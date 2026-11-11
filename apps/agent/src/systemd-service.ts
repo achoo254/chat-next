@@ -215,6 +215,86 @@ export async function uninstallSystemdService(host: SystemdHost): Promise<void> 
   await systemctl(host, "daemon-reload");
 }
 
+// --- the terminal process's own unit ----------------------------------------
+// tunelo-term-host keeps the machine's terminals and must outlive restarts
+// and updates of the agent, so it runs in a unit of its own (its own cgroup:
+// stopping tunelo.service never reaches it). It starts on demand (no
+// [Install] section), restarts after a crash, and stays down after a clean
+// exit (idle, or `shutdown`) and after exit code 3 (another one holds the
+// config folder).
+
+export const TERM_HOST_UNIT_NAME = "tunelo-term-host.service";
+
+export function termHostUnitPath(home: string): string {
+  return join(home, ".config", "systemd", "user", TERM_HOST_UNIT_NAME);
+}
+
+export interface TermHostUnitOptions {
+  /** The terminal process binary. */
+  bin: string;
+  configDir: string;
+  home: string;
+  path: string | undefined;
+}
+
+export function termHostSystemdUnit(o: TermHostUnitOptions): string {
+  const log = literal(join(o.configDir, "term-host.log"));
+  return [
+    "[Unit]",
+    "Description=tunelo: terminals of this machine",
+    "StartLimitIntervalSec=0",
+    "",
+    "[Service]",
+    "Type=simple",
+    `ExecStart=${quoted(o.bin, true)}`,
+    // Shells inherit this environment: the same PATH as the agent's sessions.
+    `Environment="PATH=${servicePath(o.home, o.path).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+    `Environment=${quoted(`TUNELO_HOME=${o.configDir}`, false)}`,
+    "Restart=on-failure",
+    "RestartSec=2",
+    "RestartPreventExitStatus=3",
+    // SIGTERM reaches the terminal process alone; it hangs up its shells in order.
+    "KillMode=mixed",
+    `StandardOutput=append:${log}`,
+    `StandardError=append:${log}`,
+    "",
+  ].join("\n");
+}
+
+/** True when the unit on disk is the one this tunelo would write for `bin`. */
+export function termHostSystemdCurrent(host: SystemdHost, configDir: string, bin: string): boolean {
+  try {
+    return readFileSync(termHostUnitPath(host.home), "utf8") === termHostSystemdUnit({ bin, configDir, home: host.home, path: host.path });
+  } catch {
+    return false;
+  }
+}
+
+/** Writes the unit and reloads the manager (a running terminal process is left as it is). */
+export async function installTermHostSystemd(host: SystemdHost, configDir: string, bin: string): Promise<void> {
+  await checkSystemd(host);
+  const file = termHostUnitPath(host.home);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, termHostSystemdUnit({ bin, configDir, home: host.home, path: host.path }), { mode: 0o644 });
+  await systemctl(host, "daemon-reload");
+}
+
+/** Starts the terminal process through its unit; nothing happens when it runs. */
+export async function startTermHostSystemd(host: SystemdHost): Promise<void> {
+  await checkSystemd(host);
+  await systemctl(host, "start", TERM_HOST_UNIT_NAME);
+}
+
+/** Stops the unit (its process was asked to shut down first) and removes it; nothing to do when none is installed. */
+export async function removeTermHostSystemd(host: SystemdHost): Promise<void> {
+  const file = termHostUnitPath(host.home);
+  if (!existsSync(file)) return;
+  await checkSystemd(host);
+  await systemctl(host, "stop", TERM_HOST_UNIT_NAME);
+  rmSync(file, { force: true });
+  await systemctl(host, "daemon-reload");
+}
+
 /**
  * Lets the user's manager, and so the service, run while nobody is logged
  * in. Never asks for a password. Returns null when linger is on, else the

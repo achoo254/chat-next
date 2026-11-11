@@ -262,6 +262,13 @@ const (
 	ErrorReason_ERROR_REASON_UPDATE_UNAVAILABLE ErrorReason = 53
 	// AgentUpdateStart while an update is already running.
 	ErrorReason_ERROR_REASON_UPDATE_BUSY ErrorReason = 54
+	// A Term* request while the machine's terminal process is missing, of
+	// another major version, or does not start (see MachineInfo.terminal).
+	ErrorReason_ERROR_REASON_TERMINAL_UNAVAILABLE ErrorReason = 55
+	// TermOpen while the machine already runs its 20 terminal sessions.
+	ErrorReason_ERROR_REASON_TERMINAL_SESSION_LIMIT ErrorReason = 56
+	// TermClose or TermResize names a terminal session that is gone.
+	ErrorReason_ERROR_REASON_TERMINAL_SESSION_NOT_FOUND ErrorReason = 57
 )
 
 // Enum value maps for ErrorReason.
@@ -322,6 +329,9 @@ var (
 		52: "ERROR_REASON_TOTP_SECRET_INVALID",
 		53: "ERROR_REASON_UPDATE_UNAVAILABLE",
 		54: "ERROR_REASON_UPDATE_BUSY",
+		55: "ERROR_REASON_TERMINAL_UNAVAILABLE",
+		56: "ERROR_REASON_TERMINAL_SESSION_LIMIT",
+		57: "ERROR_REASON_TERMINAL_SESSION_NOT_FOUND",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                 0,
@@ -379,6 +389,9 @@ var (
 		"ERROR_REASON_TOTP_SECRET_INVALID":         52,
 		"ERROR_REASON_UPDATE_UNAVAILABLE":          53,
 		"ERROR_REASON_UPDATE_BUSY":                 54,
+		"ERROR_REASON_TERMINAL_UNAVAILABLE":        55,
+		"ERROR_REASON_TERMINAL_SESSION_LIMIT":      56,
+		"ERROR_REASON_TERMINAL_SESSION_NOT_FOUND":  57,
 	}
 )
 
@@ -933,6 +946,63 @@ func (LoginState) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{11}
 }
 
+type TerminalAvailability int32
+
+const (
+	// An older machine: no terminal.
+	TerminalAvailability_TERMINAL_AVAILABILITY_UNSPECIFIED TerminalAvailability = 0
+	// Term* requests work (the terminal process starts on first use).
+	TerminalAvailability_TERMINAL_AVAILABILITY_AVAILABLE TerminalAvailability = 1
+	// The terminal process is not installed on the machine yet.
+	TerminalAvailability_TERMINAL_AVAILABILITY_MISSING TerminalAvailability = 2
+	// A terminal process of another major version runs, or the machine cannot
+	// supervise one (no launchd/systemd/Run entry); `tunelo install` again.
+	TerminalAvailability_TERMINAL_AVAILABILITY_INCOMPATIBLE TerminalAvailability = 3
+)
+
+// Enum value maps for TerminalAvailability.
+var (
+	TerminalAvailability_name = map[int32]string{
+		0: "TERMINAL_AVAILABILITY_UNSPECIFIED",
+		1: "TERMINAL_AVAILABILITY_AVAILABLE",
+		2: "TERMINAL_AVAILABILITY_MISSING",
+		3: "TERMINAL_AVAILABILITY_INCOMPATIBLE",
+	}
+	TerminalAvailability_value = map[string]int32{
+		"TERMINAL_AVAILABILITY_UNSPECIFIED":  0,
+		"TERMINAL_AVAILABILITY_AVAILABLE":    1,
+		"TERMINAL_AVAILABILITY_MISSING":      2,
+		"TERMINAL_AVAILABILITY_INCOMPATIBLE": 3,
+	}
+)
+
+func (x TerminalAvailability) Enum() *TerminalAvailability {
+	p := new(TerminalAvailability)
+	*p = x
+	return p
+}
+
+func (x TerminalAvailability) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TerminalAvailability) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[12].Descriptor()
+}
+
+func (TerminalAvailability) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[12]
+}
+
+func (x TerminalAvailability) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TerminalAvailability.Descriptor instead.
+func (TerminalAvailability) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{12}
+}
+
 type GitFileState int32
 
 const (
@@ -978,11 +1048,11 @@ func (x GitFileState) String() string {
 }
 
 func (GitFileState) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[12].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[13].Descriptor()
 }
 
 func (GitFileState) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[12]
+	return &file_remote_v1_remote_proto_enumTypes[13]
 }
 
 func (x GitFileState) Number() protoreflect.EnumNumber {
@@ -991,7 +1061,7 @@ func (x GitFileState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GitFileState.Descriptor instead.
 func (GitFileState) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{12}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{13}
 }
 
 type BrowserMouseType int32
@@ -1033,11 +1103,11 @@ func (x BrowserMouseType) String() string {
 }
 
 func (BrowserMouseType) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[13].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[14].Descriptor()
 }
 
 func (BrowserMouseType) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[13]
+	return &file_remote_v1_remote_proto_enumTypes[14]
 }
 
 func (x BrowserMouseType) Number() protoreflect.EnumNumber {
@@ -1046,7 +1116,7 @@ func (x BrowserMouseType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BrowserMouseType.Descriptor instead.
 func (BrowserMouseType) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{13}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{14}
 }
 
 type ScreenShareEnd int32
@@ -1092,11 +1162,11 @@ func (x ScreenShareEnd) String() string {
 }
 
 func (ScreenShareEnd) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[14].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[15].Descriptor()
 }
 
 func (ScreenShareEnd) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[14]
+	return &file_remote_v1_remote_proto_enumTypes[15]
 }
 
 func (x ScreenShareEnd) Number() protoreflect.EnumNumber {
@@ -1105,7 +1175,7 @@ func (x ScreenShareEnd) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScreenShareEnd.Descriptor instead.
 func (ScreenShareEnd) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{14}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{15}
 }
 
 type AgentUpdatePhase int32
@@ -1156,11 +1226,11 @@ func (x AgentUpdatePhase) String() string {
 }
 
 func (AgentUpdatePhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[15].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[16].Descriptor()
 }
 
 func (AgentUpdatePhase) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[15]
+	return &file_remote_v1_remote_proto_enumTypes[16]
 }
 
 func (x AgentUpdatePhase) Number() protoreflect.EnumNumber {
@@ -1169,7 +1239,126 @@ func (x AgentUpdatePhase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentUpdatePhase.Descriptor instead.
 func (AgentUpdatePhase) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{15}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{16}
+}
+
+type TermSignalKind int32
+
+const (
+	TermSignalKind_TERM_SIGNAL_KIND_UNSPECIFIED TermSignalKind = 0
+	// A → B: the device's SDP offer (with its data channels term-in and
+	// term-out); a new offer replaces the link's peer.
+	TermSignalKind_TERM_SIGNAL_KIND_OFFER TermSignalKind = 1
+	// B → A: the terminal process's SDP answer, with its host candidates.
+	TermSignalKind_TERM_SIGNAL_KIND_ANSWER TermSignalKind = 2
+	// Both ways: one ICE candidate line (`candidate:...`).
+	TermSignalKind_TERM_SIGNAL_KIND_CANDIDATE TermSignalKind = 3
+	// A → B: drop the link's peer (the relay stays). B → A: the peer ended (reason).
+	TermSignalKind_TERM_SIGNAL_KIND_END TermSignalKind = 4
+)
+
+// Enum value maps for TermSignalKind.
+var (
+	TermSignalKind_name = map[int32]string{
+		0: "TERM_SIGNAL_KIND_UNSPECIFIED",
+		1: "TERM_SIGNAL_KIND_OFFER",
+		2: "TERM_SIGNAL_KIND_ANSWER",
+		3: "TERM_SIGNAL_KIND_CANDIDATE",
+		4: "TERM_SIGNAL_KIND_END",
+	}
+	TermSignalKind_value = map[string]int32{
+		"TERM_SIGNAL_KIND_UNSPECIFIED": 0,
+		"TERM_SIGNAL_KIND_OFFER":       1,
+		"TERM_SIGNAL_KIND_ANSWER":      2,
+		"TERM_SIGNAL_KIND_CANDIDATE":   3,
+		"TERM_SIGNAL_KIND_END":         4,
+	}
+)
+
+func (x TermSignalKind) Enum() *TermSignalKind {
+	p := new(TermSignalKind)
+	*p = x
+	return p
+}
+
+func (x TermSignalKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TermSignalKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[17].Descriptor()
+}
+
+func (TermSignalKind) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[17]
+}
+
+func (x TermSignalKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TermSignalKind.Descriptor instead.
+func (TermSignalKind) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{17}
+}
+
+type TermPath int32
+
+const (
+	TermPath_TERM_PATH_UNSPECIFIED TermPath = 0
+	// An offer is being answered and tried.
+	TermPath_TERM_PATH_CONNECTING TermPath = 1
+	// Frames go over WebRTC.
+	TermPath_TERM_PATH_DIRECT TermPath = 2
+	// Frames go as TermData over this connection.
+	TermPath_TERM_PATH_RELAY TermPath = 3
+	// The link ended (reason says why).
+	TermPath_TERM_PATH_CLOSED TermPath = 4
+)
+
+// Enum value maps for TermPath.
+var (
+	TermPath_name = map[int32]string{
+		0: "TERM_PATH_UNSPECIFIED",
+		1: "TERM_PATH_CONNECTING",
+		2: "TERM_PATH_DIRECT",
+		3: "TERM_PATH_RELAY",
+		4: "TERM_PATH_CLOSED",
+	}
+	TermPath_value = map[string]int32{
+		"TERM_PATH_UNSPECIFIED": 0,
+		"TERM_PATH_CONNECTING":  1,
+		"TERM_PATH_DIRECT":      2,
+		"TERM_PATH_RELAY":       3,
+		"TERM_PATH_CLOSED":      4,
+	}
+)
+
+func (x TermPath) Enum() *TermPath {
+	p := new(TermPath)
+	*p = x
+	return p
+}
+
+func (x TermPath) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TermPath) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[18].Descriptor()
+}
+
+func (TermPath) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[18]
+}
+
+func (x TermPath) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TermPath.Descriptor instead.
+func (TermPath) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{18}
 }
 
 type Plain struct {
@@ -1898,6 +2087,16 @@ type Frame struct {
 	//	*Frame_ScreenShareClosed
 	//	*Frame_TotpStatus
 	//	*Frame_AgentUpdateProgress
+	//	*Frame_TermListRequest
+	//	*Frame_TermOpen
+	//	*Frame_TermClose
+	//	*Frame_TermResize
+	//	*Frame_TermSignal
+	//	*Frame_TermData
+	//	*Frame_TermListResult
+	//	*Frame_TermOpened
+	//	*Frame_TermClosed
+	//	*Frame_TermStatus
 	Body          isFrame_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2829,6 +3028,96 @@ func (x *Frame) GetAgentUpdateProgress() *AgentUpdateProgress {
 	return nil
 }
 
+func (x *Frame) GetTermListRequest() *TermListRequest {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermListRequest); ok {
+			return x.TermListRequest
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermOpen() *TermOpen {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermOpen); ok {
+			return x.TermOpen
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermClose() *TermClose {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermClose); ok {
+			return x.TermClose
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermResize() *TermResize {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermResize); ok {
+			return x.TermResize
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermSignal() *TermSignal {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermSignal); ok {
+			return x.TermSignal
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermData() *TermData {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermData); ok {
+			return x.TermData
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermListResult() *TermListResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermListResult); ok {
+			return x.TermListResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermOpened() *TermOpened {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermOpened); ok {
+			return x.TermOpened
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermClosed() *TermClosed {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermClosed); ok {
+			return x.TermClosed
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetTermStatus() *TermStatus {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_TermStatus); ok {
+			return x.TermStatus
+		}
+	}
+	return nil
+}
+
 type isFrame_Body interface {
 	isFrame_Body()
 }
@@ -3237,6 +3526,50 @@ type Frame_AgentUpdateProgress struct {
 	AgentUpdateProgress *AgentUpdateProgress `protobuf:"bytes,107,opt,name=agent_update_progress,json=agentUpdateProgress,proto3,oneof"`
 }
 
+type Frame_TermListRequest struct {
+	// The machine's terminal (tunelo 2.4.0+); see "the machine's terminal" below.
+	// A → B
+	TermListRequest *TermListRequest `protobuf:"bytes,108,opt,name=term_list_request,json=termListRequest,proto3,oneof"`
+}
+
+type Frame_TermOpen struct {
+	TermOpen *TermOpen `protobuf:"bytes,109,opt,name=term_open,json=termOpen,proto3,oneof"`
+}
+
+type Frame_TermClose struct {
+	TermClose *TermClose `protobuf:"bytes,110,opt,name=term_close,json=termClose,proto3,oneof"`
+}
+
+type Frame_TermResize struct {
+	TermResize *TermResize `protobuf:"bytes,111,opt,name=term_resize,json=termResize,proto3,oneof"`
+}
+
+type Frame_TermSignal struct {
+	// Both ways.
+	TermSignal *TermSignal `protobuf:"bytes,112,opt,name=term_signal,json=termSignal,proto3,oneof"`
+}
+
+type Frame_TermData struct {
+	TermData *TermData `protobuf:"bytes,113,opt,name=term_data,json=termData,proto3,oneof"`
+}
+
+type Frame_TermListResult struct {
+	// B → A
+	TermListResult *TermListResult `protobuf:"bytes,114,opt,name=term_list_result,json=termListResult,proto3,oneof"`
+}
+
+type Frame_TermOpened struct {
+	TermOpened *TermOpened `protobuf:"bytes,115,opt,name=term_opened,json=termOpened,proto3,oneof"`
+}
+
+type Frame_TermClosed struct {
+	TermClosed *TermClosed `protobuf:"bytes,116,opt,name=term_closed,json=termClosed,proto3,oneof"`
+}
+
+type Frame_TermStatus struct {
+	TermStatus *TermStatus `protobuf:"bytes,117,opt,name=term_status,json=termStatus,proto3,oneof"`
+}
+
 func (*Frame_ThreadList) isFrame_Body() {}
 
 func (*Frame_ThreadCreate) isFrame_Body() {}
@@ -3432,6 +3765,26 @@ func (*Frame_ScreenShareClosed) isFrame_Body() {}
 func (*Frame_TotpStatus) isFrame_Body() {}
 
 func (*Frame_AgentUpdateProgress) isFrame_Body() {}
+
+func (*Frame_TermListRequest) isFrame_Body() {}
+
+func (*Frame_TermOpen) isFrame_Body() {}
+
+func (*Frame_TermClose) isFrame_Body() {}
+
+func (*Frame_TermResize) isFrame_Body() {}
+
+func (*Frame_TermSignal) isFrame_Body() {}
+
+func (*Frame_TermData) isFrame_Body() {}
+
+func (*Frame_TermListResult) isFrame_Body() {}
+
+func (*Frame_TermOpened) isFrame_Body() {}
+
+func (*Frame_TermClosed) isFrame_Body() {}
+
+func (*Frame_TermStatus) isFrame_Body() {}
 
 type ThreadList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -10435,7 +10788,9 @@ type MachineInfo struct {
 	// code (see TotpSet).
 	TotpEnabled bool `protobuf:"varint,21,opt,name=totp_enabled,json=totpEnabled,proto3" json:"totp_enabled,omitempty"`
 	// Unset before tunelo 2.3.0.
-	AgentUpdate   *AgentUpdateInfo `protobuf:"bytes,22,opt,name=agent_update,json=agentUpdate,proto3" json:"agent_update,omitempty"`
+	AgentUpdate *AgentUpdateInfo `protobuf:"bytes,22,opt,name=agent_update,json=agentUpdate,proto3" json:"agent_update,omitempty"`
+	// The machine's terminal; unspecified before tunelo 2.4.0.
+	Terminal      TerminalAvailability `protobuf:"varint,23,opt,name=terminal,proto3,enum=remote.v1.TerminalAvailability" json:"terminal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10622,6 +10977,13 @@ func (x *MachineInfo) GetAgentUpdate() *AgentUpdateInfo {
 		return x.AgentUpdate
 	}
 	return nil
+}
+
+func (x *MachineInfo) GetTerminal() TerminalAvailability {
+	if x != nil {
+		return x.Terminal
+	}
+	return TerminalAvailability_TERMINAL_AVAILABILITY_UNSPECIFIED
 }
 
 type RemoteBrowserInfo struct {
@@ -13498,6 +13860,681 @@ func (x *AgentUpdateProgress) GetMessage() string {
 	return ""
 }
 
+// A → B: the machine's terminal sessions. Answered with TermListResult.
+type TermListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermListRequest) Reset() {
+	*x = TermListRequest{}
+	mi := &file_remote_v1_remote_proto_msgTypes[161]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermListRequest) ProtoMessage() {}
+
+func (x *TermListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[161]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermListRequest.ProtoReflect.Descriptor instead.
+func (*TermListRequest) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{161}
+}
+
+type TermSessionInfo struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Session uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
+	// The title the program set (OSC 0/2); may be empty.
+	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Cols  uint32 `protobuf:"varint,3,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows  uint32 `protobuf:"varint,4,opt,name=rows,proto3" json:"rows,omitempty"`
+	// Unix milliseconds.
+	CreatedAt int64 `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// A link of some device is attached to it now.
+	Attached bool `protobuf:"varint,6,opt,name=attached,proto3" json:"attached,omitempty"`
+	// Its program ended; it stays listed until TermClose.
+	Exited bool `protobuf:"varint,7,opt,name=exited,proto3" json:"exited,omitempty"`
+	// With exited: the exit code (-1 when a signal ended it) and the signal (0 when none).
+	ExitCode      int32  `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	ExitSignal    uint32 `protobuf:"varint,9,opt,name=exit_signal,json=exitSignal,proto3" json:"exit_signal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermSessionInfo) Reset() {
+	*x = TermSessionInfo{}
+	mi := &file_remote_v1_remote_proto_msgTypes[162]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermSessionInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermSessionInfo) ProtoMessage() {}
+
+func (x *TermSessionInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[162]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermSessionInfo.ProtoReflect.Descriptor instead.
+func (*TermSessionInfo) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{162}
+}
+
+func (x *TermSessionInfo) GetSession() uint32 {
+	if x != nil {
+		return x.Session
+	}
+	return 0
+}
+
+func (x *TermSessionInfo) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *TermSessionInfo) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *TermSessionInfo) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *TermSessionInfo) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *TermSessionInfo) GetAttached() bool {
+	if x != nil {
+		return x.Attached
+	}
+	return false
+}
+
+func (x *TermSessionInfo) GetExited() bool {
+	if x != nil {
+		return x.Exited
+	}
+	return false
+}
+
+func (x *TermSessionInfo) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *TermSessionInfo) GetExitSignal() uint32 {
+	if x != nil {
+		return x.ExitSignal
+	}
+	return 0
+}
+
+type TermListResult struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Sessions []*TermSessionInfo     `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	// Sessions the machine keeps at most (exited ones count until closed).
+	MaxSessions   uint32 `protobuf:"varint,2,opt,name=max_sessions,json=maxSessions,proto3" json:"max_sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermListResult) Reset() {
+	*x = TermListResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[163]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermListResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermListResult) ProtoMessage() {}
+
+func (x *TermListResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[163]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermListResult.ProtoReflect.Descriptor instead.
+func (*TermListResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{163}
+}
+
+func (x *TermListResult) GetSessions() []*TermSessionInfo {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+func (x *TermListResult) GetMaxSessions() uint32 {
+	if x != nil {
+		return x.MaxSessions
+	}
+	return 0
+}
+
+// A → B: start a login shell in a new session. Answered with TermOpened, or
+// ERROR_REASON_TERMINAL_SESSION_LIMIT / ERROR_REASON_TERMINAL_UNAVAILABLE /
+// ERROR_REASON_FOLDER_NOT_FOUND (cwd).
+type TermOpen struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1 to 1000 each.
+	Cols uint32 `protobuf:"varint,1,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows uint32 `protobuf:"varint,2,opt,name=rows,proto3" json:"rows,omitempty"`
+	// An absolute folder of the machine; empty for the user's home.
+	Cwd           string `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermOpen) Reset() {
+	*x = TermOpen{}
+	mi := &file_remote_v1_remote_proto_msgTypes[164]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermOpen) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermOpen) ProtoMessage() {}
+
+func (x *TermOpen) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[164]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermOpen.ProtoReflect.Descriptor instead.
+func (*TermOpen) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{164}
+}
+
+func (x *TermOpen) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *TermOpen) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *TermOpen) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+type TermOpened struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermOpened) Reset() {
+	*x = TermOpened{}
+	mi := &file_remote_v1_remote_proto_msgTypes[165]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermOpened) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermOpened) ProtoMessage() {}
+
+func (x *TermOpened) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[165]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermOpened.ProtoReflect.Descriptor instead.
+func (*TermOpened) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{165}
+}
+
+func (x *TermOpened) GetSession() uint32 {
+	if x != nil {
+		return x.Session
+	}
+	return 0
+}
+
+// A → B: hang up the session's shell (and its foreground programs) and drop
+// it. Answered with TermClosed; ERROR_REASON_TERMINAL_SESSION_NOT_FOUND.
+type TermClose struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermClose) Reset() {
+	*x = TermClose{}
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermClose) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermClose) ProtoMessage() {}
+
+func (x *TermClose) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermClose.ProtoReflect.Descriptor instead.
+func (*TermClose) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{166}
+}
+
+func (x *TermClose) GetSession() uint32 {
+	if x != nil {
+		return x.Session
+	}
+	return 0
+}
+
+type TermClosed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermClosed) Reset() {
+	*x = TermClosed{}
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermClosed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermClosed) ProtoMessage() {}
+
+func (x *TermClosed) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermClosed.ProtoReflect.Descriptor instead.
+func (*TermClosed) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{167}
+}
+
+func (x *TermClosed) GetSession() uint32 {
+	if x != nil {
+		return x.Session
+	}
+	return 0
+}
+
+// A → B: resize a session (also possible with a Resize terminal frame).
+// Answered with Ack; ERROR_REASON_TERMINAL_SESSION_NOT_FOUND.
+type TermResize struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       uint32                 `protobuf:"varint,1,opt,name=session,proto3" json:"session,omitempty"`
+	Cols          uint32                 `protobuf:"varint,2,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          uint32                 `protobuf:"varint,3,opt,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermResize) Reset() {
+	*x = TermResize{}
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermResize) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermResize) ProtoMessage() {}
+
+func (x *TermResize) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermResize.ProtoReflect.Descriptor instead.
+func (*TermResize) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{168}
+}
+
+func (x *TermResize) GetSession() uint32 {
+	if x != nil {
+		return x.Session
+	}
+	return 0
+}
+
+func (x *TermResize) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *TermResize) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+// WebRTC signaling of a link. A → B is answered with Ack (or an error by
+// id); B → A comes unasked.
+type TermSignal struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Link  uint32                 `protobuf:"varint,1,opt,name=link,proto3" json:"link,omitempty"`
+	Kind  TermSignalKind         `protobuf:"varint,2,opt,name=kind,proto3,enum=remote.v1.TermSignalKind" json:"kind,omitempty"`
+	// OFFER and ANSWER.
+	Sdp string `protobuf:"bytes,3,opt,name=sdp,proto3" json:"sdp,omitempty"`
+	// CANDIDATE.
+	Candidate string `protobuf:"bytes,4,opt,name=candidate,proto3" json:"candidate,omitempty"`
+	// B → A END: closed, ice_disconnected, channel_closed, dtls_failed,
+	// timeout, no_address, bad_offer or error (docs/terminal-wire.md).
+	Reason        string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermSignal) Reset() {
+	*x = TermSignal{}
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermSignal) ProtoMessage() {}
+
+func (x *TermSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermSignal.ProtoReflect.Descriptor instead.
+func (*TermSignal) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{169}
+}
+
+func (x *TermSignal) GetLink() uint32 {
+	if x != nil {
+		return x.Link
+	}
+	return 0
+}
+
+func (x *TermSignal) GetKind() TermSignalKind {
+	if x != nil {
+		return x.Kind
+	}
+	return TermSignalKind_TERM_SIGNAL_KIND_UNSPECIFIED
+}
+
+func (x *TermSignal) GetSdp() string {
+	if x != nil {
+		return x.Sdp
+	}
+	return ""
+}
+
+func (x *TermSignal) GetCandidate() string {
+	if x != nil {
+		return x.Candidate
+	}
+	return ""
+}
+
+func (x *TermSignal) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+// Exactly one terminal frame of the link on the relay path, both ways.
+// Never answered: a bad frame or an unknown link ends the link with
+// TermStatus(CLOSED).
+type TermData struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Link  uint32                 `protobuf:"varint,1,opt,name=link,proto3" json:"link,omitempty"`
+	// At most 65536 bytes.
+	Data          []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermData) Reset() {
+	*x = TermData{}
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermData) ProtoMessage() {}
+
+func (x *TermData) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermData.ProtoReflect.Descriptor instead.
+func (*TermData) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{170}
+}
+
+func (x *TermData) GetLink() uint32 {
+	if x != nil {
+		return x.Link
+	}
+	return 0
+}
+
+func (x *TermData) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// B → A, unasked: the path a link uses now. DIRECT may come twice, the
+// second time with rtt_ms.
+type TermStatus struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Link  uint32                 `protobuf:"varint,1,opt,name=link,proto3" json:"link,omitempty"`
+	Path  TermPath               `protobuf:"varint,2,opt,name=path,proto3,enum=remote.v1.TermPath" json:"path,omitempty"`
+	// DIRECT: the ICE round trip in milliseconds; 0 until measured.
+	RttMs float32 `protobuf:"fixed32,3,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	// CLOSED: expired, closed, revoked, agent_gone, transport_closed,
+	// shutdown, bad_frame, overflow or unavailable.
+	Reason        string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TermStatus) Reset() {
+	*x = TermStatus{}
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TermStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TermStatus) ProtoMessage() {}
+
+func (x *TermStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TermStatus.ProtoReflect.Descriptor instead.
+func (*TermStatus) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{171}
+}
+
+func (x *TermStatus) GetLink() uint32 {
+	if x != nil {
+		return x.Link
+	}
+	return 0
+}
+
+func (x *TermStatus) GetPath() TermPath {
+	if x != nil {
+		return x.Path
+	}
+	return TermPath_TERM_PATH_UNSPECIFIED
+}
+
+func (x *TermStatus) GetRttMs() float32 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *TermStatus) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 var File_remote_v1_remote_proto protoreflect.FileDescriptor
 
 const file_remote_v1_remote_proto_rawDesc = "" +
@@ -13555,7 +14592,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eHandshakeError\x121\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x1d.remote.v1.HandshakeErrorCodeR\x04code\x12)\n" +
 	"\x10protocol_version\x18\x02 \x01(\rR\x0fprotocolVersion\x120\n" +
-	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xc45\n" +
+	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\x96:\n" +
 	"\x05Frame\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\vthread_list\x18\n" +
@@ -13664,7 +14701,23 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x13screen_share_closed\x18e \x01(\v2\x1c.remote.v1.ScreenShareClosedH\x00R\x11screenShareClosed\x128\n" +
 	"\vtotp_status\x18h \x01(\v2\x15.remote.v1.TotpStatusH\x00R\n" +
 	"totpStatus\x12T\n" +
-	"\x15agent_update_progress\x18k \x01(\v2\x1e.remote.v1.AgentUpdateProgressH\x00R\x13agentUpdateProgressB\x06\n" +
+	"\x15agent_update_progress\x18k \x01(\v2\x1e.remote.v1.AgentUpdateProgressH\x00R\x13agentUpdateProgress\x12H\n" +
+	"\x11term_list_request\x18l \x01(\v2\x1a.remote.v1.TermListRequestH\x00R\x0ftermListRequest\x122\n" +
+	"\tterm_open\x18m \x01(\v2\x13.remote.v1.TermOpenH\x00R\btermOpen\x125\n" +
+	"\n" +
+	"term_close\x18n \x01(\v2\x14.remote.v1.TermCloseH\x00R\ttermClose\x128\n" +
+	"\vterm_resize\x18o \x01(\v2\x15.remote.v1.TermResizeH\x00R\n" +
+	"termResize\x128\n" +
+	"\vterm_signal\x18p \x01(\v2\x15.remote.v1.TermSignalH\x00R\n" +
+	"termSignal\x122\n" +
+	"\tterm_data\x18q \x01(\v2\x13.remote.v1.TermDataH\x00R\btermData\x12E\n" +
+	"\x10term_list_result\x18r \x01(\v2\x19.remote.v1.TermListResultH\x00R\x0etermListResult\x128\n" +
+	"\vterm_opened\x18s \x01(\v2\x15.remote.v1.TermOpenedH\x00R\n" +
+	"termOpened\x128\n" +
+	"\vterm_closed\x18t \x01(\v2\x15.remote.v1.TermClosedH\x00R\n" +
+	"termClosed\x128\n" +
+	"\vterm_status\x18u \x01(\v2\x15.remote.v1.TermStatusH\x00R\n" +
+	"termStatusB\x06\n" +
 	"\x04body\"\f\n" +
 	"\n" +
 	"ThreadList\"\xbd\x01\n" +
@@ -14164,7 +15217,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xde\x06\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\x9b\a\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +
@@ -14191,7 +15244,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\abrowser\x18\x13 \x01(\v2\x1c.remote.v1.RemoteBrowserInfoR\abrowser\x12!\n" +
 	"\fscreen_share\x18\x14 \x01(\bR\vscreenShare\x12!\n" +
 	"\ftotp_enabled\x18\x15 \x01(\bR\vtotpEnabled\x12=\n" +
-	"\fagent_update\x18\x16 \x01(\v2\x1a.remote.v1.AgentUpdateInfoR\vagentUpdate\"i\n" +
+	"\fagent_update\x18\x16 \x01(\v2\x1a.remote.v1.AgentUpdateInfoR\vagentUpdate\x12;\n" +
+	"\bterminal\x18\x17 \x01(\x0e2\x1f.remote.v1.TerminalAvailabilityR\bterminal\"i\n" +
 	"\x11RemoteBrowserInfo\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1c\n" +
@@ -14393,7 +15447,56 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1a\n" +
 	"\breceived\x18\x03 \x01(\x04R\breceived\x12\x14\n" +
 	"\x05total\x18\x04 \x01(\x04R\x05total\x12\x18\n" +
-	"\amessage\x18\x05 \x01(\tR\amessage*\x99\x03\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"\x11\n" +
+	"\x0fTermListRequest\"\xfa\x01\n" +
+	"\x0fTermSessionInfo\x12\x18\n" +
+	"\asession\x18\x01 \x01(\rR\asession\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
+	"\x04cols\x18\x03 \x01(\rR\x04cols\x12\x12\n" +
+	"\x04rows\x18\x04 \x01(\rR\x04rows\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\x03R\tcreatedAt\x12\x1a\n" +
+	"\battached\x18\x06 \x01(\bR\battached\x12\x16\n" +
+	"\x06exited\x18\a \x01(\bR\x06exited\x12\x1b\n" +
+	"\texit_code\x18\b \x01(\x05R\bexitCode\x12\x1f\n" +
+	"\vexit_signal\x18\t \x01(\rR\n" +
+	"exitSignal\"k\n" +
+	"\x0eTermListResult\x126\n" +
+	"\bsessions\x18\x01 \x03(\v2\x1a.remote.v1.TermSessionInfoR\bsessions\x12!\n" +
+	"\fmax_sessions\x18\x02 \x01(\rR\vmaxSessions\"D\n" +
+	"\bTermOpen\x12\x12\n" +
+	"\x04cols\x18\x01 \x01(\rR\x04cols\x12\x12\n" +
+	"\x04rows\x18\x02 \x01(\rR\x04rows\x12\x10\n" +
+	"\x03cwd\x18\x03 \x01(\tR\x03cwd\"&\n" +
+	"\n" +
+	"TermOpened\x12\x18\n" +
+	"\asession\x18\x01 \x01(\rR\asession\"%\n" +
+	"\tTermClose\x12\x18\n" +
+	"\asession\x18\x01 \x01(\rR\asession\"&\n" +
+	"\n" +
+	"TermClosed\x12\x18\n" +
+	"\asession\x18\x01 \x01(\rR\asession\"N\n" +
+	"\n" +
+	"TermResize\x12\x18\n" +
+	"\asession\x18\x01 \x01(\rR\asession\x12\x12\n" +
+	"\x04cols\x18\x02 \x01(\rR\x04cols\x12\x12\n" +
+	"\x04rows\x18\x03 \x01(\rR\x04rows\"\x97\x01\n" +
+	"\n" +
+	"TermSignal\x12\x12\n" +
+	"\x04link\x18\x01 \x01(\rR\x04link\x12-\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x19.remote.v1.TermSignalKindR\x04kind\x12\x10\n" +
+	"\x03sdp\x18\x03 \x01(\tR\x03sdp\x12\x1c\n" +
+	"\tcandidate\x18\x04 \x01(\tR\tcandidate\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"2\n" +
+	"\bTermData\x12\x12\n" +
+	"\x04link\x18\x01 \x01(\rR\x04link\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\"x\n" +
+	"\n" +
+	"TermStatus\x12\x12\n" +
+	"\x04link\x18\x01 \x01(\rR\x04link\x12'\n" +
+	"\x04path\x18\x02 \x01(\x0e2\x13.remote.v1.TermPathR\x04path\x12\x15\n" +
+	"\x06rtt_ms\x18\x03 \x01(\x02R\x05rttMs\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason*\x99\x03\n" +
 	"\x12HandshakeErrorCode\x12$\n" +
 	" HANDSHAKE_ERROR_CODE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE\x10\x01\x12,\n" +
@@ -14408,7 +15511,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1a\n" +
 	"\x16DECISION_ALLOW_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x03*\xad\x0f\n" +
+	"\rDECISION_DENY\x10\x03*\xaa\x10\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -14465,7 +15568,10 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x1eERROR_REASON_SCREEN_SHARE_GONE\x103\x12$\n" +
 	" ERROR_REASON_TOTP_SECRET_INVALID\x104\x12#\n" +
 	"\x1fERROR_REASON_UPDATE_UNAVAILABLE\x105\x12\x1c\n" +
-	"\x18ERROR_REASON_UPDATE_BUSY\x106*\xfe\x01\n" +
+	"\x18ERROR_REASON_UPDATE_BUSY\x106\x12%\n" +
+	"!ERROR_REASON_TERMINAL_UNAVAILABLE\x107\x12'\n" +
+	"#ERROR_REASON_TERMINAL_SESSION_LIMIT\x108\x12+\n" +
+	"'ERROR_REASON_TERMINAL_SESSION_NOT_FOUND\x109*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +
@@ -14528,7 +15634,12 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x17LOGIN_STATE_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eLOGIN_STATE_OK\x10\x01\x12\x1b\n" +
 	"\x17LOGIN_STATE_NEEDS_LOGIN\x10\x02\x12\x17\n" +
-	"\x13LOGIN_STATE_UNKNOWN\x10\x03*\xdf\x01\n" +
+	"\x13LOGIN_STATE_UNKNOWN\x10\x03*\xad\x01\n" +
+	"\x14TerminalAvailability\x12%\n" +
+	"!TERMINAL_AVAILABILITY_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fTERMINAL_AVAILABILITY_AVAILABLE\x10\x01\x12!\n" +
+	"\x1dTERMINAL_AVAILABILITY_MISSING\x10\x02\x12&\n" +
+	"\"TERMINAL_AVAILABILITY_INCOMPATIBLE\x10\x03*\xdf\x01\n" +
 	"\fGitFileState\x12\x1e\n" +
 	"\x1aGIT_FILE_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17GIT_FILE_STATE_MODIFIED\x10\x01\x12\x18\n" +
@@ -14556,7 +15667,19 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x1dAGENT_UPDATE_PHASE_INSTALLING\x10\x03\x12!\n" +
 	"\x1dAGENT_UPDATE_PHASE_RESTARTING\x10\x04\x12\x1d\n" +
 	"\x19AGENT_UPDATE_PHASE_FAILED\x10\x05\x12!\n" +
-	"\x1dAGENT_UPDATE_PHASE_UP_TO_DATE\x10\x06B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
+	"\x1dAGENT_UPDATE_PHASE_UP_TO_DATE\x10\x06*\xa5\x01\n" +
+	"\x0eTermSignalKind\x12 \n" +
+	"\x1cTERM_SIGNAL_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16TERM_SIGNAL_KIND_OFFER\x10\x01\x12\x1b\n" +
+	"\x17TERM_SIGNAL_KIND_ANSWER\x10\x02\x12\x1e\n" +
+	"\x1aTERM_SIGNAL_KIND_CANDIDATE\x10\x03\x12\x18\n" +
+	"\x14TERM_SIGNAL_KIND_END\x10\x04*\x80\x01\n" +
+	"\bTermPath\x12\x19\n" +
+	"\x15TERM_PATH_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14TERM_PATH_CONNECTING\x10\x01\x12\x14\n" +
+	"\x10TERM_PATH_DIRECT\x10\x02\x12\x13\n" +
+	"\x0fTERM_PATH_RELAY\x10\x03\x12\x14\n" +
+	"\x10TERM_PATH_CLOSED\x10\x04B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
 
 var (
 	file_remote_v1_remote_proto_rawDescOnce sync.Once
@@ -14570,8 +15693,8 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 	return file_remote_v1_remote_proto_rawDescData
 }
 
-var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 16)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 161)
+var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 19)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 172)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                    // 1: remote.v1.Decision
@@ -14585,370 +15708,398 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(PromptState)(0),                 // 9: remote.v1.PromptState
 	(TurnState)(0),                   // 10: remote.v1.TurnState
 	(LoginState)(0),                  // 11: remote.v1.LoginState
-	(GitFileState)(0),                // 12: remote.v1.GitFileState
-	(BrowserMouseType)(0),            // 13: remote.v1.BrowserMouseType
-	(ScreenShareEnd)(0),              // 14: remote.v1.ScreenShareEnd
-	(AgentUpdatePhase)(0),            // 15: remote.v1.AgentUpdatePhase
-	(*Plain)(nil),                    // 16: remote.v1.Plain
-	(*Hello)(nil),                    // 17: remote.v1.Hello
-	(*Ready)(nil),                    // 18: remote.v1.Ready
-	(*PakeStart)(nil),                // 19: remote.v1.PakeStart
-	(*PakeReply)(nil),                // 20: remote.v1.PakeReply
-	(*PakeCandidate)(nil),            // 21: remote.v1.PakeCandidate
-	(*PakeFinish)(nil),               // 22: remote.v1.PakeFinish
-	(*HandshakeError)(nil),           // 23: remote.v1.HandshakeError
-	(*Frame)(nil),                    // 24: remote.v1.Frame
-	(*ThreadList)(nil),               // 25: remote.v1.ThreadList
-	(*ThreadCreate)(nil),             // 26: remote.v1.ThreadCreate
-	(*Consent)(nil),                  // 27: remote.v1.Consent
-	(*ThreadSend)(nil),               // 28: remote.v1.ThreadSend
-	(*ThreadSubscribe)(nil),          // 29: remote.v1.ThreadSubscribe
-	(*ThreadRespond)(nil),            // 30: remote.v1.ThreadRespond
-	(*Answers)(nil),                  // 31: remote.v1.Answers
-	(*Answer)(nil),                   // 32: remote.v1.Answer
-	(*ThreadInterrupt)(nil),          // 33: remote.v1.ThreadInterrupt
-	(*ThreadClose)(nil),              // 34: remote.v1.ThreadClose
-	(*ThreadDelete)(nil),             // 35: remote.v1.ThreadDelete
-	(*ThreadSetArchived)(nil),        // 36: remote.v1.ThreadSetArchived
-	(*ThreadSetModel)(nil),           // 37: remote.v1.ThreadSetModel
-	(*ThreadSetPermissionMode)(nil),  // 38: remote.v1.ThreadSetPermissionMode
-	(*ThreadSetEffort)(nil),          // 39: remote.v1.ThreadSetEffort
-	(*ThreadSwitch)(nil),             // 40: remote.v1.ThreadSwitch
-	(*ThreadFetchFull)(nil),          // 41: remote.v1.ThreadFetchFull
-	(*ThreadGitChanges)(nil),         // 42: remote.v1.ThreadGitChanges
-	(*GitFileDiff)(nil),              // 43: remote.v1.GitFileDiff
-	(*MachineInfoRequest)(nil),       // 44: remote.v1.MachineInfoRequest
-	(*Ping)(nil),                     // 45: remote.v1.Ping
-	(*DirList)(nil),                  // 46: remote.v1.DirList
-	(*AuditList)(nil),                // 47: remote.v1.AuditList
-	(*FileList)(nil),                 // 48: remote.v1.FileList
-	(*SessionList)(nil),              // 49: remote.v1.SessionList
-	(*LocalSession)(nil),             // 50: remote.v1.LocalSession
-	(*SessionDir)(nil),               // 51: remote.v1.SessionDir
-	(*SessionListResult)(nil),        // 52: remote.v1.SessionListResult
-	(*SessionOpen)(nil),              // 53: remote.v1.SessionOpen
-	(*AttachmentUpload)(nil),         // 54: remote.v1.AttachmentUpload
-	(*AttachmentCancel)(nil),         // 55: remote.v1.AttachmentCancel
-	(*AttachmentFetch)(nil),          // 56: remote.v1.AttachmentFetch
-	(*AttachmentData)(nil),           // 57: remote.v1.AttachmentData
-	(*Attachment)(nil),               // 58: remote.v1.Attachment
-	(*AttachmentLimits)(nil),         // 59: remote.v1.AttachmentLimits
-	(*ProjectList)(nil),              // 60: remote.v1.ProjectList
-	(*ProjectAdd)(nil),               // 61: remote.v1.ProjectAdd
-	(*ProjectCreate)(nil),            // 62: remote.v1.ProjectCreate
-	(*ProjectClone)(nil),             // 63: remote.v1.ProjectClone
-	(*ProjectCloneCancel)(nil),       // 64: remote.v1.ProjectCloneCancel
-	(*ProjectCloneProgress)(nil),     // 65: remote.v1.ProjectCloneProgress
-	(*ProjectUpdate)(nil),            // 66: remote.v1.ProjectUpdate
-	(*ProjectReorder)(nil),           // 67: remote.v1.ProjectReorder
-	(*ProjectRemove)(nil),            // 68: remote.v1.ProjectRemove
-	(*ProjectDefaults)(nil),          // 69: remote.v1.ProjectDefaults
-	(*GitStatus)(nil),                // 70: remote.v1.GitStatus
-	(*Project)(nil),                  // 71: remote.v1.Project
-	(*ProjectSuggestion)(nil),        // 72: remote.v1.ProjectSuggestion
-	(*ProjectListResult)(nil),        // 73: remote.v1.ProjectListResult
-	(*ProfileList)(nil),              // 74: remote.v1.ProfileList
-	(*ProfileSelect)(nil),            // 75: remote.v1.ProfileSelect
-	(*ProfileSignInBegin)(nil),       // 76: remote.v1.ProfileSignInBegin
-	(*ProfileSignInCode)(nil),        // 77: remote.v1.ProfileSignInCode
-	(*ProfileSignInCancel)(nil),      // 78: remote.v1.ProfileSignInCancel
-	(*ProfileRemove)(nil),            // 79: remote.v1.ProfileRemove
-	(*UsageRefresh)(nil),             // 80: remote.v1.UsageRefresh
-	(*MachineSettingsSet)(nil),       // 81: remote.v1.MachineSettingsSet
-	(*OpenDiskAccessSettings)(nil),   // 82: remote.v1.OpenDiskAccessSettings
-	(*Ack)(nil),                      // 83: remote.v1.Ack
-	(*ThreadInfo)(nil),               // 84: remote.v1.ThreadInfo
-	(*ProfileSuggestion)(nil),        // 85: remote.v1.ProfileSuggestion
-	(*AccountInfo)(nil),              // 86: remote.v1.AccountInfo
-	(*SlashCommand)(nil),             // 87: remote.v1.SlashCommand
-	(*RateLimits)(nil),               // 88: remote.v1.RateLimits
-	(*RateWindow)(nil),               // 89: remote.v1.RateWindow
-	(*ClaudeProfile)(nil),            // 90: remote.v1.ClaudeProfile
-	(*ProfileListResult)(nil),        // 91: remote.v1.ProfileListResult
-	(*MachineProfile)(nil),           // 92: remote.v1.MachineProfile
-	(*SessionProfile)(nil),           // 93: remote.v1.SessionProfile
-	(*ProfileSignInPrompt)(nil),      // 94: remote.v1.ProfileSignInPrompt
-	(*ProfileSignInResult)(nil),      // 95: remote.v1.ProfileSignInResult
-	(*Pong)(nil),                     // 96: remote.v1.Pong
-	(*Error)(nil),                    // 97: remote.v1.Error
-	(*Cursor)(nil),                   // 98: remote.v1.Cursor
-	(*ThreadSummary)(nil),            // 99: remote.v1.ThreadSummary
-	(*ThreadListResult)(nil),         // 100: remote.v1.ThreadListResult
-	(*ThreadCreated)(nil),            // 101: remote.v1.ThreadCreated
-	(*ThreadDeleted)(nil),            // 102: remote.v1.ThreadDeleted
-	(*ThreadStatus)(nil),             // 103: remote.v1.ThreadStatus
-	(*ThreadItems)(nil),              // 104: remote.v1.ThreadItems
-	(*ThreadReset)(nil),              // 105: remote.v1.ThreadReset
-	(*FullItem)(nil),                 // 106: remote.v1.FullItem
-	(*Item)(nil),                     // 107: remote.v1.Item
-	(*TextItem)(nil),                 // 108: remote.v1.TextItem
-	(*ToolCallItem)(nil),             // 109: remote.v1.ToolCallItem
-	(*ToolResultItem)(nil),           // 110: remote.v1.ToolResultItem
-	(*DiffItem)(nil),                 // 111: remote.v1.DiffItem
-	(*TodoItem)(nil),                 // 112: remote.v1.TodoItem
-	(*TodoEntry)(nil),                // 113: remote.v1.TodoEntry
-	(*ApprovalItem)(nil),             // 114: remote.v1.ApprovalItem
-	(*ApprovalSecret)(nil),           // 115: remote.v1.ApprovalSecret
-	(*QuestionItem)(nil),             // 116: remote.v1.QuestionItem
-	(*Question)(nil),                 // 117: remote.v1.Question
-	(*QuestionOption)(nil),           // 118: remote.v1.QuestionOption
-	(*StatusItem)(nil),               // 119: remote.v1.StatusItem
-	(*TurnItem)(nil),                 // 120: remote.v1.TurnItem
-	(*SubagentItem)(nil),             // 121: remote.v1.SubagentItem
-	(*CompactionItem)(nil),           // 122: remote.v1.CompactionItem
-	(*ErrorItem)(nil),                // 123: remote.v1.ErrorItem
-	(*ModelChangeItem)(nil),          // 124: remote.v1.ModelChangeItem
-	(*AgentHandoffItem)(nil),         // 125: remote.v1.AgentHandoffItem
-	(*ProviderCapabilities)(nil),     // 126: remote.v1.ProviderCapabilities
-	(*ModelOption)(nil),              // 127: remote.v1.ModelOption
-	(*ProviderInfo)(nil),             // 128: remote.v1.ProviderInfo
-	(*MachineInfo)(nil),              // 129: remote.v1.MachineInfo
-	(*RemoteBrowserInfo)(nil),        // 130: remote.v1.RemoteBrowserInfo
-	(*MachineSettings)(nil),          // 131: remote.v1.MachineSettings
-	(*PairedDevice)(nil),             // 132: remote.v1.PairedDevice
-	(*DirListResult)(nil),            // 133: remote.v1.DirListResult
-	(*DirEntry)(nil),                 // 134: remote.v1.DirEntry
-	(*FileListResult)(nil),           // 135: remote.v1.FileListResult
-	(*FileEntry)(nil),                // 136: remote.v1.FileEntry
-	(*AuditListResult)(nil),          // 137: remote.v1.AuditListResult
-	(*AuditEntry)(nil),               // 138: remote.v1.AuditEntry
-	(*SecretProvide)(nil),            // 139: remote.v1.SecretProvide
-	(*SecretDecline)(nil),            // 140: remote.v1.SecretDecline
-	(*SecretList)(nil),               // 141: remote.v1.SecretList
-	(*SecretRemove)(nil),             // 142: remote.v1.SecretRemove
-	(*SecretPrompt)(nil),             // 143: remote.v1.SecretPrompt
-	(*SecretPromptEnded)(nil),        // 144: remote.v1.SecretPromptEnded
-	(*SecretListResult)(nil),         // 145: remote.v1.SecretListResult
-	(*SavedSecret)(nil),              // 146: remote.v1.SavedSecret
-	(*GitChanges)(nil),               // 147: remote.v1.GitChanges
-	(*GitFileChange)(nil),            // 148: remote.v1.GitFileChange
-	(*GitFileDiffResult)(nil),        // 149: remote.v1.GitFileDiffResult
-	(*BrowserControl)(nil),           // 150: remote.v1.BrowserControl
-	(*BrowserView)(nil),              // 151: remote.v1.BrowserView
-	(*BrowserInput)(nil),             // 152: remote.v1.BrowserInput
-	(*BrowserMouse)(nil),             // 153: remote.v1.BrowserMouse
-	(*BrowserKey)(nil),               // 154: remote.v1.BrowserKey
-	(*BrowserTakeoverEnd)(nil),       // 155: remote.v1.BrowserTakeoverEnd
-	(*BrowserTakeover)(nil),          // 156: remote.v1.BrowserTakeover
-	(*BrowserTakeoverEnded)(nil),     // 157: remote.v1.BrowserTakeoverEnded
-	(*BrowserFrame)(nil),             // 158: remote.v1.BrowserFrame
-	(*BrowserState)(nil),             // 159: remote.v1.BrowserState
-	(*BrowserTab)(nil),               // 160: remote.v1.BrowserTab
-	(*PasskeyNotice)(nil),            // 161: remote.v1.PasskeyNotice
-	(*ScreenShareStatusRequest)(nil), // 162: remote.v1.ScreenShareStatusRequest
-	(*ScreenShareStatus)(nil),        // 163: remote.v1.ScreenShareStatus
-	(*ScreenShareOpen)(nil),          // 164: remote.v1.ScreenShareOpen
-	(*ScreenShareOpened)(nil),        // 165: remote.v1.ScreenShareOpened
-	(*ScreenShareData)(nil),          // 166: remote.v1.ScreenShareData
-	(*ScreenShareClose)(nil),         // 167: remote.v1.ScreenShareClose
-	(*ScreenShareClosed)(nil),        // 168: remote.v1.ScreenShareClosed
-	(*BrowserClear)(nil),             // 169: remote.v1.BrowserClear
-	(*TotpSet)(nil),                  // 170: remote.v1.TotpSet
-	(*TotpStatusRequest)(nil),        // 171: remote.v1.TotpStatusRequest
-	(*TotpStatus)(nil),               // 172: remote.v1.TotpStatus
-	(*AgentUpdateInfo)(nil),          // 173: remote.v1.AgentUpdateInfo
-	(*AgentUpdateCheck)(nil),         // 174: remote.v1.AgentUpdateCheck
-	(*AgentUpdateStart)(nil),         // 175: remote.v1.AgentUpdateStart
-	(*AgentUpdateProgress)(nil),      // 176: remote.v1.AgentUpdateProgress
+	(TerminalAvailability)(0),        // 12: remote.v1.TerminalAvailability
+	(GitFileState)(0),                // 13: remote.v1.GitFileState
+	(BrowserMouseType)(0),            // 14: remote.v1.BrowserMouseType
+	(ScreenShareEnd)(0),              // 15: remote.v1.ScreenShareEnd
+	(AgentUpdatePhase)(0),            // 16: remote.v1.AgentUpdatePhase
+	(TermSignalKind)(0),              // 17: remote.v1.TermSignalKind
+	(TermPath)(0),                    // 18: remote.v1.TermPath
+	(*Plain)(nil),                    // 19: remote.v1.Plain
+	(*Hello)(nil),                    // 20: remote.v1.Hello
+	(*Ready)(nil),                    // 21: remote.v1.Ready
+	(*PakeStart)(nil),                // 22: remote.v1.PakeStart
+	(*PakeReply)(nil),                // 23: remote.v1.PakeReply
+	(*PakeCandidate)(nil),            // 24: remote.v1.PakeCandidate
+	(*PakeFinish)(nil),               // 25: remote.v1.PakeFinish
+	(*HandshakeError)(nil),           // 26: remote.v1.HandshakeError
+	(*Frame)(nil),                    // 27: remote.v1.Frame
+	(*ThreadList)(nil),               // 28: remote.v1.ThreadList
+	(*ThreadCreate)(nil),             // 29: remote.v1.ThreadCreate
+	(*Consent)(nil),                  // 30: remote.v1.Consent
+	(*ThreadSend)(nil),               // 31: remote.v1.ThreadSend
+	(*ThreadSubscribe)(nil),          // 32: remote.v1.ThreadSubscribe
+	(*ThreadRespond)(nil),            // 33: remote.v1.ThreadRespond
+	(*Answers)(nil),                  // 34: remote.v1.Answers
+	(*Answer)(nil),                   // 35: remote.v1.Answer
+	(*ThreadInterrupt)(nil),          // 36: remote.v1.ThreadInterrupt
+	(*ThreadClose)(nil),              // 37: remote.v1.ThreadClose
+	(*ThreadDelete)(nil),             // 38: remote.v1.ThreadDelete
+	(*ThreadSetArchived)(nil),        // 39: remote.v1.ThreadSetArchived
+	(*ThreadSetModel)(nil),           // 40: remote.v1.ThreadSetModel
+	(*ThreadSetPermissionMode)(nil),  // 41: remote.v1.ThreadSetPermissionMode
+	(*ThreadSetEffort)(nil),          // 42: remote.v1.ThreadSetEffort
+	(*ThreadSwitch)(nil),             // 43: remote.v1.ThreadSwitch
+	(*ThreadFetchFull)(nil),          // 44: remote.v1.ThreadFetchFull
+	(*ThreadGitChanges)(nil),         // 45: remote.v1.ThreadGitChanges
+	(*GitFileDiff)(nil),              // 46: remote.v1.GitFileDiff
+	(*MachineInfoRequest)(nil),       // 47: remote.v1.MachineInfoRequest
+	(*Ping)(nil),                     // 48: remote.v1.Ping
+	(*DirList)(nil),                  // 49: remote.v1.DirList
+	(*AuditList)(nil),                // 50: remote.v1.AuditList
+	(*FileList)(nil),                 // 51: remote.v1.FileList
+	(*SessionList)(nil),              // 52: remote.v1.SessionList
+	(*LocalSession)(nil),             // 53: remote.v1.LocalSession
+	(*SessionDir)(nil),               // 54: remote.v1.SessionDir
+	(*SessionListResult)(nil),        // 55: remote.v1.SessionListResult
+	(*SessionOpen)(nil),              // 56: remote.v1.SessionOpen
+	(*AttachmentUpload)(nil),         // 57: remote.v1.AttachmentUpload
+	(*AttachmentCancel)(nil),         // 58: remote.v1.AttachmentCancel
+	(*AttachmentFetch)(nil),          // 59: remote.v1.AttachmentFetch
+	(*AttachmentData)(nil),           // 60: remote.v1.AttachmentData
+	(*Attachment)(nil),               // 61: remote.v1.Attachment
+	(*AttachmentLimits)(nil),         // 62: remote.v1.AttachmentLimits
+	(*ProjectList)(nil),              // 63: remote.v1.ProjectList
+	(*ProjectAdd)(nil),               // 64: remote.v1.ProjectAdd
+	(*ProjectCreate)(nil),            // 65: remote.v1.ProjectCreate
+	(*ProjectClone)(nil),             // 66: remote.v1.ProjectClone
+	(*ProjectCloneCancel)(nil),       // 67: remote.v1.ProjectCloneCancel
+	(*ProjectCloneProgress)(nil),     // 68: remote.v1.ProjectCloneProgress
+	(*ProjectUpdate)(nil),            // 69: remote.v1.ProjectUpdate
+	(*ProjectReorder)(nil),           // 70: remote.v1.ProjectReorder
+	(*ProjectRemove)(nil),            // 71: remote.v1.ProjectRemove
+	(*ProjectDefaults)(nil),          // 72: remote.v1.ProjectDefaults
+	(*GitStatus)(nil),                // 73: remote.v1.GitStatus
+	(*Project)(nil),                  // 74: remote.v1.Project
+	(*ProjectSuggestion)(nil),        // 75: remote.v1.ProjectSuggestion
+	(*ProjectListResult)(nil),        // 76: remote.v1.ProjectListResult
+	(*ProfileList)(nil),              // 77: remote.v1.ProfileList
+	(*ProfileSelect)(nil),            // 78: remote.v1.ProfileSelect
+	(*ProfileSignInBegin)(nil),       // 79: remote.v1.ProfileSignInBegin
+	(*ProfileSignInCode)(nil),        // 80: remote.v1.ProfileSignInCode
+	(*ProfileSignInCancel)(nil),      // 81: remote.v1.ProfileSignInCancel
+	(*ProfileRemove)(nil),            // 82: remote.v1.ProfileRemove
+	(*UsageRefresh)(nil),             // 83: remote.v1.UsageRefresh
+	(*MachineSettingsSet)(nil),       // 84: remote.v1.MachineSettingsSet
+	(*OpenDiskAccessSettings)(nil),   // 85: remote.v1.OpenDiskAccessSettings
+	(*Ack)(nil),                      // 86: remote.v1.Ack
+	(*ThreadInfo)(nil),               // 87: remote.v1.ThreadInfo
+	(*ProfileSuggestion)(nil),        // 88: remote.v1.ProfileSuggestion
+	(*AccountInfo)(nil),              // 89: remote.v1.AccountInfo
+	(*SlashCommand)(nil),             // 90: remote.v1.SlashCommand
+	(*RateLimits)(nil),               // 91: remote.v1.RateLimits
+	(*RateWindow)(nil),               // 92: remote.v1.RateWindow
+	(*ClaudeProfile)(nil),            // 93: remote.v1.ClaudeProfile
+	(*ProfileListResult)(nil),        // 94: remote.v1.ProfileListResult
+	(*MachineProfile)(nil),           // 95: remote.v1.MachineProfile
+	(*SessionProfile)(nil),           // 96: remote.v1.SessionProfile
+	(*ProfileSignInPrompt)(nil),      // 97: remote.v1.ProfileSignInPrompt
+	(*ProfileSignInResult)(nil),      // 98: remote.v1.ProfileSignInResult
+	(*Pong)(nil),                     // 99: remote.v1.Pong
+	(*Error)(nil),                    // 100: remote.v1.Error
+	(*Cursor)(nil),                   // 101: remote.v1.Cursor
+	(*ThreadSummary)(nil),            // 102: remote.v1.ThreadSummary
+	(*ThreadListResult)(nil),         // 103: remote.v1.ThreadListResult
+	(*ThreadCreated)(nil),            // 104: remote.v1.ThreadCreated
+	(*ThreadDeleted)(nil),            // 105: remote.v1.ThreadDeleted
+	(*ThreadStatus)(nil),             // 106: remote.v1.ThreadStatus
+	(*ThreadItems)(nil),              // 107: remote.v1.ThreadItems
+	(*ThreadReset)(nil),              // 108: remote.v1.ThreadReset
+	(*FullItem)(nil),                 // 109: remote.v1.FullItem
+	(*Item)(nil),                     // 110: remote.v1.Item
+	(*TextItem)(nil),                 // 111: remote.v1.TextItem
+	(*ToolCallItem)(nil),             // 112: remote.v1.ToolCallItem
+	(*ToolResultItem)(nil),           // 113: remote.v1.ToolResultItem
+	(*DiffItem)(nil),                 // 114: remote.v1.DiffItem
+	(*TodoItem)(nil),                 // 115: remote.v1.TodoItem
+	(*TodoEntry)(nil),                // 116: remote.v1.TodoEntry
+	(*ApprovalItem)(nil),             // 117: remote.v1.ApprovalItem
+	(*ApprovalSecret)(nil),           // 118: remote.v1.ApprovalSecret
+	(*QuestionItem)(nil),             // 119: remote.v1.QuestionItem
+	(*Question)(nil),                 // 120: remote.v1.Question
+	(*QuestionOption)(nil),           // 121: remote.v1.QuestionOption
+	(*StatusItem)(nil),               // 122: remote.v1.StatusItem
+	(*TurnItem)(nil),                 // 123: remote.v1.TurnItem
+	(*SubagentItem)(nil),             // 124: remote.v1.SubagentItem
+	(*CompactionItem)(nil),           // 125: remote.v1.CompactionItem
+	(*ErrorItem)(nil),                // 126: remote.v1.ErrorItem
+	(*ModelChangeItem)(nil),          // 127: remote.v1.ModelChangeItem
+	(*AgentHandoffItem)(nil),         // 128: remote.v1.AgentHandoffItem
+	(*ProviderCapabilities)(nil),     // 129: remote.v1.ProviderCapabilities
+	(*ModelOption)(nil),              // 130: remote.v1.ModelOption
+	(*ProviderInfo)(nil),             // 131: remote.v1.ProviderInfo
+	(*MachineInfo)(nil),              // 132: remote.v1.MachineInfo
+	(*RemoteBrowserInfo)(nil),        // 133: remote.v1.RemoteBrowserInfo
+	(*MachineSettings)(nil),          // 134: remote.v1.MachineSettings
+	(*PairedDevice)(nil),             // 135: remote.v1.PairedDevice
+	(*DirListResult)(nil),            // 136: remote.v1.DirListResult
+	(*DirEntry)(nil),                 // 137: remote.v1.DirEntry
+	(*FileListResult)(nil),           // 138: remote.v1.FileListResult
+	(*FileEntry)(nil),                // 139: remote.v1.FileEntry
+	(*AuditListResult)(nil),          // 140: remote.v1.AuditListResult
+	(*AuditEntry)(nil),               // 141: remote.v1.AuditEntry
+	(*SecretProvide)(nil),            // 142: remote.v1.SecretProvide
+	(*SecretDecline)(nil),            // 143: remote.v1.SecretDecline
+	(*SecretList)(nil),               // 144: remote.v1.SecretList
+	(*SecretRemove)(nil),             // 145: remote.v1.SecretRemove
+	(*SecretPrompt)(nil),             // 146: remote.v1.SecretPrompt
+	(*SecretPromptEnded)(nil),        // 147: remote.v1.SecretPromptEnded
+	(*SecretListResult)(nil),         // 148: remote.v1.SecretListResult
+	(*SavedSecret)(nil),              // 149: remote.v1.SavedSecret
+	(*GitChanges)(nil),               // 150: remote.v1.GitChanges
+	(*GitFileChange)(nil),            // 151: remote.v1.GitFileChange
+	(*GitFileDiffResult)(nil),        // 152: remote.v1.GitFileDiffResult
+	(*BrowserControl)(nil),           // 153: remote.v1.BrowserControl
+	(*BrowserView)(nil),              // 154: remote.v1.BrowserView
+	(*BrowserInput)(nil),             // 155: remote.v1.BrowserInput
+	(*BrowserMouse)(nil),             // 156: remote.v1.BrowserMouse
+	(*BrowserKey)(nil),               // 157: remote.v1.BrowserKey
+	(*BrowserTakeoverEnd)(nil),       // 158: remote.v1.BrowserTakeoverEnd
+	(*BrowserTakeover)(nil),          // 159: remote.v1.BrowserTakeover
+	(*BrowserTakeoverEnded)(nil),     // 160: remote.v1.BrowserTakeoverEnded
+	(*BrowserFrame)(nil),             // 161: remote.v1.BrowserFrame
+	(*BrowserState)(nil),             // 162: remote.v1.BrowserState
+	(*BrowserTab)(nil),               // 163: remote.v1.BrowserTab
+	(*PasskeyNotice)(nil),            // 164: remote.v1.PasskeyNotice
+	(*ScreenShareStatusRequest)(nil), // 165: remote.v1.ScreenShareStatusRequest
+	(*ScreenShareStatus)(nil),        // 166: remote.v1.ScreenShareStatus
+	(*ScreenShareOpen)(nil),          // 167: remote.v1.ScreenShareOpen
+	(*ScreenShareOpened)(nil),        // 168: remote.v1.ScreenShareOpened
+	(*ScreenShareData)(nil),          // 169: remote.v1.ScreenShareData
+	(*ScreenShareClose)(nil),         // 170: remote.v1.ScreenShareClose
+	(*ScreenShareClosed)(nil),        // 171: remote.v1.ScreenShareClosed
+	(*BrowserClear)(nil),             // 172: remote.v1.BrowserClear
+	(*TotpSet)(nil),                  // 173: remote.v1.TotpSet
+	(*TotpStatusRequest)(nil),        // 174: remote.v1.TotpStatusRequest
+	(*TotpStatus)(nil),               // 175: remote.v1.TotpStatus
+	(*AgentUpdateInfo)(nil),          // 176: remote.v1.AgentUpdateInfo
+	(*AgentUpdateCheck)(nil),         // 177: remote.v1.AgentUpdateCheck
+	(*AgentUpdateStart)(nil),         // 178: remote.v1.AgentUpdateStart
+	(*AgentUpdateProgress)(nil),      // 179: remote.v1.AgentUpdateProgress
+	(*TermListRequest)(nil),          // 180: remote.v1.TermListRequest
+	(*TermSessionInfo)(nil),          // 181: remote.v1.TermSessionInfo
+	(*TermListResult)(nil),           // 182: remote.v1.TermListResult
+	(*TermOpen)(nil),                 // 183: remote.v1.TermOpen
+	(*TermOpened)(nil),               // 184: remote.v1.TermOpened
+	(*TermClose)(nil),                // 185: remote.v1.TermClose
+	(*TermClosed)(nil),               // 186: remote.v1.TermClosed
+	(*TermResize)(nil),               // 187: remote.v1.TermResize
+	(*TermSignal)(nil),               // 188: remote.v1.TermSignal
+	(*TermData)(nil),                 // 189: remote.v1.TermData
+	(*TermStatus)(nil),               // 190: remote.v1.TermStatus
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
-	17,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
-	18,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
-	19,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
-	20,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
-	22,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
-	23,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
-	21,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
+	20,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
+	21,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
+	22,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
+	23,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
+	25,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
+	26,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
+	24,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
 	0,   // 7: remote.v1.HandshakeError.code:type_name -> remote.v1.HandshakeErrorCode
-	25,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
-	26,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
-	28,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
-	29,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
-	30,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
-	33,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
-	37,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
-	40,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
-	41,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
-	44,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
-	45,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
-	46,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
-	47,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
-	34,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
-	38,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
-	39,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
-	74,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
-	75,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
-	76,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
-	77,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
-	78,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
-	79,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
-	80,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
-	81,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
-	48,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
-	82,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
-	49,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
-	53,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
-	54,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
-	55,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
-	100, // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
-	101, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
-	104, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
-	103, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
-	105, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
-	106, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
-	129, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
-	96,  // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	133, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	137, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
-	83,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
-	97,  // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
-	84,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
-	91,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
-	94,  // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
-	95,  // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
-	135, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
-	92,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
-	52,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
-	57,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
-	102, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
-	73,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
-	65,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
-	56,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
-	35,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
-	36,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
-	60,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
-	61,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
-	62,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
-	63,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
-	64,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
-	66,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
-	67,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
-	68,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
-	139, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
-	140, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
-	141, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
-	142, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
-	42,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
-	43,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
-	150, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
-	151, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
-	152, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
-	155, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
-	162, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
-	164, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
-	166, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
-	167, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
-	169, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
-	170, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
-	171, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
-	174, // 89: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
-	175, // 90: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
-	143, // 91: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
-	144, // 92: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
-	145, // 93: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
-	147, // 94: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
-	149, // 95: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
-	156, // 96: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
-	157, // 97: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
-	158, // 98: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
-	159, // 99: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
-	161, // 100: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
-	163, // 101: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
-	165, // 102: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
-	168, // 103: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
-	172, // 104: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
-	176, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
-	27,  // 106: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
-	98,  // 107: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
-	1,   // 108: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
-	31,  // 109: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
-	32,  // 110: remote.v1.Answers.answers:type_name -> remote.v1.Answer
-	50,  // 111: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
-	51,  // 112: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
-	27,  // 113: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
-	27,  // 114: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
-	2,   // 115: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
-	69,  // 116: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
-	69,  // 117: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
-	70,  // 118: remote.v1.Project.git:type_name -> remote.v1.GitStatus
-	71,  // 119: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
-	72,  // 120: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
-	87,  // 121: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
-	88,  // 122: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
-	86,  // 123: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
-	86,  // 124: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
-	85,  // 125: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
-	89,  // 126: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
-	89,  // 127: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
-	88,  // 128: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
-	90,  // 129: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
-	91,  // 130: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
-	93,  // 131: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
-	3,   // 132: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
-	2,   // 133: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
-	4,   // 134: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
-	99,  // 135: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
-	99,  // 136: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
-	99,  // 137: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
-	107, // 138: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
-	98,  // 139: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
-	5,   // 140: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
-	107, // 141: remote.v1.FullItem.item:type_name -> remote.v1.Item
-	108, // 142: remote.v1.Item.text:type_name -> remote.v1.TextItem
-	109, // 143: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
-	110, // 144: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
-	111, // 145: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
-	112, // 146: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
-	116, // 147: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
-	114, // 148: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
-	119, // 149: remote.v1.Item.status:type_name -> remote.v1.StatusItem
-	120, // 150: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
-	121, // 151: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
-	122, // 152: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
-	123, // 153: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
-	124, // 154: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
-	125, // 155: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
-	6,   // 156: remote.v1.TextItem.role:type_name -> remote.v1.Role
-	58,  // 157: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
-	7,   // 158: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
-	113, // 159: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
-	8,   // 160: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
-	7,   // 161: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
-	9,   // 162: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
-	1,   // 163: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
-	115, // 164: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
-	117, // 165: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
-	9,   // 166: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
-	31,  // 167: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
-	118, // 168: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
-	10,  // 169: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
-	127, // 170: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
-	11,  // 171: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
-	126, // 172: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
-	128, // 173: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	132, // 174: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
-	131, // 175: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
-	59,  // 176: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
-	130, // 177: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
-	173, // 178: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
-	134, // 179: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	136, // 180: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
-	138, // 181: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	146, // 182: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
-	148, // 183: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
-	12,  // 184: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
-	148, // 185: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
-	153, // 186: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
-	154, // 187: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
-	13,  // 188: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
-	160, // 189: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
-	14,  // 190: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
-	15,  // 191: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
-	192, // [192:192] is the sub-list for method output_type
-	192, // [192:192] is the sub-list for method input_type
-	192, // [192:192] is the sub-list for extension type_name
-	192, // [192:192] is the sub-list for extension extendee
-	0,   // [0:192] is the sub-list for field type_name
+	28,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
+	29,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
+	31,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
+	32,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
+	33,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
+	36,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
+	40,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
+	43,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
+	44,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
+	47,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
+	48,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
+	49,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
+	50,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
+	37,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
+	41,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
+	42,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
+	77,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
+	78,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
+	79,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
+	80,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
+	81,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
+	82,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
+	83,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
+	84,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
+	51,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
+	85,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
+	52,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
+	56,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
+	57,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
+	58,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
+	103, // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
+	104, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
+	107, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
+	106, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
+	108, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
+	109, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
+	132, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
+	99,  // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
+	136, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	140, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	86,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
+	100, // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
+	87,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
+	94,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
+	97,  // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
+	98,  // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
+	138, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
+	95,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
+	55,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
+	60,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
+	105, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
+	76,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
+	68,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
+	59,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
+	38,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
+	39,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
+	63,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
+	64,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
+	65,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
+	66,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
+	67,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
+	69,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
+	70,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
+	71,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
+	142, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
+	143, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
+	144, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
+	145, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
+	45,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
+	46,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
+	153, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
+	154, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
+	155, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
+	158, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
+	165, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
+	167, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
+	169, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
+	170, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
+	172, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
+	173, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
+	174, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
+	177, // 89: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
+	178, // 90: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
+	146, // 91: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
+	147, // 92: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
+	148, // 93: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
+	150, // 94: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
+	152, // 95: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
+	159, // 96: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
+	160, // 97: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
+	161, // 98: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
+	162, // 99: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
+	164, // 100: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
+	166, // 101: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
+	168, // 102: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
+	171, // 103: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
+	175, // 104: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
+	179, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
+	180, // 106: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
+	183, // 107: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
+	185, // 108: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
+	187, // 109: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
+	188, // 110: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
+	189, // 111: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
+	182, // 112: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
+	184, // 113: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
+	186, // 114: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
+	190, // 115: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
+	30,  // 116: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
+	101, // 117: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
+	1,   // 118: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
+	34,  // 119: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
+	35,  // 120: remote.v1.Answers.answers:type_name -> remote.v1.Answer
+	53,  // 121: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
+	54,  // 122: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
+	30,  // 123: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
+	30,  // 124: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
+	2,   // 125: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
+	72,  // 126: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
+	72,  // 127: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
+	73,  // 128: remote.v1.Project.git:type_name -> remote.v1.GitStatus
+	74,  // 129: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
+	75,  // 130: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
+	90,  // 131: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
+	91,  // 132: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
+	89,  // 133: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
+	89,  // 134: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
+	88,  // 135: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
+	92,  // 136: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
+	92,  // 137: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
+	91,  // 138: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
+	93,  // 139: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
+	94,  // 140: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
+	96,  // 141: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
+	3,   // 142: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
+	2,   // 143: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
+	4,   // 144: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
+	102, // 145: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
+	102, // 146: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
+	102, // 147: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
+	110, // 148: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
+	101, // 149: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
+	5,   // 150: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
+	110, // 151: remote.v1.FullItem.item:type_name -> remote.v1.Item
+	111, // 152: remote.v1.Item.text:type_name -> remote.v1.TextItem
+	112, // 153: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
+	113, // 154: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
+	114, // 155: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
+	115, // 156: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
+	119, // 157: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
+	117, // 158: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
+	122, // 159: remote.v1.Item.status:type_name -> remote.v1.StatusItem
+	123, // 160: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
+	124, // 161: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
+	125, // 162: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
+	126, // 163: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
+	127, // 164: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
+	128, // 165: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
+	6,   // 166: remote.v1.TextItem.role:type_name -> remote.v1.Role
+	61,  // 167: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
+	7,   // 168: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
+	116, // 169: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
+	8,   // 170: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
+	7,   // 171: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
+	9,   // 172: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
+	1,   // 173: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
+	118, // 174: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
+	120, // 175: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
+	9,   // 176: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
+	34,  // 177: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
+	121, // 178: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
+	10,  // 179: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
+	130, // 180: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
+	11,  // 181: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
+	129, // 182: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
+	131, // 183: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
+	135, // 184: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
+	134, // 185: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
+	62,  // 186: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
+	133, // 187: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
+	176, // 188: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
+	12,  // 189: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
+	137, // 190: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	139, // 191: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
+	141, // 192: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	149, // 193: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
+	151, // 194: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
+	13,  // 195: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
+	151, // 196: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
+	156, // 197: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
+	157, // 198: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
+	14,  // 199: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
+	163, // 200: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
+	15,  // 201: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
+	16,  // 202: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
+	181, // 203: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
+	17,  // 204: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
+	18,  // 205: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
+	206, // [206:206] is the sub-list for method output_type
+	206, // [206:206] is the sub-list for method input_type
+	206, // [206:206] is the sub-list for extension type_name
+	206, // [206:206] is the sub-list for extension extendee
+	0,   // [0:206] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -15063,6 +16214,16 @@ func file_remote_v1_remote_proto_init() {
 		(*Frame_ScreenShareClosed)(nil),
 		(*Frame_TotpStatus)(nil),
 		(*Frame_AgentUpdateProgress)(nil),
+		(*Frame_TermListRequest)(nil),
+		(*Frame_TermOpen)(nil),
+		(*Frame_TermClose)(nil),
+		(*Frame_TermResize)(nil),
+		(*Frame_TermSignal)(nil),
+		(*Frame_TermData)(nil),
+		(*Frame_TermListResult)(nil),
+		(*Frame_TermOpened)(nil),
+		(*Frame_TermClosed)(nil),
+		(*Frame_TermStatus)(nil),
 	}
 	file_remote_v1_remote_proto_msgTypes[14].OneofWrappers = []any{
 		(*ThreadRespond_Decision)(nil),
@@ -15096,8 +16257,8 @@ func file_remote_v1_remote_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
-			NumEnums:      16,
-			NumMessages:   161,
+			NumEnums:      19,
+			NumMessages:   172,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

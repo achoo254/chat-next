@@ -9,6 +9,7 @@ import {
   GitFileState,
   type Item,
   type MachineInfo,
+  TermPath,
   type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
 import {
@@ -44,6 +45,8 @@ import { type BrowserFrame, BrowserLink } from "./browser-link.ts";
 import { ScreenShareBusy, ScreenShareGone, type ScreenShare, ScreenSharingOff } from "../screen-share/screen-share.ts";
 import { ScreenShareLink } from "./screen-share-link.ts";
 import { wireItem } from "./wire.ts";
+import type { TerminalConnection } from "../terminal/terminal-connection.ts";
+import type { TerminalService } from "../terminal/terminal-service.ts";
 
 export type Socket = {
   send(data: Uint8Array): void;
@@ -83,6 +86,8 @@ export type LinkContext = {
   openDiskAccessSettings?: () => boolean;
   /** Updates tunelo for a device; absent where the machine has none (tests). */
   updater?: AgentUpdater;
+  /** The machine's terminal; absent where the machine has none (tests). */
+  terminal?: TerminalService;
 };
 
 const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
@@ -220,6 +225,9 @@ export class Connection {
   private queue: Promise<void> = Promise.resolve();
   private browserLink: BrowserLink | undefined;
   private screenShareLink: ScreenShareLink | undefined;
+  private terminal: TerminalConnection | undefined;
+  /** Messages queued before the link opened, not yet opened (decrypted). */
+  private rawPending = 0;
   readonly opened = Date.now();
 
   constructor(
@@ -235,10 +243,33 @@ export class Connection {
     return this.session?.peerStatic;
   }
 
-  /** Messages are handled one at a time, in order. */
+  /**
+   * Requests are handled one at a time, in order. Once the link is open,
+   * every message is opened here as it arrives (the session's counter needs
+   * arrival order), so a terminal frame goes straight to the terminal and
+   * never waits behind a slow request; the rest still queue in order.
+   */
   receive(data: Uint8Array): void {
     this.lastSeen = Date.now();
-    this.queue = this.queue.then(() => this.handle(data)).catch(() => this.close(1008, "protocol error"));
+    const session = this.session;
+    if (this.state === "open" && this.rawPending === 0 && session) {
+      let f: Frame;
+      try {
+        f = session.open(data);
+      } catch {
+        return this.close(1008, "protocol error");
+      }
+      if (f.body.case === "termData") return this.termData(f.body.value);
+      this.queue = this.queue.then(() => (this.state === "closed" ? undefined : this.frame(f))).catch(() => this.close(1008, "protocol error"));
+      return;
+    }
+    this.rawPending++;
+    this.queue = this.queue
+      .then(() => {
+        this.rawPending--;
+        return this.handle(data);
+      })
+      .catch(() => this.close(1008, "protocol error"));
   }
 
   close(code = 1000, reason = ""): void {
@@ -248,7 +279,14 @@ export class Connection {
     for (const u of this.unsubscribe) u();
     this.browserLink?.close();
     this.screenShareLink?.close();
+    if (this.terminal) this.ctx.terminal?.forget(this.terminal);
     this.socket.close(code, reason);
+  }
+
+  /** One terminal frame of the relay path: handed on at once (never behind the queue). */
+  private termData(v: Extract<Frame["body"], { case: "termData" }>["value"]): void {
+    if (this.terminal) return this.terminal.data(v);
+    this.send("", { case: "termStatus", value: { link: v.link, path: TermPath.CLOSED, reason: "unavailable" } });
   }
 
   private async handle(data: Uint8Array): Promise<void> {
@@ -352,6 +390,13 @@ export class Connection {
         () => this.socket.buffered?.() ?? 0,
         () => this.device,
       );
+    }
+    if (this.ctx.terminal) {
+      this.terminal = this.ctx.terminal.connection({
+        send: (id, body) => this.send(id, body),
+        buffered: () => this.socket.buffered?.() ?? 0,
+        deviceKey: () => this.session?.peerStatic,
+      });
     }
   }
 
@@ -725,6 +770,17 @@ export class Connection {
         case "projectRemove":
           void this.projectFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
+        case "termListRequest":
+        case "termOpen":
+        case "termClose":
+        case "termResize":
+        case "termSignal":
+          // Answered later, by id: starting the terminal process may take a moment.
+          if (!this.terminal) return this.send(id, { case: "error", value: refusal("this machine has no terminal", ErrorReason.UNSUPPORTED_REQUEST) });
+          return this.terminal.handle(id, b);
+        case "termData":
+          // Only a frame queued before the link opened comes this way.
+          return this.termData(b.value);
         default:
           return this.send(id, { case: "error", value: refusal("unsupported request", ErrorReason.UNSUPPORTED_REQUEST) });
       }

@@ -240,6 +240,21 @@ message Frame {
     ScreenShareClosed screen_share_closed = 101;
     TotpStatus totp_status = 104;
     AgentUpdateProgress agent_update_progress = 107;
+
+    // The machine's terminal (tunelo 2.4.0+); see "the machine's terminal" below.
+    // A → B
+    TermListRequest term_list_request = 108;
+    TermOpen term_open = 109;
+    TermClose term_close = 110;
+    TermResize term_resize = 111;
+    // Both ways.
+    TermSignal term_signal = 112;
+    TermData term_data = 113;
+    // B → A
+    TermListResult term_list_result = 114;
+    TermOpened term_opened = 115;
+    TermClosed term_closed = 116;
+    TermStatus term_status = 117;
   }
 }
 
@@ -1081,6 +1096,13 @@ enum ErrorReason {
   ERROR_REASON_UPDATE_UNAVAILABLE = 53;
   // AgentUpdateStart while an update is already running.
   ERROR_REASON_UPDATE_BUSY = 54;
+  // A Term* request while the machine's terminal process is missing, of
+  // another major version, or does not start (see MachineInfo.terminal).
+  ERROR_REASON_TERMINAL_UNAVAILABLE = 55;
+  // TermOpen while the machine already runs its 20 terminal sessions.
+  ERROR_REASON_TERMINAL_SESSION_LIMIT = 56;
+  // TermClose or TermResize names a terminal session that is gone.
+  ERROR_REASON_TERMINAL_SESSION_NOT_FOUND = 57;
 }
 
 enum ErrorCode {
@@ -1493,6 +1515,20 @@ message MachineInfo {
   bool totp_enabled = 21;
   // Unset before tunelo 2.3.0.
   AgentUpdateInfo agent_update = 22;
+  // The machine's terminal; unspecified before tunelo 2.4.0.
+  TerminalAvailability terminal = 23;
+}
+
+enum TerminalAvailability {
+  // An older machine: no terminal.
+  TERMINAL_AVAILABILITY_UNSPECIFIED = 0;
+  // Term* requests work (the terminal process starts on first use).
+  TERMINAL_AVAILABILITY_AVAILABLE = 1;
+  // The terminal process is not installed on the machine yet.
+  TERMINAL_AVAILABILITY_MISSING = 2;
+  // A terminal process of another major version runs, or the machine cannot
+  // supervise one (no launchd/systemd/Run entry); `tunelo install` again.
+  TERMINAL_AVAILABILITY_INCOMPATIBLE = 3;
 }
 
 message RemoteBrowserInfo {
@@ -1983,4 +2019,143 @@ message AgentUpdateProgress {
   uint64 received = 3;
   uint64 total = 4;
   string message = 5;
+}
+
+// --- the machine's terminal ------------------------------------------------------
+// Real terminals (PTYs) held on the machine by tunelo's terminal process,
+// open to the owner's paired devices like chat sessions. The terminal's own
+// bytes are frames of docs/terminal-wire.md ("terminal frames"): on the
+// direct path they go device ⟷ terminal process over WebRTC and never pass
+// here; on the relay path each one is one TermData. Signaling (SDP, ICE) goes
+// here, end-to-end sealed, so the DTLS fingerprints in it are authentic.
+//
+// A link is one terminal client of a device (one page): the device names it
+// with a link id it picks (non-zero), scoped to the end-to-end connection it
+// sends it on. A device sends TermSignal and TermData of a link on one
+// connection, normally a second connection it keeps for the terminal only
+// (its own counter and queue, so chat requests never hold keystrokes back).
+// A link is made on its first TermSignal(OFFER) or TermData and ends when
+// that connection closes or B sends TermStatus(CLOSED); the same id then
+// names a new link, which starts again with a Hello terminal frame.
+// TermListRequest, TermOpen, TermClose and TermResize name no link and work
+// on any connection. B writes each terminal opened, closed or refused to the
+// consent log, never a typed byte.
+
+// A → B: the machine's terminal sessions. Answered with TermListResult.
+message TermListRequest {}
+
+message TermSessionInfo {
+  uint32 session = 1;
+  // The title the program set (OSC 0/2); may be empty.
+  string title = 2;
+  uint32 cols = 3;
+  uint32 rows = 4;
+  // Unix milliseconds.
+  int64 created_at = 5;
+  // A link of some device is attached to it now.
+  bool attached = 6;
+  // Its program ended; it stays listed until TermClose.
+  bool exited = 7;
+  // With exited: the exit code (-1 when a signal ended it) and the signal (0 when none).
+  int32 exit_code = 8;
+  uint32 exit_signal = 9;
+}
+
+message TermListResult {
+  repeated TermSessionInfo sessions = 1;
+  // Sessions the machine keeps at most (exited ones count until closed).
+  uint32 max_sessions = 2;
+}
+
+// A → B: start a login shell in a new session. Answered with TermOpened, or
+// ERROR_REASON_TERMINAL_SESSION_LIMIT / ERROR_REASON_TERMINAL_UNAVAILABLE /
+// ERROR_REASON_FOLDER_NOT_FOUND (cwd).
+message TermOpen {
+  // 1 to 1000 each.
+  uint32 cols = 1;
+  uint32 rows = 2;
+  // An absolute folder of the machine; empty for the user's home.
+  string cwd = 3;
+}
+
+message TermOpened {
+  uint32 session = 1;
+}
+
+// A → B: hang up the session's shell (and its foreground programs) and drop
+// it. Answered with TermClosed; ERROR_REASON_TERMINAL_SESSION_NOT_FOUND.
+message TermClose {
+  uint32 session = 1;
+}
+
+message TermClosed {
+  uint32 session = 1;
+}
+
+// A → B: resize a session (also possible with a Resize terminal frame).
+// Answered with Ack; ERROR_REASON_TERMINAL_SESSION_NOT_FOUND.
+message TermResize {
+  uint32 session = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
+enum TermSignalKind {
+  TERM_SIGNAL_KIND_UNSPECIFIED = 0;
+  // A → B: the device's SDP offer (with its data channels term-in and
+  // term-out); a new offer replaces the link's peer.
+  TERM_SIGNAL_KIND_OFFER = 1;
+  // B → A: the terminal process's SDP answer, with its host candidates.
+  TERM_SIGNAL_KIND_ANSWER = 2;
+  // Both ways: one ICE candidate line (`candidate:...`).
+  TERM_SIGNAL_KIND_CANDIDATE = 3;
+  // A → B: drop the link's peer (the relay stays). B → A: the peer ended (reason).
+  TERM_SIGNAL_KIND_END = 4;
+}
+
+// WebRTC signaling of a link. A → B is answered with Ack (or an error by
+// id); B → A comes unasked.
+message TermSignal {
+  uint32 link = 1;
+  TermSignalKind kind = 2;
+  // OFFER and ANSWER.
+  string sdp = 3;
+  // CANDIDATE.
+  string candidate = 4;
+  // B → A END: closed, ice_disconnected, channel_closed, dtls_failed,
+  // timeout, no_address, bad_offer or error (docs/terminal-wire.md).
+  string reason = 5;
+}
+
+// Exactly one terminal frame of the link on the relay path, both ways.
+// Never answered: a bad frame or an unknown link ends the link with
+// TermStatus(CLOSED).
+message TermData {
+  uint32 link = 1;
+  // At most 65536 bytes.
+  bytes data = 2;
+}
+
+enum TermPath {
+  TERM_PATH_UNSPECIFIED = 0;
+  // An offer is being answered and tried.
+  TERM_PATH_CONNECTING = 1;
+  // Frames go over WebRTC.
+  TERM_PATH_DIRECT = 2;
+  // Frames go as TermData over this connection.
+  TERM_PATH_RELAY = 3;
+  // The link ended (reason says why).
+  TERM_PATH_CLOSED = 4;
+}
+
+// B → A, unasked: the path a link uses now. DIRECT may come twice, the
+// second time with rtt_ms.
+message TermStatus {
+  uint32 link = 1;
+  TermPath path = 2;
+  // DIRECT: the ICE round trip in milliseconds; 0 until measured.
+  float rtt_ms = 3;
+  // CLOSED: expired, closed, revoked, agent_gone, transport_closed,
+  // shutdown, bad_frame, overflow or unavailable.
+  string reason = 4;
 }

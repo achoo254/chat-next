@@ -4,7 +4,8 @@
 // the authenticator code), setting the authenticator secret (never its value),
 // revoking, switching the permission mode, adding, picking or removing a Claude profile,
 // turning forwarding to localhost on or off, blocking ports for it, giving,
-// using or removing a sign-in secret: never its value).
+// using or removing a sign-in secret: never its value; a terminal opened,
+// closed or refused to a device: never a typed byte or its output).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -28,7 +29,8 @@ export type AuditAction =
   | "secret_remove"
   | "browser_control"
   | "browser_clear"
-  | "screen_share";
+  | "screen_share"
+  | "terminal";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

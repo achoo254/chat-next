@@ -34,7 +34,9 @@ import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
-import { isCompiled, selfCommand, supervised, underLaunchAgent } from "./service.ts";
+import { isCompiled, selfCommand, supervised, termHostUnit, underLaunchAgent } from "./service.ts";
+import type { TermHostUnit } from "./terminal/host-supervisor.ts";
+import { TerminalService } from "./terminal/terminal-service.ts";
 import { AgentUpdater } from "./agent-updater.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
@@ -78,6 +80,13 @@ export type MachineOptions = {
   browser?: RemoteBrowser;
   /** The machine's own Screen Sharing (macOS); built when not given. */
   screenShare?: ScreenShare;
+  /**
+   * The terminal process's supervised unit; the OS one (launchd, systemd,
+   * Run entry) when not given. Tests start the terminal process directly.
+   */
+  termHostUnit?: TermHostUnit;
+  /** Environment for finding the terminal process binary (TUNELO_TERM_HOST_BIN); the process's own when not given. */
+  env?: NodeJS.ProcessEnv;
 };
 
 /** What an authenticator app names the entry; the web page uses the product name, this terminal the feature's. */
@@ -93,6 +102,7 @@ export class Machine {
   readonly secrets: SecretService;
   readonly browser: RemoteBrowser;
   readonly screenShare: ScreenShare;
+  readonly terminal: TerminalService;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -184,6 +194,17 @@ export class Machine {
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
     });
     this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
+    this.terminal = new TerminalService({
+      configDir: dir,
+      config: this.config,
+      audit: this.audit,
+      unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),
+      // A shell runs `claude` on the machine's selected profile, as Chat's sessions do; the default one needs nothing.
+      claudeConfigDir: () => this.profiles.selectedAccountDir(),
+      log: this.log,
+      onAvailability: () => void this.announceInfo(),
+      ...(opts.env ? { env: opts.env } : {}),
+    });
     this.projects = new Projects({
       config: this.config,
       audit: this.audit,
@@ -272,6 +293,7 @@ export class Machine {
     this.port = actual;
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.updater.start();
+    this.terminal.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath, false)) this.log(line);
     return actual;
@@ -283,6 +305,8 @@ export class Machine {
     this.screenShare.stop();
     this.diskWatch.stop();
     this.updater.stop();
+    // The terminal process and its shells keep running (they outlive the agent).
+    this.terminal.stop();
     this.stopRotation?.();
     clearTimeout(this.announcing);
     for (const c of this.connections) c.close(1001, "shutting down");
@@ -329,12 +353,23 @@ export class Machine {
     return { uri: totpUri({ secret, label: this.config.get().machineName || hostname(), issuer: AUTHENTICATOR_ISSUER }), secret: base32Encode(secret) };
   }
 
-  /** Cuts every live connection of a device that was just revoked. */
+  /**
+   * Cuts every live connection of a device that was just revoked, and its
+   * terminal links, direct ones included. `key` may be the first characters
+   * of the key: the terminal process takes whole keys, found among the
+   * revoked keys (already stored) and the live connections.
+   */
   dropDevice(key: string): void {
+    const full = new Set(this.config.get().revoked.filter((k) => k.startsWith(key)));
     for (const c of this.connections) {
       const k = c.deviceKey;
-      if (k && toBase64Url(k).startsWith(key)) c.close(4001, "revoked");
+      if (!k) continue;
+      const encoded = toBase64Url(k);
+      if (!encoded.startsWith(key)) continue;
+      full.add(encoded);
+      c.close(4001, "revoked");
     }
+    for (const k of full) this.terminal.revokeDevice(k);
   }
 
   private auth(): MachineAuth {
@@ -369,6 +404,7 @@ export class Machine {
         browser: this.browser,
         screenShare: this.screenShare,
         updater: this.updater,
+        terminal: this.terminal,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {
@@ -462,6 +498,7 @@ export class Machine {
       screenShare: this.screenShare.supported,
       totpEnabled: this.pairing.enabled,
       agentUpdate: this.updater.info(),
+      terminal: this.terminal.availability(),
     });
   }
 
