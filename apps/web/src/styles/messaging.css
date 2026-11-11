@@ -271,7 +271,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
    and line colours turn light for every part but the reactions and quick actions (they keep
    the page's colours), so links, mentions, code, replies, previews and files stay readable. */
 .msg.mine .bubble { --bubble: var(--c-mine); color: var(--c-on-primary); }
-.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions) {
+.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions, .msg-react) {
 	--c-text: var(--c-on-primary);
 	--c-text-muted: var(--c-mine-muted);
 	--c-icon-muted: var(--c-mine-muted);
@@ -506,11 +506,24 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .closed-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-3); min-height: 68px; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text-muted); font-size: 0.875rem; text-align: center; }
 .closed-bar .icon { color: var(--c-icon-muted); }
 
-/* Message menu layer */
-.ctx-layer { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-2); padding: var(--space-5); background: color-mix(in srgb, var(--c-backdrop) 70%, transparent); }
-.ctx-layer.mine { align-items: flex-end; }
-.ctx-message { display: flex; flex-direction: column; max-width: min(420px, 100%); }
-.ctx-layer.mine .ctx-message { align-items: flex-end; }
+/* Message popover: opens at the pointer or the button that asked for it (placed by message-menu.tsx), no dimming. */
+/* Lifted message (phones, Telegram-style): the screen blurs, a copy of the message floats from its place with the reaction row above and the menu below. */
+.ctx-layer { position: fixed; inset: 0; z-index: 30; background: transparent; transition: background var(--dur-base) var(--ease-standard), backdrop-filter var(--dur-base) var(--ease-standard); }
+.ctx-layer[data-phase="open"] { background: color-mix(in srgb, var(--c-backdrop) 62%, transparent); backdrop-filter: blur(14px); }
+.ctx-stack { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-2)); transform: translateY(0); transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.ctx-stack.mine { align-items: flex-end; }
+.ctx-layer[data-phase="open"] .ctx-stack { transform: translateY(var(--lift, 0px)); }
+.ctx-message { display: flex; flex-direction: column; max-width: 100%; }
+.ctx-message .msg { max-width: 100%; }
+.ctx-stack > :is(.react-picker, .menu, .emoji-pop) { opacity: 0; transform: scale(0.88); transition: opacity 160ms var(--ease-standard), transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.ctx-stack > .react-picker { transform-origin: bottom left; }
+.ctx-stack.mine > .react-picker { transform-origin: bottom right; }
+.ctx-stack > :is(.menu, .emoji-pop) { transform-origin: top left; }
+.ctx-stack.mine > :is(.menu, .emoji-pop) { transform-origin: top right; }
+.ctx-layer[data-phase="open"] .ctx-stack > :is(.react-picker, .menu, .emoji-pop) { opacity: 1; transform: scale(1); }
+.ctx-pop { animation: ctx-pop-in 120ms var(--ease-standard); }
+@keyframes ctx-pop-in { from { opacity: 0; transform: scale(0.96); } }
+.ctx-pop { position: fixed; z-index: 20; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-2)); }
 .react-picker { position: relative; display: flex; gap: 2px; padding: var(--space-1); border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md); }
 .react-picker button, .react-picker .emoji-anchor > button { display: grid; place-items: center; width: 40px; min-height: 40px; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; color: var(--c-icon-muted); }
 .react-picker button:hover { background: var(--c-hover); }
@@ -911,11 +924,18 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .msg-actions { position: absolute; bottom: calc(100% + var(--space-1)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
 .msg.mine .msg-actions { left: auto; right: var(--space-2); }
 .msg-actions::before { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--space-1) + 2px); }
-.msg[data-actions="beside"] .msg-actions { bottom: auto; top: 0; left: calc(100% + var(--space-1)); right: auto; }
-.msg.mine[data-actions="beside"] .msg-actions { left: auto; right: calc(100% + var(--space-1)); }
-.msg[data-actions="beside"] .msg-actions::before { top: 0; bottom: 0; height: auto; left: auto; right: 100%; width: calc(var(--space-1) + 2px); }
-.msg.mine[data-actions="beside"] .msg-actions::before { right: auto; left: 100%; }
+.msg[data-actions="beside"] .msg-actions { bottom: auto; top: 0; left: calc(100% + 16px); right: auto; }
+.msg.mine[data-actions="beside"] .msg-actions { left: auto; right: calc(100% + 16px); }
+.msg[data-actions="beside"] .msg-actions::before { top: 0; bottom: 0; height: auto; left: auto; right: 100%; width: 16px; }
+.msg.mine[data-actions="beside"] .msg-actions::before { right: auto; left: 100%; width: 16px; }
 .msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; pointer-events: auto; }
+/* The reaction button stands alone (Telegram): mostly over the bubble's outer edge at its bottom corner, on the right of messages you
+   receive and the left of your own. Only 8px of it is over the bubble (inside its 12px side padding), so it never covers the time. */
+.msg-react { position: absolute; bottom: 0; left: calc(100% - 8px); z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); color: var(--c-icon-muted); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+.msg.mine .msg-react { left: auto; right: calc(100% - 8px); }
+.msg-react::before { content: ""; position: absolute; inset: -4px; }
+.msg:hover .msg-react, .msg:focus-within .msg-react { opacity: 1; pointer-events: auto; }
+.msg-react:hover { background: color-mix(in srgb, var(--c-text) 6%, var(--c-surface)); color: var(--c-text); }
 .msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
 .msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
 
@@ -1047,7 +1067,6 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.app aside.info { width: 100%; }
 	.messages { padding: var(--space-3); }
 	.msg { max-width: 92%; }
-	.ctx-layer { padding: var(--space-3); }
 	.composer { padding: var(--space-2) var(--space-3); }
 	.contact-card { margin: var(--space-3) auto; padding-top: var(--space-6); }
 	/* Search results: the action drops under the name instead of squeezing it. */
@@ -1078,7 +1097,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 }
 /* Touch and narrow screens: no hover affordances (long press opens the menus); one column, no width handle. */
 @media (max-width: 760px), (pointer: coarse) {
-	.list-resize, .msg-actions, .row-more { display: none; }
+	.list-resize, .msg-actions, .msg-react, .row-more { display: none; }
 }
 @media (max-width: 760px) {
 	.theme-pick { grid-template-columns: minmax(0, 1fr); }
@@ -1089,6 +1108,8 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.sk { animation: none; }
 	.kb-row button[aria-busy="true"]::before { animation: none; }
 	.toast { transition: none; }
+	.ctx-layer, .ctx-stack, .ctx-stack > * { transition: none; }
+	.ctx-pop { animation: none; }
 }
 
 /* Recalled message (#message-kinds): keeps its place in the stream, nothing left to act on. */

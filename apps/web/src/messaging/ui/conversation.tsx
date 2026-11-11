@@ -134,12 +134,13 @@ function MessageMenu({ chat, readOutboxMaxSeq }: { chat: Chat; readOutboxMaxSeq:
 	return (
 		<Suspense fallback={null}>
 			<MenuLayer
-				key={`${target.chatId}:${target.key}:${target.picker === true ? 1 : 0}`}
+				key={`${target.chatId}:${target.key}:${target.picker === true ? 1 : 0}:${target.anchor.left}:${target.anchor.top}`}
 				chatId={target.chatId}
 				itemKey={target.key}
 				chat={chat}
-				readOutboxMaxSeq={readOutboxMaxSeq}
 				picker={target.picker === true}
+				anchor={target.anchor}
+				readOutboxMaxSeq={readOutboxMaxSeq}
 			/>
 		</Suspense>
 	);

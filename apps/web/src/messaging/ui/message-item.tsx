@@ -9,7 +9,7 @@
 // starts with one, URL buttons, and "đã cập nhật" when edited in place. Bot
 // messages carry callback buttons too (mockups/bots.html#inline-keyboard):
 // the pressed one waits for the bot's answer while the others stay usable.
-import { Suspense, lazy, memo, useContext, type ReactNode } from "react";
+import { Suspense, lazy, memo, useContext, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -23,7 +23,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
-import { ChatSearchContext, useIntent, useUi } from "./ui-context.tsx";
+import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
@@ -181,7 +181,7 @@ function SenderName({ name, tone, hidden, children }: { name: string; tone: stri
 /** Context menu on right click, long press or the keyboard (Enter, Shift+F10, Menu key). */
 function useMenuTrigger(chatId: number, itemKey: string) {
 	const ui = useUi();
-	return useContextTrigger(() => ui.menu.set({ chatId, key: itemKey }), true);
+	return useContextTrigger((x, y) => ui.menu.set({ chatId, key: itemKey, anchor: pointAnchor(x, y) }), true);
 }
 
 /**
@@ -366,23 +366,31 @@ function QuickActions({
 	"use no memo";
 	const copy = useCopy();
 	const ui = useUi();
+	const open = (event: MouseEvent<HTMLButtonElement>, picker: boolean) => {
+		const box = event.currentTarget.getBoundingClientRect();
+		const anchor: MenuAnchor = { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+		ui.menu.set(picker ? { chatId, key: itemKey, picker: true, anchor } : { chatId, key: itemKey, anchor });
+	};
 	return (
-		<div className="msg-actions" role="toolbar" aria-label={label}>
-			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.react} onClick={() => ui.menu.set({ chatId, key: itemKey, picker: true })}>
+		<>
+			<div className="msg-actions" role="toolbar" aria-label={label}>
+				{canReply && (
+					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
+						<Icon name="reply" small />
+					</button>
+				)}
+				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
+					<Icon name="forward" small />
+				</button>
+				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
+					<Icon name="dots" small />
+				</button>
+			</div>
+			{/* Telegram-style: the reaction button sits on its own under the bubble. */}
+			<button type="button" className="msg-react" tabIndex={-1} aria-label={copy.message.react} onClick={(event) => open(event, true)}>
 				<Icon name="smile" small />
 			</button>
-			{canReply && (
-				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
-					<Icon name="reply" small />
-				</button>
-			)}
-			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
-				<Icon name="forward" small />
-			</button>
-			<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={() => ui.menu.set({ chatId, key: itemKey })}>
-				<Icon name="dots" small />
-			</button>
-		</div>
+		</>
 	);
 }
 

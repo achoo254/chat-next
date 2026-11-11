@@ -75,7 +75,7 @@ function useColumnBehaviour(ui: Ui): void {
 		};
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented || !overlayLayout()) return;
-			if (document.querySelector("dialog[open], .ctx-layer") !== null) return;
+			if (document.querySelector("dialog[open], .ctx-pop") !== null) return;
 			closeInfo(ui, true);
 		};
 		const onDown = (event: PointerEvent) => {

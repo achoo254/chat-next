@@ -56,7 +56,7 @@ function placeQuickActions(event: PointerEvent<HTMLDivElement>): void {
 	const list = event.currentTarget.getBoundingClientRect();
 	const box = bubble.getBoundingClientRect();
 	const room = msg.classList.contains("mine") ? box.left - list.left : list.left + event.currentTarget.clientWidth - box.right;
-	msg.dataset.actions = room >= actions.offsetWidth + 8 ? "beside" : "above";
+	msg.dataset.actions = room >= actions.offsetWidth + 20 ? "beside" : "above";
 }
 
 export function groupRows(keys: readonly string[], itemOf: (key: string) => WindowItem | undefined): { key: string; keys: string[] }[] {

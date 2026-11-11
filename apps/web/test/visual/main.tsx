@@ -667,7 +667,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	info: openInfo,
 	context: async () => {
 		await contextMenu(".messages .msg", "Dashboard ổn định.");
-		await find(() => document.querySelector(".ctx-layer .menu"));
+		await find(() => document.querySelector(".ctx-pop .menu"));
 	},
 	"new-chat": async () => {
 		await click("button", "Tạo chat mới");
@@ -732,7 +732,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	"emoji-reaction": async () => {
 		await contextMenu(".messages .msg", "Dashboard ổn định.");
 		await click(".react-picker button", "Chọn biểu cảm");
-		await find(() => document.querySelector(".ctx-layer .emoji-pop"));
+		await find(() => document.querySelector(".ctx-pop .emoji-pop"));
 	},
 	reply: async () => {
 		await contextMenu(".messages .msg", "Dashboard ổn định.");

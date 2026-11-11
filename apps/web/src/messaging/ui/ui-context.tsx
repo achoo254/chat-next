@@ -57,6 +57,20 @@ export interface MenuTarget {
 	readonly key: string;
 	/** Opened from the message's "Thả cảm xúc" button: straight to the emoji panel. */
 	readonly picker?: boolean;
+	/** Where it opened (viewport pixels): the pointer, or the button that opened it. The menu appears right there. */
+	readonly anchor: MenuAnchor;
+}
+
+/** A point (right click, long press) or a button's box, in viewport pixels. */
+export interface MenuAnchor {
+	readonly left: number;
+	readonly top: number;
+	readonly right: number;
+	readonly bottom: number;
+}
+
+export function pointAnchor(x: number, y: number): MenuAnchor {
+	return { left: x, top: y, right: x, bottom: y };
 }
 
 /** A Mini App the user opened (OpenMiniApp answered), shown in the container (bots/mini-app.tsx). */

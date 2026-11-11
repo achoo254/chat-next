@@ -58,6 +58,8 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 .voice { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: center; padding: var(--space-1); width: min(280px, 100%); }
 .voice .play { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: var(--radius-full); border: 0; background: var(--c-primary-solid); color: var(--c-on-primary); }
 .voice .play:hover:not(:disabled) { background: var(--c-primary-solid-hover); }
+/* Your bubble turns --c-primary-solid light and --c-on-primary purple: hover dims the light disc, never the purple glyph. */
+.msg.mine .bubble .voice .play:hover:not(:disabled) { background: color-mix(in srgb, var(--c-on-primary) 85%, var(--c-mine)); }
 .voice .play:disabled { opacity: 0.6; }
 .voice .play .spin { width: 16px; height: 16px; }
 .voice.gone-voice .play { background: var(--c-bar-track); color: var(--c-text-muted); }
