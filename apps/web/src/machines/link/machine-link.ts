@@ -31,6 +31,7 @@ import {
 	type ProjectCloneProgress,
 	type ProjectListResult,
 	type SecretPrompt,
+	type ThreadActivity,
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -216,6 +217,13 @@ export class MachineLink {
 	private queue: Promise<void> = Promise.resolve();
 	private readonly waiters = new Map<string, Waiter>();
 	private readonly watched = new Map<string, number>();
+	/**
+	 * The latest activity of each running turn (ThreadActivity), kept out of
+	 * LinkState: it changes every second, and only the activity line reads it,
+	 * so the lists never render again for it.
+	 */
+	private activities = new Map<string, ThreadActivity>();
+	private readonly activityListeners = new Set<() => void>();
 	private attempt = 0;
 	private retryTimer: unknown = null;
 	private pingTimer: unknown = null;
@@ -248,6 +256,26 @@ export class MachineLink {
 	private set(change: Partial<LinkState>): void {
 		this.current = { ...this.current, ...change };
 		for (const listener of this.listeners) listener();
+	}
+
+	/** For useSyncExternalStore: called whenever any thread's activity changes. */
+	readonly onActivity = (listener: () => void): (() => void) => {
+		this.activityListeners.add(listener);
+		return () => this.activityListeners.delete(listener);
+	};
+
+	/** The latest activity the machine sent for the thread; undefined before any (or from a tunelo before 2.5.0). */
+	activity(threadId: string): ThreadActivity | undefined {
+		return this.activities.get(threadId);
+	}
+
+	private setActivity(threadId: string, activity: ThreadActivity | undefined): void {
+		if (activity === undefined && !this.activities.has(threadId)) return;
+		const next = new Map(this.activities);
+		if (activity === undefined) next.delete(threadId);
+		else next.set(threadId, activity);
+		this.activities = next;
+		for (const listener of this.activityListeners) listener();
 	}
 
 	journal(threadId: string): Journal {
@@ -649,6 +677,9 @@ export class MachineLink {
 				this.set({ gitChanges });
 				break;
 			}
+			case "threadActivity":
+				this.setActivity(b.value.threadId, b.value);
+				break;
 			case "fullItem":
 				if (b.value.item !== undefined) {
 					const full = new Map(this.current.full);
@@ -703,6 +734,7 @@ export class MachineLink {
 			return next;
 		};
 		const threads = this.current.threads.filter((t) => t.id !== threadId);
+		this.setActivity(threadId, undefined);
 		this.set({
 			threads,
 			openSessions: threads.filter((t) => t.open).length,
@@ -737,6 +769,6 @@ export function mergeThreadInfo(previous: ThreadInfo | undefined, next: ThreadIn
 
 /** Threads that need the user first, then running ones, then the rest by last change. */
 export function sortForList(threads: readonly ThreadSummary[]): ThreadSummary[] {
-	const rank = (t: ThreadSummary) => (t.state === ThreadState.WAITING ? 0 : t.state === ThreadState.RUNNING || t.state === ThreadState.QUEUED ? 1 : 2);
+	const rank = (t: ThreadSummary) => (t.state === ThreadState.WAITING ? 0 : t.state === ThreadState.RUNNING || t.state === ThreadState.QUEUED || t.busyElsewhere ? 1 : 2);
 	return [...threads].sort((a, b) => rank(a) - rank(b) || (a.updatedAt === b.updatedAt ? 0 : a.updatedAt > b.updatedAt ? -1 : 1));
 }

@@ -353,6 +353,9 @@ export class Connection {
         if (this.subscribed.has(threadId)) this.sendItems(threadId, items);
       }),
       this.ctx.core.onStatus((thread) => this.send("", { case: "threadStatus", value: { thread } })),
+      this.ctx.core.onActivity((activity) => {
+        if (this.subscribed.has(activity.threadId)) this.send("", { case: "threadActivity", value: activity });
+      }),
       this.ctx.core.onInfo((threadId) => {
         if (this.subscribed.has(threadId)) this.sendInfo(threadId);
       }),
@@ -622,9 +625,12 @@ export class Connection {
           this.sendInfo(threadId);
           if (r.resume.kind === "reset") {
             this.send(id, { case: "threadReset", value: { threadId, reason: r.resume.reason } });
-            return this.sendItems(threadId, core.snapshot(threadId), id);
-          }
-          return this.sendItems(threadId, r.items, id);
+            this.sendItems(threadId, core.snapshot(threadId), id);
+          } else this.sendItems(threadId, r.items, id);
+          // A turn already running: what it does now, without waiting for its next change.
+          const activity = core.activity(threadId);
+          if (activity) this.send("", { case: "threadActivity", value: activity });
+          return;
         }
         case "threadSend":
           // `/clear` alone starts a fresh thread, answered like ThreadCreate: the device moves to it.

@@ -8,6 +8,14 @@ import { resultText, toolDiff, toolKind, toolSummary } from "./tool-map.ts";
 /** A reset time claude gives in Unix seconds (or milliseconds) as milliseconds; 0 when absent. */
 const epochMs = (t: number | undefined) => (t && t > 0 ? (t < 1e12 ? t * 1000 : t) : 0);
 
+type StreamEvent = Extract<SDKMessage, { type: "stream_event" }>["event"];
+
+/** `output_tokens` of a streamed usage report; undefined when it has none (read as unknown: a stream may leave usage out). */
+function tokenCount(usage: unknown): number | undefined {
+  const n = (usage as { output_tokens?: unknown } | null | undefined)?.output_tokens;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 /** Maps SDK messages of the top-level conversation onto ProviderEvents. */
 export class MessageMapper {
   private messageId = "";
@@ -15,6 +23,8 @@ export class MessageMapper {
   private blocks = new Map<number, { id: string; role: "assistant" | "thinking"; text: string }>();
   private subagents = new Set<string>();
   private hidden = new Set<string>();
+  /** The reply streaming now, by stream ("" for the conversation, else the subagent's tool call). */
+  private replies = new Map<string, string>();
   /** The model of the conversation's latest reply ("" before one). */
   model = "";
 
@@ -25,8 +35,9 @@ export class MessageMapper {
 
   map(msg: SDKMessage): void {
     if ("parent_tool_use_id" in msg && msg.parent_tool_use_id) {
-      // Inside a subagent: only its file edits show (with the subagent), no tool cards.
+      // Inside a subagent: only its file edits show (with the subagent), no tool cards; its tokens count with the turn's.
       if (msg.type === "assistant") this.subagentEdits(msg.parent_tool_use_id, msg.message.content);
+      else if (msg.type === "stream_event") this.outputTokens(msg.parent_tool_use_id, msg.event);
       return;
     }
     switch (msg.type) {
@@ -53,7 +64,25 @@ export class MessageMapper {
     }
   }
 
-  private stream(ev: Extract<SDKMessage, { type: "stream_event" }>["event"]) {
+  /**
+   * Output tokens of the reply streaming in `stream` (the conversation, or a
+   * subagent by its tool call): message_start opens a reply with its count so
+   * far, each message_delta carries the reply's count up to then.
+   */
+  private outputTokens(stream: string, ev: StreamEvent) {
+    if (ev.type === "message_start") {
+      this.replies.set(stream, ev.message.id);
+      const tokens = tokenCount(ev.message.usage);
+      if (tokens !== undefined) this.emit({ type: "output-tokens", messageId: ev.message.id, tokens });
+    } else if (ev.type === "message_delta") {
+      const id = this.replies.get(stream);
+      const tokens = tokenCount(ev.usage);
+      if (id !== undefined && tokens !== undefined) this.emit({ type: "output-tokens", messageId: id, tokens });
+    }
+  }
+
+  private stream(ev: StreamEvent) {
+    this.outputTokens("", ev);
     if (ev.type === "message_start") {
       this.messageId = ev.message.id;
       this.streamed.add(ev.message.id);

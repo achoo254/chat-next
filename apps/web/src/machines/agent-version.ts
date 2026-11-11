@@ -23,6 +23,12 @@ export const AGENT_PROJECTS = [2, 0, 7] as const;
 export const AGENT_PARKED_SESSION = [2, 0, 9] as const;
 
 /**
+ * The first tunelo that tells what a running turn does (ThreadActivity) and
+ * which sessions run a turn elsewhere on the machine (ThreadSummary.busy_elsewhere).
+ */
+export const AGENT_LIVE_ACTIVITY = [2, 5, 0] as const;
+
+/**
  * Whether the machine offers a terminal: "available" (tunelo 2.4.0+ with its
  * terminal process), "missing" (the process is not installed yet: update),
  * "incompatible" (another major version runs, or nothing supervises it:

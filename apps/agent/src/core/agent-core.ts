@@ -6,6 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { join, resolve, sep } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import {
+  ActivityPhase,
   type Answers,
   type Cursor,
   Decision,
@@ -15,6 +16,8 @@ import {
   PromptState,
   Role,
   ThreadState,
+  type ThreadActivity,
+  ThreadActivitySchema,
   type ThreadSummary,
   ThreadSummarySchema,
   type ThreadInfo,
@@ -123,6 +126,8 @@ type ThreadMeta = {
    * update, a restart): asked again as new cards when it starts.
    */
   reask?: string[];
+  /** Unix milliseconds when the machine last closed the thread's session (its last writes to the AI's records may follow). */
+  closedAt?: number;
 };
 
 /** A session kept on the machine, as devices see it (LocalSession in the protocol). */
@@ -187,7 +192,36 @@ type Thread = {
    * the AI as a message, since the call that asked them is gone.
    */
   reasks: Map<string, Question[]>;
+  /** The session runs a turn somewhere else on the machine: since when it was last active there, and its tool ("" when unknown). */
+  elsewhere?: { since: number; tool: string };
+  /** Where the AI's record of the session ended at the last look for activity elsewhere. */
+  seenEnd?: number;
+  /** What the turn the machine runs is doing, for ThreadActivity; set only while it runs. */
+  activity?: TurnActivity;
 };
+
+/** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
+type TurnActivity = {
+  startedAt: number;
+  phase: "thinking" | "writing";
+  /** Output tokens by reply; none until the AI reports any. */
+  tokens: Map<string, number>;
+  sentAt: number;
+  timer?: ReturnType<typeof setTimeout>;
+};
+
+/** Activity of a running turn goes to devices at most this often. */
+export const ACTIVITY_MS = 1_000;
+
+/** How often threads not run by the machine are looked at for a turn running elsewhere. */
+export const ELSEWHERE_POLL_MS = 5_000;
+
+/**
+ * Activity within this long after the machine's own session of the thread
+ * was last active (or closed) is taken for that session's own late writes,
+ * not for something running elsewhere.
+ */
+const OWN_WRITE_SLACK_MS = 5_000;
 
 /** How long a thread's git changes are reused before git runs again. */
 const GIT_CHANGES_TTL_MS = 2_000;
@@ -261,6 +295,10 @@ export class AgentCore {
   private deletedListeners = new Set<(threadId: string, trashed: number) => void>();
   private infoListeners = new Set<(threadId: string) => void>();
   private turnEndListeners = new Set<(threadId: string) => void>();
+  private activityListeners = new Set<(activity: ThreadActivity) => void>();
+  private elsewhereTimer: ReturnType<typeof setInterval> | undefined;
+  /** The look for activity elsewhere under way; one at a time. */
+  private looking: Promise<void> | undefined;
   /** The latest git changes of each thread's folder (or the read under way), reused for GIT_CHANGES_TTL_MS. */
   private gitReads = new Map<string, { at: number; read: Promise<GitChangesResult> }>();
   /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
@@ -367,10 +405,16 @@ export class AgentCore {
   start(): void {
     this.idleTimer = setInterval(() => void this.parkIdle(), Math.min(30_000, this.idleMs));
     this.idleTimer.unref?.();
+    this.elsewhereTimer = setInterval(() => void this.lookElsewhere(), ELSEWHERE_POLL_MS);
+    this.elsewhereTimer.unref?.();
+    void this.lookElsewhere();
   }
 
   async stop(): Promise<void> {
     if (this.idleTimer) clearInterval(this.idleTimer);
+    if (this.elsewhereTimer) clearInterval(this.elsewhereTimer);
+    await this.looking;
+    for (const t of this.threads.values()) this.endActivity(t);
     // Prompts waiting for the user expire with the service; its next start asks the questions again.
     for (const t of this.threads.values()) this.expirePending(t);
     // A session moving to another profile opens first, then closes with the rest.
@@ -457,6 +501,127 @@ export class AgentCore {
     return () => this.statusListeners.delete(fn);
   }
 
+  /** Called with what a running turn is doing: when it starts, then at most every ACTIVITY_MS while something changes. */
+  onActivity(fn: (activity: ThreadActivity) => void): () => void {
+    this.activityListeners.add(fn);
+    return () => this.activityListeners.delete(fn);
+  }
+
+  /** What the thread's running turn is doing now; undefined when none runs (or the thread is unknown). */
+  activity(threadId: string): ThreadActivity | undefined {
+    const t = this.threads.get(threadId);
+    return t ? this.activityOf(t) : undefined;
+  }
+
+  // --- turns running elsewhere ---------------------------------------------
+
+  /**
+   * Looks at every thread the machine does not run now for a turn its
+   * session runs elsewhere (a terminal, an IDE, another app), as the
+   * thread's AI tells it (its liveness), and tells devices when that starts,
+   * changes or stops. A thread whose AI's record did not change since the
+   * last look, and that ran nothing elsewhere then, is skipped. Never fails.
+   */
+  lookElsewhere(): Promise<void> {
+    this.looking ??= (async () => {
+      try {
+        for (const t of [...this.threads.values()]) {
+          const before = elsewhereKey(this.summary(t));
+          try {
+            await this.lookAt(t);
+          } catch {
+            delete t.elsewhere;
+          }
+          if (!t.deleted && elsewhereKey(this.summary(t)) !== before) this.announce(t);
+        }
+      } finally {
+        this.looking = undefined;
+      }
+    })();
+    return this.looking;
+  }
+
+  private async lookAt(t: Thread): Promise<void> {
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (t.deleted || this.isOpen(t) || t.running || t.queued || !seg?.sessionId || !history?.liveness) {
+      delete t.elsewhere;
+      return;
+    }
+    const end = history.end(seg.sessionId);
+    if (end === undefined) {
+      delete t.elsewhere;
+      return;
+    }
+    if (!t.elsewhere && t.seenEnd !== undefined && end === t.seenEnd) return;
+    t.seenEnd = end;
+    const live = await history.liveness(seg.sessionId);
+    // The machine may have started the thread meanwhile.
+    if (this.isOpen(t) || t.running || t.queued) {
+      delete t.elsewhere;
+      return;
+    }
+    const since = live.since ?? this.now();
+    const ownAt = Math.max(t.lastActive, t.meta.closedAt ?? 0);
+    if (live.state === "busy" && since > ownAt + OWN_WRITE_SLACK_MS) t.elsewhere = { since, tool: live.tool ?? "" };
+    else delete t.elsewhere;
+  }
+
+  /** Runs a turn elsewhere, and never while the machine itself runs or holds the thread's session. */
+  private busyElsewhere(t: Thread): boolean {
+    return t.elsewhere !== undefined && !this.isOpen(t) && !t.running && !t.queued;
+  }
+
+  // --- activity of a running turn --------------------------------------------
+
+  private beginActivity(t: Thread): void {
+    this.endActivity(t);
+    delete t.elsewhere;
+    t.activity = { startedAt: this.now(), phase: "thinking", tokens: new Map(), sentAt: 0 };
+    this.markActivity(t);
+  }
+
+  private endActivity(t: Thread): void {
+    if (t.activity?.timer) clearTimeout(t.activity.timer);
+    delete t.activity;
+  }
+
+  /** Something the activity shows changed: devices hear of it now, or once ACTIVITY_MS passed since the last time. */
+  private markActivity(t: Thread): void {
+    const a = t.activity;
+    if (!a || a.timer) return;
+    const wait = a.sentAt + ACTIVITY_MS - this.now();
+    if (wait <= 0) return this.sendActivity(t);
+    a.timer = setTimeout(() => {
+      delete a.timer;
+      if (t.activity === a) this.sendActivity(t);
+    }, wait);
+    a.timer.unref?.();
+  }
+
+  private sendActivity(t: Thread): void {
+    const activity = this.activityOf(t);
+    if (!activity || !t.activity) return;
+    t.activity.sentAt = this.now();
+    for (const fn of this.activityListeners) fn(activity);
+  }
+
+  private activityOf(t: Thread): ThreadActivity | undefined {
+    const a = t.activity;
+    if (!a || !t.running) return undefined;
+    const waiting = t.pending.size + t.reasks.size + (t.outsidePrompts ?? 0) > 0;
+    const phase = waiting ? ActivityPhase.WAITING : t.runningTool ? ActivityPhase.TOOL : a.phase === "writing" ? ActivityPhase.WRITING : ActivityPhase.THINKING;
+    let tokens = 0;
+    for (const n of a.tokens.values()) tokens += n;
+    return create(ThreadActivitySchema, {
+      threadId: t.meta.id,
+      phase,
+      tool: phase === ActivityPhase.TOOL ? (t.runningTool?.name ?? "") : "",
+      turnStartedAt: BigInt(a.startedAt),
+      ...(a.tokens.size > 0 ? { outputTokens: BigInt(Math.round(tokens)) } : {}),
+    });
+  }
+
   // --- queries -------------------------------------------------------------
 
   list(): ThreadSummary[] {
@@ -524,6 +689,7 @@ export class AgentCore {
     t.outsidePrompts = count;
     if (count > before) this.opts.onNeedsInput?.(this.touch(t));
     else if (count !== before) this.announce(t);
+    if (count !== before) this.markActivity(t);
   }
 
   followMachineProfile(): void {
@@ -1006,6 +1172,7 @@ export class AgentCore {
     t.lastActive = this.now();
     t.outbox.push(message);
     this.touch(t);
+    this.beginActivity(t);
     await this.ensureSession(t);
   }
 
@@ -1105,11 +1272,10 @@ export class AgentCore {
     const sessions = this.threadSessions(t);
     if (!req.openAnyway) {
       for (const { history, sessionId } of sessions) {
-        await history.prime?.();
-        const found = history.find(sessionId);
-        // A change after this thread's own last one came from elsewhere.
-        if (found?.busy && !this.isOpen(t) && found.updatedAt > t.meta.updatedAt + 5_000) {
-          throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: found.dir });
+        const live = await history.liveness?.(sessionId);
+        // Activity after this thread's own last change came from elsewhere.
+        if (live?.state === "busy" && !this.isOpen(t) && (live.since ?? this.now()) > t.meta.updatedAt + OWN_WRITE_SLACK_MS) {
+          throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
         }
       }
     }
@@ -1128,6 +1294,7 @@ export class AgentCore {
     }
     t.deleted = true;
     clearTimeout(t.flushTimer);
+    this.endActivity(t);
     this.cancelPending(t);
     this.threads.delete(t.meta.id);
     rmSync(join(this.opts.dataDir, "threads", t.meta.id), { recursive: true, force: true });
@@ -1260,6 +1427,7 @@ export class AgentCore {
     t.running = true;
     t.outbox.push({ text: summary });
     this.touch(t);
+    this.beginActivity(t);
     await this.ensureSession(t);
   }
 
@@ -1380,6 +1548,8 @@ export class AgentCore {
     delete t.session;
     this.cancelPending(t);
     await s.close();
+    t.meta.closedAt = this.now();
+    this.saveMeta(t);
     void this.dequeue();
   }
 
@@ -1431,6 +1601,13 @@ export class AgentCore {
         return;
       }
       case "text-delta": {
+        if (t.activity) {
+          const phase = e.role === "assistant" ? "writing" : "thinking";
+          if (t.activity.phase !== phase) {
+            t.activity.phase = phase;
+            this.markActivity(t);
+          }
+        }
         const id = this.textItem(t, e.blockId, e.role);
         const item = t.journal.get(id);
         if (item?.body.case === "text") item.body.value.text += e.text;
@@ -1492,6 +1669,15 @@ export class AgentCore {
       case "usage":
         t.usage = { tokens: e.contextTokens, window: e.contextWindow };
         return;
+      case "output-tokens": {
+        const a = t.activity;
+        if (!a) return;
+        const before = a.tokens.get(e.messageId);
+        if (before !== undefined && before >= e.tokens) return;
+        a.tokens.set(e.messageId, e.tokens);
+        this.markActivity(t);
+        return;
+      }
       case "compaction":
         this.put(t, `compact:${randomUUID()}`, { case: "compaction", value: { tokensBefore: BigInt(e.tokensBefore) } });
         return;
@@ -1581,6 +1767,7 @@ export class AgentCore {
     t.running = false;
     delete t.turnItem;
     delete t.runningTool;
+    this.endActivity(t);
     this.markHistory(t);
     // A turn that went through: the profile has room again.
     if (state === TurnState.COMPLETED && t.suggestion && !t.limitSeen) {
@@ -1643,6 +1830,7 @@ export class AgentCore {
     return new Promise((resolveAnswer) => {
       const deny = req.kind === "approval" ? ({ decision: "deny" } as const) : ({ cancelled: true } as const);
       t.pending.set(itemId, { itemId, kind: req.kind, sensitive: req.kind === "approval" && req.sensitive, resolve: resolveAnswer });
+      this.markActivity(t);
       signal.addEventListener("abort", () => {
         if (!t.pending.has(itemId)) return;
         t.pending.delete(itemId);
@@ -1796,9 +1984,16 @@ export class AgentCore {
     } else if (b.case === "toolCall" && t.running) {
       t.runningTool = { toolId: b.value.toolId, name: b.value.name };
       this.announce(t);
+      this.markActivity(t);
     } else if (b.case === "toolResult" && t.runningTool?.toolId === b.value.toolId) {
       delete t.runningTool;
+      // The AI reads the result next.
+      if (t.activity) t.activity.phase = "thinking";
       this.announce(t);
+      this.markActivity(t);
+    } else if ((b.case === "approval" || b.case === "question") && b.value.state !== PromptState.PENDING) {
+      // Waiting for the user ended (answered, cancelled).
+      this.markActivity(t);
     }
   }
 
@@ -1829,6 +2024,7 @@ export class AgentCore {
         : t.running
           ? ThreadState.RUNNING
           : ThreadState.IDLE;
+    const elsewhere = this.busyElsewhere(t);
     return create(ThreadSummarySchema, {
       id: t.meta.id,
       title: t.meta.title,
@@ -1840,10 +2036,17 @@ export class AgentCore {
       updatedAt: BigInt(t.meta.updatedAt),
       open: this.isOpen(t),
       preview: t.preview,
-      previewTool: t.running ? (t.runningTool?.name ?? "") : "",
+      previewTool: t.running ? (t.runningTool?.name ?? "") : elsewhere ? (t.elsewhere?.tool ?? "") : "",
       archived: Boolean(t.meta.archived),
+      busyElsewhere: elsewhere,
+      elsewhereActiveAt: elsewhere ? BigInt(t.elsewhere?.since ?? 0) : 0n,
     });
   }
+}
+
+/** What devices see of a thread's activity elsewhere, to tell when it changed. */
+function elsewhereKey(s: ThreadSummary): string {
+  return s.busyElsewhere ? `${s.elsewhereActiveAt}:${s.previewTool}` : "";
 }
 
 /** A session's name from a message: its first line, at most 80 characters. */

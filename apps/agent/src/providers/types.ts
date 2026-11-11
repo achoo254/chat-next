@@ -87,6 +87,12 @@ export type ProviderEvent =
   | { type: "subagent"; toolId: string; description: string; done: boolean }
   | { type: "status"; text: string }
   | { type: "usage"; contextTokens: number; contextWindow: number }
+  /**
+   * Output tokens one reply of the AI (`messageId`) produced so far, counted
+   * as they stream (the count of that reply only, growing). Optional: an AI
+   * that does not stream them shows no count.
+   */
+  | { type: "output-tokens"; messageId: string; tokens: number }
   | { type: "compaction"; tokensBefore: number }
   | { type: "turn-end"; state: "completed" | "interrupted" | "failed"; durationMs: number; stats?: TurnStats }
   | { type: "error"; message: string; needsLogin?: boolean }
@@ -203,6 +209,14 @@ export type SessionQuery = {
   limit: number;
 };
 
+/**
+ * A session's liveness as its AI can tell it: "busy" while a turn runs,
+ * "idle" once it went quiet, "unknown" when it cannot tell (no record).
+ * `since`: Unix milliseconds of the last activity seen; `tool`: the tool
+ * running now, by its name, when known; `via`: what told it.
+ */
+export type Liveness = { state: "busy" | "idle" | "unknown"; since?: number; tool?: string; via: "transcript" | "process" | "api" };
+
 export type SessionPage = { sessions: LocalSession[]; total: number; dirs: { dir: string; sessions: number }[] };
 
 /**
@@ -237,6 +251,12 @@ export interface SessionHistory {
    * empty when there are none.
    */
   sessionFiles?(sessionId: string): string[];
+  /**
+   * Whether the session is running a turn right now, wherever it runs (a
+   * terminal, an IDE, another app, or this machine's own session: telling
+   * those apart is the core's job). Each AI tells it its own way; never fails.
+   */
+  liveness?(sessionId: string): Promise<Liveness>;
 }
 
 export interface AgentProvider {

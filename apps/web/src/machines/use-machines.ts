@@ -226,9 +226,13 @@ export function errorText(t: MachinesCopy, err: unknown, ai: string): string {
 	return machineErrorText(t, err, ai);
 }
 
-export type StateKey = "waiting" | "running" | "queued" | "idle" | "error";
+/** "elsewhere": idle here, but its session runs a turn elsewhere on the machine (a terminal, an IDE). */
+export type StateKey = "waiting" | "running" | "queued" | "idle" | "error" | "elsewhere";
 
-export function stateKey(thread: Pick<ThreadSummary, "state">): StateKey {
+/** What stateKey and isRunning read; busyElsewhere is absent from older machines (and reads as false). */
+export type ThreadStateOf = Pick<ThreadSummary, "state"> & Partial<Pick<ThreadSummary, "busyElsewhere">>;
+
+export function stateKey(thread: ThreadStateOf): StateKey {
 	switch (thread.state) {
 		case ThreadState.WAITING:
 			return "waiting";
@@ -239,8 +243,14 @@ export function stateKey(thread: Pick<ThreadSummary, "state">): StateKey {
 		case ThreadState.ERROR:
 			return "error";
 		default:
-			return "idle";
+			return thread.busyElsewhere === true ? "elsewhere" : "idle";
 	}
+}
+
+/** Runs a turn: on the machine for devices, waiting for room, or elsewhere on the machine. */
+export function isRunning(thread: ThreadStateOf): boolean {
+	const key = stateKey(thread);
+	return key === "running" || key === "queued" || key === "elsewhere";
 }
 
 /** The last path segment, for headers and tiles ("~/code/chat-next" → "chat-next"). */

@@ -21,7 +21,7 @@ import { useCollapsed } from "./use-collapsed.ts";
 import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing, type Conn } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
-import { aiName, folderName, modelName, stateKey, timeAgo, useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
+import { aiName, folderName, isRunning, modelName, stateKey, timeAgo, useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
@@ -42,11 +42,16 @@ function savedFilter(): Filter {
 }
 
 /** The session matches the filter: "all" leaves archived ones out, "archived" shows only them; what needs the user or runs shows either way. */
-export function matches(filter: Filter, thread: Pick<ThreadSummary, "state" | "archived">): boolean {
+export function matches(filter: Filter, thread: Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere">>): boolean {
 	if (filter === "need") return thread.state === ThreadState.WAITING;
-	if (filter === "running") return thread.state === ThreadState.RUNNING || thread.state === ThreadState.QUEUED;
+	if (filter === "running") return isRunning(thread);
 	if (filter === "archived") return thread.archived;
 	return !thread.archived;
+}
+
+/** Sessions the "running" filter shows (archived ones too, as the filter does). */
+export function runningCount(threads: readonly (Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere">>)[]): number {
+	return threads.filter((x) => matches("running", x)).length;
 }
 
 /** Sessions by folder, folders in the order of their first (most urgent, newest) session. */
@@ -109,6 +114,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	};
 	const archived = machines.some((m) => m.state.threads.some((x) => x.archived));
 	const need = machines.reduce((n, m) => n + m.state.threads.filter((x) => x.state === ThreadState.WAITING).length, 0);
+	const running = machines.reduce((n, m) => n + runningCount(m.state.threads), 0);
 	const directory = hub.directory();
 	const currentThread = view.page === "session" ? view.threadId : null;
 	const terminalOpen = view.page === "terminal" ? view.machine : null;
@@ -133,7 +139,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 						.filter((f) => f !== "archived" || archived || filter === "archived")
 						.map((f) => (
 							<button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>
-								{f === "all" ? t.sessions.all : f === "need" ? t.sessions.need(need) : f === "running" ? t.sessions.running : t.agent.thread.archived}
+								{f === "all" ? t.sessions.all : f === "need" ? t.sessions.need(need) : f === "running" ? t.sessions.running(running) : t.agent.thread.archived}
 							</button>
 						))}
 				</div>
@@ -393,7 +399,7 @@ function SessionRow({ machine, thread, now, current }: { machine: MachineView; t
 	const content = (
 		<>
 				<span className={`mx-st ${key}`} aria-hidden="true">
-					{key === "running" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
+					{key === "running" || key === "elsewhere" ? <span className="spin" /> : <MachineIcon name={key === "waiting" ? "help" : "terminal"} small />}
 				</span>
 				<span className="tx">
 					<span className="line">

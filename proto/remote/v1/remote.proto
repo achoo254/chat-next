@@ -255,6 +255,10 @@ message Frame {
     TermOpened term_opened = 115;
     TermClosed term_closed = 116;
     TermStatus term_status = 117;
+
+    // What a running turn is doing (tunelo 2.5.0+). B → A, unasked, to
+    // devices following the thread.
+    ThreadActivity thread_activity = 118;
   }
 }
 
@@ -1150,6 +1154,43 @@ message ThreadSummary {
   string preview_tool = 11;
   // Hidden from the list (ThreadSetArchived); unset before tunelo 2.0.6.
   bool archived = 12;
+  // The thread's session is running a turn somewhere else on the machine (a
+  // terminal, an IDE, another app), not in a session the machine runs for
+  // devices; state stays IDLE. Cleared once the session goes quiet. Never set
+  // while the machine itself runs the thread. preview_tool names the tool
+  // running there when the AI's records tell it. Unset before tunelo 2.5.0.
+  bool busy_elsewhere = 13;
+  // With busy_elsewhere: Unix milliseconds of the last activity seen there.
+  int64 elsewhere_active_at = 14;
+}
+
+// What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
+// line under the last message. Sent to devices following the thread when
+// the turn starts, then at most about once a second while something changes,
+// never after it ended (the thread's state says it ended). A device counts
+// the elapsed time itself from turn_started_at.
+message ThreadActivity {
+  string thread_id = 1;
+  ActivityPhase phase = 2;
+  // The tool running, by its name, with ACTIVITY_PHASE_TOOL; "" otherwise.
+  string tool = 3;
+  // Unix milliseconds when the turn started.
+  int64 turn_started_at = 4;
+  // Output tokens the AI produced in this turn so far; unset when the AI
+  // does not report them (a device then shows no count).
+  optional uint64 output_tokens = 5;
+}
+
+enum ActivityPhase {
+  ACTIVITY_PHASE_UNSPECIFIED = 0;
+  // Reasoning, or waiting for the AI's first output.
+  ACTIVITY_PHASE_THINKING = 1;
+  // Writing its answer.
+  ACTIVITY_PHASE_WRITING = 2;
+  // Running a tool (ThreadActivity.tool).
+  ACTIVITY_PHASE_TOOL = 3;
+  // Waiting for the user (an approval, a question, a secret).
+  ACTIVITY_PHASE_WAITING = 4;
 }
 
 enum ThreadState {

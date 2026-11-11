@@ -38,12 +38,12 @@ import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
-import { clockText, useNow } from "./transcript/run-time.ts";
 import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
-import { versionAtLeast } from "./agent-version.ts";
+import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
+import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 
 export { versionAtLeast };
@@ -210,7 +210,18 @@ export function SessionChat({ machine, threadId }: { machine: string; threadId: 
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
-						<Transcript blocks={blocks} state={state} running={running} startedAt={turnStartedAt(items)} waiting={prompts.length > 0 || outside > 0} fetchFull={fetchFull} link={link} threadId={threadId} />
+						<Transcript
+							blocks={blocks}
+							state={state}
+							running={running}
+							startedAt={turnStartedAt(items)}
+							waiting={prompts.length > 0 || outside > 0}
+							fetchFull={fetchFull}
+							link={link}
+							threadId={threadId}
+							thread={thread}
+							live={versionAtLeast(state.info?.agentVersion ?? "", AGENT_LIVE_ACTIVITY)}
+						/>
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -453,14 +464,18 @@ interface TranscriptProps {
 	/** A prompt waits in the dock. */
 	waiting: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
-	link: UploadLink;
+	link: UploadLink & ActivitySource;
 	threadId: string;
+	thread: ThreadSummary | null;
+	/** The machine tells what a running turn does (ThreadActivity). */
+	live: boolean;
 }
 
 /** Within this distance of the bottom, the transcript follows new content. */
 const STICK_PX = 80;
 
-function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, link, threadId }: TranscriptProps) {
+/** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
+export function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -484,9 +499,6 @@ function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, lin
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, []);
-	const now = useNow(startedAt !== null);
-	const { locale } = useI18n();
-	const typing = running && !waiting && !(last?.kind === "text" && last.partial);
 	const newer = seenAt === null ? 0 : Math.max(0, blocks.length - seenAt);
 	const toBottom = () => {
 		const el = scroller.current;
@@ -520,14 +532,17 @@ function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, lin
 				{blocks.map((block) => (
 					<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
 				))}
-				{typing && (
-					<div className="mx-typing" role="status" aria-label={t.chat.typing(aiName(state.info, ""))}>
-						<i />
-						<i />
-						<i />
-						{startedAt !== null && <span className="mx-typing-time">{t.transcript.working(clockText(now - startedAt, t, locale))}</span>}
-					</div>
-				)}
+				<ActivityLine
+					source={link}
+					threadId={threadId}
+					thread={thread}
+					running={running}
+					live={live}
+					startedAt={startedAt}
+					waiting={waiting}
+					streaming={last?.kind === "text" && last.partial}
+					ai={aiName(state.info, thread?.provider ?? "")}
+				/>
 			</div>
 			{seenAt !== null && (
 				<button type="button" className="mx-jump" onClick={toBottom}>

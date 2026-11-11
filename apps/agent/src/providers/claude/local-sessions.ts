@@ -12,9 +12,14 @@
 // folder and that session changed since it started (running-claude.ts; this
 // one also sees a claude with a Claude folder tunelo does not know, as an
 // IDE may start). Only the folder and start time of the process are read.
+//
+// Liveness (is a turn running now?) is narrower: the transcript was written
+// in the last minute, or it holds a tool call with no result yet (a long
+// command writes nothing until it ends) for at most ten minutes while a
+// running claude still holds the session.
 import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { HistoryEntry, HistoryRead, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
+import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
 import { ClaudeProcesses, heldSessions } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
 
@@ -32,6 +37,10 @@ export const RECENT_BYTES = 8 * 1024 * 1024;
 /** Longest transcript line taken in whole when reading entries (longer: a giant tool output, skipped). */
 const LINE_MAX = 8 * 1024 * 1024;
 const BUSY_MS = 60_000;
+/** How long a tool call with no result keeps a held session busy without the transcript changing (Bash's longest timeout). */
+export const TOOL_BUSY_MS = 10 * 60_000;
+/** The end of a transcript read for a tool call that has no result yet. */
+const TOOL_TAIL_BYTES = 256 * 1024;
 const TITLE_MAX = 120;
 const DIRS_MAX = 50;
 export const PAGE_DEFAULT = 30;
@@ -40,7 +49,9 @@ export const PAGE_MAX = 100;
 type Head = { end: number; dir: string; prompt: string; entrypoint: string };
 type Tail = { size: number; mtimeMs: number; title: string };
 type Count = { scanned: number; messages: number };
-type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count };
+/** The tool call of the transcript still waiting for its result, as of `size`; "" when none. */
+type OpenTool = { size: number; mtimeMs: number; name: string };
+type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool };
 
 export type LocalSessionsOptions = {
   /** Claude folders of the machine (its own, then each profile's); their projects and running sessions are read. */
@@ -157,6 +168,75 @@ export class LocalSessions implements SessionHistory {
 
   end(sessionId: string): number | undefined {
     return this.locate(sessionId)?.size;
+  }
+
+  /**
+   * Busy while the transcript was written in the last minute; past that,
+   * while a tool call has no result yet (for TOOL_BUSY_MS at most) and a
+   * running claude holds the session. Never fails.
+   */
+  async liveness(sessionId: string): Promise<Liveness> {
+    let k: Known | undefined;
+    try {
+      k = this.locate(sessionId);
+    } catch {
+      k = undefined;
+    }
+    if (!k) return { state: "unknown", via: "transcript" };
+    const since = Math.round(k.mtimeMs);
+    const quiet = this.now() - k.mtimeMs;
+    if (quiet >= TOOL_BUSY_MS) return { state: "idle", since, via: "transcript" };
+    const tool = this.openTool(k);
+    const withTool = tool ? { tool } : {};
+    if (quiet < BUSY_MS) return { state: "busy", since, ...withTool, via: "transcript" };
+    if (!tool) return { state: "idle", since, via: "transcript" };
+    await this.processes.refresh();
+    this.head(k);
+    const held = this.running([...this.known.values()]).has(k.sessionId);
+    return held ? { state: "busy", since, tool, via: "process" } : { state: "idle", since, via: "process" };
+  }
+
+  /**
+   * The newest tool call of the conversation with no result yet, from the
+   * end of the transcript ("" when none); kept until the file changes. A
+   * result too long to keep whole is still told by the id at its start.
+   */
+  private openTool(k: Known): string {
+    if (k.tool && k.tool.size === k.size && k.tool.mtimeMs === k.mtimeMs) return k.tool.name;
+    const open = new Map<string, string>();
+    const resultIds = /"tool_use_id":"([^"]+)"/g;
+    try {
+      withFile(k.file, (fd) =>
+        scanLines(
+          fd,
+          Math.max(0, k.size - TOOL_TAIL_BYTES),
+          k.size,
+          COUNT_KEEP,
+          (line, whole) => {
+            if (!whole) {
+              for (const m of line.subarray(0, 4096).toString("utf8").matchAll(resultIds)) if (m[1]) open.delete(m[1]);
+              return;
+            }
+            const rec = parseRecord(line);
+            if (!rec || rec.isSidechain === true || !Array.isArray(rec.message?.content)) return;
+            for (const block of rec.message.content as { type?: unknown; id?: unknown; name?: unknown; tool_use_id?: unknown }[]) {
+              if (rec.type === "assistant" && block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
+                open.delete(block.id);
+                open.set(block.id, block.name);
+              } else if (rec.type === "user" && block.type === "tool_result" && typeof block.tool_use_id === "string") {
+                open.delete(block.tool_use_id);
+              }
+            }
+          },
+          true,
+        ),
+      );
+    } catch {
+      return "";
+    }
+    const name = [...open.values()].at(-1) ?? "";
+    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name };
+    return name;
   }
 
   read(sessionId: string, from: number | "recent"): HistoryRead | undefined {
