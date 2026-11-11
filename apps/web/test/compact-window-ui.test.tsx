@@ -139,6 +139,43 @@ describe("compact window", () => {
 		await waitFor(() => expect(pip.document.body.querySelector(".compact")).toBeNull());
 	});
 
+	describe("the shortcut", () => {
+		const altP = (): void => {
+			fireEvent.keyDown(document, { code: "KeyP", key: "π", altKey: true });
+		};
+
+		it("opens the window, and closes it when pressed again", async () => {
+			const { fixture, open } = twoChats();
+			installPictureInPicture();
+			renderMessaging(fixture, `/c/${open}`);
+			await pageLog("Tin của Ngân");
+
+			altP();
+			await waitFor(() => expect(compactWindow.get()).not.toBeNull());
+			altP();
+			await waitFor(() => expect(compactWindow.get()).toBeNull());
+		});
+
+		it("does nothing where the browser lacks Document Picture-in-Picture", async () => {
+			const { fixture, open } = twoChats();
+			renderMessaging(fixture, `/c/${open}`);
+			await pageLog("Tin của Ngân");
+			altP();
+			expect(compactWindow.get()).toBeNull();
+		});
+
+		it("ignores the key with other modifiers", async () => {
+			const { fixture, open } = twoChats();
+			installPictureInPicture();
+			renderMessaging(fixture, `/c/${open}`);
+			await pageLog("Tin của Ngân");
+			fireEvent.keyDown(document, { code: "KeyP", altKey: true, shiftKey: true });
+			fireEvent.keyDown(document, { code: "KeyP", ctrlKey: true });
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			expect(compactWindow.get()).toBeNull();
+		});
+	});
+
 	describe("while the page is hidden behind it", () => {
 		it("marks a new message read when the window shows the chat", async () => {
 			const { fixture, open, ngan } = twoChats();

@@ -10,6 +10,7 @@ import { brand } from "../../brand.ts";
 import { FONT_MAX, FONT_MIN, LEGACY_THEME_KEY, setFontSize, storedFontSize } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
+import { isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { LOCALES, useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths, type SettingsTab } from "../../router.tsx";
@@ -557,6 +558,7 @@ function ShortcutSettings() {
 						{ label: t.upDown, keys: [["alt", "↑"], ["alt", "↓"]], joiner: "/" },
 						{ label: t.folders, keys: [["mod", "1"], ["5"]], joiner: "…" },
 						{ label: t.list, keys: [["mod", "/"]] },
+						...(isPictureInPictureSupported() ? [{ label: t.compactWindow, keys: [["alt", "P"]] }] : []),
 					])}
 				</dl>
 			</div>

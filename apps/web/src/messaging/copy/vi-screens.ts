@@ -423,6 +423,7 @@ export const viScreens = {
 		upDown: "Chat phía trên / phía dưới trong danh sách",
 		folders: "Bộ lọc Tất cả, Cá nhân, Nhóm, Bot, Chưa đọc",
 		list: "Danh sách phím tắt",
+		compactWindow: "Mở hoặc đóng cửa sổ nhỏ luôn nổi",
 		compose: "Soạn và trả lời",
 		send: "Gửi tin",
 		newline: "Xuống dòng",

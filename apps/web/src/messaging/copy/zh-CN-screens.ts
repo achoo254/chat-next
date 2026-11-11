@@ -421,6 +421,7 @@ export const zhCNScreens: ScreensCopy = {
 		upDown: "列表中的上一个 / 下一个聊天",
 		folders: "筛选：全部、个人、群组、机器人、未读",
 		list: "键盘快捷键",
+		compactWindow: "打开或关闭置顶小窗口",
 		compose: "撰写与回复",
 		send: "发送消息",
 		newline: "换行",

@@ -4,13 +4,14 @@
 // column shows at a time (#narrow); the info column handles its overlay and
 // narrow behaviour itself (info-panel.tsx). Screen-wide shortcuts
 // (settings.html#shortcuts): ⌘/Ctrl+K or F search, ⌘/Ctrl+1…5 pick a folder,
-// ⌘/Ctrl+/ opens the shortcut list.
+// ⌘/Ctrl+/ opens the shortcut list, ⌥/Alt+P opens or closes the compact window.
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { LoaderBoundary, LoaderScope, Ready } from "../../components/delayed-loader.tsx";
 import { loadConnectWeb } from "../../api/client.ts";
 import { preloadable, warm } from "../../components/preload.ts";
 import { loadIntegrationsClient } from "../integrations/api.ts";
+import { compactWindow, isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
 import { navigate, paths, useSearch, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
@@ -106,6 +107,13 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
+			// The physical key: on macOS ⌥P types a different character. A key press is the user gesture the window needs.
+			if (event.code === "KeyP" && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.repeat && isPictureInPictureSupported()) {
+				event.preventDefault();
+				if (compactWindow.get() === null) void compactWindow.open();
+				else compactWindow.close();
+				return;
+			}
 			if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
 			const key = event.key.toLowerCase();
 			if (key === "k" || key === "f") {

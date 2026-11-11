@@ -421,6 +421,7 @@ export const enScreens: ScreensCopy = {
 		upDown: "Chat above / below in the list",
 		folders: "Filters All, Personal, Groups, Bots, Unread",
 		list: "Keyboard shortcuts",
+		compactWindow: "Open or close the compact always-on-top window",
 		compose: "Write and reply",
 		send: "Send message",
 		newline: "New line",
