@@ -151,10 +151,10 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 					)}
 				</div>
 				<button type="button" className="icon-btn hide-touch" aria-label={t.splitRight} title={`${t.splitRight} (${prefix}D)`} disabled={busy} onClick={() => onAction({ kind: "split", dir: "row" })}>
-					<span className="tx-split-ico row" aria-hidden="true" />
+					<span className="tx-split-ico to-right" aria-hidden="true" />
 				</button>
 				<button type="button" className="icon-btn hide-touch" aria-label={t.splitDown} title={`${t.splitDown} (${prefix}S)`} disabled={busy} onClick={() => onAction({ kind: "split", dir: "column" })}>
-					<span className="tx-split-ico column" aria-hidden="true" />
+					<span className="tx-split-ico to-below" aria-hidden="true" />
 				</button>
 				<div className="mx-model hide-touch" ref={helpRef}>
 					<button type="button" className="icon-btn" aria-label={t.shortcuts} aria-haspopup="dialog" aria-expanded={helpOpen} onClick={() => setHelpOpen((v) => !v)}>

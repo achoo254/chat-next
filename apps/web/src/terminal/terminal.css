@@ -17,8 +17,8 @@
 .tx-actions { display: flex; align-items: center; gap: 2px; flex: none; }
 .tx-split-ico { display: block; align-self: center; justify-self: center; width: 14px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; }
 .tx-split-ico::after { content: ""; position: absolute; background: currentColor; }
-.tx-split-ico.row::after { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
-.tx-split-ico.column::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+.tx-split-ico.to-right::after { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+.tx-split-ico.to-below::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
 .tx-menu { right: 0; left: auto; min-width: 240px; }
 .tx-menu .note { margin: 0; padding: var(--space-2) var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
 .tx-keys-help { display: grid; gap: var(--space-1); margin: 0; padding: var(--space-1) var(--space-3) var(--space-2); font-size: 0.8125rem; }
