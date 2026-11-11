@@ -54,6 +54,7 @@ export const zhCNMachines: MachinesCopy = {
 		refresh: "刷新电脑状态",
 	},
 	diskAccess: {
+		guide: "操作说明",
 		title: "这台电脑需要为 tunelo 开启“完全磁盘访问权限”",
 		body: "仅当会话在桌面、文稿、下载或 iCloud 云盘中工作时需要。没有它，macOS 会拦截，或在电脑上弹窗而无人点按，导致会话卡住。请在 Mac 上：",
 		steps: [
@@ -171,7 +172,7 @@ export const zhCNMachines: MachinesCopy = {
 		typing: (ai) => `${ai} 正在输入`,
 		sending: "正在发送",
 		sendFailed: "发送失败。请检查连接后重试。",
-		chip: { waiting: "需要你", running: "运行中", queued: "排队中", offline: "已断开", idle: "空闲", error: "出错", elsewhere: "在别处运行" },
+		chip: { terminal: "正在终端中运行", waiting: "需要你", running: "运行中", queued: "排队中", offline: "已断开", idle: "空闲", error: "出错", elsewhere: "在别处运行" },
 		modelMenu: "模型和 AI",
 		modelsOf: (ai) => `${ai} 的模型`,
 		defaultModel: "默认",
@@ -801,6 +802,7 @@ export const zhCNMachines: MachinesCopy = {
 			update: "需要更新 tunelo",
 		},
 		hint: {
+			machinesNeedYou: "有设备需要你处理",
 			unpaired: "用身份验证器应用中那台电脑的 6 位数字码配对一次，即可查看和操作会话。",
 			repair: "电脑不再接受此设备。请重新配对。",
 			update: "在那台电脑上运行 tunelo update，然后重新加载此页。",
@@ -844,12 +846,14 @@ export const zhCNMachines: MachinesCopy = {
 			keys: "Enter 发送 · Shift+Enter 换行 · Esc 停止",
 		},
 		projects: {
+			notAdded: "尚未成为项目",
+			adopt: "添加为项目",
 			hostOffline: "设备离线",
 			pickFolder: "在此设备上选择文件夹",
 			addRecent: "添加",
 			host: "设备",
 			recent: "最近有 AI 会话的文件夹",
-			none: "还没有项目。将文件夹添加为项目即可打开会话。",
+			none: "还没有项目",
 			notInProject: (dir: string) => `${dir} 不是项目，因此此会话不在列表中。`,
 			add: "添加项目",
 			addTitle: "添加项目",

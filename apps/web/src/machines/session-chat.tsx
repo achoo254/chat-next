@@ -162,7 +162,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 		}
 	};
 
-	const chip = !online ? "offline" : thread === null ? null : stateKey(thread);
+	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere".
+	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? "terminal" : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
@@ -232,13 +233,13 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			{notInProject && (
-				<div className="mx-strip" role="note" data-id="session-not-in-project">
+				<div className="mx-strip slim" role="note" data-id="session-not-in-project">
 					<MachineIcon name="folder" small />
 					<span className="grow">{t.agent.projects.notInProject(folderName(dir))}</span>
 					<AddProject hosts={[{ ref: machine, name: machineName, link, state }]} initialDir={dir} />
 				</div>
 			)}
-			<DiskAccessBanner link={link} info={state.info} online={online} />
+			<DiskAccessBanner link={link} info={state.info} online={online} bar />
 			{mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (

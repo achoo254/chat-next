@@ -1,24 +1,26 @@
 // The AI Agent column, the same on every AI Agent page, kept as plain as
 // Orca's: every session lives in a project (a folder on one of the user's
 // machines), and the column is one list of projects, each with its sessions.
+// A folder that holds sessions but was never added as a project shows the
+// same way, offering "Thêm làm dự án", so nothing a user had disappears.
 // With several machines each project shows its machine's name; the machine
 // is picked only when adding a project. On top: "Quản lý máy" (machines,
-// their state, overview, settings and plain shells), then one toggle that
-// keeps only what needs the user or runs, and "Thêm dự án". Projects and sessions show a badge when they need
-// the user or run. A machine this device cannot use yet (offline, not
-// paired, too old) says so in one line, with the fix (pair) in place, so it
-// never just disappears. Archived sessions show only behind their own link;
+// their state, pairing, overview, settings and plain shells; a dot when one
+// needs the user), then one row with the switch that keeps only what needs
+// the user or runs, and "+" for "Thêm dự án". Projects and sessions show a
+// badge when they need the user or run. Projects of an offline machine stay,
+// dimmed; a machine with nothing to list stays under "Quản lý máy" only. Archived sessions show only behind their own link;
 // a row's menu (hover, or a long press on a phone) opens it in the terminal,
 // archives or deletes it on machines that can (tunelo 2.0.6+). A machine
 // older than projects (tunelo before 2.0.7) still lists its sessions by folder.
 import { useEffect, useState, type MouseEvent } from "react";
-import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { create } from "@bufbuild/protobuf";
+import { ProjectSchema, ThreadState, type MachineInfo, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths, type MachinesView } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { sortForList } from "./link/machine-link.ts";
-import { LOCAL_REF } from "./link/link-hub.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { FirstMachine } from "./first-machine.tsx";
 import { needsPairing, type Conn } from "./machine-status.ts";
@@ -105,6 +107,17 @@ export function connDot(conn: Conn): "on" | "wait" | "off" | "pair" | "warn" {
 	}
 }
 
+/** A machine's rows: its projects, then folders that hold sessions but are no project (as projects of their own). */
+export function hostRows(machine: MachineView, filter: Filter): { projects: { project: Project; threads: ThreadSummary[]; folder: boolean }[]; withProjects: boolean } {
+	const { state } = machine;
+	const withProjects = projectsSupported(state.info?.agentVersion);
+	const list = withProjects ? (state.projects?.projects ?? []) : [];
+	const grouped = byProject(state.threads.filter((x) => matches(filter, x)), list);
+	const added = grouped.groups.filter((g) => filter === "all" || g.threads.length > 0).map((g) => ({ ...g, folder: false }));
+	const folders = byFolder(grouped.other).map((f) => ({ project: create(ProjectSchema, { id: `folder:${f.dir}`, name: folderName(f.dir), dir: f.dir }), threads: f.threads, folder: true }));
+	return { projects: [...added, ...folders], withProjects };
+}
+
 /** Machines a project can be added on now: online, and keeping projects. */
 export function projectHosts(machines: readonly MachineView[]): ProjectHost[] {
 	return machines
@@ -133,6 +146,13 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	const currentThread = view.page === "session" || view.page === "session-terminal" ? view.threadId : null;
 	const currentMachine = "machine" in view ? view.machine : null;
 	const many = machines.length > 1;
+	const hosts = projectHosts(machines);
+	const rows = machines.map((m) => hostRows(m, filter));
+	// Nothing listed on any machine yet (and every machine that can answer did): one empty state for the whole list.
+	const settled = machines.every((m) => m.conn.kind !== "on" || (m.state.listed && (m.state.projects !== null || !projectsSupported(m.state.info?.agentVersion))));
+	const empty = filter === "all" && machines.length > 0 && settled && rows.every((r) => r.projects.length === 0);
+	// A machine that needs pairing or an update: "Quản lý máy" says so with a dot.
+	const attentionHost = machines.some((m) => needsPairing(m.conn) || m.conn.kind === "update");
 	return (
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
@@ -140,26 +160,41 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={t.agent.machines} current={view.page === "machines" || view.page === "add"}>
 					<MachineIcon name="monitor" small />
 					<span>{t.agent.machines}</span>
+					{attentionHost && <span className="dot warn" role="img" aria-label={t.agent.hint.machinesNeedYou} />}
 				</Link>
 			</header>
 			<div className="mx-nav-top">
 				<button
 					type="button"
+					role="switch"
 					className="mx-attn"
-					aria-pressed={filter === "attention"}
+					aria-checked={filter === "attention"}
 					onClick={() => setFilter(filter === "attention" ? "all" : "attention")}
 					data-id="sidebar-attention"
 				>
-					<Icon name="inbox" small />
+					<span className="track" aria-hidden="true" />
 					<span className="grow">{t.sessions.attentionOnly}</span>
 					{attention > 0 && <span className="badge">{attention}</span>}
 				</button>
-				<AddProject hosts={projectHosts(machines)} compact />
+				<AddProject hosts={hosts} compact />
 			</div>
 			<div className="mx-groups" aria-busy={directory.status === "loading"}>
-				{machines.map((m) => (
-					<MachineProjects key={m.entry.ref} machine={m} filter={filter} now={now} many={many} currentThread={m.entry.ref === currentMachine ? currentThread : null} />
+				{machines.map((m, i) => (
+					<MachineProjects
+						key={m.entry.ref}
+						machine={m}
+						rows={rows[i] ?? { projects: [], withProjects: false }}
+						now={now}
+						many={many}
+						currentThread={m.entry.ref === currentMachine ? currentThread : null}
+					/>
 				))}
+				{empty && (
+					<div className="mx-empty-list" data-id="sidebar-empty">
+						<p>{t.agent.projects.none}</p>
+						<AddProject hosts={hosts} primary />
+					</div>
+				)}
 				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
 				{(archived > 0 || filter === "archived") && (
 					<button type="button" className="mx-archived-link" onClick={() => setFilter(filter === "archived" ? "all" : "archived")} aria-pressed={filter === "archived"}>
@@ -173,7 +208,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 
 interface ProjectsProps {
 	machine: MachineView;
-	filter: Filter;
+	rows: ReturnType<typeof hostRows>;
 	now: number;
 	/** The user has more than one machine: each project names its own. */
 	many: boolean;
@@ -181,55 +216,33 @@ interface ProjectsProps {
 	currentThread: string | null;
 }
 
-/** One machine's projects, without a header of its own; one line when the machine cannot be used now. */
-function MachineProjects({ machine, filter, now, many, currentThread }: ProjectsProps) {
+/** One machine's projects, without a header of its own (its state lives under "Quản lý máy"). */
+function MachineProjects({ machine, rows, now, many, currentThread }: ProjectsProps) {
 	const t = useMachinesCopy();
 	const { entry, link, state, conn } = machine;
 	const ref = entry.ref;
-	const shown = state.threads.filter((x) => matches(filter, x));
-	const withProjects = projectsSupported(state.info?.agentVersion);
+	const withProjects = rows.withProjects;
 	const online = conn.kind === "on";
 	useEffect(() => {
 		if (withProjects && online && state.projects === null) link.request({ case: "projectList", value: {} }).catch(() => undefined);
 	}, [withProjects, online, state.projects, link]);
-	const projectList = withProjects ? (state.projects?.projects ?? []) : [];
-	const grouped = byProject(shown, projectList);
-	const order = projectList.map((x) => x.id);
-	const pairPath = ref === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(ref);
+	const order = (state.projects?.projects ?? []).map((x) => x.id);
 	const loading = online ? !state.listed : conn.kind === "connecting" || conn.kind === "checking";
-	const status = connText(t, conn, now);
 	const row = (thread: ThreadSummary) => (
 		<li key={thread.id}>
 			<SessionRow machine={machine} thread={thread} now={now} current={thread.id === currentThread} />
 		</li>
 	);
-	// What the machine needs before its projects show: pairing, an update, or being reachable.
-	const blocked = needsPairing(conn) || conn.kind === "update" || (!online && state.projects === null && !loading);
+	if (!loading && rows.projects.length === 0) return null;
 	return (
 		<section className="mx-group" aria-label={entry.name}>
-			{blocked && (
-				<div className="mx-host-note" data-id="sidebar-host-note">
-					<span className={`dot ${connDot(conn)}`} aria-hidden="true" />
-					<span className="grow">
-						<b>{entry.name}</b>
-						<small>{conn.kind === "update" ? t.agent.hint.update : status}</small>
-					</span>
-					{needsPairing(conn) && (
-						<Link to={pairPath} className="btn btn-sm">
-							{t.agent.pair}
-						</Link>
-					)}
-				</div>
-			)}
 			{loading && (
 				<ul className="mx-rows skeleton" aria-hidden="true">
 					<li />
 					<li />
 				</ul>
 			)}
-			{grouped.groups
-				.filter((g) => filter === "all" || g.threads.length > 0)
-				.map((g) => (
+			{rows.projects.map((g) => (
 						<ProjectSection
 							key={g.project.id}
 							machine={ref}
@@ -243,25 +256,11 @@ function MachineProjects({ machine, filter, now, many, currentThread }: Projects
 							offline={online ? "" : t.agent.projects.hostOffline}
 							need={g.threads.filter((x) => x.state === ThreadState.WAITING).length}
 							running={g.threads.some((x) => isRunning(x))}
+							{...(g.folder ? { folder: { canAdd: withProjects } } : {})}
 						>
 							{g.threads.length > 0 && <ul className="mx-rows">{g.threads.map(row)}</ul>}
 						</ProjectSection>
 				))}
-			{/* tunelo before projects: its sessions by folder, as before. */}
-			{!withProjects &&
-				byFolder(shown).map((folder) => (
-					<div key={folder.dir} className="mx-folder">
-						<p className="mx-folder-name" title={folder.dir}>
-							<MachineIcon name="folder" small />
-							{folderName(folder.dir)}
-							{many && <span className="mx-host">{entry.name}</span>}
-						</p>
-						<ul className="mx-rows">{folder.threads.map(row)}</ul>
-					</div>
-				))}
-			{online && state.listed && withProjects && state.projects !== null && projectList.length === 0 && filter === "all" && (
-				<p className="mx-group-note muted">{many ? `${entry.name}: ${t.agent.projects.none}` : t.agent.projects.none}</p>
-			)}
 		</section>
 	);
 }

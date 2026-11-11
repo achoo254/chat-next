@@ -39,6 +39,7 @@ import {
 	cycleTab,
 	EMPTY_LAYOUT,
 	focusPane,
+	isSplitPane,
 	layoutStore,
 	panesOf,
 	prune,
@@ -397,8 +398,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		const isFocused = focused?.id === pane.id;
 		const code = ended.get(pane.session);
 		const closeLabel = pane.ai === true ? tt.closePaneAi : tt.closePane;
+		// A pane of a split tab closes on its own (a lone pane closes with its tab), from a gutter beside the text.
+		const split = isSplitPane(layout, pane.id);
 		return (
-			<div className="tx-pane-in" data-focused={isFocused ? "" : undefined} onPointerUp={() => tapPane(pane)}>
+			<div className="tx-pane-in" data-focused={isFocused ? "" : undefined} data-split={split ? "" : undefined} onPointerUp={() => tapPane(pane)}>
 				<TerminalView
 					key={pane.session}
 					link={terminal}
@@ -432,6 +435,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					</div>
 				)}
 				{/* After the terminal, so xterm's layers never cover it. */}
+{split && (
 <button
 	type="button"
 	className="tx-pane-x"
@@ -443,6 +447,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 >
 	<Icon name="x" small />
 </button>
+)}
 {touch && isFocused && <ImeInput label={tt.typeHere} inputRef={ime} at={caret} onSend={send} appCursor={() => handles.current.get(pane.id)?.appCursor() ?? false} />}
 			</div>
 		);

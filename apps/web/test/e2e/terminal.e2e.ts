@@ -93,6 +93,10 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await until(page, "the path pill in the header", () => document.querySelector(".mx-head [data-id=terminal-path]") !== null);
 	assert.equal(await page.locator(".tx-head [data-id=terminal-path]").count(), 0);
 
+	// The dock fills the session's whole content area.
+	const widths = await page.evaluate(() => ({ dock: document.querySelector("[data-id=terminal-dock]")?.getBoundingClientRect().width ?? 0, body: document.querySelector(".mx-chat-body")?.getBoundingClientRect().width ?? 0 }));
+	assert.ok(widths.dock >= widths.body - 1, `dock ${widths.dock} px of ${widths.body} px`);
+
 	for (const cls of ["to-right", "to-below"]) {
 		const box = await page.locator(`.tx-split-ico.${cls}`).boundingBox();
 		assert.deepEqual([Math.round(box?.width ?? 0), Math.round(box?.height ?? 0)], [14, 12], cls);
@@ -103,15 +107,17 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	const panes = page.locator(".tx-tab-body:not([hidden]) .tx-pane");
 	assert.equal(await panes.count(), 2);
 	assert.equal(await page.locator(".tx-tab-body:not([hidden]) .tx-pane-x").count(), 2);
-	// The hit area is 44px around the glyph.
+	// The close button sits in the pane's gutter: 44px tall to hit, never over the terminal's text.
 	const x = page.locator(".tx-tab-body:not([hidden]) .tx-pane-x").nth(1);
 	await panes.nth(1).hover();
 	const hit = await x.evaluate((el) => {
 		const r = el.getBoundingClientRect();
 		const before = getComputedStyle(el, "::before");
-		return { w: r.width - parseFloat(before.left) - parseFloat(before.right), h: r.height - parseFloat(before.top) - parseFloat(before.bottom) };
+		const screen = el.parentElement?.querySelector(".xterm-screen")?.getBoundingClientRect();
+		return { h: r.height - parseFloat(before.top) - parseFloat(before.bottom), left: r.left + parseFloat(before.left), textRight: screen?.right ?? Number.POSITIVE_INFINITY };
 	});
-	assert.deepEqual([Math.round(hit.w), Math.round(hit.h)], [44, 44]);
+	assert.equal(Math.round(hit.h), 44);
+	assert.ok(hit.left >= hit.textRight - 0.5, `the close button's hit area starts at ${hit.left}, the text ends at ${hit.textRight}`);
 	await x.click();
 	await until(page, "one pane left", () => document.querySelectorAll(".tx-tab-body:not([hidden]) .tx-pane").length === 1);
 

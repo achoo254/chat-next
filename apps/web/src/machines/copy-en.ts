@@ -54,6 +54,7 @@ export const enMachines: MachinesCopy = {
 		refresh: "Refresh the machine's status",
 	},
 	diskAccess: {
+		guide: "How to",
 		title: "The machine needs to give tunelo Full Disk Access",
 		body: "Only needed for sessions in Desktop, Documents, Downloads or iCloud Drive. Without it, macOS blocks them or asks on the machine where nobody answers, so the session hangs. On the Mac:",
 		steps: [
@@ -174,7 +175,7 @@ export const enMachines: MachinesCopy = {
 		typing: (ai) => `${ai} is writing`,
 		sending: "Sending",
 		sendFailed: "Could not send. Check the connection and try again.",
-		chip: { waiting: "Needs you", running: "Running", queued: "Queued", offline: "Disconnected", idle: "Idle", error: "Error", elsewhere: "Running elsewhere" },
+		chip: { terminal: "Running in the terminal", waiting: "Needs you", running: "Running", queued: "Queued", offline: "Disconnected", idle: "Idle", error: "Error", elsewhere: "Running elsewhere" },
 		modelMenu: "Model and AI",
 		modelsOf: (ai) => `${ai} models`,
 		defaultModel: "Default",
@@ -807,6 +808,7 @@ export const enMachines: MachinesCopy = {
 			update: "tunelo needs an update",
 		},
 		hint: {
+			machinesNeedYou: "A machine needs you",
 			unpaired: "Pair once with the 6-digit code from that machine's entry in your Authenticator app to see and drive its sessions.",
 			repair: "The machine no longer accepts this device. Pair again to go on.",
 			update: "Run tunelo update on that machine, then reload this page.",
@@ -850,12 +852,14 @@ export const enMachines: MachinesCopy = {
 			keys: "Enter to send · Shift+Enter for a new line · Esc to stop",
 		},
 		projects: {
+			notAdded: "Not a project yet",
+			adopt: "Add as project",
 			hostOffline: "Machine offline",
 			pickFolder: "Choose a folder on this machine",
 			addRecent: "Add",
 			host: "Machine",
 			recent: "Recent folders with AI sessions",
-			none: "No projects yet. Add a folder as a project to open sessions.",
+			none: "No projects yet",
 			notInProject: (dir: string) => `${dir} is not a project, so this session is not in the list.`,
 			add: "Add project",
 			addTitle: "Add a project",

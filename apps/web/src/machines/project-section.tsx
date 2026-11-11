@@ -4,7 +4,9 @@
 // needs the user or runs in it, "+" that opens an empty session there at once
 // with the project's defaults in the mode last used on the machine (chat or
 // terminal; no dialog), a menu (a custom new session, rename, pin, move,
-// settings, remove), its sessions below. Dimmed while its machine is offline. The dialogs load when opened.
+// settings, remove), its sessions below. Dimmed while its machine is offline.
+// A folder that holds sessions but is no project yet shows the same way, its
+// menu offering "Thêm làm dự án" instead of the project's own settings. The dialogs load when opened.
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { type Project } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -26,7 +28,7 @@ const ProjectSettingsDialog = lazy(() => dialogs().then((m) => ({ default: m.Pro
 const RenameProjectDialog = lazy(() => dialogs().then((m) => ({ default: m.RenameProjectDialog })));
 const RemoveProjectDialog = lazy(() => dialogs().then((m) => ({ default: m.RemoveProjectDialog })));
 
-type Dialog = "custom" | "rename" | "settings" | "remove" | null;
+type Dialog = "custom" | "rename" | "settings" | "remove" | "add" | null;
 
 interface ProjectProps {
 	machine: string;
@@ -44,10 +46,12 @@ interface ProjectProps {
 	/** Sessions waiting for the user, and whether one runs. */
 	need?: number;
 	running?: boolean;
+	/** A folder with sessions that is no project; `canAdd`: the machine keeps projects (tunelo 2.0.7+). */
+	folder?: { canAdd: boolean };
 	children: ReactNode;
 }
 
-export function ProjectSection({ machine, machineName, link, state, project, order, online, host, offline = "", need = 0, running = false, children }: ProjectProps) {
+export function ProjectSection({ machine, machineName, link, state, project, order, online, host, offline = "", need = 0, running = false, folder, children }: ProjectProps) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const { open, setOpen, ref } = usePopover();
@@ -55,7 +59,11 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 	const [starting, setStarting] = useState(false);
 	const [collapsed, toggleCollapsed] = useCollapsed(`project:${machine}:${project.id}`);
 	const ai = aiName(state.info, "claude");
-	const line = offline !== "" ? offline : project.missing ? p.missing : gitLine(project, p.changed);
+	const line = offline !== "" ? offline : folder !== undefined ? p.notAdded : project.missing ? p.missing : gitLine(project, p.changed);
+	/** "Thêm làm dự án": at once; a sensitive folder goes through the dialog, which asks first. */
+	const adopt = () => {
+		link.request({ case: "projectAdd", value: { dir: project.dir, name: "", consent: { sensitive: false, projectSettings: false } } }).catch(() => setDialog("add"));
+	};
 	const at = order.indexOf(project.id);
 	const move = (step: number) => {
 		const ids = [...order];
@@ -153,7 +161,10 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 				{open && (
 					<div className="mx-menu" role="menu" aria-label={p.menu(project.name)}>
 						{item(p.newCustom, "plus", () => setDialog("custom"), project.missing)}
-
+						{folder !== undefined ? (
+							folder.canAdd && item(p.adopt, "plus", adopt)
+						) : (
+							<>
 						{item(p.rename, "edit", () => setDialog("rename"))}
 						{item(project.pinned ? p.unpin : p.pin, "pin", () => {
 							link.request({ case: "projectUpdate", value: { id: project.id, pinned: !project.pinned } }).catch(() => undefined);
@@ -163,6 +174,8 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 						{item(p.settings, "settings", () => setDialog("settings"))}
 						<hr />
 						{item(p.remove, "trash", () => setDialog("remove"))}
+							</>
+						)}
 					</div>
 				)}
 			</div>
@@ -172,6 +185,7 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
 				{dialog === "rename" && <RenameProjectDialog link={link} project={project} ai={ai} onClose={() => setDialog(null)} />}
 				{dialog === "settings" && <ProjectSettingsDialog link={link} project={project} state={state} ai={ai} onClose={() => setDialog(null)} />}
 				{dialog === "remove" && <RemoveProjectDialog link={link} project={project} ai={ai} onClose={() => setDialog(null)} />}
+				{dialog === "add" && <AddProjectOnHost hosts={[{ ref: machine, name: machineName, link, state }]} initialDir={project.dir} onClose={() => setDialog(null)} />}
 			</Suspense>
 		</div>
 	);
@@ -181,7 +195,7 @@ export function ProjectSection({ machine, machineName, link, state, project, ord
  * "Thêm dự án" on one of `hosts` (the machines that take projects now); the
  * dialog loads when opened. `compact`: an icon button.
  */
-export function AddProject({ hosts, initialRef, initialDir, compact = false }: { hosts: readonly ProjectHost[]; initialRef?: string; initialDir?: string; compact?: boolean }) {
+export function AddProject({ hosts, initialRef, initialDir, compact = false, primary = false }: { hosts: readonly ProjectHost[]; initialRef?: string; initialDir?: string; compact?: boolean; primary?: boolean }) {
 	const t = useMachinesCopy();
 	const [open, setOpen] = useState(false);
 	const label = t.agent.projects.add;
@@ -189,7 +203,7 @@ export function AddProject({ hosts, initialRef, initialDir, compact = false }: {
 		<>
 			<button
 				type="button"
-				className={compact ? "icon-btn" : "btn btn-sm"}
+				className={compact ? "icon-btn" : primary ? "btn btn-sm btn-primary" : "btn btn-sm"}
 				aria-label={label}
 				title={label}
 				disabled={hosts.length === 0}

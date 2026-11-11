@@ -30,7 +30,7 @@ import { RefreshMachine } from "./refresh-machine.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
-import { aiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
+import { aiName, folderName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
@@ -152,8 +152,8 @@ export function MachineDetail({ machine }: { machine: string }) {
 				<RefreshMachine machine={machine} />
 			</PageHead>
 			<LinkBanner machine={machine} name={name} status={state.status} />
-			<DiskAccessBanner link={link} info={state.info} online={online} />
 			<div className="mx-body">
+				<DiskAccessBanner link={link} info={state.info} online={online} />
 				<section className="card pad mx-card">
 					<h3>{t.detail.sessions}</h3>
 					{!online && <p className="muted">{t.detail.needsLink}</p>}
@@ -162,7 +162,9 @@ export function MachineDetail({ machine }: { machine: string }) {
 						<Link key={thread.id} to={paths.machineSession(machine, thread.id)} className="mx-session-row">
 							<span>
 								<b>{thread.title || t.agent.newSession}</b>
-								<span className="mono muted">{thread.dir}</span>
+								<span className="mono muted" title={thread.dir}>
+									{folderName(thread.dir)}
+								</span>
 							</span>
 							<span className={`chip mx-chip ${stateKey(thread)}`}>{t.sessions.state[stateKey(thread)]}</span>
 						</Link>

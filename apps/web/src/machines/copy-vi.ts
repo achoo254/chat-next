@@ -56,6 +56,7 @@ export const viMachines = {
 		refresh: "Làm mới trạng thái máy",
 	},
 	diskAccess: {
+		guide: "Hướng dẫn",
 		title: "Máy cần cấp Full Disk Access cho tunelo",
 		body: "Chỉ cần khi phiên làm việc trong Desktop, Documents, Downloads hoặc iCloud Drive. Thiếu quyền này, macOS chặn hoặc hỏi trên máy mà không ai bấm, nên phiên bị treo. Trên máy Mac:",
 		steps: [
@@ -176,7 +177,7 @@ export const viMachines = {
 		typing: (ai: string) => `${ai} đang viết`,
 		sending: "Đang gửi",
 		sendFailed: "Không gửi được. Kiểm tra kết nối rồi thử lại.",
-		chip: { waiting: "Chờ bạn", running: "Đang chạy", queued: "Chờ chỗ", offline: "Mất kết nối", idle: "Rảnh", error: "Lỗi", elsewhere: "Chạy ở nơi khác" },
+		chip: { terminal: "Đang chạy trong terminal", waiting: "Chờ bạn", running: "Đang chạy", queued: "Chờ chỗ", offline: "Mất kết nối", idle: "Rảnh", error: "Lỗi", elsewhere: "Chạy ở nơi khác" },
 		modelMenu: "Model và AI",
 		modelsOf: (ai: string) => `Model của ${ai}`,
 		defaultModel: "Mặc định",
@@ -813,6 +814,7 @@ export const viMachines = {
 			update: "Cần cập nhật tunelo",
 		},
 		hint: {
+			machinesNeedYou: "Máy cần bạn xử lý",
 			unpaired: "Ghép một lần bằng mã 6 số trong app Authenticator của máy đó để xem và điều khiển phiên.",
 			repair: "Máy không còn nhận thiết bị này. Ghép lại để dùng tiếp.",
 			update: "Trên máy đó chạy tunelo update, rồi tải lại trang.",
@@ -856,12 +858,14 @@ export const viMachines = {
 			keys: "Enter gửi · Shift+Enter xuống dòng · Esc dừng",
 		},
 		projects: {
+			notAdded: "Chưa là dự án",
+			adopt: "Thêm làm dự án",
 			hostOffline: "Máy ngoại tuyến",
 			pickFolder: "Chọn thư mục trên máy này",
 			addRecent: "Thêm",
 			host: "Máy",
 			recent: "Thư mục gần đây có phiên AI",
-			none: "Chưa có dự án. Thêm một thư mục làm dự án để mở phiên.",
+			none: "Chưa có dự án",
 			notInProject: (dir: string) => `${dir} chưa là dự án nên phiên này không hiện trong danh sách.`,
 			add: "Thêm dự án",
 			addTitle: "Thêm dự án",

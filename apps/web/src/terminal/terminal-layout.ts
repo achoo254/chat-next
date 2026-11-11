@@ -69,6 +69,11 @@ export function aiPane(layout: DockLayout): PaneNode | null {
 	return null;
 }
 
+/** Pane `paneId` shares its tab with others: it gets a close button of its own (a lone pane closes with its tab). */
+export function isSplitPane(layout: DockLayout, paneId: string): boolean {
+	return layout.tabs.some((tab) => tab.root.kind === "split" && panesOf(tab.root).some((p) => p.id === paneId));
+}
+
 /** Every session the layout shows. */
 export function sessionsOf(layout: DockLayout): Set<number> {
 	return new Set(layout.tabs.flatMap((tab) => panesOf(tab.root).map((p) => p.session)));

@@ -23,7 +23,9 @@ import { keySequence, withModifiers } from "../../src/terminal/mobile-key-bar.ts
 import { TerminalDock } from "../../src/terminal/terminal-dock.tsx";
 import {
 	addTab,
+	aiPane,
 	closePane,
+	isSplitPane,
 	cycleFocus,
 	EMPTY_LAYOUT,
 	layoutStore,
@@ -239,6 +241,9 @@ describe("a session in chat or in its terminal", () => {
 		held = 7;
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });
 		const bar = await screen.findByText("Claude Code đang chạy phiên này trong terminal. Ở đây chỉ xem.");
+		// Held by the machine's own terminal: not "elsewhere".
+		expect(screen.getByRole("status", { name: "Đang chạy trong terminal" })).toBeTruthy();
+		expect(screen.queryByRole("status", { name: "Chạy ở nơi khác" })).toBeNull();
 		const section = bar.closest("section");
 		expect(section).toBeTruthy();
 		expect(document.querySelector(".mx-composer.disabled")).toBeTruthy();
@@ -350,7 +355,7 @@ describe("the dock", () => {
 		expect(alert.textContent).toMatch(/thu hồi quyền|không cho thiết bị này/);
 	});
 
-	it("every pane has its own close button; closing the last pane closes the tab and hangs up the shell", async () => {
+	it("every pane of a split has its own close button; the last one closes with its tab and hangs up the shell", async () => {
 		const { view } = await dock(refusing());
 		await until(() => sent("termOpen").length === 1, "first terminal");
 		await userEvent.click(await screen.findByRole("button", { name: "Chia xuống dưới" }));
@@ -361,7 +366,9 @@ describe("the dock", () => {
 		await until(() => sent("termClose").length === 1, "first shell hung up");
 		expect(sent("termClose")[0]?.body.value).toMatchObject({ session: 1 });
 		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(1);
-		await userEvent.click(screen.getByRole("button", { name: "Đóng ô" }));
+		// A lone pane closes with its tab.
+		expect(screen.queryByRole("button", { name: "Đóng ô" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: /^Đóng / }));
 		await until(() => sent("termClose").length === 2, "second shell hung up");
 		expect(screen.queryAllByRole("tab")).toHaveLength(0);
 	});
@@ -392,8 +399,12 @@ describe("the dock", () => {
 		// A tab of its own again (every tab keeps its panes mounted).
 		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
 		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2);
-		// Still the AI's pane: its close button detaches.
-		expect(screen.getAllByRole("button", { name: "Đóng ô (phiên vẫn chạy)" })).toHaveLength(1);
+		// Still the AI's: closing its tab detaches again, nothing is hung up.
+		const tabCloses = screen.getAllByRole("button", { name: /^Đóng / }).filter((b) => b.classList.contains("tx-tab-x"));
+		await userEvent.click(tabCloses.at(-1) as HTMLElement);
+		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(1));
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("termClose")).toEqual([]);
 		expect(sent("termOpen")).toHaveLength(2);
 		parts.terminal.stop();
 		parts.link.stop();
@@ -437,6 +448,20 @@ describe("the layout", () => {
 		expect([...sessionsOf(l)]).toEqual([1, 3]);
 		for (const pane of panesOf(l.tabs[0]?.root ?? { kind: "pane", id: "", session: 0 })) l = closePane(l, pane.id);
 		expect(l).toEqual({ tabs: [], active: "" });
+	});
+
+	it("marks the AI's pane, keeps the mark when stored, and gives only panes of a split tab a close button of their own", () => {
+		let l: DockLayout = addTab(EMPTY_LAYOUT, 1, true);
+		const ai = aiPane(l);
+		expect(ai).toMatchObject({ session: 1, ai: true });
+		expect(isSplitPane(l, ai?.id ?? "")).toBe(false);
+		l = splitPane(l, ai?.id ?? "", "row", 2);
+		expect(panesOf(l.tabs[0]?.root ?? { kind: "pane", id: "", session: 0 }).map((p) => isSplitPane(l, p.id))).toEqual([true, true]);
+		l = addTab(l, 3);
+		expect(isSplitPane(l, l.tabs[1]?.focus ?? "")).toBe(false);
+		expect(aiPane(parseLayout(JSON.parse(JSON.stringify(l))) ?? EMPTY_LAYOUT)?.session).toBe(1);
+		// A shell pane is never taken for the AI's.
+		expect(aiPane(addTab(EMPTY_LAYOUT, 9))).toBeNull();
 	});
 
 	it("reads back only well-formed layouts", () => {

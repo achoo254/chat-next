@@ -1,6 +1,8 @@
 // The banner of a Mac whose tunelo lacks Full Disk Access: shown only when the
 // machine says so, with the steps and a drawing, opens the settings on the
-// machine again, and says so once it is granted.
+// machine again, and says so once it is granted. On a page the steps are
+// open the first time and folded after; in a session it is one line whose
+// steps open on "Hướng dẫn".
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { FrameSchema, MachineInfoSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -80,6 +82,45 @@ describe("Full Disk Access banner", () => {
 			</I18nProvider>,
 		);
 		expect((screen.getByRole("button", { name: viMachines.diskAccess.reopen }) as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it("on a page: the steps open the first time only; the button and its result stay on one row", async () => {
+		window.localStorage.removeItem("ai:disk-access-guide-seen");
+		const { link } = fakeLink();
+		const info = create(MachineInfoSchema, { os: "darwin", needsFullDiskAccess: true });
+		const first = render(
+			<I18nProvider>
+				<DiskAccessBanner link={link} info={info} online />
+			</I18nProvider>,
+		);
+		expect(screen.getByRole("button", { name: "Hướng dẫn" }).getAttribute("aria-expanded")).toBe("true");
+		expect(screen.getByRole("img", { name: viMachines.diskAccess.figure })).toBeTruthy();
+		first.unmount();
+		render(
+			<I18nProvider>
+				<DiskAccessBanner link={link} info={info} online />
+			</I18nProvider>,
+		);
+		expect(screen.getByRole("button", { name: "Hướng dẫn" }).getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByRole("img", { name: viMachines.diskAccess.figure })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: viMachines.diskAccess.reopen }));
+		const result = await screen.findByText(viMachines.diskAccess.reopened);
+		expect(result.parentElement?.className).toBe("mx-disk-actions");
+	});
+
+	it("in a session: one line, the steps and the button only after Hướng dẫn", async () => {
+		const { link } = fakeLink();
+		const { container } = render(
+			<I18nProvider>
+				<DiskAccessBanner link={link} info={create(MachineInfoSchema, { os: "darwin", needsFullDiskAccess: true })} online bar />
+			</I18nProvider>,
+		);
+		expect(container.querySelector(".mx-disk-bar")).toBeTruthy();
+		expect(screen.queryByText(viMachines.diskAccess.body)).toBeNull();
+		expect(screen.queryByRole("button", { name: viMachines.diskAccess.reopen })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Hướng dẫn" }));
+		expect(screen.getByText(viMachines.diskAccess.body)).toBeTruthy();
+		expect(screen.getByRole("button", { name: viMachines.diskAccess.reopen })).toBeTruthy();
 	});
 
 	it("has the same steps in every language", () => {
