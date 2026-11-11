@@ -605,6 +605,22 @@ export class AgentCore {
     return { resume, items: t.journal.since(resume.fromSeq - 1n) };
   }
 
+  /**
+   * Brings in what the AI's transcript got since the last look (turns typed
+   * in a terminal or an IDE), for a device that follows the thread. An open
+   * session opens again so the AI reads them too. Never fails: a thread gone
+   * or a transcript unreadable now is looked at again next time.
+   */
+  followHistory(threadId: string): void {
+    const t = this.threads.get(threadId);
+    if (!t || t.deleted) return;
+    try {
+      if (this.syncHistory(t) > 0 && t.session) void this.park(t).then(() => this.touch(t));
+    } catch {
+      // the next look reads from the last mark
+    }
+  }
+
   /** Every item of the thread, for a device that was told to reset. */
   snapshot(threadId: string): Item[] {
     return this.thread(threadId).journal.all();

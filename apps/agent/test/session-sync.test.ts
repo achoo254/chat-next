@@ -193,6 +193,27 @@ describe("turns typed on the machine later", () => {
     expect(sdk.log.options.map((o) => o.resume)).toEqual([t.sessionId, t.sessionId]);
   });
 
+  test("reach a device that follows the thread without it looking again, through the items every device hears", async () => {
+    const { core, claudeHome, work } = setup();
+    const t = terminalSession(work, claudeHome);
+    const thread = await core.openLocal({ provider: "claude", sessionId: t.sessionId, consent: none, openAnyway: false, device: "phone" });
+    const heard: Item[] = [];
+    const stop = core.onItems((id, items) => id === thread.id && heard.push(...items));
+    const before = t.lines.length;
+    t.user("typed in the terminal");
+    t.assistant([{ type: "text", text: "answered live" }]);
+    t.appendFrom(claudeHome, before);
+
+    core.followHistory(thread.id);
+    expect(texts(heard, Role.USER)).toEqual(["typed in the terminal"]);
+    expect(texts(heard, Role.ASSISTANT)).toEqual(["answered live"]);
+    // Following again with nothing new says nothing; a thread that is gone is no error.
+    core.followHistory(thread.id);
+    core.followHistory("no-such-thread");
+    expect(heard).toHaveLength(2);
+    stop();
+  });
+
   test("also reach a message sent from a device: they come before it", async () => {
     const { core, claudeHome, work } = setup();
     const t = terminalSession(work, claudeHome);

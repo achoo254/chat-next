@@ -123,6 +123,9 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
 }
 
+/** How often a followed thread's transcript is looked at for turns typed outside Chat. */
+const FOLLOW_MS = 1_500;
+
 const refusal = (message: string, reason: ErrorReason) => ({ code: ErrorCode.INVALID, message, reason, subject: "" });
 
 const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
@@ -206,6 +209,8 @@ export class Connection {
   private pake: Pake | undefined;
   private device = "";
   private subscribed = new Set<string>();
+  /** Looks at the transcripts of the threads this device follows, for turns typed outside Chat. */
+  private followTimer: ReturnType<typeof setInterval> | undefined;
   private unsubscribe: (() => void)[] = [];
   private queue: Promise<void> = Promise.resolve();
   private browserLink: BrowserLink | undefined;
@@ -234,6 +239,7 @@ export class Connection {
   close(code = 1000, reason = ""): void {
     if (this.state === "closed") return;
     this.state = "closed";
+    clearInterval(this.followTimer);
     for (const u of this.unsubscribe) u();
     this.browserLink?.close();
     this.screenShareLink?.close();
@@ -295,6 +301,10 @@ export class Connection {
       this.ctx.onPaired(this.pairedBy);
     }
     this.state = "open";
+    this.followTimer = setInterval(() => {
+      for (const threadId of this.subscribed) this.ctx.core.followHistory(threadId);
+    }, FOLLOW_MS);
+    this.followTimer.unref?.();
     this.unsubscribe.push(
       this.ctx.core.onItems((threadId, items) => {
         if (this.subscribed.has(threadId)) this.sendItems(threadId, items);
