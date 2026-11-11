@@ -92,6 +92,8 @@ export const zhCN: MessagingCopy = {
 		backToList: "返回聊天列表",
 		searchInChat: "在聊天中搜索",
 		info: "聊天信息",
+		openCompact: "打开置顶小窗口",
+		compactUnread: "未读聊天",
 		members: (n: number) => `${n} 位成员`,
 		membersOnline: (n: number, online: number) => `${n} 位成员 · ${online} 人在线`,
 		/** The online part of the group header, left out on phones. */

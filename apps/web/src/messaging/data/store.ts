@@ -218,6 +218,8 @@ export class ChatStore {
 	 * unread in between; the value is the newest seq already marked read.
 	 */
 	private readonly liveRead = new Map<number, number>();
+	/** Which windows (by name) show each chat's newest message right now; the chat is live while any does. */
+	private readonly liveViewers = new Map<number, Set<string>>();
 	/** What the source reported for each dialog, before live reading hid its unread messages. */
 	private readonly sourceViews = new Map<number, DialogView>();
 	private readonly unsubscribe: () => void;
@@ -368,9 +370,16 @@ export class ChatStore {
 	 * longer does. While it does, what arrives is read at once: the chat's
 	 * row, the folder badges and the app badge never count it.
 	 */
-	setLiveRead(chatId: number, live: boolean): void {
-		if (live === this.liveRead.has(chatId)) return;
-		if (live) {
+	setLiveRead(chatId: number, live: boolean, viewer = ""): void {
+		// The page and the compact window can show the same chat: it is read live while any of them does.
+		const viewers = this.liveViewers.get(chatId) ?? new Set<string>();
+		if (live) viewers.add(viewer);
+		else viewers.delete(viewer);
+		if (viewers.size === 0) this.liveViewers.delete(chatId);
+		else this.liveViewers.set(chatId, viewers);
+		const anyLive = viewers.size > 0;
+		if (anyLive === this.liveRead.has(chatId)) return;
+		if (anyLive) {
 			this.liveRead.set(chatId, 0);
 		} else {
 			this.liveRead.delete(chatId);

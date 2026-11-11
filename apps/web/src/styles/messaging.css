@@ -218,6 +218,13 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 
 /* ---------- Conversation ---------- */
 .app .convo { position: relative; display: flex; flex-direction: column; place-items: stretch; min-width: 0; background: var(--c-bg); }
+/* The compact window (picture-in-picture, messaging/ui/compact-window.tsx): a strip of unread chats above one conversation. */
+.app.compact { display: flex; flex-direction: column; }
+.app.compact .convo { flex: 1; min-height: 0; }
+.compact-strip { display: flex; flex: none; gap: var(--space-2); padding: var(--space-2); overflow-x: auto; background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
+.compact-chip { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); max-width: 160px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--c-surface); color: var(--c-text); }
+.compact-chip:hover { background: var(--c-hover); }
+.compact-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
 /* "Chọn một cuộc trò chuyện" and other whole-pane states sit in the middle of the pane. */
 .app .convo > .empty { flex: 1; align-content: center; }
 .convo-head {

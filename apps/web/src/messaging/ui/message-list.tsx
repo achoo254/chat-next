@@ -17,6 +17,7 @@ import type { ChatStore, WindowItem } from "../data/store.ts";
 import { MessageItem } from "./message-item.tsx";
 import { pendingTopics } from "../media/media-state.ts";
 import { mentionsSelf } from "./rich-text.tsx";
+import { useSurface, useSurfaceVisible } from "./surface.ts";
 import { useTypingText } from "./typing.ts";
 
 const EDGE_PX = 240;
@@ -105,17 +106,6 @@ function newestShown(element: HTMLElement): number {
 	return newest;
 }
 
-/** Whether the page is shown (not a background tab or a minimised window). */
-function usePageVisible(): boolean {
-	const [visible, setVisible] = useState(() => document.visibilityState === "visible");
-	useEffect(() => {
-		const update = () => setVisible(document.visibilityState === "visible");
-		document.addEventListener("visibilitychange", update);
-		return () => document.removeEventListener("visibilitychange", update);
-	}, []);
-	return visible;
-}
-
 function itemDate(item: WindowItem | undefined): number {
 	if (item === undefined) return 0;
 	return item.kind === "message" ? item.message.date : item.pending.date;
@@ -182,7 +172,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const [atBottom, setAtBottom] = useState(true);
 	// Newest message on screen; messages are read as they come into view.
 	const [shownSeq, setShownSeq] = useState(0);
-	const visible = usePageVisible();
+	const visible = useSurfaceVisible();
 	// A topic's divider: where its own reading stood when it was opened.
 	const [topicUnreadFrom] = useState(() => (topic !== null && topic.unreadCount > 0 ? topic.readInboxMaxSeq + 1 : 0));
 	const [focused, setFocused] = useState<string | null>(null);
@@ -262,10 +252,11 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	// at once, so no unread badge shows in between (not for forum topics,
 	// whose counts are their own).
 	const liveRead = reading && atNewest && topicId === 0 && chat?.forum !== true;
+	const viewer = useSurface().compact ? "compact" : "page";
 	useEffect(() => {
-		store.setLiveRead(chatId, liveRead);
-		return () => store.setLiveRead(chatId, false);
-	}, [store, chatId, liveRead]);
+		store.setLiveRead(chatId, liveRead, viewer);
+		return () => store.setLiveRead(chatId, false, viewer);
+	}, [store, chatId, liveRead, viewer]);
 	// Otherwise messages are read as they come into view, in a visible tab.
 	useEffect(() => {
 		if (!reading || liveRead) return;

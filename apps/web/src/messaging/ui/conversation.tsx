@@ -2,6 +2,7 @@
 // #topic-states, #connection-states).
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 import type { Chat } from "@achoo254/chat-core";
+import { compactWindow, isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { navigate, paths } from "../../router.tsx";
@@ -21,6 +22,7 @@ import { MiniAppChipSlot } from "./mini-app-slot.tsx";
 import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
+import { useSurface } from "./surface.ts";
 import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
@@ -281,6 +283,7 @@ interface ConversationProps {
 export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	const copy = useCopy();
 	const ui = useUi();
+	const { compact } = useSurface();
 	const { store, source } = useServices();
 	const chat = useChat(chatId);
 	const view = useDialog(chatId);
@@ -377,7 +380,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					dragDepth.current = 0;
 					setDragging(null);
 					addAttachments(chatId, effectiveTopic, [...event.dataTransfer.files]);
-					document.querySelector<HTMLElement>(".convo .composer .composer-field")?.focus();
+					event.currentTarget.querySelector<HTMLElement>(".composer .composer-field")?.focus();
 				},
 			}
 		: {};
@@ -396,9 +399,11 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			) : (
 				<header className="convo-head">
-					<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
-						<Icon name="back" />
-					</button>
+					{!compact && (
+						<button type="button" className="icon-btn narrow-only" aria-label={copy.convo.backToList} onClick={() => navigate(paths.home)}>
+							<Icon name="back" />
+						</button>
+					)}
 					{topic !== null ? (
 						<TopicIco topic={topic} size="sm" />
 					) : (
@@ -422,16 +427,23 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					>
 						<Icon name="search" />
 					</button>
-					<button
-						type="button"
-						className="icon-btn"
-						data-info-toggle
-						aria-pressed={infoOpen}
-						aria-label={topic !== null ? copy.topics.info : copy.convo.info}
-						onClick={() => ui.toggleInfo()}
-					>
-						<Icon name="info" />
-					</button>
+					{!compact && isPictureInPictureSupported() && (
+						<button type="button" className="icon-btn" aria-label={copy.convo.openCompact} onClick={() => void compactWindow.open()}>
+							<Icon name="pip" />
+						</button>
+					)}
+					{!compact && (
+						<button
+							type="button"
+							className="icon-btn"
+							data-info-toggle
+							aria-pressed={infoOpen}
+							aria-label={topic !== null ? copy.topics.info : copy.convo.info}
+							onClick={() => ui.toggleInfo()}
+						>
+							<Icon name="info" />
+						</button>
+					)}
 				</header>
 			)}
 			{!chat.left && (topics === null || topic !== null) && ((view?.dialog.pinnedMessageCount ?? 0) > 0 || chat.pinnedSeq !== 0) && (

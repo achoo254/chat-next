@@ -95,6 +95,8 @@ export const en: MessagingCopy = {
 		backToList: "Back to chats",
 		searchInChat: "Search in chat",
 		info: "Chat info",
+		openCompact: "Open a small always-on-top window",
+		compactUnread: "Unread chats",
 		members: (n: number) => plural(n, "member", "members"),
 		membersOnline: (n: number, online: number) => `${plural(n, "member", "members")} · ${online} online`,
 		/** The online part of the group header, left out on phones. */

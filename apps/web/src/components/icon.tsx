@@ -145,6 +145,12 @@ export const PATHS = {
 			<path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M10 14h4" />
 		</>
 	),
+	pip: (
+		<>
+			<path d="M11 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4" />
+			<rect x="14" y="14" width="7" height="5" rx="1" />
+		</>
+	),
 } satisfies Record<string, ReactElement>;
 
 export type IconName = keyof typeof PATHS;

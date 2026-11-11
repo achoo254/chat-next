@@ -17,6 +17,7 @@ import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
 import { hookData, hooksData } from "../data/screen-data.ts";
 import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
+import { CompactWindow } from "./compact-window.tsx";
 import { Conversation, EmptyConversation, preloadComposer } from "./conversation.tsx";
 import { DialogHost, dialogPreload } from "./dialog-host.tsx";
 import { FolderRail } from "./folder-rail.tsx";
@@ -238,6 +239,7 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 			</div>
 			{(chatId === 0 || adminMode) && <MiniAppChipSlot place="screen" />}
 			<DialogHost />
+			<CompactWindow chatId={chatId} topicId={topic?.id ?? 0} />
 			<RowMenu ui={ui} />
 			{route.name === "invite" && (
 				<Suspense fallback={null}>

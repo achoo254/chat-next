@@ -67,6 +67,17 @@ export interface WebChatOptions {
 	readonly leave?: () => void;
 	/** Extra foreground source (the native app's state, which the WebView's visibility does not follow on Android). */
 	readonly onForegroundChange?: (listener: (foreground: boolean) => void) => () => void;
+	/**
+	 * A surface besides this page that shows the app (the compact window): while
+	 * it reports true the app is in the foreground even if the page is hidden.
+	 * Unlike `onForegroundChange` it only adds to the page's own visibility.
+	 */
+	readonly alsoForeground?: AlsoForeground;
+}
+
+export interface AlsoForeground {
+	readonly get: () => boolean;
+	readonly subscribe: (listener: () => void) => () => void;
 }
 
 /** A notification as shown; `silent` asks the system not to play a sound. */
@@ -242,7 +253,8 @@ export function createWebChat(options: WebChatOptions): WebChat {
 			worker.postMessage({ type: "call", id, method, args });
 		});
 
-	const onVisibility = (): void => worker.postMessage({ type: "foreground", foreground: !document.hidden });
+	const foregroundNow = (): boolean => !document.hidden || (options.alsoForeground?.get() ?? false);
+	const onVisibility = (): void => worker.postMessage({ type: "foreground", foreground: foregroundNow() });
 	const onOnline = (): void => worker.postMessage({ type: "online" });
 	// A closing tab hands the database to the next tab; a page kept in the
 	// back-forward cache keeps its worker.
@@ -253,13 +265,14 @@ export function createWebChat(options: WebChatOptions): WebChat {
 	window.addEventListener("online", onOnline);
 	window.addEventListener("pagehide", onPageHide);
 	const stopForeground = options.onForegroundChange?.((foreground) => worker.postMessage({ type: "foreground", foreground }));
+	const stopAlsoForeground = options.alsoForeground?.subscribe(onVisibility);
 
 	worker.postMessage({
 		type: "init",
 		config: {
 			apiOrigin,
 			appVersion: options.appVersion,
-			foreground: !document.hidden,
+			foreground: foregroundNow(),
 			...(userId === undefined ? {} : { userIdHint: userId }),
 			...(options.native === undefined ? {} : { native: options.native }),
 		},
@@ -315,6 +328,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 			window.removeEventListener("online", onOnline);
 			window.removeEventListener("pagehide", onPageHide);
 			stopForeground?.();
+			stopAlsoForeground?.();
 			worker.postMessage({ type: "close" });
 			worker.terminate();
 			for (const pending of calls.values()) pending.reject(new Error("web chat disposed"));

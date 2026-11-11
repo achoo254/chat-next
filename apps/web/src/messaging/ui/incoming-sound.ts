@@ -6,8 +6,10 @@
 import { useEffect, useRef } from "react";
 import { useSoundInChat } from "../data/device-settings.ts";
 import { useNotificationSettings, useServices, useWindow } from "../data/services.tsx";
+import { useSurface, type Surface } from "./surface.ts";
 
 export function useIncomingSound(chatId: number): void {
+	const surface = useSurface();
 	const { store, self } = useServices();
 	const enabled = useSoundInChat(self.id);
 	const { sound } = useNotificationSettings();
@@ -28,7 +30,18 @@ export function useIncomingSound(chatId: number): void {
 		// The first look at a chat only notes where it ends.
 		if (previous === null || previous.chatId !== chatId || latest.seq <= previous.seq) return;
 		// Silent messages (webhooks posting without a notification) never play the tone.
-		if (!enabled || latest.fromId === store.selfId || latest.action !== null || latest.silent || document.visibilityState === "hidden") return;
+		if (!enabled || latest.fromId === store.selfId || latest.action !== null || latest.silent || silent(surface)) return;
 		void import("../data/sound.ts").then((module) => module.playTone(sound));
-	}, [store, chatId, window, enabled, sound]);
+	}, [store, chatId, window, enabled, sound, surface]);
+}
+
+/**
+ * The page and the compact window can show the same chat at once; only one of
+ * them plays the tone: the page when it is shown, the compact window when the
+ * page is hidden behind it.
+ */
+function silent(surface: Surface): boolean {
+	if (surface.document.visibilityState === "hidden") return true;
+	const pageHidden = document.visibilityState === "hidden";
+	return surface.compact ? !pageHidden : pageHidden;
 }

@@ -98,6 +98,8 @@ export const vi = {
 		backToList: "Về danh sách chat",
 		searchInChat: "Tìm trong chat",
 		info: "Thông tin chat",
+		openCompact: "Mở cửa sổ nhỏ luôn nổi",
+		compactUnread: "Chat chưa đọc",
 		members: (n: number) => `${n} thành viên`,
 		membersOnline: (n: number, online: number) => `${n} thành viên · ${online} đang hoạt động`,
 		/** The online part of the group header, left out on phones. */
