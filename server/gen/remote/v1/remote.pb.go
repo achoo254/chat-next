@@ -11028,7 +11028,12 @@ type MachineInfo struct {
 	// Unset before tunelo 2.3.0.
 	AgentUpdate *AgentUpdateInfo `protobuf:"bytes,22,opt,name=agent_update,json=agentUpdate,proto3" json:"agent_update,omitempty"`
 	// The machine's terminal; unspecified before tunelo 2.4.0.
-	Terminal      TerminalAvailability `protobuf:"varint,23,opt,name=terminal,proto3,enum=remote.v1.TerminalAvailability" json:"terminal,omitempty"`
+	Terminal TerminalAvailability `protobuf:"varint,23,opt,name=terminal,proto3,enum=remote.v1.TerminalAvailability" json:"terminal,omitempty"`
+	// With needs_full_disk_access: the absolute path of the tunelo program the
+	// owner adds to the Full Disk Access list (a command-line program in a
+	// hidden folder, so it is picked by path); empty when B does not run as its
+	// installed program.
+	AgentBinary   string `protobuf:"bytes,24,opt,name=agent_binary,json=agentBinary,proto3" json:"agent_binary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11222,6 +11227,13 @@ func (x *MachineInfo) GetTerminal() TerminalAvailability {
 		return x.Terminal
 	}
 	return TerminalAvailability_TERMINAL_AVAILABILITY_UNSPECIFIED
+}
+
+func (x *MachineInfo) GetAgentBinary() string {
+	if x != nil {
+		return x.AgentBinary
+	}
+	return ""
 }
 
 type RemoteBrowserInfo struct {
@@ -15543,7 +15555,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\x9b\a\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\xbe\a\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +
@@ -15571,7 +15583,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\fscreen_share\x18\x14 \x01(\bR\vscreenShare\x12!\n" +
 	"\ftotp_enabled\x18\x15 \x01(\bR\vtotpEnabled\x12=\n" +
 	"\fagent_update\x18\x16 \x01(\v2\x1a.remote.v1.AgentUpdateInfoR\vagentUpdate\x12;\n" +
-	"\bterminal\x18\x17 \x01(\x0e2\x1f.remote.v1.TerminalAvailabilityR\bterminal\"i\n" +
+	"\bterminal\x18\x17 \x01(\x0e2\x1f.remote.v1.TerminalAvailabilityR\bterminal\x12!\n" +
+	"\fagent_binary\x18\x18 \x01(\tR\vagentBinary\"i\n" +
 	"\x11RemoteBrowserInfo\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x18\n" +
 	"\arunning\x18\x02 \x01(\bR\arunning\x12\x1c\n" +

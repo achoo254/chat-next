@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../../src/machines/agent-projects-client.ts";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
-import { buildTree, locate, statusOf, unseenDone } from "../../src/machines/project-tree.ts";
+import { buildTree, locate, shortHost, statusOf, unseenDone } from "../../src/machines/project-tree.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
@@ -94,12 +94,13 @@ describe("the tree", () => {
 		expect(tree.loose.map((f) => f.machine.entry.name)).toEqual(["PC"]);
 	});
 
-	it("one machine: no machine label; two machines: every workspace of that project names its machine", () => {
-		const machines = [machine(1, "Mac", []), machine(2, "PC", [])];
-		const single = buildTree([project(1, "App", [ws(1, 1, "/w/app"), ws(1, 1, "/w/app-2")])], machines, "all", none);
-		expect(single.projects[0]?.manyMachines).toBe(false);
-		const spread = buildTree([project(1, "App", [ws(1, 1, "/w/app"), ws(1, 2, "C:\\app")])], machines, "all", none);
-		expect(spread.projects[0]?.manyMachines).toBe(true);
+	it("a machine's chip name: no .local, no domain; an address or a name with spaces stays whole", () => {
+		expect(shortHost("Hoans-Mac-mini.local")).toBe("Hoans-Mac-mini");
+		expect(shortHost("Hoans-Mac-mini.local.")).toBe("Hoans-Mac-mini");
+		expect(shortHost("build.lab.example.com")).toBe("build");
+		expect(shortHost("dattqh-cloud-1")).toBe("dattqh-cloud-1");
+		expect(shortHost("10.0.0.12")).toBe("10.0.0.12");
+		expect(shortHost("Máy nhà")).toBe("Máy nhà");
 	});
 
 	it("projects needing the user first, then the newest activity; a new empty project counts as recent", () => {

@@ -119,9 +119,17 @@ describe("the project column", () => {
 		expect(within(app).getByText("t2")).toBeTruthy();
 		expect(within(app).getByText("feature-x")).toBeTruthy();
 		expect(app.querySelector(".mx-wdot.need")).toBeTruthy();
-		// One machine: no machine label, no machine row.
-		expect(list.querySelector(".mx-host")).toBeNull();
-		expect(within(list).queryByText("Mac mini")).toBeNull();
+		// Every workspace row names its machine, even with one machine (owner, 11/12/2026); no machine header row.
+		const rows = [...list.querySelectorAll(".mx-ws")];
+		expect(rows.length).toBeGreaterThan(0);
+		for (const row of rows) {
+			const chip = row.querySelector(".mx-ws-head .mx-ws-host");
+			expect(chip?.textContent).toBe("Mac mini");
+			// Laid out, never stacked: the folder on its own line, the branch and the chip on the second.
+			expect(chip?.parentElement?.className).toBe("mx-ws-sub");
+			expect(row.querySelector(".mx-ws-name > b")?.closest(".mx-ws-sub")).toBeNull();
+		}
+		expect(list.querySelector(".mx-group-head")).toBeNull();
 		// "docs" has nothing for the user: folded.
 		expect(projectRow(list, "docs").querySelector(".mx-ws")).toBeNull();
 		// The session outside every workspace waits, folded, in "Chưa phân loại".
@@ -142,9 +150,10 @@ describe("the project column", () => {
 		]);
 		await waitFor(() => expect(server.workspaces).toHaveLength(4), WAIT);
 		expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs", "docs"]);
-		await waitFor(() => expect([...list.querySelectorAll(".mx-host")].map((e) => e.textContent).sort()).toEqual(["Mac mini", "Mac studio"]), WAIT);
-		// Only "app" spans two machines; nothing else names one.
-		for (const label of list.querySelectorAll(".mx-host")) expect(label.closest(".mx-project")?.querySelector(".mx-project-toggle b")?.textContent).toBe("app");
+		const app = projectRow(list, "app");
+		await waitFor(() => expect([...app.querySelectorAll(".mx-ws-host")].map((e) => e.textContent).sort()).toEqual(["Mac mini", "Mac studio"]), WAIT);
+		// Every workspace row shown has exactly one chip.
+		for (const row of list.querySelectorAll(".mx-ws")) expect(row.querySelectorAll(".mx-ws-host")).toHaveLength(1);
 	});
 
 	it("a folder in 'Chưa phân loại' becomes a project in one tap, named after its repository", async () => {

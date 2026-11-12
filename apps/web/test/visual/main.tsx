@@ -345,7 +345,16 @@ if (container === null) throw new Error("harness is missing #root");
 const machines = new FakeMachines();
 // The demo machine's key is pinned (IndexedDB) before the screens look for it.
 const machinesReady = at?.startsWith("machine-") === true ? installRemoteMachineDemo(machines) : Promise.resolve("");
-void machinesReady.then(() =>
+if (at === "add-project-hosts") {
+	// The dialog alone, with several online machines (?hosts=2 or 3).
+	void import("./add-project-hosts.tsx").then(({ AddProjectHosts }) =>
+		createRoot(container).render(
+			<StrictMode>
+				<AddProjectHosts count={params.get("hosts") === "3" ? 3 : 2} />
+			</StrictMode>,
+		),
+	);
+} else void machinesReady.then(() =>
 	createRoot(container).render(
 		<StrictMode>
 			<App
@@ -475,6 +484,18 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		data.items.add(new File(["x"], "anh.png", { type: "image/png" }));
 		chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
 		await find(() => document.querySelector(".mx-drop"));
+	},
+	// "Thêm dự án" on two machines: the folders of the first, then the second picked (its list dimmed until it answers).
+	"pick-folder": async () => {
+		const pick = await find(() => document.querySelector<HTMLElement>(".modal .mx-pick-folder"));
+		pick.click();
+		await find(() => document.querySelector(".modal .mx-pick-dirs button"));
+	},
+	"pick-folder-switch": async () => {
+		const pick = await find(() => document.querySelector<HTMLElement>(".modal .mx-pick-folder"));
+		pick.click();
+		await find(() => document.querySelector(".modal .mx-pick-dirs button"));
+		await click(".mx-host-seg button", /dattqh-cloud-1/);
 	},
 	// "Thêm dự án", "Chọn thư mục trên máy": the project and its first workspace from a folder.
 	"add-project": async () => {

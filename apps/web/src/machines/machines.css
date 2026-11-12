@@ -47,9 +47,16 @@
 .mx-host { flex: none; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 400; color: var(--c-text-muted); }
 .mx-run-dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-success); }
 .mx-archived-link { display: block; margin: var(--space-2) var(--space-3) 0; padding: 0; border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; text-decoration: underline; cursor: pointer; }
-.mx-mode { display: inline-flex; flex: none; box-sizing: border-box; height: 40px; padding: 2px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); }
-.mx-mode button { height: 100%; padding: 0 var(--space-2); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; cursor: pointer; }
-.mx-mode button[aria-pressed="true"] { background: var(--c-selected); color: var(--c-text); font-weight: 600; }
+/* "Trò chuyện | Terminal": a calm track, the picked side a solid accent pill. */
+.mx-view-switch { display: inline-flex; flex: none; gap: 2px; box-sizing: border-box; height: 40px; padding: 3px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 5%, var(--c-surface)); }
+.mx-view-switch button { height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
+.mx-view-switch button:hover:not([aria-pressed="true"]) { color: var(--c-text); background: var(--c-hover); }
+.mx-view-switch button[aria-pressed="true"] { background: var(--c-primary-solid); color: var(--c-on-primary); font-weight: 600; }
+.mx-view-switch button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .mx-view-switch button { transition: none; } }
+/* The session header: the title gives way first; the switch, the pill and the buttons keep their size and an even gap. */
+.mx-chat > .mx-head > :not(.title) { flex: none; }
+.mx-chat > .mx-head .tx-pill { margin-left: 0; }
 .mx-group-note { display: grid; gap: var(--space-2); justify-items: start; margin: 0 var(--space-2) var(--space-2); font-size: 0.8125rem; }
 .mx-group-note p { margin: 0; color: var(--c-text-muted); }
 p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 8px + var(--space-2)); }
@@ -66,10 +73,27 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-project-toggle > .icon { flex: none; color: var(--c-icon-muted); }
 .mx-project-toggle .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 .mx-ws { padding-left: var(--space-3); }
-.mx-ws-head { min-height: 40px; gap: var(--space-2); }
-.mx-ws-name { display: flex; align-items: baseline; gap: var(--space-2); flex: 1; min-width: 0; }
+/* A workspace on two lines: the folder (its whole width, cut last) and the actions; then the branch and the machine's chip. */
+.mx-ws-head { min-height: 44px; gap: var(--space-2); padding-top: 2px; padding-bottom: 2px; }
+.mx-ws-name { display: grid; flex: 1; min-width: 0; }
+.mx-ws-name > b { display: block; min-width: 0; }
+.mx-ws-sub { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .mx-ws-name b { font-weight: 500; }
 .mx-ws-name small { display: inline-flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
+.mx-ws-branch { flex: 0 1 auto; }
+.mx-ws-branch > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mx-ws-branch > .icon { flex: none; }
+/* The machine's chip: always there, at the end, never over its neighbours. */
+.mx-ws-host { flex: 0 1 auto; min-width: 2.5rem; max-width: 9rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+.mx-ws-host[data-offline] { border-style: dashed; opacity: 0.7; }
+/* The actions take no room until wanted: over the row's end on hover or focus, in it on touch. */
+.mx-ws-acts { position: absolute; top: 50%; right: var(--space-1); z-index: 1; display: flex; align-items: center; transform: translateY(-50%); border-radius: var(--radius-sm); background: var(--c-surface); opacity: 0; pointer-events: none; }
+.mx-ws-head:hover > .mx-ws-acts, .mx-ws-head:focus-within > .mx-ws-acts, .mx-ws-acts:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; }
+.mx-ws-acts .icon-btn { position: relative; width: 36px; height: 36px; }
+.mx-ws-acts .icon-btn::before { content: ""; position: absolute; inset: -4px; }
+@media (hover: none) {
+	.mx-ws-acts { position: static; transform: none; opacity: 1; pointer-events: auto; background: none; }
+}
 .mx-ws-name small.mx-ws-missing { color: var(--c-error-text); }
 .mx-ws[data-offline] .mx-ws-name, .mx-ws[data-offline] .mx-rows { opacity: 0.6; }
 .mx-wdot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
@@ -172,10 +196,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-strip { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); font-size: 0.8125rem; background: var(--c-surface-subtle); border-bottom: 1px solid var(--c-border-subtle); }
 .mx-strip .grow { flex: 1; }
 .mx-strip.warn { background: color-mix(in srgb, var(--c-warning) 12%, var(--c-surface)); color: var(--c-warning); }
-.mx-strip.ok { color: var(--c-success-text); background: color-mix(in srgb, var(--c-success) 12%, var(--c-surface)); }
 /* Full Disk Access: a card in the page's column, or one line in a session. */
 .mx-disk-access { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid color-mix(in srgb, var(--c-warning) 40%, var(--c-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--c-warning) 8%, var(--c-surface)); font-size: 0.875rem; color: var(--c-text); }
-.mx-disk-access.ok { display: flex; align-items: center; gap: var(--space-2); color: var(--c-success-text); }
+.mx-disk-ok, .mx-disk-access.mx-disk-ok { display: flex; align-items: center; gap: var(--space-2); border-color: color-mix(in srgb, var(--c-success) 40%, var(--c-border)); background: color-mix(in srgb, var(--c-success) 10%, var(--c-surface)); color: var(--c-success-text); }
+.mx-disk-ok .grow { flex: 1; min-width: 0; }
+.mx-disk-why { display: grid; gap: 2px; margin: 0; padding-left: var(--space-4); color: var(--c-text-muted); }
 .mx-disk-access p, .mx-disk-bar p { margin: 0; }
 .mx-disk-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .mx-disk-line > .icon { flex: none; color: var(--c-warning); }
@@ -185,22 +210,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-disk-more { display: grid; gap: var(--space-2); padding-bottom: var(--space-1); }
 .mx-disk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .mx-disk-actions span { color: var(--c-text-muted); font-size: 0.8125rem; }
-.mx-disk-guide { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
-.mx-disk-guide ol { flex: 1 1 16rem; margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
-.mx-disk-figure { flex: none; width: 10rem; max-width: 100%; height: auto; }
-.mx-disk-figure .f-frame { fill: var(--c-surface); stroke: var(--c-border); }
-.mx-disk-figure .f-rule { stroke: var(--c-border-subtle); }
-.mx-disk-figure .f-dot { fill: var(--c-border); }
-.mx-disk-figure .f-pick { fill: color-mix(in srgb, var(--c-primary-solid) 14%, var(--c-surface)); }
-.mx-disk-figure .f-app { fill: var(--c-text); }
-.mx-disk-figure .f-app-mark { fill: none; stroke: var(--c-surface); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.mx-disk-figure .f-name { fill: var(--c-text); font-size: 10px; font-family: inherit; }
-.mx-disk-figure .f-drag { stroke: var(--c-primary); stroke-width: 2; stroke-dasharray: 4 4; fill: none; }
-.mx-disk-figure .f-drag-head { stroke: var(--c-primary); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.mx-disk-figure .f-row-muted { fill: var(--c-surface-subtle); }
-.mx-disk-figure .f-row { fill: color-mix(in srgb, var(--c-primary-solid) 10%, var(--c-surface)); stroke: var(--c-primary); }
-.mx-disk-figure .f-switch { fill: var(--c-success); }
-.mx-disk-figure .f-knob { fill: var(--c-surface); }
+.mx-disk-guide { display: grid; gap: var(--space-1); }
+.mx-disk-guide p { margin: 0; font-size: 0.8125rem; }
+.mx-disk-guide ol { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
 .mx-strip.error { background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error); }
 
 /* Add machine, pair */
@@ -223,7 +235,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-otp-wrap { justify-self: stretch; min-width: 0; }
 /* A QR code stays dark on light in either theme: scanners need that contrast, so no theme colour here. */
 .mx-qr { display: block; width: min(100%, 220px); height: auto; aspect-ratio: 1; border-radius: var(--radius-sm); background: white; color: black; }
-.mx-field-row { display: grid; gap: var(--space-1); font-size: 0.875rem; font-weight: 500; }
+.mx-field-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); font-size: 0.875rem; font-weight: 500; }
 
 /* Machine page */
 .mx-session-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--c-border-subtle); color: inherit; text-decoration: none; }
@@ -714,9 +726,6 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-sdot.run { background: var(--c-primary); }
 .mx-sdot.done { background: var(--c-success); }
 /* Thêm dự án / Thêm workspace: the machine, then a folder by hand or one of the recent ones. */
-.mx-host-pick .dot { width: 8px; height: 8px; border-radius: var(--radius-full); }
-.mx-host-pick .dot.on { background: var(--c-success); }
-.mx-host-pick .dot.off { background: var(--c-border-strong); }
 .mx-pick-folder { display: flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; min-height: 64px; border: 1.5px dashed var(--c-border); border-radius: var(--radius-md); background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 .mx-pick-folder:hover { background: var(--c-hover); }
 .mx-recent-folders h4 { margin: 0 0 var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
@@ -727,3 +736,22 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-recent-folders small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-machine-acts { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: 0 var(--space-3) var(--space-2) calc(var(--space-3) + 40px); }
 .mx-chip.terminal { color: var(--c-primary); }
+/* The machine picker of "Thêm dự án": an input's height, the dot left of the name. */
+.mx-host-seg { display: flex; min-width: 0; box-sizing: border-box; height: 44px; padding: 3px; gap: 3px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
+.mx-host-seg button { display: flex; flex: 1 1 0; align-items: center; gap: var(--space-2); min-width: 0; padding: 0 var(--space-2); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.875rem; cursor: pointer; }
+.mx-host-seg button[aria-checked="true"] { background: var(--c-selected); color: var(--c-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--c-primary); }
+.mx-host-seg button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 1px; }
+.mx-host-seg .nm, .mx-host-select .nm, .mx-host-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.mx-host-seg .dot, .mx-host-select .dot, .mx-host-list .dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.mx-host-seg .dot.on, .mx-host-select .dot.on, .mx-host-list .dot.on { background: var(--c-success); }
+.mx-host-select { position: relative; min-width: 0; }
+.mx-host-select > button { display: flex; align-items: center; gap: var(--space-2); width: 100%; height: 44px; text-align: left; cursor: pointer; }
+.mx-host-list { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; max-height: 220px; margin: 0; padding: var(--space-1); overflow-y: auto; list-style: none; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); box-shadow: var(--shadow-lg); }
+.mx-host-list li { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-2); border-radius: calc(var(--radius-sm) - 2px); cursor: pointer; }
+.mx-host-list li[data-active], .mx-host-list li:hover { background: var(--c-hover); }
+.mx-host-list li[aria-selected="true"] { font-weight: 600; }
+/* Stable sizes while the machine changes: the folder list and the recent folders scroll inside. */
+.mx-add-project .mx-pick-dirs { height: 152px; max-height: none; scrollbar-gutter: stable; transition: opacity 0.15s; }
+.mx-pick-dirs[data-stale] { opacity: 0.45; pointer-events: none; }
+.mx-add-project .mx-recent-folders ul { height: 132px; overflow-y: auto; scrollbar-gutter: stable; align-content: start; }
+.mx-add-project .mx-recent-folders > .muted { margin: 0 0 var(--space-1); font-size: 0.8125rem; }

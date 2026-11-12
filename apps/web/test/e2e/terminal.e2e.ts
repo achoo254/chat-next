@@ -85,12 +85,12 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await page.goto(`http://localhost:${PORT}/?at=machine-session-terminal`);
 	await page.locator("[data-id=terminal-dock]").waitFor({ timeout: 30_000 });
 	await page.locator(".tx-pane .xterm").first().waitFor();
-	type Fake = { aiThreads: Map<number, string> };
+	type Fake = { aiThreads: Map<number, string>; exit(session: number, code: number): void; sessions: Map<number, unknown> };
 	await until(page, "the AI opened by its thread", () => ((window as unknown as { __fakeTerminal?: Fake }).__fakeTerminal?.aiThreads.size ?? 0) === 1);
 
 	const terminalMode = page.locator("[data-id=session-mode-terminal]");
 	assert.equal(await terminalMode.getAttribute("aria-pressed"), "true");
-	const switchBox = await page.locator(".mx-mode").first().boundingBox();
+	const switchBox = await page.locator(".mx-view-switch").first().boundingBox();
 	assert.equal(Math.round(switchBox?.height ?? 0), 40);
 	await until(page, "the path pill in the header", () => document.querySelector(".mx-head [data-id=terminal-path]") !== null);
 	assert.equal(await page.locator(".tx-head [data-id=terminal-path]").count(), 0);
@@ -123,6 +123,26 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await x.click();
 	await until(page, "one pane left", () => document.querySelectorAll(".tx-tab-body:not([hidden]) .tx-pane").length === 1);
 
+	// Its hidden input takes keystrokes, never a credential: no password manager offers to fill it.
+	const helper = await page.locator(".tx-tab-body:not([hidden]) .xterm-helper-textarea").first().evaluate((el) =>
+		["autocomplete", "name", "data-1p-ignore", "data-lpignore", "data-bwignore", "data-form-type"].map((n) => el.getAttribute(n)),
+	);
+	assert.deepEqual(helper, ["off", "terminal-keys", "", "true", "", "other"]);
+
+	// The session's program ends: the bar above the screen takes real clicks (nothing of xterm covers it).
+	const live = await page.evaluate(() => [...((window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.sessions.keys())]);
+	const first = live[0] ?? 1;
+	await page.evaluate((s) => (window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.exit(s, 1), first);
+	await page.getByText("Tiến trình đã thoát (mã 1).").waitFor();
+	const before = await page.evaluate(() => (window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.sessions.size);
+	await page.getByRole("button", { name: "Mở lại trong terminal" }).click();
+	await until(page, "the AI again", () => document.querySelectorAll(".tx-ended").length === 0);
+	assert.ok((await page.evaluate(() => (window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.sessions.size)) >= before);
+	const again = await page.evaluate(() => [...((window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.sessions.keys())].at(-1) ?? 0);
+	await page.evaluate((s) => (window as unknown as { __fakeTerminal: Fake }).__fakeTerminal.exit(s, 1), again);
+	await page.getByRole("button", { name: "Đóng ô" }).click();
+	await until(page, "the pane closed", () => document.querySelectorAll(".tx-ended").length === 0);
+
 	// No Terminal entry in the column; the one toggle is there.
 	assert.equal(await page.locator(".mx-list a", { hasText: /^Terminal$/ }).count(), 0);
 	assert.equal(await page.locator("[data-id=sidebar-attention]").count(), 1);
@@ -130,7 +150,7 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await context.close();
 });
 
-test("the column speaks of projects only: the machine's folders became projects, workspaces with branch and state, no machine anywhere", async () => {
+test("the column speaks of projects only: the machine's folders became projects, workspaces with branch and state, each naming its machine", async () => {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
 	const page = await context.newPage();
 	const errors: string[] = [];
@@ -145,13 +165,19 @@ test("the column speaks of projects only: the machine's folders became projects,
 	const chat = list.locator(".mx-project", { has: page.locator(".mx-project-toggle b", { hasText: /^chat-next$/ }) });
 	assert.equal(await chat.locator(".mx-project-toggle").getAttribute("aria-expanded"), "true");
 	assert.equal(await chat.locator(".mx-ws-name b").first().textContent(), "chat-next");
-	assert.equal(await chat.locator(".mx-ws-name small").first().textContent(), "main");
+	assert.equal(await chat.locator(".mx-ws-name .mx-ws-branch").first().textContent(), "main");
 	assert.equal(await chat.locator(".mx-wdot.need").count(), 1);
 	assert.equal(await chat.locator(".mx-srow", { hasText: "Sửa giao diện Máy của tôi" }).count(), 1);
-	// One machine holds them all: no machine name, label or row in the column.
+	// Every workspace row names its machine with a short chip (owner, 11/12/2026), on the second line, beside the branch and never over it;
+	// no machine header row, and the machines this browser cannot use stay out of the column.
+	const chip = chat.locator(".mx-ws-host").first();
+	assert.equal(await chip.textContent(), "DIEUVY-LAPTOP");
+	const [chipBox, branchBox, nameBox] = await Promise.all([chip.boundingBox(), chat.locator(".mx-ws-branch").first().boundingBox(), chat.locator(".mx-ws-name > b").first().boundingBox()]);
+	assert.ok(chipBox !== null && branchBox !== null && nameBox !== null);
+	assert.ok(branchBox.x + branchBox.width <= chipBox.x + 0.5, "the branch ends before the chip starts");
+	assert.ok(nameBox.y + nameBox.height <= chipBox.y + 0.5, "the folder name sits above the chip");
 	const text = (await list.textContent()) ?? "";
-	for (const machineName of ["DIEUVY-LAPTOP", "Mac mini", "Máy nhà"]) assert.ok(!text.includes(machineName), machineName);
-	assert.equal(await list.locator(".mx-host").count(), 0);
+	for (const machineName of ["Mac mini", "Máy nhà"]) assert.ok(!text.includes(machineName), machineName);
 	// The workspace's "+" and menu are real buttons, 44 px high where the row allows it.
 	const plus = chat.getByRole("button", { name: "Phiên mới trong chat-next" });
 	assert.equal(await plus.count(), 1);

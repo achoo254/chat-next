@@ -12,6 +12,7 @@ import { aiPaths } from "./ai-paths.ts";
 import { terminalGate } from "./agent-version.ts";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { errorText, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -58,7 +59,7 @@ export function ModeSwitch({ machine, threadId, mode }: { machine: string; threa
 		navigate(modePath(machine, threadId, next));
 	};
 	return (
-		<div className="mx-mode" role="group" aria-label={t.terminal.mode.label}>
+		<div className="mx-view-switch" role="group" aria-label={t.terminal.mode.label}>
 			{(["chat", "terminal"] as const).map((m) => (
 				<button key={m} type="button" aria-pressed={mode === m} onClick={() => pick(m)} data-id={`session-mode-${m}`}>
 					{t.terminal.mode[m]}
@@ -76,6 +77,7 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 	const end = () => {
 		setBusy(true);
 		setError("");
+		endOnPurpose(machine, thread.terminalSession);
 		link.request({ case: "termClose", value: { session: thread.terminalSession } }).then(
 			() => setBusy(false),
 			(err: unknown) => {

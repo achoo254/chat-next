@@ -104,10 +104,16 @@ export function ImeInput({ label, onSend, appCursor, inputRef, at }: ImeInputPro
 			ref={inputRef}
 			className="tx-ime"
 			aria-label={label}
+			// Keystrokes, never a credential (see no-autofill.ts): no password manager offers to fill it.
+			name="terminal-keys"
 			autoCapitalize="off"
 			autoComplete="off"
 			autoCorrect="off"
 			spellCheck={false}
+			data-1p-ignore=""
+			data-lpignore="true"
+			data-bwignore=""
+			data-form-type="other"
 			enterKeyHint="send"
 			rows={1}
 			defaultValue={SENTINEL}

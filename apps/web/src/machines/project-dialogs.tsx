@@ -15,16 +15,52 @@ type ProjectLink = Pick<MachineLink, "request">;
 /** The permission modes Claude offers a device, when no session told them yet. */
 const CLAUDE_MODES = ["default", "acceptEdits", "plan", "auto"];
 
-/** A folder on the machine: typed, or picked from the list of the one shown. */
-export function FolderPicker({ link, value, onChange, label }: { link: ProjectLink; value: string; onChange: (dir: string) => void; label: string }) {
+/**
+ * A folder on the machine: typed, or picked from the list of the one shown.
+ * `host` names the machine when the picker can move to another one: the last
+ * folder shown on each is kept in `cache`, so going back is instant, and
+ * until the new machine answers the old list stays, dimmed, at the same size.
+ */
+export function FolderPicker({
+	link,
+	value,
+	onChange,
+	label,
+	host,
+	cache,
+}: {
+	link: ProjectLink;
+	value: string;
+	onChange: (dir: string) => void;
+	label: string;
+	host?: string;
+	cache?: Map<string, DirListResult>;
+}) {
 	const t = useMachinesCopy();
 	const [listing, setListing] = useState<DirListResult | null>(null);
 	const [typed, setTyped] = useState(value);
 	const [error, setError] = useState("");
+	const [stale, setStale] = useState(false);
+	// Another machine: its last folder at once when seen before, else the old list dimmed until it answers.
+	const [shownHost, setShownHost] = useState(host);
+	const cached = host === undefined ? undefined : cache?.get(host);
+	if (host !== shownHost) {
+		setShownHost(host);
+		setError("");
+		if (cached !== undefined) {
+			setListing(cached);
+			setTyped(cached.path);
+			setStale(false);
+		} else {
+			setStale(true);
+		}
+	}
 	const list = (dir: string) =>
 		link.request({ case: "dirList", value: { path: dir, showHidden: false } }).then((frame) => (frame.body.case === "dirListResult" ? frame.body.value : null));
 	const shown = (result: DirListResult | null) => {
 		if (result === null) return;
+		if (host !== undefined) cache?.set(host, result);
+		setStale(false);
 		setListing(result);
 		setTyped(result.path);
 		onChange(result.path);
@@ -33,18 +69,26 @@ export function FolderPicker({ link, value, onChange, label }: { link: ProjectLi
 		setError("");
 		list(dir).then(shown, (err: unknown) => setError(errorText(t, err, "")));
 	};
-	// The folder given first (or home) opens once.
+	// The folder given first (or home) opens once per machine; a machine seen before shows its last folder at once.
 	useEffect(() => {
+		if (cached !== undefined) {
+			onChange(cached.path);
+			return;
+		}
 		let live = true;
 		list(value).then(
 			(result) => live && shown(result),
-			(err: unknown) => live && setError(errorText(t, err, "")),
+			(err: unknown) => {
+				if (!live) return;
+				setStale(false);
+				setError(errorText(t, err, ""));
+			},
 		);
 		return () => {
 			live = false;
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- opens the starting folder once; later changes come from this picker
-	}, []);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- opens the starting folder once per machine; later changes come from this picker
+	}, [host]);
 	return (
 		<div className="mx-field-row">
 			<span>{label}</span>
@@ -72,9 +116,9 @@ export function FolderPicker({ link, value, onChange, label }: { link: ProjectLi
 				)}
 			</div>
 			{error !== "" && <p className="mx-error">{error}</p>}
-			{listing !== null && (
-				<ul className="mx-dirs mx-pick-dirs">
-					{listing.parent !== "" && (
+			{(listing !== null || host !== undefined) && (
+				<ul className="mx-dirs mx-pick-dirs" data-stale={stale ? "" : undefined} aria-busy={stale}>
+					{listing !== null && listing.parent !== "" && (
 						<li>
 							<button type="button" onClick={() => open(listing.parent)}>
 								<MachineIcon name="folder" small />
@@ -82,7 +126,8 @@ export function FolderPicker({ link, value, onChange, label }: { link: ProjectLi
 							</button>
 						</li>
 					)}
-					{listing.entries.map((entry) => {
+					{(listing?.entries ?? []).map((entry) => {
+						if (listing === null) return null;
 						const sep = listing.path.includes("\\") && !listing.path.includes("/") ? "\\" : "/";
 						const dir = listing.path.endsWith(sep) ? `${listing.path}${entry.name}` : `${listing.path}${sep}${entry.name}`;
 						return (

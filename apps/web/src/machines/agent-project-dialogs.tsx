@@ -7,7 +7,8 @@
 // machine is touched), and picking a project to move a workspace to or to
 // add a folder to. A folder of another repository than the project links is
 // refused, as Orca does.
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import type { DirListResult } from "@achoo254/chat-proto/remote/remote";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { refusalOf, type AgentProject, type AgentWorkspace } from "./agent-projects-client.ts";
 import type { AgentProjectsStore } from "./agent-projects-store.ts";
@@ -48,34 +49,146 @@ interface FolderChoice {
 	readonly dir: string;
 }
 
+/** Machines up to this many show side by side; more open a list. */
+const SEGMENTED_HOSTS = 2;
+
+/**
+ * The machine, as compact as an input: two side by side (a radio group), more
+ * behind a button that opens a list (a listbox: arrows, Enter, Esc). A dot
+ * left of each name says it is online; long names are cut.
+ */
+function HostPicker({ hosts, value, onPick }: { hosts: readonly MachineView[]; value: MachineView; onPick: (machine: MachineView) => void }) {
+	const t = useMachinesCopy();
+	const p = t.agent.projects;
+	const labelId = useDomId("host-pick");
+	const listId = useDomId("host-list");
+	const [open, setOpen] = useState(false);
+	const [active, setActive] = useState(0);
+	const name = (m: MachineView) => (
+		<>
+			<span className={`dot ${m.conn.kind === "on" ? "on" : "off"}`} aria-hidden="true" />
+			<span className="nm">{m.entry.name}</span>
+		</>
+	);
+	if (hosts.length <= SEGMENTED_HOSTS) {
+		const move = (event: KeyboardEvent<HTMLButtonElement>, at: number) => {
+			const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+			if (step === 0) return;
+			event.preventDefault();
+			const next = hosts[(at + step + hosts.length) % hosts.length];
+			if (next !== undefined) onPick(next);
+		};
+		return (
+			<div className="mx-field-row">
+				<span id={labelId}>{p.host}</span>
+				<div className="mx-host-seg" role="radiogroup" aria-labelledby={labelId} data-id="add-workspace-host">
+					{hosts.map((h, i) => {
+						const on = h.entry.ref === value.entry.ref;
+						return (
+							<button key={h.entry.ref} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} title={h.entry.name} onClick={() => onPick(h)} onKeyDown={(event) => move(event, i)}>
+								{name(h)}
+							</button>
+						);
+					})}
+				</div>
+			</div>
+		);
+	}
+	const pick = (at: number) => {
+		const m = hosts[at];
+		if (m !== undefined) onPick(m);
+		setOpen(false);
+	};
+	const current = Math.max(0, hosts.findIndex((h) => h.entry.ref === value.entry.ref));
+	const keys = (event: KeyboardEvent<HTMLElement>) => {
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			// Closed: the first arrow opens the list on the machine picked now.
+			if (!open) {
+				setActive(current);
+				setOpen(true);
+				return;
+			}
+			setActive((a) => (a + (event.key === "ArrowDown" ? 1 : -1) + hosts.length) % hosts.length);
+		} else if (event.key === "Enter" && open) {
+			event.preventDefault();
+			pick(active);
+		} else if (event.key === "Escape" && open) {
+			event.preventDefault();
+			event.stopPropagation();
+			setOpen(false);
+		}
+	};
+	return (
+		<div className="mx-field-row">
+			<span id={labelId}>{p.host}</span>
+			<div className="mx-host-select" data-id="add-workspace-host">
+				<button
+					type="button"
+					role="combobox"
+					className="input"
+					aria-haspopup="listbox"
+					aria-expanded={open}
+					aria-labelledby={labelId}
+					aria-controls={listId}
+					aria-activedescendant={open ? `${listId}-${active}` : undefined}
+					title={value.entry.name}
+					onClick={() => {
+						setActive(current);
+						setOpen((v) => !v);
+					}}
+					onKeyDown={keys}
+				>
+					{name(value)}
+					<MachineIcon name="chevron-down" small />
+				</button>
+				{open && (
+					<ul className="mx-host-list" role="listbox" id={listId} aria-labelledby={labelId}>
+						{hosts.map((h, i) => (
+							<li
+								key={h.entry.ref}
+								id={`${listId}-${i}`}
+								role="option"
+								aria-selected={h.entry.ref === value.entry.ref}
+								data-active={i === active ? "" : undefined}
+								onMouseDown={(event) => event.preventDefault()}
+								onClick={() => pick(i)}
+								onKeyDown={keys}
+							>
+								{name(h)}
+							</li>
+						))}
+					</ul>
+				)}
+			</div>
+		</div>
+	);
+}
+
 /**
  * A machine (picked only when there are several) and a folder on it: typed,
  * browsed, or one of the folders with sessions in one tap (`onQuick`).
+ * Switching machines keeps everything in place: the folder list and the
+ * recent folders keep their size, the last folder shown on each machine comes
+ * back at once, and nothing typed elsewhere in the dialog is lost.
  */
 function FolderChooser({ hosts, value, onChange, onQuick, busy }: { hosts: readonly MachineView[]; value: FolderChoice | null; onChange: (choice: FolderChoice) => void; onQuick: (choice: FolderChoice) => void; busy: boolean }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
+	const [listings] = useState(() => new Map<string, DirListResult>());
 	const machine = value?.machine ?? hosts[0];
 	if (machine === undefined) return <p className="muted">{p.noHost}</p>;
 	const recent = machine.state.projects?.suggestions ?? [];
+	// With several machines the recent list keeps its place even when one machine has none.
+	const showRecent = recent.length > 0 || hosts.length > 1;
 	return (
 		<>
-			{hosts.length > 1 && (
-				<fieldset className="mx-ai-pick mx-host-pick" data-id="add-workspace-host">
-					<legend>{p.host}</legend>
-					{hosts.map((h) => (
-						<label key={h.entry.ref} className={h.entry.ref === machine.entry.ref ? "sel" : undefined}>
-							<input type="radio" name="host" checked={h.entry.ref === machine.entry.ref} onChange={() => onChange({ machine: h, dir: "" })} />
-							<span className="dot on" aria-hidden="true" />
-							<b>{h.entry.name}</b>
-						</label>
-					))}
-				</fieldset>
-			)}
-			<FolderPicker key={machine.entry.ref} link={machine.link} value="" onChange={(dir) => onChange({ machine, dir })} label={p.folder} />
-			{recent.length > 0 && (
+			{hosts.length > 1 && <HostPicker hosts={hosts} value={machine} onPick={(m) => onChange({ machine: m, dir: "" })} />}
+			<FolderPicker link={machine.link} host={machine.entry.ref} cache={listings} value="" onChange={(dir) => onChange({ machine, dir })} label={p.folder} />
+			{showRecent && (
 				<section className="mx-recent-folders" aria-label={p.recent}>
 					<h4>{p.recent}</h4>
+					{recent.length === 0 && <p className="muted">{p.noRecent}</p>}
 					<ul>
 						{recent.map((r) => (
 							<li key={r.dir}>

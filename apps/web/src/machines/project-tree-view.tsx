@@ -1,9 +1,10 @@
 // The projects in the AI Agent column: a project row (folded unless it is
 // the selected one or something in it needs the user or runs), its
-// workspaces (folder name, git branch, a state dot, the machine's name only
-// when the project spans two machines or more, "+" for a new session in the
-// mode last used, a menu), each with its three newest sessions and "Xem
-// thêm". An empty project offers "Thêm workspace". At the bottom, folded,
+// workspaces, each on two lines: a state dot and the folder name (its whole
+// width, cut last), "+" for a new session in the mode last used and a menu
+// (on hover or focus, always on touch); then the git branch and the
+// machine's short name, always shown (dimmed while that machine is offline),
+// each with its three newest sessions and "Xem thêm". An empty project offers "Thêm workspace". At the bottom, folded,
 // "Chưa phân loại (n)": folders whose sessions no workspace holds, each
 // offering "Tạo dự án" and "Thêm vào dự án…". The dialogs load when opened.
 import { lazy, Suspense, useState, type ReactNode } from "react";
@@ -17,7 +18,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { NewSession } from "./new-session.tsx";
 import { folderName } from "./new-session-hints.ts";
 import { adoptStarted, isNeedsConsent, knownFolder, placeByHand } from "./project-actions.ts";
-import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceNode, type WorkStatus, unseenDone } from "./project-tree.ts";
+import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceNode, type WorkStatus, shortHost, unseenDone } from "./project-tree.ts";
 import { SessionRow } from "./session-row.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { aiName, type MachineView } from "./use-machines.ts";
@@ -76,6 +77,16 @@ function RowMenu({ label, items, disabled = false }: { label: string; items: rea
 					))}
 				</div>
 			)}
+		</span>
+	);
+}
+
+/** The machine of a workspace or folder, always shown: its short name, the whole one on hover; dimmed while offline. */
+function HostChip({ name, offline }: { name: string; offline: boolean }) {
+	const t = useMachinesCopy();
+	return (
+		<span className="mx-host mx-ws-host" data-offline={offline ? "" : undefined} title={offline ? `${name} · ${t.agent.projects.machineOffline}` : name}>
+			{shortHost(name)}
 		</span>
 	);
 }
@@ -148,7 +159,7 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 
 type WorkspaceDialog = "custom" | "settings" | "move" | "detach" | null;
 
-function WorkspaceItem({ node, project, many, ctx }: { node: WorkspaceNode; project: AgentProject; many: boolean; ctx: TreeContext }) {
+function WorkspaceItem({ node, project, ctx }: { node: WorkspaceNode; project: AgentProject; ctx: TreeContext }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const { workspace, machine, local } = node;
@@ -160,22 +171,25 @@ function WorkspaceItem({ node, project, many, ctx }: { node: WorkspaceNode; proj
 	const missing = local?.missing === true;
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
-			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
+			<div className="mx-ws-head">
 				<StatusDot status={node.status} offline={node.offline} />
 				<span className="mx-ws-name">
-					<b>{name}</b>
-					{missing ? (
-						<small className="mx-ws-missing">{p.missing}</small>
-					) : (
-						node.branch !== "" && (
-							<small>
-								<MachineIcon name="branch" small />
-								{node.branch}
-							</small>
-						)
-					)}
-					{many && <span className="mx-host">{machineName}</span>}
+					<b title={workspace.dir}>{name}</b>
+					<span className="mx-ws-sub">
+						{missing ? (
+							<small className="mx-ws-missing">{p.missing}</small>
+						) : (
+							node.branch !== "" && (
+								<small className="mx-ws-branch" title={node.branch}>
+									<MachineIcon name="branch" small />
+									<span>{node.branch}</span>
+								</small>
+							)
+						)}
+						<HostChip name={machineName} offline={!online} />
+					</span>
 				</span>
+				<span className="mx-ws-acts">
 				<button type="button" className="icon-btn" aria-label={p.newHere(name)} title={p.newHere(name)} disabled={!online || missing || starting} onClick={start}>
 					{starting ? <span className="spin" aria-hidden="true" /> : <Icon name="plus" small />}
 				</button>
@@ -188,6 +202,7 @@ function WorkspaceItem({ node, project, many, ctx }: { node: WorkspaceNode; proj
 						{ label: p.detach, icon: "trash", run: () => setDialog("detach"), danger: true },
 					]}
 				/>
+				</span>
 			</div>
 			{machine !== null && <Sessions machine={machine} threads={node.threads} ctx={ctx} />}
 			{dialog === "custom" && machine !== null && (
@@ -273,7 +288,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 						</button>
 					</div>
 				) : (
-					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} project={project} many={node.manyMachines} ctx={ctx} />)
+					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} project={project} ctx={ctx} />)
 				))}
 			<Suspense fallback={null}>
 				{dialog === "add" && <AddWorkspaceDialog store={ctx.store} project={project} machines={ctx.machines} onClose={() => setDialog(null)} />}
@@ -304,17 +319,24 @@ function LooseItem({ folder, ctx }: { folder: LooseFolder; ctx: TreeContext }) {
 	};
 	return (
 		<div className="mx-ws">
-			<div className="mx-ws-head" title={`${machine.entry.name} · ${dir}`}>
+			<div className="mx-ws-head">
 				<StatusDot status={folder.status} offline={machine.conn.kind !== "on"} />
 				<span className="mx-ws-name">
-					<b>{name}</b>
-					<small>{p.sessions(folder.threads.length)}</small>
+					<b title={dir}>{name}</b>
+					<span className="mx-ws-sub">
+						<small className="mx-ws-branch">
+							<span>{p.sessions(folder.threads.length)}</span>
+						</small>
+						<HostChip name={machine.entry.name} offline={machine.conn.kind !== "on"} />
+					</span>
 				</span>
+				<span className="mx-ws-acts">
 				<RowMenu
 					label={p.workspaceMenu(name)}
 					disabled={!placeable}
 					items={[{ label: p.makeProject, icon: "plus", run: () => make(false) }, ctx.projects.length > 0 ? { label: p.addToProject, icon: "forward", run: () => setDialog("pick") } : null]}
 				/>
+				</span>
 			</div>
 			{error !== "" && (
 				<p className="mx-error" role="alert">

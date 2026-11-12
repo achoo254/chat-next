@@ -477,6 +477,7 @@ export class Machine {
         untestedVersion: Boolean(d.untestedVersion),
       });
     }
+    const needsDiskAccess = diskAccess() === "needed";
     return create(MachineInfoSchema, {
       name: c.machineName || hostname(),
       os: platform(),
@@ -492,7 +493,9 @@ export class Machine {
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
       devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
-      needsFullDiskAccess: diskAccess() === "needed",
+      needsFullDiskAccess: needsDiskAccess,
+      // The program to add to the list; a development run (bun, node) has none to give.
+      ...(needsDiskAccess && isCompiled() ? { agentBinary: process.execPath } : {}),
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
       gitChanges: true,

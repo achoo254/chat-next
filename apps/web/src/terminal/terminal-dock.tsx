@@ -55,6 +55,7 @@ import {
 import { TerminalSplits } from "./terminal-splits.tsx";
 import { shortcutOf, TerminalTabs, type DockAction } from "./terminal-tabs.tsx";
 import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
+import { endedOnPurpose } from "./ended-sessions.ts";
 import "./terminal.css";
 
 const SAVE_DELAY_MS = 300;
@@ -390,7 +391,13 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const restart = async (pane: PaneNode) => {
 		const session = await openSession(shellDir, pane.ai === true);
 		if (session === null) return;
-		closeSessionOnMachine(pane.session);
+		// The machine may hand back the same id (the AI still listed as running there): never close what now shows.
+		if (session !== pane.session) closeSessionOnMachine(pane.session);
+		setEnded((m) => {
+			const next = new Map(m);
+			next.delete(session);
+			return next;
+		});
 		setLayout((l) => setPaneSession(l, pane.id, session));
 	};
 
@@ -424,8 +431,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					}}
 				/>
 				{code !== undefined && (
-					<div className="tx-ended" role="status">
-						<span>{tt.exited(code)}</span>
+					// Above xterm's layers; a tap here is for its buttons, not for focusing the pane.
+					<div className="tx-ended" role="status" onPointerUp={(event) => event.stopPropagation()}>
+						<span>{endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
 						<button type="button" className="btn btn-sm" onClick={() => closePanes([pane.id])}>
 							{tt.closePane}
 						</button>

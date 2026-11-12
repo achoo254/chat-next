@@ -260,7 +260,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					{offered && (
 						<div className="mx-field-row">
 							<span>{t.terminal.mode.label}</span>
-							<div className="mx-mode" role="group" aria-label={t.terminal.mode.label}>
+							<div className="mx-view-switch" role="group" aria-label={t.terminal.mode.label}>
 								{(["chat", "terminal"] as const).map((m) => (
 									<button key={m} type="button" aria-pressed={openIn === m} onClick={() => setPicked(m)} data-id={`new-session-mode-${m}`}>
 										{t.terminal.mode[m]}

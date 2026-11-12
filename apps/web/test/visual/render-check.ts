@@ -62,6 +62,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// AI Agent: the sessions of every machine, the "Cần bạn" board, an unpaired machine, the machines page;
 	// a session with markdown, the docked prompt, the status bar's details, the changes panel and "@" files.
 	"machine-chat": "?at=machine-chat",
+	// A session in its terminal: the "Trò chuyện | Terminal" switch, the path pill and "Kết thúc" in the header.
+	"machine-session-terminal": "?at=machine-session-terminal",
 	"machine-home": "?at=machine-home",
 	"machine-need": "?at=machine-need",
 	"machine-unpaired": "?at=machine-unpaired",
@@ -105,6 +107,9 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// Projects: the column by project and workspace (git branch, state, "+"); "Thêm dự án" from a folder.
 	"machine-projects": "?at=machine-home",
 	"machine-add-project": "?at=machine-chat&open=add-project",
+	"add-project-hosts": "?at=add-project-hosts&hosts=2&open=pick-folder",
+	"add-project-hosts-switch": "?at=add-project-hosts&hosts=2&open=pick-folder-switch",
+	"add-project-hosts-three": "?at=add-project-hosts&hosts=3&open=pick-folder",
 	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",

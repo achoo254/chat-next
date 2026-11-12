@@ -67,7 +67,7 @@
 .tx-divider.row:hover::after, .tx-divider.row:focus-visible::after { width: 2px; left: 3px; }
 .tx-divider.column:hover::after, .tx-divider.column:focus-visible::after { height: 2px; top: 3px; }
 
-.tx-ended { position: absolute; left: var(--space-2); right: var(--space-2); bottom: var(--space-2); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--c-surface); box-shadow: var(--shadow-lg); font-size: 0.8125rem; }
+.tx-ended { position: absolute; z-index: 11; left: var(--space-2); right: var(--space-2); bottom: var(--space-2); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--c-surface); box-shadow: var(--shadow-lg); font-size: 0.8125rem; }
 .tx-ended span { flex: 1; min-width: 160px; }
 .tx-empty, .tx-failed { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-3); padding: var(--space-4); margin: 0; color: #c9ced8; text-align: center; font-size: 0.875rem; }
 .tx-failed { z-index: 3; background: rgb(17 19 24 / 0.92); }

@@ -15,6 +15,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { LatencyProbe } from "./latency-probe.ts";
+import { noAutofill } from "./no-autofill.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 
 /** Output smaller than this is written at once. */
@@ -201,6 +202,8 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			}
 			const textarea = term.textarea;
 			if (textarea !== undefined) {
+				// Keystrokes, never a credential: no password manager popup at the cursor.
+				noAutofill(textarea);
 				textarea.setAttribute("aria-label", labelNow());
 				if (touch) {
 					// On a touch screen the dock's own input takes the keyboard (IME composition, the key bar).

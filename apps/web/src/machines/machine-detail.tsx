@@ -153,7 +153,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 			</PageHead>
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<div className="mx-body">
-				<DiskAccessBanner link={link} info={state.info} online={online} />
+				<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} />
 				<section className="card pad mx-card">
 					<h3>{t.detail.sessions}</h3>
 					{!online && <p className="muted">{t.detail.needsLink}</p>}

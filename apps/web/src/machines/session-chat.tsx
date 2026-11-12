@@ -49,6 +49,7 @@ import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 import { ModeSwitch, TerminalHeldBar, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
+import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate } from "./project-tree.ts";
@@ -165,7 +166,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	};
 
 	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere".
-	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? "terminal" : stateKey(thread);
+	// In the terminal its pill and "Kết thúc" already say it runs there; in chat the chip says why it is read-only.
+	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : "terminal") : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
@@ -175,7 +177,12 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const own = state.projects?.projects.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
 	const branch = own?.git?.git === true ? own.git.branch : (placed?.workspace.branch ?? "");
 	const workspace = placed === null ? folderName(dir) : folderName(placed.workspace.dir);
-	const endTerminal = held ? () => link.request({ case: "termClose", value: { session: thread.terminalSession } }).then(() => undefined) : undefined;
+	const endTerminal = held
+		? () => {
+				endOnPurpose(machine, thread.terminalSession);
+				return link.request({ case: "termClose", value: { session: thread.terminalSession } }).then(() => undefined);
+			}
+		: undefined;
 	return (
 		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
 			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
@@ -234,7 +241,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				/>
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
-			<DiskAccessBanner link={link} info={state.info} online={online} bar />
+			<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} bar />
 			{mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (

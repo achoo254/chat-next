@@ -18,7 +18,9 @@ import { MachineLinksProvider } from "../../src/machines/link/connection-provide
 import { MachineLink } from "../../src/machines/link/machine-link.ts";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
-import { inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
+import { ImeInput, inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
+import { endOnPurpose } from "../../src/terminal/ended-sessions.ts";
+import { NO_AUTOFILL, noAutofill } from "../../src/terminal/no-autofill.ts";
 import { keySequence, withModifiers } from "../../src/terminal/mobile-key-bar.tsx";
 import { TerminalDock } from "../../src/terminal/terminal-dock.tsx";
 import {
@@ -50,7 +52,7 @@ import { FakeTerminalHost, serverFrames } from "./fake-terminal.ts";
 const screens = new Map<number, string>();
 
 vi.mock("../../src/terminal/terminal-view.tsx", () => ({
-	TerminalView: ({ link, session, label }: { link: TerminalLink; session: number; label: string }) => {
+	TerminalView: ({ link, session, label, onExit }: { link: TerminalLink; session: number; label: string; onExit: (code: number) => void }) => {
 		useEffect(() => {
 			const sink: TerminalSink = {
 				snapshot: (s) => screens.set(session, new TextDecoder().decode(s.vt).replace("\x1bc", "")),
@@ -58,11 +60,11 @@ vi.mock("../../src/terminal/terminal-view.tsx", () => ({
 					screens.set(session, (screens.get(session) ?? "") + new TextDecoder().decode(data));
 					done();
 				},
-				exit: () => undefined,
+				exit: (code) => onExit(code),
 				gone: () => undefined,
 			};
 			return link.attach(session, sink);
-		}, [link, session]);
+		}, [link, session, onExit]);
 		return <div data-testid={`screen-${session}`} aria-label={label} />;
 	},
 }));
@@ -227,6 +229,18 @@ describe("a session in chat or in its terminal", () => {
 		await userEvent.click(within(group).getByRole("button", { name: "Trò chuyện" }));
 		expect(window.location.pathname).toBe("/ai/1/s/t1");
 		expect(window.localStorage.getItem("ai:mode:1")).toBe("chat");
+	});
+
+	it("in terminal mode the header has no 'running in the terminal' chip (the pill and Kết thúc say it); the switch shows which side is on", async () => {
+		held = 1;
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
+		const group = await screen.findByRole("group", { name: "Mở phiên bằng" });
+		expect(group.className).toBe("mx-view-switch");
+		expect(within(group).getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe("true");
+		expect(within(group).getByRole("button", { name: "Trò chuyện" }).getAttribute("aria-pressed")).toBe("false");
+		await screen.findByRole("button", { name: "Kết thúc" });
+		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
+		expect(screen.queryByRole("status", { name: "Chạy ở nơi khác" })).toBeNull();
 	});
 
 	it("an AI without a terminal CLI: no switch, and the terminal address says so without opening anything", async () => {
@@ -425,6 +439,50 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a program that ended: the bar above the screen opens a new shell or closes the pane", async () => {
+		const { view } = await dock(refusing());
+		await until(() => sent("termOpen").length === 1, "first terminal");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		host.exit(1, 1);
+		expect(await screen.findByText("Tiến trình đã thoát (mã 1).")).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Mở shell mới" }));
+		await until(() => sent("termOpen").length === 2, "a new shell");
+		await until(() => sent("termClose").length === 1, "the ended one closed");
+		expect(sent("termClose")[0]?.body.value).toMatchObject({ session: 1 });
+		await waitFor(() => expect(screen.getByTestId("screen-2")).toBeTruthy());
+		await until(() => host.frames.filter((f) => f.frame.type === "attach").length >= 2, "attached again");
+		host.exit(2, 1);
+		await screen.findByText("Tiến trình đã thoát (mã 1).");
+		// The keyboard reaches the bar's buttons too.
+		const close = screen.getByRole("button", { name: "Đóng ô" });
+		close.focus();
+		await userEvent.keyboard("{Enter}");
+		await waitFor(() => expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(0));
+	});
+
+	it("a session the user ended on purpose says so (not the hangup's exit code), and opens its AI again", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		endOnPurpose("1", 1);
+		host.exit(1, 129);
+		expect(await screen.findByText("Phiên đã kết thúc.")).toBeTruthy();
+		expect(screen.queryByText(/mã 129/)).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
+		await until(() => sent("termOpen").length === 2, "the AI again");
+		expect(sent("termOpen")[1]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
 	it("says when the machine has no room for another terminal", async () => {
 		host.maxSessions = 0;
 		await dock(refusing());
@@ -492,6 +550,25 @@ describe("the layout", () => {
 			await expect(store.save("1", layout)).resolves.toBeUndefined();
 			expect(await store.load("1")).toEqual(layout);
 		}
+	});
+});
+
+describe("hidden inputs are not credential fields", () => {
+	const OPT_OUTS = { autocomplete: "off", autocorrect: "off", autocapitalize: "off", spellcheck: "false", name: "terminal-keys", "data-1p-ignore": "", "data-lpignore": "true", "data-bwignore": "", "data-form-type": "other" };
+
+	it("xterm's helper textarea gets every opt-out", () => {
+		const textarea = document.createElement("textarea");
+		noAutofill(textarea);
+		for (const [name, value] of Object.entries(OPT_OUTS)) expect(textarea.getAttribute(name), name).toBe(value);
+		expect(NO_AUTOFILL).toEqual(OPT_OUTS);
+	});
+
+	it("the phone's input method field has the same, and is never a password or e-mail field", () => {
+		render(<ImeInput label="Gõ vào terminal" inputRef={{ current: null }} at={null} onSend={() => undefined} appCursor={() => false} />);
+		const field = screen.getByRole("textbox", { name: "Gõ vào terminal" });
+		expect(field.tagName).toBe("TEXTAREA");
+		for (const [name, value] of Object.entries(OPT_OUTS)) expect(field.getAttribute(name), name).toBe(value);
+		expect(field.getAttribute("type")).toBeNull();
 	});
 });
 

@@ -130,7 +130,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 			</PageHead>
 			{!needsPairing(conn) && <LinkBanner machine={machine} name={entry.name} status={state.status} />}
 			<div className="mx-body">
-				<DiskAccessBanner link={link} info={state.info} online={state.status.kind === "open"} />
+				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
 				{needsPairing(conn) && (
 					<div className="empty">
 						<MachineIcon name="shield" />

@@ -290,7 +290,7 @@ export class FakeTerminalHost {
 				// A thread's AI already running in a terminal: that session again, as the agent does.
 				const threadId = b.value.aiSession?.threadId ?? "";
 				const running = [...this.aiThreads].find(([, t]) => t === threadId)?.[0];
-				if (threadId !== "" && running !== undefined && this.sessions.has(running)) return [{ case: "termOpened", value: { session: running } }];
+				if (threadId !== "" && running !== undefined && this.sessions.get(running)?.exited === null) return [{ case: "termOpened", value: { session: running } }];
 				if (this.sessions.size >= this.maxSessions) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "limit", reason: ErrorReason.TERMINAL_SESSION_LIMIT } }];
 				const session = this.open(b.value.cols, b.value.rows);
 				if (threadId !== "") this.aiThreads.set(session, threadId);

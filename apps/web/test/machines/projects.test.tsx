@@ -175,7 +175,7 @@ describe("Thêm dự án from a folder", () => {
 		const pc = machine(2, "PC", [], { suggestions: [{ dir: "/srv/site", sessions: 2, gitRemote: "git@github.com:a/site.git" }] });
 		wrap(<AddAgentProjectDialog store={store} machines={[mac.view, pc.view]} onClose={() => undefined} />);
 		await userEvent.click(screen.getByRole("button", { name: "Chọn thư mục trên máy" }));
-		const picker = screen.getByRole("group", { name: "Máy" });
+		const picker = screen.getByRole("radiogroup", { name: "Máy" });
 		await userEvent.click(within(picker).getByRole("radio", { name: "PC" }));
 		await userEvent.click(await screen.findByRole("button", { name: "Thêm site" }));
 		await waitFor(() => expect(server.projects.map((p) => [p.name, p.gitRemote])).toEqual([["site", "github.com/a/site"]]));
@@ -188,7 +188,52 @@ describe("Thêm dự án from a folder", () => {
 		const store = new AgentProjectsStore(server.api());
 		wrap(<AddAgentProjectDialog store={store} machines={[machine(1, "Mac", []).view]} onClose={() => undefined} />);
 		await userEvent.click(screen.getByRole("button", { name: "Chọn thư mục trên máy" }));
-		expect(screen.queryByRole("group", { name: "Máy" })).toBeNull();
+		expect(screen.queryByRole("radiogroup", { name: "Máy" })).toBeNull();
 		expect(await screen.findByText("app")).toBeTruthy();
+	});
+
+	it("switching machines keeps the dialog in place: the same name field and text, each machine's folders cached, the list's place kept", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		const mac = machine(1, "Mac", [], { suggestions: [{ dir: "/w/api", sessions: 3 }] });
+		const pc = machine(2, "PC", []);
+		wrap(<AddAgentProjectDialog store={store} machines={[mac.view, pc.view]} onClose={() => undefined} />);
+		await userEvent.type(screen.getByRole("textbox", { name: "Tên dự án" }), "Kho");
+		const nameField = screen.getByRole("textbox", { name: "Tên dự án" });
+		await userEvent.click(screen.getByRole("button", { name: "Chọn thư mục trên máy" }));
+		expect(await screen.findByText("app")).toBeTruthy();
+		const dirs = document.querySelector(".mx-pick-dirs");
+		const picker = screen.getByRole("radiogroup", { name: "Máy" });
+		// Arrow keys move between machines, like any radio group.
+		within(picker).getByRole("radio", { name: "Mac" }).focus();
+		await userEvent.keyboard("{ArrowRight}");
+		expect(within(picker).getByRole("radio", { name: "PC" }).getAttribute("aria-checked")).toBe("true");
+		// The recent folders keep their place, saying PC has none.
+		expect(screen.getByText("Máy này chưa có thư mục nào có phiên AI.")).toBeTruthy();
+		await waitFor(() => expect(pc.sent.filter((r) => r.case === "dirList")).toHaveLength(1));
+		await userEvent.click(within(picker).getByRole("radio", { name: "Mac" }));
+		// Back on Mac: its folder list from before, no second request; nothing remounted, nothing typed lost.
+		expect(mac.sent.filter((r) => r.case === "dirList")).toHaveLength(1);
+		expect(screen.getByText("api")).toBeTruthy();
+		expect(document.querySelector(".mx-pick-dirs")).toBe(dirs);
+		expect(screen.getByRole("textbox", { name: "Tên dự án" })).toBe(nameField);
+		expect((nameField as HTMLInputElement).value).toBe("Kho");
+	});
+
+	it("three machines or more: a list opened from one button, by mouse or keyboard", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		const hosts = [machine(1, "Mac", []), machine(2, "PC", []), machine(3, "Một máy chủ có tên rất dài ở phòng lab", [])];
+		wrap(<AddAgentProjectDialog store={store} machines={hosts.map((h) => h.view)} onClose={() => undefined} />);
+		await userEvent.click(screen.getByRole("button", { name: "Chọn thư mục trên máy" }));
+		const combo = screen.getByRole("combobox", { name: "Máy" });
+		expect(combo.textContent).toBe("Mac");
+		combo.focus();
+		await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+		expect(screen.queryByRole("listbox")).toBeNull();
+		expect(combo.textContent).toBe("PC");
+		await userEvent.click(combo);
+		await userEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /phòng lab/ }));
+		expect(combo.textContent).toBe("Một máy chủ có tên rất dài ở phòng lab");
 	});
 });

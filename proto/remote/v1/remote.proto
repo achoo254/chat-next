@@ -1577,6 +1577,11 @@ message MachineInfo {
   AgentUpdateInfo agent_update = 22;
   // The machine's terminal; unspecified before tunelo 2.4.0.
   TerminalAvailability terminal = 23;
+  // With needs_full_disk_access: the absolute path of the tunelo program the
+  // owner adds to the Full Disk Access list (a command-line program in a
+  // hidden folder, so it is picked by path); empty when B does not run as its
+  // installed program.
+  string agent_binary = 24;
 }
 
 enum TerminalAvailability {

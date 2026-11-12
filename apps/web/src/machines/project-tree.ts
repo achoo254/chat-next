@@ -27,6 +27,18 @@ export type SeenMap = ReadonlyMap<string, number>;
 type Matched = Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere" | "terminalSession">>;
 
 /** The session matches the filter: "all" leaves archived ones out, "archived" shows only them. */
+/**
+ * A machine's name short enough for a chip: no trailing ".local", no domain
+ * ("Hoans-Mac-mini.local" → "Hoans-Mac-mini", "build.lab.example.com" →
+ * "build"); an IP address or a name without dots stays as it is.
+ */
+export function shortHost(name: string): string {
+	const trimmed = name.trim().replace(/\.local\.?$/i, "");
+	if (/^\d{1,3}(\.\d{1,3}){3}$/.test(trimmed) || trimmed.includes(" ")) return trimmed;
+	const first = trimmed.split(".")[0] ?? trimmed;
+	return first === "" ? trimmed : first;
+}
+
 export function matches(filter: Filter, thread: Matched): boolean {
 	if (filter === "attention") return thread.state === ThreadState.WAITING || isRunning(thread);
 	if (filter === "archived") return thread.archived;
@@ -88,8 +100,6 @@ export interface ProjectNode {
 	readonly status: WorkStatus;
 	/** Sessions waiting for the user. */
 	readonly need: number;
-	/** Workspaces on two machines or more: each names its machine. */
-	readonly manyMachines: boolean;
 	readonly activity: number;
 }
 
@@ -163,7 +173,6 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 			workspaces,
 			status: worstStatus(workspaces.map((w) => w.status)),
 			need: everyThread.filter((t) => !t.archived && t.state === ThreadState.WAITING).length,
-			manyMachines: new Set(project.workspaces.map((w) => w.machineId)).size > 1,
 			activity: Math.max(newest(everyThread), project.createdAt * 1000),
 		};
 	});
