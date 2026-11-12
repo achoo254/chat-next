@@ -13,7 +13,7 @@ import { terminalGate } from "./agent-version.ts";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
-import { errorText, providerOf } from "./use-machines.ts";
+import { errorText, isRunning, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 export type SessionMode = "chat" | "terminal";
@@ -90,7 +90,7 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 		<section className="mx-limit" role="status" data-id="session-terminal-held">
 			<div className="mx-limit-inner">
 				<MachineIcon name="terminal" />
-				<p>{t.terminal.held(ai)}</p>
+				<p>{isRunning(thread) ? t.terminal.held(ai) : t.terminal.heldOpen(ai)}</p>
 				<button
 					type="button"
 					className="btn btn-sm btn-primary"

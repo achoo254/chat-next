@@ -485,6 +485,36 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		chat.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: data }));
 		await find(() => document.querySelector(".mx-drop"));
 	},
+	// The terminal's text as Claude Code prints it: Vietnamese with every tone (capitals with stacked marks), "đ",
+	// dim lines and coloured status lines, to judge the font, the line height and the contrast.
+	"terminal-sample": async () => {
+		await find(() => document.querySelector(".tx-pane .xterm"));
+		type Fake = { print(session: number, text: string): void; sessions: Map<number, unknown> };
+		let fake: Fake | undefined;
+		for (let i = 0; i < 200 && (fake === undefined || fake.sessions.size === 0); i++) {
+			fake = (window as unknown as { __fakeTerminal?: Fake }).__fakeTerminal;
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+		if (fake === undefined) throw new Error("harness: no fake terminal");
+		const session = [...fake.sessions.keys()][0] ?? 1;
+		const e = "\x1b[";
+		const lines = [
+			`${e}1mClaude Code${e}0m · phiên trong chat-next`,
+			"Tôi đã đổi tiêu đề xong. Bạn kiểm tra lại giúp mình nhé.",
+			"a à ả ã á ạ ă ằ ẳ ẵ ắ ặ â ầ ẩ ẫ ấ ậ e è ẻ ẽ é ẹ ê ề ể ễ ế ệ i ì ỉ ĩ í ị",
+			"o ò ỏ õ ó ọ ô ồ ổ ỗ ố ộ ơ ờ ở ỡ ớ ợ u ù ủ ũ ú ụ ư ừ ử ữ ứ ự y ỳ ỷ ỹ ý ỵ đ Đ",
+			"Ể Ộ Ữ Ẫ Ặ Ẩ Ỡ Ợ Ừ Ỷ Ỹ ĐƯỜNG NGUYỄN TRÃI · Người ủng hộ · Ước mơ",
+			"0O 1lI |  {}[]()<>  => != ===  ~/code/chat-next  main ✓",
+			`${e}2mShell cwd was reset to /Users/dieuvy/code/chat-next${e}0m`,
+			`${e}90m⎿  Đã đọc 12 tệp (ctrl+o để mở rộng)${e}0m`,
+			`${e}32m✓ 42 test đạt${e}0m  ${e}33m⚠ 2 cảnh báo${e}0m  ${e}31m✗ 1 lỗi${e}0m  ${e}34mxanh dương${e}0m  ${e}35mtím${e}0m  ${e}36mlục lam${e}0m`,
+			`${e}92m✓ sáng${e}0m ${e}93mvàng sáng${e}0m ${e}91mđỏ sáng${e}0m ${e}94mxanh sáng${e}0m ${e}95mtím sáng${e}0m ${e}96mlục lam sáng${e}0m ${e}37mtrắng${e}0m ${e}97mtrắng sáng${e}0m`,
+			`${e}1;38;5;174m✻ Đang nghĩ…${e}0m ${e}2m(esc để dừng · 12 giây · ↓ 1,2k token)${e}0m`,
+			`${e}2m? cho phím tắt${e}0m${" ".repeat(20)}${e}2mChế độ: tự sửa file (shift+tab để đổi)${e}0m`,
+		];
+		fake.print(session, `\r\n${lines.join("\r\n")}\r\n`);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+	},
 	// "Thêm dự án" on two machines: the folders of the first, then the second picked (its list dimmed until it answers).
 	"pick-folder": async () => {
 		const pick = await find(() => document.querySelector<HTMLElement>(".modal .mx-pick-folder"));

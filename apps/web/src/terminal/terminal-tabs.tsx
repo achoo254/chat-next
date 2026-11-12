@@ -12,6 +12,7 @@ import { MachineIcon } from "../machines/machine-icons.tsx";
 import { usePopover } from "../machines/use-popover.ts";
 import { Link } from "../router.tsx";
 import type { SplitDir } from "./terminal-layout.ts";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "./terminal-font.ts";
 
 export type DockAction =
 	| { readonly kind: "new-tab" }
@@ -79,6 +80,9 @@ interface TabsProps {
 	hidden: readonly TermSessionInfo[];
 	busy: boolean;
 	mac: boolean;
+	/** The terminal text size (px) and its change (A−, A+, back to the default). */
+	textSize: number;
+	onTextSize(change: "bigger" | "smaller" | "reset"): void;
 	pill: ReactNode | null;
 	onSelect(id: string): void;
 	onClose(id: string): void;
@@ -87,7 +91,7 @@ interface TabsProps {
 	onMenu(): void;
 }
 
-export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, mac, pill, onSelect, onClose, onAction, onReopen, onMenu }: TabsProps) {
+export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onMenu }: TabsProps) {
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
 	const { open: helpOpen, setOpen: setHelpOpen, ref: helpRef } = usePopover();
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
@@ -98,7 +102,8 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 					<Icon name="back" />
 				</Link>
 			)}
-			<div className="tx-tabs" role="tablist" aria-label={t.tabs}>
+			{/* Many tabs scroll sideways, on purpose. */}
+			<div className="tx-tabs" role="tablist" aria-label={t.tabs} data-scroll-x="">
 				{tabs.map((tab) => (
 					<div key={tab.id} className="tx-tab" data-active={tab.id === active ? "" : undefined}>
 						<button type="button" role="tab" aria-selected={tab.id === active} title={tab.title} onClick={() => onSelect(tab.id)}>
@@ -165,6 +170,18 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 					</button>
 					{helpOpen && (
 						<div className="mx-menu tx-menu mx-pop" role="dialog" aria-label={t.shortcuts}>
+							<div className="tx-size" role="group" aria-label={t.textSize}>
+								<span>{t.textSize}</span>
+								<button type="button" className="btn btn-sm" aria-label={t.smaller} title={`${t.smaller} (${mac ? "⌘" : "Ctrl+"}−)`} disabled={textSize <= FONT_SIZE_MIN} onClick={() => onTextSize("smaller")} data-id="terminal-text-smaller">
+									A−
+								</button>
+								<button type="button" className="btn btn-sm tx-size-now" aria-label={t.sizeReset(textSize)} title={`${t.sizeReset(textSize)} (${mac ? "⌘" : "Ctrl+"}0)`} onClick={() => onTextSize("reset")}>
+									{textSize}
+								</button>
+								<button type="button" className="btn btn-sm" aria-label={t.bigger} title={`${t.bigger} (${mac ? "⌘" : "Ctrl+"}+)`} disabled={textSize >= FONT_SIZE_MAX} onClick={() => onTextSize("bigger")} data-id="terminal-text-bigger">
+									A+
+								</button>
+							</div>
 							<h5>{t.shortcuts}</h5>
 							<dl className="tx-keys-help">
 								{shortcutList(t).map((s) => (

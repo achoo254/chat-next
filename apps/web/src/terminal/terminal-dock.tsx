@@ -55,6 +55,7 @@ import {
 import { TerminalSplits } from "./terminal-splits.tsx";
 import { shortcutOf, TerminalTabs, type DockAction } from "./terminal-tabs.tsx";
 import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
+import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
 import { endedOnPurpose } from "./ended-sessions.ts";
 import "./terminal.css";
 
@@ -330,8 +331,21 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		void openShell(openShellIn);
 	}, [ready, openShellIn]);
 
-	// Shortcuts anywhere in the dock (xterm lets them through, see onShortcut below).
+	// The text size of every terminal (this browser keeps it); the default follows the screen.
+	const fallbackSize = touch ? FONT_SIZE_TOUCH : FONT_SIZE_DEFAULT;
+	const [textSize, setTextSize] = useState(() => fontSize(fallbackSize));
+	const changeSize = (change: "bigger" | "smaller" | "reset") =>
+		setTextSize(setFontSize(change === "reset" ? null : textSize + (change === "bigger" ? 1 : -1), fallbackSize));
+
+	// Shortcuts anywhere in the dock (xterm lets them through, see onShortcut below). Ctrl/⌘ + − 0 size the
+	// terminal's text instead of zooming the page, only while the keyboard is in the dock.
 	const onKey = useEffectEvent((event: KeyboardEvent) => {
+		const size = fontKeyOf(event, mac);
+		if (size !== null) {
+			event.preventDefault();
+			changeSize(size);
+			return;
+		}
 		const action = shortcutOf(event);
 		if (action === null) return;
 		event.preventDefault();
@@ -424,7 +438,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						setLayout((l) => closeSession(l, pane.session));
 						setNotice(tt.gone);
 					}}
-					onShortcut={(event) => shortcutOf(event) !== null}
+					onShortcut={(event) => shortcutOf(event) !== null || fontKeyOf(event, mac) !== null}
 					register={(handle) => {
 						if (handle === null) handles.current.delete(pane.id);
 						else handles.current.set(pane.id, handle);
@@ -476,6 +490,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				hidden={hidden}
 				busy={busy || !online}
 				mac={mac}
+				textSize={textSize}
+				onTextSize={changeSize}
 				// A session shows the pill in its header.
 				pill={thread === undefined ? <StatusPill t={tt} status={status} online={online} /> : null}
 				onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}

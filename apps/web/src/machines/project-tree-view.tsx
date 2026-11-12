@@ -7,9 +7,11 @@
 // mode last used and a menu; under each its three newest sessions and "Xem
 // thêm". An empty project offers "Thêm workspace". At the bottom, folded,
 // "Chưa phân loại (n)": folders whose sessions no workspace holds, each
-// offering "Tạo dự án" and "Thêm vào dự án…". Rows carry data-row for the
+// offering "Tạo dự án", "Thêm vào dự án…" and "Lưu trữ tất cả phiên" (the
+// group's menu archives every folder's at once); archiving only hides the
+// sessions (no file is touched), so it asks nothing and offers "Hoàn tác". Rows carry data-row for the
 // column's arrow keys. The dialogs load when opened.
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -301,7 +303,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 }
 
 /** One folder of "Chưa phân loại": "Tạo dự án" in one tap (a sensitive folder asks first), "Thêm vào dự án…". */
-function LooseItem({ folder, ctx }: { folder: LooseFolder; ctx: TreeContext }) {
+function LooseItem({ folder, ctx, onArchive }: { folder: LooseFolder; ctx: TreeContext; onArchive: (folders: readonly LooseFolder[]) => void }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const { machine, dir } = folder;
@@ -332,8 +334,12 @@ function LooseItem({ folder, ctx }: { folder: LooseFolder; ctx: TreeContext }) {
 				<span className="mx-ws-acts">
 				<RowMenu
 					label={p.workspaceMenu(name)}
-					disabled={!placeable}
-					items={[{ label: p.makeProject, icon: "plus", run: () => make(false) }, ctx.projects.length > 0 ? { label: p.addToProject, icon: "forward", run: () => setDialog("pick") } : null]}
+					disabled={machine.conn.kind !== "on"}
+					items={[
+						placeable ? { label: p.makeProject, icon: "plus", run: () => make(false) } : null,
+						placeable && ctx.projects.length > 0 ? { label: p.addToProject, icon: "forward", run: () => setDialog("pick") } : null,
+						machine.conn.kind === "on" && folder.threads.length > 0 ? { label: p.archiveFolder, icon: "inbox", run: () => onArchive([folder]) } : null,
+					]}
 				/>
 				</span>
 			</div>
@@ -367,18 +373,76 @@ function LooseItem({ folder, ctx }: { folder: LooseFolder; ctx: TreeContext }) {
 }
 
 /** "Chưa phân loại (n)", folded until opened. */
+/** Archives (or brings back) every session of `folders`, each on its machine; the ids that changed. */
+export async function setFoldersArchived(folders: readonly Pick<LooseFolder, "machine" | "threads">[], archived: boolean, only?: ReadonlySet<string>): Promise<string[]> {
+	const done: string[] = [];
+	await Promise.all(
+		folders.flatMap((f) =>
+			f.threads
+				.filter((thread) => thread.archived !== archived && (only === undefined || only.has(thread.id)))
+				.map((thread) =>
+					f.machine.link.request({ case: "threadSetArchived", value: { threadId: thread.id, archived } }).then(
+						() => void done.push(thread.id),
+						() => undefined,
+					),
+				),
+		),
+	);
+	return done;
+}
+
+/** How long "Hoàn tác" stays offered. */
+export const UNDO_MS = 8_000;
+
 export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly LooseFolder[]; ctx: TreeContext; open: boolean; onToggle: () => void }): ReactNode {
 	const t = useMachinesCopy();
-	if (folders.length === 0) return null;
+	const p = t.agent.projects;
+	const [undo, setUndo] = useState<{ text: string; folders: readonly LooseFolder[]; ids: ReadonlySet<string> } | null>(null);
+	useEffect(() => {
+		if (undo === null) return;
+		const timer = window.setTimeout(() => setUndo(null), UNDO_MS);
+		return () => window.clearTimeout(timer);
+	}, [undo]);
+	const archive = (picked: readonly LooseFolder[]) => {
+		void setFoldersArchived(picked, true).then((ids) => {
+			if (ids.length > 0) setUndo({ text: p.archivedCount(ids.length), folders: picked, ids: new Set(ids) });
+		});
+	};
+	const restore = () => {
+		if (undo === null) return;
+		const { folders: picked, ids } = undo;
+		setUndo(null);
+		// The sessions as they were before: archived now, so the filter needs no state of theirs.
+		void setFoldersArchived(
+			picked.map((f) => ({ machine: f.machine, threads: f.threads.map((x) => ({ ...x, archived: true })) })),
+			false,
+			ids,
+		);
+	};
+	const sessions = folders.reduce((n, f) => n + f.threads.length, 0);
+	const live = folders.filter((f) => f.machine.conn.kind === "on" && f.threads.length > 0);
+	if (folders.length === 0 && undo === null) return null;
 	return (
 		<div className="mx-project mx-loose" data-id="sidebar-uncategorized">
-			<div className="mx-project-head">
-				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
-					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
-					<b>{t.agent.projects.uncategorized(folders.length)}</b>
-				</button>
-			</div>
-			{open && folders.map((f) => <LooseItem key={`${f.machine.entry.ref}\n${f.dir}`} folder={f} ctx={ctx} />)}
+			{folders.length > 0 && (
+				<div className="mx-project-head">
+					<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
+						<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
+						<b>{p.uncategorized(folders.length)}</b>
+					</button>
+					<RowMenu label={p.looseMenu} items={[live.length > 0 ? { label: p.archiveAll(sessions), icon: "inbox", run: () => archive(live) } : null]} />
+				</div>
+			)}
+			{open && folders.length > 0 && <p className="mx-loose-hint">{p.looseHint}</p>}
+			{open && folders.map((f) => <LooseItem key={`${f.machine.entry.ref}\n${f.dir}`} folder={f} ctx={ctx} onArchive={archive} />)}
+			{undo !== null && (
+				<div className="mx-undo" role="status" data-id="sidebar-undo">
+					<span className="grow">{undo.text}</span>
+					<button type="button" className="btn btn-sm" onClick={restore}>
+						{p.undo}
+					</button>
+				</div>
+			)}
 		</div>
 	);
 }

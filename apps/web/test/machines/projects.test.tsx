@@ -299,7 +299,10 @@ describe("a session row", () => {
 		expect(row.querySelector(".sub")?.textContent).toMatch(/^Đang chạy Bash · 2[7-9] giây · ↓ 1,2\sN token$/);
 		const inTerminal = screen.getByText("Trong terminal").closest<HTMLElement>(".mx-srow");
 		if (inTerminal === null) throw new Error("no row");
-		expect(within(inTerminal).getByRole("img", { name: "Đang chạy trong terminal" })).toBeTruthy();
-		expect(inTerminal.querySelector(".sub")?.textContent).not.toContain("Đang chạy trong terminal");
+		// Held by the terminal while its AI waits at the prompt: open there, not running (no spinner).
+		expect(within(inTerminal).getByRole("img", { name: "Mở trong terminal" })).toBeTruthy();
+		expect(inTerminal.querySelector(".mx-glyph.open")).toBeTruthy();
+		expect(inTerminal.querySelector(".mx-glyph.running")).toBeNull();
+		expect(inTerminal.querySelector(".sub")?.textContent).not.toContain("trong terminal");
 	});
 });

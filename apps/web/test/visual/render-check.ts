@@ -62,6 +62,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// AI Agent: the sessions of every machine, the "Cần bạn" board, an unpaired machine, the machines page;
 	// a session with markdown, the docked prompt, the status bar's details, the changes panel and "@" files.
 	"machine-chat": "?at=machine-chat",
+	// The terminal's text: Vietnamese, dim and coloured lines (RENDER_DPR=2 for a Retina capture).
+	"machine-terminal-text": "?at=machine-terminal&open=terminal-sample",
 	// A session in its terminal: the "Trò chuyện | Terminal" switch, the path pill and "Kết thúc" in the header.
 	"machine-session-terminal": "?at=machine-session-terminal",
 	"machine-home": "?at=machine-home",
@@ -118,6 +120,9 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-add": "?at=machine-add",
 };
 
+/** Device pixel ratio of the captures: RENDER_DPR=2 checks Retina rendering (1 by default). */
+const DPR = Number(process.env.RENDER_DPR ?? "1") === 2 ? 2 : 1;
+
 export const VIEWPORTS = [
 	{ width: 1000, height: 700 },
 	{ width: 1333, height: 780 },
@@ -141,7 +146,7 @@ async function main(): Promise<void> {
 			for (const viewport of VIEWPORTS) {
 				for (const theme of THEMES) {
 					runs++;
-					const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+					const context = await browser.newContext({ viewport, deviceScaleFactor: DPR });
 					const page = await context.newPage();
 					const errors: string[] = [];
 					page.on("console", (message) => {

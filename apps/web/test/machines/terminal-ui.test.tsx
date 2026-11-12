@@ -144,12 +144,20 @@ describe("where the terminal shows", () => {
 		expect(terminalGate({ terminal: TerminalAvailability.INCOMPATIBLE })).toBe("incompatible");
 	});
 
-	it("no Terminal entry in the column; a plain shell is a machine action under Quản lý máy", async () => {
+	it("no Terminal entry in the column; a plain shell is a machine action on its card under Quản lý máy", async () => {
 		screenAt({ page: "machines" });
-		const shell = await screen.findByRole("link", { name: "Terminal mới" });
-		expect(shell.getAttribute("href")).toBe("/ai/1/terminal?new=");
-		expect(screen.getByRole("link", { name: "Tổng quan máy" }).getAttribute("href")).toBe("/ai/1");
-		expect(screen.getByRole("link", { name: "Cài đặt máy" }).getAttribute("href")).toBe("/ai/1/info");
+		const card = (await screen.findAllByRole("listitem")).find((li) => li.getAttribute("data-id") === "machine-card");
+		if (card === undefined) throw new Error("no machine card");
+		// The machine as a card: its name, its state as a pill, its system, and its three actions.
+		expect(within(card).getByRole("link", { name: "Mac mini" }).getAttribute("href")).toBe("/ai/1/info");
+		await waitFor(() => expect(within(card).getByRole("status").textContent).toMatch(/Trực tuyến|Đã kết nối/));
+		const acts = within(card).getByRole("group", { name: "Việc với máy Mac mini" });
+		expect(within(acts).getByRole("link", { name: "Tổng quan máy" }).getAttribute("href")).toBe("/ai/1");
+		expect(within(acts).getByRole("link", { name: "Cài đặt máy" }).getAttribute("href")).toBe("/ai/1/info");
+		const shell = await within(acts).findByRole("button", { name: "Terminal mới" });
+		await waitFor(() => expect((shell as HTMLButtonElement).disabled).toBe(false));
+		await userEvent.click(shell);
+		expect(window.location.pathname + window.location.search).toBe("/ai/1/terminal?new=");
 		const column = document.querySelector<HTMLElement>(".mx-list") ?? document.body;
 		expect(within(column).queryByRole("link", { name: "Terminal" })).toBeNull();
 		expect(sent("termOpen")).toEqual([]);
@@ -176,7 +184,10 @@ describe("where the terminal shows", () => {
 		view.unmount();
 		screenAt({ page: "machines" });
 		await screen.findByRole("link", { name: "Tổng quan máy" });
-		expect(screen.queryByRole("link", { name: "Terminal mới" })).toBeNull();
+		// Still there, but it says why it cannot open (its tooltip and its name).
+		const shell = await screen.findByRole("button", { name: /^Terminal mới: Máy chưa có phần terminal/ });
+		expect((shell as HTMLButtonElement).disabled).toBe(true);
+		expect(shell.parentElement?.getAttribute("title")).toBe("Máy chưa có phần terminal (xem Cài đặt máy).");
 		expect(sent("termOpen")).toEqual([]);
 	});
 });
@@ -184,10 +195,13 @@ describe("where the terminal shows", () => {
 describe("a session in chat or in its terminal", () => {
 	const THREAD = { id: "t1", title: "Fix login", dir: "/w/app", provider: "claude", state: 1, updatedAt: 1n };
 	let held = 0;
+	/** The held session runs a turn there (busy elsewhere), not just waits at its prompt. */
+	let heldBusy = false;
 	let terminalCli = true;
 
 	beforeEach(() => {
 		held = 0;
+		heldBusy = false;
 		terminalCli = true;
 		window.localStorage.clear();
 		const terminalHandler = machine.handler;
@@ -195,7 +209,7 @@ describe("a session in chat or in its terminal", () => {
 			if (frame.body.case === "machineInfoRequest") {
 				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", maxSessions: 3, terminal, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: terminalCli } }] } }];
 			}
-			if (frame.body.case === "threadList") return [{ case: "threadListResult", value: { threads: [{ ...THREAD, terminalSession: held }], openSessions: 0, maxSessions: 3 } }];
+			if (frame.body.case === "threadList") return [{ case: "threadListResult", value: { threads: [{ ...THREAD, terminalSession: held, busyElsewhere: heldBusy }], openSessions: 0, maxSessions: 3 } }];
 			return terminalHandler(frame, socket);
 		};
 	});
@@ -231,6 +245,14 @@ describe("a session in chat or in its terminal", () => {
 		expect(window.localStorage.getItem("ai:mode:1")).toBe("chat");
 	});
 
+	it("a turn running in the terminal: the chat says it runs there", async () => {
+		held = 5;
+		heldBusy = true;
+		sessionAt({ page: "session", machine: "1", threadId: "t1" });
+		expect(await screen.findByText("Claude Code đang chạy phiên này trong terminal. Ở đây chỉ xem.")).toBeTruthy();
+		expect(screen.getByRole("status", { name: "Đang chạy trong terminal" })).toBeTruthy();
+	});
+
 	it("in terminal mode the header has no 'running in the terminal' chip (the pill and Kết thúc say it); the switch shows which side is on", async () => {
 		held = 1;
 		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
@@ -254,9 +276,10 @@ describe("a session in chat or in its terminal", () => {
 	it("while the terminal holds it, chat is read-only, points to the terminal, and can end it there", async () => {
 		held = 7;
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });
-		const bar = await screen.findByText("Claude Code đang chạy phiên này trong terminal. Ở đây chỉ xem.");
-		// Held by the machine's own terminal: not "elsewhere".
-		expect(screen.getByRole("status", { name: "Đang chạy trong terminal" })).toBeTruthy();
+		// Held by the machine's own terminal, its AI waiting at the prompt: open there, not running, not "elsewhere".
+		const bar = await screen.findByText("Claude Code đang mở phiên này trong terminal, chờ lệnh. Ở đây chỉ xem.");
+		expect(screen.getByRole("status", { name: "Mở trong terminal" })).toBeTruthy();
+		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Chạy ở nơi khác" })).toBeNull();
 		const section = bar.closest("section");
 		expect(section).toBeTruthy();

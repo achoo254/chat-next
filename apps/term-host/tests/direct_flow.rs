@@ -5,13 +5,14 @@
 
 mod common;
 
+use std::collections::VecDeque;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 use common::*;
 use serde_json::json;
-use tunelo_term_host::client::{Frame, TermClient};
-use tunelo_term_host::flow::{READ_CHUNK, WINDOW_START};
+use tunelo_term_host::client::{Frame, TermClient, ACK_TIMER};
+use tunelo_term_host::flow::{ACK_SAMPLE_MIN_BYTES, READ_CHUNK, WINDOW_START};
 
 fn rss_kb() -> u64 {
     let out = Command::new("ps")
@@ -34,6 +35,97 @@ fn inflight_without_acks(t: &mut TermClient, from: u64, d: Duration) -> u64 {
         }
     }
     end - from
+}
+
+/// Apply rate of the slow client in step 4.
+const SLOW_APPLY_BYTES_PER_SEC: f64 = 256.0 * 1024.0;
+/// Upper bound on the slow phase. The window halves at most once per round
+/// trip, and with a queue in front of the client one round trip is about
+/// window / apply rate. Going down from the largest window a 1 MiB ring
+/// allows (896 KiB) takes about 2 * 896 KiB / 256 KiB/s = 7 s; from the
+/// 80 to 160 KiB a flood leaves, under 1.5 s.
+const SLOW_PHASE_LIMIT: Duration = Duration::from_secs(20);
+/// Consecutive acks that must see less than `WINDOW_START` in flight.
+const SLOW_ACKS_BELOW_START: u32 = 5;
+
+/// Act as a client that applies output at `SLOW_APPLY_BYTES_PER_SEC`, with
+/// the acking rules of section 5, until the output in flight past its acks
+/// stays below `WINDOW_START`. Returns the end of the output received.
+///
+/// The apply rate is paced by elapsed time, not by sleeping per frame: a
+/// sleep can overshoot by far more than requested on a loaded runner, which
+/// made the client several times slower than intended and the shrink take
+/// longer than a fixed phase allowed. Frames are pulled off the transport at
+/// once, so the bytes received past the last ack show the daemon's window
+/// without pausing the acks (a pause would empty the queue being measured).
+fn slow_client_until_window_shrinks(t: &mut TermClient, s: u32) -> u64 {
+    let start = t.applied(s);
+    let mut received_end = start;
+    let mut applied = start;
+    let mut acked = t.acked(s);
+    let mut unacked_since: Option<Instant> = None;
+    let mut queue: VecDeque<u64> = VecDeque::new();
+    let mut budget = 0.0f64;
+    let mut last = Instant::now();
+    let mut below = 0;
+    let begin = Instant::now();
+    loop {
+        assert!(
+            begin.elapsed() < SLOW_PHASE_LIMIT,
+            "window did not shrink: still {} bytes in flight after {SLOW_PHASE_LIMIT:?} \
+             of a slow client",
+            received_end - acked
+        );
+        match t.recv(Duration::from_millis(2)) {
+            Some(Frame::Output { offset, data, .. }) => {
+                assert_eq!(offset, received_end, "output gap or overlap");
+                received_end += data.len() as u64;
+                queue.push_back(received_end);
+            }
+            Some(Frame::Snapshot { .. }) => panic!("resync: output was dropped"),
+            _ => {}
+        }
+        let now = Instant::now();
+        if queue.is_empty() {
+            // An idle client does not save up apply time.
+            budget = 0.0;
+        } else {
+            budget += now.saturating_duration_since(last).as_secs_f64() * SLOW_APPLY_BYTES_PER_SEC;
+        }
+        last = now;
+        while let Some(&end) = queue.front() {
+            let len = (end - applied) as f64;
+            if budget < len {
+                break;
+            }
+            budget -= len;
+            applied = end;
+            queue.pop_front();
+            unacked_since.get_or_insert(now);
+        }
+        let timer = unacked_since.is_some_and(|t0| now.saturating_duration_since(t0) >= ACK_TIMER);
+        if applied - acked >= ACK_SAMPLE_MIN_BYTES || (applied > acked && timer) {
+            // Everything the daemon sent past the previous ack has had at
+            // least a few ms to arrive: that is the window it applies.
+            let inflight = received_end - acked;
+            below = if inflight < WINDOW_START as u64 {
+                below + 1
+            } else {
+                0
+            };
+            t.ack(s, applied).expect("ack");
+            acked = applied;
+            unacked_since = None;
+            if below >= SLOW_ACKS_BELOW_START {
+                eprintln!(
+                    "direct: slow client shrank the window in {:.2} s ({} KiB applied)",
+                    begin.elapsed().as_secs_f64(),
+                    (applied - start) / 1024
+                );
+                return received_end;
+            }
+        }
+    }
 }
 
 #[test]
@@ -112,17 +204,12 @@ fn flood_over_the_data_channel_keeps_keys_prompt_and_the_window_adapts() {
         "memory grew {rss_before} -> {rss_after} KiB"
     );
 
-    // 4. A slow client (applies about 256 KiB/s) builds a queue: the
-    // round trip of its acks grows far above the minimum seen in step 3,
-    // so the window shrinks.
-    let slow_until = Instant::now() + Duration::from_secs(3);
-    while Instant::now() < slow_until {
-        if let Some(Frame::Output { data, .. }) = t.recv_acking(Duration::from_millis(20)) {
-            std::thread::sleep(Duration::from_micros(data.len() as u64 * 4));
-        }
-    }
-    let from = t.acked(s).max(t.applied(s));
-    // Ack everything applied so the measurement starts from a clean point.
+    // 4. A slow client (applies 256 KiB/s) builds a queue: the round trip of
+    // its acks grows far above the minimum seen in step 3, so the window
+    // shrinks.
+    let from = slow_client_until_window_shrinks(&mut t, s);
+    // Apply and ack everything received so the measurement starts from a
+    // clean point.
     t.ack(s, from).expect("ack");
     let inflight = inflight_without_acks(&mut t, from, Duration::from_millis(1500));
     eprintln!("direct: inflight with no acks after the slow phase {inflight} bytes");

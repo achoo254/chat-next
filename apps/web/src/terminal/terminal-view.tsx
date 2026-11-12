@@ -16,23 +16,15 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { LatencyProbe } from "./latency-probe.ts";
 import { noAutofill } from "./no-autofill.ts";
+import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 
 /** Output smaller than this is written at once. */
 const SMALL_WRITE = 4 * 1024;
 /** Bytes handed to xterm and not parsed yet beyond which output waits for the next frame. */
 const BUSY_BYTES = 256 * 1024;
-const FONT = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-/** Waiting for the web font before measuring cells, at most. */
+/** Waiting for the web font before measuring cells, at most; a face that comes later redraws the screen. */
 const FONT_WAIT_MS = 1_500;
-
-const THEME = {
-	background: "#111318",
-	foreground: "#e6e8ee",
-	cursor: "#e6e8ee",
-	cursorAccent: "#111318",
-	selectionBackground: "#3a4256",
-};
 
 /** What the dock asks of a pane: the keyboard, the cursor mode the arrows need, and where the caret is. */
 export interface PaneHandle {
@@ -145,11 +137,6 @@ class OutputWriter {
 	}
 }
 
-function waitForFont(): Promise<void> {
-	const fonts = typeof document === "undefined" ? undefined : document.fonts;
-	if (fonts === undefined || typeof fonts.load !== "function") return Promise.resolve();
-	return Promise.race([fonts.load('13px "JetBrains Mono"').then(() => undefined, () => undefined), new Promise<void>((resolve) => setTimeout(resolve, FONT_WAIT_MS))]);
-}
 
 const encoder = new TextEncoder();
 
@@ -168,18 +155,16 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 		if (host === null) return;
 		let alive = true;
 		let cleanup: () => void = () => undefined;
-		void waitForFont().then(() => {
+		const fallbackSize = touch ? FONT_SIZE_TOUCH : FONT_SIZE_DEFAULT;
+		void waitForFont(fontSize(fallbackSize), FONT_WAIT_MS).then(() => {
 			if (!alive) return;
 			const term = new Terminal({
 				// Unicode 11 widths are a proposed API in xterm 6.
 				allowProposedApi: true,
-				fontFamily: FONT,
-				fontSize: touch ? 12 : 13,
-				lineHeight: 1.15,
+				...textOptions(fontSize(fallbackSize)),
 				scrollback: 5_000,
 				cursorBlink: true,
 				macOptionIsMeta: true,
-				theme: THEME,
 			});
 			termRef.current = term;
 			const fit = new FitAddon();
@@ -193,13 +178,28 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				}),
 			);
 			term.open(host);
+			let webgl: WebglAddon | null = null;
 			try {
-				const webgl = new WebglAddon();
-				webgl.onContextLoss(() => webgl.dispose());
-				term.loadAddon(webgl);
+				const addon = new WebglAddon();
+				addon.onContextLoss(() => {
+					addon.dispose();
+					webgl = null;
+				});
+				term.loadAddon(addon);
+				webgl = addon;
 			} catch {
 				// No WebGL2 here: xterm keeps its DOM renderer.
 			}
+			// A face that arrives after the first draw (slow network, the bold one): measure the cells again and
+			// drop the glyphs already drawn in a fallback font.
+			const redraw = () => {
+				term.options.fontFamily = FONT;
+				webgl?.clearTextureAtlas();
+				term.refresh(0, term.rows - 1);
+				fitSoon();
+			};
+			const fonts = typeof document === "undefined" ? undefined : document.fonts;
+			fonts?.addEventListener("loadingdone", redraw);
 			const textarea = term.textarea;
 			if (textarea !== undefined) {
 				// Keystrokes, never a credential: no password manager popup at the cursor.
@@ -250,6 +250,12 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			term.attachCustomKeyEventHandler((event) => !(event.type === "keydown" && shortcut(event)));
 			const observer = new ResizeObserver(fitSoon);
 			observer.observe(host);
+			// Ctrl/⌘ + − 0 here, or A−/A+ in the dock: every terminal of the page takes the new size.
+			const stopSize = onFontSize((size) => {
+				term.options.fontSize = size;
+				webgl?.clearTextureAtlas();
+				fitSoon();
+			});
 			fitNow();
 			link.resize(session, term.cols, term.rows);
 			registerHandle({
@@ -274,6 +280,8 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				probe?.screen(session, null);
 				if (frame !== 0) cancelAnimationFrame(frame);
 				observer.disconnect();
+				stopSize();
+				fonts?.removeEventListener("loadingdone", redraw);
 				for (const s of subscriptions) s.dispose();
 				detach();
 				writer.dispose();

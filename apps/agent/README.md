@@ -85,6 +85,16 @@ Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thê
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
 nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
 
+Có gì ở 2.6.0:
+
+- **Dự án báo git remote và nhánh**: mỗi dự án gửi kèm `remote.origin.url` (bỏ mật khẩu; với http(s) bỏ cả tên người dùng, nơi
+  token hay nằm) và nhánh đang checkout, để Chat nhận ra cùng một repo trên nhiều máy. Đọc bằng `git config`/`git` chỉ đọc, không
+  chạy chương trình nào của repo.
+- **Terminal theo phiên**: một phiên AI mở được ngay trong terminal của máy (CLI của chính phiên đó); thiết bị chỉ nêu phiên, còn
+  chạy gì do tunelo chọn. Hai thiết bị mở cùng lúc dùng chung một terminal; thoát CLI thì chat gõ tiếp được.
+- **Đường dẫn cho quyền Full Disk Access**: khi còn thiếu quyền, máy gửi kèm đường dẫn tệp chạy của tunelo
+  (`MachineInfo.agent_binary`) để banner trên web chỉ đúng tệp cần kéo vào danh sách.
+
 `/clear` trong Chat (tunelo 2.0.15 trở lên) mở một phiên mới, trống, cùng thư mục và cài đặt, rồi chuyển sang đó; phiên cũ giữ lại làm
 lịch sử. Máy chạy bản cũ vẫn gửi `/clear` cho Claude như trước, nên lịch sử cũ còn hiện trên màn hình: chạy `tunelo update`.
 

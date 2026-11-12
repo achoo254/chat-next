@@ -44,7 +44,7 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
 	const key = stateKey(thread);
 	if (key === "waiting") return t.agent.sub.waiting;
 	// The column shows a terminal-held session with an icon; the words stay for other lists.
-	if (thread.terminalSession > 0 && !terminalAsIcon) return t.agent.sub.inTerminal;
+	if (thread.terminalSession > 0 && !terminalAsIcon) return isRunning(thread) ? t.agent.sub.inTerminal : t.agent.sub.openInTerminal;
 	if (thread.previewTool !== "") return t.agent.sub.tool(thread.previewTool);
 	if (thread.preview !== "") return thread.preview;
 	if (key === "running" || key === "queued" || key === "error") return t.agent.sub[key];
@@ -69,7 +69,7 @@ export function StatusGlyph({ status, offline = false }: { status: WorkStatus; o
 /** The list's clock is coarse (it ticks every 30 s): an activity older than the turn by more than this is an earlier turn's. */
 const EARLIER_TURN_MS = 60_000;
 
-const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", idle: "circle" } as const;
+const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", open: "terminal", idle: "circle" } as const;
 
 /**
  * The second line: while the machine reports the turn live (the open
@@ -92,6 +92,8 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	}
 	const live = working && latest !== undefined && (since === null || Number(latest.turnStartedAt) + EARLIER_TURN_MS >= since);
 	const now = useNow(live);
+	// A turn running in the terminal, or its AI only waiting there at its prompt.
+	const held = isRunning(thread) ? t.agent.sub.inTerminal : t.agent.sub.openInTerminal;
 	let text = fallback;
 	if (live) {
 		const parts = [phaseText(t, latest), clockText(now - Number(latest.turnStartedAt), t, locale)];
@@ -101,7 +103,7 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	return (
 		<span className="sub" data-live={live ? "" : undefined}>
 			{thread.terminalSession > 0 && (
-				<span className="mx-row-mode" role="img" aria-label={t.agent.sub.inTerminal} title={t.agent.sub.inTerminal}>
+				<span className="mx-row-mode" role="img" aria-label={held} title={held}>
 					<MachineIcon name="terminal" small />
 				</span>
 			)}

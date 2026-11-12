@@ -40,7 +40,7 @@ import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
-import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { aiName, errorText, folderName, isRunning, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
@@ -167,7 +167,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 
 	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere".
 	// In the terminal its pill and "Kết thúc" already say it runs there; in chat the chip says why it is read-only.
-	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : "terminal") : stateKey(thread);
+	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.

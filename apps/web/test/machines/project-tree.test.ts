@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../../src/machines/agent-projects-client.ts";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
-import { buildTree, locate, shortHost, statusOf, unseenDone, workspaceLabels } from "../../src/machines/project-tree.ts";
+import { buildTree, locate, shortHost, statusOf, threadStatus, unseenDone, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
@@ -32,7 +32,7 @@ function machine(id: number, name: string, threads: ThreadSummary[], online = tr
 const none = new Map<string, number>();
 
 describe("a workspace's state", () => {
-	it("needs you > failed > running > done unseen > idle; archived sessions never count", () => {
+	it("needs you > failed > running > done unseen > open in a terminal > idle; archived sessions never count", () => {
 		const seen = new Map([["d", 1000]]);
 		const idle = thread("i", "/w", ThreadState.IDLE);
 		const done = thread("d", "/w", ThreadState.IDLE, 2000);
@@ -45,9 +45,32 @@ describe("a workspace's state", () => {
 		expect(statusOf([running, failed], seen)).toBe("failed");
 		expect(statusOf([failed, waiting], seen)).toBe("need");
 		expect(statusOf([thread("a", "/w", ThreadState.WAITING, 1, { archived: true })], seen)).toBe("idle");
-		// Busy elsewhere (a terminal) runs; held by the machine's own terminal too.
+		// Running means the AI works now: a turn here, or busy elsewhere (in a terminal too).
 		expect(statusOf([thread("e", "/w", ThreadState.IDLE, 1, { busyElsewhere: true })], seen)).toBe("running");
-		expect(statusOf([thread("t", "/w", ThreadState.IDLE, 1, { terminalSession: 3 })], seen)).toBe("running");
+		expect(statusOf([thread("t", "/w", ThreadState.IDLE, 1, { terminalSession: 3, busyElsewhere: true })], seen)).toBe("running");
+		// Held by a terminal while its AI waits at the prompt: open, never running (no spinner).
+		const held = thread("h", "/w", ThreadState.IDLE, 1, { terminalSession: 3 });
+		expect(threadStatus(held, false)).toBe("open");
+		expect(statusOf([held], seen)).toBe("open");
+		expect(statusOf([held, idle], seen)).toBe("open");
+		expect(statusOf([held, done], seen)).toBe("done");
+		expect(statusOf([held, running], seen)).toBe("running");
+		expect(statusOf([held, waiting], seen)).toBe("need");
+		// A new session opened in the terminal and never used yet: still not working.
+		expect(threadStatus(thread("new", "/w", ThreadState.IDLE, 1, { terminalSession: 9 }), false)).toBe("open");
+		expect(worstStatus(["idle", "open", "done"])).toBe("done");
+		expect(worstStatus(["open", "idle"])).toBe("open");
+	});
+
+	it("a workspace and its project spin only when one of their sessions works; a terminal held at its prompt does not", () => {
+		const m = machine(1, "Mac", [thread("h", "/w/app", ThreadState.IDLE, 1, { terminalSession: 4 }), thread("i", "/w/app", ThreadState.IDLE)]);
+		const tree = buildTree([project(1, "App", [ws(1, 1, "/w/app")])], [m], "all", none);
+		expect(tree.projects[0]?.workspaces[0]?.status).toBe("open");
+		expect(tree.projects[0]?.status).toBe("open");
+		const working = machine(1, "Mac", [thread("h", "/w/app", ThreadState.IDLE, 1, { terminalSession: 4, busyElsewhere: true })]);
+		const busy = buildTree([project(1, "App", [ws(1, 1, "/w/app")])], [working], "all", none);
+		expect(busy.projects[0]?.workspaces[0]?.status).toBe("running");
+		expect(busy.projects[0]?.status).toBe("running");
 	});
 
 	it("done only for a session seen before that changed since; one never seen here is not", () => {

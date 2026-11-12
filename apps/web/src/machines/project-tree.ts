@@ -19,7 +19,13 @@ import { isRunning, type MachineView } from "./use-machines.ts";
 /** "attention": only what needs the user or runs. */
 export type Filter = "all" | "attention" | "archived";
 
-export type WorkStatus = "need" | "failed" | "running" | "done" | "idle";
+/**
+ * A session's (or a set's) state, most urgent first: needs the user, failed,
+ * running (the AI works right now: a turn here, or busy elsewhere), done and
+ * not seen, open (its AI waits at its prompt in a terminal: held, not
+ * working), idle.
+ */
+export type WorkStatus = "need" | "failed" | "running" | "done" | "open" | "idle";
 
 /** When the user last saw each session (its updatedAt then), by thread id. */
 export type SeenMap = ReadonlyMap<string, number>;
@@ -53,14 +59,16 @@ export function unseenDone(thread: ThreadSummary, seen: SeenMap): boolean {
 	return at !== undefined && updated(thread) > at && thread.state === ThreadState.IDLE && !thread.busyElsewhere && thread.terminalSession === 0;
 }
 
-const RANK: Record<WorkStatus, number> = { need: 0, failed: 1, running: 2, done: 3, idle: 4 };
+const RANK: Record<WorkStatus, number> = { need: 0, failed: 1, running: 2, done: 3, open: 4, idle: 5 };
 
 /** One session's state; `done`: it finished since the user last saw it (unseenDone). */
 export function threadStatus(thread: ThreadSummary, done: boolean): WorkStatus {
 	if (thread.state === ThreadState.WAITING) return "need";
 	if (thread.state === ThreadState.ERROR) return "failed";
-	if (isRunning(thread) || thread.terminalSession > 0) return "running";
-	return done ? "done" : "idle";
+	// Working means a turn runs; a terminal holding the session at its prompt is not work.
+	if (isRunning(thread)) return "running";
+	if (done) return "done";
+	return thread.terminalSession > 0 ? "open" : "idle";
 }
 
 /** The state of a set of sessions (archived ones never count). */
