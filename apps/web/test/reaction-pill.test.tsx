@@ -3,7 +3,7 @@
 // private chats and groups of at most 10 members ("+N" past three), the
 // count elsewhere, your own reaction pressed, and the labels people hear.
 import { ChatType } from "@achoo254/chat-proto/chats";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { pillContent, showsAvatars } from "../src/messaging/ui/reaction-pill.ts";
@@ -31,6 +31,30 @@ function messageOf(log: HTMLElement, text: string): HTMLElement {
 	if (message === null) throw new Error(`no message ${text}`);
 	return message;
 }
+
+describe("quick reaction bar", () => {
+	it("reacts from the short row over the emoji button and takes the reaction back", async () => {
+		const f = new ChatFixture();
+		const lan = f.addUser("Lan Anh");
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, lan]);
+		const seq = f.send(lan, chat, "Chiều nay review PR nhé?");
+		renderMessaging(f, `/c/${chat}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		await within(log).findByText("Chiều nay review PR nhé?", {}, LONG);
+		const message = messageOf(log, "Chiều nay review PR nhé?");
+		const bar = within(message).getByRole("group", { name: "Thả nhanh cảm xúc" });
+		// It follows the emoji button, so the stylesheet shows it while that button is hovered.
+		expect(bar.previousElementSibling?.classList.contains("msg-react")).toBe(true);
+		expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual(["👍", "❤️", "😂", "😮", "🙏"]);
+		await userEvent.click(within(bar).getByRole("button", { name: "Yêu thích" }));
+		await within(log).findByRole("button", { name: "❤️ 1 người: bạn" }, LONG);
+		const liked = within(messageOf(log, "Chiều nay review PR nhé?")).getByRole("button", { name: "Yêu thích" });
+		expect(liked.getAttribute("aria-pressed")).toBe("true");
+		// Your reaction again takes it back (an empty emoji to the server).
+		await userEvent.click(liked);
+		await waitFor(() => expect(f.reactions.at(-1)).toEqual({ chatId: chat, seq, emoji: "" }), LONG);
+	});
+});
 
 describe("pills in the list", () => {
 	it("floats faces on your short message in a private chat and toggles yours", async () => {

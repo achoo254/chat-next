@@ -666,6 +666,7 @@ export const enScreens: ScreensCopy = {
 		labelMine: "Actions for your message",
 		react: "React",
 		moreReactions: "Pick a reaction",
+		quickReactions: "Quick reactions",
 		reply: "Reply",
 		forward: "Forward",
 		saveToCloud: "Save to My Cloud",

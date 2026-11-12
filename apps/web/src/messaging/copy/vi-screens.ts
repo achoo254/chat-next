@@ -666,6 +666,7 @@ export const viScreens = {
 		labelMine: "Thao tác với tin của bạn",
 		react: "Thả cảm xúc",
 		moreReactions: "Chọn biểu cảm",
+		quickReactions: "Thả nhanh cảm xúc",
 		reply: "Trả lời",
 		forward: "Chuyển tiếp",
 		saveToCloud: "Lưu vào Cloud của tôi",

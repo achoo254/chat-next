@@ -23,10 +23,9 @@ import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble } from "./message-item.tsx";
+import { QUICK_REACTIONS } from "./reaction-pill.ts";
 import { copyText } from "./parts.tsx";
 import { useUi, type MenuAnchor } from "./ui-context.tsx";
-
-const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏"] as const;
 
 export function canPin(chat: Chat | null): boolean {
 	if (chat === null) return false;

@@ -273,7 +273,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
    and line colours turn light for every part but the reactions and quick actions (they keep
    the page's colours), so links, mentions, code, replies, previews and files stay readable. */
 .msg.mine .bubble { --bubble: var(--c-mine); color: var(--c-on-primary); }
-.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions, .msg-react) {
+.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions, .msg-react, .react-bar) {
 	--c-text: var(--c-on-primary);
 	--c-text-muted: var(--c-mine-muted);
 	--c-icon-muted: var(--c-mine-muted);
@@ -936,6 +936,16 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .msg-react::before { content: ""; position: absolute; inset: -4px; }
 .msg:hover .msg-react, .msg:focus-within .msg-react { opacity: 1; pointer-events: auto; }
 .msg-react:hover { background: color-mix(in srgb, var(--c-text) 6%, var(--c-surface)); color: var(--c-text); }
+/* Zalo-style quick reactions: resting on the emoji button for a moment shows a small row above it, stretching back over the bubble
+   (never past the message column). It stays while the pointer moves onto it (the strip below it covers the gap) and fades a beat
+   after the pointer leaves. */
+.react-bar { position: absolute; bottom: 30px; right: -16px; z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md); opacity: 0; visibility: hidden; transform: translateY(4px) scale(0.92); transform-origin: bottom right; transition: opacity 120ms var(--ease-standard) 150ms, transform 160ms var(--ease-standard) 150ms, visibility 0s linear 270ms; }
+.msg.mine .react-bar { right: auto; left: -16px; transform-origin: bottom left; }
+.react-bar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
+.msg-react:hover + .react-bar, .react-bar:hover { opacity: 1; visibility: visible; transform: none; transition-delay: 250ms, 250ms, 0s; }
+.react-bar > button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; line-height: 1; transition: transform 120ms var(--ease-standard); }
+.react-bar > button:hover { transform: scale(1.2); }
+.react-bar > button[aria-pressed="true"] { background: var(--c-selected); }
 .msg-actions > * { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-icon-muted); }
 .msg-actions > :hover { background: var(--c-hover); color: var(--c-text); }
 
@@ -1097,7 +1107,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 }
 /* Touch and narrow screens: no hover affordances (long press opens the menus); one column, no width handle. */
 @media (max-width: 760px), (pointer: coarse) {
-	.list-resize, .msg-actions, .msg-react, .row-more { display: none; }
+	.list-resize, .msg-actions, .msg-react, .react-bar, .row-more { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.sk { animation: none; }

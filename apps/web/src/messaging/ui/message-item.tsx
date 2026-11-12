@@ -21,7 +21,8 @@ import { useChat, useConnection, useItem, useMessage, useServices, useUser } fro
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
-import { pillContent } from "./reaction-pill.ts";
+import { pillContent, QUICK_REACTIONS } from "./reaction-pill.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
@@ -354,6 +355,7 @@ function QuickActions({
 	seqs,
 	label,
 	canReply,
+	chosen,
 }: {
 	chatId: number;
 	itemKey: string;
@@ -362,10 +364,18 @@ function QuickActions({
 	seqs: readonly number[];
 	label: string;
 	canReply: boolean;
+	/** Your current reaction on the message, if any. */
+	chosen: string | undefined;
 }) {
 	"use no memo";
 	const copy = useCopy();
+	const menuCopy = useScreensCopy().menu;
+	const names = menuCopy.reactionNames;
 	const ui = useUi();
+	const { remote, toasts } = useServices();
+	const react = (emoji: string) => {
+		remote.setReaction(chatId, seq, chosen === emoji ? "" : emoji).catch(() => toasts.show(copy.common.failed));
+	};
 	const open = (event: MouseEvent<HTMLButtonElement>, picker: boolean) => {
 		const box = event.currentTarget.getBoundingClientRect();
 		const anchor: MenuAnchor = { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
@@ -390,6 +400,22 @@ function QuickActions({
 			<button type="button" className="msg-react" tabIndex={-1} aria-label={copy.message.react} onClick={(event) => open(event, true)}>
 				<Icon name="smile" small />
 			</button>
+			{/* Zalo-style: resting on the emoji button shows a short row of reactions above it; a click there opens the full panel. */}
+			<div className="react-bar" role="group" aria-label={menuCopy.quickReactions}>
+				{QUICK_REACTIONS.map((emoji) => (
+					<button
+						key={emoji}
+						type="button"
+						tabIndex={-1}
+						aria-label={names[emoji] ?? emoji}
+						aria-pressed={chosen === emoji}
+						title={names[emoji] ?? emoji}
+						onClick={() => react(emoji)}
+					>
+						{emoji}
+					</button>
+				))}
+			</div>
 		</>
 	);
 }
@@ -654,6 +680,7 @@ export function MessageBubble({
 							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
 							canReply={canReply}
+							chosen={message.reactions.find((reaction) => reaction.chosen)?.emoji}
 						/>
 					)}
 					<Reactions message={message} chat={chat} />

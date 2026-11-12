@@ -665,6 +665,7 @@ export const zhCNScreens: ScreensCopy = {
 		labelMine: "对你的消息的操作",
 		react: "回应",
 		moreReactions: "选择回应",
+		quickReactions: "快速回应",
 		reply: "回复",
 		forward: "转发",
 		saveToCloud: "保存到我的云端",
