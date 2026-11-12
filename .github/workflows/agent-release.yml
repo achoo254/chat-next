@@ -162,6 +162,11 @@ jobs:
         if: matrix.test
         working-directory: apps/term-host
         run: cargo test --locked --release --target "${{ matrix.target }}"
+      # The integration suite is POSIX-only; on Windows run the named pipe tests.
+      - name: Test (Windows control pipe)
+        if: contains(matrix.target, 'windows')
+        working-directory: apps/term-host
+        run: cargo test --locked --release --target "${{ matrix.target }}" --test control_windows
       - name: Build
         working-directory: apps/term-host
         run: cargo build --locked --release --target "${{ matrix.target }}" --bin tunelo-term-host

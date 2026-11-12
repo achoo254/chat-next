@@ -14,7 +14,8 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
+use std::thread;
 use std::time::Duration;
 
 use windows_sys::Win32::Foundation::{
@@ -29,8 +30,8 @@ use windows_sys::Win32::Security::{
     TOKEN_QUERY, TOKEN_USER,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
-    OPEN_EXISTING, PIPE_ACCESS_DUPLEX,
+    CreateFileW, FlushFileBuffers, ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE,
+    FILE_FLAG_OVERLAPPED, OPEN_EXISTING, PIPE_ACCESS_DUPLEX,
 };
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, GetNamedPipeClientProcessId,
@@ -44,6 +45,8 @@ use windows_sys::Win32::System::Threading::{
 use windows_sys::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
 
 const PIPE_BUFFER: u32 = 64 * 1024;
+/// How long `Stream::shutdown` waits for the peer to read the last frames.
+const FLUSH_LIMIT: Duration = Duration::from_secs(2);
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -99,11 +102,46 @@ impl Stream {
         Stream::from_handle(self.pipe.clone())
     }
 
+    /// Close the pipe like `shutdown(Both)` on a socket: blocked readers and
+    /// writers on our side return now, and what we already wrote (the error
+    /// reply to a rejected hello, the reply to `shutdown`) still reaches the
+    /// peer. `DisconnectNamedPipe` discards unread data, so it waits for the
+    /// peer to drain the pipe first, at most `FLUSH_LIMIT`.
     pub fn shutdown(&self) {
         // SAFETY: valid handle; cancels pending I/O of every thread on it.
-        unsafe {
-            CancelIoEx(self.pipe.0, null());
-            DisconnectNamedPipe(self.pipe.0);
+        unsafe { CancelIoEx(self.pipe.0, null()) };
+        self.drain(FLUSH_LIMIT);
+        // SAFETY: valid handle. Fails harmlessly on the client end.
+        unsafe { DisconnectNamedPipe(self.pipe.0) };
+    }
+
+    /// Wait until the peer has read everything written so far, or `limit`.
+    /// `FlushFileBuffers` blocks with no timeout of its own, so it runs on a
+    /// helper thread; a peer that stops reading cannot hold the caller (the
+    /// hub, for a replaced agent) longer than `limit`.
+    fn drain(&self, limit: Duration) {
+        let pipe = self.pipe.clone();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
+        let spawned = thread::Builder::new()
+            .name("pipe-drain".into())
+            .spawn(move || {
+                // SAFETY: the Arc keeps the handle open for the call. The
+                // result is ignored on purpose: ERROR_BROKEN_PIPE (peer gone)
+                // or ERROR_PIPE_NOT_CONNECTED (already disconnected) both
+                // mean nothing is left to wait for.
+                unsafe { FlushFileBuffers(pipe.0) };
+                let _ = done_tx.send(());
+            });
+        if spawned.is_err() {
+            // Out of threads: close without waiting, as before.
+            return;
+        }
+        if done_rx.recv_timeout(limit).is_err() {
+            // The peer is not reading. The disconnect that follows completes
+            // the pending flush on the server end; on the client end this
+            // cancels it.
+            // SAFETY: valid handle.
+            unsafe { CancelIoEx(self.pipe.0, null()) };
         }
     }
 
