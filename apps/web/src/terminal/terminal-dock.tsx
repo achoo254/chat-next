@@ -399,6 +399,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		const out = withModifiers(text, mods);
 		setMods(afterKey);
 		probe?.key(focused.session);
+		handles.current.get(focused.id)?.claimSize();
 		terminal.input(focused.session, encoder.encode(out));
 	};
 	const barKey = (key: BarKey) => {
@@ -409,6 +410,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const sendRaw = (text: string) => {
 		if (focused === null || text === "") return;
 		probe?.key(focused.session);
+		handles.current.get(focused.id)?.claimSize();
 		terminal.input(focused.session, encoder.encode(text));
 	};
 	const dictation = useDictation(locale, sendRaw);

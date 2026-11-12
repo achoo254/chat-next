@@ -28,12 +28,17 @@ const BUSY_BYTES = 256 * 1024;
 const FONT_WAIT_MS = 1_500;
 
 /** What the dock asks of a pane: the keyboard, the cursor mode the arrows need, and where the caret is. */
+/** The device in use sends its size again at most this often while typing or touching. */
+const CLAIM_EVERY_MS = 1_000;
+
 export interface PaneHandle {
 	focus(): void;
 	/** DECCKM: arrows send ESC O x instead of ESC [ x. */
 	appCursor(): boolean;
 	/** The program asked for pastes in brackets (Claude Code does). */
 	bracketedPaste(): boolean;
+	/** Sends this pane's size again before typing from the dock (another device may have resized the session). */
+	claimSize(): void;
 	/** The caret's position in the pane, in CSS pixels. */
 	caret(): { readonly x: number; readonly y: number; readonly height: number } | null;
 }
@@ -243,6 +248,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			});
 			const subscriptions = [
 				term.onData((data) => {
+					claimSize();
 					probe?.key(session);
 					link.input(session, encoder.encode(data));
 				}),
@@ -265,10 +271,34 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			});
 			fitNow();
 			link.resize(session, term.cols, term.rows);
+			// One session may be attached from several devices, and the machine takes the size last sent: the device in
+			// use sends its size again (when the page shows or gets the focus, on a touch, before typing), so the program
+			// draws for this screen and not another device's width. An unchanged size wakes nothing on the machine.
+			let claimedAt = 0;
+			const claimSize = (force = false) => {
+				const now = performance.now();
+				if (!force && now - claimedAt < CLAIM_EVERY_MS) return;
+				claimedAt = now;
+				link.resize(session, term.cols, term.rows);
+			};
+			const onShow = () => {
+				if (document.visibilityState === "visible") claimSize(true);
+			};
+			const onFocus = () => claimSize(true);
+			const onTouch = () => claimSize();
+			document.addEventListener("visibilitychange", onShow);
+			window.addEventListener("focus", onFocus);
+			host.addEventListener("pointerdown", onTouch);
+			const stopClaims = () => {
+				document.removeEventListener("visibilitychange", onShow);
+				window.removeEventListener("focus", onFocus);
+				host.removeEventListener("pointerdown", onTouch);
+			};
 			registerHandle({
 				focus: () => term.focus(),
 				appCursor: () => term.modes.applicationCursorKeysMode,
 				bracketedPaste: () => term.modes.bracketedPasteMode,
+				claimSize: () => claimSize(),
 				caret: () => {
 					if (term.cols === 0 || term.rows === 0) return null;
 					const height = host.clientHeight / term.rows;
@@ -289,6 +319,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				if (frame !== 0) cancelAnimationFrame(frame);
 				observer.disconnect();
 				stopTouch();
+				stopClaims();
 				stopSize();
 				fonts?.removeEventListener("loadingdone", redraw);
 				for (const s of subscriptions) s.dispose();
