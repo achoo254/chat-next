@@ -41,7 +41,7 @@ import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
-import { aiName, errorText, folderName, isRunning, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
@@ -169,9 +169,10 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 		}
 	};
 
-	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere".
-	// In the terminal its pill and "Kết thúc" already say it runs there, and the banner says when another process has the session open; in chat the chip says why it is read-only.
-	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : mode === "terminal" && stateKey(thread) === "elsewhere" ? null : stateKey(thread);
+	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere", and
+	// no chip says so: in the terminal its pill and "Kết thúc" do, in chat the bar above the composer does (with
+	// the way to the terminal). In the terminal the banner says when another process has the session open.
+	const chip = !online ? "offline" : thread === null || thread.terminalSession > 0 ? null : mode === "terminal" && stateKey(thread) === "elsewhere" ? null : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.

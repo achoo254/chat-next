@@ -657,6 +657,7 @@ export const zhCNMachines: MachinesCopy = {
 		bigger: "放大字号",
 		sizeReset: (size: number) => `字号 ${size} px，点按恢复默认`,
 		shortcuts: "快捷键",
+		shortcutsHint: (keys: string) => `按住 ${keys}，再按对应键`,
 		sessionsOnMachine: "机器上正在运行的会话",
 		noHiddenSessions: "所有会话都已在此打开。",
 		running: "运行中",
@@ -946,6 +947,8 @@ export const zhCNMachines: MachinesCopy = {
 		},
 		hint: {
 			machinesNeedYou: "有设备需要你处理",
+			machinesUnpaired: (n: number) => `${n} 台设备未与本设备配对`,
+			machinesOutdated: (n: number) => `${n} 台设备需要更新 tunelo`,
 			unpaired: "用身份验证器应用中那台电脑的 6 位数字码配对一次，即可查看和操作会话。",
 			repair: "电脑不再接受此设备。请重新配对。",
 			update: "在那台电脑上运行 tunelo update，然后重新加载此页。",

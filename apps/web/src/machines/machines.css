@@ -41,7 +41,8 @@
 .mx-attn-count::before { content: ""; position: absolute; inset: -13px -8px; }
 .mx-empty-list { display: grid; justify-items: start; gap: var(--space-2); padding: var(--space-4) var(--space-3); }
 .mx-empty-list p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
-.mx-manage .dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); }
+/* Machines that need the user: their count, in the attention colour of the machine cards' own pill. */
+.mx-manage-count { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--c-warning) 55%, transparent); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
 .mx-groups { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-4); }
 .mx-groups > .empty { padding: var(--space-6) var(--space-4); }
 .mx-groups { padding-top: var(--space-2); }
@@ -752,8 +753,6 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-recent-folders b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
 .mx-recent-folders small { color: var(--c-text-muted); font-size: 0.75rem; }
 .mx-machine-acts { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: 0 var(--space-3) var(--space-2) calc(var(--space-3) + 40px); }
-.mx-chip.terminal { color: var(--c-primary); }
-.mx-chip.terminalOpen { color: var(--c-text-muted); }
 /* The machine picker of "Thêm dự án": an input's height, the dot left of the name. */
 .mx-host-seg { display: flex; min-width: 0; box-sizing: border-box; height: 44px; padding: 3px; gap: 3px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
 .mx-host-seg button { display: flex; flex: 1 1 0; align-items: center; gap: var(--space-2); min-width: 0; padding: 0 var(--space-2); border: 0; border-radius: calc(var(--radius-sm) - 2px); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.875rem; cursor: pointer; }

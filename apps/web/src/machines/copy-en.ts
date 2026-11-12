@@ -663,6 +663,7 @@ export const enMachines: MachinesCopy = {
 		bigger: "Larger text",
 		sizeReset: (size: number) => `Text size ${size} px, click for the default`,
 		shortcuts: "Shortcuts",
+		shortcutsHint: (keys: string) => `Hold ${keys}, then press the key`,
 		sessionsOnMachine: "Sessions running on the machine",
 		noHiddenSessions: "Every session is open here.",
 		running: "Running",
@@ -952,6 +953,8 @@ export const enMachines: MachinesCopy = {
 		},
 		hint: {
 			machinesNeedYou: "A machine needs you",
+			machinesUnpaired: (n: number) => (n === 1 ? "1 machine not paired with this device" : `${n} machines not paired with this device`),
+			machinesOutdated: (n: number) => (n === 1 ? "1 machine needs a tunelo update" : `${n} machines need a tunelo update`),
 			unpaired: "Pair once with the 6-digit code from that machine's entry in your Authenticator app to see and drive its sessions.",
 			repair: "The machine no longer accepts this device. Pair again to go on.",
 			update: "Run tunelo update on that machine, then reload this page.",

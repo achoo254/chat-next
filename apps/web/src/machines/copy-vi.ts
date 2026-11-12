@@ -672,6 +672,7 @@ export const viMachines = {
 		bigger: "Chữ lớn hơn",
 		sizeReset: (size: number) => `Cỡ chữ ${size} px, bấm để về mặc định`,
 		shortcuts: "Phím tắt",
+		shortcutsHint: (keys: string) => `Giữ ${keys} rồi bấm phím`,
 		sessionsOnMachine: "Phiên đang chạy trên máy",
 		noHiddenSessions: "Mọi phiên đều đang mở ở đây.",
 		running: "Đang chạy",
@@ -962,6 +963,8 @@ export const viMachines = {
 		},
 		hint: {
 			machinesNeedYou: "Máy cần bạn xử lý",
+			machinesUnpaired: (n: number) => `${n} máy chưa ghép với thiết bị này`,
+			machinesOutdated: (n: number) => `${n} máy cần cập nhật tunelo`,
 			unpaired: "Ghép một lần bằng mã 6 số trong app Authenticator của máy đó để xem và điều khiển phiên.",
 			repair: "Máy không còn nhận thiết bị này. Ghép lại để dùng tiếp.",
 			update: "Trên máy đó chạy tunelo update, rồi tải lại trang.",

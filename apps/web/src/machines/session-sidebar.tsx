@@ -205,16 +205,22 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	// Nothing to list yet (and every machine that can answer did): one empty state for the whole list.
 	const settled = snapshot.status !== "loading" && machines.every((m) => m.conn.kind !== "on" || m.state.listed);
 	const empty = filter === "all" && machines.length > 0 && settled && tree.projects.length === 0 && tree.loose.length === 0;
-	// A machine that needs pairing or an update: "Quản lý máy" says so with a dot.
-	const attentionHost = machines.some((m) => needsPairing(m.conn) || m.conn.kind === "update");
+	// Machines that need the user ("Quản lý máy" counts them): not paired with this device, or a tunelo too old to talk to.
+	const unpaired = machines.filter((m) => needsPairing(m.conn)).length;
+	const outdated = machines.filter((m) => m.conn.kind === "update").length;
+	const hostNote = [unpaired > 0 ? t.agent.hint.machinesUnpaired(unpaired) : "", outdated > 0 ? t.agent.hint.machinesOutdated(outdated) : ""].filter((x) => x !== "").join(" · ");
 	return (
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
 				<h2>{t.agent.title}</h2>
-				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={t.agent.machines} current={view.page === "machines" || view.page === "add"}>
+				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={hostNote === "" ? t.agent.machines : `${t.agent.machines}: ${hostNote}`} current={view.page === "machines" || view.page === "add"}>
 					<MachineIcon name="monitor" small />
 					<span>{t.agent.machines}</span>
-					{attentionHost && <span className="dot warn" role="img" aria-label={t.agent.hint.machinesNeedYou} />}
+					{hostNote !== "" && (
+						<span className="mx-manage-count" role="img" aria-label={hostNote} data-id="machines-need-you">
+							{unpaired + outdated}
+						</span>
+					)}
 				</Link>
 			</header>
 			<div className="mx-nav-top">

@@ -245,12 +245,13 @@ describe("a session in chat or in its terminal", () => {
 		expect(window.localStorage.getItem("ai:mode:1")).toBe("chat");
 	});
 
-	it("a turn running in the terminal: the chat says it runs there", async () => {
+	it("a turn running in the terminal: the bar above the composer says it runs there, and no header chip repeats it", async () => {
 		held = 5;
 		heldBusy = true;
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });
 		expect(await screen.findByText("Claude Code đang chạy phiên này trong terminal. Ở đây chỉ xem.")).toBeTruthy();
-		expect(screen.getByRole("status", { name: "Đang chạy trong terminal" })).toBeTruthy();
+		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
+		expect(screen.queryByRole("status", { name: "Mở trong terminal" })).toBeNull();
 	});
 
 	it("in terminal mode the header has no 'running in the terminal' chip (the pill and Kết thúc say it); the switch shows which side is on", async () => {
@@ -278,7 +279,8 @@ describe("a session in chat or in its terminal", () => {
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });
 		// Held by the machine's own terminal, its AI waiting at the prompt: open there, not running, not "elsewhere".
 		const bar = await screen.findByText("Claude Code đang mở phiên này trong terminal, chờ lệnh. Ở đây chỉ xem.");
-		expect(screen.getByRole("status", { name: "Mở trong terminal" })).toBeTruthy();
+		// The bar says it is held; no header chip repeats it.
+		expect(screen.queryByRole("status", { name: "Mở trong terminal" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Đang mở ngoài app" })).toBeNull();
 		const section = bar.closest("section");

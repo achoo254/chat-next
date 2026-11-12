@@ -83,10 +83,25 @@
 	.tx-tab { max-width: 140px; }
 }
 
-/* Text size in the shortcuts popover: A−, the size (back to the default), A+. */
-.tx-size { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-3) 0; font-size: 0.8125rem; }
-.tx-size > span { flex: 1; color: var(--c-text-muted); }
-.tx-size .btn { min-width: 36px; justify-content: center; font-variant-numeric: tabular-nums; }
+/* The shortcuts popover: the text size as one stepper, then each shortcut as "what it does … key", Alt+Shift said once. */
+.tx-help { width: 300px; gap: var(--space-1); padding: var(--space-3); }
+.tx-size { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-1); font-size: 0.875rem; }
+.tx-size > span { flex: 1; color: var(--c-text); }
+.tx-stepper { display: inline-flex; overflow: hidden; border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.tx-stepper button { min-width: 40px; height: 32px; padding: 0 var(--space-2); border: 0; border-left: 1px solid var(--c-border); background: none; color: var(--c-text); font: inherit; font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+.tx-stepper button:first-child { border-left: 0; }
+.tx-stepper button:hover:not(:disabled) { background: var(--c-hover); }
+.tx-stepper button:disabled { color: var(--c-text-muted); opacity: 0.5; cursor: default; }
+.tx-stepper button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.tx-stepper .tx-size-now { min-width: 44px; color: var(--c-text-muted); font-weight: 500; }
+.tx-help h5 { margin: var(--space-1) var(--space-1) 0; }
+.tx-help-hint { margin: 0 var(--space-1) var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); }
+.tx-keys-help { display: grid; margin: 0; }
+.tx-keys-help > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 32px; padding: 0 var(--space-1); border-radius: var(--radius-sm); font-size: 0.8125rem; }
+.tx-keys-help > div:hover { background: var(--c-hover); }
+.tx-keys-help dt { color: var(--c-text); }
+.tx-keys-help dd { margin: 0; flex: none; }
+.tx-keys-help kbd { display: inline-block; min-width: 24px; padding: 2px 6px; border: 1px solid var(--c-border); border-bottom-width: 2px; border-radius: var(--radius-xs, 4px); background: var(--c-surface-subtle); font-family: var(--font-mono); font-size: 0.75rem; text-align: center; color: var(--c-text); }
 
 /* JetBrains Mono's bold (600), latin and Vietnamese, only for the terminal (fonts.css ships 400). */
 @font-face {

@@ -173,28 +173,32 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 						<Icon name="command" small />
 					</button>
 					{helpOpen && (
-						<div className="mx-menu tx-menu mx-pop" role="dialog" aria-label={t.shortcuts}>
+						<div className="mx-menu tx-menu mx-pop tx-help" role="dialog" aria-label={t.shortcuts}>
 							<div className="tx-size" role="group" aria-label={t.textSize}>
 								<span>{t.textSize}</span>
-								<button type="button" className="btn btn-sm" aria-label={t.smaller} title={`${t.smaller} (${mac ? "⌘" : "Ctrl+"}−)`} disabled={textSize <= FONT_SIZE_MIN} onClick={() => onTextSize("smaller")} data-id="terminal-text-smaller">
-									A−
-								</button>
-								<button type="button" className="btn btn-sm tx-size-now" aria-label={t.sizeReset(textSize)} title={`${t.sizeReset(textSize)} (${mac ? "⌘" : "Ctrl+"}0)`} onClick={() => onTextSize("reset")}>
-									{textSize}
-								</button>
-								<button type="button" className="btn btn-sm" aria-label={t.bigger} title={`${t.bigger} (${mac ? "⌘" : "Ctrl+"}+)`} disabled={textSize >= FONT_SIZE_MAX} onClick={() => onTextSize("bigger")} data-id="terminal-text-bigger">
-									A+
-								</button>
+								<div className="tx-stepper">
+									<button type="button" aria-label={t.smaller} title={`${t.smaller} (${mac ? "⌘" : "Ctrl+"}−)`} disabled={textSize <= FONT_SIZE_MIN} onClick={() => onTextSize("smaller")} data-id="terminal-text-smaller">
+										A−
+									</button>
+									<button type="button" className="tx-size-now" aria-label={t.sizeReset(textSize)} title={`${t.sizeReset(textSize)} (${mac ? "⌘" : "Ctrl+"}0)`} onClick={() => onTextSize("reset")}>
+										{textSize}
+									</button>
+									<button type="button" aria-label={t.bigger} title={`${t.bigger} (${mac ? "⌘" : "Ctrl+"}+)`} disabled={textSize >= FONT_SIZE_MAX} onClick={() => onTextSize("bigger")} data-id="terminal-text-bigger">
+										A+
+									</button>
+								</div>
 							</div>
+							<hr />
 							<h5>{t.shortcuts}</h5>
+							<p className="tx-help-hint">{t.shortcutsHint(mac ? "⌥⇧" : "Alt+Shift")}</p>
 							<dl className="tx-keys-help">
 								{shortcutList(t).map((s) => (
 									<div key={s.keys}>
-										<dt>
-											<kbd>{prefix}</kbd>
+										<dt>{s.label}</dt>
+										<dd>
+											<span className="sr-only">{prefix}</span>
 											<kbd>{s.keys}</kbd>
-										</dt>
-										<dd>{s.label}</dd>
+										</dd>
 									</div>
 								))}
 							</dl>
