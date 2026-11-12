@@ -85,6 +85,8 @@ Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thê
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
 nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
 
+Có gì ở 2.6.1: chỉ tăng số phiên bản; bản phát hành giờ kiểm danh tính chữ ký macOS trước khi ra, để quyền Toàn quyền truy cập ổ đĩa giữ nguyên qua các lần cập nhật (dùng làm bản thử xác nhận điều đó).
+
 Có gì ở 2.6.0:
 
 - **Dự án báo git remote và nhánh**: mỗi dự án gửi kèm `remote.origin.url` (bỏ mật khẩu; với http(s) bỏ cả tên người dùng, nơi
