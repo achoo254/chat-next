@@ -42,7 +42,10 @@ describe("quick reaction bar", () => {
 		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
 		await within(log).findByText("Chiều nay review PR nhé?", {}, LONG);
 		const message = messageOf(log, "Chiều nay review PR nhé?");
-		const bar = within(message).getByRole("group", { name: "Thả nhanh cảm xúc" });
+		// The row loads once the pointer reaches the emoji button.
+		expect(within(message).queryByRole("group", { name: "Thả nhanh cảm xúc" })).toBeNull();
+		await userEvent.hover(within(message).getByRole("button", { name: "Thả cảm xúc" }));
+		const bar = await within(message).findByRole("group", { name: "Thả nhanh cảm xúc" }, LONG);
 		// It follows the emoji button, so the stylesheet shows it while that button is hovered.
 		expect(bar.previousElementSibling?.classList.contains("msg-react")).toBe(true);
 		expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual(["👍", "❤️", "😂", "😮", "🙏"]);

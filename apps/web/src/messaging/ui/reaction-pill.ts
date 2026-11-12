@@ -8,9 +8,6 @@
 // and who-reacted lists.
 import type { Chat, ReactionCount } from "@achoo254/chat-core";
 
-/** The short reaction row: the message menu's top row and the bar over the emoji button. */
-export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏"] as const;
-
 /** Largest group whose pills show avatars. */
 export const AVATAR_CHAT_MAX = 10;
 /** Avatars per pill. */

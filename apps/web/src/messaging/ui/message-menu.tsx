@@ -23,9 +23,11 @@ import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble } from "./message-item.tsx";
-import { QUICK_REACTIONS } from "./reaction-pill.ts";
 import { copyText } from "./parts.tsx";
 import { useUi, type MenuAnchor } from "./ui-context.tsx";
+
+// The quick reaction row rides in this chunk, so a message loads no extra chunk for it.
+export { default as ReactionBar } from "./reaction-bar.tsx";
 
 export function canPin(chat: Chat | null): boolean {
 	if (chat === null) return false;
@@ -349,7 +351,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 	const reactions =
 		item.kind === "message" && !item.message.recalled && !more ? (
 			<div className="react-picker" role="group" aria-label={copy.menu.react}>
-				{QUICK_REACTIONS.map((emoji) => (
+				{Object.keys(copy.menu.reactionNames).map((emoji) => (
 					<button key={emoji} type="button" aria-label={copy.menu.reactionNames[emoji] ?? emoji} onClick={() => react(emoji)}>
 						{emoji}
 					</button>

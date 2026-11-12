@@ -9,7 +9,7 @@
 // starts with one, URL buttons, and "đã cập nhật" when edited in place. Bot
 // messages carry callback buttons too (mockups/bots.html#inline-keyboard):
 // the pressed one waits for the bot's answer while the others stay usable.
-import { Suspense, lazy, memo, useContext, type MouseEvent, type ReactNode } from "react";
+import { Suspense, lazy, memo, useContext, useState, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
@@ -21,8 +21,7 @@ import { useChat, useConnection, useItem, useMessage, useServices, useUser } fro
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
-import { pillContent, QUICK_REACTIONS } from "./reaction-pill.ts";
-import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
@@ -32,6 +31,7 @@ import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 const mediaChunk = () => import("../media/media-content.tsx");
 // Buttons under webhook and bot messages, with the press handling: loaded with the first such message.
 const MessageButtons = lazy(() => import("./message-buttons.tsx"));
+const ReactionBar = lazy(() => import("./message-menu.tsx").then((m) => ({ default: m.ReactionBar })));
 const MessageMedia = lazy(() => mediaChunk().then((m) => ({ default: m.MessageMedia })));
 const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia })));
 const PendingMediaView = lazy(() => mediaChunk().then((m) => ({ default: m.PendingMediaView })));
@@ -355,7 +355,7 @@ function QuickActions({
 	seqs,
 	label,
 	canReply,
-	chosen,
+	reactions,
 }: {
 	chatId: number;
 	itemKey: string;
@@ -364,18 +364,13 @@ function QuickActions({
 	seqs: readonly number[];
 	label: string;
 	canReply: boolean;
-	/** Your current reaction on the message, if any. */
-	chosen: string | undefined;
+	reactions: StoredMessage["reactions"];
 }) {
 	"use no memo";
 	const copy = useCopy();
-	const menuCopy = useScreensCopy().menu;
-	const names = menuCopy.reactionNames;
 	const ui = useUi();
-	const { remote, toasts } = useServices();
-	const react = (emoji: string) => {
-		remote.setReaction(chatId, seq, chosen === emoji ? "" : emoji).catch(() => toasts.show(copy.common.failed));
-	};
+	// The quick reaction row loads and mounts once the pointer first reaches the emoji button.
+	const [bar, setBar] = useState(false);
 	const open = (event: MouseEvent<HTMLButtonElement>, picker: boolean) => {
 		const box = event.currentTarget.getBoundingClientRect();
 		const anchor: MenuAnchor = { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
@@ -397,25 +392,21 @@ function QuickActions({
 				</button>
 			</div>
 			{/* Telegram-style: the reaction button sits on its own under the bubble. */}
-			<button type="button" className="msg-react" tabIndex={-1} aria-label={copy.message.react} onClick={(event) => open(event, true)}>
+			<button
+				type="button"
+				className="msg-react"
+				tabIndex={-1}
+				aria-label={copy.message.react}
+				onPointerEnter={() => setBar(true)}
+				onClick={(event) => open(event, true)}
+			>
 				<Icon name="smile" small />
 			</button>
-			{/* Zalo-style: resting on the emoji button shows a short row of reactions above it; a click there opens the full panel. */}
-			<div className="react-bar" role="group" aria-label={menuCopy.quickReactions}>
-				{QUICK_REACTIONS.map((emoji) => (
-					<button
-						key={emoji}
-						type="button"
-						tabIndex={-1}
-						aria-label={names[emoji] ?? emoji}
-						aria-pressed={chosen === emoji}
-						title={names[emoji] ?? emoji}
-						onClick={() => react(emoji)}
-					>
-						{emoji}
-					</button>
-				))}
-			</div>
+			{bar && (
+				<Suspense fallback={null}>
+					<ReactionBar chatId={chatId} seq={seq} reactions={reactions} />
+				</Suspense>
+			)}
 		</>
 	);
 }
@@ -680,7 +671,7 @@ export function MessageBubble({
 							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
 							canReply={canReply}
-							chosen={message.reactions.find((reaction) => reaction.chosen)?.emoji}
+							reactions={message.reactions}
 						/>
 					)}
 					<Reactions message={message} chat={chat} />

@@ -686,6 +686,7 @@ export const zhCNScreens: ScreensCopy = {
 		deleteForMe: "仅为我删除",
 		discard: "删除",
 		resend: "重新发送",
+		// The short reaction row, in order: the message menu's top row and the bar over the emoji button.
 		reactionNames: {
 			"👍": "赞",
 			"❤️": "爱心",

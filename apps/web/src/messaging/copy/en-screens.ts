@@ -687,6 +687,7 @@ export const enScreens: ScreensCopy = {
 		deleteForMe: "Delete for me",
 		discard: "Delete",
 		resend: "Resend",
+		// The short reaction row, in order: the message menu's top row and the bar over the emoji button.
 		reactionNames: {
 			"👍": "Like",
 			"❤️": "Love",

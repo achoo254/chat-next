@@ -1,0 +1,20 @@
+/* Quick reactions over the emoji button (reaction-bar.tsx). The row follows the button in the bubble and is mounted on the first
+   hover, so it is shown by an animation (not a transition): a beat after the pointer rests on the button, so a passing pointer does
+   not flash it; it stays while the pointer is on it. It stretches back over the bubble (never past the message column) and overlaps
+   the button's hover area, so moving up onto it never crosses a gap. */
+.react-bar { position: absolute; bottom: 26px; right: -16px; z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md); visibility: hidden; }
+.msg.mine .react-bar { right: auto; left: -16px; }
+.msg-react:hover + .react-bar, .react-bar:hover { visibility: visible; animation: react-bar-in 140ms var(--ease-standard) 250ms backwards; }
+@keyframes react-bar-in { from { visibility: hidden; opacity: 0; transform: translateY(4px) scale(0.92); } }
+.msg:not(.mine) .react-bar { transform-origin: bottom right; }
+.msg.mine .react-bar { transform-origin: bottom left; }
+.react-bar > button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; line-height: 1; transition: transform 120ms var(--ease-standard); }
+.react-bar > button:hover { transform: scale(1.2); }
+.react-bar > [aria-pressed="true"] { background: var(--c-selected); }
+@media (max-width: 760px), (pointer: coarse) {
+	.react-bar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.msg-react:hover + .react-bar, .react-bar:hover { animation-duration: 1ms; }
+	.react-bar > button:hover { transform: none; }
+}

@@ -687,6 +687,7 @@ export const viScreens = {
 		deleteForMe: "Xoá ở phía tôi",
 		discard: "Xoá",
 		resend: "Gửi lại",
+		// The short reaction row, in order: the message menu's top row and the bar over the emoji button.
 		reactionNames: {
 			"👍": "Thích",
 			"❤️": "Yêu thích",
