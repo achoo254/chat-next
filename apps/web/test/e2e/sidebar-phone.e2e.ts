@@ -1,9 +1,9 @@
 // The AI Agent column on a phone (touch, 390×844) and wider screens: rows as
 // compact as their content (project about 44 px, workspace about 40 px, a
 // two-line session about 56 px; the 44 px touch target comes from an
-// invisible hit area, not from height), one grid for every row (the status
-// glyph, the provider icon, the text and the trailing column line up across
-// rows, never on top of each other), and nothing wider than the column.
+// invisible hit area, not from height), one status column for every row,
+// the icon and text stepping in per level (project, workspace, session) and
+// never on top of the glyph, and nothing wider than the column.
 // Starts its own Vite dev server of the harness:
 //
 //   node --test test/e2e/sidebar-phone.e2e.ts
@@ -105,10 +105,14 @@ function check(g: Geometry, label: string): void {
 	near(g.sessions.map((s) => s.text), `${label}: session titles`);
 	near(g.sessions.filter((s) => s.mode >= 0).map((s) => s.mode), `${label}: mode icons`);
 	for (const s of g.sessions) assert.ok(s.glyphRight <= s.ai, `${label}: "${s.title}" glyph ends at ${s.glyphRight}, its provider icon starts at ${s.ai}`);
-	// The same columns across project, workspace and session rows.
+	// The status column is shared by every row; the icon and text step in per level, a child's icon under its parent's name.
 	near([...g.projects.map((p) => p.glyph), ...g.workspaces.map((w) => w.glyph), ...g.sessions.map((s) => s.glyph)], `${label}: status glyphs of every row`);
-	near([...g.projects.map((p) => p.icon), ...g.workspaces.map((w) => w.icon), ...g.sessions.map((s) => s.ai)], `${label}: icons of every row`);
-	near([...g.projects.map((p) => p.name), ...g.workspaces.map((w) => w.name), ...g.sessions.map((s) => s.text)], `${label}: texts of every row`);
+	near(g.projects.map((p) => p.icon), `${label}: project icons`);
+	near(g.workspaces.map((w) => w.icon), `${label}: workspace icons`);
+	const step = (g.workspaces[0]?.icon ?? 0) - (g.projects[0]?.icon ?? 0);
+	assert.ok(step >= 16 && step <= 32, `${label}: a workspace steps in ${step} px from its project`);
+	near([g.workspaces[0]?.icon ?? 0, g.projects[0]?.name ?? 0], `${label}: a workspace icon under its project's name`);
+	near([g.sessions[0]?.ai ?? 0, g.workspaces[0]?.name ?? 0], `${label}: a session icon under its workspace's name`);
 	// The mode icon sits under the provider icon.
 	for (const s of g.sessions) if (s.mode >= 0) assert.ok(Math.abs(s.mode - s.ai) <= 1, `${label}: "${s.title}" mode icon at ${s.mode}, provider icon at ${s.ai}`);
 	assert.ok(g.overflow <= 0, `${label}: the column overflows by ${g.overflow} px`);
@@ -119,7 +123,7 @@ for (const [width, height, touch] of [
 	[768, 1024, true],
 	[1333, 780, false],
 ] as const) {
-	test(`the column at ${width} px${touch ? " (touch)" : ""}: compact rows, one grid, nothing too wide`, async () => {
+	test(`the column at ${width} px${touch ? " (touch)" : ""}: compact rows, stepped levels, nothing too wide`, async () => {
 		const { page, close } = await open(width, height, touch);
 		check(await geometry(page), `${width}${touch ? " touch" : ""}`);
 		await close();
