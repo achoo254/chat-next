@@ -57,7 +57,8 @@ describe("usage over a device's link", () => {
       p90Context: 400_000n,
     });
     expect(r.suggestions).toEqual([expect.objectContaining({ rule: UsageRule.CONTEXT, sessionId: "s1", turn: 2, value: 400_000n, notifiedAt: 0n })]);
-    expect(r.utcOffsetMinutes).toBe(0 - new Date().getTimezoneOffset());
+    // "+ 0" turns -0 (a UTC machine) into 0, which is what the wire carries; toBe tells the two apart.
+    expect(r.utcOffsetMinutes).toBe(0 - new Date().getTimezoneOffset() + 0);
     device.close();
   });
 
