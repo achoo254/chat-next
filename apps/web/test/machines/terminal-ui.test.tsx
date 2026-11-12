@@ -434,7 +434,7 @@ describe("the dock", () => {
 		expect(sent("termClose")).toEqual([]);
 		// Its AI is listed for coming back to (it still runs), and comes back as the same session.
 		await userEvent.click(screen.getByRole("button", { name: "Phiên đang chạy trên máy" }));
-		await userEvent.click(await screen.findByRole("menuitem", { name: /Phiên #1|Terminal/ }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: /Phiên AI|Terminal/ }));
 		// A tab of its own again (every tab keeps its panes mounted).
 		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
 		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2);

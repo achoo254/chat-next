@@ -4,7 +4,7 @@
 // shell still runs), splitting the pane with the keyboard, and the path pill.
 // The keyboard shortcuts work like Orca's, with Alt+Shift (⌥⇧ on macOS) so
 // they never take a key a shell or the browser needs.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
@@ -65,6 +65,13 @@ export function shortcutList(t: MachinesCopy["terminal"]): readonly { keys: stri
 	];
 }
 
+/** "21:05" today, else "12/11 21:05": when a session on the machine was opened. */
+export function openedTime(ms: number, now: number): string {
+	const at = new Date(ms);
+	const time = at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+	return at.toDateString() === new Date(now).toDateString() ? time : `${at.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })} ${time}`;
+}
+
 export interface TabView {
 	readonly id: string;
 	readonly title: string;
@@ -96,6 +103,8 @@ interface TabsProps {
 
 export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onMenu }: TabsProps) {
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
+	// "Today" for the sessions menu: the moment it opened.
+	const [menuAt, setMenuAt] = useState(0);
 	const { open: helpOpen, setOpen: setHelpOpen, ref: helpRef } = usePopover();
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
 	return (
@@ -131,7 +140,10 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 						aria-haspopup="menu"
 						aria-expanded={menuOpen}
 						onClick={() => {
-							if (!menuOpen) onMenu();
+							if (!menuOpen) {
+								onMenu();
+								setMenuAt(Date.now());
+							}
 							setMenuOpen((v) => !v);
 						}}
 					>
@@ -152,10 +164,18 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 										onReopen(s.session);
 									}}
 								>
-									<MachineIcon name="terminal" small />
+									<MachineIcon name={s.threadId === "" ? "terminal" : "spark"} small />
 									<span>
-										{s.title || t.untitled(s.session)}
-										<small>{[s.cwd === "" ? "" : folderName(s.cwd), s.exited ? t.exitedShort(s.exitCode) : s.attached ? t.openElsewhere : t.running].filter((x) => x !== "").join(" · ")}</small>
+										{s.title || (s.threadId === "" ? t.shellSession : t.aiSession)}
+										<small>
+											{[
+												s.cwd === "" ? "" : folderName(s.cwd),
+												s.createdAt > 0n ? t.openedAt(openedTime(Number(s.createdAt), menuAt)) : "",
+												s.exited ? t.exitedShort(s.exitCode) : s.attached ? t.openElsewhere : t.running,
+											]
+												.filter((x) => x !== "")
+												.join(" · ")}
+										</small>
 									</span>
 								</button>
 							))}
