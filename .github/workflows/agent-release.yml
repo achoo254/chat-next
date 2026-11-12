@@ -195,6 +195,8 @@ jobs:
     needs: [test, build, build-term-host]
     if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
+    # The signing secrets live in this environment, which only runs for release tags (tunelo-v*), never for a branch.
+    environment: release
     # Apple usually notarizes in minutes, but may hold a submission much longer.
     timeout-minutes: 150
     env:
@@ -312,9 +314,46 @@ jobs:
           overwrite: true
 
   release:
+    # Dry run only (workflow_dispatch): checksums of the unsigned files, no secret, no environment.
+    needs: [test, build, build-term-host]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PREFIX: ${{ needs.test.outputs.prefix }}
+      VERSION: ${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/agent/src
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          # Every file of the release, by name: a missing build stops the release here.
+          sha256sum \
+            "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" \
+            "$PREFIX-term-host-darwin-arm64" "$PREFIX-term-host-darwin-x64" "$PREFIX-term-host-windows-x64.exe" \
+            "$PREFIX-term-host-linux-x64" "$PREFIX-term-host-linux-arm64" > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Dry run checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS
+
+  publish:
     needs: [test, build, build-term-host, sign-macos]
-    # A dry run skips sign-macos; every other job must have passed.
-    if: ${{ !cancelled() && !failure() }}
+    if: github.event_name != 'workflow_dispatch'
+    # Holds the minisign key: only for release tags (tunelo-v*).
+    environment: release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -342,7 +381,6 @@ jobs:
           cat SHA256SUMS
           sha256sum -c SHA256SUMS
       - name: Signatures
-        if: env.DRY_RUN != 'true'
         working-directory: dist
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
@@ -363,13 +401,6 @@ jobs:
             minisign -Vq -P "$pubkey" -m "$f"
           done
       - name: GitHub Release
-        if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" --notes "Background agent of My machines and its terminal process. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
-      - name: Dry run checksums
-        if: env.DRY_RUN == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: SHA256SUMS
-          path: dist/SHA256SUMS
