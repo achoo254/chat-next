@@ -920,15 +920,16 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
    list's edge pushed the (invisible) bar past it and the list scrolled sideways. */
 /* Quick actions never cover the hovered message (chat.html#context-menu): beside the bubble at its top edge when the
    row has room (the message list sets data-actions="beside" on hover), otherwise wholly above the bubble. The ::before
-   strip bridges the gap, so moving the pointer from the bubble to the row keeps it open. */
-.msg-actions { position: absolute; bottom: calc(100% + var(--space-1)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
+   strip bridges the gap, and the bar lingers a moment after the pointer leaves the message, so moving the pointer from
+   anywhere on the bubble to the row (not only straight across the strip) keeps it open. */
+.msg-actions { position: absolute; bottom: calc(100% + var(--space-1)); left: var(--space-2); z-index: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease-standard) .15s, visibility 0s .3s; }
 .msg.mine .msg-actions { left: auto; right: var(--space-2); }
 .msg-actions::before { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--space-1) + 2px); }
-.msg[data-actions="beside"] .msg-actions { bottom: auto; top: 0; left: calc(100% + 16px); right: auto; }
-.msg.mine[data-actions="beside"] .msg-actions { left: auto; right: calc(100% + 16px); }
-.msg[data-actions="beside"] .msg-actions::before { top: 0; bottom: 0; height: auto; left: auto; right: 100%; width: 16px; }
-.msg.mine[data-actions="beside"] .msg-actions::before { right: auto; left: 100%; width: 16px; }
-.msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; pointer-events: auto; }
+.msg[data-actions="beside"] .msg-actions { bottom: auto; top: 0; left: calc(100% + 8px); right: auto; }
+.msg.mine[data-actions="beside"] .msg-actions { left: auto; right: calc(100% + 8px); }
+.msg[data-actions="beside"] .msg-actions::before { top: 0; bottom: 0; height: auto; left: auto; right: 100%; width: 8px; }
+.msg.mine[data-actions="beside"] .msg-actions::before { right: auto; left: 100%; width: 8px; }
+.msg:hover .msg-actions, .msg:focus-within .msg-actions { opacity: 1; visibility: visible; transition-delay: 0s; }
 /* The reaction button stands alone (Telegram): mostly over the bubble's outer edge at its bottom corner, on the right of messages you
    receive and the left of your own. Only 8px of it is over the bubble (inside its 12px side padding), so it never covers the time. */
 .msg-react { position: absolute; bottom: 0; left: calc(100% - 8px); z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-sm); color: var(--c-icon-muted); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease-standard); }
