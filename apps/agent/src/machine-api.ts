@@ -1,8 +1,8 @@
 // The calls the agent makes to the chat server (Connect, JSON): register or
 // claim the machine with an access token of the owner's account (Chat's
 // resource, machines:write), heartbeat with the tunnel address, and ask for
-// a content-free "needs you" or "new device paired" push (both with the
-// machine secret). No call
+// a content-free "needs you", "new device paired" or "usage hint" push (all
+// with the machine secret). No call
 // carries a paired device's key, the install secret or the authenticator
 // (TOTP) secret: pairing stays end to end between the device and this
 // machine.
@@ -76,6 +76,16 @@ export function notifyNeedsInput(secret: string, body: { kind: "approval" | "que
 /** Tells the account's devices that a new device was just paired with this machine; the call names no device. */
 export function notifyDevicePaired(secret: string) {
   return call<Record<string, never>>("NotifyNeedsInput", { kind: "NEEDS_INPUT_KIND_DEVICE_PAIRED", pendingCount: 1, sessionId: "" }, secret);
+}
+
+/**
+ * Asks for a "usage hint" push to the account's devices: a running session
+ * went past a usage rule. Content-free like the others: the call names no
+ * session, rule or number (the details reach devices over the sealed link).
+ * A server without the kind answers invalid_argument.
+ */
+export function notifyUsageHint(secret: string) {
+  return call<Record<string, never>>("NotifyNeedsInput", { kind: "NEEDS_INPUT_KIND_USAGE_HINT", pendingCount: 1, sessionId: "" }, secret);
 }
 
 /** Device keys come back as standard base64 (proto bytes); the config stores base64url. */

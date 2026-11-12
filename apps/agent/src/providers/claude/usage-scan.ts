@@ -188,7 +188,8 @@ export function parseUsageLine(line: Buffer, subagent: boolean, stats: UsageLine
 }
 
 /**
- * Calls `onLine` with every whole line of `path` from byte `from` on and
+ * Calls `onLine` with every whole line of `path` from byte `from` on (and
+ * `onChunk` with the size of each piece read) and
  * returns the byte after the last one; a line still being written (no
  * newline yet) is left for the next read. Lines over `cap` bytes are skipped
  * without being kept and counted in `stats.overCap`. The line passed may be
@@ -196,10 +197,18 @@ export function parseUsageLine(line: Buffer, subagent: boolean, stats: UsageLine
  * one chunk is never copied (most lines are not replies and are only looked
  * at), so a scan of gigabytes makes little garbage.
  */
-export async function readLines(path: string, from: number, cap: number, stats: UsageLineStats, onLine: (line: Buffer) => void): Promise<number> {
+export async function readLines(
+  path: string,
+  from: number,
+  cap: number,
+  stats: UsageLineStats,
+  onLine: (line: Buffer) => void,
+  onChunk?: (bytes: number) => void,
+  buffer?: Buffer,
+): Promise<number> {
   const fh = await open(path, "r");
   try {
-    const buf = Buffer.allocUnsafe(CHUNK);
+    const buf = buffer ?? Buffer.allocUnsafe(CHUNK);
     let pos = from;
     let lineStart = from;
     /** Earlier pieces of a line that started in an earlier chunk (copied: the buffer is reused). */
@@ -207,7 +216,7 @@ export async function readLines(path: string, from: number, cap: number, stats: 
     let length = 0;
     let skipping = false;
     for (;;) {
-      const { bytesRead } = await fh.read(buf, 0, CHUNK, pos);
+      const { bytesRead } = await fh.read(buf, 0, buf.length, pos);
       if (bytesRead <= 0) break;
       let start = 0;
       for (;;) {
@@ -233,6 +242,7 @@ export async function readLines(path: string, from: number, cap: number, stats: 
         start = nl + 1;
       }
       pos += bytesRead;
+      onChunk?.(bytesRead);
     }
     return lineStart;
   } finally {
@@ -243,6 +253,9 @@ export async function readLines(path: string, from: number, cap: number, stats: 
 export class ClaudeUsage implements UsageSource {
   /** Files of the last listing that are a subagent's. */
   private subagentFiles = new Set<string>();
+  /** One read buffer for every file (a scan reads them one after another), not a new 4 MB each. */
+  private buffer: Buffer | undefined;
+  private bufferBusy = false;
 
   constructor(private readonly opts: ClaudeUsageOptions) {}
 
@@ -306,14 +319,30 @@ export class ClaudeUsage implements UsageSource {
     }
   }
 
-  async read(file: UsageFile, from: number): Promise<UsageRead> {
+  async read(file: UsageFile, from: number, onChunk?: (bytes: number) => void): Promise<UsageRead> {
     const subagent = this.subagentFiles.has(file.path) || file.path.includes(`${sep}subagents${sep}`);
     const stats = emptyStats();
     const turns: UsageTurn[] = [];
-    const end = await readLines(file.path, from, LINE_CAP, stats, (line) => {
-      const turn = parseUsageLine(line, subagent, stats);
-      if (turn) turns.push(turn);
-    });
-    return { turns, end, stats };
+    // A read while another is under way gets a buffer of its own.
+    const shared = !this.bufferBusy;
+    const buffer = shared ? (this.buffer ??= Buffer.allocUnsafe(CHUNK)) : undefined;
+    if (shared) this.bufferBusy = true;
+    try {
+      const end = await readLines(
+        file.path,
+        from,
+        LINE_CAP,
+        stats,
+        (line) => {
+          const turn = parseUsageLine(line, subagent, stats);
+          if (turn) turns.push(turn);
+        },
+        onChunk,
+        buffer,
+      );
+      return { turns, end, stats };
+    } finally {
+      if (shared) this.bufferBusy = false;
+    }
   }
 }

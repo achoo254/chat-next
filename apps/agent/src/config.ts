@@ -57,6 +57,8 @@ export type AgentConfig = {
   mcpGroups?: ("tunnel" | "chat" | "localman")[];
   /** The user's projects on this machine (projects/projects.ts), in their order. */
   projects?: ProjectRecord[];
+  /** The usage rules switched on or off by the user (usage/rules.ts), by rule code; unset rules keep their default. */
+  usageRules?: Record<string, boolean>;
 };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */

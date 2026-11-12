@@ -1,5 +1,6 @@
 // `tunelo usage delete`: deletes the usage ledger (token counts read from the
-// AIs' transcripts, see docs/privacy/data-inventory.md) and its copy. A
+// AIs' transcripts, see docs/privacy/data-inventory.md): its index, monthly
+// files and their copies. A
 // running agent deletes it itself, so a scan under way does not write it
 // back; otherwise the files go here. The next scan starts again from the
 // transcripts still on the machine.
@@ -21,6 +22,6 @@ export function registerUsageCommand(program: Command, exits: Exits): void {
   const usage = program.command("usage").description("the token usage tunelo keeps from your AI's transcripts on this machine");
   usage
     .command("delete")
-    .description("delete the usage ledger and its copy")
+    .description("delete the usage ledger (every month) and its copies")
     .action(exits(() => deleteUsage(configDir(), (line) => console.log(line))));
 }

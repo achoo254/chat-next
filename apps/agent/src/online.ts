@@ -1,8 +1,8 @@
 // Puts the machine online: its place in Chat (registration-status.ts adds or
 // claims it with the signed-in account), and once it has one, the machine
 // tunnel, a heartbeat every minute (and whenever the tunnel address
-// changes), revocations from the web, "needs you" pushes and the "new device
-// paired" push.
+// changes), revocations from the web, "needs you" pushes, the "new device
+// paired" push and usage hint pushes.
 //
 // Chat, Localman and the tunnel fail apart: a heartbeat, registration or
 // Localman link that fails only changes that app's state, and the tunnel
@@ -10,7 +10,7 @@
 // Localman's requests for localhost (tunnels/forward.ts).
 import { identitySession } from "./identity/session.ts";
 import { LocalmanLink, deviceIdOf } from "./localman/self-link.ts";
-import { MachineApiError, claimMachine, heartbeat, notifyDevicePaired, notifyNeedsInput, registerMachine, toUrl64 } from "./machine-api.ts";
+import { MachineApiError, claimMachine, heartbeat, notifyDevicePaired, notifyNeedsInput, notifyUsageHint, registerMachine, toUrl64 } from "./machine-api.ts";
 import type { Machine } from "./machine.ts";
 import { Registration } from "./registration-status.ts";
 import { TUNNEL_SERVER, isSignedIn, openTunnel } from "./tunnel.ts";
@@ -80,6 +80,17 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
   });
   m.setNotifyPaired(() => {
     notifyDevicePaired(secret).catch((e: Error) => log(`push failed: ${e.message}`));
+  });
+  // A chat server without usage hint pushes refuses the kind: not asked again until tunelo restarts.
+  let usagePushRefused = false;
+  m.setNotifyUsage(async () => {
+    if (usagePushRefused) throw new Error("the chat server does not send usage hint pushes");
+    try {
+      await notifyUsageHint(secret);
+    } catch (err) {
+      if (err instanceof MachineApiError && err.code === "invalid_argument") usagePushRefused = true;
+      throw err;
+    }
   });
 
   const stop = (why: string) => {

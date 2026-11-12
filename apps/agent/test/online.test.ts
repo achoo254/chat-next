@@ -64,6 +64,7 @@ vi.mock("../src/machine-api.ts", async (importOriginal) => {
     },
     notifyNeedsInput: async () => ({}),
     notifyDevicePaired: async () => ({}),
+    notifyUsageHint: async () => ({}),
   };
 });
 
@@ -86,6 +87,7 @@ function fakeMachine(config: ConfigStore): Machine {
     publicKey: new Uint8Array(32),
     setNotify: () => undefined,
     setNotifyPaired: () => undefined,
+    setNotifyUsage: () => undefined,
     machineInfo: async () => ({ providers: [] }),
     dropDevice: () => undefined,
     audit: { write: () => undefined },

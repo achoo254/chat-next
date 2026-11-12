@@ -1,7 +1,8 @@
 // The running service: config, machine key, core, local server (the
 // devices' WebSocket, and Localman's requests for localhost under
 // `/.tunelo/forward`, tunnels/forward.ts), pairing by the authenticator code
-// and the "needs you" push decision.
+// the "needs you" push decision, and the usage hints (usage/notify.ts) to
+// connected devices and as a push.
 import { type IncomingMessage, type Server, createServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
@@ -51,6 +52,9 @@ import { SecretService } from "./sign-in-secrets/secret-service.ts";
 import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 import { ScreenShare } from "./screen-share/screen-share.ts";
 import { UsageScheduler } from "./usage/scheduler.ts";
+import { type UsageHint, UsageNotifier } from "./usage/notify.ts";
+import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
+import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -73,6 +77,8 @@ export type MachineOptions = {
   notify?: (thread: ThreadSummary, pending: number) => void;
   /** Tells the account's devices, through the chat server, that a device was paired by the authenticator code. */
   notifyPaired?: () => void;
+  /** Asks the chat server for a content-free "usage hint" push to the account's devices; rejects when it was not sent. */
+  notifyUsage?: () => Promise<void>;
   log?: (line: string) => void;
   /** tunelo's MCP for the sessions this machine opens (its tickets); absent in tests. */
   mcp?: McpHost;
@@ -108,6 +114,10 @@ export class Machine {
   readonly workspaces: Workspaces;
   /** The usage ledger and its scans of the AIs' transcripts. */
   readonly usage: UsageScheduler;
+  /** The hints for running sessions, after each scan. */
+  readonly usageNotifier: UsageNotifier;
+  /** Usage for the devices' link. */
+  private readonly usageApi: UsageApi;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -153,8 +163,18 @@ export class Machine {
       configDir: dir,
       sources: () => this.providers.flatMap((p) => (p.usage ? [{ provider: p.id, usage: p.usage }] : [])),
       refreshQuota: () => this.refreshProfileUsage(),
+      afterScan: async (scan) => {
+        await this.usageNotifier.check(scan.read > 0);
+      },
       log: this.log,
     });
+    this.usageNotifier = new UsageNotifier({
+      ledger: this.usage.ledger,
+      rules: () => this.usageRules(),
+      deliver: (hints, sentAt) => this.deliverUsageHints(hints, sentAt),
+      log: this.log,
+    });
+    this.usageApi = usageApiOf({ ledger: this.usage.ledger, config: this.config, audit: this.audit, deleteLedger: () => this.usage.deleteLedger() });
     const c = this.config.get();
     this.pairing = new TotpPairing(this.config.totpSecret());
     if (c.totpSecret && !this.pairing.enabled) this.log("authenticator secret in config.json is not valid: set it again from a paired device");
@@ -239,6 +259,7 @@ export class Machine {
       },
     });
     this.projects.onChange(() => this.announceProjects());
+    this.core.onProjectConfig(() => this.announceProjects());
     this.workspaces = new Workspaces({
       folderOf: (id) => this.projects.folderOf(id),
       audit: this.audit,
@@ -282,7 +303,7 @@ export class Machine {
       this.announcingProjects = undefined;
       void this.projects.list().then(
         (list) => {
-          const value = projectListBody(list);
+          const value = projectListBody(list, (dir) => this.core.projectConfig(dir));
           for (const c of this.connections) if (c.isOpen) c.announce({ case: "projectListResult", value });
         },
         (err: unknown) => this.log(`projects: not announced (${(err as Error).message})`),
@@ -367,6 +388,40 @@ export class Machine {
     this.opts.notifyPaired = fn;
   }
 
+  /** Wired once the machine is registered with the chat server. */
+  setNotifyUsage(fn: () => Promise<void>): void {
+    this.opts.notifyUsage = fn;
+  }
+
+  /** The usage rules switched on now (the user's switches over the defaults). */
+  private usageRules(): RuleSwitches {
+    return ruleSwitches(this.config.get().usageRules);
+  }
+
+  /**
+   * Usage hints for running sessions: the details to every connected device
+   * over the sealed link, and one content-free push through the chat server
+   * for the devices not looking. Delivered when either got through.
+   */
+  private async deliverUsageHints(hints: UsageHint[], sentAt: number): Promise<boolean> {
+    let reached = false;
+    for (const c of this.connections) {
+      if (!c.isOpen) continue;
+      for (const h of hints) c.announce({ case: "usageSuggestion", value: usageSuggestionBody({ ...h, notifiedAt: sentAt }) });
+      reached = true;
+    }
+    const push = this.opts.notifyUsage;
+    if (push) {
+      try {
+        await push();
+        reached = true;
+      } catch (err) {
+        this.log(`usage: hint push not sent (${(err as Error).message})`);
+      }
+    }
+    return reached;
+  }
+
   get publicKey(): Uint8Array {
     return this.key.publicKey;
   }
@@ -444,6 +499,7 @@ export class Machine {
         updater: this.updater,
         terminal: this.terminal,
         workspaces: this.workspaces,
+        usage: this.usageApi,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {

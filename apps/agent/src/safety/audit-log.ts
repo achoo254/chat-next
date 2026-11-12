@@ -7,7 +7,8 @@
 // using or removing a sign-in secret: never its value; a terminal opened,
 // closed or refused to a device: never a typed byte or its output; a git
 // write to a workspace: what and how many files, never a path, a file's
-// content or a commit message).
+// content or a commit message; the usage rules switched, the usage ledger
+// deleted).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -40,7 +41,9 @@ export type AuditAction =
   | "git_checkout"
   | "git_branch_create"
   | "git_pull"
-  | "git_push";
+  | "git_push"
+  | "usage_rules"
+  | "usage_delete";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

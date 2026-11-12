@@ -5,11 +5,8 @@
 // the signed-in one with the most usage left.
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { type MessageInitShape, create } from "@bufbuild/protobuf";
-import { type Frame, FrameSchema, type MachineProfile, TurnState } from "@achoo254/chat-proto/remote/remote";
-import { generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
+import { type MachineProfile, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
-import { WebSocket } from "ws";
 import { ConfigStore } from "../src/config.ts";
 import { Machine } from "../src/machine.ts";
 import { makeProfileHome } from "../src/profiles/paths.ts";
@@ -18,6 +15,7 @@ import { setupProfileHome } from "../src/profiles/setup.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { byCase, until } from "./harness.ts";
 import { signInDefault } from "./support/fake-claude.ts";
+import { type Device, connectDevice, waitFor } from "./support/machine-device.ts";
 import { profilesFixture } from "./support/profiles-fixture.ts";
 
 const savedConfigDir = process.env.CLAUDE_CONFIG_DIR;
@@ -38,59 +36,6 @@ function addProfile(f: Fixture, id: string, email: string): void {
   f.profiles.store.update((d) => {
     d.profiles.push({ id, email, orgId: "org-1", orgName: "Org One", plan: "max", createdAt: 1, signIn: { loggedIn: true, loginExpiresAt: 0, checkedAt: Date.now() } });
   });
-}
-
-type Device = { frames: Frame[]; request(id: string, body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): void; close(): void };
-
-/** A paired device on the machine's real WebSocket, recording every frame it gets. */
-async function connectDevice(machine: Machine, port: number, name: string): Promise<Device> {
-  const key = await generateKeyPair();
-  machine.config.addDevice(key.publicKey, name);
-  const ws = new WebSocket(`ws://127.0.0.1:${port}`);
-  const inbox: Uint8Array[] = [];
-  let wake: (() => void) | undefined;
-  ws.on("message", (d: Buffer) => {
-    inbox.push(new Uint8Array(d));
-    wake?.();
-  });
-  await new Promise<void>((resolve, reject) => {
-    ws.once("open", () => resolve());
-    ws.once("error", reject);
-  });
-  const next = async (): Promise<Uint8Array> => {
-    for (;;) {
-      const d = inbox.shift();
-      if (d) return d;
-      await new Promise<void>((r) => (wake = r));
-    }
-  };
-  const hs = await startHandshake({ device: key, deviceName: name, trust: { kind: "pinned", machineKey: machine.publicKey } });
-  ws.send(hs.hello);
-  const { session } = await hs.finish(await next());
-  const frames: Frame[] = [];
-  let open = true;
-  void (async () => {
-    while (open) frames.push(session.open(await next()));
-  })();
-  const device: Device = {
-    frames,
-    request: (id, body) => ws.send(session.seal(create(FrameSchema, { id, body }))),
-    close: () => {
-      open = false;
-      ws.close();
-    },
-  };
-  device.request("hello", { case: "ping", value: {} });
-  await waitFor(() => frames.some((f) => f.body.case === "pong"));
-  return device;
-}
-
-async function waitFor(ok: () => boolean, ms = 5000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!ok()) {
-    if (Date.now() > end) throw new Error("timed out");
-    await new Promise((r) => setTimeout(r, 10));
-  }
 }
 
 const announced = (d: Device): MachineProfile[] => d.frames.flatMap((f) => (f.body.case === "machineProfile" && f.id === "" ? [f.body.value] : []));

@@ -14,6 +14,7 @@ import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts"
 import type { RemoteBrowser } from "../../src/remote-browser/remote-browser.ts";
 import type { ScreenShare } from "../../src/screen-share/screen-share.ts";
 import type { Workspaces } from "../../src/workspace/workspaces.ts";
+import type { UsageApi } from "../../src/link/usage-link.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -36,6 +37,7 @@ export async function pairedDevice(ctx: {
   browser?: RemoteBrowser;
   screenShare?: ScreenShare;
   workspaces?: Workspaces;
+  usage?: UsageApi;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -61,6 +63,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.browser ? { browser: ctx.browser } : {}),
       ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
       ...(ctx.workspaces ? { workspaces: ctx.workspaces } : {}),
+      ...(ctx.usage ? { usage: ctx.usage } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: new TotpPairing(),
       machineInfo:

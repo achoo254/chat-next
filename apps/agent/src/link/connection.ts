@@ -1,5 +1,6 @@
 // One WebSocket from one device: pairing by the authenticator code or the
 // handshake first, then sealed frames dispatched to the core.
+import { resolve } from "node:path";
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import {
   ErrorCode,
@@ -8,6 +9,7 @@ import {
   FrameSchema,
   type Item,
   type MachineInfo,
+  type ProjectConfigLevel,
   TermPath,
   type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -48,6 +50,9 @@ import type { TerminalConnection } from "../terminal/terminal-connection.ts";
 import type { TerminalService } from "../terminal/terminal-service.ts";
 import type { Workspaces } from "../workspace/workspaces.ts";
 import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-link.ts";
+import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
+import { LedgerUnreadable } from "../usage/ledger.ts";
+import { ReportRangeError } from "../usage/report.ts";
 
 export type Socket = {
   send(data: Uint8Array): void;
@@ -91,6 +96,8 @@ export type LinkContext = {
   terminal?: TerminalService;
   /** Workspaces' files and git for the right panel; absent where the machine has none (tests). */
   workspaces?: Workspaces;
+  /** The AIs' token usage on the machine; absent where the machine keeps none (tests). */
+  usage?: UsageApi;
 };
 
 const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
@@ -120,6 +127,8 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   if (err instanceof UpdateUnavailable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UPDATE_UNAVAILABLE, subject: "" };
   if (err instanceof UpdateBusy) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UPDATE_BUSY, subject: "" };
   if (err instanceof ScreenShareGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SCREEN_SHARE_GONE, subject: "" };
+  if (err instanceof ReportRangeError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.USAGE_RANGE_INVALID, subject: "" };
+  if (err instanceof LedgerUnreadable) return { code: ErrorCode.INVALID, message, reason: ErrorReason.USAGE_LEDGER_BLOCKED, subject: "" };
   if (err instanceof InputError || err instanceof BrowserToolError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
   if (isFsError(err)) {
     const fsCode = (err as { code: string }).code;
@@ -179,7 +188,8 @@ export function secretListBody(list: readonly SavedSecretInfo[]) {
 }
 
 /** The projects as devices get them. */
-export function projectListBody(list: ProjectList) {
+/** `levelOf`: the folder's project configuration level (AgentCore.projectConfig); unset sends none. */
+export function projectListBody(list: ProjectList, levelOf?: (dir: string) => ProjectConfigLevel) {
   return {
     projects: list.projects.map((p) => ({
       id: p.id,
@@ -191,6 +201,7 @@ export function projectListBody(list: ProjectList) {
       sensitive: p.sensitive,
       ...(p.git ? { git: p.git } : {}),
       gitRemote: p.gitRemote ?? "",
+      ...(levelOf ? { projectConfig: levelOf(p.dir) } : {}),
     })),
     suggestions: list.suggestions.map((s) => ({ dir: s.dir, sessions: s.sessions, gitRemote: s.gitRemote ?? "", branch: s.branch ?? "" })),
   };
@@ -490,7 +501,8 @@ export class Connection {
   private async projectFrame(id: string, b: ProjectFrame): Promise<void> {
     const projects = this.ctx.projects;
     if (!projects) return this.send(id, { case: "error", value: refusal("this machine keeps no projects", ErrorReason.UNSUPPORTED_REQUEST) });
-    const sendList = async () => this.send(id, { case: "projectListResult", value: projectListBody(await projects.list()) });
+    const levelOf = (dir: string) => this.ctx.core.projectConfig(dir);
+    const sendList = async () => this.send(id, { case: "projectListResult", value: projectListBody(await projects.list(), levelOf) });
     switch (b.case) {
       case "projectList":
         return sendList();
@@ -802,6 +814,20 @@ export class Connection {
         case "wsGitBranchCompare":
         case "wsGitPrUrl":
           return this.workspaceFrame(id, b);
+        case "usageReportRequest":
+        case "usageSettingsGet":
+        case "usageSettingsSet":
+        case "usageDelete":
+          return this.usageFrame(id, b);
+        case "projectConfigGet": {
+          const dir = b.value.dir;
+          if (!dir) return this.send(id, { case: "error", value: refusal("a folder is needed", ErrorReason.FOLDER_NOT_FOUND) });
+          return this.send(id, { case: "projectConfig", value: { dir: resolve(dir), level: core.projectConfig(dir) } });
+        }
+        case "projectConfigSet": {
+          const dir = await core.setProjectConfig({ dir: b.value.dir, level: b.value.level, device: this.device });
+          return this.send(id, { case: "projectConfig", value: { dir, level: core.projectConfig(dir) } });
+        }
         default:
           return this.send(id, { case: "error", value: refusal("unsupported request", ErrorReason.UNSUPPORTED_REQUEST) });
       }
@@ -832,6 +858,13 @@ export class Connection {
     const link = this.workspaceLink;
     if (!link) return this.send(id, { case: "error", value: refusal("this machine has no workspaces", ErrorReason.UNSUPPORTED_REQUEST) });
     void link.handle(id, b).catch((err: unknown) => this.sendError(id, err));
+  }
+
+  /** Usage: a report reads the ledger's months from disk, so it answers later, by id. */
+  private usageFrame(id: string, b: UsageFrame): void {
+    const usage = this.ctx.usage;
+    if (!usage) return this.send(id, { case: "error", value: refusal("this machine keeps no usage ledger", ErrorReason.UNSUPPORTED_REQUEST) });
+    void handleUsage(usage, id, b, (i, body) => this.send(i, body), this.device).catch((err: unknown) => this.sendError(id, err));
   }
 
   /** The tunelo browser: answered later, by id; input in order. */

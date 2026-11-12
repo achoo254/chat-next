@@ -13,6 +13,7 @@ import {
   ErrorCode,
   ErrorReason,
   type Item,
+  ProjectConfigLevel,
   PromptState,
   Role,
   ThreadState,
@@ -60,6 +61,7 @@ import { keptImage, prepareAttachments, textForAi } from "../attachments/message
 import { imageType } from "../attachments/image-type.ts";
 import { ATTACHMENTS_FOLDER } from "../attachments/project-files.ts";
 import { type Trash, systemTrash } from "../safety/trash.ts";
+import { ProjectConfigStore } from "./project-config.ts";
 
 /** A refusal devices can say in the user's language: `reason` (+ `subject`) is stable, `message` is English. */
 export class AgentError extends Error {
@@ -208,6 +210,8 @@ type Thread = {
   seenEnd?: number;
   /** What the turn the machine runs is doing, for ThreadActivity; set only while it runs. */
   activity?: TurnActivity;
+  /** Whether the open session loaded the folder's project configuration (meaningful only while it is open). */
+  projectLoaded?: boolean;
 };
 
 /** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
@@ -325,6 +329,9 @@ export class AgentCore {
   private readonly now: () => number;
   /** Files devices sent for messages not sent yet. */
   private readonly uploads: Uploads;
+  /** The folders' project configuration levels. */
+  private readonly projectConfigs: ProjectConfigStore;
+  private projectConfigListeners = new Set<(dir: string) => void>();
 
   constructor(private readonly opts: CoreOptions) {
     this.maxSessions = opts.maxSessions ?? 50;
@@ -332,6 +339,7 @@ export class AgentCore {
     this.now = opts.now ?? Date.now;
     mkdirSync(join(opts.dataDir, "threads"), { recursive: true, mode: 0o700 });
     this.uploads = new Uploads(join(opts.dataDir, "uploads"), { now: this.now, ...(opts.attachmentLimits ? { limits: opts.attachmentLimits } : {}) });
+    this.projectConfigs = new ProjectConfigStore(opts.dataDir);
     this.epoch = this.bumpEpoch();
     this.loadThreads();
   }
@@ -906,7 +914,8 @@ export class AgentCore {
     const detected = await provider.detect(this.detectOptions());
     this.assertReady(provider, detected);
 
-    const trustNow = consent.projectSettings && !(this.opts.isTrusted?.(dir) ?? false);
+    const trusted = (this.opts.isTrusted?.(dir) ?? false) || this.projectConfigs.level(dir) === "full";
+    const trustNow = consent.projectSettings && !trusted;
     if (trustNow) {
       // Trusting a sensitive folder (home, a disk root) from a device would trust everything under it.
       if (sensitive || !this.opts.trust) {
@@ -1523,7 +1532,7 @@ export class AgentCore {
     const policy = {
       dir: t.meta.dir,
       mcpServers: this.opts.mcpServers ?? {},
-      projectSettings: t.meta.projectSettings,
+      projectSettings: this.loadsProject(t),
       isSensitive: this.opts.isSensitive,
       ...(t.meta.model ? { model: t.meta.model } : {}),
       ...(t.meta.effort ? { effort: t.meta.effort } : {}),
@@ -1536,6 +1545,7 @@ export class AgentCore {
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
     const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, ...(lease.secrets ? { secrets: lease.secrets } : {}), ...(lease.browserNotices ? { browserNotices: lease.browserNotices } : {}) } } : policy;
     t.modeUnseen = true;
+    t.projectLoaded = policy.projectSettings;
     t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {
       t.session = await t.starting;
@@ -2068,7 +2078,71 @@ export class AgentCore {
       busyElsewhere: elsewhere,
       elsewhereActiveAt: elsewhere ? BigInt(t.elsewhere?.since ?? 0) : 0n,
       terminalSession: t.meta.terminal?.session ?? 0,
+      projectConfig: this.threadProjectConfig(t),
     });
+  }
+
+  // --- the folders' project configuration -------------------------------------
+
+  /** Whether the thread's next session loads its folder's project configuration: the folder's level, or the consent it was opened with. */
+  private loadsProject(t: Thread): boolean {
+    return t.meta.projectSettings || this.projectConfigs.level(t.meta.dir) === "full";
+  }
+
+  /** What the thread runs with: its open session's own, else what the next one opens with. */
+  private threadProjectConfig(t: Thread): ProjectConfigLevel {
+    const loaded = this.isOpen(t) && t.projectLoaded !== undefined ? t.projectLoaded : this.loadsProject(t);
+    return loaded ? ProjectConfigLevel.FULL : ProjectConfigLevel.OFF;
+  }
+
+  /** The level that applies in `dir` (its own or a folder's above it). */
+  projectConfig(dir: string): ProjectConfigLevel {
+    return this.projectConfigs.level(dir) === "full" ? ProjectConfigLevel.FULL : ProjectConfigLevel.OFF;
+  }
+
+  /** Called with the folder whenever a device sets a folder's level. */
+  onProjectConfig(fn: (dir: string) => void): () => void {
+    this.projectConfigListeners.add(fn);
+    return () => this.projectConfigListeners.delete(fn);
+  }
+
+  /**
+   * Sets a folder's level for every chat session there from now on, logged
+   * in the consent log. A sensitive folder is turned on only on the machine
+   * (trusting it would trust everything under it). Idle open sessions whose
+   * level changes close, to open again (resumed) with the next message; a
+   * running one keeps its level until then. Returns the folder as resolved.
+   */
+  async setProjectConfig(req: { dir: string; level: ProjectConfigLevel; device: string }): Promise<string> {
+    if (req.level !== ProjectConfigLevel.OFF && req.level !== ProjectConfigLevel.FULL) {
+      const name = ProjectConfigLevel[req.level] ?? String(req.level);
+      throw new AgentError(ErrorCode.INVALID, `project configuration level ${name} is not offered by this machine`, {
+        reason: ErrorReason.UNSUPPORTED_REQUEST,
+        subject: name,
+      });
+    }
+    const dir = resolve(req.dir);
+    if (!req.dir || !existsSync(dir) || !statSync(dir).isDirectory()) {
+      throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
+    }
+    const full = req.level === ProjectConfigLevel.FULL;
+    if (full && this.opts.isSensitive(dir)) {
+      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
+        reason: ErrorReason.TRUST_ON_MACHINE,
+        subject: dir,
+      });
+    }
+    const before = new Map([...this.threads.values()].map((t) => [t, this.threadProjectConfig(t)]));
+    this.projectConfigs.set(dir, full ? "full" : "off");
+    this.opts.audit.write({ device: req.device, action: "project_settings", path: dir, detail: full ? "level:full" : "level:off" });
+    for (const [t, was] of before) {
+      if (t.deleted) continue;
+      const idle = t.session !== undefined && !t.running && !t.starting && !t.switching && t.pending.size === 0;
+      if (idle && t.projectLoaded !== this.loadsProject(t)) await this.park(t);
+      if (this.threadProjectConfig(t) !== was) this.announce(t);
+    }
+    for (const fn of this.projectConfigListeners) fn(dir);
+    return dir;
   }
 
   // --- the thread's AI in a terminal of the machine ------------------------------
@@ -2109,7 +2183,6 @@ export class AgentCore {
     const seg = t.meta.segments.at(-1);
     const command = await provider.terminal.command({
       dir,
-      projectSettings: t.meta.projectSettings,
       ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
       ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
       ...(t.meta.model ? { model: t.meta.model } : {}),

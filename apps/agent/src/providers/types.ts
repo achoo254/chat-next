@@ -143,7 +143,7 @@ export type SessionPolicy = {
   dir: string;
   /** MCP servers the user enabled on this machine (adapter-specific config). */
   mcpServers: Record<string, unknown>;
-  /** Load the project's own agent settings and hooks. */
+  /** Load the folder's own agent configuration (settings, hooks, permission rules, skills, commands). */
   projectSettings: boolean;
   /** Tells whether a path is sensitive (for the approval card label). */
   isSensitive: (path: string) => boolean;
@@ -275,8 +275,6 @@ export type TerminalLaunch = {
   model?: string;
   /** One of the AI's own permission modes (never one that skips every prompt). */
   permissionMode?: string;
-  /** Load the project's own agent settings, as the thread agreed to. */
-  projectSettings: boolean;
 };
 
 /** The program the terminal process runs for a TerminalLaunch: argv, never a shell line. */
@@ -343,8 +341,12 @@ export type UsageRead = { turns: UsageTurn[]; end: number; stats: UsageLineStats
 export interface UsageSource {
   /** Every transcript file, each once (links are not followed). */
   files(): Promise<UsageFile[]>;
-  /** The calls recorded in `file` from byte `from` on. */
-  read(file: UsageFile, from: number): Promise<UsageRead>;
+  /**
+   * The calls recorded in `file` from byte `from` on; `onChunk` hears the
+   * bytes of each piece read (a caller may free memory between pieces of a
+   * large file).
+   */
+  read(file: UsageFile, from: number, onChunk?: (bytes: number) => void): Promise<UsageRead>;
 }
 
 export interface AgentProvider {

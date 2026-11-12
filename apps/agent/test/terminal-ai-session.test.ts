@@ -71,7 +71,7 @@ describe("a thread's AI in the terminal", () => {
     const open = m.host.commands.find((x) => x.cmd === "open");
     expect(open).toMatchObject({ cols: 100, rows: 30, shell: "/opt/fake-ai", args: ["--resume", "fake-session-1"], cwd: m.work });
     expect(open).not.toHaveProperty("env");
-    expect(provider.launches).toEqual([{ dir: m.work, projectSettings: false, resumeId: "fake-session-1", model: "small" }]);
+    expect(provider.launches).toEqual([{ dir: m.work, resumeId: "fake-session-1", model: "small" }]);
     // The machine's own session of the thread closed: only the terminal writes to it.
     expect(summaryOf(m, created.id)).toMatchObject({ open: false, terminalSession: 1 });
     await expect(m.core.send(created.id, "from chat", "")).rejects.toMatchObject({ reason: ErrorReason.SESSION_OPEN_ELSEWHERE });
@@ -142,16 +142,16 @@ describe("what a device can ask the terminal to run", () => {
   });
 
   it("claude: resumes a Claude session id only, picks a new id otherwise, passes only its own models and modes", () => {
-    const base = { dir: "/w", projectSettings: false };
+    const base = { dir: "/w" };
     const id = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
     expect(terminalCommand("/bin/claude", { ...base, resumeId: id, accountDir: "/p1", model: "opus", permissionMode: "plan" }, () => "x")).toEqual({
       file: "/bin/claude",
-      args: ["--resume", id, "--model", "opus", "--permission-mode", "plan", "--setting-sources", "user"],
+      args: ["--resume", id, "--model", "opus", "--permission-mode", "plan"],
       env: { CLAUDE_CONFIG_DIR: "/p1" },
     });
-    expect(terminalCommand("/bin/claude", { ...base, projectSettings: true, model: "--evil", permissionMode: "bypassPermissions" }, () => id)).toEqual({
+    expect(terminalCommand("/bin/claude", { ...base, model: "--evil", permissionMode: "bypassPermissions" }, () => id)).toEqual({
       file: "/bin/claude",
-      args: ["--session-id", id, "--setting-sources", "user,project,local"],
+      args: ["--session-id", id],
       env: {},
       sessionId: id,
     });

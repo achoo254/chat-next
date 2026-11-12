@@ -6,6 +6,10 @@
 // halfway loses little. Every 30 minutes, when the scans found new calls,
 // the plan usage of each profile is read too (marked as scheduled).
 //
+// After a scan `afterScan` runs (the hints for sessions still running,
+// notify.ts), then the ledger lets go of the monthly shards it read (the
+// next scan or report reads them again).
+//
 // The core knows no AI: each provider with a `usage` source is scanned the
 // same way.
 import type { UsageSource } from "../providers/types.ts";
@@ -19,8 +23,9 @@ export const CHECKPOINT_FILES = 50;
 const FIRST_SCAN_DELAY_MS = 5_000;
 /**
  * Bun, the agent's runtime, collects garbage lazily: a cold scan parses
- * gigabytes of transcript lines, so it asks for a collection after reading
- * this much, which keeps the scan's peak memory low on a shared machine.
+ * gigabytes of transcript lines (one file reaches 100 MB), so it asks for a
+ * collection after reading this much, counted piece by piece within files
+ * too, which keeps the scan's peak memory low on a shared machine.
  */
 const COLLECT_EVERY_BYTES = 32 * 1024 * 1024;
 
@@ -40,6 +45,8 @@ export type UsageSchedulerOptions = {
   firstScanDelayMs?: number;
   checkpointFiles?: number;
   repoKey?: (cwd: string) => string;
+  /** Runs after each scan that finished (not stopped, ledger not blocked). */
+  afterScan?: (summary: ScanSummary) => Promise<void>;
 };
 
 export type ScanSummary = {
@@ -115,7 +122,7 @@ export class UsageScheduler {
       .catch((err: unknown) => this.log(`usage: plan usage not recorded (${(err as Error).message})`));
   }
 
-  /** Deletes the ledger (and its copy); a scan under way stops, the next one starts from nothing. */
+  /** Deletes the ledger (every file of it); a scan under way stops, the next one starts from nothing. */
   async deleteLedger(): Promise<void> {
     await this.ledger.delete();
     this.addedSinceQuota = 0;
@@ -144,6 +151,12 @@ export class UsageScheduler {
     const summary: ScanSummary = { files: 0, read: 0, added: 0, failed: 0, ms: 0, stopped: false };
     const halted = () => this.stopping || ledger.generation !== gen;
     let sinceCollect = 0;
+    const onChunk = (bytes: number) => {
+      sinceCollect += bytes;
+      if (sinceCollect < COLLECT_EVERY_BYTES) return;
+      sinceCollect = 0;
+      collectGarbage();
+    };
     for (const { provider, usage } of this.opts.sources()) {
       const files = await usage.files();
       summary.files += files.length;
@@ -153,24 +166,17 @@ export class UsageScheduler {
         if (from === file.size) continue;
         let read;
         try {
-          read = await usage.read(file, from);
+          read = await usage.read(file, from, onChunk);
         } catch (err) {
           summary.failed++;
           if (summary.failed === 1) this.log(`usage: a transcript could not be read (${(err as Error).message})`);
           continue;
         }
-        await ledger.update((d) => {
-          if (ledger.generation !== gen) return;
-          summary.added += ledger.applyRead(d, provider, file, read, repoKey);
-        });
+        summary.added += await ledger.apply(provider, file, read, repoKey, gen);
         summary.read++;
-        sinceCollect += file.size - from;
         if (summary.read % every === 0) {
           await ledger.save();
-          // A checkpoint leaves the ledger's text behind as garbage too.
-          sinceCollect = COLLECT_EVERY_BYTES;
-        }
-        if (sinceCollect >= COLLECT_EVERY_BYTES) {
+          // A checkpoint leaves the shards' text behind as garbage too.
           sinceCollect = 0;
           collectGarbage();
         }
@@ -182,9 +188,15 @@ export class UsageScheduler {
       });
     }
     summary.stopped = halted();
-    if (!summary.stopped) await ledger.update((d) => ledger.finishScan(d));
+    // The format check reads the last two weeks' shards: only when something new came.
+    if (!summary.stopped) await ledger.finishScan(summary.read > 0);
     await ledger.save();
     summary.ms = this.now() - started;
+    const after = this.opts.afterScan;
+    // While the scan's shards are still in memory.
+    if (!summary.stopped && after) await after(summary).catch((err: unknown) => this.log(`usage: after the scan (${(err as Error).message})`));
+    await ledger.release();
+    collectGarbage();
     this.addedSinceQuota += summary.added;
     if (!summary.stopped) await this.maybeRefreshQuota();
     return summary;

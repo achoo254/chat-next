@@ -135,7 +135,8 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 - **Mở trên máy, làm tiếp trong Chat.** Hộp thoại Phiên mới › tab "Phiên có sẵn trên máy" liệt kê các phiên trong
   `projects/` của thư mục Claude của máy và của mọi profile (Terminal, IDE, Claude Desktop, Chat), nhóm theo thư mục,
   có tìm kiếm và phân trang. Mở một phiên: lịch sử (tin người dùng, trả lời, tool, diff) hiện ngay; tin nhắn đầu tiên resume
-  đúng session id trong thư mục của nó. Thư mục nhạy cảm và cấu hình `.claude` của dự án hỏi đồng ý như phiên mới.
+  đúng session id trong thư mục của nó. Thư mục nhạy cảm và cấu hình `.claude` của dự án hỏi đồng ý như phiên mới (thư mục đã
+  bật cấu hình dự án thì không hỏi, xem dưới).
 - **Lượt gõ trên máy sau đó** (`claude --resume` trong Terminal) hiện trong Chat khi mở lại phiên hoặc gửi tin tiếp; phiên đang
   mở trong tunelo được mở lại để Claude đọc cả phần đó.
 - **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây, khi một `claude` đang chạy ghi
@@ -281,6 +282,25 @@ Thiết bị xem tệp và git của một workspace (một dự án của máy)
   `git_checkout`, `git_branch_create`, `git_pull`, `git_push` ghi thư mục workspace, mã workspace và số tệp; không bao giờ ghi
   đường dẫn tệp, nội dung, tên nhánh hay thông điệp commit. Mỗi workspace chỉ một lệnh git ghi tại một thời điểm
   (`ERROR_REASON_GIT_BUSY`).
+
+## Cấu hình `.claude` của dự án trong phiên chat
+
+Phiên chat chỉ nạp cấu hình của người dùng (`settingSources: ['user']`) cho tới khi thư mục được bật cấu hình dự án. Bật một lần
+cho một thư mục từ thiết bị (`ProjectConfigSet`, mức `FULL`): máy nhớ trong `<thư mục config tunelo>/data/project-config.json`
+(0600), áp cho thư mục đó và mọi thư mục con (thư mục gần nhất được đặt thắng), cho phiên mới, phiên mở lại (resume) và phiên mở
+từ "Phiên có sẵn trên máy", không cần tick từng phiên. `FULL` nạp cả settings, hook, luật quyền, skill, lệnh và `CLAUDE.md` của
+dự án, như một thư mục đã tin trong terminal. Phiên rảnh đang mở ở đó đóng lại và mở tiếp (cùng hội thoại) ở tin nhắn sau; phiên
+đang chạy giữ mức cũ tới lúc đó. `ThreadSummary.project_config` cho thiết bị biết phiên đang chạy với mức nào (để hiện "chưa nạp
+skill của dự án" và nút bật). Nhật ký đồng ý ghi `project_settings` với thiết bị, thư mục và `level:full`/`level:off`. Thư mục
+nhạy cảm chỉ bật được trên máy (`tunelo trust`). Tick "Nạp cấu hình .claude" từng phiên (`Consent.project_settings`) vẫn chạy
+như cũ cho thiết bị cũ.
+
+Không có mức "chỉ skill và lệnh": Claude Code nạp cấu hình dự án nguyên khối, và skill của dự án tự mang hook và `allowed-tools`
+trong front matter, có hiệu lực khi skill chạy kể cả khi chỉ nạp riêng skill (thử với `claude` thật:
+`TUNELO_REAL_CLAUDE=1 pnpm exec vitest run test/project-config-real-claude.test.ts`).
+
+Terminal của phiên (mở phiên trong terminal) chạy `claude` với nguồn cài đặt mặc định của CLI (người dùng, dự án, local; không
+`--setting-sources`): skill và lệnh của dự án hiện như ở mọi terminal, sau hộp thoại tin thư mục của chính CLI.
 
 ## Dự án (2.0.7)
 

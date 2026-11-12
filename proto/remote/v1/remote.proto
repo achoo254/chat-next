@@ -297,6 +297,26 @@ message Frame {
     WsGitLogResult ws_git_log_result = 148;
     WsGitBranchCompareResult ws_git_branch_compare_result = 149;
     WsGitPrUrlResult ws_git_pr_url_result = 150;
+
+    // The AIs' token usage on the machine; see "usage of the AIs" below.
+    // A → B
+    UsageReportRequest usage_report_request = 151;
+    UsageSettingsGet usage_settings_get = 152;
+    UsageSettingsSet usage_settings_set = 153;
+    UsageDelete usage_delete = 154;
+    // B → A
+    UsageReport usage_report = 155;
+    UsageSettings usage_settings = 156;
+    // Unasked, to every connected device, when a rule fires for a session
+    // that is still running.
+    UsageSuggestion usage_suggestion = 157;
+
+    // A folder's project configuration level; see ProjectConfigLevel.
+    // A → B, both answered with ProjectConfig
+    ProjectConfigGet project_config_get = 158;
+    ProjectConfigSet project_config_set = 159;
+    // B → A
+    ProjectConfig project_config = 160;
   }
 }
 
@@ -327,7 +347,8 @@ message Consent {
   // The directory is sensitive (home, root, ~/.ssh, …) and the user agreed.
   bool sensitive = 1;
   // Load the project's own agent settings (for Claude: .claude/settings.json
-  // and hooks). Off by default; B logs it when on.
+  // and hooks). Off by default; B logs it when on. Not needed in a folder
+  // whose ProjectConfigLevel is FULL.
   bool project_settings = 2;
   // With project_settings: the user agreed to trust this directory's project
   // settings on B from now on (as `tunelo trust` on the machine does). B logs
@@ -781,6 +802,57 @@ message Project {
   // when not read quickly; tunelo 2.5.0 and before never send it. Devices
   // and the server derive the repository key from it (spec/git-remote).
   string git_remote = 9;
+  // The folder's project configuration level (ProjectConfig.level for dir);
+  // UNSPECIFIED from machines without ProjectConfigGet.
+  ProjectConfigLevel project_config = 10;
+}
+
+// How much of a folder's own AI configuration the chat sessions B opens
+// there load (for Claude: the folder's .claude settings, hooks, permission
+// rules, skills, commands and CLAUDE.md). Kept by B per folder, for the
+// folder and every folder inside it (the nearest one set wins). The AI's own
+// CLI in a terminal (TermOpen.ai_session) is not affected: it loads them as
+// in any terminal, after its own folder trust prompt.
+enum ProjectConfigLevel {
+  // Not told (older machines).
+  PROJECT_CONFIG_LEVEL_UNSPECIFIED = 0;
+  // Only the user's own configuration (the default).
+  PROJECT_CONFIG_LEVEL_OFF = 1;
+  // The project's skills and commands without its hooks and permission
+  // rules. Reserved: no tunelo offers it yet (the AI loads a folder's
+  // configuration as a whole); B refuses it with
+  // ERROR_REASON_UNSUPPORTED_REQUEST.
+  PROJECT_CONFIG_LEVEL_SKILLS = 2;
+  // All of it, as a trusted folder in the AI's own CLI.
+  PROJECT_CONFIG_LEVEL_FULL = 3;
+}
+
+// The level a folder has now (set on it, on a folder it is inside, or OFF).
+// Machines before this answer ERROR_REASON_UNSUPPORTED_REQUEST.
+message ProjectConfigGet {
+  // Absolute.
+  string dir = 1;
+}
+
+// Sets a folder's level, once for every chat session there from now on (new
+// threads and threads opened again, resumed): no per-session Consent needed.
+// B logs it in the consent log (the folder and the level). The folder must
+// exist (ERROR_REASON_FOLDER_NOT_FOUND); FULL on a sensitive folder is
+// refused with ERROR_REASON_TRUST_ON_MACHINE; SKILLS and UNSPECIFIED with
+// ERROR_REASON_UNSUPPORTED_REQUEST. An idle open session there closes and
+// opens again (resumed) with its next message; a running one keeps its
+// level until then. Threads there get a ThreadStatus with their new
+// ThreadSummary.project_config.
+message ProjectConfigSet {
+  // Absolute.
+  string dir = 1;
+  ProjectConfigLevel level = 2;
+}
+
+message ProjectConfig {
+  // As B resolved it (absolute).
+  string dir = 1;
+  ProjectConfigLevel level = 2;
 }
 
 // A folder that has sessions but is no project yet.
@@ -1194,6 +1266,12 @@ enum ErrorReason {
   // name in confirm_sensitive (code NEEDS_CONSENT; subject: those paths, one
   // a line).
   ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED = 71;
+  // UsageReportRequest: a day that is not YYYY-MM-DD, from after to, a range
+  // longer than 92 days, or a repo_key that cannot be one.
+  ERROR_REASON_USAGE_RANGE_INVALID = 72;
+  // The usage ledger cannot be read, or a newer tunelo wrote it: it is left
+  // as it is until deleted (UsageDelete, or `tunelo usage delete`).
+  ERROR_REASON_USAGE_LEDGER_BLOCKED = 73;
 }
 
 enum ErrorCode {
@@ -1255,6 +1333,12 @@ message ThreadSummary {
   // devices show the thread read-only, offering the terminal. busy_elsewhere
   // still tells whether a turn runs there. Unset before ProviderCapabilities.terminal.
   uint32 terminal_session = 15;
+  // The project configuration the thread's chat session runs with: an open
+  // session's own, else what it opens with next (FULL when its folder's
+  // level is FULL or the thread was opened with Consent.project_settings).
+  // A device may show "project skills not loaded" for OFF, with
+  // ProjectConfigSet to turn it on. UNSPECIFIED from older machines.
+  ProjectConfigLevel project_config = 16;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
@@ -2235,8 +2319,10 @@ message TermOpen {
   // Instead of a shell: the thread's AI in its own CLI (only where
   // ProviderCapabilities.terminal is set). B picks the program, its
   // arguments, folder and account from the thread; a device never names a
-  // command. A thread whose AI already runs in a terminal gets that session
-  // again (TermOpened names it). Refused with ERROR_REASON_THREAD_RUNNING
+  // command. The CLI loads its configuration as in any terminal (the user's,
+  // and the folder's after the CLI's own trust prompt), whatever the
+  // thread's project_config. A thread whose AI already runs in a terminal
+  // gets that session again (TermOpened names it). Refused with ERROR_REASON_THREAD_RUNNING
   // while the machine runs a turn of it, SESSION_OPEN_ELSEWHERE while
   // something else on the machine does, UNSUPPORTED_REQUEST for an AI
   // without a terminal CLI, NOT_FOUND for an unknown thread.
@@ -2784,3 +2870,148 @@ message WsGitPrUrlResult {
   // "github" or "gitlab".
   string provider = 3;
 }
+
+// --- usage of the AIs -------------------------------------------------------------
+// B reads the token counts the AIs' transcripts on the machine record (never
+// a message, a tool's input or its result) into a ledger kept on the machine
+// (docs/privacy/data-inventory.md), every 15 minutes. What reaches a device
+// here are numbers, rule codes, session ids, repository keys and days: never
+// a message, a title or a file's path. A repository key is the canonical
+// remote of the repository a call ran in, `local:<folder name>` for one
+// without a remote, or `scratch` for temporary folders. Machines without it
+// answer ERROR_REASON_UNSUPPORTED_REQUEST.
+//
+// The context of a call is its input + cache read + cache write tokens. A
+// main-session call is one of the session itself, not of its subagents.
+
+// A → B: the usage of a range of the machine's local days. Answered with
+// UsageReport; ERROR_REASON_USAGE_RANGE_INVALID or
+// ERROR_REASON_USAGE_LEDGER_BLOCKED.
+message UsageReportRequest {
+  // YYYY-MM-DD, local days of the machine, both included; at most 92 days.
+  string from = 1;
+  string to = 2;
+  // Only this repository key; empty: every key.
+  string repo_key = 3;
+}
+
+message UsageReport {
+  string from = 1;
+  string to = 2;
+  // Minutes east of UTC of the machine's time zone, in which days are cut.
+  int32 utc_offset_minutes = 3;
+  // Unix milliseconds the last scan finished; 0 before the first.
+  int64 last_scan_at = 4;
+  UsageShape shape = 5;
+  // One row per repository key and day with a call, by day then key.
+  repeated UsageDay days = 6;
+  // The rules that fired in the range, in time order.
+  repeated UsageSuggestion suggestions = 7;
+  // Plan usage readings in the range, in time order.
+  repeated UsageQuotaPoint quota = 8;
+}
+
+message UsageDay {
+  string repo_key = 1;
+  // YYYY-MM-DD.
+  string day = 2;
+  uint64 input_tokens = 3;
+  uint64 cache_read_tokens = 4;
+  uint64 cache_write_tokens = 5;
+  uint64 output_tokens = 6;
+  uint32 main_turns = 7;
+  uint32 subagent_turns = 8;
+  // Sessions with a call (main or subagent) that day.
+  uint32 sessions = 9;
+  // Main-session calls of sessions the machine opened (a chat thread, its
+  // CLI in the machine's terminal).
+  uint32 app_turns = 10;
+  // Context per main-session call: mean (rounded), median, and the value at
+  // rank round(0.9 × (n − 1)).
+  uint64 mean_context = 11;
+  uint64 median_context = 12;
+  uint64 p90_context = 13;
+}
+
+// Whether the transcripts still look as B's reader expects.
+message UsageShape {
+  // Share of reply records with token counts over the last 7 days (0-1);
+  // low_usage_ratio below 0.95.
+  double usage_ratio = 1;
+  bool low_usage_ratio = 2;
+  // Median context per main-session call of the last 7 days against the 7
+  // days before; drift when it moved more than 40% either way.
+  double drift_ratio = 3;
+  bool drift = 4;
+  // Kinds of reply content of the last 7 days the reader did not know.
+  uint32 unknown_types = 5;
+}
+
+enum UsageRule {
+  USAGE_RULE_UNSPECIFIED = 0;
+  // A main-session call carried more than 300K context: open a new session
+  // or compact.
+  USAGE_RULE_CONTEXT = 1;
+  // The main session went past 300 calls.
+  USAGE_RULE_TURNS = 2;
+  // Experimental: a strong model (Opus) mostly reading, searching or running
+  // commands while writing little.
+  USAGE_RULE_MECHANICAL = 3;
+  // Subagents carried more than half of the session's context.
+  USAGE_RULE_SUBAGENTS = 4;
+}
+
+message UsageSuggestion {
+  UsageRule rule = 1;
+  // The AI's own session id.
+  string session_id = 2;
+  string repo_key = 3;
+  // The main-session call (from 1) at which the rule first held; for
+  // SUBAGENTS, the main-session calls made by then.
+  uint32 turn = 4;
+  // Unix milliseconds of that call.
+  int64 at = 5;
+  // CONTEXT: that call's context; TURNS: the session's main-session calls;
+  // MECHANICAL, SUBAGENTS: the share, per mille.
+  uint64 value = 6;
+  bool experimental = 7;
+  // Unix milliseconds the hint went to devices; 0 when it did not (the
+  // session was not running, or no device was reached).
+  int64 notified_at = 8;
+}
+
+message UsageQuotaPoint {
+  // ClaudeProfile.id; empty: the default profile.
+  string profile_id = 1;
+  int64 at = 2;
+  // Read by B's own schedule; false: a session or a person asked.
+  bool scheduled = 3;
+  RateWindow five_hour = 4;
+  RateWindow seven_day = 5;
+}
+
+// A → B: the rules switched on. Answered with UsageSettings.
+message UsageSettingsGet {}
+
+// A → B: switches rules on or off (rules not named stay as they are).
+// Answered with UsageSettings; B writes the change to the consent log.
+message UsageSettingsSet {
+  repeated UsageRuleSwitch rules = 1;
+}
+
+message UsageSettings {
+  // Every rule B knows, in UsageRule order.
+  repeated UsageRuleSwitch rules = 1;
+}
+
+message UsageRuleSwitch {
+  UsageRule rule = 1;
+  bool enabled = 2;
+  // Set by B: the rule is still being tried.
+  bool experimental = 3;
+}
+
+// A → B: deletes the usage ledger (as `tunelo usage delete`); the next scan
+// starts again from the transcripts still on the machine. Answered with Ack;
+// B writes it to the consent log.
+message UsageDelete {}

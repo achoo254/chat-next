@@ -49,14 +49,22 @@ Agent `tunelo` đọc transcript của AI cài trên máy (Claude Code: `<thư m
 
 | Dữ liệu | Nơi lưu | Giữ bao lâu | Cơ sở |
 |---|---|---|---|
-| Mỗi lời gọi API của AI: khoá của lời gọi (id tin trả lời và id request của nhà cung cấp), id phiên, id subagent (nếu có), thời điểm, tên model, 4 loại token (input, cache đọc, cache ghi, output), thư mục làm việc của lời gọi, tên các tool đã gọi (kể cả tên tool MCP, dạng `mcp__<server>__<tool>`; với tool Skill thêm tên skill) | `<thư mục config tunelo>/usage/ledger.json` (quyền 0600, thư mục 0700) và bản sao `ledger.prev.json` trước mỗi lần ghi | Không tự hết hạn (transcript gốc bị AI tự xoá sau khoảng 30 ngày, sổ là bản còn lại); xoá bằng `tunelo usage delete` | ĐY (người dùng cài agent trên máy của mình) |
-| Mỗi thư mục làm việc gặp lần đầu: đường dẫn → remote `origin` của repo chứa nó (đọc từ file cấu hình git, bỏ user và mật khẩu của remote https; worktree đi về repo gốc), hoặc `local:<tên thư mục>`, hoặc `scratch` cho thư mục tạm; thời điểm ghi | Cùng sổ | Như trên | ĐY |
-| Mỗi file transcript đã đọc: đường dẫn, thiết bị và inode, kích thước, thời điểm sửa, vị trí đã đọc tới | Cùng sổ | Bỏ khi file không còn trên máy (số liệu của nó vẫn giữ) | ĐY |
-| Id phiên AI do agent mở (luồng chat, resume, terminal của app), thời điểm thấy lần đầu | Cùng sổ | Như dòng đầu | ĐY |
-| Mức dùng gói của từng profile Claude (id profile, % cửa sổ 5 giờ và 7 ngày, thời điểm đặt lại, đánh dấu "theo lịch" hay "do người dùng") | Cùng sổ | Như dòng đầu | ĐY |
-| Kiểm tra định dạng: số bản ghi trả lời có và không có token theo ngày (giữ 60 ngày), loại nội dung lạ (chỉ tên loại), số dòng lỗi, `schemaVersion`, thời điểm quét cuối | Cùng sổ | Như dòng đầu | ĐY |
+| Mỗi lời gọi API của AI: khoá của lời gọi (id tin trả lời và id request của nhà cung cấp), id phiên, id subagent (nếu có), thời điểm, tên model, 4 loại token (input, cache đọc, cache ghi, output), thư mục làm việc của lời gọi, tên các tool đã gọi (kể cả tên tool MCP, dạng `mcp__<server>__<tool>`; với tool Skill thêm tên skill) | Một file mỗi tháng theo giờ máy: `<thư mục config tunelo>/usage/ledger/YYYY-MM.json` (quyền 0600, thư mục 0700) và bản sao `YYYY-MM.prev.json` trước mỗi lần ghi; một lượt quét chỉ ghi lại tháng nó thêm số liệu | Không tự hết hạn (transcript gốc bị AI tự xoá sau khoảng 30 ngày, sổ là bản còn lại); xoá bằng `tunelo usage delete` hoặc nút xoá trên thiết bị đã ghép | ĐY (người dùng cài agent trên máy của mình) |
+| Mỗi thư mục làm việc gặp lần đầu: đường dẫn → remote `origin` của repo chứa nó (đọc từ file cấu hình git, bỏ user và mật khẩu của remote https; worktree đi về repo gốc), hoặc `local:<tên thư mục>`, hoặc `scratch` cho thư mục tạm; thời điểm ghi | Mục lục của sổ: `<thư mục config tunelo>/usage/index.json` (0600) và bản sao `index.prev.json` trước mỗi lần ghi | Như trên | ĐY |
+| Mỗi file transcript đã đọc: đường dẫn, thiết bị và inode, kích thước, thời điểm sửa, vị trí đã đọc tới | Mục lục của sổ | Bỏ khi file không còn trên máy (số liệu của nó vẫn giữ) | ĐY |
+| Id phiên AI do agent mở (luồng chat, resume, terminal của app), thời điểm thấy lần đầu | Mục lục của sổ | Như dòng đầu | ĐY |
+| Mức dùng gói của từng profile Claude (id profile, % cửa sổ 5 giờ và 7 ngày, thời điểm đặt lại, đánh dấu "theo lịch" hay "do người dùng") | Mục lục của sổ | Như dòng đầu | ĐY |
+| Gợi ý đã gửi: id nhà cung cấp, id phiên, mã luật (`context`, `turns`, `mechanical`, `subagents`), thời điểm gửi | Mục lục của sổ | Như dòng đầu | ĐY |
+| Kiểm tra định dạng: số bản ghi trả lời có và không có token theo ngày (giữ 60 ngày), loại nội dung lạ (chỉ tên loại), số dòng lỗi, `schemaVersion`, thời điểm quét cuối | Mục lục của sổ | Như dòng đầu | ĐY |
+| Công tắc bật/tắt từng luật gợi ý (chỉ mã luật và bật/tắt) | `<thư mục config tunelo>/config.json`, trường `usageRules` | Tới khi người dùng đổi | ĐY |
 
-Sổ không rời máy; khi có màn xem số liệu, số liệu chỉ tới thiết bị đã ghép của chính người dùng qua kênh mã hoá đầu cuối giữa thiết bị và máy. Agent không ghi đè một sổ nó không đọc được hoặc do bản agent mới hơn ghi (`schemaVersion` lạ): sổ giữ nguyên tới khi người dùng xoá.
+Sổ không rời máy. Báo cáo theo khoảng ngày và gợi ý cho phiên đang chạy chỉ tới thiết bị đã ghép của chính người dùng qua kênh mã hoá đầu cuối giữa thiết bị và máy, và chỉ gồm số, mã luật, id phiên, khoá repo và ngày: không nội dung tin nhắn, không tiêu đề, không đường dẫn file hay thư mục, không tên model hay tên tool. Khi có gợi ý, agent còn xin server chat một thông báo đẩy không nội dung (chỉ loại "gợi ý dùng AI" và tên máy, giống thông báo "cần bạn"): lời gọi không mang id phiên, mã luật hay con số nào. Bật/tắt luật và xoá sổ từ thiết bị được ghi vào nhật ký đồng ý (`usage_rules` với mã luật và bật/tắt, `usage_delete`).
+
+Agent không ghi đè một file của sổ (mục lục hoặc file tháng) nó không đọc được hoặc do bản agent mới hơn ghi (`schemaVersion` lạ): sổ giữ nguyên tới khi người dùng xoá. Sổ một file của bản đầu (`usage/ledger.json`) được tách thành file tháng ở lần chạy đầu: ghi vào thư mục riêng, đọc lại so từng token, chuyển vào chỗ, ghi mục lục, rồi mới xoá file cũ; file cũ không đọc được thì giữ nguyên.
+
+## Mức cấu hình dự án trên máy của người dùng
+
+Agent `tunelo` giữ, cho mỗi thư mục người dùng bật hay tắt cấu hình `.claude` của dự án từ thiết bị đã ghép, đường dẫn thư mục và mức (`full`/`off`) trong `<thư mục config tunelo>/data/project-config.json` (quyền 0600) trên chính máy đó, tới khi người dùng đổi; server chat không nhận gì. Mỗi lần đổi được ghi vào nhật ký đồng ý trên máy (`project_settings`: thiết bị, thời điểm, thư mục, `level:full`/`level:off`). Thiết bị đã ghép thấy mức của thư mục và của từng phiên qua kênh mã hoá đầu cuối.
 
 ## Quyền của người dùng
 
