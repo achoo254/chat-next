@@ -34,3 +34,6 @@ apps/mobile/www/
 # Cargo output of the terminal daemon.
 apps/term-host/target/
 apps/stun/target/
+
+# Per-agent working memory written by coding agents
+**/.claude/agent-memory/
