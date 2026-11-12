@@ -276,6 +276,8 @@ export type CoreOptions = {
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
   /** A session reported plan usage for its profile ("" for the default one). */
   onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
+  /** A session this machine opened (chat, resume, terminal) has this id of its AI; may come more than once. */
+  onSessionId?: (provider: string, sessionId: string) => void;
   /** Smaller limits for files sent with a message (tests); ATTACHMENT_LIMITS otherwise. */
   attachmentLimits?: Partial<AttachmentLimits>;
   /** Moves files to the operating system's trash (tests record instead). */
@@ -638,6 +640,13 @@ export class AgentCore {
 
   list(): ThreadSummary[] {
     return [...this.threads.values()].map((t) => this.summary(t)).sort((a, b) => Number(b.updatedAt - a.updatedAt));
+  }
+
+  /** The AI session ids of every thread's sessions, by provider. */
+  sessionIds(): { provider: string; sessionId: string }[] {
+    const out: { provider: string; sessionId: string }[] = [];
+    for (const t of this.threads.values()) for (const seg of t.meta.segments) if (seg.sessionId) out.push({ provider: seg.provider, sessionId: seg.sessionId });
+    return out;
   }
 
   /** True when an open session runs with this AI account profile. */
@@ -1615,6 +1624,7 @@ export class AgentCore {
           seg.sessionId = e.sessionId;
           this.saveMeta(t);
         }
+        if (seg) this.opts.onSessionId?.(seg.provider, e.sessionId);
         return;
       }
       case "text-delta": {
@@ -2113,6 +2123,7 @@ export class AgentCore {
       seg.sessionId = command.sessionId;
       this.pendingTerminalSession.set(t.meta.id, command.sessionId);
     }
+    if (seg?.sessionId) this.opts.onSessionId?.(seg.provider, seg.sessionId);
     this.saveMeta(t);
     return { shell: command.file, args: command.args, cwd: dir, env: command.env };
   }

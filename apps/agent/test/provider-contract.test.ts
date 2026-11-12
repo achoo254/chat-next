@@ -9,7 +9,7 @@ import { createClaudeProvider, denialText } from "../src/providers/claude/index.
 import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { fakeQuery } from "./fake-sdk.ts";
-import { byCase, makeCore, until } from "./harness.ts";
+import { byCase, makeCore, tempDir, until } from "./harness.ts";
 
 const consent = { sensitive: false, projectSettings: false };
 
@@ -402,5 +402,15 @@ describe("tunelo's MCP in a claude session", () => {
     await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
     expect(sdk.log.options[0]?.mcpServers).toEqual({});
     await core.stop();
+  });
+});
+
+describe("usage from the AI's own transcripts", () => {
+  it("the Claude adapter reads its transcripts in every Claude folder; an adapter without one leaves `usage` out", async () => {
+    const home = join(tempDir("contract-usage-"), "claude");
+    const provider = createClaudeProvider({ query: fakeQuery().fn, findBinary: async () => "claude", homes: () => [home] });
+    expect(provider.usage).toBeDefined();
+    expect(await provider.usage?.files()).toEqual([]);
+    expect(fakeProvider().usage).toBeUndefined();
   });
 });

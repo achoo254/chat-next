@@ -43,6 +43,21 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Bản sao lưu DB | `/opt/chat/backups` | 14 bản hằng ngày: dữ liệu đã xoá còn trong bản sao lưu tối đa 14 ngày | NV |
 | Log ứng dụng, nginx | `/var/log/chat`, `/var/log/nginx` | Theo pm2-logrotate và logrotate của server; app chỉ ghi id, không ghi nội dung tin, email, token; mọi logger của server qua bộ lọc `server/internal/logging/redact` (che giá trị dưới khoá nhạy cảm và các dạng token, JWT, bot token, URL hook, `code=`/`state=`, email trong chữ) | NV |
 
+## Sổ số liệu AI trên máy của người dùng
+
+Agent `tunelo` đọc transcript của AI cài trên máy (Claude Code: `<thư mục Claude>/projects/**/*.jsonl`, kể cả `subagents/`) và ghi **số liệu** vào sổ trên chính máy đó ([`apps/agent/src/usage/`](../../apps/agent/src/usage/ledger.ts)). Server chat không nhận gì từ sổ. Sổ không chứa nội dung tin nhắn, nội dung lệnh hay tham số tool (trừ tên skill của tool Skill), kết quả tool; bộ đọc bước qua các phần đó mà không giải mã.
+
+| Dữ liệu | Nơi lưu | Giữ bao lâu | Cơ sở |
+|---|---|---|---|
+| Mỗi lời gọi API của AI: khoá của lời gọi (id tin trả lời và id request của nhà cung cấp), id phiên, id subagent (nếu có), thời điểm, tên model, 4 loại token (input, cache đọc, cache ghi, output), thư mục làm việc của lời gọi, tên các tool đã gọi (kể cả tên tool MCP, dạng `mcp__<server>__<tool>`; với tool Skill thêm tên skill) | `<thư mục config tunelo>/usage/ledger.json` (quyền 0600, thư mục 0700) và bản sao `ledger.prev.json` trước mỗi lần ghi | Không tự hết hạn (transcript gốc bị AI tự xoá sau khoảng 30 ngày, sổ là bản còn lại); xoá bằng `tunelo usage delete` | ĐY (người dùng cài agent trên máy của mình) |
+| Mỗi thư mục làm việc gặp lần đầu: đường dẫn → remote `origin` của repo chứa nó (đọc từ file cấu hình git, bỏ user và mật khẩu của remote https; worktree đi về repo gốc), hoặc `local:<tên thư mục>`, hoặc `scratch` cho thư mục tạm; thời điểm ghi | Cùng sổ | Như trên | ĐY |
+| Mỗi file transcript đã đọc: đường dẫn, thiết bị và inode, kích thước, thời điểm sửa, vị trí đã đọc tới | Cùng sổ | Bỏ khi file không còn trên máy (số liệu của nó vẫn giữ) | ĐY |
+| Id phiên AI do agent mở (luồng chat, resume, terminal của app), thời điểm thấy lần đầu | Cùng sổ | Như dòng đầu | ĐY |
+| Mức dùng gói của từng profile Claude (id profile, % cửa sổ 5 giờ và 7 ngày, thời điểm đặt lại, đánh dấu "theo lịch" hay "do người dùng") | Cùng sổ | Như dòng đầu | ĐY |
+| Kiểm tra định dạng: số bản ghi trả lời có và không có token theo ngày (giữ 60 ngày), loại nội dung lạ (chỉ tên loại), số dòng lỗi, `schemaVersion`, thời điểm quét cuối | Cùng sổ | Như dòng đầu | ĐY |
+
+Sổ không rời máy; khi có màn xem số liệu, số liệu chỉ tới thiết bị đã ghép của chính người dùng qua kênh mã hoá đầu cuối giữa thiết bị và máy. Agent không ghi đè một sổ nó không đọc được hoặc do bản agent mới hơn ghi (`schemaVersion` lạ): sổ giữ nguyên tới khi người dùng xoá.
+
 ## Quyền của người dùng
 
 - **Xuất dữ liệu**: chạy nền, tải trong app (không email), giữ 30 ngày, mỗi 7 ngày một lần (lần lỗi không tính). ZIP gồm `profile.json`, `contacts.json`, `blocked.json`, `sessions.json`, `bots.json` (không token), `chats.json`, tin chính mình gửi theo từng chat (`messages/<chat>.json`, `chats/<chat>.html`), `index.html` xem offline và `media/` (file đính kèm tin mình gửi, tới 4 GB; phần vượt ghi `included: false`). Không có tin của người khác; người cùng chat chỉ xuất hiện qua tên và username. Link tải ký HMAC, sống 10 phút, trên host media.

@@ -13,6 +13,7 @@ import { registerInstallCommand } from "./commands/install.ts";
 import { registerProfilesCommand } from "./commands/profiles.ts";
 import { registerSecretsCommand } from "./commands/secrets.ts";
 import { registerBrowserCommand } from "./commands/browser.ts";
+import { registerUsageCommand } from "./commands/usage.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
@@ -301,6 +302,7 @@ function buildProgram(): Command {
   registerAuthenticatorCommand(program, exits);
   registerSecretsCommand(program, exits);
   registerBrowserCommand(program, exits);
+  registerUsageCommand(program, exits);
   // The running service asks a new copy of itself whether macOS granted Full Disk Access.
   program
     .command("disk-access", { hidden: true })

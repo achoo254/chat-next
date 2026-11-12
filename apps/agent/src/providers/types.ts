@@ -295,6 +295,58 @@ export interface TerminalRunner {
   command(req: TerminalLaunch): Promise<TerminalCommand | undefined>;
 }
 
+/** One transcript file the AI keeps on the machine, as found on disk now. */
+export type UsageFile = { path: string; dev: number; ino: number; size: number; mtimeMs: number };
+
+/**
+ * One API call of the AI as its transcript records it: numbers and names
+ * only, never a message, a tool's input or its result. `key` is the AI's own
+ * id of the call (the same call copied into another transcript keeps it).
+ * Token counts the AI does not record are absent.
+ */
+export type UsageTurn = {
+  key: string;
+  sessionId: string;
+  /** A subagent's call (its transcript sits under the session's subagents). */
+  subagent: boolean;
+  agentId?: string;
+  /** Unix milliseconds. */
+  at: number;
+  model: string;
+  /** The working directory of this call. */
+  cwd: string;
+  inputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  outputTokens?: number;
+  /** Names of the tools the call used; for a skill, the skill's name. */
+  tools: string[];
+};
+
+/** What a read saw of the transcript's records, to tell whether its format changed. */
+export type UsageLineStats = {
+  /** Records of the AI's replies read. */
+  records: number;
+  /** Of those, records that carry token counts. */
+  withUsage: number;
+  parseErrors: number;
+  /** Lines longer than the reader takes, skipped without being kept. */
+  overCap: number;
+  /** Kinds of reply content the reader does not know, by kind. */
+  unknownTypes: Record<string, number>;
+};
+
+/** `end`: the byte after the last whole line read; a line still being written is left for the next read. */
+export type UsageRead = { turns: UsageTurn[]; end: number; stats: UsageLineStats };
+
+/** The AI's token usage as its own transcripts on the machine record it (Claude: ~/.claude/projects). */
+export interface UsageSource {
+  /** Every transcript file, each once (links are not followed). */
+  files(): Promise<UsageFile[]>;
+  /** The calls recorded in `file` from byte `from` on. */
+  read(file: UsageFile, from: number): Promise<UsageRead>;
+}
+
 export interface AgentProvider {
   readonly id: string;
   readonly name: string;
@@ -305,4 +357,6 @@ export interface AgentProvider {
   readonly history?: SessionHistory;
   /** Its CLI opens in the machine's terminal; absent when it has none. */
   readonly terminal?: TerminalRunner;
+  /** Token usage from the AI's own transcripts; absent when it keeps none tunelo can read. */
+  readonly usage?: UsageSource;
 }

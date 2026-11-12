@@ -187,6 +187,11 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     await profiles.refreshUsage(profileInput.parse(input).id);
     return profiles.list();
   },
+  /** `tunelo usage delete`: the usage ledger and its copy; a scan under way stops and does not write it back. */
+  "POST /usage/delete": async (t) => {
+    await machineOf(t).usage.deleteLedger();
+    return { deleted: true };
+  },
   /** Localman's requests for localhost: on or off, and ports refused on this machine. */
   "GET /local-forward": (t) => machineOf(t).localForward.state(),
   "POST /local-forward": (t, input) => machineOf(t).localForward.setEnabled(forwardToggle.parse(input).enabled, "local"),

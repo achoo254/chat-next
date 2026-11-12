@@ -33,6 +33,7 @@ let localPort = 0;
 const answers: string[] = [];
 
 let forwardOn = true;
+let usageDeletes = 0;
 let forwardBlocked: number[] = [];
 
 /** A machine with just what the commands touch. */
@@ -56,6 +57,11 @@ function fakeMachine(): Machine {
       cancel: async () => undefined,
       remove: async () => undefined,
       refreshUsage: async () => undefined,
+    },
+    usage: {
+      deleteLedger: async () => {
+        usageDeletes++;
+      },
     },
     localForward: {
       state: () => ({ enabled: forwardOn, available: false, blockedPorts: forwardBlocked }),
@@ -149,6 +155,7 @@ describe("control socket", () => {
         "POST /trust",
         "POST /totp/enroll",
         "POST /tunnels/close",
+        "POST /usage/delete",
       ].sort(),
     );
     expect(Object.keys(CONTROL_STREAMS).sort()).toEqual(["POST /mcp/session", "POST /tunnels/open"]);
@@ -269,6 +276,8 @@ describe("control socket", () => {
       expect(await call("POST", "/claude/profiles/usage", { id: "" })).toMatchObject({ selectedId: "" });
       expect(await call("POST", "/claude/profiles/remove", { id: "p1" })).toMatchObject({ selectedId: "" });
       expect(await call("POST", "/claude/profiles/remove", {})).toMatchObject({ error: expect.any(String) });
+      expect(await call("POST", "/usage/delete")).toEqual({ deleted: true });
+      expect(usageDeletes).toBe(1);
       expect(await call("GET", "/local-forward")).toEqual({ enabled: true, available: false, blockedPorts: [] });
       expect(await call("POST", "/local-forward", { enabled: false })).toMatchObject({ enabled: false });
       expect(await call("POST", "/local-forward", { enabled: "no" })).toMatchObject({ error: expect.any(String) });

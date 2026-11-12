@@ -51,6 +51,7 @@ import type {
 } from "../types.ts";
 import { LocalSessions } from "./local-sessions.ts";
 import { MessageMapper } from "./message-mapper.ts";
+import { ClaudeUsage } from "./usage-scan.ts";
 import { toolKind, toolPaths, toolSummary } from "./tool-map.ts";
 
 export { MessageMapper };
@@ -113,13 +114,15 @@ export function createClaudeProvider(
 ): AgentProvider {
   const queryFn: QueryFn = deps.query ?? ((p) => sdkQuery(p));
   const findBinary = deps.findBinary ?? findClaude;
-  const history = new LocalSessions({ homes: deps.homes ?? (() => [defaultClaudeHome()]) });
+  const homes = deps.homes ?? (() => [defaultClaudeHome()]);
+  const history = new LocalSessions({ homes });
 
   return {
     id: "claude",
     name: "Claude Code",
     capabilities: CLAUDE_CAPABILITIES,
     history,
+    usage: new ClaudeUsage({ homes }),
 
     async detect(opts: DetectOptions = {}): Promise<Detected> {
       const bin = await findBinary();

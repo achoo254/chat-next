@@ -230,6 +230,58 @@ Chỉ có trên macOS. Cho các hộp thoại của hệ điều hành mà trìn
 - `request_takeover(…, os_dialog: true)`: Claude báo hộp thoại hệ điều hành đang chờ; thẻ trên web đưa "Điều khiển toàn màn hình"
   lên đầu.
 
+## Bảng phải của workspace: Explorer và Source Control (2.7.0)
+
+Thiết bị xem tệp và git của một workspace (một dự án của máy) qua kênh mã hoá đầu cuối: các yêu cầu `Ws*` trong
+[`remote.proto`](../../proto/remote/v1/remote.proto) (mục "a workspace's files and git"), mã ở `src/workspace/`.
+
+- **Chỉ theo mã dự án**: thiết bị gửi `workspace_id` (id dự án của máy), không bao giờ gửi đường dẫn tuyệt đối. Đường dẫn
+  tương đối được giải `realpath` rồi phải nằm trong thư mục thật của dự án: `..`, đường dẫn tuyệt đối, symlink ra ngoài, vòng
+  symlink, tên giả dạng `..` (ký tự Unicode trông giống) đều bị từ chối hoặc không ra khỏi thư mục. Symlink ra ngoài vẫn hiện
+  nhưng không mở được; thiết bị, socket, pipe không hiện, không đọc.
+- **Tệp bí mật** (dotenv trừ mẫu `.env.example`…, khoá `*.pem`/`*.key`/`id_*`, `.npmrc`, `.netrc`, `credentials`, nội bộ `.git`,
+  `.ssh`, `.aws`, `*.tfstate`, `.vault-token`…; so tên sau khi bỏ ký tự vô hình và không phân biệt hoa thường) không liệt kê,
+  không đọc, không tìm, kể cả khi bật "hiện tệp ẩn"; trong Source Control vẫn hiện tên nhưng không có diff (kể cả khi là tên cũ
+  của tệp đổi tên). Thư mục nhạy cảm của máy (`~/.ssh`, cấu hình tunelo…) cũng bị chặn trong mọi lệnh đọc, và tệp có nhiều hơn
+  một hard link không được xem. Stage hoặc commit tệp bí mật cần thiết bị nêu đúng tên tệp đó (`confirm_sensitive`).
+- **Chỉ ở thư mục gốc của repo**: git chỉ chạy khi workspace là thư mục gốc của repo (`ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT`
+  nếu là thư mục con của repo lớn hơn; Explorer vẫn xem được, không có dấu git); repo đặt `core.worktree` bị từ chối.
+- **Explorer (chỉ đọc)**: trang thư mục tối đa 2000 mục (mặc định 500), con trỏ theo tên, thư mục trước rồi tên tự nhiên; thư
+  mục quá 100 000 mục thì từ chối. Cờ gitignore lấy bằng `git check-ignore` cho đúng các mục đang trả; dấu U/A/M từ
+  `git status`. Xem tệp: văn bản ≤ 1 MiB, ảnh ≤ 5 MiB (SVG coi là văn bản), còn lại chỉ kích thước. Tìm tên: `git ls-files`
+  (ngoài git thì đi cây tối đa 100 000 mục, bỏ `node_modules`), mọi từ phải khớp, tối đa 500. Tìm nội dung: `git grep`
+  (không cần ripgrep), tối đa 2000 kết quả, 15 giây, bỏ tệp nhị phân và tệp > 5 MiB.
+- **Theo dõi thay đổi** chỉ khi có thiết bị đang xem (`WsWatch`): `fs.watch` đệ quy, gom 125 ms (tối đa 1 giây), bỏ
+  `node_modules`, `dist`, `build`…; đọc lại `git status` sau thay đổi, cách nhau ít nhất 3 giây, và 60 giây một lần dù không
+  có sự kiện; chỉ báo `git` khi trạng thái thật sự khác. Trên Linux (watch đệ quy sẽ giữ watch cho mọi thư mục, kể cả
+  `node_modules`) hoặc khi hệ điều hành từ chối, tunelo chuyển hẳn sang đọc `git status` mỗi 10 giây và báo `polling` cho thiết bị.
+- **Source Control**: status (porcelain v2, tối đa 1000 mục, số dòng +/−), stage/unstage, huỷ thay đổi (thiết bị phải gửi
+  `confirm`; tệp chưa theo dõi vào Thùng rác của hệ điều hành theo lô 100, không xoá hẳn; symlink thì chuyển chính link, không
+  bao giờ chuyển thứ nó trỏ tới; mục bị đổi giữa lúc liệt kê và lúc chuyển thì không chuyển gì; chỉ khôi phục tệp đã theo dõi sau
+  khi Thùng rác nhận hết), commit (**không chạy git hook**: `--no-verify` và `core.hooksPath` trỏ vào một thư mục rỗng tuyệt đối
+  của tunelo; **không ký**: repo bật ký commit thì bị từ chối, `ERROR_REASON_GIT_COMMIT_SIGNING`; HEAD tách rời cần
+  `allow_detached`), nhánh (danh sách, đổi, tạo), fetch, pull chỉ fast-forward, push không bao giờ force (nhánh chưa có upstream
+  thì đẩy lên cùng tên ở origin và đặt upstream; repo dùng Git LFS thì chạy `git lfs pre-push` trước, máy thiếu git-lfs thì từ
+  chối `ERROR_REASON_GIT_LFS_MISSING`). Commit, checkout và pull bị từ chối khi đang dở merge, rebase, cherry-pick, revert hay
+  bisect (`ERROR_REASON_GIT_OPERATION_IN_PROGRESS`). Log phân trang, "committed on
+  branch" so với `origin/HEAD` (rồi `origin/main`, `origin/master`, `main`, `master`), và URL trang tạo PR/MR của GitHub hoặc
+  GitLab (chỉ https, không kèm thông tin đăng nhập).
+- **git không bao giờ chạy chương trình do repo chọn và không bao giờ hỏi**: không shell, mọi lệnh có hết giờ và trần đầu ra,
+  `GIT_TERMINAL_PROMPT=0`, askpass không trả gì, ssh `BatchMode`, chỉ https/ssh. Trước mỗi lệnh, tunelo đọc cấu hình **của
+  chính repo** (phạm vi local/worktree; cấu hình global/system của người dùng vẫn dùng): `credential.helper`, `core.sshCommand`,
+  `gpg.*.program`, `filter.*`, `diff.*.textconv`/`command`, `merge.*.driver`, `remote.*.uploadpack`… Lệnh đọc chạy với các
+  chương trình đó bị tắt; lệnh ghi hoặc mạng bị từ chối, nêu tên khoá (`ERROR_REASON_GIT_UNSAFE_CONFIG`), để người dùng chạy
+  trong terminal. Lệnh mạng còn bị từ chối khi repo tự đặt proxy, chứng chỉ, tắt `sslVerify`, `curloptResolve` hay
+  `extraHeader`. Sau lệnh ghi/mạng, cấu hình được đọc lại: repo bị thêm khoá nguy hiểm trong lúc chạy thì báo lỗi. Thiếu đăng
+  nhập khi fetch/pull/push trả `ERROR_REASON_GIT_NEEDS_CREDENTIALS` ngay, không treo. git chạy trong nhóm tiến trình riêng: hết
+  giờ thì dừng cả git lẫn helper nó mở (remote helper, ssh), mạng chậm dưới 1000 byte/giây trong 30 giây thì dừng; khoá ghi của
+  workspace luôn được trả, và nếu dừng cứng để lại `.git/index.lock` thì lỗi nói rõ. Lỗi gửi về thiết bị không bao giờ chứa
+  đường dẫn tuyệt đối của máy.
+- **Nhật ký đồng ý**: `git_stage`, `git_unstage`, `git_discard` (số tệp khôi phục và số tệp vào Thùng rác), `git_commit`,
+  `git_checkout`, `git_branch_create`, `git_pull`, `git_push` ghi thư mục workspace, mã workspace và số tệp; không bao giờ ghi
+  đường dẫn tệp, nội dung, tên nhánh hay thông điệp commit. Mỗi workspace chỉ một lệnh git ghi tại một thời điểm
+  (`ERROR_REASON_GIT_BUSY`).
+
 ## Dự án (2.0.7)
 
 Cột AI Agent nhóm phiên theo máy → dự án → phiên; phiên ngoài mọi dự án nằm ở "Khác". Danh sách dự án lưu trên máy trong
