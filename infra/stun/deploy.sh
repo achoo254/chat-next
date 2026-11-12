@@ -16,6 +16,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
+# The release must be exactly a commit that is already on origin/main.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "working tree is not clean: commit or stash first (git status)" >&2
+  exit 1
+fi
+git fetch --quiet origin main
+if ! git merge-base --is-ancestor HEAD origin/main; then
+  echo "HEAD $(git rev-parse --short HEAD) is not on origin/main: push it first" >&2
+  exit 1
+fi
+
 if [ -n "${REMOTE_SHELL:-}" ]; then
   # Word splitting is intended: REMOTE_SHELL is a command plus its arguments.
   # shellcheck disable=SC2206
@@ -26,9 +37,23 @@ else
   remote=(ssh ${SSH_OPTS:-} "$SSH_TARGET")
 fi
 
+# One deploy at a time across machines and agent sessions; a lock older than 30 minutes is a crashed run.
+lock=/run/lock/chat-stun-deploy
+owner="$(hostname -s) $(git rev-parse --short HEAD) $(date -u +%FT%TZ)"
+# Exit 3 from the server means the lock is held; anything else is ssh failing.
+rc=0
+"${remote[@]}" "find $lock -maxdepth 0 -mmin +30 -exec rm -rf {} + 2>/dev/null; mkdir $lock 2>/dev/null || exit 3; echo '$owner' >$lock/owner" </dev/null || rc=$?
+if [ "$rc" -eq 3 ]; then
+  echo "another deploy is running: $("${remote[@]}" "cat $lock/owner" </dev/null 2>/dev/null)" >&2
+  exit 1
+elif [ "$rc" -ne 0 ]; then
+  echo "could not take the deploy lock on the server (ssh exit $rc)" >&2
+  exit 1
+fi
+
 # TMPDIR picks where the throwaway build lands (it is deleted on exit).
 work="$(mktemp -d "${TMPDIR:-/tmp}/stun-deploy.XXXXXX")"
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work"; "${remote[@]}" "rm -rf $lock" </dev/null || true' EXIT
 bundle="$work/bundle"
 mkdir -p "$bundle"
 

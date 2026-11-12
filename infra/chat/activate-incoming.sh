@@ -12,6 +12,10 @@ set -euo pipefail
 ROOT=/opt/chat
 ID="${1:?usage: chat-activate-incoming <release-id>}"
 [[ "$ID" =~ ^[0-9]{8}-[0-9]{6}-[0-9a-f]{12}$ ]] || { echo "bad release id" >&2; exit 2; }
+
+# One activation at a time: a CI deploy and a manual release from a dev machine may meet.
+exec 9>/run/chat-activate.lock
+flock -w 600 9 || { echo "another activation still holds /run/chat-activate.lock" >&2; exit 1; }
 SRC="$ROOT/incoming/$ID"
 STAGE="$ROOT/staging"
 DST="$ROOT/releases/$ID"
