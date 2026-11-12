@@ -110,8 +110,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-glyph.running { color: var(--c-primary); }
 .mx-glyph.running .icon { animation: spin 0.9s linear infinite; }
 .mx-glyph.done { color: var(--c-success); }
-/* Held at its prompt in a terminal looks idle: the row's second line already shows the terminal icon. */
-.mx-glyph.idle, .mx-glyph.open { opacity: 0.6; }
+/* Idle, or held at its prompt in a terminal (the row's second line shows the terminal icon): nothing to look at, so the
+   column stays blank; the label still names the state for a screen reader and on hover. */
+.mx-glyph.idle .icon, .mx-glyph.open .icon { visibility: hidden; }
 .mx-glyph[data-offline] { opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon { animation: none; } }
 /* Arrow keys move between rows: one is in the tab order, focus shows. */
@@ -842,3 +843,10 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 .mx-project-toggle > .icon, .mx-ws-title > .icon, .mx-row-ai, .mx-row-mode { width: 16px; flex: none; }
 .mx-row-mode { margin-right: var(--space-2); }
 .mx-srow .line { gap: var(--space-2); }
+/* Each level steps in by one icon column plus its gap, so a child's icon sits under its parent's name: project, then
+   workspace (or a folder of "Chưa phân loại"), then session. The status column stays put at the left edge. */
+.mx-groups { --mx-indent: calc(16px + var(--space-2)); }
+.mx-project .mx-ws-name { padding-left: var(--mx-indent); }
+.mx-ws .mx-srow .tx { padding-left: calc(var(--mx-indent) * 2); }
+.mx-ws .mx-more { margin-left: calc(var(--space-2) + 16px + var(--space-2) + var(--mx-indent) * 2); }
+.mx-ws-empty { padding-left: calc(var(--space-2) + 16px + var(--space-2) + var(--mx-indent)); }
