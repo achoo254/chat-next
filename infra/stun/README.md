@@ -22,7 +22,16 @@ tường lửa máy chủ và nhà cung cấp để UDP 3478 đi vào.
 
 ## Triển khai
 
-Chạy trên máy dev (không build trên máy chủ). Cần `cargo` có target `x86_64-unknown-linux-musl` (hoặc `aarch64-…` theo máy chủ) và, ngoài Linux, `cargo-zigbuild` + `zig`.
+**Bình thường: chạy workflow `stun-deploy`** (`gh workflow run stun-deploy.yml`, rồi `gh run watch`). Đây là ngoại lệ duy
+nhất của quy tắc deploy mỗi lần push (`docs/deploy-standard.md` của workspace `hoandat-app`), vì stun ít đổi và không có
+app phía sau. Workflow build binary musl x86_64 trên CI, upload bằng user `chat-deploy` vào
+`/opt/chat/incoming/stun-<id>` rồi chạy `sudo /usr/local/sbin/stun-activate-incoming <id>`
+([`activate-incoming.sh`](activate-incoming.sh): `flock` trên `/run/stun-activate.lock`, kiểm bundle, rồi
+`install-on-server.sh` như dưới). Cài lệnh đó một lần bằng root: `install -m 755 infra/stun/activate-incoming.sh
+/usr/local/sbin/stun-activate-incoming`; sudoers của `chat-deploy` có sẵn dòng cho nó (`infra/chat/setup-deploy-user.sh`).
+
+**Dự phòng khi CI hỏng:** chạy trên máy dev (không build trên máy chủ). Script từ chối cây chưa sạch và commit chưa lên
+`origin/main`, rồi đi qua cùng `stun-activate-incoming`. Cần `cargo` có target `x86_64-unknown-linux-musl` (hoặc `aarch64-…` theo máy chủ) và, ngoài Linux, `cargo-zigbuild` + `zig`.
 
 ```bash
 SSH_TARGET=<user>@<SERVER_65_IP> SSH_OPTS="-i <key> -p <SSH_PORT> -o IdentitiesOnly=yes" bash infra/stun/deploy.sh

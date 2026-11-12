@@ -1,7 +1,9 @@
 #!/bin/bash
+# Break-glass install of stun-responder; the normal path is the stun-deploy workflow (workflow_dispatch).
 # Builds apps/stun on this machine for the server's CPU (static musl binary)
 # and installs it on the shared server as the systemd service
-# stun-responder, running as the system user `stun`, on UDP 3478.
+# stun-responder, running as the system user `stun`, on UDP 3478, through the
+# same /usr/local/sbin/stun-activate-incoming the workflow runs (flock).
 #
 #   SSH_TARGET=<user>@<SERVER_65_IP> SSH_OPTS="-i <key> -p <SSH_PORT> -o IdentitiesOnly=yes" bash infra/stun/deploy.sh
 # or with any command that runs a remote command given as its last argument
@@ -37,23 +39,9 @@ else
   remote=(ssh ${SSH_OPTS:-} "$SSH_TARGET")
 fi
 
-# One deploy at a time across machines and agent sessions; a lock older than 30 minutes is a crashed run.
-lock=/run/lock/chat-stun-deploy
-owner="$(hostname -s) $(git rev-parse --short HEAD) $(date -u +%FT%TZ)"
-# Exit 3 from the server means the lock is held; anything else is ssh failing.
-rc=0
-"${remote[@]}" "find $lock -maxdepth 0 -mmin +30 -exec rm -rf {} + 2>/dev/null; mkdir $lock 2>/dev/null || exit 3; echo '$owner' >$lock/owner" </dev/null || rc=$?
-if [ "$rc" -eq 3 ]; then
-  echo "another deploy is running: $("${remote[@]}" "cat $lock/owner" </dev/null 2>/dev/null)" >&2
-  exit 1
-elif [ "$rc" -ne 0 ]; then
-  echo "could not take the deploy lock on the server (ssh exit $rc)" >&2
-  exit 1
-fi
-
 # TMPDIR picks where the throwaway build lands (it is deleted on exit).
 work="$(mktemp -d "${TMPDIR:-/tmp}/stun-deploy.XXXXXX")"
-trap 'rm -rf "$work"; "${remote[@]}" "rm -rf $lock" </dev/null || true' EXIT
+trap 'rm -rf "$work"' EXIT
 bundle="$work/bundle"
 mkdir -p "$bundle"
 
@@ -80,11 +68,11 @@ chmod 755 "$bundle/stun-responder"
 cp infra/stun/stun-responder.service infra/stun/install-on-server.sh "$bundle/"
 ls -l "$bundle/stun-responder"
 
-echo "== upload and install"
-# One SSH session: the bundle travels on stdin, is unpacked into a private
-# temporary directory, installed, and the directory is removed either way.
-# The command is expanded on the server, hence the single quotes.
-# shellcheck disable=SC2016
+echo "== upload and install (the same step as the stun-deploy workflow; it waits for any other install)"
+id="$(date -u +%Y%m%d-%H%M%S)-$(git rev-parse --short=12 HEAD)"
+cp infra/stun/activate-incoming.sh "$bundle/"
+# One SSH session: the bundle travels on stdin into /opt/chat/incoming/stun-<id>, the install command is refreshed
+# from it, then runs. The command is expanded on the server except for the id, hence the quoting.
 COPYFILE_DISABLE=1 tar --no-xattrs -C "$bundle" -czf - . | "${remote[@]}" \
-  'd="$(mktemp -d)" && tar -xzf - -C "$d" && bash "$d/install-on-server.sh" "$d"; rc=$?; rm -rf "$d"; exit $rc'
+  "set -e; d=/opt/chat/incoming/stun-$id; mkdir -p \"\$d\"; tar -xzf - -C \"\$d\"; install -m 755 -o root -g root \"\$d/activate-incoming.sh\" /usr/local/sbin/stun-activate-incoming; /usr/local/sbin/stun-activate-incoming $id"
 echo "== done"

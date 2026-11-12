@@ -4,8 +4,11 @@
 #   bash /opt/chat/infra/setup-deploy-user.sh < chat-deploy.pub
 # With empty stdin (`< /dev/null`) it keeps the installed key and only
 # reinstalls the sudo command, e.g. after activate-incoming.sh changed.
-# The user can only write /opt/chat/incoming and run one root-owned command
-# through sudo: /usr/local/sbin/chat-activate-incoming <release-id>.
+# The user can only write /opt/chat/incoming and run two root-owned commands
+# through sudo: /usr/local/sbin/chat-activate-incoming <release-id> and
+# /usr/local/sbin/stun-activate-incoming <release-id> (the stun-deploy workflow;
+# install it with `install -m 755 infra/stun/activate-incoming.sh
+# /usr/local/sbin/stun-activate-incoming`, see infra/stun/README.md).
 set -euo pipefail
 USER_NAME=chat-deploy
 ROOT=/opt/chat
@@ -33,6 +36,7 @@ install -m 755 -o root -g root "$ROOT/infra/activate-incoming.sh" /usr/local/sbi
 {
 	printf 'Defaults:%s secure_path="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"\n' "$USER_NAME"
 	printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/chat-activate-incoming\n' "$USER_NAME"
+	printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/stun-activate-incoming\n' "$USER_NAME"
 } >/etc/sudoers.d/chat-deploy
 chmod 440 /etc/sudoers.d/chat-deploy
 visudo -cf /etc/sudoers.d/chat-deploy

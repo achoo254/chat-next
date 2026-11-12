@@ -1,0 +1,78 @@
+# Deploy of stun-responder (apps/stun) to the shared server, started by hand (Actions > stun-deploy > Run workflow, or
+# `gh workflow run stun-deploy.yml`): it changes rarely and has no app behind it, the one exception to deploying on
+# every push (docs/deploy-standard.md in the hoandat-app workspace). The build job makes a static musl binary for the
+# server's x86_64 CPU without the deploy key; the deploy job uploads the bundle as `chat-deploy` to
+# /opt/chat/incoming/stun-<id> and runs the one stun command that user has through sudo
+# (infra/stun/activate-incoming.sh: flock, checks, infra/stun/install-on-server.sh).
+name: stun-deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: musl toolchain
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools >/dev/null
+          rustup target add x86_64-unknown-linux-musl
+      - id: release
+        name: build bundle
+        run: |
+          echo "id=$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:12}" >>"$GITHUB_OUTPUT"
+          (cd apps/stun && cargo build --release --locked --target x86_64-unknown-linux-musl)
+          mkdir bundle
+          install -m 755 apps/stun/target/x86_64-unknown-linux-musl/release/stun-responder bundle/stun-responder
+          ./bundle/stun-responder --version
+          cp infra/stun/stun-responder.service infra/stun/install-on-server.sh bundle/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stun-bundle
+          path: bundle/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      RELEASE_ID: ${{ needs.build.outputs.release_id }}
+      # The server address and SSH port are secrets so the public repository does not show them.
+      DEPLOY_HOST: ${{ secrets.CHAT_DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ secrets.CHAT_DEPLOY_PORT }}
+      TARGET: chat-deploy@${{ secrets.CHAT_DEPLOY_HOST }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: stun-bundle
+          path: bundle/
+      - name: ssh setup
+        env:
+          SSH_KEY: ${{ secrets.CHAT_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.CHAT_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" >~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" >~/.ssh/known_hosts
+          printf 'Host %s\n  Port %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$DEPLOY_HOST" "$DEPLOY_PORT" >~/.ssh/config
+      - name: upload and install
+        run: |
+          chmod 755 bundle/stun-responder
+          rsync -rltz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r,F+x bundle/ "$TARGET:/opt/chat/incoming/stun-$RELEASE_ID/"
+          ssh "$TARGET" "sudo -n /usr/local/sbin/stun-activate-incoming $RELEASE_ID"
+      - if: always()
+        run: rm -f ~/.ssh/deploy_key
