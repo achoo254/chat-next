@@ -57,7 +57,7 @@ describe("usage over a device's link", () => {
       p90Context: 400_000n,
     });
     expect(r.suggestions).toEqual([expect.objectContaining({ rule: UsageRule.CONTEXT, sessionId: "s1", turn: 2, value: 400_000n, notifiedAt: 0n })]);
-    expect(r.utcOffsetMinutes).toBe(-new Date().getTimezoneOffset());
+    expect(r.utcOffsetMinutes).toBe(0 - new Date().getTimezoneOffset());
     device.close();
   });
 
