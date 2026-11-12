@@ -85,6 +85,19 @@ Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thê
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
 nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
 
+Có gì ở 2.7.0:
+
+- **Thống kê sử dụng**: tunelo đọc transcript của Claude Code trên máy thành sổ số liệu theo tháng (chỉ số đếm rời transcript,
+  khử trùng toàn máy, ghi lại phiên nào do app mở). Thiết bị đọc báo cáo qua kênh mã hoá; luật (context dài, nhiều lượt, việc
+  máy móc trên model mạnh nhất, phiên nặng subagent) gửi tối đa một thông báo mỗi luật mỗi phiên. Màn "Sử dụng" trên web xem và
+  xoá sổ.
+- **Cấu hình dự án theo thư mục**: mỗi thư mục có một mức bật/tắt cấu hình `.claude` (skill, lệnh, hook, quyền) cho phiên chat,
+  mặc định tắt, ghi vào nhật ký đồng ý; phiên terminal chạy CLI với nguồn cài đặt của chính nó.
+- **Trình duyệt file và source control** cho thư mục làm việc, giới hạn trong thư mục, lọc file bí mật, chặn cấu hình git nguy
+  hiểm.
+- Terminal: menu phiên hiện thư mục của phiên; thư mục đã mất thì không còn báo phiên đang chạy.
+- Nâng `ws`, `zod`, `fast-uri` (vá lỗi phân tích URI).
+
 Có gì ở 2.6.1: chỉ tăng số phiên bản; bản phát hành giờ kiểm danh tính chữ ký macOS trước khi ra, để quyền Toàn quyền truy cập ổ đĩa giữ nguyên qua các lần cập nhật (dùng làm bản thử xác nhận điều đó).
 
 Có gì ở 2.6.0:
