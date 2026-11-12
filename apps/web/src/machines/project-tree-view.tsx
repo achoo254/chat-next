@@ -263,7 +263,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 			<div className="mx-project-head">
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
 					{/* The status column of every row: the most urgent state of its workspaces; a calm project keeps the place empty. */}
-					{node.status !== "idle" ? <StatusGlyph status={node.status} offline={offline} /> : <span className="mx-glyph-slot" aria-hidden="true" />}
+					{node.status !== "idle" && node.status !== "open" ? <StatusGlyph status={node.status} offline={offline} /> : <span className="mx-glyph-slot" aria-hidden="true" />}
 					<MachineIcon name="folder" small />
 					<b>{project.name}</b>
 					{node.need > 0 && (

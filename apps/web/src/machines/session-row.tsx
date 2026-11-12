@@ -69,7 +69,8 @@ export function StatusGlyph({ status, offline = false }: { status: WorkStatus; o
 /** The list's clock is coarse (it ticks every 30 s): an activity older than the turn by more than this is an earlier turn's. */
 const EARLIER_TURN_MS = 60_000;
 
-const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", open: "terminal", idle: "circle" } as const;
+// Held by a terminal is calm, not work: a circle like idle (tinted), since the row's second line already shows the terminal icon.
+const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", open: "circle", idle: "circle" } as const;
 
 /**
  * The second line: while the machine reports the turn live (the open
