@@ -1,5 +1,6 @@
 // The device key store on a small fake IndexedDB: one non-extractable key
-// made once and kept, machine keys pinned and forgotten, and the connection
+// made once and kept (and renewed on demand), the machine keys seen last
+// remembered and forgotten, and the connection
 // closing when sign-out deletes the database.
 import { DEVICE_KEYS_DATABASE } from "@achoo254/chat-core";
 import { generateKeyPair } from "@achoo254/chat-remote-protocol";
@@ -112,16 +113,27 @@ describe("device key store", () => {
 		await expect(store.device()).rejects.toThrow(/extractable/);
 	});
 
-	it("pins and forgets machine keys", async () => {
+	it("remembers and forgets the key each machine answered with", async () => {
 		const store = deviceKeyStore(asFactory(new FakeIndexedDb()));
-		expect(await store.pinned("12")).toBeNull();
+		expect(await store.seenMachineKey("12")).toBeNull();
 		const key = new Uint8Array(32).fill(7);
-		await store.pin("12", key);
-		expect(await store.pinned("12")).toEqual(key);
-		expect(await store.pinned("13")).toBeNull();
-		await store.forget("12");
-		expect(await store.pinned("12")).toBeNull();
-		await expect(store.pin("12", new Uint8Array(31))).rejects.toThrow();
+		await store.rememberMachineKey("12", key);
+		expect(await store.seenMachineKey("12")).toEqual(key);
+		expect(await store.seenMachineKey("13")).toBeNull();
+		await store.forgetMachineKey("12");
+		expect(await store.seenMachineKey("12")).toBeNull();
+		await expect(store.rememberMachineKey("12", new Uint8Array(31))).rejects.toThrow();
+	});
+
+	it("renews the device key: a new one, kept for the next page", async () => {
+		const idb = new FakeIndexedDb();
+		const store = deviceKeyStore(asFactory(idb));
+		const old = await store.device();
+		const renewed = await store.renew();
+		expect(renewed.publicKey).not.toEqual(old.publicKey);
+		expect(renewed.privateKey.extractable).toBe(false);
+		expect(await store.device()).toBe(renewed);
+		expect((await deviceKeyStore(asFactory(idb)).device()).publicKey).toEqual(renewed.publicKey);
 	});
 
 	it("does not replace a stored device key it cannot read", async () => {

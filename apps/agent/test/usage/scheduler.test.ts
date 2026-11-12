@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ClaudeUsage } from "../../src/providers/claude/usage-scan.ts";
 import type { UsageFile, UsageRead, UsageSource } from "../../src/providers/types.ts";
-import { deleteUsage } from "../../src/commands/usage.ts";
 import { type Turn, localMonth, parseIndex, parseShard } from "../../src/usage/ledger.ts";
 import { UsageScheduler } from "../../src/usage/scheduler.ts";
 import { tempDir } from "../harness.ts";
@@ -196,11 +195,9 @@ describe("scanning transcripts", () => {
     await next.run();
     await next.stop();
     expect(ledgerFiles(configDir)).toContain(`ledger/${MONTH}.prev.json`);
-    // With no agent running, the command deletes the files itself.
-    const out: string[] = [];
-    expect(await deleteUsage(configDir, (l) => out.push(l))).toBe(0);
+    // Deleting again takes the copies the last scan kept too.
+    await make().deleteLedger();
     expect(ledgerFiles(configDir)).toEqual([]);
-    expect(out[0]).toContain("Deleted");
   });
 
   it("runs afterScan after each finished scan while its shards are in memory, then lets them go", async () => {

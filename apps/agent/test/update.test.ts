@@ -1,7 +1,10 @@
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { assetName, newestRelease, signedComment, trustedComment, verifyMinisign } from "../src/update.ts";
+import { archiveName, assetName, newestRelease, signedComment, termHostAssetName, trustedComment, unpackArchive, verifyMinisign } from "../src/update.ts";
 
 const dir = join(import.meta.dirname, "fixtures");
 const file = new Uint8Array(readFileSync(join(dir, "payload.bin")));
@@ -34,6 +37,77 @@ describe("minisign", () => {
     expect(assetName("linux", "arm64")).toBe("tunelo-linux-arm64");
     expect(() => assetName("linux", "ia32")).toThrow(/no tunelo build for Linux on ia32/);
     expect(() => assetName("freebsd", "x64")).toThrow(/no tunelo build for freebsd/);
+  });
+
+  it("names the release archive per platform", () => {
+    expect(archiveName("darwin", "arm64")).toBe("tunelo-darwin-arm64.tar.gz");
+    expect(archiveName("darwin", "x64")).toBe("tunelo-darwin-x64.tar.gz");
+    expect(archiveName("linux", "x64")).toBe("tunelo-linux-x64.tar.gz");
+    expect(archiveName("linux", "arm64")).toBe("tunelo-linux-arm64.tar.gz");
+    expect(archiveName("win32", "x64")).toBe("tunelo-windows-x64.zip");
+  });
+});
+
+describe("release archives", () => {
+  const PLATFORMS = [
+    ["darwin", "arm64"],
+    ["darwin", "x64"],
+    ["linux", "x64"],
+    ["linux", "arm64"],
+    ["win32", "x64"],
+  ] as const;
+
+  it("unpacks every archive the release script packs, with the executable files and their signatures", () => {
+    const root = mkdtempSync(join(tmpdir(), "tunelo-package-"));
+    try {
+      const dist = join(root, "dist");
+      mkdirSync(dist);
+      const names = PLATFORMS.flatMap(([os, cpu]) => [assetName(os, cpu), termHostAssetName(os, cpu)]);
+      for (const name of names) {
+        writeFileSync(join(dist, name), `${name} body`);
+        writeFileSync(join(dist, `${name}.minisig`), `${name} signature`);
+      }
+      const script = join(import.meta.dirname, "..", "scripts", "package-release.sh");
+      const run = spawnSync("sh", [script, dist, join(root, "out"), "--signed"], { encoding: "utf8", env: { ...process.env, COPYFILE_DISABLE: "1" } });
+      expect(run.stderr).not.toMatch(/missing/);
+      expect(run.status).toBe(0);
+      const sums = readFileSync(join(root, "out", "SHA256SUMS"), "utf8");
+      for (const [os, cpu] of PLATFORMS) {
+        const archive = archiveName(os, cpu);
+        expect(sums).toContain(`  ${archive}`);
+        const files = unpackArchive(archive, new Uint8Array(readFileSync(join(root, "out", archive))));
+        const want = [assetName(os, cpu), termHostAssetName(os, cpu)];
+        expect([...files.keys()].sort()).toEqual([...want, ...want.map((n) => `${n}.minisig`)].sort());
+        for (const name of want) {
+          expect(new TextDecoder().decode(files.get(name))).toBe(`${name} body`);
+          expect(new TextDecoder().decode(files.get(`${name}.minisig`))).toBe(`${name} signature`);
+        }
+      }
+      // Cut short: the tar's first file ends past the data, the zip lost its directory.
+      const tar = gunzipSync(readFileSync(join(root, "out", archiveName("linux", "x64"))));
+      expect(() => unpackArchive("x.tar.gz", new Uint8Array(gzipSync(tar.subarray(0, 520))))).toThrow("cut short");
+      const zip = readFileSync(join(root, "out", archiveName("win32", "x64")));
+      expect(() => unpackArchive("x.zip", new Uint8Array(zip.subarray(0, zip.length - 30)))).toThrow("not a zip archive");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("stops before packing anything when a file is missing", () => {
+    const root = mkdtempSync(join(tmpdir(), "tunelo-package-"));
+    try {
+      const script = join(import.meta.dirname, "..", "scripts", "package-release.sh");
+      const run = spawnSync("sh", [script, root, join(root, "out")], { encoding: "utf8" });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain("missing");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses broken archives", () => {
+    expect(() => unpackArchive("x.zip", new TextEncoder().encode("not a zip"))).toThrow("not a zip archive");
+    expect(() => unpackArchive("x.tar.gz", new TextEncoder().encode("not gzip"))).toThrow();
   });
 });
 

@@ -34,7 +34,7 @@ let device: KeyPair;
 beforeEach(async () => {
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	machine.handler = (frame) => {
 		switch (frame.body.case) {
 			case "browserView":
@@ -52,8 +52,7 @@ beforeEach(async () => {
 async function openLink(): Promise<MachineLink> {
 	const l = new MachineLink({
 		device: () => Promise.resolve(device),
-		deviceName: "test",
-		pinned: () => Promise.resolve(machine.keys.publicKey),
+		expectedKey: () => machine.keys.publicKey,
 		tunnelUrl: () => URL_A,
 		refreshTunnel: () => Promise.resolve(URL_A),
 		socket: machine.factory,

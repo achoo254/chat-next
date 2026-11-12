@@ -90,7 +90,7 @@ function processTerminal(): Terminal {
 /** Adds `mcp-local-writes` under `tunelo config`. */
 export function registerMcpLocalWritesCommand(config: Command, exits: Exits): void {
 	config
-		.command("mcp-local-writes [action]")
+		.command("mcp-local-writes [action]", { hidden: true })
 		.description(
 			"let MCP clients outside tunelo's claude sessions use write tools (send messages, send requests, open tunnels): on (asks in a terminal), off (default); no action shows the state",
 		)

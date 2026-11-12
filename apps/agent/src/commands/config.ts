@@ -46,7 +46,7 @@ export function describeLocalForward(state: LocalForwardState, running: boolean)
       ? "Forwarding to localhost: on. Localman, signed in with this machine's account, may send requests to localhost:<port> here."
       : "Forwarding to localhost: off. Localman gets “turned off” for this machine. Turn it on with `tunelo config local-forward on`.",
   ];
-  if (!running) lines.push("The background service is not running (tunelo start): nothing is forwarded until it runs.");
+  if (!running) lines.push("The background service is not running (`tunelo login` starts it): nothing is forwarded until it runs.");
   else if (state.enabled && !state.available) lines.push("The tunnel server does not carry these requests yet (or the machine tunnel is not connected): nothing is forwarded for now.");
   lines.push(
     "Never forwarded: Docker, debug, database and admin ports of the built-in list, tunelo's own ports, Claude Code IDE ports, and debug ports of running processes.",
@@ -79,7 +79,7 @@ async function localForward(action: string | undefined, ports: string[]): Promis
 /** Adds `local-forward` under `tunelo config`. */
 export function registerLocalForwardCommand(config: Command, exits: Exits): void {
   config
-    .command("local-forward [action] [ports...]")
+    .command("local-forward [action] [ports...]", { hidden: true })
     .description("let Localman send requests to localhost on this machine: on, off, block <ports…>, unblock <ports…>; no action shows the state")
     .action(exits((action: string | undefined, ports: string[]) => localForward(action, ports)));
 }

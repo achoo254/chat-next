@@ -1,61 +1,68 @@
-// Development only: pair with `tunelo run --port N` on this computer
-// (ws://127.0.0.1:N, no server and no tunnel) using the machine's 6-digit
-// Authenticator code, so every screen can be tried end to end locally. The
-// route and this page do not exist in production builds (router.tsx).
-import { useState } from "react";
+// Development only: reach `tunelo run --port N` on this computer
+// (ws://127.0.0.1:N, no tunnel), so every screen can be tried end to end
+// locally. That tunelo signed in to this account (tunelo login), so it is one
+// of the directory's machines: picking it gives the link the key the account
+// lists for it, and the machine accepts this device like any other device of
+// the account. The route and this page do not exist in production builds
+// (router.tsx).
+import { useEffect, useState, type FormEvent } from "react";
 import { navigate, paths } from "../router.tsx";
-import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
+import { LOCAL_REF, localMachine, setLocalMachine } from "./link/link-hub.ts";
 import { PageHead } from "./page-head.tsx";
-import { CodeInput } from "./code-input.tsx";
-import { pairByCode, pairProblem, pairProblemText } from "./pair-device.tsx";
-import { useHub } from "./use-machines.ts";
+import { useDirectory, useHub } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 export function LocalMachine() {
 	const t = useMachinesCopy();
 	const hub = useHub();
-	const [port, setPort] = useState("47821");
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState("");
+	const directory = useDirectory(hub);
+	const saved = localMachine();
+	const [port, setPort] = useState(String(saved?.port ?? 47821));
+	const [machineId, setMachineId] = useState(saved?.machineId ?? 0);
+	useEffect(() => {
+		hub.refresh().catch(() => undefined);
+	}, [hub]);
 	if (!import.meta.env.DEV) return null;
-	const valid = /^[0-9]{2,5}$/.test(port) && Number(port) < 65536;
-	const connect = (code: string) => {
+	const machines = directory.machines;
+	const chosen = machines.some((m) => m.id === machineId) ? machineId : (machines[0]?.id ?? 0);
+	const valid = /^[0-9]{2,5}$/.test(port) && Number(port) < 65536 && chosen > 0;
+	const connect = (event: FormEvent) => {
+		event.preventDefault();
 		if (!valid) return;
-		setBusy(true);
-		setError("");
-		setLocalPort(Number(port));
-		pairByCode(hub, LOCAL_REF, `ws://127.0.0.1:${port}`, code).then(
-			() => navigate(paths.machine(LOCAL_REF)),
-			(err: unknown) => {
-				setBusy(false);
-				setError(pairProblemText(t, pairProblem(err), t.local.name));
-			},
-		);
+		setLocalMachine({ port: Number(port), machineId: chosen });
+		void hub.reload(LOCAL_REF).catch(() => undefined);
+		navigate(paths.machine(LOCAL_REF));
 	};
 	return (
 		<div className="mx-scroll">
 			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.local.title} />
 			<div className="mx-body">
-				<div className="card pad mx-card narrow">
+				<form className="card pad mx-card narrow" onSubmit={connect}>
 					<p className="muted">{t.local.hint}</p>
 					<label className="mx-field-row">
 						<span>{t.local.port}</span>
 						<input className="input mono" inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value.trim())} />
 					</label>
-					<p className="note">{t.local.code}</p>
-					<CodeInput label={t.local.code} disabled={busy || !valid} onCode={connect} />
-					{busy && (
-						<div className="mx-wait">
-							<span className="spin" aria-hidden="true" />
-							{t.local.connecting}
-						</div>
+					{machines.length === 0 ? (
+						<p className="note">{directory.status === "loading" ? "" : t.local.noMachines}</p>
+					) : (
+						<label className="mx-field-row">
+							<span>{t.local.machine}</span>
+							<select className="input" value={chosen} onChange={(event) => setMachineId(Number(event.target.value))}>
+								{machines.map((m) => (
+									<option key={m.id} value={m.id}>
+										{m.name}
+									</option>
+								))}
+							</select>
+						</label>
 					)}
-					{error !== "" && (
-						<p className="mx-error" role="alert">
-							{error}
-						</p>
-					)}
-				</div>
+					<div className="acts">
+						<button type="submit" className="btn btn-primary" disabled={!valid}>
+							{t.local.connect}
+						</button>
+					</div>
+				</form>
 			</div>
 		</div>
 	);

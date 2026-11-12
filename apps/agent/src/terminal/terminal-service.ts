@@ -166,7 +166,7 @@ export class TerminalService {
       ...(opts.execPath ? { execPath: opts.execPath } : {}),
     });
     this.grants = new Grants({
-      isPaired: (k) => opts.config.deviceStatus(k) === "paired",
+      isPaired: (k) => opts.config.deviceStatus(k) === "trusted",
       call: (cmd, params) => this.supervisor.link.call(cmd, params),
       denied: (k, why) => this.write(toBase64Url(k), `denied (${why})`),
     });
@@ -210,7 +210,7 @@ export class TerminalService {
 
   /** Revoked keys as the terminal process takes them (whole 32-byte keys only). */
   private revokedKeys(): string[] {
-    return this.opts.config.get().revoked.filter(isDeviceKey);
+    return this.opts.config.revokedKeys().filter(isDeviceKey);
   }
 
   /** A device was just revoked (its whole key): its terminal links close now. */
@@ -226,7 +226,7 @@ export class TerminalService {
   }
 
   assertPaired(deviceKey: Uint8Array | undefined): void {
-    if (deviceKey && this.opts.config.deviceStatus(deviceKey) === "paired") return;
+    if (deviceKey && this.opts.config.deviceStatus(deviceKey) === "trusted") return;
     if (deviceKey) this.write(toBase64Url(deviceKey), "denied (not paired)");
     throw new TerminalDenied("this device is not paired with the machine");
   }
@@ -508,7 +508,7 @@ export class TerminalService {
   }
 
   private write(deviceKey: string | undefined, detail: string, at?: number): void {
-    const name = deviceKey ? this.opts.config.get().devices.find((d) => d.key === deviceKey)?.name : undefined;
+    const name = deviceKey ? this.opts.config.deviceName(deviceKey) : undefined;
     this.opts.audit.write({ device: deviceKey ? deviceLabel(deviceKey, name) : "unknown", action: "terminal", path: "", detail, ...(at ? { at } : {}) });
   }
 }

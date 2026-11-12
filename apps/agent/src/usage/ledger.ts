@@ -509,7 +509,7 @@ export class Ledger {
       try {
         this.data = parseIndex(text);
       } catch (err) {
-        return this.block(`${(err as Error).message} (${from}); it is left as it is until deleted (\`tunelo usage delete\`)`);
+        return this.block(`${(err as Error).message} (${from}); it is left as it is until deleted (Usage on the machine's page in Chat)`);
       }
       if (from === this.indexPrev) {
         this.log("usage: the ledger's index was missing; its last copy was taken");
@@ -536,7 +536,7 @@ export class Ledger {
     try {
       old = parseLegacyLedger(text);
     } catch (err) {
-      return this.block(`${(err as Error).message} (${from}); it is left as it is until deleted (\`tunelo usage delete\`)`);
+      return this.block(`${(err as Error).message} (${from}); it is left as it is until deleted (Usage on the machine's page in Chat)`);
     }
     const byMonth = new Map<string, Turn[]>();
     for (const t of old.turns) {
@@ -711,7 +711,7 @@ export class Ledger {
     try {
       return { turns: parseShard(text, month), fromCopy };
     } catch (err) {
-      this.block(`${(err as Error).message}; it is left as it is until deleted (\`tunelo usage delete\`)`);
+      this.block(`${(err as Error).message}; it is left as it is until deleted (Usage on the machine's page in Chat)`);
       throw new LedgerUnreadable(this.blockedBy);
     }
   }

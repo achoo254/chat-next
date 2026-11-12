@@ -96,14 +96,13 @@ let link: TerminalLink;
 async function setup(options: { direct: boolean }): Promise<void> {
 	machine = await FakeMachine.create();
 	const device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	peers = new FakePeers();
 	host = new FakeTerminalHost(machine, peers);
 	machine.handler = (frame, socket) => host.handle(frame, socket) ?? defaultAnswer(frame);
 	carrier = new MachineLink({
 		device: () => Promise.resolve(device),
-		deviceName: "test",
-		pinned: () => Promise.resolve(machine.keys.publicKey),
+		expectedKey: () => machine.keys.publicKey,
 		tunnelUrl: () => URL_A,
 		refreshTunnel: () => Promise.resolve(URL_A),
 		socket: machine.factory,

@@ -27,7 +27,14 @@ type AccessToken struct {
 	ClientID string
 	Scopes   []string
 	Expiry   time.Time
+	// GrantID is the IdP grant the token belongs to (claim grant_id, which
+	// the IdP adds for the tunelo-agent client); "" when absent or longer
+	// than maxGrantIDLength.
+	GrantID string
 }
+
+// maxGrantIDLength is the longest grant_id the IdP issues.
+const maxGrantIDLength = 128
 
 // HasScope reports whether the token carries scope.
 func (t AccessToken) HasScope(scope string) bool {
@@ -37,6 +44,7 @@ func (t AccessToken) HasScope(scope string) bool {
 type accessTokenClaims struct {
 	ClientID string `json:"client_id"`
 	Scope    string `json:"scope"`
+	GrantID  string `json:"grant_id"`
 }
 
 // VerifyAccessToken checks an access token offline against the IdP's JWKS:
@@ -72,5 +80,10 @@ func (p *IdP) VerifyAccessToken(ctx context.Context, raw, audience string) (Acce
 	case c.ClientID == "" || len(c.ClientID) > maxClaimLength:
 		return AccessToken{}, fmt.Errorf("%w: bad client_id", ErrInvalidToken)
 	}
-	return AccessToken{Subject: tok.Subject, ClientID: c.ClientID, Scopes: strings.Fields(c.Scope), Expiry: tok.Expiry}, nil
+	grantID := c.GrantID
+	if len(grantID) > maxGrantIDLength {
+		grantID = ""
+	}
+	return AccessToken{Subject: tok.Subject, ClientID: c.ClientID, Scopes: strings.Fields(c.Scope), Expiry: tok.Expiry,
+		GrantID: grantID}, nil
 }

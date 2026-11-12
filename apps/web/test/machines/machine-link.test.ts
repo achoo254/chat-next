@@ -1,13 +1,16 @@
 // MachineLink against a fake machine running the real handshake: requests by
 // id, pings while active, reconnecting with the thread cursor, ThreadReset,
-// a broken frame, refused devices, and asking the directory for a new tunnel.
+// a broken frame, devices the machine does not know (yet) or that were
+// revoked, a machine key that changed, and asking the directory for a new
+// tunnel.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ItemSchema, Role, ThreadInfoSchema, type Item } from "@achoo254/chat-proto/remote/remote";
-import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
+import { ErrorCode, HandshakeErrorCode, ItemSchema, Role, ThreadInfoSchema, type Item } from "@achoo254/chat-proto/remote/remote";
+import { encodeHandshakeError, generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MachineLink, mergeThreadInfo, RemoteError, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
+import { DeviceRegistrationRefused } from "../../src/machines/link/device-registration.ts";
+import { MachineLink, mergeThreadInfo, RemoteError, UNKNOWN_DEVICE_WAITS_MS, UNSYNCED_RETRY_MS, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
 import { orderedItems } from "../../src/machines/transcript/reducer.ts";
-import { defaultAnswer as defaultAnswerOf, FakeMachine, until } from "./fake-machine.ts";
+import { defaultAnswer as defaultAnswerOf, FakeMachine, until, type FakeSocket } from "./fake-machine.ts";
 
 const URL_A = "wss://abc.tunnel.hoandat.com";
 const URL_B = "wss://def.tunnel.hoandat.com";
@@ -45,7 +48,7 @@ let timers: ReturnType<typeof testTimers>;
 beforeEach(async () => {
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	timers = testTimers();
 });
 
@@ -53,8 +56,7 @@ function link(overrides: Partial<LinkDeps> = {}): MachineLink {
 	let n = 0;
 	return new MachineLink({
 		device: () => Promise.resolve(device),
-		deviceName: "test",
-		pinned: () => Promise.resolve(machine.keys.publicKey),
+		expectedKey: () => machine.keys.publicKey,
 		tunnelUrl: () => URL_A,
 		refreshTunnel: () => Promise.resolve(URL_A),
 		socket: machine.factory,
@@ -66,7 +68,7 @@ function link(overrides: Partial<LinkDeps> = {}): MachineLink {
 }
 
 describe("MachineLink", () => {
-	it("opens with the pinned key, then asks for the machine info and the threads", async () => {
+	it("opens with the key the account lists, then asks for the machine info and the threads", async () => {
 		const l = link();
 		l.start();
 		await until(() => l.snapshot().status.kind === "open", "open");
@@ -339,25 +341,116 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
-	it("stops for good when the device is not paired or not accepted", async () => {
-		const unpaired = link({ pinned: () => Promise.resolve(null) });
-		unpaired.start();
-		await until(() => unpaired.snapshot().status.kind === "failed", "unpaired");
-		expect(unpaired.snapshot().status).toEqual({ kind: "failed", reason: "unpaired" });
-		expect(machine.sockets).toHaveLength(0);
+	it("waits for a machine that does not know this device yet, a little longer each time, then says it refused", async () => {
+		machine.trusted = [];
+		const waits: number[] = [];
+		const l = link({ timers: { ...timers, setTimeout: (fn, ms) => (waits.push(ms), setTimeout(fn, 0)) } });
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "refused");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "refused" });
+		expect(waits).toEqual(UNKNOWN_DEVICE_WAITS_MS);
+		expect(UNKNOWN_DEVICE_WAITS_MS.reduce((a, b) => a + b, 0)).toBe(15_000);
+		expect(machine.sockets).toHaveLength(UNKNOWN_DEVICE_WAITS_MS.length + 1);
+	});
 
-		machine.paired = [];
-		const refused = link();
-		refused.start();
-		await until(() => refused.snapshot().status.kind === "failed", "refused");
-		expect(refused.snapshot().status).toEqual({ kind: "failed", reason: "refused" });
+	it("opens once the machine learns about this device while the link waits", async () => {
+		machine.trusted = [];
+		const l = link({
+			timers: {
+				...timers,
+				setTimeout: (fn) =>
+					setTimeout(() => {
+						// The machine's next heartbeat brought the account's new device.
+						machine.trusted = [device.publicKey];
+						fn();
+					}, 0),
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open after the sync");
+		expect(machine.sockets).toHaveLength(2);
+		l.stop();
+	});
 
+	it("stops for good, without retrying, when the account revoked this device", async () => {
+		machine.trusted = [];
+		machine.revoked = [device.publicKey];
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "revoked");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "revoked" });
+		await new Promise((r) => setTimeout(r, 20));
+		expect(machine.sockets).toHaveLength(1);
+	});
+
+	it("refuses a machine answering with another key than the account lists", async () => {
 		const impostor = await FakeMachine.create();
-		impostor.paired = [device.publicKey];
+		impostor.trusted = [device.publicKey];
 		const changed = link({ socket: impostor.factory });
 		changed.start();
 		await until(() => changed.snapshot().status.kind === "failed", "key changed");
 		expect(changed.snapshot().status).toEqual({ kind: "failed", reason: "key-changed" });
+	});
+
+	it("remembers the key of a link that opened, and refuses a listed key that differs from it without a socket", async () => {
+		const remembered: Uint8Array[] = [];
+		const first = link({ seenKey: () => Promise.resolve(null), rememberKey: (key) => (remembered.push(key), Promise.resolve()) });
+		first.start();
+		await until(() => remembered.length === 1, "the key remembered");
+		expect(remembered[0]).toEqual(machine.keys.publicKey);
+		first.stop();
+
+		const sockets = machine.sockets.length;
+		const other = await generateKeyPair();
+		const changed = link({ seenKey: () => Promise.resolve(machine.keys.publicKey), expectedKey: () => other.publicKey });
+		changed.start();
+		await until(() => changed.snapshot().status.kind === "failed", "key changed");
+		expect(changed.snapshot().status).toEqual({ kind: "failed", reason: "key-changed" });
+		expect(machine.sockets).toHaveLength(sockets);
+	});
+
+	it("waits for the directory while it lists no key for the machine", async () => {
+		let refreshed = 0;
+		const l = link({
+			expectedKey: () => (refreshed >= 2 ? machine.keys.publicKey : null),
+			refreshTunnel: () => {
+				refreshed += 1;
+				return Promise.resolve(URL_A);
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open once the key is listed");
+		expect(refreshed).toBeGreaterThanOrEqual(2);
+		l.stop();
+	});
+
+	it("says the machine cannot reach the chat when it answers BUSY, and asks again only after a long wait", async () => {
+		const waits: number[] = [];
+		let answers = 0;
+		const l = link({
+			timers: { ...timers, setTimeout: (fn, ms) => (waits.push(ms), ms === UNSYNCED_RETRY_MS ? 0 : setTimeout(fn, 0)) },
+			socket: (url) => {
+				answers += 1;
+				// The machine's trusted list is stale: it answers every Hello with BUSY.
+				const socket = machine.factory(url) as FakeSocket;
+				socket.send = () => socket.deliver(encodeHandshakeError(HandshakeErrorCode.BUSY));
+				return socket;
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "unsynced");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "machine-unsynced" });
+		expect(waits).toEqual([UNSYNCED_RETRY_MS]);
+		expect(answers).toBe(1);
+		l.stop();
+	});
+
+	it("says the session must sign in again when the account takes no device from it", async () => {
+		const l = link({ device: () => Promise.reject(new DeviceRegistrationRefused("session-revoked")) });
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "session revoked");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "session-revoked" });
+		expect(machine.sockets).toHaveLength(0);
 	});
 
 	it("never opens an address outside the tunnel domain", async () => {

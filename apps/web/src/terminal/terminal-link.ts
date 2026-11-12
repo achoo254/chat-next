@@ -135,7 +135,7 @@ export interface TerminalLinkDeps {
 }
 
 export type TerminalFailure =
-	/** The machine does not let this device open terminals (not paired, or revoked before). */
+	/** The machine does not let this device open terminals (it does not know this device yet). */
 	| "refused"
 	/** The device was revoked while its terminal was open. */
 	| "revoked"

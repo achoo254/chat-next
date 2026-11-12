@@ -1,12 +1,13 @@
-// This browser's device key for "My machines" (ADR 0013) and the machine keys
-// it pinned, in IndexedDB. The private key is a non-extractable WebCrypto
-// X25519 key: IndexedDB stores the CryptoKey object itself (structured
-// clone), so the key material never exists as bytes the page could read or
-// send anywhere. A browser that cannot keep a CryptoKey there (iOS WebKit
-// reads it back as null) keeps the key as PKCS#8 bytes instead and imports it
-// non-extractable on every load. Ending the session deletes the database
-// (@achoo254/chat-core wipeDeviceKeys); clearing site data does too, after
-// which the device pairs again with the machine's Authenticator code.
+// This browser's device key for "My machines" (ADR 0013) and the key each
+// machine answered with the last time a link opened, in IndexedDB. The
+// private key is a non-extractable WebCrypto X25519 key: IndexedDB stores the
+// CryptoKey object itself (structured clone), so the key material never
+// exists as bytes the page could read or send anywhere. A browser that cannot
+// keep a CryptoKey there (iOS WebKit reads it back as null) keeps the key as
+// PKCS#8 bytes instead and imports it non-extractable on every load. Ending
+// the session deletes the database (@achoo254/chat-core wipeDeviceKeys);
+// clearing site data does too. Either way the device makes a new key and
+// registers it with the account (device-registration.ts).
 import { DEVICE_KEYS_DATABASE } from "@achoo254/chat-core";
 import { exportPrivateKey, generateKeyPair, importKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 
@@ -21,10 +22,12 @@ type StoredDeviceBytes = { readonly publicKey: Uint8Array<ArrayBuffer>; readonly
 export interface DeviceKeyStore {
 	/** The device key, made on first use. */
 	device(): Promise<KeyPair>;
-	/** The machine key pinned for `machine` (a machine id, or "local" in development). */
-	pinned(machine: string): Promise<Uint8Array | null>;
-	pin(machine: string, key: Uint8Array): Promise<void>;
-	forget(machine: string): Promise<void>;
+	/** Drops the device key and makes a new one (the account revoked the old one). */
+	renew(): Promise<KeyPair>;
+	/** The key `machine` (a machine id, or "local" in development) answered with when a link last opened; null before. */
+	seenMachineKey(machine: string): Promise<Uint8Array | null>;
+	rememberMachineKey(machine: string, key: Uint8Array): Promise<void>;
+	forgetMachineKey(machine: string): Promise<void>;
 }
 
 function promised<T>(request: IDBRequest<T>): Promise<T> {
@@ -55,7 +58,7 @@ function storedDevice(value: unknown): KeyPair | null {
 
 /**
  * Asks the browser not to evict this origin's storage under pressure (iOS
- * home-screen apps otherwise can lose the device key and need pairing again).
+ * home-screen apps otherwise can lose the device key and register a new one).
  * Best effort: a refusal or a browser without the call changes nothing.
  */
 async function requestPersistentStorage(): Promise<void> {
@@ -147,8 +150,8 @@ export function deviceKeyStore(
 		const bytes = storedDeviceBytes(existing);
 		if (bytes !== null) return importKeyPair(bytes);
 		// A record that is there but unreadable is not "no key yet": making a new
-		// key over it would silently turn this browser into an unknown device for
-		// every machine it is paired with. Fail instead, so the link retries.
+		// key over it would silently add one more device to the account. Fail
+		// instead, so the link retries.
 		if (existing !== undefined && existing !== null) throw new Error("the stored device key is unreadable");
 		console.info("machines: made a new device key (none was stored)");
 		return createDevice();
@@ -162,14 +165,23 @@ export function deviceKeyStore(
 			});
 			return device;
 		},
-		async pinned(machine) {
+		async renew() {
+			await write(DEVICE, undefined);
+			const next = createDevice();
+			device = next.catch((err: unknown) => {
+				device = null;
+				throw err;
+			});
+			return device;
+		},
+		async seenMachineKey(machine) {
 			return key32(await read(machineKey(machine)));
 		},
-		async pin(machine, key) {
+		async rememberMachineKey(machine, key) {
 			if (key.length !== 32) throw new Error("a machine key is 32 bytes");
 			await write(machineKey(machine), new Uint8Array(key));
 		},
-		async forget(machine) {
+		async forgetMachineKey(machine) {
 			await write(machineKey(machine), undefined);
 		},
 	};

@@ -1,11 +1,13 @@
 // The machine directory on the chat server (MachinesService, ADR 0013): the
-// user's machines with their tunnel address and last heartbeat, renaming,
-// removing a machine and revoking a paired device. tunelo adds a machine by
-// itself with the account it signed in with; there are no install codes. Mapped
-// from the wire (ADR 0001: int64 arrive as bigint below 2^53, leave as number). The
-// server never vouches for a machine key: pairing does.
+// user's machines with their tunnel address, last heartbeat and key, renaming
+// and removing a machine, and the account's devices (registering this one
+// with a proof that it holds its key, listing and revoking them). tunelo adds
+// a machine by itself with the account it signed in with. Mapped from the
+// wire (ADR 0001: int64 arrive as bigint below 2^53, leave as number). The
+// account is the anchor of trust: a device expects the machine key listed
+// here, and a machine accepts the device keys the account lists for it.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
-import { MachinesService, type Machine } from "@achoo254/chat-proto/machines";
+import { MachinesService, type AccountDevice, type KeyChallenge, type Machine } from "@achoo254/chat-proto/machines";
 
 /** A heartbeat this recent counts as online (the agent beats every 60 s). */
 export const ONLINE_MS = 2 * 60_000;
@@ -25,15 +27,43 @@ export interface MachineEntry {
 	/** Unix seconds. */
 	readonly createdAt: number;
 	readonly lastSeenAt: number;
-	/** Tied to the account by tunelo login; false for a machine of an old install code until then. */
-	readonly claimed: boolean;
+	/** The machine's X25519 key the handshake must meet (32 bytes; empty when the server has none). */
+	readonly publicKey: Uint8Array;
+}
+
+/** A device key of the account, as ListDevices returns it. */
+export interface DeviceEntry {
+	readonly publicKey: Uint8Array;
+	readonly name: string;
+	/** "web", "pwa", "ios", "android", … as the device reported it. */
+	readonly platform: string;
+	/** Unix seconds. */
+	readonly createdAt: number;
+	/** 0 before the device opened a link to any machine. */
+	readonly lastSeenAt: number;
+	/** 0 while the key is live. */
+	readonly revokedAt: number;
+	/** Registered by the session that asks: this device. */
+	readonly current: boolean;
+}
+
+export interface DeviceRegistration {
+	readonly publicKey: Uint8Array;
+	readonly name: string;
+	readonly platform: string;
+	/** The challenge as received, and the mac proving the private key (proveKeyPossession). */
+	readonly challenge: KeyChallenge;
+	readonly mac: Uint8Array;
 }
 
 export interface MachinesDirectory {
 	list(): Promise<MachineEntry[]>;
 	rename(id: number, name: string): Promise<MachineEntry>;
 	remove(id: number): Promise<void>;
-	revokeDevice(id: number, deviceKey: Uint8Array): Promise<void>;
+	keyChallenge(): Promise<KeyChallenge>;
+	registerDevice(registration: DeviceRegistration): Promise<DeviceEntry>;
+	devices(): Promise<DeviceEntry[]>;
+	revokeDevice(deviceKey: Uint8Array): Promise<void>;
 }
 
 export function toEntry(m: Machine): MachineEntry {
@@ -48,7 +78,19 @@ export function toEntry(m: Machine): MachineEntry {
 		tunnelUrl: m.tunnelUrl,
 		createdAt: Number(m.createdAt),
 		lastSeenAt: Number(m.lastSeenAt),
-		claimed: m.claimed,
+		publicKey: m.publicKey,
+	};
+}
+
+export function toDevice(d: AccountDevice): DeviceEntry {
+	return {
+		publicKey: d.publicKey,
+		name: d.name,
+		platform: d.platform,
+		createdAt: Number(d.createdAt),
+		lastSeenAt: Number(d.lastSeenAt),
+		revokedAt: Number(d.revokedAt),
+		current: d.current,
 	};
 }
 
@@ -78,9 +120,27 @@ export function createMachinesDirectory(transport: Transport, onUnauthenticated:
 			call(async () => {
 				await client.revokeMachine({ machineId: BigInt(id) });
 			}),
-		revokeDevice: (id, deviceKey) =>
+		keyChallenge: () =>
 			call(async () => {
-				await client.revokeDevice({ machineId: BigInt(id), devicePublicKey: new Uint8Array(deviceKey) });
+				const { challenge } = await client.getDeviceKeyChallenge({});
+				if (challenge === undefined) throw new Error("the server sent no key challenge");
+				return challenge;
+			}),
+		registerDevice: (r) =>
+			call(async () => {
+				const { device } = await client.registerDevice({
+					publicKey: new Uint8Array(r.publicKey),
+					name: r.name,
+					platform: r.platform,
+					proof: { challenge: r.challenge, mac: new Uint8Array(r.mac) },
+				});
+				if (device === undefined) throw new Error("register returned no device");
+				return toDevice(device);
+			}),
+		devices: () => call(async () => (await client.listDevices({})).devices.map(toDevice)),
+		revokeDevice: (deviceKey) =>
+			call(async () => {
+				await client.revokeDevice({ devicePublicKey: new Uint8Array(deviceKey) });
 			}),
 	};
 }

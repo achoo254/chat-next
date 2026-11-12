@@ -1,22 +1,20 @@
 // "Thêm máy này", done in the browser of the machine to add: (1) the AI CLI is
-// installed and signed in, (2) one command installs tunelo with this
-// browser's device key, then asks for the pairing secret, which this page
-// made and shows (it never goes to the server), and signs tunelo in with the
-// account (tunelo login): tunelo then adds the machine to AI Agent by
-// itself, without an install code, (3) the page waits for the new machine in
-// the directory and checks in the first handshake that it knows the secret
-// before pinning its key.
+// installed and signed in, (2) one fixed command (no code, no key: the same
+// for everyone) installs tunelo and runs `tunelo login`, which opens this
+// browser on the account's consent page; once allowed, tunelo adds the
+// machine to the account by itself, (3) the page watches the directory and
+// says "connected" as soon as a new machine (or one of the account's
+// machines that was offline) comes online. Any device signed in to the
+// account can use it then: the account is the anchor of trust.
 import { useEffect, useRef, useState } from "react";
-import { random, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { brand } from "../brand.ts";
 import { Icon } from "../components/screen-icons.tsx";
-import { useI18n } from "../i18n/i18n.tsx";
 import { CopyButton } from "../messaging/ui/parts.tsx";
 import { Link, paths } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import { serverOrigin } from "../server-origin.ts";
-import { confirmTrust } from "./link/pairing.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { reachable } from "./machine-status.ts";
 import type { MachineEntry } from "./machines-client.ts";
 import { PageHead } from "./page-head.tsx";
 import { useHub } from "./use-machines.ts";
@@ -39,50 +37,73 @@ export function detectOs(userAgent: string): Os | "phone" {
 	return /Linux/.test(userAgent) && !/CrOS/.test(userAgent) ? "linux" : "mac";
 }
 
-/** The one command the page shows (macOS and Linux share install.sh); the one-time pairing secret rides in it, so nothing is pasted later. */
-export function installCommand(os: Os, origin: string, deviceKey: string, secret: string, locale: string): string {
-	return os === "windows"
-		? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${deviceKey} ${secret} ${locale}`
-		: `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${deviceKey} ${secret} ${locale}`;
+/** The shells the page has a command for. */
+export type InstallTab = "mac" | "powershell" | "cmd" | "linux";
+
+export const INSTALL_TABS: readonly InstallTab[] = ["mac", "powershell", "cmd", "linux"];
+
+/** The tab shown first: Windows opens on PowerShell. */
+export function defaultTab(os: Os): InstallTab {
+	return os === "windows" ? "powershell" : os;
 }
 
-/** Installs (or updates) tunelo alone, for a machine that is listed already but lacks it. */
-export function quickInstallCommand(os: Os, origin: string, locale: string): string {
-	return os === "windows" ? `& ([scriptblock]::Create((irm ${origin}/agent/install.ps1))) ${locale}` : `curl -fsSL ${origin}/agent/install.sh | sh -s -- ${locale}`;
+/**
+ * The one command of each tab. It carries nothing of the account or of this
+ * browser: the scripts take no arguments, and signing in happens in the
+ * browser tunelo opens. cmd runs the PowerShell script as one line.
+ */
+export function installCommand(tab: InstallTab, origin: string): string {
+	switch (tab) {
+		case "mac":
+		case "linux":
+			return `curl -fsSL ${origin}/agent/install.sh | sh`;
+		case "powershell":
+			return `irm ${origin}/agent/install.ps1 | iex`;
+		case "cmd":
+			return `powershell -NoProfile -c "irm ${origin}/agent/install.ps1 | iex"`;
+	}
 }
 
-type Step =
-	| { readonly kind: "start" }
-	| { readonly kind: "making" }
-	| { readonly kind: "waiting"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number>; readonly until: number }
-	| { readonly kind: "stale"; readonly secret: Uint8Array<ArrayBuffer>; readonly known: ReadonlySet<number> }
-	| { readonly kind: "confirming"; readonly machine: MachineEntry; readonly secret: Uint8Array<ArrayBuffer> }
+/**
+ * The machine the page waits for, from two readings of the directory: a
+ * machine that was not listed before and is online now, else one that was
+ * listed offline and came online (tunelo installed again on it). The newest
+ * first; null while there is none.
+ */
+export function arrivedMachine(before: ReadonlyMap<number, boolean>, machines: readonly MachineEntry[], nowMs: number): MachineEntry | null {
+	const online = machines.filter((m) => reachable(m, nowMs));
+	const fresh = online.filter((m) => !before.has(m.id)).sort((a, b) => b.createdAt - a.createdAt)[0];
+	return fresh ?? online.find((m) => before.get(m.id) === false) ?? null;
+}
+
+/** Each machine of the directory: online now or not. */
+function onlineById(machines: readonly MachineEntry[], nowMs: number): ReadonlyMap<number, boolean> {
+	return new Map(machines.map((m) => [m.id, reachable(m, nowMs)]));
+}
+
+type Wait =
+	| { readonly kind: "waiting"; readonly until: number }
+	| { readonly kind: "stale" }
 	| { readonly kind: "connected"; readonly machine: MachineEntry };
 
 export function AddMachine() {
 	const t = useMachinesCopy();
-	const { locale } = useI18n();
 	const hub = useHub();
-	const [os, setOs] = useState<Os | "phone">(() => detectOs(navigator.userAgent));
-	const [step, setStep] = useState<Step>({ kind: "start" });
-	const [deviceKey, setDeviceKey] = useState("");
+	const os = detectOs(navigator.userAgent);
+	const [tab, setTab] = useState<InstallTab>(() => defaultTab(os === "phone" ? "mac" : os));
+	const [wait, setWait] = useState<Wait>(() => ({ kind: "waiting", until: Date.now() + WAIT_MS }));
 	const [error, setError] = useState("");
+	/** The directory as the page first read it; null until then. */
+	const before = useRef<ReadonlyMap<number, boolean> | null>(null);
 	const busy = useRef(false);
 
+	// Watch the directory: tunelo adds the machine once the user allowed it, then opens its tunnel.
 	useEffect(() => {
-		hub.deps.keys.device().then(
-			(key) => setDeviceKey(toBase64Url(key.publicKey)),
-			() => setError(t.errors.generic),
-		);
-	}, [hub, t]);
-
-	// Wait for the new machine in the directory (tunelo adds it once signed in, then opens its tunnel).
-	useEffect(() => {
-		if (step.kind !== "waiting") return;
+		if (os === "phone" || wait.kind !== "waiting") return;
 		let stopped = false;
-		const timer = window.setInterval(() => {
-			if (Date.now() > step.until) {
-				setStep({ kind: "stale", secret: step.secret, known: step.known });
+		const check = () => {
+			if (Date.now() > wait.until) {
+				setWait({ kind: "stale" });
 				return;
 			}
 			if (busy.current) return;
@@ -90,58 +111,30 @@ export function AddMachine() {
 			hub
 				.refresh()
 				.then((machines) => {
-					const fresh = machines.filter((m) => !step.known.has(m.id) && m.tunnelUrl !== "").sort((a, b) => b.createdAt - a.createdAt)[0];
-					if (fresh !== undefined && !stopped) setStep({ kind: "confirming", machine: fresh, secret: step.secret });
+					if (stopped) return;
+					setError("");
+					const now = Date.now();
+					if (before.current === null) {
+						before.current = onlineById(machines, now);
+						return;
+					}
+					const machine = arrivedMachine(before.current, machines, now);
+					if (machine !== null) setWait({ kind: "connected", machine });
 				})
-				.catch(() => undefined)
+				.catch(() => {
+					if (!stopped) setError(t.errors.generic);
+				})
 				.finally(() => {
 					busy.current = false;
 				});
-		}, POLL_MS);
+		};
+		check();
+		const timer = window.setInterval(check, POLL_MS);
 		return () => {
 			stopped = true;
 			window.clearInterval(timer);
 		};
-	}, [step, hub]);
-
-	// The machine must prove the secret this page made before its key is pinned.
-	useEffect(() => {
-		if (step.kind !== "confirming") return;
-		let active = true;
-		const { machine, secret } = step;
-		hub.deps.keys
-			.device()
-			.then((device) =>
-				confirmTrust({ url: machine.tunnelUrl, device, deviceName: hub.deps.deviceName, socket: hub.deps.socket }, { kind: "install", secret }),
-			)
-			.then((machineKey) => hub.pinned(machine.ref, machineKey))
-			.then(
-				() => {
-					if (active) setStep({ kind: "connected", machine });
-				},
-				() => {
-					if (!active) return;
-					setStep({ kind: "start" });
-					setError(t.addMachine.failed);
-				},
-			);
-		return () => {
-			active = false;
-		};
-	}, [step, hub, t]);
-
-	// The machines already listed are not the new one: read the directory first.
-	const make = () => {
-		setError("");
-		setStep({ kind: "making" });
-		hub.refresh().then(
-			(machines) => setStep({ kind: "waiting", secret: random(32), known: new Set(machines.map((m) => m.id)), until: Date.now() + WAIT_MS }),
-			() => {
-				setStep({ kind: "start" });
-				setError(t.errors.generic);
-			},
-		);
-	};
+	}, [os, wait, hub, t]);
 
 	if (os === "phone") {
 		return (
@@ -157,13 +150,14 @@ export function AddMachine() {
 		);
 	}
 
-	const waiting = step.kind === "waiting" || step.kind === "stale" ? step : null;
-	const checkAgain = () => {
-		if (step.kind === "stale") setStep({ kind: "waiting", secret: step.secret, known: step.known, until: Date.now() + WAIT_MS });
+	const command = installCommand(tab, serverOrigin());
+	const done = wait.kind === "connected";
+	const tabName: Readonly<Record<InstallTab, string>> = {
+		mac: t.addMachine.macos,
+		powershell: t.addMachine.powershell,
+		cmd: t.addMachine.cmd,
+		linux: t.addMachine.linux,
 	};
-	const command = waiting === null || deviceKey === "" ? "" : installCommand(os, serverOrigin(), deviceKey, toBase64Url(waiting.secret), locale);
-	const done = step.kind === "connected";
-	const state = (isDone: boolean, isCurrent: boolean): string | undefined => (isDone ? "is-done" : isCurrent ? "is-current" : undefined);
 	return (
 		<div className="mx-scroll">
 			<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={t.add} subtitle={t.addMachine.subtitle} />
@@ -182,81 +176,55 @@ export function AddMachine() {
 								</a>
 							</p>
 						</li>
-						<li className={state(step.kind === "confirming" || done, step.kind === "start" || step.kind === "making")} data-id="add-machine-command">
-							<h4>{os === "windows" ? t.addMachine.step2Win : t.addMachine.step2Mac}</h4>
-							<div className="mx-step-row">
-								<div className="choice" role="group" aria-label={t.addMachine.osTabs}>
-									<button type="button" aria-pressed={os === "mac"} onClick={() => setOs("mac")}>
-										{t.addMachine.macos}
+						<li className={done ? "is-done" : "is-current"} data-id="add-machine-command">
+							<h4>{t.addMachine.step2}</h4>
+							<div className="choice" role="group" aria-label={t.addMachine.osTabs} data-id="add-machine-tabs">
+								{INSTALL_TABS.map((key) => (
+									<button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} data-id={`add-machine-tab-${key}`}>
+										{tabName[key]}
 									</button>
-									<button type="button" aria-pressed={os === "windows"} onClick={() => setOs("windows")}>
-										{t.addMachine.windows}
-									</button>
-									<button type="button" aria-pressed={os === "linux"} onClick={() => setOs("linux")}>
-										{t.addMachine.linux}
-									</button>
-								</div>
-								{waiting === null && step.kind !== "confirming" && !done && (
-									<button
-										type="button"
-										className="btn btn-primary btn-sm"
-										disabled={step.kind === "making" || deviceKey === ""}
-										onClick={make}
-										data-id="add-machine-make"
-									>
-										{step.kind === "making" ? t.addMachine.making : t.addMachine.make}
-									</button>
-								)}
+								))}
 							</div>
-							{os === "linux" && (
+							{tab === "linux" && (
 								<p className="note" data-id="add-machine-linux-note">
 									{t.addMachine.linuxNote}
 								</p>
 							)}
-							{waiting !== null && (
-								<>
-									<div className="mx-cmd">
-										<code aria-label={t.addMachine.command}>{command}</code>
-										<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
-									</div>
-									<p className="note">{t.addMachine.note}</p>
-								</>
-							)}
+							<div className="mx-cmd" data-id="add-machine-command-text">
+								<code aria-label={t.addMachine.command}>{command}</code>
+								<CopyButton text={command} label={t.addMachine.copy} copiedLabel={t.addMachine.copied} small />
+							</div>
+							<p className="note">{t.addMachine.note}</p>
+							<p className="note">{t.addMachine.remote}</p>
 						</li>
-						<li className={state(done, waiting !== null || step.kind === "confirming")} data-id="add-machine-wait">
+						<li className={done ? "is-done" : undefined} data-id="add-machine-wait">
 							<h4>{t.addMachine.step3}</h4>
-							{step.kind === "waiting" && (
+							{wait.kind === "waiting" && (
 								<div className="mx-wait" role="status">
 									<span className="spin" aria-hidden="true" />
 									{t.addMachine.waiting}
 								</div>
 							)}
-							{step.kind === "stale" && (
+							{wait.kind === "stale" && (
 								<div className="mx-wait">
 									<span className="muted">{t.addMachine.stale}</span>
-									<button type="button" className="btn btn-sm" onClick={checkAgain}>
+									<button type="button" className="btn btn-sm" onClick={() => setWait({ kind: "waiting", until: Date.now() + WAIT_MS })}>
 										{t.addMachine.checkAgain}
 									</button>
 								</div>
 							)}
-							{step.kind === "confirming" && (
-								<div className="mx-wait" role="status">
-									<span className="spin" aria-hidden="true" />
-									{t.addMachine.confirming}
-								</div>
-							)}
-							{done && (
-								<div className="mx-ok" role="status">
+							{wait.kind === "connected" && (
+								<div className="mx-ok" role="status" data-id="add-machine-connected">
 									<Icon name="check" small />
-									{t.addMachine.connected(step.machine.name)}
-									<Link to={paths.machine(step.machine.ref)} className="btn btn-primary btn-sm">
+									{t.addMachine.connected(wait.machine.name)}
+									<Link to={paths.machine(wait.machine.ref)} className="btn btn-primary btn-sm">
 										{t.addMachine.open}
 									</Link>
 								</div>
 							)}
 						</li>
-						{os === "mac" && (
-							<li className={state(false, done)} data-id="add-machine-disk-access">
+						{tab === "mac" && (
+							<li className={done ? "is-current" : undefined} data-id="add-machine-disk-access">
 								<h4>{t.diskAccess.addStep}</h4>
 								<p className="muted">{t.diskAccess.addBody}</p>
 								<DiskAccessGuide />

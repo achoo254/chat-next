@@ -1,6 +1,7 @@
 // One end-to-end encrypted link to one machine (ADR 0013), shared by every
-// thread of that machine: one WebSocket, the handshake with the pinned
-// machine key, sealed frames handled strictly one at a time (the frame
+// thread of that machine: one WebSocket, the handshake with the machine key
+// the account lists (and the one seen last time, if any: a change is refused
+// until the user refreshes the machine), sealed frames handled strictly one at a time (the frame
 // counters must stay in order), requests matched by id, a ping every 10 s
 // while the user looks at the machine, and reconnection with backoff. Every
 // few failures it asks the directory again for the tunnel address (it changes
@@ -35,9 +36,10 @@ import {
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
-import { HandshakeFailure, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
+import { HandshakeFailure, equal, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
 import { applyItems, EMPTY_JOURNAL, resetJournal, type Journal } from "../transcript/reducer.ts";
 import type { PendingSend, ShownAttachment } from "../transcript/tool-fold.ts";
+import { DeviceRegistrationRefused } from "./device-registration.ts";
 import { allowedTunnel, frameBytes, type SocketFactory, type SocketLike } from "./socket.ts";
 
 export const PING_MS = 10_000;
@@ -47,16 +49,32 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const BACKOFF = { baseMs: 1_000, maxMs: 30_000 };
 /** After this many failed attempts in a row, ask the directory for a new address. */
 const REFRESH_AFTER = 3;
+/**
+ * A machine that does not know this device yet may still be fetching the
+ * account's device list: ask again after these waits (about 15 s in all)
+ * before saying it refused.
+ */
+export const UNKNOWN_DEVICE_WAITS_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000];
+/** How long a link waits before asking a machine that could not reach the chat again. */
+export const UNSYNCED_RETRY_MS = 60_000;
 
 export type LinkFailure =
-	/** No machine key is pinned on this device: pair first. */
-	| "unpaired"
-	/** The machine does not know or no longer accepts this device. */
+	/** The machine still does not know this device after waiting for it to sync. */
 	| "refused"
+	/** The account revoked this device. */
 	| "revoked"
-	/** The machine answered with another key than the pinned one. */
+	/** The machine's key is not the one the account lists, or not the one seen last time. */
 	| "key-changed"
-	| "version";
+	| "version"
+	/** A device of this session was revoked: sign in again. */
+	| "session-revoked"
+	/** The account holds as many devices as it may. */
+	| "too-many-devices"
+	/**
+	 * The machine has not reached the chat for too long (or never since it
+	 * started), so it takes no new device: the link tries again now and then.
+	 */
+	| "machine-unsynced";
 
 export type LinkStatus =
 	| { readonly kind: "idle" }
@@ -154,9 +172,14 @@ const systemTimers: Timers = {
 };
 
 export interface LinkDeps {
+	/** This device's key, registered with the account. */
 	readonly device: () => Promise<KeyPair>;
-	readonly deviceName: string;
-	readonly pinned: () => Promise<Uint8Array | null>;
+	/** The machine's key as the directory lists it now; null while unknown. */
+	readonly expectedKey: () => Uint8Array | null;
+	/** The key the machine answered with when a link last opened; null before (or not kept). */
+	readonly seenKey?: () => Promise<Uint8Array | null>;
+	/** Keeps the key of a link that opened. */
+	readonly rememberKey?: (key: Uint8Array) => Promise<void>;
 	/** The tunnel address as the directory knows it now ("" when down). */
 	readonly tunnelUrl: () => string;
 	/** Asks the directory again; resolves with the new address. */
@@ -225,6 +248,10 @@ export class MachineLink {
 	private activities = new Map<string, ThreadActivity>();
 	private readonly activityListeners = new Set<() => void>();
 	private attempt = 0;
+	/** UNKNOWN_DEVICE answers in a row (the machine may still be syncing the account's devices). */
+	private unknownDevice = 0;
+	/** The machine key the current socket expects. */
+	private expected: Uint8Array | null = null;
 	private retryTimer: unknown = null;
 	private pingTimer: unknown = null;
 	private lastHeard = 0;
@@ -289,11 +316,12 @@ export class MachineLink {
 		return !this.stopped;
 	}
 
-	/** Connects (once a key is pinned) and keeps reconnecting until stop(). */
+	/** Connects and keeps reconnecting until stop(). */
 	start(): void {
 		if (!this.stopped) return;
 		this.stopped = false;
 		this.attempt = 0;
+		this.unknownDevice = 0;
 		void this.connect();
 	}
 
@@ -423,25 +451,32 @@ export class MachineLink {
 		this.dropSocket();
 		this.attempt += 1;
 		this.set({ status: { kind: "connecting", attempt: this.attempt } });
-		let pinned: Uint8Array | null;
+		let seen: Uint8Array | null;
 		let device: KeyPair;
 		try {
-			[pinned, device] = await Promise.all([this.deps.pinned(), this.deps.device()]);
-		} catch {
+			[seen, device] = await Promise.all([this.deps.seenKey?.() ?? Promise.resolve(null), this.deps.device()]);
+		} catch (err) {
+			if (err instanceof DeviceRegistrationRefused) return this.fail(err.reason);
 			return this.retry();
 		}
 		if (this.stopped) return;
-		if (pinned === null) return this.fail("unpaired");
 		let url = this.deps.tunnelUrl();
-		// The first attempt without an address (a page opened straight from a
-		// link, before the directory loaded) asks the directory at once.
-		if ((this.attempt === 1 && url === "") || (this.attempt > 1 && (this.attempt - 1) % REFRESH_AFTER === 0)) {
+		// The first attempt without an address or key (a page opened straight
+		// from a link, before the directory loaded) asks the directory at once.
+		const unknown = url === "" || this.deps.expectedKey() === null;
+		if ((this.attempt === 1 && unknown) || (this.attempt > 1 && (this.attempt - 1) % REFRESH_AFTER === 0)) {
 			url = await this.deps.refreshTunnel().catch(() => url);
 			if (this.stopped) return;
 		}
 		// No address (the machine is off or its agent is reconnecting the
-		// tunnel): try again later, asking the directory every few attempts.
-		if (url === "" || !allowedTunnel(url)) return this.retry();
+		// tunnel) or no key yet: try again later, asking the directory every few attempts.
+		const expected = this.deps.expectedKey();
+		if (url === "" || !allowedTunnel(url) || expected === null || expected.length !== 32) return this.retry();
+		if (seen !== null && !equal(seen, expected)) {
+			console.warn("machines: the account lists another key for this machine than the one it answered with before");
+			return this.fail("key-changed");
+		}
+		this.expected = expected;
 		let socket: SocketLike;
 		try {
 			socket = this.deps.socket(url);
@@ -455,7 +490,7 @@ export class MachineLink {
 		let handshake: Awaited<ReturnType<typeof startHandshake>> | null = null;
 		socket.onopen = () => {
 			if (!mine()) return;
-			void startHandshake({ device, deviceName: this.deps.deviceName, trust: { kind: "pinned", machineKey: pinned } }).then(
+			void startHandshake({ device, expectedMachineKey: expected }).then(
 				(started) => {
 					if (!mine()) return;
 					handshake = started;
@@ -492,6 +527,9 @@ export class MachineLink {
 
 	private opened(): void {
 		this.attempt = 0;
+		this.unknownDevice = 0;
+		const key = this.expected;
+		if (key !== null) this.deps.rememberKey?.(key).catch(() => undefined);
 		// The machine sends every prompt and takeover still open again on this connection.
 		this.set({ status: { kind: "open" }, secretPrompts: new Map(), takeovers: new Map() });
 		this.timers.clearInterval(this.pingTimer);
@@ -528,12 +566,16 @@ export class MachineLink {
 		if (err instanceof HandshakeFailure) {
 			switch (err.code) {
 				case HandshakeErrorCode.UNKNOWN_DEVICE:
-					return this.fail("refused");
+					return this.notKnownYet();
 				case HandshakeErrorCode.REVOKED:
 					return this.fail("revoked");
 				case HandshakeErrorCode.VERSION_UNSUPPORTED:
 					return this.fail("version");
+				case HandshakeErrorCode.BUSY:
+					return this.unsynced();
+				case HandshakeErrorCode.MACHINE_KEY_CHANGED:
 				case HandshakeErrorCode.BAD_PROOF:
+					console.warn("machines: the machine answered with another key than the account lists");
 					return this.fail("key-changed");
 				default:
 					break;
@@ -549,6 +591,38 @@ export class MachineLink {
 		this.dropSocket();
 		if (this.stopped || this.current.status.kind === "failed") return;
 		this.retry();
+	}
+
+	/**
+	 * The machine does not know this device: it may not have fetched the
+	 * account's devices since this one registered. Ask again a few times,
+	 * waiting longer each time, then give up.
+	 */
+	private notKnownYet(): void {
+		const wait = UNKNOWN_DEVICE_WAITS_MS[this.unknownDevice];
+		if (wait === undefined) return this.fail("refused");
+		this.unknownDevice += 1;
+		this.dropSocket();
+		if (this.stopped) return;
+		// Waiting for the machine's sync is no failed attempt: the page keeps saying "connecting".
+		this.attempt = Math.max(0, this.attempt - 1);
+		this.set({ status: { kind: "connecting", attempt: Math.max(1, this.attempt) } });
+		this.timers.clearTimeout(this.retryTimer);
+		this.retryTimer = this.timers.setTimeout(() => {
+			this.retryTimer = null;
+			void this.connect();
+		}, wait);
+	}
+
+	/** The machine cannot check this device now: say so, and ask again only after a long wait. */
+	private unsynced(): void {
+		this.fail("machine-unsynced");
+		if (this.stopped) return;
+		this.timers.clearTimeout(this.retryTimer);
+		this.retryTimer = this.timers.setTimeout(() => {
+			this.retryTimer = null;
+			void this.connect();
+		}, UNSYNCED_RETRY_MS);
 	}
 
 	private retry(): void {

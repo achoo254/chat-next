@@ -1,18 +1,20 @@
-// `tunelo update`: fetch the newest tunelo-v* release, check the minisign
-// signatures (key built into this binary) and the SHA-256 (from the signed
-// SHA256SUMS) of both its files, tunelo itself and tunelo-term-host (the
-// terminal process), and only then replace anything: the terminal process
-// goes into a folder named after its version and is staged in
-// `<config>/term-host/bin/next/`, where the agent's supervisor
-// (terminal/host-supervisor.ts) switches to it once no terminal runs; then
-// tunelo's own file is swapped (the previous one kept as `<file>.old`) and
-// the service restarts itself. `tunelo update --rollback` puts the previous
-// release back the same way. (The Tunelo CLI 1.x updated through npm;
-// tunelo has one way: these signed binaries.)
+// `tunelo update`: fetch the newest tunelo-v* release's archive for this
+// platform (`tunelo-<os>-<arch>.tar.gz`, `tunelo-windows-x64.zip`), check its
+// minisign signature (key built into this binary) and its SHA-256 (from the
+// signed SHA256SUMS), unpack it in memory and check the signature of each of
+// the two files inside, tunelo itself and tunelo-term-host (the terminal
+// process), and only then replace anything: the terminal process goes into a
+// folder named after its version (with its signature, which names that
+// version) and is staged in `<config>/term-host/bin/next/`, where the agent's
+// supervisor (terminal/host-supervisor.ts) switches to it once no terminal
+// runs; then tunelo's own file is swapped (the previous one kept as
+// `<file>.old`) and the service restarts itself. `tunelo update --rollback`
+// puts the previous release back the same way, from that release's archive.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
+import { gunzipSync, inflateRawSync } from "node:zlib";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { blake2b } from "@noble/hashes/blake2.js";
 import { z } from "zod";
@@ -58,7 +60,11 @@ export function trustedComment(sigText: string): string {
   return line.startsWith("trusted comment: ") ? line.slice("trusted comment: ".length) : "";
 }
 
-/** Tags of tunelo releases: `tunelo-v<semver>`; other release lines share the repo. */
+/**
+ * Tags of tunelo releases: `tunelo-v<semver>`; other release lines share the
+ * repo. A test release (`tunelo-v3.0.0-rc.1`) does not match, so no machine
+ * updates to it.
+ */
 const RELEASE_TAG = /^tunelo-v(\d+\.\d+\.\d+)$/;
 const VERSION = /^\d+\.\d+\.\d+$/;
 
@@ -75,6 +81,103 @@ export function assetName(os = platform(), cpu = arch()): string {
 /** The release file of the terminal process for the same platform as `assetName`. */
 export function termHostAssetName(os = platform(), cpu = arch()): string {
   return assetName(os, cpu).replace(/^tunelo-/, "tunelo-term-host-");
+}
+
+/**
+ * The file a release publishes for a platform: an archive holding
+ * `assetName` and `termHostAssetName`, each next to its `.minisig`.
+ */
+export function archiveName(os = platform(), cpu = arch()): string {
+  const binary = assetName(os, cpu);
+  return os === "win32" ? binary.replace(/\.exe$/, ".zip") : `${binary}.tar.gz`;
+}
+
+/** A Node Buffer as a plain Uint8Array over the same memory (its `slice` copies, as the readers expect). */
+const plain = (b: Buffer) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+
+/** A NUL-terminated text field of a tar header. */
+function tarField(header: Uint8Array, from: number, length: number): string {
+  const field = header.subarray(from, from + length);
+  const end = field.indexOf(0);
+  return new TextDecoder().decode(end < 0 ? field : field.subarray(0, end));
+}
+
+/** The regular files of a tar archive (ustar, as the release packs it), by name. */
+function readTar(tar: Uint8Array): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>();
+  let at = 0;
+  while (at + 512 <= tar.length) {
+    const header = tar.subarray(at, at + 512);
+    // Two zero blocks end the archive; one is enough to stop reading.
+    if (header.every((b) => b === 0)) break;
+    const sizeText = tarField(header, 124, 12).trim();
+    const size = sizeText === "" ? 0 : Number.parseInt(sizeText, 8);
+    if (!Number.isSafeInteger(size) || size < 0) throw new Error("a tar header has no valid size");
+    const start = at + 512;
+    if (start + size > tar.length) throw new Error("the tar archive is cut short");
+    const type = tarField(header, 156, 1);
+    if (type === "0" || type === "") {
+      const prefix = tarField(header, 257, 6) === "ustar" ? tarField(header, 345, 155) : "";
+      const name = (prefix ? `${prefix}/` : "") + tarField(header, 0, 100);
+      files.set(name.replace(/^(\.\/)+/, ""), tar.slice(start, start + size));
+    }
+    at = start + Math.ceil(size / 512) * 512;
+  }
+  return files;
+}
+
+const ZIP_END = 0x06054b50;
+const ZIP_ENTRY = 0x02014b50;
+const ZIP_LOCAL = 0x04034b50;
+
+/** The files of a zip archive (stored or deflated, no zip64), by name. */
+function readZip(zip: Uint8Array): Map<string, Uint8Array> {
+  const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  const u32 = (at: number) => (at >= 0 && at + 4 <= zip.length ? view.getUint32(at, true) : -1);
+  const u16 = (at: number) => (at >= 0 && at + 2 <= zip.length ? view.getUint16(at, true) : -1);
+  // The end record sits in the last 22 bytes plus at most a 64 KiB comment.
+  let end = -1;
+  for (let i = zip.length - 22; i >= Math.max(0, zip.length - 22 - 0xffff); i--) {
+    if (u32(i) === ZIP_END) {
+      end = i;
+      break;
+    }
+  }
+  if (end < 0) throw new Error("not a zip archive");
+  const files = new Map<string, Uint8Array>();
+  const count = u16(end + 10);
+  let at = u32(end + 16);
+  for (let n = 0; n < count; n++) {
+    if (u32(at) !== ZIP_ENTRY) throw new Error("the zip directory is damaged");
+    const flags = u16(at + 8);
+    const method = u16(at + 10);
+    const packedSize = u32(at + 20);
+    const size = u32(at + 24);
+    const nameLength = u16(at + 28);
+    const local = u32(at + 42);
+    const name = new TextDecoder().decode(zip.subarray(at + 46, at + 46 + nameLength));
+    if (flags & 1) throw new Error(`${name} is encrypted in the zip archive`);
+    if (packedSize === 0xffffffff || size === 0xffffffff || local === 0xffffffff) throw new Error("zip64 archives are not supported");
+    if (u32(local) !== ZIP_LOCAL) throw new Error("the zip archive is damaged");
+    const start = local + 30 + u16(local + 26) + u16(local + 28);
+    if (start + packedSize > zip.length) throw new Error("the zip archive is cut short");
+    const packed = zip.subarray(start, start + packedSize);
+    if (!name.endsWith("/")) {
+      let bytes: Uint8Array;
+      if (method === 0) bytes = packed.slice();
+      else if (method === 8) bytes = plain(inflateRawSync(packed));
+      else throw new Error(`${name} uses an unsupported zip compression (${method})`);
+      if (bytes.length !== size) throw new Error(`${name} has the wrong size in the zip archive`);
+      files.set(name, bytes);
+    }
+    at += 46 + nameLength + u16(at + 30) + u16(at + 32);
+  }
+  return files;
+}
+
+/** The files of a release archive (`archiveName`), by name. */
+export function unpackArchive(name: string, bytes: Uint8Array): Map<string, Uint8Array> {
+  return name.endsWith(".zip") ? readZip(bytes) : readTar(plain(gunzipSync(bytes)));
 }
 
 /** The trusted comment a release signs into each file's signature. */
@@ -144,6 +247,8 @@ type Resolved = {
   currentVersion: string;
   agentAsset: string;
   hostAsset: string;
+  /** The release archive holding both. */
+  archive: string;
   /** The terminal process's file name on this OS. */
   hostBinary: string;
   /** `<config>/term-host/bin`, where the supervisor looks for `current/` and `next/`. */
@@ -169,6 +274,7 @@ async function resolveEnv(env: UpdateEnv): Promise<Resolved> {
     currentVersion: env.currentVersion ?? AGENT_VERSION,
     agentAsset: assetName(env.os, env.cpu),
     hostAsset: termHostAssetName(env.os, env.cpu),
+    archive: archiveName(env.os, env.cpu),
     hostBinary: TERM_HOST_BINARY,
     binDir: join(termHostDir(dir), "bin"),
     versionsDir: join(termHostDir(dir), "versions"),
@@ -466,55 +572,59 @@ function swapAgent(exe: string, incoming: string, aside: string): void {
   }
 }
 
-type Verified = { agent: Uint8Array | undefined; host: Uint8Array; hostSig: string };
+type Verified = { agent: Uint8Array; host: Uint8Array; hostSig: string };
+
+/** One file of an unpacked release archive; throws when the archive lacks it. */
+function archiveEntry(files: Map<string, Uint8Array>, r: Resolved, version: string, name: string): Uint8Array {
+  const bytes = files.get(name);
+  if (!bytes) throw new Error(`${r.archive} of tunelo ${version} has no ${name}; nothing was installed`);
+  return bytes;
+}
 
 /**
- * Downloads the terminal process of `version` (and tunelo's own file when
- * `withAgent`), their signatures and the signed SHA256SUMS, and checks all
- * of them. Nothing on disk changes here.
+ * Downloads this platform's archive of `version`, its signature and the
+ * signed SHA256SUMS; checks the archive against both, unpacks it in memory
+ * and checks the signature of tunelo and of its terminal process inside.
+ * Nothing on disk changes here.
  */
 async function downloadVerified(
   r: Resolved,
   release: Release,
   version: string,
-  withAgent: boolean,
   log: (l: string) => void,
   onProgress?: DownloadProgress,
   onPhase?: (phase: "verifying" | "installing") => void,
 ): Promise<Verified> {
-  const agent = withAgent ? findAsset(release, version, r.agentAsset) : undefined;
-  const host = findAsset(release, version, r.hostAsset);
+  const archive = findAsset(release, version, r.archive);
   const text = (name: string) => fetchBytes(r.fetch, findAsset(release, version, name)).then(decode);
-  const [agentSig, hostSig, sumsSig, sums] = await Promise.all([
-    agent ? text(`${r.agentAsset}.minisig`) : Promise.resolve(""),
-    text(`${r.hostAsset}.minisig`),
-    text(`${SUMS_FILE}.minisig`),
-    text(SUMS_FILE),
-  ]);
+  const [archiveSig, sumsSig, sums] = await Promise.all([text(`${r.archive}.minisig`), text(`${SUMS_FILE}.minisig`), text(SUMS_FILE)]);
 
-  log(withAgent ? `downloading tunelo ${version}…` : `downloading the terminal process of tunelo ${version}…`);
-  // One progress line for both files, in the order they download.
-  const total = (agent?.size ?? 0) + (host.size ?? 0);
-  const agentBytes = agent ? await fetchBytes(r.fetch, agent, onProgress && ((received) => onProgress(received, total))) : undefined;
-  const before = agentBytes?.length ?? 0;
-  const hostBytes = await fetchBytes(r.fetch, host, onProgress && ((received) => onProgress(before + received, total)));
+  log(`downloading tunelo ${version}…`);
+  const bytes = await fetchBytes(r.fetch, archive, onProgress && ((received, total) => onProgress(received, archive.size ?? total)));
 
   onPhase?.("verifying");
   checkSignature(new TextEncoder().encode(sums), sumsSig, version, SUMS_FILE, r.pubkey);
-  const pinned = parseSums(sums);
-  const files: [string, Uint8Array, string][] = [[r.hostAsset, hostBytes, hostSig]];
-  if (agentBytes) files.unshift([r.agentAsset, agentBytes, agentSig]);
-  for (const [name, bytes, sig] of files) {
-    checkSignature(bytes, sig, version, name, r.pubkey);
-    if (pinned.get(name) !== sha256(bytes)) throw new Error(`${name} does not match its SHA-256 in ${SUMS_FILE}; nothing was installed`);
+  checkSignature(bytes, archiveSig, version, r.archive, r.pubkey);
+  if (parseSums(sums).get(r.archive) !== sha256(bytes)) throw new Error(`${r.archive} does not match its SHA-256 in ${SUMS_FILE}; nothing was installed`);
+  let files: Map<string, Uint8Array>;
+  try {
+    files = unpackArchive(r.archive, bytes);
+  } catch (err) {
+    throw new Error(`${r.archive} could not be unpacked (${(err as Error).message}); nothing was installed`, { cause: err });
   }
-  return { agent: agentBytes, host: hostBytes, hostSig };
+  // Each file keeps its own signature: the terminal process's names its
+  // version, which the supervisor and a later update read from disk.
+  const agent = archiveEntry(files, r, version, r.agentAsset);
+  const host = archiveEntry(files, r, version, r.hostAsset);
+  const hostSig = decode(archiveEntry(files, r, version, `${r.hostAsset}.minisig`));
+  checkSignature(agent, decode(archiveEntry(files, r, version, `${r.agentAsset}.minisig`)), version, r.agentAsset, r.pubkey);
+  checkSignature(host, hostSig, version, r.hostAsset, r.pubkey);
+  return { agent, host, hostSig };
 }
 
 /**
  * The running release's own terminal process, when this machine has none
- * (tunelo was installed or updated before its release shipped one, or the
- * file was removed). Returns true when it installed it.
+ * (the file was removed). Returns true when it installed it.
  */
 async function repairTermHost(
   r: Resolved,
@@ -524,9 +634,10 @@ async function repairTermHost(
   onPhase?: (phase: "verifying" | "installing") => void,
 ): Promise<boolean> {
   const release = releases.find((x) => x.tag_name === `tunelo-v${r.currentVersion}`);
-  // Not published (a development build), or a release from before the terminal.
-  if (!release?.assets.some((a) => a.name === r.hostAsset)) return false;
-  const verified = await downloadVerified(r, release, r.currentVersion, false, log, onProgress, onPhase);
+  // Not published (a development build).
+  if (!release?.assets.some((a) => a.name === r.archive)) return false;
+  log(`the terminal process of tunelo ${r.currentVersion} is missing; installing it again`);
+  const verified = await downloadVerified(r, release, r.currentVersion, log, onProgress, onPhase);
   onPhase?.("installing");
   keepTermHostVersion(r, r.currentVersion, verified.host, verified.hostSig);
   pointTermHostAt(r, r.currentVersion);
@@ -554,8 +665,7 @@ export async function update(
       return (await repairTermHost(r, releases, log, onProgress, onPhase)) ? r.currentVersion : null;
     }
     const { release, version } = found;
-    const verified = await downloadVerified(r, release, version, true, log, onProgress, onPhase);
-    if (!verified.agent) throw new Error(`tunelo ${version} did not download`);
+    const verified = await downloadVerified(r, release, version, log, onProgress, onPhase);
 
     // Both files are verified: from here on files change.
     onPhase?.("installing");
@@ -588,32 +698,13 @@ export async function update(
   });
 }
 
-/** The terminal process of `version` from this computer, when one there carries a valid signature. */
-function localTermHost(r: Resolved, version: string, sigText: string): Uint8Array | undefined {
-  const candidates = [
-    join(r.versionsDir, version, r.hostBinary),
-    join(r.binDir, "current", r.hostBinary),
-    // An install by the install script puts it next to tunelo.
-    join(dirname(r.execPath), r.hostBinary),
-  ];
-  for (const path of candidates) {
-    let bytes: Uint8Array;
-    try {
-      bytes = new Uint8Array(readFileSync(path));
-    } catch {
-      continue;
-    }
-    if (verifyMinisign(bytes, sigText, r.pubkey) && trustedComment(sigText) === signedComment(version, r.hostAsset)) return bytes;
-  }
-  return undefined;
-}
-
 /**
  * `tunelo update --rollback`: puts back the release the last `tunelo update`
- * replaced. Its signatures are checked again (fetched from that release)
- * before anything changes; then the terminal process is pointed back (it
- * switches once no terminal runs) and tunelo's `.old` file is restored. The
- * caller restarts the service. Returns the version now installed.
+ * replaced. That release's archive is downloaded and checked again, and the
+ * kept `.old` file must be byte for byte the signed tunelo inside it, before
+ * anything changes; then the terminal process is pointed back (it switches
+ * once no terminal runs) and tunelo's `.old` file is restored. The caller
+ * restarts the service. Returns the version now installed.
  */
 export async function rollback(log: (l: string) => void, env: UpdateEnv = {}): Promise<string> {
   const r = await resolveEnv(env);
@@ -634,27 +725,11 @@ async function rollbackLocked(r: Resolved, log: (l: string) => void): Promise<st
   const release = (await listReleases(r.fetch)).find((x) => x.tag_name === `tunelo-v${record.from}`);
   if (!release) throw new Error(`tunelo ${record.from} is no longer published; nothing was changed`);
 
-  log(`checking the signatures of tunelo ${record.from}…`);
-  const agentSig = decode(await fetchBytes(r.fetch, findAsset(release, record.from, `${r.agentAsset}.minisig`)));
-  checkSignature(oldBytes, agentSig, record.from, r.agentAsset, r.pubkey);
+  const previous = await downloadVerified(r, release, record.from, log);
+  if (!same(oldBytes, previous.agent)) throw new Error(`${old} is not the signed tunelo ${record.from}; nothing was changed`);
 
-  // Releases before the terminal have no terminal process; their tunelo does not use one.
-  let pointed: Pointed = "dropped";
-  const hostSigAsset = release.assets.find((a) => a.name === `${r.hostAsset}.minisig`);
-  if (hostSigAsset) {
-    const hostSig = decode(await fetchBytes(r.fetch, hostSigAsset));
-    let hostBytes = localTermHost(r, record.from, hostSig);
-    if (!hostBytes) {
-      log(`downloading the terminal process of tunelo ${record.from}…`);
-      hostBytes = await fetchBytes(r.fetch, findAsset(release, record.from, r.hostAsset));
-      checkSignature(hostBytes, hostSig, record.from, r.hostAsset, r.pubkey);
-    }
-    keepTermHostVersion(r, record.from, hostBytes, hostSig);
-    pointed = pointTermHostAt(r, record.from);
-  } else {
-    rmSync(join(r.binDir, "next"), { recursive: true, force: true });
-  }
-
+  keepTermHostVersion(r, record.from, previous.host, previous.hostSig);
+  const pointed = pointTermHostAt(r, record.from);
   try {
     swapAgent(exe, old, `${exe}.rollback`);
   } catch (err) {

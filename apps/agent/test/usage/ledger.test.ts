@@ -223,7 +223,7 @@ describe("writing the ledger", () => {
       await expect(ledger.turns()).rejects.toThrow();
       await ledger.save();
       expect(readFileSync(join(dir, name), "utf8")).toBe(text);
-      expect(logs.join("\n")).toContain("usage delete");
+      expect(logs.join("\n")).toContain("until deleted");
       await ledger.delete();
       expect(ledger.blocked).toBeUndefined();
       expect(readdirSync(dir)).toEqual([]);

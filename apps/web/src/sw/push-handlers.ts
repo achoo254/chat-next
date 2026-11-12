@@ -11,12 +11,14 @@
 // - machine pushes (ADR 0013, payload kind "machine"): one per machine (tag
 //   "machine:<id>"), no content, only the machine's name and what it waits
 //   for; a click opens the machine's waiting session (/ai/<id>/s/<thread>).
-//   A device newly paired by the machine's authenticator code comes apart
-//   (tag "machine-paired:<id>", so neither replaces the other), names the
-//   machine only, and opens the machine (/ai/<id>). A usage hint (a running
+//   A usage hint (a running
 //   session went past one of the machine's usage rules) comes apart too, one
 //   per machine (tag "machine-usage:<id>"), names the machine only, and opens
 //   its usage screen (/ai/<id>/usage).
+// - a new device of the account (payload kind "account_device_added", tag
+//   "account-device:<id>", one per device key): names the device and its
+//   platform; a click opens the machines settings with the account's
+//   devices (/ai/machines), where it can be revoked.
 // - pushsubscriptionchange: the browser renewed the subscription; register
 //   the new one for the session (the cookie rides along) over Connect JSON.
 //
@@ -129,8 +131,9 @@ export function parsePayload(raw: unknown): PushPayload | null {
 	};
 }
 
-/** A machine's "needs you", "new device paired" or usage hint push (server/internal/push Payload with kind "machine"). */
+/** A machine's "needs you" or usage hint push (kind "machine"), or a new device of the account (kind "account_device_added"). */
 export interface MachinePushPayload {
+	/** 0 for a new device of the account. */
 	readonly machineId: number;
 	/** The waiting thread; "" when the agent did not say. */
 	readonly sessionId: string;
@@ -144,15 +147,35 @@ export interface MachinePushPayload {
 
 const SESSION_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** Reads a machine payload; null when it is not one. */
+/** The page a new-device push opens: the machines settings, which list the account's devices. */
+export const ACCOUNT_DEVICES_PATH = "/ai/machines";
+const ACCOUNT_DEVICE_TAG = /^account-device:[1-9][0-9]{0,15}$/;
+
+/** Reads a new-device push; null when it is not one. */
+function parseAccountDevicePayload(raw: Record<string, unknown>): MachinePushPayload | null {
+	const { title, body, tag, ts } = raw;
+	if (typeof title !== "string" || typeof body !== "string" || typeof tag !== "string" || !ACCOUNT_DEVICE_TAG.test(tag)) return null;
+	return {
+		machineId: 0,
+		sessionId: "",
+		title,
+		body,
+		tag,
+		timestamp: typeof ts === "number" && Number.isFinite(ts) ? ts : Date.now(),
+		path: ACCOUNT_DEVICES_PATH,
+	};
+}
+
+/** Reads a machine payload (or a new device of the account); null when it is not one. */
 export function parseMachinePayload(raw: unknown): MachinePushPayload | null {
 	if (typeof raw !== "object" || raw === null) return null;
 	const { kind, machine_id: machineId, session_id: sessionId, title, body, tag, ts } = raw as Record<string, unknown>;
+	if (kind === "account_device_added") return parseAccountDevicePayload(raw as Record<string, unknown>);
 	if (kind !== "machine") return null;
 	if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
 	if (typeof title !== "string" || typeof body !== "string") return null;
 	const usage = tag === `machine-usage:${machineId}`;
-	if (tag !== `machine:${machineId}` && tag !== `machine-paired:${machineId}` && !usage) return null;
+	if (tag !== `machine:${machineId}` && !usage) return null;
 	const session = tag === `machine:${machineId}` && typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
 	const path = usage ? `/ai/${machineId}/usage` : session === "" ? `/ai/${machineId}` : `/ai/${machineId}/s/${session}`;
 	return {

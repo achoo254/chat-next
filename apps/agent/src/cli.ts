@@ -1,36 +1,33 @@
 #!/usr/bin/env node
-// tunelo: the one process of the ecosystem on the user's machine. Tunnels to
-// localhost (the commands of the Tunelo CLI 1.x: http, tcp, login, whoami,
-// link, watch, mcp…), and, as a background service, lets the user's own
-// devices drive the AI coding CLI installed here, end-to-end encrypted.
+// tunelo: the one process of the ecosystem on the user's machine. As a
+// background service it lets the devices of the user's account drive the AI
+// coding CLI installed here, end-to-end encrypted; it also opens tunnels to
+// localhost (http, tcp, kill, watch). `tunelo login` connects the machine,
+// `tunelo logout` takes it out of the account, `tunelo uninstall` removes it.
 import { Command } from "commander";
+import { configureGroupedHelp } from "./cli-help.ts";
 import { ConfigStore, configDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerLocalForwardCommand } from "./commands/config.ts";
+import { logout } from "./commands/logout.ts";
 import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
-import { registerAuthenticatorCommand } from "./commands/authenticator.ts";
-import { registerInstallCommand } from "./commands/install.ts";
-import { registerProfilesCommand } from "./commands/profiles.ts";
-import { registerSecretsCommand } from "./commands/secrets.ts";
-import { registerBrowserCommand } from "./commands/browser.ts";
-import { registerUsageCommand } from "./commands/usage.ts";
+import { status } from "./commands/status.ts";
+import { uninstall } from "./commands/uninstall.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
 import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
-import { startService, stopService, uninstallService } from "./service.ts";
-import { diskAccess, diskAccessSteps } from "./safety/disk-access.ts";
+import { startService, stopService } from "./service.ts";
+import { diskAccess } from "./safety/disk-access.ts";
 import { dropInheritedMarkers } from "./startup-env.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
 import { registerHttpCommand } from "./tunnels/cli-http-command.js";
-import { registerLinkCommands } from "./tunnels/cli-link-command.js";
-import { registerLoginCommands } from "./tunnels/cli-login-command.js";
-import { registerKillCommand, tunnelRunLines } from "./tunnels/cli-status-commands.js";
+import { registerLoginCommand } from "./tunnels/cli-login-command.js";
+import { registerKillCommand } from "./tunnels/cli-status-commands.js";
 import { registerTcpCommand } from "./tunnels/cli-tcp-command.js";
 import { registerWatchCommand } from "./tunnels/cli-watch-command.js";
-import { registerWhoamiCommand } from "./tunnels/cli-whoami-command.js";
 import { Display } from "./tunnels/display.js";
 import { TunnelService } from "./tunnels/tunnel-service.ts";
 import { checkForUpdate, rollback, update } from "./update.ts";
@@ -111,38 +108,6 @@ async function printJson(path: string): Promise<number> {
   return 0;
 }
 
-/**
- * `tunelo status`: exit 1 when the background service is not running (the
- * Windows restart loop relies on it). For a person at a terminal, the
- * tunnels of this machine come first; with `--json` or when the output goes
- * to a program, only the service's JSON, as before.
- */
-async function status(options: { json?: boolean }): Promise<number> {
-  const dir = configDir();
-  const forPeople = !options.json && process.stdout.isTTY === true;
-  if (forPeople) for (const line of tunnelRunLines()) console.log(line);
-  let service: unknown;
-  try {
-    service = await callControl(dir, "GET", "/status");
-  } catch (err) {
-    console.error((err as Error).message);
-    return 1;
-  }
-  if (!forPeople) {
-    console.log(JSON.stringify(service, null, 2));
-    return 0;
-  }
-  const held = (await callControl(dir, "GET", "/tunnels").catch(() => ({ mcp: [] }))) as { mcp?: { id: string; protocol: string; url: string; localPort: number }[] };
-  for (const t of held.mcp ?? []) console.log(`MCP ${t.id}  [${t.protocol}]  ${t.url} → :${t.localPort}`);
-  console.log("Background service:");
-  console.log(JSON.stringify(service, null, 2));
-  if ((service as { fullDiskAccess?: unknown }).fullDiskAccess === "needed") {
-    console.log("");
-    for (const line of diskAccessSteps(process.execPath, false)) console.log(line);
-  }
-  return 0;
-}
-
 /** Shows download progress: one rewritten line on a terminal, a line per quarter when output is piped. */
 function downloadProgressPrinter(): (received: number, total: number) => void {
   const mb = (n: number) => (n / 1_048_576).toFixed(1);
@@ -218,41 +183,31 @@ async function setTrust(dir: string | undefined, trusted: boolean): Promise<numb
   return 0;
 }
 
-function buildProgram(): Command {
+export function buildProgram(): Command {
   const program = new Command();
   const display = new Display();
   program
     .name("tunelo")
     .version(AGENT_VERSION)
-    .description("Tunnels to localhost, and your own devices driving the AI coding CLI of this machine, end-to-end encrypted")
+    .description("Your account's devices driving the AI coding CLI of this machine, end-to-end encrypted; and tunnels to localhost")
     .hook("preAction", async () => {
       // Older installs left their sign-ins in plain text; move them under the key store once.
       await importLegacySignIns(configDir()).catch((err: Error) => console.error(`tunelo: could not move the earlier sign-in yet (${err.message})`));
     });
+  configureGroupedHelp(program);
 
-  // The background service and this machine in AI Agent.
-  registerInstallCommand(program);
-  program.command("start").description("run in the background (keeps running after the terminal closes)").action(exits(start));
+  // The machine.
+  registerLoginCommand(program);
   program
-    .command("stop")
-    .description("stop the background service until tunelo start or the next login")
-    .action(
-      exits(async () => {
-        await stopService(configDir());
-        console.log("tunelo stopped. `tunelo start` starts it again; it also starts at the next login.");
-        return 0;
-      }),
-    );
+    .command("logout")
+    .description("take this machine out of your account: Chat, Localman, the background service and the sign-in (keeps the binary)")
+    .option("-f, --force", "without the network, forget the machine on this side anyway")
+    .action(exits((options: { force?: boolean }) => logout(configDir(), { force: options.force === true })));
   program
-    .command("uninstall")
-    .description("stop starting at login")
-    .action(
-      exits(async () => {
-        await uninstallService(configDir());
-        console.log("tunelo no longer starts at login. Remove the machine on the web to forget it there.");
-        return 0;
-      }),
-    );
+    .command("status")
+    .description("show the account, this machine in AI Agent, the background service and the tunnels")
+    .option("--json", "as JSON (also when the output is not a terminal)")
+    .action(exits(status));
   program
     .command("update")
     .description("install the newest signed release and restart")
@@ -260,66 +215,55 @@ function buildProgram(): Command {
     .option("--rollback", "Put back the release the last update replaced (signatures checked again), then restart")
     .action(exits(updateCommand));
   program
-    .command("run")
-    .description("run in this terminal only (closing it stops tunelo)")
-    .option("--port <n>", "local port of the device link")
-    .action(async (options: { port?: string }) => {
-      await runAgent(configDir(), options.port ? ["--port", options.port] : []);
-    });
-  program
-    .command("status")
-    .description("show the tunnels of this machine, and machine, AI and session status")
-    .option("--json", "only the status of the background service, as JSON (also when the output is not a terminal)")
-    .action(exits(status));
+    .command("uninstall")
+    .description("log out, then remove tunelo from this machine: service, settings, keys, PATH entry and binary")
+    .action(exits(() => uninstall(configDir())));
   program
     .command("logs")
     .description("show the last lines of the log")
     .option("-n, --lines <count>", "how many lines", "50")
     .option("-f, --follow", "keep following it")
     .action(logs);
-  const devices = program.command("devices").description("list or revoke paired devices");
-  devices.command("list", { isDefault: true }).description("list paired devices").action(exits(() => printJson("/devices")));
-  devices
-    .command("revoke <key>")
-    .description("revoke a paired device (first characters of its key)")
+
+  // Kept off the help: the service's own controls, and what only a person at
+  // this machine may change (never offered to the AI or the web).
+  program.command("start", { hidden: true }).description("run in the background (keeps running after the terminal closes)").action(exits(start));
+  program
+    .command("stop", { hidden: true })
+    .description("stop the background service until tunelo login or the next login")
     .action(
-      exits(async (key: string) => {
-        console.log(JSON.stringify(await callControl(configDir(), "POST", "/devices/revoke", { key })));
+      exits(async () => {
+        await stopService(configDir());
+        console.log("tunelo stopped. `tunelo login` starts it again; it also starts at the next login.");
         return 0;
       }),
     );
-  program.command("audit").description("show the consent log").action(exits(() => printJson("/audit")));
   program
-    .command("trust [dir]")
+    .command("run", { hidden: true })
+    .description("run in this terminal only (closing it stops tunelo)")
+    .option("--port <n>", "local port of the device link")
+    .action(async (options: { port?: string }) => {
+      await runAgent(configDir(), options.port ? ["--port", options.port] : []);
+    });
+  program
+    .command("trust [dir]", { hidden: true })
     .description("let a folder's own .claude settings load (default: current folder)")
     .action(exits((dir: string | undefined) => setTrust(dir, true)));
   program
-    .command("untrust [dir]")
+    .command("untrust [dir]", { hidden: true })
     .description("stop loading that folder's .claude settings")
     .action(exits((dir: string | undefined) => setTrust(dir, false)));
-  program.command("trusted").description("list trusted folders").action(exits(() => printJson("/trust")));
-  registerProfilesCommand(program, exits);
-  registerAuthenticatorCommand(program, exits);
-  registerSecretsCommand(program, exits);
-  registerBrowserCommand(program, exits);
-  registerUsageCommand(program, exits);
+  program.command("trusted", { hidden: true }).description("list trusted folders").action(exits(() => printJson("/trust")));
   // The running service asks a new copy of itself whether macOS granted Full Disk Access.
   program
     .command("disk-access", { hidden: true })
     .description("print whether this process has Full Disk Access (granted, needed, not-applicable)")
     .action(() => console.log(diskAccess()));
-  program
-    .command("version")
-    .description("print the version")
-    .action(() => console.log(AGENT_VERSION));
+  registerMcpCommand(program);
 
-  // Tunnels: the commands of the Tunelo CLI 1.x.
+  // Tunnels.
   registerHttpCommand(program, display);
   registerTcpCommand(program, display);
-  registerLoginCommands(program);
-  registerWhoamiCommand(program);
-  registerLinkCommands(program);
-  registerMcpCommand(program);
   registerKillCommand(program);
   registerWatchCommand(program);
   const configCommand = registerConfigCommand(program);

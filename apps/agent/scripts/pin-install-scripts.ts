@@ -1,8 +1,9 @@
 // The pins of the install scripts for one tunelo release: version, SHA-256 of
-// each released file (from the release's SHA256SUMS) and the minisign key.
-// Every platform gets two files: tunelo and tunelo-term-host (the terminal
-// process). Pure text in, text out; pin-release.ts reads and writes the files.
-import { MINISIGN_PUBKEY, assetName, parseSums, termHostAssetName } from "../src/update.ts";
+// each platform's archive (from the release's SHA256SUMS) and the minisign
+// key. An archive holds tunelo and tunelo-term-host (the terminal process),
+// each with its signature. Pure text in, text out; pin-release.ts reads and
+// writes the files.
+import { MINISIGN_PUBKEY, archiveName, parseSums } from "../src/update.ts";
 
 export interface InstallScripts {
   /** apps/web/public/agent/install.sh (macOS, Linux) */
@@ -20,7 +21,7 @@ const PLATFORMS = [
 ] as const;
 
 /** Every file a release must list in SHA256SUMS for the install scripts. */
-export const PINNED_ASSETS = [...PLATFORMS.map(([os, cpu]) => assetName(os, cpu)), ...PLATFORMS.map(([os, cpu]) => termHostAssetName(os, cpu))] as const;
+export const PINNED_ASSETS = PLATFORMS.map(([os, cpu]) => archiveName(os, cpu));
 
 function replaceAll(file: string, text: string, pairs: readonly (readonly [RegExp, string])[]): string {
   let s = text;
@@ -43,21 +44,18 @@ export function pinInstallScripts(version: string, sumsText: string, scripts: In
   const shPin = (variable: string, file: string) => [new RegExp(`^${variable}=".*"$`, "m"), `${variable}="${need(file)}"`] as const;
   const sh = replaceAll("install.sh", scripts.sh, [
     [/^TUNELO_VERSION=".*"$/m, `TUNELO_VERSION="${version}"`],
-    shPin("SHA256_DARWIN_ARM64", assetName("darwin", "arm64")),
-    shPin("SHA256_DARWIN_X64", assetName("darwin", "x64")),
-    shPin("SHA256_LINUX_X64", assetName("linux", "x64")),
-    shPin("SHA256_LINUX_ARM64", assetName("linux", "arm64")),
-    shPin("SHA256_TERM_HOST_DARWIN_ARM64", termHostAssetName("darwin", "arm64")),
-    shPin("SHA256_TERM_HOST_DARWIN_X64", termHostAssetName("darwin", "x64")),
-    shPin("SHA256_TERM_HOST_LINUX_X64", termHostAssetName("linux", "x64")),
-    shPin("SHA256_TERM_HOST_LINUX_ARM64", termHostAssetName("linux", "arm64")),
+    shPin("SHA256_DARWIN_ARM64", archiveName("darwin", "arm64")),
+    shPin("SHA256_DARWIN_X64", archiveName("darwin", "x64")),
+    shPin("SHA256_LINUX_X64", archiveName("linux", "x64")),
+    shPin("SHA256_LINUX_ARM64", archiveName("linux", "arm64")),
     [/^MINISIGN_PUBKEY=".*"$/m, `MINISIGN_PUBKEY="${MINISIGN_PUBKEY}"`],
   ]);
+  // install.ps1 runs inside `& { … }`, so its pin lines are indented.
+  const psPin = (variable: string, value: string) => [new RegExp(`^([ \\t]*)\\$${variable} = '.*'$`, "m"), `$1$$${variable} = '${value}'`] as const;
   const ps1 = replaceAll("install.ps1", scripts.ps1, [
-    [/^\$TuneloVersion = '.*'$/m, `$TuneloVersion = '${version}'`],
-    [/^\$Sha256WindowsX64 = '.*'$/m, `$Sha256WindowsX64 = '${need(assetName("win32", "x64"))}'`],
-    [/^\$Sha256TermHostWindowsX64 = '.*'$/m, `$Sha256TermHostWindowsX64 = '${need(termHostAssetName("win32", "x64"))}'`],
-    [/^\$MinisignPubKey = '.*'$/m, `$MinisignPubKey = '${MINISIGN_PUBKEY}'`],
+    psPin("TuneloVersion", version),
+    psPin("Sha256WindowsX64", need(archiveName("win32", "x64"))),
+    psPin("MinisignPubKey", MINISIGN_PUBKEY),
   ]);
   return { sh, ps1 };
 }

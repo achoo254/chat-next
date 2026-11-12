@@ -12,7 +12,6 @@ import { toBinary } from "@bufbuild/protobuf";
 import { ErrorReason, FrameSchema, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type WebSocket as WsSocket, WebSocketServer } from "ws";
-import { runSecrets } from "../src/commands/secrets.ts";
 import { ConfigStore } from "../src/config.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
 import { forgetSecrets, redact, redactDeep, redactSecrets, rememberSecret, secretVariants } from "../src/mcp/redact.ts";
@@ -509,23 +508,6 @@ describe("tunelo's MCP", () => {
 		const ref = (JSON.parse((result.content[0] as { text: string }).text) as { ref: string }).ref;
 		host.release(ticket);
 		expect(await service.store.reveal(ref.replace("secret://", ""))).toBeUndefined();
-	});
-});
-
-describe("tunelo secrets", () => {
-	it("lists without values and removes by id, logging the removal", async () => {
-		const dir = tempDir("cli-");
-		const held = await new SecretStore(dir).save("https://github.com", "GH_PASSWORD", VALUE);
-		const lines: string[] = [];
-		expect(await runSecrets("list", undefined, dir, (l) => lines.push(l))).toBe(0);
-		expect(lines.join("\n")).toContain(`${held.id}  https://github.com  GH_PASSWORD`);
-		expect(lines.join("\n")).not.toContain(VALUE);
-		expect(await runSecrets("remove", held.id, dir, (l) => lines.push(l))).toBe(0);
-		await expect(runSecrets("remove", held.id, dir, () => undefined)).rejects.toThrow(/no secret/);
-		expect(readFileSync(join(dir, "audit.jsonl"), "utf8")).toContain("secret_remove");
-		const empty: string[] = [];
-		await runSecrets("list", undefined, dir, (l) => empty.push(l));
-		expect(empty).toEqual(["No sign-in secrets are kept on this machine."]);
 	});
 });
 

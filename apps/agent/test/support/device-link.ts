@@ -1,12 +1,14 @@
-// A paired device talking to the machine's Connection over in-memory sockets,
+// A device of the account talking to the machine's Connection over in-memory sockets,
 // for tests that go through the end-to-end link: it sends sealed frames and
 // waits for the answer with a given id.
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import { type Frame, FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
-import { type Session, TotpPairing, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
+import { type Session, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
 import type { ConfigStore } from "../../src/config.ts";
 import type { AgentCore } from "../../src/core/agent-core.ts";
+import { DeviceTrust } from "../../src/device-trust.ts";
 import { Connection } from "../../src/link/connection.ts";
+import { trustDevice } from "./trusted-devices.ts";
 import type { ClaudeProfiles } from "../../src/profiles/service.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
 import type { LocalForward } from "../../src/tunnels/forward.ts";
@@ -42,7 +44,7 @@ export async function pairedDevice(ctx: {
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
   const device = await generateKeyPair();
-  ctx.config.addDevice(device.publicKey, "phone");
+  trustDevice(ctx.config, device.publicKey, "phone");
   const inbox: Uint8Array[] = [];
   let wake: (() => void) | undefined;
   const conn = new Connection(
@@ -64,8 +66,8 @@ export async function pairedDevice(ctx: {
       ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
       ...(ctx.workspaces ? { workspaces: ctx.workspaces } : {}),
       ...(ctx.usage ? { usage: ctx.usage } : {}),
-      auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
-      pairing: new TotpPairing(),
+      machineKey: () => machineKey,
+      trust: new DeviceTrust({ config: ctx.config }),
       machineInfo:
         ctx.machineInfo ??
         (async () => {
@@ -73,7 +75,6 @@ export async function pairedDevice(ctx: {
         }),
       isSensitive: () => false,
       onPing: () => undefined,
-      onPaired: () => undefined,
     },
   );
   const next = async (): Promise<Uint8Array> => {
@@ -83,7 +84,7 @@ export async function pairedDevice(ctx: {
       await new Promise<void>((r) => (wake = r));
     }
   };
-  const hs = await startHandshake({ device, deviceName: "phone", trust: { kind: "pinned", machineKey: machineKey.publicKey } });
+  const hs = await startHandshake({ device, expectedMachineKey: machineKey.publicKey });
   conn.receive(hs.hello);
   const { session }: { session: Session } = await hs.finish(await next());
   const received: Frame[] = [];

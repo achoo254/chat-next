@@ -178,7 +178,7 @@ export async function installService(configDir: string, cmd = command()): Promis
 /** Starts the background agent now (it already starts at login). */
 export async function startService(configDir: string, cmd = command()): Promise<void> {
   if (process.platform === "darwin") {
-    if (!existsSync(plistFile())) throw new Error("tunelo is not installed on this Mac; add the machine from the web first");
+    if (!existsSync(plistFile())) throw new Error("tunelo does not run in the background on this Mac yet; run `tunelo login`");
     await run("launchctl", ["bootstrap", `gui/${process.getuid?.() ?? 0}`, plistFile()]).catch(() => undefined);
     await run("launchctl", ["kickstart", launchdTarget()]);
     return;

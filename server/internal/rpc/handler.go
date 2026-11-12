@@ -14,6 +14,7 @@ import (
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/hooks"
+	"app.local/server/internal/keyproof"
 	"app.local/server/internal/media"
 	"app.local/server/internal/miniapp"
 	"app.local/server/internal/privacy"
@@ -58,10 +59,15 @@ type Deps struct {
 	Feedback FeedbackReplier
 	// Announcer sends operators' announcements through the assistant bot;
 	// nil when the assistant is off (the announcement calls then fail).
-	Announcer  Announcer
-	TenantID   string
-	TenantName string
-	Logger     *slog.Logger
+	Announcer Announcer
+	// KeyProofs makes and checks the device key challenges
+	// (MachinesService.RegisterDevice).
+	KeyProofs *keyproof.Issuer
+	// MachineGrants revokes the IdP grant of a removed machine.
+	MachineGrants MachineGrants
+	TenantID      string
+	TenantName    string
+	Logger        *slog.Logger
 }
 
 // compressMinBytes: smaller answers go out uncompressed.
@@ -75,6 +81,9 @@ const compressMinBytes = 1024
 func NewHandler(d Deps) (http.Handler, error) {
 	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.MiniApp == nil || d.Push == nil || d.Privacy == nil || d.SignIn == nil {
 		return nil, errors.New("rpc: chat, hooks, bot, Mini App, push, privacy and sign-in services are required")
+	}
+	if d.KeyProofs == nil || d.MachineGrants == nil || d.Sessions == nil {
+		return nil, errors.New("rpc: sessions, key proofs and machine grants are required")
 	}
 	var uploadMax int64
 	if d.Media != nil {
@@ -117,7 +126,10 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{
 		privacy: d.Privacy, store: d.Store, tenantID: d.TenantID, logger: d.Logger,
 	}, opts...))
-	mux.Handle(appv1connect.NewMachinesServiceHandler(&machinesService{store: d.Store, tenantID: d.TenantID, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewMachinesServiceHandler(&machinesService{
+		store: d.Store, sessions: d.Sessions, notifier: d.Push, keyProofs: d.KeyProofs, grants: d.MachineGrants,
+		tenantID: d.TenantID, logger: d.Logger,
+	}, opts...))
 	mux.Handle(appv1connect.NewAgentProjectsServiceHandler(&agentProjectsService{
 		store: d.Store, announce: d.Chat, tenantID: d.TenantID, logger: d.Logger,
 	}, opts...))

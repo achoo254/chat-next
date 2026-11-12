@@ -3,6 +3,7 @@
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-11-08
 - Bổ sung bởi [ADR 0014](./0014-tunelo-machine-agent.md): Tunelo là tiến trình máy duy nhất, máy đăng ký theo tài khoản (không còn mã cài), profile Claude, Localman gọi `localhost` của máy.
+- Sửa ngày 2026-11-12 (tunelo 3.0): tài khoản là gốc tin cậy cả hai chiều, thay ghép thiết bị bằng lệnh cài và mã Authenticator (mục "Tài khoản là gốc tin cậy").
 
 ## Bối cảnh
 
@@ -14,36 +15,37 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 
 - Máy B chạy `tunelo` (`apps/agent`, xem "Cài đặt và phát hành tunelo"): một file chạy duy nhất, giữ các phiên AI qua adapter. Adapter đầu tiên chạy `claude` CLI người dùng đã cài, qua Claude Agent SDK.
 - Máy A nối tới máy B qua relay Tunelo (`wss://<subdomain>.tunnel.hoandat.com`). Tiến trình nền mở WebSocket server trên `127.0.0.1` và cho tunnel chuyển tới đó.
-- Server Chat chỉ là danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối) và bắn Web Push không chứa nội dung. Máy đăng ký theo tài khoản của chủ (ADR 0014); mã cài trước đây chỉ còn cho máy cũ tới bước dọn. Server không phải gốc tin cậy cho khoá máy B và không thấy nội dung.
+- Server Chat giữ danh bạ máy (tên, OS, khoá công khai, địa chỉ tunnel, lần thấy cuối) và danh bạ khoá thiết bị của tài khoản, và bắn Web Push không chứa nội dung. Máy đăng ký theo tài khoản của chủ (ADR 0014). Server là gốc tin cậy cho khoá ở cả hai chiều (mục "Tài khoản là gốc tin cậy") nhưng không thấy nội dung.
 - Không dùng Bot API của Chat: bot đi qua server và lưu tin nhắn, trái với yêu cầu nội dung chỉ nằm ở hai đầu.
 
 ### Giao thức và mã hoá (`proto/remote/v1/remote.proto`, `packages/remote-protocol`)
 
 - Trước bắt tay chỉ có `Plain` (khoá công khai, bằng chứng); sau bắt tay mỗi tin WebSocket là một `Frame` đã niêm phong.
-- Bắt tay kiểu Noise KK: A gửi khoá tạm + khoá tĩnh + nonce; B kiểm khoá tĩnh của A nằm trong danh sách đã ghép; hai bên tính `ee`, `es`, `se` (X25519, WebCrypto), HKDF-SHA256 với salt = SHA-256(nonceA ‖ nonceB) và info = băm transcript, ra hai khoá một chiều + mã phiên 15 byte. `Ready` mang bản niêm phong của transcript (khung 0 chiều B → A) để A xác nhận khoá; khung đầu của A xác nhận khoá A.
+- Bắt tay kiểu Noise KK: A gửi khoá tạm + khoá tĩnh + nonce; B kiểm khoá tĩnh của A nằm trong danh sách thiết bị tin cậy; A kiểm khoá tĩnh của B đúng khoá máy mong đợi; hai bên tính `ee`, `es`, `se` (X25519, WebCrypto), HKDF-SHA256 với salt = SHA-256(nonceA ‖ nonceB) và info = băm transcript, ra hai khoá một chiều + mã phiên 15 byte. `Ready` mang bản niêm phong của transcript (khung 0 chiều B → A) để A xác nhận khoá; khung đầu của A xác nhận khoá A.
 - Khung: `secretbox` (tweetnacl), nonce = mã phiên ‖ chiều ‖ bộ đếm 64-bit. Bộ đếm phải tăng đúng 1: khung phát lại, mất hay đảo thứ tự làm hỏng phiên, máy A nối lại theo con trỏ journal.
-- `Hello`/`Ready`/`HandshakeError` mang `protocolVersion` và `minProtocolVersion`; lệch thì báo bên nào cần cập nhật. Giao thức hiện là 2 (`PROTOCOL_VERSION` = `MIN_PROTOCOL_VERSION` = 2); server chỉ nhận `tunelo` 2.2.2 trở lên (`MinAgentVersion`), bản cũ được báo chạy `tunelo update`.
-- Ghép thiết bị, không có bí mật nào đi qua server. Có đúng hai cách:
-  - Lệnh cài một dòng (`tunelo install --trust <khoá trình duyệt>`) tin trình duyệt đang hiện lệnh: trình duyệt sinh bí mật 32 byte, người dùng dán vào script cài, script đưa cho `tunelo install` qua stdin (không nằm trong argv). Ở lần bắt tay đầu, B gửi HMAC(bí mật, "install" ‖ khoá A ‖ khoá B); A kiểm rồi mới ghim khoá B. A không bao giờ lấy khoá B từ server. Bí mật chỉ dùng được cho đúng khoá trình duyệt đó và bị xoá khỏi cấu hình khi trình duyệt đã nối.
-  - Mọi thiết bị khác ghép bằng mã 6 số của app Authenticator (TOTP theo RFC 6238: HMAC-SHA1, 6 số, bước 30 giây), không cần chạy lệnh trên máy B và không cần cầm thiết bị đã ghép lúc ghép.
-- Bí mật Authenticator (20 byte) chỉ nằm trên máy B, trong `config.json` (quyền 0600, base64url). Server Chat không bao giờ nhận nó: không lời gọi nào của tunelo tới server mang bí mật, và log, nhật ký đồng ý, lỗi đều không ghi giá trị.
-- Bật hay tạo lại trên web, từ thiết bị đã ghép (Cài đặt máy › "Ghép bằng Authenticator"):
-  - Trình duyệt sinh bí mật, hiện một lần mã QR `otpauth://` và khoá base32 để thêm vào app Authenticator.
-  - Người dùng gõ mã đầu tiên; trình duyệt tự kiểm. Mã sai thì không gửi gì. Mã đúng thì gửi `TotpSet` trong phiên mã hoá đầu cuối; B lưu vào `config.json` trước rồi mới dùng, trả `TotpStatus`, ghi nhật ký `totp_set` (`set` hoặc `replaced`).
-  - Đóng hộp thoại là bí mật mất khỏi trình duyệt: không lưu `localStorage`, IndexedDB hay server, không xem lại được.
-  - Tạo lại dùng cùng đường; bí mật cũ hết hiệu lực ngay. `MachineInfo.totp_enabled` cho web biết máy đã bật chưa.
-- Ghép bằng mã (`pairing.ts`), trước bắt tay:
-  - Mã người dùng gõ là mật khẩu của CPace trên ristretto255 (`@noble/curves`), kèm thẻ xác nhận gắn cả hai khoá tĩnh và tên thiết bị. Relay nhìn thấy hay sửa trao đổi cũng không dò mã offline được; mỗi lần đoán cần một `PakeStart` thật.
-  - B không biết mã của thiết bị thuộc bước nào, nên `PakeReply` mang ba ứng viên CPace (bước trước, hiện tại, sau; lệch đồng hồ một bước), mỗi ứng viên một share và một thẻ riêng. A giữ ứng viên có thẻ khớp, không ứng viên nào khớp nghĩa là mã sai. B kiểm `PakeFinish` với cả ba ứng viên, không dừng sớm, nên không lộ bước nào đúng. Một `PakeStart` vì thế trúng với xác suất 3/10^6, bằng bộ kiểm TOTP chuẩn có cửa sổ ±1 bước.
-  - Khoá chặn: mỗi `PakeStart` hợp lệ tính một lần thử trước mọi việc khác, đếm chung cho mọi kết nối của máy. Kiểm khoá và tăng đếm chạy liền trong một bước đồng bộ, nên nhiều kết nối song song không vượt được. Năm lần không ghép được thì máy khoá ghép 15 phút, kể cả với mã đúng (`TOO_MANY_ATTEMPTS`); mỗi lần khoá liên tiếp gấp đôi thời gian khoá, tối đa 24 giờ; ghép đúng hoặc đặt bí mật mới thì xoá đếm và khoá. Đếm nằm trong bộ nhớ, khởi động lại tunelo thì về 0.
-  - Máy chưa có bí mật trả `TOTP_NOT_SET` (không tính là một lần thử); web hướng dẫn chạy `tunelo authenticator` trên chính máy (không cần cài lại) hoặc bật từ thiết bị đã ghép.
-  - Ghép xong, B thêm khoá thiết bị vào danh sách, ghi nhật ký `pair` với detail `totp` (cài bằng lệnh thì `install`), gửi `MachineInfo` mới cho các thiết bị đang nối, rồi đóng; thiết bị nối lại bằng `Hello` thường.
-  - Mọi thiết bị của tài khoản nhận Web Push "Một thiết bị mới vừa ghép với <máy>" (`NotifyNeedsInput` với `NEEDS_INPUT_KIND_DEVICE_PAIRED`). Push chỉ nêu tên máy, không có tên hay khoá thiết bị, gửi ngay, không gộp với push "cần bạn" và có tag riêng. Ghép bằng lệnh cài không gửi push, vì chủ máy vừa tự chạy lệnh trên máy.
-- Máy đã cài mà chưa có thiết bị nào ghép (cài qua SSH, đóng trình duyệt trước khi ghép), hoặc đã mất hết thiết bị và cả app Authenticator: chạy `tunelo authenticator` trên máy B (ngồi trước máy hoặc qua SSH). Dịch vụ nền sinh bí mật 20 byte ngay trên máy, lưu vào `config.json` và chỉ trả về terminal đó, hiện một lần dưới dạng mã QR và khoá base32; máy chủ Chat không thấy. Người dùng quét vào app Authenticator rồi ghép thiết bị bằng mã 6 số như thường lệ. Máy đã có bí mật thì lệnh từ chối trừ khi có `--replace` (mã cũ ngừng dùng được); mỗi lần ghi vào nhật ký đồng ý (`totp_set`). Quyền chạy lệnh chính là quyền của người dùng hệ điều hành trên máy, ngang với việc đọc `config.json`. Không cần tải lại tunelo và không tạo mục máy mới.
-- Cách khác, khi muốn tin hẳn một trình duyệt mới thay vì quét mã: chạy lại lệnh của "Thêm máy" trên máy B từ một trình duyệt mới. `tunelo install --trust` chạy được trên máy đã cài: dừng dịch vụ nền đang chạy, đặt lại bí mật cài cho trình duyệt mới, cài lại dịch vụ. Máy được thêm lại vào danh sách như một mục mới (mục cũ xoá trên web); thiết bị đã ghép và bí mật Authenticator cũ giữ nguyên cho tới khi người dùng thu hồi hay tạo lại mã từ trình duyệt mới.
-- Rủi ro còn lại của ghép bằng mã: ai biết địa chỉ tunnel của máy (chỉ hiện cho tài khoản chủ máy) đoán được tối đa 5 mã mỗi đợt khoá, đợt khoá tăng dần tới 24 giờ nên số lần đoán trong một năm chưa tới hai nghìn, và cũng giữ được máy ở trạng thái khoá ghép bằng cách gửi mã sai đều đặn (chủ máy mở khoá bằng cách tạo lại mã Authenticator từ thiết bị đã ghép). Thiết bị đã ghép vẫn nối bình thường trong lúc khoá.
+- `Hello`/`Ready`/`HandshakeError` mang `protocolVersion` và `minProtocolVersion`; lệch thì báo bên nào cần cập nhật. Giao thức hiện là 3 (`PROTOCOL_VERSION` = `MIN_PROTOCOL_VERSION` = 3, [`handshake.ts`](../../packages/remote-protocol/src/crypto/handshake.ts)); server chỉ nhận `tunelo` 3.0.0 trở lên (`MinAgentVersion` ở [`machineapi.go`](../../server/internal/machineapi/machineapi.go)), bản cũ được báo chạy lại lệnh cài trên trang Máy.
+- Ghép thiết bị bằng lệnh cài (`tunelo install --trust`, bí mật một lần qua stdin) và bằng mã Authenticator (TOTP làm mật khẩu CPace, bí mật chỉ trên máy, khoá ghép sau 5 lần sai), cùng `tunelo authenticator`: **đã thay thế bởi tunelo 3.0** (mục "Tài khoản là gốc tin cậy"). Quyết định cũ giữ máy làm gốc tin cậy, server không bảo lãnh thiết bị nào; cái giá là mỗi thiết bị mới phải ghép, cài phải dán bí mật, máy cài qua SSH không có thiết bị nào. Chi tiết cũ ở lịch sử git của tệp này.
 - Journal theo luồng chat: mỗi mục có `seq` tăng dần và `revision`; thiết bị nhận tiếp từ con trỏ `{epoch, seq}`. `epoch` tăng mỗi lần tiến trình nền khởi động lại; con trỏ khác epoch, vượt quá, hay rơi vào phần đã nén thì nhận `ThreadReset` và tải lại (`journal-rules.ts`).
 - Không gắn với một AI: khung tin dùng loại tool chuẩn (`read, edit, shell, search, web, mcp, subagent, todo, other`) và cờ khả năng của adapter; web không đọc tên tool riêng.
+
+### Tài khoản là gốc tin cậy (tunelo 3.0, chốt 12/11/2026)
+
+Mục tiêu: thêm máy bằng một lệnh cố định (không mã, không khoá), và mọi trình duyệt hay app điện thoại đã đăng nhập cùng tài khoản điều khiển được máy ngay, không ghép.
+
+- **Thiết bị → máy.** Chat lưu khoá công khai X25519 của thiết bị theo tài khoản (`account_devices`, [`0037_account_devices.sql`](../../server/migrations/0037_account_devices.sql)). Trình duyệt và app Capacitor/PWA tự tạo và đăng ký khoá khi vào khu Máy (`RegisterDevice`, [`device-registration.ts`](../../apps/web/src/machines/link/device-registration.ts)). Mỗi heartbeat trả cho máy các khoá sống của chủ (`trusted_devices`); máy chỉ nhận bắt tay của khoá trong danh sách, khoá rời danh sách thì máy cắt kênh của nó ([`device-trust.ts`](../../apps/agent/src/device-trust.ts)).
+- **Máy → thiết bị.** Thiết bị lấy khoá máy mong đợi từ `ListMachines[].public_key` mỗi lần kết nối, không còn ghim lúc ghép. Khoá khác khoá đã thấy lần trước (lưu trên thiết bị) thì không mở kênh, báo khoá máy đã đổi và ghi log; người dùng bấm làm mới trạng thái máy mới là đồng ý nhận khoá mới.
+- Kênh vẫn mã hoá đầu cuối, server không thấy nội dung. `Ready.confirm` giữ nguyên: mọi lần bắt tay vẫn xác nhận khoá hai chiều.
+- Khoá thiết bị mới: push tới mọi đăng ký push của tài khoản và hiện trong "Thiết bị của tài khoản" ở trang Quản lý máy (thời điểm thêm, lần dùng cuối, thu hồi). Không có bước duyệt.
+
+**Đánh đổi.** Người vận hành server (hoặc ai chiếm được server) về lý thuyết cài được khoá giả ở một trong hai chiều; lộ phiên tài khoản là vào được máy cho tới khi chủ thấy push và thu hồi. Chấp nhận để bỏ ghép, TOTP và bí mật trong lệnh cài. Các biện pháp bù:
+
+1. **Gắn phiên.** Mỗi khoá thiết bị gắn phiên chat đã đăng ký nó. Thu hồi khoá thu hồi luôn phiên đó; phiên kết thúc vì bất cứ lý do gì (đăng xuất, bị thu hồi, IdP kết thúc grant, xoá tài khoản) thì trigger trong DB thu hồi khoá của nó, phiên chỉ hết hạn thì bị bắt ở lần đọc kế tiếp. Khoá đã thu hồi không bao giờ đăng ký lại được, và phiên từng bị thu hồi khoá không đăng ký khoá mới: thiết bị phải đăng nhập lại và tạo khoá mới, kéo theo push "thiết bị mới".
+2. **Chứng minh sở hữu khoá.** `RegisterDevice` và `RegisterMachine` cần trả lời một thử thách Diffie-Hellman do server cấp (`GetDeviceKeyChallenge`, `GetMachineKeyChallenge`; server không giữ trạng thái, [`keyproof`](../../server/internal/keyproof/keyproof.go)), nên không ai đăng ký được khoá công khai của người khác.
+3. **Thu hồi máy dứt điểm.** Xoá máy trên web (hoặc `tunelo logout`) thu hồi luôn grant `tunelo-agent` của máy ở auth-next ([`agentgrant`](../../server/internal/agentgrant/agentgrant.go), biến `TUNELO_GRANT_REVOKE_URL` ở [`server/README.md`](../../server/README.md); quyết định phía IdP ở [ADR 0016 của `auth-next`](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0016-tunelo-agent-grant-revocation-and-prefilled-link.md)). Muốn quay lại máy phải `tunelo login` mới và chủ bấm Đồng ý. Mục máy đã xoá không hồi sinh; cài lại khi còn khoá máy giữ mục máy cũ.
+4. **Link điền sẵn mã chỉ khi trùng IP.** `tunelo login` mở trang đồng ý của auth-next với mã điền sẵn; trang chỉ nhận mã đó khi IP trình duyệt trùng IP máy xin mã, khác IP thì người dùng gõ mã đang hiện trong terminal. Cùng NAT (cùng mạng nhà, công ty) vẫn lọt; chấp nhận.
+5. **Chat sập tối đa 24 giờ.** Máy lưu danh sách thiết bị tin cậy ra đĩa kèm thời điểm đồng bộ; quá 24 giờ không đồng bộ được thì từ chối mọi bắt tay mới (kênh đang mở giữ). Hệ quả: thiết bị bị thu hồi trong lúc Chat sập vẫn vào được tới 24 giờ.
+
+Khoá lạ chưa có trong danh sách làm máy hỏi Chat ngay (một heartbeat, mỗi khoá tối đa một lần trong 30 giây), nên thiết bị vừa đăng ký vào được ngay mà người lạ không bắt máy gọi Chat liên tục được.
 
 ### Ràng buộc khi chạy claude CLI
 
@@ -55,7 +57,7 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 ### An toàn phiên
 
 - `settingSources: ['user']` mặc định: `.claude/settings.json` và hook của dự án không có hiệu lực, trừ khi người dùng tick "Nạp cấu hình .claude của dự án" (ghi nhật ký).
-  Máy chỉ nạp cấu hình đó ở thư mục đã tin (`tunelo trust` trên máy). Từ `tunelo` 2.0.1, thiết bị đã ghép tin được thư mục ngay
+  Máy chỉ nạp cấu hình đó ở thư mục đã tin (`tunelo trust` trên máy). Từ `tunelo` 2.0.1, thiết bị của tài khoản tin được thư mục ngay
   trên web bằng nút "Tin thư mục này và mở phiên" (`Consent.trust_project`); máy ghi nhật ký đồng ý (thiết bị, thời điểm, thư mục,
   `project_settings`/`trust`). Thư mục nhạy cảm (home, gốc ổ đĩa…) chỉ tin được trên máy, vì tin nó là tin mọi thư mục con.
   Từ 12/11/2026 (Jev chốt): mức cấu hình dự án theo **thư mục** (`ProjectConfigSet`, `ProjectConfigLevel` OFF/FULL), mặc định OFF,
@@ -72,14 +74,15 @@ Người dùng muốn chat với Claude Code đang chạy trên máy của chín
 ## Cài đặt và phát hành tunelo (08/11/2026)
 
 - Lệnh và file chạy `tunelo` (`%LOCALAPPDATA%\tunelo\tunelo.exe` / `~/.local/bin/tunelo`); thư mục cấu hình `%APPDATA%\tunelo`, `~/.config/tunelo` (biến `TUNELO_HOME`); LaunchAgent `com.hoandat.tunelo`, giá trị Run `tunelo`; Keychain `com.hoandat.tunelo`. Danh tính máy: `deviceId = tunelo.<machineId>` (subdomain suy từ tài khoản và `deviceId`), `machineId`, `machineSecret`, khoá X25519.
-- Phát hành: tag `tunelo-v<semver>`, file `tunelo-*`, chú thích ký `tunelo <version> <file>`.
+- Phát hành: tag `tunelo-v<semver>`, chú thích ký `tunelo <version> <file>`. Từ 3.0.0 release chỉ đăng file nén mỗi nền tảng (`tunelo-<os>-<arch>.tar.gz`, `tunelo-windows-x64.zip`), mỗi file chứa `tunelo`, `tunelo-term-host` và chữ ký minisign của từng file; `SHA256SUMS` và chữ ký tính trên file nén ([`package-release.sh`](../../apps/agent/scripts/package-release.sh)). Lý do giữ chữ ký từng file: term-host và `tunelo update --rollback` kiểm từng binary.
+- Cài (từ 3.0.0): trang "Thêm máy" hiện một lệnh cố định không tham số, bốn tab (macOS và Linux `curl … | sh`, Windows PowerShell `irm … | iex`, Windows cmd là một dòng `powershell -NoProfile -c "irm … | iex"`, không `-ExecutionPolicy Bypass`). Script tải file nén đã ghim, kiểm rồi chạy `tunelo login`: đăng nhập, cài dịch vụ nền, máy tự đăng ký (có chứng minh khoá máy) và tự liên kết Localman. Lệnh cmd giống kiểu lừa "ClickFix" nên có thể bị Defender chặn; khi đó mới đổi sang tải zip.
 - `install.sh`/`install.ps1` thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
 - Rủi ro macOS: LaunchAgent và Keychain cần phiên đăng nhập GUI (`gui/<uid>`). Mac headless tắt tự đăng nhập không chạy được tiến trình nền; cài qua SSH thì `launchctl bootstrap` hỏng. Nghiệm thu trên Mac làm khi có phiên GUI.
 - Linux (từ `tunelo` 2.2.0, chốt 10/11/2026):
   - Bản `tunelo-linux-x64` và `tunelo-linux-arm64`, dùng glibc (Alpine/musl chưa hỗ trợ, `install.sh` từ chối), cùng chữ ký minisign và `SHA256SUMS` như các bản khác.
   - Dịch vụ là systemd **user unit** `~/.config/systemd/user/tunelo.service` (`Restart=always`), không cần root; tunelo không bao giờ tự gọi `sudo`.
   - Chạy khi chưa đăng nhập cần `loginctl enable-linger`: tunelo thử không cần mật khẩu; không được thì vẫn cài và chạy, rồi in `sudo loginctl enable-linger <user>` để chủ máy chạy một lần.
-  - Kho khoá là tệp 0600 trong thư mục cấu hình, giống bí mật Authenticator; không dùng libsecret/secret-service. Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy và bí mật Authenticator.
+  - Kho khoá là tệp 0600 trong thư mục cấu hình; không dùng libsecret/secret-service. Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy.
   - Chia sẻ màn hình của máy chỉ có trên macOS.
 
 ## MCP của tunelo trong phiên claude (09/11/2026)

@@ -11,7 +11,6 @@ import { browserArgs, findBrowser } from "../src/remote-browser/browser-profile.
 import { PASSKEY_BINDING, PASSKEY_SCRIPT } from "../src/remote-browser/passkey-watch.ts";
 import { type BrowserSession, RemoteBrowser, checkBrowserUrl } from "../src/remote-browser/remote-browser.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
-import { mentionsSensitive } from "../src/safety/sensitive-paths.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { makeCore, tempDir } from "./harness.ts";
 import { type DeviceLink, pairedDevice } from "./support/device-link.ts";
@@ -359,9 +358,5 @@ describe("Claude's side", () => {
 		const post = { ...pre, hook_event_name: "PostToolUse", tool_response: "ok" };
 		expect(await hook(post as Parameters<Hook>[0], undefined, { signal })).toMatchObject({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: queue[0] ?? expect.stringContaining("passkey") } });
 		expect(await hook(post as Parameters<Hook>[0], undefined, { signal })).toEqual({});
-	});
-
-	it("`tunelo browser …` run by Claude asks first", () => {
-		expect(mentionsSensitive("tunelo browser clear", () => false)).toBe(true);
 	});
 });

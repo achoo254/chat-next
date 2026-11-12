@@ -440,7 +440,7 @@ export class ClaudeProfiles {
   /**
    * From a device: starts claude's sign-in and returns its link. When this
    * claude cannot sign in without a terminal, the answer says to do it on the
-   * machine (`tunelo claude profiles add`).
+   * machine.
    */
   beginRemote(): Promise<{ ok: true; attemptId: string; url: string; expiresAt: number } | { ok: false; error: SignInError }> {
     return this.serial(async () => {
@@ -592,7 +592,7 @@ export class ClaudeProfiles {
           });
         }
         throw new ProfileError(
-          `claude could not sign this account out, so nothing was deleted. On the machine, \`tunelo claude profiles remove ${id} --force\` deletes it anyway`,
+          "claude could not sign this account out, so nothing was deleted; try again once claude can reach its server",
           "sign-out-failed",
           id,
         );

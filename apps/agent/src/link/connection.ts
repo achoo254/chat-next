@@ -1,5 +1,6 @@
-// One WebSocket from one device: pairing by the authenticator code or the
-// handshake first, then sealed frames dispatched to the core.
+// One WebSocket from one device: the handshake first (only a device key the
+// owner's account lists gets in, device-trust.ts), then sealed frames
+// dispatched to the core.
 import { resolve } from "node:path";
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import {
@@ -7,28 +8,19 @@ import {
   ErrorReason,
   type Frame,
   FrameSchema,
+  HandshakeErrorCode,
   type Item,
   type MachineInfo,
   type ProjectConfigLevel,
   TermPath,
   type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
-import {
-  type MachineAuth,
-  type PairingMethod,
-  type Session,
-  type TotpPairing,
-  acceptHello,
-  decodePlain,
-  encodeHandshakeError,
-  encodePlain,
-  isTotpSecret,
-  pakeReply,
-} from "@achoo254/chat-remote-protocol";
+import { type KeyPair, type Session, acceptHello, decodePlain, encodeHandshakeError } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
+import type { TrustVerdict } from "../device-trust.ts";
 import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileError } from "../profiles/service.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import type { LocalForward } from "../tunnels/forward.ts";
@@ -65,17 +57,16 @@ export type LinkContext = {
   core: AgentCore;
   config: ConfigStore;
   audit: AuditLog;
-  auth: () => MachineAuth;
-  /** The machine's one pairing state: its authenticator secret and the shared count of failed attempts. */
-  pairing: TotpPairing;
+  /** The machine's static key pair. */
+  machineKey: () => KeyPair;
+  /** Whether a device key may shake hands; asks Chat about a key it does not know yet (device-trust.ts). */
+  trust: { check(key: Uint8Array): Promise<TrustVerdict> };
+  /** A handshake was refused, for the machine's log. */
+  onRefused?: (deviceKey: Uint8Array, verdict: TrustVerdict) => void;
   machineInfo: () => Promise<MachineInfo>;
   isSensitive: (p: string) => boolean;
   /** A device is looking at the machine (for push decisions). */
   onPing: () => void;
-  /** A device was paired (refresh caches, close the install window). */
-  onPaired: (via: PairingMethod) => void;
-  /** A paired device set or replaced the authenticator secret (already stored). */
-  onTotpSet?: () => void;
   /** The Claude profiles of the machine; absent where the machine has none (tests). */
   profiles?: ClaudeProfiles;
   /** The machine's projects; absent where the machine has none (tests). */
@@ -207,18 +198,15 @@ export function projectListBody(list: ProjectList, levelOf?: (dir: string) => Pr
   };
 }
 
-type Pake = Extract<Awaited<ReturnType<typeof pakeReply>>, { ok: true }>;
+const KEY_LENGTH = 32;
 
 export class Connection {
   // "confirming": the handshake answered, but the device has not yet proven
   // its key with a first valid frame; it holds no session until then.
-  private state: "new" | "pake" | "confirming" | "open" | "closed" = "new";
-  private pairedBy: "install" | undefined;
-  private deviceName = "";
+  private state: "new" | "confirming" | "open" | "closed" = "new";
   /** Last time any message arrived, for the idle timeout. */
   lastSeen = Date.now();
   private session: Session | undefined;
-  private pake: Pake | undefined;
   private device = "";
   private subscribed = new Set<string>();
   /** Looks at the transcripts of the threads this device follows, for turns typed outside Chat. */
@@ -301,52 +289,38 @@ export class Connection {
       this.confirmed();
       return this.frame(first);
     }
-    const plain = decodePlain(data);
-    const body = plain.body;
-    if (this.state === "pake") {
-      if (body.case !== "pakeFinish" || !this.pake) throw new Error("expected pake finish");
-      const paired = await this.pake.confirm(body.value);
-      if (paired) {
-        this.ctx.config.addDevice(paired.deviceKey, paired.deviceName);
-        this.ctx.audit.write({ device: deviceLabel(paired.deviceKey, paired.deviceName), action: "pair", path: "", detail: "totp" });
-        this.ctx.onPaired("totp");
-      }
-      // The device reconnects with a normal handshake.
-      return this.close(1000, paired ? "paired" : "pairing failed");
-    }
-    if (body.case === "pakeStart") {
-      // Refused with TOTP_NOT_SET until a paired device set the secret, and
-      // with TOO_MANY_ATTEMPTS while failed attempts lock pairing.
-      const r = await pakeReply({ pairing: this.ctx.pairing, machineKey: this.ctx.auth().machine.publicKey, start: body.value });
-      if (!r.ok) {
-        this.socket.send(encodeHandshakeError(r.code));
-        return this.close(1000, "pairing refused");
-      }
-      this.pake = r;
-      this.state = "pake";
-      this.socket.send(encodePlain({ case: "pakeReply", value: r.reply }));
-      return;
-    }
+    const body = decodePlain(data).body;
     if (body.case !== "hello") throw new Error("expected hello");
-    const result = await acceptHello(data, this.ctx.auth());
+    const hello = body.value;
+    // Only a well-formed hello may make the machine ask Chat about its key;
+    // acceptHello refuses the rest as malformed.
+    const wellFormed = hello.staticKey.length === KEY_LENGTH && hello.ephemeralKey.length === KEY_LENGTH && hello.nonce.length === KEY_LENGTH;
+    const verdict: TrustVerdict = wellFormed ? await this.ctx.trust.check(hello.staticKey) : "unknown";
+    if (this.isClosed) return;
+    if (verdict === "stale") {
+      // The list of trusted devices is too old to stand in for Chat: try later.
+      this.ctx.onRefused?.(hello.staticKey, verdict);
+      this.socket.send(encodeHandshakeError(HandshakeErrorCode.BUSY));
+      return this.close(1000, "this machine has not reached Chat for over 24 hours");
+    }
+    const result = await acceptHello(data, { machine: this.ctx.machineKey(), deviceStatus: () => verdict });
     this.socket.send(result.reply);
-    if (!result.ok) return this.close(1000, "handshake refused");
+    if (!result.ok) {
+      if (wellFormed) this.ctx.onRefused?.(hello.staticKey, verdict);
+      return this.close(1000, "handshake refused");
+    }
     this.session = result.session;
-    this.device = deviceLabel(result.deviceKey, result.deviceName);
-    this.deviceName = result.deviceName;
-    this.pairedBy = result.pairedBy;
+    this.device = deviceLabel(result.deviceKey, this.ctx.config.deviceName(result.deviceKey));
     this.state = "confirming";
   }
 
-  /** The device proved its key: pair it if this was a pairing, then serve it. */
+  private get isClosed(): boolean {
+    return this.state === "closed";
+  }
+
+  /** The device proved its key: serve it. */
   private confirmed(): void {
-    const key = this.session?.peerStatic;
-    if (!key) throw new Error("no session");
-    if (this.pairedBy) {
-      this.ctx.config.addDevice(key, this.deviceName);
-      this.ctx.audit.write({ device: this.device, action: "pair", path: "", detail: this.pairedBy });
-      this.ctx.onPaired(this.pairedBy);
-    }
+    if (!this.session) throw new Error("no session");
     this.state = "open";
     this.followTimer = setInterval(() => {
       for (const threadId of this.subscribed) this.ctx.core.followHistory(threadId);
@@ -738,10 +712,6 @@ export class Connection {
           void updater.run();
           return ack();
         }
-        case "totpSet":
-          return this.totpSet(id, b.value.secret);
-        case "totpStatusRequest":
-          return this.send(id, { case: "totpStatus", value: { enabled: this.ctx.pairing.enabled } });
         case "auditList": {
           const entries = this.ctx.audit.list(b.value.limit || 100).map((e) => ({ ...e, at: BigInt(e.at) }));
           return this.send(id, { case: "auditListResult", value: { entries } });
@@ -838,23 +808,6 @@ export class Connection {
     } catch (err) {
       this.sendError(id, err);
     }
-  }
-
-  /**
-   * A paired device sets or replaces the authenticator secret: stored first,
-   * then used for pairing. The secret arrives only here, sealed end to end,
-   * and is never logged or echoed.
-   */
-  private totpSet(id: string, secret: Uint8Array): void {
-    if (!isTotpSecret(secret)) {
-      return this.send(id, { case: "error", value: refusal("a TOTP secret is 20 bytes", ErrorReason.TOTP_SECRET_INVALID) });
-    }
-    const replaced = this.ctx.pairing.enabled;
-    this.ctx.config.setTotpSecret(secret);
-    this.ctx.pairing.setSecret(secret);
-    this.ctx.audit.write({ device: this.device, action: "totp_set", path: "", detail: replaced ? "replaced" : "set" });
-    this.ctx.onTotpSet?.();
-    this.send(id, { case: "totpStatus", value: { enabled: true } });
   }
 
   /** A workspace's files and git: answered later, by id (git may take a while). */

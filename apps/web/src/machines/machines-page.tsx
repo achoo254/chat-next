@@ -5,6 +5,7 @@
 // what it holds (system, projects, sessions running, the terminal), and
 // what to do there: its overview, a plain terminal (only while it is
 // reachable, else said why), its settings. Without machines: how to add one.
+// Below them, the account's devices (account-devices.tsx).
 import type { MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths } from "../router.tsx";
@@ -12,7 +13,9 @@ import { aiPaths } from "./ai-paths.ts";
 import { terminalGate } from "./agent-version.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { needsPairing, type Conn } from "./machine-status.ts";
+import { AccountDevices } from "./account-devices.tsx";
+import { failureText } from "./link-banner.tsx";
+import { isBlocked, type Conn } from "./machine-status.ts";
 import { PageHead } from "./page-head.tsx";
 import { shortHost } from "./project-tree.ts";
 import { connText } from "./session-row.tsx";
@@ -109,19 +112,9 @@ function MachineCard({ machine, now }: { machine: MachineView; now: number }) {
 					{version !== "" && <small className="mx-mcard-ver">{m.version(version)}</small>}
 				</span>
 			</div>
-			{(newer !== "" || !entry.claimed || needsPairing(conn)) && (
-				<p className="mx-mcard-note">
-					{newer !== "" ? m.update(newer) : !entry.claimed ? t.status.needsLoginHint : conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}
-				</p>
-			)}
+			{(newer !== "" || isBlocked(conn)) && <p className="mx-mcard-note">{newer !== "" ? m.update(newer) : isBlocked(conn) ? failureText(t, conn.reason) : ""}</p>}
 			<p className="mx-mcard-facts">{facts(t, machine).join(" · ")}</p>
 			<div className="mx-mcard-acts" role="group" aria-label={m.actions(short)}>
-				{needsPairing(conn) && (
-					<Link to={paths.machinePair(entry.ref)} className="btn btn-sm btn-primary">
-						<Icon name="link" small />
-						{t.agent.pair}
-					</Link>
-				)}
 				<Link to={paths.machine(entry.ref)} className="btn btn-sm">
 					<Icon name="inbox" small />
 					{t.agent.machineBoard}
@@ -192,6 +185,7 @@ export function MachinesPage() {
 						))}
 					</ul>
 				)}
+				<AccountDevices />
 				{import.meta.env.DEV && (
 					<Link to={paths.machinesLocal()} className="link">
 						{t.local.entry}

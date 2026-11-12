@@ -40,13 +40,12 @@ let link: MachineLink;
 beforeEach(async () => {
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	ws = new FakeWorkspace();
 	machine.handler = (frame) => ws.handle(frame) ?? defaultAnswer(frame);
 	link = new MachineLink({
 		device: () => Promise.resolve(device),
-		deviceName: "test",
-		pinned: () => Promise.resolve(machine.keys.publicKey),
+		expectedKey: () => machine.keys.publicKey,
 		tunnelUrl: () => URL_A,
 		refreshTunnel: () => Promise.resolve(URL_A),
 		socket: machine.factory,

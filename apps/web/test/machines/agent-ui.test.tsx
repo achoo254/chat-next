@@ -39,22 +39,21 @@ const idle = { status: { kind: "idle" } } as const;
 
 describe("machine state", () => {
 	it("names why a machine cannot be used, before and after its link ran", () => {
-		expect(connOf(online, false, idle, NOW)).toEqual({ kind: "unpaired", online: true });
-		expect(connOf(online, null, idle, NOW)).toEqual({ kind: "checking" });
-		expect(connOf(online, true, idle, NOW)).toEqual({ kind: "connecting" });
-		expect(connOf(online, true, { status: { kind: "offline", attempt: 3 } }, NOW)).toEqual({ kind: "retrying", attempt: 3 });
-		expect(connOf({ ...online, lastSeenAt: NOW / 1000 - 3600 }, true, idle, NOW)).toEqual({ kind: "offline", lastSeenMs: NOW - 3_600_000 });
-		expect(connOf(online, true, { status: { kind: "failed", reason: "revoked" } }, NOW)).toEqual({ kind: "repair" });
-		expect(connOf(online, true, { status: { kind: "failed", reason: "version" } }, NOW)).toEqual({ kind: "update" });
-		expect(connOf(online, true, { status: { kind: "open" } }, NOW)).toEqual({ kind: "on" });
+		expect(connOf(online, idle, NOW)).toEqual({ kind: "connecting" });
+		expect(connOf(online, { status: { kind: "offline", attempt: 3 } }, NOW)).toEqual({ kind: "retrying", attempt: 3 });
+		expect(connOf({ ...online, lastSeenAt: NOW / 1000 - 3600 }, idle, NOW)).toEqual({ kind: "offline", lastSeenMs: NOW - 3_600_000 });
+		expect(connOf(online, { status: { kind: "failed", reason: "revoked" } }, NOW)).toEqual({ kind: "blocked", reason: "revoked" });
+		expect(connOf(online, { status: { kind: "failed", reason: "refused" } }, NOW)).toEqual({ kind: "blocked", reason: "refused" });
+		expect(connOf(online, { status: { kind: "failed", reason: "key-changed" } }, NOW)).toEqual({ kind: "blocked", reason: "key-changed" });
+		expect(connOf(online, { status: { kind: "failed", reason: "session-revoked" } }, NOW)).toEqual({ kind: "blocked", reason: "session-revoked" });
+		expect(connOf(online, { status: { kind: "failed", reason: "version" } }, NOW)).toEqual({ kind: "update" });
+		expect(connOf(online, { status: { kind: "open" } }, NOW)).toEqual({ kind: "on" });
 	});
 
-	it("opens links only to paired machines the directory sees online", () => {
-		expect(shouldConnect(online, true, NOW)).toBe(true);
-		expect(shouldConnect(online, false, NOW)).toBe(false);
-		expect(shouldConnect(online, null, NOW)).toBe(false);
-		expect(shouldConnect({ ...online, tunnelUrl: "" }, true, NOW)).toBe(false);
-		expect(shouldConnect({ ...online, lastSeenAt: 0 }, true, NOW)).toBe(false);
+	it("opens links to every machine of the account the directory sees online", () => {
+		expect(shouldConnect(online, NOW)).toBe(true);
+		expect(shouldConnect({ ...online, tunnelUrl: "" }, NOW)).toBe(false);
+		expect(shouldConnect({ ...online, lastSeenAt: 0 }, NOW)).toBe(false);
 	});
 });
 

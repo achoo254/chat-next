@@ -77,10 +77,13 @@ export function mentionsSensitive(
   opts: { home?: string; cwd?: string } = {},
 ): boolean {
   const home = opts.home ?? homedir();
-  // The agent's own commands revoke devices, install with a pairing secret,
-  // sign in or out, or change trust, Claude profiles, local forwarding,
-  // MCP writes from outside tunelo's sessions, and the tunelo browser's profile.
-  if (/\btunelo(\.exe)?\s+(devices|trust|untrust|install|login|logout|browser|claude\s+profiles|config\s+(local-forward|mcp-local-writes))\b/i.test(text)) return true;
+  // The agent's own commands that only a person at the machine should run:
+  // signing in or out (which adds the machine to an account or takes it
+  // out), uninstalling, starting, stopping or running the service, trusting
+  // a folder's settings, and every `tunelo config` (the default server and
+  // token with -s/-k, local forwarding, MCP writes from outside tunelo's
+  // sessions).
+  if (/\btunelo(\.exe)?\s+(login|logout|uninstall|trust|untrust|config|start|stop|run)\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")

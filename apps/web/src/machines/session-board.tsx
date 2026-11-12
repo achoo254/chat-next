@@ -12,12 +12,11 @@ import { Link, navigate, paths, useSearch } from "../router.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
-import { LOCAL_REF } from "./link/link-hub.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { FirstMachine } from "./first-machine.tsx";
-import { needsPairing } from "./machine-status.ts";
+import { isBlocked } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
 import { PageHead } from "./page-head.tsx";
 import { connText } from "./session-row.tsx";
@@ -107,7 +106,6 @@ export function MachineBoard({ machine }: { machine: string }) {
 	}
 	const { entry, link, state, conn } = view;
 	const { need, running, idle } = collect([view]);
-	const pairPath = machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine);
 	const max = state.maxSessions;
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.agent.machineBoardOf(entry.name)}>
@@ -115,7 +113,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 				<Link to={paths.machineInfo(machine)} className="icon-btn" aria-label={t.agent.info}>
 					<Icon name="info" />
 				</Link>
-				{!needsPairing(conn) && (
+				{!isBlocked(conn) && (
 					<button
 						type="button"
 						className="btn btn-primary btn-sm"
@@ -128,19 +126,9 @@ export function MachineBoard({ machine }: { machine: string }) {
 					</button>
 				)}
 			</PageHead>
-			{!needsPairing(conn) && <LinkBanner machine={machine} name={entry.name} status={state.status} />}
+			<LinkBanner machine={machine} name={entry.name} status={state.status} />
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
-				{needsPairing(conn) && (
-					<div className="empty">
-						<MachineIcon name="shield" />
-						<h2>{t.agent.conn[conn.kind === "unpaired" ? "unpaired" : "repair"]}</h2>
-						<p>{conn.kind === "unpaired" ? t.agent.hint.unpaired : t.agent.hint.repair}</p>
-						<Link to={pairPath} className="btn btn-primary">
-							{t.agent.pair}
-						</Link>
-					</div>
-				)}
 				{conn.kind === "offline" && <p className="muted">{t.agent.hint.offline}</p>}
 				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && <p className="muted">{t.board.nothing}</p>}
 				<Tiles need={need} running={running} showMachine={false} />

@@ -195,16 +195,18 @@ describe("linking the machine to Localman", () => {
   });
 });
 
-describe("in tunelo whoami", () => {
+describe("in tunelo status", () => {
   test("the registration reports Localman's state and `tunelo login` relinks it too", () => {
     const config = new ConfigStore(dir);
     const localman = { state: () => ({ status: "error" as const, detail: "Localman refused" }), retryNow: vi.fn() };
     const registration = new Registration({
       config,
       session: session(AGENT),
-      api: { register: async () => ({ machineId: "1", machineSecret: "s" }), claim: async () => ({}) },
-      publicKey: () => new Uint8Array(32),
-      agentVersion: "2.1.0",
+      api: { register: async () => ({ machineId: "1", machineSecret: "s" }) },
+      machineKey: () => {
+        throw new Error("not reached");
+      },
+      agentVersion: "3.0.0",
       onRegistered: () => undefined,
       localman,
       log: () => undefined,

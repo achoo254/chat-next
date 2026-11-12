@@ -44,6 +44,12 @@ Deploy tự động không đổi được conf nginx hay script trong `/opt/cha
 - Một tenant ([ADR 0013 Đơn tenant](https://github.com/achoo254/auth-next/blob/main/docs/decisions/0013-single-tenant.md) của `auth-next`): server không đọc `TENANT_ID` (tenant luôn `primary`, dữ liệu không đổi), `TENANT_DOMAIN` giữ nguyên.
 - Service worker: `/sw.js` và `index.html` phải trả `Cache-Control: no-cache` (nếu không trình duyệt giữ worker cũ lâu hơn), CSP phải có `worker-src 'self'`. Rollback về release không có `sw.js` cần kill switch ([Rollback](#rollback)).
 
+### Máy (tunelo)
+
+- `TUNELO_GRANT_REVOKE_URL` (mô tả ở [`server/README.md`](../server/README.md)) phải đặt ở production. Thiếu biến thì máy bị xoá trên web vẫn bị Chat từ chối, nhưng grant `tunelo-agent` của nó ở IdP không bị thu hồi cho tới khi đặt biến (ADR 0013, "Tài khoản là gốc tin cậy").
+- Script cài trong web (`apps/web/public/agent/install.sh`, `install.ps1`) ghim một bản tunelo đã phát hành. Sau tag `tunelo-v<version>`, đợi workflow phát hành xong hết (cả notarize macOS), chạy [`pin-release.ts`](../apps/agent/scripts/pin-release.ts) với `SHA256SUMS` của release rồi mới đẩy lên `main`. Mỗi lần `main` xanh là deploy web tự động, nên không đẩy lên `main` thay đổi script cài mà pin còn trỏ bản cũ khác định dạng: script đó báo không tải được và không cài gì.
+- Đổi giao thức giữa máy, Chat và IdP (như tunelo 3.0): tag và đợi release → ghim script cài → deploy `auth-next` → sao lưu DB Chat, deploy server và web Chat cùng một release → deploy Localman. Máy chạy bản dưới `MinAgentVersion` ngoại tuyến cho tới khi chủ chạy lại lệnh cài.
+
 Bản ghi deploy cũ: git log của file này.
 
 ## Các lần sau
@@ -220,7 +226,7 @@ Khi một worker lỗi đã tới trình duyệt (trang trắng, file cũ, khôn
 ## Rollback
 
 - Media: release trước R3 bỏ qua các bảng media; file trong `/opt/chat/media` giữ nguyên. Tắt media mà không rollback: xoá `MEDIA_PUBLIC_URL` khỏi `/opt/chat/.env` rồi reload (tin có media vẫn hiển thị thumb trong tin, nhưng không tải được bản đầy đủ).
-- Code: `bash /opt/chat/infra/switch-release.sh <release-id>` (danh sách: `ls /opt/chat/releases`). Không đảo ngược dữ liệu. Về release không có `sw.js` (trước bản mở app khi offline) thì đặt kill switch ngay sau đó ([Service worker: kill switch](#service-worker-kill-switch)).
+- Code: `bash /opt/chat/infra/switch-release.sh <release-id>` (danh sách: `ls /opt/chat/releases`). Không đảo ngược dữ liệu. Về release trước migration `0037_account_devices.sql`: binary cũ luôn tạo dòng máy mới khi `RegisterMachine`, nên một máy 2.x chạy `tunelo login` lại trong lúc dòng cũ cùng khoá máy còn sống gặp lỗi 500 (chỉ một dòng sống mỗi khoá máy); xoá máy cũ trên web rồi đăng nhập lại. Về release không có `sw.js` (trước bản mở app khi offline) thì đặt kill switch ngay sau đó ([Service worker: kill switch](#service-worker-kill-switch)).
 - Dữ liệu: dừng `chat-api`, `pg_restore --clean --if-exists` từ bản trong `/opt/chat/backups` với kết nối từ `pg-env.sh`, **tăng `server_epoch`** (`UPDATE server_meta SET server_epoch = server_epoch + 1;` qua [`psql.sh`](../infra/chat/psql.sh)), rồi chạy lại. Bản restore làm `pts`/`seq` lùi về lúc backup; epoch mới báo cho client rằng vị trí đồng bộ của nó không còn đúng, để client tự đồng bộ lại thay vì bỏ sót tin (ADR 0002). Process đang chạy đọc lại epoch mỗi 30 giây và yêu cầu mọi socket kết nối lại.
 
 ## Dữ liệu đồng bộ

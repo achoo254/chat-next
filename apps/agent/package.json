@@ -2,7 +2,7 @@
   "name": "@achoo254/tunelo-agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Background process on a user's own machine: tunnels to localhost (the Tunelo CLI), and their installed AI coding CLI relayed end-to-end encrypted to their paired devices",
+  "description": "Background process on a user's own machine: tunnels to localhost (the Tunelo CLI), and their installed AI coding CLI relayed end-to-end encrypted to the devices of their account",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -23,7 +23,6 @@
     "@tunelo/shared": "github:achoo254/localman-next#tunelo-shared-v0.2.1&path:/packages/tunelo-shared",
     "chalk": "5.6.2",
     "commander": "12.1.0",
-    "uqr": "0.1.3",
     "ws": "8.21.0",
     "zod": "4.6.7"
   },

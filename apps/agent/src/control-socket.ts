@@ -27,7 +27,7 @@ import type { TunnelService } from "./tunnels/tunnel-service.ts";
 
 const controlFile = (configDir: string) => join(configDir, "control.json");
 const TOKEN_HEADER = "x-tunelo-token";
-const NOT_RUNNING = "tunelo is not running (start it with `tunelo start`)";
+const NOT_RUNNING = "tunelo is not running in the background (`tunelo login` starts it)";
 const MAX_BODY_BYTES = 1024 * 1024;
 /** Streams send a line this often, so neither side mistakes a quiet tunnel for a dead one. */
 const STREAM_PING_MS = 5_000;
@@ -82,13 +82,10 @@ export type ControlTarget = {
 type Route = (target: ControlTarget & { streams: StreamLiveness }, input: unknown) => unknown;
 type Stream = (target: ControlTarget, input: unknown, send: (message: unknown) => void, end: () => void) => () => void;
 
-const deviceRevoke = z.object({ key: z.string().min(6, "give at least 6 characters of the device key").max(128) });
 const trustInput = z.object({ dir: z.string().min(1).max(4096), trusted: z.enum(["true", "false"]).optional() });
-const totpEnroll = z.object({ replace: z.boolean().optional() });
+const registrationRetry = z.object({ signedInNow: z.boolean().optional() });
 const closeInput = z.object({ id: z.string().min(1).max(64) });
 const mcpSession = z.object({ server: z.string().min(1).max(512), ticket: z.string().min(1).max(64).optional() });
-const profileInput = z.object({ id: z.string().max(64) });
-const profileRemove = z.object({ id: z.string().max(64), force: z.boolean().optional() });
 const forwardToggle = z.object({ enabled: z.boolean() });
 const forwardBlocked = z.object({ ports: z.array(z.number().int().min(1).max(65_535)).min(1).max(100), blocked: z.boolean() });
 const mcpTools = z.object({ ticket: z.string().min(1).max(64).optional() });
@@ -111,12 +108,16 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     if (!t.machine) return { tunnels };
     const m = t.machine;
     const info = await m.machineInfo();
+    const c = m.config.get();
     return {
       name: info.name,
       agentVersion: info.agentVersion,
       providers: info.providers.map((p) => ({ id: p.id, version: p.version, login: p.loginState })),
       sessions: `${info.openSessions}/${info.maxSessions}`,
-      devices: m.config.get().devices.length,
+      registered: Boolean(c.machineId && c.machineSecret),
+      trustedDevices: c.trustedDevices?.list.length ?? 0,
+      // When Chat last listed the account's devices (Unix ms; 0 = never).
+      trustSyncedAt: c.trustedDevices?.syncedAt ?? 0,
       memoryMb: info.memoryMb,
       tunnels,
       // What macOS lets the service itself (not the terminal asking) open.
@@ -128,25 +129,11 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     if (!t.registration) throw new Error("this tunelo runs tunnels only");
     return t.registration.report();
   },
-  /** `tunelo login` just signed in: add or claim the machine in Chat now. */
-  "POST /registration/retry": (t) => {
-    t.registration?.retryNow();
+  /** `tunelo login` ran: add the machine to Chat now (again after a removal on the web when it signed in anew). */
+  "POST /registration/retry": (t, input) => {
+    t.registration?.retryNow(registrationRetry.parse(input).signedInNow === true);
     return { retrying: t.registration !== undefined };
   },
-  "GET /devices": (t) =>
-    machineOf(t)
-      .config.get()
-      .devices.map((d) => ({ key: d.key.slice(0, 12), name: d.name, addedAt: new Date(d.addedAt).toISOString() })),
-  "POST /devices/revoke": (t, input) => {
-    const m = machineOf(t);
-    const { key } = deviceRevoke.parse(input);
-    const found = m.config.revokeDevice(key);
-    m.dropDevice(key);
-    m.audit.write({ device: "local", action: "revoke", path: "", detail: key });
-    return { revoked: found };
-  },
-  /** `tunelo authenticator`: only here (this OS user, on the machine) can the first pairing secret be made. */
-  "POST /totp/enroll": (t, input) => machineOf(t).enrollAuthenticator(totpEnroll.parse(input).replace === true),
   "POST /restart": () => {
     // The supervisor starts the agent again (launchd KeepAlive, task loop).
     setTimeout(() => process.exit(0), 200);
@@ -159,38 +146,6 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const dir = m.config.setTrusted(given, trusted !== "false");
     m.audit.write({ device: "local", action: "project_settings", path: dir, detail: trusted === "false" ? "untrust" : "trust" });
     return { dir, trusted: trusted !== "false" };
-  },
-  "GET /audit": (t) => machineOf(t).audit.list(50),
-  /** Claude profiles: accounts and usage, never a credential. */
-  "GET /claude/profiles": (t) => machineOf(t).profiles.list(),
-  "POST /claude/profiles/select": async (t, input) => {
-    const { profiles } = machineOf(t);
-    await profiles.select(profileInput.parse(input).id, "local");
-    return profiles.list();
-  },
-  /** `tunelo claude profiles add`: a folder for claude's own sign-in in that terminal. */
-  "POST /claude/profiles/prepare": (t) => machineOf(t).profiles.prepareTerminal(),
-  "POST /claude/profiles/finish": (t, input) => machineOf(t).profiles.finishTerminal(profileInput.parse(input).id),
-  "POST /claude/profiles/cancel": async (t, input) => {
-    await machineOf(t).profiles.cancel(profileInput.parse(input).id);
-    return { cancelled: true };
-  },
-  /** Only here (this OS user, on the machine) may a removal be forced past a failed sign-out. */
-  "POST /claude/profiles/remove": async (t, input) => {
-    const { profiles } = machineOf(t);
-    const { id, force } = profileRemove.parse(input);
-    await profiles.remove(id, "local", { force: force === true });
-    return profiles.list();
-  },
-  "POST /claude/profiles/usage": async (t, input) => {
-    const { profiles } = machineOf(t);
-    await profiles.refreshUsage(profileInput.parse(input).id);
-    return profiles.list();
-  },
-  /** `tunelo usage delete`: the usage ledger and its copies; a scan under way stops and does not write it back. */
-  "POST /usage/delete": async (t) => {
-    await machineOf(t).usage.deleteLedger();
-    return { deleted: true };
   },
   /** Localman's requests for localhost: on or off, and ports refused on this machine. */
   "GET /local-forward": (t) => machineOf(t).localForward.state(),

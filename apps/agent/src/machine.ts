@@ -1,6 +1,7 @@
 // The running service: config, machine key, core, local server (the
 // devices' WebSocket, and Localman's requests for localhost under
-// `/.tunelo/forward`, tunnels/forward.ts), pairing by the authenticator code
+// `/.tunelo/forward`, tunnels/forward.ts), the account's trusted devices
+// (device-trust.ts; a device dropped from the list loses its links at once),
 // the "needs you" push decision, and the usage hints (usage/notify.ts) to
 // connected devices and as a push.
 import { type IncomingMessage, type Server, createServer } from "node:http";
@@ -9,19 +10,10 @@ import { arch, homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import { LoginState, type MachineInfo, MachineInfoSchema, ThreadState, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
-import {
-  type KeyPair,
-  type MachineAuth,
-  PROTOCOL_VERSION,
-  TotpPairing,
-  base32Encode,
-  fromBase64Url,
-  generateTotpSecret,
-  toBase64Url,
-  totpUri,
-} from "@achoo254/chat-remote-protocol";
+import { type KeyPair, PROTOCOL_VERSION, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type WebSocket, WebSocketServer } from "ws";
-import { ConfigStore } from "./config.ts";
+import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
+import { DeviceTrust } from "./device-trust.ts";
 import { AgentCore } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
 import { Connection, profileListBody, projectListBody } from "./link/connection.ts";
@@ -75,8 +67,6 @@ export type MachineOptions = {
   profiles?: ClaudeProfiles;
   /** Sends a content-free "needs you" push through the chat server. */
   notify?: (thread: ThreadSummary, pending: number) => void;
-  /** Tells the account's devices, through the chat server, that a device was paired by the authenticator code. */
-  notifyPaired?: () => void;
   /** Asks the chat server for a content-free "usage hint" push to the account's devices; rejects when it was not sent. */
   notifyUsage?: () => Promise<void>;
   log?: (line: string) => void;
@@ -96,9 +86,6 @@ export type MachineOptions = {
   /** Environment for finding the terminal process binary (TUNELO_TERM_HOST_BIN); the process's own when not given. */
   env?: NodeJS.ProcessEnv;
 };
-
-/** What an authenticator app names the entry; the web page uses the product name, this terminal the feature's. */
-export const AUTHENTICATOR_ISSUER = "AI Agent";
 
 export class Machine {
   readonly config: ConfigStore;
@@ -122,9 +109,9 @@ export class Machine {
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
-  private key!: KeyPair;
-  /** Pairing by the authenticator code; its failed-attempt count lives only in memory. */
-  private readonly pairing: TotpPairing;
+  private key: KeyPair | undefined;
+  /** The account's devices this machine accepts. */
+  readonly trust: DeviceTrust;
   private server: Server | undefined;
   private wss: WebSocketServer | undefined;
   private port = 0;
@@ -176,8 +163,7 @@ export class Machine {
     });
     this.usageApi = usageApiOf({ ledger: this.usage.ledger, config: this.config, audit: this.audit, deleteLedger: () => this.usage.deleteLedger() });
     const c = this.config.get();
-    this.pairing = new TotpPairing(this.config.totpSecret());
-    if (c.totpSecret && !this.pairing.enabled) this.log("authenticator secret in config.json is not valid: set it again from a paired device");
+    this.trust = new DeviceTrust({ config: this.config });
     this.profiles =
       opts.profiles ??
       new ClaudeProfiles({
@@ -384,11 +370,6 @@ export class Machine {
   }
 
   /** Wired once the machine is registered with the chat server. */
-  setNotifyPaired(fn: () => void): void {
-    this.opts.notifyPaired = fn;
-  }
-
-  /** Wired once the machine is registered with the chat server. */
   setNotifyUsage(fn: () => Promise<void>): void {
     this.opts.notifyUsage = fn;
   }
@@ -422,56 +403,67 @@ export class Machine {
     return reached;
   }
 
+  /** The machine's key pair; there once start() loaded it. */
+  get keyPair(): KeyPair {
+    if (!this.key) throw new Error("the machine key is not loaded yet");
+    return this.key;
+  }
+
   get publicKey(): Uint8Array {
-    return this.key.publicKey;
+    return this.keyPair.publicKey;
   }
 
-  /**
-   * `tunelo authenticator`: makes the authenticator secret here, on this
-   * machine, so the first device can pair without another paired device. The
-   * secret exists only here and in the terminal that asked; the Chat server
-   * never sees it. An existing secret is replaced only when asked.
-   */
-  enrollAuthenticator(replace: boolean): { uri: string; secret: string } {
-    const replaced = this.pairing.enabled;
-    if (replaced && !replace) {
-      throw new Error("this machine already pairs by an authenticator code; run `tunelo authenticator --replace` to make a new one (the old code stops working)");
+  /** The device keys with an open link now, for the heartbeat. */
+  connectedDeviceKeys(): Uint8Array[] {
+    const seen = new Map<string, Uint8Array>();
+    for (const c of this.connections) {
+      const k = c.isOpen ? c.deviceKey : undefined;
+      if (k) seen.set(toBase64Url(k), k);
     }
-    const secret = generateTotpSecret();
-    this.config.setTotpSecret(secret);
-    this.pairing.setSecret(secret);
-    this.audit.write({ device: "local", action: "totp_set", path: "", detail: replaced ? "replaced" : "set" });
-    this.log("authenticator pairing set from this machine");
-    void this.announceInfo();
-    return { uri: totpUri({ secret, label: this.config.get().machineName || hostname(), issuer: AUTHENTICATOR_ISSUER }), secret: base32Encode(secret) };
+    return [...seen.values()];
   }
 
   /**
-   * Cuts every live connection of a device that was just revoked, and its
-   * terminal links, direct ones included. `key` may be the first characters
-   * of the key: the terminal process takes whole keys, found among the
-   * revoked keys (already stored) and the live connections.
+   * The owner's devices as Chat just listed them: stored with the time, and
+   * compared with the list before. A device that left the list (revoked on
+   * the web, or its session ended) loses every link and terminal now; both
+   * changes go to the consent log.
    */
-  dropDevice(key: string): void {
-    const full = new Set(this.config.get().revoked.filter((k) => k.startsWith(key)));
+  applyTrustedDevices(list: readonly TrustedDevice[]): void {
+    const { added, removed } = this.config.syncTrustedDevices(list);
+    this.trust.listed(added.map((d) => d.key));
+    for (const d of added) {
+      this.audit.write({ device: deviceLabel(d.key, d.name), action: "device_added", path: "", detail: d.platform });
+      this.log(`new device of the account: ${deviceLabel(d.key, d.name)}`);
+    }
+    for (const d of removed) {
+      this.audit.write({ device: deviceLabel(d.key, d.name), action: "revoke", path: "", detail: "revoked by the account" });
+      this.log(`device revoked by the account: ${deviceLabel(d.key, d.name)}`);
+      this.dropDevice(d.key);
+    }
+  }
+
+  /**
+   * The machine left the owner's account (removed on the web, or `tunelo
+   * logout`): it trusts no device until Chat lists them again, and every link
+   * closes now.
+   */
+  leftAccount(): void {
+    const keys = this.config.get().trustedDevices?.list.map((d) => d.key) ?? [];
+    this.config.update((c) => {
+      c.trustedDevices = { list: [], syncedAt: 0, revoked: c.trustedDevices?.revoked ?? [] };
+    });
+    for (const c of this.connections) c.close(4001, "the machine left the account");
+    for (const k of keys) this.terminal.revokeDevice(k);
+  }
+
+  /** Cuts every live connection of a revoked device (whole base64url key), and its terminal links, direct ones included. */
+  private dropDevice(key: string): void {
     for (const c of this.connections) {
       const k = c.deviceKey;
-      if (!k) continue;
-      const encoded = toBase64Url(k);
-      if (!encoded.startsWith(key)) continue;
-      full.add(encoded);
-      c.close(4001, "revoked");
+      if (k && toBase64Url(k) === key) c.close(4001, "revoked");
     }
-    for (const k of full) this.terminal.revokeDevice(k);
-  }
-
-  private auth(): MachineAuth {
-    const install = this.config.get().install;
-    return {
-      machine: this.key,
-      deviceStatus: (k) => this.config.deviceStatus(k),
-      install: install ? { deviceKey: fromBase64Url(install.deviceKey), secret: fromBase64Url(install.secret) } : undefined,
-    };
+    this.terminal.revokeDevice(key);
   }
 
   private accept(ws: WebSocket): void {
@@ -486,8 +478,9 @@ export class Machine {
         core: this.core,
         config: this.config,
         audit: this.audit,
-        auth: () => this.auth(),
-        pairing: this.pairing,
+        machineKey: () => this.keyPair,
+        trust: this.trust,
+        onRefused: (key, verdict) => this.log(`refused a device (${deviceLabel(key)}): ${refusalReason(verdict)}`),
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
         profiles: this.profiles,
@@ -502,19 +495,6 @@ export class Machine {
         usage: this.usageApi,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
-        onPaired: (via) => {
-          if (via === "install") this.config.update((c) => delete c.install);
-          this.log(`paired a device (${via})`);
-          // Devices already connected see the new one in the machine's device list.
-          void this.announceInfo();
-          // A device paired from afar by the code: every device of the account
-          // hears of it. Not after an install, which the owner ran on this machine.
-          if (via === "totp") this.opts.notifyPaired?.();
-        },
-        onTotpSet: () => {
-          this.log("authenticator pairing set from a paired device");
-          void this.announceInfo();
-        },
       },
     );
     this.connections.add(conn);
@@ -585,7 +565,6 @@ export class Machine {
       openSessions: this.core.openSessions(),
       maxSessions: this.core.limit,
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
-      devices: c.devices.map((d) => ({ publicKey: fromBase64Url(d.key), name: d.name, addedAt: BigInt(d.addedAt) })),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
       needsFullDiskAccess: needsDiskAccess,
       // The program to add to the list; a development run (bun, node) has none to give.
@@ -595,7 +574,6 @@ export class Machine {
       gitChanges: true,
       browser: { available: this.browser.available(), running: this.browser.running(), clearable: true },
       screenShare: this.screenShare.supported,
-      totpEnabled: this.pairing.enabled,
       agentUpdate: this.updater.info(),
       terminal: this.terminal.availability(),
     });
@@ -672,6 +650,12 @@ export class Machine {
       else this.log(`needs you: "${now.title}" (${pending} waiting)`);
     }, PUSH_DELAY_MS).unref?.();
   }
+}
+
+function refusalReason(verdict: string): string {
+  if (verdict === "stale") return "this machine has not reached Chat for over 24 hours";
+  if (verdict === "revoked") return "revoked by the account";
+  return "not a device of the machine's account";
 }
 
 /**

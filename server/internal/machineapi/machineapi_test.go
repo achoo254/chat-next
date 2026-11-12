@@ -3,6 +3,8 @@ package machineapi
 import (
 	"bytes"
 	"context"
+	"crypto/ecdh"
+	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"io"
@@ -21,6 +23,7 @@ import (
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/auth"
 	"app.local/server/internal/auth/idptest"
+	"app.local/server/internal/keyproof"
 	"app.local/server/internal/push"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
@@ -70,6 +73,24 @@ func (n *notifier) users() []int64 {
 	return append([]int64(nil), n.user...)
 }
 
+// kicker counts the calls of Kick.
+type kicker struct {
+	mu    sync.Mutex
+	kicks int
+}
+
+func (k *kicker) Kick() {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.kicks++
+}
+
+func (k *kicker) count() int {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.kicks
+}
+
 // timer is a pending merged push that the test fires by hand.
 type timer struct {
 	after   time.Duration
@@ -87,6 +108,9 @@ type env struct {
 	notifier *notifier
 	idp      *idptest.Provider
 	userID   int64
+	grants   *kicker
+	// machineKey is the machine's X25519 key: registerRequest proves it.
+	machineKey *ecdh.PrivateKey
 
 	// The service's clock and timers, used from the handler's goroutines.
 	mu     sync.Mutex
@@ -140,8 +164,14 @@ func newEnv(t *testing.T) *env {
 	if err := verifier.Discover(ctx); err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, store: st, notifier: &notifier{}, idp: provider, userID: u.ID, clock: time.Unix(1_800_000_000, 0)}
-	e.svc, err = New(Config{TenantID: tenant, TenantDomain: "hoandat.com", Resource: resource}, st, verifier, e.notifier, ratelimit.NewMemory(), quiet)
+	proofs, err := keyproof.New(bytes.Repeat([]byte{4}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &env{t: t, store: st, notifier: &notifier{}, idp: provider, userID: u.ID, clock: time.Unix(1_800_000_000, 0),
+		grants: &kicker{}, machineKey: newKey(t)}
+	e.svc, err = New(Config{TenantID: tenant, TenantDomain: "hoandat.com", Resource: resource, KeyProofs: proofs, Grants: e.grants},
+		st, verifier, e.notifier, ratelimit.NewMemory(), quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,6 +200,7 @@ func (e *env) token(sub string, mods ...func(claims map[string]any) string) stri
 	claims := map[string]any{
 		"iss": e.idp.Issuer(), "aud": resource, "sub": sub, "client_id": "tunelo-agent",
 		"scope": "chat:read chat:write machines:write", "iat": time.Now().Unix(), "exp": time.Now().Add(10 * time.Minute).Unix(),
+		"grant_id": "grant-of-" + sub,
 	}
 	typ := "at+jwt"
 	for _, mod := range mods {
@@ -184,34 +215,51 @@ func (e *env) token(sub string, mods ...func(claims map[string]any) string) stri
 	return tok
 }
 
-func registerRequest() *appv1.RegisterMachineRequest {
+func newKey(t *testing.T) *ecdh.PrivateKey {
+	t.Helper()
+	k, err := ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+// prove answers c with key, as tunelo does.
+func prove(t *testing.T, key *ecdh.PrivateKey, c *appv1.KeyChallenge) *appv1.KeyProof {
+	t.Helper()
+	server, err := ecdh.X25519().NewPublicKey(c.GetServerKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := key.ECDH(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &appv1.KeyProof{Challenge: c, Mac: keyproof.MAC(shared, c.GetNonce())}
+}
+
+// registerRequestFor registers key, with a proof of it.
+func (e *env) registerRequestFor(key *ecdh.PrivateKey) *appv1.RegisterMachineRequest {
+	e.t.Helper()
+	c, err := e.svc.cfg.KeyProofs.Challenge(keyproof.Machine)
+	if err != nil {
+		e.t.Fatal(err)
+	}
 	return &appv1.RegisterMachineRequest{Name: " Mac mini ", Os: "darwin", Arch: "arm64",
-		AgentVersion: "2.2.2", PublicKey: bytes.Repeat([]byte{5}, 32)}
+		AgentVersion: "3.0.0", PublicKey: key.PublicKey().Bytes(), Proof: prove(e.t, key, c)}
+}
+
+func (e *env) registerRequest() *appv1.RegisterMachineRequest {
+	return e.registerRequestFor(e.machineKey)
 }
 
 func (e *env) register() (int64, string) {
 	e.t.Helper()
-	resp, err := e.client.RegisterMachine(context.Background(), withSecret(registerRequest(), e.token(ownerSub)))
+	resp, err := e.client.RegisterMachine(context.Background(), withSecret(e.registerRequest(), e.token(ownerSub)))
 	if err != nil {
 		e.t.Fatal(err)
 	}
 	return resp.Msg.GetMachineId(), resp.Msg.GetMachineSecret()
-}
-
-// legacy inserts a machine of the owner as an install code made it
-// (unclaimed) and returns its id and secret.
-func (e *env) legacy() (int64, string) {
-	e.t.Helper()
-	secret := strings.Repeat("L", 43)
-	hash := sha256.Sum256([]byte(secret))
-	var id int64
-	if err := e.store.Pool().QueryRow(context.Background(), `
-		INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
-		VALUES ($1, $2, 'Laptop', 'win32', 'x64', '0.2.4', $3, $4) RETURNING id`,
-		tenant, e.userID, bytes.Repeat([]byte{6}, 32), hash[:]).Scan(&id); err != nil {
-		e.t.Fatal(err)
-	}
-	return id, secret
 }
 
 // machineTunnel is the tunnel Tunelo holds for the machine id of sub.
@@ -238,18 +286,16 @@ func TestRegisterMachine(t *testing.T) {
 		"secret":  strings.Repeat("A", 43),
 		"no sub":  e.token(""),
 	} {
-		req := connect.NewRequest(registerRequest())
+		req := connect.NewRequest(e.registerRequest())
 		if tok != "" {
 			req.Header().Set("Authorization", "Bearer "+tok)
 		}
-		// An install code alone no longer registers anything.
-		req.Msg.InstallCode = strings.Repeat("c", 22) //nolint:staticcheck // the deprecated field must be ignored
 		if _, err := e.client.RegisterMachine(ctx, req); connect.CodeOf(err) != connect.CodeUnauthenticated {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	noScope := e.token(ownerSub, func(c map[string]any) string { c["scope"] = "chat:read chat:write"; return "" })
-	if _, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), noScope)); connect.CodeOf(err) != connect.CodePermissionDenied ||
+	if _, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), noScope)); connect.CodeOf(err) != connect.CodePermissionDenied ||
 		!strings.Contains(err.Error(), "insufficient_scope") {
 		t.Fatalf("without machines:write: %v", err)
 	}
@@ -262,28 +308,47 @@ func TestRegisterMachine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), forged)); connect.CodeOf(err) != connect.CodeUnauthenticated {
+	if _, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), forged)); connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("token of a foreign key: %v", err)
 	}
 
 	tok := e.token(ownerSub)
 	for name, msg := range map[string]*appv1.RegisterMachineRequest{
-		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
-		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
-		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "2.2.2", PublicKey: make([]byte, 32)},
+		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
+		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
+		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
 		"bad version": {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "v1", PublicKey: make([]byte, 32)},
-		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: make([]byte, 31)},
+		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 31)},
 	} {
 		if _, err := e.client.RegisterMachine(ctx, withSecret(msg, tok)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	old := registerRequest()
-	old.AgentVersion = "2.0.15"
-	if _, err := e.client.RegisterMachine(ctx, withSecret(old, tok)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	old := e.registerRequest()
+	old.AgentVersion = "2.7.1"
+	if _, err := e.client.RegisterMachine(ctx, withSecret(old, tok)); connect.CodeOf(err) != connect.CodeFailedPrecondition ||
+		!strings.Contains(err.Error(), "run the install command") {
 		t.Fatalf("old agent: %v", err)
 	}
-	resp, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), tok))
+	// The key must be proven: no proof, a proof of another key, or one made
+	// for a device challenge are all refused.
+	noProof := e.registerRequest()
+	noProof.Proof = nil
+	otherKey := e.registerRequest()
+	otherKey.Proof = e.registerRequestFor(newKey(t)).GetProof()
+	deviceChallenge, err := e.svc.cfg.KeyProofs.Challenge(keyproof.AccountDevice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongPurpose := e.registerRequest()
+	wrongPurpose.Proof = prove(t, e.machineKey, deviceChallenge)
+	for name, msg := range map[string]*appv1.RegisterMachineRequest{"no proof": noProof, "other key": otherKey, "device challenge": wrongPurpose} {
+		if _, err := e.client.RegisterMachine(ctx, withSecret(msg, tok)); connect.CodeOf(err) != connect.CodePermissionDenied ||
+			!strings.Contains(err.Error(), "bad_key_proof") {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	resp, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), tok))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,8 +356,45 @@ func TestRegisterMachine(t *testing.T) {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, err := e.store.ListMachines(ctx, tenant, e.userID)
-	if err != nil || len(list) != 1 || list[0].Name != "Mac mini" || !list[0].Claimed {
+	if err != nil || len(list) != 1 || list[0].Name != "Mac mini" || !list[0].Claimed ||
+		!bytes.Equal(list[0].PublicKey, e.machineKey.PublicKey().Bytes()) {
 		t.Fatalf("directory %+v %v", list, err)
+	}
+	var grant string
+	if err := e.store.Pool().QueryRow(ctx, `SELECT idp_grant_id FROM machines WHERE id = $1`, resp.Msg.GetMachineId()).Scan(&grant); err != nil ||
+		grant != "grant-of-"+ownerSub {
+		t.Fatalf("grant %q %v", grant, err)
+	}
+}
+
+// The challenge comes from the service with the owner's token; registering
+// the same key again keeps the machine and rotates its secret.
+func TestRegisterMachineAgainWithChallenge(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := e.client.GetMachineKeyChallenge(ctx, connect.NewRequest(&appv1.GetMachineKeyChallengeRequest{})); connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("challenge without a token: %v", err)
+	}
+	noScope := e.token(ownerSub, func(c map[string]any) string { c["scope"] = "chat:read"; return "" })
+	if _, err := e.client.GetMachineKeyChallenge(ctx, withSecret(&appv1.GetMachineKeyChallengeRequest{}, noScope)); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("challenge without machines:write: %v", err)
+	}
+	id, oldSecret := e.register()
+	c, err := e.client.GetMachineKeyChallenge(ctx, withSecret(&appv1.GetMachineKeyChallengeRequest{}, e.token(ownerSub)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &appv1.RegisterMachineRequest{Name: "new host name", Os: "darwin", Arch: "arm64", AgentVersion: "3.0.1",
+		PublicKey: e.machineKey.PublicKey().Bytes(), Proof: prove(t, e.machineKey, c.Msg.GetChallenge())}
+	resp, err := e.client.RegisterMachine(ctx, withSecret(req, e.token(ownerSub)))
+	if err != nil || resp.Msg.GetMachineId() != id || resp.Msg.GetMachineSecret() == oldSecret {
+		t.Fatalf("registered again: %+v %v", resp, err)
+	}
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.1"}, oldSecret)); connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("the old secret still works: %v", err)
+	}
+	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); len(list) != 1 || list[0].Name != "Mac mini" {
+		t.Fatalf("directory %+v", list)
 	}
 }
 
@@ -302,7 +404,7 @@ func TestRegisterMachineCreatesTheChatUser(t *testing.T) {
 	// New accounts refused (sign-up caps): a reason of its own, so tunelo waits.
 	var asked []string
 	e.svc.cfg.AdmitNewUser = func(ip string) bool { asked = append(asked, ip); return false }
-	_, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token("acc_new")))
+	_, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), e.token("acc_new")))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "chat_account_missing") {
 		t.Fatalf("new account refused: %v", err)
 	}
@@ -316,7 +418,7 @@ func TestRegisterMachineCreatesTheChatUser(t *testing.T) {
 	}
 	// Admitted: the user is created, pending its profile, and owns the machine.
 	e.svc.cfg.AdmitNewUser = func(string) bool { return true }
-	resp, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token("acc_new")))
+	resp, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), e.token("acc_new")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +432,8 @@ func TestRegisterMachineCreatesTheChatUser(t *testing.T) {
 	}
 	// An existing user is never admitted again.
 	e.svc.cfg.AdmitNewUser = func(string) bool { t.Error("admission asked for an existing user"); return false }
-	if _, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token(ownerSub))); err != nil {
+	e.machineKey = newKey(t)
+	if _, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), e.token(ownerSub))); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -342,16 +445,18 @@ func TestRegisterMachineLimitHoldsUnderConcurrency(t *testing.T) {
 		if _, err := e.store.Pool().Exec(ctx, `
 			INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
 			VALUES ($1, $2, 'm', 'linux', 'x64', '0.1.0', $3, $4)`,
-			tenant, e.userID, bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{byte(i + 1)}, 32)); err != nil {
+			tenant, e.userID, bytes.Repeat([]byte{byte(100 + i)}, 32), bytes.Repeat([]byte{byte(i + 1)}, 32)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	tok := e.token(ownerSub)
+	// Two different machines at once: one fits.
+	reqs := []*appv1.RegisterMachineRequest{e.registerRequestFor(newKey(t)), e.registerRequestFor(newKey(t))}
 	errs := make([]error, 2)
 	var wg sync.WaitGroup
 	for i := range errs {
 		wg.Go(func() {
-			_, errs[i] = e.client.RegisterMachine(ctx, withSecret(registerRequest(), tok))
+			_, errs[i] = e.client.RegisterMachine(ctx, withSecret(reqs[i], tok))
 		})
 	}
 	wg.Wait()
@@ -379,96 +484,17 @@ func TestRegisterMachineLimit(t *testing.T) {
 		if _, err := e.store.Pool().Exec(ctx, `
 			INSERT INTO machines (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash)
 			VALUES ($1, $2, 'm', 'linux', 'x64', '0.1.0', $3, $4)`,
-			tenant, e.userID, bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{byte(i + 1)}, 32)); err != nil {
+			tenant, e.userID, bytes.Repeat([]byte{byte(100 + i)}, 32), bytes.Repeat([]byte{byte(i + 1)}, 32)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	_, err := e.client.RegisterMachine(ctx, withSecret(registerRequest(), e.token(ownerSub)))
+	// The registered machine comes back at the limit; a new one does not fit.
+	if _, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequest(), e.token(ownerSub))); err != nil {
+		t.Fatalf("the same machine again: %v", err)
+	}
+	_, err := e.client.RegisterMachine(ctx, withSecret(e.registerRequestFor(newKey(t)), e.token(ownerSub)))
 	if connect.CodeOf(err) != connect.CodeResourceExhausted || !strings.Contains(err.Error(), "too_many_machines") {
 		t.Fatalf("the 21st machine: %v", err)
-	}
-}
-
-func TestClaimMachine(t *testing.T) {
-	e := newEnv(t)
-	ctx := context.Background()
-	if _, err := e.store.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_2", PreferredUsername: "binh"}); err != nil {
-		t.Fatal(err)
-	}
-	id, secret := e.legacy()
-	claim := func(tok, secret string) error {
-		_, err := e.client.ClaimMachine(ctx, withSecret(&appv1.ClaimMachineRequest{MachineSecret: secret}, tok))
-		return err
-	}
-	beat := func(tunnel string) (*appv1.HeartbeatResponse, error) {
-		resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.2.2"}, secret))
-		if err != nil {
-			return nil, err
-		}
-		return resp.Msg, nil
-	}
-	// Unclaimed: any tunnel of the domain passes, and the agent is told to claim.
-	if r, err := beat("wss://old-name.tunnel.hoandat.com"); err != nil || r.GetClaimed() {
-		t.Fatalf("unclaimed heartbeat: %+v %v", r, err)
-	}
-
-	if err := claim("", secret); connect.CodeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("without a token: %v", err)
-	}
-	noScope := e.token(ownerSub, func(c map[string]any) string { c["scope"] = "chat:read"; return "" })
-	if err := claim(noScope, secret); connect.CodeOf(err) != connect.CodePermissionDenied {
-		t.Fatalf("without machines:write: %v", err)
-	}
-	if err := claim(e.token(ownerSub), strings.Repeat("W", 43)); connect.CodeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("wrong secret: %v", err)
-	}
-	if err := claim(e.token(ownerSub), "short"); connect.CodeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("malformed secret: %v", err)
-	}
-	if err := claim(e.token("acc_2"), secret); connect.CodeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "claim_wrong_account") {
-		t.Fatalf("claim by another account: %v", err)
-	}
-	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].Claimed {
-		t.Fatal("claimed by the wrong account")
-	}
-	if err := claim(e.token(ownerSub), secret); err != nil {
-		t.Fatal(err)
-	}
-	if err := claim(e.token(ownerSub), secret); err != nil {
-		t.Fatalf("claim again: %v", err)
-	}
-
-	// Claimed: only the machine tunnel of the owner's account is listed. Another
-	// one is refused without failing the heartbeat: the machine stays alive
-	// without a tunnel and still learns which devices were revoked.
-	phone := bytes.Repeat([]byte{9}, 32)
-	if err := e.store.RevokeMachineDevice(ctx, tenant, e.userID, id, phone); err != nil {
-		t.Fatal(err)
-	}
-	for _, tunnel := range []string{"wss://old-name.tunnel.hoandat.com", machineTunnel("acc_2", id), machineTunnel(ownerSub, id+1)} {
-		r, err := beat(tunnel)
-		if err != nil || !r.GetTunnelRefused() || len(r.GetRevokedDeviceKeys()) != 1 || !bytes.Equal(r.GetRevokedDeviceKeys()[0], phone) {
-			t.Errorf("tunnel %s: %+v %v", tunnel, r, err)
-		}
-		if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != "" {
-			t.Fatalf("a refused tunnel was listed: %q", list[0].TunnelURL)
-		}
-	}
-	if r, err := beat(machineTunnel(ownerSub, id) + "/"); err != nil || !r.GetClaimed() || r.GetTunnelRefused() {
-		t.Fatalf("own tunnel: %+v %v", r, err)
-	}
-	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != machineTunnel(ownerSub, id) {
-		t.Fatalf("own tunnel recorded %q", list[0].TunnelURL)
-	}
-	if r, err := beat(""); err != nil || !r.GetClaimed() {
-		t.Fatalf("tunnel down: %+v %v", r, err)
-	}
-
-	if err := e.store.RevokeMachine(ctx, tenant, e.userID, id); err != nil {
-		t.Fatal(err)
-	}
-	if err := claim(e.token(ownerSub), secret); connect.CodeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "machine_revoked") {
-		t.Fatalf("claim a revoked machine: %v", err)
 	}
 }
 
@@ -477,29 +503,39 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 	ctx := context.Background()
 	id, secret := e.register()
 	beat := func(tunnel string) (bool, error) {
-		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "2.2.2"}, secret))
+		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.0.0"}, secret))
 		if err != nil {
 			return false, err
 		}
 		return r.Msg.GetTunnelRefused(), nil
 	}
-	if refused, err := beat("wss://dat-mac.tunnel.hoandat.com"); err != nil || !refused {
-		t.Fatalf("another tunnel: %v %v", refused, err)
+	// Only the machine tunnel of the owner's account is listed. Another one
+	// is refused without failing the heartbeat: the machine stays alive
+	// without a tunnel.
+	for _, tunnel := range []string{"wss://dat-mac.tunnel.hoandat.com", machineTunnel("acc_2", id), machineTunnel(ownerSub, id+1)} {
+		if refused, err := beat(tunnel); err != nil || !refused {
+			t.Errorf("tunnel %s: %v %v", tunnel, refused, err)
+		}
+		if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != "" {
+			t.Fatalf("a refused tunnel was listed: %q", list[0].TunnelURL)
+		}
 	}
-	if refused, err := beat(machineTunnel(ownerSub, id)); err != nil || refused {
+	if refused, err := beat(machineTunnel(ownerSub, id) + "/"); err != nil || refused {
 		t.Fatalf("own tunnel: %v %v", refused, err)
+	}
+	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); list[0].TunnelURL != machineTunnel(ownerSub, id) {
+		t.Fatalf("own tunnel recorded %q", list[0].TunnelURL)
 	}
 }
 
-// Pairing stays end to end: the agent's calls carry no device key, install
-// secret or authenticator (TOTP) secret, so the server can never vouch for a
-// device or compute a pairing code. Any new field fails here first.
-func TestAgentCallsTakeNoDeviceKey(t *testing.T) {
+// What the agent sends stays metadata: no session content, no secret of the
+// end-to-end link. Any new field fails here first, to be weighed.
+func TestAgentCallFields(t *testing.T) {
 	for msg, want := range map[proto.Message][]string{
-		&appv1.RegisterMachineRequest{}:  {"install_code", "name", "os", "arch", "agent_version", "public_key"},
-		&appv1.HeartbeatRequest{}:        {"tunnel_url", "agent_version", "claude_version"},
-		&appv1.ClaimMachineRequest{}:     {"machine_secret"},
-		&appv1.NotifyNeedsInputRequest{}: {"kind", "pending_count", "session_id"},
+		&appv1.RegisterMachineRequest{}:   {"name", "os", "arch", "agent_version", "public_key", "proof"},
+		&appv1.HeartbeatRequest{}:         {"tunnel_url", "agent_version", "claude_version", "connected_device_keys"},
+		&appv1.NotifyNeedsInputRequest{}:  {"kind", "pending_count", "session_id"},
+		&appv1.UnregisterMachineRequest{}: nil,
 	} {
 		fields := msg.ProtoReflect().Descriptor().Fields()
 		var got []string
@@ -531,8 +567,9 @@ func TestMachineSubdomain(t *testing.T) {
 func TestHeartbeat(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	id, secret := e.legacy()
-	beat := &appv1.HeartbeatRequest{TunnelUrl: "wss://dat-mac.tunnel.hoandat.com/", AgentVersion: "2.2.3", ClaudeVersion: "2.1.319"}
+	id, secret := e.register()
+	tunnel := machineTunnel(ownerSub, id)
+	beat := &appv1.HeartbeatRequest{TunnelUrl: tunnel + "/", AgentVersion: "3.0.1", ClaudeVersion: "2.1.319"}
 
 	for name, header := range map[string]string{"none": "", "not bearer": "Basic " + secret, "wrong": "Bearer " + wrong(secret)} {
 		req := connect.NewRequest(beat)
@@ -547,11 +584,19 @@ func TestHeartbeat(t *testing.T) {
 		"https://dat.tunnel.hoandat.com", "wss://dat.tunnel.evil.com", "wss://a.b.tunnel.hoandat.com",
 		"wss://DAT.tunnel.hoandat.com", "wss://dat.tunnel.hoandat.com/x", "wss://dat.tunnel.hoandat.com.evil.com",
 	} {
-		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "2.2.2"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "3.0.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("tunnel %q: %v", url, err)
 		}
 	}
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.0.15"}, secret)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	for name, keys := range map[string][][]byte{
+		"short key": {make([]byte, 31)},
+		"too many":  slices.Repeat([][]byte{make([]byte, 32)}, store.MaxConnectedDeviceKeys+1),
+	} {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0", ConnectedDeviceKeys: keys}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.7.1"}, secret)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("old agent: %v", err)
 	}
 
@@ -559,21 +604,51 @@ func TestHeartbeat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Msg.GetRevoked() || len(resp.Msg.GetRevokedDeviceKeys()) != 0 || resp.Msg.GetMinAgentVersion() != MinAgentVersion {
+	if resp.Msg.GetRevoked() || len(resp.Msg.GetTrustedDevices()) != 0 || resp.Msg.GetMinAgentVersion() != MinAgentVersion {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, _ := e.store.ListMachines(ctx, tenant, e.userID)
-	if list[0].TunnelURL != "wss://dat-mac.tunnel.hoandat.com" || list[0].AgentVersion != "2.2.3" || list[0].ClaudeVersion != "2.1.319" {
+	if list[0].TunnelURL != tunnel || list[0].AgentVersion != "3.0.1" || list[0].ClaudeVersion != "2.1.319" {
 		t.Fatalf("recorded %+v", list[0])
 	}
 
+	// The owner's devices come back; another account's never do.
+	session := func(userID int64, token string) int64 {
+		t.Helper()
+		sum := sha256.Sum256([]byte(token))
+		sid, err := e.store.CreateSession(ctx, store.NewSession{TokenHash: sum[:], TenantID: tenant, UserID: userID, IdPClientID: "chat-web"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sid
+	}
+	other, err := e.store.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_2", PreferredUsername: "binh"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	phone := bytes.Repeat([]byte{9}, 32)
-	if err := e.store.RevokeMachineDevice(ctx, tenant, e.userID, id, phone); err != nil {
+	if _, _, err := e.store.RegisterAccountDevice(ctx, tenant, e.userID, session(e.userID, "phone"),
+		store.NewAccountDevice{PublicKey: phone, Name: "iPhone", Platform: "ios"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.store.RegisterAccountDevice(ctx, tenant, other.ID, session(other.ID, "theirs"),
+		store.NewAccountDevice{PublicKey: bytes.Repeat([]byte{8}, 32), Name: "theirs", Platform: "web"}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err = e.client.Heartbeat(ctx, withSecret(beat, secret))
-	if err != nil || len(resp.Msg.GetRevokedDeviceKeys()) != 1 || !bytes.Equal(resp.Msg.GetRevokedDeviceKeys()[0], phone) {
-		t.Fatalf("revoked device: %+v %v", resp, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := resp.Msg.GetTrustedDevices()
+	if len(got) != 1 || !bytes.Equal(got[0].GetPublicKey(), phone) || got[0].GetName() != "iPhone" || got[0].GetPlatform() != "ios" ||
+		got[0].GetCreatedAt() == 0 {
+		t.Fatalf("trusted devices %+v", got)
+	}
+	if _, err := e.store.RevokeAccountDevice(ctx, tenant, e.userID, phone); err != nil {
+		t.Fatal(err)
+	}
+	if resp, err := e.client.Heartbeat(ctx, withSecret(beat, secret)); err != nil || len(resp.Msg.GetTrustedDevices()) != 0 {
+		t.Fatalf("after revoking the device: %+v %v", resp, err)
 	}
 
 	if err := e.store.RevokeMachine(ctx, tenant, e.userID, id); err != nil {
@@ -581,13 +656,45 @@ func TestHeartbeat(t *testing.T) {
 	}
 	// A revoked machine is told so, whatever version it runs.
 	resp, err = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "0.0.1"}, secret))
-	if err != nil || !resp.Msg.GetRevoked() {
+	if err != nil || !resp.Msg.GetRevoked() || len(resp.Msg.GetTrustedDevices()) != 0 {
 		t.Fatalf("revoked machine: %+v %v", resp, err)
 	}
 	_, err = e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
 		Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, PendingCount: 1}, secret))
 	if connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("notice of a revoked machine: %v", err)
+	}
+}
+
+func TestUnregisterMachine(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	id, secret := e.register()
+	if _, err := e.client.UnregisterMachine(ctx, withSecret(&appv1.UnregisterMachineRequest{}, wrong(secret))); connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("wrong secret: %v", err)
+	}
+	for range 2 {
+		if _, err := e.client.UnregisterMachine(ctx, withSecret(&appv1.UnregisterMachineRequest{}, secret)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if e.grants.count() != 2 {
+		t.Fatalf("grant revocation kicked %d times", e.grants.count())
+	}
+	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); len(list) != 0 {
+		t.Fatalf("still listed: %+v", list)
+	}
+	if resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, secret)); err != nil || !resp.Msg.GetRevoked() {
+		t.Fatalf("heartbeat after unregistering: %+v %v", resp, err)
+	}
+	pending, err := e.store.PendingGrantRevocations(ctx, tenant, 10)
+	if err != nil || len(pending) != 1 || pending[0].MachineID != id || pending[0].GrantID != "grant-of-"+ownerSub {
+		t.Fatalf("pending grant %+v %v", pending, err)
+	}
+	// Registering the key again makes a new machine.
+	again, _ := e.register()
+	if again == id {
+		t.Fatal("the removed machine came back")
 	}
 }
 
@@ -663,66 +770,6 @@ func TestNotifyNeedsInputMerges(t *testing.T) {
 	}
 }
 
-func TestNotifyDevicePairedGoesOutAtOnce(t *testing.T) {
-	e := newEnv(t)
-	ctx := context.Background()
-	id, secret := e.register()
-	notify := func(kind appv1.NeedsInputKind, pending int32, session string) error {
-		_, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
-			Kind: kind, PendingCount: pending, SessionId: session}, secret))
-		return err
-	}
-	for name, err := range map[string]error{
-		"no count":   notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 0, ""),
-		"count":      notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 2, ""),
-		"session":    notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, "t_1"),
-		"bad kind 5": notify(appv1.NeedsInputKind(5), 1, ""),
-	} {
-		if connect.CodeOf(err) != connect.CodeInvalidArgument {
-			t.Errorf("%s: %v", name, err)
-		}
-	}
-	if sent := e.notifier.take(); len(sent) != 0 {
-		t.Fatalf("pushed on invalid calls: %+v", sent)
-	}
-
-	// A "needs you" push opens the machine's window ...
-	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, 1, "t_1"); err != nil {
-		t.Fatal(err)
-	}
-	e.notifier.take()
-	e.advance(5 * time.Second)
-	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_QUESTION, 2, "t_2"); err != nil {
-		t.Fatal(err)
-	}
-	// ... but a newly paired device is told at once and keeps the merged one.
-	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, ""); err != nil {
-		t.Fatal(err)
-	}
-	sent := e.notifier.take()
-	want := push.MachineNotice{MachineID: id, MachineName: "Mac mini", Kind: push.MachineDevicePaired, Pending: 1, At: e.now()}
-	if len(sent) != 1 || sent[0] != want {
-		t.Fatalf("device paired push %+v", sent)
-	}
-	timers := e.pending()
-	if len(timers) != 1 {
-		t.Fatalf("merged push lost: %d timers", len(timers))
-	}
-	e.advance(25 * time.Second)
-	timers[0].fire()
-	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Kind != push.MachineQuestion || sent[0].SessionID != "t_2" {
-		t.Fatalf("merged push %+v", sent)
-	}
-	// Not after Close.
-	e.svc.Close()
-	if err := notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, ""); err != nil {
-		t.Fatal(err)
-	}
-	if sent := e.notifier.take(); len(sent) != 0 {
-		t.Fatalf("pushed after Close: %+v", sent)
-	}
-}
-
 func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -733,9 +780,11 @@ func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
 		return err
 	}
 	for name, err := range map[string]error{
-		"no count": notify(0, ""),
-		"count":    notify(2, ""),
-		"session":  notify(1, "t_1"),
+		"no count":       notify(0, ""),
+		"count":          notify(2, ""),
+		"session":        notify(1, "t_1"),
+		"retired kind 3": notifyKind(e, secret, appv1.NeedsInputKind(3)),
+		"bad kind 5":     notifyKind(e, secret, appv1.NeedsInputKind(5)),
 	} {
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -770,28 +819,33 @@ func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
 	}
 }
 
+func notifyKind(e *env, secret string, kind appv1.NeedsInputKind) error {
+	_, err := e.client.NotifyNeedsInput(context.Background(), withSecret(&appv1.NotifyNeedsInputRequest{Kind: kind, PendingCount: 1}, secret))
+	return err
+}
+
 func TestFailedAuthenticationsAreLimited(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	_, secret := e.register()
 	var last error
 	for range 25 {
-		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.2.2"}, wrong(secret)))
+		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, wrong(secret)))
 	}
 	if connect.CodeOf(last) != connect.CodeResourceExhausted {
 		t.Fatalf("after many failures: %v", last)
 	}
 	// A valid secret still passes.
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "2.2.2"}, secret)); err != nil {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, secret)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCheckVersion(t *testing.T) {
 	for v, want := range map[string]connect.Code{
-		"2.2.2": 0, "2.2.3": 0, "2.3.0": 0, "3.0.0": 0,
-		// Older than the minimum: refused with a clear "run tunelo update".
-		"2.2.1": connect.CodeFailedPrecondition, "2.1.0": connect.CodeFailedPrecondition, "2.0.15": connect.CodeFailedPrecondition,
+		"3.0.0": 0, "3.0.1": 0, "3.1.0": 0, "4.0.0": 0, "3.0.0-beta.1": 0,
+		// Older than the minimum: refused with what to do.
+		"2.7.1": connect.CodeFailedPrecondition, "2.2.2": connect.CodeFailedPrecondition, "2.0.15": connect.CodeFailedPrecondition,
 		"1.9.1": connect.CodeFailedPrecondition, "0.1.0": connect.CodeFailedPrecondition,
 		"": connect.CodeInvalidArgument, "2.1": connect.CodeInvalidArgument, "02.1.0": connect.CodeInvalidArgument,
 		"2.1.0+build": connect.CodeInvalidArgument,
@@ -801,7 +855,8 @@ func TestCheckVersion(t *testing.T) {
 		}
 	}
 	// An older tunelo reads what to do from the message.
-	if err := checkVersion("2.0.15"); err == nil || !strings.Contains(err.Error(), "agent_update_required: tunelo 2.2.2 or newer is required; run tunelo update") {
+	if err := checkVersion("2.7.1"); err == nil ||
+		!strings.Contains(err.Error(), "agent_update_required: tunelo 3.0.0 or newer is required; run the install command on the chat's Machines page again") {
 		t.Errorf("old agent message: %v", err)
 	}
 }

@@ -1,39 +1,42 @@
-// Machine config, owned by the running service: paired devices, revoked
-// keys, the authenticator secret for pairing, limits, MCP servers, pinned
-// folders. Written atomically (temp file +
-// rename) with mode 0600; CLI commands go through the control socket so only
-// the service writes it.
+// Machine config, owned by the running service: the account's trusted
+// devices as Chat last listed them (and when), limits, MCP servers, pinned
+// folders. Written atomically (temp file + rename) with mode 0600; CLI
+// commands go through the control socket so only the service writes it.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { fromBase64Url, isTotpSecret, toBase64Url } from "@achoo254/chat-remote-protocol";
+import { toBase64Url } from "@achoo254/chat-remote-protocol";
 import type { ProjectRecord } from "./projects/projects.ts";
 
-export type PairedDevice = { key: string; name: string; addedAt: number };
+/** A device key of the owner's account that Chat lists for this machine (base64url key, Unix ms). */
+export type TrustedDevice = { key: string; name: string; platform: string; createdAt: number };
+
+/**
+ * The owner's live device keys as the last heartbeat returned them, and when
+ * (Unix ms; 0 = never). `revoked` keeps the keys that were listed once and
+ * dropped since (newest last, bounded), so a revoked device hears REVOKED and
+ * the terminal process refuses it.
+ */
+export type TrustedDevices = { list: TrustedDevice[]; syncedAt: number; revoked?: string[] };
+
+/** How long the stored list may stand in for Chat: older than this, new handshakes are refused. */
+export const TRUST_MAX_AGE_MS = 24 * 60 * 60_000;
+/** Revoked keys kept for REVOKED answers and the terminal process. */
+const MAX_REVOKED_KEPT = 500;
 
 export type AgentConfig = {
   machineName: string;
-  devices: PairedDevice[];
-  revoked: string[];
   maxSessions: number;
   idleMinutes: number;
   mcpServers: Record<string, unknown>;
   pinnedDirs: string[];
   /** Folders whose own .claude settings may load (set on the machine: tunelo trust). */
   trustedDirs: string[];
-  /**
-   * The authenticator (TOTP) secret new devices pair with, base64url; set from
-   * a paired device over the end-to-end link. Never logged, written to the
-   * consent log or sent to the chat server.
-   */
-  totpSecret?: string;
-  /** Set by `tunelo install`; cleared once that browser has connected. */
-  install?: { deviceKey: string; secret: string };
+  /** The devices the machine accepts (heartbeat's trusted_devices). */
+  trustedDevices?: TrustedDevices;
   machineId?: string;
   machineSecret?: string;
-  /** The machine is tied to the signed-in account in Chat (registered with it, or claimed). */
-  claimed?: boolean;
-  /** The owner removed the machine on the web: it is not added again until `tunelo install`. */
+  /** The owner removed the machine on the web: it is not added again until a new `tunelo login`. */
   machineRemoved?: boolean;
   /**
    * The machine tunnel's subdomain, kept by tunelo before 2.0.14. No longer
@@ -79,8 +82,6 @@ export function configDir(): string {
 
 const DEFAULTS: AgentConfig = {
   machineName: "",
-  devices: [],
-  revoked: [],
   maxSessions: 50,
   idleMinutes: 5,
   mcpServers: {},
@@ -89,6 +90,7 @@ const DEFAULTS: AgentConfig = {
 };
 
 const OLD_DEFAULT_MAX_SESSIONS = 3;
+const LEGACY_FIELDS = ["devices", "revoked", "totpSecret", "install", "claimed"];
 
 export class ConfigStore {
   readonly file: string;
@@ -97,9 +99,10 @@ export class ConfigStore {
   constructor(readonly dir = configDir()) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     this.file = join(dir, "config.json");
-    this.data = existsSync(this.file)
-      ? { ...DEFAULTS, ...(JSON.parse(readFileSync(this.file, "utf8")) as Partial<AgentConfig>) }
-      : { ...DEFAULTS };
+    const stored = existsSync(this.file) ? (JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>) : {};
+    // Fields of the pairing era (2.x): never read again, dropped at the next write.
+    const kept = Object.fromEntries(Object.entries(stored).filter(([field]) => !LEGACY_FIELDS.includes(field)));
+    this.data = { ...DEFAULTS, ...(kept as Partial<AgentConfig>) };
     // 3 was the old default and update() wrote it back into every config.json:
     // lift it to the new default so existing machines get the higher limit.
     if (this.data.maxSessions === OLD_DEFAULT_MAX_SESSIONS) this.data.maxSessions = DEFAULTS.maxSessions;
@@ -118,45 +121,50 @@ export class ConfigStore {
     this.data = next;
   }
 
-  deviceStatus(key: Uint8Array): "paired" | "revoked" | "unknown" {
-    const k = toBase64Url(key);
-    if (this.data.revoked.includes(k)) return "revoked";
-    return this.data.devices.some((d) => d.key === k) ? "paired" : "unknown";
+  /** What the machine knows of a device key from the stored list (its age aside: see trustStale). */
+  deviceStatus(key: Uint8Array | string): "trusted" | "revoked" | "unknown" {
+    const k = typeof key === "string" ? key : toBase64Url(key);
+    const t = this.data.trustedDevices;
+    if (t?.list.some((d) => d.key === k)) return "trusted";
+    return t?.revoked?.includes(k) ? "revoked" : "unknown";
   }
 
-  addDevice(key: Uint8Array, name: string): void {
-    const k = toBase64Url(key);
-    this.update((c) => {
-      c.revoked = c.revoked.filter((r) => r !== k);
-      // Names come from the device: no control characters, at most 64.
-      const clean = [...name].filter((ch) => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) !== 127).join("").trim().slice(0, 64) || "device";
-      if (!c.devices.some((d) => d.key === k)) c.devices.push({ key: k, name: clean, addedAt: Date.now() });
-    });
+  /** The name the account gave a trusted device; undefined for any other key. */
+  deviceName(key: Uint8Array | string): string | undefined {
+    const k = typeof key === "string" ? key : toBase64Url(key);
+    return this.data.trustedDevices?.list.find((d) => d.key === k)?.name;
+  }
+
+  /** Keys listed once and dropped since. */
+  revokedKeys(): string[] {
+    return [...(this.data.trustedDevices?.revoked ?? [])];
+  }
+
+  /** True when the list was never synced or is older than TRUST_MAX_AGE_MS. */
+  trustStale(now = Date.now()): boolean {
+    const at = this.data.trustedDevices?.syncedAt ?? 0;
+    return at <= 0 || now - at > TRUST_MAX_AGE_MS;
   }
 
   /**
-   * The stored authenticator secret; undefined when none is set or the stored
-   * value is not a 20-byte secret (pairing then stays off until one is set).
+   * Stores the list Chat just returned and when; answers which keys are new
+   * and which were dropped (those join `revoked`). Names and platforms come
+   * from other devices: control characters are taken out.
    */
-  totpSecret(): Uint8Array | undefined {
-    const stored = this.data.totpSecret;
-    if (!stored) return undefined;
-    let secret: Uint8Array;
-    try {
-      secret = fromBase64Url(stored);
-    } catch {
-      return undefined;
+  syncTrustedDevices(list: readonly TrustedDevice[], now = Date.now()): { added: TrustedDevice[]; removed: TrustedDevice[] } {
+    const clean = new Map<string, TrustedDevice>();
+    for (const d of list) {
+      if (!clean.has(d.key)) clean.set(d.key, { key: d.key, name: printable(d.name, 64) || "device", platform: printable(d.platform, 32), createdAt: d.createdAt });
     }
-    return isTotpSecret(secret) ? secret : undefined;
-  }
-
-  /** Stores (or replaces) the authenticator secret; throws when it is not 20 bytes. */
-  setTotpSecret(secret: Uint8Array): void {
-    if (!isTotpSecret(secret)) throw new Error("a TOTP secret is 20 bytes");
-    const stored = toBase64Url(secret);
+    const before = this.data.trustedDevices?.list ?? [];
+    const added = [...clean.values()].filter((d) => !before.some((b) => b.key === d.key));
+    const removed = before.filter((b) => !clean.has(b.key));
     this.update((c) => {
-      c.totpSecret = stored;
+      const keep = (c.trustedDevices?.revoked ?? []).filter((k) => !clean.has(k));
+      for (const d of removed) if (!keep.includes(d.key)) keep.push(d.key);
+      c.trustedDevices = { list: [...clean.values()], syncedAt: now, revoked: keep.slice(-MAX_REVOKED_KEPT) };
     });
+    return { added, removed };
   }
 
   /** True when dir is a trusted folder or inside one. */
@@ -177,17 +185,18 @@ export class ConfigStore {
     });
     return full;
   }
+}
 
-  revokeDevice(key: string): boolean {
-    let found = false;
-    this.update((c) => {
-      found = c.devices.some((d) => d.key === key || d.key.startsWith(key));
-      const full = c.devices.filter((d) => d.key === key || d.key.startsWith(key)).map((d) => d.key);
-      c.devices = c.devices.filter((d) => !full.includes(d.key));
-      for (const k of full.length ? full : [key]) if (!c.revoked.includes(k)) c.revoked.push(k);
-    });
-    return found;
-  }
+/** Text from elsewhere with control characters taken out, trimmed to `max` characters. */
+function printable(text: string, max: number): string {
+  return [...text]
+    .filter((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 32 && (code < 127 || code > 159);
+    })
+    .join("")
+    .trim()
+    .slice(0, max);
 }
 
 /** Short id of a device key, for logs and the consent log. */

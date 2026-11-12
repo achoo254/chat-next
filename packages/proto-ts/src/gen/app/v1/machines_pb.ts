@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/machines.proto.
  */
 export const file_app_v1_machines: GenFile = /*@__PURE__*/
-  fileDesc("ChVhcHAvdjEvbWFjaGluZXMucHJvdG8SBmFwcC52MSLbAQoHTWFjaGluZRIOCgJpZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCRIKCgJvcxgDIAEoCRIMCgRhcmNoGAQgASgJEhUKDWFnZW50X3ZlcnNpb24YBSABKAkSFgoOY2xhdWRlX3ZlcnNpb24YBiABKAkSEgoKcHVibGljX2tleRgHIAEoDBISCgp0dW5uZWxfdXJsGAggASgJEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACEhgKDGxhc3Rfc2Vlbl9hdBgKIAEoA0ICMAISDwoHY2xhaW1lZBgLIAEoCCIaChhDcmVhdGVJbnN0YWxsQ29kZVJlcXVlc3QiQQoZQ3JlYXRlSW5zdGFsbENvZGVSZXNwb25zZRIMCgRjb2RlGAEgASgJEhYKCmV4cGlyZXNfYXQYAiABKANCAjACIhUKE0xpc3RNYWNoaW5lc1JlcXVlc3QiOQoUTGlzdE1hY2hpbmVzUmVzcG9uc2USIQoIbWFjaGluZXMYASADKAsyDy5hcHAudjEuTWFjaGluZSI8ChRSZW5hbWVNYWNoaW5lUmVxdWVzdBIWCgptYWNoaW5lX2lkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJIjkKFVJlbmFtZU1hY2hpbmVSZXNwb25zZRIgCgdtYWNoaW5lGAEgASgLMg8uYXBwLnYxLk1hY2hpbmUiLgoUUmV2b2tlTWFjaGluZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAIiFwoVUmV2b2tlTWFjaGluZVJlc3BvbnNlIkgKE1Jldm9rZURldmljZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAISGQoRZGV2aWNlX3B1YmxpY19rZXkYAiABKAwiFgoUUmV2b2tlRGV2aWNlUmVzcG9uc2UihQEKFlJlZ2lzdGVyTWFjaGluZVJlcXVlc3QSGAoMaW5zdGFsbF9jb2RlGAEgASgJQgIYARIMCgRuYW1lGAIgASgJEgoKAm9zGAMgASgJEgwKBGFyY2gYBCABKAkSFQoNYWdlbnRfdmVyc2lvbhgFIAEoCRISCgpwdWJsaWNfa2V5GAYgASgMIkkKF1JlZ2lzdGVyTWFjaGluZVJlc3BvbnNlEhYKCm1hY2hpbmVfaWQYASABKANCAjACEhYKDm1hY2hpbmVfc2VjcmV0GAIgASgJIi0KE0NsYWltTWFjaGluZVJlcXVlc3QSFgoObWFjaGluZV9zZWNyZXQYASABKAkiLgoUQ2xhaW1NYWNoaW5lUmVzcG9uc2USFgoKbWFjaGluZV9pZBgBIAEoA0ICMAIiVQoQSGVhcnRiZWF0UmVxdWVzdBISCgp0dW5uZWxfdXJsGAEgASgJEhUKDWFnZW50X3ZlcnNpb24YAiABKAkSFgoOY2xhdWRlX3ZlcnNpb24YAyABKAkihQEKEUhlYXJ0YmVhdFJlc3BvbnNlEg8KB3Jldm9rZWQYASABKAgSGwoTcmV2b2tlZF9kZXZpY2Vfa2V5cxgCIAMoDBIZChFtaW5fYWdlbnRfdmVyc2lvbhgDIAEoCRIPCgdjbGFpbWVkGAQgASgIEhYKDnR1bm5lbF9yZWZ1c2VkGAUgASgIImoKF05vdGlmeU5lZWRzSW5wdXRSZXF1ZXN0EiQKBGtpbmQYASABKA4yFi5hcHAudjEuTmVlZHNJbnB1dEtpbmQSFQoNcGVuZGluZ19jb3VudBgCIAEoBRISCgpzZXNzaW9uX2lkGAMgASgJIhoKGE5vdGlmeU5lZWRzSW5wdXRSZXNwb25zZSq1AQoOTmVlZHNJbnB1dEtpbmQSIAocTkVFRFNfSU5QVVRfS0lORF9VTlNQRUNJRklFRBAAEh0KGU5FRURTX0lOUFVUX0tJTkRfQVBQUk9WQUwQARIdChlORUVEU19JTlBVVF9LSU5EX1FVRVNUSU9OEAISIgoeTkVFRFNfSU5QVVRfS0lORF9ERVZJQ0VfUEFJUkVEEAMSHwobTkVFRFNfSU5QVVRfS0lORF9VU0FHRV9ISU5UEAQynQMKD01hY2hpbmVzU2VydmljZRJYChFDcmVhdGVJbnN0YWxsQ29kZRIgLmFwcC52MS5DcmVhdGVJbnN0YWxsQ29kZVJlcXVlc3QaIS5hcHAudjEuQ3JlYXRlSW5zdGFsbENvZGVSZXNwb25zZRJJCgxMaXN0TWFjaGluZXMSGy5hcHAudjEuTGlzdE1hY2hpbmVzUmVxdWVzdBocLmFwcC52MS5MaXN0TWFjaGluZXNSZXNwb25zZRJMCg1SZW5hbWVNYWNoaW5lEhwuYXBwLnYxLlJlbmFtZU1hY2hpbmVSZXF1ZXN0Gh0uYXBwLnYxLlJlbmFtZU1hY2hpbmVSZXNwb25zZRJMCg1SZXZva2VNYWNoaW5lEhwuYXBwLnYxLlJldm9rZU1hY2hpbmVSZXF1ZXN0Gh0uYXBwLnYxLlJldm9rZU1hY2hpbmVSZXNwb25zZRJJCgxSZXZva2VEZXZpY2USGy5hcHAudjEuUmV2b2tlRGV2aWNlUmVxdWVzdBocLmFwcC52MS5SZXZva2VEZXZpY2VSZXNwb25zZTLNAgoTTWFjaGluZUFnZW50U2VydmljZRJSCg9SZWdpc3Rlck1hY2hpbmUSHi5hcHAudjEuUmVnaXN0ZXJNYWNoaW5lUmVxdWVzdBofLmFwcC52MS5SZWdpc3Rlck1hY2hpbmVSZXNwb25zZRJJCgxDbGFpbU1hY2hpbmUSGy5hcHAudjEuQ2xhaW1NYWNoaW5lUmVxdWVzdBocLmFwcC52MS5DbGFpbU1hY2hpbmVSZXNwb25zZRJACglIZWFydGJlYXQSGC5hcHAudjEuSGVhcnRiZWF0UmVxdWVzdBoZLmFwcC52MS5IZWFydGJlYXRSZXNwb25zZRJVChBOb3RpZnlOZWVkc0lucHV0Eh8uYXBwLnYxLk5vdGlmeU5lZWRzSW5wdXRSZXF1ZXN0GiAuYXBwLnYxLk5vdGlmeU5lZWRzSW5wdXRSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
+  fileDesc("ChVhcHAvdjEvbWFjaGluZXMucHJvdG8SBmFwcC52MSLZAQoHTWFjaGluZRIOCgJpZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCRIKCgJvcxgDIAEoCRIMCgRhcmNoGAQgASgJEhUKDWFnZW50X3ZlcnNpb24YBSABKAkSFgoOY2xhdWRlX3ZlcnNpb24YBiABKAkSEgoKcHVibGljX2tleRgHIAEoDBISCgp0dW5uZWxfdXJsGAggASgJEhYKCmNyZWF0ZWRfYXQYCSABKANCAjACEhgKDGxhc3Rfc2Vlbl9hdBgKIAEoA0ICMAJKBAgLEAxSB2NsYWltZWQiSQoMS2V5Q2hhbGxlbmdlEhIKCnNlcnZlcl9rZXkYASABKAwSDQoFbm9uY2UYAiABKAwSFgoKZXhwaXJlc19hdBgDIAEoA0ICMAIiQAoIS2V5UHJvb2YSJwoJY2hhbGxlbmdlGAEgASgLMhQuYXBwLnYxLktleUNoYWxsZW5nZRILCgNtYWMYAiABKAwingEKDUFjY291bnREZXZpY2USEgoKcHVibGljX2tleRgBIAEoDBIMCgRuYW1lGAIgASgJEhAKCHBsYXRmb3JtGAMgASgJEhYKCmNyZWF0ZWRfYXQYBCABKANCAjACEhgKDGxhc3Rfc2Vlbl9hdBgFIAEoA0ICMAISFgoKcmV2b2tlZF9hdBgGIAEoA0ICMAISDwoHY3VycmVudBgHIAEoCCIVChNMaXN0TWFjaGluZXNSZXF1ZXN0IjkKFExpc3RNYWNoaW5lc1Jlc3BvbnNlEiEKCG1hY2hpbmVzGAEgAygLMg8uYXBwLnYxLk1hY2hpbmUiPAoUUmVuYW1lTWFjaGluZVJlcXVlc3QSFgoKbWFjaGluZV9pZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCSI5ChVSZW5hbWVNYWNoaW5lUmVzcG9uc2USIAoHbWFjaGluZRgBIAEoCzIPLmFwcC52MS5NYWNoaW5lIi4KFFJldm9rZU1hY2hpbmVSZXF1ZXN0EhYKCm1hY2hpbmVfaWQYASABKANCAjACIhcKFVJldm9rZU1hY2hpbmVSZXNwb25zZSIeChxHZXREZXZpY2VLZXlDaGFsbGVuZ2VSZXF1ZXN0IkgKHUdldERldmljZUtleUNoYWxsZW5nZVJlc3BvbnNlEicKCWNoYWxsZW5nZRgBIAEoCzIULmFwcC52MS5LZXlDaGFsbGVuZ2UibAoVUmVnaXN0ZXJEZXZpY2VSZXF1ZXN0EhIKCnB1YmxpY19rZXkYASABKAwSDAoEbmFtZRgCIAEoCRIQCghwbGF0Zm9ybRgDIAEoCRIfCgVwcm9vZhgEIAEoCzIQLmFwcC52MS5LZXlQcm9vZiI/ChZSZWdpc3RlckRldmljZVJlc3BvbnNlEiUKBmRldmljZRgBIAEoCzIVLmFwcC52MS5BY2NvdW50RGV2aWNlIhQKEkxpc3REZXZpY2VzUmVxdWVzdCI9ChNMaXN0RGV2aWNlc1Jlc3BvbnNlEiYKB2RldmljZXMYASADKAsyFS5hcHAudjEuQWNjb3VudERldmljZSJCChNSZXZva2VEZXZpY2VSZXF1ZXN0EhkKEWRldmljZV9wdWJsaWNfa2V5GAIgASgMSgQIARACUgptYWNoaW5lX2lkIhYKFFJldm9rZURldmljZVJlc3BvbnNlIh8KHUdldE1hY2hpbmVLZXlDaGFsbGVuZ2VSZXF1ZXN0IkkKHkdldE1hY2hpbmVLZXlDaGFsbGVuZ2VSZXNwb25zZRInCgljaGFsbGVuZ2UYASABKAsyFC5hcHAudjEuS2V5Q2hhbGxlbmdlIqABChZSZWdpc3Rlck1hY2hpbmVSZXF1ZXN0EgwKBG5hbWUYAiABKAkSCgoCb3MYAyABKAkSDAoEYXJjaBgEIAEoCRIVCg1hZ2VudF92ZXJzaW9uGAUgASgJEhIKCnB1YmxpY19rZXkYBiABKAwSHwoFcHJvb2YYByABKAsyEC5hcHAudjEuS2V5UHJvb2ZKBAgBEAJSDGluc3RhbGxfY29kZSJJChdSZWdpc3Rlck1hY2hpbmVSZXNwb25zZRIWCgptYWNoaW5lX2lkGAEgASgDQgIwAhIWCg5tYWNoaW5lX3NlY3JldBgCIAEoCSJ0ChBIZWFydGJlYXRSZXF1ZXN0EhIKCnR1bm5lbF91cmwYASABKAkSFQoNYWdlbnRfdmVyc2lvbhgCIAEoCRIWCg5jbGF1ZGVfdmVyc2lvbhgDIAEoCRIdChVjb25uZWN0ZWRfZGV2aWNlX2tleXMYBCADKAwiWwoNVHJ1c3RlZERldmljZRISCgpwdWJsaWNfa2V5GAEgASgMEgwKBG5hbWUYAiABKAkSEAoIcGxhdGZvcm0YAyABKAkSFgoKY3JlYXRlZF9hdBgEIAEoA0ICMAIisQEKEUhlYXJ0YmVhdFJlc3BvbnNlEg8KB3Jldm9rZWQYASABKAgSGQoRbWluX2FnZW50X3ZlcnNpb24YAyABKAkSFgoOdHVubmVsX3JlZnVzZWQYBSABKAgSLgoPdHJ1c3RlZF9kZXZpY2VzGAYgAygLMhUuYXBwLnYxLlRydXN0ZWREZXZpY2VKBAgCEANKBAgEEAVSE3Jldm9rZWRfZGV2aWNlX2tleXNSB2NsYWltZWQiagoXTm90aWZ5TmVlZHNJbnB1dFJlcXVlc3QSJAoEa2luZBgBIAEoDjIWLmFwcC52MS5OZWVkc0lucHV0S2luZBIVCg1wZW5kaW5nX2NvdW50GAIgASgFEhIKCnNlc3Npb25faWQYAyABKAkiGgoYTm90aWZ5TmVlZHNJbnB1dFJlc3BvbnNlIhoKGFVucmVnaXN0ZXJNYWNoaW5lUmVxdWVzdCIbChlVbnJlZ2lzdGVyTWFjaGluZVJlc3BvbnNlKrcBCg5OZWVkc0lucHV0S2luZBIgChxORUVEU19JTlBVVF9LSU5EX1VOU1BFQ0lGSUVEEAASHQoZTkVFRFNfSU5QVVRfS0lORF9BUFBST1ZBTBABEh0KGU5FRURTX0lOUFVUX0tJTkRfUVVFU1RJT04QAhIfChtORUVEU19JTlBVVF9LSU5EX1VTQUdFX0hJTlQQBCIECAMQAyoeTkVFRFNfSU5QVVRfS0lORF9ERVZJQ0VfUEFJUkVEMsIECg9NYWNoaW5lc1NlcnZpY2USSQoMTGlzdE1hY2hpbmVzEhsuYXBwLnYxLkxpc3RNYWNoaW5lc1JlcXVlc3QaHC5hcHAudjEuTGlzdE1hY2hpbmVzUmVzcG9uc2USTAoNUmVuYW1lTWFjaGluZRIcLmFwcC52MS5SZW5hbWVNYWNoaW5lUmVxdWVzdBodLmFwcC52MS5SZW5hbWVNYWNoaW5lUmVzcG9uc2USTAoNUmV2b2tlTWFjaGluZRIcLmFwcC52MS5SZXZva2VNYWNoaW5lUmVxdWVzdBodLmFwcC52MS5SZXZva2VNYWNoaW5lUmVzcG9uc2USZAoVR2V0RGV2aWNlS2V5Q2hhbGxlbmdlEiQuYXBwLnYxLkdldERldmljZUtleUNoYWxsZW5nZVJlcXVlc3QaJS5hcHAudjEuR2V0RGV2aWNlS2V5Q2hhbGxlbmdlUmVzcG9uc2USTwoOUmVnaXN0ZXJEZXZpY2USHS5hcHAudjEuUmVnaXN0ZXJEZXZpY2VSZXF1ZXN0Gh4uYXBwLnYxLlJlZ2lzdGVyRGV2aWNlUmVzcG9uc2USRgoLTGlzdERldmljZXMSGi5hcHAudjEuTGlzdERldmljZXNSZXF1ZXN0GhsuYXBwLnYxLkxpc3REZXZpY2VzUmVzcG9uc2USSQoMUmV2b2tlRGV2aWNlEhsuYXBwLnYxLlJldm9rZURldmljZVJlcXVlc3QaHC5hcHAudjEuUmV2b2tlRGV2aWNlUmVzcG9uc2UyxQMKE01hY2hpbmVBZ2VudFNlcnZpY2USZwoWR2V0TWFjaGluZUtleUNoYWxsZW5nZRIlLmFwcC52MS5HZXRNYWNoaW5lS2V5Q2hhbGxlbmdlUmVxdWVzdBomLmFwcC52MS5HZXRNYWNoaW5lS2V5Q2hhbGxlbmdlUmVzcG9uc2USUgoPUmVnaXN0ZXJNYWNoaW5lEh4uYXBwLnYxLlJlZ2lzdGVyTWFjaGluZVJlcXVlc3QaHy5hcHAudjEuUmVnaXN0ZXJNYWNoaW5lUmVzcG9uc2USQAoJSGVhcnRiZWF0EhguYXBwLnYxLkhlYXJ0YmVhdFJlcXVlc3QaGS5hcHAudjEuSGVhcnRiZWF0UmVzcG9uc2USVQoQTm90aWZ5TmVlZHNJbnB1dBIfLmFwcC52MS5Ob3RpZnlOZWVkc0lucHV0UmVxdWVzdBogLmFwcC52MS5Ob3RpZnlOZWVkc0lucHV0UmVzcG9uc2USWAoRVW5yZWdpc3Rlck1hY2hpbmUSIC5hcHAudjEuVW5yZWdpc3Rlck1hY2hpbmVSZXF1ZXN0GiEuYXBwLnYxLlVucmVnaXN0ZXJNYWNoaW5lUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
 
 /**
  * A machine of the directory.
@@ -56,9 +56,9 @@ export type Machine = Message<"app.v1.Machine"> & {
   claudeVersion: string;
 
   /**
-   * The machine's X25519 static public key (32 bytes), as the agent reported
-   * it. Informational only: a device trusts a machine key solely through the
-   * pairing proof (ADR 0013), never because the server lists it.
+   * The machine's X25519 static public key (32 bytes): the key devices
+   * expect in the handshake; the server is the source of trust for it. The
+   * machine proved it holds the key when it registered.
    *
    * @generated from field: bytes public_key = 7;
    */
@@ -82,15 +82,6 @@ export type Machine = Message<"app.v1.Machine"> & {
    * @generated from field: int64 last_seen_at = 10 [jstype = JS_NUMBER];
    */
   lastSeenAt: bigint;
-
-  /**
-   * The machine is tied to the account by tunelo login (registered that
-   * way, or claimed later). False for a machine registered with an install
-   * code whose tunelo has not signed in with the account yet.
-   *
-   * @generated from field: bool claimed = 11;
-   */
-  claimed: boolean;
 };
 
 /**
@@ -101,45 +92,125 @@ export const MachineSchema: GenMessage<Machine> = /*@__PURE__*/
   messageDesc(file_app_v1_machines, 0);
 
 /**
- * @generated from message app.v1.CreateInstallCodeRequest
- */
-export type CreateInstallCodeRequest = Message<"app.v1.CreateInstallCodeRequest"> & {
-};
-
-/**
- * Describes the message app.v1.CreateInstallCodeRequest.
- * Use `create(CreateInstallCodeRequestSchema)` to create a new message.
- */
-export const CreateInstallCodeRequestSchema: GenMessage<CreateInstallCodeRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 1);
-
-/**
- * Never answered (CreateInstallCode is retired); kept for older clients.
+ * Proof that a caller holds the X25519 private key of the public key it
+ * registers. The server makes a throwaway X25519 key pair for each
+ * challenge; the caller answers
+ *   mac = HMAC-SHA256(key = X25519(caller private key, server_key), nonce)
+ * and sends it back with the challenge, unchanged, in a KeyProof. A
+ * challenge lives 2 minutes and is only good for the call it was made for
+ * (device or machine registration). The server keeps no state: it derives
+ * the throwaway key again from the challenge.
  *
- * @generated from message app.v1.CreateInstallCodeResponse
+ * @generated from message app.v1.KeyChallenge
  */
-export type CreateInstallCodeResponse = Message<"app.v1.CreateInstallCodeResponse"> & {
+export type KeyChallenge = Message<"app.v1.KeyChallenge"> & {
   /**
-   * 128 random bits, base64url without padding (22 characters).
+   * X25519 public key, 32 bytes.
    *
-   * @generated from field: string code = 1;
+   * @generated from field: bytes server_key = 1;
    */
-  code: string;
+  serverKey: Uint8Array;
+
+  /**
+   * 32 random bytes.
+   *
+   * @generated from field: bytes nonce = 2;
+   */
+  nonce: Uint8Array;
 
   /**
    * Unix seconds.
    *
-   * @generated from field: int64 expires_at = 2 [jstype = JS_NUMBER];
+   * @generated from field: int64 expires_at = 3 [jstype = JS_NUMBER];
    */
   expiresAt: bigint;
 };
 
 /**
- * Describes the message app.v1.CreateInstallCodeResponse.
- * Use `create(CreateInstallCodeResponseSchema)` to create a new message.
+ * Describes the message app.v1.KeyChallenge.
+ * Use `create(KeyChallengeSchema)` to create a new message.
  */
-export const CreateInstallCodeResponseSchema: GenMessage<CreateInstallCodeResponse> = /*@__PURE__*/
+export const KeyChallengeSchema: GenMessage<KeyChallenge> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 1);
+
+/**
+ * @generated from message app.v1.KeyProof
+ */
+export type KeyProof = Message<"app.v1.KeyProof"> & {
+  /**
+   * @generated from field: app.v1.KeyChallenge challenge = 1;
+   */
+  challenge?: KeyChallenge | undefined;
+
+  /**
+   * HMAC-SHA256 as KeyChallenge says, 32 bytes.
+   *
+   * @generated from field: bytes mac = 2;
+   */
+  mac: Uint8Array;
+};
+
+/**
+ * Describes the message app.v1.KeyProof.
+ * Use `create(KeyProofSchema)` to create a new message.
+ */
+export const KeyProofSchema: GenMessage<KeyProof> = /*@__PURE__*/
   messageDesc(file_app_v1_machines, 2);
+
+/**
+ * A device key of the account.
+ *
+ * @generated from message app.v1.AccountDevice
+ */
+export type AccountDevice = Message<"app.v1.AccountDevice"> & {
+  /**
+   * X25519 static public key, 32 bytes (RevokeDevice takes it as is).
+   *
+   * @generated from field: bytes public_key = 1;
+   */
+  publicKey: Uint8Array;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string platform = 3;
+   */
+  platform: string;
+
+  /**
+   * Unix seconds; revoked_at is 0 for a live device.
+   *
+   * @generated from field: int64 created_at = 4 [jstype = JS_NUMBER];
+   */
+  createdAt: bigint;
+
+  /**
+   * @generated from field: int64 last_seen_at = 5 [jstype = JS_NUMBER];
+   */
+  lastSeenAt: bigint;
+
+  /**
+   * @generated from field: int64 revoked_at = 6 [jstype = JS_NUMBER];
+   */
+  revokedAt: bigint;
+
+  /**
+   * Registered by the caller's own session.
+   *
+   * @generated from field: bool current = 7;
+   */
+  current: boolean;
+};
+
+/**
+ * Describes the message app.v1.AccountDevice.
+ * Use `create(AccountDeviceSchema)` to create a new message.
+ */
+export const AccountDeviceSchema: GenMessage<AccountDevice> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 3);
 
 /**
  * @generated from message app.v1.ListMachinesRequest
@@ -152,7 +223,7 @@ export type ListMachinesRequest = Message<"app.v1.ListMachinesRequest"> & {
  * Use `create(ListMachinesRequestSchema)` to create a new message.
  */
 export const ListMachinesRequestSchema: GenMessage<ListMachinesRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 3);
+  messageDesc(file_app_v1_machines, 4);
 
 /**
  * @generated from message app.v1.ListMachinesResponse
@@ -169,7 +240,7 @@ export type ListMachinesResponse = Message<"app.v1.ListMachinesResponse"> & {
  * Use `create(ListMachinesResponseSchema)` to create a new message.
  */
 export const ListMachinesResponseSchema: GenMessage<ListMachinesResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 4);
+  messageDesc(file_app_v1_machines, 5);
 
 /**
  * @generated from message app.v1.RenameMachineRequest
@@ -193,7 +264,7 @@ export type RenameMachineRequest = Message<"app.v1.RenameMachineRequest"> & {
  * Use `create(RenameMachineRequestSchema)` to create a new message.
  */
 export const RenameMachineRequestSchema: GenMessage<RenameMachineRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 5);
+  messageDesc(file_app_v1_machines, 6);
 
 /**
  * @generated from message app.v1.RenameMachineResponse
@@ -210,7 +281,7 @@ export type RenameMachineResponse = Message<"app.v1.RenameMachineResponse"> & {
  * Use `create(RenameMachineResponseSchema)` to create a new message.
  */
 export const RenameMachineResponseSchema: GenMessage<RenameMachineResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 6);
+  messageDesc(file_app_v1_machines, 7);
 
 /**
  * @generated from message app.v1.RevokeMachineRequest
@@ -227,7 +298,7 @@ export type RevokeMachineRequest = Message<"app.v1.RevokeMachineRequest"> & {
  * Use `create(RevokeMachineRequestSchema)` to create a new message.
  */
 export const RevokeMachineRequestSchema: GenMessage<RevokeMachineRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 7);
+  messageDesc(file_app_v1_machines, 8);
 
 /**
  * @generated from message app.v1.RevokeMachineResponse
@@ -240,17 +311,131 @@ export type RevokeMachineResponse = Message<"app.v1.RevokeMachineResponse"> & {
  * Use `create(RevokeMachineResponseSchema)` to create a new message.
  */
 export const RevokeMachineResponseSchema: GenMessage<RevokeMachineResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 8);
+  messageDesc(file_app_v1_machines, 9);
+
+/**
+ * @generated from message app.v1.GetDeviceKeyChallengeRequest
+ */
+export type GetDeviceKeyChallengeRequest = Message<"app.v1.GetDeviceKeyChallengeRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.GetDeviceKeyChallengeRequest.
+ * Use `create(GetDeviceKeyChallengeRequestSchema)` to create a new message.
+ */
+export const GetDeviceKeyChallengeRequestSchema: GenMessage<GetDeviceKeyChallengeRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 10);
+
+/**
+ * @generated from message app.v1.GetDeviceKeyChallengeResponse
+ */
+export type GetDeviceKeyChallengeResponse = Message<"app.v1.GetDeviceKeyChallengeResponse"> & {
+  /**
+   * @generated from field: app.v1.KeyChallenge challenge = 1;
+   */
+  challenge?: KeyChallenge | undefined;
+};
+
+/**
+ * Describes the message app.v1.GetDeviceKeyChallengeResponse.
+ * Use `create(GetDeviceKeyChallengeResponseSchema)` to create a new message.
+ */
+export const GetDeviceKeyChallengeResponseSchema: GenMessage<GetDeviceKeyChallengeResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 11);
+
+/**
+ * @generated from message app.v1.RegisterDeviceRequest
+ */
+export type RegisterDeviceRequest = Message<"app.v1.RegisterDeviceRequest"> & {
+  /**
+   * The device's X25519 static public key, 32 bytes.
+   *
+   * @generated from field: bytes public_key = 1;
+   */
+  publicKey: Uint8Array;
+
+  /**
+   * Shown in the device list and in the "new device" push, such as
+   * "Chrome on macOS". Trimmed; 1 to 64 characters, no control characters.
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * What the device is, such as "web", "pwa", "ios" or "android": 1 to 32
+   * characters of a-z, 0-9 and -.
+   *
+   * @generated from field: string platform = 3;
+   */
+  platform: string;
+
+  /**
+   * Made with a challenge of GetDeviceKeyChallenge.
+   *
+   * @generated from field: app.v1.KeyProof proof = 4;
+   */
+  proof?: KeyProof | undefined;
+};
+
+/**
+ * Describes the message app.v1.RegisterDeviceRequest.
+ * Use `create(RegisterDeviceRequestSchema)` to create a new message.
+ */
+export const RegisterDeviceRequestSchema: GenMessage<RegisterDeviceRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 12);
+
+/**
+ * @generated from message app.v1.RegisterDeviceResponse
+ */
+export type RegisterDeviceResponse = Message<"app.v1.RegisterDeviceResponse"> & {
+  /**
+   * @generated from field: app.v1.AccountDevice device = 1;
+   */
+  device?: AccountDevice | undefined;
+};
+
+/**
+ * Describes the message app.v1.RegisterDeviceResponse.
+ * Use `create(RegisterDeviceResponseSchema)` to create a new message.
+ */
+export const RegisterDeviceResponseSchema: GenMessage<RegisterDeviceResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 13);
+
+/**
+ * @generated from message app.v1.ListDevicesRequest
+ */
+export type ListDevicesRequest = Message<"app.v1.ListDevicesRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.ListDevicesRequest.
+ * Use `create(ListDevicesRequestSchema)` to create a new message.
+ */
+export const ListDevicesRequestSchema: GenMessage<ListDevicesRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 14);
+
+/**
+ * @generated from message app.v1.ListDevicesResponse
+ */
+export type ListDevicesResponse = Message<"app.v1.ListDevicesResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.AccountDevice devices = 1;
+   */
+  devices: AccountDevice[];
+};
+
+/**
+ * Describes the message app.v1.ListDevicesResponse.
+ * Use `create(ListDevicesResponseSchema)` to create a new message.
+ */
+export const ListDevicesResponseSchema: GenMessage<ListDevicesResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 15);
 
 /**
  * @generated from message app.v1.RevokeDeviceRequest
  */
 export type RevokeDeviceRequest = Message<"app.v1.RevokeDeviceRequest"> & {
-  /**
-   * @generated from field: int64 machine_id = 1 [jstype = JS_NUMBER];
-   */
-  machineId: bigint;
-
   /**
    * The device's X25519 static public key, 32 bytes.
    *
@@ -264,7 +449,7 @@ export type RevokeDeviceRequest = Message<"app.v1.RevokeDeviceRequest"> & {
  * Use `create(RevokeDeviceRequestSchema)` to create a new message.
  */
 export const RevokeDeviceRequestSchema: GenMessage<RevokeDeviceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 9);
+  messageDesc(file_app_v1_machines, 16);
 
 /**
  * @generated from message app.v1.RevokeDeviceResponse
@@ -277,23 +462,46 @@ export type RevokeDeviceResponse = Message<"app.v1.RevokeDeviceResponse"> & {
  * Use `create(RevokeDeviceResponseSchema)` to create a new message.
  */
 export const RevokeDeviceResponseSchema: GenMessage<RevokeDeviceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 10);
+  messageDesc(file_app_v1_machines, 17);
+
+/**
+ * @generated from message app.v1.GetMachineKeyChallengeRequest
+ */
+export type GetMachineKeyChallengeRequest = Message<"app.v1.GetMachineKeyChallengeRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.GetMachineKeyChallengeRequest.
+ * Use `create(GetMachineKeyChallengeRequestSchema)` to create a new message.
+ */
+export const GetMachineKeyChallengeRequestSchema: GenMessage<GetMachineKeyChallengeRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 18);
+
+/**
+ * @generated from message app.v1.GetMachineKeyChallengeResponse
+ */
+export type GetMachineKeyChallengeResponse = Message<"app.v1.GetMachineKeyChallengeResponse"> & {
+  /**
+   * @generated from field: app.v1.KeyChallenge challenge = 1;
+   */
+  challenge?: KeyChallenge | undefined;
+};
+
+/**
+ * Describes the message app.v1.GetMachineKeyChallengeResponse.
+ * Use `create(GetMachineKeyChallengeResponseSchema)` to create a new message.
+ */
+export const GetMachineKeyChallengeResponseSchema: GenMessage<GetMachineKeyChallengeResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 19);
 
 /**
  * @generated from message app.v1.RegisterMachineRequest
  */
 export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & {
   /**
-   * Ignored: the owner comes from the access token.
-   *
-   * @generated from field: string install_code = 1 [deprecated = true];
-   * @deprecated
-   */
-  installCode: string;
-
-  /**
    * Shown in the directory; the host name is a good default. Trimmed; 1 to
-   * 64 characters, no control characters.
+   * 64 characters, no control characters. A machine registering again keeps
+   * the name it has.
    *
    * @generated from field: string name = 2;
    */
@@ -313,7 +521,7 @@ export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & 
   arch: string;
 
   /**
-   * Semantic version of tunelo, such as "2.1.0".
+   * Semantic version of tunelo, such as "3.0.0".
    *
    * @generated from field: string agent_version = 5;
    */
@@ -325,6 +533,14 @@ export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & 
    * @generated from field: bytes public_key = 6;
    */
   publicKey: Uint8Array;
+
+  /**
+   * Made with a challenge of GetMachineKeyChallenge and the private half of
+   * public_key.
+   *
+   * @generated from field: app.v1.KeyProof proof = 7;
+   */
+  proof?: KeyProof | undefined;
 };
 
 /**
@@ -332,7 +548,7 @@ export type RegisterMachineRequest = Message<"app.v1.RegisterMachineRequest"> & 
  * Use `create(RegisterMachineRequestSchema)` to create a new message.
  */
 export const RegisterMachineRequestSchema: GenMessage<RegisterMachineRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 11);
+  messageDesc(file_app_v1_machines, 20);
 
 /**
  * @generated from message app.v1.RegisterMachineResponse
@@ -345,8 +561,8 @@ export type RegisterMachineResponse = Message<"app.v1.RegisterMachineResponse"> 
 
   /**
    * 256 random bits, base64url without padding (43 characters): the bearer
-   * token of Heartbeat and NotifyNeedsInput. Shown once; the server keeps
-   * only its hash.
+   * token of Heartbeat, NotifyNeedsInput and UnregisterMachine. Shown once;
+   * the server keeps only its hash.
    *
    * @generated from field: string machine_secret = 2;
    */
@@ -358,43 +574,7 @@ export type RegisterMachineResponse = Message<"app.v1.RegisterMachineResponse"> 
  * Use `create(RegisterMachineResponseSchema)` to create a new message.
  */
 export const RegisterMachineResponseSchema: GenMessage<RegisterMachineResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 12);
-
-/**
- * @generated from message app.v1.ClaimMachineRequest
- */
-export type ClaimMachineRequest = Message<"app.v1.ClaimMachineRequest"> & {
-  /**
-   * RegisterMachineResponse.machine_secret of the machine to claim.
-   *
-   * @generated from field: string machine_secret = 1;
-   */
-  machineSecret: string;
-};
-
-/**
- * Describes the message app.v1.ClaimMachineRequest.
- * Use `create(ClaimMachineRequestSchema)` to create a new message.
- */
-export const ClaimMachineRequestSchema: GenMessage<ClaimMachineRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 13);
-
-/**
- * @generated from message app.v1.ClaimMachineResponse
- */
-export type ClaimMachineResponse = Message<"app.v1.ClaimMachineResponse"> & {
-  /**
-   * @generated from field: int64 machine_id = 1 [jstype = JS_NUMBER];
-   */
-  machineId: bigint;
-};
-
-/**
- * Describes the message app.v1.ClaimMachineResponse.
- * Use `create(ClaimMachineResponseSchema)` to create a new message.
- */
-export const ClaimMachineResponseSchema: GenMessage<ClaimMachineResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 14);
+  messageDesc(file_app_v1_machines, 21);
 
 /**
  * @generated from message app.v1.HeartbeatRequest
@@ -420,6 +600,14 @@ export type HeartbeatRequest = Message<"app.v1.HeartbeatRequest"> & {
    * @generated from field: string claude_version = 3;
    */
   claudeVersion: string;
+
+  /**
+   * Public keys (32 bytes each, at most 50) of the devices connected to the
+   * machine now: their last_seen_at moves to now.
+   *
+   * @generated from field: repeated bytes connected_device_keys = 4;
+   */
+  connectedDeviceKeys: Uint8Array[];
 };
 
 /**
@@ -427,7 +615,45 @@ export type HeartbeatRequest = Message<"app.v1.HeartbeatRequest"> & {
  * Use `create(HeartbeatRequestSchema)` to create a new message.
  */
 export const HeartbeatRequestSchema: GenMessage<HeartbeatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 15);
+  messageDesc(file_app_v1_machines, 22);
+
+/**
+ * A device the machine accepts: a live key of the owner's account.
+ *
+ * @generated from message app.v1.TrustedDevice
+ */
+export type TrustedDevice = Message<"app.v1.TrustedDevice"> & {
+  /**
+   * X25519 static public key, 32 bytes.
+   *
+   * @generated from field: bytes public_key = 1;
+   */
+  publicKey: Uint8Array;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string platform = 3;
+   */
+  platform: string;
+
+  /**
+   * Unix seconds.
+   *
+   * @generated from field: int64 created_at = 4 [jstype = JS_NUMBER];
+   */
+  createdAt: bigint;
+};
+
+/**
+ * Describes the message app.v1.TrustedDevice.
+ * Use `create(TrustedDeviceSchema)` to create a new message.
+ */
+export const TrustedDeviceSchema: GenMessage<TrustedDevice> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 23);
 
 /**
  * @generated from message app.v1.HeartbeatResponse
@@ -441,14 +667,6 @@ export type HeartbeatResponse = Message<"app.v1.HeartbeatResponse"> & {
   revoked: boolean;
 
   /**
-   * Public keys (32 bytes each) of the devices the user revoked for this
-   * machine: drop their connections and forget them.
-   *
-   * @generated from field: repeated bytes revoked_device_keys = 2;
-   */
-  revokedDeviceKeys: Uint8Array[];
-
-  /**
    * The oldest tunelo version the server accepts; update before falling
    * below it.
    *
@@ -457,20 +675,20 @@ export type HeartbeatResponse = Message<"app.v1.HeartbeatResponse"> & {
   minAgentVersion: string;
 
   /**
-   * Machine.claimed: false asks tunelo to call ClaimMachine once it is
-   * signed in with the account.
-   *
-   * @generated from field: bool claimed = 4;
-   */
-  claimed: boolean;
-
-  /**
    * The reported tunnel was opened by another account than the machine's
    * owner, so the directory shows the machine without a tunnel.
    *
    * @generated from field: bool tunnel_refused = 5;
    */
   tunnelRefused: boolean;
+
+  /**
+   * Every live device key of the owner, oldest first. The machine accepts
+   * these devices only: a connected device missing from the list is dropped.
+   *
+   * @generated from field: repeated app.v1.TrustedDevice trusted_devices = 6;
+   */
+  trustedDevices: TrustedDevice[];
 };
 
 /**
@@ -478,7 +696,7 @@ export type HeartbeatResponse = Message<"app.v1.HeartbeatResponse"> & {
  * Use `create(HeartbeatResponseSchema)` to create a new message.
  */
 export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 16);
+  messageDesc(file_app_v1_machines, 24);
 
 /**
  * @generated from message app.v1.NotifyNeedsInputRequest
@@ -491,7 +709,7 @@ export type NotifyNeedsInputRequest = Message<"app.v1.NotifyNeedsInputRequest"> 
 
   /**
    * How many approvals and questions wait on the machine in total (at least
-   * 1, at most 1000). 1 for DEVICE_PAIRED and USAGE_HINT.
+   * 1, at most 1000). 1 for USAGE_HINT.
    *
    * @generated from field: int32 pending_count = 2;
    */
@@ -500,7 +718,7 @@ export type NotifyNeedsInputRequest = Message<"app.v1.NotifyNeedsInputRequest"> 
   /**
    * The waiting thread, so the notification opens it: up to 64 characters of
    * [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
-   * for DEVICE_PAIRED and USAGE_HINT.
+   * for USAGE_HINT.
    *
    * @generated from field: string session_id = 3;
    */
@@ -512,7 +730,7 @@ export type NotifyNeedsInputRequest = Message<"app.v1.NotifyNeedsInputRequest"> 
  * Use `create(NotifyNeedsInputRequestSchema)` to create a new message.
  */
 export const NotifyNeedsInputRequestSchema: GenMessage<NotifyNeedsInputRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 17);
+  messageDesc(file_app_v1_machines, 25);
 
 /**
  * @generated from message app.v1.NotifyNeedsInputResponse
@@ -525,11 +743,37 @@ export type NotifyNeedsInputResponse = Message<"app.v1.NotifyNeedsInputResponse"
  * Use `create(NotifyNeedsInputResponseSchema)` to create a new message.
  */
 export const NotifyNeedsInputResponseSchema: GenMessage<NotifyNeedsInputResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_machines, 18);
+  messageDesc(file_app_v1_machines, 26);
 
 /**
- * What the machine tells the user about: a waiting session, or a security
- * event of the machine.
+ * @generated from message app.v1.UnregisterMachineRequest
+ */
+export type UnregisterMachineRequest = Message<"app.v1.UnregisterMachineRequest"> & {
+};
+
+/**
+ * Describes the message app.v1.UnregisterMachineRequest.
+ * Use `create(UnregisterMachineRequestSchema)` to create a new message.
+ */
+export const UnregisterMachineRequestSchema: GenMessage<UnregisterMachineRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 27);
+
+/**
+ * @generated from message app.v1.UnregisterMachineResponse
+ */
+export type UnregisterMachineResponse = Message<"app.v1.UnregisterMachineResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.UnregisterMachineResponse.
+ * Use `create(UnregisterMachineResponseSchema)` to create a new message.
+ */
+export const UnregisterMachineResponseSchema: GenMessage<UnregisterMachineResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_machines, 28);
+
+/**
+ * What the machine tells the user about: a waiting session, or an event of
+ * the machine.
  *
  * @generated from enum app.v1.NeedsInputKind
  */
@@ -554,16 +798,6 @@ export enum NeedsInputKind {
   QUESTION = 2,
 
   /**
-   * A new device was just paired with the machine using the machine's
-   * Authenticator code. The notice names the machine only, never the device
-   * (its name and key stay between the machine and its devices). Sent at
-   * once, never merged with the "needs you" notices.
-   *
-   * @generated from enum value: NEEDS_INPUT_KIND_DEVICE_PAIRED = 3;
-   */
-  DEVICE_PAIRED = 3,
-
-  /**
    * A running session went past one of the machine's usage rules. The notice
    * names the machine only: never the session, the rule, a number or a
    * repository (those reach the devices over the end-to-end link). Sent at
@@ -583,28 +817,16 @@ export const NeedsInputKindSchema: GenEnum<NeedsInputKind> = /*@__PURE__*/
 
 /**
  * My machines (ADR 0013): the directory of the computers where the user runs
- * tunelo. The server only lists them (name, OS, public
- * key, tunnel address, last seen) and sends content-free Web Pushes for
- * them; it is never a root of trust for a machine's key and never
- * sees what goes through the tunnel. Served under /rpc with the user's
- * session like every user service.
+ * tunelo, and the account's devices (browsers, the phone app) that may open
+ * an end-to-end link to them. The account is the root of trust both ways:
+ * the server hands each machine the owner's live device keys (Heartbeat) and
+ * each device the machine's key (ListMachines). It never sees what goes
+ * through the tunnel. Served under /rpc with the user's session like every
+ * user service.
  *
  * @generated from service app.v1.MachinesService
  */
 export const MachinesService: GenService<{
-  /**
-   * Retired: machines now join with the owner's account (tunelo login), so
-   * there are no install codes any more. Always fails with
-   * failed_precondition "install_codes_retired" (update tunelo, then add the
-   * machine again).
-   *
-   * @generated from rpc app.v1.MachinesService.CreateInstallCode
-   */
-  createInstallCode: {
-    methodKind: "unary";
-    input: typeof CreateInstallCodeRequestSchema;
-    output: typeof CreateInstallCodeResponseSchema;
-  },
   /**
    * The caller's machines that are not revoked, oldest first.
    *
@@ -629,8 +851,10 @@ export const MachinesService: GenService<{
   },
   /**
    * Removes the machine from the directory: its secret stops working for
-   * NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
-   * closes its tunnel. not_found as RenameMachine.
+   * NotifyNeedsInput, its next Heartbeat answers revoked (tunelo closes its
+   * tunnel), and the IdP grant of the tunelo sign-in that registered it is
+   * revoked, so the machine only comes back after a new tunelo login.
+   * not_found as RenameMachine.
    *
    * @generated from rpc app.v1.MachinesService.RevokeMachine
    */
@@ -640,9 +864,52 @@ export const MachinesService: GenService<{
     output: typeof RevokeMachineResponseSchema;
   },
   /**
-   * Puts a paired device's public key on the machine's revoked list: the
-   * machine drops that device at its next Heartbeat. Succeeds when the key is
-   * already revoked; not_found as RenameMachine.
+   * A proof-of-possession challenge for RegisterDevice (see KeyChallenge).
+   *
+   * @generated from rpc app.v1.MachinesService.GetDeviceKeyChallenge
+   */
+  getDeviceKeyChallenge: {
+    methodKind: "unary";
+    input: typeof GetDeviceKeyChallengeRequestSchema;
+    output: typeof GetDeviceKeyChallengeResponseSchema;
+  },
+  /**
+   * Adds this device's key to the account, bound to the caller's session.
+   * Succeeds again (nothing changes but name and platform) for a key this
+   * session already registered. The first registration of a key pushes
+   * "new device" to every push registration of the account. Fails with
+   * invalid_argument for malformed fields; permission_denied "bad_key_proof"
+   * when the proof does not check or the challenge expired (get a new one);
+   * permission_denied "device_revoked" for a key that was ever revoked
+   * (generate a new key); permission_denied "session_devices_revoked" when a
+   * key of this session was revoked; failed_precondition "device_key_in_use"
+   * when another live session registered the key; resource_exhausted
+   * "too_many_devices" at 50 live devices.
+   *
+   * @generated from rpc app.v1.MachinesService.RegisterDevice
+   */
+  registerDevice: {
+    methodKind: "unary";
+    input: typeof RegisterDeviceRequestSchema;
+    output: typeof RegisterDeviceResponseSchema;
+  },
+  /**
+   * The account's devices: every live one, then the most recently revoked,
+   * newest first, at most 100 in all. A key whose session ended is revoked
+   * before listing.
+   *
+   * @generated from rpc app.v1.MachinesService.ListDevices
+   */
+  listDevices: {
+    methodKind: "unary";
+    input: typeof ListDevicesRequestSchema;
+    output: typeof ListDevicesResponseSchema;
+  },
+  /**
+   * Revokes a device key of the account and the chat session that
+   * registered it (that device is signed out). Machines drop the device at
+   * their next Heartbeat. Succeeds when the key is already revoked;
+   * not_found for a key the account never registered.
    *
    * @generated from rpc app.v1.MachinesService.RevokeDevice
    */
@@ -656,27 +923,41 @@ export const MachinesService: GenService<{
 
 /**
  * The calls of tunelo itself. Served under /machine-api (not /rpc): the agent
- * sends no Origin and has no user session. RegisterMachine and ClaimMachine
- * are authenticated by an access token of the owner's IdP account in
- * "Authorization: Bearer <token>": an ES256 JWT whose aud is the chat's MCP
- * resource (<chat origin>/mcp) and whose scope holds machines:write (only the
- * tunelo-agent client gets it). The other calls by the machine secret in
- * "Authorization: Bearer <machine_secret>". Every call fails with
- * unauthenticated for a wrong token or secret (and resource_exhausted after
- * too many failures from one address); RegisterMachine and ClaimMachine fail
- * with permission_denied "insufficient_scope" for a token without
+ * sends no Origin and has no user session. GetMachineKeyChallenge and
+ * RegisterMachine are authenticated by an access token of the owner's IdP
+ * account in "Authorization: Bearer <token>": an ES256 JWT whose aud is the
+ * chat's MCP resource (<chat origin>/mcp) and whose scope holds
+ * machines:write (only the tunelo-agent client gets it). The other calls by
+ * the machine secret in "Authorization: Bearer <machine_secret>". Every call
+ * fails with unauthenticated for a wrong token or secret (and
+ * resource_exhausted after too many failures from one address); the token
+ * calls fail with permission_denied "insufficient_scope" for a token without
  * machines:write and unavailable while the server cannot check tokens yet.
  *
  * @generated from service app.v1.MachineAgentService
  */
 export const MachineAgentService: GenService<{
   /**
-   * Adds a machine to the directory of the token's account, claimed from the
-   * start. An account that never opened the chat gets its chat user now,
-   * with a placeholder profile that is not findable until its first web
-   * sign-in; new users are admitted as at a web sign-in, and a refusal
-   * fails with failed_precondition "chat_account_missing" (tunelo waits and
-   * retries). Fails with invalid_argument for malformed fields,
+   * A proof-of-possession challenge for RegisterMachine (see KeyChallenge).
+   *
+   * @generated from rpc app.v1.MachineAgentService.GetMachineKeyChallenge
+   */
+  getMachineKeyChallenge: {
+    methodKind: "unary";
+    input: typeof GetMachineKeyChallengeRequestSchema;
+    output: typeof GetMachineKeyChallengeResponseSchema;
+  },
+  /**
+   * Adds the machine to the directory of the token's account, or takes its
+   * live row back when the account already has the same machine key (same
+   * machine_id, a new machine_secret; the old secret stops working). A
+   * removed machine is never brought back: a new row is made. An account
+   * that never opened the chat gets its chat user now, with a placeholder
+   * profile that is not findable until its first web sign-in; new users are
+   * admitted as at a web sign-in, and a refusal fails with
+   * failed_precondition "chat_account_missing" (tunelo waits and retries).
+   * Fails with invalid_argument for malformed fields, permission_denied
+   * "bad_key_proof" when the proof does not check or its challenge expired,
    * failed_precondition "agent_update_required" when agent_version is below
    * the minimum, and resource_exhausted "too_many_machines" when the owner
    * has 20 machines.
@@ -689,29 +970,13 @@ export const MachineAgentService: GenService<{
     output: typeof RegisterMachineResponseSchema;
   },
   /**
-   * Ties a machine registered with an install code (before accounts) to the
-   * token's account, so the tunnel check of Heartbeat applies to it. The
-   * machine is named by its secret in the request. Succeeds again for a
-   * machine already claimed by the same account. Fails with unauthenticated
-   * for a wrong secret, permission_denied "claim_wrong_account" when the
-   * machine belongs to another account and permission_denied
-   * "machine_revoked" for a removed machine.
-   *
-   * @generated from rpc app.v1.MachineAgentService.ClaimMachine
-   */
-  claimMachine: {
-    methodKind: "unary";
-    input: typeof ClaimMachineRequestSchema;
-    output: typeof ClaimMachineResponseSchema;
-  },
-  /**
    * Reports the machine alive (every 60 s and whenever the tunnel changes)
-   * and returns what was revoked. A revoked machine gets revoked = true (and
-   * nothing is recorded); otherwise an agent_version below the minimum fails
-   * with failed_precondition "agent_update_required". For a claimed machine
-   * a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+   * and returns the owner's trusted devices. A revoked machine gets revoked =
+   * true (and nothing is recorded); otherwise an agent_version below the
+   * minimum fails with failed_precondition "agent_update_required". A
+   * tunnel_url other than the machine tunnel Tunelo holds for its owner is
    * not recorded: the machine is recorded alive without a tunnel and the
-   * answer says tunnel_refused (revoked devices still come back).
+   * answer says tunnel_refused (trusted devices still come back).
    *
    * @generated from rpc app.v1.MachineAgentService.Heartbeat
    */
@@ -733,6 +998,18 @@ export const MachineAgentService: GenService<{
     methodKind: "unary";
     input: typeof NotifyNeedsInputRequestSchema;
     output: typeof NotifyNeedsInputResponseSchema;
+  },
+  /**
+   * Removes the machine from its owner's directory, as RevokeMachine does
+   * from the web (the IdP grant of its sign-in is revoked too): tunelo
+   * logout. Succeeds again for a machine already removed.
+   *
+   * @generated from rpc app.v1.MachineAgentService.UnregisterMachine
+   */
+  unregisterMachine: {
+    methodKind: "unary";
+    input: typeof UnregisterMachineRequestSchema;
+    output: typeof UnregisterMachineResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_machines, 1);

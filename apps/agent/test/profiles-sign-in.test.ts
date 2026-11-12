@@ -368,13 +368,13 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect([expiryMs(null), expiryMs(undefined), expiryMs(""), expiryMs("soon")]).toEqual([0, 0, 0, 0]);
   });
 
-  it("refuses to remove a profile claude cannot sign out, unless forced on the machine", async () => {
+  it("refuses to remove a profile claude cannot sign out, unless forced", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
     await f.profiles.select(added.id, "x");
     process.env.FAKE_CLAUDE_LOGOUT_FAIL = "1";
-    await expect(f.profiles.remove(added.id, "phone")).rejects.toThrow(/--force/);
+    await expect(f.profiles.remove(added.id, "phone")).rejects.toThrow(/could not sign this account out/);
     expect(existsSync(profileHome(f.configDir, added.id))).toBe(true);
     expect((await f.profiles.list()).selectedId).toBe(added.id);
     await f.profiles.remove(added.id, "local", { force: true });

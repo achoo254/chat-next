@@ -2,13 +2,17 @@
 // the slot above the screens, the directory, one machine's link, and the
 // wording of remote errors.
 import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
+import { brand } from "../brand.ts";
+import { isStandalone } from "../install-prompt.ts";
+import { IS_NATIVE } from "../server-origin.ts";
 import { ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { useServices } from "../messaging/data/services.tsx";
 import { setAgentNeeds } from "./agent-needs.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { useHubSlot } from "./link/connection-provider.tsx";
 import { deviceKeyStore } from "./link/device-keys.ts";
-import { deviceName, LinkHub, LOCAL_REF, localPort, type DirectoryState } from "./link/link-hub.ts";
+import { deviceIdentity } from "./link/device-registration.ts";
+import { LinkHub, LOCAL_REF, localMachine, type DirectoryState } from "./link/link-hub.ts";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
@@ -28,7 +32,7 @@ export function useHub(): LinkHub {
 			// A 401 also reaches the client core, which ends the session; nothing to add here.
 			directory: createMachinesDirectory(transport, () => undefined),
 			keys: deviceKeyStore(),
-			deviceName: deviceName(navigator.userAgent),
+			identity: deviceIdentity({ userAgent: navigator.userAgent, native: IS_NATIVE, standalone: isStandalone(), appName: brand.appName }),
 			socket: browserSocket,
 			localName: t.local.name,
 		});
@@ -40,7 +44,7 @@ export function useHub(): LinkHub {
 /** Waiting sessions of every machine the hub has a link to, for the navigation badge. */
 export function needsOf(hub: LinkHub): number {
 	const refs = hub.directory().machines.map((m) => m.ref);
-	if (localPort() !== null) refs.push(LOCAL_REF);
+	if (localMachine() !== null) refs.push(LOCAL_REF);
 	let count = 0;
 	for (const ref of refs) {
 		for (const thread of hub.link(ref).snapshot().threads) if (thread.state === ThreadState.WAITING) count += 1;
@@ -71,10 +75,14 @@ function countNeeds(hub: LinkHub): void {
 /**
  * While a machines screen is open and the app visible, links ping (so the
  * machines hold back pushes) and reconnect at once when the app comes back
- * or the network returns. The directory refreshes every minute.
+ * or the network returns. The directory refreshes every minute. Entering the
+ * machines screens registers this device with the account (once per page),
+ * so the machines know it by the time a link opens.
  */
 export function useHubPresence(hub: LinkHub): void {
 	useEffect(() => {
+		// A failure here is retried by the first link that needs the key, which also reports it.
+		hub.device().catch(() => undefined);
 		const visible = () => document.visibilityState === "visible";
 		const update = () => {
 			hub.setActive(visible());
@@ -126,13 +134,13 @@ export interface MachineView {
 
 /**
  * Every machine of the directory (and the development machine) with its
- * link. A link opens only to a paired machine the directory sees online
- * (shouldConnect), so unpaired or sleeping machines hold no socket; open
- * links ping only while a machines screen is visible (useHubPresence).
+ * link. A link opens only to a machine the directory sees online
+ * (shouldConnect), so sleeping machines hold no socket; open links ping
+ * only while a machines screen is visible (useHubPresence).
  */
 export function useMachineViews(hub: LinkHub, now: number): MachineView[] {
 	const directory = useDirectory(hub);
-	const local = localPort() !== null ? hub.entry(LOCAL_REF) : null;
+	const local = localMachine() !== null ? hub.entry(LOCAL_REF) : null;
 	const entries = local === null ? directory.machines : [...directory.machines, local];
 	const refs = entries.map((e) => e.ref).join(",");
 	const links = entries.map((e) => hub.link(e.ref));
@@ -144,41 +152,16 @@ export function useMachineViews(hub: LinkHub, now: number): MachineView[] {
 		};
 	}, [hub, refs]);
 	const states = links.map((link) => link.snapshot());
-	const pinned = usePinned(hub, refs, states.map((s) => s.status.kind).join(","));
 	useEffect(() => {
 		for (const entry of entries) {
-			if (shouldConnect(entry, pinned.get(entry.ref) ?? null, now)) hub.link(entry.ref).start();
+			if (shouldConnect(entry, now)) hub.link(entry.ref).start();
 		}
 	});
 	return entries.map((entry, i) => {
 		const link = links[i] ?? hub.link(entry.ref);
 		const state = states[i] ?? link.snapshot();
-		return { entry, link, state, conn: connOf(entry, pinned.get(entry.ref) ?? null, state, now) };
+		return { entry, link, state, conn: connOf(entry, state, now) };
 	});
-}
-
-/**
- * Whether this device holds each machine's key, read again whenever a
- * link's status changes (pairing restarts the link).
- */
-function usePinned(hub: LinkHub, refs: string, statuses: string): ReadonlyMap<string, boolean> {
-	const [pinned, setPinned] = useState<ReadonlyMap<string, boolean>>(() => new Map());
-	useEffect(() => {
-		let live = true;
-		const list = refs === "" ? [] : refs.split(",");
-		Promise.all(list.map(async (ref) => [ref, (await hub.deps.keys.pinned(ref)) !== null] as const)).then(
-			(pairs) => {
-				if (!live) return;
-				setPinned((current) => (pairs.every(([ref, has]) => current.get(ref) === has) && current.size === pairs.length ? current : new Map(pairs)));
-			},
-			// Unreadable key store: the links report "unpaired" themselves once started.
-			() => undefined,
-		);
-		return () => {
-			live = false;
-		};
-	}, [hub, refs, statuses]);
-	return pinned;
 }
 
 /** Watches a thread while the component shows it. */

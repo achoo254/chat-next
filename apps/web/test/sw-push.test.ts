@@ -193,11 +193,8 @@ describe("machine pushes", () => {
 		expect(parseMachinePayload({ ...machine, session_id: "" })?.path).toBe("/ai/42");
 		expect(parseMachinePayload({ ...machine, session_id: "../../x" })?.path).toBe("/ai/42");
 		expect(parseMachinePayload({ ...machine, tag: "machine:43" })).toBeNull();
-		// A newly paired device: its own tag, and it opens the machine, never a thread.
-		const paired = parseMachinePayload({ ...machine, session_id: "", body: "Một thiết bị mới vừa ghép với Mac mini", tag: "machine-paired:42" });
-		expect(paired).toMatchObject({ tag: "machine-paired:42", path: "/ai/42", body: "Một thiết bị mới vừa ghép với Mac mini" });
-		expect(parseMachinePayload({ ...machine, tag: "machine-paired:42" })?.path).toBe("/ai/42");
-		expect(parseMachinePayload({ ...machine, tag: "machine-paired:43" })).toBeNull();
+		// The per-machine "new device paired" push is gone: devices belong to the account now.
+		expect(parseMachinePayload({ ...machine, tag: "machine-paired:42" })).toBeNull();
 		expect(parseMachinePayload({ ...machine, machine_id: 0 })).toBeNull();
 		expect(parseMachinePayload(payload)).toBeNull();
 		// A machine payload is not a message: the chat parser leaves it alone.
@@ -230,6 +227,43 @@ describe("machine pushes", () => {
 		await clicked.fire("notificationclick", clickOf({ chatId: 0, path: "/ai/42/usage" }));
 		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/ai/42/usage" }]);
 		expect(openPath({ type: OPEN_PATH, path: "/ai/42/usage/x" })).toBeNull();
+	});
+
+	it("shows a new device of the account apart, one per device, that opens the account's devices", async () => {
+		const added = {
+			kind: "account_device_added",
+			title: "Chat",
+			body: "Tài khoản của bạn vừa thêm thiết bị mới: Chrome · Windows (web).",
+			tag: "account-device:17",
+			url: "/machines",
+			silent: false,
+			ts: 1_800_000_000_000,
+		};
+		const sw = scope();
+		await sw.fire("push", pushOf(added));
+		expect(sw.shown).toEqual([
+			{
+				title: "Chat",
+				options: {
+					body: added.body,
+					tag: "account-device:17",
+					icon: NOTIFICATION_ICON,
+					silent: false,
+					renotify: true,
+					timestamp: added.ts,
+					data: { chatId: 0, path: "/ai/machines" },
+				},
+			},
+		]);
+		// Only its own tag shape; a machine id riding along changes nothing.
+		expect(parseMachinePayload({ ...added, tag: "account-device:x" })).toBeNull();
+		expect(parseMachinePayload({ ...added, tag: "machine:17" })).toBeNull();
+		expect(parseMachinePayload({ ...added, machine_id: 42 })?.path).toBe("/ai/machines");
+		const open = new FakeWindow(`${ORIGIN}/c/1`, false, "visible");
+		const clicked = scope([open]);
+		await clicked.fire("notificationclick", clickOf({ chatId: 0, path: "/ai/machines" }));
+		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/ai/machines" }]);
+		expect(openPath({ type: OPEN_PATH, path: "/ai/machines/x" })).toBeNull();
 	});
 
 	it("asks an open window to open the session, or opens one on it", async () => {

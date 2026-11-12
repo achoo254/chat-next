@@ -3,7 +3,7 @@
 // records what the device sent, and answers through a scriptable handler.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { FrameSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
-import { acceptHello, generateKeyPair, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
+import { acceptHello, equal, generateKeyPair, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
 import type { SocketLike } from "../../src/machines/link/socket.ts";
 
 type FrameValue<K> = Extract<Frame["body"], { case: K }> extends { value: infer V } ? V : never;
@@ -51,7 +51,10 @@ export class FakeSocket implements SocketLike {
 export class FakeMachine {
 	readonly sockets: FakeSocket[] = [];
 	readonly received: Frame[] = [];
-	paired: Uint8Array[] = [];
+	/** Device keys the account lists for this machine. */
+	trusted: Uint8Array[] = [];
+	/** Device keys the account revoked. */
+	revoked: Uint8Array[] = [];
 	/** Answers a request; return nothing to stay silent. */
 	handler: (frame: Frame, socket: FakeSocket) => Body[] | undefined = (frame) => defaultAnswer(frame);
 	/** URLs the factory refuses (closes before open). */
@@ -84,7 +87,7 @@ export class FakeMachine {
 		if (socket.session === null) {
 			const result = await acceptHello(bytes, {
 				machine: this.keys,
-				deviceStatus: (key) => (this.paired.some((p) => p.every((b, i) => b === key[i])) ? "paired" : "unknown"),
+				deviceStatus: (key) => (this.trusted.some((p) => equal(p, key)) ? "trusted" : this.revoked.some((p) => equal(p, key)) ? "revoked" : "unknown"),
 			});
 			socket.deliver(result.reply);
 			if (result.ok) socket.session = result.session;

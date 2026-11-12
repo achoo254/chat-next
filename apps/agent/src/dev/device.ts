@@ -1,24 +1,16 @@
-// Development stand-in for a paired device (machine A) in the terminal.
-//   node src/dev/device.ts pair <ws-url> <6-digit authenticator code>
+// Development stand-in for a device of the account (side A) in the terminal.
+//   node src/dev/device.ts key                       (prints the device's public key)
+//   node src/dev/device.ts machine <machine key>     (the machine key Chat lists, base64url)
 //   node src/dev/device.ts chat <ws-url> <folder> "<first message>" [--yes] [--model haiku]
-// The device key and the pinned machine key live in $CHAT_DEV_DEVICE
-// (default: ./dev-device.json). Approvals are asked on stdin unless --yes.
+// The machine accepts the device only once Chat lists its key for the
+// account (RegisterDevice; the web does it). The device key and the machine
+// key live in $CHAT_DEV_DEVICE (default: ./dev-device.json). Approvals are
+// asked on stdin unless --yes.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { create } from "@bufbuild/protobuf";
 import { Decision, FrameSchema, type Frame, PromptState, Role } from "@achoo254/chat-proto/remote/remote";
-import {
-  type Session,
-  decodePlain,
-  encodePlain,
-  exportPrivateKey,
-  fromBase64Url,
-  generateKeyPair,
-  importKeyPair,
-  pakeStart,
-  startHandshake,
-  toBase64Url,
-} from "@achoo254/chat-remote-protocol";
+import { type Session, exportPrivateKey, fromBase64Url, generateKeyPair, importKeyPair, startHandshake, toBase64Url } from "@achoo254/chat-remote-protocol";
 import WebSocket from "ws";
 
 const FILE = process.env.CHAT_DEV_DEVICE ?? "dev-device.json";
@@ -51,26 +43,24 @@ function next(ws: WebSocket): Promise<Uint8Array> {
   });
 }
 
-async function pair(url: string, code: string) {
-  const { saved, pair: key } = await device();
-  const ws = await open(url);
-  const p = await pakeStart({ code, deviceKey: key.publicKey, deviceName: "terminal" });
-  ws.send(encodePlain({ case: "pakeStart", value: p.start }));
-  const reply = decodePlain(await next(ws));
-  if (reply.body.case !== "pakeReply") throw new Error(`pairing refused: ${JSON.stringify(reply.body.value)}`);
-  const { machineKey, finish } = await p.finish(reply.body.value);
-  ws.send(encodePlain({ case: "pakeFinish", value: finish }));
-  saved.machineKey = toBase64Url(machineKey);
+async function printKey() {
+  const { pair: key } = await device();
+  console.log(toBase64Url(key.publicKey));
+}
+
+async function setMachineKey(machineKey: string) {
+  if (fromBase64Url(machineKey).length !== 32) throw new Error("a machine key is 32 bytes, base64url");
+  const { saved } = await device();
+  saved.machineKey = machineKey;
   writeFileSync(FILE, JSON.stringify(saved), { mode: 0o600 });
-  console.log(`paired; machine key ${saved.machineKey.slice(0, 12)}… pinned`);
-  ws.close();
+  console.log(`machine key ${machineKey.slice(0, 12)}… saved`);
 }
 
 async function chat(url: string, dir: string, text: string, yes: boolean, model: string) {
   const { saved, pair: key } = await device();
-  if (!saved.machineKey) throw new Error("pair first");
+  if (!saved.machineKey) throw new Error("save the machine key first (device.ts machine <key>)");
   const ws = await open(url);
-  const hs = await startHandshake({ device: key, deviceName: "terminal", trust: { kind: "pinned", machineKey: fromBase64Url(saved.machineKey) } });
+  const hs = await startHandshake({ device: key, expectedMachineKey: fromBase64Url(saved.machineKey) });
   ws.send(hs.hello);
   const { session } = await hs.finish(await next(ws));
   const send = (s: Session, f: Parameters<typeof create<typeof FrameSchema>>[1]) => ws.send(s.seal(create(FrameSchema, f)));
@@ -145,10 +135,10 @@ async function chat(url: string, dir: string, text: string, yes: boolean, model:
 /** Round trips of sealed ping frames, to measure latency through the relay. */
 async function ping(url: string, count: number) {
   const { saved, pair: key } = await device();
-  if (!saved.machineKey) throw new Error("pair first");
+  if (!saved.machineKey) throw new Error("save the machine key first (device.ts machine <key>)");
   const t0 = performance.now();
   const ws = await open(url);
-  const hs = await startHandshake({ device: key, deviceName: "terminal", trust: { kind: "pinned", machineKey: fromBase64Url(saved.machineKey) } });
+  const hs = await startHandshake({ device: key, expectedMachineKey: fromBase64Url(saved.machineKey) });
   ws.send(hs.hello);
   const { session } = await hs.finish(await next(ws));
   console.log(`connect + handshake: ${Math.round(performance.now() - t0)} ms`);
@@ -172,6 +162,7 @@ async function ping(url: string, count: number) {
 const [cmd, url, a, b, ...rest] = process.argv.slice(2);
 const model = rest.includes("--model") ? (rest[rest.indexOf("--model") + 1] ?? "") : "";
 if (cmd === "ping" && url) await ping(url, Number(a ?? 50));
-else if (cmd === "pair" && url && a) await pair(url, a);
+else if (cmd === "key") await printKey();
+else if (cmd === "machine" && url) await setMachineKey(url);
 else if (cmd === "chat" && url && a && b) await chat(url, a, b, rest.includes("--yes"), model);
-else console.log("usage: device.ts pair <ws-url> <code> | ping <ws-url> [count] | chat <ws-url> <folder> <text> [--yes] [--model m]");
+else console.log("usage: device.ts key | machine <machine key> | ping <ws-url> [count] | chat <ws-url> <folder> <text> [--yes] [--model m]");

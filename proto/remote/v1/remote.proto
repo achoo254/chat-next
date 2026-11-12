@@ -10,6 +10,10 @@ option go_package = "app.local/server/gen/remote/v1;remotev1";
 // `Plain` messages only carry public keys and proofs, everything after the
 // handshake is a `Frame` sealed with the session keys (ADR 0013).
 //
+// Trust comes from the owner's chat account: A expects the machine key the
+// chat lists for the machine (Machine.public_key), and B accepts the device
+// keys the chat lists for its owner (HeartbeatResponse.trusted_devices).
+//
 // Nothing here is specific to one AI: B runs adapters (Claude Code first)
 // that map their own events and tool names onto the generic shapes below.
 
@@ -17,12 +21,11 @@ option go_package = "app.local/server/gen/remote/v1;remotev1";
 // Before the handshake: sent in clear, one WebSocket binary message each.
 
 message Plain {
+  reserved 3, 4, 5;
+  reserved "pake_start", "pake_reply", "pake_finish";
   oneof body {
     Hello hello = 1;
     Ready ready = 2;
-    PakeStart pake_start = 3;
-    PakeReply pake_reply = 4;
-    PakeFinish pake_finish = 5;
     HandshakeError error = 6;
   }
 }
@@ -36,62 +39,22 @@ message Hello {
   bytes static_key = 4;
   // 32 random bytes.
   bytes nonce = 5;
-  reserved 6;
-  reserved "pair_proof";
-  // Shown on B's device list; at most 64 characters.
-  string device_name = 7;
+  reserved 6, 7;
+  reserved "pair_proof", "device_name";
 }
 
-// B → A: answers a Hello.
+// B → A: answers a Hello. A checks that static_key is the machine key the
+// chat lists for the machine before anything else.
 message Ready {
+  reserved 6;
+  reserved "install_proof";
   uint32 protocol_version = 1;
   uint32 min_protocol_version = 2;
   bytes ephemeral_key = 3;
   bytes static_key = 4;
   bytes nonce = 5;
-  // First connection after the one-command install only:
-  // HMAC-SHA256(install secret, "install" ‖ A static ‖ B static). A pins B's
-  // static key only after checking it; it never takes B's key from the server.
-  bytes install_proof = 6;
   // Key confirmation: the transcript hash sealed as B → A frame 0.
   bytes confirm = 7;
-}
-
-// Pairing a new device with the machine's authenticator code (TOTP, RFC
-// 6238, set from an already paired device with TotpSet). The 6-digit code is
-// the password of CPace on ristretto255: a wrong guess costs one online
-// attempt and reveals nothing that allows an offline search. B counts every
-// PakeStart as an attempt and locks pairing for 15 minutes after 5 that did
-// not pair; the device reconnects with a normal Hello once paired.
-message PakeStart {
-  bytes share = 1;
-  bytes static_key = 2;
-  string device_name = 3;
-  // 16 random bytes chosen by A: the CPace session id.
-  bytes sid = 4;
-}
-
-// B does not know which 30-second step the device's code belongs to, so it
-// answers with one candidate per step it accepts (previous, current, next),
-// each a CPace run of its own keyed by that step's code. A uses the one whose
-// tag checks; none checking means the code was wrong.
-message PakeReply {
-  reserved 1, 3;
-  reserved "share", "tag";
-  bytes static_key = 2;
-  repeated PakeCandidate candidates = 4;
-}
-
-message PakeCandidate {
-  bytes share = 1;
-  // HMAC-SHA256(ISK, "B" ‖ transcript) of this candidate.
-  bytes tag = 2;
-}
-
-message PakeFinish {
-  // HMAC-SHA256(ISK, "A" ‖ transcript) of the candidate A used; B tries every
-  // candidate it sent and answers nothing that tells them apart.
-  bytes tag = 1;
 }
 
 message HandshakeError {
@@ -102,27 +65,30 @@ message HandshakeError {
 }
 
 enum HandshakeErrorCode {
+  reserved 4, 5, 9;
+  reserved "HANDSHAKE_ERROR_CODE_PAIRING_EXPIRED", "HANDSHAKE_ERROR_CODE_TOO_MANY_ATTEMPTS", "HANDSHAKE_ERROR_CODE_TOTP_NOT_SET";
   HANDSHAKE_ERROR_CODE_UNSPECIFIED = 0;
-  // A's static key is not paired with this machine.
+  // A's static key is not a device key of the machine's owner (another
+  // account, or a key the machine has not learnt from the chat yet).
   HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE = 1;
   HANDSHAKE_ERROR_CODE_VERSION_UNSUPPORTED = 2;
+  // The key confirmation failed: a relay changed the handshake.
   HANDSHAKE_ERROR_CODE_BAD_PROOF = 3;
-  reserved 4;
-  reserved "HANDSHAKE_ERROR_CODE_PAIRING_EXPIRED";
-  // Pairing is locked after 5 attempts that did not pair, for 15 minutes.
-  HANDSHAKE_ERROR_CODE_TOO_MANY_ATTEMPTS = 5;
+  // The owner revoked A's key.
   HANDSHAKE_ERROR_CODE_REVOKED = 6;
   HANDSHAKE_ERROR_CODE_BUSY = 7;
   HANDSHAKE_ERROR_CODE_MALFORMED = 8;
-  // PakeStart to a machine without an authenticator secret: a paired device
-  // sets one first (TotpSet). Not counted as an attempt.
-  HANDSHAKE_ERROR_CODE_TOTP_NOT_SET = 9;
+  // Never sent: A's own verdict when B's static key is not the machine key
+  // the chat lists for the machine.
+  HANDSHAKE_ERROR_CODE_MACHINE_KEY_CHANGED = 10;
 }
 
 // ---------------------------------------------------------------------------
 // After the handshake: every WebSocket message is one sealed Frame.
 
 message Frame {
+  reserved 102, 103, 104;
+  reserved "totp_set", "totp_status_request", "totp_status";
   // Set by A on requests; B echoes it on the direct answer or error.
   string id = 1;
   oneof body {
@@ -215,9 +181,6 @@ message Frame {
     ScreenShareClose screen_share_close = 97;
     // Deletes the tunelo browser's profile (as `tunelo browser clear`). Answered with MachineInfo.
     BrowserClear browser_clear = 98;
-    // Pairing by authenticator code; see "pairing by authenticator" below.
-    TotpSet totp_set = 102;
-    TotpStatusRequest totp_status_request = 103;
     // Updating tunelo itself (tunelo 2.3.0+); see "updating tunelo" below.
     AgentUpdateCheck agent_update_check = 105;
     AgentUpdateStart agent_update_start = 106;
@@ -238,7 +201,6 @@ message Frame {
     ScreenShareStatus screen_share_status = 99;
     ScreenShareOpened screen_share_opened = 100;
     ScreenShareClosed screen_share_closed = 101;
-    TotpStatus totp_status = 104;
     AgentUpdateProgress agent_update_progress = 107;
 
     // The machine's terminal (tunelo 2.4.0+); see "the machine's terminal" below.
@@ -529,7 +491,7 @@ message FileList {
 //
 // The AI's own transcripts on B, whatever started them: a terminal, an IDE,
 // Claude Desktop or tunelo itself (Claude Code keeps every session under
-// ~/.claude/projects). They only ever go to paired devices, end-to-end
+// ~/.claude/projects). They only ever go to the owner's trusted devices, end-to-end
 // encrypted, like the rest of a thread.
 
 // Answered with SessionListResult, newest first.
@@ -1129,6 +1091,8 @@ message Error {
 }
 
 enum ErrorReason {
+  reserved 52;
+  reserved "ERROR_REASON_TOTP_SECRET_INVALID";
   ERROR_REASON_UNSPECIFIED = 0;
   // The working directory does not exist or is not a folder.
   ERROR_REASON_FOLDER_NOT_FOUND = 1;
@@ -1236,8 +1200,6 @@ enum ErrorReason {
   ERROR_REASON_SCREEN_SHARE_BUSY = 50;
   // ScreenShareData or ScreenShareClose names a session that is no longer open.
   ERROR_REASON_SCREEN_SHARE_GONE = 51;
-  // TotpSet with a secret that is not 20 bytes.
-  ERROR_REASON_TOTP_SECRET_INVALID = 52;
   // AgentUpdateStart on a machine that cannot replace its own file (tunelo
   // run from source, or not installed as the single binary).
   ERROR_REASON_UPDATE_UNAVAILABLE = 53;
@@ -1716,6 +1678,8 @@ message ProviderInfo {
 }
 
 message MachineInfo {
+  reserved 13, 21;
+  reserved "devices", "totp_enabled";
   string name = 1;
   string os = 2;
   string arch = 3;
@@ -1729,8 +1693,6 @@ message MachineInfo {
   uint32 max_sessions = 11;
   // Resident memory of the agent and its sessions, in megabytes.
   uint32 memory_mb = 12;
-  // Devices paired with this machine, for revoking one from another device.
-  repeated PairedDevice devices = 13;
   // Unset on machines that have no settings to change from a device.
   MachineSettings settings = 14;
   // macOS only: tunelo lacks Full Disk Access, so its sessions cannot read
@@ -1754,9 +1716,6 @@ message MachineInfo {
   // (ScreenShareStatusRequest, ScreenShareOpen); false before tunelo 2.0.13
   // and on other systems.
   bool screen_share = 20;
-  // The machine has an authenticator secret: new devices can pair with its
-  // code (see TotpSet).
-  bool totp_enabled = 21;
   // Unset before tunelo 2.3.0.
   AgentUpdateInfo agent_update = 22;
   // The machine's terminal; unspecified before tunelo 2.4.0.
@@ -1799,14 +1758,6 @@ message MachineSettings {
   bool local_forward_available = 2;
 }
 
-message PairedDevice {
-  // X25519 public key, 32 bytes (RevokeDevice takes it as is).
-  bytes public_key = 1;
-  string name = 2;
-  // Unix milliseconds.
-  int64 added_at = 3;
-}
-
 message DirListResult {
   string path = 1;
   repeated DirEntry entries = 2;
@@ -1845,7 +1796,7 @@ message AuditEntry {
   int64 at = 1;
   string device = 2;
   // open_sensitive, project_settings (detail "trust" when a device trusted
-  // the folder), approve_sensitive, pair (detail: "install" or "totp"), revoke,
+  // the folder), approve_sensitive, revoke (the account revoked a connected device),
   // permission_mode, profile_add, profile_select, profile_remove,
   // delete_session (path: the folder; detail: the session ids),
   // project_add (a sensitive folder added as a project),
@@ -1856,7 +1807,6 @@ message AuditEntry {
   // path: the site it showed; detail: "claude" or "user"),
   // browser_clear (the tunelo browser's profile was deleted),
   // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
-  // totp_set (a device set or replaced the authenticator secret; never the secret),
   // agent_update (a device started an update of tunelo; detail: the version),
   // git_stage, git_unstage, git_discard, git_commit, git_checkout,
   // git_branch_create, git_pull, git_push (a device changed a workspace's git;
@@ -2206,28 +2156,6 @@ message ScreenShareClosed {
 // A → B: delete the tunelo browser's profile. Answered with MachineInfo.
 message BrowserClear {}
 
-// --- pairing by authenticator ---------------------------------------------------
-// The machine keeps a TOTP secret (RFC 6238: HMAC-SHA1, 6 digits, 30-second
-// steps) that new devices pair with (PakeStart). A paired device makes the
-// secret, shows it once as an otpauth:// QR for the user's authenticator app,
-// checks the first code the user types, then sends it here; it reaches the
-// machine end-to-end sealed and never the chat server. Sending a new one
-// replaces it. B writes each change to the consent log.
-
-// A → B: set or replace the secret. Answered with TotpStatus;
-// ERROR_REASON_TOTP_SECRET_INVALID when it is not 20 bytes.
-message TotpSet {
-  bytes secret = 1;
-}
-
-// A → B: answered with TotpStatus.
-message TotpStatusRequest {}
-
-message TotpStatus {
-  // The machine has a secret: new devices can pair with its code.
-  bool enabled = 1;
-}
-
 // --- updating tunelo ----------------------------------------------------------
 // A device can ask a machine to update itself, as `tunelo update` does at the
 // machine: B fetches the newest tunelo release, checks its minisign signature
@@ -2280,7 +2208,7 @@ message AgentUpdateProgress {
 
 // --- the machine's terminal ------------------------------------------------------
 // Real terminals (PTYs) held on the machine by tunelo's terminal process,
-// open to the owner's paired devices like chat sessions. The terminal's own
+// open to the owner's trusted devices like chat sessions. The terminal's own
 // bytes are frames of docs/terminal-wire.md ("terminal frames"): on the
 // direct path they go device ⟷ terminal process over WebRTC and never pass
 // here; on the relay path each one is one TermData. Signaling (SDP, ICE) goes

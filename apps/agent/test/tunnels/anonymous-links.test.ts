@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkContextOf } from "../../src/tunnels/cli-link-command.js";
+import { linkContextOf } from "../../src/tunnels/anonymous-links.ts";
 
 const SERVER = "wss://tunnel.hoandat.com";
 

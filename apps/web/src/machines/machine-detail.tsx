@@ -1,15 +1,13 @@
 // A machine's page: its sessions, its Claude accounts (claude-profiles.tsx),
 // whether Localman may send requests to localhost on it (local-forward-setting.tsx),
-// the consent log kept on the machine (opening
-// sensitive folders, loading project settings, approving sensitive tools,
-// pairing and revoking devices), what it runs, the devices paired with it
-// (any of them can be revoked from here), turning on or replacing pairing
-// with an Authenticator code (totp-setup.tsx), and renaming or removing the
-// machine. Removing it or revoking a device takes effect at the machine's
-// next heartbeat (about a minute); revoking this device also forgets the
-// machine's key here and opens the pairing page.
+// the consent log kept on the machine (opening sensitive folders, loading
+// project settings, approving sensitive tools, devices the account added or
+// revoked), what it runs, and renaming or removing the machine. Removing it
+// takes effect at the machine's next heartbeat (about a minute). The devices
+// that may use it are the account's (account-devices.tsx, on the machines
+// page).
 import { useEffect, useState, type FormEvent } from "react";
-import type { AuditEntry, PairedDevice } from "@achoo254/chat-proto/remote/remote";
+import type { AuditEntry } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
@@ -17,18 +15,16 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { Link, navigate, paths } from "../router.tsx";
 import { AuditEntryText } from "./audit-entry-text.tsx";
 import { ClaudeProfiles } from "./claude-profiles.tsx";
-import { LOCAL_REF, setLocalPort } from "./link/link-hub.ts";
+import { LOCAL_REF, setLocalMachine } from "./link/link-hub.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
-import { TotpSetting } from "./totp-setup.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
 import { RefreshMachine } from "./refresh-machine.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
-import { keyText, PairedDevices, revokePairedDevice, sameKey } from "./paired-devices.tsx";
 import { sortForList } from "./link/machine-link.ts";
 import { aiName, folderName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -44,30 +40,12 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const [link, state] = useLink(hub, machine);
 	const [audit, setAudit] = useState<readonly AuditEntry[] | null>(null);
 	const [auditLimit, setAuditLimit] = useState(AUDIT_FIRST);
-	const [dialog, setDialog] = useState<"rename" | "remove" | "revoke" | null>(null);
-	/** The device the revoke dialog is about; null for this device when the machine's list is not known. */
-	const [target, setTarget] = useState<PairedDevice | null>(null);
-	const [myKey, setMyKey] = useState<Uint8Array | null>(null);
-	/** Devices revoked from this page, by key (the machine drops them at its next heartbeat). */
-	const [revoked, setRevoked] = useState<ReadonlySet<string>>(() => new Set());
+	const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const online = state.status.kind === "open";
 	const name = entry?.name ?? "";
 	const local = machine === LOCAL_REF;
-
-	useEffect(() => {
-		let active = true;
-		hub.deps.keys.device().then(
-			(device) => {
-				if (active) setMyKey(device.publicKey);
-			},
-			() => undefined,
-		);
-		return () => {
-			active = false;
-		};
-	}, [hub]);
 
 	useEffect(() => {
 		if (!online) return;
@@ -101,33 +79,13 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const remove = () =>
 		act(
 			async () => {
-				if (local) setLocalPort(null);
+				if (local) setLocalMachine(null);
 				else if (entry !== null) await hub.deps.directory.remove(entry.id);
 				await hub.forget(machine);
 				await hub.refresh().catch(() => undefined);
 			},
 			() => navigate(paths.machines()),
 		);
-	const revoke = (device: PairedDevice | null) => {
-		let whose: "self" | "other" = "other";
-		act(
-			async () => {
-				if (entry === null) return;
-				whose = await revokePairedDevice(hub, machine, entry.id, device);
-				if (whose === "other" && device !== null) setRevoked((current) => new Set(current).add(keyText(device.publicKey)));
-			},
-			() => {
-				if (whose === "self") navigate(paths.machinePair(machine));
-			},
-		);
-	};
-	const askRevoke = (device: PairedDevice | null) => {
-		setError("");
-		setTarget(device);
-		setDialog("revoke");
-	};
-	const devices = state.info?.devices ?? [];
-	const targetIsSelf = target === null || (myKey !== null && sameKey(target.publicKey, myKey));
 
 	if (entry === null) {
 		return (
@@ -224,27 +182,8 @@ export function MachineDetail({ machine }: { machine: string }) {
 						<dt>{t.detail.agent}</dt>
 						<dd className="mono">
 							tunelo {state.info?.agentVersion || entry.agentVersion || "—"}{" "}
-							{!entry.claimed && <span className="chip mx-chip warn">{t.status.needsLogin}</span>}
 							{online && state.info !== null && <AgentUpdateSetting link={link} info={state.info} progress={state.agentUpdate} online={online} />}
 						</dd>
-						{!entry.claimed && (
-							<dd className="note" role="note">
-								{t.status.needsLoginHint}
-							</dd>
-						)}
-						<dt>{t.detail.devices}</dt>
-						<dd className="mx-devices">
-							<PairedDevices devices={devices} myKey={myKey} revoked={revoked} canRevoke={!local} onRevoke={askRevoke} />
-							<span className="note">{t.detail.pairNewHint}</span>
-						</dd>
-						{online && state.info !== null && (
-							<>
-								<dt>{t.totp.label}</dt>
-								<dd>
-									<TotpSetting link={link} machine={name} enabled={state.info.totpEnabled} online={online} />
-								</dd>
-							</>
-						)}
 					</dl>
 					<div className="acts">
 						{!local && (
@@ -274,27 +213,6 @@ export function MachineDetail({ machine }: { machine: string }) {
 					busy={busy}
 					danger
 					onConfirm={remove}
-					onClose={() => setDialog(null)}
-				/>
-			)}
-			{dialog === "revoke" && (
-				<ConfirmDialog
-					title={targetIsSelf ? t.detail.revokeTitle : t.detail.revokeOtherTitle(target?.name || t.detail.unnamedDevice)}
-					body={
-						<>
-							<p>{targetIsSelf ? t.detail.revokeBody(name) : t.detail.revokeOtherBody(name)}</p>
-							{error !== "" && (
-								<p className="mx-error" role="alert">
-									{error}
-								</p>
-							)}
-						</>
-					}
-					action={t.detail.revokeThis}
-					busyLabel={t.detail.revoking}
-					busy={busy}
-					danger
-					onConfirm={() => revoke(target)}
 					onClose={() => setDialog(null)}
 				/>
 			)}

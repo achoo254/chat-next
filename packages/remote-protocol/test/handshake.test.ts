@@ -10,31 +10,31 @@ import {
   acceptHello,
   decodePlain,
   encodePlain,
+  equal,
   generateKeyPair,
-  random,
   startHandshake,
 } from "../src/index.ts";
 
 const ping = (id: string) => create(FrameSchema, { id, body: { case: "ping", value: {} } });
 
+/** A machine whose owner's account lists the device as trusted. */
 async function setup() {
   const machine = await generateKeyPair();
   const device = await generateKeyPair();
-  const paired: Uint8Array[] = [device.publicKey];
-  const deviceStatus = (k: Uint8Array): DeviceStatus =>
-    paired.some((p) => p.every((x, i) => x === k[i])) ? "paired" : "unknown";
+  const trusted: Uint8Array[] = [device.publicKey];
+  const deviceStatus = (k: Uint8Array): DeviceStatus => (trusted.some((p) => equal(p, k)) ? "trusted" : "unknown");
   return { machine, device, deviceStatus };
 }
 
 describe("handshake", () => {
-  it("opens a session both ways with a pinned machine key", async () => {
+  it("opens a session both ways with the machine key the chat lists", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const a = await startHandshake({ device, deviceName: "phone", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const b = await acceptHello(a.hello, { machine, deviceStatus });
     expect(b.ok).toBe(true);
     if (!b.ok) return;
+    expect(b.deviceKey).toEqual(device.publicKey);
     const { session: sa } = await a.finish(b.reply);
-    expect(b.deviceName).toBe("phone");
 
     const got = b.session.open(sa.seal(ping("1")));
     expect(got.id).toBe("1");
@@ -42,10 +42,10 @@ describe("handshake", () => {
     expect(sa.open(b.session.seal(ping("3"))).id).toBe("3");
   });
 
-  it("refuses an unpaired device", async () => {
+  it("refuses a device the owner's account does not list", async () => {
     const { machine, deviceStatus } = await setup();
     const stranger = await generateKeyPair();
-    const a = await startHandshake({ device: stranger, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device: stranger, expectedMachineKey: machine.publicKey });
     const b = await acceptHello(a.hello, { machine, deviceStatus });
     expect(b.ok).toBe(false);
     if (b.ok) return;
@@ -53,25 +53,40 @@ describe("handshake", () => {
     await expect(a.finish(b.reply)).rejects.toMatchObject({ code: HandshakeErrorCode.UNKNOWN_DEVICE });
   });
 
-  it("refuses a revoked device", async () => {
+  it("refuses a revoked device apart from an unknown one", async () => {
     const { machine, device } = await setup();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const b = await acceptHello(a.hello, { machine, deviceStatus: () => "revoked" });
     expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.REVOKED);
+    if (b.ok) return;
+    await expect(a.finish(b.reply)).rejects.toMatchObject({ code: HandshakeErrorCode.REVOKED });
   });
 
-  it("detects a machine impersonator (wrong static key)", async () => {
+  it("stops at a machine key other than the one the chat lists", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const fake = await generateKeyPair();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
-    const b = await acceptHello(a.hello, { machine: fake, deviceStatus });
+    const other = await generateKeyPair();
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
+    // Another machine (or one that changed its key) answers.
+    const b = await acceptHello(a.hello, { machine: other, deviceStatus });
     if (!b.ok) throw new Error("expected ready");
-    await expect(a.finish(b.reply)).rejects.toMatchObject({ code: HandshakeErrorCode.BAD_PROOF });
+    await expect(a.finish(b.reply)).rejects.toMatchObject({ code: HandshakeErrorCode.MACHINE_KEY_CHANGED });
+  });
+
+  it("detects a relay that claims the listed key without holding it", async () => {
+    const { machine, device, deviceStatus } = await setup();
+    const impostor = await generateKeyPair();
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
+    const b = await acceptHello(a.hello, { machine: impostor, deviceStatus });
+    if (!b.ok) throw new Error("expected ready");
+    const plain = decodePlain(b.reply);
+    if (plain.body.case !== "ready") throw new Error("expected ready");
+    plain.body.value.staticKey = machine.publicKey;
+    await expect(a.finish(encodePlain(plain.body))).rejects.toMatchObject({ code: HandshakeErrorCode.BAD_PROOF });
   });
 
   it("detects a relay that rewrites the Ready keys", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const b = await acceptHello(a.hello, { machine, deviceStatus });
     if (!b.ok) throw new Error("expected ready");
     const plain = decodePlain(b.reply);
@@ -80,9 +95,16 @@ describe("handshake", () => {
     await expect(a.finish(encodePlain(plain.body))).rejects.toBeInstanceOf(HandshakeFailure);
   });
 
+  it("refuses a malformed expected machine key", async () => {
+    const device = await generateKeyPair();
+    await expect(startHandshake({ device, expectedMachineKey: new Uint8Array(31) })).rejects.toMatchObject({
+      code: HandshakeErrorCode.MALFORMED,
+    });
+  });
+
   it("rejects replayed, reordered and forged frames", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const b = await acceptHello(a.hello, { machine, deviceStatus });
     if (!b.ok) throw new Error("expected ready");
     const { session: sa } = await a.finish(b.reply);
@@ -100,7 +122,7 @@ describe("handshake", () => {
 
   it("reports an unsupported protocol version on both sides", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const plain = decodePlain(a.hello);
     if (plain.body.case !== "hello") throw new Error();
     const future = create(HelloSchema, { ...plain.body.value, protocolVersion: 9, minProtocolVersion: PROTOCOL_VERSION + 1 });
@@ -111,72 +133,16 @@ describe("handshake", () => {
     expect(err.body.case === "error" && err.body.value.protocolVersion).toBe(PROTOCOL_VERSION);
     expect(err.body.case === "error" && err.body.value.minProtocolVersion).toBe(MIN_PROTOCOL_VERSION);
   });
-});
 
-describe("install pairing", () => {
-  it("lets the installing browser pin the machine key after the proof checks", async () => {
-    const machine = await generateKeyPair();
-    const device = await generateKeyPair();
-    const secret = random(32);
-    const a = await startHandshake({ device, deviceName: "laptop", trust: { kind: "install", secret } });
-    const b = await acceptHello(a.hello, {
-      machine,
-      deviceStatus: () => "unknown",
-      install: { deviceKey: device.publicKey, secret },
-    });
-    if (!b.ok) throw new Error("expected ready");
-    expect(b.pairedBy).toBe("install");
-    const { machineKey } = await a.finish(b.reply);
-    expect(machineKey).toEqual(machine.publicKey);
-  });
-
-  it("refuses a machine that does not know the install secret", async () => {
-    const machine = await generateKeyPair();
-    const device = await generateKeyPair();
-    const a = await startHandshake({ device, deviceName: "laptop", trust: { kind: "install", secret: random(32) } });
-    const b = await acceptHello(a.hello, {
-      machine,
-      deviceStatus: () => "unknown",
-      install: { deviceKey: device.publicKey, secret: random(32) },
-    });
-    if (!b.ok) throw new Error("expected ready");
-    await expect(a.finish(b.reply)).rejects.toMatchObject({ code: HandshakeErrorCode.BAD_PROOF });
-  });
-});
-
-describe("new devices", () => {
-  it("refuses an unknown device even while an install is pending for another key", async () => {
-    const machine = await generateKeyPair();
-    const installer = await generateKeyPair();
-    const stranger = await generateKeyPair();
-    const secret = random(32);
-    const a = await startHandshake({ device: stranger, deviceName: "x", trust: { kind: "install", secret } });
-    const b = await acceptHello(a.hello, {
-      machine,
-      deviceStatus: () => "unknown",
-      install: { deviceKey: installer.publicKey, secret },
-    });
-    expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.UNKNOWN_DEVICE);
-  });
-
-  it("does not mark a paired device as newly paired", async () => {
-    const machine = await generateKeyPair();
-    const device = await generateKeyPair();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
-    const b = await acceptHello(a.hello, { machine, deviceStatus: () => "paired" });
-    if (!b.ok) throw new Error("expected ready");
-    expect(b.pairedBy).toBeUndefined();
-  });
-
-  it("refuses a peer that only speaks protocol 1", async () => {
+  it("refuses a peer that only speaks protocol 2", async () => {
     const { machine, device, deviceStatus } = await setup();
-    const a = await startHandshake({ device, deviceName: "x", trust: { kind: "pinned", machineKey: machine.publicKey } });
+    const a = await startHandshake({ device, expectedMachineKey: machine.publicKey });
     const plain = decodePlain(a.hello);
     if (plain.body.case !== "hello") throw new Error("expected hello");
-    const old = create(HelloSchema, { ...plain.body.value, protocolVersion: 1, minProtocolVersion: 1 });
+    const old = create(HelloSchema, { ...plain.body.value, protocolVersion: 2, minProtocolVersion: 2 });
     const b = await acceptHello(encodePlain({ case: "hello", value: old }), { machine, deviceStatus });
     expect(b.ok ? null : b.code).toBe(HandshakeErrorCode.VERSION_UNSUPPORTED);
-    expect(PROTOCOL_VERSION).toBe(2);
-    expect(MIN_PROTOCOL_VERSION).toBe(2);
+    expect(PROTOCOL_VERSION).toBe(3);
+    expect(MIN_PROTOCOL_VERSION).toBe(3);
   });
 });

@@ -49,7 +49,13 @@ type Config struct {
 	OIDCIssuer       string
 	OIDCClientID     string
 	OIDCClientSecret string
-	SessionKey       []byte
+	// TuneloGrantRevokeURL (TUNELO_GRANT_REVOKE_URL, optional) is the IdP
+	// endpoint that revokes the tunelo-agent grant of a removed machine,
+	// called with the chat's client credentials (OIDC_CLIENT_ID and
+	// OIDC_CLIENT_SECRET). Empty: removed machines keep their grant
+	// recorded as pending until it is set.
+	TuneloGrantRevokeURL string
+	SessionKey           []byte
 	// SessionKeyPrevious (SESSION_KEY_PREVIOUS, optional) still opens values
 	// sealed and tokens signed before a key rotation; nothing new uses it.
 	SessionKeyPrevious []byte
@@ -286,6 +292,18 @@ func Load(lookup Lookup) (Config, error) {
 			errs = append(errs, invalid("OIDC_ISSUER", "must use https in production"))
 		default:
 			c.OIDCIssuer = raw
+		}
+	}
+
+	if raw := get("TUNELO_GRANT_REVOKE_URL"); raw != "" {
+		u, err := url.Parse(raw)
+		switch {
+		case err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.Fragment != "":
+			errs = append(errs, invalid("TUNELO_GRANT_REVOKE_URL", "must be an absolute http(s) URL"))
+		case production && u.Scheme != "https":
+			errs = append(errs, invalid("TUNELO_GRANT_REVOKE_URL", "must use https in production"))
+		default:
+			c.TuneloGrantRevokeURL = raw
 		}
 	}
 

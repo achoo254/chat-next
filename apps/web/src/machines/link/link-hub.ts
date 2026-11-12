@@ -1,53 +1,73 @@
-// The machines screens' shared state: the directory (ListMachines) and one
+// The machines screens' shared state: the directory (ListMachines), this
+// device's key registered with the account (device-registration.ts) and one
 // MachineLink per machine, kept in the HubSlot above the screens
 // (connection-provider.tsx). In development a machine on this computer
-// ("local", `tunelo run --port N`) can stand in for the directory.
+// ("local", `tunelo run --port N`) can stand in for the directory: it is one
+// of the directory's machines, reached on 127.0.0.1 instead of its tunnel.
+import type { KeyPair } from "@achoo254/chat-remote-protocol";
 import type { MachineEntry, MachinesDirectory } from "../machines-client.ts";
 import type { DeviceKeyStore } from "./device-keys.ts";
+import { registeredDevice, type DeviceIdentity } from "./device-registration.ts";
 import { MachineLink } from "./machine-link.ts";
 import type { SocketFactory } from "./socket.ts";
 
 export const LOCAL_REF = "local";
-const LOCAL_PORT_KEY = "machines:local-port";
+const LOCAL_KEY = "machines:local";
 
 export type DirectoryState =
 	| { readonly status: "loading"; readonly machines: readonly MachineEntry[] }
 	| { readonly status: "ready"; readonly machines: readonly MachineEntry[] }
 	| { readonly status: "error"; readonly machines: readonly MachineEntry[] };
 
-/** The development machine's port, if one was paired (development builds only). */
-export function localPort(): number | null {
+/** The development machine: its port on this computer and which machine of the directory it is. */
+export interface LocalMachine {
+	readonly port: number;
+	readonly machineId: number;
+}
+
+/** The development machine, if one was set up (development builds only). */
+export function localMachine(): LocalMachine | null {
 	if (!import.meta.env.DEV) return null;
-	const port = Number(window.localStorage.getItem(LOCAL_PORT_KEY));
-	return Number.isInteger(port) && port > 0 && port < 65536 ? port : null;
+	try {
+		const raw: unknown = JSON.parse(window.localStorage.getItem(LOCAL_KEY) ?? "null");
+		if (typeof raw !== "object" || raw === null) return null;
+		const { port, machineId } = raw as Record<string, unknown>;
+		if (typeof port !== "number" || !Number.isInteger(port) || port <= 0 || port >= 65536) return null;
+		if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
+		return { port, machineId };
+	} catch {
+		return null;
+	}
 }
 
-export function setLocalPort(port: number | null): void {
+export function setLocalMachine(local: LocalMachine | null): void {
 	if (!import.meta.env.DEV) return;
-	if (port === null) window.localStorage.removeItem(LOCAL_PORT_KEY);
-	else window.localStorage.setItem(LOCAL_PORT_KEY, String(port));
+	if (local === null) window.localStorage.removeItem(LOCAL_KEY);
+	else window.localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
 }
 
-function localEntry(port: number, name: string): MachineEntry {
+function localEntry(local: LocalMachine, name: string, listed: MachineEntry | undefined): MachineEntry {
 	return {
 		ref: LOCAL_REF,
 		id: 0,
 		name,
-		os: "",
-		arch: "",
-		agentVersion: "",
-		claudeVersion: "",
-		tunnelUrl: `ws://127.0.0.1:${port}`,
+		os: listed?.os ?? "",
+		arch: listed?.arch ?? "",
+		agentVersion: listed?.agentVersion ?? "",
+		claudeVersion: listed?.claudeVersion ?? "",
+		tunnelUrl: `ws://127.0.0.1:${local.port}`,
 		createdAt: 0,
 		lastSeenAt: 0,
-		claimed: true,
+		// The key the account lists for that machine; empty until the directory loaded.
+		publicKey: listed?.publicKey ?? new Uint8Array(0),
 	};
 }
 
 export interface HubDeps {
 	readonly directory: MachinesDirectory;
 	readonly keys: DeviceKeyStore;
-	readonly deviceName: string;
+	/** How this device names itself on the account's device list. */
+	readonly identity: DeviceIdentity;
 	readonly socket: SocketFactory;
 	/** Name shown for the development machine. */
 	readonly localName: string;
@@ -61,8 +81,12 @@ export class LinkHub {
 	/** Second connections that carry only a machine's terminal (MachineLink purpose "terminal"). */
 	private readonly carriers = new Map<string, MachineLink>();
 	private active = false;
+	/** This device's key, registered with the account on first use. */
+	readonly device: () => Promise<KeyPair>;
 
-	constructor(readonly deps: HubDeps) {}
+	constructor(readonly deps: HubDeps) {
+		this.device = registeredDevice(deps.keys, deps.directory, deps.identity);
+	}
 
 	readonly subscribe = (listener: () => void): (() => void) => {
 		this.listeners.add(listener);
@@ -102,8 +126,8 @@ export class LinkHub {
 	/** The machine `ref` from the directory (or the development machine); null when unknown. */
 	entry(ref: string): MachineEntry | null {
 		if (ref === LOCAL_REF) {
-			const port = localPort();
-			return port === null ? null : localEntry(port, this.deps.localName);
+			const local = localMachine();
+			return local === null ? null : localEntry(local, this.deps.localName, this.state.machines.find((m) => m.id === local.machineId));
 		}
 		return this.state.machines.find((m) => m.ref === ref) ?? null;
 	}
@@ -131,12 +155,16 @@ export class LinkHub {
 
 	private makeLink(ref: string, purpose: "chat" | "terminal"): MachineLink {
 		return new MachineLink({
-			device: () => this.deps.keys.device(),
-			deviceName: this.deps.deviceName,
-			pinned: () => this.deps.keys.pinned(ref),
+			device: this.device,
+			expectedKey: () => {
+				const key = this.entry(ref)?.publicKey;
+				return key === undefined || key.length !== 32 ? null : key;
+			},
+			seenKey: () => this.deps.keys.seenMachineKey(ref),
+			rememberKey: (key) => this.deps.keys.rememberMachineKey(ref, key),
 			tunnelUrl: () => this.entry(ref)?.tunnelUrl ?? "",
 			refreshTunnel: async () => {
-				if (ref !== LOCAL_REF) await this.refresh();
+				await this.refresh();
 				return this.entry(ref)?.tunnelUrl ?? "";
 			},
 			socket: this.deps.socket,
@@ -144,7 +172,7 @@ export class LinkHub {
 		});
 	}
 
-	/** Restarts the terminal connection of `ref` if it runs (a new key, a new address). */
+	/** Restarts the terminal connection of `ref` if it runs (a new address, a new key accepted). */
 	private restartCarrier(ref: string): void {
 		const carrier = this.carriers.get(ref);
 		if (carrier === undefined || !carrier.started) return;
@@ -152,24 +180,20 @@ export class LinkHub {
 		carrier.start();
 	}
 
-	/** Pins a machine key after pairing and restarts its link with it. */
-	async pinned(ref: string, machineKey: Uint8Array): Promise<void> {
-		await this.deps.keys.pin(ref, machineKey);
-		const link = this.links.get(ref);
-		if (link !== undefined) {
-			link.stop();
-			link.start();
-		}
-		this.restartCarrier(ref);
-	}
-
 	/**
-	 * Reads the machine's latest state again: the directory (its address and
-	 * heartbeat), then a fresh link that re-reads this device's pinned key.
-	 * A directory failure leaves the link alone.
+	 * Reads the machine's latest state again: the directory (its address,
+	 * heartbeat and key), then fresh links. A link stopped because the
+	 * machine's key changed takes the key the account lists now: asking for
+	 * this is the user's consent to it. A directory failure leaves the link
+	 * alone.
 	 */
 	async reload(ref: string): Promise<void> {
-		if (ref !== LOCAL_REF) await this.refresh();
+		await this.refresh();
+		const status = this.links.get(ref)?.snapshot().status;
+		if (status?.kind === "failed" && status.reason === "key-changed") {
+			console.warn(`machines: the user accepted the new key of machine ${ref}`);
+			await this.deps.keys.forgetMachineKey(ref);
+		}
 		this.restartCarrier(ref);
 		const link = this.links.get(ref);
 		if (link === undefined) return;
@@ -177,12 +201,12 @@ export class LinkHub {
 		link.start();
 	}
 
-	/** Forgets a machine on this device (removed, or paired again). */
+	/** Forgets a machine on this device (removed from the account). */
 	async forget(ref: string): Promise<void> {
 		this.links.get(ref)?.stop();
 		this.links.delete(ref);
 		this.carriers.get(ref)?.stop();
-		await this.deps.keys.forget(ref);
+		await this.deps.keys.forgetMachineKey(ref);
 	}
 
 	/** The user is on a machines screen and the app is visible: links ping. */
@@ -201,31 +225,4 @@ export class LinkHub {
 		for (const link of this.links.values()) link.stop();
 		for (const carrier of this.carriers.values()) carrier.stop();
 	}
-}
-
-/** A name for this device on the machine's device list, such as "Chrome on Windows". */
-export function deviceName(userAgent: string): string {
-	const browser = /Edg\//.test(userAgent)
-		? "Edge"
-		: /Firefox\//.test(userAgent)
-			? "Firefox"
-			: /Chrome\//.test(userAgent)
-				? "Chrome"
-				: /Safari\//.test(userAgent)
-					? "Safari"
-					: "Browser";
-	const os = /iPhone/.test(userAgent)
-		? "iPhone"
-		: /iPad/.test(userAgent)
-			? "iPad"
-			: /Android/.test(userAgent)
-				? "Android"
-				: /Windows/.test(userAgent)
-					? "Windows"
-					: /Mac OS X|Macintosh/.test(userAgent)
-						? "macOS"
-						: /Linux/.test(userAgent)
-							? "Linux"
-							: "";
-	return os === "" ? browser : `${browser} · ${os}`;
 }

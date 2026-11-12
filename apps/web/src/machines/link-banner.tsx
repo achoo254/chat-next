@@ -1,12 +1,32 @@
 // The state of a machine's link above a page, when it is not simply open:
 // connecting, offline and retrying (attempt N), or a lasting failure with
-// what to do about it (pair this device, update).
+// what to do about it (wait for the machine, refresh, sign in again, update).
+import { brand } from "../brand.ts";
 import { Icon } from "../components/screen-icons.tsx";
-import { Link, paths } from "../router.tsx";
-import { LOCAL_REF } from "./link/link-hub.ts";
-import type { LinkStatus } from "./link/machine-link.ts";
+import type { MachinesCopy } from "./copy-vi.ts";
+import type { LinkFailure, LinkStatus } from "./link/machine-link.ts";
 import { RefreshMachine } from "./refresh-machine.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+
+/** What a lasting failure means and what to do about it, in a sentence. */
+export function failureText(t: MachinesCopy, reason: LinkFailure): string {
+	switch (reason) {
+		case "refused":
+			return t.link.refused;
+		case "revoked":
+			return t.link.revoked;
+		case "key-changed":
+			return t.link.keyChanged;
+		case "version":
+			return t.link.version;
+		case "session-revoked":
+			return t.link.sessionRevoked;
+		case "too-many-devices":
+			return t.link.tooManyDevices;
+		case "machine-unsynced":
+			return t.link.machineUnsynced(brand.appName);
+	}
+}
 
 export function LinkBanner({ machine, name, status }: { machine: string; name: string; status: LinkStatus }) {
 	const t = useMachinesCopy();
@@ -36,30 +56,13 @@ export function LinkBanner({ machine, name, status }: { machine: string; name: s
 					<RefreshMachine machine={machine} />
 				</div>
 			);
-		case "failed": {
-			const text =
-				status.reason === "unpaired"
-					? t.link.unpaired
-					: status.reason === "refused"
-						? t.link.refused
-						: status.reason === "revoked"
-							? t.link.revoked
-							: status.reason === "key-changed"
-								? t.link.keyChanged
-								: t.link.version;
-			const pairable = status.reason !== "version" && status.reason !== "revoked";
+		case "failed":
 			return (
 				<div className="mx-strip error" role="alert">
 					<Icon name="alert" small />
-					<span className="grow">{text}</span>
+					<span className="grow">{failureText(t, status.reason)}</span>
 					<RefreshMachine machine={machine} />
-					{pairable && (
-						<Link to={machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine)} className="btn btn-sm">
-							{t.link.pair}
-						</Link>
-					)}
 				</div>
 			);
-		}
 	}
 }

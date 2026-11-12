@@ -5,16 +5,12 @@ thiết bị khác, mã hoá đầu-cuối), Localman gọi `localhost` của m�
 [ADR 0013](../../docs/adr/0013-remote-machines.md), [ADR 0014](../../docs/adr/0014-tunelo-machine-agent.md).
 
 Chạy trên macOS (arm64, x64), Windows x64 và Linux x64, arm64 (glibc, có systemd; từ 2.2.0). Một file chạy do Bun build, ký minisign, phát hành ở GitHub Releases của repo này
-(tag `tunelo-v<version>`). Không có gói npm. Từ 2.0.3, bản macOS còn được ký Developer ID (team `AM5C55N339`, identifier
+(tag `tunelo-v<version>`) dưới dạng file nén mỗi nền tảng ([`scripts/package-release.sh`](scripts/package-release.sh)). Không có gói npm. Từ 2.0.3, bản macOS còn được ký Developer ID (team `AM5C55N339`, identifier
 `com.hoandat.tunelo`, hardened runtime) và notarize trong `agent-release.yml`.
 
 ## Cài
 
-AI Agent › Máy › Thêm máy trong Chat hiện lệnh một dòng kèm khoá của thiết bị. Lệnh đó cài `tunelo`, hỏi mã ghép (dán vào, chữ
-không hiện), rồi chạy `tunelo install`: đăng nhập trên trình duyệt, máy tự vào danh sách, không cần mã cài. Trang nhận ra Linux từ
-trình duyệt và đưa lệnh Linux kèm ghi chú Linux (không có bước Full Disk Access).
-
-Chỉ cài file chạy và đăng nhập (cũng là cách cập nhật khi `tunelo update` không dùng được):
+AI Agent › Máy › Thêm máy trong Chat hiện một lệnh cố định, không tham số, theo hệ điều hành của trình duyệt (bốn tab):
 
 ```sh
 # macOS và Linux (x86_64/amd64, aarch64/arm64)
@@ -22,19 +18,32 @@ curl -fsSL https://chat.hoandat.com/agent/install.sh | sh
 ```
 
 ```powershell
-# Windows (PowerShell)
-& ([scriptblock]::Create((irm https://chat.hoandat.com/agent/install.ps1)))
+# Windows PowerShell
+irm https://chat.hoandat.com/agent/install.ps1 | iex
 ```
 
-Script tải đúng phiên bản đã ghim, kiểm SHA-256, và kiểm chữ ký nếu máy có `minisign`. File chạy nằm ở `~/.local/bin/tunelo`
-(macOS, Linux) hoặc `%LOCALAPPDATA%\tunelo\tunelo.exe` (Windows). Thư mục cấu hình là `~/.config/tunelo` (hoặc
-`$XDG_CONFIG_HOME/tunelo` khi có biến này) hoặc `%APPDATA%\tunelo` (biến `TUNELO_HOME` đổi được). Trên Linux script ghi PATH vào
-`~/.profile`, `~/.bashrc` (nếu có) và `~/.zshrc` (nếu shell là zsh); Alpine và bản musl khác bị từ chối.
+```bat
+:: Windows cmd
+powershell -NoProfile -c "irm https://chat.hoandat.com/agent/install.ps1 | iex"
+```
 
-Từ bản có terminal, script cài thêm `tunelo-term-host` (tiến trình Rust giữ terminal, [đặc tả](../../docs/terminal-wire.md)) cạnh
-`tunelo`, ghim SHA-256 riêng cho từng nền tảng; cả hai tệp kiểm xong mới cài tệp nào. Máy đã có bản do `tunelo update` đặt trong
-`<thư mục cấu hình>/term-host/bin/current/` thì bản mới được đặt sẵn ở `term-host/bin/next/`, tunelo chuyển sang khi không còn
-terminal nào mở. Giấy phép các thư viện của nó: [`docs/term-host-licenses.md`](../../docs/term-host-licenses.md).
+Script tải file nén của bản đã ghim (`tunelo-<os>-<arch>.tar.gz`, Windows `tunelo-windows-x64.zip`), kiểm SHA-256, và kiểm chữ
+ký minisign của file nén và của từng file trong đó nếu máy có `minisign`. Rồi nó cài `tunelo` và `tunelo-term-host` (tiến trình
+Rust giữ terminal, [đặc tả](../../docs/terminal-wire.md)) và chạy `tunelo login`: trình duyệt mở trang đồng ý của auth-next, bấm
+"Đồng ý" là máy đăng nhập, chạy nền, tự vào danh sách máy (và liên kết Localman), trang "Thêm máy" tự chuyển "đã kết nối". Trang
+đồng ý chỉ nhận mã điền sẵn khi trình duyệt cùng IP với máy; cài qua SSH hay máy không có trình duyệt thì mở link in trong terminal
+ở thiết bị khác và gõ mã đang hiện. Thông báo theo ngôn ngữ của hệ điều hành. Chạy lại lệnh cài là cách cập nhật khi `tunelo update`
+không dùng được.
+
+File chạy nằm ở `~/.local/bin/tunelo` (macOS, Linux) hoặc `%LOCALAPPDATA%\tunelo\tunelo.exe` (Windows). Thư mục cấu hình là
+`~/.config/tunelo` trên macOS và Linux (hoặc `$XDG_CONFIG_HOME/tunelo` khi có biến này), `%APPDATA%\tunelo` trên Windows; biến
+`TUNELO_HOME` đổi được ([`config.ts`](src/config.ts)). Script ghi PATH vào `~/.zprofile` (và `~/.bash_profile` nếu có) trên macOS,
+vào `~/.profile`, `~/.bashrc` (nếu có) và `~/.zshrc` (nếu shell là zsh) trên Linux; Windows thêm `%LOCALAPPDATA%\tunelo` vào PATH
+của người dùng. Alpine và bản musl khác bị từ chối.
+
+Máy đã có bản term-host do `tunelo update` đặt trong `<thư mục cấu hình>/term-host/bin/current/` thì bản mới được đặt sẵn ở
+`term-host/bin/next/`, tunelo chuyển sang khi không còn terminal nào mở. Giấy phép các thư viện của nó:
+[`docs/term-host-licenses.md`](../../docs/term-host-licenses.md).
 
 Windows, tuỳ chọn: terminal nối thẳng cần UDP vào. Không có quy tắc tường lửa thì kết nối thử chiều ra trước, không được thì đi qua
 relay (vẫn dùng được, chậm hơn); Windows có thể hiện hộp thoại tường lửa lần đầu. Muốn mở sẵn, chạy một lần trong PowerShell
@@ -50,40 +59,47 @@ foreach ($p in "$env:LOCALAPPDATA\tunelo\tunelo-term-host.exe", "$env:APPDATA\tu
 Binary Windows chưa ký mã (Authenticode), nên SmartScreen hay Defender có thể báo "nhà phát hành không xác định"; ký mã Windows
 nằm ngoài phạm vi hiện tại.
 
-## Lệnh chính
+## Lệnh
+
+`tunelo --help` chỉ hiện hai nhóm ([`src/cli-help.ts`](src/cli-help.ts)); cờ và mô tả của từng lệnh: `tunelo <lệnh> --help`.
 
 | Lệnh | Việc |
 |---|---|
-| `tunelo login` / `logout` / `whoami` | Một lần đăng nhập cho tunnel, Chat, Localman; `whoami` hiện trạng thái từng app |
-| `tunelo start` / `stop` | Bật, tắt bản chạy nền (tự chạy lúc đăng nhập máy) |
-| `tunelo status` | Tunnel đang mở, rồi trạng thái máy, claude, phiên; thoát 1 khi dịch vụ không chạy |
-| `tunelo logs -f` | Xem log liên tục (`agent.log` trong thư mục cấu hình) |
-| `tunelo update` (`--check`, `--rollback`) | Cài bản ký mới nhất rồi khởi động lại; hiện phần trăm khi tải. Từ 2.3.0 cũng làm được từ trang máy trong Chat. Tải cả `tunelo-term-host`, kiểm chữ ký minisign và SHA-256 của cả hai tệp rồi mới thay. `--rollback` đưa về bản mà lần `update` trước đã thay (kiểm lại chữ ký trước), terminal đang mở giữ nguyên |
-| `tunelo devices list` / `revoke <khoá>` | Thiết bị đã ghép |
-| `tunelo authenticator` [`--replace`] | Tạo mã Authenticator ngay trên máy và hiện một lần (QR + khoá base32), để ghép thiết bị đầu tiên bằng mã 6 số mà không cần cài lại; máy đã có mã thì cần `--replace` |
-| `tunelo claude profiles list` / `add` / `select <profile>` / `remove <profile>` | Các tài khoản Claude của máy; `add` đăng nhập ngay trong terminal; `select` đổi profile cho cả máy: phiên rảnh mở lại ngay dưới profile mới (cùng hội thoại), phiên đang chạy đổi sau lượt hiện tại |
-| `tunelo http <cổng>` / `tcp <cổng>` | Mở tunnel; inspector request ở `127.0.0.1:4040`, `tunelo watch` xem request |
+| `tunelo login` | Đăng nhập một lần cho tunnel, Chat và Localman, cài dịch vụ nền, đợi máy vào AI Agent rồi báo đã kết nối. Chạy lại khi đã kết nối thì chỉ kiểm |
+| `tunelo logout` [`--force`] | Gỡ máy khỏi tài khoản (Chat, liên kết Localman), dừng dịch vụ nền, xoá đăng nhập; giữ binary và khoá máy, nên `login` lại giữ mục máy cũ. Mất mạng thì không đổi gì, trừ khi có `--force` |
+| `tunelo status` [`--json`] | Phiên bản, tài khoản, trạng thái tunnel/Chat/Localman, dịch vụ nền, máy trong AI Agent, số thiết bị tin cậy, tunnel đang chạy; thoát 1 khi dịch vụ không chạy |
+| `tunelo update` (`--check`, `--rollback`) | Cài bản ký mới nhất rồi khởi động lại (cũng làm được từ trang máy trong Chat). Tải file nén, kiểm SHA-256 và chữ ký minisign của file nén và của từng file trong đó rồi mới thay. `--rollback` đưa về bản mà lần `update` trước đã thay (kiểm lại chữ ký), terminal đang mở giữ nguyên |
+| `tunelo uninstall` | `logout` (mất mạng thì cảnh báo và đi tiếp), rồi gỡ dịch vụ nền, thư mục cấu hình, mục Keychain, dòng PATH và binary (mục "Gỡ") |
+| `tunelo logs` [`-n <số dòng>`] [`-f`] | Log của dịch vụ (`agent.log` trong thư mục cấu hình) |
+| `tunelo http <cổng>…` / `tcp <cổng>` | Mở tunnel; inspector request ở `127.0.0.1:4040` |
 | `tunelo kill <pid\|subdomain\|all>` | Đóng tunnel |
-| `tunelo link <mã>` / `links list` / `links revoke <id>` | Liên kết máy với Localman |
-| `tunelo config local-forward [on\|off\|block\|unblock] [cổng…]` | Cho Localman gửi request tới `localhost` của máy (mặc định bật) |
-| `tunelo config mcp-local-writes [on\|off]` | Cho client MCP ngoài phiên của tunelo dùng tool ghi (mặc định tắt) |
-| `tunelo mcp` | Server MCP (stdio): tool tunnel, Chat, Localman |
-| `tunelo trust [thư mục]` / `untrust` / `trusted` | Thư mục được nạp cấu hình `.claude` của dự án; thiết bị đã ghép cũng tin được từ web (có ghi nhật ký), trừ thư mục nhạy cảm |
-| `tunelo secrets list` / `remove <id>` | Bí mật đăng nhập đã lưu cho Claude (trang, tên, lần dùng cuối; không bao giờ in giá trị) |
-| `tunelo browser status` / `close` / `clear` (cũng xoá được từ trang máy trên web) | Trình duyệt riêng của tunelo cho Claude: trình duyệt nào, hồ sơ ở đâu, có đang chạy; đóng (giữ đăng nhập); `clear` xoá hồ sơ (đăng xuất mọi trang, ghi nhật ký) |
-| `tunelo audit` | Nhật ký đồng ý |
-| `tunelo run` | Chạy trong terminal để gỡ lỗi; từ chối khi đã có bản chạy nền |
+| `tunelo watch [đích]` | Xem request của tunnel |
+| `tunelo config` (`--show`, `-s`, `-k`) | Cấu hình mặc định của tunnel |
 
-`tunelo config mcp-local-writes on` chỉ chạy trong terminal thật và hỏi xác nhận (gõ `yes`). Chạy từ client AI, script hay pipe thì
-bị từ chối. `off` luôn chạy được.
+Lệnh ẩn khỏi help nhưng vẫn chạy:
+
+- Của dịch vụ: `start`, `stop` (bật, tắt bản chạy nền; nó tự chạy lúc đăng nhập máy), `run` (chạy trong terminal để gỡ lỗi; từ chối
+  khi đã có bản chạy nền), `mcp` (server MCP stdio, xem ADR 0013), `disk-access`.
+- Chỉ người ngồi trước máy được đổi, cố ý không có trên web để AI không tự bật: `trust [thư mục]` / `untrust` / `trusted` (thư mục
+  được nạp cấu hình `.claude` của dự án; thư mục thường cũng bật được từ web, có ghi nhật ký), `config local-forward
+  [on|off|block|unblock] [cổng…]` (cho Localman gửi request tới `localhost` của máy, mặc định bật), `config mcp-local-writes
+  [on|off]` (cho client MCP ngoài phiên của tunelo dùng tool ghi, mặc định tắt; `on` chỉ chạy trong terminal thật và hỏi xác nhận
+  gõ `yes`, chạy từ client AI, script hay pipe thì bị từ chối; `off` luôn chạy được). Claude chạy các lệnh này luôn bị hỏi như lệnh
+  nhạy cảm ([`src/safety/sensitive-paths.ts`](src/safety/sensitive-paths.ts)).
+
+Thiết bị (trình duyệt, app điện thoại) không ghép với máy: mọi thiết bị đã đăng nhập cùng tài khoản tự đăng ký khoá khi vào khu Máy,
+và máy tin các khoá Chat liệt kê. Xem, thu hồi thiết bị: "Thiết bị của tài khoản" ở trang Quản lý máy trong Chat. Mô hình tin cậy,
+đánh đổi và biện pháp bù: [ADR 0013](../../docs/adr/0013-remote-machines.md), mục "Tài khoản là gốc tin cậy". Nhật ký đồng ý, bí
+mật đã lưu, trình duyệt của máy, profile Claude và số liệu sử dụng xem và quản lý trên trang máy trong Chat.
 
 ## Cập nhật
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
 
-Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thêm máy") mà Chat thấy không có tunnel, ô mã ghép bị khoá: `tunelo` 2.0.13
-trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
-nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
+Có gì ở 3.0.0: tài khoản là gốc tin cậy (không còn ghép thiết bị, mã Authenticator hay khoá thiết bị trong lệnh cài), lệnh cài một
+dòng không tham số, `tunelo login` làm hết việc đăng ký máy, cây lệnh gọn (`logout` gỡ máy khỏi tài khoản, `uninstall` gỡ hẳn),
+release chỉ còn file nén. Giao thức lên 3 và Chat chỉ nhận `tunelo` 3.0.0 trở lên: máy 2.x không tự cập nhật lên được, chạy lại lệnh
+cài trên trang Máy của Chat.
 
 Có gì ở 2.7.1: gửi ảnh vào terminal của phiên. Thiết bị tải ảnh lên qua kênh mã hoá như file đính kèm của tin nhắn, rồi
 `AttachmentSave` lưu nó vào `.tunelo-attachments/<ngày>/` trong thư mục của phiên (cùng kiểm thư mục nhạy cảm, đường dẫn và
@@ -114,32 +130,7 @@ Có gì ở 2.6.0:
 - **Đường dẫn cho quyền Full Disk Access**: khi còn thiếu quyền, máy gửi kèm đường dẫn tệp chạy của tunelo
   (`MachineInfo.agent_binary`) để banner trên web chỉ đúng tệp cần kéo vào danh sách.
 
-`/clear` trong Chat (tunelo 2.0.15 trở lên) mở một phiên mới, trống, cùng thư mục và cài đặt, rồi chuyển sang đó; phiên cũ giữ lại làm
-lịch sử. Máy chạy bản cũ vẫn gửi `/clear` cho Claude như trước, nên lịch sử cũ còn hiện trên màn hình: chạy `tunelo update`.
-
-Script cài ở trên thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
-
-## Ghép thêm thiết bị bằng mã Authenticator (2.1.0)
-
-Thiết bị mới (điện thoại, laptop khác) ghép với máy bằng mã 6 số của app Authenticator, không cần chạy lệnh nào trên máy và không cần
-cầm thiết bị đã ghép lúc ghép:
-
-1. Bật một lần từ thiết bị đã ghép (trình duyệt đã cài máy bằng lệnh "Thêm máy"): trong AI Agent, mở máy và bật ghép bằng
-   Authenticator. Trình duyệt tạo bí mật, hiện mã QR một lần để quét vào app Authenticator; nhập đúng mã đầu tiên thì bí mật mới
-   được gửi tới máy qua kênh mã hoá đầu cuối. Tạo lại bí mật cũng bằng đường đó (bí mật cũ hết hiệu lực).
-2. Trên thiết bị mới: chọn máy, nhập mã 6 số đang hiện trong app Authenticator.
-
-Bí mật nằm trong `config.json` của máy (quyền 0600), không bao giờ ghi ra log, nhật ký hoạt động hay gửi lên máy chủ Chat. Mã là
-mật khẩu của bước ghép mã hoá (CPace), nên relay không thử mã offline được. Máy chấp nhận mã của bước 30 giây trước, hiện tại và sau.
-Sai 5 lần (cộng chung mọi thiết bị) thì máy khoá ghép 15 phút; ghép đúng thì xoá đếm. Máy chưa bật thì thiết bị mới được báo cần bật
-từ thiết bị đã ghép. Nhật ký hoạt động ghi thiết bị ghép bằng Authenticator hay bằng lệnh cài, và lần đặt, tạo lại bí mật (không có
-giá trị bí mật). Mỗi lần ghép bằng mã, mọi thiết bị của tài khoản nhận thông báo "Một thiết bị mới vừa ghép với <máy>" (chỉ có tên
-máy, không có tên hay khoá thiết bị); không thấy thiết bị lạ trong "Thiết bị đã ghép" thì thu hồi nó và tạo lại mã Authenticator.
-
-Mất hết thiết bị đã ghép và cả app Authenticator: mở "Thêm máy" trong Chat trên một trình duyệt và chạy lại lệnh đó trên máy.
-`tunelo install --trust` chạy được trên máy đã cài: dừng bản chạy nền, tin trình duyệt mới, cài lại dịch vụ. Máy hiện thành một mục
-mới trong AI Agent (xoá mục cũ); thiết bị đã ghép và bí mật cũ vẫn còn, nên từ trình duyệt mới hãy thu hồi thiết bị bị mất và tạo
-lại mã Authenticator. Từ 2.1.0 máy chủ Chat chỉ nhận tunelo 2.1.0 trở lên (giao thức 2); bản cũ được báo chạy `tunelo update`.
+Script cài thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
 
 ## Phiên Claude Code hai chiều giữa Chat và máy
 
@@ -168,7 +159,7 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
 
 Đọc ít: danh sách chỉ đọc đầu file (thư mục, câu hỏi đầu) và cuối file (tiêu đề), giữ theo kích thước và giờ sửa; số tin
 đếm một lần cho các phiên đang hiện (tối đa 256 MB mỗi lần hỏi) rồi chỉ đếm phần thêm. Mở một phiên dài chỉ đọc 8 MB cuối, bắt
-đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị đã ghép qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
+đầu từ một tin người dùng. Nội dung bản ghi chỉ đi tới thiết bị của tài khoản qua kênh mã hoá đầu cuối; tunelo không đọc token Claude.
 
 Phiên đang xem trên một thiết bị theo sát lượt gõ ở terminal (tunelo 2.2.1 trở lên): máy đọc lại nhật ký mỗi 1,5 giây và gửi phần mới, thay vì chỉ
 khi mở phiên hay gửi tin. Máy chạy bản cũ chỉ thấy lượt mới khi mở lại phiên: chạy `tunelo update`.
@@ -194,7 +185,7 @@ chiếu** (`secret://…`), không bao giờ nhận giá trị.
   không có trong nội dung lệnh, argv hay transcript.
 - Che: hook PostToolUse thay output mọi tool trước khi Claude đọc (giá trị, base64, base64url, URL-encode, JSON-escape thành
   `[hidden]`; giá trị dưới 3 ký tự không che), sự kiện gửi web/journal, kết quả tool MCP, log đều qua cùng bộ che.
-- Trang cài đặt máy có "Bí mật đã lưu" (trang, tên, lần dùng cuối, nút xoá); `tunelo secrets list|remove`. Nhật ký đồng ý ghi
+- Trang cài đặt máy có "Bí mật đã lưu" (trang, tên, lần dùng cuối, nút xoá). Nhật ký đồng ý ghi
   `secret_add` / `secret_use` (fill hoặc env) / `secret_remove`, không bao giờ ghi giá trị. Máy cũ hơn 2.0.8: web ẩn cả hai.
 - Giới hạn: bảo vệ khỏi lộ tình cờ và khỏi lưu vào lịch sử, không chống được một phiên cố ý xấu (Claude điều khiển trình duyệt
   có thể đọc lại ô đã điền, lệnh được duyệt có thể gửi biến đi nơi khác). Vì vậy lệnh dùng bí mật luôn hỏi.
@@ -226,7 +217,7 @@ Phiên tunelo mở có thêm 3 tool MCP. Không tool nào trả hình của tran
   `mediation: "conditional"`). Trang đòi passkey khi không bật passkey ảo: web hiện "Trang cần passkey" (mở điều khiển từ xa, chọn
   cách khác, hoặc chờ ở máy), và Claude nhận thông báo kèm kết quả tool kế tiếp (hook PostToolUse). Hộp thoại passkey của hệ điều
   hành vẫn cần người ở máy.
-- `tunelo browser clear` xoá hồ sơ (đăng xuất mọi trang); Claude chạy lệnh `tunelo browser …` luôn bị hỏi như lệnh nhạy cảm.
+- Nút "Xoá hồ sơ trình duyệt" trên trang máy xoá hồ sơ (đăng xuất mọi trang).
 
 ## Màn hình của máy qua Chia sẻ màn hình của macOS (2.0.13)
 
@@ -244,7 +235,7 @@ Chỉ có trên macOS. Cho các hộp thoại của hệ điều hành mà trìn
   dưới dạng byte mã hoá, tunelo không đọc, không lưu, không log.
 - Web dùng noVNC 1.7.0 (MPL-2.0, mã nguồn <https://github.com/novnc/noVNC>), nạp lười; một file được vá, xem
   [`patches/README.md`](../../patches/README.md).
-- Trang máy có nút "Xoá hồ sơ trình duyệt" (cùng việc với `tunelo browser clear`, có xác nhận, ghi `browser_clear`).
+- Trang máy có nút "Xoá hồ sơ trình duyệt" (có xác nhận, ghi `browser_clear`).
 - `request_takeover(…, os_dialog: true)`: Claude báo hộp thoại hệ điều hành đang chờ; thẻ trên web đưa "Điều khiển toàn màn hình"
   lên đầu.
 
@@ -375,7 +366,7 @@ Phiên làm trong Desktop, Documents, Downloads hoặc iCloud Drive cần tunelo
 hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy cấp được: kéo `~/.local/bin/tunelo` vào danh sách ở Cài đặt hệ thống
 › Quyền riêng tư & Bảo mật › Truy cập toàn bộ ổ đĩa, rồi bật công tắc.
 
-- Script cài và `tunelo install` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` và log của dịch vụ in các
+- Script cài và `tunelo login` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` và log của dịch vụ in các
   bước khi còn thiếu (không mở gì, nên cũng không nói là đã mở).
 - Dịch vụ dò quyền mà không gây hộp thoại, báo cho thiết bị (`MachineInfo.needs_full_disk_access`; web hiện banner có nút mở lại
   trang cài đặt trên máy). Khi còn thiếu, nó kiểm lại vài giây một lần và báo ngay khi được cấp, không cần khởi động lại.
@@ -390,35 +381,43 @@ Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ
 - Bản chạy nền là **user unit** `~/.config/systemd/user/tunelo.service` (chạy `tunelo run`, `Restart=always`, `RestartSec=10`,
   luôn đặt `TUNELO_HOME`, PATH là `%h/.local/bin:/usr/local/bin:/usr/bin:/bin` cộng các thư mục PATH lúc cài, log ghi tiếp vào
   `agent.log`). Không cần root, tunelo không bao giờ tự gọi `sudo`. `tunelo update` thay file chạy rồi để `Restart=always` chạy lại.
-- `tunelo install` kiểm máy chạy được dịch vụ **trước khi** đăng nhập. Không có systemd (container, WSL không bật systemd) hoặc
-  không tới được phiên systemd của người dùng (shell SSH/`su`/`sudo` thiếu `XDG_RUNTIME_DIR`) thì báo lỗi kèm cách xử lý.
+- `tunelo login` kiểm máy chạy được dịch vụ **trước khi** đăng nhập. Không có systemd (container, WSL không bật systemd) hoặc
+  không tới được phiên systemd của người dùng (shell SSH/`su`/`sudo` thiếu `XDG_RUNTIME_DIR`) thì báo kèm cách xử lý, rồi chỉ đăng
+  nhập cho tunnel (máy không vào AI Agent).
 - User unit chỉ chạy khi người dùng đang đăng nhập, trừ khi bật **linger**. tunelo thử `loginctl enable-linger` không cần mật khẩu;
   không được thì vẫn cài và chạy, rồi in lệnh để chủ máy chạy một lần: `sudo loginctl enable-linger <user>`.
-- `tunelo stop` / `start` / `uninstall` dừng, bật, gỡ unit thật (máy chưa cài thì `stop`/`start` báo lỗi rõ).
+- `tunelo stop` / `start` (lệnh ẩn) / `uninstall` dừng, bật, gỡ unit thật (máy chưa cài thì `stop`/`start` báo lỗi rõ).
 - Kiểm: `tunelo status`, `systemctl --user status tunelo`, `journalctl --user -u tunelo` (sự kiện của systemd), log của tunelo ở
   `agent.log` (`tunelo logs -f`).
 - `claude` phải cài cho **chính người dùng chạy tunelo** (thường ở `~/.local/bin`, đã có trong PATH của unit). `claude` cài riêng cho
   root (link `/usr/local/bin/claude` trỏ vào `/root/.local`) thì người dùng khác không chạy được, tunelo không thấy provider.
 - Kho khoá: Linux không có Keychain/DPAPI, nên khoá máy và khoá niêm phong là tệp 0600 trong thư mục cấu hình (không dùng
-  libsecret/secret-service), như bí mật Authenticator trong `config.json`. Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy,
-  mở được token và bí mật đã lưu, và lấy được bí mật Authenticator của máy.
+  libsecret/secret-service). Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy, mở được token và bí mật đã lưu.
 - Khác macOS: không có Chia sẻ màn hình của máy, không có Full Disk Access (trạng thái dịch vụ ghi `fullDiskAccess: not-applicable`).
   Trình duyệt của máy tìm Chrome/Chromium như hệ khác. Thùng rác dùng `gio trash`. Cổng đang nghe (cho chuyển tiếp `localhost` của
   Localman) đọc bằng `lsof`, máy thiếu `lsof` thì dùng `ss -Hltnp`.
 
 ## Gỡ
 
-1. Xoá máy ở AI Agent › Máy trong Chat (thu hồi máy và thiết bị đã ghép).
-2. `tunelo logout`: thu hồi đăng nhập của máy trên IdP.
-3. `tunelo uninstall`: dừng dịch vụ và bỏ khởi động lúc đăng nhập (Linux: xoá cả user unit).
-4. Xoá file chạy (`~/.local/bin/tunelo` hoặc `%LOCALAPPDATA%\tunelo`) và thư mục cấu hình (`~/.config/tunelo` hoặc
-   `%APPDATA%\tunelo`; trên Windows khoá DPAPI, trên Linux tệp khoá nằm trong đó).
-5. macOS: xoá khoá Keychain:
-   `security delete-generic-password -s com.hoandat.tunelo -a machine-key` và
-   `security delete-generic-password -s com.hoandat.tunelo -a session-key`.
+- Chỉ gỡ máy khỏi tài khoản: `tunelo logout` (hoặc xoá máy ở trang Quản lý máy trong Chat). Máy biến khỏi AI Agent, grant
+  `tunelo-agent` của máy ở IdP bị thu hồi; `tunelo login` lại (chủ bấm Đồng ý) là quay về, giữ mục máy cũ.
+- Gỡ hẳn: `tunelo uninstall` ([`src/commands/uninstall.ts`](src/commands/uninstall.ts)). Nó chạy `logout` (mất mạng thì cảnh báo và
+  đi tiếp; khi đó xoá máy trên web), rồi xoá:
+  - dịch vụ nền và tiến trình terminal cùng unit của chúng: macOS LaunchAgent `com.hoandat.tunelo` và
+    `com.hoandat.tunelo.term-host` (trong `~/Library/LaunchAgents/`); Linux user unit `~/.config/systemd/user/tunelo.service` và `tunelo-term-host.service`;
+    Windows giá trị `tunelo` và `tunelo-term-host` dưới `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` và các tệp `run-agent.*`;
+  - mục Keychain `com.hoandat.tunelo` (`machine-key`, `session-key`) trên macOS; trên Windows (DPAPI) và Linux khoá là tệp trong thư
+    mục cấu hình;
+  - thư mục cấu hình đang dùng (`~/.config/tunelo`, hoặc `$XDG_CONFIG_HOME/tunelo`, hoặc `TUNELO_HOME`); trên macOS thêm
+    `~/Library/Application Support/tunelo` nếu có;
+  - macOS, Linux: `~/.local/bin/tunelo`, `~/.local/bin/tunelo-term-host` và các bản `*.old*` cạnh chúng; dòng
+    `export PATH="$HOME/.local/bin:$PATH"` trong `.zprofile`, `.bash_profile`, `.profile`, `.bashrc`, `.zshrc` chỉ khi
+    `~/.local/bin` đã trống (thư mục dùng chung với công cụ khác);
+  - Windows: bỏ `%LOCALAPPDATA%\tunelo` khỏi PATH của người dùng, rồi một tiến trình tách rời xoá `%APPDATA%\tunelo` và
+    `%LOCALAPPDATA%\tunelo` vài giây sau khi `tunelo` thoát (Windows không xoá được tệp đang chạy).
 
-Profile Claude nằm trong thư mục cấu hình (`claude-profiles/`). Xoá thư mục đó không đụng `~/.claude` của máy, nhưng đăng xuất từng
-profile trước (`tunelo claude profiles remove <profile>`) để claude thu hồi phiên đăng nhập của nó.
+Profile Claude nằm trong thư mục cấu hình (`claude-profiles/`), nên `uninstall` xoá luôn chúng mà không đăng xuất từng profile;
+xoá profile trên trang máy trước để claude thu hồi phiên đăng nhập của nó. `~/.claude` của máy không bị đụng.
 
 ## Phát triển
 

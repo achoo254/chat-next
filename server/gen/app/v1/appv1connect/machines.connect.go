@@ -35,9 +35,6 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// MachinesServiceCreateInstallCodeProcedure is the fully-qualified name of the MachinesService's
-	// CreateInstallCode RPC.
-	MachinesServiceCreateInstallCodeProcedure = "/app.v1.MachinesService/CreateInstallCode"
 	// MachinesServiceListMachinesProcedure is the fully-qualified name of the MachinesService's
 	// ListMachines RPC.
 	MachinesServiceListMachinesProcedure = "/app.v1.MachinesService/ListMachines"
@@ -47,30 +44,37 @@ const (
 	// MachinesServiceRevokeMachineProcedure is the fully-qualified name of the MachinesService's
 	// RevokeMachine RPC.
 	MachinesServiceRevokeMachineProcedure = "/app.v1.MachinesService/RevokeMachine"
+	// MachinesServiceGetDeviceKeyChallengeProcedure is the fully-qualified name of the
+	// MachinesService's GetDeviceKeyChallenge RPC.
+	MachinesServiceGetDeviceKeyChallengeProcedure = "/app.v1.MachinesService/GetDeviceKeyChallenge"
+	// MachinesServiceRegisterDeviceProcedure is the fully-qualified name of the MachinesService's
+	// RegisterDevice RPC.
+	MachinesServiceRegisterDeviceProcedure = "/app.v1.MachinesService/RegisterDevice"
+	// MachinesServiceListDevicesProcedure is the fully-qualified name of the MachinesService's
+	// ListDevices RPC.
+	MachinesServiceListDevicesProcedure = "/app.v1.MachinesService/ListDevices"
 	// MachinesServiceRevokeDeviceProcedure is the fully-qualified name of the MachinesService's
 	// RevokeDevice RPC.
 	MachinesServiceRevokeDeviceProcedure = "/app.v1.MachinesService/RevokeDevice"
+	// MachineAgentServiceGetMachineKeyChallengeProcedure is the fully-qualified name of the
+	// MachineAgentService's GetMachineKeyChallenge RPC.
+	MachineAgentServiceGetMachineKeyChallengeProcedure = "/app.v1.MachineAgentService/GetMachineKeyChallenge"
 	// MachineAgentServiceRegisterMachineProcedure is the fully-qualified name of the
 	// MachineAgentService's RegisterMachine RPC.
 	MachineAgentServiceRegisterMachineProcedure = "/app.v1.MachineAgentService/RegisterMachine"
-	// MachineAgentServiceClaimMachineProcedure is the fully-qualified name of the MachineAgentService's
-	// ClaimMachine RPC.
-	MachineAgentServiceClaimMachineProcedure = "/app.v1.MachineAgentService/ClaimMachine"
 	// MachineAgentServiceHeartbeatProcedure is the fully-qualified name of the MachineAgentService's
 	// Heartbeat RPC.
 	MachineAgentServiceHeartbeatProcedure = "/app.v1.MachineAgentService/Heartbeat"
 	// MachineAgentServiceNotifyNeedsInputProcedure is the fully-qualified name of the
 	// MachineAgentService's NotifyNeedsInput RPC.
 	MachineAgentServiceNotifyNeedsInputProcedure = "/app.v1.MachineAgentService/NotifyNeedsInput"
+	// MachineAgentServiceUnregisterMachineProcedure is the fully-qualified name of the
+	// MachineAgentService's UnregisterMachine RPC.
+	MachineAgentServiceUnregisterMachineProcedure = "/app.v1.MachineAgentService/UnregisterMachine"
 )
 
 // MachinesServiceClient is a client for the app.v1.MachinesService service.
 type MachinesServiceClient interface {
-	// Retired: machines now join with the owner's account (tunelo login), so
-	// there are no install codes any more. Always fails with
-	// failed_precondition "install_codes_retired" (update tunelo, then add the
-	// machine again).
-	CreateInstallCode(context.Context, *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error)
 	// The caller's machines that are not revoked, oldest first.
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	// Renames one of the caller's machines. Fails with invalid_argument for an
@@ -78,12 +82,33 @@ type MachinesServiceClient interface {
 	// caller's (or is revoked).
 	RenameMachine(context.Context, *connect.Request[v1.RenameMachineRequest]) (*connect.Response[v1.RenameMachineResponse], error)
 	// Removes the machine from the directory: its secret stops working for
-	// NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
-	// closes its tunnel. not_found as RenameMachine.
+	// NotifyNeedsInput, its next Heartbeat answers revoked (tunelo closes its
+	// tunnel), and the IdP grant of the tunelo sign-in that registered it is
+	// revoked, so the machine only comes back after a new tunelo login.
+	// not_found as RenameMachine.
 	RevokeMachine(context.Context, *connect.Request[v1.RevokeMachineRequest]) (*connect.Response[v1.RevokeMachineResponse], error)
-	// Puts a paired device's public key on the machine's revoked list: the
-	// machine drops that device at its next Heartbeat. Succeeds when the key is
-	// already revoked; not_found as RenameMachine.
+	// A proof-of-possession challenge for RegisterDevice (see KeyChallenge).
+	GetDeviceKeyChallenge(context.Context, *connect.Request[v1.GetDeviceKeyChallengeRequest]) (*connect.Response[v1.GetDeviceKeyChallengeResponse], error)
+	// Adds this device's key to the account, bound to the caller's session.
+	// Succeeds again (nothing changes but name and platform) for a key this
+	// session already registered. The first registration of a key pushes
+	// "new device" to every push registration of the account. Fails with
+	// invalid_argument for malformed fields; permission_denied "bad_key_proof"
+	// when the proof does not check or the challenge expired (get a new one);
+	// permission_denied "device_revoked" for a key that was ever revoked
+	// (generate a new key); permission_denied "session_devices_revoked" when a
+	// key of this session was revoked; failed_precondition "device_key_in_use"
+	// when another live session registered the key; resource_exhausted
+	// "too_many_devices" at 50 live devices.
+	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
+	// The account's devices: every live one, then the most recently revoked,
+	// newest first, at most 100 in all. A key whose session ended is revoked
+	// before listing.
+	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	// Revokes a device key of the account and the chat session that
+	// registered it (that device is signed out). Machines drop the device at
+	// their next Heartbeat. Succeeds when the key is already revoked;
+	// not_found for a key the account never registered.
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
 }
 
@@ -98,12 +123,6 @@ func NewMachinesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	machinesServiceMethods := v1.File_app_v1_machines_proto.Services().ByName("MachinesService").Methods()
 	return &machinesServiceClient{
-		createInstallCode: connect.NewClient[v1.CreateInstallCodeRequest, v1.CreateInstallCodeResponse](
-			httpClient,
-			baseURL+MachinesServiceCreateInstallCodeProcedure,
-			connect.WithSchema(machinesServiceMethods.ByName("CreateInstallCode")),
-			connect.WithClientOptions(opts...),
-		),
 		listMachines: connect.NewClient[v1.ListMachinesRequest, v1.ListMachinesResponse](
 			httpClient,
 			baseURL+MachinesServiceListMachinesProcedure,
@@ -122,6 +141,24 @@ func NewMachinesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(machinesServiceMethods.ByName("RevokeMachine")),
 			connect.WithClientOptions(opts...),
 		),
+		getDeviceKeyChallenge: connect.NewClient[v1.GetDeviceKeyChallengeRequest, v1.GetDeviceKeyChallengeResponse](
+			httpClient,
+			baseURL+MachinesServiceGetDeviceKeyChallengeProcedure,
+			connect.WithSchema(machinesServiceMethods.ByName("GetDeviceKeyChallenge")),
+			connect.WithClientOptions(opts...),
+		),
+		registerDevice: connect.NewClient[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse](
+			httpClient,
+			baseURL+MachinesServiceRegisterDeviceProcedure,
+			connect.WithSchema(machinesServiceMethods.ByName("RegisterDevice")),
+			connect.WithClientOptions(opts...),
+		),
+		listDevices: connect.NewClient[v1.ListDevicesRequest, v1.ListDevicesResponse](
+			httpClient,
+			baseURL+MachinesServiceListDevicesProcedure,
+			connect.WithSchema(machinesServiceMethods.ByName("ListDevices")),
+			connect.WithClientOptions(opts...),
+		),
 		revokeDevice: connect.NewClient[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse](
 			httpClient,
 			baseURL+MachinesServiceRevokeDeviceProcedure,
@@ -133,16 +170,13 @@ func NewMachinesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // machinesServiceClient implements MachinesServiceClient.
 type machinesServiceClient struct {
-	createInstallCode *connect.Client[v1.CreateInstallCodeRequest, v1.CreateInstallCodeResponse]
-	listMachines      *connect.Client[v1.ListMachinesRequest, v1.ListMachinesResponse]
-	renameMachine     *connect.Client[v1.RenameMachineRequest, v1.RenameMachineResponse]
-	revokeMachine     *connect.Client[v1.RevokeMachineRequest, v1.RevokeMachineResponse]
-	revokeDevice      *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
-}
-
-// CreateInstallCode calls app.v1.MachinesService.CreateInstallCode.
-func (c *machinesServiceClient) CreateInstallCode(ctx context.Context, req *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error) {
-	return c.createInstallCode.CallUnary(ctx, req)
+	listMachines          *connect.Client[v1.ListMachinesRequest, v1.ListMachinesResponse]
+	renameMachine         *connect.Client[v1.RenameMachineRequest, v1.RenameMachineResponse]
+	revokeMachine         *connect.Client[v1.RevokeMachineRequest, v1.RevokeMachineResponse]
+	getDeviceKeyChallenge *connect.Client[v1.GetDeviceKeyChallengeRequest, v1.GetDeviceKeyChallengeResponse]
+	registerDevice        *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
+	listDevices           *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeDevice          *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
 }
 
 // ListMachines calls app.v1.MachinesService.ListMachines.
@@ -160,6 +194,21 @@ func (c *machinesServiceClient) RevokeMachine(ctx context.Context, req *connect.
 	return c.revokeMachine.CallUnary(ctx, req)
 }
 
+// GetDeviceKeyChallenge calls app.v1.MachinesService.GetDeviceKeyChallenge.
+func (c *machinesServiceClient) GetDeviceKeyChallenge(ctx context.Context, req *connect.Request[v1.GetDeviceKeyChallengeRequest]) (*connect.Response[v1.GetDeviceKeyChallengeResponse], error) {
+	return c.getDeviceKeyChallenge.CallUnary(ctx, req)
+}
+
+// RegisterDevice calls app.v1.MachinesService.RegisterDevice.
+func (c *machinesServiceClient) RegisterDevice(ctx context.Context, req *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
+	return c.registerDevice.CallUnary(ctx, req)
+}
+
+// ListDevices calls app.v1.MachinesService.ListDevices.
+func (c *machinesServiceClient) ListDevices(ctx context.Context, req *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
+	return c.listDevices.CallUnary(ctx, req)
+}
+
 // RevokeDevice calls app.v1.MachinesService.RevokeDevice.
 func (c *machinesServiceClient) RevokeDevice(ctx context.Context, req *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return c.revokeDevice.CallUnary(ctx, req)
@@ -167,11 +216,6 @@ func (c *machinesServiceClient) RevokeDevice(ctx context.Context, req *connect.R
 
 // MachinesServiceHandler is an implementation of the app.v1.MachinesService service.
 type MachinesServiceHandler interface {
-	// Retired: machines now join with the owner's account (tunelo login), so
-	// there are no install codes any more. Always fails with
-	// failed_precondition "install_codes_retired" (update tunelo, then add the
-	// machine again).
-	CreateInstallCode(context.Context, *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error)
 	// The caller's machines that are not revoked, oldest first.
 	ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error)
 	// Renames one of the caller's machines. Fails with invalid_argument for an
@@ -179,12 +223,33 @@ type MachinesServiceHandler interface {
 	// caller's (or is revoked).
 	RenameMachine(context.Context, *connect.Request[v1.RenameMachineRequest]) (*connect.Response[v1.RenameMachineResponse], error)
 	// Removes the machine from the directory: its secret stops working for
-	// NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
-	// closes its tunnel. not_found as RenameMachine.
+	// NotifyNeedsInput, its next Heartbeat answers revoked (tunelo closes its
+	// tunnel), and the IdP grant of the tunelo sign-in that registered it is
+	// revoked, so the machine only comes back after a new tunelo login.
+	// not_found as RenameMachine.
 	RevokeMachine(context.Context, *connect.Request[v1.RevokeMachineRequest]) (*connect.Response[v1.RevokeMachineResponse], error)
-	// Puts a paired device's public key on the machine's revoked list: the
-	// machine drops that device at its next Heartbeat. Succeeds when the key is
-	// already revoked; not_found as RenameMachine.
+	// A proof-of-possession challenge for RegisterDevice (see KeyChallenge).
+	GetDeviceKeyChallenge(context.Context, *connect.Request[v1.GetDeviceKeyChallengeRequest]) (*connect.Response[v1.GetDeviceKeyChallengeResponse], error)
+	// Adds this device's key to the account, bound to the caller's session.
+	// Succeeds again (nothing changes but name and platform) for a key this
+	// session already registered. The first registration of a key pushes
+	// "new device" to every push registration of the account. Fails with
+	// invalid_argument for malformed fields; permission_denied "bad_key_proof"
+	// when the proof does not check or the challenge expired (get a new one);
+	// permission_denied "device_revoked" for a key that was ever revoked
+	// (generate a new key); permission_denied "session_devices_revoked" when a
+	// key of this session was revoked; failed_precondition "device_key_in_use"
+	// when another live session registered the key; resource_exhausted
+	// "too_many_devices" at 50 live devices.
+	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
+	// The account's devices: every live one, then the most recently revoked,
+	// newest first, at most 100 in all. A key whose session ended is revoked
+	// before listing.
+	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	// Revokes a device key of the account and the chat session that
+	// registered it (that device is signed out). Machines drop the device at
+	// their next Heartbeat. Succeeds when the key is already revoked;
+	// not_found for a key the account never registered.
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
 }
 
@@ -195,12 +260,6 @@ type MachinesServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewMachinesServiceHandler(svc MachinesServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	machinesServiceMethods := v1.File_app_v1_machines_proto.Services().ByName("MachinesService").Methods()
-	machinesServiceCreateInstallCodeHandler := connect.NewUnaryHandler(
-		MachinesServiceCreateInstallCodeProcedure,
-		svc.CreateInstallCode,
-		connect.WithSchema(machinesServiceMethods.ByName("CreateInstallCode")),
-		connect.WithHandlerOptions(opts...),
-	)
 	machinesServiceListMachinesHandler := connect.NewUnaryHandler(
 		MachinesServiceListMachinesProcedure,
 		svc.ListMachines,
@@ -219,6 +278,24 @@ func NewMachinesServiceHandler(svc MachinesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(machinesServiceMethods.ByName("RevokeMachine")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machinesServiceGetDeviceKeyChallengeHandler := connect.NewUnaryHandler(
+		MachinesServiceGetDeviceKeyChallengeProcedure,
+		svc.GetDeviceKeyChallenge,
+		connect.WithSchema(machinesServiceMethods.ByName("GetDeviceKeyChallenge")),
+		connect.WithHandlerOptions(opts...),
+	)
+	machinesServiceRegisterDeviceHandler := connect.NewUnaryHandler(
+		MachinesServiceRegisterDeviceProcedure,
+		svc.RegisterDevice,
+		connect.WithSchema(machinesServiceMethods.ByName("RegisterDevice")),
+		connect.WithHandlerOptions(opts...),
+	)
+	machinesServiceListDevicesHandler := connect.NewUnaryHandler(
+		MachinesServiceListDevicesProcedure,
+		svc.ListDevices,
+		connect.WithSchema(machinesServiceMethods.ByName("ListDevices")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machinesServiceRevokeDeviceHandler := connect.NewUnaryHandler(
 		MachinesServiceRevokeDeviceProcedure,
 		svc.RevokeDevice,
@@ -227,14 +304,18 @@ func NewMachinesServiceHandler(svc MachinesServiceHandler, opts ...connect.Handl
 	)
 	return "/app.v1.MachinesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case MachinesServiceCreateInstallCodeProcedure:
-			machinesServiceCreateInstallCodeHandler.ServeHTTP(w, r)
 		case MachinesServiceListMachinesProcedure:
 			machinesServiceListMachinesHandler.ServeHTTP(w, r)
 		case MachinesServiceRenameMachineProcedure:
 			machinesServiceRenameMachineHandler.ServeHTTP(w, r)
 		case MachinesServiceRevokeMachineProcedure:
 			machinesServiceRevokeMachineHandler.ServeHTTP(w, r)
+		case MachinesServiceGetDeviceKeyChallengeProcedure:
+			machinesServiceGetDeviceKeyChallengeHandler.ServeHTTP(w, r)
+		case MachinesServiceRegisterDeviceProcedure:
+			machinesServiceRegisterDeviceHandler.ServeHTTP(w, r)
+		case MachinesServiceListDevicesProcedure:
+			machinesServiceListDevicesHandler.ServeHTTP(w, r)
 		case MachinesServiceRevokeDeviceProcedure:
 			machinesServiceRevokeDeviceHandler.ServeHTTP(w, r)
 		default:
@@ -245,10 +326,6 @@ func NewMachinesServiceHandler(svc MachinesServiceHandler, opts ...connect.Handl
 
 // UnimplementedMachinesServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedMachinesServiceHandler struct{}
-
-func (UnimplementedMachinesServiceHandler) CreateInstallCode(context.Context, *connect.Request[v1.CreateInstallCodeRequest]) (*connect.Response[v1.CreateInstallCodeResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.CreateInstallCode is not implemented"))
-}
 
 func (UnimplementedMachinesServiceHandler) ListMachines(context.Context, *connect.Request[v1.ListMachinesRequest]) (*connect.Response[v1.ListMachinesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.ListMachines is not implemented"))
@@ -262,37 +339,47 @@ func (UnimplementedMachinesServiceHandler) RevokeMachine(context.Context, *conne
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.RevokeMachine is not implemented"))
 }
 
+func (UnimplementedMachinesServiceHandler) GetDeviceKeyChallenge(context.Context, *connect.Request[v1.GetDeviceKeyChallengeRequest]) (*connect.Response[v1.GetDeviceKeyChallengeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.GetDeviceKeyChallenge is not implemented"))
+}
+
+func (UnimplementedMachinesServiceHandler) RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.RegisterDevice is not implemented"))
+}
+
+func (UnimplementedMachinesServiceHandler) ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.ListDevices is not implemented"))
+}
+
 func (UnimplementedMachinesServiceHandler) RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachinesService.RevokeDevice is not implemented"))
 }
 
 // MachineAgentServiceClient is a client for the app.v1.MachineAgentService service.
 type MachineAgentServiceClient interface {
-	// Adds a machine to the directory of the token's account, claimed from the
-	// start. An account that never opened the chat gets its chat user now,
-	// with a placeholder profile that is not findable until its first web
-	// sign-in; new users are admitted as at a web sign-in, and a refusal
-	// fails with failed_precondition "chat_account_missing" (tunelo waits and
-	// retries). Fails with invalid_argument for malformed fields,
+	// A proof-of-possession challenge for RegisterMachine (see KeyChallenge).
+	GetMachineKeyChallenge(context.Context, *connect.Request[v1.GetMachineKeyChallengeRequest]) (*connect.Response[v1.GetMachineKeyChallengeResponse], error)
+	// Adds the machine to the directory of the token's account, or takes its
+	// live row back when the account already has the same machine key (same
+	// machine_id, a new machine_secret; the old secret stops working). A
+	// removed machine is never brought back: a new row is made. An account
+	// that never opened the chat gets its chat user now, with a placeholder
+	// profile that is not findable until its first web sign-in; new users are
+	// admitted as at a web sign-in, and a refusal fails with
+	// failed_precondition "chat_account_missing" (tunelo waits and retries).
+	// Fails with invalid_argument for malformed fields, permission_denied
+	// "bad_key_proof" when the proof does not check or its challenge expired,
 	// failed_precondition "agent_update_required" when agent_version is below
 	// the minimum, and resource_exhausted "too_many_machines" when the owner
 	// has 20 machines.
 	RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error)
-	// Ties a machine registered with an install code (before accounts) to the
-	// token's account, so the tunnel check of Heartbeat applies to it. The
-	// machine is named by its secret in the request. Succeeds again for a
-	// machine already claimed by the same account. Fails with unauthenticated
-	// for a wrong secret, permission_denied "claim_wrong_account" when the
-	// machine belongs to another account and permission_denied
-	// "machine_revoked" for a removed machine.
-	ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error)
 	// Reports the machine alive (every 60 s and whenever the tunnel changes)
-	// and returns what was revoked. A revoked machine gets revoked = true (and
-	// nothing is recorded); otherwise an agent_version below the minimum fails
-	// with failed_precondition "agent_update_required". For a claimed machine
-	// a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+	// and returns the owner's trusted devices. A revoked machine gets revoked =
+	// true (and nothing is recorded); otherwise an agent_version below the
+	// minimum fails with failed_precondition "agent_update_required". A
+	// tunnel_url other than the machine tunnel Tunelo holds for its owner is
 	// not recorded: the machine is recorded alive without a tunnel and the
-	// answer says tunnel_refused (revoked devices still come back).
+	// answer says tunnel_refused (trusted devices still come back).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -300,6 +387,10 @@ type MachineAgentServiceClient interface {
 	// count. The push holds the machine's name and the kind of request only.
 	// Fails with permission_denied "machine_revoked" for a revoked machine.
 	NotifyNeedsInput(context.Context, *connect.Request[v1.NotifyNeedsInputRequest]) (*connect.Response[v1.NotifyNeedsInputResponse], error)
+	// Removes the machine from its owner's directory, as RevokeMachine does
+	// from the web (the IdP grant of its sign-in is revoked too): tunelo
+	// logout. Succeeds again for a machine already removed.
+	UnregisterMachine(context.Context, *connect.Request[v1.UnregisterMachineRequest]) (*connect.Response[v1.UnregisterMachineResponse], error)
 }
 
 // NewMachineAgentServiceClient constructs a client for the app.v1.MachineAgentService service. By
@@ -313,16 +404,16 @@ func NewMachineAgentServiceClient(httpClient connect.HTTPClient, baseURL string,
 	baseURL = strings.TrimRight(baseURL, "/")
 	machineAgentServiceMethods := v1.File_app_v1_machines_proto.Services().ByName("MachineAgentService").Methods()
 	return &machineAgentServiceClient{
+		getMachineKeyChallenge: connect.NewClient[v1.GetMachineKeyChallengeRequest, v1.GetMachineKeyChallengeResponse](
+			httpClient,
+			baseURL+MachineAgentServiceGetMachineKeyChallengeProcedure,
+			connect.WithSchema(machineAgentServiceMethods.ByName("GetMachineKeyChallenge")),
+			connect.WithClientOptions(opts...),
+		),
 		registerMachine: connect.NewClient[v1.RegisterMachineRequest, v1.RegisterMachineResponse](
 			httpClient,
 			baseURL+MachineAgentServiceRegisterMachineProcedure,
 			connect.WithSchema(machineAgentServiceMethods.ByName("RegisterMachine")),
-			connect.WithClientOptions(opts...),
-		),
-		claimMachine: connect.NewClient[v1.ClaimMachineRequest, v1.ClaimMachineResponse](
-			httpClient,
-			baseURL+MachineAgentServiceClaimMachineProcedure,
-			connect.WithSchema(machineAgentServiceMethods.ByName("ClaimMachine")),
 			connect.WithClientOptions(opts...),
 		),
 		heartbeat: connect.NewClient[v1.HeartbeatRequest, v1.HeartbeatResponse](
@@ -337,25 +428,32 @@ func NewMachineAgentServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(machineAgentServiceMethods.ByName("NotifyNeedsInput")),
 			connect.WithClientOptions(opts...),
 		),
+		unregisterMachine: connect.NewClient[v1.UnregisterMachineRequest, v1.UnregisterMachineResponse](
+			httpClient,
+			baseURL+MachineAgentServiceUnregisterMachineProcedure,
+			connect.WithSchema(machineAgentServiceMethods.ByName("UnregisterMachine")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // machineAgentServiceClient implements MachineAgentServiceClient.
 type machineAgentServiceClient struct {
-	registerMachine  *connect.Client[v1.RegisterMachineRequest, v1.RegisterMachineResponse]
-	claimMachine     *connect.Client[v1.ClaimMachineRequest, v1.ClaimMachineResponse]
-	heartbeat        *connect.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
-	notifyNeedsInput *connect.Client[v1.NotifyNeedsInputRequest, v1.NotifyNeedsInputResponse]
+	getMachineKeyChallenge *connect.Client[v1.GetMachineKeyChallengeRequest, v1.GetMachineKeyChallengeResponse]
+	registerMachine        *connect.Client[v1.RegisterMachineRequest, v1.RegisterMachineResponse]
+	heartbeat              *connect.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
+	notifyNeedsInput       *connect.Client[v1.NotifyNeedsInputRequest, v1.NotifyNeedsInputResponse]
+	unregisterMachine      *connect.Client[v1.UnregisterMachineRequest, v1.UnregisterMachineResponse]
+}
+
+// GetMachineKeyChallenge calls app.v1.MachineAgentService.GetMachineKeyChallenge.
+func (c *machineAgentServiceClient) GetMachineKeyChallenge(ctx context.Context, req *connect.Request[v1.GetMachineKeyChallengeRequest]) (*connect.Response[v1.GetMachineKeyChallengeResponse], error) {
+	return c.getMachineKeyChallenge.CallUnary(ctx, req)
 }
 
 // RegisterMachine calls app.v1.MachineAgentService.RegisterMachine.
 func (c *machineAgentServiceClient) RegisterMachine(ctx context.Context, req *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error) {
 	return c.registerMachine.CallUnary(ctx, req)
-}
-
-// ClaimMachine calls app.v1.MachineAgentService.ClaimMachine.
-func (c *machineAgentServiceClient) ClaimMachine(ctx context.Context, req *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error) {
-	return c.claimMachine.CallUnary(ctx, req)
 }
 
 // Heartbeat calls app.v1.MachineAgentService.Heartbeat.
@@ -368,33 +466,36 @@ func (c *machineAgentServiceClient) NotifyNeedsInput(ctx context.Context, req *c
 	return c.notifyNeedsInput.CallUnary(ctx, req)
 }
 
+// UnregisterMachine calls app.v1.MachineAgentService.UnregisterMachine.
+func (c *machineAgentServiceClient) UnregisterMachine(ctx context.Context, req *connect.Request[v1.UnregisterMachineRequest]) (*connect.Response[v1.UnregisterMachineResponse], error) {
+	return c.unregisterMachine.CallUnary(ctx, req)
+}
+
 // MachineAgentServiceHandler is an implementation of the app.v1.MachineAgentService service.
 type MachineAgentServiceHandler interface {
-	// Adds a machine to the directory of the token's account, claimed from the
-	// start. An account that never opened the chat gets its chat user now,
-	// with a placeholder profile that is not findable until its first web
-	// sign-in; new users are admitted as at a web sign-in, and a refusal
-	// fails with failed_precondition "chat_account_missing" (tunelo waits and
-	// retries). Fails with invalid_argument for malformed fields,
+	// A proof-of-possession challenge for RegisterMachine (see KeyChallenge).
+	GetMachineKeyChallenge(context.Context, *connect.Request[v1.GetMachineKeyChallengeRequest]) (*connect.Response[v1.GetMachineKeyChallengeResponse], error)
+	// Adds the machine to the directory of the token's account, or takes its
+	// live row back when the account already has the same machine key (same
+	// machine_id, a new machine_secret; the old secret stops working). A
+	// removed machine is never brought back: a new row is made. An account
+	// that never opened the chat gets its chat user now, with a placeholder
+	// profile that is not findable until its first web sign-in; new users are
+	// admitted as at a web sign-in, and a refusal fails with
+	// failed_precondition "chat_account_missing" (tunelo waits and retries).
+	// Fails with invalid_argument for malformed fields, permission_denied
+	// "bad_key_proof" when the proof does not check or its challenge expired,
 	// failed_precondition "agent_update_required" when agent_version is below
 	// the minimum, and resource_exhausted "too_many_machines" when the owner
 	// has 20 machines.
 	RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error)
-	// Ties a machine registered with an install code (before accounts) to the
-	// token's account, so the tunnel check of Heartbeat applies to it. The
-	// machine is named by its secret in the request. Succeeds again for a
-	// machine already claimed by the same account. Fails with unauthenticated
-	// for a wrong secret, permission_denied "claim_wrong_account" when the
-	// machine belongs to another account and permission_denied
-	// "machine_revoked" for a removed machine.
-	ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error)
 	// Reports the machine alive (every 60 s and whenever the tunnel changes)
-	// and returns what was revoked. A revoked machine gets revoked = true (and
-	// nothing is recorded); otherwise an agent_version below the minimum fails
-	// with failed_precondition "agent_update_required". For a claimed machine
-	// a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+	// and returns the owner's trusted devices. A revoked machine gets revoked =
+	// true (and nothing is recorded); otherwise an agent_version below the
+	// minimum fails with failed_precondition "agent_update_required". A
+	// tunnel_url other than the machine tunnel Tunelo holds for its owner is
 	// not recorded: the machine is recorded alive without a tunnel and the
-	// answer says tunnel_refused (revoked devices still come back).
+	// answer says tunnel_refused (trusted devices still come back).
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
 	// Asks the server to tell the owner's devices, by Web Push, that a session
 	// waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -402,6 +503,10 @@ type MachineAgentServiceHandler interface {
 	// count. The push holds the machine's name and the kind of request only.
 	// Fails with permission_denied "machine_revoked" for a revoked machine.
 	NotifyNeedsInput(context.Context, *connect.Request[v1.NotifyNeedsInputRequest]) (*connect.Response[v1.NotifyNeedsInputResponse], error)
+	// Removes the machine from its owner's directory, as RevokeMachine does
+	// from the web (the IdP grant of its sign-in is revoked too): tunelo
+	// logout. Succeeds again for a machine already removed.
+	UnregisterMachine(context.Context, *connect.Request[v1.UnregisterMachineRequest]) (*connect.Response[v1.UnregisterMachineResponse], error)
 }
 
 // NewMachineAgentServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -411,16 +516,16 @@ type MachineAgentServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewMachineAgentServiceHandler(svc MachineAgentServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	machineAgentServiceMethods := v1.File_app_v1_machines_proto.Services().ByName("MachineAgentService").Methods()
+	machineAgentServiceGetMachineKeyChallengeHandler := connect.NewUnaryHandler(
+		MachineAgentServiceGetMachineKeyChallengeProcedure,
+		svc.GetMachineKeyChallenge,
+		connect.WithSchema(machineAgentServiceMethods.ByName("GetMachineKeyChallenge")),
+		connect.WithHandlerOptions(opts...),
+	)
 	machineAgentServiceRegisterMachineHandler := connect.NewUnaryHandler(
 		MachineAgentServiceRegisterMachineProcedure,
 		svc.RegisterMachine,
 		connect.WithSchema(machineAgentServiceMethods.ByName("RegisterMachine")),
-		connect.WithHandlerOptions(opts...),
-	)
-	machineAgentServiceClaimMachineHandler := connect.NewUnaryHandler(
-		MachineAgentServiceClaimMachineProcedure,
-		svc.ClaimMachine,
-		connect.WithSchema(machineAgentServiceMethods.ByName("ClaimMachine")),
 		connect.WithHandlerOptions(opts...),
 	)
 	machineAgentServiceHeartbeatHandler := connect.NewUnaryHandler(
@@ -435,16 +540,24 @@ func NewMachineAgentServiceHandler(svc MachineAgentServiceHandler, opts ...conne
 		connect.WithSchema(machineAgentServiceMethods.ByName("NotifyNeedsInput")),
 		connect.WithHandlerOptions(opts...),
 	)
+	machineAgentServiceUnregisterMachineHandler := connect.NewUnaryHandler(
+		MachineAgentServiceUnregisterMachineProcedure,
+		svc.UnregisterMachine,
+		connect.WithSchema(machineAgentServiceMethods.ByName("UnregisterMachine")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MachineAgentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case MachineAgentServiceGetMachineKeyChallengeProcedure:
+			machineAgentServiceGetMachineKeyChallengeHandler.ServeHTTP(w, r)
 		case MachineAgentServiceRegisterMachineProcedure:
 			machineAgentServiceRegisterMachineHandler.ServeHTTP(w, r)
-		case MachineAgentServiceClaimMachineProcedure:
-			machineAgentServiceClaimMachineHandler.ServeHTTP(w, r)
 		case MachineAgentServiceHeartbeatProcedure:
 			machineAgentServiceHeartbeatHandler.ServeHTTP(w, r)
 		case MachineAgentServiceNotifyNeedsInputProcedure:
 			machineAgentServiceNotifyNeedsInputHandler.ServeHTTP(w, r)
+		case MachineAgentServiceUnregisterMachineProcedure:
+			machineAgentServiceUnregisterMachineHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -454,12 +567,12 @@ func NewMachineAgentServiceHandler(svc MachineAgentServiceHandler, opts ...conne
 // UnimplementedMachineAgentServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedMachineAgentServiceHandler struct{}
 
-func (UnimplementedMachineAgentServiceHandler) RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.RegisterMachine is not implemented"))
+func (UnimplementedMachineAgentServiceHandler) GetMachineKeyChallenge(context.Context, *connect.Request[v1.GetMachineKeyChallengeRequest]) (*connect.Response[v1.GetMachineKeyChallengeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.GetMachineKeyChallenge is not implemented"))
 }
 
-func (UnimplementedMachineAgentServiceHandler) ClaimMachine(context.Context, *connect.Request[v1.ClaimMachineRequest]) (*connect.Response[v1.ClaimMachineResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.ClaimMachine is not implemented"))
+func (UnimplementedMachineAgentServiceHandler) RegisterMachine(context.Context, *connect.Request[v1.RegisterMachineRequest]) (*connect.Response[v1.RegisterMachineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.RegisterMachine is not implemented"))
 }
 
 func (UnimplementedMachineAgentServiceHandler) Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error) {
@@ -468,4 +581,8 @@ func (UnimplementedMachineAgentServiceHandler) Heartbeat(context.Context, *conne
 
 func (UnimplementedMachineAgentServiceHandler) NotifyNeedsInput(context.Context, *connect.Request[v1.NotifyNeedsInputRequest]) (*connect.Response[v1.NotifyNeedsInputResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.NotifyNeedsInput is not implemented"))
+}
+
+func (UnimplementedMachineAgentServiceHandler) UnregisterMachine(context.Context, *connect.Request[v1.UnregisterMachineRequest]) (*connect.Response[v1.UnregisterMachineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MachineAgentService.UnregisterMachine is not implemented"))
 }

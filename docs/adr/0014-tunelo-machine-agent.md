@@ -3,6 +3,7 @@
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-11-09
 - Bổ sung cho [ADR 0013](./0013-remote-machines.md). Thay phần mã cài của ADR đó: máy giờ đăng ký theo tài khoản.
+- Sửa ngày 2026-11-12 (tunelo 3.0): `tunelo login` thay `tunelo install`, cây lệnh gọn, thiết bị tin theo tài khoản (ADR 0013).
 
 ## Bối cảnh
 
@@ -16,6 +17,11 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 
 - Tiến trình nền của Máy của tôi là `tunelo` 2.0.0 (`apps/agent`). Nó nhận toàn bộ CLI Tunelo 1.11: `http`, `tcp`, `kill`, `watch`, `link`/`links`,
   `mcp`, `config`, `login`/`logout`/`whoami`. Bun single-file, ký minisign, phát hành qua GitHub Releases (không npm).
+- Từ 3.0.0 help chỉ còn hai nhóm, lệnh máy và lệnh tunnel ([`cli-help.ts`](../../apps/agent/src/cli-help.ts)). Lệnh dịch vụ
+  (`start`, `stop`, `run`, `mcp`, `disk-access`) và lệnh chỉ người ngồi trước máy được đổi (`trust`, `untrust`, `trusted`,
+  `config mcp-local-writes`, `config local-forward`) vẫn chạy nhưng ẩn khỏi help, và không đưa lên web để AI không tự bật. Các lệnh
+  còn lại của 2.x (`install`, `devices`, `audit`, `authenticator`, `claude profiles`, `secrets`, `browser`, `usage`, `link`/`links`,
+  `whoami`, `version`) đã bỏ; việc của chúng làm trên trang máy trong Chat, `whoami` và phiên bản gộp vào `status`.
 - Không còn portal web: `tunelo http` chỉ giữ inspector request trên `127.0.0.1` và `tunelo watch`. Phía web của Tunelo chỉ còn trang
   giới thiệu trên tunelo-server (localman-next).
 - Gói npm `tunelo` có bản 1.12 cuối: `tunelo update` của nó chạy script cài 2.x rồi gọi thẳng binary mới.
@@ -29,20 +35,26 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
   (Linux, nên chỉ quyền thư mục bảo vệ nó; ADR 0013) (`keystore.ts`). Chỉ dịch vụ làm mới
   token, dưới khoá file, và đọc lại sau khi giữ khoá. Access token ngắn hạn, theo từng tài nguyên.
 - Không route nào (socket điều khiển, HTTP cục bộ, MCP) trả token thô. Dịch vụ tự gắn Bearer.
-- `tunelo whoami` hiện trạng thái từng app. Lỗi của Chat hay Localman chỉ đổi dòng của app đó, không làm hỏng tunnel.
+- `tunelo status` hiện tài khoản và trạng thái từng app. Lỗi của Chat hay Localman chỉ đổi dòng của app đó, không làm hỏng tunnel.
 
 ### Máy theo tài khoản
 
-- Không còn mã cài. `tunelo install` đăng nhập trước, rồi gọi `RegisterMachine` với access token của chủ (`aud` là MCP của Chat,
-  scope `machines:write`). Config chỉ đổi sau khi đăng nhập thành công.
+- Không còn mã cài. `tunelo login` đăng nhập, cài dịch vụ nền, rồi dịch vụ gọi `RegisterMachine` với access token của chủ (`aud` là
+  MCP của Chat, scope `machines:write`) kèm bằng chứng giữ khoá máy (ADR 0013, "Tài khoản là gốc tin cậy"). Chỉ dịch vụ đăng ký,
+  để `login` không đua với nó. Config chỉ đổi sau khi đăng nhập thành công.
+- Đăng ký lại cùng khoá máy (cài lại) giữ mục máy cũ, tên cũ và xoay `machine_secret`; mục đã xoá trên web không hồi sinh, cài lại
+  thành mục mới. Mất khoá máy thì cũng thành mục mới.
 - `machines.claimed_at` là lúc máy được gắn với tài khoản (migration `0035_machine_claimed_at.sql`). Chủ máy được tìm qua
-  `machines.user_id` → `users.idp_sub`, không lưu bản sao. Máy cài bằng mã trước đây được dịch vụ gắn bằng `ClaimMachine` khi máy đã đăng nhập.
-- Máy đã claim chỉ được liệt kê với tunnel máy mà Tunelo giữ cho đúng tài khoản đó. Heartbeat từ tunnel của tài khoản khác bị ghi là
+  `machines.user_id` → `users.idp_sub`, không lưu bản sao. `ClaimMachine` cho máy cài bằng mã cũ đã bỏ ở 3.0.
+- Máy chỉ được liệt kê với tunnel máy mà Tunelo giữ cho đúng tài khoản đó. Heartbeat từ tunnel của tài khoản khác bị ghi là
   sống nhưng không có tunnel, kèm `tunnel_refused`.
 - Tài khoản chưa từng mở Chat: `RegisterMachine` tạo người dùng tạm với `profile_pending` (tên giữ chỗ, không tìm được theo username
   hay tìm kiếm), theo hạn mức đăng ký web. Lần đăng nhập web đầu tiên điền hồ sơ từ IdP và xoá cờ.
 - Tối đa 20 máy chưa thu hồi mỗi tài khoản, cùng hạn mức với máy Localman.
-- Ghép thiết bị vẫn đầu-cuối như ADR 0013: trình duyệt cài máy được tin qua bí mật đi qua stdin của `tunelo install`, thiết bị khác ghép bằng mã Authenticator; server không bảo lãnh thiết bị và không giữ bí mật ghép nào.
+- Thiết bị không ghép với máy: máy tin mọi khoá thiết bị sống của chủ mà Chat liệt kê (ADR 0013, "Tài khoản là gốc tin cậy").
+- `tunelo logout` gỡ máy khỏi tài khoản (`UnregisterMachine`, kéo theo thu hồi grant `tunelo-agent`), gỡ liên kết Localman, dừng dịch
+  vụ nền và xoá đăng nhập; giữ binary và khoá máy, nên `tunelo login` lại giữ mục máy cũ. `tunelo uninstall` = `logout` (mất mạng
+  thì cảnh báo và đi tiếp) rồi gỡ dịch vụ, binary, thư mục cấu hình, mục Keychain và dòng PATH ([`uninstall.ts`](../../apps/agent/src/commands/uninstall.ts)).
 - Máy tự liên kết với Localman sau `tunelo login` (`POST /api/links/self`). Token liên kết giao cho Localman, tunelo không lưu.
 
 ### Profile Claude
@@ -62,16 +74,17 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
     `profile_switch_pending` kèm tài khoản sẽ chuyển sang.
   - Resume chạy được dưới profile khác vì `projects/` (nơi claude lưu hội thoại) là thư mục dùng chung.
 - Mỗi lần đổi profile máy, mỗi phiên chuyển xong, mỗi lần đọc lại hạn mức, máy gửi `MachineProfile` (danh sách profile, profile
-  máy, profile từng phiên) tới mọi thiết bị đang kết nối, không cần thiết bị hỏi. Đổi từ thiết bị nào hay từ
-  `tunelo claude profiles select` trên máy đều như nhau. Hạn mức profile mới được đọc lại ngay (tối đa 1 lần/30 giây mỗi profile).
+  máy, profile từng phiên) tới mọi thiết bị đang kết nối, không cần thiết bị hỏi. Đổi từ thiết bị nào cũng như
+  nhau. Hạn mức profile mới được đọc lại ngay (tối đa 1 lần/30 giây mỗi profile).
 - Phiên hết hạn mức (claude báo `rate_limit`) mà máy có profile khác đã đăng nhập và còn hạn mức: `ThreadInfo.profile_suggestion`
   gợi ý profile còn nhiều nhất (phần trăm còn lại theo cửa sổ chặt hơn). Chỉ là gợi ý; máy không tự đổi.
 - Profile dùng chung dữ liệu với `~/.claude` (`projects`, `todos`, `plans`, … liên kết bằng symlink hoặc junction). Chỉ đăng nhập
   là riêng. `settings.json` và `keybindings.json` được chép lại mỗi lần mở phiên, vì claude ghi file bằng cách đổi tên nên link bị cắt.
 - Tài khoản lấy từ `claude auth status --json`. tunelo không đọc token Claude. Trùng email + tổ chức với profile có sẵn thì bị từ chối.
 - Hạn mức 5 giờ và tuần lấy từ claude, kèm giờ cập nhật. Profile hết đăng nhập hiện "Cần đăng nhập lại" và không chọn được.
-- Xoá profile: đăng xuất trước, xoá link như link, không bao giờ đụng file trong `~/.claude`. Đăng xuất lỗi thì từ chối xoá; chỉ
-  `tunelo claude profiles remove <id> --force` trên máy xoá cưỡng bức.
+- Xoá profile: đăng xuất trước, xoá link như link, không bao giờ đụng file trong `~/.claude`. Đăng xuất lỗi thì từ chối xoá. Lệnh
+  xoá cưỡng bức trên máy (`tunelo claude profiles remove <id> --force`) bỏ cùng nhóm lệnh `claude profiles` ở 3.0, nên hiện không
+  còn đường xoá cưỡng bức, dù dịch vụ vẫn nhận cờ `force`.
 - `profiles.json` hỏng thì được giữ nguyên, chép một bản `.corrupt-<ts>`, mọi thao tác báo lỗi rõ.
 
 ### Đăng nhập Claude từ xa
@@ -80,7 +93,8 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
   rồi gửi URL đăng nhập về thiết bị. Người dùng mở URL, dán code, code đi qua E2E vào stdin của claude.
 - Code không lưu, không log. Env của tiến trình đăng nhập bỏ `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_*`.
 - Mỗi lúc chỉ một lần đăng nhập. Lần đăng nhập hết hạn sau 10 phút. Huỷ, hết hạn hay code sai đều dừng tiến trình claude.
-- Đăng nhập không TTY hỏng: web hướng dẫn chạy `tunelo claude profiles add` ngay trên máy.
+- Đăng nhập không TTY hỏng: web còn hướng dẫn chạy `tunelo claude profiles add` trên máy, nhưng lệnh này đã bỏ ở 3.0; chưa có đường
+  thay thế.
 
 ### MCP trong phiên claude
 
@@ -126,19 +140,21 @@ Chi tiết ở ADR 0013, mục "MCP của tunelo trong phiên claude". Tóm tắ
 
 ### Cập nhật tunelo từ trang máy trong Chat
 
-Từ 2.3.0, thiết bị đã ghép cập nhật được tunelo của máy ngay trên trang máy, không cần ngồi trước máy chạy `tunelo update`.
+Từ 2.3.0, thiết bị của tài khoản cập nhật được tunelo của máy ngay trên trang máy, không cần ngồi trước máy chạy `tunelo update`.
 
 - Máy tự tìm bản `tunelo-v*` mới ngay khi chạy và mỗi 6 giờ, báo qua `MachineInfo.agent_update` (`supported`, `latest_version`, `updating`). Nút "Kiểm tra bản mới" gửi `AgentUpdateCheck`.
 - `AgentUpdateStart` được trả `Ack` ngay; máy tải, kiểm chữ ký minisign với khoá nằm sẵn trong binary đang chạy (đúng đường của `tunelo update`), thay file rồi thoát cho trình giám sát khởi động bản mới. Từng bước gửi tới mọi thiết bị đang nối bằng `AgentUpdateProgress` (đang tải kèm phần trăm, kiểm tra chữ ký, cài, khởi động lại, lỗi kèm lý do). Kết nối rớt khi khởi động lại; thiết bị tự nối lại và thấy bản mới.
 - Chỉ máy có thể tự thay file và có thứ khởi động lại nó mới cập nhật từ xa: file binary đã build, chạy dưới launchd (macOS), systemd (Linux) hoặc vòng lặp `run-agent.cmd` (Windows). Còn lại `supported=false` và trang chỉ chỉ cách chạy `tunelo update` trên máy.
 - Mỗi lần bắt đầu cập nhật ghi một dòng `agent_update` (kèm phiên bản) vào nhật ký đồng ý. Phiên đang chạy trên máy có thể bị ngắt khi khởi động lại; trang hỏi lại trước khi cập nhật nếu máy đang mở phiên.
-- Không đổi `MinAgentVersion`: field mới đều tuỳ chọn, máy cũ không gửi `agent_update` thì trang chỉ nhắc chạy `tunelo update` trên máy một lần để lên 2.3.0.
+- Tính năng này không cần nâng `MinAgentVersion`: field mới đều tuỳ chọn. `MinAgentVersion` hiện là 3.0.0 vì giao thức 3 (ADR 0013); máy
+  2.x không tự cập nhật lên được mà phải chạy lại lệnh cài, vì 3.0.0 chỉ phát hành file nén.
 
 ## Hệ quả
 
 - Thư mục cấu hình tunelo chỉ có một refresh token hoandat, đã niêm phong. Ngoài `claude-profiles/*/home` (kho riêng của claude),
   không file nào của tunelo chứa token Claude, code đăng nhập hay JWT (`test/no-secret-leak.test.ts`).
-- Dọn sau nghiệm thu và ít nhất 14 ngày: bỏ `CreateInstallCode` và bảng mã cài, nâng `MinAgentVersion` lên `2.0.0`.
+- `CreateInstallCode` đã bỏ ở 3.0. Bảng `machine_install_codes` và `machine_revoked_devices` không còn được ghi; chúng ở lại cho
+  binary trước (migration chỉ thêm) và bị xoá bằng một migration dọn riêng sau khi 3.0 chạy ổn trên production.
 - CI chạy test agent dưới Bun của bản phát hành và phần chỉ có trên Windows (DPAPI, junction, `netstat`) trên `windows-latest`.
   Job `typescript` chạy toàn bộ test agent trên Linux của CI, gồm test dịch vụ systemd bằng host giả; systemd thật được kiểm trên máy
   lab (ADR 0013, "Kiểm trên Linux").

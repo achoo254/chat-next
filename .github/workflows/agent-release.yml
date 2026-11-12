@@ -5,16 +5,22 @@
 # of tunelo-term-host for the same five platforms; the macOS files signed with
 # the Developer ID (hardened runtime; identifiers com.hoandat.tunelo and
 # com.hoandat.tunelo.term-host) and notarized on a macOS runner, so macOS keeps
-# the Full Disk Access granted to tunelo across updates; then SHA256SUMS of all
-# ten files and minisign signatures of every file (SHA256SUMS too; update.ts
-# checks them), then a GitHub Release. Afterwards pin the install scripts
-# locally: node apps/agent/scripts/pin-release.ts <version> SHA256SUMS, commit
-# and push (the web deploy serves them).
+# the Full Disk Access granted to tunelo across updates; then a minisign
+# signature of each of the ten files, one archive per platform holding its two
+# files and their signatures (apps/agent/scripts/package-release.sh), and
+# SHA256SUMS and minisign signatures of the archives (update.ts and the install
+# scripts check them), then a GitHub Release of the archives only. Afterwards
+# pin the install scripts locally: node apps/agent/scripts/pin-release.ts
+# <version> SHA256SUMS, commit and push (the web deploy serves them).
+#
+# A test release, tag tunelo-v<AGENT_VERSION>-rc.<n>, runs the same way and is
+# published as a prerelease; its files are signed for that rc version, and
+# `tunelo update` never picks it up (it only follows tunelo-v<semver> tags).
 #
 # Dry run: start the workflow by hand (workflow_dispatch) on any branch. It
 # tests and builds the version in apps/agent/src/version.ts and uploads the
-# unsigned files and their SHA256SUMS as artifacts of the run: no Developer ID
-# signature, no notarization, no minisign, no Release, no secret is read.
+# unsigned archives and their SHA256SUMS as artifacts of the run: no Developer
+# ID signature, no notarization, no minisign, no Release, no secret is read.
 #
 # tunelo-v0.x and tunelo-v1.x tags belong to the Tunelo CLI 1.x released from
 # localman-next; this workflow refuses those versions and any tag that exists
@@ -41,6 +47,7 @@ jobs:
     outputs:
       prefix: ${{ steps.line.outputs.prefix }}
       version: ${{ steps.line.outputs.version }}
+      prerelease: ${{ steps.line.outputs.prerelease }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -60,14 +67,20 @@ jobs:
             case "$GITHUB_REF_NAME" in
             tunelo-v*)
               prefix=tunelo version="${GITHUB_REF_NAME#tunelo-v}"
-              test "$version" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
+              # A test release (-rc.<n>) is of the version it leads up to.
+              test "${version%-rc.*}" = "$have" || { echo "tag $version != AGENT_VERSION $have"; exit 1; }
               ;;
             *) echo "not a release tag: $GITHUB_REF_NAME"; exit 1 ;;
             esac
           fi
-          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "not a version: $version"; exit 1; }
-          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || { echo "not a version: $version"; exit 1; }
+          prerelease=false
+          case "$version" in *-rc.*) prerelease=true ;; esac
+          {
+            echo "prefix=$prefix"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
       - name: The version is not one of localman-next's
         env:
           VERSION: ${{ steps.line.outputs.version }}
@@ -314,7 +327,7 @@ jobs:
           overwrite: true
 
   release:
-    # Dry run only (workflow_dispatch): checksums of the unsigned files, no secret, no environment.
+    # Dry run only (workflow_dispatch): archives and checksums of the unsigned files, no secret, no environment.
     needs: [test, build, build-term-host]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -327,27 +340,19 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          sparse-checkout: apps/agent/src
+          sparse-checkout: apps/agent/scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
-      - name: Checksums
-        working-directory: dist
-        run: |
-          set -euo pipefail
-          # Every file of the release, by name: a missing build stops the release here.
-          sha256sum \
-            "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" \
-            "$PREFIX-term-host-darwin-arm64" "$PREFIX-term-host-darwin-x64" "$PREFIX-term-host-windows-x64.exe" \
-            "$PREFIX-term-host-linux-x64" "$PREFIX-term-host-linux-arm64" > SHA256SUMS
-          cat SHA256SUMS
-          sha256sum -c SHA256SUMS
-      - name: Dry run checksums
+      # The same archives as a release, without signatures; a missing build stops here.
+      - name: Archives and checksums
+        run: sh apps/agent/scripts/package-release.sh dist out
+      - name: Dry run archives
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: SHA256SUMS
-          path: dist/SHA256SUMS
+          name: dry-run-release
+          path: out/
 
   publish:
     needs: [test, build, build-term-host, sign-macos]
@@ -364,43 +369,65 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          sparse-checkout: apps/agent/src
+          sparse-checkout: |
+            apps/agent/src
+            apps/agent/scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
-      - name: Checksums
-        working-directory: dist
-        run: |
-          set -euo pipefail
-          # Every file of the release, by name: a missing build stops the release here.
-          sha256sum \
-            "$PREFIX-darwin-arm64" "$PREFIX-darwin-x64" "$PREFIX-windows-x64.exe" "$PREFIX-linux-x64" "$PREFIX-linux-arm64" \
-            "$PREFIX-term-host-darwin-arm64" "$PREFIX-term-host-darwin-x64" "$PREFIX-term-host-windows-x64.exe" \
-            "$PREFIX-term-host-linux-x64" "$PREFIX-term-host-linux-arm64" > SHA256SUMS
-          cat SHA256SUMS
-          sha256sum -c SHA256SUMS
-      - name: Signatures
-        working-directory: dist
+      - name: Signatures, archives and checksums
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
         run: |
           set -euo pipefail
           sudo apt-get install -y minisign >/dev/null
-          umask 077
           # The key leaves the runner's disk even when signing or checking fails.
-          trap 'rm -f ../minisign.key' EXIT
-          printf '%s\n' "$MINISIGN_SECRET_KEY" > ../minisign.key
+          trap 'rm -f "$RUNNER_TEMP/minisign.key"' EXIT
+          (umask 077 && printf '%s\n' "$MINISIGN_SECRET_KEY" > "$RUNNER_TEMP/minisign.key")
           # The signed comment names the program, version and file (update.ts checks it).
-          for f in "$PREFIX"-* SHA256SUMS; do minisign -S -s ../minisign.key -m "$f" -t "$PREFIX $VERSION $f" < /dev/null; done
-          rm -f ../minisign.key
-          # Checked with the public key built into tunelo.
-          pubkey=$(sed -n 's/^export const MINISIGN_PUBKEY = "\(.*\)";$/\1/p' ../apps/agent/src/update.ts)
-          for f in "$PREFIX"-* SHA256SUMS; do
+          # sign <folder> <file>…
+          sign() {
+            folder="$1"
+            shift
+            for f in "$@"; do minisign -S -s "$RUNNER_TEMP/minisign.key" -m "$folder/$f" -t "$PREFIX $VERSION $f" < /dev/null; done
+          }
+          # Each file inside an archive keeps its own signature: term-host versions and rollbacks read it.
+          files="" archives="SHA256SUMS"
+          for p in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            files="$files $PREFIX-$p $PREFIX-term-host-$p"
+            archives="$archives $PREFIX-$p.tar.gz"
+          done
+          files="$files $PREFIX-windows-x64.exe $PREFIX-term-host-windows-x64.exe"
+          archives="$archives $PREFIX-windows-x64.zip"
+          # shellcheck disable=SC2086 # the file names have no spaces
+          sign dist $files
+          sh apps/agent/scripts/package-release.sh dist out --signed
+          # shellcheck disable=SC2086
+          sign out $archives
+          rm -f "$RUNNER_TEMP/minisign.key"
+          # Checked with the public key built into tunelo, inside and outside the archives.
+          pubkey=$(sed -n 's/^export const MINISIGN_PUBKEY = "\(.*\)";$/\1/p' apps/agent/src/update.ts)
+          # shellcheck disable=SC2086
+          for f in $files; do minisign -Vq -P "$pubkey" -m "dist/$f"; done
+          # shellcheck disable=SC2086
+          for f in $archives; do minisign -Vq -P "$pubkey" -m "out/$f"; done
+          mkdir unpacked
+          for f in out/*.tar.gz; do tar -xzf "$f" -C unpacked; done
+          (cd unpacked && unzip -q ../out/*.zip)
+          for f in unpacked/*; do
             case "$f" in *.minisig) continue ;; esac
             minisign -Vq -P "$pubkey" -m "$f"
           done
+          ls -l out
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" --notes "Background agent of My machines and its terminal process. Install from the web page; verify with SHA256SUMS and the .minisig files." --latest=false
+          PRERELEASE: ${{ needs.test.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          flags="--latest=false"
+          if [ "$PRERELEASE" = "true" ]; then flags="$flags --prerelease"; fi
+          # shellcheck disable=SC2086
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" $flags \
+            --notes "Background agent of My machines and its terminal process, one archive per platform. Install from the web page; verify with SHA256SUMS and the .minisig files."

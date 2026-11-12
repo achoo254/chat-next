@@ -16,6 +16,7 @@ import { ControlError, readControlInfo } from "../src/terminal/host-link.ts";
 import type { TermHostUnit } from "../src/terminal/host-supervisor.ts";
 import { tempDir } from "./harness.ts";
 import { type DeviceConnection, termStatuses, terminalMachine } from "./support/terminal-device.ts";
+import { revokeDevice } from "./support/trusted-devices.ts";
 import { T, attachFrame, helloFrame, inputFrame, readServerFrame } from "./support/terminal-frames.ts";
 
 const BIN = process.env.TUNELO_TERM_HOST_BIN;
@@ -170,7 +171,7 @@ describe.skipIf(!BIN)("terminal with the real terminal process", () => {
     const session = await openShell(c, 1);
     await typeAndWait(c, 1, session, "echo ready_$((2+3))\r", "ready_5");
     const key = toBase64Url(device.publicKey);
-    m.config.revokeDevice(key);
+    revokeDevice(m.config, key);
     const t0 = performance.now();
     m.terminal.revokeDevice(key);
     const closed = await c.waitFor((f) => f.body.case === "termStatus" && f.body.value.link === 1 && f.body.value.path === TermPath.CLOSED, 1_000);
@@ -195,7 +196,7 @@ describe.skipIf(!BIN)("terminal with the real terminal process", () => {
     c.close();
     // The agent stops (as for an update) and the old phone is revoked meanwhile.
     first.terminal.stop();
-    first.config.revokeDevice(toBase64Url(gone.publicKey));
+    revokeDevice(first.config, gone.publicKey);
 
     const second = await terminalMachine({ unit: first.unit, env: { TUNELO_TERM_HOST_BIN: BIN ?? "" }, configDir });
     cleanup.push(() => second.terminal.stop());
@@ -230,7 +231,7 @@ describe.skipIf(!BIN)("terminal with the real terminal process", () => {
     const [left, revokedLeft] = await Promise.all(firstGrants.mock.results.map((r) => (r.type === "return" ? r.value : Promise.reject(new Error("grant threw")))));
     // The agent goes away without a word (crash or update); the old phone is revoked meanwhile.
     first.terminal.stop();
-    first.config.revokeDevice(toBase64Url(gone.publicKey));
+    revokeDevice(first.config, gone.publicKey);
 
     const second = await terminalMachine({ unit: first.unit, env: { TUNELO_TERM_HOST_BIN: BIN ?? "" }, configDir, orphanGraceMs: 600 });
     cleanup.push(() => second.terminal.stop());

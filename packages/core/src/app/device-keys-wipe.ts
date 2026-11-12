@@ -1,7 +1,9 @@
 // The device keys of "My machines" (ADR 0013): this browser's X25519 key and
-// the machine keys it pinned, kept in one IndexedDB database by the web app
-// (apps/web/src/machines/link/device-keys.ts). They belong to the signed-in
-// session like the local database, so ending the session deletes them too.
+// the machine keys it saw last, kept in one IndexedDB database by the web app
+// (apps/web/src/machines/link/device-keys.ts). The device key is registered
+// with the account for the signed-in session, and the server revokes it when
+// that session ends; ending the session here deletes the database too, so the
+// next session makes and registers a new key.
 
 /** Name of the IndexedDB database holding the device keys. */
 export const DEVICE_KEYS_DATABASE = "machine-device-keys";

@@ -1,6 +1,7 @@
 /**
- * Minimal HTTP client for the Tunelo server API: token verify and
- * `tunelo link`. Account sign-in talks to the identity provider instead
+ * Minimal HTTP client for the Tunelo server API: token verify, the links
+ * of the account's machines to apps (`tunelo logout` revokes this machine's)
+ * and the account's tunnels. Account sign-in talks to the identity provider instead
  * (idp-client.ts).
  */
 
@@ -91,21 +92,10 @@ export async function verifyKey(
 	}
 }
 
-/** `tunelo link <code>`: approve a pairing a client (Localman) opened. */
-export async function approveLink(
-	baseUrl: string,
-	key: string,
-	code: string,
-): Promise<{ clientName: string }> {
-	return request(baseUrl, "/links/approve", {
-		method: "POST",
-		apiKey: key,
-		body: { code },
-	});
-}
-
 export interface LinkInfo {
 	id: string;
+	/** The machine's tunnel device (`tunelo.<machine id>`); in the account's list only. */
+	deviceId?: string;
 	clientName: string;
 	createdAt: string | null;
 	lastUsedAt: string | null;

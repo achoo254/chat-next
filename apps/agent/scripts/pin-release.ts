@@ -1,6 +1,6 @@
 // Pins the install scripts to a published tunelo release (tag tunelo-v<version>): version,
-// SHA-256 of each file, tunelo and tunelo-term-host for every platform (from
-// the release's SHA256SUMS), and the minisign key.
+// SHA-256 of every platform's archive (from the release's SHA256SUMS), and
+// the minisign key. Test releases (tunelo-v<version>-rc.<n>) are never pinned.
 //   node apps/agent/scripts/pin-release.ts <version> <SHA256SUMS file>
 // Commit and push the result; the web deploy then serves the new scripts.
 import { readFileSync, writeFileSync } from "node:fs";

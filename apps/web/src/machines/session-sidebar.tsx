@@ -16,7 +16,7 @@ import { aiPaths } from "./ai-paths.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { FirstMachine } from "./first-machine.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
-import { needsPairing, type Conn } from "./machine-status.ts";
+import { isBlocked, type Conn } from "./machine-status.ts";
 import { useProjectSync, type SyncHost } from "./project-actions.ts";
 import { buildTree, locate, matches, type Filter } from "./project-tree.ts";
 import { LooseGroup, ProjectItem, type TreeContext } from "./project-tree-view.tsx";
@@ -55,17 +55,13 @@ const asked = new WeakSet<MachineView["link"]>();
 
 const asFilter = (raw: unknown): Filter => (raw === "attention" || raw === "archived" ? raw : "all");
 
-/** The dot beside a machine: on, waiting, off, ready to pair, or a problem to fix. */
-export function connDot(conn: Conn): "on" | "wait" | "off" | "pair" | "warn" {
+/** The dot beside a machine: on, waiting, off, or a problem to fix. */
+export function connDot(conn: Conn): "on" | "wait" | "off" | "warn" {
 	switch (conn.kind) {
-		case "unpaired":
-			// Online and only waiting for this device to pair, or not reachable at all.
-			return conn.online ? "pair" : "off";
 		case "on":
 			return "on";
 		case "connecting":
 		case "retrying":
-		case "checking":
 			return "wait";
 		case "offline":
 			return "off";
@@ -205,10 +201,10 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	// Nothing to list yet (and every machine that can answer did): one empty state for the whole list.
 	const settled = snapshot.status !== "loading" && machines.every((m) => m.conn.kind !== "on" || m.state.listed);
 	const empty = filter === "all" && machines.length > 0 && settled && tree.projects.length === 0 && tree.loose.length === 0;
-	// Machines that need the user ("Quản lý máy" counts them): not paired with this device, or a tunelo too old to talk to.
-	const unpaired = machines.filter((m) => needsPairing(m.conn)).length;
+	// Machines that need the user ("Quản lý máy" counts them): blocked on this device, or a tunelo too old to talk to.
+	const blocked = machines.filter((m) => isBlocked(m.conn)).length;
 	const outdated = machines.filter((m) => m.conn.kind === "update").length;
-	const hostNote = [unpaired > 0 ? t.agent.hint.machinesUnpaired(unpaired) : "", outdated > 0 ? t.agent.hint.machinesOutdated(outdated) : ""].filter((x) => x !== "").join(" · ");
+	const hostNote = [blocked > 0 ? t.agent.hint.machinesBlocked(blocked) : "", outdated > 0 ? t.agent.hint.machinesOutdated(outdated) : ""].filter((x) => x !== "").join(" · ");
 	return (
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
@@ -218,7 +214,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 					<span>{t.agent.machines}</span>
 					{hostNote !== "" && (
 						<span className="mx-manage-count" role="img" aria-label={hostNote} data-id="machines-need-you">
-							{unpaired + outdated}
+							{blocked + outdated}
 						</span>
 					)}
 				</Link>

@@ -10,7 +10,7 @@ dữ liệu lớn; cửa sổ 64 KB giữ p99 khoảng 45 ms.
 
 - **Phiên (session)**: một PTY do daemon giữ, id `u32` (daemon cấp, tăng dần, bắt đầu từ 1, không dùng lại trong một lần chạy daemon).
 - **Kết nối (conn)**: một client đang nói chuyện với daemon, id `u32` do agent cấp. Một kết nối đi qua **đường thẳng** (WebRTC) hoặc **đường relay** (qua agent) hoặc cả hai lúc đổi đường.
-  Daemon gửi trên đường thẳng khi đang nối, ngược lại trên relay. Kết nối gắn **khoá thiết bị** (`deviceKey`, 32 byte, base64url) đã ghép; dùng để thu hồi.
+  Daemon gửi trên đường thẳng khi đang nối, ngược lại trên relay. Kết nối gắn **khoá thiết bị** (`deviceKey`, 32 byte, base64url) mà máy đang tin (ADR 0013); dùng để thu hồi.
 - **Offset đầu ra**: `u64` đếm byte đầu ra thô của PTY từ lúc mở phiên (trước mọi xử lý của terminal). Mọi khung đầu ra mang offset của byte đầu tiên; client ack theo offset.
 - Số nguyên nhiều byte luôn **big-endian**. Văn bản luôn UTF-8.
 
@@ -216,7 +216,7 @@ Vân tay không khớp thì peer kết thúc với `signal {kind: end, reason: d
 ## 8. Kênh E2E thiết bị ⟷ agent (`remote.proto`)
 
 Thiết bị (web, PWA, `tunelo term` sau này) nói với agent bằng các thân `Frame` dưới đây, niêm phong E2E như mọi khung khác. Agent chuyển chúng sang giao thức điều khiển ở mục 6.
-Chỉ thêm, không đổi gì cũ: `PROTOCOL_VERSION` giữ nguyên; tính năng có từ `AGENT_VERSION` **2.4.0** và chỉ dùng khi `MachineInfo.terminal` là `AVAILABLE`.
+Các thân này chỉ thêm, không đổi gì cũ: tính năng có từ `AGENT_VERSION` **2.4.0** mà không đổi số giao thức, và chỉ dùng khi `MachineInfo.terminal` là `AVAILABLE`. Giao thức hiện là 3 (`PROTOCOL_VERSION` = `MIN_PROTOCOL_VERSION` = 3, [`handshake.ts`](../packages/remote-protocol/src/crypto/handshake.ts)), tức mọi agent nối được đều đã có các thân này.
 Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_REQUEST` như mọi khung lạ.
 
 ### Thân `Frame` (số trường 108 đến 117; 105 đến 107 đã thuộc cập nhật agent)
@@ -237,8 +237,8 @@ Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_RE
 - `TermSessionInfo {session=1 (uint32), title=2, cols=3, rows=4, created_at=5 (int64, ms Unix), attached=6, exited=7, exit_code=8 (int32, -1 khi bị tín hiệu giết), exit_signal=9, thread_id=10, cwd=11}`. `thread_id` là luồng mà AI của nó chạy trong phiên này (rỗng với shell). `cwd` là thư mục phiên được mở, do agent ghi lại khi mở; rỗng nếu không biết (phiên mở trước lần khởi động agent gần nhất). `max_sessions` hiện là 20.
 - `TermSignalKind`: `OFFER=1` (A → B), `ANSWER=2` (B → A), `CANDIDATE=3` (hai chiều, một dòng `candidate:...`), `END=4` (A → B: bỏ peer, relay giữ nguyên; B → A: peer đã kết thúc, `reason` theo mục 6 "Đường thẳng").
 - `TermPath`: `CONNECTING=1`, `DIRECT=2`, `RELAY=3`, `CLOSED=4`. `DIRECT` có thể đến hai lần, lần hai có `rtt_ms` (0 là chưa đo).
-- `MachineInfo.terminal = 23` (`TerminalAvailability`): `UNSPECIFIED=0` (agent cũ), `AVAILABLE=1`, `MISSING=2` (chưa có binary daemon), `INCOMPATIBLE=3` (daemon khác `major` đang chạy, hoặc máy không có trình giám sát; gợi ý chạy lại `tunelo install`). Agent gửi lại `MachineInfo` không hỏi khi giá trị đổi.
-- `ErrorReason`: `TERMINAL_UNAVAILABLE=55`, `TERMINAL_SESSION_LIMIT=56`, `TERMINAL_SESSION_NOT_FOUND=57`. Thiết bị không còn được ghép nhận `ACCESS_DENIED`.
+- `MachineInfo.terminal = 23` (`TerminalAvailability`): `UNSPECIFIED=0` (agent cũ), `AVAILABLE=1`, `MISSING=2` (chưa có binary daemon), `INCOMPATIBLE=3` (daemon khác `major` đang chạy, hoặc máy không có trình giám sát; gợi ý chạy lại lệnh cài trên trang Máy). Agent gửi lại `MachineInfo` không hỏi khi giá trị đổi.
+- `ErrorReason`: `TERMINAL_UNAVAILABLE=55`, `TERMINAL_SESSION_LIMIT=56`, `TERMINAL_SESSION_NOT_FOUND=57`. Thiết bị không còn được máy tin nhận `ACCESS_DENIED`.
 
 ### Phiên AI trong terminal (`TermOpen.ai_session`)
 
@@ -272,7 +272,7 @@ Người dùng mở một phiên AI bằng giao diện terminal thay vì chat: A
 ### `TermStatus` từ `conn_state` của daemon
 
 `connecting` → `CONNECTING`, `direct` → `DIRECT` (kèm `rttMs` nếu có), `relay` → `RELAY`, `closed` → `CLOSED` với `reason` của daemon (`expired`, `closed`, `revoked`, `agent_gone`, `transport_closed`, `shutdown`).
-Agent thêm các `reason` của riêng nó: `bad_frame`, `overflow`, `unavailable` (daemon không chạy được hay mất giữa chừng), `revoked` (thiết bị không còn được ghép), `agent_gone` (agent mất socket điều khiển: liên kết chỉ có relay đóng; liên kết đang thẳng vẫn sống, relay của nó phải mở lại bằng `TermData` mới).
+Agent thêm các `reason` của riêng nó: `bad_frame`, `overflow`, `unavailable` (daemon không chạy được hay mất giữa chừng), `revoked` (thiết bị đã bị thu hồi khỏi tài khoản), `agent_gone` (agent mất socket điều khiển: liên kết chỉ có relay đóng; liên kết đang thẳng vẫn sống, relay của nó phải mở lại bằng `TermData` mới).
 Khi agent khởi động lại, kết nối E2E của thiết bị đứt; peer thẳng của nó vẫn chạy trên data channel nhưng agent mới không còn biết liên kết đó. Client mở liên kết mới (relay hoặc offer mới) và `Attach` lại theo mục 4.
 Peer cũ ấy bị agent mới đóng sau thời gian chờ (xem "Kết nối mồ côi" bên dưới), để một client im lặng không giữ window của phiên dùng chung (mục 5).
 

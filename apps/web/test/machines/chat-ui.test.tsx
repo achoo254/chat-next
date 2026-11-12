@@ -1,28 +1,25 @@
 // The remote chat's widgets: tool rows (one call alone, two or more grouped,
 // the answered prompt folded in), the status bar (what shows, what is left
 // out, reset countdowns, the permission mode), the "/" picker of the
-// composer, and the paired devices of a machine with revoking.
+// composer.
 import { create } from "@bufbuild/protobuf";
 import {
 	Decision,
-	PairedDeviceSchema,
 	PromptState,
 	SlashCommandSchema,
 	ThreadInfoSchema,
 	ToolKind,
 	type ApprovalItem,
-	type PairedDevice,
 	type ToolCallItem,
 	type ToolResultItem,
 } from "@achoo254/chat-proto/remote/remote";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { ToolRunCard } from "../../src/machines/cards/tool-run.tsx";
 import { Composer } from "../../src/machines/composer.tsx";
-import { PairedDevices, revokePairedDevice } from "../../src/machines/paired-devices.tsx";
 import { filterCommands, flatCommands } from "../../src/machines/slash-commands.ts";
 import { commandToken } from "../../src/components/plain-text-box.tsx";
 import type { MachineLink } from "../../src/machines/link/machine-link.ts";
@@ -311,69 +308,5 @@ describe("slash commands", () => {
 		expect(onSend).toHaveBeenCalledWith("dòng một\ndòng hai", []);
 		expect(boxValue(field)).toBe("");
 		expect(document.activeElement).toBe(field);
-	});
-});
-
-describe("paired devices", () => {
-	const key = (n: number) => new Uint8Array(32).fill(n);
-	const devices: PairedDevice[] = [
-		create(PairedDeviceSchema, { publicKey: key(1), name: "Chrome · Windows", addedAt: BigInt(Date.UTC(2026, 10, 1)) }),
-		create(PairedDeviceSchema, { publicKey: key(2), name: "Safari · iPhone", addedAt: 0n }),
-	];
-
-	it("lists the machine's devices, marks this one and revokes any", async () => {
-		const user = userEvent.setup();
-		const onRevoke = vi.fn();
-		wrap(<PairedDevices devices={devices} myKey={key(2)} revoked={new Set()} canRevoke onRevoke={onRevoke} />);
-		const rows = screen.getAllByRole("listitem");
-		expect(rows[0]?.textContent).toContain("ghép ngày 01/11/2026");
-		expect(within(rows[0] as HTMLElement).queryByText("Thiết bị này")).toBeNull();
-		expect(within(rows[1] as HTMLElement).getByText("Thiết bị này")).toBeTruthy();
-		await user.click(screen.getByRole("button", { name: "Thu hồi: Chrome · Windows" }));
-		expect(onRevoke).toHaveBeenCalledWith(devices[0]);
-	});
-
-	it("shows a revoked device as revoked, and no device (nor a revoke) before the machine's list arrives", () => {
-		const { unmount } = wrap(
-			<PairedDevices devices={devices} myKey={null} revoked={new Set(["01".repeat(32)])} canRevoke onRevoke={() => undefined} />,
-		);
-		expect(within(screen.getAllByRole("listitem")[0] as HTMLElement).getByText("Đã thu hồi")).toBeTruthy();
-		unmount();
-		wrap(<PairedDevices devices={[]} myKey={null} revoked={new Set()} canRevoke onRevoke={() => undefined} />);
-		expect(screen.getByText("Danh sách thiết bị hiện khi đã kết nối tới máy.")).toBeTruthy();
-		expect(screen.queryByText("Thiết bị này")).toBeNull();
-		expect(screen.queryByRole("button")).toBeNull();
-	});
-
-	const fakeHub = (mine: Uint8Array) => {
-		const revokeDevice = vi.fn((_id: number, _key: Uint8Array) => Promise.resolve());
-		const forget = vi.fn((_ref: string) => Promise.resolve());
-		const hub = {
-			deps: { keys: { device: () => Promise.resolve({ publicKey: mine, privateKey: {} as CryptoKey }) }, directory: { revokeDevice } },
-			forget,
-		} as unknown as Parameters<typeof revokePairedDevice>[0];
-		return { hub, revokeDevice, forget };
-	};
-
-	it("revokes another device through the directory and keeps this one's pairing", async () => {
-		const { hub, revokeDevice, forget } = fakeHub(key(2));
-		await expect(revokePairedDevice(hub, "7", 7, devices[0] ?? null)).resolves.toBe("other");
-		expect(revokeDevice).toHaveBeenCalledWith(7, key(1));
-		expect(forget).not.toHaveBeenCalled();
-	});
-
-	it("revoking this device forgets the machine's key here", async () => {
-		const { hub, revokeDevice, forget } = fakeHub(key(2));
-		await expect(revokePairedDevice(hub, "7", 7, devices[1] ?? null)).resolves.toBe("self");
-		await expect(revokePairedDevice(hub, "7", 7, null)).resolves.toBe("self");
-		expect(revokeDevice).toHaveBeenLastCalledWith(7, key(2));
-		expect(forget).toHaveBeenCalledWith("7");
-	});
-
-	it("does not forget anything when the directory refuses", async () => {
-		const { hub, revokeDevice, forget } = fakeHub(key(2));
-		revokeDevice.mockRejectedValueOnce(new Error("offline"));
-		await act(() => expect(revokePairedDevice(hub, "7", 7, devices[1] ?? null)).rejects.toThrow("offline"));
-		expect(forget).not.toHaveBeenCalled();
 	});
 });

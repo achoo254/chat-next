@@ -220,16 +220,50 @@ func (s *Service) allowLocal() bool {
 }
 
 // NotifyUser queues the push of a machine's notice to every device of the
-// user whose session is still usable (the conditions of chat.PushTargets:
-// not revoked, idle less than SessionIdleTimeout, younger than
-// SessionMaxAge), whether or not the user has the app open: tunelo asks
-// only when no device answered. Delivery, retries and dropping gone
-// subscriptions are the consumer's (deliver.go). It returns how many pushes
-// were queued; none when Web Push is off.
+// user whose session is still usable (userTargets), whether or not the user
+// has the app open: tunelo asks only when no device answered. Delivery,
+// retries and dropping gone subscriptions are the consumer's (deliver.go).
+// It returns how many pushes were queued; none when Web Push is off.
 func (s *Service) NotifyUser(ctx context.Context, userID int64, n MachineNotice) (int, error) {
 	if s.queue == nil {
 		return 0, nil
 	}
+	targets, err := s.userTargets(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("push: notify user: %w", err)
+	}
+	if n.At.IsZero() {
+		n.At = s.now()
+	}
+	for _, t := range targets {
+		s.queue.add(job{target: t, notification: s.machineNotification(n, t.Locale)})
+	}
+	return len(targets), nil
+}
+
+// NotifyAccountDevice queues the "new device" push to every push
+// registration of the user whose session is still usable, as NotifyUser.
+func (s *Service) NotifyAccountDevice(ctx context.Context, userID int64, n AccountDeviceNotice) (int, error) {
+	if s.queue == nil {
+		return 0, nil
+	}
+	targets, err := s.userTargets(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("push: notify account device: %w", err)
+	}
+	if n.At.IsZero() {
+		n.At = s.now()
+	}
+	for _, t := range targets {
+		s.queue.add(job{target: t, notification: s.accountDeviceNotification(n, t.Locale)})
+	}
+	return len(targets), nil
+}
+
+// userTargets are the push registrations of the user whose session is still
+// usable (the conditions of chat.PushTargets: not revoked, idle less than
+// SessionIdleTimeout, younger than SessionMaxAge).
+func (s *Service) userTargets(ctx context.Context, userID int64) ([]chat.PushTarget, error) {
 	now := s.now()
 	rows, err := s.pool.Query(ctx, `
 		SELECT ps.id, ps.user_id, ps.endpoint, ps.p256dh, ps.auth, ps.locale
@@ -239,21 +273,11 @@ func (s *Service) NotifyUser(ctx context.Context, userID int64, n MachineNotice)
 		ORDER BY ps.id`,
 		s.cfg.TenantID, userID, now.Add(-s.cfg.SessionIdleTimeout), now.Add(-s.cfg.SessionMaxAge))
 	if err != nil {
-		return 0, fmt.Errorf("push: notify user: %w", err)
+		return nil, err
 	}
-	targets, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (chat.PushTarget, error) {
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (chat.PushTarget, error) {
 		var t chat.PushTarget
 		err := row.Scan(&t.SubscriptionID, &t.UserID, &t.Endpoint, &t.P256DH, &t.Auth, &t.Locale)
 		return t, err
 	})
-	if err != nil {
-		return 0, fmt.Errorf("push: notify user: %w", err)
-	}
-	if n.At.IsZero() {
-		n.At = now
-	}
-	for _, t := range targets {
-		s.queue.add(job{target: t, notification: s.machineNotification(n, t.Locale)})
-	}
-	return len(targets), nil
 }

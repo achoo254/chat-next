@@ -219,11 +219,10 @@ describe("activity frames on the machine's link", () => {
 	it("are kept for the activity line without changing the link's state, so the session list does not render again", async () => {
 		const machine = await FakeMachine.create();
 		const device = await generateKeyPair();
-		machine.paired = [device.publicKey];
+		machine.trusted = [device.publicKey];
 		const link = new MachineLink({
 			device: () => Promise.resolve(device),
-			deviceName: "test",
-			pinned: () => Promise.resolve(machine.keys.publicKey),
+			expectedKey: () => machine.keys.publicKey,
 			tunnelUrl: () => "wss://abc.tunnel.hoandat.com",
 			refreshTunnel: () => Promise.resolve("wss://abc.tunnel.hoandat.com"),
 			socket: machine.factory,

@@ -10,6 +10,8 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"app.local/server/internal/agentgrant"
 	"app.local/server/internal/assistant"
 	"app.local/server/internal/auth"
 	"app.local/server/internal/botadmin"
@@ -35,6 +38,7 @@ import (
 	"app.local/server/internal/config"
 	"app.local/server/internal/gateway"
 	"app.local/server/internal/hooks"
+	"app.local/server/internal/keyproof"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/machineapi"
 	"app.local/server/internal/media"
@@ -221,6 +225,14 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	keyProofs, err := keyproof.New(subKey(cfg.SessionKey, "key-challenge"))
+	if err != nil {
+		return nil, err
+	}
+	grants, err := newGrantRevoker(cfg, st, httpClient, logger)
+	if err != nil {
+		return nil, err
+	}
 	var feedback rpc.FeedbackReplier
 	var announcer rpc.Announcer
 	if assistantSvc != nil {
@@ -230,7 +242,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	rpcDeps := rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, SignIn: routes, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		Bots: botAdmin, BotUpdates: botUpdates, MiniApp: miniAppSigner, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
-		TenantName: cfg.TenantDomain, Logger: logger,
+		TenantName: cfg.TenantDomain, Logger: logger, KeyProofs: keyProofs, MachineGrants: grants,
 	}
 	rpcHandler, err := rpc.NewHandler(rpcDeps)
 	if err != nil {
@@ -238,6 +250,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	}
 	machines, err := machineapi.New(machineapi.Config{
 		TenantID: cfg.TenantID, TenantDomain: cfg.TenantDomain, Resource: publicOrigin + "/mcp", AdmitNewUser: routes.AdmitSignup,
+		KeyProofs: keyProofs, Grants: grants,
 	},
 		st, idp, pushSvc, limiter, logger.With("component", "machineapi"))
 	if err != nil {
@@ -272,7 +285,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		cancel: cancel}
 	loops := []func(context.Context){
 		ids.Run, chatSvc.RunOutboxSweeper, chatSvc.RunMaintenance, hub.RunActivity, ws.RunSweeps, hookSvc.Run, botUpdates.Run,
-		pushSvc.Run, privacySvc.Run,
+		pushSvc.Run, privacySvc.Run, grants.Run,
 		func(ctx context.Context) { runEvery(ctx, time.Minute, func() { limiter.Sweep(10 * time.Minute) }) },
 		func(ctx context.Context) {
 			runEvery(ctx, botAbuseRuleEvery, func() {
@@ -346,6 +359,30 @@ func newMCP(cfg config.Config, st *store.Store, idp *auth.IdP, origins *auth.Ori
 		TenantID: cfg.TenantID, IdP: idp, Store: st, Services: services, Limiter: limiter,
 		AllowOrigin: origins.Allowed, SessionKey: cfg.SessionKey, Logger: logger.With("component", "mcp"),
 	})
+}
+
+// subKey derives a key for one use from the session key, so a value made
+// for that use never verifies as another.
+func subKey(sessionKey []byte, use string) []byte {
+	m := hmac.New(sha256.New, sessionKey)
+	m.Write([]byte("chat-subkey:" + use))
+	return m.Sum(nil)
+}
+
+// newGrantRevoker sets up the revocation of removed machines' IdP grants:
+// off (grants stay pending) without TUNELO_GRANT_REVOKE_URL.
+func newGrantRevoker(cfg config.Config, st *store.Store, httpClient *http.Client, logger *slog.Logger) (*agentgrant.Revoker, error) {
+	logger = logger.With("component", "agentgrant")
+	var client agentgrant.Client
+	if cfg.TuneloGrantRevokeURL != "" {
+		c, err := agentgrant.NewHTTPClient(cfg.TuneloGrantRevokeURL, cfg.OIDCClientID, cfg.OIDCClientSecret, httpClient)
+		if err != nil {
+			return nil, err
+		}
+		client = c
+	}
+	logger.Info("tunelo grant revocation", "enabled", client != nil)
+	return agentgrant.New(st, client, cfg.TenantID, logger), nil
 }
 
 // newPush sets up Web Push: off (registrations refused, no consumer)

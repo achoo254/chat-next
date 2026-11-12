@@ -2,7 +2,7 @@
   "name": "@achoo254/chat-remote-protocol",
   "version": "0.0.0",
   "private": true,
-  "description": "End-to-end encrypted link between a user's device and their own machine: handshake, sealed frames, device pairing and journal rules; runs in browsers and Node",
+  "description": "End-to-end encrypted link between a user's device and their own machine: handshake, sealed frames, key possession proofs and journal rules; runs in browsers and Node",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -15,8 +15,6 @@
   "dependencies": {
     "@achoo254/chat-proto": "workspace:*",
     "@bufbuild/protobuf": "2.16.0",
-    "@noble/curves": "2.4.0",
-    "@noble/hashes": "2.4.0",
     "tweetnacl": "1.0.3"
   }
 }

@@ -25,7 +25,7 @@ import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-to
 import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
 
 const NOT_RUNNING =
-	"tunelo is not running in the background: run `tunelo start`, then call the tool again.";
+	"tunelo is not running in the background: run `tunelo login`, then call the tool again.";
 /** How long the list waits for the service to name the Chat and Localman tools. */
 const REMOTE_LIST_WAIT_MS = 8_000;
 
@@ -146,7 +146,7 @@ async function offeredTools(dir: string, context: McpContext, ticket: string | u
  */
 export function registerMcpCommand(program: Command): void {
 	program
-		.command("mcp")
+		.command("mcp", { hidden: true })
 		.description("Run an MCP server (stdio) with tunelo's tools: tunnels, Chat, Localman")
 		.option("--server <url>", "Tunnel server URL")
 		.action(async (options: { server?: string }) => {

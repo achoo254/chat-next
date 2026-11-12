@@ -27,15 +27,14 @@ export type MachinesView =
 	| { readonly page: "list" }
 	/** The "Cần bạn" board of every machine (what phones open from the list). */
 	| { readonly page: "need" }
-	/** Managing the machines: the list, adding, pairing, details. */
+	/** Managing the machines: the list and the account's devices, adding, details. */
 	| { readonly page: "machines" }
 	| { readonly page: "add" }
-	/** Development only: pair with `tunelo run` on this computer. */
+	/** Development only: reach `tunelo run` on this computer. */
 	| { readonly page: "local" }
 	/** The machine's sessions and their board. */
 	| { readonly page: "machine"; readonly machine: string }
 	| { readonly page: "info"; readonly machine: string }
-	| { readonly page: "pair"; readonly machine: string }
 	/** The machine's plain shells (tunelo 2.4.0+ with its terminal process); ?new=<folder> opens one more. */
 	| { readonly page: "terminal"; readonly machine: string }
 	| { readonly page: "session"; readonly machine: string; readonly threadId: string }
@@ -101,10 +100,9 @@ export const paths = {
 	moderationBot: (botId: number) => `/moderation/bots/${botId}`,
 	machines: () => "/ai",
 	machinesAdd: () => "/ai/add",
-	machinesLocal: () => "/ai/local/pair",
+	machinesLocal: () => "/ai/local/setup",
 	machine: (machine: string) => `/ai/${machine}`,
 	machineInfo: (machine: string) => `/ai/${machine}/info`,
-	machinePair: (machine: string) => `/ai/${machine}/pair`,
 	machineTerminal: (machine: string) => `/ai/${machine}/terminal`,
 	machineSession: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}`,
 	/** The sign-in card alone, for visitors (the header's "Đăng nhập"); signed in, it opens the chats. */
@@ -223,12 +221,11 @@ function matchMachines(parts: readonly string[]): Route | null {
 	const head = parts[0] ?? "";
 	// The development machine exists only in development builds.
 	const local = head === "local" && import.meta.env.DEV;
-	if (local && parts.length === 2 && parts[1] === "pair") return route({ page: "local" });
+	if (local && parts.length === 2 && parts[1] === "setup") return route({ page: "local" });
 	const machine = local ? "local" : parseId(head) === null ? null : head;
 	if (machine === null) return null;
 	if (parts.length === 1) return route({ page: "machine", machine });
 	if (parts.length === 2 && parts[1] === "info") return route({ page: "info", machine });
-	if (parts.length === 2 && parts[1] === "pair" && !local) return route({ page: "pair", machine });
 	if (parts.length === 2 && parts[1] === "terminal") return route({ page: "terminal", machine });
 	// The third part: a thread id, or the repository key of the usage page (only a filter of the machine's own report).
 	const threadId = parts[2] === undefined ? "" : decodeURIComponent(parts[2]);

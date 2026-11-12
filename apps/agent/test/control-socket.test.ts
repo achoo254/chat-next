@@ -33,7 +33,6 @@ let localPort = 0;
 const answers: string[] = [];
 
 let forwardOn = true;
-let usageDeletes = 0;
 let forwardBlocked: number[] = [];
 
 /** A machine with just what the commands touch. */
@@ -41,28 +40,10 @@ function fakeMachine(): Machine {
   const fake = {
     machineInfo: async () => ({ name: "mac", agentVersion: "2.0.0", providers: [], openSessions: 0, maxSessions: 3, memoryMb: 1 }),
     config: {
-      get: () => ({ devices: [{ key: "devicekey123456", name: "phone", addedAt: 0 }], trustedDirs: [] }),
-      revokeDevice: () => true,
+      get: () => ({ trustedDevices: { list: [{ key: "devicekey123456", name: "phone", platform: "web", createdAt: 0 }], syncedAt: 5 }, trustedDirs: [] }),
       setTrusted: (d: string) => d,
     },
-    dropDevice: () => undefined,
     audit: { write: () => undefined, list: () => [] },
-    profiles: {
-      list: async () => ({ profiles: [{ id: "", email: "me@example.com", organization: "", plan: "max", signedIn: true, createdAt: 0 }], selectedId: "" }),
-      select: (id: string) => {
-        if (id === "nope") throw new Error("no such profile");
-      },
-      prepareTerminal: async () => ({ id: "p1", home: join(dir, "claude-profiles", "p1", "home") }),
-      finishTerminal: async () => ({ ok: false, error: "expired" }),
-      cancel: async () => undefined,
-      remove: async () => undefined,
-      refreshUsage: async () => undefined,
-    },
-    usage: {
-      deleteLedger: async () => {
-        usageDeletes++;
-      },
-    },
     localForward: {
       state: () => ({ enabled: forwardOn, available: false, blockedPorts: forwardBlocked }),
       setEnabled: (on: boolean) => {
@@ -107,10 +88,11 @@ beforeAll(async () => {
       register: async () => {
         throw new Error("not reached: the session does not cover Chat");
       },
-      claim: async () => undefined,
     },
-    publicKey: () => new Uint8Array(32),
-    agentVersion: "2.0.0",
+    machineKey: () => {
+      throw new Error("not reached: the session does not cover Chat");
+    },
+    agentVersion: "3.0.0",
     onRegistered: () => undefined,
     log: () => undefined,
   });
@@ -131,20 +113,10 @@ describe("control socket", () => {
     expect(Object.keys(CONTROL_ROUTES).sort()).toEqual(
       [
         "GET /apps",
-        "GET /audit",
-        "GET /claude/profiles",
-        "GET /devices",
         "GET /local-forward",
         "GET /status",
         "GET /trust",
         "GET /tunnels",
-        "POST /claude/profiles/cancel",
-        "POST /claude/profiles/finish",
-        "POST /claude/profiles/prepare",
-        "POST /claude/profiles/remove",
-        "POST /claude/profiles/select",
-        "POST /claude/profiles/usage",
-        "POST /devices/revoke",
         "POST /local-forward",
         "POST /local-forward/blocked",
         "POST /mcp/call",
@@ -153,9 +125,7 @@ describe("control socket", () => {
         "POST /restart",
         "POST /streams/alive",
         "POST /trust",
-        "POST /totp/enroll",
         "POST /tunnels/close",
-        "POST /usage/delete",
       ].sort(),
     );
     expect(Object.keys(CONTROL_STREAMS).sort()).toEqual(["POST /mcp/session", "POST /tunnels/open"]);
@@ -259,25 +229,13 @@ describe("control socket", () => {
   test("the machine commands answer without tokens", async () => {
     const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     try {
-      await call("GET", "/status");
-      await call("GET", "/devices");
-      await call("POST", "/devices/revoke", { key: "devicekey" });
+      expect(await call("GET", "/status")).toMatchObject({ name: "mac", registered: false, trustedDevices: 1, trustSyncedAt: 5 });
       await call("GET", "/trust");
       await call("POST", "/trust", { dir: "/tmp/x", trusted: "true" });
-      await call("GET", "/audit");
       expect(await call("GET", "/apps")).toMatchObject({ chat: { status: "sign-in" }, localman: { status: "sign-in" } });
       expect(await call("POST", "/registration/retry")).toEqual({ retrying: true });
-      expect(await call("GET", "/claude/profiles")).toMatchObject({ selectedId: "" });
-      expect(await call("POST", "/claude/profiles/select", { id: "" })).toMatchObject({ selectedId: "" });
-      expect(await call("POST", "/claude/profiles/select", { id: "nope" })).toEqual({ error: "no such profile" });
-      expect(await call("POST", "/claude/profiles/prepare")).toMatchObject({ id: "p1" });
-      expect(await call("POST", "/claude/profiles/finish", { id: "p1" })).toEqual({ ok: false, error: "expired" });
-      expect(await call("POST", "/claude/profiles/cancel", { id: "p1" })).toEqual({ cancelled: true });
-      expect(await call("POST", "/claude/profiles/usage", { id: "" })).toMatchObject({ selectedId: "" });
-      expect(await call("POST", "/claude/profiles/remove", { id: "p1" })).toMatchObject({ selectedId: "" });
-      expect(await call("POST", "/claude/profiles/remove", {})).toMatchObject({ error: expect.any(String) });
-      expect(await call("POST", "/usage/delete")).toEqual({ deleted: true });
-      expect(usageDeletes).toBe(1);
+      expect(await call("POST", "/registration/retry", { signedInNow: true })).toEqual({ retrying: true });
+      expect(await call("POST", "/registration/retry", { signedInNow: "yes" })).toMatchObject({ error: expect.any(String) });
       expect(await call("GET", "/local-forward")).toEqual({ enabled: true, available: false, blockedPorts: [] });
       expect(await call("POST", "/local-forward", { enabled: false })).toMatchObject({ enabled: false });
       expect(await call("POST", "/local-forward", { enabled: "no" })).toMatchObject({ error: expect.any(String) });
@@ -285,7 +243,6 @@ describe("control socket", () => {
       expect(await call("POST", "/local-forward/blocked", { ports: [70000], blocked: true })).toMatchObject({ error: expect.any(String) });
       await call("POST", "/restart");
       expect(await call("POST", "/streams/alive", { id: "nope" })).toMatchObject({ error: "no such stream" });
-      expect(await call("POST", "/devices/revoke", { key: "x" })).toMatchObject({ error: expect.stringContaining("6 characters") });
       expect(await call("POST", "/nope")).toMatchObject({ error: "unknown command POST /nope" });
       await new Promise((r) => setTimeout(r, 300));
     } finally {

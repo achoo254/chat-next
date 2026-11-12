@@ -15,14 +15,8 @@ import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { MachineBrowser } from "../../src/machines/browser/machine-browser.tsx";
 import ScreenView from "../../src/machines/screen/screen-view.tsx";
 import { keysymOfChar, keysymOfKey, VncChannel } from "../../src/machines/screen/vnc-channel.ts";
-import { QuickInstall } from "../../src/machines/pair-device.tsx";
-import { quickInstallCommand } from "../../src/machines/add-machine.tsx";
 import { MachineLink, type Timers } from "../../src/machines/link/machine-link.ts";
-import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 import { defaultAnswer, FakeMachine, until } from "./fake-machine.ts";
-
-/** CopyButton reports through the app's toasts. */
-const services = { toasts: { show: () => undefined } } as unknown as Services;
 
 /** noVNC needs a real canvas: a stand-in that records what the view asks of it. */
 const made: { credentials?: unknown; sent: unknown[]; connect: () => void }[] = [];
@@ -74,7 +68,7 @@ beforeEach(async () => {
 	status = { supported: true, enabled: true, exposed: false, firewallOn: false };
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	machine.handler = (frame, socket) => {
 		switch (frame.body.case) {
 			case "screenShareStatusRequest":
@@ -97,8 +91,7 @@ beforeEach(async () => {
 async function openLink(): Promise<MachineLink> {
 	const l = new MachineLink({
 		device: () => Promise.resolve(device),
-		deviceName: "test",
-		pinned: () => Promise.resolve(machine.keys.publicKey),
+		expectedKey: () => machine.keys.publicKey,
 		tunnelUrl: () => URL_A,
 		refreshTunnel: () => Promise.resolve(URL_A),
 		socket: machine.factory,
@@ -291,30 +284,7 @@ describe("deleting the browser's profile", () => {
 	});
 });
 
-describe("getting tunelo onto a machine", () => {
-	it("the quick install follows the machine's system, or lets the user pick", async () => {
-		expect(quickInstallCommand("windows", "https://chat.hoandat.com", "vi")).toBe("& ([scriptblock]::Create((irm https://chat.hoandat.com/agent/install.ps1))) vi");
-		expect(quickInstallCommand("mac", "https://chat.hoandat.com", "vi")).toBe("curl -fsSL https://chat.hoandat.com/agent/install.sh | sh -s -- vi");
-		const { unmount } = render(
-			<I18nProvider>
-<ServicesContext value={services}><QuickInstall machineOs="win32" /></ServicesContext>
-			</I18nProvider>,
-		);
-		expect(screen.getByText(/Mở PowerShell trên máy đó/)).toBeTruthy();
-		expect(screen.getByText(/install\.ps1/)).toBeTruthy();
-		expect(screen.getByText(/mở cửa sổ PowerShell mới/)).toBeTruthy();
-		expect(screen.queryByRole("group", { name: "Hệ điều hành của máy" })).toBeNull();
-		unmount();
-		render(
-			<I18nProvider>
-<ServicesContext value={services}><QuickInstall machineOs="" /></ServicesContext>
-			</I18nProvider>,
-		);
-		expect(screen.getByText(/install\.sh/)).toBeTruthy();
-		await userEvent.click(screen.getByRole("button", { name: "Windows" }));
-		expect(screen.getByText(/install\.ps1/)).toBeTruthy();
-	});
-
+describe("a first machine", () => {
 	it("an account with no machine is told what AI Agent does and how to start; on a phone, where to run it", async () => {
 		const { FirstMachine } = await import("../../src/machines/first-machine.tsx");
 		const ua = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)");

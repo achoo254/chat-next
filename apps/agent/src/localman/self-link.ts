@@ -115,7 +115,7 @@ export class LocalmanLink {
     this.current = this.stored() ?? this.current;
   }
 
-  /** Localman's line in `tunelo whoami`. */
+  /** Localman's line in `tunelo status`. */
   state(): AppState {
     const s = { ...this.current };
     if (s.status === "ok") s.detail = `${s.detail}; ${forwardDetail(this.deps.forward?.())}`;

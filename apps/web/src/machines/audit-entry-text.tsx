@@ -1,6 +1,6 @@
-// One line of a machine's consent log: who did what, how a device was paired
-// (the Authenticator code or the install command on the machine), the path,
-// and the detail of the actions that have a readable one.
+// One line of a machine's consent log: who did what (or, for the account's
+// devices, which device was added or revoked), the path, and the detail of
+// the actions that have a readable one.
 import type { AuditEntry } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "./copy-vi.ts";
 
@@ -19,7 +19,6 @@ export function AuditEntryText({ entry, copy }: { entry: AuditEntry; copy: Machi
 	return (
 		<>
 			{entry.device} {copy.auditActions[entry.action] ?? entry.action}
-			{entry.action === "pair" && copy.auditPairedBy[entry.detail]}
 			{entry.path !== "" && (
 				<>
 					{" "}

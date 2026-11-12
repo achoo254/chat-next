@@ -120,7 +120,7 @@ describe("tunelo mcp over stdio", () => {
 		await waitFor(() => tunnelServer.openSockets() === 0);
 	});
 
-	test("without the background service it still answers (read tools only: writes are off there), and a call says to start it", async () => {
+	test("without the background service it still answers (read tools only: writes are off there), and a call says how to start it", async () => {
 		const empty = mkdtempSync(join(tmpdir(), "tunelo-mcp-none-"));
 		try {
 			const { client, transport } = mcpClient(bundle, tunnelServer.wsUrl, empty);
@@ -129,7 +129,7 @@ describe("tunelo mcp over stdio", () => {
 			expect(tools.tools.map((t) => t.name).sort()).toEqual(READ_TOOLS);
 			const result = await client.callTool({ name: "whoami", arguments: {} });
 			expect(result.isError).toBe(true);
-			expect(textOf(result)).toContain("tunelo start");
+			expect(textOf(result)).toContain("tunelo login");
 			await client.close();
 		} finally {
 			rmSync(empty, { recursive: true, force: true });

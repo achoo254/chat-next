@@ -25,7 +25,6 @@
 .mx .dot.off { background: var(--c-border-strong); }
 .mx .dot.wait { background: var(--c-warning); }
 .mx .dot.warn { background: var(--c-error); }
-.mx .dot.pair { background: var(--c-primary); }
 
 /* The AI Agent column: one toggle for what needs the user or runs, then every project of every machine. */
 .mx-nav-top { display: flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-1) 0 var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
@@ -234,7 +233,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-disk-guide ol { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
 .mx-strip.error { background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error); }
 
-/* Add machine, pair */
+/* Add machine */
 /* A vertical stepper: every step has the same numbered marker, tinted while it is the current one and ticked once done. */
 .mx-steps { --mx-step: 28px; list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-5); counter-reset: step; }
 .mx-steps > li { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); justify-items: start; min-width: 0; padding-left: calc(var(--mx-step) + var(--space-3)); counter-increment: step; }
@@ -248,12 +247,6 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-ext { display: inline-flex; align-items: center; gap: var(--space-1); }
 .mx-cmd { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); }
 .mx-cmd code { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.8125rem; overflow-wrap: anywhere; user-select: all; }
-.mx-otp { display: flex; gap: var(--space-2); width: 100%; max-width: 304px; }
-.mx-otp .input { flex: 1 1 0; min-width: 0; width: auto; height: 52px; padding: 0; text-align: center; font-family: var(--font-mono); font-size: 1.25rem; }
-/* A wrapper (data-id) in a stepper, whose items shrink to content: give the boxes the full width to share. */
-.mx-otp-wrap { justify-self: stretch; min-width: 0; }
-/* A QR code stays dark on light in either theme: scanners need that contrast, so no theme colour here. */
-.mx-qr { display: block; width: min(100%, 220px); height: auto; aspect-ratio: 1; border-radius: var(--radius-sm); background: white; color: black; }
 .mx-field-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); font-size: 0.875rem; font-weight: 500; }
 
 /* Machine page */
@@ -265,12 +258,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; font-size: 0.875rem; }
 .mx-kv dt { color: var(--c-text-muted); }
 .mx-kv dd { margin: 0; }
-.mx-devices { display: grid; gap: var(--space-2); min-width: 0; }
-.mx-totp { display: grid; gap: var(--space-2); min-width: 0; justify-items: start; }
 .mx-device-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .mx-device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .mx-device .tx { display: grid; min-width: 0; }
 .mx-device b { font-weight: 500; overflow-wrap: anywhere; }
+.mx-device.revoked b { color: var(--c-text-muted); }
 .mx-device small { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); color: var(--c-text-muted); font-size: 0.75rem; }
 .mx .acts, .mx-sheet .acts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
@@ -732,11 +724,6 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-first .btn-lg { min-height: 48px; padding-inline: var(--space-5); font-size: 1rem; }
 .mx-first.compact { padding: var(--space-5) var(--space-3); }
 .mx-first-phone { font-weight: 600; }
-.mx-quick-install { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-.mx-quick-install .note { margin: 0; }
-.mx-pair-offline { display: grid; gap: var(--space-2); }
-.mx-pair-offline h4 { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
-.mx-pair-offline > p { margin: 0; }
 .mx-update { display: grid; gap: var(--space-2); margin-top: var(--space-2); min-width: 0; justify-items: start; }
 .mx-update progress { width: min(16rem, 100%); }
 

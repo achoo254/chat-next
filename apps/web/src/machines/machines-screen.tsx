@@ -1,7 +1,7 @@
 // "AI Agent" (ADR 0013): chatting with the AI on the user's own machines.
 // The column on the left is always the sessions of every machine
 // (session-sidebar.tsx); beside it the "Cần bạn" board, a machine's board, a
-// session, or the machine pages (list, adding, pairing, details) reached
+// session, or the machine pages (list and devices, adding, details) reached
 // from "Máy" at the top of the column. Phones show one column at a time:
 // the sessions at /ai, the page itself elsewhere. Old /machines links open
 // the same page under /ai. A machine's terminals (xterm and the dock) load
@@ -16,7 +16,6 @@ import { LocalMachine } from "./local-machine.tsx";
 import { MachineDetail } from "./machine-detail.tsx";
 import { PageHead } from "./page-head.tsx";
 import { MachinesPage } from "./machines-page.tsx";
-import { PairDevice } from "./pair-device.tsx";
 import { TerminalScreen } from "./terminal-screen.ts";
 import { HomeBoard, MachineBoard } from "./session-board.tsx";
 import { SessionChat } from "./session-chat.tsx";
@@ -60,9 +59,6 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			break;
 		case "info":
 			main = <MachineDetail key={view.machine} machine={view.machine} />;
-			break;
-		case "pair":
-			main = <PairDevice key={view.machine} machine={view.machine} />;
 			break;
 		case "machine":
 			main = <MachineBoard key={view.machine} machine={view.machine} />;

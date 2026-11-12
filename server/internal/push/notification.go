@@ -22,9 +22,9 @@ const (
 	// machineTTL is how long a push service keeps a machine's "needs you"
 	// push: a request older than that has likely been answered or expired.
 	machineTTL = time.Hour
-	// devicePairedTTL is how long a push service keeps a "new device
-	// paired" push: the owner should learn of it even a day later.
-	devicePairedTTL = 24 * time.Hour
+	// accountDeviceTTL is how long a push service keeps a "new device"
+	// push: the owner should learn of it even a day later.
+	accountDeviceTTL = 24 * time.Hour
 	// usageHintTTL is how long a push service keeps a usage hint push: the
 	// hint is for a session still running, which the agent counts as one
 	// with a call in the last 30 minutes.
@@ -36,32 +36,39 @@ type copyText struct {
 	hidden, photo, video, audio, voice, file string
 	// Machine pushes (fmt formats): the machine's name, and for
 	// machinePending also the number of waiting requests.
-	machineApproval, machineQuestion, machinePending, devicePaired string
+	machineApproval, machineQuestion, machinePending string
 	// usageHint names the machine only (fmt format).
 	usageHint string
+	// accountDevice: a device key was added to the account (fmt format: the
+	// device's name and platform).
+	accountDevice string
 }
 
 var copies = map[string]copyText{
 	LocaleVI: {hidden: "Bạn có tin nhắn mới", photo: "Ảnh", video: "Video", audio: "Âm thanh", voice: "Tin nhắn thoại", file: "Tệp",
 		machineApproval: "Claude trên %s cần bạn duyệt", machineQuestion: "Claude trên %s cần bạn trả lời",
-		machinePending: "Claude trên %s có %d việc cần bạn", devicePaired: "Một thiết bị mới vừa ghép với %s",
-		usageHint: "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên %s"},
+		machinePending: "Claude trên %s có %d việc cần bạn",
+		usageHint:      "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên %s",
+		accountDevice:  "Thiết bị mới được thêm vào tài khoản: %s (%s). Không phải bạn? Thu hồi ngay trong AI Agent"},
 	LocaleEN: {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File",
 		machineApproval: "Claude on %s needs your approval", machineQuestion: "Claude on %s needs your answer",
-		machinePending: "Claude on %s has %d requests waiting for you", devicePaired: "A new device was just paired with %s",
-		usageHint: "A tip to use the AI more efficiently in a session on %s"},
+		machinePending: "Claude on %s has %d requests waiting for you",
+		usageHint:      "A tip to use the AI more efficiently in a session on %s",
+		accountDevice:  "A new device was added to your account: %s (%s). Not you? Revoke it in AI Agent"},
 	LocaleZhCN: {hidden: "你有一条新消息", photo: "照片", video: "视频", audio: "音频", voice: "语音消息", file: "文件",
 		machineApproval: "%s 上的 Claude 需要你批准", machineQuestion: "%s 上的 Claude 需要你回答",
-		machinePending: "%s 上的 Claude 有 %d 个请求等你处理", devicePaired: "有新设备刚刚与 %s 配对",
-		usageHint: "%s 上的一个会话有更省用量的建议"},
+		machinePending: "%s 上的 Claude 有 %d 个请求等你处理",
+		usageHint:      "%s 上的一个会话有更省用量的建议",
+		accountDevice:  "你的账号添加了新设备：%s（%s）。不是你？请在 AI Agent 中撤销"},
 }
 
 // Payload is the JSON the service worker receives (apps/web/src/sw). A
 // message push has ChatID and no Kind; a machine push (ADR 0013) has Kind
-// KindMachine, MachineID and SessionID instead of ChatID.
+// KindMachine, MachineID and SessionID instead of ChatID; a new device of the
+// account has Kind KindAccountDeviceAdded and no id.
 type Payload struct {
-	// Kind is "" for a message and KindMachine for a machine that needs the
-	// user.
+	// Kind is "" for a message, KindMachine for a machine that needs the
+	// user and KindAccountDeviceAdded for a new device of the account.
 	Kind string `json:"kind,omitempty"`
 	// ChatID is below 2^53 (ADR 0001).
 	ChatID int64 `json:"chat_id,omitempty"`
@@ -73,8 +80,9 @@ type Payload struct {
 	Body      string `json:"body"`
 	// Tag groups notifications: one per chat, as the in-app ones
 	// ("chat:<id>"), one per machine ("machine:<id>"), and apart from it
-	// one per machine for a newly paired device ("machine-paired:<id>") and
-	// for a usage hint ("machine-usage:<id>"), so none replaces another.
+	// one per machine for a usage hint ("machine-usage:<id>"), so none
+	// replaces another; one per new device key of the account
+	// ("account-device:<id>").
 	Tag string `json:"tag"`
 	// URL is the app path the notification opens.
 	URL    string `json:"url"`
@@ -155,9 +163,6 @@ const KindMachine = "machine"
 const (
 	MachineApproval = "approval"
 	MachineQuestion = "question"
-	// MachineDevicePaired: a new device was just paired with the machine.
-	// The notice names the machine only, never the device.
-	MachineDevicePaired = "device_paired"
 	// MachineUsageHint: a running session went past a usage rule. The notice
 	// names the machine only, never the session, rule or numbers.
 	MachineUsageHint = "usage_hint"
@@ -168,8 +173,7 @@ const (
 type MachineNotice struct {
 	MachineID   int64
 	MachineName string
-	// Kind is MachineApproval, MachineQuestion, MachineDevicePaired or
-	// MachineUsageHint.
+	// Kind is MachineApproval, MachineQuestion or MachineUsageHint.
 	Kind string
 	// Pending is how many requests wait on the machine; above 1 the push
 	// gives the count instead of the kind.
@@ -185,13 +189,6 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 		text = copies[LocaleVI]
 	}
 	id := strconv.FormatInt(n.MachineID, 10)
-	if n.Kind == MachineDevicePaired {
-		p := Payload{Kind: KindMachine, MachineID: n.MachineID, Title: s.cfg.AppName,
-			Body: fmt.Sprintf(text.devicePaired, n.MachineName), Tag: "machine-paired:" + id, URL: "/machines/" + id,
-			Timestamp: n.At.UnixMilli()}
-		payload, _ := json.Marshal(p)
-		return webpush.Message{Payload: payload, TTL: devicePairedTTL, Urgency: webpush.UrgencyHigh, Topic: "machinepaired" + id}
-	}
 	if n.Kind == MachineUsageHint {
 		p := Payload{Kind: KindMachine, MachineID: n.MachineID, Title: s.cfg.AppName,
 			Body: fmt.Sprintf(text.usageHint, n.MachineName), Tag: "machine-usage:" + id, URL: "/machines/" + id + "/usage",
@@ -218,4 +215,34 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 	// characters, well below webpush.PayloadMax.
 	payload, _ := json.Marshal(p)
 	return webpush.Message{Payload: payload, TTL: machineTTL, Urgency: webpush.UrgencyHigh, Topic: "machine" + id}
+}
+
+// KindAccountDeviceAdded is Payload.Kind of the push telling the owner that
+// a device key was added to the account (MachinesService.RegisterDevice).
+const KindAccountDeviceAdded = "account_device_added"
+
+// AccountDeviceNotice is what the "new device" push says: the device's name
+// and platform as the device reported them.
+type AccountDeviceNotice struct {
+	// DeviceID is account_devices.id, which keeps each device's notification
+	// apart.
+	DeviceID int64
+	Name     string
+	Platform string
+	At       time.Time
+}
+
+// accountDeviceNotification is the push message of n in locale.
+func (s *Service) accountDeviceNotification(n AccountDeviceNotice, locale string) webpush.Message {
+	text, ok := copies[locale]
+	if !ok {
+		text = copies[LocaleVI]
+	}
+	id := strconv.FormatInt(n.DeviceID, 10)
+	p := Payload{Kind: KindAccountDeviceAdded, Title: s.cfg.AppName, Body: fmt.Sprintf(text.accountDevice, n.Name, n.Platform),
+		Tag: "account-device:" + id, URL: "/machines", Timestamp: n.At.UnixMilli()}
+	// The name is at most 64 characters and the platform 32: Marshal cannot
+	// fail and the payload stays well below webpush.PayloadMax.
+	payload, _ := json.Marshal(p)
+	return webpush.Message{Payload: payload, TTL: accountDeviceTTL, Urgency: webpush.UrgencyHigh, Topic: "accountdevice" + id}
 }

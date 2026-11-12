@@ -3,6 +3,10 @@
 // feed HKDF-SHA256, so both static keys are proven and a later key leak does
 // not open recorded sessions. B confirms the keys in its Ready; A's first
 // sealed frame confirms A's.
+//
+// Both static keys come from the owner's chat account: A expects the machine
+// key the chat lists for the machine (Machine.public_key) and B accepts the
+// device keys the chat lists for its owner (HeartbeatResponse.trusted_devices).
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import {
   HandshakeErrorCode,
@@ -15,14 +19,13 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { concat, equal, lv, random, u32, utf8 } from "../bytes.ts";
 import { type SessionKeys, Session, openBytes, sealBytes } from "./framing.ts";
-import type { PairingMethod } from "./pairing.ts";
-import { type KeyPair, dh, generateKeyPair, hkdf, hmac, sha256 } from "./primitives.ts";
+import { type KeyPair, dh, generateKeyPair, hkdf, sha256 } from "./primitives.ts";
 
-export const PROTOCOL_VERSION = 2;
-export const MIN_PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
+export const MIN_PROTOCOL_VERSION = 3;
 
 const LABEL = "hoandat-remote-v1";
-const MAX_DEVICE_NAME = 64;
+const KEY_LENGTH = 32;
 
 export class HandshakeFailure extends Error {
   constructor(
@@ -58,23 +61,15 @@ function versionsCompatible(peer: { protocolVersion: number; minProtocolVersion:
   return peer.protocolVersion >= MIN_PROTOCOL_VERSION && PROTOCOL_VERSION >= peer.minProtocolVersion;
 }
 
-export function installProof(
-  secret: Uint8Array<ArrayBuffer>,
-  deviceKey: Uint8Array,
-  machineKey: Uint8Array,
-): Promise<Uint8Array<ArrayBuffer>> {
-  return hmac(secret, utf8("install"), deviceKey, machineKey);
-}
-
 async function transcript(h: Hello, r: Omit<Ready, "confirm">): Promise<Uint8Array<ArrayBuffer>> {
   return sha256(
     lv(utf8(LABEL)),
     u32(h.protocolVersion),
     u32(h.minProtocolVersion),
-    lv(h.ephemeralKey, h.staticKey, h.nonce, utf8(h.deviceName)),
+    lv(h.ephemeralKey, h.staticKey, h.nonce),
     u32(r.protocolVersion),
     u32(r.minProtocolVersion),
-    lv(r.ephemeralKey, r.staticKey, r.nonce, r.installProof),
+    lv(r.ephemeralKey, r.staticKey, r.nonce),
   );
 }
 
@@ -87,24 +82,21 @@ async function deriveKeys(ee: Uint8Array, es: Uint8Array, se: Uint8Array, h: Hel
 // ---------------------------------------------------------------------------
 // Device side (A)
 
-export type DeviceTrust =
-  /** B's machine key pinned at pairing. */
-  | { kind: "pinned"; machineKey: Uint8Array }
-  /** First connection after the one-command install: B proves the secret. */
-  | { kind: "install"; secret: Uint8Array<ArrayBuffer> };
-
 export type DeviceHandshake = {
   /** Send this first. */
   hello: Uint8Array;
-  /** Feed B's answer; resolves with the open session and B's key to pin. */
-  finish(reply: Uint8Array): Promise<{ session: Session; machineKey: Uint8Array }>;
+  /** Feed B's answer; resolves with the open session. */
+  finish(reply: Uint8Array): Promise<{ session: Session }>;
 };
 
-export async function startHandshake(opts: {
-  device: KeyPair;
-  deviceName: string;
-  trust: DeviceTrust;
-}): Promise<DeviceHandshake> {
+/**
+ * Opens a session to the machine whose key the chat lists as
+ * expectedMachineKey. A Ready with another static key fails with
+ * MACHINE_KEY_CHANGED before any key is derived; a Ready whose key
+ * confirmation does not check fails with BAD_PROOF.
+ */
+export async function startHandshake(opts: { device: KeyPair; expectedMachineKey: Uint8Array }): Promise<DeviceHandshake> {
+  if (opts.expectedMachineKey.length !== KEY_LENGTH) throw new HandshakeFailure(HandshakeErrorCode.MALFORMED);
   const eph = await generateKeyPair();
   const hello = create(HelloSchema, {
     protocolVersion: PROTOCOL_VERSION,
@@ -112,7 +104,6 @@ export async function startHandshake(opts: {
     ephemeralKey: eph.publicKey,
     staticKey: opts.device.publicKey,
     nonce: random(32),
-    deviceName: opts.deviceName.slice(0, MAX_DEVICE_NAME),
   });
 
   return {
@@ -128,18 +119,20 @@ export async function startHandshake(opts: {
       if (!versionsCompatible(ready)) {
         throw new HandshakeFailure(HandshakeErrorCode.VERSION_UNSUPPORTED, ready);
       }
-      const machineKey = ready.staticKey;
-      const trust = opts.trust;
-      if (trust.kind === "install") {
-        const want = await installProof(trust.secret, opts.device.publicKey, machineKey);
-        if (!equal(want, ready.installProof)) throw new HandshakeFailure(HandshakeErrorCode.BAD_PROOF);
-      } else if (!equal(trust.machineKey, machineKey)) {
-        throw new HandshakeFailure(HandshakeErrorCode.BAD_PROOF);
+      if (ready.ephemeralKey.length !== KEY_LENGTH || ready.nonce.length !== 32) {
+        throw new HandshakeFailure(HandshakeErrorCode.MALFORMED);
       }
+      const machineKey = ready.staticKey;
+      if (!equal(opts.expectedMachineKey, machineKey)) throw new HandshakeFailure(HandshakeErrorCode.MACHINE_KEY_CHANGED);
 
-      const ee = await dh(eph.privateKey, ready.ephemeralKey);
-      const es = await dh(eph.privateKey, machineKey);
-      const se = await dh(opts.device.privateKey, ready.ephemeralKey);
+      let ee: Uint8Array, es: Uint8Array, se: Uint8Array;
+      try {
+        ee = await dh(eph.privateKey, ready.ephemeralKey);
+        es = await dh(eph.privateKey, machineKey);
+        se = await dh(opts.device.privateKey, ready.ephemeralKey);
+      } catch {
+        throw new HandshakeFailure(HandshakeErrorCode.MALFORMED);
+      }
       const t = await transcript(hello, ready);
       const keys = await deriveKeys(ee, es, se, hello, ready, t);
       let confirmed: Uint8Array;
@@ -149,7 +142,7 @@ export async function startHandshake(opts: {
         throw new HandshakeFailure(HandshakeErrorCode.BAD_PROOF);
       }
       if (!equal(confirmed, t)) throw new HandshakeFailure(HandshakeErrorCode.BAD_PROOF);
-      return { session: new Session(keys, "a", machineKey), machineKey };
+      return { session: new Session(keys, "a", machineKey) };
     },
   };
 }
@@ -157,13 +150,16 @@ export async function startHandshake(opts: {
 // ---------------------------------------------------------------------------
 // Machine side (B)
 
-export type DeviceStatus = "paired" | "revoked" | "unknown";
+/**
+ * What the machine knows of a device key from the owner's account: trusted
+ * (listed now), revoked (listed before and dropped since) or unknown (never
+ * listed: another account, or a key the machine has not learnt yet).
+ */
+export type DeviceStatus = "trusted" | "revoked" | "unknown";
 
 export type MachineAuth = {
   machine: KeyPair;
   deviceStatus(deviceKey: Uint8Array): DeviceStatus;
-  /** Set from `tunelo install --trust`: the installing browser's key and secret. */
-  install?: { deviceKey: Uint8Array; secret: Uint8Array<ArrayBuffer> } | undefined;
 };
 
 export type Accepted = {
@@ -171,12 +167,6 @@ export type Accepted = {
   reply: Uint8Array;
   session: Session;
   deviceKey: Uint8Array;
-  deviceName: string;
-  /**
-   * Set when this handshake paired a new device. Pairing by authenticator
-   * code happens before the handshake (pairing.ts), so only "install" here.
-   */
-  pairedBy?: Extract<PairingMethod, "install">;
 };
 
 export type Rejected = { ok: false; reply: Uint8Array; code: HandshakeErrorCode };
@@ -192,32 +182,22 @@ export async function acceptHello(bytes: Uint8Array, auth: MachineAuth): Promise
   if (plain.body.case !== "hello") return reject(HandshakeErrorCode.MALFORMED);
   const hello = plain.body.value;
   if (!versionsCompatible(hello)) return reject(HandshakeErrorCode.VERSION_UNSUPPORTED);
-  if (hello.ephemeralKey.length !== 32 || hello.staticKey.length !== 32 || hello.nonce.length !== 32) {
+  if (hello.ephemeralKey.length !== KEY_LENGTH || hello.staticKey.length !== KEY_LENGTH || hello.nonce.length !== 32) {
     return reject(HandshakeErrorCode.MALFORMED);
   }
 
   const deviceKey = hello.staticKey;
-  const machineKey = auth.machine.publicKey;
-  let pairedBy: Accepted["pairedBy"];
-  let proof = new Uint8Array();
   const status = auth.deviceStatus(deviceKey);
   if (status === "revoked") return reject(HandshakeErrorCode.REVOKED);
-  if (auth.install && equal(auth.install.deviceKey, deviceKey)) {
-    proof = await installProof(auth.install.secret, deviceKey, machineKey);
-    if (status === "unknown") pairedBy = "install";
-  } else if (status === "unknown") {
-    // A new device pairs by authenticator code first (PakeStart).
-    return reject(HandshakeErrorCode.UNKNOWN_DEVICE);
-  }
+  if (status !== "trusted") return reject(HandshakeErrorCode.UNKNOWN_DEVICE);
 
   const eph = await generateKeyPair();
   const ready = create(ReadySchema, {
     protocolVersion: PROTOCOL_VERSION,
     minProtocolVersion: MIN_PROTOCOL_VERSION,
     ephemeralKey: eph.publicKey,
-    staticKey: machineKey,
+    staticKey: auth.machine.publicKey,
     nonce: random(32),
-    installProof: proof,
   });
   let ee: Uint8Array, es: Uint8Array, se: Uint8Array;
   try {
@@ -230,13 +210,10 @@ export async function acceptHello(bytes: Uint8Array, auth: MachineAuth): Promise
   const t = await transcript(hello, ready);
   const keys = await deriveKeys(ee, es, se, hello, ready, t);
   ready.confirm = sealBytes(keys, "b-to-a", 0n, t);
-  const result: Accepted = {
+  return {
     ok: true,
     reply: encodePlain({ case: "ready", value: ready }),
     session: new Session(keys, "b", deviceKey),
     deviceKey,
-    deviceName: hello.deviceName.slice(0, MAX_DEVICE_NAME),
   };
-  if (pairedBy) result.pairedBy = pairedBy;
-  return result;
 }

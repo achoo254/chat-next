@@ -1,6 +1,6 @@
-// A paired machine for the visual harness: the real handshake and sealed
-// frames (FakeMachine) behind the browser's WebSocket for one tunnel
-// address, its key pinned in this browser, and a session with long shell
+// A machine of the account for the visual harness: the real handshake and
+// sealed frames (FakeMachine) behind the browser's WebSocket for one tunnel
+// address, its key listed in the directory, and a session with long shell
 // commands, an answered and a pending permission prompt, a grouped run, a
 // markdown answer (list, tasks, table, a code block wider than a phone),
 // diffs of two files (one more edited by a subagent), the turn's numbers
@@ -307,16 +307,23 @@ function gitFiles() {
 	];
 }
 
-/** Adds the machine to `machines`, pins its key here and answers its link; resolves with its ref. */
+/** Adds the machine (with its key) to `machines`, trusts this browser's key on it and answers its link; resolves with its ref. */
 export async function installRemoteMachineDemo(machines: FakeMachines): Promise<string> {
 	const now = Date.now();
 	const machine = await FakeMachine.create();
 	const keys = deviceKeyStore();
 	const device = await keys.device();
-	machine.paired = [device.publicKey];
-	const entry = machines.add({ name: "DIEUVY-LAPTOP", os: "win32", arch: "x64", tunnelUrl: TUNNEL, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
+	machine.trusted = [device.publicKey];
+	const entry = machines.add({
+		name: "DIEUVY-LAPTOP",
+		os: "win32",
+		arch: "x64",
+		tunnelUrl: TUNNEL,
+		lastSeenAt: BigInt(Math.floor(now / 1000)),
+		agentVersion: "2.0.1",
+		publicKey: machine.keys.publicKey,
+	});
 	const ref = String(entry.id);
-	await keys.pin(ref, machine.keys.publicKey);
 	const image = await demoImage();
 	const browserPicture = await demoBrowserPicture();
 	const at = new URLSearchParams(window.location.search).get("at");

@@ -1,16 +1,17 @@
 // One reading of "can this device use that machine now", shared by the
 // session column, the boards and the session header, so every place names
-// the same reason: not paired with this device, must pair again, tunelo too
-// old, offline (from the directory's heartbeat), connecting, reconnecting
+// the same reason: blocked (the machine refused this device, the device was
+// revoked, the machine's key changed, the session must sign in again), tunelo
+// too old, offline (from the directory's heartbeat), connecting, reconnecting
 // (attempt N), or open.
-import type { LinkState } from "./link/machine-link.ts";
+import type { LinkFailure, LinkState } from "./link/machine-link.ts";
 import { isOnline, type MachineEntry } from "./machines-client.ts";
 
+/** A lasting failure the user must act on, other than updating tunelo. */
+export type BlockReason = Exclude<LinkFailure, "version">;
+
 export type Conn =
-	| { readonly kind: "checking" }
-	/** Not paired with this device; `online`: the machine itself is reachable now. */
-	| { readonly kind: "unpaired"; readonly online: boolean }
-	| { readonly kind: "repair" }
+	| { readonly kind: "blocked"; readonly reason: BlockReason }
 	| { readonly kind: "update" }
 	| { readonly kind: "offline"; readonly lastSeenMs: number }
 	| { readonly kind: "connecting" }
@@ -23,39 +24,24 @@ export function reachable(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunn
 }
 
 /**
- * The link to open: only to a machine this device is paired with (its key
- * is pinned) and that the directory sees online. The others cost nothing:
- * no socket, no ping, no retries.
+ * The link to open: only to a machine the directory sees online. The others
+ * cost nothing: no socket, no ping, no retries.
  */
-export function shouldConnect(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunnelUrl">, pinned: boolean | null, nowMs: number): boolean {
-	return pinned === true && reachable(entry, nowMs);
+export function shouldConnect(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunnelUrl">, nowMs: number): boolean {
+	return reachable(entry, nowMs);
 }
 
-/**
- * `pinned`: whether this device holds the machine's key (null while
- * reading it). The link's own state wins once it has opened or failed.
- */
-export function connOf(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunnelUrl">, pinned: boolean | null, state: Pick<LinkState, "status">, nowMs: number): Conn {
+/** The link's own state wins once it has opened or failed. */
+export function connOf(entry: Pick<MachineEntry, "ref" | "lastSeenAt" | "tunnelUrl">, state: Pick<LinkState, "status">, nowMs: number): Conn {
 	const status = state.status;
 	if (status.kind === "open") return { kind: "on" };
-	if (status.kind === "failed") {
-		switch (status.reason) {
-			case "unpaired":
-				return { kind: "unpaired", online: true };
-			case "version":
-				return { kind: "update" };
-			default:
-				return { kind: "repair" };
-		}
-	}
-	if (pinned === false) return { kind: "unpaired", online: reachable(entry, nowMs) };
+	if (status.kind === "failed") return status.reason === "version" ? { kind: "update" } : { kind: "blocked", reason: status.reason };
 	if (!reachable(entry, nowMs)) return { kind: "offline", lastSeenMs: entry.lastSeenAt * 1000 };
-	if (pinned === null) return { kind: "checking" };
 	if ((status.kind === "connecting" || status.kind === "offline") && status.attempt > 1) return { kind: "retrying", attempt: status.attempt };
 	return { kind: "connecting" };
 }
 
-/** Pairing (again) is what unblocks this machine on this device. */
-export function needsPairing(conn: Conn): boolean {
-	return conn.kind === "unpaired" || conn.kind === "repair";
+/** Something only the user can unblock stops this device from using the machine. */
+export function isBlocked(conn: Conn): conn is Extract<Conn, { kind: "blocked" }> {
+	return conn.kind === "blocked";
 }

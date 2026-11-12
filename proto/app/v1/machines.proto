@@ -8,17 +8,13 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // always holds a value < 2^53; the server asserts the bound when serializing.
 
 // My machines (ADR 0013): the directory of the computers where the user runs
-// tunelo. The server only lists them (name, OS, public
-// key, tunnel address, last seen) and sends content-free Web Pushes for
-// them; it is never a root of trust for a machine's key and never
-// sees what goes through the tunnel. Served under /rpc with the user's
-// session like every user service.
+// tunelo, and the account's devices (browsers, the phone app) that may open
+// an end-to-end link to them. The account is the root of trust both ways:
+// the server hands each machine the owner's live device keys (Heartbeat) and
+// each device the machine's key (ListMachines). It never sees what goes
+// through the tunnel. Served under /rpc with the user's session like every
+// user service.
 service MachinesService {
-  // Retired: machines now join with the owner's account (tunelo login), so
-  // there are no install codes any more. Always fails with
-  // failed_precondition "install_codes_retired" (update tunelo, then add the
-  // machine again).
-  rpc CreateInstallCode(CreateInstallCodeRequest) returns (CreateInstallCodeResponse);
   // The caller's machines that are not revoked, oldest first.
   rpc ListMachines(ListMachinesRequest) returns (ListMachinesResponse);
   // Renames one of the caller's machines. Fails with invalid_argument for an
@@ -26,52 +22,71 @@ service MachinesService {
   // caller's (or is revoked).
   rpc RenameMachine(RenameMachineRequest) returns (RenameMachineResponse);
   // Removes the machine from the directory: its secret stops working for
-  // NotifyNeedsInput, and its next Heartbeat answers revoked, so tunelo
-  // closes its tunnel. not_found as RenameMachine.
+  // NotifyNeedsInput, its next Heartbeat answers revoked (tunelo closes its
+  // tunnel), and the IdP grant of the tunelo sign-in that registered it is
+  // revoked, so the machine only comes back after a new tunelo login.
+  // not_found as RenameMachine.
   rpc RevokeMachine(RevokeMachineRequest) returns (RevokeMachineResponse);
-  // Puts a paired device's public key on the machine's revoked list: the
-  // machine drops that device at its next Heartbeat. Succeeds when the key is
-  // already revoked; not_found as RenameMachine.
+  // A proof-of-possession challenge for RegisterDevice (see KeyChallenge).
+  rpc GetDeviceKeyChallenge(GetDeviceKeyChallengeRequest) returns (GetDeviceKeyChallengeResponse);
+  // Adds this device's key to the account, bound to the caller's session.
+  // Succeeds again (nothing changes but name and platform) for a key this
+  // session already registered. The first registration of a key pushes
+  // "new device" to every push registration of the account. Fails with
+  // invalid_argument for malformed fields; permission_denied "bad_key_proof"
+  // when the proof does not check or the challenge expired (get a new one);
+  // permission_denied "device_revoked" for a key that was ever revoked
+  // (generate a new key); permission_denied "session_devices_revoked" when a
+  // key of this session was revoked; failed_precondition "device_key_in_use"
+  // when another live session registered the key; resource_exhausted
+  // "too_many_devices" at 50 live devices.
+  rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+  // The account's devices: every live one, then the most recently revoked,
+  // newest first, at most 100 in all. A key whose session ended is revoked
+  // before listing.
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  // Revokes a device key of the account and the chat session that
+  // registered it (that device is signed out). Machines drop the device at
+  // their next Heartbeat. Succeeds when the key is already revoked;
+  // not_found for a key the account never registered.
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
 }
 
 // The calls of tunelo itself. Served under /machine-api (not /rpc): the agent
-// sends no Origin and has no user session. RegisterMachine and ClaimMachine
-// are authenticated by an access token of the owner's IdP account in
-// "Authorization: Bearer <token>": an ES256 JWT whose aud is the chat's MCP
-// resource (<chat origin>/mcp) and whose scope holds machines:write (only the
-// tunelo-agent client gets it). The other calls by the machine secret in
-// "Authorization: Bearer <machine_secret>". Every call fails with
-// unauthenticated for a wrong token or secret (and resource_exhausted after
-// too many failures from one address); RegisterMachine and ClaimMachine fail
-// with permission_denied "insufficient_scope" for a token without
+// sends no Origin and has no user session. GetMachineKeyChallenge and
+// RegisterMachine are authenticated by an access token of the owner's IdP
+// account in "Authorization: Bearer <token>": an ES256 JWT whose aud is the
+// chat's MCP resource (<chat origin>/mcp) and whose scope holds
+// machines:write (only the tunelo-agent client gets it). The other calls by
+// the machine secret in "Authorization: Bearer <machine_secret>". Every call
+// fails with unauthenticated for a wrong token or secret (and
+// resource_exhausted after too many failures from one address); the token
+// calls fail with permission_denied "insufficient_scope" for a token without
 // machines:write and unavailable while the server cannot check tokens yet.
 service MachineAgentService {
-  // Adds a machine to the directory of the token's account, claimed from the
-  // start. An account that never opened the chat gets its chat user now,
-  // with a placeholder profile that is not findable until its first web
-  // sign-in; new users are admitted as at a web sign-in, and a refusal
-  // fails with failed_precondition "chat_account_missing" (tunelo waits and
-  // retries). Fails with invalid_argument for malformed fields,
+  // A proof-of-possession challenge for RegisterMachine (see KeyChallenge).
+  rpc GetMachineKeyChallenge(GetMachineKeyChallengeRequest) returns (GetMachineKeyChallengeResponse);
+  // Adds the machine to the directory of the token's account, or takes its
+  // live row back when the account already has the same machine key (same
+  // machine_id, a new machine_secret; the old secret stops working). A
+  // removed machine is never brought back: a new row is made. An account
+  // that never opened the chat gets its chat user now, with a placeholder
+  // profile that is not findable until its first web sign-in; new users are
+  // admitted as at a web sign-in, and a refusal fails with
+  // failed_precondition "chat_account_missing" (tunelo waits and retries).
+  // Fails with invalid_argument for malformed fields, permission_denied
+  // "bad_key_proof" when the proof does not check or its challenge expired,
   // failed_precondition "agent_update_required" when agent_version is below
   // the minimum, and resource_exhausted "too_many_machines" when the owner
   // has 20 machines.
   rpc RegisterMachine(RegisterMachineRequest) returns (RegisterMachineResponse);
-  // Ties a machine registered with an install code (before accounts) to the
-  // token's account, so the tunnel check of Heartbeat applies to it. The
-  // machine is named by its secret in the request. Succeeds again for a
-  // machine already claimed by the same account. Fails with unauthenticated
-  // for a wrong secret, permission_denied "claim_wrong_account" when the
-  // machine belongs to another account and permission_denied
-  // "machine_revoked" for a removed machine.
-  rpc ClaimMachine(ClaimMachineRequest) returns (ClaimMachineResponse);
   // Reports the machine alive (every 60 s and whenever the tunnel changes)
-  // and returns what was revoked. A revoked machine gets revoked = true (and
-  // nothing is recorded); otherwise an agent_version below the minimum fails
-  // with failed_precondition "agent_update_required". For a claimed machine
-  // a tunnel_url other than the machine tunnel Tunelo holds for its owner is
+  // and returns the owner's trusted devices. A revoked machine gets revoked =
+  // true (and nothing is recorded); otherwise an agent_version below the
+  // minimum fails with failed_precondition "agent_update_required". A
+  // tunnel_url other than the machine tunnel Tunelo holds for its owner is
   // not recorded: the machine is recorded alive without a tunnel and the
-  // answer says tunnel_refused (revoked devices still come back).
+  // answer says tunnel_refused (trusted devices still come back).
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   // Asks the server to tell the owner's devices, by Web Push, that a session
   // waits for them. Pushes of one machine are at most one per 30 s: calls in
@@ -79,10 +94,16 @@ service MachineAgentService {
   // count. The push holds the machine's name and the kind of request only.
   // Fails with permission_denied "machine_revoked" for a revoked machine.
   rpc NotifyNeedsInput(NotifyNeedsInputRequest) returns (NotifyNeedsInputResponse);
+  // Removes the machine from its owner's directory, as RevokeMachine does
+  // from the web (the IdP grant of its sign-in is revoked too): tunelo
+  // logout. Succeeds again for a machine already removed.
+  rpc UnregisterMachine(UnregisterMachineRequest) returns (UnregisterMachineResponse);
 }
 
 // A machine of the directory.
 message Machine {
+  reserved 11;
+  reserved "claimed";
   int64 id = 1 [jstype = JS_NUMBER];
   // Up to 64 characters, chosen at install and changed with RenameMachine.
   string name = 2;
@@ -93,29 +114,52 @@ message Machine {
   // As last reported by the agent; claude_version is empty when unknown.
   string agent_version = 5;
   string claude_version = 6;
-  // The machine's X25519 static public key (32 bytes), as the agent reported
-  // it. Informational only: a device trusts a machine key solely through the
-  // pairing proof (ADR 0013), never because the server lists it.
+  // The machine's X25519 static public key (32 bytes): the key devices
+  // expect in the handshake; the server is the source of trust for it. The
+  // machine proved it holds the key when it registered.
   bytes public_key = 7;
   // wss://<subdomain>.tunnel.<domain>, empty while the tunnel is down.
   string tunnel_url = 8;
   // Unix seconds.
   int64 created_at = 9 [jstype = JS_NUMBER];
   int64 last_seen_at = 10 [jstype = JS_NUMBER];
-  // The machine is tied to the account by tunelo login (registered that
-  // way, or claimed later). False for a machine registered with an install
-  // code whose tunelo has not signed in with the account yet.
-  bool claimed = 11;
 }
 
-message CreateInstallCodeRequest {}
-
-// Never answered (CreateInstallCode is retired); kept for older clients.
-message CreateInstallCodeResponse {
-  // 128 random bits, base64url without padding (22 characters).
-  string code = 1;
+// Proof that a caller holds the X25519 private key of the public key it
+// registers. The server makes a throwaway X25519 key pair for each
+// challenge; the caller answers
+//   mac = HMAC-SHA256(key = X25519(caller private key, server_key), nonce)
+// and sends it back with the challenge, unchanged, in a KeyProof. A
+// challenge lives 2 minutes and is only good for the call it was made for
+// (device or machine registration). The server keeps no state: it derives
+// the throwaway key again from the challenge.
+message KeyChallenge {
+  // X25519 public key, 32 bytes.
+  bytes server_key = 1;
+  // 32 random bytes.
+  bytes nonce = 2;
   // Unix seconds.
-  int64 expires_at = 2 [jstype = JS_NUMBER];
+  int64 expires_at = 3 [jstype = JS_NUMBER];
+}
+
+message KeyProof {
+  KeyChallenge challenge = 1;
+  // HMAC-SHA256 as KeyChallenge says, 32 bytes.
+  bytes mac = 2;
+}
+
+// A device key of the account.
+message AccountDevice {
+  // X25519 static public key, 32 bytes (RevokeDevice takes it as is).
+  bytes public_key = 1;
+  string name = 2;
+  string platform = 3;
+  // Unix seconds; revoked_at is 0 for a live device.
+  int64 created_at = 4 [jstype = JS_NUMBER];
+  int64 last_seen_at = 5 [jstype = JS_NUMBER];
+  int64 revoked_at = 6 [jstype = JS_NUMBER];
+  // Registered by the caller's own session.
+  bool current = 7;
 }
 
 message ListMachinesRequest {}
@@ -140,45 +184,76 @@ message RevokeMachineRequest {
 
 message RevokeMachineResponse {}
 
+message GetDeviceKeyChallengeRequest {}
+
+message GetDeviceKeyChallengeResponse {
+  KeyChallenge challenge = 1;
+}
+
+message RegisterDeviceRequest {
+  // The device's X25519 static public key, 32 bytes.
+  bytes public_key = 1;
+  // Shown in the device list and in the "new device" push, such as
+  // "Chrome on macOS". Trimmed; 1 to 64 characters, no control characters.
+  string name = 2;
+  // What the device is, such as "web", "pwa", "ios" or "android": 1 to 32
+  // characters of a-z, 0-9 and -.
+  string platform = 3;
+  // Made with a challenge of GetDeviceKeyChallenge.
+  KeyProof proof = 4;
+}
+
+message RegisterDeviceResponse {
+  AccountDevice device = 1;
+}
+
+message ListDevicesRequest {}
+
+message ListDevicesResponse {
+  repeated AccountDevice devices = 1;
+}
+
 message RevokeDeviceRequest {
-  int64 machine_id = 1 [jstype = JS_NUMBER];
+  reserved 1;
+  reserved "machine_id";
   // The device's X25519 static public key, 32 bytes.
   bytes device_public_key = 2;
 }
 
 message RevokeDeviceResponse {}
 
+message GetMachineKeyChallengeRequest {}
+
+message GetMachineKeyChallengeResponse {
+  KeyChallenge challenge = 1;
+}
+
 message RegisterMachineRequest {
-  // Ignored: the owner comes from the access token.
-  string install_code = 1 [deprecated = true];
+  reserved 1;
+  reserved "install_code";
   // Shown in the directory; the host name is a good default. Trimmed; 1 to
-  // 64 characters, no control characters.
+  // 64 characters, no control characters. A machine registering again keeps
+  // the name it has.
   string name = 2;
   // "darwin", "win32" or "linux"; "arm64" or "x64" (process.platform and
   // process.arch).
   string os = 3;
   string arch = 4;
-  // Semantic version of tunelo, such as "2.1.0".
+  // Semantic version of tunelo, such as "3.0.0".
   string agent_version = 5;
   // The machine's X25519 static public key, 32 bytes.
   bytes public_key = 6;
+  // Made with a challenge of GetMachineKeyChallenge and the private half of
+  // public_key.
+  KeyProof proof = 7;
 }
 
 message RegisterMachineResponse {
   int64 machine_id = 1 [jstype = JS_NUMBER];
   // 256 random bits, base64url without padding (43 characters): the bearer
-  // token of Heartbeat and NotifyNeedsInput. Shown once; the server keeps
-  // only its hash.
+  // token of Heartbeat, NotifyNeedsInput and UnregisterMachine. Shown once;
+  // the server keeps only its hash.
   string machine_secret = 2;
-}
-
-message ClaimMachineRequest {
-  // RegisterMachineResponse.machine_secret of the machine to claim.
-  string machine_secret = 1;
-}
-
-message ClaimMachineResponse {
-  int64 machine_id = 1 [jstype = JS_NUMBER];
 }
 
 message HeartbeatRequest {
@@ -189,38 +264,47 @@ message HeartbeatRequest {
   // `claude --version` of the machine, up to 64 characters; empty when
   // unknown.
   string claude_version = 3;
+  // Public keys (32 bytes each, at most 50) of the devices connected to the
+  // machine now: their last_seen_at moves to now.
+  repeated bytes connected_device_keys = 4;
+}
+
+// A device the machine accepts: a live key of the owner's account.
+message TrustedDevice {
+  // X25519 static public key, 32 bytes.
+  bytes public_key = 1;
+  string name = 2;
+  string platform = 3;
+  // Unix seconds.
+  int64 created_at = 4 [jstype = JS_NUMBER];
 }
 
 message HeartbeatResponse {
+  reserved 2, 4;
+  reserved "revoked_device_keys", "claimed";
   // The user revoked the machine: close the tunnel and stop.
   bool revoked = 1;
-  // Public keys (32 bytes each) of the devices the user revoked for this
-  // machine: drop their connections and forget them.
-  repeated bytes revoked_device_keys = 2;
   // The oldest tunelo version the server accepts; update before falling
   // below it.
   string min_agent_version = 3;
-  // Machine.claimed: false asks tunelo to call ClaimMachine once it is
-  // signed in with the account.
-  bool claimed = 4;
   // The reported tunnel was opened by another account than the machine's
   // owner, so the directory shows the machine without a tunnel.
   bool tunnel_refused = 5;
+  // Every live device key of the owner, oldest first. The machine accepts
+  // these devices only: a connected device missing from the list is dropped.
+  repeated TrustedDevice trusted_devices = 6;
 }
 
-// What the machine tells the user about: a waiting session, or a security
-// event of the machine.
+// What the machine tells the user about: a waiting session, or an event of
+// the machine.
 enum NeedsInputKind {
+  reserved 3;
+  reserved "NEEDS_INPUT_KIND_DEVICE_PAIRED";
   NEEDS_INPUT_KIND_UNSPECIFIED = 0;
   // A tool waits for allow or deny.
   NEEDS_INPUT_KIND_APPROVAL = 1;
   // The AI asked the user a question.
   NEEDS_INPUT_KIND_QUESTION = 2;
-  // A new device was just paired with the machine using the machine's
-  // Authenticator code. The notice names the machine only, never the device
-  // (its name and key stay between the machine and its devices). Sent at
-  // once, never merged with the "needs you" notices.
-  NEEDS_INPUT_KIND_DEVICE_PAIRED = 3;
   // A running session went past one of the machine's usage rules. The notice
   // names the machine only: never the session, the rule, a number or a
   // repository (those reach the devices over the end-to-end link). Sent at
@@ -232,12 +316,16 @@ enum NeedsInputKind {
 message NotifyNeedsInputRequest {
   NeedsInputKind kind = 1;
   // How many approvals and questions wait on the machine in total (at least
-  // 1, at most 1000). 1 for DEVICE_PAIRED and USAGE_HINT.
+  // 1, at most 1000). 1 for USAGE_HINT.
   int32 pending_count = 2;
   // The waiting thread, so the notification opens it: up to 64 characters of
   // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
-  // for DEVICE_PAIRED and USAGE_HINT.
+  // for USAGE_HINT.
   string session_id = 3;
 }
 
 message NotifyNeedsInputResponse {}
+
+message UnregisterMachineRequest {}
+
+message UnregisterMachineResponse {}

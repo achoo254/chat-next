@@ -48,12 +48,13 @@ type Machine struct {
 	// authenticates, to be told so.
 	Revoked bool
 	// Claimed: tied to the owner's IdP account (registered with an access
-	// token, or claimed later); machines of install codes start unclaimed.
+	// token); only rows from the install-code era are unclaimed, and they
+	// become claimed when tunelo registers the same key again.
 	Claimed bool
 }
 
 // AuthenticatedMachine is the machine of a secret with its owner's IdP
-// subject (users.idp_sub), which its claim and tunnel checks compare with.
+// subject (users.idp_sub), which its tunnel check compares with.
 type AuthenticatedMachine struct {
 	Machine
 	OwnerSub string
@@ -66,6 +67,10 @@ type NewMachine struct {
 	Arch         string
 	AgentVersion string
 	PublicKey    []byte
+	// GrantID is the IdP grant of the tunelo sign-in whose access token
+	// registers the machine ("" when the token does not name it); removing
+	// the machine revokes it.
+	GrantID string
 }
 
 const machineColumns = `m.id, m.tenant_id, m.user_id, m.name, m.os, m.arch, m.agent_version, m.claude_version,
@@ -109,10 +114,13 @@ func machineTokenHash(token string) []byte {
 }
 
 // RegisterMachine adds a claimed machine of the user (a live person; the
-// caller resolved it from the access token) and returns it with its secret
-// (256 random bits; only its hash is stored). The fields must be validated
-// by the caller. ErrNotFound when the user is gone, ErrTooManyMachines at
-// the limit.
+// caller resolved it from the access token), or takes back the user's live
+// machine with the same public key: same id and name, the reported fields,
+// the new grant and a new secret (the old one stops working). A revoked
+// machine is never brought back; a new row is made. It returns the machine
+// with its secret (256 random bits; only its hash is stored). The fields
+// must be validated by the caller. ErrNotFound when the user is gone,
+// ErrTooManyMachines at the limit.
 func (s *Store) RegisterMachine(ctx context.Context, tenantID string, userID int64, n NewMachine) (Machine, string, error) {
 	secret, secretHash, err := newMachineToken(32)
 	if err != nil {
@@ -120,7 +128,8 @@ func (s *Store) RegisterMachine(ctx context.Context, tenantID string, userID int
 	}
 	var m Machine
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		// The user row serializes the user's registrations, so the limit holds.
+		// The user row serializes the user's registrations, so the limit and
+		// the one live row per key hold.
 		var live bool
 		err := tx.QueryRow(ctx, `SELECT deleted_at IS NULL FROM users WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
 			userID, tenantID).Scan(&live)
@@ -128,6 +137,15 @@ func (s *Store) RegisterMachine(ctx context.Context, tenantID string, userID int
 			return ErrNotFound
 		}
 		if err != nil {
+			return err
+		}
+		m, err = scanMachine(tx.QueryRow(ctx, `
+			UPDATE machines m SET os = $4, arch = $5, agent_version = $6, secret_hash = $7, idp_grant_id = $8,
+				grant_revoked_at = NULL, claimed_at = coalesce(m.claimed_at, now()), last_seen_at = now()
+			WHERE m.tenant_id = $1 AND m.user_id = $2 AND m.public_key = $3 AND m.revoked_at IS NULL
+			RETURNING `+machineColumns,
+			tenantID, userID, n.PublicKey, n.OS, n.Arch, n.AgentVersion, secretHash, n.GrantID))
+		if !errors.Is(err, ErrNotFound) {
 			return err
 		}
 		var count int
@@ -139,10 +157,10 @@ func (s *Store) RegisterMachine(ctx context.Context, tenantID string, userID int
 			return ErrTooManyMachines
 		}
 		m, err = scanMachine(tx.QueryRow(ctx, `
-			INSERT INTO machines AS m (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash, claimed_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+			INSERT INTO machines AS m (tenant_id, user_id, name, os, arch, agent_version, public_key, secret_hash, claimed_at, idp_grant_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
 			RETURNING `+machineColumns,
-			tenantID, userID, n.Name, n.OS, n.Arch, n.AgentVersion, n.PublicKey, secretHash))
+			tenantID, userID, n.Name, n.OS, n.Arch, n.AgentVersion, n.PublicKey, secretHash, n.GrantID))
 		return err
 	})
 	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrTooManyMachines) {
@@ -177,47 +195,45 @@ func (s *Store) AuthenticateMachine(ctx context.Context, tenantID, secret string
 	return a, nil
 }
 
-// ClaimMachine ties a machine that is not revoked to its owner's IdP
-// account: it sets claimed_at (kept when already set) only while the
-// owner's idp_sub is ownerSub. ErrNotFound otherwise.
-func (s *Store) ClaimMachine(ctx context.Context, tenantID string, machineID int64, ownerSub string) (Machine, error) {
-	m, err := scanMachine(s.pool.QueryRow(ctx, `
-		UPDATE machines m SET claimed_at = coalesce(m.claimed_at, now())
-		FROM users u
-		WHERE m.id = $1 AND m.tenant_id = $2 AND m.revoked_at IS NULL
-			AND u.id = m.user_id AND u.deleted_at IS NULL AND u.idp_sub = $3
-		RETURNING `+machineColumns, machineID, tenantID, ownerSub))
-	if err != nil && !errors.Is(err, ErrNotFound) {
-		return Machine{}, fmt.Errorf("store: claim machine: %w", err)
-	}
-	return m, err
-}
-
 // MachineHeartbeat records that a machine that is not revoked is alive, with
-// what it reported, and returns the device keys revoked for it.
+// what it reported, moves last_seen_at of the owner's devices connected to it
+// (connected: at most MaxConnectedDeviceKeys keys) and returns the owner's
+// trusted devices: live keys with a usable session, oldest first.
 // ErrNotFound when the machine is revoked (or unknown).
-func (s *Store) MachineHeartbeat(ctx context.Context, tenantID string, machineID int64, tunnelURL, agentVersion, claudeVersion string) ([][]byte, error) {
-	tag, err := s.pool.Exec(ctx, `
-		UPDATE machines SET tunnel_url = $3, agent_version = $4, claude_version = $5, last_seen_at = now()
-		WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL`,
-		machineID, tenantID, tunnelURL, agentVersion, claudeVersion)
+func (s *Store) MachineHeartbeat(ctx context.Context, tenantID string, machineID int64, tunnelURL, agentVersion, claudeVersion string,
+	connected [][]byte) ([]AccountDevice, error) {
+	var trusted []AccountDevice
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var userID int64
+		err := tx.QueryRow(ctx, `
+			UPDATE machines SET tunnel_url = $3, agent_version = $4, claude_version = $5, last_seen_at = now()
+			WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+			RETURNING user_id`,
+			machineID, tenantID, tunnelURL, agentVersion, claudeVersion).Scan(&userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if len(connected) > 0 {
+			if _, err := tx.Exec(ctx, `
+				UPDATE account_devices SET last_seen_at = now()
+				WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL AND public_key = ANY($3)`,
+				tenantID, userID, connected); err != nil {
+				return err
+			}
+		}
+		trusted, err = trustedDevices(ctx, tx, tenantID, userID)
+		return err
+	})
+	if errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("store: machine heartbeat: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return nil, ErrNotFound
-	}
-	rows, err := s.pool.Query(ctx, `
-		SELECT device_public_key FROM machine_revoked_devices WHERE machine_id = $1 AND tenant_id = $2 ORDER BY revoked_at, device_public_key`,
-		machineID, tenantID)
-	if err != nil {
-		return nil, fmt.Errorf("store: revoked devices: %w", err)
-	}
-	keys, err := pgx.CollectRows(rows, pgx.RowTo[[]byte])
-	if err != nil {
-		return nil, fmt.Errorf("store: revoked devices: %w", err)
-	}
-	return keys, nil
+	return trusted, nil
 }
 
 // ListMachines returns the user's machines that are not revoked, oldest
@@ -274,25 +290,45 @@ func (s *Store) RevokeMachine(ctx context.Context, tenantID string, userID, mach
 	return nil
 }
 
-// RevokeMachineDevice adds a device key (MachineKeyLen bytes) to the revoked
-// list of one of the user's machines that is not revoked (ErrNotFound
-// otherwise). Revoking a key twice is not an error.
-func (s *Store) RevokeMachineDevice(ctx context.Context, tenantID string, userID, machineID int64, deviceKey []byte) error {
-	var found bool
-	err := s.pool.QueryRow(ctx, `
-		WITH m AS (
-			SELECT id, tenant_id FROM machines WHERE id = $1 AND tenant_id = $2 AND user_id = $3 AND revoked_at IS NULL
-		), ins AS (
-			INSERT INTO machine_revoked_devices (machine_id, tenant_id, device_public_key)
-			SELECT id, tenant_id, $4 FROM m
-			ON CONFLICT (machine_id, device_public_key) DO NOTHING
-		)
-		SELECT EXISTS (SELECT 1 FROM m)`, machineID, tenantID, userID, deviceKey).Scan(&found)
+// GrantRevocation is the IdP grant of a removed machine that is not known
+// to be revoked yet.
+type GrantRevocation struct {
+	MachineID int64
+	// OwnerSub is the owner's IdP subject; "" once the account was erased.
+	OwnerSub string
+	GrantID  string
+}
+
+// PendingGrantRevocations returns up to limit removed machines whose IdP
+// grant is not revoked yet, the earliest removed first.
+func (s *Store) PendingGrantRevocations(ctx context.Context, tenantID string, limit int) ([]GrantRevocation, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT m.id, coalesce(u.idp_sub, ''), m.idp_grant_id FROM machines m JOIN users u ON u.id = m.user_id
+		WHERE m.tenant_id = $1 AND m.revoked_at IS NOT NULL AND m.idp_grant_id <> '' AND m.grant_revoked_at IS NULL
+		ORDER BY m.revoked_at, m.id LIMIT $2`, tenantID, limit)
 	if err != nil {
-		return fmt.Errorf("store: revoke machine device: %w", err)
+		return nil, fmt.Errorf("store: pending grant revocations: %w", err)
 	}
-	if !found {
-		return ErrNotFound
+	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GrantRevocation, error) {
+		var g GrantRevocation
+		err := row.Scan(&g.MachineID, &g.OwnerSub, &g.GrantID)
+		return g, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("store: pending grant revocations: %w", err)
+	}
+	return list, nil
+}
+
+// MarkGrantRevoked records that the IdP revoked grantID of a removed
+// machine. Nothing happens when the machine registered with another grant
+// since.
+func (s *Store) MarkGrantRevoked(ctx context.Context, tenantID string, machineID int64, grantID string) error {
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE machines SET grant_revoked_at = now()
+		WHERE id = $1 AND tenant_id = $2 AND idp_grant_id = $3 AND grant_revoked_at IS NULL`,
+		machineID, tenantID, grantID); err != nil {
+		return fmt.Errorf("store: mark grant revoked: %w", err)
 	}
 	return nil
 }

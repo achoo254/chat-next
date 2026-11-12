@@ -1,18 +1,20 @@
-// A machine with a terminal (TerminalService) and its paired devices talking
+// A machine with a terminal (TerminalService) and the devices of its account talking
 // to it over in-memory end-to-end connections, for the terminal tests: a
 // device may open several connections (chat and terminal), each with its
 // own session counter, as the web does.
 import { join } from "node:path";
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import { type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
-import { type KeyPair, type Session, TotpPairing, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
+import { type KeyPair, type Session, generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
 import { ConfigStore } from "../../src/config.ts";
+import { DeviceTrust } from "../../src/device-trust.ts";
 import { Connection } from "../../src/link/connection.ts";
 import type { AgentProvider } from "../../src/providers/types.ts";
 import type { TermHostUnit } from "../../src/terminal/host-supervisor.ts";
 import { TerminalService, aiTerminalsOf } from "../../src/terminal/terminal-service.ts";
 import { fakeProvider } from "../fake-provider.ts";
 import { makeCore, tempDir } from "../harness.ts";
+import { trustDevice } from "./trusted-devices.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -46,6 +48,7 @@ export async function terminalMachine(opts: {
   const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()]);
   const config = new ConfigStore(opts.configDir ?? join(tempDir("term-"), "cfg"));
   const machineKey = await generateKeyPair(true);
+  const trust = new DeviceTrust({ config });
   const logs: string[] = [];
   const terminal = new TerminalService({
     configDir: config.dir,
@@ -80,14 +83,13 @@ export async function terminalMachine(opts: {
         config,
         audit,
         terminal,
-        auth: () => ({ machine: machineKey, deviceStatus: (k) => config.deviceStatus(k) }),
-        pairing: new TotpPairing(),
+        machineKey: () => machineKey,
+        trust,
         machineInfo: async () => {
           throw new Error("unused");
         },
         isSensitive: () => false,
         onPing: () => undefined,
-        onPaired: () => undefined,
       },
     );
     const next = async (): Promise<Uint8Array | null> => {
@@ -98,7 +100,7 @@ export async function terminalMachine(opts: {
         await new Promise<void>((r) => (wake = r));
       }
     };
-    const hs = await startHandshake({ device, deviceName: "laptop", trust: { kind: "pinned", machineKey: machineKey.publicKey } });
+    const hs = await startHandshake({ device, expectedMachineKey: machineKey.publicKey });
     conn.receive(hs.hello);
     const first = await next();
     if (!first) throw new Error("the machine refused the device");
@@ -149,10 +151,10 @@ export async function terminalMachine(opts: {
     };
   };
 
-  /** A device paired with the machine. */
+  /** A device of the machine's account. */
   const pair = async (name = "laptop"): Promise<KeyPair> => {
     const device = await generateKeyPair();
-    config.addDevice(device.publicKey, name);
+    trustDevice(config, device.publicKey, name);
     return device;
   };
 

@@ -18,7 +18,7 @@ export interface TerminalTunnel {
 	close(): void;
 }
 
-const SERVICE_GONE = "tunelo stopped in the background, so the tunnel closed. Start it again with `tunelo start`.";
+const SERVICE_GONE = "tunelo stopped in the background, so the tunnel closed. Start it again with `tunelo login`.";
 
 function isEvent(message: unknown): message is TunnelEvent {
 	return typeof message === "object" && message !== null && typeof (message as { type?: unknown }).type === "string";

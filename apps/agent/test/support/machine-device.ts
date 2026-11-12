@@ -1,17 +1,18 @@
-// A paired device on a running Machine's real WebSocket, recording every
+// A device of the account on a running Machine's real WebSocket, recording every
 // frame it gets (for tests of what the machine sends devices unasked).
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import { type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, startHandshake } from "@achoo254/chat-remote-protocol";
 import { WebSocket } from "ws";
 import type { Machine } from "../../src/machine.ts";
+import { trustDevice } from "./trusted-devices.ts";
 
 export type Device = { frames: Frame[]; request(id: string, body: NonNullable<MessageInitShape<typeof FrameSchema>["body"]>): void; close(): void };
 
-/** A paired device on the machine's real WebSocket, recording every frame it gets. */
+/** A device of the account on the machine's real WebSocket, recording every frame it gets. */
 export async function connectDevice(machine: Machine, port: number, name: string): Promise<Device> {
   const key = await generateKeyPair();
-  machine.config.addDevice(key.publicKey, name);
+  trustDevice(machine.config, key.publicKey, name);
   const ws = new WebSocket(`ws://127.0.0.1:${port}`);
   const inbox: Uint8Array[] = [];
   let wake: (() => void) | undefined;
@@ -30,7 +31,7 @@ export async function connectDevice(machine: Machine, port: number, name: string
       await new Promise<void>((r) => (wake = r));
     }
   };
-  const hs = await startHandshake({ device: key, deviceName: name, trust: { kind: "pinned", machineKey: machine.publicKey } });
+  const hs = await startHandshake({ device: key, expectedMachineKey: machine.publicKey });
   ws.send(hs.hello);
   const { session } = await hs.finish(await next());
   const frames: Frame[] = [];

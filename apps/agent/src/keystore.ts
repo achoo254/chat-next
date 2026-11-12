@@ -7,7 +7,7 @@
 // alone is useless without this user's Keychain or DPAPI.
 import { execFile } from "node:child_process";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { type KeyPair, exportPrivateKey, fromBase64Url, generateKeyPair, importKeyPair, toBase64Url } from "@achoo254/chat-remote-protocol";
@@ -131,6 +131,29 @@ export async function machineKey(dir: string): Promise<KeyPair> {
   const saved = await store.read();
   if (!saved) throw new Error("could not store the machine key");
   return importKeyPair(fromBase64Url(saved));
+}
+
+const ENTRIES: readonly Entry[] = ["machine-key", "session-key"];
+
+/**
+ * `tunelo uninstall`: deletes both entries from this user's key store (the
+ * Keychain items on macOS; the DPAPI and plain files live in the config
+ * folder, which is deleted after this, but go here too). Entries already
+ * gone are fine; a store that refuses rejects.
+ */
+export async function deleteKeyStore(dir: string): Promise<void> {
+  for (const entry of ENTRIES) {
+    if (usesKeychain()) {
+      try {
+        await run("security", ["delete-generic-password", "-s", SERVICE, "-a", entry]);
+      } catch (err) {
+        const code = (err as { code?: unknown }).code;
+        if (code !== ITEM_NOT_FOUND) throw new KeyStoreUnavailableError(`security exited ${String(code)}`);
+      }
+    }
+    for (const file of [join(dir, entry), join(dir, `${entry}.dpapi`)]) rmSync(file, { force: true });
+  }
+  sealingKeys.delete(dir);
 }
 
 const SEALED_PREFIX = "v1";

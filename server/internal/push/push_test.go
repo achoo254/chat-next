@@ -713,9 +713,6 @@ func TestNotifyUserMachine(t *testing.T) {
 		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你批准"},
 		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你回答"},
 		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 2}, LocaleZhCN, "PC 上的 Claude 有 2 个请求等你处理"},
-		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleVI, "Một thiết bị mới vừa ghép với PC"},
-		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleEN, "A new device was just paired with PC"},
-		{MachineNotice{MachineName: "PC", Kind: MachineDevicePaired, Pending: 1}, LocaleZhCN, "有新设备刚刚与 PC 配对"},
 	} {
 		var p Payload
 		if err := json.Unmarshal(e.svc.machineNotification(c.notice, c.locale).Payload, &p); err != nil {
@@ -724,20 +721,6 @@ func TestNotifyUserMachine(t *testing.T) {
 		if p.Body != c.body || p.URL != "/machines/0" {
 			t.Errorf("%s %+v: %+v", c.locale, c.notice, p)
 		}
-	}
-
-	// A newly paired device: its own tag and topic, so it never replaces a
-	// "needs you" push, and only the machine's name.
-	paired := e.svc.machineNotification(MachineNotice{MachineID: 42, MachineName: "Mac mini", Kind: MachineDevicePaired,
-		Pending: 1, SessionID: "t_9", At: time.UnixMilli(1000)}, LocaleEN)
-	var pp Payload
-	if err := json.Unmarshal(paired.Payload, &pp); err != nil {
-		t.Fatal(err)
-	}
-	wantPaired := Payload{Kind: KindMachine, MachineID: 42, Title: appName, Body: "A new device was just paired with Mac mini",
-		Tag: "machine-paired:42", URL: "/machines/42", Timestamp: 1000}
-	if pp != wantPaired || paired.Topic != "machinepaired42" || paired.TTL != devicePairedTTL || paired.Urgency != webpush.UrgencyHigh {
-		t.Fatalf("device paired push %+v %+v", pp, paired)
 	}
 
 	// A usage hint: its own tag and topic, the machine's name only, and
@@ -767,5 +750,49 @@ func TestNotifyUserMachine(t *testing.T) {
 	}
 	if n, err := off.NotifyUser(ctx, an, MachineNotice{MachineID: 1, MachineName: "x", Kind: MachineApproval, Pending: 1}); n != 0 || err != nil {
 		t.Fatalf("disabled service: %d %v", n, err)
+	}
+}
+
+func TestNotifyAccountDevice(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	an, binh := e.User("an_user"), e.User("binh_user")
+	phone := e.device(an, LocaleVI)
+	laptop := e.device(an, LocaleEN)
+	desk := e.device(an, LocaleZhCN)
+	gone := e.device(an, LocaleVI)
+	other := e.device(binh, LocaleVI)
+	if _, err := e.Store.RevokeSession(ctx, bottest.TenantID, an, gone.session, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	n, err := e.svc.NotifyAccountDevice(ctx, an, AccountDeviceNotice{DeviceID: 7, Name: "Chrome on macOS", Platform: "web",
+		At: time.UnixMilli(1000)})
+	if err != nil || n != 3 {
+		t.Fatalf("queued %d: %v", n, err)
+	}
+	jobs := e.planned()
+	if len(jobsFor(jobs, gone)) != 0 || len(jobsFor(jobs, other)) != 0 {
+		t.Fatal("pushed to a revoked session or another user")
+	}
+	for _, c := range []struct {
+		target device
+		body   string
+	}{
+		{phone, "Thiết bị mới được thêm vào tài khoản: Chrome on macOS (web). Không phải bạn? Thu hồi ngay trong AI Agent"},
+		{laptop, "A new device was added to your account: Chrome on macOS (web). Not you? Revoke it in AI Agent"},
+		{desk, "你的账号添加了新设备：Chrome on macOS（web）。不是你？请在 AI Agent 中撤销"},
+	} {
+		got := jobsFor(jobs, c.target)
+		if len(got) != 1 {
+			t.Fatalf("%d pushes", len(got))
+		}
+		p := payloadOf(t, got[0], c.target)
+		want := Payload{Kind: KindAccountDeviceAdded, Title: appName, Body: c.body, Tag: "account-device:7", URL: "/machines", Timestamp: 1000}
+		if p != want {
+			t.Fatalf("payload %+v", p)
+		}
+		if msg := got[0].notification; msg.Urgency != webpush.UrgencyHigh || msg.Topic != "accountdevice7" || msg.TTL != accountDeviceTTL {
+			t.Fatalf("message options %+v", msg)
+		}
 	}
 }

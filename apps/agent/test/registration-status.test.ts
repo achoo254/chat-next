@@ -1,9 +1,11 @@
-// The machine's place in Chat after `tunelo login`: added (or claimed) with
-// the account, waiting with backoff while the account has not opened Chat,
-// and never holding back the machine tunnel when Chat fails.
+// The machine's place in Chat after `tunelo login`: added by the service
+// with the account and its machine key, waiting with backoff while the
+// account has not opened Chat, never holding back the machine tunnel when
+// Chat fails, and out after a removal on the web until a new sign-in.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type KeyPair, generateKeyPair } from "@achoo254/chat-remote-protocol";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { type AppName, ResourceNotGrantedError, type SessionInfo } from "../src/identity/session.ts";
@@ -23,8 +25,10 @@ const AGENT: SessionInfo = { issuer: "https://auth.example", sub: "acc_1", clien
 const CLI: SessionInfo = { issuer: "https://auth.example", sub: "acc_1", clientId: "tunelo-cli" };
 
 let dir = "";
-beforeEach(() => {
+let machineKey: KeyPair;
+beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "tunelo-registration-"));
+  machineKey = await generateKeyPair();
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -50,15 +54,14 @@ function setup(info: SessionInfo | undefined, api: Partial<RegistrationDeps["api
   const timers: { fn: () => void; ms: number; cancelled: boolean }[] = [];
   const registered = vi.fn();
   const register = vi.fn(api.register ?? (async () => ({ machineId: "7", machineSecret: "s".repeat(43) })));
-  const claim = vi.fn(api.claim ?? (async () => ({ machineId: "7" })));
   const session = fakeSession(info);
   let now = 1_000_000;
   const registration = new Registration({
     config,
     session,
-    api: { register, claim },
-    publicKey: () => new Uint8Array(32).fill(5),
-    agentVersion: "2.1.0",
+    api: { register },
+    machineKey: () => machineKey,
+    agentVersion: "3.0.0",
     onRegistered: registered,
     log: () => undefined,
     now: () => now,
@@ -79,7 +82,7 @@ function setup(info: SessionInfo | undefined, api: Partial<RegistrationDeps["api
     t.fn();
     await settle();
   };
-  return { config, registration, register, claim, registered, timers, session, fire };
+  return { config, registration, register, registered, timers, session, fire };
 }
 
 /** Lets the registration's run finish. */
@@ -91,13 +94,13 @@ describe("registration status", () => {
     expect(retryDelay(1)).toBe(RETRY_FIRST_MS);
   });
 
-  test("signed in with the account: the machine is added, claimed, and its tunnel opens", async () => {
+  test("signed in with the account: the machine is added with its key, and its tunnel opens", async () => {
     const s = setup(AGENT);
     s.registration.start();
     await settle();
-    expect(s.register).toHaveBeenCalledWith("token-chat", new Uint8Array(32).fill(5), "2.1.0");
+    expect(s.register).toHaveBeenCalledWith("token-chat", machineKey, "3.0.0");
     expect(s.session.asked).toEqual(["chat"]);
-    expect(s.config.get()).toMatchObject({ machineId: "7", machineSecret: "s".repeat(43), claimed: true });
+    expect(s.config.get()).toMatchObject({ machineId: "7", machineSecret: "s".repeat(43) });
     expect(s.registered).toHaveBeenCalledTimes(1);
     expect(s.registration.report().chat).toEqual({ status: "ok", detail: "in AI Agent (machine 7)" });
     expect(s.registration.report().localman.status).toBe("ok");
@@ -145,55 +148,30 @@ describe("registration status", () => {
     expect(s.registration.report().chat.status).toBe("ok");
   });
 
-  test("a machine of an install code is claimed once signed in with the account, and keeps its place", async () => {
+  test("a registered machine is not registered again: tunelo login keeps its id and secret", async () => {
     const s = setup(AGENT);
     s.config.update((c) => {
       c.machineId = "3";
       c.machineSecret = "o".repeat(43);
     });
     s.registration.start();
+    s.registration.retryNow(true);
     await settle();
-    expect(s.claim).toHaveBeenCalledWith("token-chat", "o".repeat(43));
     expect(s.register).not.toHaveBeenCalled();
-    expect(s.config.get()).toMatchObject({ machineId: "3", claimed: true });
-    // Already claimed: nothing more to ask.
-    s.registration.retryNow();
-    await settle();
-    expect(s.claim).toHaveBeenCalledTimes(1);
+    expect(s.config.get()).toMatchObject({ machineId: "3", machineSecret: "o".repeat(43) });
+    expect(s.registration.report().chat).toEqual({ status: "ok", detail: "in AI Agent (machine 3)" });
   });
 
-  test("a claim refused for another account is an error with backoff, not a new machine", async () => {
+  test("a refused key proof or too many machines is an error with backoff", async () => {
     const s = setup(AGENT, {
-      claim: async () => {
-        throw new MachineApiError("permission_denied", "claim_wrong_account: the machine belongs to another account");
+      register: async () => {
+        throw new MachineApiError("resource_exhausted", "too_many_machines: the account has 20 machines");
       },
-    });
-    s.config.update((c) => {
-      c.machineId = "3";
-      c.machineSecret = "o".repeat(43);
     });
     s.registration.start();
     await settle();
-    expect(s.registration.report().chat).toMatchObject({ status: "error", detail: expect.stringContaining("another Chat account") });
-    expect(s.register).not.toHaveBeenCalled();
+    expect(s.registration.report().chat).toMatchObject({ status: "error", detail: expect.stringContaining("20 machines") });
     expect(s.timers).toHaveLength(1);
-  });
-
-  test("a machine removed on the web while unclaimed stops trying", async () => {
-    const s = setup(AGENT, {
-      claim: async () => {
-        throw new MachineApiError("permission_denied", "machine_revoked: the machine was removed from the account");
-      },
-    });
-    s.config.update((c) => {
-      c.machineId = "3";
-      c.machineSecret = "o".repeat(43);
-    });
-    s.registration.start();
-    await settle();
-    expect(s.registration.report().chat.status).toBe("off");
-    expect(s.timers).toHaveLength(0);
-    expect(s.config.get().machineId).toBeUndefined();
   });
 
   test("a tunnel Chat does not list shows as a Chat error until it is listed again", async () => {
@@ -201,7 +179,6 @@ describe("registration status", () => {
     s.config.update((c) => {
       c.machineId = "3";
       c.machineSecret = "o".repeat(43);
-      c.claimed = true;
     });
     s.registration.tunnelListed(false);
     expect(s.registration.report().chat).toMatchObject({ status: "error", detail: expect.stringContaining("another account") });
@@ -219,35 +196,33 @@ describe("registration status", () => {
     expect(s.timers).toHaveLength(0);
   });
 
-  test("the heartbeat asks for a claim when the server lost it", async () => {
+  test("a machine removed on the web is not added again until a new sign-in", async () => {
     const s = setup(AGENT);
     s.config.update((c) => {
       c.machineId = "3";
       c.machineSecret = "o".repeat(43);
-      c.claimed = true;
-    });
-    s.registration.claimNeeded();
-    await settle();
-    expect(s.claim).toHaveBeenCalledTimes(1);
-    expect(s.config.get().claimed).toBe(true);
-  });
-
-  test("a machine removed on the web is not added again", async () => {
-    const s = setup(AGENT);
-    s.config.update((c) => {
-      c.machineId = "3";
-      c.machineSecret = "o".repeat(43);
-      c.claimed = true;
+      c.localman = { sub: "acc_1", deviceId: "tunelo.3", linkedAt: 1 };
     });
     s.registration.removed();
-    s.registration.retryNow();
+    expect(s.config.get()).toMatchObject({ machineRemoved: true });
+    expect(s.config.get().localman).toBeUndefined();
+    // `tunelo login` without a new sign-in: still out.
+    s.registration.retryNow(false);
     await settle();
     expect(s.register).not.toHaveBeenCalled();
     expect(s.config.get().machineId).toBeUndefined();
-    expect(s.registration.report().chat.status).toBe("off");
+    expect(s.registration.report().chat).toMatchObject({ status: "off", detail: expect.stringContaining("tunelo login") });
+    // A new sign-in adds it again (a new row in Chat, with a new id).
+    s.registration.retryNow(true);
+    expect(s.registration.report().chat.status).toBe("waiting");
+    await settle();
+    expect(s.register).toHaveBeenCalledTimes(1);
+    expect(s.config.get()).toMatchObject({ machineId: "7" });
+    expect(s.config.get().machineRemoved).toBeUndefined();
+    expect(s.registered).toHaveBeenCalledTimes(1);
   });
 
-  test("whoami lines name each app, and the stored report works without the service", () => {
+  test("status lines name each app, and the stored report works without the service", () => {
     const config = new ConfigStore(dir);
     const report = storedReport(config, fakeSession(AGENT));
     expect(report.tunnel.status).toBe("off");

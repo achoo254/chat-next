@@ -21,8 +21,7 @@ func agentUser(t *testing.T, s *store.Store, sub string) int64 {
 
 func agentMachine(t *testing.T, s *store.Store, userID int64, key byte) int64 {
 	t.Helper()
-	in := newMachineInput("m")
-	in.PublicKey = bytes.Repeat([]byte{key}, 32)
+	in := newMachineInput("m", key)
 	m, _, err := s.RegisterMachine(context.Background(), tenant, userID, in)
 	if err != nil {
 		t.Fatal(err)

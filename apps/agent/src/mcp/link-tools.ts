@@ -1,7 +1,7 @@
 /**
- * `tunelo links` / `links revoke <id>` over MCP: the clients (Localman)
- * linked to this machine's anonymous token. Revoking cannot be undone (a
- * person has to link again), so it takes a dry run and a confirm token.
+ * The clients (Localman) still linked to this machine's anonymous token,
+ * over MCP: listed and revoked. Revoking cannot be undone (no new link can
+ * be made that way), so it takes a dry run and a confirm token.
  */
 import { z } from "zod";
 import {
@@ -16,7 +16,7 @@ import {
 	OTHER_SERVER_SESSION_MESSAGE,
 	linkContextOf,
 	linkStateOf,
-} from "../tunnels/cli-link-command.js";
+} from "../tunnels/anonymous-links.ts";
 import { ConfirmTokens } from "./confirm-tokens.js";
 import type { ToolRegistrar } from "./groups.js";
 import type { McpContext } from "./mcp-context.js";
@@ -26,7 +26,7 @@ type LinkAccess =
 	| { needed: false }
 	| { needed: true; baseUrl: string; key: string; note?: string };
 
-/** Same rule as `tunelo links`: only a machine on an anonymous token has links. */
+/** Only a machine on an anonymous token has links. */
 function linkAccess(context: McpContext): LinkAccess {
 	const link = linkContextOf(
 		linkStateOf(context.dir),
@@ -64,7 +64,7 @@ export function registerLinkTools(
 		{
 			title: "List linked clients",
 			description:
-				"Clients (such as Localman) linked with `tunelo link` to see this machine's tunnels. Only machines on an anonymous token have links; a signed-in machine shares its tunnels through the account.",
+				"Clients (such as Localman) linked earlier, by code, to see this machine's tunnels. Only machines on an anonymous token have links; a signed-in machine shares its tunnels through the account.",
 			annotations: { readOnlyHint: true, openWorldHint: false },
 		},
 		() =>
@@ -83,7 +83,7 @@ export function registerLinkTools(
 		{
 			title: "Revoke a linked client",
 			description:
-				"Stop a linked client from seeing this machine's tunnels. Cannot be undone: linking again needs a person with a new code. Two steps: call with dry_run=true to get a preview and a confirm_token, show the preview to the user, then call again with the same id and that confirm_token.",
+				"Stop a linked client from seeing this machine's tunnels. Cannot be undone: such a link cannot be made again (sign the machine in with `tunelo login` instead). Two steps: call with dry_run=true to get a preview and a confirm_token, show the preview to the user, then call again with the same id and that confirm_token.",
 			inputSchema: z.object({
 				id: z
 					.string()

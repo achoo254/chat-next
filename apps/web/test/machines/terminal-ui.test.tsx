@@ -77,9 +77,10 @@ let terminal = TerminalAvailability.AVAILABLE;
 vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	deviceKeyStore: () => ({
 		device: async () => device,
-		pinned: async () => machine.keys.publicKey,
-		pin: async () => undefined,
-		forget: async () => undefined,
+		renew: async () => device,
+		seenMachineKey: async () => null,
+		rememberMachineKey: async () => undefined,
+		forgetMachineKey: async () => undefined,
 	}),
 }));
 
@@ -91,7 +92,7 @@ beforeEach(async () => {
 	terminal = TerminalAvailability.AVAILABLE;
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	host = new FakeTerminalHost(machine);
 	machine.handler = (frame: Frame, socket) => {
 		if (frame.body.case === "machineInfoRequest") return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", maxSessions: 3, terminal } }];
@@ -112,7 +113,7 @@ const sent = (kind: string) => machine.received.filter((f) => f.body.case === ki
 describe("where the terminal shows", () => {
 	function screenAt(view: MachinesView) {
 		const machines = new FakeMachines();
-		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)) });
+		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)), publicKey: machine.keys.publicKey });
 		const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 		return render(
 			<I18nProvider>
@@ -174,7 +175,7 @@ describe("where the terminal shows", () => {
 
 	it.each([
 		[TerminalAvailability.MISSING, "Máy chưa có phần terminal. Chạy tunelo update trên máy để dùng."],
-		[TerminalAvailability.INCOMPATIBLE, "Phần terminal trên máy khác phiên bản. Chạy lại tunelo install trên máy."],
+		[TerminalAvailability.INCOMPATIBLE, "Phần terminal trên máy khác phiên bản. Chạy lại tunelo login trên máy."],
 		[TerminalAvailability.UNSPECIFIED, "Cập nhật tunelo trên máy (2.4.0 trở lên) để dùng terminal."],
 	])("terminal %i: no dock and no shell action, a hint instead", async (availability, hint) => {
 		terminal = availability;
@@ -216,7 +217,7 @@ describe("a session in chat or in its terminal", () => {
 
 	function sessionAt(view: MachinesView) {
 		const machines = new FakeMachines();
-		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)) });
+		machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)), publicKey: machine.keys.publicKey });
 		const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 		return render(
 			<I18nProvider>
@@ -301,8 +302,7 @@ describe("the dock", () => {
 	function links(): { link: MachineLink; terminal: TerminalLink } {
 		const deps = {
 			device: () => Promise.resolve(device),
-			deviceName: "test",
-			pinned: () => Promise.resolve(machine.keys.publicKey),
+			expectedKey: () => machine.keys.publicKey,
 			tunnelUrl: () => URL_A,
 			refreshTunnel: () => Promise.resolve(URL_A),
 			socket: machine.factory,
@@ -376,14 +376,15 @@ describe("the dock", () => {
 		expect(sent("termOpen")).toHaveLength(3);
 	});
 
-	it("says when the machine revoked this device, and offers to pair again", async () => {
+	it("says when the account revoked this device, with nothing to retry", async () => {
 		await dock(refusing());
 		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
 		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
 		host.broadcast(serverFrames.error(0, 6, "revoked"));
 		const alert = await screen.findByRole("alert");
-		expect(alert.textContent).toContain("Thiết bị này đã bị thu hồi quyền trên máy.");
-		expect(within(alert).getByRole("link", { name: "Ghép thiết bị này" }).getAttribute("href")).toBe("/ai/1/pair");
+		expect(alert.textContent).toContain("Thiết bị này đã bị thu hồi khỏi tài khoản nên máy đóng terminal.");
+		expect(within(alert).queryByRole("button")).toBeNull();
+		expect(within(alert).queryByRole("link")).toBeNull();
 		expect(document.querySelector("[data-id=terminal-path]")?.textContent).toBe("Không mở được");
 	});
 
@@ -391,7 +392,7 @@ describe("the dock", () => {
 		host.refuse = true;
 		await dock(refusing());
 		const alert = await screen.findByRole("alert");
-		expect(alert.textContent).toMatch(/thu hồi quyền|không cho thiết bị này/);
+		expect(alert.textContent).toMatch(/thu hồi khỏi tài khoản|chưa nhận thiết bị này/);
 	});
 
 	it("every pane of a split has its own close button; the last one closes with its tab and hangs up the shell", async () => {

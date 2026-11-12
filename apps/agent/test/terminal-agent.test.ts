@@ -14,6 +14,7 @@ import { TokenBucket } from "../src/terminal/terminal-service.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { tempDir } from "./harness.ts";
 import { pairedDevice } from "./support/device-link.ts";
+import { revokeDevice } from "./support/trusted-devices.ts";
 import { FakeTermHost, fakeUnit } from "./support/fake-term-host.ts";
 import { type DeviceConnection, termDatas, termSignals, termStatuses, terminalMachine } from "./support/terminal-device.ts";
 import { T, attachFrame, helloFrame, inputFrame, readServerFrame } from "./support/terminal-frames.ts";
@@ -63,7 +64,7 @@ describe("terminal permission", () => {
     const m = await setup();
     const device = await m.pair();
     const c = await m.connect(device);
-    m.config.revokeDevice(toBase64Url(device.publicKey));
+    revokeDevice(m.config, device.publicKey);
     const r = await c.request("1", { case: "termListRequest", value: {} });
     expect(r.body).toMatchObject({ case: "error", value: { code: ErrorCode.INVALID, reason: ErrorReason.ACCESS_DENIED } });
     c.send({ case: "termData", value: { link: 3, data: helloFrame() } });
@@ -281,7 +282,7 @@ describe("terminal revocation and reconnects", () => {
     await c.waitFor((f) => f.body.case === "termData");
     await o.waitFor((f) => f.body.case === "termData");
     const key = toBase64Url(device.publicKey);
-    m.config.revokeDevice(key);
+    revokeDevice(m.config, key);
     const t0 = performance.now();
     m.terminal.revokeDevice(key);
     const closed = await c.waitFor((f) => f.body.case === "termStatus" && f.body.value.path === TermPath.CLOSED, 1_000);
@@ -305,20 +306,23 @@ describe("terminal revocation and reconnects", () => {
     expect(order.indexOf("set_revoked")).toBeLessThan(order.indexOf("grant"));
   });
 
-  it("Machine.dropDevice sends the whole key even when given its first characters", async () => {
+  it("a device the account no longer lists loses its terminal links, and the consent log says so", async () => {
     const host = new FakeTermHost(join(tempDir("term-"), "cfg"));
     const config = new ConfigStore(host.configDir);
     const machine = new Machine({ config, providers: [fakeProvider()], log: () => undefined, termHostUnit: fakeUnit(host), env });
     cleanup.push(() => rmSync(dirname(host.configDir), { recursive: true, force: true }), () => machine.terminal.stop(), () => host.stop());
     const device = await generateKeyPair();
-    config.addDevice(device.publicKey, "phone");
-    await machine.terminal.ensure();
     const key = toBase64Url(device.publicKey);
-    config.revokeDevice(key.slice(0, 8));
-    machine.dropDevice(key.slice(0, 8));
+    machine.applyTrustedDevices([{ key, name: "phone", platform: "ios", createdAt: 1 }]);
+    await machine.terminal.ensure();
+    machine.applyTrustedDevices([]);
     await vi.waitFor(() => expect(host.commands.find((x) => x.cmd === "revoke_device")?.deviceKey).toBe(key));
-    // A prefix matching nothing is never sent as a key.
     expect(host.commands.filter((x) => x.cmd === "revoke_device")).toHaveLength(1);
+    expect(config.deviceStatus(device.publicKey)).toBe("revoked");
+    expect(machine.audit.list(10).map((e) => [e.action, e.device])).toEqual([
+      ["revoke", `phone (${key.slice(0, 8)})`],
+      ["device_added", `phone (${key.slice(0, 8)})`],
+    ]);
   });
 
   it("writes the terminal process's unsent audit once, acknowledges it, and keeps typed bytes out", async () => {

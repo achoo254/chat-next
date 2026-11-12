@@ -1,15 +1,17 @@
 // Where this machine stands with each app of the one sign-in (tunnel, Chat,
 // Localman; the Localman link itself is localman/self-link.ts), and the
-// machine's place in Chat: after `tunelo login` the
-// service adds the machine to the account's "AI Agent" by itself
-// (RegisterMachine), or ties a machine added with an install code before
-// accounts to that account (ClaimMachine).
+// machine's place in Chat: after `tunelo login` the service, and only the
+// service, adds the machine to the account's "AI Agent" (RegisterMachine,
+// with a proof that it holds the machine key). Registering again with the
+// same key takes the machine's row back. A machine the owner removed on the
+// web stays out until the next `tunelo login` (its sign-in was revoked too).
 //
 // Chat failing never touches the tunnel: an account that has not opened
 // Chat yet, a server error or an old binary only set Chat's state and try
 // again later, 1 minute after the first failure, doubling up to 1 hour, and
 // at once after each `tunelo login`. Nothing here holds a token: the session
 // gives one per call.
+import type { KeyPair } from "@achoo254/chat-remote-protocol";
 import type { ConfigStore } from "./config.ts";
 import { MachineApiError } from "./machine-api.ts";
 import { APPS, type AppName, ResourceNotGrantedError, SessionExpiredError, type SessionInfo } from "./identity/session.ts";
@@ -37,10 +39,9 @@ export interface RegistrationDeps {
   config: ConfigStore;
   session: AppSession;
   api: {
-    register(accessToken: string, publicKey: Uint8Array, agentVersion: string): Promise<{ machineId: string; machineSecret: string }>;
-    claim(accessToken: string, machineSecret: string): Promise<unknown>;
+    register(accessToken: string, key: KeyPair, agentVersion: string): Promise<{ machineId: string; machineSecret: string }>;
   };
-  publicKey: () => Uint8Array;
+  machineKey: () => KeyPair;
   agentVersion: string;
   /** The machine just got its id and secret: open its tunnel. */
   onRegistered: () => void;
@@ -57,17 +58,9 @@ const LOGIN_HINT = "run `tunelo login`";
 /** Chat's state from what is stored, when no call to Chat is needed (or possible). */
 function storedChatState(config: ConfigStore, session: AppSession): AppState | undefined {
   const c = config.get();
-  if (c.machineRemoved) return { status: "off", detail: "removed on the web; add it again from the Chat page (Add this machine)" };
-  const registered = Boolean(c.machineId && c.machineSecret);
-  if (registered && c.claimed) return { status: "ok", detail: `in AI Agent (machine ${c.machineId ?? ""})` };
-  if (!session.covers("chat")) {
-    return {
-      status: "sign-in",
-      detail: registered
-        ? `in AI Agent; ${LOGIN_HINT} once to tie it to your account`
-        : `${LOGIN_HINT} to add this machine to AI Agent`,
-    };
-  }
+  if (c.machineRemoved) return { status: "off", detail: `removed on the web; ${LOGIN_HINT} to add it again` };
+  if (c.machineId && c.machineSecret) return { status: "ok", detail: `in AI Agent (machine ${c.machineId})` };
+  if (!session.covers("chat")) return { status: "sign-in", detail: `${LOGIN_HINT} to add this machine to AI Agent` };
   return undefined;
 }
 
@@ -77,7 +70,7 @@ function localmanState(session: AppSession): AppState {
 
 /** The report when the background service is not running: what the files say. */
 export function storedReport(config: ConfigStore, session: AppSession): AppsReport {
-  const stopped = "the background service is not running (tunelo start)";
+  const stopped = "the background service is not running (tunelo login starts it)";
   const info = session.info();
   const linked = info !== undefined && session.covers("localman") && config.get().localman?.sub === info.sub;
   return {
@@ -87,7 +80,7 @@ export function storedReport(config: ConfigStore, session: AppSession): AppsRepo
   };
 }
 
-/** Lines of `tunelo whoami`, one per app, labelled with its capitalised name. */
+/** Lines of `tunelo status`, one per app, labelled with its capitalised name. */
 export function describeApps(report: AppsReport, now = Date.now()): string[] {
   return APPS.map((app) => {
     const s = report[app];
@@ -133,8 +126,16 @@ export class Registration {
     this.tunnel = state;
   }
 
-  /** Starts (or restarts) the registration and the Localman link now, forgetting the backoff: after `tunelo login`. */
-  retryNow(): void {
+  /**
+   * Starts (or restarts) the registration and the Localman link now,
+   * forgetting the backoff: after `tunelo login`. `signedInNow`: a new
+   * sign-in happened, so a machine removed on the web may be added again.
+   */
+  retryNow(signedInNow = false): void {
+    if (signedInNow && this.deps.config.get().machineRemoved) this.deps.config.update((c) => delete c.machineRemoved);
+    const c = this.deps.config.get();
+    // Until this try settles, `tunelo login` must not read the state from before it.
+    if (!c.machineRemoved && !(c.machineId && c.machineSecret)) this.chat = { status: "waiting", detail: "adding this machine to AI Agent" };
     this.deps.localman?.retryNow();
     this.failures = 0;
     this.cancelRetry?.();
@@ -144,21 +145,6 @@ export class Registration {
 
   start(): void {
     void this.run();
-  }
-
-  /** The server says the machine is not tied to an account (Heartbeat): claim it. */
-  claimNeeded(): void {
-    if (this.deps.config.get().claimed) {
-      this.deps.config.update((c) => (c.claimed = false));
-      void this.run();
-    } else if (this.chat.status === "ok") {
-      void this.run();
-    }
-  }
-
-  /** The server confirmed the claim (Heartbeat). */
-  claimConfirmed(): void {
-    if (!this.deps.config.get().claimed) this.deps.config.update((c) => (c.claimed = true));
   }
 
   /**
@@ -178,14 +164,14 @@ export class Registration {
     }
   }
 
-  /** The owner removed the machine on the web: never added again until `tunelo install`. */
+  /** The owner removed the machine on the web: not added again until the next `tunelo login`. */
   removed(): void {
     this.cancelRetry?.();
     this.cancelRetry = undefined;
     this.deps.config.update((c) => {
       delete c.machineId;
       delete c.machineSecret;
-      delete c.claimed;
+      delete c.localman;
       c.machineRemoved = true;
     });
     this.chat = storedChatState(this.deps.config, this.deps.session) ?? this.chat;
@@ -224,19 +210,11 @@ export class Registration {
     }
     try {
       const token = await session.getAppToken("chat");
-      const c = config.get();
-      if (c.machineId && c.machineSecret) {
-        await api.claim(token, c.machineSecret);
-        config.update((x) => (x.claimed = true));
-        this.deps.log(`machine ${c.machineId} is now tied to account ${session.info()?.sub ?? ""} in Chat`);
-        this.settled({ status: "ok", detail: `in AI Agent (machine ${c.machineId})` });
-        return;
-      }
-      const reg = await api.register(token, this.deps.publicKey(), this.deps.agentVersion);
+      const reg = await api.register(token, this.deps.machineKey(), this.deps.agentVersion);
+      // Kept even when stopping now: the server already replaced the earlier secret.
       config.update((x) => {
         x.machineId = reg.machineId;
         x.machineSecret = reg.machineSecret;
-        x.claimed = true;
       });
       this.deps.log(`added to AI Agent in Chat (machine ${reg.machineId})`);
       this.settled({ status: "ok", detail: `in AI Agent (machine ${reg.machineId})` });
@@ -258,18 +236,13 @@ export class Registration {
       return;
     }
     const reason = err instanceof MachineApiError ? err.reason : "";
-    if (reason === "machine_revoked") {
-      // Removed on the web while unclaimed: nothing left to claim.
-      this.removed();
-      return;
-    }
     const detail =
       reason === "chat_account_missing"
         ? "waiting: Chat cannot add this account yet (open Chat once, or wait); the machine then appears in AI Agent"
         : reason === "agent_update_required"
-          ? "this tunelo is too old for Chat: run `tunelo update`"
-          : reason === "claim_wrong_account"
-            ? "the machine belongs to another Chat account: sign in with that account (`tunelo login --force`)"
+          ? "this tunelo is too old for Chat: run the install command on the chat's Machines page again"
+          : reason === "too_many_machines"
+            ? "the account already has 20 machines: remove one on the chat's Machines page"
             : `could not reach Chat: ${(err as Error).message}`;
     this.failures++;
     const delay = retryDelay(this.failures);

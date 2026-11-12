@@ -28,8 +28,8 @@ export function connText(t: MachinesCopy, conn: Conn, now: number): string {
 			return conn.lastSeenMs === 0 ? t.agent.conn.never : t.agent.conn.offline(timeAgo(t, conn.lastSeenMs, now));
 		case "retrying":
 			return t.agent.conn.retrying(conn.attempt);
-		case "unpaired":
-			return conn.online ? t.agent.conn.unpaired : t.agent.conn.unpairedOffline;
+		case "blocked":
+			return t.agent.conn.blocked[conn.reason];
 		default:
 			return t.agent.conn[conn.kind];
 	}

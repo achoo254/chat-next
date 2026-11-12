@@ -6,8 +6,8 @@ import {
 	serverIdentity,
 } from "@tunelo/client";
 import type { Command } from "commander";
+import { type MachineSetupDeps, connectMachine, defaultMachineSetupDeps, serviceProblem } from "../commands/login.ts";
 import { configDir } from "../config.ts";
-import { callControl } from "../control-socket.ts";
 import { pollAgentTokens, startAgentAuthorization } from "../identity/agent-login.ts";
 import { updateSettings } from "../identity/cli-settings.ts";
 import { AGENT_CLIENT_ID, appResources, identitySession } from "../identity/session.ts";
@@ -79,15 +79,15 @@ async function deviceLogin(issuer: string): Promise<string> {
 		deviceNameForIdp(hostname()),
 	);
 
-	// The IdP gives this client no link with the code filled in: the person
-	// types the code shown here, on a page they opened themselves.
+	// The IdP fills the code in only for a browser at the same address as this
+	// machine; elsewhere the page asks for the code shown here.
 	console.log();
-	console.log("  Sign in with your account in the browser (Tunelo, Chat and Localman):");
-	console.log(`  ${authorization.verificationUri}`);
-	console.log(`  and type the code: ${authorization.userCode}`);
+	console.log("  Approve this machine in the browser (Tunelo, Chat and Localman):");
+	console.log(`  ${authorization.verificationUriComplete ?? authorization.verificationUri}`);
+	console.log(`  Code: ${authorization.userCode} (type it if the page asks; open ${authorization.verificationUri} on another device)`);
 	console.log();
 	console.log("  Waiting for approval...");
-	await openBrowser(authorization.verificationUri);
+	await openBrowser(authorization.verificationUriComplete ?? authorization.verificationUri);
 
 	const tokens = await pollAgentTokens(endpoints, issuer, authorization, "tunnel");
 	const resources = appResources(issuer);
@@ -133,15 +133,18 @@ export async function signInForServer(
 		return { sub: existing.sub, signedInNow: false };
 	}
 	const sub = await deviceLogin(issuer);
-	// A running service adds or claims the machine in Chat now instead of at its next try.
-	await callControl(configDir(), "POST", "/registration/retry").catch(() => undefined);
 	return { sub, signedInNow: true };
 }
 
-export function registerLoginCommands(program: Command): void {
+export function registerLoginCommand(
+	program: Command,
+	setup: MachineSetupDeps = defaultMachineSetupDeps,
+): void {
 	program
 		.command("login")
-		.description("Sign in with your account for the tunnel, Chat and Localman (opens the browser)")
+		.description(
+			"Sign in with your account and connect this machine: AI Agent in Chat, tunnels and Localman (opens the browser)",
+		)
 		.option(
 			"--legacy-key [token]",
 			"Save an anonymous access token instead (CI, no browser); without a value it is read from TUNELO_KEY, keeping it out of shell history",
@@ -166,6 +169,12 @@ export function registerLoginCommands(program: Command): void {
 					await saveLegacyKey(key);
 					return;
 				}
+				// Said before the sign-in, not after the person approved it.
+				const problem = await serviceProblem(setup);
+				if (problem) {
+					console.log(`  ${problem}.`);
+					console.log("  Signing in for tunnels only.");
+				}
 				const serverUrl = options.server
 					? normalizeServer(options.server)
 					: resolveServerUrl(undefined, printServerMigration);
@@ -176,35 +185,13 @@ export function registerLoginCommands(program: Command): void {
 				if (options.server) {
 					updateSettings((settings) => ({ ...settings, server: serverUrl }));
 				}
-				if (signedInNow) {
-					console.log(
-						`  ✓ Signed in (account ${sub}). Run: tunelo http <port>`,
-					);
+				if (signedInNow) console.log(`  ✓ Signed in (account ${sub}).`);
+				if (problem) {
+					console.log("  Run: tunelo http <port>");
+					return;
 				}
+				const code = await connectMachine(configDir(), { signedInNow }, setup);
+				if (code !== 0) process.exit(code);
 			},
 		);
-
-	program
-		.command("logout")
-		.description("Sign out: revoke this machine's sign-in and forget tokens")
-		.action(async () => {
-			const dir = configDir();
-			const result = await identitySession(dir).signOut();
-			let hadKey = false;
-			updateSettings((settings) => {
-				hadKey = settings.key !== undefined;
-				// Keep deviceId so a later sign-in stays idempotent for this machine.
-				return { ...settings, key: undefined };
-			});
-			if (!result && !hadKey) {
-				console.log("  Not signed in.");
-				return;
-			}
-			if (result?.revokeError) {
-				console.error(
-					`  Could not revoke at ${result.issuer} (${result.revokeError.message}); revoke this machine at ${result.issuer}/account.`,
-				);
-			}
-			console.log("  Signed out. Tokens removed from this machine.");
-		});
 }

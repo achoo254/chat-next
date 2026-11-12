@@ -133,9 +133,10 @@ let usageAnswer: (frame: Frame) => Body[];
 vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	deviceKeyStore: () => ({
 		device: async () => device,
-		pinned: async () => machine.keys.publicKey,
-		pin: async () => undefined,
-		forget: async () => undefined,
+		renew: async () => device,
+		seenMachineKey: async () => null,
+		rememberMachineKey: async () => undefined,
+		forgetMachineKey: async () => undefined,
 	}),
 }));
 
@@ -180,7 +181,7 @@ beforeEach(async () => {
 	usageAnswer = usageSide();
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	machine.handler = (frame: Frame) => {
 		switch (frame.body.case) {
 			case "machineInfoRequest":
@@ -204,7 +205,7 @@ afterEach(() => {
 
 function open(view: MachinesView, online = true) {
 	const machines = new FakeMachines();
-	machines.add({ name: "Mac mini", tunnelUrl: online ? "wss://m-1.tunnel.hoandat.com" : "", lastSeenAt: online ? BigInt(Math.floor(Date.now() / 1000)) : 0n });
+	machines.add({ name: "Mac mini", tunnelUrl: online ? "wss://m-1.tunnel.hoandat.com" : "", lastSeenAt: online ? BigInt(Math.floor(Date.now() / 1000)) : 0n, publicKey: machine.keys.publicKey });
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	render(
 		<I18nProvider>

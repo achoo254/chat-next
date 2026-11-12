@@ -24,7 +24,7 @@ import { RemoteError, type MachineLink } from "../machines/link/machine-link.ts"
 import { errorText, useHub, useLink } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { Icon } from "../components/screen-icons.tsx";
-import { navigate, Link, paths } from "../router.tsx";
+import { navigate, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
@@ -607,11 +607,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				{status.kind === "failed" && (
 					<div className="tx-failed" role="alert">
 						<p>{tt.failed[status.reason]}</p>
-						{status.reason === "refused" || status.reason === "revoked" ? (
-							<Link to={machine === LOCAL_REF ? paths.machinesLocal() : paths.machinePair(machine)} className="btn btn-sm">
-								{t.agent.pair}
-							</Link>
-						) : (
+						{status.reason !== "revoked" && (
 							<button type="button" className="btn btn-sm" onClick={() => terminal.retry()}>
 								{tt.retry}
 							</button>

@@ -323,9 +323,6 @@ const SCREENS: Record<string, string> = {
 	"machine-info": paths.machineInfo("1"),
 	// "Hiệu quả" of the demo folder (test/support/fake-usage.ts).
 	"machine-usage": `/ai/1/usage/${encodeURIComponent("local:chat-next")}`,
-	"machine-pair": paths.machinePair("2"),
-	// Pairing with the offline machine: why it is not connected and what to run on it.
-	"machine-pair-offline": paths.machinePair("3"),
 	"machine-add": paths.machinesAdd(),
 };
 const at = params.get("at");
@@ -345,7 +342,7 @@ if (screenPath !== undefined) window.history.replaceState(null, "", `${screenPat
 const container = document.getElementById("root");
 if (container === null) throw new Error("harness is missing #root");
 const machines = new FakeMachines();
-// The demo machine's key is pinned (IndexedDB) before the screens look for it.
+// The demo machine (with its key in the directory) is listed before the screens look for it.
 const machinesReady = at?.startsWith("machine-") === true ? installRemoteMachineDemo(machines) : Promise.resolve("");
 if (at === "add-project-hosts") {
 	// The dialog alone, with several online machines (?hosts=2 or 3).
@@ -603,12 +600,6 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-browser-open]:not(:disabled)"));
 		open.click();
 		await find(() => document.querySelector(".mx-browser-surface img"));
-	},
-	// "Bật ghép bằng Authenticator" on the machine's page: the dialog with the QR code, the key and the code boxes.
-	"totp-setup": async () => {
-		const start = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-totp-start]:not(:disabled)"));
-		start.click();
-		await find(() => document.querySelector("[data-id=totp-setup-qr] svg"));
 	},
 	// "Bí mật đã lưu" on the machine's page, scrolled into view.
 	"saved-secrets": async () => {

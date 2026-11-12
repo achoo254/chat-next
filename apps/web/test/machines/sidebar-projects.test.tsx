@@ -33,9 +33,10 @@ let suggestions: { dir: string; sessions: number; gitRemote: string; branch: str
 vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	deviceKeyStore: () => ({
 		device: async () => device,
-		pinned: async () => machine.keys.publicKey,
-		pin: async () => undefined,
-		forget: async () => undefined,
+		renew: async () => device,
+		seenMachineKey: async () => null,
+		rememberMachineKey: async () => undefined,
+		forgetMachineKey: async () => undefined,
 	}),
 }));
 
@@ -54,7 +55,7 @@ beforeEach(async () => {
 	suggestions = [{ dir: "/tmp/scratch", sessions: 1, gitRemote: "git@github.com:a/scratch.git", branch: "main" }];
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
-	machine.paired = [device.publicKey];
+	machine.trusted = [device.publicKey];
 	machine.handler = (frame: Frame) => {
 		switch (frame.body.case) {
 			case "machineInfoRequest":
@@ -84,7 +85,7 @@ afterEach(() => {
 function column(hosts: { name: string; online: boolean }[], view: MachinesView = { page: "machines" }) {
 	const machines = new FakeMachines();
 	hosts.forEach((h, i) =>
-		machines.add({ name: h.name, tunnelUrl: h.online ? `wss://m-${i + 1}.tunnel.hoandat.com` : "", lastSeenAt: h.online ? BigInt(Math.floor(Date.now() / 1000)) : 0n }),
+		machines.add({ name: h.name, tunnelUrl: h.online ? `wss://m-${i + 1}.tunnel.hoandat.com` : "", lastSeenAt: h.online ? BigInt(Math.floor(Date.now() / 1000)) : 0n, publicKey: machine.keys.publicKey }),
 	);
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	render(

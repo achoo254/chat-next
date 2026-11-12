@@ -1,8 +1,7 @@
 // Consent log on the machine: append-only JSONL of what a device agreed to
 // (opening a session in a sensitive folder, loading project settings,
-// approving a tool that touches a sensitive path, pairing (by install or by
-// the authenticator code), setting the authenticator secret (never its value),
-// revoking, switching the permission mode, adding, picking or removing a Claude profile,
+// approving a tool that touches a sensitive path, a device the account added
+// or revoked (from the list Chat gives the machine), switching the permission mode, adding, picking or removing a Claude profile,
 // turning forwarding to localhost on or off, blocking ports for it, giving,
 // using or removing a sign-in secret: never its value; a terminal opened,
 // closed or refused to a device: never a typed byte or its output; a git
@@ -17,8 +16,7 @@ export type AuditAction =
   | "project_add"
   | "project_settings"
   | "approve_sensitive"
-  | "pair"
-  | "totp_set"
+  | "device_added"
   | "agent_update"
   | "revoke"
   | "permission_mode"

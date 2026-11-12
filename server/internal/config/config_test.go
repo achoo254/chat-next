@@ -51,6 +51,13 @@ func TestLoadValid(t *testing.T) {
 	if len(c.DevOrigins) != 0 {
 		t.Fatalf("DEV_ORIGINS honoured in production: %v", c.DevOrigins)
 	}
+	if c.TuneloGrantRevokeURL != "" {
+		t.Fatalf("grant revocation on without TUNELO_GRANT_REVOKE_URL: %q", c.TuneloGrantRevokeURL)
+	}
+	env["TUNELO_GRANT_REVOKE_URL"] = "https://auth.hoandat.com/internal/tunelo-agent/grants/revoke"
+	if c, err = Load(lookupFrom(env)); err != nil || c.TuneloGrantRevokeURL != env["TUNELO_GRANT_REVOKE_URL"] {
+		t.Fatalf("TUNELO_GRANT_REVOKE_URL = %q: %v", c.TuneloGrantRevokeURL, err)
+	}
 }
 
 // The tenant id is a constant: signatures, media tokens and the clients'
@@ -99,6 +106,9 @@ func TestLoadErrorsNameVariablesWithoutValues(t *testing.T) {
 		"TENANT_DOMAIN":    func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
 		"CHAT_LISTEN_ADDR": func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
 		"APP_URL_SCHEME":   func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },
+		"TUNELO_GRANT_REVOKE_URL": func(e map[string]string) {
+			e["TUNELO_GRANT_REVOKE_URL"] = "http://auth.hoandat.com/internal/tunelo-agent/grants/revoke"
+		},
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {

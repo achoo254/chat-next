@@ -1,7 +1,6 @@
 package api_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -31,15 +30,7 @@ func TestAgentProjects(t *testing.T) {
 
 	// A machine of the account (tunelo registers it with the account's token).
 	agent := appv1connect.NewMachineAgentServiceClient(e.srv.Client(), e.srv.URL+"/machine-api")
-	register := connect.NewRequest(&appv1.RegisterMachineRequest{
-		Name: "Mac", Os: "darwin", Arch: "arm64", AgentVersion: "2.2.2", PublicKey: bytes.Repeat([]byte{4}, 32),
-	})
-	register.Header().Set("Authorization", "Bearer "+e.mcpToken(t, "machines:write"))
-	reg, err := agent.RegisterMachine(ctx, register)
-	if err != nil {
-		t.Fatal(err)
-	}
-	machine := reg.Msg.GetMachineId()
+	machine, _ := registerMachine(t, agent, e.mcpToken(t, "machines:write"), newX25519(t), "Mac")
 
 	start := rpcOK(t, updates.GetState, &appv1.GetStateRequest{}).GetState()
 
