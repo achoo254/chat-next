@@ -97,10 +97,10 @@ func (c *HTTPClient) Revoke(ctx context.Context, sub, grantID string) error {
 	defer func() { _ = resp.Body.Close() }()
 	// The error body is a short JSON object; read a little for the log.
 	detail, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
-	switch {
-	case resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK:
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
 		return nil
-	case resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusNotFound:
+	case http.StatusBadRequest, http.StatusNotFound:
 		return fmt.Errorf("%w: status %d %s", ErrPermanent, resp.StatusCode, bytes.TrimSpace(detail))
 	default:
 		return fmt.Errorf("agentgrant: revoke: status %d %s", resp.StatusCode, bytes.TrimSpace(detail))
