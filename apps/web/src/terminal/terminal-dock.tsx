@@ -492,7 +492,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 
 	const relayNote = status.kind === "open" && status.path === "relay" && status.directIssue !== "";
 	return (
-		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock">
+		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock" data-typing={touch && keyboardUp ? "" : undefined}>
 			<TerminalTabs
 				t={tt}
 				back={back}

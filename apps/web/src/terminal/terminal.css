@@ -140,3 +140,18 @@
 .tx-dock.touch.embedded .tx-note.relay { display: none; }
 /* Touch scrolling stays inside the terminal. */
 .tx-term { touch-action: pan-y; overscroll-behavior: contain; }
+
+/* Typing on a phone (the keyboard up): the terminal takes every row it can. The session header, the tabs and
+   the relay note step aside until the keyboard goes down, and the key row slims to one 44px strip. */
+.mx-chat:has(.tx-dock.touch[data-typing]) > .mx-head,
+.mx-chat[data-keyboard]:has(.tx-dock.touch) > .mx-head,
+.tx-dock.touch[data-typing] > .tx-head,
+.tx-dock.touch[data-keyboard] > .tx-head,
+.mx-chat[data-keyboard] .tx-dock.touch > .tx-head,
+.tx-dock.touch[data-typing] > .tx-note,
+.tx-dock.touch[data-keyboard] > .tx-note,
+.mx-chat[data-keyboard] .tx-dock.touch > .tx-note { display: none; }
+/* Without its header the fixed session view keeps the terminal clear of the status bar itself. */
+.mx-chat[data-keyboard]:has(.tx-dock.touch) { padding-top: env(safe-area-inset-top); box-sizing: border-box; }
+.tx-keys[data-keyboard], .mx-chat[data-keyboard] .tx-keys, .tx-dock[data-keyboard] .tx-keys { gap: 6px; padding: 3px var(--space-2); }
+.tx-keys[data-keyboard] .tx-key, .mx-chat[data-keyboard] .tx-key, .tx-dock[data-keyboard] .tx-key { height: 38px; min-width: 44px; padding: 0 var(--space-2); }

@@ -280,13 +280,18 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	await p.keyboard(336);
 	await until(p.page, "the session keeps to the visible box", () => document.querySelector(".mx-chat")?.hasAttribute("data-keyboard") === true);
 	const box = await p.page.evaluate(() => ({
-		head: document.querySelector(".mx-chat .mx-head")?.getBoundingClientRect().top ?? -1,
+		head: document.querySelector(".mx-chat .mx-head")?.getBoundingClientRect().height ?? -1,
+		tabs: document.querySelector(".tx-dock .tx-head")?.getBoundingClientRect().height ?? -1,
+		keys: document.querySelector(".tx-keys")?.getBoundingClientRect().height ?? -1,
 		bar: document.querySelector(".tx-keys")?.getBoundingClientRect().bottom ?? -1,
 		dock: document.querySelector("[data-id=terminal-dock]")?.getBoundingClientRect().height ?? 0,
 	}));
-	assert.equal(Math.round(box.head), 0);
+	// Typing: the header and the tabs step aside, the key row slims to one 44px strip.
+	assert.equal(box.head, 0, "the session header steps aside");
+	assert.equal(box.tabs, 0, "the tabs step aside");
+	assert.ok(box.keys <= 45, `key row ${box.keys} px tall`);
 	assert.ok(Math.abs(box.bar - (844 - 336)) <= 1, `key row ends at ${box.bar}`);
-	assert.ok(box.dock > 200, `terminal ${box.dock} px tall`);
+	assert.ok(box.dock > 400, `terminal ${box.dock} px tall`);
 	await p.shot("phone-terminal-keyboard-open");
 	await p.keyboard(0);
 	assert.deepEqual(errors, []);
