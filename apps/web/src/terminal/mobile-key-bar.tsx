@@ -1,6 +1,6 @@
-// The keys a phone keyboard lacks, in one row above it (above the home
-// indicator while it is closed), ordered for an AI in a terminal as Orca's
-// phone app orders them: the keyboard toggle, Esc, Tab, Shift+Tab (Claude
+// The keys a phone keyboard lacks, in one row above it (above the live input
+// bar while it is closed), ordered for an AI in a terminal as Orca's phone app
+// orders them: hiding the keyboard (while it is up), Esc, Tab, Shift+Tab (Claude
 // Code's permission modes), Ctrl and Alt (tap: the next key; tap twice: held
 // until tapped again), the arrows, Enter, Ctrl+C on its own, then / - | ~ $ >
 // and Backspace, Ctrl+D, Ctrl+L, Ctrl+R, paste, and "more" for Del, Home,
@@ -10,6 +10,7 @@
 // cancelled, not its pointerdown, since WebKit drops the click of a tap whose
 // pointerdown was cancelled.
 import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { Icon } from "../components/icon.tsx";
 
 export type BarKey =
 	| "esc"
@@ -175,7 +176,6 @@ const REPEATS = new Set<BarKey>(["left", "up", "down", "right", "backspace", "de
 
 export interface BarLabels {
 	readonly bar: string;
-	readonly keyboard: string;
 	readonly esc: string;
 	readonly tab: string;
 	readonly shiftTab: string;
@@ -191,12 +191,15 @@ export interface BarLabels {
 	readonly backspace: string;
 	readonly paste: string;
 	readonly more: string;
+	readonly liveInput: string;
+	readonly tapToType: string;
+	readonly hideKeyboard: string;
 }
 
 interface MobileKeyBarProps {
 	labels: BarLabels;
 	mods: Modifiers;
-	/** The phone keyboard is up. */
+	/** The phone keyboard is up: the row starts with the key that hides it. */
 	keyboard: boolean;
 	/** A modifier tapped, `sinceLastTapMs` after its previous tap (for tapLatch). */
 	onToggle(mod: Modifier, sinceLastTapMs: number): void;
@@ -209,15 +212,15 @@ type Item = { key: BarKey; text: string; label?: keyof BarLabels; className?: st
 
 const MAIN: readonly Item[] = [
 	{ key: "esc", text: "Esc", label: "esc" },
-	{ key: "tab", text: "⇥", label: "tab" },
-	{ key: "shift-tab", text: "⇤", label: "shiftTab" },
+	{ key: "tab", text: "Tab", label: "tab" },
+	{ key: "shift-tab", text: "⇧Tab", label: "shiftTab" },
 ];
 const AFTER_MODS: readonly Item[] = [
 	{ key: "left", text: "←", label: "left" },
 	{ key: "up", text: "↑", label: "up" },
 	{ key: "down", text: "↓", label: "down" },
 	{ key: "right", text: "→", label: "right" },
-	{ key: "enter", text: "⏎", label: "enter" },
+	{ key: "enter", text: "Enter", label: "enter" },
 	{ key: "ctrl-c", text: "^C", label: "interrupt", className: "stop" },
 	{ key: "slash", text: "/" },
 	{ key: "dash", text: "-" },
@@ -312,9 +315,11 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 	};
 	return (
 		<div className="tx-keys" role="toolbar" aria-label={labels.bar} data-keyboard={keyboard ? "" : undefined}>
-			<button type="button" className="tx-key kbd" aria-label={labels.keyboard} aria-pressed={keyboard} onMouseDown={keepFocus} onClick={onKeyboard}>
-				⌨
-			</button>
+			{keyboard && (
+				<button type="button" className="tx-key kbd" aria-label={labels.hideKeyboard} title={labels.hideKeyboard} onMouseDown={keepFocus} onClick={onKeyboard}>
+					<Icon name="keyboard" small />
+				</button>
+			)}
 			{MAIN.map(key)}
 			{modKey("ctrl")}
 			{modKey("alt")}
@@ -326,6 +331,27 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 				⋯
 			</button>
 			{more && MORE.map(key)}
+		</div>
+	);
+}
+
+/**
+ * Under the key row while the phone keyboard is down (Orca's "Live input"):
+ * one wide target that brings the keyboard up for the terminal, and paste.
+ */
+export function LiveInput({ labels, onKeyboard, onPaste }: { labels: BarLabels; onKeyboard(): void; onPaste(): void }) {
+	return (
+		<div className="tx-live">
+			<button type="button" className="tx-live-field" onClick={onKeyboard} data-id="terminal-live-input">
+				<Icon name="keyboard" />
+				<span>
+					<strong>{labels.liveInput}</strong>
+					<span>{labels.tapToType}</span>
+				</span>
+			</button>
+			<button type="button" className="tx-live-btn" aria-label={labels.paste} title={labels.paste} onClick={onPaste}>
+				<Icon name="copy" />
+			</button>
 		</div>
 	);
 }

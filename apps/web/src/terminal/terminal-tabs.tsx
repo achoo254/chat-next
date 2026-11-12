@@ -68,6 +68,8 @@ export function shortcutList(t: MachinesCopy["terminal"]): readonly { keys: stri
 export interface TabView {
 	readonly id: string;
 	readonly title: string;
+	/** The session's AI runs in it (its spark), not a shell. */
+	readonly ai?: boolean;
 }
 
 interface TabsProps {
@@ -108,7 +110,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 				{tabs.map((tab) => (
 					<div key={tab.id} className="tx-tab" data-active={tab.id === active ? "" : undefined}>
 						<button type="button" role="tab" aria-selected={tab.id === active} title={tab.title} onClick={() => onSelect(tab.id)}>
-							<MachineIcon name="terminal" small />
+							<MachineIcon name={tab.ai === true ? "spark" : "terminal"} small />
 							<span>{tab.title}</span>
 						</button>
 						<button type="button" className="tx-tab-x" aria-label={t.closeTab(tab.title)} title={t.closeTab(tab.title)} onClick={() => onClose(tab.id)}>

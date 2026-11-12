@@ -151,7 +151,6 @@ describe("the terminal's key row", () => {
 
 	const labels: BarLabels = {
 		bar: "Phím phụ",
-		keyboard: "Bàn phím",
 		esc: "Esc",
 		tab: "Tab",
 		shiftTab: "Shift+Tab",
@@ -167,6 +166,9 @@ describe("the terminal's key row", () => {
 		backspace: "Xoá lùi",
 		paste: "Dán",
 		more: "Thêm phím",
+		liveInput: "Nhập trực tiếp",
+		tapToType: "Chạm để hiện bàn phím",
+		hideKeyboard: "Ẩn bàn phím",
 	};
 
 	it("puts the AI's keys first, says which modifiers are on, and keeps the rest behind 'more'", async () => {
@@ -178,7 +180,9 @@ describe("the terminal's key row", () => {
 			<MobileKeyBar labels={labels} mods={NO_MODIFIERS} keyboard={false} onToggle={(m, since) => toggles.push([m, since])} onKey={(k) => keys.push(k)} onPaste={() => (pasted += 1)} onKeyboard={() => (keyboard += 1)} />,
 		);
 		const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
-		expect(names.slice(0, 9)).toEqual(["Bàn phím", "Esc", "Tab", "Shift+Tab", "Ctrl", "Alt", "Mũi tên trái", "Mũi tên lên", "Mũi tên xuống"]);
+		expect(names.slice(0, 8)).toEqual(["Esc", "Tab", "Shift+Tab", "Ctrl", "Alt", "Mũi tên trái", "Mũi tên lên", "Mũi tên xuống"]);
+		// The key that hides the keyboard shows only while it is up (the live input brings it up).
+		expect(screen.queryByRole("button", { name: "Ẩn bàn phím" })).toBeNull();
 		expect(names).toContain("Ctrl+C (dừng)");
 		expect(screen.queryByText("F5")).toBeNull();
 		await userEvent.click(screen.getByRole("button", { name: "Shift+Tab" }));
@@ -193,7 +197,7 @@ describe("the terminal's key row", () => {
 		expect(ctrl.getAttribute("aria-pressed")).toBe("true");
 		expect(ctrl.getAttribute("data-latch")).toBe("lock");
 		expect(screen.getByRole("button", { name: "Alt" }).getAttribute("data-latch")).toBe("once");
-		expect(screen.getByRole("button", { name: "Bàn phím" }).getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getAllByRole("button")[0]?.getAttribute("aria-label")).toBe("Ẩn bàn phím");
 		await userEvent.click(screen.getByRole("button", { name: "Thêm phím" }));
 		expect(screen.getByText("F5")).toBeTruthy();
 		expect(screen.getByText("PgDn")).toBeTruthy();

@@ -26,7 +26,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, Link, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
-import { afterKey, keySequence, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
+import { afterKey, keySequence, LiveInput, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
 import { useViewportFit } from "../machines/viewport-fit.ts";
 import { StatusPill } from "./status-pill.tsx";
 import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.ts";
@@ -396,12 +396,17 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			() => undefined,
 		);
 	};
-	/** The keyboard button: up when it is down, down when it is up. */
+	const keyboardUp = imeOpen || keyboard > 0;
+	/** The keyboard key and the live input: up when it is down (at the caret), down when it is up. */
 	const toggleKeyboard = () => {
 		const field = ime.current;
 		if (field === null) return;
-		if (imeOpen || keyboard > 0) field.blur();
-		else field.focus();
+		if (keyboardUp) {
+			field.blur();
+			return;
+		}
+		if (focused !== null) setCaret(handles.current.get(focused.id)?.caret() ?? null);
+		field.focus();
 	};
 	const tapPane = (pane: PaneNode) => {
 		setLayout((l) => focusPane(l, pane.id));
@@ -494,7 +499,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				backLabel={t.back}
 				tabs={layout.tabs.map((x, i) => {
 					const pane = panesOf(x.root).find((p) => p.id === x.focus);
-					return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i) };
+					return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
 				})}
 				active={tab?.id ?? ""}
 				hidden={hidden}
@@ -521,7 +526,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				}}
 			/>
 			{(notice !== "" || relayNote) && (
-				<p className="tx-note" role="status">
+				<p className={notice !== "" ? "tx-note" : "tx-note relay"} role="status">
 					{notice !== "" ? notice : tt.fellBack}
 				</p>
 			)}
@@ -561,9 +566,12 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					</div>
 				)}
 			</div>
-			{/* The key bar while a terminal shows (it holds the keyboard toggle too). */}
+			{/* The key bar while a terminal shows; under it, while the keyboard is down, the live input that brings it up. */}
 			{touch && focused !== null && (
-				<MobileKeyBar labels={tt.keys} mods={mods} keyboard={imeOpen || keyboard > 0} onToggle={toggle} onKey={barKey} onPaste={paste} onKeyboard={toggleKeyboard} />
+				<>
+					<MobileKeyBar labels={tt.keys} mods={mods} keyboard={keyboardUp} onToggle={toggle} onKey={barKey} onPaste={paste} onKeyboard={toggleKeyboard} />
+					{!keyboardUp && <LiveInput labels={tt.keys} onKeyboard={toggleKeyboard} onPaste={paste} />}
+				</>
 			)}
 		</div>
 	);

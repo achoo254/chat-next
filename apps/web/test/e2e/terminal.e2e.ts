@@ -270,8 +270,10 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	await p.page.goto(`http://localhost:${PORT}/?at=machine-session-terminal`);
 	const bar = p.page.getByRole("toolbar", { name: "Phím phụ" });
 	await bar.waitFor({ timeout: 30_000 });
-	const first = await bar.getByRole("button").evaluateAll((els) => els.slice(0, 6).map((e) => e.getAttribute("aria-label")));
-	assert.deepEqual(first, ["Bàn phím", "Esc", "Tab", "Shift+Tab", "Ctrl", "Alt"]);
+	const first = await bar.getByRole("button").evaluateAll((els) => els.slice(0, 5).map((e) => e.getAttribute("aria-label")));
+	assert.deepEqual(first, ["Esc", "Tab", "Shift+Tab", "Ctrl", "Alt"]);
+	// Under the keys while the keyboard is down: the live input that brings it up.
+	await p.page.locator("[data-id=terminal-live-input]").waitFor();
 	const heights = await bar.getByRole("button").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
 	assert.ok(heights.every((h) => h >= 44), `key heights ${heights.join(",")}`);
 	await p.shot("phone-terminal-keyboard-closed");
@@ -286,11 +288,12 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	assert.ok(Math.abs(box.bar - (844 - 336)) <= 1, `key row ends at ${box.bar}`);
 	assert.ok(box.dock > 200, `terminal ${box.dock} px tall`);
 	await p.shot("phone-terminal-keyboard-open");
+	await p.keyboard(0);
 	assert.deepEqual(errors, []);
 	await p.close();
 });
 
-test("an iPhone (WebKit, touch): a tap on the terminal or on the keyboard key leaves the focus in the dock's input, so the phone keyboard comes up", async () => {
+test("an iPhone (WebKit, touch): a tap on the terminal or on the live input leaves the focus in the dock's input, so the phone keyboard comes up", async () => {
 	const safari = await webkit.launch();
 	const context = await safari.newContext({ locale: "vi-VN", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 	const page = await context.newPage();
@@ -308,14 +311,13 @@ test("an iPhone (WebKit, touch): a tap on the terminal or on the keyboard key le
 	// A key of the row keeps the focus where it is.
 	await page.getByRole("button", { name: "Esc" }).tap();
 	assert.equal(await inInput(), true, "Esc keeps the focus");
-	// The keyboard key: down, then up again (WebKit drops the click of a tap whose pointerdown was cancelled).
-	const kbd = page.getByRole("button", { name: "Bàn phím" });
-	await kbd.tap();
+	// The key that hides the keyboard, then the live input that brings it back.
+	await page.getByRole("button", { name: "Ẩn bàn phím" }).tap();
 	await page.waitForTimeout(200);
-	assert.equal(await inInput(), false, "the keyboard key lets go of the input");
-	await kbd.tap();
+	assert.equal(await inInput(), false, "hiding the keyboard lets go of the input");
+	await page.locator("[data-id=terminal-live-input]").tap();
 	await page.waitForTimeout(200);
-	assert.equal(await inInput(), true, "the keyboard key takes the input again");
+	assert.equal(await inInput(), true, "the live input takes the input again");
 	assert.deepEqual(errors, []);
 	await context.close();
 	await safari.close();

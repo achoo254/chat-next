@@ -221,6 +221,14 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				title={thread ? thread.title || t.agent.newSession : ""}
 				subtitle={
 					<>
+						{mode === "terminal" && offered && (
+							// On a phone the path pill sits under the title (the header has no room beside it).
+							<span className="mx-sub-pill">
+								<Suspense fallback={null}>
+									<TerminalPill machine={machine} />
+								</Suspense>
+							</span>
+						)}
 						<span className="mono" title={dir}>
 							{placed?.project.name ?? workspace}
 						</span>
@@ -241,7 +249,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					</Suspense>
 				)}
 				{mode === "terminal" && endTerminal !== undefined && (
-					<button type="button" className="btn btn-sm" title={t.terminal.endHint} onClick={() => void endTerminal().catch(() => undefined)} data-id="session-terminal-end-btn">
+					<button type="button" className="btn btn-sm mx-end-btn" title={t.terminal.endHint} onClick={() => void endTerminal().catch(() => undefined)} data-id="session-terminal-end-btn">
 						{t.terminal.end}
 					</button>
 				)}

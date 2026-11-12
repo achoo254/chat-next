@@ -830,7 +830,17 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 	.mx-view-switch button { padding: 0 10px; }
 	.mx-view-switch .mx-view-word { display: none; }
 	.mx-chat > .mx-head .tx-pill { display: none; }
+	/* The session in its terminal (after Orca's phone app): the title centred over the path pill, round buttons, "Kết thúc" in the menu. */
+	.mx-chat[data-mode="terminal"] > .mx-head { gap: var(--space-2); padding: var(--space-2); }
+	.mx-chat[data-mode="terminal"] > .mx-head .title { text-align: center; }
+	.mx-chat[data-mode="terminal"] > .mx-head .title > span { justify-content: center; }
+	.mx-chat[data-mode="terminal"] .mx-sub-pill { display: inline-flex; min-width: 0; }
+	.mx-chat[data-mode="terminal"] .mx-sub-pill .tx-pill { display: inline-flex; margin: 0; padding: 0; border: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+	.mx-chat[data-mode="terminal"] .mx-sub-pill:has(.tx-pill) ~ * { display: none; }
+	.mx-chat[data-mode="terminal"] .mx-end-btn { display: none; }
+	.mx-chat[data-mode="terminal"] > .mx-head .icon-btn { width: 44px; height: 44px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
 }
+.mx-sub-pill { display: none; }
 /* The session header's button of the workspace panel (the panel's own styles load with it). */
 .ws-toggle[aria-expanded="true"] { color: var(--c-primary); background: var(--c-selected); }
 /* One grid for project, workspace and session rows (the same left padding): each row has one 16 px icon column
