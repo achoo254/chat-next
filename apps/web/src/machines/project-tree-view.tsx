@@ -329,6 +329,7 @@ function LooseItem({ folder, ctx, onArchive }: { folder: LooseFolder; ctx: TreeC
 				<StatusGlyph status={folder.status} offline={machine.conn.kind !== "on"} />
 				<span className="mx-ws-name" title={`${machine.entry.name} · ${dir}`}>
 					<span className="mx-ws-title">
+						<MachineIcon name="folder" small />
 						<b>{name}</b>
 						<HostChip name={machine.entry.name} offline={machine.conn.kind !== "on"} />
 					</span>
