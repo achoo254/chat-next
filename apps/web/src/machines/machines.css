@@ -110,9 +110,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-glyph.running { color: var(--c-primary); }
 .mx-glyph.running .icon { animation: spin 0.9s linear infinite; }
 .mx-glyph.done { color: var(--c-success); }
-/* Held at its prompt in a terminal: calm and static, in a muted accent; only a working AI spins. */
-.mx-glyph.open { color: color-mix(in srgb, var(--c-primary) 70%, var(--c-icon-muted)); }
-.mx-glyph.idle { opacity: 0.6; }
+/* Held at its prompt in a terminal looks idle: the row's second line already shows the terminal icon. */
+.mx-glyph.idle, .mx-glyph.open { opacity: 0.6; }
 .mx-glyph[data-offline] { opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon { animation: none; } }
 /* Arrow keys move between rows: one is in the tab order, focus shows. */
