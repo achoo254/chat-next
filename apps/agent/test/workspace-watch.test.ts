@@ -137,7 +137,7 @@ describe("the watcher", () => {
     const dir = repo();
     writeFileSync(join(dir, "a.txt"), "1\n");
     commitAll(dir);
-    const { ws } = workspaces({ w: dir }, { watchTimings: { ...WATCH_TIMINGS, statusMinMs: 200 } });
+    const { ws } = workspaces({ w: dir }, { watchTimings: { ...WATCH_TIMINGS, statusMinMs: 200, pollingMs: 500 } });
     const changes: WorkspaceChange[] = [];
     const stop = await ws.watch("w", (c) => changes.push(c));
     try {

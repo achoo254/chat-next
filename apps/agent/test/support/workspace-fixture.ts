@@ -11,7 +11,13 @@ import { AuditLog } from "../../src/safety/audit-log.ts";
 import { Workspaces, type WorkspacesOptions } from "../../src/workspace/workspaces.ts";
 import { tempDir } from "../harness.ts";
 
-const globalConfig = join(tempDir("ws-gitconfig-"), "gitconfig");
+// A home of the tests' own: git's global config (~/.gitconfig, $XDG_CONFIG_HOME/git/config),
+// credential stores and anything else read from home are the test's, never the machine's.
+const home = tempDir("ws-home-");
+mkdirSync(join(home, ".config"));
+process.env.HOME = home;
+process.env.XDG_CONFIG_HOME = join(home, ".config");
+const globalConfig = join(home, "gitconfig");
 writeFileSync(globalConfig, "[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n[advice]\n\tdetachedHead = false\n");
 process.env.GIT_CONFIG_GLOBAL = globalConfig;
 process.env.GIT_CONFIG_NOSYSTEM = "1";

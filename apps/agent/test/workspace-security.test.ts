@@ -34,13 +34,20 @@ function setup(extra: Parameters<typeof workspaces>[1] = {}) {
   return { base, dir, ...workspaces({ w: dir }, extra) };
 }
 
-/** An executable script in a fresh folder, and that folder first on PATH for the rest of the test. */
-function onPath(name: string, script: string): string {
+/**
+ * An executable script in a fresh folder, that folder first on PATH (so it
+ * wins over any copy the machine has installed) until the returned undo,
+ * which also removes the folder.
+ */
+function onPath(name: string, script: string): () => void {
   const bin = tempDir("ws-bin-");
   writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`);
   chmodSync(join(bin, name), 0o755);
   vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
-  return bin;
+  return () => {
+    vi.unstubAllEnvs();
+    rmSync(bin, { recursive: true, force: true });
+  };
 }
 
 function withRemote(base: string, dir: string): string {
@@ -194,7 +201,7 @@ describe("diffs and old paths", () => {
 describe("a stuck git", () => {
   it("is stopped with every helper it started, and the workspace is free again", async () => {
     if (!posix) return;
-    onPath("git-remote-slow", "sleep 31.5 &\nsleep 31.5");
+    const undo = onPath("git-remote-slow", "sleep 31.5 &\nsleep 31.5");
     const { ws, dir } = setup({ extraGitConfig: [...TEST_GIT_CONFIG, "-c", "protocol.slow.allow=always"] });
     git(dir, "remote", "add", "origin", "slow::nowhere");
     const limit = OPS_LIMITS.networkTimeoutMs;
@@ -209,7 +216,7 @@ describe("a stuck git", () => {
       await vi.waitFor(() => expect(execFileSync("ps", ["-axo", "command"], { encoding: "utf8" })).not.toContain("sleep 31.5"), { timeout: 5_000 });
     } finally {
       OPS_LIMITS.networkTimeoutMs = limit;
-      vi.unstubAllEnvs();
+      undo();
     }
   });
 });
@@ -260,11 +267,12 @@ describe("Git LFS", () => {
     if (!posix) return;
     const { ws, dir, base } = lfsRepo();
     const log = join(base, "lfs.log");
-    onPath("git-lfs", `echo "args: $*" >> "${log}"\ncat >> "${log}"`);
+    // A working git-lfs as far as tunelo can tell: it answers `version` and takes pre-push (logged, not uploading).
+    const undo = onPath("git-lfs", `if [ "$1" = version ]; then echo "git-lfs/3.0.0 (stub)"; exit 0; fi\necho "args: $*" >> "${log}"\ncat >> "${log}"`);
     try {
       await ws.push("w", "dev");
     } finally {
-      vi.unstubAllEnvs();
+      undo();
     }
     const head = git(dir, "rev-parse", "HEAD").trim();
     const logged = readFileSync(log, "utf8");
@@ -272,20 +280,27 @@ describe("Git LFS", () => {
     expect(logged).toMatch(new RegExp(`refs/heads/main ${head} refs/heads/main [0-9a-f]{40}`));
   });
 
-  it("refuses to push without git-lfs, pushing nothing", async () => {
+  it("refuses to push without a working git-lfs, pushing nothing", async () => {
+    if (!posix) return;
     const { ws, dir, base } = lfsRepo();
-    expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_LFS_MISSING);
+    // First on PATH whatever the machine has installed: fails as a missing or broken git-lfs does.
+    const undo = onPath("git-lfs", "echo 'git-lfs: not available' >&2\nexit 127");
+    try {
+      expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_LFS_MISSING);
+    } finally {
+      undo();
+    }
     expect(git(join(base, "remote.git"), "rev-parse", "main").trim()).not.toBe(git(dir, "rev-parse", "HEAD").trim());
   });
 
   it("refuses when git lfs pre-push fails", async () => {
     if (!posix) return;
     const { ws } = lfsRepo();
-    onPath("git-lfs", 'if [ "$1" = version ]; then exit 0; fi\nexit 2');
+    const undo = onPath("git-lfs", 'if [ "$1" = version ]; then exit 0; fi\nexit 2');
     try {
       expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
     } finally {
-      vi.unstubAllEnvs();
+      undo();
     }
   });
 });
@@ -349,14 +364,14 @@ describe("the repository's own network settings", () => {
 describe("config changed by a command", () => {
   it("is noticed after a write or network command", async () => {
     if (!posix) return;
-    onPath("git-remote-cfg", `git config credential.helper '!touch MARKER'\nexit 1`);
+    const undo = onPath("git-remote-cfg", `git config credential.helper '!touch MARKER'\nexit 1`);
     const { ws, dir } = setup({ extraGitConfig: [...TEST_GIT_CONFIG, "-c", "protocol.cfg.allow=always"] });
     git(dir, "remote", "add", "origin", "cfg::nowhere");
     try {
       const r = await reasonOf(ws.fetch("w"));
       expect(r).toMatchObject({ reason: ErrorReason.GIT_UNSAFE_CONFIG, subject: "credential.helper" });
     } finally {
-      vi.unstubAllEnvs();
+      undo();
     }
   });
 });
