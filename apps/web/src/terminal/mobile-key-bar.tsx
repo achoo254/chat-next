@@ -9,8 +9,10 @@
 // terminal's input, so the phone keyboard stays up: its mousedown is
 // cancelled, not its pointerdown, since WebKit drops the click of a tap whose
 // pointerdown was cancelled.
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { Icon } from "../components/icon.tsx";
+import type { Dictation } from "./dictation.ts";
+import type { CustomKey } from "./key-prefs.ts";
 
 export type BarKey =
 	| "esc"
@@ -194,6 +196,9 @@ export interface BarLabels {
 	readonly liveInput: string;
 	readonly tapToType: string;
 	readonly hideKeyboard: string;
+	readonly mic: string;
+	readonly micStop: string;
+	readonly micDenied: string;
 }
 
 interface MobileKeyBarProps {
@@ -204,18 +209,24 @@ interface MobileKeyBarProps {
 	/** A modifier tapped, `sinceLastTapMs` after its previous tap (for tapLatch). */
 	onToggle(mod: Modifier, sinceLastTapMs: number): void;
 	onKey(key: BarKey): void;
+	/** A key of the user's own: its text as typed (the dock applies held Ctrl/Alt). */
+	onText(text: string): void;
 	onPaste(): void;
 	onKeyboard(): void;
+	/** The "more" key: the sheet of other keys, combos, macros and managing the row. */
+	onMore(): void;
+	/** The ids the row shows, in order (key-prefs.ts rowOf). */
+	row: readonly string[];
+	custom: readonly CustomKey[];
 }
 
 type Item = { key: BarKey; text: string; label?: keyof BarLabels; className?: string };
 
-const MAIN: readonly Item[] = [
+/** The built-in keys a row can show, by id (key-prefs.ts orders and hides them). */
+const ITEMS: readonly Item[] = [
 	{ key: "esc", text: "Esc", label: "esc" },
 	{ key: "tab", text: "Tab", label: "tab" },
 	{ key: "shift-tab", text: "⇧Tab", label: "shiftTab" },
-];
-const AFTER_MODS: readonly Item[] = [
 	{ key: "left", text: "←", label: "left" },
 	{ key: "up", text: "↑", label: "up" },
 	{ key: "down", text: "↓", label: "down" },
@@ -233,20 +244,32 @@ const AFTER_MODS: readonly Item[] = [
 	{ key: "ctrl-l", text: "^L" },
 	{ key: "ctrl-r", text: "^R" },
 ];
-const MORE: readonly Item[] = [
+const ITEM_BY_ID = new Map(ITEMS.map((item) => [item.key as string, item]));
+
+/** Keys the "more" sheet offers that the row does not carry. */
+export const MORE_KEYS: readonly { key: BarKey; text: string }[] = [
 	{ key: "delete", text: "Del" },
 	{ key: "home", text: "Home" },
 	{ key: "end", text: "End" },
 	{ key: "page-up", text: "PgUp" },
 	{ key: "page-down", text: "PgDn" },
-	...([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n): Item => ({ key: `f${n}`, text: `F${n}` })),
+	...([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => ({ key: `f${n}` as BarKey, text: `F${n}` })),
 ];
 
-/** Keeps the focus (and the phone keyboard) where it is. */
-const keepFocus = (event: MouseEvent) => event.preventDefault();
+/** What a key of the row says, for lists of keys (the manage sheet). */
+export function keyText(id: string, labels: BarLabels, custom: readonly CustomKey[]): string {
+	if (id === "ctrl") return labels.ctrl;
+	if (id === "alt") return labels.alt;
+	if (id === "paste") return labels.paste;
+	const item = ITEM_BY_ID.get(id);
+	if (item !== undefined) return item.text;
+	return custom.find((c) => c.id === id)?.label ?? id;
+}
 
-export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste, onKeyboard }: MobileKeyBarProps) {
-	const [more, setMore] = useState(false);
+/** Keeps the focus (and the phone keyboard) where it is. */
+export const keepFocus = (event: MouseEvent) => event.preventDefault();
+
+export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, onKey, onText, onPaste, onKeyboard, onMore }: MobileKeyBarProps) {
 	const lastTap = useRef<Record<Modifier, number>>({ ctrl: 0, alt: 0 });
 	const stopRepeat = useRef<(() => void) | null>(null);
 	const stop = () => {
@@ -313,6 +336,25 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 			</button>
 		);
 	};
+	const byId = (id: string) => {
+		if (id === "ctrl" || id === "alt") return modKey(id);
+		if (id === "paste") {
+			return (
+				<button key={id} type="button" className="tx-key" aria-label={labels.paste} onMouseDown={keepFocus} onClick={onPaste}>
+					⎘
+				</button>
+			);
+		}
+		const item = ITEM_BY_ID.get(id);
+		if (item !== undefined) return key(item);
+		const own = custom.find((c) => c.id === id);
+		if (own === undefined) return null;
+		return (
+			<button key={id} type="button" className="tx-key own" data-key={id} onMouseDown={keepFocus} onClick={() => onText(own.send)}>
+				{own.label}
+			</button>
+		);
+	};
 	return (
 		<div className="tx-keys" role="toolbar" aria-label={labels.bar} data-keyboard={keyboard ? "" : undefined}>
 			{keyboard && (
@@ -320,38 +362,44 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 					<Icon name="keyboard" small />
 				</button>
 			)}
-			{MAIN.map(key)}
-			{modKey("ctrl")}
-			{modKey("alt")}
-			{AFTER_MODS.map(key)}
-			<button type="button" className="tx-key" aria-label={labels.paste} onMouseDown={keepFocus} onClick={onPaste}>
-				⎘
-			</button>
-			<button type="button" className="tx-key" aria-label={labels.more} aria-expanded={more} onMouseDown={keepFocus} onClick={() => setMore((v) => !v)}>
+			{row.map(byId)}
+			<button type="button" className="tx-key" aria-label={labels.more} aria-haspopup="dialog" onMouseDown={keepFocus} onClick={onMore} data-id="terminal-keys-more">
 				⋯
 			</button>
-			{more && MORE.map(key)}
 		</div>
 	);
 }
 
 /**
  * Under the key row while the phone keyboard is down (Orca's "Live input"):
- * one wide target that brings the keyboard up for the terminal, and paste.
+ * one wide target that brings the keyboard up for the terminal, and the mic
+ * (speech typed into the terminal) where the browser can listen.
  */
-export function LiveInput({ labels, onKeyboard, onPaste }: { labels: BarLabels; onKeyboard(): void; onPaste(): void }) {
+export function LiveInput({ labels, dictation, onKeyboard }: { labels: BarLabels; dictation: Dictation; onKeyboard(): void }) {
+	const listening = dictation.listening;
+	const hint = listening ? dictation.interim || labels.micStop : dictation.error === "not-allowed" ? labels.micDenied : labels.tapToType;
 	return (
 		<div className="tx-live">
-			<button type="button" className="tx-live-field" onClick={onKeyboard} data-id="terminal-live-input">
-				<Icon name="keyboard" />
+			<button type="button" className="tx-live-field" onClick={onKeyboard} data-id="terminal-live-input" data-listening={listening ? "" : undefined}>
+				<Icon name={listening ? "mic" : "keyboard"} />
 				<span>
 					<strong>{labels.liveInput}</strong>
-					<span>{labels.tapToType}</span>
+					<span>{hint}</span>
 				</span>
 			</button>
-			<button type="button" className="tx-live-btn" aria-label={labels.paste} title={labels.paste} onClick={onPaste}>
-				<Icon name="copy" />
-			</button>
+			{dictation.supported && (
+				<button
+					type="button"
+					className="tx-live-btn"
+					aria-label={listening ? labels.micStop : labels.mic}
+					title={listening ? labels.micStop : labels.mic}
+					aria-pressed={listening}
+					onClick={dictation.toggle}
+					data-id="terminal-mic"
+				>
+					<Icon name="mic" />
+				</button>
+			)}
 		</div>
 	);
 }

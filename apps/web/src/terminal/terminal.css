@@ -140,6 +140,8 @@
 .tx-dock.touch.embedded .tx-note.relay { display: none; }
 /* Touch scrolling stays inside the terminal. */
 .tx-term { touch-action: pan-y; overscroll-behavior: contain; }
+/* A finger scrolls through touch-scroll.ts, so the browser takes no gesture of its own there. */
+.tx-dock.touch .tx-term { touch-action: none; }
 
 /* Typing on a phone (the keyboard up): the terminal takes every row it can. The session header, the tabs and
    the relay note step aside until the keyboard goes down, and the key row slims to one 44px strip. */
@@ -155,3 +157,52 @@
 .mx-chat[data-keyboard]:has(.tx-dock.touch) { padding-top: env(safe-area-inset-top); box-sizing: border-box; }
 .tx-keys[data-keyboard], .mx-chat[data-keyboard] .tx-keys, .tx-dock[data-keyboard] .tx-keys { gap: 6px; padding: 3px var(--space-2); }
 .tx-keys[data-keyboard] .tx-key, .mx-chat[data-keyboard] .tx-key, .tx-dock[data-keyboard] .tx-key { height: 38px; min-width: 44px; padding: 0 var(--space-2); }
+
+/* On a phone the sessions menu is the app's bottom sheet (machines.css): the tab row's popover offsets must not push it aside. */
+@media (max-width: 760px), (pointer: coarse) {
+	.tx-dock .tx-menu { left: 0; right: 0; min-width: 0; }
+}
+
+/* The key row's "more" sheet (key-sheet.tsx), after Orca's "Add Shortcut". */
+.tx-sheet-wrap { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; }
+.tx-sheet-backdrop { position: absolute; inset: 0; border: 0; padding: 0; background: rgb(0 0 0 / 0.45); cursor: default; }
+.tx-sheet { position: relative; display: grid; gap: var(--space-3); max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-2) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--c-surface); box-shadow: var(--shadow-lg); }
+.tx-sheet-grip { justify-self: center; width: 40px; height: 5px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.tx-sheet-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-2); }
+.tx-sheet-head h2 { margin: 0; font-size: 1rem; font-weight: 600; text-align: center; }
+.tx-sheet-nav { justify-self: start; min-height: 44px; padding: 0 var(--space-1); border: 0; background: none; color: var(--c-primary); font: inherit; font-size: 0.9375rem; cursor: pointer; }
+.tx-sheet-nav.end { justify-self: end; }
+.tx-sheet-group { display: grid; overflow: hidden; border-radius: var(--radius-lg); background: var(--c-surface-subtle); }
+.tx-sheet-row { display: flex; align-items: center; gap: var(--space-3); min-height: 64px; padding: var(--space-2) var(--space-4); border: 0; border-top: 1px solid var(--c-border-subtle); background: none; color: var(--c-text); font: inherit; text-align: left; cursor: pointer; }
+.tx-sheet-row:first-child { border-top: 0; }
+.tx-sheet-row:active { background: var(--c-hover); }
+.tx-sheet-row > span:first-child { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.tx-sheet-row strong { font-size: 1rem; font-weight: 500; }
+.tx-sheet-row small { font-size: 0.8125rem; color: var(--c-text-muted); }
+.tx-sheet-row > span:last-child { font-size: 1.25rem; color: var(--c-text-muted); }
+.tx-sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: var(--space-2); }
+.tx-sheet-grid .tx-key { width: 100%; }
+.tx-sheet-grid.small { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+.tx-sheet-form { display: grid; gap: var(--space-3); }
+.tx-sheet-mods { display: flex; gap: var(--space-2); }
+.tx-sheet-mods .tx-key { flex: 1; }
+.tx-sheet .tx-key[aria-pressed="true"] { background: color-mix(in srgb, var(--c-primary) 24%, var(--c-surface)); box-shadow: inset 0 0 0 1px var(--c-primary); }
+.tx-sheet-field { display: grid; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
+.tx-sheet-field .input { font-size: 16px; font-family: var(--font-mono); }
+.tx-sheet-check { display: flex; flex: 1; align-items: center; gap: var(--space-2); min-height: 44px; min-width: 0; font-size: 0.9375rem; }
+.tx-sheet-check input { width: 20px; height: 20px; margin: 0; accent-color: var(--c-primary); }
+.tx-sheet-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.tx-sheet-actions .btn { min-height: 44px; }
+.tx-sheet-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--c-text-muted); }
+.tx-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-radius: var(--radius-lg); background: var(--c-surface-subtle); }
+.tx-sheet-list li { display: flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2) 0 var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.tx-sheet-list li:first-child { border-top: 0; }
+.tx-sheet-list li[data-hidden] .tx-sheet-keyname { color: var(--c-text-muted); text-decoration: line-through; }
+.tx-sheet-keyname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.tx-sheet-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text); font-size: 1.125rem; cursor: pointer; }
+.tx-sheet-icon:disabled { opacity: 0.3; cursor: default; }
+.tx-sheet-icon:not(:disabled):active { background: var(--c-hover); }
+.tx-sheet-row:focus-visible, .tx-sheet-nav:focus-visible, .tx-sheet-icon:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.tx-key.own { color: var(--c-primary); }
+.tx-live-btn[aria-pressed="true"] { background: var(--c-error); color: #fff; }
+.tx-live-field[data-listening] { border-color: var(--c-error); }

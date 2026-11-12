@@ -16,6 +16,7 @@
 import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ErrorReason, type TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../brand.ts";
+import { useI18n } from "../i18n/i18n.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
 import type { LinkHub } from "../machines/link/link-hub.ts";
 import { LOCAL_REF } from "../machines/link/link-hub.ts";
@@ -26,6 +27,9 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, Link, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
+import { useDictation } from "./dictation.ts";
+import { KeySheet } from "./key-sheet.tsx";
+import { loadPrefs, rowOf, savePrefs, type KeyPrefs } from "./key-prefs.ts";
 import { afterKey, keySequence, LiveInput, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
 import { useViewportFit } from "../machines/viewport-fit.ts";
 import { StatusPill } from "./status-pill.tsx";
@@ -188,6 +192,14 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [ended, setEnded] = useState<ReadonlyMap<number, number>>(() => new Map());
 	const [listed, setListed] = useState<readonly TermSessionInfo[]>([]);
 	const [mods, setMods] = useState<Modifiers>(NO_MODIFIERS);
+	// The phone key row as this device keeps it, and its "more" sheet.
+	const [keyPrefs, setKeyPrefs] = useState<KeyPrefs>(loadPrefs);
+	const [sheet, setSheet] = useState(false);
+	const changeKeyPrefs = (next: KeyPrefs) => {
+		setKeyPrefs(next);
+		savePrefs(next);
+	};
+	const { locale } = useI18n();
 	const [caret, setCaret] = useState<ReturnType<PaneHandle["caret"]>>(null);
 	const [probe] = useState(() => latencyProbe());
 	const [mac] = useState(isMac);
@@ -386,6 +398,13 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		const handle = focused === null ? undefined : handles.current.get(focused.id);
 		send(keySequence(key, handle?.appCursor() ?? false));
 	};
+	/** Bytes as they are, to the focused terminal (speech, the sheet's keys and combos). */
+	const sendRaw = (text: string) => {
+		if (focused === null || text === "") return;
+		probe?.key(focused.session);
+		terminal.input(focused.session, encoder.encode(text));
+	};
+	const dictation = useDictation(locale, sendRaw);
 	const toggle = (mod: Modifier, sinceLastTapMs: number) => setMods((m) => ({ ...m, [mod]: tapLatch(m[mod], sinceLastTapMs) }));
 	/** Paste from the clipboard into the terminal (the browser may ask first; a refusal pastes nothing). */
 	const paste = () => {
@@ -569,8 +588,30 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			{/* The key bar while a terminal shows; under it, while the keyboard is down, the live input that brings it up. */}
 			{touch && focused !== null && (
 				<>
-					<MobileKeyBar labels={tt.keys} mods={mods} keyboard={keyboardUp} onToggle={toggle} onKey={barKey} onPaste={paste} onKeyboard={toggleKeyboard} />
-					{!keyboardUp && <LiveInput labels={tt.keys} onKeyboard={toggleKeyboard} onPaste={paste} />}
+					<MobileKeyBar
+						labels={tt.keys}
+						mods={mods}
+						keyboard={keyboardUp}
+						row={rowOf(keyPrefs)}
+						custom={keyPrefs.custom}
+						onToggle={toggle}
+						onKey={barKey}
+						onText={send}
+						onPaste={paste}
+						onKeyboard={toggleKeyboard}
+						onMore={() => setSheet(true)}
+					/>
+					{!keyboardUp && <LiveInput labels={tt.keys} dictation={dictation} onKeyboard={toggleKeyboard} />}
+					{sheet && (
+						<KeySheet
+							t={tt.keys}
+							prefs={keyPrefs}
+							onPrefs={changeKeyPrefs}
+							onSend={sendRaw}
+							appCursor={() => (focused === null ? false : (handles.current.get(focused.id)?.appCursor() ?? false))}
+							onClose={() => setSheet(false)}
+						/>
+					)}
 				</>
 			)}
 		</div>

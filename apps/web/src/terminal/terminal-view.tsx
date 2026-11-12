@@ -15,6 +15,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { LatencyProbe } from "./latency-probe.ts";
+import { TouchScroller } from "./touch-scroll.ts";
 import { noAutofill } from "./no-autofill.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
@@ -142,6 +143,7 @@ const encoder = new TextEncoder();
 
 export function TerminalView({ link, session, focused, touch, label, probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
+	const scrollerRef = useRef<TouchScroller | null>(null);
 	const termRef = useRef<Terminal | null>(null);
 	const title = useEffectEvent((text: string) => onTitle(text));
 	const exited = useEffectEvent((code: number) => onExit(code));
@@ -250,6 +252,9 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			term.attachCustomKeyEventHandler((event) => !(event.type === "keydown" && shortcut(event)));
 			const observer = new ResizeObserver(fitSoon);
 			observer.observe(host);
+			// A finger scrolls the terminal itself (touch-scroll.ts): the history of the normal screen, or arrow
+			// keys for a full-screen program (its own screen has no history), as xterm does for a mouse wheel.
+			const stopTouch = touch ? touchScroll(host, term, (seq) => link.input(session, encoder.encode(seq)), scrollerRef) : () => undefined;
 			// Ctrl/⌘ + − 0 here, or A−/A+ in the dock: every terminal of the page takes the new size.
 			const stopSize = onFontSize((size) => {
 				term.options.fontSize = size;
@@ -280,6 +285,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				probe?.screen(session, null);
 				if (frame !== 0) cancelAnimationFrame(frame);
 				observer.disconnect();
+				stopTouch();
 				stopSize();
 				fonts?.removeEventListener("loadingdone", redraw);
 				for (const s of subscriptions) s.dispose();
@@ -310,5 +316,46 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 		if (touch && event.pointerType !== "mouse") event.preventDefault();
 		onFocus();
 	};
-	return <div className="tx-term" ref={hostRef} onPointerDown={onPointerDown} />;
+	// A swipe was a scroll: the pane does not take it for a tap (no keyboard).
+	const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+		if (scrollerRef.current?.moved === true) event.stopPropagation();
+	};
+	return <div className="tx-term" ref={hostRef} onPointerDown={onPointerDown} onPointerUp={onPointerUp} />;
+}
+
+/** Wires a TouchScroller to the pane's fingers; returns the cleanup. */
+function touchScroll(host: HTMLElement, term: Terminal, input: (seq: string) => void, ref: { current: TouchScroller | null }): () => void {
+	const scroller = new TouchScroller({
+		rowHeight: () => host.clientHeight / Math.max(1, term.rows),
+		scrollLines: (lines) => {
+			if (term.buffer.active.type === "alternate") {
+				const older = lines < 0;
+				const code = older ? "A" : "B";
+				input((term.modes.applicationCursorKeysMode ? `\x1bO${code}` : `\x1b[${code}`).repeat(Math.abs(lines)));
+			} else term.scrollLines(lines);
+		},
+	});
+	ref.current = scroller;
+	const finger = (event: globalThis.PointerEvent) => event.pointerType !== "mouse" && event.isPrimary;
+	const down = (event: globalThis.PointerEvent) => {
+		if (finger(event)) scroller.start(event.clientY, event.timeStamp);
+	};
+	const move = (event: globalThis.PointerEvent) => {
+		if (finger(event)) scroller.move(event.clientY, event.timeStamp);
+	};
+	const up = (event: globalThis.PointerEvent) => {
+		if (finger(event)) scroller.end(event.timeStamp);
+	};
+	host.addEventListener("pointerdown", down);
+	host.addEventListener("pointermove", move);
+	host.addEventListener("pointerup", up);
+	host.addEventListener("pointercancel", up);
+	return () => {
+		scroller.stop();
+		ref.current = null;
+		host.removeEventListener("pointerdown", down);
+		host.removeEventListener("pointermove", move);
+		host.removeEventListener("pointerup", up);
+		host.removeEventListener("pointercancel", up);
+	};
 }

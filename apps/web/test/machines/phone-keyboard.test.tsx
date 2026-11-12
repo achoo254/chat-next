@@ -21,6 +21,7 @@ import {
 	withModifiers,
 	type BarLabels,
 } from "../../src/terminal/mobile-key-bar.tsx";
+import { EMPTY_PREFS, rowOf } from "../../src/terminal/key-prefs.ts";
 
 /** A visualViewport the test moves, as the keyboard would. */
 class FakeViewport extends EventTarget {
@@ -169,6 +170,9 @@ describe("the terminal's key row", () => {
 		liveInput: "Nhập trực tiếp",
 		tapToType: "Chạm để hiện bàn phím",
 		hideKeyboard: "Ẩn bàn phím",
+		mic: "Nói để nhập",
+		micStop: "Dừng nghe",
+		micDenied: "Chưa được phép dùng micro.",
 	};
 
 	it("puts the AI's keys first, says which modifiers are on, and keeps the rest behind 'more'", async () => {
@@ -176,8 +180,22 @@ describe("the terminal's key row", () => {
 		const toggles: [string, number][] = [];
 		let keyboard = 0;
 		let pasted = 0;
+		let more = 0;
+		const texts: string[] = [];
 		const { rerender } = render(
-			<MobileKeyBar labels={labels} mods={NO_MODIFIERS} keyboard={false} onToggle={(m, since) => toggles.push([m, since])} onKey={(k) => keys.push(k)} onPaste={() => (pasted += 1)} onKeyboard={() => (keyboard += 1)} />,
+			<MobileKeyBar
+				labels={labels}
+				mods={NO_MODIFIERS}
+				keyboard={false}
+				row={rowOf(EMPTY_PREFS)}
+				custom={[]}
+				onToggle={(m, since) => toggles.push([m, since])}
+				onKey={(k) => keys.push(k)}
+				onText={(text) => texts.push(text)}
+				onPaste={() => (pasted += 1)}
+				onKeyboard={() => (keyboard += 1)}
+				onMore={() => (more += 1)}
+			/>,
 		);
 		const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
 		expect(names.slice(0, 8)).toEqual(["Esc", "Tab", "Shift+Tab", "Ctrl", "Alt", "Mũi tên trái", "Mũi tên lên", "Mũi tên xuống"]);
@@ -192,15 +210,33 @@ describe("the terminal's key row", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Ctrl" }));
 		expect(toggles.map(([m]) => m)).toEqual(["ctrl", "ctrl"]);
 		expect(toggles[1]?.[1]).toBeLessThan(DOUBLE_TAP_MS);
-		rerender(<MobileKeyBar labels={labels} mods={{ ctrl: "lock", alt: "once" }} keyboard onToggle={() => undefined} onKey={() => undefined} onPaste={() => undefined} onKeyboard={() => undefined} />);
+		const own = { id: "c:1", label: "ls", send: "ls\r" };
+		rerender(
+			<MobileKeyBar
+				labels={labels}
+				mods={{ ctrl: "lock", alt: "once" }}
+				keyboard
+				row={["ctrl", "alt", "c:1"]}
+				custom={[own]}
+				onToggle={() => undefined}
+				onKey={() => undefined}
+				onText={(text) => texts.push(text)}
+				onPaste={() => undefined}
+				onKeyboard={() => undefined}
+				onMore={() => (more += 1)}
+			/>,
+		);
 		const ctrl = screen.getByRole("button", { name: "Ctrl (giữ)" });
 		expect(ctrl.getAttribute("aria-pressed")).toBe("true");
 		expect(ctrl.getAttribute("data-latch")).toBe("lock");
 		expect(screen.getByRole("button", { name: "Alt" }).getAttribute("data-latch")).toBe("once");
 		expect(screen.getAllByRole("button")[0]?.getAttribute("aria-label")).toBe("Ẩn bàn phím");
+		// A key of the user's own sends its text; "more" opens the sheet.
+		await userEvent.click(screen.getByRole("button", { name: "ls" }));
+		expect(texts).toEqual(["ls\r"]);
 		await userEvent.click(screen.getByRole("button", { name: "Thêm phím" }));
-		expect(screen.getByText("F5")).toBeTruthy();
-		expect(screen.getByText("PgDn")).toBeTruthy();
+		expect(more).toBe(1);
+		expect(screen.queryByRole("button", { name: "Esc" })).toBeNull();
 		expect(keyboard + pasted).toBe(0);
 	});
 });
