@@ -48,8 +48,8 @@ export function AddProjectHosts({ count }: { count: number }) {
 		host(1, "Hoans-Mac-mini.local", 50, [
 			{ dir: "/Users/dieuvy/code/chat-next", sessions: 12 },
 			{ dir: "/Users/dieuvy/code/hoandat-app", sessions: 5 },
-			{ dir: "/Users/dieuvy/code/cloud-panel-application", sessions: 3 },
-			{ dir: "/Users/dieuvy/code/workspace-application", sessions: 1 },
+			{ dir: "/Users/dieuvy/code/acme-billing", sessions: 3 },
+			{ dir: "/Users/dieuvy/code/acme-workspace", sessions: 1 },
 		]),
 		host(2, "dattqh-cloud-1 (máy chủ phòng lab)", 1200, []),
 		host(3, "hoandat-pc", 300, [{ dir: "/home/dieuvy/kb-next", sessions: 2 }]),

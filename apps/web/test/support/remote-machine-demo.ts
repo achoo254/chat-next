@@ -363,9 +363,9 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const profiles = {
 		selectedId: "p2",
 		profiles: [
-			{ id: "", email: "dieuvy@inet.vn", organization: "iNET", plan: "team", signedIn: true, lastUsage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
-			{ id: "p2", email: "dieuvy.max@gmail.com", plan: "max", signedIn: true, lastUsage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
-			{ id: "p3", email: "dieuvy.pro@gmail.com", plan: "pro", signedIn: false },
+			{ id: "", email: "user@example.com", organization: "Acme", plan: "team", signedIn: true, lastUsage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
+			{ id: "p2", email: "user.max@example.com", plan: "max", signedIn: true, lastUsage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
+			{ id: "p3", email: "user.pro@example.com", plan: "pro", signedIn: false },
 		],
 	};
 	machine.handler = (frame, socket) => {
@@ -451,10 +451,10 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 								threadId,
 								profileId: "",
 								machineProfileId: "p2",
-								account: { email: "dieuvy@inet.vn", organization: "iNET", plan: "team" },
+								account: { email: "user@example.com", organization: "Acme", plan: "team" },
 								profileSwitchPending: threadId === DEMO_THREAD,
-								...(threadId === DEMO_THREAD ? { nextAccount: { email: "dieuvy.max@gmail.com", plan: "max" } } : {}),
-								...(threadId === "demo-running" ? { profileSuggestion: { profileId: "p2", email: "dieuvy.max@gmail.com", remaining: 20 } } : {}),
+								...(threadId === DEMO_THREAD ? { nextAccount: { email: "user.max@example.com", plan: "max" } } : {}),
+								...(threadId === "demo-running" ? { profileSuggestion: { profileId: "p2", email: "user.max@example.com", remaining: 20 } } : {}),
 								permissionMode: "acceptEdits",
 								gitBranch: "main",
 								linesAdded: 22,

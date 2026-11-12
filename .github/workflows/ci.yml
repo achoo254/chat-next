@@ -34,7 +34,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The agent's tests that need the release's runtime (Bun) run, not skip.
       - uses: ./.github/actions/setup-bun
+      # Includes check:forbidden: strings this public repo must not hold, listed
+      # in a repo secret (empty on fork pull requests, where the check skips).
       - run: pnpm lint
+        env:
+          FORBIDDEN_PATTERNS: ${{ secrets.FORBIDDEN_PATTERNS }}
       - run: pnpm typecheck
       - run: pnpm test
       # The SDK packages: @achoo254/chat-client assembles

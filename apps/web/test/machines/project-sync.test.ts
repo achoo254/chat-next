@@ -227,13 +227,13 @@ describe("only the same known repository shares a project", () => {
 	it("three folders without a known remote on two machines: three projects, each named after its folder", async () => {
 		const { store } = await freshStore();
 		// A machine too old to report remotes: every remote is empty.
-		await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/bo-ho-so-hop-nhat-inet")]), host(2, [own("/root")])]);
+		await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/acme-records-portal")]), host(2, [own("/root")])]);
 		expect(shape(store)).toEqual([
-			["bo-ho-so-hop-nhat-inet", "", ["1:/Users/me/bo-ho-so-hop-nhat-inet"]],
+			["acme-records-portal", "", ["1:/Users/me/acme-records-portal"]],
 			["hoandat-app", "", ["1:/Users/me/hoandat-app"]],
 			["root", "", ["2:/root"]],
 		]);
-		expect(await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/bo-ho-so-hop-nhat-inet")]), host(2, [own("/root")])])).toBe(0);
+		expect(await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/acme-records-portal")]), host(2, [own("/root")])])).toBe(0);
 	});
 
 	it("a folder without a remote never joins an existing project linking none", async () => {
@@ -249,9 +249,9 @@ describe("only the same known repository shares a project", () => {
 
 	it("two folders of different repositories: two projects", async () => {
 		const { store } = await freshStore();
-		await syncHosts(store, [host(1, [own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git"), own("/w/bo-ho-so", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git")])]);
+		await syncHosts(store, [host(1, [own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git"), own("/w/acme-records", "https://gitlab.example.com/scm/team/acme-records.git")])]);
 		expect(shape(store)).toEqual([
-			["bo-ho-so", "nexus-account.inet.vn/scm/team/bo-ho-so", ["1:/w/bo-ho-so"]],
+			["acme-records", "gitlab.example.com/scm/team/acme-records", ["1:/w/acme-records"]],
 			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
 		]);
 	});
@@ -266,17 +266,17 @@ describe("only the same known repository shares a project", () => {
 describe("repairing workspaces grouped with another repository", () => {
 	it("a workspace in a project linking another repository moves to its own repository's project; one with no known remote stays; nothing else changes", async () => {
 		const server = new FakeAgentProjects();
-		const wrong = server.seed("bo-ho-so-hop-nhat-inet", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git", [
-			{ machineId: 1, dir: "/w/bo-ho-so-hop-nhat-inet", branch: "", kind: 1 },
+		const wrong = server.seed("acme-records-portal", "https://gitlab.example.com/scm/team/acme-records.git", [
+			{ machineId: 1, dir: "/w/acme-records-portal", branch: "", kind: 1 },
 			{ machineId: 1, dir: "/w/hoandat-app", branch: "", kind: 1 },
 			{ machineId: 2, dir: "/root", branch: "", kind: 3 },
 		]);
 		const { store } = await freshStore(server);
-		const mac = host(1, [own("/w/bo-ho-so-hop-nhat-inet", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git"), own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git")]);
+		const mac = host(1, [own("/w/acme-records-portal", "https://gitlab.example.com/scm/team/acme-records.git"), own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git")]);
 		const cloud = host(2, [own("/root")]);
 		expect(await syncHosts(store, [mac, cloud])).toBe(1);
 		expect(shape(store)).toEqual([
-			["bo-ho-so-hop-nhat-inet", "nexus-account.inet.vn/scm/team/bo-ho-so", ["1:/w/bo-ho-so-hop-nhat-inet", "2:/root"]],
+			["acme-records-portal", "gitlab.example.com/scm/team/acme-records", ["1:/w/acme-records-portal", "2:/root"]],
 			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
 		]);
 		// Only moves: no workspace or project removed, nothing asked of the machines.
