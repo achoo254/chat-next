@@ -36,7 +36,7 @@ import { AccountMenuSlot } from "./ui/account-menu-slot.tsx";
 import { FolderRail } from "./ui/folder-rail.tsx";
 import { ContactsGlyph } from "./ui/contacts-glyph.tsx";
 import { MachineLinksProvider } from "../machines/link/connection-provider.tsx";
-import { MachineIcon } from "../machines/machine-icons.tsx";
+import { CpuIcon } from "../machines/cpu-icon.tsx";
 import { messageExtrasPreloads } from "./ui/message-item.tsx";
 import { ChatAvatar, Toast } from "./ui/parts.tsx";
 import { forgetSelf } from "../api/offline-self.ts";
@@ -442,7 +442,7 @@ function MachinesLink({ current }: { current: boolean }) {
 	const copy = useCopy();
 	return (
 		<Link to={paths.machines()} className="icon-btn" current={current} aria-label={copy.folders.machines}>
-			<MachineIcon name="cpu" />
+			<CpuIcon />
 		</Link>
 	);
 }

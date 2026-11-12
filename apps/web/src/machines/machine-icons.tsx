@@ -1,15 +1,11 @@
 // Icons only AI Agent draws (paths from the mock), kept out of the
-// shared sets. The folder rail imports MachineIcon "cpu" too: one small path.
+// shared sets. The chat's startup draws only "cpu", from cpu-icon.tsx.
 import type { ReactElement } from "react";
 import { iconSvg } from "../components/icon.tsx";
+import { CPU_PATH } from "./cpu-icon.tsx";
 
 const PATHS = {
-	cpu: (
-		<>
-			<rect x="6" y="6" width="12" height="12" rx="2" />
-			<path d="M9 2.5v3.5M15 2.5v3.5M9 18v3.5M15 18v3.5M2.5 9h3.5M2.5 15h3.5M18 9h3.5M18 15h3.5" />
-		</>
-	),
+	cpu: CPU_PATH,
 	monitor: (
 		<>
 			<rect x="3" y="4" width="18" height="12" rx="2" />
