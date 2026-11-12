@@ -269,6 +269,45 @@ const (
 	ErrorReason_ERROR_REASON_TERMINAL_SESSION_LIMIT ErrorReason = 56
 	// TermClose or TermResize names a terminal session that is gone.
 	ErrorReason_ERROR_REASON_TERMINAL_SESSION_NOT_FOUND ErrorReason = 57
+	// A workspace request names a secret file (dotenv, a key, credentials, git
+	// internals): never read, searched or listed.
+	ErrorReason_ERROR_REASON_SECRET_FILE ErrorReason = 58
+	// A git write or network request in a repository whose own config (local or
+	// worktree scope) names a program git would run (subject: the config key).
+	// The user runs that command in a terminal instead.
+	ErrorReason_ERROR_REASON_GIT_UNSAFE_CONFIG ErrorReason = 59
+	// A git network request needs a sign-in the machine does not have (no
+	// credential stored, ssh key refused or unknown host); tunelo never prompts.
+	ErrorReason_ERROR_REASON_GIT_NEEDS_CREDENTIALS ErrorReason = 60
+	// git refused or failed (subject: its last line, in English).
+	ErrorReason_ERROR_REASON_GIT_FAILED ErrorReason = 61
+	// Another git write of the same workspace is running.
+	ErrorReason_ERROR_REASON_GIT_BUSY ErrorReason = 62
+	// A git request in a workspace that is not in a git work tree.
+	ErrorReason_ERROR_REASON_NOT_A_GIT_REPOSITORY ErrorReason = 63
+	// WsGitDiscard without confirm (code NEEDS_CONSENT).
+	ErrorReason_ERROR_REASON_DISCARD_NOT_CONFIRMED ErrorReason = 64
+	// WsDirList of a folder with more than 100 000 entries.
+	ErrorReason_ERROR_REASON_FOLDER_TOO_LARGE ErrorReason = 65
+	// WsGitPush of a repository that uses Git LFS on a machine without
+	// git-lfs: nothing was pushed (pushing would leave only LFS pointers).
+	ErrorReason_ERROR_REASON_GIT_LFS_MISSING ErrorReason = 66
+	// A git request in a workspace that is a folder inside a larger
+	// repository, not the repository's top folder.
+	ErrorReason_ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT ErrorReason = 67
+	// WsGitCommit where git would sign the commit (commit.gpgSign, or
+	// gpg.format ssh or x509): signing may prompt, so it is left to a terminal.
+	ErrorReason_ERROR_REASON_GIT_COMMIT_SIGNING ErrorReason = 68
+	// WsGitCommit, WsGitCheckout or WsGitPull while a merge, rebase,
+	// cherry-pick, revert or bisect is in progress (subject: which); the user
+	// finishes it in a terminal.
+	ErrorReason_ERROR_REASON_GIT_OPERATION_IN_PROGRESS ErrorReason = 69
+	// WsGitCommit on a detached HEAD without allow_detached.
+	ErrorReason_ERROR_REASON_GIT_DETACHED_HEAD ErrorReason = 70
+	// WsGitStage or WsGitCommit takes in a secret file the request did not
+	// name in confirm_sensitive (code NEEDS_CONSENT; subject: those paths, one
+	// a line).
+	ErrorReason_ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED ErrorReason = 71
 )
 
 // Enum value maps for ErrorReason.
@@ -332,66 +371,94 @@ var (
 		55: "ERROR_REASON_TERMINAL_UNAVAILABLE",
 		56: "ERROR_REASON_TERMINAL_SESSION_LIMIT",
 		57: "ERROR_REASON_TERMINAL_SESSION_NOT_FOUND",
+		58: "ERROR_REASON_SECRET_FILE",
+		59: "ERROR_REASON_GIT_UNSAFE_CONFIG",
+		60: "ERROR_REASON_GIT_NEEDS_CREDENTIALS",
+		61: "ERROR_REASON_GIT_FAILED",
+		62: "ERROR_REASON_GIT_BUSY",
+		63: "ERROR_REASON_NOT_A_GIT_REPOSITORY",
+		64: "ERROR_REASON_DISCARD_NOT_CONFIRMED",
+		65: "ERROR_REASON_FOLDER_TOO_LARGE",
+		66: "ERROR_REASON_GIT_LFS_MISSING",
+		67: "ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT",
+		68: "ERROR_REASON_GIT_COMMIT_SIGNING",
+		69: "ERROR_REASON_GIT_OPERATION_IN_PROGRESS",
+		70: "ERROR_REASON_GIT_DETACHED_HEAD",
+		71: "ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED",
 	}
 	ErrorReason_value = map[string]int32{
-		"ERROR_REASON_UNSPECIFIED":                 0,
-		"ERROR_REASON_FOLDER_NOT_FOUND":            1,
-		"ERROR_REASON_EMPTY_MESSAGE":               2,
-		"ERROR_REASON_SENSITIVE_FOLDER":            3,
-		"ERROR_REASON_PROJECT_SETTINGS_UNTRUSTED":  4,
-		"ERROR_REASON_TRUST_ON_MACHINE":            5,
-		"ERROR_REASON_AI_NOT_INSTALLED":            6,
-		"ERROR_REASON_AI_NEEDS_LOGIN":              7,
-		"ERROR_REASON_UNKNOWN_AI":                  8,
-		"ERROR_REASON_SAME_AI":                     9,
-		"ERROR_REASON_AI_START_FAILED":             10,
-		"ERROR_REASON_PROFILE_UNUSABLE":            11,
-		"ERROR_REASON_THREAD_NOT_FOUND":            12,
-		"ERROR_REASON_ITEM_NOT_FOUND":              13,
-		"ERROR_REASON_PROMPT_STALE":                14,
-		"ERROR_REASON_DENY_MESSAGE_INVALID":        15,
-		"ERROR_REASON_UNKNOWN_EFFORT":              16,
-		"ERROR_REASON_PERMISSION_MODE_NOT_ALLOWED": 17,
-		"ERROR_REASON_NO_PROFILES":                 18,
-		"ERROR_REASON_PROFILE_NOT_FOUND":           19,
-		"ERROR_REASON_DEFAULT_PROFILE_PERMANENT":   20,
-		"ERROR_REASON_PROFILE_IN_USE":              21,
-		"ERROR_REASON_PROFILE_SIGN_OUT_FAILED":     22,
-		"ERROR_REASON_PROFILES_DAMAGED":            23,
-		"ERROR_REASON_AI_CLI_MISSING":              24,
-		"ERROR_REASON_NO_LOCAL_FORWARD":            25,
-		"ERROR_REASON_UNSUPPORTED_REQUEST":         26,
-		"ERROR_REASON_ACCESS_DENIED":               27,
-		"ERROR_REASON_PATH_OUTSIDE_FOLDER":         28,
-		"ERROR_REASON_FULL_DISK_ACCESS_NEEDED":     29,
-		"ERROR_REASON_SESSION_NOT_FOUND":           30,
-		"ERROR_REASON_SESSION_OPEN_ELSEWHERE":      31,
-		"ERROR_REASON_ATTACHMENT_TOO_LARGE":        32,
-		"ERROR_REASON_TOO_MANY_ATTACHMENTS":        33,
-		"ERROR_REASON_ATTACHMENT_NOT_FOUND":        34,
-		"ERROR_REASON_THREAD_RUNNING":              35,
-		"ERROR_REASON_TRASH_UNAVAILABLE":           36,
-		"ERROR_REASON_PROJECT_NOT_FOUND":           37,
-		"ERROR_REASON_PROJECT_EXISTS":              38,
-		"ERROR_REASON_CLONE_URL_INVALID":           39,
-		"ERROR_REASON_CLONE_FAILED":                40,
-		"ERROR_REASON_GIT_NOT_INSTALLED":           41,
-		"ERROR_REASON_NAME_INVALID":                42,
-		"ERROR_REASON_SECRET_PROMPT_GONE":          43,
-		"ERROR_REASON_SECRET_INVALID":              44,
-		"ERROR_REASON_SECRET_NOT_FOUND":            45,
-		"ERROR_REASON_BROWSER_UNAVAILABLE":         46,
-		"ERROR_REASON_TAKEOVER_GONE":               47,
-		"ERROR_REASON_BROWSER_NOT_RUNNING":         48,
-		"ERROR_REASON_SCREEN_SHARING_OFF":          49,
-		"ERROR_REASON_SCREEN_SHARE_BUSY":           50,
-		"ERROR_REASON_SCREEN_SHARE_GONE":           51,
-		"ERROR_REASON_TOTP_SECRET_INVALID":         52,
-		"ERROR_REASON_UPDATE_UNAVAILABLE":          53,
-		"ERROR_REASON_UPDATE_BUSY":                 54,
-		"ERROR_REASON_TERMINAL_UNAVAILABLE":        55,
-		"ERROR_REASON_TERMINAL_SESSION_LIMIT":      56,
-		"ERROR_REASON_TERMINAL_SESSION_NOT_FOUND":  57,
+		"ERROR_REASON_UNSPECIFIED":                   0,
+		"ERROR_REASON_FOLDER_NOT_FOUND":              1,
+		"ERROR_REASON_EMPTY_MESSAGE":                 2,
+		"ERROR_REASON_SENSITIVE_FOLDER":              3,
+		"ERROR_REASON_PROJECT_SETTINGS_UNTRUSTED":    4,
+		"ERROR_REASON_TRUST_ON_MACHINE":              5,
+		"ERROR_REASON_AI_NOT_INSTALLED":              6,
+		"ERROR_REASON_AI_NEEDS_LOGIN":                7,
+		"ERROR_REASON_UNKNOWN_AI":                    8,
+		"ERROR_REASON_SAME_AI":                       9,
+		"ERROR_REASON_AI_START_FAILED":               10,
+		"ERROR_REASON_PROFILE_UNUSABLE":              11,
+		"ERROR_REASON_THREAD_NOT_FOUND":              12,
+		"ERROR_REASON_ITEM_NOT_FOUND":                13,
+		"ERROR_REASON_PROMPT_STALE":                  14,
+		"ERROR_REASON_DENY_MESSAGE_INVALID":          15,
+		"ERROR_REASON_UNKNOWN_EFFORT":                16,
+		"ERROR_REASON_PERMISSION_MODE_NOT_ALLOWED":   17,
+		"ERROR_REASON_NO_PROFILES":                   18,
+		"ERROR_REASON_PROFILE_NOT_FOUND":             19,
+		"ERROR_REASON_DEFAULT_PROFILE_PERMANENT":     20,
+		"ERROR_REASON_PROFILE_IN_USE":                21,
+		"ERROR_REASON_PROFILE_SIGN_OUT_FAILED":       22,
+		"ERROR_REASON_PROFILES_DAMAGED":              23,
+		"ERROR_REASON_AI_CLI_MISSING":                24,
+		"ERROR_REASON_NO_LOCAL_FORWARD":              25,
+		"ERROR_REASON_UNSUPPORTED_REQUEST":           26,
+		"ERROR_REASON_ACCESS_DENIED":                 27,
+		"ERROR_REASON_PATH_OUTSIDE_FOLDER":           28,
+		"ERROR_REASON_FULL_DISK_ACCESS_NEEDED":       29,
+		"ERROR_REASON_SESSION_NOT_FOUND":             30,
+		"ERROR_REASON_SESSION_OPEN_ELSEWHERE":        31,
+		"ERROR_REASON_ATTACHMENT_TOO_LARGE":          32,
+		"ERROR_REASON_TOO_MANY_ATTACHMENTS":          33,
+		"ERROR_REASON_ATTACHMENT_NOT_FOUND":          34,
+		"ERROR_REASON_THREAD_RUNNING":                35,
+		"ERROR_REASON_TRASH_UNAVAILABLE":             36,
+		"ERROR_REASON_PROJECT_NOT_FOUND":             37,
+		"ERROR_REASON_PROJECT_EXISTS":                38,
+		"ERROR_REASON_CLONE_URL_INVALID":             39,
+		"ERROR_REASON_CLONE_FAILED":                  40,
+		"ERROR_REASON_GIT_NOT_INSTALLED":             41,
+		"ERROR_REASON_NAME_INVALID":                  42,
+		"ERROR_REASON_SECRET_PROMPT_GONE":            43,
+		"ERROR_REASON_SECRET_INVALID":                44,
+		"ERROR_REASON_SECRET_NOT_FOUND":              45,
+		"ERROR_REASON_BROWSER_UNAVAILABLE":           46,
+		"ERROR_REASON_TAKEOVER_GONE":                 47,
+		"ERROR_REASON_BROWSER_NOT_RUNNING":           48,
+		"ERROR_REASON_SCREEN_SHARING_OFF":            49,
+		"ERROR_REASON_SCREEN_SHARE_BUSY":             50,
+		"ERROR_REASON_SCREEN_SHARE_GONE":             51,
+		"ERROR_REASON_TOTP_SECRET_INVALID":           52,
+		"ERROR_REASON_UPDATE_UNAVAILABLE":            53,
+		"ERROR_REASON_UPDATE_BUSY":                   54,
+		"ERROR_REASON_TERMINAL_UNAVAILABLE":          55,
+		"ERROR_REASON_TERMINAL_SESSION_LIMIT":        56,
+		"ERROR_REASON_TERMINAL_SESSION_NOT_FOUND":    57,
+		"ERROR_REASON_SECRET_FILE":                   58,
+		"ERROR_REASON_GIT_UNSAFE_CONFIG":             59,
+		"ERROR_REASON_GIT_NEEDS_CREDENTIALS":         60,
+		"ERROR_REASON_GIT_FAILED":                    61,
+		"ERROR_REASON_GIT_BUSY":                      62,
+		"ERROR_REASON_NOT_A_GIT_REPOSITORY":          63,
+		"ERROR_REASON_DISCARD_NOT_CONFIRMED":         64,
+		"ERROR_REASON_FOLDER_TOO_LARGE":              65,
+		"ERROR_REASON_GIT_LFS_MISSING":               66,
+		"ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT": 67,
+		"ERROR_REASON_GIT_COMMIT_SIGNING":            68,
+		"ERROR_REASON_GIT_OPERATION_IN_PROGRESS":     69,
+		"ERROR_REASON_GIT_DETACHED_HEAD":             70,
+		"ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED":  71,
 	}
 )
 
@@ -1072,6 +1139,8 @@ const (
 	GitFileState_GIT_FILE_STATE_UNTRACKED    GitFileState = 4
 	GitFileState_GIT_FILE_STATE_TYPE_CHANGED GitFileState = 5
 	GitFileState_GIT_FILE_STATE_CONFLICTED   GitFileState = 6
+	// Only in a workspace's git (WsGitEntry, WsEntry): renamed or copied.
+	GitFileState_GIT_FILE_STATE_RENAMED GitFileState = 7
 )
 
 // Enum value maps for GitFileState.
@@ -1084,6 +1153,7 @@ var (
 		4: "GIT_FILE_STATE_UNTRACKED",
 		5: "GIT_FILE_STATE_TYPE_CHANGED",
 		6: "GIT_FILE_STATE_CONFLICTED",
+		7: "GIT_FILE_STATE_RENAMED",
 	}
 	GitFileState_value = map[string]int32{
 		"GIT_FILE_STATE_UNSPECIFIED":  0,
@@ -1093,6 +1163,7 @@ var (
 		"GIT_FILE_STATE_UNTRACKED":    4,
 		"GIT_FILE_STATE_TYPE_CHANGED": 5,
 		"GIT_FILE_STATE_CONFLICTED":   6,
+		"GIT_FILE_STATE_RENAMED":      7,
 	}
 )
 
@@ -1418,6 +1489,180 @@ func (x TermPath) Number() protoreflect.EnumNumber {
 // Deprecated: Use TermPath.Descriptor instead.
 func (TermPath) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{19}
+}
+
+type WsFileKind int32
+
+const (
+	WsFileKind_WS_FILE_KIND_UNSPECIFIED WsFileKind = 0
+	// UTF-8 text of at most 1 MiB, in text.
+	WsFileKind_WS_FILE_KIND_TEXT WsFileKind = 1
+	// A PNG, JPEG, GIF, WebP, BMP, ICO or AVIF picture of at most 5 MiB, in data
+	// with mime (SVG is text).
+	WsFileKind_WS_FILE_KIND_IMAGE WsFileKind = 2
+	// Anything else: size and mtime only.
+	WsFileKind_WS_FILE_KIND_BINARY WsFileKind = 3
+	// Over the limit of its kind: size and mtime only.
+	WsFileKind_WS_FILE_KIND_TOO_LARGE WsFileKind = 4
+)
+
+// Enum value maps for WsFileKind.
+var (
+	WsFileKind_name = map[int32]string{
+		0: "WS_FILE_KIND_UNSPECIFIED",
+		1: "WS_FILE_KIND_TEXT",
+		2: "WS_FILE_KIND_IMAGE",
+		3: "WS_FILE_KIND_BINARY",
+		4: "WS_FILE_KIND_TOO_LARGE",
+	}
+	WsFileKind_value = map[string]int32{
+		"WS_FILE_KIND_UNSPECIFIED": 0,
+		"WS_FILE_KIND_TEXT":        1,
+		"WS_FILE_KIND_IMAGE":       2,
+		"WS_FILE_KIND_BINARY":      3,
+		"WS_FILE_KIND_TOO_LARGE":   4,
+	}
+)
+
+func (x WsFileKind) Enum() *WsFileKind {
+	p := new(WsFileKind)
+	*p = x
+	return p
+}
+
+func (x WsFileKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WsFileKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[20].Descriptor()
+}
+
+func (WsFileKind) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[20]
+}
+
+func (x WsFileKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WsFileKind.Descriptor instead.
+func (WsFileKind) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{20}
+}
+
+type WsGitArea int32
+
+const (
+	WsGitArea_WS_GIT_AREA_UNSPECIFIED WsGitArea = 0
+	WsGitArea_WS_GIT_AREA_STAGED      WsGitArea = 1
+	WsGitArea_WS_GIT_AREA_UNSTAGED    WsGitArea = 2
+	WsGitArea_WS_GIT_AREA_UNTRACKED   WsGitArea = 3
+	WsGitArea_WS_GIT_AREA_CONFLICTED  WsGitArea = 4
+)
+
+// Enum value maps for WsGitArea.
+var (
+	WsGitArea_name = map[int32]string{
+		0: "WS_GIT_AREA_UNSPECIFIED",
+		1: "WS_GIT_AREA_STAGED",
+		2: "WS_GIT_AREA_UNSTAGED",
+		3: "WS_GIT_AREA_UNTRACKED",
+		4: "WS_GIT_AREA_CONFLICTED",
+	}
+	WsGitArea_value = map[string]int32{
+		"WS_GIT_AREA_UNSPECIFIED": 0,
+		"WS_GIT_AREA_STAGED":      1,
+		"WS_GIT_AREA_UNSTAGED":    2,
+		"WS_GIT_AREA_UNTRACKED":   3,
+		"WS_GIT_AREA_CONFLICTED":  4,
+	}
+)
+
+func (x WsGitArea) Enum() *WsGitArea {
+	p := new(WsGitArea)
+	*p = x
+	return p
+}
+
+func (x WsGitArea) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WsGitArea) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[21].Descriptor()
+}
+
+func (WsGitArea) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[21]
+}
+
+func (x WsGitArea) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WsGitArea.Descriptor instead.
+func (WsGitArea) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{21}
+}
+
+type WsGitDiffSource int32
+
+const (
+	WsGitDiffSource_WS_GIT_DIFF_SOURCE_UNSPECIFIED WsGitDiffSource = 0
+	// Working tree against the index (an untracked file: as all new).
+	WsGitDiffSource_WS_GIT_DIFF_SOURCE_UNSTAGED WsGitDiffSource = 1
+	// Index against HEAD.
+	WsGitDiffSource_WS_GIT_DIFF_SOURCE_STAGED WsGitDiffSource = 2
+	// One commit against its parent.
+	WsGitDiffSource_WS_GIT_DIFF_SOURCE_COMMIT WsGitDiffSource = 3
+	// HEAD against its merge base with the base ref (WsGitBranchCompare).
+	WsGitDiffSource_WS_GIT_DIFF_SOURCE_BRANCH WsGitDiffSource = 4
+)
+
+// Enum value maps for WsGitDiffSource.
+var (
+	WsGitDiffSource_name = map[int32]string{
+		0: "WS_GIT_DIFF_SOURCE_UNSPECIFIED",
+		1: "WS_GIT_DIFF_SOURCE_UNSTAGED",
+		2: "WS_GIT_DIFF_SOURCE_STAGED",
+		3: "WS_GIT_DIFF_SOURCE_COMMIT",
+		4: "WS_GIT_DIFF_SOURCE_BRANCH",
+	}
+	WsGitDiffSource_value = map[string]int32{
+		"WS_GIT_DIFF_SOURCE_UNSPECIFIED": 0,
+		"WS_GIT_DIFF_SOURCE_UNSTAGED":    1,
+		"WS_GIT_DIFF_SOURCE_STAGED":      2,
+		"WS_GIT_DIFF_SOURCE_COMMIT":      3,
+		"WS_GIT_DIFF_SOURCE_BRANCH":      4,
+	}
+)
+
+func (x WsGitDiffSource) Enum() *WsGitDiffSource {
+	p := new(WsGitDiffSource)
+	*p = x
+	return p
+}
+
+func (x WsGitDiffSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WsGitDiffSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[22].Descriptor()
+}
+
+func (WsGitDiffSource) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[22]
+}
+
+func (x WsGitDiffSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WsGitDiffSource.Descriptor instead.
+func (WsGitDiffSource) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{22}
 }
 
 type Plain struct {
@@ -2157,6 +2402,38 @@ type Frame struct {
 	//	*Frame_TermClosed
 	//	*Frame_TermStatus
 	//	*Frame_ThreadActivity
+	//	*Frame_WsDirList
+	//	*Frame_WsFileRead
+	//	*Frame_WsFindNames
+	//	*Frame_WsFindContents
+	//	*Frame_WsWatch
+	//	*Frame_WsGitStatus
+	//	*Frame_WsGitDiff
+	//	*Frame_WsGitStage
+	//	*Frame_WsGitUnstage
+	//	*Frame_WsGitDiscard
+	//	*Frame_WsGitCommit
+	//	*Frame_WsGitBranches
+	//	*Frame_WsGitCheckout
+	//	*Frame_WsGitBranchCreate
+	//	*Frame_WsGitFetch
+	//	*Frame_WsGitPull
+	//	*Frame_WsGitPush
+	//	*Frame_WsGitLog
+	//	*Frame_WsGitBranchCompare
+	//	*Frame_WsGitPrUrl
+	//	*Frame_WsDirListResult
+	//	*Frame_WsFileReadResult
+	//	*Frame_WsFindNamesResult
+	//	*Frame_WsFindContentsResult
+	//	*Frame_WsChanged
+	//	*Frame_WsGitStatusResult
+	//	*Frame_WsGitDiffResult
+	//	*Frame_WsGitCommitResult
+	//	*Frame_WsGitBranchesResult
+	//	*Frame_WsGitLogResult
+	//	*Frame_WsGitBranchCompareResult
+	//	*Frame_WsGitPrUrlResult
 	Body          isFrame_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3187,6 +3464,294 @@ func (x *Frame) GetThreadActivity() *ThreadActivity {
 	return nil
 }
 
+func (x *Frame) GetWsDirList() *WsDirList {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsDirList); ok {
+			return x.WsDirList
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFileRead() *WsFileRead {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFileRead); ok {
+			return x.WsFileRead
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFindNames() *WsFindNames {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFindNames); ok {
+			return x.WsFindNames
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFindContents() *WsFindContents {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFindContents); ok {
+			return x.WsFindContents
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsWatch() *WsWatch {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsWatch); ok {
+			return x.WsWatch
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitStatus() *WsGitStatus {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitStatus); ok {
+			return x.WsGitStatus
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitDiff() *WsGitDiff {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitDiff); ok {
+			return x.WsGitDiff
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitStage() *WsGitStage {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitStage); ok {
+			return x.WsGitStage
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitUnstage() *WsGitUnstage {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitUnstage); ok {
+			return x.WsGitUnstage
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitDiscard() *WsGitDiscard {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitDiscard); ok {
+			return x.WsGitDiscard
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitCommit() *WsGitCommit {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitCommit); ok {
+			return x.WsGitCommit
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitBranches() *WsGitBranches {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitBranches); ok {
+			return x.WsGitBranches
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitCheckout() *WsGitCheckout {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitCheckout); ok {
+			return x.WsGitCheckout
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitBranchCreate() *WsGitBranchCreate {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitBranchCreate); ok {
+			return x.WsGitBranchCreate
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitFetch() *WsGitFetch {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitFetch); ok {
+			return x.WsGitFetch
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitPull() *WsGitPull {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitPull); ok {
+			return x.WsGitPull
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitPush() *WsGitPush {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitPush); ok {
+			return x.WsGitPush
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitLog() *WsGitLog {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitLog); ok {
+			return x.WsGitLog
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitBranchCompare() *WsGitBranchCompare {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitBranchCompare); ok {
+			return x.WsGitBranchCompare
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitPrUrl() *WsGitPrUrl {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitPrUrl); ok {
+			return x.WsGitPrUrl
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsDirListResult() *WsDirListResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsDirListResult); ok {
+			return x.WsDirListResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFileReadResult() *WsFileReadResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFileReadResult); ok {
+			return x.WsFileReadResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFindNamesResult() *WsFindNamesResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFindNamesResult); ok {
+			return x.WsFindNamesResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsFindContentsResult() *WsFindContentsResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsFindContentsResult); ok {
+			return x.WsFindContentsResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsChanged() *WsChanged {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsChanged); ok {
+			return x.WsChanged
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitStatusResult() *WsGitStatusResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitStatusResult); ok {
+			return x.WsGitStatusResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitDiffResult() *WsGitDiffResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitDiffResult); ok {
+			return x.WsGitDiffResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitCommitResult() *WsGitCommitResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitCommitResult); ok {
+			return x.WsGitCommitResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitBranchesResult() *WsGitBranchesResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitBranchesResult); ok {
+			return x.WsGitBranchesResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitLogResult() *WsGitLogResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitLogResult); ok {
+			return x.WsGitLogResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitBranchCompareResult() *WsGitBranchCompareResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitBranchCompareResult); ok {
+			return x.WsGitBranchCompareResult
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetWsGitPrUrlResult() *WsGitPrUrlResult {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_WsGitPrUrlResult); ok {
+			return x.WsGitPrUrlResult
+		}
+	}
+	return nil
+}
+
 type isFrame_Body interface {
 	isFrame_Body()
 }
@@ -3645,6 +4210,139 @@ type Frame_ThreadActivity struct {
 	ThreadActivity *ThreadActivity `protobuf:"bytes,118,opt,name=thread_activity,json=threadActivity,proto3,oneof"`
 }
 
+type Frame_WsDirList struct {
+	// A workspace's files and git (tunelo 2.7.0+); see "a workspace's files
+	// and git" below.
+	// A → B
+	WsDirList *WsDirList `protobuf:"bytes,119,opt,name=ws_dir_list,json=wsDirList,proto3,oneof"`
+}
+
+type Frame_WsFileRead struct {
+	WsFileRead *WsFileRead `protobuf:"bytes,120,opt,name=ws_file_read,json=wsFileRead,proto3,oneof"`
+}
+
+type Frame_WsFindNames struct {
+	WsFindNames *WsFindNames `protobuf:"bytes,121,opt,name=ws_find_names,json=wsFindNames,proto3,oneof"`
+}
+
+type Frame_WsFindContents struct {
+	WsFindContents *WsFindContents `protobuf:"bytes,122,opt,name=ws_find_contents,json=wsFindContents,proto3,oneof"`
+}
+
+type Frame_WsWatch struct {
+	WsWatch *WsWatch `protobuf:"bytes,123,opt,name=ws_watch,json=wsWatch,proto3,oneof"`
+}
+
+type Frame_WsGitStatus struct {
+	WsGitStatus *WsGitStatus `protobuf:"bytes,124,opt,name=ws_git_status,json=wsGitStatus,proto3,oneof"`
+}
+
+type Frame_WsGitDiff struct {
+	WsGitDiff *WsGitDiff `protobuf:"bytes,125,opt,name=ws_git_diff,json=wsGitDiff,proto3,oneof"`
+}
+
+type Frame_WsGitStage struct {
+	WsGitStage *WsGitStage `protobuf:"bytes,126,opt,name=ws_git_stage,json=wsGitStage,proto3,oneof"`
+}
+
+type Frame_WsGitUnstage struct {
+	WsGitUnstage *WsGitUnstage `protobuf:"bytes,127,opt,name=ws_git_unstage,json=wsGitUnstage,proto3,oneof"`
+}
+
+type Frame_WsGitDiscard struct {
+	WsGitDiscard *WsGitDiscard `protobuf:"bytes,128,opt,name=ws_git_discard,json=wsGitDiscard,proto3,oneof"`
+}
+
+type Frame_WsGitCommit struct {
+	WsGitCommit *WsGitCommit `protobuf:"bytes,129,opt,name=ws_git_commit,json=wsGitCommit,proto3,oneof"`
+}
+
+type Frame_WsGitBranches struct {
+	WsGitBranches *WsGitBranches `protobuf:"bytes,130,opt,name=ws_git_branches,json=wsGitBranches,proto3,oneof"`
+}
+
+type Frame_WsGitCheckout struct {
+	WsGitCheckout *WsGitCheckout `protobuf:"bytes,131,opt,name=ws_git_checkout,json=wsGitCheckout,proto3,oneof"`
+}
+
+type Frame_WsGitBranchCreate struct {
+	WsGitBranchCreate *WsGitBranchCreate `protobuf:"bytes,132,opt,name=ws_git_branch_create,json=wsGitBranchCreate,proto3,oneof"`
+}
+
+type Frame_WsGitFetch struct {
+	WsGitFetch *WsGitFetch `protobuf:"bytes,133,opt,name=ws_git_fetch,json=wsGitFetch,proto3,oneof"`
+}
+
+type Frame_WsGitPull struct {
+	WsGitPull *WsGitPull `protobuf:"bytes,134,opt,name=ws_git_pull,json=wsGitPull,proto3,oneof"`
+}
+
+type Frame_WsGitPush struct {
+	WsGitPush *WsGitPush `protobuf:"bytes,135,opt,name=ws_git_push,json=wsGitPush,proto3,oneof"`
+}
+
+type Frame_WsGitLog struct {
+	WsGitLog *WsGitLog `protobuf:"bytes,136,opt,name=ws_git_log,json=wsGitLog,proto3,oneof"`
+}
+
+type Frame_WsGitBranchCompare struct {
+	WsGitBranchCompare *WsGitBranchCompare `protobuf:"bytes,137,opt,name=ws_git_branch_compare,json=wsGitBranchCompare,proto3,oneof"`
+}
+
+type Frame_WsGitPrUrl struct {
+	WsGitPrUrl *WsGitPrUrl `protobuf:"bytes,138,opt,name=ws_git_pr_url,json=wsGitPrUrl,proto3,oneof"`
+}
+
+type Frame_WsDirListResult struct {
+	// B → A
+	WsDirListResult *WsDirListResult `protobuf:"bytes,139,opt,name=ws_dir_list_result,json=wsDirListResult,proto3,oneof"`
+}
+
+type Frame_WsFileReadResult struct {
+	WsFileReadResult *WsFileReadResult `protobuf:"bytes,140,opt,name=ws_file_read_result,json=wsFileReadResult,proto3,oneof"`
+}
+
+type Frame_WsFindNamesResult struct {
+	WsFindNamesResult *WsFindNamesResult `protobuf:"bytes,141,opt,name=ws_find_names_result,json=wsFindNamesResult,proto3,oneof"`
+}
+
+type Frame_WsFindContentsResult struct {
+	WsFindContentsResult *WsFindContentsResult `protobuf:"bytes,142,opt,name=ws_find_contents_result,json=wsFindContentsResult,proto3,oneof"`
+}
+
+type Frame_WsChanged struct {
+	// Unasked, to devices watching the workspace (WsWatch).
+	WsChanged *WsChanged `protobuf:"bytes,143,opt,name=ws_changed,json=wsChanged,proto3,oneof"`
+}
+
+type Frame_WsGitStatusResult struct {
+	WsGitStatusResult *WsGitStatusResult `protobuf:"bytes,144,opt,name=ws_git_status_result,json=wsGitStatusResult,proto3,oneof"`
+}
+
+type Frame_WsGitDiffResult struct {
+	WsGitDiffResult *WsGitDiffResult `protobuf:"bytes,145,opt,name=ws_git_diff_result,json=wsGitDiffResult,proto3,oneof"`
+}
+
+type Frame_WsGitCommitResult struct {
+	WsGitCommitResult *WsGitCommitResult `protobuf:"bytes,146,opt,name=ws_git_commit_result,json=wsGitCommitResult,proto3,oneof"`
+}
+
+type Frame_WsGitBranchesResult struct {
+	WsGitBranchesResult *WsGitBranchesResult `protobuf:"bytes,147,opt,name=ws_git_branches_result,json=wsGitBranchesResult,proto3,oneof"`
+}
+
+type Frame_WsGitLogResult struct {
+	WsGitLogResult *WsGitLogResult `protobuf:"bytes,148,opt,name=ws_git_log_result,json=wsGitLogResult,proto3,oneof"`
+}
+
+type Frame_WsGitBranchCompareResult struct {
+	WsGitBranchCompareResult *WsGitBranchCompareResult `protobuf:"bytes,149,opt,name=ws_git_branch_compare_result,json=wsGitBranchCompareResult,proto3,oneof"`
+}
+
+type Frame_WsGitPrUrlResult struct {
+	WsGitPrUrlResult *WsGitPrUrlResult `protobuf:"bytes,150,opt,name=ws_git_pr_url_result,json=wsGitPrUrlResult,proto3,oneof"`
+}
+
 func (*Frame_ThreadList) isFrame_Body() {}
 
 func (*Frame_ThreadCreate) isFrame_Body() {}
@@ -3862,6 +4560,70 @@ func (*Frame_TermClosed) isFrame_Body() {}
 func (*Frame_TermStatus) isFrame_Body() {}
 
 func (*Frame_ThreadActivity) isFrame_Body() {}
+
+func (*Frame_WsDirList) isFrame_Body() {}
+
+func (*Frame_WsFileRead) isFrame_Body() {}
+
+func (*Frame_WsFindNames) isFrame_Body() {}
+
+func (*Frame_WsFindContents) isFrame_Body() {}
+
+func (*Frame_WsWatch) isFrame_Body() {}
+
+func (*Frame_WsGitStatus) isFrame_Body() {}
+
+func (*Frame_WsGitDiff) isFrame_Body() {}
+
+func (*Frame_WsGitStage) isFrame_Body() {}
+
+func (*Frame_WsGitUnstage) isFrame_Body() {}
+
+func (*Frame_WsGitDiscard) isFrame_Body() {}
+
+func (*Frame_WsGitCommit) isFrame_Body() {}
+
+func (*Frame_WsGitBranches) isFrame_Body() {}
+
+func (*Frame_WsGitCheckout) isFrame_Body() {}
+
+func (*Frame_WsGitBranchCreate) isFrame_Body() {}
+
+func (*Frame_WsGitFetch) isFrame_Body() {}
+
+func (*Frame_WsGitPull) isFrame_Body() {}
+
+func (*Frame_WsGitPush) isFrame_Body() {}
+
+func (*Frame_WsGitLog) isFrame_Body() {}
+
+func (*Frame_WsGitBranchCompare) isFrame_Body() {}
+
+func (*Frame_WsGitPrUrl) isFrame_Body() {}
+
+func (*Frame_WsDirListResult) isFrame_Body() {}
+
+func (*Frame_WsFileReadResult) isFrame_Body() {}
+
+func (*Frame_WsFindNamesResult) isFrame_Body() {}
+
+func (*Frame_WsFindContentsResult) isFrame_Body() {}
+
+func (*Frame_WsChanged) isFrame_Body() {}
+
+func (*Frame_WsGitStatusResult) isFrame_Body() {}
+
+func (*Frame_WsGitDiffResult) isFrame_Body() {}
+
+func (*Frame_WsGitCommitResult) isFrame_Body() {}
+
+func (*Frame_WsGitBranchesResult) isFrame_Body() {}
+
+func (*Frame_WsGitLogResult) isFrame_Body() {}
+
+func (*Frame_WsGitBranchCompareResult) isFrame_Body() {}
+
+func (*Frame_WsGitPrUrlResult) isFrame_Body() {}
 
 type ThreadList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -11732,7 +12494,13 @@ type AuditEntry struct {
 	// browser_clear (the tunelo browser's profile was deleted),
 	// screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
 	// totp_set (a device set or replaced the authenticator secret; never the secret),
-	// agent_update (a device started an update of tunelo; detail: the version)
+	// agent_update (a device started an update of tunelo; detail: the version),
+	// git_stage, git_unstage, git_discard, git_commit, git_checkout,
+	// git_branch_create, git_pull, git_push (a device changed a workspace's git;
+	// path: the workspace folder; detail: "workspace <id>" and, for stage,
+	// unstage and discard, how many files ("restored N, trashed M" for
+	// discard); never a file's content, a file's path, a branch or a commit
+	// message)
 	Action        string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	Path          string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Detail        string `protobuf:"bytes,5,opt,name=detail,proto3" json:"detail,omitempty"`
@@ -14856,6 +15624,2722 @@ func (x *TermStatus) GetReason() string {
 	return ""
 }
 
+// A → B: one page of a folder. Answered with WsDirListResult. Folders first,
+// then files, each by name in natural order (9 before 10); a folder of more
+// than 100 000 entries is refused with ERROR_REASON_FOLDER_TOO_LARGE.
+type WsDirList struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// Relative to the workspace; empty: its root.
+	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// The last entry of the previous page (its name and dir): the page starts
+	// after it, so entries made or removed meanwhile neither repeat nor go
+	// missing. Empty: the first page.
+	AfterName string `protobuf:"bytes,3,opt,name=after_name,json=afterName,proto3" json:"after_name,omitempty"`
+	AfterDir  bool   `protobuf:"varint,4,opt,name=after_dir,json=afterDir,proto3" json:"after_dir,omitempty"`
+	// At most this many entries; 0 means 500, B caps it at 2000.
+	Limit uint32 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Names starting with "." too (secret files stay hidden).
+	ShowHidden bool `protobuf:"varint,6,opt,name=show_hidden,json=showHidden,proto3" json:"show_hidden,omitempty"`
+	// Leave out what git ignores (by default it is listed with ignored set).
+	HideIgnored   bool `protobuf:"varint,7,opt,name=hide_ignored,json=hideIgnored,proto3" json:"hide_ignored,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsDirList) Reset() {
+	*x = WsDirList{}
+	mi := &file_remote_v1_remote_proto_msgTypes[174]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsDirList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsDirList) ProtoMessage() {}
+
+func (x *WsDirList) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[174]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsDirList.ProtoReflect.Descriptor instead.
+func (*WsDirList) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{174}
+}
+
+func (x *WsDirList) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsDirList) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsDirList) GetAfterName() string {
+	if x != nil {
+		return x.AfterName
+	}
+	return ""
+}
+
+func (x *WsDirList) GetAfterDir() bool {
+	if x != nil {
+		return x.AfterDir
+	}
+	return false
+}
+
+func (x *WsDirList) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *WsDirList) GetShowHidden() bool {
+	if x != nil {
+		return x.ShowHidden
+	}
+	return false
+}
+
+func (x *WsDirList) GetHideIgnored() bool {
+	if x != nil {
+		return x.HideIgnored
+	}
+	return false
+}
+
+type WsEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Dir   bool                   `protobuf:"varint,2,opt,name=dir,proto3" json:"dir,omitempty"`
+	// A symbolic link, never followed outside the workspace: dir is false and
+	// outside is set when it points outside (or nowhere).
+	Symlink bool `protobuf:"varint,3,opt,name=symlink,proto3" json:"symlink,omitempty"`
+	Outside bool `protobuf:"varint,4,opt,name=outside,proto3" json:"outside,omitempty"`
+	// Bytes; 0 for a folder.
+	Size uint64 `protobuf:"varint,5,opt,name=size,proto3" json:"size,omitempty"`
+	// Unix milliseconds.
+	Mtime int64 `protobuf:"varint,6,opt,name=mtime,proto3" json:"mtime,omitempty"`
+	// git ignores it.
+	Ignored bool `protobuf:"varint,7,opt,name=ignored,proto3" json:"ignored,omitempty"`
+	// What git sees: a file's own state; a folder is UNTRACKED when everything
+	// changed below it is untracked, MODIFIED when anything else changed below
+	// it; UNSPECIFIED when unchanged or outside git.
+	Git           GitFileState `protobuf:"varint,8,opt,name=git,proto3,enum=remote.v1.GitFileState" json:"git,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsEntry) Reset() {
+	*x = WsEntry{}
+	mi := &file_remote_v1_remote_proto_msgTypes[175]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsEntry) ProtoMessage() {}
+
+func (x *WsEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[175]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsEntry.ProtoReflect.Descriptor instead.
+func (*WsEntry) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{175}
+}
+
+func (x *WsEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WsEntry) GetDir() bool {
+	if x != nil {
+		return x.Dir
+	}
+	return false
+}
+
+func (x *WsEntry) GetSymlink() bool {
+	if x != nil {
+		return x.Symlink
+	}
+	return false
+}
+
+func (x *WsEntry) GetOutside() bool {
+	if x != nil {
+		return x.Outside
+	}
+	return false
+}
+
+func (x *WsEntry) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *WsEntry) GetMtime() int64 {
+	if x != nil {
+		return x.Mtime
+	}
+	return 0
+}
+
+func (x *WsEntry) GetIgnored() bool {
+	if x != nil {
+		return x.Ignored
+	}
+	return false
+}
+
+func (x *WsEntry) GetGit() GitFileState {
+	if x != nil {
+		return x.Git
+	}
+	return GitFileState_GIT_FILE_STATE_UNSPECIFIED
+}
+
+type WsDirListResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path        string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Entries     []*WsEntry             `protobuf:"bytes,3,rep,name=entries,proto3" json:"entries,omitempty"`
+	HasMore     bool                   `protobuf:"varint,4,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	// Entries of the folder as listed (after hidden and ignored ones are left out).
+	Total         uint32 `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsDirListResult) Reset() {
+	*x = WsDirListResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[176]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsDirListResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsDirListResult) ProtoMessage() {}
+
+func (x *WsDirListResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[176]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsDirListResult.ProtoReflect.Descriptor instead.
+func (*WsDirListResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{176}
+}
+
+func (x *WsDirListResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsDirListResult) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsDirListResult) GetEntries() []*WsEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *WsDirListResult) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+func (x *WsDirListResult) GetTotal() uint32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+// A → B: a file for a read-only preview. Answered with WsFileReadResult.
+// Only a regular file (no folder, device, socket or pipe).
+type WsFileRead struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFileRead) Reset() {
+	*x = WsFileRead{}
+	mi := &file_remote_v1_remote_proto_msgTypes[177]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFileRead) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFileRead) ProtoMessage() {}
+
+func (x *WsFileRead) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[177]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFileRead.ProtoReflect.Descriptor instead.
+func (*WsFileRead) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{177}
+}
+
+func (x *WsFileRead) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFileRead) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type WsFileReadResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Kind          WsFileKind             `protobuf:"varint,3,opt,name=kind,proto3,enum=remote.v1.WsFileKind" json:"kind,omitempty"`
+	Size          uint64                 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	Mtime         int64                  `protobuf:"varint,5,opt,name=mtime,proto3" json:"mtime,omitempty"`
+	Mime          string                 `protobuf:"bytes,6,opt,name=mime,proto3" json:"mime,omitempty"`
+	Text          string                 `protobuf:"bytes,7,opt,name=text,proto3" json:"text,omitempty"`
+	Data          []byte                 `protobuf:"bytes,8,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFileReadResult) Reset() {
+	*x = WsFileReadResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[178]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFileReadResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFileReadResult) ProtoMessage() {}
+
+func (x *WsFileReadResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[178]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFileReadResult.ProtoReflect.Descriptor instead.
+func (*WsFileReadResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{178}
+}
+
+func (x *WsFileReadResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFileReadResult) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsFileReadResult) GetKind() WsFileKind {
+	if x != nil {
+		return x.Kind
+	}
+	return WsFileKind_WS_FILE_KIND_UNSPECIFIED
+}
+
+func (x *WsFileReadResult) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *WsFileReadResult) GetMtime() int64 {
+	if x != nil {
+		return x.Mtime
+	}
+	return 0
+}
+
+func (x *WsFileReadResult) GetMime() string {
+	if x != nil {
+		return x.Mime
+	}
+	return ""
+}
+
+func (x *WsFileReadResult) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *WsFileReadResult) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// A → B: files whose path holds every word of the query (split at spaces,
+// case-insensitive), among what git does not ignore (in a git work tree:
+// tracked and untracked files; else a walk of at most 100 000 entries that
+// skips node_modules). Secret files are left out. Answered with
+// WsFindNamesResult, shortest paths first.
+type WsFindNames struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 2048 characters; empty matches nothing.
+	Query string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	// 0 means 100, B caps it at 500.
+	Limit         uint32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFindNames) Reset() {
+	*x = WsFindNames{}
+	mi := &file_remote_v1_remote_proto_msgTypes[179]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFindNames) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFindNames) ProtoMessage() {}
+
+func (x *WsFindNames) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[179]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFindNames.ProtoReflect.Descriptor instead.
+func (*WsFindNames) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{179}
+}
+
+func (x *WsFindNames) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFindNames) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *WsFindNames) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type WsFindNamesResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Paths         []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	Truncated     bool                   `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFindNamesResult) Reset() {
+	*x = WsFindNamesResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[180]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFindNamesResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFindNamesResult) ProtoMessage() {}
+
+func (x *WsFindNamesResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[180]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFindNamesResult.ProtoReflect.Descriptor instead.
+func (*WsFindNamesResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{180}
+}
+
+func (x *WsFindNamesResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFindNamesResult) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *WsFindNamesResult) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+// A → B: lines holding the query in files git does not ignore (git grep:
+// text files only, secret files and files over 5 MiB left out), at most
+// 2000 matches, at most 15 s. Answered with WsFindContentsResult.
+type WsFindContents struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 2048 characters.
+	Query         string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	CaseSensitive bool   `protobuf:"varint,3,opt,name=case_sensitive,json=caseSensitive,proto3" json:"case_sensitive,omitempty"`
+	WholeWord     bool   `protobuf:"varint,4,opt,name=whole_word,json=wholeWord,proto3" json:"whole_word,omitempty"`
+	// A POSIX extended regular expression; otherwise the query is literal text.
+	Regex bool `protobuf:"varint,5,opt,name=regex,proto3" json:"regex,omitempty"`
+	// Matches at most; 0 means 2000, B caps it at 2000.
+	Limit         uint32 `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFindContents) Reset() {
+	*x = WsFindContents{}
+	mi := &file_remote_v1_remote_proto_msgTypes[181]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFindContents) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFindContents) ProtoMessage() {}
+
+func (x *WsFindContents) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[181]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFindContents.ProtoReflect.Descriptor instead.
+func (*WsFindContents) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{181}
+}
+
+func (x *WsFindContents) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFindContents) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *WsFindContents) GetCaseSensitive() bool {
+	if x != nil {
+		return x.CaseSensitive
+	}
+	return false
+}
+
+func (x *WsFindContents) GetWholeWord() bool {
+	if x != nil {
+		return x.WholeWord
+	}
+	return false
+}
+
+func (x *WsFindContents) GetRegex() bool {
+	if x != nil {
+		return x.Regex
+	}
+	return false
+}
+
+func (x *WsFindContents) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type WsContentMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1-based.
+	Line   uint32 `protobuf:"varint,1,opt,name=line,proto3" json:"line,omitempty"`
+	Column uint32 `protobuf:"varint,2,opt,name=column,proto3" json:"column,omitempty"`
+	// The line, at most 300 characters.
+	Text          string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsContentMatch) Reset() {
+	*x = WsContentMatch{}
+	mi := &file_remote_v1_remote_proto_msgTypes[182]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsContentMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsContentMatch) ProtoMessage() {}
+
+func (x *WsContentMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[182]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsContentMatch.ProtoReflect.Descriptor instead.
+func (*WsContentMatch) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{182}
+}
+
+func (x *WsContentMatch) GetLine() uint32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *WsContentMatch) GetColumn() uint32 {
+	if x != nil {
+		return x.Column
+	}
+	return 0
+}
+
+func (x *WsContentMatch) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+type WsContentFile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Matches       []*WsContentMatch      `protobuf:"bytes,2,rep,name=matches,proto3" json:"matches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsContentFile) Reset() {
+	*x = WsContentFile{}
+	mi := &file_remote_v1_remote_proto_msgTypes[183]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsContentFile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsContentFile) ProtoMessage() {}
+
+func (x *WsContentFile) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[183]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsContentFile.ProtoReflect.Descriptor instead.
+func (*WsContentFile) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{183}
+}
+
+func (x *WsContentFile) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsContentFile) GetMatches() []*WsContentMatch {
+	if x != nil {
+		return x.Matches
+	}
+	return nil
+}
+
+type WsFindContentsResult struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId  string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Files        []*WsContentFile       `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	TotalMatches uint32                 `protobuf:"varint,3,opt,name=total_matches,json=totalMatches,proto3" json:"total_matches,omitempty"`
+	// More matches than listed.
+	Truncated bool `protobuf:"varint,4,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// git grep ran out of time: what it found so far.
+	TimedOut      bool `protobuf:"varint,5,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsFindContentsResult) Reset() {
+	*x = WsFindContentsResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[184]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsFindContentsResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsFindContentsResult) ProtoMessage() {}
+
+func (x *WsFindContentsResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[184]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsFindContentsResult.ProtoReflect.Descriptor instead.
+func (*WsFindContentsResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{184}
+}
+
+func (x *WsFindContentsResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsFindContentsResult) GetFiles() []*WsContentFile {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *WsFindContentsResult) GetTotalMatches() uint32 {
+	if x != nil {
+		return x.TotalMatches
+	}
+	return 0
+}
+
+func (x *WsFindContentsResult) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *WsFindContentsResult) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
+// A → B: start (on) or stop watching the workspace for this connection.
+// Answered with Ack. B watches only while some device does, and stops when
+// the connection closes.
+type WsWatch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	On            bool                   `protobuf:"varint,2,opt,name=on,proto3" json:"on,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsWatch) Reset() {
+	*x = WsWatch{}
+	mi := &file_remote_v1_remote_proto_msgTypes[185]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsWatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsWatch) ProtoMessage() {}
+
+func (x *WsWatch) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[185]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsWatch.ProtoReflect.Descriptor instead.
+func (*WsWatch) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{185}
+}
+
+func (x *WsWatch) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsWatch) GetOn() bool {
+	if x != nil {
+		return x.On
+	}
+	return false
+}
+
+// B → A, unasked: files changed in the workspace. File events are gathered
+// for 125 ms; git's status is looked at again at most every 3 s, and every
+// 60 s in any case.
+type WsChanged struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// Folders whose entries changed, relative ("" is the root), at most 200.
+	Dirs []string `protobuf:"bytes,2,rep,name=dirs,proto3" json:"dirs,omitempty"`
+	// Too many changes to name: read every open folder again.
+	Overflow bool `protobuf:"varint,3,opt,name=overflow,proto3" json:"overflow,omitempty"`
+	// git's status changed: read WsGitStatus again.
+	Git bool `protobuf:"varint,4,opt,name=git,proto3" json:"git,omitempty"`
+	// B cannot watch files here (or does not, on Linux, where a recursive
+	// watch would hold every folder of the tree): it looks at git's status
+	// every 10 s instead, and says overflow with git when it changed. Sent
+	// once, right after WsWatch, when so.
+	Polling       bool `protobuf:"varint,5,opt,name=polling,proto3" json:"polling,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsChanged) Reset() {
+	*x = WsChanged{}
+	mi := &file_remote_v1_remote_proto_msgTypes[186]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsChanged) ProtoMessage() {}
+
+func (x *WsChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[186]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsChanged.ProtoReflect.Descriptor instead.
+func (*WsChanged) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{186}
+}
+
+func (x *WsChanged) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsChanged) GetDirs() []string {
+	if x != nil {
+		return x.Dirs
+	}
+	return nil
+}
+
+func (x *WsChanged) GetOverflow() bool {
+	if x != nil {
+		return x.Overflow
+	}
+	return false
+}
+
+func (x *WsChanged) GetGit() bool {
+	if x != nil {
+		return x.Git
+	}
+	return false
+}
+
+func (x *WsChanged) GetPolling() bool {
+	if x != nil {
+		return x.Polling
+	}
+	return false
+}
+
+// A → B: the workspace's git status. Answered with WsGitStatusResult.
+type WsGitStatus struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitStatus) Reset() {
+	*x = WsGitStatus{}
+	mi := &file_remote_v1_remote_proto_msgTypes[187]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitStatus) ProtoMessage() {}
+
+func (x *WsGitStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[187]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitStatus.ProtoReflect.Descriptor instead.
+func (*WsGitStatus) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{187}
+}
+
+func (x *WsGitStatus) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type WsGitEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Path  string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// RENAMED: the path it had.
+	OldPath string       `protobuf:"bytes,2,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
+	Area    WsGitArea    `protobuf:"varint,3,opt,name=area,proto3,enum=remote.v1.WsGitArea" json:"area,omitempty"`
+	State   GitFileState `protobuf:"varint,4,opt,name=state,proto3,enum=remote.v1.GitFileState" json:"state,omitempty"`
+	// Lines; 0 for untracked files, binary files and when truncated.
+	Added   uint32 `protobuf:"varint,5,opt,name=added,proto3" json:"added,omitempty"`
+	Removed uint32 `protobuf:"varint,6,opt,name=removed,proto3" json:"removed,omitempty"`
+	Binary  bool   `protobuf:"varint,7,opt,name=binary,proto3" json:"binary,omitempty"`
+	// A secret file: listed, never diffed.
+	Sensitive     bool `protobuf:"varint,8,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitEntry) Reset() {
+	*x = WsGitEntry{}
+	mi := &file_remote_v1_remote_proto_msgTypes[188]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitEntry) ProtoMessage() {}
+
+func (x *WsGitEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[188]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitEntry.ProtoReflect.Descriptor instead.
+func (*WsGitEntry) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{188}
+}
+
+func (x *WsGitEntry) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsGitEntry) GetOldPath() string {
+	if x != nil {
+		return x.OldPath
+	}
+	return ""
+}
+
+func (x *WsGitEntry) GetArea() WsGitArea {
+	if x != nil {
+		return x.Area
+	}
+	return WsGitArea_WS_GIT_AREA_UNSPECIFIED
+}
+
+func (x *WsGitEntry) GetState() GitFileState {
+	if x != nil {
+		return x.State
+	}
+	return GitFileState_GIT_FILE_STATE_UNSPECIFIED
+}
+
+func (x *WsGitEntry) GetAdded() uint32 {
+	if x != nil {
+		return x.Added
+	}
+	return 0
+}
+
+func (x *WsGitEntry) GetRemoved() uint32 {
+	if x != nil {
+		return x.Removed
+	}
+	return 0
+}
+
+func (x *WsGitEntry) GetBinary() bool {
+	if x != nil {
+		return x.Binary
+	}
+	return false
+}
+
+func (x *WsGitEntry) GetSensitive() bool {
+	if x != nil {
+		return x.Sensitive
+	}
+	return false
+}
+
+type WsGitUpstream struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// e.g. "origin/main".
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Ahead         uint32 `protobuf:"varint,2,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind        uint32 `protobuf:"varint,3,opt,name=behind,proto3" json:"behind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitUpstream) Reset() {
+	*x = WsGitUpstream{}
+	mi := &file_remote_v1_remote_proto_msgTypes[189]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitUpstream) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitUpstream) ProtoMessage() {}
+
+func (x *WsGitUpstream) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[189]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitUpstream.ProtoReflect.Descriptor instead.
+func (*WsGitUpstream) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{189}
+}
+
+func (x *WsGitUpstream) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WsGitUpstream) GetAhead() uint32 {
+	if x != nil {
+		return x.Ahead
+	}
+	return 0
+}
+
+func (x *WsGitUpstream) GetBehind() uint32 {
+	if x != nil {
+		return x.Behind
+	}
+	return 0
+}
+
+type WsGitStatusResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// The workspace is in a git work tree; false: nothing else is set.
+	Git bool `protobuf:"varint,2,opt,name=git,proto3" json:"git,omitempty"`
+	// Empty when HEAD is detached.
+	Branch string `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
+	// The commit HEAD names; empty before the first commit.
+	Head string `protobuf:"bytes,4,opt,name=head,proto3" json:"head,omitempty"`
+	// Unset without one.
+	Upstream *WsGitUpstream `protobuf:"bytes,5,opt,name=upstream,proto3" json:"upstream,omitempty"`
+	// A file staged and changed again is listed twice (STAGED and UNSTAGED).
+	Entries []*WsGitEntry `protobuf:"bytes,6,rep,name=entries,proto3" json:"entries,omitempty"`
+	// More than 1000 entries: the first 1000, without line counts.
+	Truncated     bool `protobuf:"varint,7,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitStatusResult) Reset() {
+	*x = WsGitStatusResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[190]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitStatusResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitStatusResult) ProtoMessage() {}
+
+func (x *WsGitStatusResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[190]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitStatusResult.ProtoReflect.Descriptor instead.
+func (*WsGitStatusResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{190}
+}
+
+func (x *WsGitStatusResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitStatusResult) GetGit() bool {
+	if x != nil {
+		return x.Git
+	}
+	return false
+}
+
+func (x *WsGitStatusResult) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *WsGitStatusResult) GetHead() string {
+	if x != nil {
+		return x.Head
+	}
+	return ""
+}
+
+func (x *WsGitStatusResult) GetUpstream() *WsGitUpstream {
+	if x != nil {
+		return x.Upstream
+	}
+	return nil
+}
+
+func (x *WsGitStatusResult) GetEntries() []*WsGitEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *WsGitStatusResult) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+// A → B: one file's diff. Answered with WsGitDiffResult (a secret file comes
+// with sensitive set and no content).
+type WsGitDiff struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Path        string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	// RENAMED: the old path.
+	OldPath string          `protobuf:"bytes,3,opt,name=old_path,json=oldPath,proto3" json:"old_path,omitempty"`
+	Source  WsGitDiffSource `protobuf:"varint,4,opt,name=source,proto3,enum=remote.v1.WsGitDiffSource" json:"source,omitempty"`
+	// COMMIT: a full commit id (40 or 64 hex).
+	Commit string `protobuf:"bytes,5,opt,name=commit,proto3" json:"commit,omitempty"`
+	// BRANCH: the base ref; empty picks it as WsGitBranchCompare does.
+	Base          string `protobuf:"bytes,6,opt,name=base,proto3" json:"base,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitDiff) Reset() {
+	*x = WsGitDiff{}
+	mi := &file_remote_v1_remote_proto_msgTypes[191]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitDiff) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitDiff) ProtoMessage() {}
+
+func (x *WsGitDiff) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[191]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitDiff.ProtoReflect.Descriptor instead.
+func (*WsGitDiff) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{191}
+}
+
+func (x *WsGitDiff) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitDiff) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WsGitDiff) GetOldPath() string {
+	if x != nil {
+		return x.OldPath
+	}
+	return ""
+}
+
+func (x *WsGitDiff) GetSource() WsGitDiffSource {
+	if x != nil {
+		return x.Source
+	}
+	return WsGitDiffSource_WS_GIT_DIFF_SOURCE_UNSPECIFIED
+}
+
+func (x *WsGitDiff) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *WsGitDiff) GetBase() string {
+	if x != nil {
+		return x.Base
+	}
+	return ""
+}
+
+type WsGitDiffResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 1 MiB of unified diff.
+	File          *GitFileChange `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitDiffResult) Reset() {
+	*x = WsGitDiffResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[192]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitDiffResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitDiffResult) ProtoMessage() {}
+
+func (x *WsGitDiffResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[192]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitDiffResult.ProtoReflect.Descriptor instead.
+func (*WsGitDiffResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{192}
+}
+
+func (x *WsGitDiffResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitDiffResult) GetFile() *GitFileChange {
+	if x != nil {
+		return x.File
+	}
+	return nil
+}
+
+// A → B: stage files (paths of WsGitStatusResult), or everything with all.
+// Answered with WsGitStatusResult. Logged (git_stage). Taking in a secret
+// file (WsGitEntry.sensitive) needs its path in confirm_sensitive, else
+// ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED.
+type WsGitStage struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 1000.
+	Paths []string `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	All   bool     `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	// Secret files the user agreed, on the device, to stage.
+	ConfirmSensitive []string `protobuf:"bytes,4,rep,name=confirm_sensitive,json=confirmSensitive,proto3" json:"confirm_sensitive,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *WsGitStage) Reset() {
+	*x = WsGitStage{}
+	mi := &file_remote_v1_remote_proto_msgTypes[193]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitStage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitStage) ProtoMessage() {}
+
+func (x *WsGitStage) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[193]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitStage.ProtoReflect.Descriptor instead.
+func (*WsGitStage) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{193}
+}
+
+func (x *WsGitStage) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitStage) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *WsGitStage) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
+func (x *WsGitStage) GetConfirmSensitive() []string {
+	if x != nil {
+		return x.ConfirmSensitive
+	}
+	return nil
+}
+
+// A → B: unstage files, or everything with all. As WsGitStage (git_unstage).
+type WsGitUnstage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Paths         []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	All           bool                   `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitUnstage) Reset() {
+	*x = WsGitUnstage{}
+	mi := &file_remote_v1_remote_proto_msgTypes[194]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitUnstage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitUnstage) ProtoMessage() {}
+
+func (x *WsGitUnstage) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[194]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitUnstage.ProtoReflect.Descriptor instead.
+func (*WsGitUnstage) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{194}
+}
+
+func (x *WsGitUnstage) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitUnstage) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *WsGitUnstage) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
+// A → B: throw away the working tree's changes of files: untracked files
+// go to the operating system's trash first (never deleted for good; a link
+// goes, never what it points to), then tracked files go back to the index.
+// Staged changes stay. Without confirm, refused
+// with ERROR_REASON_DISCARD_NOT_CONFIRMED (code NEEDS_CONSENT). Answered with
+// WsGitStatusResult. Logged (git_discard).
+type WsGitDiscard struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 1000.
+	Paths []string `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	// The user confirmed it on the device.
+	Confirm       bool `protobuf:"varint,3,opt,name=confirm,proto3" json:"confirm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitDiscard) Reset() {
+	*x = WsGitDiscard{}
+	mi := &file_remote_v1_remote_proto_msgTypes[195]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitDiscard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitDiscard) ProtoMessage() {}
+
+func (x *WsGitDiscard) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[195]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitDiscard.ProtoReflect.Descriptor instead.
+func (*WsGitDiscard) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{195}
+}
+
+func (x *WsGitDiscard) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitDiscard) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *WsGitDiscard) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+// A → B: commit what is staged. git hooks never run (the device says so)
+// and nothing is signed. An empty message is refused with
+// ERROR_REASON_EMPTY_MESSAGE; also refused: GIT_COMMIT_SIGNING,
+// GIT_OPERATION_IN_PROGRESS, GIT_DETACHED_HEAD, and
+// SENSITIVE_FILE_NOT_CONFIRMED for a staged secret file not named in
+// confirm_sensitive. Answered with WsGitCommitResult. Logged (git_commit),
+// never the message.
+type WsGitCommit struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// At most 65 536 characters.
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// The user agreed to commit on a detached HEAD.
+	AllowDetached bool `protobuf:"varint,3,opt,name=allow_detached,json=allowDetached,proto3" json:"allow_detached,omitempty"`
+	// Staged secret files the user agreed, on the device, to commit.
+	ConfirmSensitive []string `protobuf:"bytes,4,rep,name=confirm_sensitive,json=confirmSensitive,proto3" json:"confirm_sensitive,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *WsGitCommit) Reset() {
+	*x = WsGitCommit{}
+	mi := &file_remote_v1_remote_proto_msgTypes[196]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitCommit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitCommit) ProtoMessage() {}
+
+func (x *WsGitCommit) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[196]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitCommit.ProtoReflect.Descriptor instead.
+func (*WsGitCommit) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{196}
+}
+
+func (x *WsGitCommit) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitCommit) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *WsGitCommit) GetAllowDetached() bool {
+	if x != nil {
+		return x.AllowDetached
+	}
+	return false
+}
+
+func (x *WsGitCommit) GetConfirmSensitive() []string {
+	if x != nil {
+		return x.ConfirmSensitive
+	}
+	return nil
+}
+
+type WsGitLogEntry struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Oid     string                 `protobuf:"bytes,1,opt,name=oid,proto3" json:"oid,omitempty"`
+	Subject string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	Author  string                 `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`
+	// Unix milliseconds (committer date).
+	At int64 `protobuf:"varint,4,opt,name=at,proto3" json:"at,omitempty"`
+	// Branches and tags pointing at it ("HEAD -> main", "origin/main", "tag: v1").
+	Refs          []string `protobuf:"bytes,5,rep,name=refs,proto3" json:"refs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitLogEntry) Reset() {
+	*x = WsGitLogEntry{}
+	mi := &file_remote_v1_remote_proto_msgTypes[197]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitLogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitLogEntry) ProtoMessage() {}
+
+func (x *WsGitLogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[197]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitLogEntry.ProtoReflect.Descriptor instead.
+func (*WsGitLogEntry) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{197}
+}
+
+func (x *WsGitLogEntry) GetOid() string {
+	if x != nil {
+		return x.Oid
+	}
+	return ""
+}
+
+func (x *WsGitLogEntry) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *WsGitLogEntry) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *WsGitLogEntry) GetAt() int64 {
+	if x != nil {
+		return x.At
+	}
+	return 0
+}
+
+func (x *WsGitLogEntry) GetRefs() []string {
+	if x != nil {
+		return x.Refs
+	}
+	return nil
+}
+
+type WsGitCommitResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Commit        *WsGitLogEntry         `protobuf:"bytes,2,opt,name=commit,proto3" json:"commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitCommitResult) Reset() {
+	*x = WsGitCommitResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[198]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitCommitResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitCommitResult) ProtoMessage() {}
+
+func (x *WsGitCommitResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[198]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitCommitResult.ProtoReflect.Descriptor instead.
+func (*WsGitCommitResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{198}
+}
+
+func (x *WsGitCommitResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitCommitResult) GetCommit() *WsGitLogEntry {
+	if x != nil {
+		return x.Commit
+	}
+	return nil
+}
+
+// A → B: the branches. Answered with WsGitBranchesResult.
+type WsGitBranches struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranches) Reset() {
+	*x = WsGitBranches{}
+	mi := &file_remote_v1_remote_proto_msgTypes[199]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranches) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranches) ProtoMessage() {}
+
+func (x *WsGitBranches) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[199]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranches.ProtoReflect.Descriptor instead.
+func (*WsGitBranches) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{199}
+}
+
+func (x *WsGitBranches) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type WsGitBranch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// e.g. "origin/main"; empty without one.
+	Upstream string `protobuf:"bytes,2,opt,name=upstream,proto3" json:"upstream,omitempty"`
+	Ahead    uint32 `protobuf:"varint,3,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind   uint32 `protobuf:"varint,4,opt,name=behind,proto3" json:"behind,omitempty"`
+	// The upstream branch is gone from the remote.
+	Gone          bool `protobuf:"varint,5,opt,name=gone,proto3" json:"gone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranch) Reset() {
+	*x = WsGitBranch{}
+	mi := &file_remote_v1_remote_proto_msgTypes[200]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranch) ProtoMessage() {}
+
+func (x *WsGitBranch) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[200]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranch.ProtoReflect.Descriptor instead.
+func (*WsGitBranch) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{200}
+}
+
+func (x *WsGitBranch) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WsGitBranch) GetUpstream() string {
+	if x != nil {
+		return x.Upstream
+	}
+	return ""
+}
+
+func (x *WsGitBranch) GetAhead() uint32 {
+	if x != nil {
+		return x.Ahead
+	}
+	return 0
+}
+
+func (x *WsGitBranch) GetBehind() uint32 {
+	if x != nil {
+		return x.Behind
+	}
+	return 0
+}
+
+func (x *WsGitBranch) GetGone() bool {
+	if x != nil {
+		return x.Gone
+	}
+	return false
+}
+
+type WsGitBranchesResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// Empty when HEAD is detached.
+	Current string         `protobuf:"bytes,2,opt,name=current,proto3" json:"current,omitempty"`
+	Local   []*WsGitBranch `protobuf:"bytes,3,rep,name=local,proto3" json:"local,omitempty"`
+	// Remote-tracking branches ("origin/feature"), without */HEAD.
+	Remote        []string `protobuf:"bytes,4,rep,name=remote,proto3" json:"remote,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranchesResult) Reset() {
+	*x = WsGitBranchesResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[201]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranchesResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranchesResult) ProtoMessage() {}
+
+func (x *WsGitBranchesResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[201]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranchesResult.ProtoReflect.Descriptor instead.
+func (*WsGitBranchesResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{201}
+}
+
+func (x *WsGitBranchesResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitBranchesResult) GetCurrent() string {
+	if x != nil {
+		return x.Current
+	}
+	return ""
+}
+
+func (x *WsGitBranchesResult) GetLocal() []*WsGitBranch {
+	if x != nil {
+		return x.Local
+	}
+	return nil
+}
+
+func (x *WsGitBranchesResult) GetRemote() []string {
+	if x != nil {
+		return x.Remote
+	}
+	return nil
+}
+
+// A → B: switch to a branch: a local one, or the short name of a remote
+// one ("feature" for "origin/feature"), which makes a local branch tracking
+// it. git refuses when changes would be lost; refused too while an
+// operation is in progress (GIT_OPERATION_IN_PROGRESS). Answered with
+// WsGitStatusResult. Logged (git_checkout).
+type WsGitCheckout struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Branch        string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitCheckout) Reset() {
+	*x = WsGitCheckout{}
+	mi := &file_remote_v1_remote_proto_msgTypes[202]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitCheckout) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitCheckout) ProtoMessage() {}
+
+func (x *WsGitCheckout) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[202]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitCheckout.ProtoReflect.Descriptor instead.
+func (*WsGitCheckout) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{202}
+}
+
+func (x *WsGitCheckout) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitCheckout) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+// A → B: a new branch (a valid branch name, else ERROR_REASON_NAME_INVALID)
+// at start_point (a branch, tag or commit; empty: HEAD), switched to with
+// checkout. Answered with WsGitStatusResult. Logged (git_branch_create).
+type WsGitBranchCreate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	StartPoint    string                 `protobuf:"bytes,3,opt,name=start_point,json=startPoint,proto3" json:"start_point,omitempty"`
+	Checkout      bool                   `protobuf:"varint,4,opt,name=checkout,proto3" json:"checkout,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranchCreate) Reset() {
+	*x = WsGitBranchCreate{}
+	mi := &file_remote_v1_remote_proto_msgTypes[203]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranchCreate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranchCreate) ProtoMessage() {}
+
+func (x *WsGitBranchCreate) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[203]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranchCreate.ProtoReflect.Descriptor instead.
+func (*WsGitBranchCreate) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{203}
+}
+
+func (x *WsGitBranchCreate) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitBranchCreate) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WsGitBranchCreate) GetStartPoint() string {
+	if x != nil {
+		return x.StartPoint
+	}
+	return ""
+}
+
+func (x *WsGitBranchCreate) GetCheckout() bool {
+	if x != nil {
+		return x.Checkout
+	}
+	return false
+}
+
+// A → B: git fetch --prune of the default remote. Answered with
+// WsGitStatusResult. Network requests never prompt: a missing sign-in is
+// ERROR_REASON_GIT_NEEDS_CREDENTIALS. At most 120 s.
+type WsGitFetch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitFetch) Reset() {
+	*x = WsGitFetch{}
+	mi := &file_remote_v1_remote_proto_msgTypes[204]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitFetch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitFetch) ProtoMessage() {}
+
+func (x *WsGitFetch) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[204]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitFetch.ProtoReflect.Descriptor instead.
+func (*WsGitFetch) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{204}
+}
+
+func (x *WsGitFetch) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+// A → B: git pull --ff-only of the current branch's upstream (never a merge
+// commit or a rebase); refused while an operation is in progress. As
+// WsGitFetch. Logged (git_pull).
+type WsGitPull struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitPull) Reset() {
+	*x = WsGitPull{}
+	mi := &file_remote_v1_remote_proto_msgTypes[205]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitPull) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitPull) ProtoMessage() {}
+
+func (x *WsGitPull) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[205]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitPull.ProtoReflect.Descriptor instead.
+func (*WsGitPull) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{205}
+}
+
+func (x *WsGitPull) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+// A → B: push the current branch to its upstream, never forced. A branch
+// without one is pushed to the same name on origin (or the only remote) and
+// that becomes its upstream. In a repository that uses Git LFS, B runs
+// `git lfs pre-push` first (its objects go up before the commits), and
+// refuses with ERROR_REASON_GIT_LFS_MISSING without git-lfs. As WsGitFetch.
+// Logged (git_push).
+type WsGitPush struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitPush) Reset() {
+	*x = WsGitPush{}
+	mi := &file_remote_v1_remote_proto_msgTypes[206]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitPush) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitPush) ProtoMessage() {}
+
+func (x *WsGitPush) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[206]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitPush.ProtoReflect.Descriptor instead.
+func (*WsGitPush) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{206}
+}
+
+func (x *WsGitPush) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+// A → B: commits, newest first. Answered with WsGitLogResult.
+type WsGitLog struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// A branch, tag or commit; empty: HEAD.
+	Ref  string `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	Skip uint32 `protobuf:"varint,3,opt,name=skip,proto3" json:"skip,omitempty"`
+	// 0 means 50, B caps it at 50.
+	Limit         uint32 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitLog) Reset() {
+	*x = WsGitLog{}
+	mi := &file_remote_v1_remote_proto_msgTypes[207]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitLog) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitLog) ProtoMessage() {}
+
+func (x *WsGitLog) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[207]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitLog.ProtoReflect.Descriptor instead.
+func (*WsGitLog) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{207}
+}
+
+func (x *WsGitLog) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitLog) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *WsGitLog) GetSkip() uint32 {
+	if x != nil {
+		return x.Skip
+	}
+	return 0
+}
+
+func (x *WsGitLog) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type WsGitLogResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Commits       []*WsGitLogEntry       `protobuf:"bytes,2,rep,name=commits,proto3" json:"commits,omitempty"`
+	HasMore       bool                   `protobuf:"varint,3,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitLogResult) Reset() {
+	*x = WsGitLogResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[208]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitLogResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitLogResult) ProtoMessage() {}
+
+func (x *WsGitLogResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[208]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitLogResult.ProtoReflect.Descriptor instead.
+func (*WsGitLogResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{208}
+}
+
+func (x *WsGitLogResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitLogResult) GetCommits() []*WsGitLogEntry {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+func (x *WsGitLogResult) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+// A → B: what the current branch committed since it left base ("committed
+// on branch"). Answered with WsGitBranchCompareResult.
+type WsGitBranchCompare struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// A branch, tag or commit; empty: origin/HEAD, else origin/main,
+	// origin/master, main, master (the first that exists).
+	Base          string `protobuf:"bytes,2,opt,name=base,proto3" json:"base,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranchCompare) Reset() {
+	*x = WsGitBranchCompare{}
+	mi := &file_remote_v1_remote_proto_msgTypes[209]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranchCompare) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranchCompare) ProtoMessage() {}
+
+func (x *WsGitBranchCompare) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[209]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranchCompare.ProtoReflect.Descriptor instead.
+func (*WsGitBranchCompare) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{209}
+}
+
+func (x *WsGitBranchCompare) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitBranchCompare) GetBase() string {
+	if x != nil {
+		return x.Base
+	}
+	return ""
+}
+
+type WsGitBranchCompareResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// The base used; empty when none was found (nothing else is set).
+	Base      string `protobuf:"bytes,2,opt,name=base,proto3" json:"base,omitempty"`
+	MergeBase string `protobuf:"bytes,3,opt,name=merge_base,json=mergeBase,proto3" json:"merge_base,omitempty"`
+	// Commits of HEAD not in base, and of base not in HEAD.
+	Ahead  uint32 `protobuf:"varint,4,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind uint32 `protobuf:"varint,5,opt,name=behind,proto3" json:"behind,omitempty"`
+	// Files changed from the merge base to HEAD (area STAGED), at most 1000.
+	Files         []*WsGitEntry `protobuf:"bytes,6,rep,name=files,proto3" json:"files,omitempty"`
+	Truncated     bool          `protobuf:"varint,7,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitBranchCompareResult) Reset() {
+	*x = WsGitBranchCompareResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[210]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitBranchCompareResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitBranchCompareResult) ProtoMessage() {}
+
+func (x *WsGitBranchCompareResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[210]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitBranchCompareResult.ProtoReflect.Descriptor instead.
+func (*WsGitBranchCompareResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{210}
+}
+
+func (x *WsGitBranchCompareResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitBranchCompareResult) GetBase() string {
+	if x != nil {
+		return x.Base
+	}
+	return ""
+}
+
+func (x *WsGitBranchCompareResult) GetMergeBase() string {
+	if x != nil {
+		return x.MergeBase
+	}
+	return ""
+}
+
+func (x *WsGitBranchCompareResult) GetAhead() uint32 {
+	if x != nil {
+		return x.Ahead
+	}
+	return 0
+}
+
+func (x *WsGitBranchCompareResult) GetBehind() uint32 {
+	if x != nil {
+		return x.Behind
+	}
+	return 0
+}
+
+func (x *WsGitBranchCompareResult) GetFiles() []*WsGitEntry {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *WsGitBranchCompareResult) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+// A → B: the web page that opens a pull request (GitHub) or merge request
+// (GitLab) of the current branch. Answered with WsGitPrUrlResult; a remote
+// on another host is refused with ERROR_REASON_GIT_FAILED.
+type WsGitPrUrl struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// The branch to merge into; empty: picked as WsGitBranchCompare does.
+	Base          string `protobuf:"bytes,2,opt,name=base,proto3" json:"base,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitPrUrl) Reset() {
+	*x = WsGitPrUrl{}
+	mi := &file_remote_v1_remote_proto_msgTypes[211]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitPrUrl) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitPrUrl) ProtoMessage() {}
+
+func (x *WsGitPrUrl) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[211]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitPrUrl.ProtoReflect.Descriptor instead.
+func (*WsGitPrUrl) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{211}
+}
+
+func (x *WsGitPrUrl) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitPrUrl) GetBase() string {
+	if x != nil {
+		return x.Base
+	}
+	return ""
+}
+
+type WsGitPrUrlResult struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// https only, never with credentials.
+	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// "github" or "gitlab".
+	Provider      string `protobuf:"bytes,3,opt,name=provider,proto3" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WsGitPrUrlResult) Reset() {
+	*x = WsGitPrUrlResult{}
+	mi := &file_remote_v1_remote_proto_msgTypes[212]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WsGitPrUrlResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WsGitPrUrlResult) ProtoMessage() {}
+
+func (x *WsGitPrUrlResult) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[212]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WsGitPrUrlResult.ProtoReflect.Descriptor instead.
+func (*WsGitPrUrlResult) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{212}
+}
+
+func (x *WsGitPrUrlResult) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *WsGitPrUrlResult) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *WsGitPrUrlResult) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
 var File_remote_v1_remote_proto protoreflect.FileDescriptor
 
 const file_remote_v1_remote_proto_rawDesc = "" +
@@ -14913,7 +18397,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eHandshakeError\x121\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x1d.remote.v1.HandshakeErrorCodeR\x04code\x12)\n" +
 	"\x10protocol_version\x18\x02 \x01(\rR\x0fprotocolVersion\x120\n" +
-	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xdc:\n" +
+	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\x93L\n" +
 	"\x05Frame\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\vthread_list\x18\n" +
@@ -15039,7 +18523,45 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"termClosed\x128\n" +
 	"\vterm_status\x18u \x01(\v2\x15.remote.v1.TermStatusH\x00R\n" +
 	"termStatus\x12D\n" +
-	"\x0fthread_activity\x18v \x01(\v2\x19.remote.v1.ThreadActivityH\x00R\x0ethreadActivityB\x06\n" +
+	"\x0fthread_activity\x18v \x01(\v2\x19.remote.v1.ThreadActivityH\x00R\x0ethreadActivity\x126\n" +
+	"\vws_dir_list\x18w \x01(\v2\x14.remote.v1.WsDirListH\x00R\twsDirList\x129\n" +
+	"\fws_file_read\x18x \x01(\v2\x15.remote.v1.WsFileReadH\x00R\n" +
+	"wsFileRead\x12<\n" +
+	"\rws_find_names\x18y \x01(\v2\x16.remote.v1.WsFindNamesH\x00R\vwsFindNames\x12E\n" +
+	"\x10ws_find_contents\x18z \x01(\v2\x19.remote.v1.WsFindContentsH\x00R\x0ewsFindContents\x12/\n" +
+	"\bws_watch\x18{ \x01(\v2\x12.remote.v1.WsWatchH\x00R\awsWatch\x12<\n" +
+	"\rws_git_status\x18| \x01(\v2\x16.remote.v1.WsGitStatusH\x00R\vwsGitStatus\x126\n" +
+	"\vws_git_diff\x18} \x01(\v2\x14.remote.v1.WsGitDiffH\x00R\twsGitDiff\x129\n" +
+	"\fws_git_stage\x18~ \x01(\v2\x15.remote.v1.WsGitStageH\x00R\n" +
+	"wsGitStage\x12?\n" +
+	"\x0ews_git_unstage\x18\x7f \x01(\v2\x17.remote.v1.WsGitUnstageH\x00R\fwsGitUnstage\x12@\n" +
+	"\x0ews_git_discard\x18\x80\x01 \x01(\v2\x17.remote.v1.WsGitDiscardH\x00R\fwsGitDiscard\x12=\n" +
+	"\rws_git_commit\x18\x81\x01 \x01(\v2\x16.remote.v1.WsGitCommitH\x00R\vwsGitCommit\x12C\n" +
+	"\x0fws_git_branches\x18\x82\x01 \x01(\v2\x18.remote.v1.WsGitBranchesH\x00R\rwsGitBranches\x12C\n" +
+	"\x0fws_git_checkout\x18\x83\x01 \x01(\v2\x18.remote.v1.WsGitCheckoutH\x00R\rwsGitCheckout\x12P\n" +
+	"\x14ws_git_branch_create\x18\x84\x01 \x01(\v2\x1c.remote.v1.WsGitBranchCreateH\x00R\x11wsGitBranchCreate\x12:\n" +
+	"\fws_git_fetch\x18\x85\x01 \x01(\v2\x15.remote.v1.WsGitFetchH\x00R\n" +
+	"wsGitFetch\x127\n" +
+	"\vws_git_pull\x18\x86\x01 \x01(\v2\x14.remote.v1.WsGitPullH\x00R\twsGitPull\x127\n" +
+	"\vws_git_push\x18\x87\x01 \x01(\v2\x14.remote.v1.WsGitPushH\x00R\twsGitPush\x124\n" +
+	"\n" +
+	"ws_git_log\x18\x88\x01 \x01(\v2\x13.remote.v1.WsGitLogH\x00R\bwsGitLog\x12S\n" +
+	"\x15ws_git_branch_compare\x18\x89\x01 \x01(\v2\x1d.remote.v1.WsGitBranchCompareH\x00R\x12wsGitBranchCompare\x12;\n" +
+	"\rws_git_pr_url\x18\x8a\x01 \x01(\v2\x15.remote.v1.WsGitPrUrlH\x00R\n" +
+	"wsGitPrUrl\x12J\n" +
+	"\x12ws_dir_list_result\x18\x8b\x01 \x01(\v2\x1a.remote.v1.WsDirListResultH\x00R\x0fwsDirListResult\x12M\n" +
+	"\x13ws_file_read_result\x18\x8c\x01 \x01(\v2\x1b.remote.v1.WsFileReadResultH\x00R\x10wsFileReadResult\x12P\n" +
+	"\x14ws_find_names_result\x18\x8d\x01 \x01(\v2\x1c.remote.v1.WsFindNamesResultH\x00R\x11wsFindNamesResult\x12Y\n" +
+	"\x17ws_find_contents_result\x18\x8e\x01 \x01(\v2\x1f.remote.v1.WsFindContentsResultH\x00R\x14wsFindContentsResult\x126\n" +
+	"\n" +
+	"ws_changed\x18\x8f\x01 \x01(\v2\x14.remote.v1.WsChangedH\x00R\twsChanged\x12P\n" +
+	"\x14ws_git_status_result\x18\x90\x01 \x01(\v2\x1c.remote.v1.WsGitStatusResultH\x00R\x11wsGitStatusResult\x12J\n" +
+	"\x12ws_git_diff_result\x18\x91\x01 \x01(\v2\x1a.remote.v1.WsGitDiffResultH\x00R\x0fwsGitDiffResult\x12P\n" +
+	"\x14ws_git_commit_result\x18\x92\x01 \x01(\v2\x1c.remote.v1.WsGitCommitResultH\x00R\x11wsGitCommitResult\x12V\n" +
+	"\x16ws_git_branches_result\x18\x93\x01 \x01(\v2\x1e.remote.v1.WsGitBranchesResultH\x00R\x13wsGitBranchesResult\x12G\n" +
+	"\x11ws_git_log_result\x18\x94\x01 \x01(\v2\x19.remote.v1.WsGitLogResultH\x00R\x0ewsGitLogResult\x12f\n" +
+	"\x1cws_git_branch_compare_result\x18\x95\x01 \x01(\v2#.remote.v1.WsGitBranchCompareResultH\x00R\x18wsGitBranchCompareResult\x12N\n" +
+	"\x14ws_git_pr_url_result\x18\x96\x01 \x01(\v2\x1b.remote.v1.WsGitPrUrlResultH\x00R\x10wsGitPrUrlResultB\x06\n" +
 	"\x04body\"\f\n" +
 	"\n" +
 	"ThreadList\"\xbd\x01\n" +
@@ -15841,7 +19363,203 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04link\x18\x01 \x01(\rR\x04link\x12'\n" +
 	"\x04path\x18\x02 \x01(\x0e2\x13.remote.v1.TermPathR\x04path\x12\x15\n" +
 	"\x06rtt_ms\x18\x03 \x01(\x02R\x05rttMs\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason*\x99\x03\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xd8\x01\n" +
+	"\tWsDirList\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"after_name\x18\x03 \x01(\tR\tafterName\x12\x1b\n" +
+	"\tafter_dir\x18\x04 \x01(\bR\bafterDir\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\rR\x05limit\x12\x1f\n" +
+	"\vshow_hidden\x18\x06 \x01(\bR\n" +
+	"showHidden\x12!\n" +
+	"\fhide_ignored\x18\a \x01(\bR\vhideIgnored\"\xd2\x01\n" +
+	"\aWsEntry\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
+	"\x03dir\x18\x02 \x01(\bR\x03dir\x12\x18\n" +
+	"\asymlink\x18\x03 \x01(\bR\asymlink\x12\x18\n" +
+	"\aoutside\x18\x04 \x01(\bR\aoutside\x12\x12\n" +
+	"\x04size\x18\x05 \x01(\x04R\x04size\x12\x14\n" +
+	"\x05mtime\x18\x06 \x01(\x03R\x05mtime\x12\x18\n" +
+	"\aignored\x18\a \x01(\bR\aignored\x12)\n" +
+	"\x03git\x18\b \x01(\x0e2\x17.remote.v1.GitFileStateR\x03git\"\xa7\x01\n" +
+	"\x0fWsDirListResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12,\n" +
+	"\aentries\x18\x03 \x03(\v2\x12.remote.v1.WsEntryR\aentries\x12\x19\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\rR\x05total\"C\n" +
+	"\n" +
+	"WsFileRead\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"\xda\x01\n" +
+	"\x10WsFileReadResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12)\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x15.remote.v1.WsFileKindR\x04kind\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x04R\x04size\x12\x14\n" +
+	"\x05mtime\x18\x05 \x01(\x03R\x05mtime\x12\x12\n" +
+	"\x04mime\x18\x06 \x01(\tR\x04mime\x12\x12\n" +
+	"\x04text\x18\a \x01(\tR\x04text\x12\x12\n" +
+	"\x04data\x18\b \x01(\fR\x04data\"\\\n" +
+	"\vWsFindNames\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\rR\x05limit\"j\n" +
+	"\x11WsFindNamesResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x1c\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\"\xbb\x01\n" +
+	"\x0eWsFindContents\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12%\n" +
+	"\x0ecase_sensitive\x18\x03 \x01(\bR\rcaseSensitive\x12\x1d\n" +
+	"\n" +
+	"whole_word\x18\x04 \x01(\bR\twholeWord\x12\x14\n" +
+	"\x05regex\x18\x05 \x01(\bR\x05regex\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\rR\x05limit\"P\n" +
+	"\x0eWsContentMatch\x12\x12\n" +
+	"\x04line\x18\x01 \x01(\rR\x04line\x12\x16\n" +
+	"\x06column\x18\x02 \x01(\rR\x06column\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\"X\n" +
+	"\rWsContentFile\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x123\n" +
+	"\amatches\x18\x02 \x03(\v2\x19.remote.v1.WsContentMatchR\amatches\"\xc9\x01\n" +
+	"\x14WsFindContentsResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12.\n" +
+	"\x05files\x18\x02 \x03(\v2\x18.remote.v1.WsContentFileR\x05files\x12#\n" +
+	"\rtotal_matches\x18\x03 \x01(\rR\ftotalMatches\x12\x1c\n" +
+	"\ttruncated\x18\x04 \x01(\bR\ttruncated\x12\x1b\n" +
+	"\ttimed_out\x18\x05 \x01(\bR\btimedOut\"<\n" +
+	"\aWsWatch\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x0e\n" +
+	"\x02on\x18\x02 \x01(\bR\x02on\"\x8a\x01\n" +
+	"\tWsChanged\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04dirs\x18\x02 \x03(\tR\x04dirs\x12\x1a\n" +
+	"\boverflow\x18\x03 \x01(\bR\boverflow\x12\x10\n" +
+	"\x03git\x18\x04 \x01(\bR\x03git\x12\x18\n" +
+	"\apolling\x18\x05 \x01(\bR\apolling\"0\n" +
+	"\vWsGitStatus\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\xfa\x01\n" +
+	"\n" +
+	"WsGitEntry\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x19\n" +
+	"\bold_path\x18\x02 \x01(\tR\aoldPath\x12(\n" +
+	"\x04area\x18\x03 \x01(\x0e2\x14.remote.v1.WsGitAreaR\x04area\x12-\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x17.remote.v1.GitFileStateR\x05state\x12\x14\n" +
+	"\x05added\x18\x05 \x01(\rR\x05added\x12\x18\n" +
+	"\aremoved\x18\x06 \x01(\rR\aremoved\x12\x16\n" +
+	"\x06binary\x18\a \x01(\bR\x06binary\x12\x1c\n" +
+	"\tsensitive\x18\b \x01(\bR\tsensitive\"Q\n" +
+	"\rWsGitUpstream\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05ahead\x18\x02 \x01(\rR\x05ahead\x12\x16\n" +
+	"\x06behind\x18\x03 \x01(\rR\x06behind\"\xf9\x01\n" +
+	"\x11WsGitStatusResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x10\n" +
+	"\x03git\x18\x02 \x01(\bR\x03git\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch\x12\x12\n" +
+	"\x04head\x18\x04 \x01(\tR\x04head\x124\n" +
+	"\bupstream\x18\x05 \x01(\v2\x18.remote.v1.WsGitUpstreamR\bupstream\x12/\n" +
+	"\aentries\x18\x06 \x03(\v2\x15.remote.v1.WsGitEntryR\aentries\x12\x1c\n" +
+	"\ttruncated\x18\a \x01(\bR\ttruncated\"\xbd\x01\n" +
+	"\tWsGitDiff\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x19\n" +
+	"\bold_path\x18\x03 \x01(\tR\aoldPath\x122\n" +
+	"\x06source\x18\x04 \x01(\x0e2\x1a.remote.v1.WsGitDiffSourceR\x06source\x12\x16\n" +
+	"\x06commit\x18\x05 \x01(\tR\x06commit\x12\x12\n" +
+	"\x04base\x18\x06 \x01(\tR\x04base\"b\n" +
+	"\x0fWsGitDiffResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12,\n" +
+	"\x04file\x18\x02 \x01(\v2\x18.remote.v1.GitFileChangeR\x04file\"\x84\x01\n" +
+	"\n" +
+	"WsGitStage\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x10\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all\x12+\n" +
+	"\x11confirm_sensitive\x18\x04 \x03(\tR\x10confirmSensitive\"Y\n" +
+	"\fWsGitUnstage\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x10\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all\"a\n" +
+	"\fWsGitDiscard\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\x12\x18\n" +
+	"\aconfirm\x18\x03 \x01(\bR\aconfirm\"\x9e\x01\n" +
+	"\vWsGitCommit\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12%\n" +
+	"\x0eallow_detached\x18\x03 \x01(\bR\rallowDetached\x12+\n" +
+	"\x11confirm_sensitive\x18\x04 \x03(\tR\x10confirmSensitive\"w\n" +
+	"\rWsGitLogEntry\x12\x10\n" +
+	"\x03oid\x18\x01 \x01(\tR\x03oid\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x16\n" +
+	"\x06author\x18\x03 \x01(\tR\x06author\x12\x0e\n" +
+	"\x02at\x18\x04 \x01(\x03R\x02at\x12\x12\n" +
+	"\x04refs\x18\x05 \x03(\tR\x04refs\"h\n" +
+	"\x11WsGitCommitResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x120\n" +
+	"\x06commit\x18\x02 \x01(\v2\x18.remote.v1.WsGitLogEntryR\x06commit\"2\n" +
+	"\rWsGitBranches\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"\x7f\n" +
+	"\vWsGitBranch\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bupstream\x18\x02 \x01(\tR\bupstream\x12\x14\n" +
+	"\x05ahead\x18\x03 \x01(\rR\x05ahead\x12\x16\n" +
+	"\x06behind\x18\x04 \x01(\rR\x06behind\x12\x12\n" +
+	"\x04gone\x18\x05 \x01(\bR\x04gone\"\x98\x01\n" +
+	"\x13WsGitBranchesResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x18\n" +
+	"\acurrent\x18\x02 \x01(\tR\acurrent\x12,\n" +
+	"\x05local\x18\x03 \x03(\v2\x16.remote.v1.WsGitBranchR\x05local\x12\x16\n" +
+	"\x06remote\x18\x04 \x03(\tR\x06remote\"J\n" +
+	"\rWsGitCheckout\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x16\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\"\x87\x01\n" +
+	"\x11WsGitBranchCreate\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vstart_point\x18\x03 \x01(\tR\n" +
+	"startPoint\x12\x1a\n" +
+	"\bcheckout\x18\x04 \x01(\bR\bcheckout\"/\n" +
+	"\n" +
+	"WsGitFetch\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\".\n" +
+	"\tWsGitPull\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\".\n" +
+	"\tWsGitPush\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"i\n" +
+	"\bWsGitLog\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x10\n" +
+	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x12\n" +
+	"\x04skip\x18\x03 \x01(\rR\x04skip\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\rR\x05limit\"\x82\x01\n" +
+	"\x0eWsGitLogResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x122\n" +
+	"\acommits\x18\x02 \x03(\v2\x18.remote.v1.WsGitLogEntryR\acommits\x12\x19\n" +
+	"\bhas_more\x18\x03 \x01(\bR\ahasMore\"K\n" +
+	"\x12WsGitBranchCompare\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04base\x18\x02 \x01(\tR\x04base\"\xe9\x01\n" +
+	"\x18WsGitBranchCompareResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04base\x18\x02 \x01(\tR\x04base\x12\x1d\n" +
+	"\n" +
+	"merge_base\x18\x03 \x01(\tR\tmergeBase\x12\x14\n" +
+	"\x05ahead\x18\x04 \x01(\rR\x05ahead\x12\x16\n" +
+	"\x06behind\x18\x05 \x01(\rR\x06behind\x12+\n" +
+	"\x05files\x18\x06 \x03(\v2\x15.remote.v1.WsGitEntryR\x05files\x12\x1c\n" +
+	"\ttruncated\x18\a \x01(\bR\ttruncated\"C\n" +
+	"\n" +
+	"WsGitPrUrl\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04base\x18\x02 \x01(\tR\x04base\"c\n" +
+	"\x10WsGitPrUrlResult\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x1a\n" +
+	"\bprovider\x18\x03 \x01(\tR\bprovider*\x99\x03\n" +
 	"\x12HandshakeErrorCode\x12$\n" +
 	" HANDSHAKE_ERROR_CODE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#HANDSHAKE_ERROR_CODE_UNKNOWN_DEVICE\x10\x01\x12,\n" +
@@ -15856,7 +19574,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14DECISION_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eDECISION_ALLOW\x10\x01\x12\x1a\n" +
 	"\x16DECISION_ALLOW_SESSION\x10\x02\x12\x11\n" +
-	"\rDECISION_DENY\x10\x03*\xaa\x10\n" +
+	"\rDECISION_DENY\x10\x03*\xb4\x14\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -15916,7 +19634,21 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x18ERROR_REASON_UPDATE_BUSY\x106\x12%\n" +
 	"!ERROR_REASON_TERMINAL_UNAVAILABLE\x107\x12'\n" +
 	"#ERROR_REASON_TERMINAL_SESSION_LIMIT\x108\x12+\n" +
-	"'ERROR_REASON_TERMINAL_SESSION_NOT_FOUND\x109*\xfe\x01\n" +
+	"'ERROR_REASON_TERMINAL_SESSION_NOT_FOUND\x109\x12\x1c\n" +
+	"\x18ERROR_REASON_SECRET_FILE\x10:\x12\"\n" +
+	"\x1eERROR_REASON_GIT_UNSAFE_CONFIG\x10;\x12&\n" +
+	"\"ERROR_REASON_GIT_NEEDS_CREDENTIALS\x10<\x12\x1b\n" +
+	"\x17ERROR_REASON_GIT_FAILED\x10=\x12\x19\n" +
+	"\x15ERROR_REASON_GIT_BUSY\x10>\x12%\n" +
+	"!ERROR_REASON_NOT_A_GIT_REPOSITORY\x10?\x12&\n" +
+	"\"ERROR_REASON_DISCARD_NOT_CONFIRMED\x10@\x12!\n" +
+	"\x1dERROR_REASON_FOLDER_TOO_LARGE\x10A\x12 \n" +
+	"\x1cERROR_REASON_GIT_LFS_MISSING\x10B\x12.\n" +
+	"*ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT\x10C\x12#\n" +
+	"\x1fERROR_REASON_GIT_COMMIT_SIGNING\x10D\x12*\n" +
+	"&ERROR_REASON_GIT_OPERATION_IN_PROGRESS\x10E\x12\"\n" +
+	"\x1eERROR_REASON_GIT_DETACHED_HEAD\x10F\x12-\n" +
+	")ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED\x10G*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +
@@ -15990,7 +19722,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"!TERMINAL_AVAILABILITY_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fTERMINAL_AVAILABILITY_AVAILABLE\x10\x01\x12!\n" +
 	"\x1dTERMINAL_AVAILABILITY_MISSING\x10\x02\x12&\n" +
-	"\"TERMINAL_AVAILABILITY_INCOMPATIBLE\x10\x03*\xdf\x01\n" +
+	"\"TERMINAL_AVAILABILITY_INCOMPATIBLE\x10\x03*\xfb\x01\n" +
 	"\fGitFileState\x12\x1e\n" +
 	"\x1aGIT_FILE_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17GIT_FILE_STATE_MODIFIED\x10\x01\x12\x18\n" +
@@ -15998,7 +19730,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x16GIT_FILE_STATE_DELETED\x10\x03\x12\x1c\n" +
 	"\x18GIT_FILE_STATE_UNTRACKED\x10\x04\x12\x1f\n" +
 	"\x1bGIT_FILE_STATE_TYPE_CHANGED\x10\x05\x12\x1d\n" +
-	"\x19GIT_FILE_STATE_CONFLICTED\x10\x06*\xa9\x01\n" +
+	"\x19GIT_FILE_STATE_CONFLICTED\x10\x06\x12\x1a\n" +
+	"\x16GIT_FILE_STATE_RENAMED\x10\a*\xa9\x01\n" +
 	"\x10BrowserMouseType\x12\"\n" +
 	"\x1eBROWSER_MOUSE_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17BROWSER_MOUSE_TYPE_MOVE\x10\x01\x12\x1b\n" +
@@ -16030,7 +19763,26 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14TERM_PATH_CONNECTING\x10\x01\x12\x14\n" +
 	"\x10TERM_PATH_DIRECT\x10\x02\x12\x13\n" +
 	"\x0fTERM_PATH_RELAY\x10\x03\x12\x14\n" +
-	"\x10TERM_PATH_CLOSED\x10\x04B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
+	"\x10TERM_PATH_CLOSED\x10\x04*\x8e\x01\n" +
+	"\n" +
+	"WsFileKind\x12\x1c\n" +
+	"\x18WS_FILE_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11WS_FILE_KIND_TEXT\x10\x01\x12\x16\n" +
+	"\x12WS_FILE_KIND_IMAGE\x10\x02\x12\x17\n" +
+	"\x13WS_FILE_KIND_BINARY\x10\x03\x12\x1a\n" +
+	"\x16WS_FILE_KIND_TOO_LARGE\x10\x04*\x91\x01\n" +
+	"\tWsGitArea\x12\x1b\n" +
+	"\x17WS_GIT_AREA_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12WS_GIT_AREA_STAGED\x10\x01\x12\x18\n" +
+	"\x14WS_GIT_AREA_UNSTAGED\x10\x02\x12\x19\n" +
+	"\x15WS_GIT_AREA_UNTRACKED\x10\x03\x12\x1a\n" +
+	"\x16WS_GIT_AREA_CONFLICTED\x10\x04*\xb3\x01\n" +
+	"\x0fWsGitDiffSource\x12\"\n" +
+	"\x1eWS_GIT_DIFF_SOURCE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bWS_GIT_DIFF_SOURCE_UNSTAGED\x10\x01\x12\x1d\n" +
+	"\x19WS_GIT_DIFF_SOURCE_STAGED\x10\x02\x12\x1d\n" +
+	"\x19WS_GIT_DIFF_SOURCE_COMMIT\x10\x03\x12\x1d\n" +
+	"\x19WS_GIT_DIFF_SOURCE_BRANCH\x10\x04B)Z'app.local/server/gen/remote/v1;remotev1b\x06proto3"
 
 var (
 	file_remote_v1_remote_proto_rawDescOnce sync.Once
@@ -16044,8 +19796,8 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 	return file_remote_v1_remote_proto_rawDescData
 }
 
-var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 20)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 174)
+var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 23)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 213)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                    // 1: remote.v1.Decision
@@ -16067,396 +19819,485 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(AgentUpdatePhase)(0),            // 17: remote.v1.AgentUpdatePhase
 	(TermSignalKind)(0),              // 18: remote.v1.TermSignalKind
 	(TermPath)(0),                    // 19: remote.v1.TermPath
-	(*Plain)(nil),                    // 20: remote.v1.Plain
-	(*Hello)(nil),                    // 21: remote.v1.Hello
-	(*Ready)(nil),                    // 22: remote.v1.Ready
-	(*PakeStart)(nil),                // 23: remote.v1.PakeStart
-	(*PakeReply)(nil),                // 24: remote.v1.PakeReply
-	(*PakeCandidate)(nil),            // 25: remote.v1.PakeCandidate
-	(*PakeFinish)(nil),               // 26: remote.v1.PakeFinish
-	(*HandshakeError)(nil),           // 27: remote.v1.HandshakeError
-	(*Frame)(nil),                    // 28: remote.v1.Frame
-	(*ThreadList)(nil),               // 29: remote.v1.ThreadList
-	(*ThreadCreate)(nil),             // 30: remote.v1.ThreadCreate
-	(*Consent)(nil),                  // 31: remote.v1.Consent
-	(*ThreadSend)(nil),               // 32: remote.v1.ThreadSend
-	(*ThreadSubscribe)(nil),          // 33: remote.v1.ThreadSubscribe
-	(*ThreadRespond)(nil),            // 34: remote.v1.ThreadRespond
-	(*Answers)(nil),                  // 35: remote.v1.Answers
-	(*Answer)(nil),                   // 36: remote.v1.Answer
-	(*ThreadInterrupt)(nil),          // 37: remote.v1.ThreadInterrupt
-	(*ThreadClose)(nil),              // 38: remote.v1.ThreadClose
-	(*ThreadDelete)(nil),             // 39: remote.v1.ThreadDelete
-	(*ThreadSetArchived)(nil),        // 40: remote.v1.ThreadSetArchived
-	(*ThreadSetModel)(nil),           // 41: remote.v1.ThreadSetModel
-	(*ThreadSetPermissionMode)(nil),  // 42: remote.v1.ThreadSetPermissionMode
-	(*ThreadSetEffort)(nil),          // 43: remote.v1.ThreadSetEffort
-	(*ThreadSwitch)(nil),             // 44: remote.v1.ThreadSwitch
-	(*ThreadFetchFull)(nil),          // 45: remote.v1.ThreadFetchFull
-	(*ThreadGitChanges)(nil),         // 46: remote.v1.ThreadGitChanges
-	(*GitFileDiff)(nil),              // 47: remote.v1.GitFileDiff
-	(*MachineInfoRequest)(nil),       // 48: remote.v1.MachineInfoRequest
-	(*Ping)(nil),                     // 49: remote.v1.Ping
-	(*DirList)(nil),                  // 50: remote.v1.DirList
-	(*AuditList)(nil),                // 51: remote.v1.AuditList
-	(*FileList)(nil),                 // 52: remote.v1.FileList
-	(*SessionList)(nil),              // 53: remote.v1.SessionList
-	(*LocalSession)(nil),             // 54: remote.v1.LocalSession
-	(*SessionDir)(nil),               // 55: remote.v1.SessionDir
-	(*SessionListResult)(nil),        // 56: remote.v1.SessionListResult
-	(*SessionOpen)(nil),              // 57: remote.v1.SessionOpen
-	(*AttachmentUpload)(nil),         // 58: remote.v1.AttachmentUpload
-	(*AttachmentCancel)(nil),         // 59: remote.v1.AttachmentCancel
-	(*AttachmentFetch)(nil),          // 60: remote.v1.AttachmentFetch
-	(*AttachmentData)(nil),           // 61: remote.v1.AttachmentData
-	(*Attachment)(nil),               // 62: remote.v1.Attachment
-	(*AttachmentLimits)(nil),         // 63: remote.v1.AttachmentLimits
-	(*ProjectList)(nil),              // 64: remote.v1.ProjectList
-	(*ProjectAdd)(nil),               // 65: remote.v1.ProjectAdd
-	(*ProjectCreate)(nil),            // 66: remote.v1.ProjectCreate
-	(*ProjectClone)(nil),             // 67: remote.v1.ProjectClone
-	(*ProjectCloneCancel)(nil),       // 68: remote.v1.ProjectCloneCancel
-	(*ProjectCloneProgress)(nil),     // 69: remote.v1.ProjectCloneProgress
-	(*ProjectUpdate)(nil),            // 70: remote.v1.ProjectUpdate
-	(*ProjectReorder)(nil),           // 71: remote.v1.ProjectReorder
-	(*ProjectRemove)(nil),            // 72: remote.v1.ProjectRemove
-	(*ProjectDefaults)(nil),          // 73: remote.v1.ProjectDefaults
-	(*GitStatus)(nil),                // 74: remote.v1.GitStatus
-	(*Project)(nil),                  // 75: remote.v1.Project
-	(*ProjectSuggestion)(nil),        // 76: remote.v1.ProjectSuggestion
-	(*ProjectListResult)(nil),        // 77: remote.v1.ProjectListResult
-	(*ProfileList)(nil),              // 78: remote.v1.ProfileList
-	(*ProfileSelect)(nil),            // 79: remote.v1.ProfileSelect
-	(*ProfileSignInBegin)(nil),       // 80: remote.v1.ProfileSignInBegin
-	(*ProfileSignInCode)(nil),        // 81: remote.v1.ProfileSignInCode
-	(*ProfileSignInCancel)(nil),      // 82: remote.v1.ProfileSignInCancel
-	(*ProfileRemove)(nil),            // 83: remote.v1.ProfileRemove
-	(*UsageRefresh)(nil),             // 84: remote.v1.UsageRefresh
-	(*MachineSettingsSet)(nil),       // 85: remote.v1.MachineSettingsSet
-	(*OpenDiskAccessSettings)(nil),   // 86: remote.v1.OpenDiskAccessSettings
-	(*Ack)(nil),                      // 87: remote.v1.Ack
-	(*ThreadInfo)(nil),               // 88: remote.v1.ThreadInfo
-	(*ProfileSuggestion)(nil),        // 89: remote.v1.ProfileSuggestion
-	(*AccountInfo)(nil),              // 90: remote.v1.AccountInfo
-	(*SlashCommand)(nil),             // 91: remote.v1.SlashCommand
-	(*RateLimits)(nil),               // 92: remote.v1.RateLimits
-	(*RateWindow)(nil),               // 93: remote.v1.RateWindow
-	(*ClaudeProfile)(nil),            // 94: remote.v1.ClaudeProfile
-	(*ProfileListResult)(nil),        // 95: remote.v1.ProfileListResult
-	(*MachineProfile)(nil),           // 96: remote.v1.MachineProfile
-	(*SessionProfile)(nil),           // 97: remote.v1.SessionProfile
-	(*ProfileSignInPrompt)(nil),      // 98: remote.v1.ProfileSignInPrompt
-	(*ProfileSignInResult)(nil),      // 99: remote.v1.ProfileSignInResult
-	(*Pong)(nil),                     // 100: remote.v1.Pong
-	(*Error)(nil),                    // 101: remote.v1.Error
-	(*Cursor)(nil),                   // 102: remote.v1.Cursor
-	(*ThreadSummary)(nil),            // 103: remote.v1.ThreadSummary
-	(*ThreadActivity)(nil),           // 104: remote.v1.ThreadActivity
-	(*ThreadListResult)(nil),         // 105: remote.v1.ThreadListResult
-	(*ThreadCreated)(nil),            // 106: remote.v1.ThreadCreated
-	(*ThreadDeleted)(nil),            // 107: remote.v1.ThreadDeleted
-	(*ThreadStatus)(nil),             // 108: remote.v1.ThreadStatus
-	(*ThreadItems)(nil),              // 109: remote.v1.ThreadItems
-	(*ThreadReset)(nil),              // 110: remote.v1.ThreadReset
-	(*FullItem)(nil),                 // 111: remote.v1.FullItem
-	(*Item)(nil),                     // 112: remote.v1.Item
-	(*TextItem)(nil),                 // 113: remote.v1.TextItem
-	(*ToolCallItem)(nil),             // 114: remote.v1.ToolCallItem
-	(*ToolResultItem)(nil),           // 115: remote.v1.ToolResultItem
-	(*DiffItem)(nil),                 // 116: remote.v1.DiffItem
-	(*TodoItem)(nil),                 // 117: remote.v1.TodoItem
-	(*TodoEntry)(nil),                // 118: remote.v1.TodoEntry
-	(*ApprovalItem)(nil),             // 119: remote.v1.ApprovalItem
-	(*ApprovalSecret)(nil),           // 120: remote.v1.ApprovalSecret
-	(*QuestionItem)(nil),             // 121: remote.v1.QuestionItem
-	(*Question)(nil),                 // 122: remote.v1.Question
-	(*QuestionOption)(nil),           // 123: remote.v1.QuestionOption
-	(*StatusItem)(nil),               // 124: remote.v1.StatusItem
-	(*TurnItem)(nil),                 // 125: remote.v1.TurnItem
-	(*SubagentItem)(nil),             // 126: remote.v1.SubagentItem
-	(*CompactionItem)(nil),           // 127: remote.v1.CompactionItem
-	(*ErrorItem)(nil),                // 128: remote.v1.ErrorItem
-	(*ModelChangeItem)(nil),          // 129: remote.v1.ModelChangeItem
-	(*AgentHandoffItem)(nil),         // 130: remote.v1.AgentHandoffItem
-	(*ProviderCapabilities)(nil),     // 131: remote.v1.ProviderCapabilities
-	(*ModelOption)(nil),              // 132: remote.v1.ModelOption
-	(*ProviderInfo)(nil),             // 133: remote.v1.ProviderInfo
-	(*MachineInfo)(nil),              // 134: remote.v1.MachineInfo
-	(*RemoteBrowserInfo)(nil),        // 135: remote.v1.RemoteBrowserInfo
-	(*MachineSettings)(nil),          // 136: remote.v1.MachineSettings
-	(*PairedDevice)(nil),             // 137: remote.v1.PairedDevice
-	(*DirListResult)(nil),            // 138: remote.v1.DirListResult
-	(*DirEntry)(nil),                 // 139: remote.v1.DirEntry
-	(*FileListResult)(nil),           // 140: remote.v1.FileListResult
-	(*FileEntry)(nil),                // 141: remote.v1.FileEntry
-	(*AuditListResult)(nil),          // 142: remote.v1.AuditListResult
-	(*AuditEntry)(nil),               // 143: remote.v1.AuditEntry
-	(*SecretProvide)(nil),            // 144: remote.v1.SecretProvide
-	(*SecretDecline)(nil),            // 145: remote.v1.SecretDecline
-	(*SecretList)(nil),               // 146: remote.v1.SecretList
-	(*SecretRemove)(nil),             // 147: remote.v1.SecretRemove
-	(*SecretPrompt)(nil),             // 148: remote.v1.SecretPrompt
-	(*SecretPromptEnded)(nil),        // 149: remote.v1.SecretPromptEnded
-	(*SecretListResult)(nil),         // 150: remote.v1.SecretListResult
-	(*SavedSecret)(nil),              // 151: remote.v1.SavedSecret
-	(*GitChanges)(nil),               // 152: remote.v1.GitChanges
-	(*GitFileChange)(nil),            // 153: remote.v1.GitFileChange
-	(*GitFileDiffResult)(nil),        // 154: remote.v1.GitFileDiffResult
-	(*BrowserControl)(nil),           // 155: remote.v1.BrowserControl
-	(*BrowserView)(nil),              // 156: remote.v1.BrowserView
-	(*BrowserInput)(nil),             // 157: remote.v1.BrowserInput
-	(*BrowserMouse)(nil),             // 158: remote.v1.BrowserMouse
-	(*BrowserKey)(nil),               // 159: remote.v1.BrowserKey
-	(*BrowserTakeoverEnd)(nil),       // 160: remote.v1.BrowserTakeoverEnd
-	(*BrowserTakeover)(nil),          // 161: remote.v1.BrowserTakeover
-	(*BrowserTakeoverEnded)(nil),     // 162: remote.v1.BrowserTakeoverEnded
-	(*BrowserFrame)(nil),             // 163: remote.v1.BrowserFrame
-	(*BrowserState)(nil),             // 164: remote.v1.BrowserState
-	(*BrowserTab)(nil),               // 165: remote.v1.BrowserTab
-	(*PasskeyNotice)(nil),            // 166: remote.v1.PasskeyNotice
-	(*ScreenShareStatusRequest)(nil), // 167: remote.v1.ScreenShareStatusRequest
-	(*ScreenShareStatus)(nil),        // 168: remote.v1.ScreenShareStatus
-	(*ScreenShareOpen)(nil),          // 169: remote.v1.ScreenShareOpen
-	(*ScreenShareOpened)(nil),        // 170: remote.v1.ScreenShareOpened
-	(*ScreenShareData)(nil),          // 171: remote.v1.ScreenShareData
-	(*ScreenShareClose)(nil),         // 172: remote.v1.ScreenShareClose
-	(*ScreenShareClosed)(nil),        // 173: remote.v1.ScreenShareClosed
-	(*BrowserClear)(nil),             // 174: remote.v1.BrowserClear
-	(*TotpSet)(nil),                  // 175: remote.v1.TotpSet
-	(*TotpStatusRequest)(nil),        // 176: remote.v1.TotpStatusRequest
-	(*TotpStatus)(nil),               // 177: remote.v1.TotpStatus
-	(*AgentUpdateInfo)(nil),          // 178: remote.v1.AgentUpdateInfo
-	(*AgentUpdateCheck)(nil),         // 179: remote.v1.AgentUpdateCheck
-	(*AgentUpdateStart)(nil),         // 180: remote.v1.AgentUpdateStart
-	(*AgentUpdateProgress)(nil),      // 181: remote.v1.AgentUpdateProgress
-	(*TermListRequest)(nil),          // 182: remote.v1.TermListRequest
-	(*TermSessionInfo)(nil),          // 183: remote.v1.TermSessionInfo
-	(*TermListResult)(nil),           // 184: remote.v1.TermListResult
-	(*TermOpen)(nil),                 // 185: remote.v1.TermOpen
-	(*TermAiSession)(nil),            // 186: remote.v1.TermAiSession
-	(*TermOpened)(nil),               // 187: remote.v1.TermOpened
-	(*TermClose)(nil),                // 188: remote.v1.TermClose
-	(*TermClosed)(nil),               // 189: remote.v1.TermClosed
-	(*TermResize)(nil),               // 190: remote.v1.TermResize
-	(*TermSignal)(nil),               // 191: remote.v1.TermSignal
-	(*TermData)(nil),                 // 192: remote.v1.TermData
-	(*TermStatus)(nil),               // 193: remote.v1.TermStatus
+	(WsFileKind)(0),                  // 20: remote.v1.WsFileKind
+	(WsGitArea)(0),                   // 21: remote.v1.WsGitArea
+	(WsGitDiffSource)(0),             // 22: remote.v1.WsGitDiffSource
+	(*Plain)(nil),                    // 23: remote.v1.Plain
+	(*Hello)(nil),                    // 24: remote.v1.Hello
+	(*Ready)(nil),                    // 25: remote.v1.Ready
+	(*PakeStart)(nil),                // 26: remote.v1.PakeStart
+	(*PakeReply)(nil),                // 27: remote.v1.PakeReply
+	(*PakeCandidate)(nil),            // 28: remote.v1.PakeCandidate
+	(*PakeFinish)(nil),               // 29: remote.v1.PakeFinish
+	(*HandshakeError)(nil),           // 30: remote.v1.HandshakeError
+	(*Frame)(nil),                    // 31: remote.v1.Frame
+	(*ThreadList)(nil),               // 32: remote.v1.ThreadList
+	(*ThreadCreate)(nil),             // 33: remote.v1.ThreadCreate
+	(*Consent)(nil),                  // 34: remote.v1.Consent
+	(*ThreadSend)(nil),               // 35: remote.v1.ThreadSend
+	(*ThreadSubscribe)(nil),          // 36: remote.v1.ThreadSubscribe
+	(*ThreadRespond)(nil),            // 37: remote.v1.ThreadRespond
+	(*Answers)(nil),                  // 38: remote.v1.Answers
+	(*Answer)(nil),                   // 39: remote.v1.Answer
+	(*ThreadInterrupt)(nil),          // 40: remote.v1.ThreadInterrupt
+	(*ThreadClose)(nil),              // 41: remote.v1.ThreadClose
+	(*ThreadDelete)(nil),             // 42: remote.v1.ThreadDelete
+	(*ThreadSetArchived)(nil),        // 43: remote.v1.ThreadSetArchived
+	(*ThreadSetModel)(nil),           // 44: remote.v1.ThreadSetModel
+	(*ThreadSetPermissionMode)(nil),  // 45: remote.v1.ThreadSetPermissionMode
+	(*ThreadSetEffort)(nil),          // 46: remote.v1.ThreadSetEffort
+	(*ThreadSwitch)(nil),             // 47: remote.v1.ThreadSwitch
+	(*ThreadFetchFull)(nil),          // 48: remote.v1.ThreadFetchFull
+	(*ThreadGitChanges)(nil),         // 49: remote.v1.ThreadGitChanges
+	(*GitFileDiff)(nil),              // 50: remote.v1.GitFileDiff
+	(*MachineInfoRequest)(nil),       // 51: remote.v1.MachineInfoRequest
+	(*Ping)(nil),                     // 52: remote.v1.Ping
+	(*DirList)(nil),                  // 53: remote.v1.DirList
+	(*AuditList)(nil),                // 54: remote.v1.AuditList
+	(*FileList)(nil),                 // 55: remote.v1.FileList
+	(*SessionList)(nil),              // 56: remote.v1.SessionList
+	(*LocalSession)(nil),             // 57: remote.v1.LocalSession
+	(*SessionDir)(nil),               // 58: remote.v1.SessionDir
+	(*SessionListResult)(nil),        // 59: remote.v1.SessionListResult
+	(*SessionOpen)(nil),              // 60: remote.v1.SessionOpen
+	(*AttachmentUpload)(nil),         // 61: remote.v1.AttachmentUpload
+	(*AttachmentCancel)(nil),         // 62: remote.v1.AttachmentCancel
+	(*AttachmentFetch)(nil),          // 63: remote.v1.AttachmentFetch
+	(*AttachmentData)(nil),           // 64: remote.v1.AttachmentData
+	(*Attachment)(nil),               // 65: remote.v1.Attachment
+	(*AttachmentLimits)(nil),         // 66: remote.v1.AttachmentLimits
+	(*ProjectList)(nil),              // 67: remote.v1.ProjectList
+	(*ProjectAdd)(nil),               // 68: remote.v1.ProjectAdd
+	(*ProjectCreate)(nil),            // 69: remote.v1.ProjectCreate
+	(*ProjectClone)(nil),             // 70: remote.v1.ProjectClone
+	(*ProjectCloneCancel)(nil),       // 71: remote.v1.ProjectCloneCancel
+	(*ProjectCloneProgress)(nil),     // 72: remote.v1.ProjectCloneProgress
+	(*ProjectUpdate)(nil),            // 73: remote.v1.ProjectUpdate
+	(*ProjectReorder)(nil),           // 74: remote.v1.ProjectReorder
+	(*ProjectRemove)(nil),            // 75: remote.v1.ProjectRemove
+	(*ProjectDefaults)(nil),          // 76: remote.v1.ProjectDefaults
+	(*GitStatus)(nil),                // 77: remote.v1.GitStatus
+	(*Project)(nil),                  // 78: remote.v1.Project
+	(*ProjectSuggestion)(nil),        // 79: remote.v1.ProjectSuggestion
+	(*ProjectListResult)(nil),        // 80: remote.v1.ProjectListResult
+	(*ProfileList)(nil),              // 81: remote.v1.ProfileList
+	(*ProfileSelect)(nil),            // 82: remote.v1.ProfileSelect
+	(*ProfileSignInBegin)(nil),       // 83: remote.v1.ProfileSignInBegin
+	(*ProfileSignInCode)(nil),        // 84: remote.v1.ProfileSignInCode
+	(*ProfileSignInCancel)(nil),      // 85: remote.v1.ProfileSignInCancel
+	(*ProfileRemove)(nil),            // 86: remote.v1.ProfileRemove
+	(*UsageRefresh)(nil),             // 87: remote.v1.UsageRefresh
+	(*MachineSettingsSet)(nil),       // 88: remote.v1.MachineSettingsSet
+	(*OpenDiskAccessSettings)(nil),   // 89: remote.v1.OpenDiskAccessSettings
+	(*Ack)(nil),                      // 90: remote.v1.Ack
+	(*ThreadInfo)(nil),               // 91: remote.v1.ThreadInfo
+	(*ProfileSuggestion)(nil),        // 92: remote.v1.ProfileSuggestion
+	(*AccountInfo)(nil),              // 93: remote.v1.AccountInfo
+	(*SlashCommand)(nil),             // 94: remote.v1.SlashCommand
+	(*RateLimits)(nil),               // 95: remote.v1.RateLimits
+	(*RateWindow)(nil),               // 96: remote.v1.RateWindow
+	(*ClaudeProfile)(nil),            // 97: remote.v1.ClaudeProfile
+	(*ProfileListResult)(nil),        // 98: remote.v1.ProfileListResult
+	(*MachineProfile)(nil),           // 99: remote.v1.MachineProfile
+	(*SessionProfile)(nil),           // 100: remote.v1.SessionProfile
+	(*ProfileSignInPrompt)(nil),      // 101: remote.v1.ProfileSignInPrompt
+	(*ProfileSignInResult)(nil),      // 102: remote.v1.ProfileSignInResult
+	(*Pong)(nil),                     // 103: remote.v1.Pong
+	(*Error)(nil),                    // 104: remote.v1.Error
+	(*Cursor)(nil),                   // 105: remote.v1.Cursor
+	(*ThreadSummary)(nil),            // 106: remote.v1.ThreadSummary
+	(*ThreadActivity)(nil),           // 107: remote.v1.ThreadActivity
+	(*ThreadListResult)(nil),         // 108: remote.v1.ThreadListResult
+	(*ThreadCreated)(nil),            // 109: remote.v1.ThreadCreated
+	(*ThreadDeleted)(nil),            // 110: remote.v1.ThreadDeleted
+	(*ThreadStatus)(nil),             // 111: remote.v1.ThreadStatus
+	(*ThreadItems)(nil),              // 112: remote.v1.ThreadItems
+	(*ThreadReset)(nil),              // 113: remote.v1.ThreadReset
+	(*FullItem)(nil),                 // 114: remote.v1.FullItem
+	(*Item)(nil),                     // 115: remote.v1.Item
+	(*TextItem)(nil),                 // 116: remote.v1.TextItem
+	(*ToolCallItem)(nil),             // 117: remote.v1.ToolCallItem
+	(*ToolResultItem)(nil),           // 118: remote.v1.ToolResultItem
+	(*DiffItem)(nil),                 // 119: remote.v1.DiffItem
+	(*TodoItem)(nil),                 // 120: remote.v1.TodoItem
+	(*TodoEntry)(nil),                // 121: remote.v1.TodoEntry
+	(*ApprovalItem)(nil),             // 122: remote.v1.ApprovalItem
+	(*ApprovalSecret)(nil),           // 123: remote.v1.ApprovalSecret
+	(*QuestionItem)(nil),             // 124: remote.v1.QuestionItem
+	(*Question)(nil),                 // 125: remote.v1.Question
+	(*QuestionOption)(nil),           // 126: remote.v1.QuestionOption
+	(*StatusItem)(nil),               // 127: remote.v1.StatusItem
+	(*TurnItem)(nil),                 // 128: remote.v1.TurnItem
+	(*SubagentItem)(nil),             // 129: remote.v1.SubagentItem
+	(*CompactionItem)(nil),           // 130: remote.v1.CompactionItem
+	(*ErrorItem)(nil),                // 131: remote.v1.ErrorItem
+	(*ModelChangeItem)(nil),          // 132: remote.v1.ModelChangeItem
+	(*AgentHandoffItem)(nil),         // 133: remote.v1.AgentHandoffItem
+	(*ProviderCapabilities)(nil),     // 134: remote.v1.ProviderCapabilities
+	(*ModelOption)(nil),              // 135: remote.v1.ModelOption
+	(*ProviderInfo)(nil),             // 136: remote.v1.ProviderInfo
+	(*MachineInfo)(nil),              // 137: remote.v1.MachineInfo
+	(*RemoteBrowserInfo)(nil),        // 138: remote.v1.RemoteBrowserInfo
+	(*MachineSettings)(nil),          // 139: remote.v1.MachineSettings
+	(*PairedDevice)(nil),             // 140: remote.v1.PairedDevice
+	(*DirListResult)(nil),            // 141: remote.v1.DirListResult
+	(*DirEntry)(nil),                 // 142: remote.v1.DirEntry
+	(*FileListResult)(nil),           // 143: remote.v1.FileListResult
+	(*FileEntry)(nil),                // 144: remote.v1.FileEntry
+	(*AuditListResult)(nil),          // 145: remote.v1.AuditListResult
+	(*AuditEntry)(nil),               // 146: remote.v1.AuditEntry
+	(*SecretProvide)(nil),            // 147: remote.v1.SecretProvide
+	(*SecretDecline)(nil),            // 148: remote.v1.SecretDecline
+	(*SecretList)(nil),               // 149: remote.v1.SecretList
+	(*SecretRemove)(nil),             // 150: remote.v1.SecretRemove
+	(*SecretPrompt)(nil),             // 151: remote.v1.SecretPrompt
+	(*SecretPromptEnded)(nil),        // 152: remote.v1.SecretPromptEnded
+	(*SecretListResult)(nil),         // 153: remote.v1.SecretListResult
+	(*SavedSecret)(nil),              // 154: remote.v1.SavedSecret
+	(*GitChanges)(nil),               // 155: remote.v1.GitChanges
+	(*GitFileChange)(nil),            // 156: remote.v1.GitFileChange
+	(*GitFileDiffResult)(nil),        // 157: remote.v1.GitFileDiffResult
+	(*BrowserControl)(nil),           // 158: remote.v1.BrowserControl
+	(*BrowserView)(nil),              // 159: remote.v1.BrowserView
+	(*BrowserInput)(nil),             // 160: remote.v1.BrowserInput
+	(*BrowserMouse)(nil),             // 161: remote.v1.BrowserMouse
+	(*BrowserKey)(nil),               // 162: remote.v1.BrowserKey
+	(*BrowserTakeoverEnd)(nil),       // 163: remote.v1.BrowserTakeoverEnd
+	(*BrowserTakeover)(nil),          // 164: remote.v1.BrowserTakeover
+	(*BrowserTakeoverEnded)(nil),     // 165: remote.v1.BrowserTakeoverEnded
+	(*BrowserFrame)(nil),             // 166: remote.v1.BrowserFrame
+	(*BrowserState)(nil),             // 167: remote.v1.BrowserState
+	(*BrowserTab)(nil),               // 168: remote.v1.BrowserTab
+	(*PasskeyNotice)(nil),            // 169: remote.v1.PasskeyNotice
+	(*ScreenShareStatusRequest)(nil), // 170: remote.v1.ScreenShareStatusRequest
+	(*ScreenShareStatus)(nil),        // 171: remote.v1.ScreenShareStatus
+	(*ScreenShareOpen)(nil),          // 172: remote.v1.ScreenShareOpen
+	(*ScreenShareOpened)(nil),        // 173: remote.v1.ScreenShareOpened
+	(*ScreenShareData)(nil),          // 174: remote.v1.ScreenShareData
+	(*ScreenShareClose)(nil),         // 175: remote.v1.ScreenShareClose
+	(*ScreenShareClosed)(nil),        // 176: remote.v1.ScreenShareClosed
+	(*BrowserClear)(nil),             // 177: remote.v1.BrowserClear
+	(*TotpSet)(nil),                  // 178: remote.v1.TotpSet
+	(*TotpStatusRequest)(nil),        // 179: remote.v1.TotpStatusRequest
+	(*TotpStatus)(nil),               // 180: remote.v1.TotpStatus
+	(*AgentUpdateInfo)(nil),          // 181: remote.v1.AgentUpdateInfo
+	(*AgentUpdateCheck)(nil),         // 182: remote.v1.AgentUpdateCheck
+	(*AgentUpdateStart)(nil),         // 183: remote.v1.AgentUpdateStart
+	(*AgentUpdateProgress)(nil),      // 184: remote.v1.AgentUpdateProgress
+	(*TermListRequest)(nil),          // 185: remote.v1.TermListRequest
+	(*TermSessionInfo)(nil),          // 186: remote.v1.TermSessionInfo
+	(*TermListResult)(nil),           // 187: remote.v1.TermListResult
+	(*TermOpen)(nil),                 // 188: remote.v1.TermOpen
+	(*TermAiSession)(nil),            // 189: remote.v1.TermAiSession
+	(*TermOpened)(nil),               // 190: remote.v1.TermOpened
+	(*TermClose)(nil),                // 191: remote.v1.TermClose
+	(*TermClosed)(nil),               // 192: remote.v1.TermClosed
+	(*TermResize)(nil),               // 193: remote.v1.TermResize
+	(*TermSignal)(nil),               // 194: remote.v1.TermSignal
+	(*TermData)(nil),                 // 195: remote.v1.TermData
+	(*TermStatus)(nil),               // 196: remote.v1.TermStatus
+	(*WsDirList)(nil),                // 197: remote.v1.WsDirList
+	(*WsEntry)(nil),                  // 198: remote.v1.WsEntry
+	(*WsDirListResult)(nil),          // 199: remote.v1.WsDirListResult
+	(*WsFileRead)(nil),               // 200: remote.v1.WsFileRead
+	(*WsFileReadResult)(nil),         // 201: remote.v1.WsFileReadResult
+	(*WsFindNames)(nil),              // 202: remote.v1.WsFindNames
+	(*WsFindNamesResult)(nil),        // 203: remote.v1.WsFindNamesResult
+	(*WsFindContents)(nil),           // 204: remote.v1.WsFindContents
+	(*WsContentMatch)(nil),           // 205: remote.v1.WsContentMatch
+	(*WsContentFile)(nil),            // 206: remote.v1.WsContentFile
+	(*WsFindContentsResult)(nil),     // 207: remote.v1.WsFindContentsResult
+	(*WsWatch)(nil),                  // 208: remote.v1.WsWatch
+	(*WsChanged)(nil),                // 209: remote.v1.WsChanged
+	(*WsGitStatus)(nil),              // 210: remote.v1.WsGitStatus
+	(*WsGitEntry)(nil),               // 211: remote.v1.WsGitEntry
+	(*WsGitUpstream)(nil),            // 212: remote.v1.WsGitUpstream
+	(*WsGitStatusResult)(nil),        // 213: remote.v1.WsGitStatusResult
+	(*WsGitDiff)(nil),                // 214: remote.v1.WsGitDiff
+	(*WsGitDiffResult)(nil),          // 215: remote.v1.WsGitDiffResult
+	(*WsGitStage)(nil),               // 216: remote.v1.WsGitStage
+	(*WsGitUnstage)(nil),             // 217: remote.v1.WsGitUnstage
+	(*WsGitDiscard)(nil),             // 218: remote.v1.WsGitDiscard
+	(*WsGitCommit)(nil),              // 219: remote.v1.WsGitCommit
+	(*WsGitLogEntry)(nil),            // 220: remote.v1.WsGitLogEntry
+	(*WsGitCommitResult)(nil),        // 221: remote.v1.WsGitCommitResult
+	(*WsGitBranches)(nil),            // 222: remote.v1.WsGitBranches
+	(*WsGitBranch)(nil),              // 223: remote.v1.WsGitBranch
+	(*WsGitBranchesResult)(nil),      // 224: remote.v1.WsGitBranchesResult
+	(*WsGitCheckout)(nil),            // 225: remote.v1.WsGitCheckout
+	(*WsGitBranchCreate)(nil),        // 226: remote.v1.WsGitBranchCreate
+	(*WsGitFetch)(nil),               // 227: remote.v1.WsGitFetch
+	(*WsGitPull)(nil),                // 228: remote.v1.WsGitPull
+	(*WsGitPush)(nil),                // 229: remote.v1.WsGitPush
+	(*WsGitLog)(nil),                 // 230: remote.v1.WsGitLog
+	(*WsGitLogResult)(nil),           // 231: remote.v1.WsGitLogResult
+	(*WsGitBranchCompare)(nil),       // 232: remote.v1.WsGitBranchCompare
+	(*WsGitBranchCompareResult)(nil), // 233: remote.v1.WsGitBranchCompareResult
+	(*WsGitPrUrl)(nil),               // 234: remote.v1.WsGitPrUrl
+	(*WsGitPrUrlResult)(nil),         // 235: remote.v1.WsGitPrUrlResult
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
-	21,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
-	22,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
-	23,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
-	24,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
-	26,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
-	27,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
-	25,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
+	24,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
+	25,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
+	26,  // 2: remote.v1.Plain.pake_start:type_name -> remote.v1.PakeStart
+	27,  // 3: remote.v1.Plain.pake_reply:type_name -> remote.v1.PakeReply
+	29,  // 4: remote.v1.Plain.pake_finish:type_name -> remote.v1.PakeFinish
+	30,  // 5: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
+	28,  // 6: remote.v1.PakeReply.candidates:type_name -> remote.v1.PakeCandidate
 	0,   // 7: remote.v1.HandshakeError.code:type_name -> remote.v1.HandshakeErrorCode
-	29,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
-	30,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
-	32,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
-	33,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
-	34,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
-	37,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
-	41,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
-	44,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
-	45,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
-	48,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
-	49,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
-	50,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
-	51,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
-	38,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
-	42,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
-	43,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
-	78,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
-	79,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
-	80,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
-	81,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
-	82,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
-	83,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
-	84,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
-	85,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
-	52,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
-	86,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
-	53,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
-	57,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
-	58,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
-	59,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
-	105, // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
-	106, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
-	109, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
-	108, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
-	110, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
-	111, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
-	134, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
-	100, // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	138, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	142, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
-	87,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
-	101, // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
-	88,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
-	95,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
-	98,  // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
-	99,  // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
-	140, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
-	96,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
-	56,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
-	61,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
-	107, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
-	77,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
-	69,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
-	60,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
-	39,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
-	40,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
-	64,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
-	65,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
-	66,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
-	67,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
-	68,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
-	70,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
-	71,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
-	72,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
-	144, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
-	145, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
-	146, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
-	147, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
-	46,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
-	47,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
-	155, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
-	156, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
-	157, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
-	160, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
-	167, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
-	169, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
-	171, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
-	172, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
-	174, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
-	175, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
-	176, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
-	179, // 89: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
-	180, // 90: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
-	148, // 91: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
-	149, // 92: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
-	150, // 93: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
-	152, // 94: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
-	154, // 95: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
-	161, // 96: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
-	162, // 97: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
-	163, // 98: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
-	164, // 99: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
-	166, // 100: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
-	168, // 101: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
-	170, // 102: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
-	173, // 103: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
-	177, // 104: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
-	181, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
-	182, // 106: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
-	185, // 107: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
-	188, // 108: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
-	190, // 109: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
-	191, // 110: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
-	192, // 111: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
-	184, // 112: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
-	187, // 113: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
-	189, // 114: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
-	193, // 115: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
-	104, // 116: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
-	31,  // 117: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
-	102, // 118: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
-	1,   // 119: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
-	35,  // 120: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
-	36,  // 121: remote.v1.Answers.answers:type_name -> remote.v1.Answer
-	54,  // 122: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
-	55,  // 123: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
-	31,  // 124: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
-	31,  // 125: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
-	2,   // 126: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
-	73,  // 127: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
-	73,  // 128: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
-	74,  // 129: remote.v1.Project.git:type_name -> remote.v1.GitStatus
-	75,  // 130: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
-	76,  // 131: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
-	91,  // 132: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
-	92,  // 133: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
-	90,  // 134: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
-	90,  // 135: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
-	89,  // 136: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
-	93,  // 137: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
-	93,  // 138: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
-	92,  // 139: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
-	94,  // 140: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
-	95,  // 141: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
-	97,  // 142: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
-	3,   // 143: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
-	2,   // 144: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
-	5,   // 145: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
-	4,   // 146: remote.v1.ThreadActivity.phase:type_name -> remote.v1.ActivityPhase
-	103, // 147: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
-	103, // 148: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
-	103, // 149: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
-	112, // 150: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
-	102, // 151: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
-	6,   // 152: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
-	112, // 153: remote.v1.FullItem.item:type_name -> remote.v1.Item
-	113, // 154: remote.v1.Item.text:type_name -> remote.v1.TextItem
-	114, // 155: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
-	115, // 156: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
-	116, // 157: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
-	117, // 158: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
-	121, // 159: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
-	119, // 160: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
-	124, // 161: remote.v1.Item.status:type_name -> remote.v1.StatusItem
-	125, // 162: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
-	126, // 163: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
-	127, // 164: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
-	128, // 165: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
-	129, // 166: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
-	130, // 167: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
-	7,   // 168: remote.v1.TextItem.role:type_name -> remote.v1.Role
-	62,  // 169: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
-	8,   // 170: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
-	118, // 171: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
-	9,   // 172: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
-	8,   // 173: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
-	10,  // 174: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
-	1,   // 175: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
-	120, // 176: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
-	122, // 177: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
-	10,  // 178: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
-	35,  // 179: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
-	123, // 180: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
-	11,  // 181: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
-	132, // 182: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
-	12,  // 183: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
-	131, // 184: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
-	133, // 185: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	137, // 186: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
-	136, // 187: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
-	63,  // 188: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
-	135, // 189: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
-	178, // 190: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
-	13,  // 191: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
-	139, // 192: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	141, // 193: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
-	143, // 194: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	151, // 195: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
-	153, // 196: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
-	14,  // 197: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
-	153, // 198: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
-	158, // 199: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
-	159, // 200: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
-	15,  // 201: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
-	165, // 202: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
-	16,  // 203: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
-	17,  // 204: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
-	183, // 205: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
-	186, // 206: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
-	18,  // 207: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
-	19,  // 208: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
-	209, // [209:209] is the sub-list for method output_type
-	209, // [209:209] is the sub-list for method input_type
-	209, // [209:209] is the sub-list for extension type_name
-	209, // [209:209] is the sub-list for extension extendee
-	0,   // [0:209] is the sub-list for field type_name
+	32,  // 8: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
+	33,  // 9: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
+	35,  // 10: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
+	36,  // 11: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
+	37,  // 12: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
+	40,  // 13: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
+	44,  // 14: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
+	47,  // 15: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
+	48,  // 16: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
+	51,  // 17: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
+	52,  // 18: remote.v1.Frame.ping:type_name -> remote.v1.Ping
+	53,  // 19: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
+	54,  // 20: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
+	41,  // 21: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
+	45,  // 22: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
+	46,  // 23: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
+	81,  // 24: remote.v1.Frame.profile_list:type_name -> remote.v1.ProfileList
+	82,  // 25: remote.v1.Frame.profile_select:type_name -> remote.v1.ProfileSelect
+	83,  // 26: remote.v1.Frame.profile_sign_in_begin:type_name -> remote.v1.ProfileSignInBegin
+	84,  // 27: remote.v1.Frame.profile_sign_in_code:type_name -> remote.v1.ProfileSignInCode
+	85,  // 28: remote.v1.Frame.profile_sign_in_cancel:type_name -> remote.v1.ProfileSignInCancel
+	86,  // 29: remote.v1.Frame.profile_remove:type_name -> remote.v1.ProfileRemove
+	87,  // 30: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
+	88,  // 31: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
+	55,  // 32: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
+	89,  // 33: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
+	56,  // 34: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
+	60,  // 35: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
+	61,  // 36: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
+	62,  // 37: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
+	108, // 38: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
+	109, // 39: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
+	112, // 40: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
+	111, // 41: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
+	113, // 42: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
+	114, // 43: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
+	137, // 44: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
+	103, // 45: remote.v1.Frame.pong:type_name -> remote.v1.Pong
+	141, // 46: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	145, // 47: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	90,  // 48: remote.v1.Frame.ack:type_name -> remote.v1.Ack
+	104, // 49: remote.v1.Frame.error:type_name -> remote.v1.Error
+	91,  // 50: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
+	98,  // 51: remote.v1.Frame.profile_list_result:type_name -> remote.v1.ProfileListResult
+	101, // 52: remote.v1.Frame.profile_sign_in_prompt:type_name -> remote.v1.ProfileSignInPrompt
+	102, // 53: remote.v1.Frame.profile_sign_in_result:type_name -> remote.v1.ProfileSignInResult
+	143, // 54: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
+	99,  // 55: remote.v1.Frame.machine_profile:type_name -> remote.v1.MachineProfile
+	59,  // 56: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
+	64,  // 57: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
+	110, // 58: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
+	80,  // 59: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
+	72,  // 60: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
+	63,  // 61: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
+	42,  // 62: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
+	43,  // 63: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
+	67,  // 64: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
+	68,  // 65: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
+	69,  // 66: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
+	70,  // 67: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
+	71,  // 68: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
+	73,  // 69: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
+	74,  // 70: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
+	75,  // 71: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
+	147, // 72: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
+	148, // 73: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
+	149, // 74: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
+	150, // 75: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
+	49,  // 76: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
+	50,  // 77: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
+	158, // 78: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
+	159, // 79: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
+	160, // 80: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
+	163, // 81: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
+	170, // 82: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
+	172, // 83: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
+	174, // 84: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
+	175, // 85: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
+	177, // 86: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
+	178, // 87: remote.v1.Frame.totp_set:type_name -> remote.v1.TotpSet
+	179, // 88: remote.v1.Frame.totp_status_request:type_name -> remote.v1.TotpStatusRequest
+	182, // 89: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
+	183, // 90: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
+	151, // 91: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
+	152, // 92: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
+	153, // 93: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
+	155, // 94: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
+	157, // 95: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
+	164, // 96: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
+	165, // 97: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
+	166, // 98: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
+	167, // 99: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
+	169, // 100: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
+	171, // 101: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
+	173, // 102: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
+	176, // 103: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
+	180, // 104: remote.v1.Frame.totp_status:type_name -> remote.v1.TotpStatus
+	184, // 105: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
+	185, // 106: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
+	188, // 107: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
+	191, // 108: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
+	193, // 109: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
+	194, // 110: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
+	195, // 111: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
+	187, // 112: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
+	190, // 113: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
+	192, // 114: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
+	196, // 115: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
+	107, // 116: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
+	197, // 117: remote.v1.Frame.ws_dir_list:type_name -> remote.v1.WsDirList
+	200, // 118: remote.v1.Frame.ws_file_read:type_name -> remote.v1.WsFileRead
+	202, // 119: remote.v1.Frame.ws_find_names:type_name -> remote.v1.WsFindNames
+	204, // 120: remote.v1.Frame.ws_find_contents:type_name -> remote.v1.WsFindContents
+	208, // 121: remote.v1.Frame.ws_watch:type_name -> remote.v1.WsWatch
+	210, // 122: remote.v1.Frame.ws_git_status:type_name -> remote.v1.WsGitStatus
+	214, // 123: remote.v1.Frame.ws_git_diff:type_name -> remote.v1.WsGitDiff
+	216, // 124: remote.v1.Frame.ws_git_stage:type_name -> remote.v1.WsGitStage
+	217, // 125: remote.v1.Frame.ws_git_unstage:type_name -> remote.v1.WsGitUnstage
+	218, // 126: remote.v1.Frame.ws_git_discard:type_name -> remote.v1.WsGitDiscard
+	219, // 127: remote.v1.Frame.ws_git_commit:type_name -> remote.v1.WsGitCommit
+	222, // 128: remote.v1.Frame.ws_git_branches:type_name -> remote.v1.WsGitBranches
+	225, // 129: remote.v1.Frame.ws_git_checkout:type_name -> remote.v1.WsGitCheckout
+	226, // 130: remote.v1.Frame.ws_git_branch_create:type_name -> remote.v1.WsGitBranchCreate
+	227, // 131: remote.v1.Frame.ws_git_fetch:type_name -> remote.v1.WsGitFetch
+	228, // 132: remote.v1.Frame.ws_git_pull:type_name -> remote.v1.WsGitPull
+	229, // 133: remote.v1.Frame.ws_git_push:type_name -> remote.v1.WsGitPush
+	230, // 134: remote.v1.Frame.ws_git_log:type_name -> remote.v1.WsGitLog
+	232, // 135: remote.v1.Frame.ws_git_branch_compare:type_name -> remote.v1.WsGitBranchCompare
+	234, // 136: remote.v1.Frame.ws_git_pr_url:type_name -> remote.v1.WsGitPrUrl
+	199, // 137: remote.v1.Frame.ws_dir_list_result:type_name -> remote.v1.WsDirListResult
+	201, // 138: remote.v1.Frame.ws_file_read_result:type_name -> remote.v1.WsFileReadResult
+	203, // 139: remote.v1.Frame.ws_find_names_result:type_name -> remote.v1.WsFindNamesResult
+	207, // 140: remote.v1.Frame.ws_find_contents_result:type_name -> remote.v1.WsFindContentsResult
+	209, // 141: remote.v1.Frame.ws_changed:type_name -> remote.v1.WsChanged
+	213, // 142: remote.v1.Frame.ws_git_status_result:type_name -> remote.v1.WsGitStatusResult
+	215, // 143: remote.v1.Frame.ws_git_diff_result:type_name -> remote.v1.WsGitDiffResult
+	221, // 144: remote.v1.Frame.ws_git_commit_result:type_name -> remote.v1.WsGitCommitResult
+	224, // 145: remote.v1.Frame.ws_git_branches_result:type_name -> remote.v1.WsGitBranchesResult
+	231, // 146: remote.v1.Frame.ws_git_log_result:type_name -> remote.v1.WsGitLogResult
+	233, // 147: remote.v1.Frame.ws_git_branch_compare_result:type_name -> remote.v1.WsGitBranchCompareResult
+	235, // 148: remote.v1.Frame.ws_git_pr_url_result:type_name -> remote.v1.WsGitPrUrlResult
+	34,  // 149: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
+	105, // 150: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
+	1,   // 151: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
+	38,  // 152: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
+	39,  // 153: remote.v1.Answers.answers:type_name -> remote.v1.Answer
+	57,  // 154: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
+	58,  // 155: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
+	34,  // 156: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
+	34,  // 157: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
+	2,   // 158: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
+	76,  // 159: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
+	76,  // 160: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
+	77,  // 161: remote.v1.Project.git:type_name -> remote.v1.GitStatus
+	78,  // 162: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
+	79,  // 163: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
+	94,  // 164: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
+	95,  // 165: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
+	93,  // 166: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
+	93,  // 167: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
+	92,  // 168: remote.v1.ThreadInfo.profile_suggestion:type_name -> remote.v1.ProfileSuggestion
+	96,  // 169: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
+	96,  // 170: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
+	95,  // 171: remote.v1.ClaudeProfile.last_usage:type_name -> remote.v1.RateLimits
+	97,  // 172: remote.v1.ProfileListResult.profiles:type_name -> remote.v1.ClaudeProfile
+	98,  // 173: remote.v1.MachineProfile.profiles:type_name -> remote.v1.ProfileListResult
+	100, // 174: remote.v1.MachineProfile.sessions:type_name -> remote.v1.SessionProfile
+	3,   // 175: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
+	2,   // 176: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
+	5,   // 177: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
+	4,   // 178: remote.v1.ThreadActivity.phase:type_name -> remote.v1.ActivityPhase
+	106, // 179: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
+	106, // 180: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
+	106, // 181: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
+	115, // 182: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
+	105, // 183: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
+	6,   // 184: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
+	115, // 185: remote.v1.FullItem.item:type_name -> remote.v1.Item
+	116, // 186: remote.v1.Item.text:type_name -> remote.v1.TextItem
+	117, // 187: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
+	118, // 188: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
+	119, // 189: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
+	120, // 190: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
+	124, // 191: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
+	122, // 192: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
+	127, // 193: remote.v1.Item.status:type_name -> remote.v1.StatusItem
+	128, // 194: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
+	129, // 195: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
+	130, // 196: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
+	131, // 197: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
+	132, // 198: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
+	133, // 199: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
+	7,   // 200: remote.v1.TextItem.role:type_name -> remote.v1.Role
+	65,  // 201: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
+	8,   // 202: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
+	121, // 203: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
+	9,   // 204: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
+	8,   // 205: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
+	10,  // 206: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
+	1,   // 207: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
+	123, // 208: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
+	125, // 209: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
+	10,  // 210: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
+	38,  // 211: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
+	126, // 212: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
+	11,  // 213: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
+	135, // 214: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
+	12,  // 215: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
+	134, // 216: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
+	136, // 217: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
+	140, // 218: remote.v1.MachineInfo.devices:type_name -> remote.v1.PairedDevice
+	139, // 219: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
+	66,  // 220: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
+	138, // 221: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
+	181, // 222: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
+	13,  // 223: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
+	142, // 224: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	144, // 225: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
+	146, // 226: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	154, // 227: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
+	156, // 228: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
+	14,  // 229: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
+	156, // 230: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
+	161, // 231: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
+	162, // 232: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
+	15,  // 233: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
+	168, // 234: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
+	16,  // 235: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
+	17,  // 236: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
+	186, // 237: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
+	189, // 238: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
+	18,  // 239: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
+	19,  // 240: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
+	14,  // 241: remote.v1.WsEntry.git:type_name -> remote.v1.GitFileState
+	198, // 242: remote.v1.WsDirListResult.entries:type_name -> remote.v1.WsEntry
+	20,  // 243: remote.v1.WsFileReadResult.kind:type_name -> remote.v1.WsFileKind
+	205, // 244: remote.v1.WsContentFile.matches:type_name -> remote.v1.WsContentMatch
+	206, // 245: remote.v1.WsFindContentsResult.files:type_name -> remote.v1.WsContentFile
+	21,  // 246: remote.v1.WsGitEntry.area:type_name -> remote.v1.WsGitArea
+	14,  // 247: remote.v1.WsGitEntry.state:type_name -> remote.v1.GitFileState
+	212, // 248: remote.v1.WsGitStatusResult.upstream:type_name -> remote.v1.WsGitUpstream
+	211, // 249: remote.v1.WsGitStatusResult.entries:type_name -> remote.v1.WsGitEntry
+	22,  // 250: remote.v1.WsGitDiff.source:type_name -> remote.v1.WsGitDiffSource
+	156, // 251: remote.v1.WsGitDiffResult.file:type_name -> remote.v1.GitFileChange
+	220, // 252: remote.v1.WsGitCommitResult.commit:type_name -> remote.v1.WsGitLogEntry
+	223, // 253: remote.v1.WsGitBranchesResult.local:type_name -> remote.v1.WsGitBranch
+	220, // 254: remote.v1.WsGitLogResult.commits:type_name -> remote.v1.WsGitLogEntry
+	211, // 255: remote.v1.WsGitBranchCompareResult.files:type_name -> remote.v1.WsGitEntry
+	256, // [256:256] is the sub-list for method output_type
+	256, // [256:256] is the sub-list for method input_type
+	256, // [256:256] is the sub-list for extension type_name
+	256, // [256:256] is the sub-list for extension extendee
+	0,   // [0:256] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -16582,6 +20423,38 @@ func file_remote_v1_remote_proto_init() {
 		(*Frame_TermClosed)(nil),
 		(*Frame_TermStatus)(nil),
 		(*Frame_ThreadActivity)(nil),
+		(*Frame_WsDirList)(nil),
+		(*Frame_WsFileRead)(nil),
+		(*Frame_WsFindNames)(nil),
+		(*Frame_WsFindContents)(nil),
+		(*Frame_WsWatch)(nil),
+		(*Frame_WsGitStatus)(nil),
+		(*Frame_WsGitDiff)(nil),
+		(*Frame_WsGitStage)(nil),
+		(*Frame_WsGitUnstage)(nil),
+		(*Frame_WsGitDiscard)(nil),
+		(*Frame_WsGitCommit)(nil),
+		(*Frame_WsGitBranches)(nil),
+		(*Frame_WsGitCheckout)(nil),
+		(*Frame_WsGitBranchCreate)(nil),
+		(*Frame_WsGitFetch)(nil),
+		(*Frame_WsGitPull)(nil),
+		(*Frame_WsGitPush)(nil),
+		(*Frame_WsGitLog)(nil),
+		(*Frame_WsGitBranchCompare)(nil),
+		(*Frame_WsGitPrUrl)(nil),
+		(*Frame_WsDirListResult)(nil),
+		(*Frame_WsFileReadResult)(nil),
+		(*Frame_WsFindNamesResult)(nil),
+		(*Frame_WsFindContentsResult)(nil),
+		(*Frame_WsChanged)(nil),
+		(*Frame_WsGitStatusResult)(nil),
+		(*Frame_WsGitDiffResult)(nil),
+		(*Frame_WsGitCommitResult)(nil),
+		(*Frame_WsGitBranchesResult)(nil),
+		(*Frame_WsGitLogResult)(nil),
+		(*Frame_WsGitBranchCompareResult)(nil),
+		(*Frame_WsGitPrUrlResult)(nil),
 	}
 	file_remote_v1_remote_proto_msgTypes[14].OneofWrappers = []any{
 		(*ThreadRespond_Decision)(nil),
@@ -16616,8 +20489,8 @@ func file_remote_v1_remote_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
-			NumEnums:      20,
-			NumMessages:   174,
+			NumEnums:      23,
+			NumMessages:   213,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

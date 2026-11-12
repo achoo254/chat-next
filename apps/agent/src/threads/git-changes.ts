@@ -145,7 +145,7 @@ export function clipDiff(unified: string, maxLines: number, maxChars: number): {
 }
 
 /** A whole new file as a diff that adds every line; null for a binary, unreadable or too large one. */
-async function newFileDiff(full: string, path: string, limits: Limits): Promise<{ unified: string; added: number } | null> {
+export async function newFileDiff(full: string, path: string, limits: Limits): Promise<{ unified: string; added: number } | null> {
   try {
     const info = await stat(full);
     if (!info.isFile() || info.size > limits.newFileBytes) return null;

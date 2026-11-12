@@ -45,10 +45,12 @@ import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
+import { Workspaces } from "./workspace/workspaces.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
 import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 import { ScreenShare } from "./screen-share/screen-share.ts";
+import { UsageScheduler } from "./usage/scheduler.ts";
 
 const MAX_CONNECTIONS = 16;
 const MAX_HANDSHAKING = 8;
@@ -103,6 +105,9 @@ export class Machine {
   readonly browser: RemoteBrowser;
   readonly screenShare: ScreenShare;
   readonly terminal: TerminalService;
+  readonly workspaces: Workspaces;
+  /** The usage ledger and its scans of the AIs' transcripts. */
+  readonly usage: UsageScheduler;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -144,6 +149,12 @@ export class Machine {
     });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
     this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
+    this.usage = new UsageScheduler({
+      configDir: dir,
+      sources: () => this.providers.flatMap((p) => (p.usage ? [{ provider: p.id, usage: p.usage }] : [])),
+      refreshQuota: () => this.refreshProfileUsage(),
+      log: this.log,
+    });
     const c = this.config.get();
     this.pairing = new TotpPairing(this.config.totpSecret());
     if (c.totpSecret && !this.pairing.enabled) this.log("authenticator secret in config.json is not valid: set it again from a paired device");
@@ -155,7 +166,10 @@ export class Machine {
         findBinary: findClaude,
         probeUsage: (bin, accountDir) => probeUsage(bin, accountDir),
         inUse: (id) => this.core.profileInUse(id),
-        onUsage: (id, usage) => this.core.setProfileUsage(id, usage),
+        onUsage: (id, usage) => {
+          this.core.setProfileUsage(id, usage);
+          this.usage.recordQuota(id, usage);
+        },
         log: this.log,
       });
     const forwardSettings = new ForwardSettings(dir);
@@ -190,7 +204,11 @@ export class Machine {
       profileAccount: (id) => this.profiles.account(id),
       suggestProfile: (id) => this.profiles.suggestion(id),
       onSessionProfile: () => this.announceProfiles(),
-      onProfileUsage: (id, usage) => this.profiles.recordUsage(id, usage),
+      onProfileUsage: (id, usage) => {
+        this.profiles.recordUsage(id, usage);
+        this.usage.recordQuota(id, usage, "user");
+      },
+      onSessionId: (provider, sessionId) => this.usage.launched.add(provider, sessionId),
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
     });
     this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
@@ -221,6 +239,13 @@ export class Machine {
       },
     });
     this.projects.onChange(() => this.announceProjects());
+    this.workspaces = new Workspaces({
+      folderOf: (id) => this.projects.folderOf(id),
+      audit: this.audit,
+      isSensitive: this.isSensitive,
+      // git's hooks folder for the right panel: absolute, the agent's own, always empty.
+      hooksDir: join(dir, "git-empty-hooks"),
+    });
     // A session waiting for a secret or for the user on the browser shows as waiting for the user,
     // like a prompt in its transcript.
     this.secrets.onEvent((event) => this.outsidePrompts(event.type === "prompt" ? event.prompt.threadId : event.threadId));
@@ -234,6 +259,14 @@ export class Machine {
     this.core.onStatus((s) => {
       if (s.state === ThreadState.IDLE && this.projects.invalidate(s.dir)) this.announceProjects();
     });
+  }
+
+  /** Reads the plan usage of every signed-in profile again, one after another. */
+  private async refreshProfileUsage(): Promise<void> {
+    for (const p of this.profiles.view().profiles) {
+      if (!p.signedIn) continue;
+      await this.profiles.refreshUsage(p.id).catch((err: unknown) => this.log(`usage: plan usage of a profile not read (${(err as Error).message})`));
+    }
   }
 
   private outsidePrompts(threadId: string): void {
@@ -295,6 +328,8 @@ export class Machine {
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.updater.start();
     this.terminal.start();
+    for (const s of this.core.sessionIds()) this.usage.launched.add(s.provider, s.sessionId);
+    this.usage.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath, false)) this.log(line);
     return actual;
@@ -314,9 +349,11 @@ export class Machine {
     await new Promise<void>((r) => (this.wss ? this.wss.close(() => r()) : r()));
     this.server?.closeAllConnections?.();
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
+    await this.usage.stop();
     await this.profiles.stop();
     clearTimeout(this.announcingProjects);
     this.projects.stop();
+    this.workspaces.stop();
     await this.core.stop();
   }
 
@@ -406,6 +443,7 @@ export class Machine {
         screenShare: this.screenShare,
         updater: this.updater,
         terminal: this.terminal,
+        workspaces: this.workspaces,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
         onPaired: (via) => {

@@ -13,6 +13,7 @@ import type { LocalForward } from "../../src/tunnels/forward.ts";
 import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts";
 import type { RemoteBrowser } from "../../src/remote-browser/remote-browser.ts";
 import type { ScreenShare } from "../../src/screen-share/screen-share.ts";
+import type { Workspaces } from "../../src/workspace/workspaces.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -34,6 +35,7 @@ export async function pairedDevice(ctx: {
   secrets?: SecretService;
   browser?: RemoteBrowser;
   screenShare?: ScreenShare;
+  workspaces?: Workspaces;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -58,6 +60,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.secrets ? { secrets: ctx.secrets } : {}),
       ...(ctx.browser ? { browser: ctx.browser } : {}),
       ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
+      ...(ctx.workspaces ? { workspaces: ctx.workspaces } : {}),
       auth: () => ({ machine: machineKey, deviceStatus: (k) => ctx.config.deviceStatus(k) }),
       pairing: new TotpPairing(),
       machineInfo:

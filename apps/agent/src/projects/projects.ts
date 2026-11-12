@@ -122,6 +122,11 @@ export class Projects {
     for (const fn of this.listeners) fn();
   }
 
+  /** The folder of project `id` (a workspace of the right panel); undefined for an unknown id. */
+  folderOf(id: string): string | undefined {
+    return this.records().find((p) => p.id === id)?.dir;
+  }
+
   /** The project a folder belongs to (the deepest one holding it). */
   projectOf(dir: string): ProjectRecord | undefined {
     return this.records()

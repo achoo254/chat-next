@@ -259,6 +259,44 @@ message Frame {
     // What a running turn is doing (tunelo 2.5.0+). B → A, unasked, to
     // devices following the thread.
     ThreadActivity thread_activity = 118;
+
+    // A workspace's files and git (tunelo 2.7.0+); see "a workspace's files
+    // and git" below.
+    // A → B
+    WsDirList ws_dir_list = 119;
+    WsFileRead ws_file_read = 120;
+    WsFindNames ws_find_names = 121;
+    WsFindContents ws_find_contents = 122;
+    WsWatch ws_watch = 123;
+    WsGitStatus ws_git_status = 124;
+    WsGitDiff ws_git_diff = 125;
+    WsGitStage ws_git_stage = 126;
+    WsGitUnstage ws_git_unstage = 127;
+    WsGitDiscard ws_git_discard = 128;
+    WsGitCommit ws_git_commit = 129;
+    WsGitBranches ws_git_branches = 130;
+    WsGitCheckout ws_git_checkout = 131;
+    WsGitBranchCreate ws_git_branch_create = 132;
+    WsGitFetch ws_git_fetch = 133;
+    WsGitPull ws_git_pull = 134;
+    WsGitPush ws_git_push = 135;
+    WsGitLog ws_git_log = 136;
+    WsGitBranchCompare ws_git_branch_compare = 137;
+    WsGitPrUrl ws_git_pr_url = 138;
+    // B → A
+    WsDirListResult ws_dir_list_result = 139;
+    WsFileReadResult ws_file_read_result = 140;
+    WsFindNamesResult ws_find_names_result = 141;
+    WsFindContentsResult ws_find_contents_result = 142;
+    // Unasked, to devices watching the workspace (WsWatch).
+    WsChanged ws_changed = 143;
+    WsGitStatusResult ws_git_status_result = 144;
+    WsGitDiffResult ws_git_diff_result = 145;
+    WsGitCommitResult ws_git_commit_result = 146;
+    WsGitBranchesResult ws_git_branches_result = 147;
+    WsGitLogResult ws_git_log_result = 148;
+    WsGitBranchCompareResult ws_git_branch_compare_result = 149;
+    WsGitPrUrlResult ws_git_pr_url_result = 150;
   }
 }
 
@@ -1117,6 +1155,45 @@ enum ErrorReason {
   ERROR_REASON_TERMINAL_SESSION_LIMIT = 56;
   // TermClose or TermResize names a terminal session that is gone.
   ERROR_REASON_TERMINAL_SESSION_NOT_FOUND = 57;
+  // A workspace request names a secret file (dotenv, a key, credentials, git
+  // internals): never read, searched or listed.
+  ERROR_REASON_SECRET_FILE = 58;
+  // A git write or network request in a repository whose own config (local or
+  // worktree scope) names a program git would run (subject: the config key).
+  // The user runs that command in a terminal instead.
+  ERROR_REASON_GIT_UNSAFE_CONFIG = 59;
+  // A git network request needs a sign-in the machine does not have (no
+  // credential stored, ssh key refused or unknown host); tunelo never prompts.
+  ERROR_REASON_GIT_NEEDS_CREDENTIALS = 60;
+  // git refused or failed (subject: its last line, in English).
+  ERROR_REASON_GIT_FAILED = 61;
+  // Another git write of the same workspace is running.
+  ERROR_REASON_GIT_BUSY = 62;
+  // A git request in a workspace that is not in a git work tree.
+  ERROR_REASON_NOT_A_GIT_REPOSITORY = 63;
+  // WsGitDiscard without confirm (code NEEDS_CONSENT).
+  ERROR_REASON_DISCARD_NOT_CONFIRMED = 64;
+  // WsDirList of a folder with more than 100 000 entries.
+  ERROR_REASON_FOLDER_TOO_LARGE = 65;
+  // WsGitPush of a repository that uses Git LFS on a machine without
+  // git-lfs: nothing was pushed (pushing would leave only LFS pointers).
+  ERROR_REASON_GIT_LFS_MISSING = 66;
+  // A git request in a workspace that is a folder inside a larger
+  // repository, not the repository's top folder.
+  ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT = 67;
+  // WsGitCommit where git would sign the commit (commit.gpgSign, or
+  // gpg.format ssh or x509): signing may prompt, so it is left to a terminal.
+  ERROR_REASON_GIT_COMMIT_SIGNING = 68;
+  // WsGitCommit, WsGitCheckout or WsGitPull while a merge, rebase,
+  // cherry-pick, revert or bisect is in progress (subject: which); the user
+  // finishes it in a terminal.
+  ERROR_REASON_GIT_OPERATION_IN_PROGRESS = 69;
+  // WsGitCommit on a detached HEAD without allow_detached.
+  ERROR_REASON_GIT_DETACHED_HEAD = 70;
+  // WsGitStage or WsGitCommit takes in a secret file the request did not
+  // name in confirm_sensitive (code NEEDS_CONSENT; subject: those paths, one
+  // a line).
+  ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED = 71;
 }
 
 enum ErrorCode {
@@ -1673,7 +1750,13 @@ message AuditEntry {
   // browser_clear (the tunelo browser's profile was deleted),
   // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
   // totp_set (a device set or replaced the authenticator secret; never the secret),
-  // agent_update (a device started an update of tunelo; detail: the version)
+  // agent_update (a device started an update of tunelo; detail: the version),
+  // git_stage, git_unstage, git_discard, git_commit, git_checkout,
+  // git_branch_create, git_pull, git_push (a device changed a workspace's git;
+  // path: the workspace folder; detail: "workspace <id>" and, for stage,
+  // unstage and discard, how many files ("restored N, trashed M" for
+  // discard); never a file's content, a file's path, a branch or a commit
+  // message)
   string action = 3;
   string path = 4;
   string detail = 5;
@@ -1773,6 +1856,8 @@ enum GitFileState {
   GIT_FILE_STATE_UNTRACKED = 4;
   GIT_FILE_STATE_TYPE_CHANGED = 5;
   GIT_FILE_STATE_CONFLICTED = 6;
+  // Only in a workspace's git (WsGitEntry, WsEntry): renamed or copied.
+  GIT_FILE_STATE_RENAMED = 7;
 }
 
 message GitFileChange {
@@ -2240,4 +2325,459 @@ message TermStatus {
   // CLOSED: expired, closed, revoked, agent_gone, transport_closed,
   // shutdown, bad_frame, overflow or unavailable.
   string reason = 4;
+}
+
+// --- a workspace's files and git ------------------------------------------------
+// The right panel of a workspace on a device (Explorer and Source Control),
+// tunelo 2.7.0+. A workspace is one of the machine's projects (Project.id in
+// ProjectListResult): every request names it by workspace_id, never by a
+// folder, and B maps it to the project's folder itself
+// (ERROR_REASON_PROJECT_NOT_FOUND for an unknown id, FOLDER_NOT_FOUND when the
+// folder is gone). Paths are relative to that folder, "/"-separated, without
+// "." or ".." parts; B resolves them (symbolic links included) and refuses one
+// that ends outside the folder with ERROR_REASON_PATH_OUTSIDE_FOLDER, and a
+// secret file (dotenv, private keys, credential files, git internals) with
+// ERROR_REASON_SECRET_FILE (so are paths in a folder the machine holds
+// sensitive, and hard-linked files). The workspace must be its repository's
+// top folder for git (ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT). git runs
+// without a shell, with a timeout and an output cap (its helpers stopped
+// with it), never prompts, and never runs a program the repository names:
+// hooks and fsmonitor are always off, a read switches off the programs the
+// repository's own config names, and a write or network request in such a
+// repository is refused (ERROR_REASON_GIT_UNSAFE_CONFIG), as is a network
+// request where the repository sets its own proxy, TLS or header settings,
+// and any request where it sets core.worktree. Git writes are
+// written to the consent log, never a file's content or a commit message.
+
+// A → B: one page of a folder. Answered with WsDirListResult. Folders first,
+// then files, each by name in natural order (9 before 10); a folder of more
+// than 100 000 entries is refused with ERROR_REASON_FOLDER_TOO_LARGE.
+message WsDirList {
+  string workspace_id = 1;
+  // Relative to the workspace; empty: its root.
+  string path = 2;
+  // The last entry of the previous page (its name and dir): the page starts
+  // after it, so entries made or removed meanwhile neither repeat nor go
+  // missing. Empty: the first page.
+  string after_name = 3;
+  bool after_dir = 4;
+  // At most this many entries; 0 means 500, B caps it at 2000.
+  uint32 limit = 5;
+  // Names starting with "." too (secret files stay hidden).
+  bool show_hidden = 6;
+  // Leave out what git ignores (by default it is listed with ignored set).
+  bool hide_ignored = 7;
+}
+
+message WsEntry {
+  string name = 1;
+  bool dir = 2;
+  // A symbolic link, never followed outside the workspace: dir is false and
+  // outside is set when it points outside (or nowhere).
+  bool symlink = 3;
+  bool outside = 4;
+  // Bytes; 0 for a folder.
+  uint64 size = 5;
+  // Unix milliseconds.
+  int64 mtime = 6;
+  // git ignores it.
+  bool ignored = 7;
+  // What git sees: a file's own state; a folder is UNTRACKED when everything
+  // changed below it is untracked, MODIFIED when anything else changed below
+  // it; UNSPECIFIED when unchanged or outside git.
+  GitFileState git = 8;
+}
+
+message WsDirListResult {
+  string workspace_id = 1;
+  string path = 2;
+  repeated WsEntry entries = 3;
+  bool has_more = 4;
+  // Entries of the folder as listed (after hidden and ignored ones are left out).
+  uint32 total = 5;
+}
+
+// A → B: a file for a read-only preview. Answered with WsFileReadResult.
+// Only a regular file (no folder, device, socket or pipe).
+message WsFileRead {
+  string workspace_id = 1;
+  string path = 2;
+}
+
+enum WsFileKind {
+  WS_FILE_KIND_UNSPECIFIED = 0;
+  // UTF-8 text of at most 1 MiB, in text.
+  WS_FILE_KIND_TEXT = 1;
+  // A PNG, JPEG, GIF, WebP, BMP, ICO or AVIF picture of at most 5 MiB, in data
+  // with mime (SVG is text).
+  WS_FILE_KIND_IMAGE = 2;
+  // Anything else: size and mtime only.
+  WS_FILE_KIND_BINARY = 3;
+  // Over the limit of its kind: size and mtime only.
+  WS_FILE_KIND_TOO_LARGE = 4;
+}
+
+message WsFileReadResult {
+  string workspace_id = 1;
+  string path = 2;
+  WsFileKind kind = 3;
+  uint64 size = 4;
+  int64 mtime = 5;
+  string mime = 6;
+  string text = 7;
+  bytes data = 8;
+}
+
+// A → B: files whose path holds every word of the query (split at spaces,
+// case-insensitive), among what git does not ignore (in a git work tree:
+// tracked and untracked files; else a walk of at most 100 000 entries that
+// skips node_modules). Secret files are left out. Answered with
+// WsFindNamesResult, shortest paths first.
+message WsFindNames {
+  string workspace_id = 1;
+  // At most 2048 characters; empty matches nothing.
+  string query = 2;
+  // 0 means 100, B caps it at 500.
+  uint32 limit = 3;
+}
+
+message WsFindNamesResult {
+  string workspace_id = 1;
+  repeated string paths = 2;
+  bool truncated = 3;
+}
+
+// A → B: lines holding the query in files git does not ignore (git grep:
+// text files only, secret files and files over 5 MiB left out), at most
+// 2000 matches, at most 15 s. Answered with WsFindContentsResult.
+message WsFindContents {
+  string workspace_id = 1;
+  // At most 2048 characters.
+  string query = 2;
+  bool case_sensitive = 3;
+  bool whole_word = 4;
+  // A POSIX extended regular expression; otherwise the query is literal text.
+  bool regex = 5;
+  // Matches at most; 0 means 2000, B caps it at 2000.
+  uint32 limit = 6;
+}
+
+message WsContentMatch {
+  // 1-based.
+  uint32 line = 1;
+  uint32 column = 2;
+  // The line, at most 300 characters.
+  string text = 3;
+}
+
+message WsContentFile {
+  string path = 1;
+  repeated WsContentMatch matches = 2;
+}
+
+message WsFindContentsResult {
+  string workspace_id = 1;
+  repeated WsContentFile files = 2;
+  uint32 total_matches = 3;
+  // More matches than listed.
+  bool truncated = 4;
+  // git grep ran out of time: what it found so far.
+  bool timed_out = 5;
+}
+
+// A → B: start (on) or stop watching the workspace for this connection.
+// Answered with Ack. B watches only while some device does, and stops when
+// the connection closes.
+message WsWatch {
+  string workspace_id = 1;
+  bool on = 2;
+}
+
+// B → A, unasked: files changed in the workspace. File events are gathered
+// for 125 ms; git's status is looked at again at most every 3 s, and every
+// 60 s in any case.
+message WsChanged {
+  string workspace_id = 1;
+  // Folders whose entries changed, relative ("" is the root), at most 200.
+  repeated string dirs = 2;
+  // Too many changes to name: read every open folder again.
+  bool overflow = 3;
+  // git's status changed: read WsGitStatus again.
+  bool git = 4;
+  // B cannot watch files here (or does not, on Linux, where a recursive
+  // watch would hold every folder of the tree): it looks at git's status
+  // every 10 s instead, and says overflow with git when it changed. Sent
+  // once, right after WsWatch, when so.
+  bool polling = 5;
+}
+
+// A → B: the workspace's git status. Answered with WsGitStatusResult.
+message WsGitStatus {
+  string workspace_id = 1;
+}
+
+enum WsGitArea {
+  WS_GIT_AREA_UNSPECIFIED = 0;
+  WS_GIT_AREA_STAGED = 1;
+  WS_GIT_AREA_UNSTAGED = 2;
+  WS_GIT_AREA_UNTRACKED = 3;
+  WS_GIT_AREA_CONFLICTED = 4;
+}
+
+message WsGitEntry {
+  string path = 1;
+  // RENAMED: the path it had.
+  string old_path = 2;
+  WsGitArea area = 3;
+  GitFileState state = 4;
+  // Lines; 0 for untracked files, binary files and when truncated.
+  uint32 added = 5;
+  uint32 removed = 6;
+  bool binary = 7;
+  // A secret file: listed, never diffed.
+  bool sensitive = 8;
+}
+
+message WsGitUpstream {
+  // e.g. "origin/main".
+  string name = 1;
+  uint32 ahead = 2;
+  uint32 behind = 3;
+}
+
+message WsGitStatusResult {
+  string workspace_id = 1;
+  // The workspace is in a git work tree; false: nothing else is set.
+  bool git = 2;
+  // Empty when HEAD is detached.
+  string branch = 3;
+  // The commit HEAD names; empty before the first commit.
+  string head = 4;
+  // Unset without one.
+  WsGitUpstream upstream = 5;
+  // A file staged and changed again is listed twice (STAGED and UNSTAGED).
+  repeated WsGitEntry entries = 6;
+  // More than 1000 entries: the first 1000, without line counts.
+  bool truncated = 7;
+}
+
+enum WsGitDiffSource {
+  WS_GIT_DIFF_SOURCE_UNSPECIFIED = 0;
+  // Working tree against the index (an untracked file: as all new).
+  WS_GIT_DIFF_SOURCE_UNSTAGED = 1;
+  // Index against HEAD.
+  WS_GIT_DIFF_SOURCE_STAGED = 2;
+  // One commit against its parent.
+  WS_GIT_DIFF_SOURCE_COMMIT = 3;
+  // HEAD against its merge base with the base ref (WsGitBranchCompare).
+  WS_GIT_DIFF_SOURCE_BRANCH = 4;
+}
+
+// A → B: one file's diff. Answered with WsGitDiffResult (a secret file comes
+// with sensitive set and no content).
+message WsGitDiff {
+  string workspace_id = 1;
+  string path = 2;
+  // RENAMED: the old path.
+  string old_path = 3;
+  WsGitDiffSource source = 4;
+  // COMMIT: a full commit id (40 or 64 hex).
+  string commit = 5;
+  // BRANCH: the base ref; empty picks it as WsGitBranchCompare does.
+  string base = 6;
+}
+
+message WsGitDiffResult {
+  string workspace_id = 1;
+  // At most 1 MiB of unified diff.
+  GitFileChange file = 2;
+}
+
+// A → B: stage files (paths of WsGitStatusResult), or everything with all.
+// Answered with WsGitStatusResult. Logged (git_stage). Taking in a secret
+// file (WsGitEntry.sensitive) needs its path in confirm_sensitive, else
+// ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED.
+message WsGitStage {
+  string workspace_id = 1;
+  // At most 1000.
+  repeated string paths = 2;
+  bool all = 3;
+  // Secret files the user agreed, on the device, to stage.
+  repeated string confirm_sensitive = 4;
+}
+
+// A → B: unstage files, or everything with all. As WsGitStage (git_unstage).
+message WsGitUnstage {
+  string workspace_id = 1;
+  repeated string paths = 2;
+  bool all = 3;
+}
+
+// A → B: throw away the working tree's changes of files: untracked files
+// go to the operating system's trash first (never deleted for good; a link
+// goes, never what it points to), then tracked files go back to the index.
+// Staged changes stay. Without confirm, refused
+// with ERROR_REASON_DISCARD_NOT_CONFIRMED (code NEEDS_CONSENT). Answered with
+// WsGitStatusResult. Logged (git_discard).
+message WsGitDiscard {
+  string workspace_id = 1;
+  // At most 1000.
+  repeated string paths = 2;
+  // The user confirmed it on the device.
+  bool confirm = 3;
+}
+
+// A → B: commit what is staged. git hooks never run (the device says so)
+// and nothing is signed. An empty message is refused with
+// ERROR_REASON_EMPTY_MESSAGE; also refused: GIT_COMMIT_SIGNING,
+// GIT_OPERATION_IN_PROGRESS, GIT_DETACHED_HEAD, and
+// SENSITIVE_FILE_NOT_CONFIRMED for a staged secret file not named in
+// confirm_sensitive. Answered with WsGitCommitResult. Logged (git_commit),
+// never the message.
+message WsGitCommit {
+  string workspace_id = 1;
+  // At most 65 536 characters.
+  string message = 2;
+  // The user agreed to commit on a detached HEAD.
+  bool allow_detached = 3;
+  // Staged secret files the user agreed, on the device, to commit.
+  repeated string confirm_sensitive = 4;
+}
+
+message WsGitLogEntry {
+  string oid = 1;
+  string subject = 2;
+  string author = 3;
+  // Unix milliseconds (committer date).
+  int64 at = 4;
+  // Branches and tags pointing at it ("HEAD -> main", "origin/main", "tag: v1").
+  repeated string refs = 5;
+}
+
+message WsGitCommitResult {
+  string workspace_id = 1;
+  WsGitLogEntry commit = 2;
+}
+
+// A → B: the branches. Answered with WsGitBranchesResult.
+message WsGitBranches {
+  string workspace_id = 1;
+}
+
+message WsGitBranch {
+  string name = 1;
+  // e.g. "origin/main"; empty without one.
+  string upstream = 2;
+  uint32 ahead = 3;
+  uint32 behind = 4;
+  // The upstream branch is gone from the remote.
+  bool gone = 5;
+}
+
+message WsGitBranchesResult {
+  string workspace_id = 1;
+  // Empty when HEAD is detached.
+  string current = 2;
+  repeated WsGitBranch local = 3;
+  // Remote-tracking branches ("origin/feature"), without */HEAD.
+  repeated string remote = 4;
+}
+
+// A → B: switch to a branch: a local one, or the short name of a remote
+// one ("feature" for "origin/feature"), which makes a local branch tracking
+// it. git refuses when changes would be lost; refused too while an
+// operation is in progress (GIT_OPERATION_IN_PROGRESS). Answered with
+// WsGitStatusResult. Logged (git_checkout).
+message WsGitCheckout {
+  string workspace_id = 1;
+  string branch = 2;
+}
+
+// A → B: a new branch (a valid branch name, else ERROR_REASON_NAME_INVALID)
+// at start_point (a branch, tag or commit; empty: HEAD), switched to with
+// checkout. Answered with WsGitStatusResult. Logged (git_branch_create).
+message WsGitBranchCreate {
+  string workspace_id = 1;
+  string name = 2;
+  string start_point = 3;
+  bool checkout = 4;
+}
+
+// A → B: git fetch --prune of the default remote. Answered with
+// WsGitStatusResult. Network requests never prompt: a missing sign-in is
+// ERROR_REASON_GIT_NEEDS_CREDENTIALS. At most 120 s.
+message WsGitFetch {
+  string workspace_id = 1;
+}
+
+// A → B: git pull --ff-only of the current branch's upstream (never a merge
+// commit or a rebase); refused while an operation is in progress. As
+// WsGitFetch. Logged (git_pull).
+message WsGitPull {
+  string workspace_id = 1;
+}
+
+// A → B: push the current branch to its upstream, never forced. A branch
+// without one is pushed to the same name on origin (or the only remote) and
+// that becomes its upstream. In a repository that uses Git LFS, B runs
+// `git lfs pre-push` first (its objects go up before the commits), and
+// refuses with ERROR_REASON_GIT_LFS_MISSING without git-lfs. As WsGitFetch.
+// Logged (git_push).
+message WsGitPush {
+  string workspace_id = 1;
+}
+
+// A → B: commits, newest first. Answered with WsGitLogResult.
+message WsGitLog {
+  string workspace_id = 1;
+  // A branch, tag or commit; empty: HEAD.
+  string ref = 2;
+  uint32 skip = 3;
+  // 0 means 50, B caps it at 50.
+  uint32 limit = 4;
+}
+
+message WsGitLogResult {
+  string workspace_id = 1;
+  repeated WsGitLogEntry commits = 2;
+  bool has_more = 3;
+}
+
+// A → B: what the current branch committed since it left base ("committed
+// on branch"). Answered with WsGitBranchCompareResult.
+message WsGitBranchCompare {
+  string workspace_id = 1;
+  // A branch, tag or commit; empty: origin/HEAD, else origin/main,
+  // origin/master, main, master (the first that exists).
+  string base = 2;
+}
+
+message WsGitBranchCompareResult {
+  string workspace_id = 1;
+  // The base used; empty when none was found (nothing else is set).
+  string base = 2;
+  string merge_base = 3;
+  // Commits of HEAD not in base, and of base not in HEAD.
+  uint32 ahead = 4;
+  uint32 behind = 5;
+  // Files changed from the merge base to HEAD (area STAGED), at most 1000.
+  repeated WsGitEntry files = 6;
+  bool truncated = 7;
+}
+
+// A → B: the web page that opens a pull request (GitHub) or merge request
+// (GitLab) of the current branch. Answered with WsGitPrUrlResult; a remote
+// on another host is refused with ERROR_REASON_GIT_FAILED.
+message WsGitPrUrl {
+  string workspace_id = 1;
+  // The branch to merge into; empty: picked as WsGitBranchCompare does.
+  string base = 2;
+}
+
+message WsGitPrUrlResult {
+  string workspace_id = 1;
+  // https only, never with credentials.
+  string url = 2;
+  // "github" or "gitlab".
+  string provider = 3;
 }

@@ -90,7 +90,7 @@ const REMOTE_MAX = 2048;
 const BRANCH_MAX = 255;
 
 /** C0 and C1 control characters and DEL. */
-function hasControl(s: string): boolean {
+export function hasControl(s: string): boolean {
   for (const ch of s) {
     const c = ch.charCodeAt(0);
     if (c < 0x20 || (c >= 0x7f && c <= 0x9f)) return true;

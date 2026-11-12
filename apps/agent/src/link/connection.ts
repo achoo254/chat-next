@@ -6,7 +6,6 @@ import {
   ErrorReason,
   type Frame,
   FrameSchema,
-  GitFileState,
   type Item,
   type MachineInfo,
   TermPath,
@@ -38,7 +37,7 @@ import type { ProjectList, Projects } from "../projects/projects.ts";
 import { SecretInputError } from "../sign-in-secrets/secret-names.ts";
 import type { SavedSecretInfo } from "../sign-in-secrets/secret-store.ts";
 import { type SecretEvent, SecretNotFound, SecretPromptGone, type SecretService } from "../sign-in-secrets/secret-service.ts";
-import type { GitChangesResult, GitFileChange } from "../threads/git-changes.ts";
+import type { GitChangesResult } from "../threads/git-changes.ts";
 import { InputError } from "../remote-browser/browser-input.ts";
 import { BrowserNotRunning, BrowserToolError, BrowserUnavailable, type RemoteBrowser, TakeoverGone } from "../remote-browser/remote-browser.ts";
 import { type BrowserFrame, BrowserLink } from "./browser-link.ts";
@@ -47,6 +46,8 @@ import { ScreenShareLink } from "./screen-share-link.ts";
 import { wireItem } from "./wire.ts";
 import type { TerminalConnection } from "../terminal/terminal-connection.ts";
 import type { TerminalService } from "../terminal/terminal-service.ts";
+import type { Workspaces } from "../workspace/workspaces.ts";
+import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-link.ts";
 
 export type Socket = {
   send(data: Uint8Array): void;
@@ -88,6 +89,8 @@ export type LinkContext = {
   updater?: AgentUpdater;
   /** The machine's terminal; absent where the machine has none (tests). */
   terminal?: TerminalService;
+  /** Workspaces' files and git for the right panel; absent where the machine has none (tests). */
+  workspaces?: Workspaces;
 };
 
 const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
@@ -163,19 +166,6 @@ export function profileListBody(list: ProfileList) {
   };
 }
 
-const GIT_STATE: Record<GitFileChange["state"], GitFileState> = {
-  modified: GitFileState.MODIFIED,
-  added: GitFileState.ADDED,
-  deleted: GitFileState.DELETED,
-  untracked: GitFileState.UNTRACKED,
-  typeChanged: GitFileState.TYPE_CHANGED,
-  conflicted: GitFileState.CONFLICTED,
-};
-
-function gitFileBody(f: GitFileChange) {
-  return { path: f.path, state: GIT_STATE[f.state], added: f.added, removed: f.removed, unified: f.unified, truncated: f.truncated, binary: f.binary, sensitive: f.sensitive };
-}
-
 /** A thread's uncommitted changes as devices get them (only over the sealed link). */
 export function gitChangesBody(threadId: string, r: GitChangesResult) {
   return { threadId, git: r.git, files: r.files.map(gitFileBody), truncated: r.truncated, partial: r.partial };
@@ -227,6 +217,7 @@ export class Connection {
   private browserLink: BrowserLink | undefined;
   private screenShareLink: ScreenShareLink | undefined;
   private terminal: TerminalConnection | undefined;
+  private workspaceLink: WorkspaceLink | undefined;
   /** Messages queued before the link opened, not yet opened (decrypted). */
   private rawPending = 0;
   readonly opened = Date.now();
@@ -281,6 +272,7 @@ export class Connection {
     this.browserLink?.close();
     this.screenShareLink?.close();
     if (this.terminal) this.ctx.terminal?.forget(this.terminal);
+    this.workspaceLink?.close();
     this.socket.close(code, reason);
   }
 
@@ -395,6 +387,7 @@ export class Connection {
         () => this.device,
       );
     }
+    if (this.ctx.workspaces) this.workspaceLink = new WorkspaceLink(this.ctx.workspaces, (id, body) => this.send(id, body), () => this.device);
     if (this.ctx.terminal) {
       this.terminal = this.ctx.terminal.connection({
         send: (id, body) => this.send(id, body),
@@ -788,6 +781,27 @@ export class Connection {
         case "termData":
           // Only a frame queued before the link opened comes this way.
           return this.termData(b.value);
+        case "wsDirList":
+        case "wsFileRead":
+        case "wsFindNames":
+        case "wsFindContents":
+        case "wsWatch":
+        case "wsGitStatus":
+        case "wsGitDiff":
+        case "wsGitStage":
+        case "wsGitUnstage":
+        case "wsGitDiscard":
+        case "wsGitCommit":
+        case "wsGitBranches":
+        case "wsGitCheckout":
+        case "wsGitBranchCreate":
+        case "wsGitFetch":
+        case "wsGitPull":
+        case "wsGitPush":
+        case "wsGitLog":
+        case "wsGitBranchCompare":
+        case "wsGitPrUrl":
+          return this.workspaceFrame(id, b);
         default:
           return this.send(id, { case: "error", value: refusal("unsupported request", ErrorReason.UNSUPPORTED_REQUEST) });
       }
@@ -811,6 +825,13 @@ export class Connection {
     this.ctx.audit.write({ device: this.device, action: "totp_set", path: "", detail: replaced ? "replaced" : "set" });
     this.ctx.onTotpSet?.();
     this.send(id, { case: "totpStatus", value: { enabled: true } });
+  }
+
+  /** A workspace's files and git: answered later, by id (git may take a while). */
+  private workspaceFrame(id: string, b: WorkspaceFrame): void {
+    const link = this.workspaceLink;
+    if (!link) return this.send(id, { case: "error", value: refusal("this machine has no workspaces", ErrorReason.UNSUPPORTED_REQUEST) });
+    void link.handle(id, b).catch((err: unknown) => this.sendError(id, err));
   }
 
   /** The tunelo browser: answered later, by id; input in order. */

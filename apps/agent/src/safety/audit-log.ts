@@ -5,7 +5,9 @@
 // revoking, switching the permission mode, adding, picking or removing a Claude profile,
 // turning forwarding to localhost on or off, blocking ports for it, giving,
 // using or removing a sign-in secret: never its value; a terminal opened,
-// closed or refused to a device: never a typed byte or its output).
+// closed or refused to a device: never a typed byte or its output; a git
+// write to a workspace: what and how many files, never a path, a file's
+// content or a commit message).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -30,7 +32,15 @@ export type AuditAction =
   | "browser_control"
   | "browser_clear"
   | "screen_share"
-  | "terminal";
+  | "terminal"
+  | "git_stage"
+  | "git_unstage"
+  | "git_discard"
+  | "git_commit"
+  | "git_checkout"
+  | "git_branch_create"
+  | "git_pull"
+  | "git_push";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 
