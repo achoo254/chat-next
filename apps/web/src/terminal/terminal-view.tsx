@@ -32,6 +32,8 @@ export interface PaneHandle {
 	focus(): void;
 	/** DECCKM: arrows send ESC O x instead of ESC [ x. */
 	appCursor(): boolean;
+	/** The program asked for pastes in brackets (Claude Code does). */
+	bracketedPaste(): boolean;
 	/** The caret's position in the pane, in CSS pixels. */
 	caret(): { readonly x: number; readonly y: number; readonly height: number } | null;
 }
@@ -266,6 +268,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			registerHandle({
 				focus: () => term.focus(),
 				appCursor: () => term.modes.applicationCursorKeysMode,
+				bracketedPaste: () => term.modes.bracketedPasteMode,
 				caret: () => {
 					if (term.cols === 0 || term.rows === 0) return null;
 					const height = host.clientHeight / term.rows;

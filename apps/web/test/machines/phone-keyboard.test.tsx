@@ -173,6 +173,10 @@ describe("the terminal's key row", () => {
 		mic: "Nói để nhập",
 		micStop: "Dừng nghe",
 		micDenied: "Chưa được phép dùng micro.",
+		image: "Gửi ảnh vào terminal",
+		imageSending: (pct) => `Đang gửi ảnh… ${pct}%`,
+		imageFailed: "Không gửi được ảnh. Thử lại.",
+		imageTooLarge: "Ảnh quá lớn để gửi.",
 	};
 
 	it("puts the AI's keys first, says which modifiers are on, and keeps the rest behind 'more'", async () => {

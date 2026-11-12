@@ -11,6 +11,7 @@
 // pointerdown was cancelled.
 import { useEffect, useRef, type MouseEvent } from "react";
 import { Icon } from "../components/icon.tsx";
+import { Icon as ScreenIcon } from "../components/screen-icons.tsx";
 import type { Dictation } from "./dictation.ts";
 import type { CustomKey } from "./key-prefs.ts";
 
@@ -199,6 +200,10 @@ export interface BarLabels {
 	readonly mic: string;
 	readonly micStop: string;
 	readonly micDenied: string;
+	readonly image: string;
+	readonly imageSending: (pct: number) => string;
+	readonly imageFailed: string;
+	readonly imageTooLarge: string;
 }
 
 interface MobileKeyBarProps {
@@ -370,14 +375,34 @@ export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, on
 	);
 }
 
+/** Sending an image into the terminal: the picker's state, absent where the machine cannot take one. */
+export interface LiveImage {
+	/** 0 to 1 while sending, else null. */
+	readonly progress: number | null;
+	/** What went wrong with the last image, else "". */
+	readonly error: string;
+	pick(file: File): void;
+}
+
 /**
  * Under the key row while the phone keyboard is down (Orca's "Live input"):
- * one wide target that brings the keyboard up for the terminal, and the mic
- * (speech typed into the terminal) where the browser can listen.
+ * one wide target that brings the keyboard up for the terminal, an image
+ * into the terminal where the machine takes one, and the mic (speech typed
+ * into the terminal) where the browser can listen.
  */
-export function LiveInput({ labels, dictation, onKeyboard }: { labels: BarLabels; dictation: Dictation; onKeyboard(): void }) {
+export function LiveInput({ labels, dictation, image, onKeyboard }: { labels: BarLabels; dictation: Dictation; image?: LiveImage | undefined; onKeyboard(): void }) {
 	const listening = dictation.listening;
-	const hint = listening ? dictation.interim || labels.micStop : dictation.error === "not-allowed" ? labels.micDenied : labels.tapToType;
+	const picker = useRef<HTMLInputElement>(null);
+	const sending = image?.progress ?? null;
+	const hint = listening
+		? dictation.interim || labels.micStop
+		: sending !== null
+			? labels.imageSending(Math.round(sending * 100))
+			: image !== undefined && image.error !== ""
+				? image.error
+				: dictation.error === "not-allowed"
+					? labels.micDenied
+					: labels.tapToType;
 	return (
 		<div className="tx-live">
 			<button type="button" className="tx-live-field" onClick={onKeyboard} data-id="terminal-live-input" data-listening={listening ? "" : undefined}>
@@ -387,6 +412,32 @@ export function LiveInput({ labels, dictation, onKeyboard }: { labels: BarLabels
 					<span>{hint}</span>
 				</span>
 			</button>
+			{image !== undefined && (
+				<>
+					<button
+						type="button"
+						className="tx-live-btn"
+						aria-label={labels.image}
+						title={labels.image}
+						disabled={sending !== null}
+						onClick={() => picker.current?.click()}
+						data-id="terminal-image"
+					>
+						<ScreenIcon name="photo" />
+					</button>
+					<input
+						ref={picker}
+						type="file"
+						accept="image/*"
+						hidden
+						onChange={(event) => {
+							const file = event.currentTarget.files?.[0];
+							event.currentTarget.value = "";
+							if (file !== undefined) image.pick(file);
+						}}
+					/>
+				</>
+			)}
 			{dictation.supported && (
 				<button
 					type="button"

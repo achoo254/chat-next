@@ -27,7 +27,10 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, Link, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
+import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
+import { limitsOf, type Limits } from "../machines/attachments.ts";
 import { useDictation } from "./dictation.ts";
+import { ImageTooLarge, imageIntoMachine, pathInput } from "./terminal-image.ts";
 import { KeySheet } from "./key-sheet.tsx";
 import { loadPrefs, rowOf, savePrefs, type KeyPrefs } from "./key-prefs.ts";
 import { afterKey, keySequence, LiveInput, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
@@ -137,6 +140,7 @@ export default function TerminalScreen({ machine, thread, openShellIn }: { machi
 	const hub = useHub();
 	const [link, state] = useLink(hub, machine);
 	const terminal = terminalLinkFor(hub, machine);
+	const imageLimits = thread !== undefined && versionAtLeast(state.info?.agentVersion ?? "", AGENT_TERMINAL_IMAGES) ? limitsOf(state.info?.attachments) : null;
 	const machinePage = machine === LOCAL_REF ? paths.machines() : paths.machine(machine);
 	return (
 		<TerminalDock
@@ -146,6 +150,7 @@ export default function TerminalScreen({ machine, thread, openShellIn }: { machi
 			terminal={terminal}
 			back={thread === undefined ? machinePage : undefined}
 			thread={thread}
+			imageLimits={imageLimits}
 			openShellIn={openShellIn}
 			// The request is done: the address goes back to the plain terminal page.
 			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
@@ -176,9 +181,11 @@ export interface TerminalDockProps {
 	onShellOpened?: () => void;
 	store?: LayoutStore;
 	touch?: boolean;
+	/** What the machine takes, when it saves an image for the session's terminal (tunelo 2.7.1+). */
+	imageLimits?: Limits | null;
 }
 
-export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch() }: TerminalDockProps) {
+export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null }: TerminalDockProps) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
@@ -405,6 +412,31 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		terminal.input(focused.session, encoder.encode(text));
 	};
 	const dictation = useDictation(locale, sendRaw);
+	// An image into the session's terminal: sent to the machine, its saved path typed where the AI reads it.
+	const [imageProgress, setImageProgress] = useState<number | null>(null);
+	const [imageError, setImageError] = useState("");
+	const imageAbort = useRef<AbortController | null>(null);
+	useEffect(() => () => imageAbort.current?.abort(), []);
+	const pickImage = (file: File) => {
+		if (thread === undefined || imageLimits === null || focused === null) return;
+		const pane = focused;
+		const abort = new AbortController();
+		imageAbort.current = abort;
+		setImageError("");
+		setImageProgress(0);
+		imageIntoMachine(link, thread.id, file, imageLimits, setImageProgress, abort.signal).then(
+			(path) => {
+				const bracketed = handles.current.get(pane.id)?.bracketedPaste() ?? false;
+				terminal.input(pane.session, encoder.encode(pathInput(path, bracketed)));
+				setImageProgress(null);
+			},
+			(err: unknown) => {
+				setImageProgress(null);
+				if (!abort.signal.aborted) setImageError(err instanceof ImageTooLarge ? tt.keys.imageTooLarge : tt.keys.imageFailed);
+			},
+		);
+	};
+	const liveImage = thread !== undefined && imageLimits !== null ? { progress: imageProgress, error: imageError, pick: pickImage } : undefined;
 	const toggle = (mod: Modifier, sinceLastTapMs: number) => setMods((m) => ({ ...m, [mod]: tapLatch(m[mod], sinceLastTapMs) }));
 	/** Paste from the clipboard into the terminal (the browser may ask first; a refusal pastes nothing). */
 	const paste = () => {
@@ -601,7 +633,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						onKeyboard={toggleKeyboard}
 						onMore={() => setSheet(true)}
 					/>
-					{!keyboardUp && <LiveInput labels={tt.keys} dictation={dictation} onKeyboard={toggleKeyboard} />}
+					{!keyboardUp && <LiveInput labels={tt.keys} dictation={dictation} image={liveImage} onKeyboard={toggleKeyboard} />}
 					{sheet && (
 						<KeySheet
 							t={tt.keys}
