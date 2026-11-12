@@ -9,7 +9,7 @@
 // loại" at the bottom; archived sessions show only behind their own link.
 // While it shows, the folders every machine keeps become workspaces
 // (project-actions.ts), and each session this device opens counts as seen.
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, type MachinesView } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
@@ -74,6 +74,78 @@ export function connDot(conn: Conn): "on" | "wait" | "off" | "pair" | "warn" {
 	}
 }
 
+const rowsIn = (root: HTMLElement | null): HTMLElement[] => (root === null ? [] : [...root.querySelectorAll<HTMLElement>("[data-row]")]);
+
+/**
+ * The column's rows as one list for the keyboard (roving tabindex): one row
+ * is in the tab order (the last one focused, else the open session, else the
+ * first); Up/Down move, Home/End jump, Enter opens (links and buttons do it
+ * themselves), Right opens a folded project, Left folds it or goes up to it.
+ */
+function useRowKeys() {
+	const ref = useRef<HTMLDivElement>(null);
+	const last = useRef<HTMLElement | null>(null);
+	useEffect(() => {
+		const rows = rowsIn(ref.current);
+		const keep = last.current !== null && rows.includes(last.current) ? last.current : (rows.find((r) => r.getAttribute("aria-current") === "page") ?? rows[0]);
+		for (const row of rows) row.tabIndex = row === keep ? 0 : -1;
+	});
+	const focus = (row: HTMLElement | undefined) => {
+		if (row === undefined) return;
+		for (const r of rowsIn(ref.current)) r.tabIndex = r === row ? 0 : -1;
+		last.current = row;
+		row.focus();
+	};
+	// Listened on the column itself: the rows stay plain links and buttons.
+	useEffect(() => {
+		const root = ref.current;
+		if (root === null) return;
+		const onFocus = (event: FocusEvent) => {
+			if (event.target instanceof HTMLElement && event.target.hasAttribute("data-row")) last.current = event.target;
+		};
+		const onKeyDown = (event: KeyboardEvent) => {
+			const row = event.target;
+			if (!(row instanceof HTMLElement) || !row.hasAttribute("data-row")) return;
+			const rows = rowsIn(root);
+			const at = rows.indexOf(row);
+			const toggle = row.classList.contains("mx-project-toggle") ? row : null;
+			switch (event.key) {
+				case "ArrowDown":
+					focus(rows[at + 1]);
+					break;
+				case "ArrowUp":
+					focus(rows[at - 1]);
+					break;
+				case "Home":
+					focus(rows[0]);
+					break;
+				case "End":
+					focus(rows.at(-1));
+					break;
+				case "ArrowRight":
+					if (toggle?.getAttribute("aria-expanded") !== "false") return;
+					toggle.click();
+					break;
+				case "ArrowLeft":
+					if (toggle?.getAttribute("aria-expanded") === "true") toggle.click();
+					else if (toggle === null) focus(row.closest(".mx-project")?.querySelector<HTMLElement>(".mx-project-toggle") ?? undefined);
+					else return;
+					break;
+				default:
+					return;
+			}
+			event.preventDefault();
+		};
+		root.addEventListener("keydown", onKeyDown);
+		root.addEventListener("focusin", onFocus);
+		return () => {
+			root.removeEventListener("keydown", onKeyDown);
+			root.removeEventListener("focusin", onFocus);
+		};
+	}, []);
+	return ref;
+}
+
 export function SessionSidebar({ view }: { view: MachinesView }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
@@ -87,6 +159,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	};
 	const [opened, setOpened] = useState<Record<string, boolean>>(() => readSession(OPEN_KEY, (raw) => (typeof raw === "object" && raw !== null ? (raw as Record<string, boolean>) : {}), {}));
 	const [looseOpen, setLooseOpen] = useState(false);
+	const groups = useRowKeys();
 	const current = view.page === "session" || view.page === "session-terminal" ? { machine: view.machine, thread: view.threadId } : null;
 	const seen = useSeen(machines.flatMap((m) => m.state.threads.map((x) => ({ id: x.id, at: Number(x.updatedAt), open: m.entry.ref === current?.machine && x.id === current.thread }))));
 
@@ -155,11 +228,16 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				>
 					<span className="track" aria-hidden="true" />
 					<span className="grow">{t.sessions.attentionOnly}</span>
-					{attention > 0 && <span className="badge">{attention}</span>}
 				</button>
+				{attention > 0 && (
+					// The count turns the filter on (never off): it names what it shows.
+					<button type="button" className="badge mx-attn-count" aria-label={t.agent.projects.showAttention(attention)} title={t.agent.projects.showAttention(attention)} onClick={() => setFilter("attention")}>
+						{attention}
+					</button>
+				)}
 				<AddProject machines={machines} compact />
 			</div>
-			<div className="mx-groups" aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
+			<div className="mx-groups" ref={groups} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
 				{snapshot.status === "loading" && machines.length > 0 && (
 					<ul className="mx-rows skeleton" aria-hidden="true">
 						<li />

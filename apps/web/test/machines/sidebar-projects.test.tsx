@@ -117,17 +117,25 @@ describe("the project column", () => {
 		// The project needing the user is open, with its workspace: folder, branch, state dot.
 		expect(within(app).getByText("t1")).toBeTruthy();
 		expect(within(app).getByText("t2")).toBeTruthy();
-		expect(within(app).getByText("feature-x")).toBeTruthy();
-		expect(app.querySelector(".mx-wdot.need")).toBeTruthy();
+		// The workspace is titled by its branch, the folder under it; never the project's name again.
+		const title = app.querySelector(".mx-ws-title b");
+		expect(title?.textContent).toBe("feature-x");
+		// The folder is the project's name: not said again under the branch.
+		expect(app.querySelector(".mx-ws-sub")).toBeNull();
+		// States are glyphs: the workspace and its waiting session need the user, the idle one is a hollow circle.
+		expect(app.querySelector(".mx-ws-head .mx-glyph.need")?.getAttribute("aria-label")).toBe("Cần bạn");
+		// The project row counts what needs the user instead of a glyph.
+		expect(app.querySelector(".mx-project-head .badge")?.textContent).toBe("1");
+		expect(app.querySelectorAll(".mx-srow .mx-glyph.need")).toHaveLength(1);
+		expect(app.querySelectorAll(".mx-srow .mx-glyph.idle")).toHaveLength(1);
 		// Every workspace row names its machine, even with one machine (owner, 11/12/2026); no machine header row.
 		const rows = [...list.querySelectorAll(".mx-ws")];
 		expect(rows.length).toBeGreaterThan(0);
 		for (const row of rows) {
 			const chip = row.querySelector(".mx-ws-head .mx-ws-host");
 			expect(chip?.textContent).toBe("Mac mini");
-			// Laid out, never stacked: the folder on its own line, the branch and the chip on the second.
-			expect(chip?.parentElement?.className).toBe("mx-ws-sub");
-			expect(row.querySelector(".mx-ws-name > b")?.closest(".mx-ws-sub")).toBeNull();
+			// On the title line, at its end.
+			expect(chip?.parentElement?.className).toBe("mx-ws-title");
 		}
 		expect(list.querySelector(".mx-group-head")).toBeNull();
 		// "docs" has nothing for the user: folded.
@@ -215,6 +223,40 @@ describe("the project column", () => {
 		await waitFor(() => expect(within(list).queryByText("t2")).toBeNull());
 		expect(within(list).getByText("t1")).toBeTruthy();
 		expect(within(list).queryByText("docs")).toBeNull();
+	});
+
+	it("the count on the switch turns the filter on; it never turns it off", async () => {
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		await within(list).findByText("t2", undefined, WAIT);
+		const count = within(list).getByRole("button", { name: "Chỉ hiện 1 mục cần bạn hoặc đang chạy" });
+		await userEvent.click(count);
+		expect(within(list).getByRole("switch").getAttribute("aria-checked")).toBe("true");
+		await userEvent.click(within(list).getByRole("button", { name: "Chỉ hiện 1 mục cần bạn hoặc đang chạy" }));
+		expect(within(list).getByRole("switch").getAttribute("aria-checked")).toBe("true");
+	});
+
+	it("the keyboard: one row in the tab order, arrows move, Left and Right fold and open a project, Enter opens", async () => {
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		await within(list).findByText("t2", undefined, WAIT);
+		await waitFor(() => expect(list.querySelectorAll(".mx-project-toggle")).toHaveLength(3), WAIT);
+		const rows = () => [...list.querySelectorAll<HTMLElement>(".mx-groups [data-row]")];
+		await waitFor(() => expect(rows().filter((r) => r.tabIndex === 0)).toHaveLength(1));
+		const app = projectRow(list, "app").querySelector<HTMLElement>(".mx-project-toggle");
+		if (app === null) throw new Error("no project row");
+		app.focus();
+		await userEvent.keyboard("{ArrowDown}");
+		expect(document.activeElement?.textContent).toContain("t1");
+		expect((document.activeElement as HTMLElement).tabIndex).toBe(0);
+		expect(app.tabIndex).toBe(-1);
+		// Left from a session goes up to its project; Left again folds it; Right opens it.
+		await userEvent.keyboard("{ArrowLeft}");
+		expect(document.activeElement).toBe(app);
+		await userEvent.keyboard("{ArrowLeft}");
+		expect(app.getAttribute("aria-expanded")).toBe("false");
+		await userEvent.keyboard("{ArrowRight}");
+		expect(app.getAttribute("aria-expanded")).toBe("true");
+		await userEvent.keyboard("{ArrowDown}{Enter}");
+		await waitFor(() => expect(window.location.pathname).toBe("/ai/1/s/t1"));
 	});
 
 	it("nothing on any machine: one empty state for the whole list", async () => {

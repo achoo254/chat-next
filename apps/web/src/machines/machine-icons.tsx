@@ -65,6 +65,29 @@ const PATHS = {
 		</>
 	),
 	gauge: <path d="M4 18a8 8 0 1 1 16 0M12 18l4-6" />,
+	// A session's state in the AI Agent column (status-glyph): working, done, needs the user, failed, idle.
+	spinner: <path d="M12 3a9 9 0 1 0 9 9" />,
+	"check-circle": (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M8 12.5l2.5 2.5L16 9.5" />
+		</>
+	),
+	"alert-circle": (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 7.5v5.5M12 16.5h.01" />
+		</>
+	),
+	"x-circle": (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M9 9l6 6M15 9l-6 6" />
+		</>
+	),
+	circle: <circle cx="12" cy="12" r="8" />,
+	// The session's AI (any provider): a spark.
+	spark: <path d="M12 3c.5 4.5 2 6.5 6.5 7-.1.1 0 0 0 0-4.5.5-6 2.5-6.5 7-.5-4.5-2-6.5-6.5-7 4.5-.5 6-2.5 6.5-7z" />,
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 } satisfies Record<string, ReactElement>;
 

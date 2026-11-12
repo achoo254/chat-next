@@ -1,12 +1,14 @@
-// The projects in the AI Agent column: a project row (folded unless it is
-// the selected one or something in it needs the user or runs), its
-// workspaces, each on two lines: a state dot and the folder name (its whole
-// width, cut last), "+" for a new session in the mode last used and a menu
-// (on hover or focus, always on touch); then the git branch and the
-// machine's short name, always shown (dimmed while that machine is offline),
-// each with its three newest sessions and "Xem thêm". An empty project offers "Thêm workspace". At the bottom, folded,
+// The projects in the AI Agent column, as Orca lays them out but calmer: a
+// project row (folder icon, bold name, the state of the most urgent of its
+// workspaces, "⋮" on hover), folded unless it is the selected one or
+// something in it needs the user or runs; its workspaces, each titled by its
+// git branch with the folder under it ("primary" on the main checkout, the
+// machine's short name always on the right), "+" for a new session in the
+// mode last used and a menu; under each its three newest sessions and "Xem
+// thêm". An empty project offers "Thêm workspace". At the bottom, folded,
 // "Chưa phân loại (n)": folders whose sessions no workspace holds, each
-// offering "Tạo dự án" and "Thêm vào dự án…". The dialogs load when opened.
+// offering "Tạo dự án" and "Thêm vào dự án…". Rows carry data-row for the
+// column's arrow keys. The dialogs load when opened.
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
@@ -17,9 +19,9 @@ import type { AgentProjectsStore } from "./agent-projects-store.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { NewSession } from "./new-session.tsx";
 import { folderName } from "./new-session-hints.ts";
-import { adoptStarted, isNeedsConsent, knownFolder, placeByHand } from "./project-actions.ts";
-import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceNode, type WorkStatus, shortHost, unseenDone } from "./project-tree.ts";
-import { SessionRow } from "./session-row.tsx";
+import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace, workspaceRemote } from "./project-actions.ts";
+import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, shortHost, unseenDone, workspaceLabels } from "./project-tree.ts";
+import { SessionRow, StatusGlyph } from "./session-row.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { aiName, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -28,6 +30,7 @@ import { usePopover } from "./use-popover.ts";
 const dialogs = () => import("./agent-project-dialogs.tsx");
 const AddWorkspaceDialog = lazy(() => dialogs().then((m) => ({ default: m.AddWorkspaceDialog })));
 const RenameProjectDialog = lazy(() => dialogs().then((m) => ({ default: m.RenameProjectDialog })));
+const LinkRepositoryDialog = lazy(() => dialogs().then((m) => ({ default: m.LinkRepositoryDialog })));
 const DeleteProjectDialog = lazy(() => dialogs().then((m) => ({ default: m.DeleteProjectDialog })));
 const DetachWorkspaceDialog = lazy(() => dialogs().then((m) => ({ default: m.DetachWorkspaceDialog })));
 const PickProjectDialog = lazy(() => dialogs().then((m) => ({ default: m.PickProjectDialog })));
@@ -91,14 +94,6 @@ function HostChip({ name, offline }: { name: string; offline: boolean }) {
 	);
 }
 
-/** The state dot of a workspace or folder; "offline" lies over the last state known. */
-function StatusDot({ status, offline }: { status: WorkStatus; offline: boolean }) {
-	const t = useMachinesCopy();
-	const p = t.agent.projects;
-	const label = offline ? p.offlineStatus(p.status[status]) : p.status[status];
-	return <span className={`mx-wdot ${status}`} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label} />;
-}
-
 /** Sessions of a workspace or folder: the three newest, then "Xem thêm". */
 function Sessions({ machine, threads, ctx }: { machine: MachineView; threads: readonly ThreadSummary[]; ctx: TreeContext }) {
 	const t = useMachinesCopy();
@@ -117,7 +112,7 @@ function Sessions({ machine, threads, ctx }: { machine: MachineView; threads: re
 				))}
 			</ul>
 			{threads.length > SHOWN_SESSIONS && (
-				<button type="button" className="mx-more" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+				<button type="button" className="mx-more" data-row="" aria-expanded={all} onClick={() => setAll((v) => !v)}>
 					{all ? t.agent.projects.less : t.agent.projects.more(threads.length - shown.length)}
 				</button>
 			)}
@@ -159,7 +154,7 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 
 type WorkspaceDialog = "custom" | "settings" | "move" | "detach" | null;
 
-function WorkspaceItem({ node, project, ctx }: { node: WorkspaceNode; project: AgentProject; ctx: TreeContext }) {
+function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; label: WorkspaceLabel; project: AgentProject; ctx: TreeContext }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const { workspace, machine, local } = node;
@@ -171,23 +166,16 @@ function WorkspaceItem({ node, project, ctx }: { node: WorkspaceNode; project: A
 	const missing = local?.missing === true;
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
-			<div className="mx-ws-head">
-				<StatusDot status={node.status} offline={node.offline} />
+			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
+				<StatusGlyph status={node.status} offline={node.offline} />
 				<span className="mx-ws-name">
-					<b title={workspace.dir}>{name}</b>
-					<span className="mx-ws-sub">
-						{missing ? (
-							<small className="mx-ws-missing">{p.missing}</small>
-						) : (
-							node.branch !== "" && (
-								<small className="mx-ws-branch" title={node.branch}>
-									<MachineIcon name="branch" small />
-									<span>{node.branch}</span>
-								</small>
-							)
-						)}
+					<span className="mx-ws-title">
+						{label.byBranch && <MachineIcon name="branch" small />}
+						<b>{label.title}</b>
+						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
 					</span>
+					{(missing || label.sub !== "") && <small className={missing ? "mx-ws-sub mx-ws-missing" : "mx-ws-sub"}>{missing ? p.missing : label.sub}</small>}
 				</span>
 				<span className="mx-ws-acts">
 				<button type="button" className="icon-btn" aria-label={p.newHere(name)} title={p.newHere(name)} disabled={!online || missing || starting} onClick={start}>
@@ -199,6 +187,14 @@ function WorkspaceItem({ node, project, ctx }: { node: WorkspaceNode; project: A
 						online && !missing ? { label: p.newCustom, icon: "plus", run: () => setDialog("custom") } : null,
 						online && local !== undefined ? { label: p.settings, icon: "settings", run: () => setDialog("settings") } : null,
 						ctx.projects.length > 1 ? { label: p.move, icon: "forward", run: () => setDialog("move") } : null,
+						project.workspaces.length > 1
+							? {
+									label: p.split,
+									icon: "external",
+									run: () =>
+										splitWorkspace(ctx.store, workspace, workspaceRemote(machine === null ? null : { id: machine.entry.id, link: machine.link, state: machine.state }, workspace.dir)).catch((err: unknown) => console.warn("ai: could not split the workspace", err)),
+								}
+							: null,
 						{ label: p.detach, icon: "trash", run: () => setDialog("detach"), danger: true },
 					]}
 				/>
@@ -243,7 +239,7 @@ function WorkspaceItem({ node, project, ctx }: { node: WorkspaceNode; project: A
 	);
 }
 
-type ProjectDialog = "rename" | "delete" | "add" | null;
+type ProjectDialog = "rename" | "link" | "delete" | "add" | null;
 
 export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; open: boolean; onToggle: () => void; ctx: TreeContext }) {
 	const t = useMachinesCopy();
@@ -255,18 +251,21 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 		return m === undefined ? null : { id: m.entry.id, link: m.link, state: m.state };
 	};
 	const empty = project.workspaces.length === 0;
+	const labels = workspaceLabels(project.name, node.workspaces);
+	const offline = node.workspaces.length > 0 && node.workspaces.every((w) => w.offline);
 	return (
 		<div className="mx-project" data-id="sidebar-project">
 			<div className="mx-project-head">
-				<button type="button" className="mx-project-toggle" aria-expanded={open} onClick={onToggle}>
-					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
+				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
+					<MachineIcon name="folder" small />
 					<b>{project.name}</b>
 					{node.need > 0 ? (
 						<span className="badge" aria-label={t.sessions.waiting(node.need)}>
 							{node.need}
 						</span>
 					) : (
-						node.status === "running" && <span className="mx-run-dot" role="img" aria-label={t.sessions.state.running} />
+						// The most urgent state of its workspaces; a calm project shows none.
+						node.status !== "idle" && <StatusGlyph status={node.status} offline={offline} />
 					)}
 				</button>
 				<RowMenu
@@ -274,6 +273,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 					items={[
 						{ label: p.addWorkspace, icon: "plus", run: () => setDialog("add") },
 						{ label: p.rename, icon: "edit", run: () => setDialog("rename") },
+						{ label: p.link, icon: "link", run: () => setDialog("link") },
 						{ label: p.remove, icon: "trash", run: () => setDialog("delete"), danger: true },
 					]}
 				/>
@@ -288,11 +288,12 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 						</button>
 					</div>
 				) : (
-					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} project={project} ctx={ctx} />)
+					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} label={labels.get(w.workspace.id) ?? { title: folderName(w.workspace.dir), byBranch: false, sub: "", primary: false }} project={project} ctx={ctx} />)
 				))}
 			<Suspense fallback={null}>
 				{dialog === "add" && <AddWorkspaceDialog store={ctx.store} project={project} machines={ctx.machines} onClose={() => setDialog(null)} />}
 				{dialog === "rename" && <RenameProjectDialog store={ctx.store} project={project} onClose={() => setDialog(null)} />}
+				{dialog === "link" && <LinkRepositoryDialog store={ctx.store} project={project} onClose={() => setDialog(null)} />}
 				{dialog === "delete" && <DeleteProjectDialog store={ctx.store} project={project} hostOf={hostOf} onClose={() => setDialog(null)} />}
 			</Suspense>
 		</div>
@@ -320,15 +321,13 @@ function LooseItem({ folder, ctx }: { folder: LooseFolder; ctx: TreeContext }) {
 	return (
 		<div className="mx-ws">
 			<div className="mx-ws-head">
-				<StatusDot status={folder.status} offline={machine.conn.kind !== "on"} />
-				<span className="mx-ws-name">
-					<b title={dir}>{name}</b>
-					<span className="mx-ws-sub">
-						<small className="mx-ws-branch">
-							<span>{p.sessions(folder.threads.length)}</span>
-						</small>
+				<StatusGlyph status={folder.status} offline={machine.conn.kind !== "on"} />
+				<span className="mx-ws-name" title={`${machine.entry.name} · ${dir}`}>
+					<span className="mx-ws-title">
+						<b>{name}</b>
 						<HostChip name={machine.entry.name} offline={machine.conn.kind !== "on"} />
 					</span>
+					<small className="mx-ws-sub">{p.sessions(folder.threads.length)}</small>
 				</span>
 				<span className="mx-ws-acts">
 				<RowMenu
@@ -374,7 +373,7 @@ export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly
 	return (
 		<div className="mx-project mx-loose" data-id="sidebar-uncategorized">
 			<div className="mx-project-head">
-				<button type="button" className="mx-project-toggle" aria-expanded={open} onClick={onToggle}>
+				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
 					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
 					<b>{t.agent.projects.uncategorized(folders.length)}</b>
 				</button>

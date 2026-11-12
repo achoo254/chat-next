@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../../src/machines/agent-projects-client.ts";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
-import { buildTree, locate, shortHost, statusOf, unseenDone } from "../../src/machines/project-tree.ts";
+import { buildTree, locate, shortHost, statusOf, unseenDone, workspaceLabels } from "../../src/machines/project-tree.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
@@ -121,5 +121,27 @@ describe("the tree", () => {
 		const tree = buildTree([project(1, "A", [ws(1, 1, "/w/a")]), project(2, "B", [ws(2, 1, "/w/b")]), project(3, "Empty", [])], [m], "attention", none);
 		expect(tree.projects.map((p) => p.project.name)).toEqual(["A"]);
 		expect(tree.loose).toEqual([]);
+	});
+});
+
+describe("workspace titles", () => {
+	const node = (id: number, dir: string, branch: string, kind = AgentWorkspaceKind.CLONE, createdAt = id) => ({ workspace: { ...ws(1, 1, dir, branch), id, kind, createdAt }, branch });
+
+	it("the branch, with the folder under it; the folder when two share a branch or there is none; never the project's name alone", () => {
+		const labels = workspaceLabels("app", [node(1, "/w/app", "main"), node(2, "/w/app-fix", "fix/login", AgentWorkspaceKind.WORKTREE), node(3, "/srv/app", "main"), node(4, "/tmp/notes", "")]);
+		expect(labels.get(1)).toEqual({ title: "w/app", byBranch: false, sub: "", primary: true });
+		expect(labels.get(2)).toEqual({ title: "fix/login", byBranch: true, sub: "app-fix", primary: false });
+		expect(labels.get(3)?.title).toBe("srv/app");
+		expect(labels.get(4)).toEqual({ title: "notes", byBranch: false, sub: "", primary: false });
+	});
+
+	it("one workspace: no primary badge; a branch named like the project gives way to the folder", () => {
+		expect(workspaceLabels("app", [node(1, "/w/site", "main")]).get(1)).toEqual({ title: "main", byBranch: true, sub: "site", primary: false });
+		expect(workspaceLabels("main", [node(1, "/w/site", "main")]).get(1)?.title).toBe("site");
+	});
+
+	it("primary is the oldest checkout that is not a git worktree", () => {
+		const labels = workspaceLabels("x", [node(1, "/w/wt", "a", AgentWorkspaceKind.WORKTREE, 1), node(2, "/w/x", "b", AgentWorkspaceKind.CLONE, 5), node(3, "/w/y", "c", AgentWorkspaceKind.FOLDER, 9)]);
+		expect([...labels].filter(([, l]) => l.primary).map(([id]) => id)).toEqual([2]);
 	});
 });

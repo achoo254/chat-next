@@ -35,6 +35,14 @@ service AgentProjectsService {
   // Renames one of the caller's projects. invalid_argument for a bad name,
   // not_found for a project that is not the caller's.
   rpc RenameAgentProject(RenameAgentProjectRequest) returns (RenameAgentProjectResponse);
+  // Changes one of the caller's projects: its name, the git repository it
+  // links, or both (at least one). A git_remote is kept as its canonical key
+  // like CreateAgentProject's, and an empty one unlinks the project; the
+  // workspaces stay where they are. Fails with invalid_argument for a bad
+  // name or remote or a request changing nothing, not_found for a project
+  // that is not the caller's, and already_exists "project_remote_exists"
+  // when another project of the caller links that repository.
+  rpc UpdateAgentProject(UpdateAgentProjectRequest) returns (UpdateAgentProjectResponse);
   // Deletes one of the caller's projects with its workspace records; no
   // folder or session on any machine is touched. not_found as
   // RenameAgentProject.
@@ -124,6 +132,19 @@ message RenameAgentProjectRequest {
 }
 
 message RenameAgentProjectResponse {
+  AgentProject project = 1;
+}
+
+message UpdateAgentProjectRequest {
+  int64 project_id = 1 [jstype = JS_NUMBER];
+  // Set: the new name, as CreateAgentProjectRequest.name.
+  optional string name = 2;
+  // Set: the repository linked from now on, as
+  // CreateAgentProjectRequest.git_remote; "" unlinks the project.
+  optional string git_remote = 3;
+}
+
+message UpdateAgentProjectResponse {
   AgentProject project = 1;
 }
 

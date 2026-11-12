@@ -37,6 +37,15 @@ func errBadProjectName() error {
 	return connect.NewError(connect.CodeInvalidArgument, errors.New("name must be 1 to 64 characters without control characters"))
 }
 
+func errBadGitRemote() error {
+	return connect.NewError(connect.CodeInvalidArgument,
+		errors.New("git_remote must be a remote URL of a repository (https, ssh or user@host:path)"))
+}
+
+func errRemoteExists() error {
+	return connect.NewError(connect.CodeAlreadyExists, errors.New("project_remote_exists: a project links this repository already"))
+}
+
 func errProjectNotFound() error {
 	return connect.NewError(connect.CodeNotFound, errors.New("project_not_found: project not found"))
 }
@@ -73,14 +82,13 @@ func (s *agentProjectsService) CreateAgentProject(ctx context.Context, req *conn
 	var remote string
 	if raw := req.Msg.GetGitRemote(); raw != "" {
 		if remote, ok = gitremote.Canonical(raw); !ok {
-			return nil, connect.NewError(connect.CodeInvalidArgument,
-				errors.New("git_remote must be a remote URL of a repository (https, ssh or user@host:path)"))
+			return nil, errBadGitRemote()
 		}
 	}
 	p, err := s.store.CreateAgentProject(ctx, s.tenantID, sess.UserID, name, remote)
 	switch {
 	case errors.Is(err, store.ErrAgentProjectRemoteExists):
-		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("project_remote_exists: a project links this repository already"))
+		return nil, errRemoteExists()
 	case errors.Is(err, store.ErrTooManyAgentProjects):
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too_many_projects: remove a project first"))
 	case errors.Is(err, store.ErrNotFound):
@@ -110,6 +118,46 @@ func (s *agentProjectsService) RenameAgentProject(ctx context.Context, req *conn
 	}
 	s.changed(ctx, sess.UserID)
 	return connect.NewResponse(&appv1.RenameAgentProjectResponse{Project: agentProjectProto(p)}), nil
+}
+
+func (s *agentProjectsService) UpdateAgentProject(ctx context.Context, req *connect.Request[appv1.UpdateAgentProjectRequest]) (*connect.Response[appv1.UpdateAgentProjectResponse], error) {
+	sess, err := mustSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m := req.Msg
+	if m.Name == nil && m.GitRemote == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("set name, git_remote or both"))
+	}
+	var name, remote *string
+	if m.Name != nil {
+		clean, ok := store.CleanAgentProjectName(m.GetName())
+		if !ok {
+			return nil, errBadProjectName()
+		}
+		name = &clean
+	}
+	if m.GitRemote != nil {
+		key := ""
+		if raw := m.GetGitRemote(); raw != "" {
+			var ok bool
+			if key, ok = gitremote.Canonical(raw); !ok {
+				return nil, errBadGitRemote()
+			}
+		}
+		remote = &key
+	}
+	p, err := s.store.UpdateAgentProject(ctx, s.tenantID, sess.UserID, m.GetProjectId(), name, remote)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, errProjectNotFound()
+	case errors.Is(err, store.ErrAgentProjectRemoteExists):
+		return nil, errRemoteExists()
+	case err != nil:
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
+	}
+	s.changed(ctx, sess.UserID)
+	return connect.NewResponse(&appv1.UpdateAgentProjectResponse{Project: agentProjectProto(p)}), nil
 }
 
 func (s *agentProjectsService) DeleteAgentProject(ctx context.Context, req *connect.Request[appv1.DeleteAgentProjectRequest]) (*connect.Response[appv1.DeleteAgentProjectResponse], error) {

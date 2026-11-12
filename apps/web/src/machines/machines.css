@@ -37,7 +37,8 @@
 .mx-attn[aria-checked="true"] { color: var(--c-text); }
 .mx-attn[aria-checked="true"] .track { background: var(--c-primary); }
 .mx-attn[aria-checked="true"] .track::after { transform: translateX(12px); }
-.mx-attn .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
+.mx-attn-count { position: relative; flex: none; min-width: 18px; height: 18px; padding: 0 5px; border: 0; font: inherit; font-size: 0.6875rem; cursor: pointer; }
+.mx-attn-count::before { content: ""; position: absolute; inset: -13px -8px; }
 .mx-empty-list { display: grid; justify-items: start; gap: var(--space-2); padding: var(--space-4) var(--space-3); }
 .mx-empty-list p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
 .mx-manage .dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); }
@@ -45,7 +46,6 @@
 .mx-groups > .empty { padding: var(--space-6) var(--space-4); }
 .mx-groups { padding-top: var(--space-2); }
 .mx-host { flex: none; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 400; color: var(--c-text-muted); }
-.mx-run-dot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-success); }
 .mx-archived-link { display: block; margin: var(--space-2) var(--space-3) 0; padding: 0; border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; text-decoration: underline; cursor: pointer; }
 /* "Trò chuyện | Terminal": a calm track, the picked side a solid accent pill. */
 .mx-view-switch { display: inline-flex; flex: none; gap: 2px; box-sizing: border-box; height: 40px; padding: 3px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 5%, var(--c-surface)); }
@@ -64,27 +64,28 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-srow:hover, .mx-srow-wrap:hover .mx-srow:not([aria-current="page"]) { background: var(--c-hover); }
 .mx-srow.disabled { cursor: not-allowed; opacity: 0.55; }
 .mx-srow.disabled:hover { background: none; }
-/* Projects > workspaces > sessions: a project row (fold, name, badge, menu), its workspace rows (dot, folder, branch, machine, +, menu), their sessions. */
-.mx-project { margin-top: var(--space-1); }
-.mx-project-head, .mx-ws-head { position: relative; display: flex; align-items: center; gap: 2px; padding: 0 var(--space-1) 0 var(--space-2); }
+/* Projects > workspaces > sessions, one rhythm (--space-3) between projects so each reads as a group: a project row (folder, bold name, the state glyph, "⋮" on hover), its workspace rows (glyph, branch title with the folder under it, "primary", the machine's chip, + and ⋮ on hover), their sessions. */
+.mx-project + .mx-project { margin-top: var(--space-3); }
+.mx-project-head, .mx-ws-head { position: relative; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-1) 0 var(--space-2); }
 .mx-row-menu > .mx-menu { top: 100%; }
 .mx-project-toggle { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.mx-project-toggle b, .mx-ws-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+.mx-project-toggle b, .mx-ws-title b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
 .mx-project-toggle > .icon { flex: none; color: var(--c-icon-muted); }
+.mx-project-toggle[aria-expanded="true"] > .icon { color: var(--c-text-muted); }
 .mx-project-toggle .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
+.mx-project-head > .mx-row-menu { opacity: 0; }
+.mx-project-head:hover > .mx-row-menu, .mx-project-head:focus-within > .mx-row-menu, .mx-project-head > .mx-row-menu:has([aria-expanded="true"]) { opacity: 1; }
 .mx-ws { padding-left: var(--space-3); }
-/* A workspace on two lines: the folder (its whole width, cut last) and the actions; then the branch and the machine's chip. */
-.mx-ws-head { min-height: 44px; gap: var(--space-2); padding-top: 2px; padding-bottom: 2px; }
+.mx-ws-head { min-height: 40px; padding-top: 2px; padding-bottom: 2px; }
 .mx-ws-name { display: grid; flex: 1; min-width: 0; }
-.mx-ws-name > b { display: block; min-width: 0; }
-.mx-ws-sub { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.mx-ws-name b { font-weight: 500; }
-.mx-ws-name small { display: inline-flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
-.mx-ws-branch { flex: 0 1 auto; }
-.mx-ws-branch > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.mx-ws-branch > .icon { flex: none; }
-/* The machine's chip: always there, at the end, never over its neighbours. */
-.mx-ws-host { flex: 0 1 auto; min-width: 2.5rem; max-width: 9rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+.mx-ws-title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.mx-ws-title > .icon { flex: none; color: var(--c-icon-muted); }
+.mx-ws-title b { min-width: 0; font-weight: 500; }
+.mx-ws-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
+.mx-ws-sub.mx-ws-missing { color: var(--c-error-text); }
+.mx-ws-primary { flex: none; padding: 0 5px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); color: var(--c-text-muted); font-size: 0.6875rem; line-height: 1.5; }
+/* The machine's chip: always there, at the end of the title line, cut before the title is. */
+.mx-ws-host { flex: 0 1 auto; min-width: 2.5rem; max-width: 7rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
 .mx-ws-host[data-offline] { border-style: dashed; opacity: 0.7; }
 /* The actions take no room until wanted: over the row's end on hover or focus, in it on touch. */
 .mx-ws-acts { position: absolute; top: 50%; right: var(--space-1); z-index: 1; display: flex; align-items: center; transform: translateY(-50%); border-radius: var(--radius-sm); background: var(--c-surface); opacity: 0; pointer-events: none; }
@@ -93,17 +94,23 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-ws-acts .icon-btn::before { content: ""; position: absolute; inset: -4px; }
 @media (hover: none) {
 	.mx-ws-acts { position: static; transform: none; opacity: 1; pointer-events: auto; background: none; }
+	.mx-project-head > .mx-row-menu { opacity: 1; }
 }
-.mx-ws-name small.mx-ws-missing { color: var(--c-error-text); }
 .mx-ws[data-offline] .mx-ws-name, .mx-ws[data-offline] .mx-rows { opacity: 0.6; }
-.mx-wdot { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
-.mx-wdot.need { background: var(--c-warning); }
-.mx-wdot.failed { background: var(--c-error); }
-.mx-wdot.running { background: var(--c-primary); }
-.mx-wdot.done { background: var(--c-success); }
-.mx-wdot[data-offline] { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 3px var(--c-border-strong); }
+/* State glyphs: working spins (still under reduced motion), done is a check, needs-you an amber alert, failed a cross, idle a hollow circle. */
+.mx-glyph { display: inline-flex; flex: none; color: var(--c-icon-muted); }
+.mx-glyph.need { color: var(--c-warning); }
+.mx-glyph.failed { color: var(--c-error); }
+.mx-glyph.running { color: var(--c-primary); }
+.mx-glyph.running .icon { animation: spin 0.9s linear infinite; }
+.mx-glyph.done { color: var(--c-success); }
+.mx-glyph.idle { opacity: 0.6; }
+.mx-glyph[data-offline] { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon { animation: none; } }
+/* Arrow keys move between rows: one is in the tab order, focus shows. */
+.mx-groups [data-row]:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; border-radius: var(--radius-sm); }
 .mx-ws .mx-rows { flex: none; overflow: visible; padding: 0 0 2px var(--space-2); }
-.mx-more { display: block; min-height: 32px; margin-left: calc(var(--space-2) + 8px + var(--space-2)); padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.mx-more { display: block; min-height: 32px; margin-left: calc(var(--space-2) + 16px + var(--space-2)); padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; cursor: pointer; }
 .mx-more:hover { color: var(--c-text); }
 .mx-ws-empty { display: grid; justify-items: start; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-2) calc(var(--space-2) + 16px + var(--space-2)); }
 .mx-ws-empty p { margin: 0; color: var(--c-text-muted); font-size: 0.8125rem; }
@@ -719,12 +726,11 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-update { display: grid; gap: var(--space-2); margin-top: var(--space-2); min-width: 0; justify-items: start; }
 .mx-update progress { width: min(16rem, 100%); }
 
-/* Session rows: a dot only when it needs the user (amber), runs (accent) or finished unseen (green); the state and time below the title. */
-.mx-srow.slim { grid-template-columns: 8px minmax(0, 1fr); min-height: 48px; }
-.mx-sdot { width: 8px; height: 8px; border-radius: var(--radius-full); }
-.mx-sdot.need { background: var(--c-warning); }
-.mx-sdot.run { background: var(--c-primary); }
-.mx-sdot.done { background: var(--c-success); }
+/* Session rows: the state glyph, the AI and the title with its age, then what the turn does now (or the last message) below. */
+.mx-srow.slim { grid-template-columns: 16px minmax(0, 1fr); min-height: 48px; }
+.mx-row-ai, .mx-row-mode { display: inline-flex; flex: none; color: var(--c-icon-muted); }
+.mx-row-mode { margin-right: 4px; vertical-align: -2px; }
+.mx-srow .sub[data-live] { font-variant-numeric: tabular-nums; }
 /* Thêm dự án / Thêm workspace: the machine, then a folder by hand or one of the recent ones. */
 .mx-pick-folder { display: flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; min-height: 64px; border: 1.5px dashed var(--c-border); border-radius: var(--radius-md); background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 .mx-pick-folder:hover { background: var(--c-hover); }

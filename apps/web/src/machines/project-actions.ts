@@ -9,9 +9,9 @@ import { useEffect, useRef } from "react";
 import { ErrorCode, ErrorReason, type Project } from "@achoo254/chat-proto/remote/remote";
 import type { AgentProject, AgentWorkspace } from "./agent-projects-client.ts";
 import type { AgentProjectsStore, ProjectsSnapshot } from "./agent-projects-store.ts";
-import { remoteMismatch } from "./git-remote.ts";
+import { canonicalRemote, remoteMismatch, remoteUrlFor } from "./git-remote.ts";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
-import { findWorkspace, placeFolder, syncFolders, type FolderInfo, type Placement } from "./project-sync.ts";
+import { findWorkspace, placeFolder, projectForRemote, projectNameFor, remoteKey, repairWorkspaces, syncFolders, type FolderInfo, type KnownRemote, type Placement } from "./project-sync.ts";
 import { locate } from "./project-tree.ts";
 import { projectsSupported, samePath } from "./projects-view.ts";
 
@@ -182,8 +182,62 @@ export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncH
 		placed += result.placed;
 		for (const f of result.failed) console.warn(`ai: could not record ${f.dir} as a workspace`, f.error);
 	}
-	if (placed > 0) await store.refresh();
-	return placed;
+	// A workspace in a project that links another repository goes to its own repository's project (projects linking none are left alone).
+	const moved = await repairWorkspaces(store.api, known, knownRemotes(known, hosts)).catch((err: unknown) => {
+		console.warn("ai: could not move a workspace to its repository's project", err);
+		return 0;
+	});
+	if (placed + moved > 0) await store.refresh();
+	return placed + moved;
+}
+
+/** The repository each workspace's machine (online, keeping projects) reports for its folder now; unknown ones are left out. */
+export function knownRemotes(projects: readonly AgentProject[], hosts: readonly SyncHost[]): KnownRemote[] {
+	const out: KnownRemote[] = [];
+	for (const workspace of projects.flatMap((p) => p.workspaces)) {
+		const host = hosts.find((h) => h.ready && h.id > 0 && h.id === workspace.machineId);
+		const own = host?.state.projects?.projects.find((p) => samePath(p.dir, workspace.dir));
+		const key = own === undefined ? null : remoteKey(own.gitRemote);
+		if (key !== null) out.push({ workspace, key });
+	}
+	return out;
+}
+
+/** The remote the machine reports for a workspace's folder (or "" when it reports none). */
+export function workspaceRemote(host: Host | null, dir: string): string {
+	return host?.state.projects?.projects.find((p) => samePath(p.dir, dir))?.gitRemote ?? "";
+}
+
+/**
+ * "Tách thành dự án riêng": the workspace into a project of its own, the
+ * one linking its repository when its machine reports one (made if none),
+ * else a new project named after its folder. Only a move: nothing is removed.
+ */
+export async function splitWorkspace(store: AgentProjectsStore, workspace: AgentWorkspace, remote: string): Promise<void> {
+	await store.change(async (api) => {
+		const known = [...store.snapshot().projects];
+		const key = remoteKey(remote);
+		const home = known.find((p) => p.id === workspace.projectId);
+		// The project already links that repository (one project per repository): a project of its own without the link.
+		const target =
+			key !== null && home?.gitRemote !== key
+				? (await projectForRemote(api, known, key, remote, projectNameFor({ name: "", remote, dir: workspace.dir }))).id
+				: (await api.create(projectNameFor({ name: "", remote: "", dir: workspace.dir }), "")).id;
+		if (target !== workspace.projectId) await api.move(workspace.id, target);
+	});
+}
+
+/** Links `project` to the repository of `url` ("" unlinks); the next sync pass moves the workspaces of that repository into it. */
+export async function linkRepository(store: AgentProjectsStore, project: AgentProject, url: string): Promise<void> {
+	const key = url.trim() === "" ? "" : canonicalRemote(url);
+	if (key === null) throw new InvalidRemoteError();
+	await store.change((api) => api.link(project.id, key === "" ? "" : remoteUrlFor(key, url)));
+}
+
+export class InvalidRemoteError extends Error {
+	constructor() {
+		super("the address names no git repository");
+	}
 }
 
 const running = new WeakSet<AgentProjectsStore>();
@@ -215,7 +269,7 @@ export function useProjectSync(store: AgentProjectsStore, snapshot: ProjectsSnap
 	});
 	const signature = hosts
 		.filter((h) => h.ready && h.id > 0)
-		.map((h) => `${h.id}:${(h.state.projects?.projects ?? []).map((p) => p.dir).join("|")}`)
+		.map((h) => `${h.id}:${(h.state.projects?.projects ?? []).map((p) => `${p.dir}=${p.gitRemote}`).join("|")}`)
 		.join(",");
 	useEffect(() => {
 		if (snapshot.status !== "ready" || signature === "") return;

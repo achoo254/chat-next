@@ -253,26 +253,41 @@ func (s *Store) CreateAgentProject(ctx context.Context, tenantID string, userID 
 // RenameAgentProject renames one of the user's projects (ErrNotFound
 // otherwise) and returns it with its workspaces; the name must be clean.
 func (s *Store) RenameAgentProject(ctx context.Context, tenantID string, userID, projectID int64, name string) (AgentProject, error) {
-	p, err := scanProject(s.pool.QueryRow(ctx, `
-		UPDATE agent_projects p SET name = $4
-		WHERE p.id = $1 AND p.tenant_id = $2 AND p.user_id = $3
-		RETURNING `+projectColumns, projectID, tenantID, userID, name))
-	if errors.Is(err, ErrNotFound) {
-		return AgentProject{}, err
+	return s.UpdateAgentProject(ctx, tenantID, userID, projectID, &name, nil)
+}
+
+// UpdateAgentProject changes one of the user's projects (ErrNotFound
+// otherwise): its name when name is set (clean), the repository it links
+// when gitRemote is set (a canonical key, or "" to unlink). It returns the
+// project with its workspaces; ErrAgentProjectRemoteExists when another
+// project of the user links that repository. The workspaces stay.
+func (s *Store) UpdateAgentProject(ctx context.Context, tenantID string, userID, projectID int64, name, gitRemote *string) (AgentProject, error) {
+	var remote *string
+	if gitRemote != nil && *gitRemote != "" {
+		remote = gitRemote
 	}
-	if err != nil {
-		return AgentProject{}, fmt.Errorf("store: rename agent project: %w", err)
+	p, err := scanProject(s.pool.QueryRow(ctx, `
+		UPDATE agent_projects p SET name = coalesce($4, p.name), git_remote = CASE WHEN $5 THEN $6 ELSE p.git_remote END
+		WHERE p.id = $1 AND p.tenant_id = $2 AND p.user_id = $3
+		RETURNING `+projectColumns, projectID, tenantID, userID, name, gitRemote != nil, remote))
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return AgentProject{}, err
+	case isUnique(err, agentProjectsRemoteIx):
+		return AgentProject{}, ErrAgentProjectRemoteExists
+	case err != nil:
+		return AgentProject{}, fmt.Errorf("store: update agent project: %w", err)
 	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+workspaceColumns+` FROM agent_workspaces w
 		WHERE w.project_id = $1 AND w.tenant_id = $2 AND w.user_id = $3 ORDER BY w.created_at, w.id`,
 		projectID, tenantID, userID)
 	if err != nil {
-		return AgentProject{}, fmt.Errorf("store: rename agent project: %w", err)
+		return AgentProject{}, fmt.Errorf("store: update agent project: %w", err)
 	}
 	p.Workspaces, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (AgentWorkspace, error) { return scanWorkspace(r) })
 	if err != nil {
-		return AgentProject{}, fmt.Errorf("store: rename agent project: %w", err)
+		return AgentProject{}, fmt.Errorf("store: update agent project: %w", err)
 	}
 	return p, nil
 }

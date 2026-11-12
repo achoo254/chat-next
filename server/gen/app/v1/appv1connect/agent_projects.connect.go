@@ -42,6 +42,9 @@ const (
 	// AgentProjectsServiceRenameAgentProjectProcedure is the fully-qualified name of the
 	// AgentProjectsService's RenameAgentProject RPC.
 	AgentProjectsServiceRenameAgentProjectProcedure = "/app.v1.AgentProjectsService/RenameAgentProject"
+	// AgentProjectsServiceUpdateAgentProjectProcedure is the fully-qualified name of the
+	// AgentProjectsService's UpdateAgentProject RPC.
+	AgentProjectsServiceUpdateAgentProjectProcedure = "/app.v1.AgentProjectsService/UpdateAgentProject"
 	// AgentProjectsServiceDeleteAgentProjectProcedure is the fully-qualified name of the
 	// AgentProjectsService's DeleteAgentProject RPC.
 	AgentProjectsServiceDeleteAgentProjectProcedure = "/app.v1.AgentProjectsService/DeleteAgentProject"
@@ -70,6 +73,14 @@ type AgentProjectsServiceClient interface {
 	// Renames one of the caller's projects. invalid_argument for a bad name,
 	// not_found for a project that is not the caller's.
 	RenameAgentProject(context.Context, *connect.Request[v1.RenameAgentProjectRequest]) (*connect.Response[v1.RenameAgentProjectResponse], error)
+	// Changes one of the caller's projects: its name, the git repository it
+	// links, or both (at least one). A git_remote is kept as its canonical key
+	// like CreateAgentProject's, and an empty one unlinks the project; the
+	// workspaces stay where they are. Fails with invalid_argument for a bad
+	// name or remote or a request changing nothing, not_found for a project
+	// that is not the caller's, and already_exists "project_remote_exists"
+	// when another project of the caller links that repository.
+	UpdateAgentProject(context.Context, *connect.Request[v1.UpdateAgentProjectRequest]) (*connect.Response[v1.UpdateAgentProjectResponse], error)
 	// Deletes one of the caller's projects with its workspace records; no
 	// folder or session on any machine is touched. not_found as
 	// RenameAgentProject.
@@ -119,6 +130,12 @@ func NewAgentProjectsServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(agentProjectsServiceMethods.ByName("RenameAgentProject")),
 			connect.WithClientOptions(opts...),
 		),
+		updateAgentProject: connect.NewClient[v1.UpdateAgentProjectRequest, v1.UpdateAgentProjectResponse](
+			httpClient,
+			baseURL+AgentProjectsServiceUpdateAgentProjectProcedure,
+			connect.WithSchema(agentProjectsServiceMethods.ByName("UpdateAgentProject")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteAgentProject: connect.NewClient[v1.DeleteAgentProjectRequest, v1.DeleteAgentProjectResponse](
 			httpClient,
 			baseURL+AgentProjectsServiceDeleteAgentProjectProcedure,
@@ -151,6 +168,7 @@ type agentProjectsServiceClient struct {
 	listAgentProjects    *connect.Client[v1.ListAgentProjectsRequest, v1.ListAgentProjectsResponse]
 	createAgentProject   *connect.Client[v1.CreateAgentProjectRequest, v1.CreateAgentProjectResponse]
 	renameAgentProject   *connect.Client[v1.RenameAgentProjectRequest, v1.RenameAgentProjectResponse]
+	updateAgentProject   *connect.Client[v1.UpdateAgentProjectRequest, v1.UpdateAgentProjectResponse]
 	deleteAgentProject   *connect.Client[v1.DeleteAgentProjectRequest, v1.DeleteAgentProjectResponse]
 	attachAgentWorkspace *connect.Client[v1.AttachAgentWorkspaceRequest, v1.AttachAgentWorkspaceResponse]
 	detachAgentWorkspace *connect.Client[v1.DetachAgentWorkspaceRequest, v1.DetachAgentWorkspaceResponse]
@@ -170,6 +188,11 @@ func (c *agentProjectsServiceClient) CreateAgentProject(ctx context.Context, req
 // RenameAgentProject calls app.v1.AgentProjectsService.RenameAgentProject.
 func (c *agentProjectsServiceClient) RenameAgentProject(ctx context.Context, req *connect.Request[v1.RenameAgentProjectRequest]) (*connect.Response[v1.RenameAgentProjectResponse], error) {
 	return c.renameAgentProject.CallUnary(ctx, req)
+}
+
+// UpdateAgentProject calls app.v1.AgentProjectsService.UpdateAgentProject.
+func (c *agentProjectsServiceClient) UpdateAgentProject(ctx context.Context, req *connect.Request[v1.UpdateAgentProjectRequest]) (*connect.Response[v1.UpdateAgentProjectResponse], error) {
+	return c.updateAgentProject.CallUnary(ctx, req)
 }
 
 // DeleteAgentProject calls app.v1.AgentProjectsService.DeleteAgentProject.
@@ -206,6 +229,14 @@ type AgentProjectsServiceHandler interface {
 	// Renames one of the caller's projects. invalid_argument for a bad name,
 	// not_found for a project that is not the caller's.
 	RenameAgentProject(context.Context, *connect.Request[v1.RenameAgentProjectRequest]) (*connect.Response[v1.RenameAgentProjectResponse], error)
+	// Changes one of the caller's projects: its name, the git repository it
+	// links, or both (at least one). A git_remote is kept as its canonical key
+	// like CreateAgentProject's, and an empty one unlinks the project; the
+	// workspaces stay where they are. Fails with invalid_argument for a bad
+	// name or remote or a request changing nothing, not_found for a project
+	// that is not the caller's, and already_exists "project_remote_exists"
+	// when another project of the caller links that repository.
+	UpdateAgentProject(context.Context, *connect.Request[v1.UpdateAgentProjectRequest]) (*connect.Response[v1.UpdateAgentProjectResponse], error)
 	// Deletes one of the caller's projects with its workspace records; no
 	// folder or session on any machine is touched. not_found as
 	// RenameAgentProject.
@@ -251,6 +282,12 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 		connect.WithSchema(agentProjectsServiceMethods.ByName("RenameAgentProject")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentProjectsServiceUpdateAgentProjectHandler := connect.NewUnaryHandler(
+		AgentProjectsServiceUpdateAgentProjectProcedure,
+		svc.UpdateAgentProject,
+		connect.WithSchema(agentProjectsServiceMethods.ByName("UpdateAgentProject")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentProjectsServiceDeleteAgentProjectHandler := connect.NewUnaryHandler(
 		AgentProjectsServiceDeleteAgentProjectProcedure,
 		svc.DeleteAgentProject,
@@ -283,6 +320,8 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 			agentProjectsServiceCreateAgentProjectHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceRenameAgentProjectProcedure:
 			agentProjectsServiceRenameAgentProjectHandler.ServeHTTP(w, r)
+		case AgentProjectsServiceUpdateAgentProjectProcedure:
+			agentProjectsServiceUpdateAgentProjectHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceDeleteAgentProjectProcedure:
 			agentProjectsServiceDeleteAgentProjectHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceAttachAgentWorkspaceProcedure:
@@ -310,6 +349,10 @@ func (UnimplementedAgentProjectsServiceHandler) CreateAgentProject(context.Conte
 
 func (UnimplementedAgentProjectsServiceHandler) RenameAgentProject(context.Context, *connect.Request[v1.RenameAgentProjectRequest]) (*connect.Response[v1.RenameAgentProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.RenameAgentProject is not implemented"))
+}
+
+func (UnimplementedAgentProjectsServiceHandler) UpdateAgentProject(context.Context, *connect.Request[v1.UpdateAgentProjectRequest]) (*connect.Response[v1.UpdateAgentProjectResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.UpdateAgentProject is not implemented"))
 }
 
 func (UnimplementedAgentProjectsServiceHandler) DeleteAgentProject(context.Context, *connect.Request[v1.DeleteAgentProjectRequest]) (*connect.Response[v1.DeleteAgentProjectResponse], error) {

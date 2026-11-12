@@ -17,7 +17,7 @@ import { canonicalRemote, remoteMismatch, remoteUrlFor } from "./git-remote.ts";
 import { OfflineError, RemoteError } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { folderName } from "./new-session-hints.ts";
-import { deleteProject, detachWorkspace, isNeedsConsent, placeByHand, RemoteMismatchError, type Host } from "./project-actions.ts";
+import { deleteProject, detachWorkspace, InvalidRemoteError, isNeedsConsent, linkRepository, placeByHand, RemoteMismatchError, type Host } from "./project-actions.ts";
 import { FolderPicker } from "./project-dialogs.tsx";
 import { errorText, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -28,6 +28,7 @@ const MAX_NAME = 64;
 function failText(t: MachinesCopy, err: unknown, project?: AgentProject): string {
 	const p = t.agent.projects;
 	if (err instanceof RemoteMismatchError) return p.mismatch(project?.gitRemote ?? p.otherRepo);
+	if (err instanceof InvalidRemoteError) return p.repoInvalid;
 	const refusal = refusalOf(err);
 	if (refusal === "too_many_projects" || refusal === "too_many_workspaces") return p.tooMany;
 	if (refusal === "invalid") return p.repoInvalid;
@@ -375,6 +376,48 @@ export function AddWorkspaceDialog({ store, project, machines, onClose }: { stor
 						)
 					}
 				/>
+			</form>
+		</Modal>
+	);
+}
+
+/** "Liên kết kho git": the repository the project links, set, changed or cleared (checked with the shared rule first). */
+export function LinkRepositoryDialog({ store, project, onClose }: { store: AgentProjectsStore; project: AgentProject; onClose: () => void }) {
+	const t = useMachinesCopy();
+	const p = t.agent.projects;
+	const id = useDomId("link-agent-project");
+	const [url, setUrl] = useState(project.gitRemote === "" ? "" : `https://${project.gitRemote}`);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const key = url.trim() === "" ? "" : canonicalRemote(url);
+	const save = (event: FormEvent) => {
+		event.preventDefault();
+		if (key === null) return setError(p.repoInvalid);
+		setBusy(true);
+		setError("");
+		linkRepository(store, project, url).then(onClose, (err: unknown) => {
+			setBusy(false);
+			setError(failText(t, err));
+		});
+	};
+	return (
+		<Modal labelledBy={id} onClose={onClose}>
+			<DialogHead id={id} title={p.linkTitle(project.name)} onClose={onClose} />
+			<form className="dlg-body stack" onSubmit={save}>
+				<label className="mx-field-row">
+					<span>{p.repo}</span>
+					<input
+						className="input mono"
+						value={url}
+						spellCheck={false}
+						autoComplete="off"
+						placeholder="https://github.com/user/repo"
+						aria-invalid={key === null}
+						onChange={(event) => setUrl(event.target.value)}
+					/>
+				</label>
+				<p className="muted">{p.linkHint}</p>
+				<Foot error={error} busy={busy || key === null || key === project.gitRemote} submit={p.linkSave} onClose={onClose} />
 			</form>
 		</Modal>
 	);

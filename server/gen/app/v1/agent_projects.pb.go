@@ -543,6 +543,113 @@ func (x *RenameAgentProjectResponse) GetProject() *AgentProject {
 	return nil
 }
 
+type UpdateAgentProjectRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId int64                  `protobuf:"varint,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	// Set: the new name, as CreateAgentProjectRequest.name.
+	Name *string `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	// Set: the repository linked from now on, as
+	// CreateAgentProjectRequest.git_remote; "" unlinks the project.
+	GitRemote     *string `protobuf:"bytes,3,opt,name=git_remote,json=gitRemote,proto3,oneof" json:"git_remote,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentProjectRequest) Reset() {
+	*x = UpdateAgentProjectRequest{}
+	mi := &file_app_v1_agent_projects_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentProjectRequest) ProtoMessage() {}
+
+func (x *UpdateAgentProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_agent_projects_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentProjectRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentProjectRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateAgentProjectRequest) GetProjectId() int64 {
+	if x != nil {
+		return x.ProjectId
+	}
+	return 0
+}
+
+func (x *UpdateAgentProjectRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateAgentProjectRequest) GetGitRemote() string {
+	if x != nil && x.GitRemote != nil {
+		return *x.GitRemote
+	}
+	return ""
+}
+
+type UpdateAgentProjectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Project       *AgentProject          `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentProjectResponse) Reset() {
+	*x = UpdateAgentProjectResponse{}
+	mi := &file_app_v1_agent_projects_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentProjectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentProjectResponse) ProtoMessage() {}
+
+func (x *UpdateAgentProjectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_agent_projects_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentProjectResponse.ProtoReflect.Descriptor instead.
+func (*UpdateAgentProjectResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UpdateAgentProjectResponse) GetProject() *AgentProject {
+	if x != nil {
+		return x.Project
+	}
+	return nil
+}
+
 type DeleteAgentProjectRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId     int64                  `protobuf:"varint,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
@@ -552,7 +659,7 @@ type DeleteAgentProjectRequest struct {
 
 func (x *DeleteAgentProjectRequest) Reset() {
 	*x = DeleteAgentProjectRequest{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[8]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +671,7 @@ func (x *DeleteAgentProjectRequest) String() string {
 func (*DeleteAgentProjectRequest) ProtoMessage() {}
 
 func (x *DeleteAgentProjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[8]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +684,7 @@ func (x *DeleteAgentProjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentProjectRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAgentProjectRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{8}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteAgentProjectRequest) GetProjectId() int64 {
@@ -595,7 +702,7 @@ type DeleteAgentProjectResponse struct {
 
 func (x *DeleteAgentProjectResponse) Reset() {
 	*x = DeleteAgentProjectResponse{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[9]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -607,7 +714,7 @@ func (x *DeleteAgentProjectResponse) String() string {
 func (*DeleteAgentProjectResponse) ProtoMessage() {}
 
 func (x *DeleteAgentProjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[9]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -620,7 +727,7 @@ func (x *DeleteAgentProjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentProjectResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAgentProjectResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{11}
 }
 
 type AttachAgentWorkspaceRequest struct {
@@ -640,7 +747,7 @@ type AttachAgentWorkspaceRequest struct {
 
 func (x *AttachAgentWorkspaceRequest) Reset() {
 	*x = AttachAgentWorkspaceRequest{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[10]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -652,7 +759,7 @@ func (x *AttachAgentWorkspaceRequest) String() string {
 func (*AttachAgentWorkspaceRequest) ProtoMessage() {}
 
 func (x *AttachAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[10]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -665,7 +772,7 @@ func (x *AttachAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachAgentWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*AttachAgentWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{10}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *AttachAgentWorkspaceRequest) GetProjectId() int64 {
@@ -712,7 +819,7 @@ type AttachAgentWorkspaceResponse struct {
 
 func (x *AttachAgentWorkspaceResponse) Reset() {
 	*x = AttachAgentWorkspaceResponse{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[11]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -724,7 +831,7 @@ func (x *AttachAgentWorkspaceResponse) String() string {
 func (*AttachAgentWorkspaceResponse) ProtoMessage() {}
 
 func (x *AttachAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[11]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -737,7 +844,7 @@ func (x *AttachAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachAgentWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*AttachAgentWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{11}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AttachAgentWorkspaceResponse) GetWorkspace() *AgentWorkspace {
@@ -756,7 +863,7 @@ type DetachAgentWorkspaceRequest struct {
 
 func (x *DetachAgentWorkspaceRequest) Reset() {
 	*x = DetachAgentWorkspaceRequest{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[12]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -768,7 +875,7 @@ func (x *DetachAgentWorkspaceRequest) String() string {
 func (*DetachAgentWorkspaceRequest) ProtoMessage() {}
 
 func (x *DetachAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[12]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -781,7 +888,7 @@ func (x *DetachAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetachAgentWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*DetachAgentWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{12}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DetachAgentWorkspaceRequest) GetWorkspaceId() int64 {
@@ -799,7 +906,7 @@ type DetachAgentWorkspaceResponse struct {
 
 func (x *DetachAgentWorkspaceResponse) Reset() {
 	*x = DetachAgentWorkspaceResponse{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[13]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +918,7 @@ func (x *DetachAgentWorkspaceResponse) String() string {
 func (*DetachAgentWorkspaceResponse) ProtoMessage() {}
 
 func (x *DetachAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[13]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +931,7 @@ func (x *DetachAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetachAgentWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*DetachAgentWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{13}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{15}
 }
 
 type MoveAgentWorkspaceRequest struct {
@@ -838,7 +945,7 @@ type MoveAgentWorkspaceRequest struct {
 
 func (x *MoveAgentWorkspaceRequest) Reset() {
 	*x = MoveAgentWorkspaceRequest{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[14]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +957,7 @@ func (x *MoveAgentWorkspaceRequest) String() string {
 func (*MoveAgentWorkspaceRequest) ProtoMessage() {}
 
 func (x *MoveAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[14]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +970,7 @@ func (x *MoveAgentWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveAgentWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*MoveAgentWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{14}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *MoveAgentWorkspaceRequest) GetWorkspaceId() int64 {
@@ -889,7 +996,7 @@ type MoveAgentWorkspaceResponse struct {
 
 func (x *MoveAgentWorkspaceResponse) Reset() {
 	*x = MoveAgentWorkspaceResponse{}
-	mi := &file_app_v1_agent_projects_proto_msgTypes[15]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -901,7 +1008,7 @@ func (x *MoveAgentWorkspaceResponse) String() string {
 func (*MoveAgentWorkspaceResponse) ProtoMessage() {}
 
 func (x *MoveAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_agent_projects_proto_msgTypes[15]
+	mi := &file_app_v1_agent_projects_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -914,7 +1021,7 @@ func (x *MoveAgentWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveAgentWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*MoveAgentWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{15}
+	return file_app_v1_agent_projects_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MoveAgentWorkspaceResponse) GetWorkspace() *AgentWorkspace {
@@ -965,6 +1072,16 @@ const file_app_v1_agent_projects_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\x03B\x020\x02R\tprojectId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"L\n" +
 	"\x1aRenameAgentProjectResponse\x12.\n" +
+	"\aproject\x18\x01 \x01(\v2\x14.app.v1.AgentProjectR\aproject\"\x93\x01\n" +
+	"\x19UpdateAgentProjectRequest\x12!\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\x03B\x020\x02R\tprojectId\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"git_remote\x18\x03 \x01(\tH\x01R\tgitRemote\x88\x01\x01B\a\n" +
+	"\x05_nameB\r\n" +
+	"\v_git_remote\"L\n" +
+	"\x1aUpdateAgentProjectResponse\x12.\n" +
 	"\aproject\x18\x01 \x01(\v2\x14.app.v1.AgentProjectR\aproject\">\n" +
 	"\x19DeleteAgentProjectRequest\x12!\n" +
 	"\n" +
@@ -993,11 +1110,12 @@ const file_app_v1_agent_projects_proto_rawDesc = "" +
 	" AGENT_WORKSPACE_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aAGENT_WORKSPACE_KIND_CLONE\x10\x01\x12!\n" +
 	"\x1dAGENT_WORKSPACE_KIND_WORKTREE\x10\x02\x12\x1f\n" +
-	"\x1bAGENT_WORKSPACE_KIND_FOLDER\x10\x032\xaa\x05\n" +
+	"\x1bAGENT_WORKSPACE_KIND_FOLDER\x10\x032\x87\x06\n" +
 	"\x14AgentProjectsService\x12X\n" +
 	"\x11ListAgentProjects\x12 .app.v1.ListAgentProjectsRequest\x1a!.app.v1.ListAgentProjectsResponse\x12[\n" +
 	"\x12CreateAgentProject\x12!.app.v1.CreateAgentProjectRequest\x1a\".app.v1.CreateAgentProjectResponse\x12[\n" +
 	"\x12RenameAgentProject\x12!.app.v1.RenameAgentProjectRequest\x1a\".app.v1.RenameAgentProjectResponse\x12[\n" +
+	"\x12UpdateAgentProject\x12!.app.v1.UpdateAgentProjectRequest\x1a\".app.v1.UpdateAgentProjectResponse\x12[\n" +
 	"\x12DeleteAgentProject\x12!.app.v1.DeleteAgentProjectRequest\x1a\".app.v1.DeleteAgentProjectResponse\x12a\n" +
 	"\x14AttachAgentWorkspace\x12#.app.v1.AttachAgentWorkspaceRequest\x1a$.app.v1.AttachAgentWorkspaceResponse\x12a\n" +
 	"\x14DetachAgentWorkspace\x12#.app.v1.DetachAgentWorkspaceRequest\x1a$.app.v1.DetachAgentWorkspaceResponse\x12[\n" +
@@ -1016,7 +1134,7 @@ func file_app_v1_agent_projects_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_agent_projects_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_agent_projects_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_app_v1_agent_projects_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_app_v1_agent_projects_proto_goTypes = []any{
 	(AgentWorkspaceKind)(0),              // 0: app.v1.AgentWorkspaceKind
 	(*AgentProject)(nil),                 // 1: app.v1.AgentProject
@@ -1027,14 +1145,16 @@ var file_app_v1_agent_projects_proto_goTypes = []any{
 	(*CreateAgentProjectResponse)(nil),   // 6: app.v1.CreateAgentProjectResponse
 	(*RenameAgentProjectRequest)(nil),    // 7: app.v1.RenameAgentProjectRequest
 	(*RenameAgentProjectResponse)(nil),   // 8: app.v1.RenameAgentProjectResponse
-	(*DeleteAgentProjectRequest)(nil),    // 9: app.v1.DeleteAgentProjectRequest
-	(*DeleteAgentProjectResponse)(nil),   // 10: app.v1.DeleteAgentProjectResponse
-	(*AttachAgentWorkspaceRequest)(nil),  // 11: app.v1.AttachAgentWorkspaceRequest
-	(*AttachAgentWorkspaceResponse)(nil), // 12: app.v1.AttachAgentWorkspaceResponse
-	(*DetachAgentWorkspaceRequest)(nil),  // 13: app.v1.DetachAgentWorkspaceRequest
-	(*DetachAgentWorkspaceResponse)(nil), // 14: app.v1.DetachAgentWorkspaceResponse
-	(*MoveAgentWorkspaceRequest)(nil),    // 15: app.v1.MoveAgentWorkspaceRequest
-	(*MoveAgentWorkspaceResponse)(nil),   // 16: app.v1.MoveAgentWorkspaceResponse
+	(*UpdateAgentProjectRequest)(nil),    // 9: app.v1.UpdateAgentProjectRequest
+	(*UpdateAgentProjectResponse)(nil),   // 10: app.v1.UpdateAgentProjectResponse
+	(*DeleteAgentProjectRequest)(nil),    // 11: app.v1.DeleteAgentProjectRequest
+	(*DeleteAgentProjectResponse)(nil),   // 12: app.v1.DeleteAgentProjectResponse
+	(*AttachAgentWorkspaceRequest)(nil),  // 13: app.v1.AttachAgentWorkspaceRequest
+	(*AttachAgentWorkspaceResponse)(nil), // 14: app.v1.AttachAgentWorkspaceResponse
+	(*DetachAgentWorkspaceRequest)(nil),  // 15: app.v1.DetachAgentWorkspaceRequest
+	(*DetachAgentWorkspaceResponse)(nil), // 16: app.v1.DetachAgentWorkspaceResponse
+	(*MoveAgentWorkspaceRequest)(nil),    // 17: app.v1.MoveAgentWorkspaceRequest
+	(*MoveAgentWorkspaceResponse)(nil),   // 18: app.v1.MoveAgentWorkspaceResponse
 }
 var file_app_v1_agent_projects_proto_depIdxs = []int32{
 	2,  // 0: app.v1.AgentProject.workspaces:type_name -> app.v1.AgentWorkspace
@@ -1042,28 +1162,31 @@ var file_app_v1_agent_projects_proto_depIdxs = []int32{
 	1,  // 2: app.v1.ListAgentProjectsResponse.projects:type_name -> app.v1.AgentProject
 	1,  // 3: app.v1.CreateAgentProjectResponse.project:type_name -> app.v1.AgentProject
 	1,  // 4: app.v1.RenameAgentProjectResponse.project:type_name -> app.v1.AgentProject
-	0,  // 5: app.v1.AttachAgentWorkspaceRequest.kind:type_name -> app.v1.AgentWorkspaceKind
-	2,  // 6: app.v1.AttachAgentWorkspaceResponse.workspace:type_name -> app.v1.AgentWorkspace
-	2,  // 7: app.v1.MoveAgentWorkspaceResponse.workspace:type_name -> app.v1.AgentWorkspace
-	3,  // 8: app.v1.AgentProjectsService.ListAgentProjects:input_type -> app.v1.ListAgentProjectsRequest
-	5,  // 9: app.v1.AgentProjectsService.CreateAgentProject:input_type -> app.v1.CreateAgentProjectRequest
-	7,  // 10: app.v1.AgentProjectsService.RenameAgentProject:input_type -> app.v1.RenameAgentProjectRequest
-	9,  // 11: app.v1.AgentProjectsService.DeleteAgentProject:input_type -> app.v1.DeleteAgentProjectRequest
-	11, // 12: app.v1.AgentProjectsService.AttachAgentWorkspace:input_type -> app.v1.AttachAgentWorkspaceRequest
-	13, // 13: app.v1.AgentProjectsService.DetachAgentWorkspace:input_type -> app.v1.DetachAgentWorkspaceRequest
-	15, // 14: app.v1.AgentProjectsService.MoveAgentWorkspace:input_type -> app.v1.MoveAgentWorkspaceRequest
-	4,  // 15: app.v1.AgentProjectsService.ListAgentProjects:output_type -> app.v1.ListAgentProjectsResponse
-	6,  // 16: app.v1.AgentProjectsService.CreateAgentProject:output_type -> app.v1.CreateAgentProjectResponse
-	8,  // 17: app.v1.AgentProjectsService.RenameAgentProject:output_type -> app.v1.RenameAgentProjectResponse
-	10, // 18: app.v1.AgentProjectsService.DeleteAgentProject:output_type -> app.v1.DeleteAgentProjectResponse
-	12, // 19: app.v1.AgentProjectsService.AttachAgentWorkspace:output_type -> app.v1.AttachAgentWorkspaceResponse
-	14, // 20: app.v1.AgentProjectsService.DetachAgentWorkspace:output_type -> app.v1.DetachAgentWorkspaceResponse
-	16, // 21: app.v1.AgentProjectsService.MoveAgentWorkspace:output_type -> app.v1.MoveAgentWorkspaceResponse
-	15, // [15:22] is the sub-list for method output_type
-	8,  // [8:15] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 5: app.v1.UpdateAgentProjectResponse.project:type_name -> app.v1.AgentProject
+	0,  // 6: app.v1.AttachAgentWorkspaceRequest.kind:type_name -> app.v1.AgentWorkspaceKind
+	2,  // 7: app.v1.AttachAgentWorkspaceResponse.workspace:type_name -> app.v1.AgentWorkspace
+	2,  // 8: app.v1.MoveAgentWorkspaceResponse.workspace:type_name -> app.v1.AgentWorkspace
+	3,  // 9: app.v1.AgentProjectsService.ListAgentProjects:input_type -> app.v1.ListAgentProjectsRequest
+	5,  // 10: app.v1.AgentProjectsService.CreateAgentProject:input_type -> app.v1.CreateAgentProjectRequest
+	7,  // 11: app.v1.AgentProjectsService.RenameAgentProject:input_type -> app.v1.RenameAgentProjectRequest
+	9,  // 12: app.v1.AgentProjectsService.UpdateAgentProject:input_type -> app.v1.UpdateAgentProjectRequest
+	11, // 13: app.v1.AgentProjectsService.DeleteAgentProject:input_type -> app.v1.DeleteAgentProjectRequest
+	13, // 14: app.v1.AgentProjectsService.AttachAgentWorkspace:input_type -> app.v1.AttachAgentWorkspaceRequest
+	15, // 15: app.v1.AgentProjectsService.DetachAgentWorkspace:input_type -> app.v1.DetachAgentWorkspaceRequest
+	17, // 16: app.v1.AgentProjectsService.MoveAgentWorkspace:input_type -> app.v1.MoveAgentWorkspaceRequest
+	4,  // 17: app.v1.AgentProjectsService.ListAgentProjects:output_type -> app.v1.ListAgentProjectsResponse
+	6,  // 18: app.v1.AgentProjectsService.CreateAgentProject:output_type -> app.v1.CreateAgentProjectResponse
+	8,  // 19: app.v1.AgentProjectsService.RenameAgentProject:output_type -> app.v1.RenameAgentProjectResponse
+	10, // 20: app.v1.AgentProjectsService.UpdateAgentProject:output_type -> app.v1.UpdateAgentProjectResponse
+	12, // 21: app.v1.AgentProjectsService.DeleteAgentProject:output_type -> app.v1.DeleteAgentProjectResponse
+	14, // 22: app.v1.AgentProjectsService.AttachAgentWorkspace:output_type -> app.v1.AttachAgentWorkspaceResponse
+	16, // 23: app.v1.AgentProjectsService.DetachAgentWorkspace:output_type -> app.v1.DetachAgentWorkspaceResponse
+	18, // 24: app.v1.AgentProjectsService.MoveAgentWorkspace:output_type -> app.v1.MoveAgentWorkspaceResponse
+	17, // [17:25] is the sub-list for method output_type
+	9,  // [9:17] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_agent_projects_proto_init() }
@@ -1071,13 +1194,14 @@ func file_app_v1_agent_projects_proto_init() {
 	if File_app_v1_agent_projects_proto != nil {
 		return
 	}
+	file_app_v1_agent_projects_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_agent_projects_proto_rawDesc), len(file_app_v1_agent_projects_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

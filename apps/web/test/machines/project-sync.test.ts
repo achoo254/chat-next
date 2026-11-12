@@ -10,8 +10,8 @@ import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 type FrameBody = Parameters<MachineLink["request"]>[0];
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentProjectsStore } from "../../src/machines/agent-projects-store.ts";
-import { adoptStarted, detachWorkspace, placeByHand, RemoteMismatchError, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
-import { placeFolder, syncFolders, type FolderInfo } from "../../src/machines/project-sync.ts";
+import { adoptStarted, detachWorkspace, linkRepository, placeByHand, RemoteMismatchError, splitWorkspace, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
+import { misplaced, placeFolder, syncFolders, type FolderInfo } from "../../src/machines/project-sync.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
 
 const folder = (machineId: number, dir: string, remote = "", name = ""): FolderInfo => ({ machineId, dir, remote, branch: remote === "" ? "" : "main", git: remote !== "", name });
@@ -206,5 +206,167 @@ describe("the sync and the app's own actions", () => {
 		expect(mac.sent.map((b) => b.case)).toEqual(["projectRemove"]);
 		expect(store.isDetached({ machineId: 1, dir: "/w/app" })).toBe(false);
 		expect(store.snapshot().projects[0]?.workspaces).toEqual([]);
+	});
+});
+
+/** Projects by name with their folders, sorted, for exact checks. */
+function shape(store: AgentProjectsStore): [string, string, string[]][] {
+	return store
+		.snapshot()
+		.projects.map((p): [string, string, string[]] => [p.name, p.gitRemote, p.workspaces.map((w) => `${w.machineId}:${w.dir}`).sort()])
+		.sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+async function freshStore(server = new FakeAgentProjects()) {
+	const store = new AgentProjectsStore(server.api());
+	await store.refresh();
+	return { server, store };
+}
+
+describe("only the same known repository shares a project", () => {
+	it("three folders without a known remote on two machines: three projects, each named after its folder", async () => {
+		const { store } = await freshStore();
+		// A machine too old to report remotes: every remote is empty.
+		await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/bo-ho-so-hop-nhat-inet")]), host(2, [own("/root")])]);
+		expect(shape(store)).toEqual([
+			["bo-ho-so-hop-nhat-inet", "", ["1:/Users/me/bo-ho-so-hop-nhat-inet"]],
+			["hoandat-app", "", ["1:/Users/me/hoandat-app"]],
+			["root", "", ["2:/root"]],
+		]);
+		expect(await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/bo-ho-so-hop-nhat-inet")]), host(2, [own("/root")])])).toBe(0);
+	});
+
+	it("a folder without a remote never joins an existing project linking none", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("Notes", "", [{ machineId: 1, dir: "/w/notes", branch: "", kind: 3 }]);
+		const { store } = await freshStore(server);
+		await syncHosts(store, [host(1, [own("/w/notes"), own("/w/other")])]);
+		expect(shape(store)).toEqual([
+			["Notes", "", ["1:/w/notes"]],
+			["other", "", ["1:/w/other"]],
+		]);
+	});
+
+	it("two folders of different repositories: two projects", async () => {
+		const { store } = await freshStore();
+		await syncHosts(store, [host(1, [own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git"), own("/w/bo-ho-so", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git")])]);
+		expect(shape(store)).toEqual([
+			["bo-ho-so", "nexus-account.inet.vn/scm/team/bo-ho-so", ["1:/w/bo-ho-so"]],
+			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
+		]);
+	});
+
+	it("one repository on two machines: one project", async () => {
+		const { store } = await freshStore();
+		await syncHosts(store, [host(1, [own("/Users/me/app", "git@github.com:a/app.git")]), host(2, [own("/srv/app", "https://github.com/a/app")])]);
+		expect(shape(store)).toEqual([["app", "github.com/a/app", ["1:/Users/me/app", "2:/srv/app"]]]);
+	});
+});
+
+describe("repairing workspaces grouped with another repository", () => {
+	it("a workspace in a project linking another repository moves to its own repository's project; one with no known remote stays; nothing else changes", async () => {
+		const server = new FakeAgentProjects();
+		const wrong = server.seed("bo-ho-so-hop-nhat-inet", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git", [
+			{ machineId: 1, dir: "/w/bo-ho-so-hop-nhat-inet", branch: "", kind: 1 },
+			{ machineId: 1, dir: "/w/hoandat-app", branch: "", kind: 1 },
+			{ machineId: 2, dir: "/root", branch: "", kind: 3 },
+		]);
+		const { store } = await freshStore(server);
+		const mac = host(1, [own("/w/bo-ho-so-hop-nhat-inet", "https://nexus-account.inet.vn/scm/team/bo-ho-so.git"), own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git")]);
+		const cloud = host(2, [own("/root")]);
+		expect(await syncHosts(store, [mac, cloud])).toBe(1);
+		expect(shape(store)).toEqual([
+			["bo-ho-so-hop-nhat-inet", "nexus-account.inet.vn/scm/team/bo-ho-so", ["1:/w/bo-ho-so-hop-nhat-inet", "2:/root"]],
+			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
+		]);
+		// Only moves: no workspace or project removed, nothing asked of the machines.
+		expect(server.log.filter((x) => x.startsWith("detach:") || x.startsWith("delete:"))).toEqual([]);
+		expect([...mac.sent, ...cloud.sent]).toEqual([]);
+		expect(store.snapshot().projects.find((p) => p.id === wrong.id)).toBeTruthy();
+		// A second pass finds nothing to do.
+		expect(await syncHosts(store, [mac, cloud])).toBe(0);
+	});
+
+	it("a project linking none, holding folders whose remotes are unknown, is the user's grouping: left alone", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("Mine", "", [
+			{ machineId: 1, dir: "/w/a", branch: "", kind: 3 },
+			{ machineId: 2, dir: "/root", branch: "", kind: 3 },
+		]);
+		const { store } = await freshStore(server);
+		expect(await syncHosts(store, [host(1, [own("/w/a")]), host(2, [own("/root")])])).toBe(0);
+		expect(shape(store)).toEqual([["Mine", "", ["1:/w/a", "2:/root"]]]);
+	});
+
+	it("an offline machine's workspaces are never moved (their remote is not known now)", () => {
+		const project = { id: 1, name: "x", gitRemote: "github.com/a/x", order: 0, createdAt: 0, workspaces: [] };
+		expect(misplaced([project], [])).toEqual([]);
+	});
+
+	it("a project linking none is never repaired, even when another project links a workspace's repository", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("Mine", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 1 }]);
+		server.seed("App", "git@github.com:a/app.git");
+		const { store } = await freshStore(server);
+		const mac = host(1, [own("/w/app", "git@github.com:a/app.git")]);
+		expect(await syncHosts(store, [mac])).toBe(0);
+		expect(shape(store)).toEqual([
+			["App", "github.com/a/app", []],
+			["Mine", "", ["1:/w/app"]],
+		]);
+		expect(server.log.filter((x) => x.startsWith("move:"))).toEqual([]);
+	});
+
+	it("after linking a project to a repository: new folders of it join, workspaces placed elsewhere stay, another repository's workspace in it moves out", async () => {
+		const server = new FakeAgentProjects();
+		const plan = server.seed("Kế hoạch", "", [{ machineId: 1, dir: "/w/other", branch: "", kind: 1 }]);
+		server.seed("Mine", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 1 }]);
+		const { store } = await freshStore(server);
+		const own3 = [own("/w/app", "git@github.com:a/app.git"), own("/w/other", "git@github.com:a/other.git")];
+		const mac = host(1, own3);
+		expect(await syncHosts(store, [mac])).toBe(0);
+		const target = store.snapshot().projects.find((p) => p.id === plan.id);
+		if (target === undefined) throw new Error("no project");
+		await linkRepository(store, target, "https://user:tok@github.com/A/App.git");
+		expect(server.projects.find((p) => p.id === plan.id)?.gitRemote).toBe("github.com/a/app");
+		// A clone of the repository the machine adds later joins the linked project.
+		own3.push(own("/srv/app-2", "https://github.com/a/app"));
+		expect(await syncHosts(store, [mac])).toBe(2);
+		expect(shape(store)).toEqual([
+			["Kế hoạch", "github.com/a/app", ["1:/srv/app-2"]],
+			["Mine", "", ["1:/w/app"]],
+			["other", "github.com/a/other", ["1:/w/other"]],
+		]);
+		// A second pass finds nothing to do.
+		expect(await syncHosts(store, [mac])).toBe(0);
+		// A repository another project links is refused; "" unlinks.
+		const other = store.snapshot().projects.find((p) => p.name === "other");
+		if (other === undefined) throw new Error("no project");
+		await expect(linkRepository(store, other, "git@github.com:a/app.git")).rejects.toThrow(/project_remote_exists/);
+		await linkRepository(store, target, "");
+		expect(server.projects.find((p) => p.id === plan.id)?.gitRemote).toBe("");
+	});
+
+	it("'Tách thành dự án riêng': a folder without a remote gets a project named after it; one with a remote goes to its repository's project", async () => {
+		const server = new FakeAgentProjects();
+		const mixed = server.seed("Mixed", "", [
+			{ machineId: 2, dir: "/root", branch: "", kind: 3 },
+			{ machineId: 1, dir: "/w/site", branch: "", kind: 1 },
+			{ machineId: 1, dir: "/w/keep", branch: "", kind: 3 },
+		]);
+		const { store } = await freshStore(server);
+		const ws = (dir: string) => store.snapshot().projects.flatMap((p) => p.workspaces).find((w) => w.dir === dir);
+		const root = ws("/root");
+		const site = ws("/w/site");
+		if (root === undefined || site === undefined) throw new Error("no workspace");
+		await splitWorkspace(store, root, "");
+		await splitWorkspace(store, site, "git@github.com:a/site.git");
+		expect(shape(store)).toEqual([
+			["Mixed", "", ["1:/w/keep"]],
+			["root", "", ["2:/root"]],
+			["site", "github.com/a/site", ["1:/w/site"]],
+		]);
+		expect(store.snapshot().projects.find((p) => p.id === mixed.id)).toBeTruthy();
+		expect(server.log.filter((x) => x.startsWith("detach:") || x.startsWith("delete:"))).toEqual([]);
 	});
 });

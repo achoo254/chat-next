@@ -110,6 +110,21 @@ export class FakeAgentProjects {
 		return this.wire(p);
 	}
 
+	async update(projectId: number, name: string | undefined, gitRemote: string | undefined): Promise<WireProject> {
+		await tick();
+		const p = this.project(projectId);
+		if (name === undefined && gitRemote === undefined) throw new ConnectError("set name, git_remote or both", Code.InvalidArgument);
+		if (gitRemote !== undefined) {
+			const key = gitRemote === "" ? "" : canonicalRemote(gitRemote);
+			if (key === null) throw new ConnectError("invalid git_remote", Code.InvalidArgument);
+			if (key !== "" && this.projects.some((x) => x.id !== projectId && x.gitRemote === key)) throw new ConnectError("project_remote_exists: a project links this repository already", Code.AlreadyExists);
+			p.gitRemote = key;
+			this.log.push(`link:${projectId}:${key}`);
+		}
+		if (name !== undefined) p.name = name.trim();
+		return this.wire(p);
+	}
+
 	async remove(projectId: number): Promise<void> {
 		await tick();
 		this.project(projectId);
@@ -143,6 +158,7 @@ export class FakeAgentProjects {
 			},
 			create: async (name, remote) => toProject(await this.createProject(name, remote)),
 			rename: async (id, name) => toProject(await this.rename(id, name)),
+			link: async (id, remote) => toProject(await this.update(id, undefined, remote)),
 			remove: (id) => this.remove(id),
 			attach: async (id, w) => toWorkspace(this.wireWs(await this.attach(id, w))),
 			detach: (id) => this.detach(id),
@@ -155,6 +171,7 @@ export class FakeAgentProjects {
 			listAgentProjects: () => ({ projects: this.list() }),
 			createAgentProject: async (req) => ({ project: await this.createProject(req.name, req.gitRemote) }),
 			renameAgentProject: async (req) => ({ project: await this.rename(Number(req.projectId), req.name) }),
+			updateAgentProject: async (req) => ({ project: await this.update(Number(req.projectId), req.name, req.gitRemote) }),
 			deleteAgentProject: async (req) => {
 				await this.remove(Number(req.projectId));
 				return {};

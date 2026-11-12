@@ -161,21 +161,29 @@ test("the column speaks of projects only: the machine's folders became projects,
 	await until(page, "three projects", () => document.querySelectorAll(".mx-list .mx-project-toggle").length === 3, 30_000);
 	const names = await list.locator(".mx-project-toggle b").allTextContents();
 	assert.deepEqual([...names].sort(), ["auth-next", "chat-next", "localman-next"]);
-	// The open session's project is open: its workspace with folder, branch and the "needs you" dot, the session inside.
+	// The open session's project is open: its workspace titled by the branch (the folder is the project's name, so not repeated), the "needs you" glyph, the session inside with a glyph, the AI and its live line.
 	const chat = list.locator(".mx-project", { has: page.locator(".mx-project-toggle b", { hasText: /^chat-next$/ }) });
 	assert.equal(await chat.locator(".mx-project-toggle").getAttribute("aria-expanded"), "true");
-	assert.equal(await chat.locator(".mx-ws-name b").first().textContent(), "chat-next");
-	assert.equal(await chat.locator(".mx-ws-name .mx-ws-branch").first().textContent(), "main");
-	assert.equal(await chat.locator(".mx-wdot.need").count(), 1);
-	assert.equal(await chat.locator(".mx-srow", { hasText: "Sửa giao diện Máy của tôi" }).count(), 1);
-	// Every workspace row names its machine with a short chip (owner, 11/12/2026), on the second line, beside the branch and never over it;
-	// no machine header row, and the machines this browser cannot use stay out of the column.
+	assert.equal(await chat.locator(".mx-ws-title b").first().textContent(), "main");
+	assert.equal(await chat.locator(".mx-ws-sub").count(), 0);
+	assert.equal(await chat.locator(".mx-ws-head .mx-glyph.need").count(), 1);
+	const session = chat.locator(".mx-srow", { hasText: "Sửa giao diện Máy của tôi" });
+	assert.equal(await session.count(), 1);
+	assert.equal(await session.locator(".mx-glyph.need").count(), 1);
+	assert.equal(await chat.locator(".mx-srow .mx-glyph.running").count(), 1);
+	// Every workspace names its machine with a short chip at the end of its title line, after the title, never over it.
 	const chip = chat.locator(".mx-ws-host").first();
 	assert.equal(await chip.textContent(), "DIEUVY-LAPTOP");
-	const [chipBox, branchBox, nameBox] = await Promise.all([chip.boundingBox(), chat.locator(".mx-ws-branch").first().boundingBox(), chat.locator(".mx-ws-name > b").first().boundingBox()]);
-	assert.ok(chipBox !== null && branchBox !== null && nameBox !== null);
-	assert.ok(branchBox.x + branchBox.width <= chipBox.x + 0.5, "the branch ends before the chip starts");
-	assert.ok(nameBox.y + nameBox.height <= chipBox.y + 0.5, "the folder name sits above the chip");
+	const [chipBox, titleBox] = await Promise.all([chip.boundingBox(), chat.locator(".mx-ws-title b").first().boundingBox()]);
+	assert.ok(chipBox !== null && titleBox !== null);
+	assert.ok(titleBox.x + titleBox.width <= chipBox.x + 0.5, "the title ends before the chip starts");
+	assert.ok(Math.abs(titleBox.y + titleBox.height / 2 - (chipBox.y + chipBox.height / 2)) < 4, "the chip is on the title line");
+	// The keyboard: one row in the tab order, the arrows move, focus shows.
+	assert.equal(await list.locator(".mx-groups [data-row][tabindex='0']").count(), 1);
+	await chat.locator(".mx-project-toggle").focus();
+	await page.keyboard.press("ArrowDown");
+	const outline = await page.evaluate(() => (document.activeElement === null ? "" : getComputedStyle(document.activeElement).outlineStyle));
+	assert.equal(outline, "solid");
 	const text = (await list.textContent()) ?? "";
 	for (const machineName of ["Mac mini", "Máy nhà"]) assert.ok(!text.includes(machineName), machineName);
 	// The workspace's "+" and menu are real buttons, 44 px high where the row allows it.

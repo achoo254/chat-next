@@ -54,6 +54,8 @@ export interface AgentProjectsApi {
 	/** `gitRemote`: a URL (the server keeps its key), or "" for none. */
 	create(name: string, gitRemote: string): Promise<AgentProject>;
 	rename(projectId: number, name: string): Promise<AgentProject>;
+	/** Links the repository of `gitRemote` (a URL; the server keeps its key) from now on; "" unlinks. */
+	link(projectId: number, gitRemote: string): Promise<AgentProject>;
 	remove(projectId: number): Promise<void>;
 	attach(projectId: number, workspace: WorkspaceInput): Promise<AgentWorkspace>;
 	detach(workspaceId: number): Promise<void>;
@@ -87,6 +89,7 @@ export function createAgentProjectsApi(transport: Transport): AgentProjectsApi {
 		list: async () => (await client.listAgentProjects({})).projects.map(toProject),
 		create: async (name, gitRemote) => toProject(must((await client.createAgentProject({ name, gitRemote })).project, "create")),
 		rename: async (projectId, name) => toProject(must((await client.renameAgentProject({ projectId: BigInt(projectId), name })).project, "rename")),
+		link: async (projectId, gitRemote) => toProject(must((await client.updateAgentProject({ projectId: BigInt(projectId), gitRemote })).project, "link")),
 		remove: async (projectId) => {
 			await client.deleteAgentProject({ projectId: BigInt(projectId) });
 		},

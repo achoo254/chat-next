@@ -58,10 +58,46 @@ export function findWorkspace(projects: readonly AgentProject[], machineId: numb
 
 
 /**
+ * The repository key a folder's remote names, or null: no remote reported
+ * (outside git, or a machine too old to say), or one naming no repository.
+ * A null key never matches anything: a folder without a known remote never
+ * joins another folder's project on its own.
+ */
+export function remoteKey(remote: string): string | null {
+	const key = canonicalRemote(remote);
+	return key === null || key === "" ? null : key;
+}
+
+/** The project linking repository `key`: found, else made (named `name`), else the one another device made a moment ago. */
+export async function projectForRemote(api: AgentProjectsApi, known: AgentProject[], key: string, raw: string, name: string): Promise<{ id: number; created: boolean }> {
+	const linked = known.find((p) => p.gitRemote !== "" && p.gitRemote === key);
+	if (linked !== undefined) return { id: linked.id, created: false };
+	try {
+		const project = await api.create(name, remoteUrlFor(key, raw));
+		known.push(project);
+		return { id: project.id, created: true };
+	} catch (err) {
+		// Another device linked the repository a moment ago: join its project.
+		if (refusalOf(err) !== "project_remote_exists") throw err;
+		const found = (await relist(api, known)).find((p) => p.gitRemote === key);
+		if (found === undefined) throw err;
+		return { id: found.id, created: false };
+	}
+}
+
+/** `known` with `workspace` added to its project (a new object: `known` may share projects with a store's snapshot). */
+function withWorkspace(known: AgentProject[], workspace: AgentWorkspace): void {
+	const at = known.findIndex((p) => p.id === workspace.projectId);
+	const project = known[at];
+	if (project !== undefined) known[at] = { ...project, workspaces: [...project.workspaces, workspace] };
+}
+
+/**
  * Records `folder` as a workspace: of `target` when given (moving it there
  * if it is a workspace of another project already), else of the project
- * linking its repository, else of a new project. `known`: the server's list
- * as this device last read it; it is updated in place.
+ * linking its repository, else of a new project of its own. Only folders
+ * with the same known repository share a project this way. `known`: the
+ * server's list as this device last read it; it is updated in place.
  */
 export async function placeFolder(api: AgentProjectsApi, known: AgentProject[], folder: FolderInfo, target?: number): Promise<Placement> {
 	const existing = findWorkspace(known, folder.machineId, folder.dir);
@@ -69,28 +105,19 @@ export async function placeFolder(api: AgentProjectsApi, known: AgentProject[], 
 	let projectId = target;
 	let created = false;
 	if (projectId === undefined) {
-		const key = canonicalRemote(folder.remote);
-		const linked = key === null ? undefined : known.find((p) => p.gitRemote === key);
-		if (linked !== undefined) projectId = linked.id;
+		const key = remoteKey(folder.remote);
+		if (key !== null) ({ id: projectId, created } = await projectForRemote(api, known, key, folder.remote, projectNameFor(folder)));
 		else {
-			try {
-				const project = await api.create(projectNameFor(folder), key === null ? "" : remoteUrlFor(key, folder.remote));
-				known.push(project);
-				projectId = project.id;
-				created = true;
-			} catch (err) {
-				// Another device linked the repository a moment ago: join its project.
-				if (refusalOf(err) !== "project_remote_exists") throw err;
-				const fresh = await relist(api, known);
-				const found = fresh.find((p) => p.gitRemote === key);
-				if (found === undefined) throw err;
-				projectId = found.id;
-			}
+			// No known repository: a project of its own, never another folder's.
+			const project = await api.create(projectNameFor(folder), "");
+			known.push(project);
+			projectId = project.id;
+			created = true;
 		}
 	}
 	try {
 		const workspace = await api.attach(projectId, { machineId: folder.machineId, dir: folder.dir, branch: folder.branch, kind: workspaceKind(folder) });
-		known.find((p) => p.id === projectId)?.workspaces.push(workspace);
+		withWorkspace(known, workspace);
 		return { projectId, workspaceId: workspace.id };
 	} catch (err) {
 		// Another device recorded the folder a moment ago: that counts.
@@ -104,6 +131,43 @@ export async function placeFolder(api: AgentProjectsApi, known: AgentProject[], 
 		}
 		return settle(api, recorded, target);
 	}
+}
+
+/** A workspace and the repository its machine reports for its folder now. */
+export interface KnownRemote {
+	readonly workspace: AgentWorkspace;
+	/** A repository key (remoteKey), never empty. */
+	readonly key: string;
+}
+
+/**
+ * Workspaces in the wrong project by the repository their machine reports:
+ * the project links another repository. A workspace in a project linking
+ * none is never moved (it may have been put there by hand, and the sync
+ * must not fight the owner), nor one whose remote is unknown.
+ */
+export function misplaced(projects: readonly AgentProject[], remotes: readonly KnownRemote[]): KnownRemote[] {
+	return remotes.filter(({ workspace, key }) => {
+		const home = projects.find((p) => p.id === workspace.projectId);
+		return home !== undefined && home.gitRemote !== "" && home.gitRemote !== key;
+	});
+}
+
+/**
+ * Moves every misplaced workspace (misplaced) to the project linking its
+ * repository, made when there is none. Only moves: no folder, file, session
+ * or record is removed, and a second pass finds nothing to do.
+ */
+export async function repairWorkspaces(api: AgentProjectsApi, known: AgentProject[], remotes: readonly KnownRemote[]): Promise<number> {
+	let moved = 0;
+	for (const { workspace, key } of misplaced(known, remotes)) {
+		const home = await projectForRemote(api, known, key, `https://${key}`, repoName(key));
+		if (home.id === workspace.projectId) continue;
+		await api.move(workspace.id, home.id);
+		moved += 1;
+	}
+	if (moved > 0) await relist(api, known);
+	return moved;
 }
 
 /** `workspace` exists: moved to `target` when that is another project. */

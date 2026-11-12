@@ -5,7 +5,7 @@
 // folder in one tap, a sensitive folder asked first, a folder of another
 // repository refused; "Thêm dự án" from a folder on a picked machine.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, ProjectSchema, TerminalAvailability, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ActivityPhase, ErrorCode, ErrorReason, ProjectSchema, TerminalAvailability, ThreadState, ThreadSummarySchema, type Frame, type Project, type ThreadActivity, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -28,11 +28,18 @@ const ACK = { body: { case: "ack", value: {} } } as unknown as Frame;
 const listing = (path: string): Frame => ({ body: { case: "dirListResult", value: { path, parent: "/", entries: [{ name: "app", git: true, branch: "main" }] } } }) as unknown as Frame;
 
 /** A machine keeping `own` (its folders), answering like tunelo; `answer` first when it returns a frame. */
-function machine(id: number, name: string, own: Project[], options: { answer?: (req: Req) => Promise<Frame | null>; info?: object; suggestions?: { dir: string; sessions: number; gitRemote?: string }[] } = {}) {
+function machine(
+	id: number,
+	name: string,
+	own: Project[],
+	options: { answer?: (req: Req) => Promise<Frame | null>; info?: object; suggestions?: { dir: string; sessions: number; gitRemote?: string }[]; threads?: ThreadSummary[]; activity?: ThreadActivity } = {},
+) {
 	const sent: Req[] = [];
 	const projects = { projects: own, suggestions: (options.suggestions ?? []).map((s) => ({ gitRemote: "", branch: "", ...s })) };
 	const result = () => ({ body: { case: "projectListResult", value: projects } }) as unknown as Frame;
 	const link = {
+		activity: () => options.activity,
+		onActivity: () => () => undefined,
 		request: async (req: Req) => {
 			sent.push(req);
 			const custom = (await options.answer?.(req)) ?? null;
@@ -47,7 +54,7 @@ function machine(id: number, name: string, own: Project[], options: { answer?: (
 			return ACK;
 		},
 	} as unknown as MachineLink;
-	const state = { info: { agentVersion: "2.6.0", providers: [{ id: "claude", name: "Claude Code" }], home: "/w", ...options.info }, threads: [], projects, threadInfo: new Map(), status: { kind: "open" } } as unknown as LinkState;
+	const state = { info: { agentVersion: "2.6.0", providers: [{ id: "claude", name: "Claude Code" }], home: "/w", ...options.info }, threads: options.threads ?? [], projects, threadInfo: new Map(), status: { kind: "open" } } as unknown as LinkState;
 	const view: MachineView = {
 		entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", claudeVersion: "", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, claimed: true },
 		link,
@@ -235,5 +242,64 @@ describe("Thêm dự án from a folder", () => {
 		await userEvent.click(combo);
 		await userEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: /phòng lab/ }));
 		expect(combo.textContent).toBe("Một máy chủ có tên rất dài ở phòng lab");
+	});
+});
+
+describe("a project's git link and splitting a workspace off", () => {
+	it("'Liên kết kho git' checks the address with the shared rule, then links the repository's key", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 1 }]);
+		const { ctx, node } = await oneProject(server, [machine(1, "Mac", []).view]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={ctx} />);
+		await userEvent.click(screen.getByRole("button", { name: "Tuỳ chọn cho dự án App" }));
+		await userEvent.click(screen.getByRole("menuitem", { name: "Liên kết kho git" }));
+		const dialog = await screen.findByRole("dialog", { name: "Liên kết kho git cho App" });
+		const field = within(dialog).getByRole("textbox", { name: "Repo git (tuỳ chọn)" });
+		await userEvent.type(field, "/srv/git/app.git");
+		expect((within(dialog).getByRole("button", { name: "Lưu liên kết" }) as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.clear(field);
+		await userEvent.type(field, "https://user:tok@github.com/A/App.git");
+		await userEvent.click(within(dialog).getByRole("button", { name: "Lưu liên kết" }));
+		await waitFor(() => expect(server.projects[0]?.gitRemote).toBe("github.com/a/app"));
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	});
+
+	it("'Tách thành dự án riêng' shows only in a project with several workspaces, and moves the folder to a project of its own", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("Mixed", "", [
+			{ machineId: 1, dir: "/w/app", branch: "", kind: 3 },
+			{ machineId: 1, dir: "/root", branch: "", kind: 3 },
+		]);
+		const { ctx, node } = await oneProject(server, [machine(1, "Mac", []).view]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={ctx} />);
+		await userEvent.click(screen.getByRole("button", { name: "Tuỳ chọn cho workspace root" }));
+		await userEvent.click(screen.getByRole("menuitem", { name: "Tách thành dự án riêng" }));
+		await waitFor(() => expect(server.projects.map((p) => [p.name, server.workspaces.filter((w) => w.projectId === p.id).map((w) => w.dir)])).toEqual([
+			["Mixed", ["/w/app"]],
+			["root", ["/root"]],
+		]));
+	});
+});
+
+describe("a session row", () => {
+	it("shows a glyph, the AI, its age and what the turn does now, live; a session in the terminal shows an icon, not words", async () => {
+		const now = Date.now();
+		const running = create(ThreadSummarySchema, { id: "r", title: "Sửa lỗi", dir: "/w/app", provider: "claude", state: ThreadState.RUNNING, updatedAt: BigInt(now), open: true });
+		const held = create(ThreadSummarySchema, { id: "h", title: "Trong terminal", dir: "/w/app", provider: "claude", state: ThreadState.IDLE, updatedAt: BigInt(now - 60_000), open: true, terminalSession: 2, busyElsewhere: false });
+		const activity = { threadId: "r", phase: ActivityPhase.TOOL, tool: "Bash", turnStartedAt: BigInt(now - 27_000), outputTokens: 1200n } as unknown as ThreadActivity;
+		const mac = machine(1, "Mac", [], { threads: [running, held], activity });
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 3 }]);
+		const { ctx, node } = await oneProject(server, [mac.view]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={ctx} />);
+		const row = screen.getByText("Sửa lỗi").closest<HTMLElement>(".mx-srow");
+		if (row === null) throw new Error("no row");
+		expect(row.querySelector(".mx-glyph.running")).toBeTruthy();
+		expect(within(row).getByRole("img", { name: "Claude Code" })).toBeTruthy();
+		expect(row.querySelector(".sub")?.textContent).toMatch(/^Đang chạy Bash · 2[7-9] giây · ↓ 1,2\sN token$/);
+		const inTerminal = screen.getByText("Trong terminal").closest<HTMLElement>(".mx-srow");
+		if (inTerminal === null) throw new Error("no row");
+		expect(within(inTerminal).getByRole("img", { name: "Đang chạy trong terminal" })).toBeTruthy();
+		expect(inTerminal.querySelector(".sub")?.textContent).not.toContain("Đang chạy trong terminal");
 	});
 });

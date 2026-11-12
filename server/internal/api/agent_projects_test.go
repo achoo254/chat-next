@@ -148,6 +148,44 @@ func TestAgentProjects(t *testing.T) {
 	if renamed.GetName() != "Chat" || len(renamed.GetWorkspaces()) != 1 {
 		t.Fatalf("renamed %+v", renamed)
 	}
+	// The git link set or changed later: kept as its key, a duplicate refused, unlinked with "", bob changes nothing.
+	str := func(v string) *string { return &v }
+	before := rpcOK(t, updates.GetState, &appv1.GetStateRequest{}).GetState()
+	linkedLater := rpcOK(t, projects.UpdateAgentProject, &appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), GitRemote: str("git@GitHub.com:achoo254/Notes.git")}).GetProject()
+	if linkedLater.GetGitRemote() != "github.com/achoo254/notes" || linkedLater.GetName() != "Notes" {
+		t.Fatalf("linked later %+v", linkedLater)
+	}
+	for _, tc := range []struct {
+		req  *appv1.UpdateAgentProjectRequest
+		code connect.Code
+	}{
+		{&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), GitRemote: str("https://github.com/achoo254/chat-next")}, connect.CodeAlreadyExists},
+		{&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), GitRemote: str("/srv/git/app.git")}, connect.CodeInvalidArgument},
+		{&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), Name: str(" ")}, connect.CodeInvalidArgument},
+		{&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId()}, connect.CodeInvalidArgument},
+		{&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId() + 1000, Name: str("x")}, connect.CodeNotFound},
+	} {
+		if _, err := projects.UpdateAgentProject(ctx, connect.NewRequest(tc.req)); codeOf(err) != tc.code {
+			t.Fatalf("update %+v: %v, want %v", tc.req, err, tc.code)
+		}
+	}
+	if _, err := bobProjects.UpdateAgentProject(ctx, connect.NewRequest(&appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), GitRemote: str("")})); codeOf(err) != connect.CodeNotFound {
+		t.Fatalf("bob unlinks mine: %v", err)
+	}
+	unlinked := rpcOK(t, projects.UpdateAgentProject, &appv1.UpdateAgentProjectRequest{ProjectId: empty.GetId(), GitRemote: str("")}).GetProject()
+	if unlinked.GetGitRemote() != "" {
+		t.Fatalf("unlinked %+v", unlinked)
+	}
+	diff = rpcOK(t, updates.GetDifference, &appv1.GetDifferenceRequest{Pts: before.GetPts(), ServerEpoch: before.GetServerEpoch()}).GetFull()
+	changes = 0
+	for _, u := range diff.GetUpdates() {
+		if u.GetAgentProjectsChanged() != nil {
+			changes++
+		}
+	}
+	if changes != 2 {
+		t.Fatalf("%d agent_projects_changed updates after linking and unlinking", changes)
+	}
 	moved := rpcOK(t, projects.MoveAgentWorkspace, &appv1.MoveAgentWorkspaceRequest{WorkspaceId: ws.GetId(), ProjectId: empty.GetId()}).GetWorkspace()
 	if moved.GetProjectId() != empty.GetId() {
 		t.Fatalf("moved %+v", moved)

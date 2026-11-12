@@ -3,13 +3,17 @@
 // second line ("state · time"). Its menu (hover, or a long press on a phone)
 // opens it in the terminal, archives or deletes it on machines that can
 // (tunelo 2.0.6+). Disabled while its machine cannot be reached.
-import { useState, type MouseEvent } from "react";
+import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import type { MachineInfo, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
-import { Link, navigate, paths } from "../router.tsx";
+import { followInApp, navigate, paths } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
+import { phaseText, tokenCount } from "./activity-line.tsx";
+import { useI18n } from "../i18n/i18n.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { threadStatus, type WorkStatus } from "./project-tree.ts";
+import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
 import { rememberMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
@@ -36,10 +40,11 @@ export function connText(t: MachinesCopy, conn: Conn, now: number): string {
  * running now, the last message (tunelo 2.0.2+), else the state or model.
  * A session opened with no message (it has no name yet) says so.
  */
-export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInfo | null): string {
+export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInfo | null, terminalAsIcon = false): string {
 	const key = stateKey(thread);
 	if (key === "waiting") return t.agent.sub.waiting;
-	if (thread.terminalSession > 0) return t.agent.sub.inTerminal;
+	// The column shows a terminal-held session with an icon; the words stay for other lists.
+	if (thread.terminalSession > 0 && !terminalAsIcon) return t.agent.sub.inTerminal;
 	if (thread.previewTool !== "") return t.agent.sub.tool(thread.previewTool);
 	if (thread.preview !== "") return thread.preview;
 	if (key === "running" || key === "queued" || key === "error") return t.agent.sub[key];
@@ -49,54 +54,116 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
 	return (info?.providers.length ?? 0) > 1 ? `${aiName(info, thread.provider)} · ${model}` : model;
 }
 
+/** The state of a workspace, folder or session as a glyph: spinner, check, alert, cross or a hollow circle; dimmed while offline. */
+export function StatusGlyph({ status, offline = false }: { status: WorkStatus; offline?: boolean }) {
+	const t = useMachinesCopy();
+	const p = t.agent.projects;
+	const label = offline ? p.offlineStatus(p.status[status]) : p.status[status];
+	return (
+		<span className={`mx-glyph ${status}`} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label}>
+			<MachineIcon name={GLYPHS[status]} small />
+		</span>
+	);
+}
+
+/** The list's clock is coarse (it ticks every 30 s): an activity older than the turn by more than this is an earlier turn's. */
+const EARLIER_TURN_MS = 60_000;
+
+const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", idle: "circle" } as const;
+
+/**
+ * The second line: while the machine reports the turn live (the open
+ * session, tunelo 2.5.0+), what it does now, how long it has run and its
+ * tokens ("Đang chạy Bash · 27 giây · ↓ 1,2K token"), ticking each second;
+ * else the line of rowLine. A session in the machine's terminal says so with
+ * an icon.
+ */
+function RowActivity({ machine, thread, fallback, now: listNow }: { machine: MachineView; thread: ThreadSummary; fallback: string; now: number }) {
+	const t = useMachinesCopy();
+	const { locale } = useI18n();
+	const latest = useSyncExternalStore(machine.link.onActivity, () => machine.link.activity(thread.id));
+	const working = isRunning(thread) && !thread.busyElsewhere;
+	// A turn that started while this row showed: an activity from before it belongs to an earlier turn.
+	const [was, setWas] = useState(working);
+	const [since, setSince] = useState<number | null>(null);
+	if (working !== was) {
+		setWas(working);
+		setSince(working ? listNow : null);
+	}
+	const live = working && latest !== undefined && (since === null || Number(latest.turnStartedAt) + EARLIER_TURN_MS >= since);
+	const now = useNow(live);
+	let text = fallback;
+	if (live) {
+		const parts = [phaseText(t, latest), clockText(now - Number(latest.turnStartedAt), t, locale)];
+		if (latest.outputTokens !== undefined) parts.push(t.transcript.activity.tokens(tokenCount(latest.outputTokens, locale)));
+		text = parts.join(" · ");
+	}
+	return (
+		<span className="sub" data-live={live ? "" : undefined}>
+			{thread.terminalSession > 0 && (
+				<span className="mx-row-mode" role="img" aria-label={t.agent.sub.inTerminal} title={t.agent.sub.inTerminal}>
+					<MachineIcon name="terminal" small />
+				</span>
+			)}
+			{text}
+		</span>
+	);
+}
+
 export function SessionRow({ machine, thread, now, current, done }: { machine: MachineView; thread: ThreadSummary; now: number; current: boolean; done: boolean }) {
 	const t = useMachinesCopy();
 	const key = stateKey(thread);
-	const sub = rowLine(t, thread, machine.state.info);
+	const sub = rowLine(t, thread, machine.state.info, true);
 	const manage = threadActionsSupported(machine.state.info) && machine.state.status.kind === "open";
 	const { open, setOpen, ref } = usePopover();
 	const [deleting, setDeleting] = useState(false);
 	const online = machine.conn.kind === "on" || current;
 	const ref_ = machine.entry.ref;
 	const inTerminal = terminalOffered(machine.state.info, thread.provider);
-	const dot = key === "waiting" ? "need" : isRunning(thread) || thread.terminalSession > 0 ? "run" : done ? "done" : "";
+	const status = threadStatus(thread, done);
+	const path = sessionPath(ref_, thread.id, inTerminal);
+	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>
-			<span className={`mx-sdot ${dot}`} aria-hidden="true" />
+			<StatusGlyph status={status} offline={machine.conn.kind !== "on"} />
 			<span className="tx">
 				<span className="line">
+					<span className="mx-row-ai" role="img" aria-label={ai} title={ai}>
+						<MachineIcon name="spark" small />
+					</span>
 					<span className="name">{thread.title || t.agent.newSession}</span>
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
 							{thread.pending}
 						</span>
 					)}
+					<time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
 				</span>
 				<span className="line">
-					<span className="sub">
-						{sub} · <time>{timeAgo(t, Number(thread.updatedAt), now)}</time>
-					</span>
+					<RowActivity machine={machine} thread={thread} fallback={sub} now={now} />
 				</span>
 			</span>
 		</>
 	);
 	const row = online ? (
-		<Link
-			to={sessionPath(ref_, thread.id, inTerminal)}
+		// A plain anchor (not Link): the row is one of the column's arrow-key rows, and a long press on a phone (or a right click) opens its menu.
+		<a
+			href={path}
 			className={`mx-srow slim ${key}`}
-			current={current}
-			// A long press on a phone (or a right click) opens the row's menu.
-			{...(manage
-				? {
-						onContextMenu: (event: MouseEvent) => {
+			aria-current={current ? "page" : undefined}
+			data-row=""
+			onClick={(event) => followInApp(event, path)}
+			onContextMenu={
+				manage
+					? (event: MouseEvent) => {
 							event.preventDefault();
 							setOpen(true);
-						},
-					}
-				: {})}
+						}
+					: undefined
+			}
 		>
 			{content}
-		</Link>
+		</a>
 	) : (
 		<div className={`mx-srow slim ${key} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
 			{content}

@@ -146,6 +146,24 @@ func TestAgentProjects(t *testing.T) {
 	if err != nil || renamed.Name != "Chat" || len(renamed.Workspaces) != 1 {
 		t.Fatalf("rename: %+v %v", renamed, err)
 	}
+	// Linking a repository later, changing it, a duplicate refused, unlinking; the workspaces stay.
+	remote := func(v string) *string { return &v }
+	if p, err := s.UpdateAgentProject(ctx, tenant, me, empty.ID, nil, remote("github.com/achoo254/notes")); err != nil || p.GitRemote != "github.com/achoo254/notes" || p.Name != "Notes" {
+		t.Fatalf("link later: %+v %v", p, err)
+	}
+	if _, err := s.UpdateAgentProject(ctx, tenant, me, empty.ID, nil, remote("github.com/achoo254/chat-next")); !errors.Is(err, store.ErrAgentProjectRemoteExists) {
+		t.Fatalf("link a repository another project links: %v", err)
+	}
+	if _, err := s.UpdateAgentProject(ctx, tenant, bob, empty.ID, nil, remote("")); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("bob unlinks mine: %v", err)
+	}
+	if p, err := s.UpdateAgentProject(ctx, tenant, me, linked.ID, remote("Chat 2"), remote("")); err != nil || p.GitRemote != "" || p.Name != "Chat 2" || len(p.Workspaces) != 1 {
+		t.Fatalf("rename and unlink: %+v %v", p, err)
+	}
+	// Unlinked: the repository is free again, for another project.
+	if p, err := s.UpdateAgentProject(ctx, tenant, me, empty.ID, nil, remote("github.com/achoo254/chat-next")); err != nil || p.GitRemote != "github.com/achoo254/chat-next" {
+		t.Fatalf("relink: %+v %v", p, err)
+	}
 	moved, err := s.MoveAgentWorkspace(ctx, tenant, me, w.ID, empty.ID)
 	if err != nil || moved.ProjectID != empty.ID || moved.MachineID != mac {
 		t.Fatalf("move: %+v %v", moved, err)

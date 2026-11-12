@@ -11,7 +11,7 @@
 // replace it. Projects: those needing the user first, then by their newest
 // session (a project made recently counts as active then).
 import { ThreadState, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
-import type { AgentProject, AgentWorkspace } from "./agent-projects-client.ts";
+import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "./agent-projects-client.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { inFolder, samePath } from "./projects-view.ts";
 import { isRunning, type MachineView } from "./use-machines.ts";
@@ -55,24 +55,17 @@ export function unseenDone(thread: ThreadSummary, seen: SeenMap): boolean {
 
 const RANK: Record<WorkStatus, number> = { need: 0, failed: 1, running: 2, done: 3, idle: 4 };
 
+/** One session's state; `done`: it finished since the user last saw it (unseenDone). */
+export function threadStatus(thread: ThreadSummary, done: boolean): WorkStatus {
+	if (thread.state === ThreadState.WAITING) return "need";
+	if (thread.state === ThreadState.ERROR) return "failed";
+	if (isRunning(thread) || thread.terminalSession > 0) return "running";
+	return done ? "done" : "idle";
+}
+
 /** The state of a set of sessions (archived ones never count). */
 export function statusOf(threads: readonly ThreadSummary[], seen: SeenMap): WorkStatus {
-	let best: WorkStatus = "idle";
-	for (const thread of threads) {
-		if (thread.archived) continue;
-		const status: WorkStatus =
-			thread.state === ThreadState.WAITING
-				? "need"
-				: thread.state === ThreadState.ERROR
-					? "failed"
-					: isRunning(thread) || thread.terminalSession > 0
-						? "running"
-						: unseenDone(thread, seen)
-							? "done"
-							: "idle";
-		if (RANK[status] < RANK[best]) best = status;
-	}
-	return best;
+	return worstStatus(threads.filter((x) => !x.archived).map((x) => threadStatus(x, unseenDone(x, seen))));
 }
 
 export function worstStatus(list: readonly WorkStatus[]): WorkStatus {
@@ -195,4 +188,48 @@ export function locate(projects: readonly AgentProject[], machineId: number, dir
 	);
 	const project = w === undefined ? undefined : projects.find((p) => p.id === w.projectId);
 	return w === undefined || project === undefined ? null : { project, workspace: w };
+}
+
+/** How a workspace row names itself. */
+export interface WorkspaceLabel {
+	/** The branch, else the folder (two workspaces on one branch, no branch); never just the project's name. */
+	readonly title: string;
+	readonly byBranch: boolean;
+	/** The line under it: the folder when the title is the branch; "" otherwise. */
+	readonly sub: string;
+	/** The main checkout (not a git worktree), marked when the project has several workspaces. */
+	readonly primary: boolean;
+}
+
+/** The last two parts of a path ("/Users/me/code/app" → "code/app"). */
+function pathTail(dir: string): string {
+	return dir.split(/[\\/]+/).filter((x) => x !== "").slice(-2).join("/") || dir;
+}
+
+const lastPart = (dir: string): string => dir.split(/[\\/]+/).filter((x) => x !== "").at(-1) ?? dir;
+
+/**
+ * Names for a project's workspace rows, as Orca does: the branch, with the
+ * folder under it (unless it is the project's name); the folder when there is no branch or two workspaces
+ * share it. A title equal to the project's name says more (the folder, or
+ * the folder with its parent), since the project row above already says it.
+ * The primary badge marks the main checkout: the oldest workspace that is
+ * not a git worktree, only when the project has more than one.
+ */
+export function workspaceLabels(projectName: string, nodes: readonly Pick<WorkspaceNode, "workspace" | "branch">[]): Map<number, WorkspaceLabel> {
+	const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+	const main = nodes
+		.filter((n) => n.workspace.kind !== AgentWorkspaceKind.WORKTREE)
+		.sort((a, b) => a.workspace.createdAt - b.workspace.createdAt || a.workspace.id - b.workspace.id)[0];
+	const out = new Map<number, WorkspaceLabel>();
+	for (const n of nodes) {
+		const folder = lastPart(n.workspace.dir);
+		const shared = n.branch !== "" && nodes.some((o) => o !== n && o.branch === n.branch);
+		const byBranch = n.branch !== "" && !shared && !same(n.branch, projectName);
+		const title = byBranch ? n.branch : same(folder, projectName) ? pathTail(n.workspace.dir) : folder;
+		// The folder under the branch, unless it only says the project's name again.
+		const sub = byBranch && !same(folder, projectName) ? folder : "";
+		out.set(n.workspace.id, { title, byBranch, sub, primary: nodes.length > 1 && main === n });
+	}
+	return out;
 }
