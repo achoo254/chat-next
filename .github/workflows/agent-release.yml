@@ -77,8 +77,9 @@ jobs:
           0.* | 1.*) echo "tunelo $VERSION is a Tunelo CLI 1.x version of localman-next; tunelo starts at 2.0.0"; exit 1 ;;
           esac
           # 2: no such tag there. 0: it exists. Anything else: could not ask, so no release.
-          git ls-remote --exit-code --tags https://github.com/achoo254/localman-next "refs/tags/tunelo-v$VERSION" >/dev/null
-          rc=$?
+          # The step's shell runs with -e, so a status of 2 (no such tag, what we want) must not end the step before it is read.
+          rc=0
+          git ls-remote --exit-code --tags https://github.com/achoo254/localman-next "refs/tags/tunelo-v$VERSION" >/dev/null || rc=$?
           if [ "$rc" -eq 0 ]; then echo "tag tunelo-v$VERSION exists in localman-next"; exit 1; fi
           if [ "$rc" -ne 2 ]; then echo "could not list the tags of localman-next (exit $rc)"; exit 1; fi
       # The tests that need the release's runtime run under the same Bun.
