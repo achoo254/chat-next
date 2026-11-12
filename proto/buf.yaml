@@ -9,16 +9,3 @@ lint:
 breaking:
   use:
     - FILE
-  # Tunelo 3.0 drops the pairing, TOTP and install-code messages, fields and RPCs on purpose.
-  ignore_only:
-    FIELD_NO_DELETE:
-      - app/v1/machines.proto
-      - remote/v1/remote.proto
-    ENUM_VALUE_NO_DELETE:
-      - app/v1/machines.proto
-      - remote/v1/remote.proto
-    MESSAGE_NO_DELETE:
-      - app/v1/machines.proto
-      - remote/v1/remote.proto
-    RPC_NO_DELETE:
-      - app/v1/machines.proto
