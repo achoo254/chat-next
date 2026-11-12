@@ -49,7 +49,7 @@
 .mx-archived-link { display: block; margin: var(--space-2) var(--space-3) 0; padding: 0; border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; text-decoration: underline; cursor: pointer; }
 /* "Trò chuyện | Terminal": a calm track, the picked side a solid accent pill. */
 .mx-view-switch { display: inline-flex; flex: none; gap: 2px; box-sizing: border-box; height: 40px; padding: 3px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 5%, var(--c-surface)); }
-.mx-view-switch button { height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
+.mx-view-switch button { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
 .mx-view-switch button:hover:not([aria-pressed="true"]) { color: var(--c-text); background: var(--c-hover); }
 .mx-view-switch button[aria-pressed="true"] { background: var(--c-primary-solid); color: var(--c-on-primary); font-weight: 600; }
 .mx-view-switch button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
@@ -814,4 +814,21 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-mcard-status { justify-items: start; max-width: 100%; flex-basis: 100%; padding-left: calc(40px + var(--space-3)); }
 	.mx-mcard-acts > * { flex: 1 1 auto; }
 	.mx-mcard-acts .btn { justify-content: center; width: 100%; }
+}
+/* Phones: while the keyboard is up (iOS slides it over the page), the session keeps to the visible box
+   (viewport-fit.ts): header on top, composer or key bar right above the keyboard; the page stays still. */
+@media (max-width: 760px), (pointer: coarse) {
+	.mx-chat[data-keyboard] { position: fixed; z-index: 40; left: 0; right: 0; top: var(--vf-t, 0px); height: var(--vf-h, 100dvh); }
+	.mx-chat[data-keyboard] .mx-composer { padding-bottom: var(--space-2); }
+	.mx-composer [data-composer] { font-size: 16px; }
+}
+html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behavior: none; }
+.mx-chat { overscroll-behavior: contain; }
+/* Phones (after Orca): back, the title (it keeps room), the switch as two icons, the menu. */
+@media (max-width: 520px) {
+	.mx-chat > .mx-head { gap: var(--space-1); padding-left: var(--space-1); padding-right: var(--space-1); }
+	.mx-chat > .mx-head .title { flex: 1 1 auto; min-width: 72px; }
+	.mx-view-switch button { padding: 0 10px; }
+	.mx-view-switch .mx-view-word { display: none; }
+	.mx-chat > .mx-head .tx-pill { display: none; }
 }

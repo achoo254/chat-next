@@ -16,6 +16,7 @@
 //   node --test test/e2e/terminal.e2e.ts
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
@@ -199,4 +200,92 @@ test("the column speaks of projects only: the machine's folders became projects,
 	assert.equal(await dialog.getByRole("button", { name: "Chọn thư mục trên máy" }).count(), 1);
 	assert.deepEqual(errors, []);
 	await context.close();
+});
+
+/** iOS's keyboard, as far as a page sees it: the visual viewport shrinks while the page stays tall. */
+async function phone(): Promise<{ page: Page; keyboard: (height: number) => Promise<void>; shot: (name: string) => Promise<void>; close: () => Promise<void> }> {
+	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+	await context.addInitScript(() => {
+		class FakeViewport extends EventTarget {
+			height = window.innerHeight;
+			offsetTop = 0;
+			offsetLeft = 0;
+			pageTop = 0;
+			pageLeft = 0;
+			width = window.innerWidth;
+			scale = 1;
+			onresize = null;
+			onscroll = null;
+			onscrollend = null;
+		}
+		const viewport = new FakeViewport();
+		Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+		(window as unknown as { __keyboard: (h: number) => void }).__keyboard = (h: number) => {
+			viewport.height = window.innerHeight - h;
+			viewport.dispatchEvent(new Event("resize"));
+		};
+	});
+	const page = await context.newPage();
+	return {
+		page,
+		keyboard: (height) => page.evaluate((h) => (window as unknown as { __keyboard: (h: number) => void }).__keyboard(h), height),
+		shot: async (name) => {
+			const dir = process.env.E2E_SHOTS;
+			if (dir !== undefined && dir !== "") await page.screenshot({ path: join(dir, `${name}.png`) });
+		},
+		close: () => context.close(),
+	};
+}
+
+test("a phone, keyboard up: the session keeps to what is left (header on top, composer right above the keyboard)", async () => {
+	const p = await phone();
+	const errors: string[] = [];
+	p.page.on("pageerror", (err) => errors.push(String(err)));
+	await p.page.goto(`http://localhost:${PORT}/?at=machine-chat`);
+	const chat = p.page.locator(".mx-chat");
+	await chat.waitFor({ timeout: 30_000 });
+	await p.page.locator(".mx-chat [data-composer]").waitFor();
+	await p.shot("phone-chat-keyboard-closed");
+	await p.keyboard(336);
+	await until(p.page, "the session keeps to the visible box", () => document.querySelector(".mx-chat")?.hasAttribute("data-keyboard") === true);
+	const box = await p.page.evaluate(() => {
+		const r = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+		return { head: r(".mx-chat .mx-head")?.top ?? -1, composer: r(".mx-chat .mx-composer")?.bottom ?? -1, font: getComputedStyle(document.querySelector(".mx-chat [data-composer]") ?? document.body).fontSize, locked: document.documentElement.classList.contains("keyboard-open") };
+	});
+	assert.equal(Math.round(box.head), 0);
+	assert.ok(Math.abs(box.composer - (844 - 336)) <= 1, `composer ends at ${box.composer}`);
+	assert.equal(box.font, "16px", "no zoom on focus");
+	assert.equal(box.locked, true);
+	await p.shot("phone-chat-keyboard-open");
+	await p.keyboard(0);
+	await until(p.page, "back to the page", () => !document.documentElement.classList.contains("keyboard-open"));
+	assert.deepEqual(errors, []);
+	await p.close();
+});
+
+test("a phone, the session in its terminal: the key row (44 px keys, the AI's first) above the keyboard, the header kept", async () => {
+	const p = await phone();
+	const errors: string[] = [];
+	p.page.on("pageerror", (err) => errors.push(String(err)));
+	await p.page.goto(`http://localhost:${PORT}/?at=machine-session-terminal`);
+	const bar = p.page.getByRole("toolbar", { name: "Phím phụ" });
+	await bar.waitFor({ timeout: 30_000 });
+	const first = await bar.getByRole("button").evaluateAll((els) => els.slice(0, 6).map((e) => e.getAttribute("aria-label")));
+	assert.deepEqual(first, ["Bàn phím", "Esc", "Tab", "Shift+Tab", "Ctrl", "Alt"]);
+	const heights = await bar.getByRole("button").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+	assert.ok(heights.every((h) => h >= 44), `key heights ${heights.join(",")}`);
+	await p.shot("phone-terminal-keyboard-closed");
+	await p.keyboard(336);
+	await until(p.page, "the session keeps to the visible box", () => document.querySelector(".mx-chat")?.hasAttribute("data-keyboard") === true);
+	const box = await p.page.evaluate(() => ({
+		head: document.querySelector(".mx-chat .mx-head")?.getBoundingClientRect().top ?? -1,
+		bar: document.querySelector(".tx-keys")?.getBoundingClientRect().bottom ?? -1,
+		dock: document.querySelector("[data-id=terminal-dock]")?.getBoundingClientRect().height ?? 0,
+	}));
+	assert.equal(Math.round(box.head), 0);
+	assert.ok(Math.abs(box.bar - (844 - 336)) <= 1, `key row ends at ${box.bar}`);
+	assert.ok(box.dock > 200, `terminal ${box.dock} px tall`);
+	await p.shot("phone-terminal-keyboard-open");
+	assert.deepEqual(errors, []);
+	await p.close();
 });

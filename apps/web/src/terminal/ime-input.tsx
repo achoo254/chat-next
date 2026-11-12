@@ -57,9 +57,11 @@ interface ImeInputProps {
 	inputRef: Ref<HTMLTextAreaElement>;
 	/** Where the caret is, so the input method's suggestions show next to it. */
 	at: { readonly x: number; readonly y: number; readonly height: number } | null;
+	/** It took (true) or let go of (false) the keyboard: the key bar's keyboard button follows. */
+	onOpen?: (open: boolean) => void;
 }
 
-export function ImeInput({ label, onSend, appCursor, inputRef, at }: ImeInputProps) {
+export function ImeInput({ label, onSend, appCursor, inputRef, at, onOpen }: ImeInputProps) {
 	const sent = useRef(SENTINEL);
 	const composing = useRef(false);
 
@@ -122,7 +124,11 @@ export function ImeInput({ label, onSend, appCursor, inputRef, at }: ImeInputPro
 			onCompositionStart={onCompositionStart}
 			onCompositionEnd={onCompositionEnd}
 			onKeyDown={onKeyDown}
-			onBlur={(event) => clear(event.currentTarget)}
+			onFocus={() => onOpen?.(true)}
+			onBlur={(event) => {
+				clear(event.currentTarget);
+				onOpen?.(false);
+			}}
 		/>
 	);
 }

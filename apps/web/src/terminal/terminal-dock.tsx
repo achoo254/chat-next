@@ -26,7 +26,8 @@ import { Icon } from "../components/screen-icons.tsx";
 import { navigate, Link, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
-import { keySequence, MobileKeyBar, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
+import { afterKey, keySequence, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
+import { useViewportFit } from "../machines/viewport-fit.ts";
 import { StatusPill } from "./status-pill.tsx";
 import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.ts";
 import {
@@ -184,7 +185,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [titles, setTitles] = useState<ReadonlyMap<number, string>>(() => new Map());
 	const [ended, setEnded] = useState<ReadonlyMap<number, number>>(() => new Map());
 	const [listed, setListed] = useState<readonly TermSessionInfo[]>([]);
-	const [mods, setMods] = useState<Modifiers>({ ctrl: false, alt: false });
+	const [mods, setMods] = useState<Modifiers>(NO_MODIFIERS);
 	const [caret, setCaret] = useState<ReturnType<PaneHandle["caret"]>>(null);
 	const [probe] = useState(() => latencyProbe());
 	const [mac] = useState(isMac);
@@ -358,23 +359,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		return () => el.removeEventListener("keydown", onKey);
 	}, []);
 
-	// On a touch screen the dock fills what the phone keyboard leaves visible.
-	useEffect(() => {
-		const vv = window.visualViewport;
-		const el = root.current;
-		if (!touch || vv === null || vv === undefined || el === null) return;
-		const update = () => {
-			el.style.setProperty("--tx-vh", `${Math.round(vv.height)}px`);
-			el.style.setProperty("--tx-vt", `${Math.round(vv.offsetTop)}px`);
-		};
-		update();
-		vv.addEventListener("resize", update);
-		vv.addEventListener("scroll", update);
-		return () => {
-			vv.removeEventListener("resize", update);
-			vv.removeEventListener("scroll", update);
-		};
-	}, [touch]);
+	// On a touch screen the machine's own terminal page fills what the phone keyboard leaves visible; a
+	// session's dock sits in the session view, which does the same for its header and the dock together.
+	const keyboard = useViewportFit(root, touch && thread === undefined);
+	const [imeOpen, setImeOpen] = useState(false);
 
 	const tab = activeTab(layout);
 	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
@@ -386,7 +374,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const send = (text: string) => {
 		if (focused === null || text === "") return;
 		const out = withModifiers(text, mods);
-		if (mods.ctrl || mods.alt) setMods({ ctrl: false, alt: false });
+		setMods(afterKey);
 		probe?.key(focused.session);
 		terminal.input(focused.session, encoder.encode(out));
 	};
@@ -394,7 +382,23 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		const handle = focused === null ? undefined : handles.current.get(focused.id);
 		send(keySequence(key, handle?.appCursor() ?? false));
 	};
-	const toggle = (mod: Modifier) => setMods((m) => ({ ...m, [mod]: !m[mod] }));
+	const toggle = (mod: Modifier, sinceLastTapMs: number) => setMods((m) => ({ ...m, [mod]: tapLatch(m[mod], sinceLastTapMs) }));
+	/** Paste from the clipboard into the terminal (the browser may ask first; a refusal pastes nothing). */
+	const paste = () => {
+		navigator.clipboard?.readText().then(
+			(text) => {
+				if (focused !== null && text !== "") terminal.input(focused.session, encoder.encode(text));
+			},
+			() => undefined,
+		);
+	};
+	/** The keyboard button: up when it is down, down when it is up. */
+	const toggleKeyboard = () => {
+		const field = ime.current;
+		if (field === null) return;
+		if (imeOpen || keyboard > 0) field.blur();
+		else field.focus();
+	};
 	const tapPane = (pane: PaneNode) => {
 		setLayout((l) => focusPane(l, pane.id));
 		if (!touch) return;
@@ -470,17 +474,19 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	<Icon name="x" small />
 </button>
 )}
-{touch && isFocused && <ImeInput label={tt.typeHere} inputRef={ime} at={caret} onSend={send} appCursor={() => handles.current.get(pane.id)?.appCursor() ?? false} />}
+{touch && isFocused && (
+	<ImeInput label={tt.typeHere} inputRef={ime} at={caret} onSend={send} appCursor={() => handles.current.get(pane.id)?.appCursor() ?? false} onOpen={setImeOpen} />
+)}
 			</div>
 		);
 	};
 
 	const relayNote = status.kind === "open" && status.path === "relay" && status.directIssue !== "";
 	return (
-		<div className={touch ? "tx-dock touch" : "tx-dock"} ref={root} data-id="terminal-dock">
+		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock">
 			<TerminalTabs
 				t={tt}
-				back={back ?? (touch ? thread?.chat : undefined)}
+				back={back}
 				backLabel={t.back}
 				tabs={layout.tabs.map((x, i) => {
 					const pane = panesOf(x.root).find((p) => p.id === x.focus);
@@ -551,13 +557,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					</div>
 				)}
 			</div>
-			{touch && (
-				<MobileKeyBar
-					labels={{ bar: tt.keys.bar, esc: tt.keys.esc, tab: tt.keys.tab, ctrl: tt.keys.ctrl, alt: tt.keys.alt, up: tt.keys.up, down: tt.keys.down, left: tt.keys.left, right: tt.keys.right }}
-					mods={mods}
-					onToggle={toggle}
-					onKey={barKey}
-				/>
+			{/* The key bar while a terminal shows (it holds the keyboard toggle too). */}
+			{touch && focused !== null && (
+				<MobileKeyBar labels={tt.keys} mods={mods} keyboard={imeOpen || keyboard > 0} onToggle={toggle} onKey={barKey} onPaste={paste} onKeyboard={toggleKeyboard} />
 			)}
 		</div>
 	);

@@ -49,6 +49,7 @@ import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 import { ModeSwitch, TerminalHeldBar, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
+import { isPhone, useViewportFit } from "./viewport-fit.ts";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
@@ -170,6 +171,10 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
+	// On a phone the session keeps to what the keyboard leaves: header on top, composer (or key bar) at the bottom.
+	const chatRef = useRef<HTMLDivElement>(null);
+	const [phone] = useState(isPhone);
+	useViewportFit(chatRef, phone);
 	useEffect(() => rememberSessionMode(machine, threadId, mode), [machine, threadId, mode]);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
 	const held = thread !== null && thread.terminalSession > 0;
@@ -185,7 +190,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			}
 		: undefined;
 	return (
-		<div className="mx-chat" data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
+		<div className="mx-chat" ref={chatRef} data-mode={mode} data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
 			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
 			<PageHead
 				back={paths.machines()}

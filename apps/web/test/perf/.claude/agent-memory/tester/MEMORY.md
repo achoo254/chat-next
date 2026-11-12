@@ -1,0 +1,1 @@
+- [Lab remote acceptance lessons](lab-remote-acceptance-lessons.md) — socket path limit, Windows upload, Mac disk guard, hook traps, pipe reply-loss defect

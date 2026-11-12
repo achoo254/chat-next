@@ -93,8 +93,9 @@ export function ModeSwitch({ machine, threadId, mode }: { machine: string; threa
 	return (
 		<div className="mx-view-switch" role="group" aria-label={t.terminal.mode.label}>
 			{(["chat", "terminal"] as const).map((m) => (
-				<button key={m} type="button" aria-pressed={mode === m} onClick={() => pick(m)} data-id={`session-mode-${m}`}>
-					{t.terminal.mode[m]}
+				<button key={m} type="button" aria-pressed={mode === m} aria-label={t.terminal.mode[m]} title={t.terminal.mode[m]} onClick={() => pick(m)} data-id={`session-mode-${m}`}>
+					<MachineIcon name={m === "terminal" ? "terminal" : "chat"} small />
+					<span className="mx-view-word">{t.terminal.mode[m]}</span>
 				</button>
 			))}
 		</div>
