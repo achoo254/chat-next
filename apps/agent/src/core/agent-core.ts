@@ -59,7 +59,7 @@ import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
 import { keptImage, prepareAttachments, textForAi } from "../attachments/message-attachments.ts";
 import { imageType } from "../attachments/image-type.ts";
-import { ATTACHMENTS_FOLDER } from "../attachments/project-files.ts";
+import { ATTACHMENTS_FOLDER, saveInFolder } from "../attachments/project-files.ts";
 import { type Trash, systemTrash } from "../safety/trash.ts";
 import { ProjectConfigStore } from "./project-config.ts";
 
@@ -1138,6 +1138,23 @@ export class AgentCore {
 
   cancelUpload(uploadId: string): void {
     this.uploads.cancel(uploadId);
+  }
+
+  /**
+   * A whole upload of the thread saved in its folder (.tunelo-attachments,
+   * as a message's files are), for the device to type into the session's
+   * terminal: the absolute path. The upload is gone afterwards.
+   */
+  saveUpload(threadId: string, uploadId: string): string {
+    const t = this.thread(threadId);
+    const [u] = this.uploads.take(threadId, [uploadId]);
+    if (u === undefined) throw new AttachmentError("no such upload", ErrorReason.ATTACHMENT_NOT_FOUND);
+    try {
+      const rel = saveInFolder(t.meta.dir, u.file, u.name, { isSensitive: this.opts.isSensitive, now: new Date(this.now()) });
+      return join(t.meta.dir, ...rel.split("/"));
+    } finally {
+      this.uploads.discard(u);
+    }
   }
 
   /** An image a message of the thread carried, as kept with the thread. */

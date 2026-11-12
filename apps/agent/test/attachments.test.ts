@@ -258,6 +258,23 @@ describe("a message with files, through the core", () => {
     await core.stop();
   });
 
+  it("saves an upload in the session's folder for its terminal and gives the absolute path, once", async () => {
+    const p = fakeProvider();
+    const { core, work } = makeCore([p]);
+    const t = await core.create({ provider: "fake", model: "", dir: work, text: "hi", consent, device: "test" });
+    upload(core, t.id, "image-0003", "../ảnh chụp.png", PNG);
+    const path = core.saveUpload(t.id, "image-0003");
+    expect(path.startsWith(join(work, ATTACHMENTS_FOLDER))).toBe(true);
+    expect(path.endsWith("ảnh chụp.png")).toBe(true);
+    expect(new Uint8Array(readFileSync(path))).toEqual(PNG);
+    // Gone once saved, and never for another thread's upload.
+    expect(reason(() => core.saveUpload(t.id, "image-0003"))).toBe(ErrorReason.ATTACHMENT_NOT_FOUND);
+    const other = await core.create({ provider: "fake", model: "", dir: work, text: "hi", consent, device: "test" });
+    upload(core, other.id, "image-0004", "x.png", PNG);
+    expect(reason(() => core.saveUpload(t.id, "image-0004"))).toBe(ErrorReason.ATTACHMENT_NOT_FOUND);
+    await core.stop();
+  });
+
   it("refuses the first piece of an upload for a thread that does not exist", () => {
     const { core } = makeCore([fakeProvider()]);
     expect(() => upload(core, "nope", "upload-0009", "a", new Uint8Array(1))).toThrow(/no such thread/);

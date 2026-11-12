@@ -661,6 +661,10 @@ export class Connection {
         case "attachmentCancel":
           core.cancelUpload(b.value.uploadId);
           return ack();
+        case "attachmentSave": {
+          const { threadId, uploadId } = b.value;
+          return this.send(id, { case: "attachmentSaved", value: { uploadId, path: core.saveUpload(threadId, uploadId) } });
+        }
         case "attachmentFetch": {
           const { threadId, attachmentId } = b.value;
           const image = core.attachmentImage(threadId, attachmentId);

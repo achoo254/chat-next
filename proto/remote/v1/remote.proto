@@ -317,6 +317,12 @@ message Frame {
     ProjectConfigSet project_config_set = 159;
     // B → A
     ProjectConfig project_config = 160;
+
+    // An upload saved in the session's folder for its terminal (tunelo 2.7.1+).
+    // A → B, answered with AttachmentSaved
+    AttachmentSave attachment_save = 161;
+    // B → A
+    AttachmentSaved attachment_saved = 162;
   }
 }
 
@@ -649,6 +655,23 @@ message AttachmentData {
   string attachment_id = 2;
   string mime_type = 3;
   bytes data = 4;
+}
+
+// A whole upload of the thread, saved in the session's folder under
+// .tunelo-attachments/<yyyy-mm-dd>/ (as a file a message carries, images
+// too) instead of going with a message: the device types its path into the
+// session's terminal, where the AI reads it (tunelo 2.7.1+). The upload is
+// gone afterwards. Answered with AttachmentSaved; refused like a message's
+// files (ATTACHMENT_NOT_FOUND, SENSITIVE_FOLDER, PATH_OUTSIDE_FOLDER).
+message AttachmentSave {
+  string thread_id = 1;
+  string upload_id = 2;
+}
+
+message AttachmentSaved {
+  string upload_id = 1;
+  // Absolute, in the machine's own form.
+  string path = 2;
 }
 
 // A file that went with a user message (TextItem.attachments).

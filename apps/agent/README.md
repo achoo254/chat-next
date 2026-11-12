@@ -85,6 +85,10 @@ Máy đã gỡ trên web rồi thêm lại (cài lại bằng lệnh của "Thê
 trở về trước xin relay cái tên subdomain của lần thêm trước, relay từ chối và máy ở yên ngoài mạng. Từ 2.0.14 tunnel không xin tên
 nào (relay tự suy từ tài khoản và số máy); chạy `tunelo update` là máy lên mạng lại.
 
+Có gì ở 2.7.1: gửi ảnh vào terminal của phiên. Thiết bị tải ảnh lên qua kênh mã hoá như file đính kèm của tin nhắn, rồi
+`AttachmentSave` lưu nó vào `.tunelo-attachments/<ngày>/` trong thư mục của phiên (cùng kiểm thư mục nhạy cảm, đường dẫn và
+`.git/info/exclude` như file của tin nhắn) và trả đường dẫn tuyệt đối để thiết bị gõ vào terminal cho AI đọc.
+
 Có gì ở 2.7.0:
 
 - **Thống kê sử dụng**: tunelo đọc transcript của Claude Code trên máy thành sổ số liệu theo tháng (chỉ số đếm rời transcript,
