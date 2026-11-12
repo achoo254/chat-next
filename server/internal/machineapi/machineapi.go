@@ -347,8 +347,18 @@ func (s *Service) NotifyNeedsInput(ctx context.Context, req *connect.Request[app
 			MachineID: machine.ID, MachineName: machine.Name, Kind: push.MachineDevicePaired, Pending: 1,
 		})
 		return connect.NewResponse(&appv1.NotifyNeedsInputResponse{}), nil
+	case appv1.NeedsInputKind_NEEDS_INPUT_KIND_USAGE_HINT:
+		if m.GetPendingCount() != 1 || m.GetSessionId() != "" {
+			return nil, invalid("USAGE_HINT takes pending_count 1 and no session_id")
+		}
+		// Not a request waiting for the user: sent at once, apart from the
+		// merged "needs you" pushes, so it neither delays nor replaces one.
+		s.notifyNow(machine.UserID, push.MachineNotice{
+			MachineID: machine.ID, MachineName: machine.Name, Kind: push.MachineUsageHint, Pending: 1,
+		})
+		return connect.NewResponse(&appv1.NotifyNeedsInputResponse{}), nil
 	default:
-		return nil, invalid("kind must be APPROVAL, QUESTION or DEVICE_PAIRED")
+		return nil, invalid("kind must be APPROVAL, QUESTION, DEVICE_PAIRED or USAGE_HINT")
 	}
 	if m.GetPendingCount() < 1 || m.GetPendingCount() > maxPending {
 		return nil, invalid("pending_count must be 1 to 1000")

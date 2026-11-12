@@ -221,16 +221,22 @@ enum NeedsInputKind {
   // (its name and key stay between the machine and its devices). Sent at
   // once, never merged with the "needs you" notices.
   NEEDS_INPUT_KIND_DEVICE_PAIRED = 3;
+  // A running session went past one of the machine's usage rules. The notice
+  // names the machine only: never the session, the rule, a number or a
+  // repository (those reach the devices over the end-to-end link). Sent at
+  // once, apart from the "needs you" notices, one per machine replacing the
+  // previous one.
+  NEEDS_INPUT_KIND_USAGE_HINT = 4;
 }
 
 message NotifyNeedsInputRequest {
   NeedsInputKind kind = 1;
   // How many approvals and questions wait on the machine in total (at least
-  // 1, at most 1000). 1 for DEVICE_PAIRED.
+  // 1, at most 1000). 1 for DEVICE_PAIRED and USAGE_HINT.
   int32 pending_count = 2;
   // The waiting thread, so the notification opens it: up to 64 characters of
   // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
-  // for DEVICE_PAIRED.
+  // for DEVICE_PAIRED and USAGE_HINT.
   string session_id = 3;
 }
 

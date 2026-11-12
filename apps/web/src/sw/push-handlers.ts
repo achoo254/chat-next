@@ -13,7 +13,10 @@
 //   for; a click opens the machine's waiting session (/ai/<id>/s/<thread>).
 //   A device newly paired by the machine's authenticator code comes apart
 //   (tag "machine-paired:<id>", so neither replaces the other), names the
-//   machine only, and opens the machine (/ai/<id>).
+//   machine only, and opens the machine (/ai/<id>). A usage hint (a running
+//   session went past one of the machine's usage rules) comes apart too, one
+//   per machine (tag "machine-usage:<id>"), names the machine only, and opens
+//   its usage screen (/ai/<id>/usage).
 // - pushsubscriptionchange: the browser renewed the subscription; register
 //   the new one for the session (the cookie rides along) over Connect JSON.
 //
@@ -126,7 +129,7 @@ export function parsePayload(raw: unknown): PushPayload | null {
 	};
 }
 
-/** A machine's "needs you" or "new device paired" push (server/internal/push Payload with kind "machine"). */
+/** A machine's "needs you", "new device paired" or usage hint push (server/internal/push Payload with kind "machine"). */
 export interface MachinePushPayload {
 	readonly machineId: number;
 	/** The waiting thread; "" when the agent did not say. */
@@ -148,9 +151,10 @@ export function parseMachinePayload(raw: unknown): MachinePushPayload | null {
 	if (kind !== "machine") return null;
 	if (typeof machineId !== "number" || !Number.isSafeInteger(machineId) || machineId <= 0) return null;
 	if (typeof title !== "string" || typeof body !== "string") return null;
-	if (tag !== `machine:${machineId}` && tag !== `machine-paired:${machineId}`) return null;
+	const usage = tag === `machine-usage:${machineId}`;
+	if (tag !== `machine:${machineId}` && tag !== `machine-paired:${machineId}` && !usage) return null;
 	const session = tag === `machine:${machineId}` && typeof sessionId === "string" && SESSION_ID.test(sessionId) ? sessionId : "";
-	const path = session === "" ? `/ai/${machineId}` : `/ai/${machineId}/s/${session}`;
+	const path = usage ? `/ai/${machineId}/usage` : session === "" ? `/ai/${machineId}` : `/ai/${machineId}/s/${session}`;
 	return {
 		machineId,
 		sessionId: session,

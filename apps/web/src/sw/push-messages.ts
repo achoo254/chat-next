@@ -17,7 +17,7 @@ export function openChatId(data: unknown): number | null {
 	return type === OPEN_CHAT && typeof chatId === "number" && Number.isSafeInteger(chatId) && chatId > 0 ? chatId : null;
 }
 
-/** A click on a machine's push ("needs you", ADR 0013): open that machine or its waiting thread. */
+/** A click on a machine's push ("needs you", ADR 0013): open that machine, its waiting thread or its usage. */
 export const OPEN_PATH = "app-push:open-path";
 
 export interface OpenPathMessage {
@@ -25,8 +25,8 @@ export interface OpenPathMessage {
 	readonly path: string;
 }
 
-/** The only paths a push may open: a machine, or one of its threads (under /ai, or /machines from an older worker). */
-const MACHINE_PATH = /^\/(?:ai|machines)\/[1-9][0-9]{0,15}(?:\/s\/[A-Za-z0-9_-]{1,64})?$/;
+/** The only paths a push may open: a machine, one of its threads or its usage (under /ai, or /machines from an older worker). */
+const MACHINE_PATH = /^\/(?:ai|machines)\/[1-9][0-9]{0,15}(?:\/usage|\/s\/[A-Za-z0-9_-]{1,64})?$/;
 
 export function isMachinePath(path: string): boolean {
 	return MACHINE_PATH.test(path);

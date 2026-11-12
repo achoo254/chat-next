@@ -740,6 +740,26 @@ func TestNotifyUserMachine(t *testing.T) {
 		t.Fatalf("device paired push %+v %+v", pp, paired)
 	}
 
+	// A usage hint: its own tag and topic, the machine's name only, and
+	// kept no longer than a running session lasts without a call.
+	for _, c := range []struct{ locale, body string }{
+		{LocaleVI, "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên Mac mini"},
+		{LocaleEN, "A tip to use the AI more efficiently in a session on Mac mini"},
+		{LocaleZhCN, "Mac mini 上的一个会话有更省用量的建议"},
+	} {
+		hint := e.svc.machineNotification(MachineNotice{MachineID: 42, MachineName: "Mac mini", Kind: MachineUsageHint,
+			Pending: 1, SessionID: "t_9", At: time.UnixMilli(1000)}, c.locale)
+		var hp Payload
+		if err := json.Unmarshal(hint.Payload, &hp); err != nil {
+			t.Fatal(err)
+		}
+		wantHint := Payload{Kind: KindMachine, MachineID: 42, Title: appName, Body: c.body,
+			Tag: "machine-usage:42", URL: "/machines/42/usage", Timestamp: 1000}
+		if hp != wantHint || hint.Topic != "machineusage42" || hint.TTL != usageHintTTL || hint.Urgency != webpush.UrgencyNormal {
+			t.Fatalf("usage hint push %s %+v %+v", c.locale, hp, hint)
+		}
+	}
+
 	off, err := New(e.Store.Pool(), e.Chat, e.presence, Config{TenantID: bottest.TenantID, AppName: appName,
 		SessionIdleTimeout: time.Hour, SessionMaxAge: time.Hour}, bottest.Quiet)
 	if err != nil {

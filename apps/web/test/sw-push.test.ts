@@ -204,6 +204,34 @@ describe("machine pushes", () => {
 		expect(parsePayload(machine)).toBeNull();
 	});
 
+	it("shows a usage hint apart, one per machine, that opens the machine's usage screen", async () => {
+		const hint = { ...machine, session_id: "", body: "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên Mac mini", tag: "machine-usage:42" };
+		const sw = scope();
+		await sw.fire("push", pushOf(hint));
+		expect(sw.shown).toEqual([
+			{
+				title: "Chat",
+				options: {
+					body: hint.body,
+					tag: "machine-usage:42",
+					icon: NOTIFICATION_ICON,
+					silent: false,
+					renotify: true,
+					timestamp: hint.ts,
+					data: { chatId: 0, path: "/ai/42/usage" },
+				},
+			},
+		]);
+		// Never a thread, even when a session id rides along; another machine's tag is refused.
+		expect(parseMachinePayload({ ...hint, session_id: "t_1" })?.path).toBe("/ai/42/usage");
+		expect(parseMachinePayload({ ...hint, tag: "machine-usage:43" })).toBeNull();
+		const open = new FakeWindow(`${ORIGIN}/c/1`, false, "visible");
+		const clicked = scope([open]);
+		await clicked.fire("notificationclick", clickOf({ chatId: 0, path: "/ai/42/usage" }));
+		expect(open.messages).toEqual([{ type: OPEN_PATH, path: "/ai/42/usage" }]);
+		expect(openPath({ type: OPEN_PATH, path: "/ai/42/usage/x" })).toBeNull();
+	});
+
 	it("asks an open window to open the session, or opens one on it", async () => {
 		const open = new FakeWindow(`${ORIGIN}/c/1`, false, "visible");
 		const sw = scope([open]);

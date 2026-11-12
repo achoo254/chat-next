@@ -676,7 +676,7 @@ func TestNotifyDevicePairedGoesOutAtOnce(t *testing.T) {
 		"no count":   notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 0, ""),
 		"count":      notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 2, ""),
 		"session":    notify(appv1.NeedsInputKind_NEEDS_INPUT_KIND_DEVICE_PAIRED, 1, "t_1"),
-		"bad kind 4": notify(appv1.NeedsInputKind(4), 1, ""),
+		"bad kind 5": notify(appv1.NeedsInputKind(5), 1, ""),
 	} {
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -720,6 +720,53 @@ func TestNotifyDevicePairedGoesOutAtOnce(t *testing.T) {
 	}
 	if sent := e.notifier.take(); len(sent) != 0 {
 		t.Fatalf("pushed after Close: %+v", sent)
+	}
+}
+
+func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	id, secret := e.register()
+	notify := func(pending int32, session string) error {
+		_, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+			Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_USAGE_HINT, PendingCount: pending, SessionId: session}, secret))
+		return err
+	}
+	for name, err := range map[string]error{
+		"no count": notify(0, ""),
+		"count":    notify(2, ""),
+		"session":  notify(1, "t_1"),
+	} {
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if sent := e.notifier.take(); len(sent) != 0 {
+		t.Fatalf("pushed on invalid calls: %+v", sent)
+	}
+
+	// A "needs you" push opens the machine's window; a usage hint goes out at
+	// once beside it and leaves the merged one waiting.
+	if _, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+		Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, PendingCount: 1, SessionId: "t_1"}, secret)); err != nil {
+		t.Fatal(err)
+	}
+	e.notifier.take()
+	e.advance(5 * time.Second)
+	if _, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+		Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_QUESTION, PendingCount: 2, SessionId: "t_2"}, secret)); err != nil {
+		t.Fatal(err)
+	}
+	if err := notify(1, ""); err != nil {
+		t.Fatal(err)
+	}
+	sent := e.notifier.take()
+	want := push.MachineNotice{MachineID: id, MachineName: "Mac mini", Kind: push.MachineUsageHint, Pending: 1, At: e.now()}
+	if len(sent) != 1 || sent[0] != want {
+		t.Fatalf("usage hint push %+v", sent)
+	}
+	if timers := e.pending(); len(timers) != 1 {
+		t.Fatalf("merged push lost: %d timers", len(timers))
 	}
 }
 
