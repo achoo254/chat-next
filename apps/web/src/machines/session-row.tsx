@@ -15,7 +15,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { threadStatus, type WorkStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { rememberMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { rememberMode, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -94,6 +94,9 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	const now = useNow(live);
 	// A turn running in the terminal, or its AI only waiting there at its prompt.
 	const held = isRunning(thread) ? t.agent.sub.inTerminal : t.agent.sub.openInTerminal;
+	// Which view the session lives in: a terminal hold says how, otherwise "Trò chuyện" or "Terminal".
+	const mode = rowMode(machine.entry.ref, thread);
+	const modeLabel = thread.terminalSession > 0 ? held : t.terminal.mode[mode];
 	let text = fallback;
 	if (live) {
 		const parts = [phaseText(t, latest), clockText(now - Number(latest.turnStartedAt), t, locale)];
@@ -102,11 +105,9 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	}
 	return (
 		<span className="sub" data-live={live ? "" : undefined}>
-			{thread.terminalSession > 0 && (
-				<span className="mx-row-mode" role="img" aria-label={held} title={held}>
-					<MachineIcon name="terminal" small />
-				</span>
-			)}
+			<span className="mx-row-mode" role="img" aria-label={modeLabel} title={modeLabel} data-mode={mode}>
+				<MachineIcon name={mode === "terminal" ? "terminal" : "chat"} small />
+			</span>
 			{text}
 		</span>
 	);

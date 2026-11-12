@@ -42,6 +42,38 @@ export function rememberMode(machine: string, mode: SessionMode): void {
 	}
 }
 
+const SESSION_MODE_KEY = (machine: string, threadId: string) => `ai:mode:${machine}:${threadId}`;
+
+/** The mode the session was last opened in on this device; the machine's last mode when never. */
+export function sessionModeOf(machine: string, threadId: string): SessionMode {
+	try {
+		const kept = window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId));
+		return kept === "terminal" || kept === "chat" ? kept : lastMode(machine);
+	} catch {
+		return lastMode(machine);
+	}
+}
+
+/** The session was just opened in `mode` (each visit records it). */
+export function rememberSessionMode(machine: string, threadId: string, mode: SessionMode): void {
+	try {
+		window.localStorage.setItem(SESSION_MODE_KEY(machine, threadId), mode);
+	} catch {
+		// Storage refused: the row falls back to the machine's last mode.
+	}
+}
+
+/**
+ * The view a session row names: a live hold wins (held by a terminal: the
+ * terminal; open as a chat in this app: the chat), else the mode it was last
+ * opened in.
+ */
+export function rowMode(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">): SessionMode {
+	if (thread.terminalSession > 0) return "terminal";
+	if (thread.open) return "chat";
+	return sessionModeOf(machine, thread.id);
+}
+
 export function modePath(machine: string, threadId: string, mode: SessionMode): string {
 	return mode === "terminal" ? aiPaths.sessionTerminal(machine, threadId) : paths.machineSession(machine, threadId);
 }

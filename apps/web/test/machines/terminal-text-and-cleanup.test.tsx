@@ -15,6 +15,7 @@ import type { Conn } from "../../src/machines/machine-status.ts";
 import type { LooseFolder } from "../../src/machines/project-tree.ts";
 import { LooseGroup, setFoldersArchived, UNDO_MS, type TreeContext } from "../../src/machines/project-tree-view.tsx";
 import type { MachineView } from "../../src/machines/use-machines.ts";
+import { rememberMode, rememberSessionMode, rowMode, sessionModeOf } from "../../src/machines/session-mode.tsx";
 import {
 	FONT_SAMPLE,
 	FONT_SIZE_DEFAULT,
@@ -170,6 +171,48 @@ describe("a session row's glyph", () => {
 		// A turn running in the terminal: the spinner, and it says so.
 		expect(workingRow?.querySelector(".mx-glyph")?.className).toBe("mx-glyph running");
 		expect(within(workingRow as HTMLElement).getByRole("img", { name: "Đang chạy trong terminal" })).toBeTruthy();
+	});
+});
+
+describe("a session row's mode icon", () => {
+	it("a live hold wins (terminal, or open as a chat here); else the mode the session was last opened in; else the machine's", () => {
+		const base = { id: "s1", terminalSession: 0, open: false };
+		expect(rowMode("1", { ...base, terminalSession: 2 })).toBe("terminal");
+		expect(rowMode("1", { ...base, open: true })).toBe("chat");
+		// Never opened here: the machine's last mode.
+		expect(rowMode("1", base)).toBe("chat");
+		rememberMode("1", "terminal");
+		expect(rowMode("1", base)).toBe("terminal");
+		// Opened in a mode: that one, whatever the machine's last.
+		rememberSessionMode("1", "s1", "chat");
+		expect(sessionModeOf("1", "s1")).toBe("chat");
+		expect(rowMode("1", base)).toBe("chat");
+		// A live hold still wins over what was remembered.
+		expect(rowMode("1", { ...base, terminalSession: 5 })).toBe("terminal");
+	});
+
+	it("every row shows its mode: a chat bubble 'Trò chuyện' or a terminal 'Terminal' (a terminal hold says how)", async () => {
+		rememberSessionMode("1", "c1", "chat");
+		rememberSessionMode("1", "t1", "terminal");
+		const mac = host(1, "Mac");
+		const row = (id: string, extra: { open?: boolean; terminalSession?: number } = {}) => create(ThreadSummarySchema, { id, dir: "/tmp/a", title: id, provider: "claude", updatedAt: 1n, ...extra });
+		// A folder lists its three newest sessions: two folders hold the four cases.
+		const folders: LooseFolder[] = [
+			{ machine: mac.view, dir: "/tmp/a", threads: [row("c1"), row("t1"), row("hi", { open: true })], status: "idle" },
+			{ machine: mac.view, dir: "/tmp/b", threads: [row("held", { terminalSession: 3 })], status: "open" },
+		];
+		const { container } = wrap(<LooseGroup folders={folders} ctx={await looseCtx([mac.view])} open onToggle={() => undefined} />);
+		const modeOf = (title: string) => {
+			const r = [...container.querySelectorAll(".mx-srow")].find((x) => x.querySelector(".name")?.textContent === title);
+			const icon = r?.querySelector(".mx-row-mode");
+			return [icon?.getAttribute("data-mode"), icon?.getAttribute("aria-label")];
+		};
+		expect(modeOf("c1")).toEqual(["chat", "Trò chuyện"]);
+		expect(modeOf("t1")).toEqual(["terminal", "Terminal"]);
+		expect(modeOf("hi")).toEqual(["chat", "Trò chuyện"]);
+		expect(modeOf("held")).toEqual(["terminal", "Mở trong terminal"]);
+		// The status glyph stays beside it, unchanged.
+		expect(container.querySelectorAll(".mx-srow .mx-glyph")).toHaveLength(4);
 	});
 });
 

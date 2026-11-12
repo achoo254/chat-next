@@ -47,7 +47,7 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeSwitch, TerminalHeldBar, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { ModeSwitch, TerminalHeldBar, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
@@ -170,6 +170,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
+	useEffect(() => rememberSessionMode(machine, threadId, mode), [machine, threadId, mode]);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
 	const held = thread !== null && thread.terminalSession > 0;
 	// "project · workspace · branch · machine" under the title: the project holding the session's folder, else the folder.
