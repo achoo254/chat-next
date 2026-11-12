@@ -65,10 +65,9 @@ export function StatusGlyph({ status, icon, who, offline = false }: { status: Wo
 	const p = t.agent.projects;
 	const state = offline ? p.offlineStatus(p.status[status]) : p.status[status];
 	const label = who === undefined ? state : `${who} · ${state}`;
-	const calm = status === "idle" || status === "open";
 	return (
 		<span className={`mx-glyph ${status}`} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label}>
-			<MachineIcon name={calm ? icon : GLYPHS[status]} small />
+			<MachineIcon name={GLYPHS[status] ?? icon} small />
 		</span>
 	);
 }
@@ -77,7 +76,7 @@ export function StatusGlyph({ status, icon, who, offline = false }: { status: Wo
 const EARLIER_TURN_MS = 60_000;
 
 // Held by a terminal is calm, not work: the row keeps its own icon, as idle does, since its second line already shows the terminal icon.
-const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle" } as const;
+const GLYPHS: Partial<Record<WorkStatus, MachineIconName>> = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle" };
 
 /**
  * The second line: while the machine reports the turn live (the open
