@@ -116,6 +116,8 @@ export function freeForHotkey(event: KeyboardEvent): boolean {
 	if (document.querySelector("dialog[open]") !== null) return false;
 	const target = event.target;
 	if (!(target instanceof HTMLElement)) return true;
+	// A part of the screen with keys of its own (the workspace panel's tree and buttons) keeps them.
+	if (target.closest("[data-own-keys]") !== null) return false;
 	if (target.dataset.composer !== undefined) return (target.textContent ?? "") === "";
 	return !(target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement);
 }

@@ -110,6 +110,7 @@ export const viMachines = {
 	newSession: {
 		noProject: "Không nạp .claude ở thư mục home hay thư mục nhạy cảm: Claude Code cũng không bao giờ tin cấu hình ở đó.",
 		title: (machine: string) => `Phiên mới trên ${machine}`,
+		titleIn: (folder: string, branch: string) => (branch === "" ? `Phiên mới trong ${folder}` : `Phiên mới trong ${folder} · ${branch}`),
 		model: "Model",
 		ai: "AI",
 		needsLogin: "chưa đăng nhập",
@@ -386,6 +387,24 @@ export const viMachines = {
 			terminalUnavailable: "Phần terminal trên máy chưa chạy được. Thử lại, hoặc chạy tunelo install trên máy.",
 			terminalSessionLimit: "Máy đã chạy đủ 20 phiên terminal. Đóng bớt rồi mở lại.",
 			terminalSessionNotFound: "Phiên terminal này không còn trên máy.",
+			// The workspace panel (Explorer, Source Control; tunelo 2.7.0+).
+			secretFile: "Đây là tệp bí mật (dotenv, khoá, thông tin đăng nhập) nên không được xem từ thiết bị khác.",
+			gitUnsafeConfig: (key: string) => `Cấu hình riêng của repo đặt chương trình git sẽ chạy (${key}). Hãy chạy lệnh này trong terminal.`,
+			gitNeedsCredentials: "Máy chưa có thông tin đăng nhập git cho remote này. Hãy push từ terminal một lần để lưu thông tin đăng nhập.",
+			gitFailed: (line: string) => (line === "" ? "git báo lỗi." : `git báo lỗi: ${line}`),
+			gitBusy: "Một lệnh git khác của workspace này đang chạy. Thử lại sau giây lát.",
+			notGitRepository: "Thư mục này không phải repo git.",
+			discardNotConfirmed: "Cần xác nhận trước khi huỷ thay đổi.",
+			folderTooLarge: "Thư mục có hơn 100 000 mục, quá lớn để liệt kê.",
+			gitLfsMissing: "Repo dùng Git LFS nhưng máy chưa cài git-lfs nên chưa đẩy gì. Cài git-lfs rồi thử lại.",
+			workspaceNotRepositoryRoot: "Workspace là thư mục con của một repo lớn hơn; git chỉ chạy ở thư mục gốc của repo.",
+			gitCommitSigning: "Repo bật ký commit (GPG/SSH), việc ký có thể cần nhập mật khẩu. Hãy commit trong terminal.",
+			gitOperationInProgress: (what: string) => `Đang dở ${what === "" ? "một thao tác git" : what}. Hoàn tất hoặc huỷ nó trong terminal trước.`,
+			gitDetachedHead: "HEAD đang tách rời.",
+			sensitiveFileNotConfirmed: "Cần xác nhận trước khi đưa tệp bí mật vào git.",
+			// Usage statistics of the machine.
+			usageRangeInvalid: "Khoảng thời gian không hợp lệ (tối đa 92 ngày).",
+			usageLedgerBlocked: "Sổ thống kê của máy đang bị khoá vì không đọc được hoặc có phiên bản lạ; có thể xoá sổ để làm lại.",
 		},
 	},
 	detail: {
@@ -881,6 +900,9 @@ export const viMachines = {
 			e2ee: "Mã hoá đầu cuối giữa thiết bị này và máy",
 			machine: (machine: string) => `Máy: ${machine}`,
 			changes: "Thay đổi",
+			/** The workspace panel (Explorer and Source Control) beside the session. */
+			panel: "Tệp và git của workspace",
+			panelKeys: "Alt+Shift+E",
 		},
 		jump: { newer: "Mới", needYou: "Cần bạn duyệt" },
 		composer: {

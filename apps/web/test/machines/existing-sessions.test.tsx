@@ -3,7 +3,7 @@
 // came from; searched; a session that may be open elsewhere asks first, as
 // do a sensitive folder and untrusted project settings.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, LocalSessionSchema, type LocalSession } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LocalSessionSchema, ProjectSchema, type LocalSession, type Project } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
@@ -30,9 +30,14 @@ const fakeLink = (sessions: LocalSession[], refuse: (sent: Sent) => RemoteError 
 			if (body.case === "dirList") return Promise.resolve({ body: { case: "dirListResult", value: { path: HOME, parent: "/Users", entries: [], sensitive: true } } });
 			if (body.case === "sessionList") {
 				const words = String(body.value.query ?? "").toLowerCase();
-				const shown = sessions.filter((s) => s.title.toLowerCase().includes(words));
-				const dirs = [...new Set(shown.map((s) => s.dir))].map((dir) => ({ dir, sessions: shown.filter((s) => s.dir === dir).length }));
-				return Promise.resolve({ body: { case: "sessionListResult", value: { sessions: shown, total: shown.length, dirs } } });
+				const matching = sessions.filter((s) => s.title.toLowerCase().includes(words));
+				// As the machine does: the folders of every match, the sessions of the folder asked for (and below), one page of them.
+				const dirs = [...new Set(matching.map((s) => s.dir))].map((dir) => ({ dir, sessions: matching.filter((s) => s.dir === dir).length }));
+				const folder = String(body.value.dir ?? "");
+				const inFolder = folder === "" ? matching : matching.filter((s) => s.dir === folder || s.dir.startsWith(`${folder}/`));
+				const offset = Number(body.value.offset ?? 0);
+				const limit = Number(body.value.limit ?? 30);
+				return Promise.resolve({ body: { case: "sessionListResult", value: { sessions: inFolder.slice(offset, offset + limit), total: inFolder.length, dirs } } });
 			}
 			if (body.case === "sessionOpen") {
 				const err = refuse(body);
@@ -47,10 +52,10 @@ const fakeLink = (sessions: LocalSession[], refuse: (sent: Sent) => RemoteError 
 
 const state = { status: { kind: "open" }, info: { home: HOME, providers: [{ id: "claude", name: "Claude Code" }] }, threads: [], listed: true, openSessions: 0, maxSessions: 3 } as unknown as LinkState;
 
-async function openTab(link: MachineLink) {
+async function openTab(link: MachineLink, project?: Project) {
 	render(
 		<I18nProvider>
-			<NewSession machine="1" name="Mac mini" link={link} state={state} onClose={() => {}} />
+			<NewSession machine="1" name="Mac mini" link={link} state={state} onClose={() => {}} {...(project !== undefined ? { project } : {})} />
 		</I18nProvider>,
 	);
 	fireEvent.click(screen.getByRole("tab", { name: "Phiên có sẵn trên máy" }));
@@ -159,5 +164,70 @@ describe("sessions on the machine", () => {
 		} as unknown as MachineLink;
 		await openTab(link);
 		expect(await screen.findByText("Máy chưa hỗ trợ việc này. Cập nhật trên máy: tunelo update.")).toBeTruthy();
+	});
+});
+
+describe("opened from a workspace or from the machine", () => {
+	const many = [
+		session("b1", `${HOME}/blog`, "Viết bài mới"),
+		session("b2", `${HOME}/blog`, "Sửa ảnh bìa"),
+		...Array.from({ length: 35 }, (_, i) => session(`s${i}`, `${HOME}/shop`, `Shop ${i}`)),
+	];
+	const workspace = create(ProjectSchema, { id: "p", name: "shop", dir: `${HOME}/shop`, git: { git: true, branch: "main" } });
+
+	it("from a workspace: named after its folder and branch, its sessions only, paged within the folder; widened for this open only", async () => {
+		const { link, sent: list } = fakeLink(many);
+		await openTab(link, workspace);
+		expect(screen.getByRole("heading", { name: "Phiên mới trong shop · main" })).toBeTruthy();
+		await screen.findByText("Shop 0");
+		const folder = screen.getByRole("combobox", { name: "Lọc theo thư mục" }) as HTMLSelectElement;
+		expect(folder.value).toBe(`${HOME}/shop`);
+		expect(sent(list, "sessionList")[0]?.value).toMatchObject({ dir: `${HOME}/shop` });
+		expect(screen.queryByText("Viết bài mới")).toBeNull();
+		// The group header names the folder; the count is the folder's.
+		expect(screen.getByRole("region", { name: `${HOME}/shop` })).toBeTruthy();
+		expect(screen.getByText("30/35 phiên")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Xem thêm" }));
+		await screen.findByText("Shop 34");
+		expect(sent(list, "sessionList").at(-1)?.value).toMatchObject({ dir: `${HOME}/shop`, offset: 30 });
+		expect(screen.getByText("35/35 phiên")).toBeTruthy();
+		// Widened: every folder.
+		fireEvent.change(folder, { target: { value: "" } });
+		await screen.findByText("Viết bài mới");
+		expect(sent(list, "sessionList").at(-1)?.value).toMatchObject({ dir: "" });
+		expect(screen.getByText("30/37 phiên")).toBeTruthy();
+	});
+
+	it("a workspace folder the machine lists no session in is still offered, and 'Mọi thư mục' widens it", async () => {
+		const { link } = fakeLink(many);
+		await openTab(link, create(ProjectSchema, { id: "q", name: "new", dir: `${HOME}/new` }));
+		expect(screen.getByRole("heading", { name: "Phiên mới trong new" })).toBeTruthy();
+		const folder = screen.getByRole("combobox", { name: "Lọc theo thư mục" }) as HTMLSelectElement;
+		await waitFor(() => expect(folder.value).toBe(`${HOME}/new`));
+		expect([...folder.options].map((o) => o.value)).toEqual(["", `${HOME}/new`, `${HOME}/blog`, `${HOME}/shop`]);
+	});
+
+	it("from the machine: named after the machine, every folder, as before", async () => {
+		const { link, sent: list } = fakeLink(many);
+		await openTab(link);
+		expect(screen.getByRole("heading", { name: "Phiên mới trên Mac mini" })).toBeTruthy();
+		await screen.findByText("Viết bài mới");
+		expect((screen.getByRole("combobox", { name: "Lọc theo thư mục" }) as HTMLSelectElement).value).toBe("");
+		expect(sent(list, "sessionList")[0]?.value).toMatchObject({ dir: "" });
+	});
+
+	it("each open starts again from the workspace's folder (the widening is not kept)", async () => {
+		const { link } = fakeLink(many);
+		const first = render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={link} state={state} onClose={() => {}} project={workspace} />
+			</I18nProvider>,
+		);
+		fireEvent.click(screen.getByRole("tab", { name: "Phiên có sẵn trên máy" }));
+		const folder = (await screen.findByRole("combobox", { name: "Lọc theo thư mục" })) as HTMLSelectElement;
+		fireEvent.change(folder, { target: { value: "" } });
+		first.unmount();
+		await openTab(link, workspace);
+		await waitFor(() => expect((screen.getByRole("combobox", { name: "Lọc theo thư mục" }) as HTMLSelectElement).value).toBe(`${HOME}/shop`));
 	});
 });

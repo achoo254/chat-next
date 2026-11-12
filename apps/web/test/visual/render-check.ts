@@ -95,6 +95,12 @@ export const PAGES: Readonly<Record<string, string>> = {
 	// The folder's uncommitted changes (git), one file of them fetched whole; a turn's numbers; a command reading secrets.
 	"machine-changes-git-file": "?at=machine-chat&open=changes-git-file",
 	"machine-turn-details": "?at=machine-chat&open=turn-details",
+	// The workspace panel (Explorer and Source Control, as in Orca): the tree, a preview, git, a diff, the secret-file confirmation.
+	"machine-workspace-explorer": "?at=machine-chat&open=workspace-explorer",
+	"machine-workspace-preview": "?at=machine-chat&open=workspace-preview",
+	"machine-workspace-scm": "?at=machine-chat&open=workspace-scm",
+	"machine-workspace-diff": "?at=machine-chat&open=workspace-diff",
+	"machine-workspace-confirm": "?at=machine-chat&open=workspace-confirm",
 	"machine-secret-command": "?at=machine-chat&open=secret-command",
 	"machine-mention": "?at=machine-chat&open=mention",
 	"machine-slash": "?at=machine-chat&open=slash",

@@ -403,6 +403,23 @@ async function contextMenu(selector: string, text: string): Promise<void> {
 	target.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left + 40, clientY: rect.top + 20 }));
 }
 
+/** Opens the demo session's workspace panel from the header and waits for its tree. */
+async function openWorkspacePanel(): Promise<void> {
+	await find(() => document.querySelector(".mx-status .mx-mode"));
+	const toggle = await find(() => document.querySelector<HTMLElement>("[data-id=session-panel-toggle]"));
+	toggle.click();
+	await find(() => document.querySelector(".ws-tree [role=treeitem] .ws-name"));
+}
+
+/** The Explorer's row of `name`. */
+function rowNamed(name: string): HTMLElement | undefined {
+	return [...document.querySelectorAll<HTMLElement>(".ws-tree [role=treeitem]")].find((row) => row.querySelector(".ws-name")?.textContent === name);
+}
+
+async function clickRow(name: string): Promise<void> {
+	(await find(() => rowNamed(name))).click();
+}
+
 /** Types into a React-controlled input (the native setter, then an input event). */
 async function type(selector: string, text: string): Promise<void> {
 	const input = await find(() => document.querySelector<HTMLInputElement>(selector));
@@ -661,6 +678,41 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".mx-file", /build-log/);
 		await click(".mx-changes .mx-diff button", /Xem đủ/);
 		await find(() => [...document.querySelectorAll(".mx-changes .mx-diff")].find((el) => el.textContent?.includes("1440")) ?? null);
+	},
+	// The workspace panel (Alt+Shift+E): the Explorer with two folders open, git's marks, an ignored folder dimmed.
+	"workspace-explorer": async () => {
+		await openWorkspacePanel();
+		await clickRow("apps");
+		await clickRow("web");
+		await clickRow("docs");
+		await find(() => rowNamed("guide.md"));
+	},
+	// A file's read-only preview in the drawer over the session (markdown rendered).
+	"workspace-preview": async () => {
+		await openWorkspacePanel();
+		await clickRow("README.md");
+		await find(() => document.querySelector(".ws-viewer .mx-agent"));
+	},
+	// Source Control: branch with upstream, Create PR, the commit box, CHANGES by folder, committed on branch, commits.
+	"workspace-scm": async () => {
+		await openWorkspacePanel();
+		await click(".ws-tab", /Quản lý mã nguồn/);
+		await find(() => document.querySelector(".ws-commit-row"));
+	},
+	// A changed file's diff in the drawer.
+	"workspace-diff": async () => {
+		await openWorkspacePanel();
+		await click(".ws-tab", /Quản lý mã nguồn/);
+		const file = await find(() => document.querySelector<HTMLElement>('.ws-change .ws-hit[title="package.json"]'));
+		file.click();
+		await find(() => document.querySelector(".ws-viewer .mx-diff"));
+	},
+	// "Stage All" with a secret file among the changes: the confirmation names it.
+	"workspace-confirm": async () => {
+		await openWorkspacePanel();
+		await click(".ws-tab", /Quản lý mã nguồn/);
+		await click(".ws-split .btn", /Stage tất cả/);
+		await find(() => document.querySelector("[data-id=workspace-confirm]"));
 	},
 	// The end of a turn opened to its numbers.
 	"turn-details": async () => {

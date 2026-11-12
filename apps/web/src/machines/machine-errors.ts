@@ -126,6 +126,38 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.terminalSessionLimit;
 		case ErrorReason.TERMINAL_SESSION_NOT_FOUND:
 			return r.terminalSessionNotFound;
+		case ErrorReason.SECRET_FILE:
+			return r.secretFile;
+		case ErrorReason.GIT_UNSAFE_CONFIG:
+			return r.gitUnsafeConfig(s);
+		case ErrorReason.GIT_NEEDS_CREDENTIALS:
+			return r.gitNeedsCredentials;
+		case ErrorReason.GIT_FAILED:
+			return r.gitFailed(s);
+		case ErrorReason.GIT_BUSY:
+			return r.gitBusy;
+		case ErrorReason.NOT_A_GIT_REPOSITORY:
+			return r.notGitRepository;
+		case ErrorReason.DISCARD_NOT_CONFIRMED:
+			return r.discardNotConfirmed;
+		case ErrorReason.FOLDER_TOO_LARGE:
+			return r.folderTooLarge;
+		case ErrorReason.GIT_LFS_MISSING:
+			return r.gitLfsMissing;
+		case ErrorReason.WORKSPACE_NOT_REPOSITORY_ROOT:
+			return r.workspaceNotRepositoryRoot;
+		case ErrorReason.GIT_COMMIT_SIGNING:
+			return r.gitCommitSigning;
+		case ErrorReason.GIT_OPERATION_IN_PROGRESS:
+			return r.gitOperationInProgress(s);
+		case ErrorReason.GIT_DETACHED_HEAD:
+			return r.gitDetachedHead;
+		case ErrorReason.SENSITIVE_FILE_NOT_CONFIRMED:
+			return r.sensitiveFileNotConfirmed;
+		case ErrorReason.USAGE_RANGE_INVALID:
+			return r.usageRangeInvalid;
+		case ErrorReason.USAGE_LEDGER_BLOCKED:
+			return r.usageLedgerBlocked;
 		default:
 			return undefined;
 	}

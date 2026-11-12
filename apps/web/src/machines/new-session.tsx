@@ -201,7 +201,8 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 
 	return (
 		<Modal labelledBy={titleId} onClose={onClose} className="mx-sheet">
-			<DialogHead id={titleId} title={t.newSession.title(name)} onClose={onClose} />
+			{/* From a workspace: its folder and branch; from the machine: the machine. */}
+			<DialogHead id={titleId} title={project === undefined ? t.newSession.title(name) : t.newSession.titleIn(folderName(project.dir), project.git?.git === true ? project.git.branch : "")} onClose={onClose} />
 			<div className="tabs mx-new-tabs" role="tablist" aria-label={t.existing.tabs}>
 				<button type="button" role="tab" id={`${tabsId}-new`} aria-controls={`${tabsId}-new-panel`} aria-selected={tab === "new"} onClick={() => setTab("new")}>
 					{t.existing.newTab}
@@ -228,7 +229,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 							</p>
 						}
 					>
-						<ExistingSessions machine={machine} name={name} link={link} ai={ai} home={state.info?.home ?? ""} onClose={onClose} />
+						<ExistingSessions machine={machine} name={name} link={link} ai={ai} home={state.info?.home ?? ""} folder={project?.dir} onClose={onClose} />
 					</Suspense>
 				</div>
 			) : (

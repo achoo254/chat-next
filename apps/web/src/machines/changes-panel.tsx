@@ -58,7 +58,7 @@ function stateLabel(t: MachinesCopy, state: GitFileState): string {
 }
 
 /** A git file's diff in the shape the diff card draws. */
-function asDiff(file: GitFileChange): DiffItem {
+export function asDiff(file: GitFileChange): DiffItem {
 	return create(DiffItemSchema, { path: file.path, unified: file.unified, added: file.added, removed: file.removed, truncated: file.truncated });
 }
 

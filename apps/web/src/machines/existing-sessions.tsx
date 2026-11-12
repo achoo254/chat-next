@@ -25,6 +25,11 @@ export interface ExistingSessionsProps {
 	ai: string;
 	/** The machine's home folder ("" when unknown). */
 	home: string;
+	/**
+	 * Opened from a workspace: its folder, picked at first (its sessions only);
+	 * "Mọi thư mục" and the other folders still widen the list, for this open only.
+	 */
+	folder?: string | undefined;
 	onClose: () => void;
 }
 
@@ -95,13 +100,13 @@ function useSettled<T>(value: T, ms: number): T {
 	return settled;
 }
 
-export default function ExistingSessions({ machine, name, link, ai, home, onClose }: ExistingSessionsProps) {
+export default function ExistingSessions({ machine, name, link, ai, home, folder, onClose }: ExistingSessionsProps) {
 	const t = useMachinesCopy();
 	const c = t.existing;
 	const now = useNow();
 	const [query, setQuery] = useState("");
 	const search = useSettled(query.trim(), SEARCH_DELAY_MS);
-	const [dir, setDir] = useState("");
+	const [dir, setDir] = useState(folder ?? "");
 	// Pages asked for, for this search and folder; another search or folder starts again at one.
 	const [more, setMore] = useState({ key: "", pages: 1 });
 	const filterKey = `${search}\n${dir}`;
@@ -197,9 +202,11 @@ export default function ExistingSessions({ machine, name, link, ai, home, onClos
 					onChange={(event) => setQuery(event.target.value)}
 					data-id="existing-sessions-search"
 				/>
-				{dirs.length > 1 && (
+				{(dirs.length > 1 || folder !== undefined) && (
 					<select className="input" aria-label={c.folder} value={dir} onChange={(event) => setDir(event.target.value)} data-id="existing-sessions-folder">
 						<option value="">{c.allFolders}</option>
+						{/* The workspace's folder stays offered even when the machine's list does not name it. */}
+						{folder !== undefined && !dirs.some((d) => d.dir === folder) && <option value={folder}>{shortDir(folder, home)}</option>}
 						{dirs.map((d) => (
 							<option key={d.dir} value={d.dir}>
 								{`${shortDir(d.dir, home)} (${d.sessions})`}

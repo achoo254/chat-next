@@ -22,6 +22,7 @@ import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
 import { FakeTerminalHost } from "../machines/fake-terminal.ts";
 import { FakeRfb } from "./fake-rfb.ts";
+import { FakeWorkspace } from "./fake-workspace.ts";
 import type { FakeMachines } from "./fake-machines.ts";
 
 export const DEMO_THREAD = "demo-thread";
@@ -337,6 +338,9 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const terminalHost = new FakeTerminalHost(machine);
 	terminalHost.greeting = "dieuvy@laptop ~ % ";
 	(window as unknown as { __fakeTerminal?: FakeTerminalHost }).__fakeTerminal = terminalHost;
+	// The workspace panel of project pr1 (the demo session's folder): files and git in memory; the e2e reads it as window.__fakeWorkspace.
+	const workspace = new FakeWorkspace("pr1");
+	(window as unknown as { __fakeWorkspace?: FakeWorkspace }).__fakeWorkspace = workspace;
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();
 	const thread = {
@@ -355,6 +359,10 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	const others = [
 		{ id: "demo-running", title: "Viết test cho bảng Cần bạn", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "sonnet", state: ThreadState.RUNNING, pending: 0, updatedAt: BigInt(now - 60_000), open: true, preview: "", previewTool: "Bash" },
 		{ id: "demo-idle", title: "Rà soát quyền MCP của tunelo", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 3 * 3_600_000), open: false, preview: "Đã rà 12 tool MCP: tool ghi đều hỏi lại, tool đọc chạy thẳng.", previewTool: "" },
+		// The phone sidebar's cases: an open chat with a short title, sessions held by the terminal (idle, and working) with long titles.
+		{ id: "demo-hi", title: "hi", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 30 * 60_000), open: true, preview: "Chào bạn, mình giúp gì được?", previewTool: "" },
+		{ id: "demo-held", title: "Phiên AI agent không tiếp tục được sau khi khởi động lại máy", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 8 * 3_600_000), open: false, preview: "Tất cả đã commit và lên production.", previewTool: "", terminalSession: 2 },
+		{ id: "demo-held-busy", title: "Sửa bố cục cột AI Agent trên điện thoại cho gọn", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 2 * 60_000), open: false, preview: "", previewTool: "Edit", terminalSession: 3, busyElsewhere: true, elsewhereActiveAt: BigInt(now - 20_000) },
 	];
 	// A machine this browser has not paired with, and one that went offline.
 	machines.add({ name: "Mac mini", os: "darwin", arch: "arm64", tunnelUrl: `wss://other.tunnel.${brand.domain}`, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
@@ -598,7 +606,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "attachmentFetch":
 				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
-				return terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
+				return workspace.handle(frame) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
 		}
 	};
 	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.

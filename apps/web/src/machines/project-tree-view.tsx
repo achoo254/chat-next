@@ -172,7 +172,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 				<StatusGlyph status={node.status} offline={node.offline} />
 				<span className="mx-ws-name">
 					<span className="mx-ws-title">
-						{label.byBranch && <MachineIcon name="branch" small />}
+						{/* The icon column of every row: its branch, or its folder. */}
+						<MachineIcon name={label.byBranch ? "branch" : "folder"} small />
 						<b>{label.title}</b>
 						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
@@ -259,15 +260,14 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 		<div className="mx-project" data-id="sidebar-project">
 			<div className="mx-project-head">
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
+					{/* The status column of every row: the most urgent state of its workspaces; a calm project keeps the place empty. */}
+					{node.status !== "idle" ? <StatusGlyph status={node.status} offline={offline} /> : <span className="mx-glyph-slot" aria-hidden="true" />}
 					<MachineIcon name="folder" small />
 					<b>{project.name}</b>
-					{node.need > 0 ? (
+					{node.need > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(node.need)}>
 							{node.need}
 						</span>
-					) : (
-						// The most urgent state of its workspaces; a calm project shows none.
-						node.status !== "idle" && <StatusGlyph status={node.status} offline={offline} />
 					)}
 				</button>
 				<RowMenu

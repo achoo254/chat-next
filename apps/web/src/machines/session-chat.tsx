@@ -47,7 +47,9 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeSwitch, TerminalHeldBar, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { ModeSwitch, TerminalHeldBar, rememberMode, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { aiPaths } from "./ai-paths.ts";
+import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
 import { isPhone, useViewportFit } from "./viewport-fit.ts";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
@@ -171,6 +173,26 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
+	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
+	const panel = useWorkspacePanel(machine, link, state, dir);
+	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
+	const toTerminal = offered && mode === "chat" && thread !== null
+		? () => {
+				rememberMode(machine, "terminal");
+				navigate(aiPaths.sessionTerminal(machine, threadId));
+			}
+		: undefined;
+	const workspacePanel = panelShown && panel.workspace !== undefined && (
+		<WorkspacePanelHost
+			link={link}
+			workspace={{ id: panel.workspace.id, name: panel.workspace.name || folderName(panel.workspace.dir), dir: panel.workspace.dir }}
+			online={online}
+			ai={ai}
+			prefs={panel.prefs}
+			onPrefs={panel.update}
+			onTerminal={toTerminal}
+		/>
+	);
 	// On a phone the session keeps to what the keyboard leaves: header on top, composer (or key bar) at the bottom.
 	const chatRef = useRef<HTMLDivElement>(null);
 	const [phone] = useState(isPhone);
@@ -238,6 +260,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						{changeCount > 0 && <span className="count">{changeCount}</span>}
 					</button>
 				)}
+				{thread !== null && <PanelToggle panel={panel} />}
 				<HeadMenu
 					machine={machine}
 					machineName={machineName}
@@ -259,6 +282,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							{state.info === null || thread === null ? t.terminal.loading : t.terminal.offerFailed}
 						</p>
 					)}
+					{workspacePanel}
 				</div>
 			) : (
 			<div className="mx-chat-body">
@@ -356,6 +380,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						onClose={closeChanges}
 					/>
 				)}
+				{workspacePanel}
 			</div>
 			)}
 		</div>
