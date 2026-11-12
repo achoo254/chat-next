@@ -82,11 +82,13 @@ jobs:
       - if: steps.browsers.outputs.cache-hit != 'true'
         run: pnpm --filter @app/web exec playwright install --with-deps --only-shell chromium
       # The cache holds the browser only; its system libraries come from apt.
-      # A stale package index makes apt fail on mirror files the runner image no longer has: refresh it, and try once more if a mirror is still flaky.
+      # security.ubuntu.com has been unreachable from the runners (each fetch waits out its timeout); the Azure mirror serves the same security pockets. Point apt there and keep its timeouts short so a bad mirror fails fast instead of eating the job's time.
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: |
-          sudo apt-get update
-          pnpm --filter @app/web exec playwright install-deps chromium || { sleep 20; sudo apt-get update; pnpm --filter @app/web exec playwright install-deps chromium; }
+          sudo sed -i 's#https\?://security\.ubuntu\.com#http://azure.archive.ubuntu.com#g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+          echo 'Acquire::http::Timeout "15"; Acquire::https::Timeout "15"; Acquire::Retries "2";' | sudo tee /etc/apt/apt.conf.d/99-fast-fail >/dev/null
+          sudo apt-get update || true
+          pnpm --filter @app/web exec playwright install-deps chromium
       - run: pnpm perf
 
   proto:
