@@ -11,7 +11,7 @@ import { aiPaths } from "./ai-paths.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { phaseText, tokenCount } from "./activity-line.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { MachineIcon } from "./machine-icons.tsx";
+import { MachineIcon, type MachineIconName } from "./machine-icons.tsx";
 import { threadStatus, type WorkStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
@@ -54,14 +54,21 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
 	return (info?.providers.length ?? 0) > 1 ? `${aiName(info, thread.provider)} · ${model}` : model;
 }
 
-/** The state of a workspace, folder or session as a glyph: spinner, check, alert, cross or a hollow circle; dimmed while offline. */
-export function StatusGlyph({ status, offline = false }: { status: WorkStatus; offline?: boolean }) {
+/**
+ * A row's own icon (folder, branch, the AI's spark), or its state in its place
+ * while it has one to show: spinner, check, alert or cross; dimmed while
+ * offline. One column carries both, so a calm list wastes no space on an empty
+ * status column. `who` (the AI's name on a session) leads the label.
+ */
+export function StatusGlyph({ status, icon, who, offline = false }: { status: WorkStatus; icon: MachineIconName; who?: string; offline?: boolean }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
-	const label = offline ? p.offlineStatus(p.status[status]) : p.status[status];
+	const state = offline ? p.offlineStatus(p.status[status]) : p.status[status];
+	const label = who === undefined ? state : `${who} · ${state}`;
+	const calm = status === "idle" || status === "open";
 	return (
 		<span className={`mx-glyph ${status}`} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label}>
-			<MachineIcon name={GLYPHS[status]} small />
+			<MachineIcon name={calm ? icon : GLYPHS[status]} small />
 		</span>
 	);
 }
@@ -69,8 +76,8 @@ export function StatusGlyph({ status, offline = false }: { status: WorkStatus; o
 /** The list's clock is coarse (it ticks every 30 s): an activity older than the turn by more than this is an earlier turn's. */
 const EARLIER_TURN_MS = 60_000;
 
-// Held by a terminal is calm, not work: the same circle as idle, since the row's second line already shows the terminal icon.
-const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle", open: "circle", idle: "circle" } as const;
+// Held by a terminal is calm, not work: the row keeps its own icon, as idle does, since its second line already shows the terminal icon.
+const GLYPHS = { need: "alert-circle", failed: "x-circle", running: "spinner", done: "check-circle" } as const;
 
 /**
  * The second line: while the machine reports the turn live (the open
@@ -129,12 +136,9 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>
-			<StatusGlyph status={status} offline={machine.conn.kind !== "on"} />
 			<span className="tx">
 				<span className="line">
-					<span className="mx-row-ai" role="img" aria-label={ai} title={ai}>
-						<MachineIcon name="spark" small />
-					</span>
+					<StatusGlyph status={status} icon="spark" who={ai} offline={machine.conn.kind !== "on"} />
 					<span className="name">{thread.title || t.agent.newSession}</span>
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>

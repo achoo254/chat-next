@@ -166,7 +166,7 @@ describe("a session row's glyph", () => {
 		const heldRow = rows.find((r) => r.textContent?.includes("Phiên mới"));
 		const workingRow = rows.find((r) => r.textContent?.includes("Đang sửa"));
 		expect(heldRow?.querySelector(".mx-glyph")?.className).toBe("mx-glyph open");
-		expect(heldRow?.querySelector(".mx-glyph")?.getAttribute("aria-label")).toBe("Mở trong terminal, đang chờ lệnh");
+		expect(heldRow?.querySelector(".mx-glyph")?.getAttribute("aria-label")).toBe("claude · Mở trong terminal, đang chờ lệnh");
 		expect(within(heldRow as HTMLElement).getByRole("img", { name: "Mở trong terminal" })).toBeTruthy();
 		// A turn running in the terminal: the spinner, and it says so.
 		expect(workingRow?.querySelector(".mx-glyph")?.className).toBe("mx-glyph running");
@@ -211,7 +211,7 @@ describe("a session row's mode icon", () => {
 		expect(modeOf("t1")).toEqual(["terminal", "Terminal"]);
 		expect(modeOf("hi")).toEqual(["chat", "Trò chuyện"]);
 		expect(modeOf("held")).toEqual(["terminal", "Mở trong terminal"]);
-		// The status glyph stays beside it, unchanged.
+		// The AI icon, which carries the state, stays beside it, unchanged.
 		expect(container.querySelectorAll(".mx-srow .mx-glyph")).toHaveLength(4);
 	});
 });

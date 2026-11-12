@@ -170,11 +170,10 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
 			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
-				<StatusGlyph status={node.status} offline={node.offline} />
 				<span className="mx-ws-name">
 					<span className="mx-ws-title">
-						{/* The icon column of every row: its branch, or its folder. */}
-						<MachineIcon name={label.byBranch ? "branch" : "folder"} small />
+						{/* Its branch or its folder, or its state in that place. */}
+						<StatusGlyph status={node.status} icon={label.byBranch ? "branch" : "folder"} offline={node.offline} />
 						<b>{label.title}</b>
 						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
@@ -262,9 +261,9 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 		<div className="mx-project" data-id="sidebar-project">
 			<div className="mx-project-head">
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
-					{/* The status column of every row: the most urgent state of its workspaces; a calm project keeps the place empty. */}
-					{node.status !== "idle" && node.status !== "open" ? <StatusGlyph status={node.status} offline={offline} /> : <span className="mx-glyph-slot" aria-hidden="true" />}
-					<MachineIcon name="folder" small />
+					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
+					{/* Its folder, or in that place the most urgent state of its workspaces. */}
+					<StatusGlyph status={node.status} icon="folder" offline={offline} />
 					<b>{project.name}</b>
 					{node.need > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(node.need)}>
@@ -326,10 +325,9 @@ function LooseItem({ folder, ctx, onArchive }: { folder: LooseFolder; ctx: TreeC
 	return (
 		<div className="mx-ws">
 			<div className="mx-ws-head">
-				<StatusGlyph status={folder.status} offline={machine.conn.kind !== "on"} />
 				<span className="mx-ws-name" title={`${machine.entry.name} · ${dir}`}>
 					<span className="mx-ws-title">
-						<MachineIcon name="folder" small />
+						<StatusGlyph status={folder.status} icon="folder" offline={machine.conn.kind !== "on"} />
 						<b>{name}</b>
 						<HostChip name={machine.entry.name} offline={machine.conn.kind !== "on"} />
 					</span>

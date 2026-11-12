@@ -295,7 +295,7 @@ describe("a session row", () => {
 		const row = screen.getByText("Sửa lỗi").closest<HTMLElement>(".mx-srow");
 		if (row === null) throw new Error("no row");
 		expect(row.querySelector(".mx-glyph.running")).toBeTruthy();
-		expect(within(row).getByRole("img", { name: "Claude Code" })).toBeTruthy();
+		expect(within(row).getByRole("img", { name: "Claude Code · Đang chạy" })).toBeTruthy();
 		expect(row.querySelector(".sub")?.textContent).toMatch(/^Đang chạy Bash · 2[7-9] giây · ↓ 1,2\sN token$/);
 		const inTerminal = screen.getByText("Trong terminal").closest<HTMLElement>(".mx-srow");
 		if (inTerminal === null) throw new Error("no row");

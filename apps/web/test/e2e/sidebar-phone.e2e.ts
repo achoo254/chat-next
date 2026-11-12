@@ -1,9 +1,10 @@
 // The AI Agent column on a phone (touch, 390×844) and wider screens: rows as
 // compact as their content (project about 44 px, workspace about 40 px, a
 // two-line session about 56 px; the 44 px touch target comes from an
-// invisible hit area, not from height), one status column for every row,
-// the icon and text stepping in per level (project, workspace, session) and
-// never on top of the glyph, and nothing wider than the column.
+// invisible hit area, not from height), no empty status column (a row's
+// state takes its icon's place), a chevron leading each project, the icon and
+// text stepping in per level (project, workspace, session), and nothing wider
+// than the column.
 // Starts its own Vite dev server of the harness:
 //
 //   node --test test/e2e/sidebar-phone.e2e.ts
@@ -33,9 +34,9 @@ after(async () => {
 });
 
 type Geometry = {
-	projects: { height: number; glyph: number; icon: number; name: number }[];
-	workspaces: { height: number; glyph: number; icon: number; name: number }[];
-	sessions: { height: number; glyph: number; ai: number; aiRight: number; glyphRight: number; mode: number; text: number; title: string }[];
+	projects: { height: number; chevron: number; chevronRight: number; icon: number; name: number }[];
+	workspaces: { height: number; icon: number; name: number }[];
+	sessions: { height: number; ai: number; mode: number; text: number; title: string }[];
 	overflow: number;
 	column: number;
 };
@@ -47,25 +48,20 @@ function geometry(page: Page): Promise<Geometry> {
 		const list = document.querySelector(".mx-list");
 		const projects = [...document.querySelectorAll(".mx-list .mx-project:not(.mx-loose) > .mx-project-head")].map((head) => ({
 			height: rect(head)?.height ?? 0,
-			glyph: rect(head.querySelector(".mx-project-toggle > .mx-glyph, .mx-project-toggle > .mx-glyph-slot"))?.left ?? -1,
-			icon: rect(head.querySelector(".mx-project-toggle > .icon"))?.left ?? -1,
+			chevron: rect(head.querySelector(".mx-project-toggle > .icon"))?.left ?? -1,
+			chevronRight: rect(head.querySelector(".mx-project-toggle > .icon"))?.right ?? -1,
+			icon: rect(head.querySelector(".mx-project-toggle > .mx-glyph"))?.left ?? -1,
 			name: rect(head.querySelector("b"))?.left ?? -1,
 		}));
 		const workspaces = [...document.querySelectorAll(".mx-list .mx-ws-head")].map((head) => ({
 			height: rect(head)?.height ?? 0,
-			glyph: rect(head.querySelector(".mx-glyph"))?.left ?? -1,
-			icon: rect(head.querySelector(".mx-ws-title > .icon"))?.left ?? -1,
+			icon: rect(head.querySelector(".mx-ws-title > .mx-glyph"))?.left ?? -1,
 			name: rect(head.querySelector(".mx-ws-name b, .mx-ws-title b"))?.left ?? -1,
 		}));
 		const sessions = [...document.querySelectorAll(".mx-list .mx-srow")].map((row) => {
-			const glyph = rect(row.querySelector(".mx-glyph"));
-			const ai = rect(row.querySelector(".mx-row-ai"));
 			return {
 				height: rect(row)?.height ?? 0,
-				glyph: glyph?.left ?? -1,
-				glyphRight: glyph?.right ?? -1,
-				ai: ai?.left ?? -1,
-				aiRight: ai?.right ?? -1,
+				ai: rect(row.querySelector(".mx-glyph"))?.left ?? -1,
 				mode: rect(row.querySelector(".mx-row-mode"))?.left ?? -1,
 				text: rect(row.querySelector(".name"))?.left ?? -1,
 				title: row.querySelector(".name")?.textContent ?? "",
@@ -99,19 +95,18 @@ function check(g: Geometry, label: string): void {
 	for (const p of g.projects) assert.ok(p.height >= 40 && p.height <= 48, `${label}: project row ${p.height} px`);
 	for (const w of g.workspaces) assert.ok(w.height >= 36 && w.height <= 44, `${label}: workspace row ${w.height} px`);
 	for (const s of g.sessions) assert.ok(s.height >= 48 && s.height <= 62, `${label}: session row "${s.title}" ${s.height} px`);
-	// One grid: the same columns in every session row, the glyph never on the provider icon.
-	near(g.sessions.map((s) => s.glyph), `${label}: session glyphs`);
+	// One grid: the same columns in every session row.
 	near(g.sessions.map((s) => s.ai), `${label}: provider icons`);
 	near(g.sessions.map((s) => s.text), `${label}: session titles`);
 	near(g.sessions.filter((s) => s.mode >= 0).map((s) => s.mode), `${label}: mode icons`);
-	for (const s of g.sessions) assert.ok(s.glyphRight <= s.ai, `${label}: "${s.title}" glyph ends at ${s.glyphRight}, its provider icon starts at ${s.ai}`);
-	// The status column is shared by every row; the icon and text step in per level, a child's icon under its parent's name.
-	near([...g.projects.map((p) => p.glyph), ...g.workspaces.map((w) => w.glyph), ...g.sessions.map((s) => s.glyph)], `${label}: status glyphs of every row`);
+	// A project leads with its chevron, its folder after it; the icon and text step in per level.
+	near(g.projects.map((p) => p.chevron), `${label}: project chevrons`);
+	for (const p of g.projects) assert.ok(p.chevronRight <= p.icon, `${label}: a project's chevron ends at ${p.chevronRight}, its folder starts at ${p.icon}`);
 	near(g.projects.map((p) => p.icon), `${label}: project icons`);
 	near(g.workspaces.map((w) => w.icon), `${label}: workspace icons`);
-	const step = (g.workspaces[0]?.icon ?? 0) - (g.projects[0]?.icon ?? 0);
-	assert.ok(step >= 16 && step <= 32, `${label}: a workspace steps in ${step} px from its project`);
-	near([g.workspaces[0]?.icon ?? 0, g.projects[0]?.name ?? 0], `${label}: a workspace icon under its project's name`);
+	const step = (g.workspaces[0]?.icon ?? 0) - (g.projects[0]?.chevron ?? 0);
+	assert.ok(step >= 16 && step <= 32, `${label}: a workspace steps in ${step} px from its project's chevron`);
+	near([g.workspaces[0]?.icon ?? 0, g.projects[0]?.icon ?? 0], `${label}: a workspace icon under its project's folder`);
 	near([g.sessions[0]?.ai ?? 0, g.workspaces[0]?.name ?? 0], `${label}: a session icon under its workspace's name`);
 	// The mode icon sits under the provider icon.
 	for (const s of g.sessions) if (s.mode >= 0) assert.ok(Math.abs(s.mode - s.ai) <= 1, `${label}: "${s.title}" mode icon at ${s.mode}, provider icon at ${s.ai}`);

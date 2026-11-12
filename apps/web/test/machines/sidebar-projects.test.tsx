@@ -122,7 +122,7 @@ describe("the project column", () => {
 		expect(title?.textContent).toBe("feature-x");
 		// The folder is the project's name: not said again under the branch.
 		expect(app.querySelector(".mx-ws-sub")).toBeNull();
-		// States are glyphs: the workspace and its waiting session need the user, the idle one is a hollow circle.
+		// States are glyphs: the workspace and its waiting session need the user, the idle one keeps its own icon.
 		expect(app.querySelector(".mx-ws-head .mx-glyph.need")?.getAttribute("aria-label")).toBe("Cần bạn");
 		// The project row counts what needs the user instead of a glyph.
 		expect(app.querySelector(".mx-project-head .badge")?.textContent).toBe("1");

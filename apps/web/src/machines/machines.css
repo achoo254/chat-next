@@ -79,7 +79,6 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-ws-head { min-height: 40px; padding-top: 0; padding-bottom: 0; }
 .mx-ws-name { display: grid; flex: 1; min-width: 0; }
 .mx-ws-title { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.mx-ws-title > .icon { flex: none; color: var(--c-icon-muted); }
 .mx-ws-title b { min-width: 0; font-weight: 500; }
 .mx-ws-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-ws-sub.mx-ws-missing { color: var(--c-error-text); }
@@ -112,7 +111,6 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-glyph.done { color: var(--c-success); }
 /* Idle, or held at its prompt in a terminal (the row's second line shows the terminal icon): nothing to look at, so the
    column stays blank; the label still names the state for a screen reader and on hover. */
-.mx-glyph.idle .icon, .mx-glyph.open .icon { visibility: hidden; }
 .mx-glyph[data-offline] { opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon { animation: none; } }
 /* Arrow keys move between rows: one is in the tab order, focus shows. */
@@ -740,8 +738,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-update progress { width: min(16rem, 100%); }
 
 /* Session rows: the state glyph, the AI and the title with its age, then what the turn does now (or the last message) below. */
-.mx-srow.slim { grid-template-columns: 16px minmax(0, 1fr); min-height: 48px; padding-left: var(--space-2); }
-.mx-row-ai, .mx-row-mode { display: inline-flex; flex: none; color: var(--c-icon-muted); }
+.mx-srow.slim { grid-template-columns: minmax(0, 1fr); min-height: 48px; padding-left: var(--space-2); }
+.mx-row-mode { display: inline-flex; flex: none; color: var(--c-icon-muted); }
 .mx-row-mode { vertical-align: -2px; }
 .mx-srow .sub[data-live] { font-variant-numeric: tabular-nums; }
 /* Thêm dự án / Thêm workspace: the machine, then a folder by hand or one of the recent ones. */
@@ -835,18 +833,18 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 }
 /* The session header's button of the workspace panel (the panel's own styles load with it). */
 .ws-toggle[aria-expanded="true"] { color: var(--c-primary); background: var(--c-selected); }
-/* One grid for project, workspace and session rows (the same left padding): a 16 px status column, an 8 px gap,
-   a 16 px icon column (folder, branch, the AI's spark; the mode icon under it), then the text. The status glyph
-   and the icon line up across rows and never overlap; touch targets grow by invisible hit areas, not by height. */
-.mx-glyph, .mx-glyph-slot { width: 16px; justify-content: center; }
-.mx-glyph-slot { display: inline-block; flex: none; height: 16px; }
-.mx-project-toggle > .icon, .mx-ws-title > .icon, .mx-row-ai, .mx-row-mode { width: 16px; flex: none; }
+/* One grid for project, workspace and session rows (the same left padding): each row has one 16 px icon column
+   (folder, branch, the AI's spark; the mode icon under it) that shows the row's state in place of its icon while
+   there is one, so no row keeps an empty status column. A project leads with its chevron. Touch targets grow by
+   invisible hit areas, not by height. */
+.mx-glyph { width: 16px; justify-content: center; }
+.mx-project-toggle > .icon, .mx-row-mode { width: 16px; flex: none; }
 .mx-row-mode { margin-right: var(--space-2); }
 .mx-srow .line { gap: var(--space-2); }
-/* Each level steps in by one icon column plus its gap, so a child's icon sits under its parent's name: project, then
-   workspace (or a folder of "Chưa phân loại"), then session. The status column stays put at the left edge. */
+/* Each level steps in by one icon column plus its gap: a workspace (or a folder of "Chưa phân loại") puts its icon
+   under its project's folder, past the chevron; a session puts its icon under its workspace's name. */
 .mx-groups { --mx-indent: calc(16px + var(--space-2)); }
 .mx-project .mx-ws-name { padding-left: var(--mx-indent); }
 .mx-ws .mx-srow .tx { padding-left: calc(var(--mx-indent) * 2); }
-.mx-ws .mx-more { margin-left: calc(var(--space-2) + 16px + var(--space-2) + var(--mx-indent) * 2); }
-.mx-ws-empty { padding-left: calc(var(--space-2) + 16px + var(--space-2) + var(--mx-indent)); }
+.mx-ws .mx-more { margin-left: calc(var(--space-2) + var(--mx-indent) * 2); }
+.mx-ws-empty { padding-left: calc(var(--space-2) + var(--mx-indent)); }
