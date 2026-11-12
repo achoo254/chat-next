@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, webkit, type Browser, type Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 
 const HARNESS = fileURLToPath(new URL("../visual/", import.meta.url));
@@ -288,4 +288,35 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	await p.shot("phone-terminal-keyboard-open");
 	assert.deepEqual(errors, []);
 	await p.close();
+});
+
+test("an iPhone (WebKit, touch): a tap on the terminal or on the keyboard key leaves the focus in the dock's input, so the phone keyboard comes up", async () => {
+	const safari = await webkit.launch();
+	const context = await safari.newContext({ locale: "vi-VN", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+	const page = await context.newPage();
+	const errors: string[] = [];
+	page.on("pageerror", (err) => errors.push(String(err)));
+	await page.goto(`http://localhost:${PORT}/?at=machine-session-terminal`);
+	await page.locator(".tx-pane .xterm-screen").first().waitFor({ timeout: 30_000 });
+	const inInput = () => page.evaluate(() => document.activeElement?.classList.contains("tx-ime") === true);
+	// xterm's emulated mousedown once took the focus for its own read-only field.
+	const screen = await page.locator(".tx-pane .xterm-screen").first().boundingBox();
+	assert.ok(screen !== null);
+	await page.touchscreen.tap(screen.x + 100, screen.y + 100);
+	await page.waitForTimeout(300);
+	assert.equal(await inInput(), true, "a tap on the terminal focuses the input");
+	// A key of the row keeps the focus where it is.
+	await page.getByRole("button", { name: "Esc" }).tap();
+	assert.equal(await inInput(), true, "Esc keeps the focus");
+	// The keyboard key: down, then up again (WebKit drops the click of a tap whose pointerdown was cancelled).
+	const kbd = page.getByRole("button", { name: "Bàn phím" });
+	await kbd.tap();
+	await page.waitForTimeout(200);
+	assert.equal(await inInput(), false, "the keyboard key lets go of the input");
+	await kbd.tap();
+	await page.waitForTimeout(200);
+	assert.equal(await inInput(), true, "the keyboard key takes the input again");
+	assert.deepEqual(errors, []);
+	await context.close();
+	await safari.close();
 });

@@ -6,8 +6,10 @@
 // and Backspace, Ctrl+D, Ctrl+L, Ctrl+R, paste, and "more" for Del, Home,
 // End, PgUp, PgDn and F1 to F12. Arrows, Backspace and Del repeat while held
 // (after 400 ms, every 45 ms). A key never takes the focus from the
-// terminal's input, so the phone keyboard stays up.
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+// terminal's input, so the phone keyboard stays up: its mousedown is
+// cancelled, not its pointerdown, since WebKit drops the click of a tap whose
+// pointerdown was cancelled.
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 export type BarKey =
 	| "esc"
@@ -238,7 +240,7 @@ const MORE: readonly Item[] = [
 ];
 
 /** Keeps the focus (and the phone keyboard) where it is. */
-const keepFocus = (event: PointerEvent) => event.preventDefault();
+const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste, onKeyboard }: MobileKeyBarProps) {
 	const [more, setMore] = useState(false);
@@ -260,7 +262,7 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 		};
 		if (!REPEATS.has(item.key)) {
 			return (
-				<button key={item.key} {...common} onPointerDown={keepFocus} onClick={() => onKey(item.key)}>
+				<button key={item.key} {...common} onMouseDown={keepFocus} onClick={() => onKey(item.key)}>
 					{item.text}
 				</button>
 			);
@@ -270,8 +272,8 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 			<button
 				key={item.key}
 				{...common}
-				onPointerDown={(event) => {
-					keepFocus(event);
+				onMouseDown={keepFocus}
+				onPointerDown={() => {
 					stop();
 					stopRepeat.current = repeatKey(() => onKey(item.key));
 				}}
@@ -296,7 +298,7 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 				data-latch={state}
 				aria-pressed={state !== "off"}
 				aria-label={state === "lock" ? labels.held(labels[mod]) : labels[mod]}
-				onPointerDown={keepFocus}
+				onMouseDown={keepFocus}
 				onClick={() => {
 					const now = Date.now();
 					const since = now - lastTap.current[mod];
@@ -310,17 +312,17 @@ export function MobileKeyBar({ labels, mods, keyboard, onToggle, onKey, onPaste,
 	};
 	return (
 		<div className="tx-keys" role="toolbar" aria-label={labels.bar} data-keyboard={keyboard ? "" : undefined}>
-			<button type="button" className="tx-key kbd" aria-label={labels.keyboard} aria-pressed={keyboard} onPointerDown={keepFocus} onClick={onKeyboard}>
+			<button type="button" className="tx-key kbd" aria-label={labels.keyboard} aria-pressed={keyboard} onMouseDown={keepFocus} onClick={onKeyboard}>
 				⌨
 			</button>
 			{MAIN.map(key)}
 			{modKey("ctrl")}
 			{modKey("alt")}
 			{AFTER_MODS.map(key)}
-			<button type="button" className="tx-key" aria-label={labels.paste} onPointerDown={keepFocus} onClick={onPaste}>
+			<button type="button" className="tx-key" aria-label={labels.paste} onMouseDown={keepFocus} onClick={onPaste}>
 				⎘
 			</button>
-			<button type="button" className="tx-key" aria-label={labels.more} aria-expanded={more} onPointerDown={keepFocus} onClick={() => setMore((v) => !v)}>
+			<button type="button" className="tx-key" aria-label={labels.more} aria-expanded={more} onMouseDown={keepFocus} onClick={() => setMore((v) => !v)}>
 				⋯
 			</button>
 			{more && MORE.map(key)}

@@ -7,7 +7,7 @@
 // counts as written (and is acknowledged to the machine) when xterm's write
 // callback runs, so a flood paces the machine instead of the page.
 // Loaded lazily with the dock; xterm never reaches the app's first chunk.
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, type PointerEvent } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -304,5 +304,11 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 		termRef.current?.textarea?.setAttribute("aria-label", label);
 	}, [label]);
 
-	return <div className="tx-term" ref={hostRef} onPointerDown={onFocus} />;
+	// A finger on a touch screen: no emulated mousedown follows, so xterm never takes the focus for its own
+	// read-only field and the phone keyboard stays with the dock's input (focused on pointerup).
+	const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+		if (touch && event.pointerType !== "mouse") event.preventDefault();
+		onFocus();
+	};
+	return <div className="tx-term" ref={hostRef} onPointerDown={onPointerDown} />;
 }
