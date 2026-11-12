@@ -2,7 +2,7 @@ module app.local/server
 
 go 1.26.4
 
-toolchain go1.26.9
+toolchain go1.26.11
 
 require (
 	connectrpc.com/connect v1.21.0

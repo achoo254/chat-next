@@ -12,3 +12,7 @@ allowBuilds:
 
 patchedDependencies:
   '@novnc/novnc@1.7.0': patches/@novnc__novnc@1.7.0.patch
+
+# ajv pulls fast-uri; versions below 3.1.9 have URI parsing advisories.
+overrides:
+  fast-uri: ">=3.1.9"
