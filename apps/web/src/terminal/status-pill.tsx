@@ -23,6 +23,8 @@ export function pillOf(t: MachinesCopy["terminal"], status: TerminalStatus, onli
 }
 
 export function StatusPill({ t, status, online }: { t: MachinesCopy["terminal"]; status: TerminalStatus; online: boolean }) {
+	// Online with no terminal attached there is no path to show yet.
+	if (online && status.kind === "idle") return null;
 	const pill = pillOf(t, status, online);
 	return (
 		<span className="tx-pill" data-tone={pill.tone} title={pill.hint} data-id="terminal-path">

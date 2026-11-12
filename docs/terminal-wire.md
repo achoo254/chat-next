@@ -234,7 +234,7 @@ Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_RE
 | 116 | `TermClosed {session=1}` | B → A | |
 | 117 | `TermStatus {link=1, path=2, rtt_ms=3 (float), reason=4}` | B → A, không hỏi | |
 
-- `TermSessionInfo {session=1 (uint32), title=2, cols=3, rows=4, created_at=5 (int64, ms Unix), attached=6, exited=7, exit_code=8 (int32, -1 khi bị tín hiệu giết), exit_signal=9, thread_id=10}`. `thread_id` là luồng mà AI của nó chạy trong phiên này (rỗng với shell). `max_sessions` hiện là 20.
+- `TermSessionInfo {session=1 (uint32), title=2, cols=3, rows=4, created_at=5 (int64, ms Unix), attached=6, exited=7, exit_code=8 (int32, -1 khi bị tín hiệu giết), exit_signal=9, thread_id=10, cwd=11}`. `thread_id` là luồng mà AI của nó chạy trong phiên này (rỗng với shell). `cwd` là thư mục phiên được mở, do agent ghi lại khi mở; rỗng nếu không biết (phiên mở trước lần khởi động agent gần nhất). `max_sessions` hiện là 20.
 - `TermSignalKind`: `OFFER=1` (A → B), `ANSWER=2` (B → A), `CANDIDATE=3` (hai chiều, một dòng `candidate:...`), `END=4` (A → B: bỏ peer, relay giữ nguyên; B → A: peer đã kết thúc, `reason` theo mục 6 "Đường thẳng").
 - `TermPath`: `CONNECTING=1`, `DIRECT=2`, `RELAY=3`, `CLOSED=4`. `DIRECT` có thể đến hai lần, lần hai có `rtt_ms` (0 là chưa đo).
 - `MachineInfo.terminal = 23` (`TerminalAvailability`): `UNSPECIFIED=0` (agent cũ), `AVAILABLE=1`, `MISSING=2` (chưa có binary daemon), `INCOMPATIBLE=3` (daemon khác `major` đang chạy, hoặc máy không có trình giám sát; gợi ý chạy lại `tunelo install`). Agent gửi lại `MachineInfo` không hỏi khi giá trị đổi.

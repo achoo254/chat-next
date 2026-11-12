@@ -232,7 +232,7 @@ describe("terminal sessions", () => {
     expect(open?.cwd).toBeTypeOf("string");
     expect(open).not.toHaveProperty("env");
     const list = await c.request("2", { case: "termListRequest", value: {} });
-    expect(list.body).toMatchObject({ case: "termListResult", value: { maxSessions: 20, sessions: [{ session: 1, cols: 80, rows: 24 }] } });
+    expect(list.body).toMatchObject({ case: "termListResult", value: { maxSessions: 20, sessions: [{ session: 1, cols: 80, rows: 24, cwd: open?.cwd }] } });
     expect((await c.request("3", { case: "termResize", value: { session: 1, cols: 100, rows: 30 } })).body.case).toBe("ack");
     expect((await c.request("4", { case: "termClose", value: { session: 1 } })).body).toMatchObject({ case: "termClosed", value: { session: 1 } });
     const gone = await c.request("5", { case: "termResize", value: { session: 1, cols: 100, rows: 30 } });

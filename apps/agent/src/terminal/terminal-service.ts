@@ -140,6 +140,8 @@ export class TerminalService {
   private orphanTimer: ReturnType<typeof setTimeout> | undefined;
   /** A thread's AI being opened, so two devices asking at once share one terminal. */
   private readonly aiOpening = new Map<string, Promise<number>>();
+  /** The folder each session opened in (the terminal process does not keep it). */
+  private readonly cwds = new Map<number, string>();
 
   constructor(private readonly opts: TerminalServiceOptions) {
     this.supervisor = new HostSupervisor({
@@ -240,6 +242,8 @@ export class TerminalService {
   async list(): Promise<MessageInitShape<typeof TermListResultSchema>> {
     await this.ensure();
     const sessions = sessionListSchema.parse(await this.call("list", {}));
+    const live = new Set(sessions.map((s) => s.session));
+    for (const session of this.cwds.keys()) if (!live.has(session)) this.cwds.delete(session);
     return {
       maxSessions: MAX_TERMINAL_SESSIONS,
       sessions: sessions.map((s) => ({
@@ -253,6 +257,7 @@ export class TerminalService {
         exitCode: s.exited?.code ?? 0,
         exitSignal: s.exited?.signal ?? 0,
         threadId: this.opts.ai?.threadOf(s.session, this.hostPid) ?? "",
+        cwd: this.cwds.get(s.session) ?? "",
       })),
     };
   }
@@ -269,6 +274,7 @@ export class TerminalService {
     const r = await this.call("open", { cols, rows, cwd, ...(claude ? { env: { CLAUDE_CONFIG_DIR: claude } } : {}) });
     const session = (r as { session?: unknown }).session;
     if (typeof session !== "number") throw new Error("the terminal process did not name the session");
+    this.cwds.set(session, cwd);
     return session;
   }
 
@@ -291,6 +297,7 @@ export class TerminalService {
       const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars });
       const session = (r as { session?: unknown }).session;
       if (typeof session !== "number") throw new Error("the terminal process did not name the session");
+      this.cwds.set(session, cwd);
       ai.started(threadId, session, this.hostPid);
       return session;
     })();
@@ -305,6 +312,7 @@ export class TerminalService {
   async close(session: number): Promise<void> {
     await this.ensure();
     await this.call("close", { session });
+    this.cwds.delete(session);
     // "Kết thúc" of a thread's AI: chat may write again even if no exit event comes.
     this.opts.ai?.ended(session, this.hostPid);
   }

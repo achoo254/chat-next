@@ -955,6 +955,8 @@ export class TerminalLink {
 			return { kind: "open", path, rttMs: this.rttShown, directIssue: path === "relay" ? gen.directIssue : "" };
 		}
 		if (this.relinks > 0) return { kind: "reconnecting", attempt: this.relinks };
+		// The machine's link is up and no session is attached: nothing is connecting (a generation begins with the first attach).
+		if (this.sessions.size === 0 && this.deps.carrier.snapshot().status.kind === "open") return { kind: "idle" };
 		return { kind: "connecting" };
 	}
 

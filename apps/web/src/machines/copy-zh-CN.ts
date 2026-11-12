@@ -598,6 +598,7 @@ export const zhCNMachines: MachinesCopy = {
 		reopenAi: "在终端中重新打开",
 		closePaneAi: "关闭窗格（会话继续运行）",
 		detached: "会话仍在设备上运行，但未在此显示。",
+		folderGone: "此会话的文件夹已不在机器上，无法打开终端。",
 		offerFailed: "此设备暂时无法在终端中打开会话。",
 		keys: {
 			bar: "附加按键",

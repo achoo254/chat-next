@@ -2211,6 +2211,9 @@ message TermSessionInfo {
   uint32 exit_signal = 9;
   // The thread whose AI runs in it (TermOpen.ai_session); empty for a shell.
   string thread_id = 10;
+  // The folder it was opened in, as this machine's agent recorded it; empty when
+  // unknown (a session opened before the agent last started).
+  string cwd = 11;
 }
 
 message TermListResult {

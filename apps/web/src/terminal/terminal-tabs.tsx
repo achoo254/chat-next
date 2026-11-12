@@ -9,6 +9,7 @@ import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
 import { MachineIcon } from "../machines/machine-icons.tsx";
+import { folderName } from "../machines/new-session-hints.ts";
 import { usePopover } from "../machines/use-popover.ts";
 import { Link } from "../router.tsx";
 import type { SplitDir } from "./terminal-layout.ts";
@@ -143,6 +144,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 									key={s.session}
 									type="button"
 									role="menuitem"
+									title={s.cwd === "" ? undefined : s.cwd}
 									onClick={() => {
 										setMenuOpen(false);
 										onReopen(s.session);
@@ -151,7 +153,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 									<MachineIcon name="terminal" small />
 									<span>
 										{s.title || t.untitled(s.session)}
-										<small>{s.exited ? t.exitedShort(s.exitCode) : s.attached ? t.openElsewhere : t.running}</small>
+										<small>{[s.cwd === "" ? "" : folderName(s.cwd), s.exited ? t.exitedShort(s.exitCode) : s.attached ? t.openElsewhere : t.running].filter((x) => x !== "").join(" · ")}</small>
 									</span>
 								</button>
 							))}

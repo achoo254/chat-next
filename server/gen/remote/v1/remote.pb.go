@@ -14932,7 +14932,10 @@ type TermSessionInfo struct {
 	ExitCode   int32  `protobuf:"varint,8,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
 	ExitSignal uint32 `protobuf:"varint,9,opt,name=exit_signal,json=exitSignal,proto3" json:"exit_signal,omitempty"`
 	// The thread whose AI runs in it (TermOpen.ai_session); empty for a shell.
-	ThreadId      string `protobuf:"bytes,10,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	ThreadId string `protobuf:"bytes,10,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	// The folder it was opened in, as this machine's agent recorded it; empty when
+	// unknown (a session opened before the agent last started).
+	Cwd           string `protobuf:"bytes,11,opt,name=cwd,proto3" json:"cwd,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -15033,6 +15036,13 @@ func (x *TermSessionInfo) GetExitSignal() uint32 {
 func (x *TermSessionInfo) GetThreadId() string {
 	if x != nil {
 		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *TermSessionInfo) GetCwd() string {
+	if x != nil {
+		return x.Cwd
 	}
 	return ""
 }
@@ -19309,7 +19319,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\breceived\x18\x03 \x01(\x04R\breceived\x12\x14\n" +
 	"\x05total\x18\x04 \x01(\x04R\x05total\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\"\x11\n" +
-	"\x0fTermListRequest\"\x97\x02\n" +
+	"\x0fTermListRequest\"\xa9\x02\n" +
 	"\x0fTermSessionInfo\x12\x18\n" +
 	"\asession\x18\x01 \x01(\rR\asession\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -19323,7 +19333,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vexit_signal\x18\t \x01(\rR\n" +
 	"exitSignal\x12\x1b\n" +
 	"\tthread_id\x18\n" +
-	" \x01(\tR\bthreadId\"k\n" +
+	" \x01(\tR\bthreadId\x12\x10\n" +
+	"\x03cwd\x18\v \x01(\tR\x03cwd\"k\n" +
 	"\x0eTermListResult\x126\n" +
 	"\bsessions\x18\x01 \x03(\v2\x1a.remote.v1.TermSessionInfoR\bsessions\x12!\n" +
 	"\fmax_sessions\x18\x02 \x01(\rR\vmaxSessions\"}\n" +

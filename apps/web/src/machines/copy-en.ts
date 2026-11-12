@@ -604,6 +604,7 @@ export const enMachines: MachinesCopy = {
 		reopenAi: "Open again in terminal",
 		closePaneAi: "Close pane (the session keeps running)",
 		detached: "The session still runs on the machine but is not shown here.",
+		folderGone: "This session's folder is no longer on the machine, so its terminal cannot open.",
 		offerFailed: "This machine cannot open sessions in a terminal yet.",
 		keys: {
 			bar: "Extra keys",

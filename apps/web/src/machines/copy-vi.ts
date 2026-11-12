@@ -609,6 +609,7 @@ export const viMachines = {
 		reopenAi: "Mở lại trong terminal",
 		closePaneAi: "Đóng ô (phiên vẫn chạy)",
 		detached: "Phiên vẫn chạy trên máy nhưng không hiện ở đây.",
+		folderGone: "Thư mục của phiên này không còn trên máy, nên chưa mở được terminal.",
 		offerFailed: "Máy này chưa mở được phiên bằng terminal.",
 		keys: {
 			bar: "Phím phụ",

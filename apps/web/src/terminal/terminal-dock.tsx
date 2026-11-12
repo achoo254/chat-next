@@ -182,6 +182,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [ready, setReady] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [notice, setNotice] = useState("");
+	/** The session's folder is gone from the machine: its AI cannot open there, so it is not "still running". */
+	const [folderGone, setFolderGone] = useState(false);
 	const [titles, setTitles] = useState<ReadonlyMap<number, string>>(() => new Map());
 	const [ended, setEnded] = useState<ReadonlyMap<number, number>>(() => new Map());
 	const [listed, setListed] = useState<readonly TermSessionInfo[]>([]);
@@ -239,6 +241,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const openSession = async (cwd = shellDir, ai = false): Promise<number | null> => {
 		setBusy(true);
 		setNotice("");
+		setFolderGone(false);
 		try {
 			const value = ai && threadId !== undefined ? { cols: 80, rows: 24, cwd: "", aiSession: { threadId } } : { cols: 80, rows: 24, cwd };
 			const frame = await link.request({ case: "termOpen", value });
@@ -246,6 +249,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			return frame.body.value.session;
 		} catch (err) {
 			setNotice(openErrorText(t, err));
+			setFolderGone(err instanceof RemoteError && err.reason === ErrorReason.FOLDER_NOT_FOUND);
 			return null;
 		} finally {
 			setBusy(false);
@@ -530,8 +534,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				{!ready && <p className="tx-empty">{online ? t.terminal.loading : tt.offline}</p>}
 				{ready && layout.tabs.length === 0 && (
 					<div className="tx-empty">
-						<p>{threadId !== undefined ? tt.detached : tt.none}</p>
-						{threadId !== undefined ? (
+						<p>{folderGone ? tt.folderGone : threadId !== undefined ? tt.detached : tt.none}</p>
+						{folderGone ? null : threadId !== undefined ? (
 							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void showAi()}>
 								{tt.reopenAi}
 							</button>
