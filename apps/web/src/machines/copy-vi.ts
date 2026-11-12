@@ -300,6 +300,7 @@ export const viMachines = {
 		skills: "Skill",
 	},
 	transcript: {
+		earlier: (n: number) => `Xem ${n} mục trước`,
 		ranTools: (n: number) => `Đã chạy ${n} tool`,
 		runningTool: (name: string) => `Đang chạy ${name}`,
 		runningFor: (time: string) => `Chạy được ${time}`,

@@ -295,6 +295,7 @@ export const enMachines: MachinesCopy = {
 		skills: "Skills",
 	},
 	transcript: {
+		earlier: (n: number) => (n === 1 ? "Show 1 earlier item" : `Show ${n} earlier items`),
 		ranTools: (n) => (n === 1 ? "Ran 1 tool" : `Ran ${n} tools`),
 		runningTool: (name) => `Running ${name}`,
 		runningFor: (time) => `Running for ${time}`,

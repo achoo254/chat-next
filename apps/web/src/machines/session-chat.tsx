@@ -9,7 +9,7 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 // "Chat | Terminal" in the header opens the same session in its AI's own CLI
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -594,6 +594,10 @@ interface TranscriptProps {
 
 /** Within this distance of the bottom, the transcript follows new content. */
 const STICK_PX = 80;
+/** Blocks drawn when a session opens; scrolling near the top draws this many more. */
+export const TRANSCRIPT_PAGE = 40;
+/** How near the top (px) scrolling starts drawing earlier blocks. */
+const EARLIER_PX = 600;
 
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
 export function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live }: TranscriptProps) {
@@ -602,6 +606,27 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 	const stick = useRef(true);
 	/** Blocks there were when the user scrolled up; null while following. */
 	const [seenAt, setSeenAt] = useState<number | null>(null);
+	// A long session opens on its last blocks only (drawing hundreds took seconds on a slower device); earlier ones
+	// come in pages as the user scrolls up. While following, the window is the last page; once the user scrolls up
+	// its first block stays put, so blocks arriving meanwhile never shift what is being read.
+	const [from, setFrom] = useState<{ threadId: string; start: number | null }>({ threadId, start: null });
+	const fixed = from.threadId === threadId ? from.start : null;
+	const start = fixed ?? Math.max(0, blocks.length - TRANSCRIPT_PAGE);
+	const shown = start > 0 ? blocks.slice(start) : blocks;
+	/** The scroll height before earlier blocks came in: the reading position is kept across them. */
+	const heightBefore = useRef<number | null>(null);
+	useLayoutEffect(() => {
+		const el = scroller.current;
+		if (el === null || heightBefore.current === null) return;
+		el.scrollTop += el.scrollHeight - heightBefore.current;
+		heightBefore.current = null;
+	}, [start]);
+	const showEarlier = () => {
+		const el = scroller.current;
+		if (start === 0 || heightBefore.current !== null) return;
+		heightBefore.current = el?.scrollHeight ?? null;
+		setFrom({ threadId, start: Math.max(0, start - TRANSCRIPT_PAGE) });
+	};
 	const last = blocks.at(-1);
 	const tail = last === undefined ? "" : `${blocks.length}:${last.kind === "text" ? last.text.length : last.id}`;
 	// New content scrolls into view unless the user scrolled up to read.
@@ -646,11 +671,18 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 						// Only the user scrolling up stops the following; content growing does not.
 						stick.current = false;
 						setSeenAt((seen) => seen ?? blocks.length);
+						if (fixed === null) setFrom({ threadId, start });
 					}
+					if (up && el.scrollTop < EARLIER_PX) showEarlier();
 				}}
 			>
 				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
-				{blocks.map((block) => (
+				{start > 0 && (
+					<button type="button" className="btn btn-sm mx-earlier" onClick={showEarlier} data-id="transcript-earlier">
+						{t.transcript.earlier(Math.min(start, TRANSCRIPT_PAGE))}
+					</button>
+				)}
+				{shown.map((block) => (
 					<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
 				))}
 				<ActivityLine

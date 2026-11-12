@@ -292,6 +292,7 @@ export const zhCNMachines: MachinesCopy = {
 		skills: "技能",
 	},
 	transcript: {
+		earlier: (n: number) => `查看之前的 ${n} 项`,
 		ranTools: (n) => `已运行 ${n} 个工具`,
 		runningTool: (name) => `正在运行 ${name}`,
 		runningFor: (time) => `已运行 ${time}`,

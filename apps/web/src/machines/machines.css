@@ -346,6 +346,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-chat { --mx-col: 1000px; }
 .mx-messages > * { flex: none; max-width: var(--mx-col); width: 100%; min-width: 0; margin-inline: auto; }
 .mx-msg.mine { display: flex; justify-content: flex-end; }
+/* Earlier blocks of a long session (they also come in on scrolling up). */
+.mx-earlier { align-self: center; margin: var(--space-2) auto; }
 .mx-msg .bubble { max-width: 80%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-md); background: var(--c-mine); color: var(--c-on-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
 .mx-msg .bubble[aria-busy="true"] { opacity: 0.6; }
 .mx-agent.streaming::after { content: "▍"; color: var(--c-primary); animation: mx-blink 1s steps(2) infinite; }

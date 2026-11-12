@@ -15,7 +15,7 @@ import { enMachines } from "../../src/machines/copy-en.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import { zhCNMachines } from "../../src/machines/copy-zh-CN.ts";
 import { MachineLink, sortForList, type LinkState } from "../../src/machines/link/machine-link.ts";
-import { Transcript } from "../../src/machines/session-chat.tsx";
+import { TRANSCRIPT_PAGE, Transcript } from "../../src/machines/session-chat.tsx";
 import { matches, rowLine } from "../../src/machines/session-sidebar.tsx";
 import type { Block } from "../../src/machines/transcript/tool-fold.ts";
 import { isRunning, stateKey } from "../../src/machines/use-machines.ts";
@@ -194,6 +194,24 @@ describe("the activity line", () => {
 		act(() => source.set(create(ThreadActivitySchema, { threadId: "t1", phase: ActivityPhase.WRITING, turnStartedAt: BigInt(NOW - 5_000), outputTokens: 50n })));
 		expect(screen.getByRole("status").textContent).toContain("Đang viết");
 		expect(textRenders.count).toBe(rendered);
+	});
+});
+
+describe("a long transcript", () => {
+	it("draws its last page, and earlier pages on request", async () => {
+		const blocks: Block[] = Array.from({ length: TRANSCRIPT_PAGE * 2 + 5 }, (_, i): Block => ({ kind: "text", id: `a${i}`, text: `reply ${i}`, partial: false }));
+		const state = { info: null, full: new Map(), journals: new Map(), threads: [] } as unknown as LinkState;
+		const source = manualSource();
+		const link = { ...source, request: () => Promise.reject(new Error("not used")) };
+		const view = wrap(<Transcript blocks={blocks} state={state} running={false} startedAt={0} waiting={false} fetchFull={() => Promise.resolve()} link={link} threadId="t1" thread={summary()} live />);
+		expect(screen.queryByText(`reply ${blocks.length - 1}`)).toBeTruthy();
+		expect(screen.queryByText(`reply ${blocks.length - TRANSCRIPT_PAGE - 1}`)).toBeNull();
+		await act(async () => screen.getByRole("button", { name: `Xem ${TRANSCRIPT_PAGE} mục trước` }).click());
+		expect(screen.queryByText(`reply ${blocks.length - TRANSCRIPT_PAGE - 1}`)).toBeTruthy();
+		// The last page left holds the rest: 5 more, then no button.
+		await act(async () => screen.getByRole("button", { name: "Xem 5 mục trước" }).click());
+		expect(screen.queryByText("reply 0")).toBeTruthy();
+		expect(view.container.querySelector("[data-id=transcript-earlier]")).toBeNull();
 	});
 });
 
