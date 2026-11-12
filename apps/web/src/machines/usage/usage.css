@@ -1,0 +1,18 @@
+/* "Hiệu quả" (usage-screen.tsx): loaded with the page, never at startup. */
+.mx-usage > .mx-card { max-width: 760px; }
+.mx-usage-table { border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.mx-usage-table th, .mx-usage-table td { padding: var(--space-1) var(--space-3); text-align: right; border-bottom: 1px solid var(--c-border-subtle); }
+.mx-usage-table th[scope="row"] { text-align: left; font-weight: 400; color: var(--c-text-muted); padding-left: 0; }
+.mx-usage-table thead th { font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
+.mx-usage .mx-kv dd { font-variant-numeric: tabular-nums; }
+.mx-usage-better { margin: 0; color: var(--c-success-text); font-weight: 500; }
+.mx-usage-worse { margin: 0; color: var(--c-warning-text); font-weight: 500; }
+.mx-usage-hints, .mx-usage-switches { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.mx-usage-hints li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.mx-usage-hints li:last-child { padding-bottom: 0; border-bottom: 0; }
+.mx-usage-hints p { flex-basis: 100%; margin: 0; font-size: 0.875rem; }
+.mx-usage-hints small { flex-basis: 100%; overflow-wrap: anywhere; }
+.mx-usage-switches label { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; font-size: 0.875rem; cursor: pointer; }
+.mx-usage-switches input { width: 18px; height: 18px; margin: 0; accent-color: var(--c-primary); }
+.mx-usage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.mx-warn > .mx-usage-actions { margin-top: var(--space-1); }

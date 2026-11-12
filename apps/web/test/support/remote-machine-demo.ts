@@ -16,12 +16,13 @@
 // paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { Decision, GitFileState, ItemSchema, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { Decision, GitFileState, ItemSchema, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
-import { defaultAnswer, FakeMachine } from "../machines/fake-machine.ts";
+import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
 import { FakeTerminalHost } from "../machines/fake-terminal.ts";
 import { FakeRfb } from "./fake-rfb.ts";
+import { FakeUsage } from "./fake-usage.ts";
 import { FakeWorkspace } from "./fake-workspace.ts";
 import type { FakeMachines } from "./fake-machines.ts";
 
@@ -341,8 +342,15 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	// The workspace panel of project pr1 (the demo session's folder): files and git in memory; the e2e reads it as window.__fakeWorkspace.
 	const workspace = new FakeWorkspace("pr1");
 	(window as unknown as { __fakeWorkspace?: FakeWorkspace }).__fakeWorkspace = workspace;
+	// "Hiệu quả" of the machine: the demo folder's usage in memory; the e2e reads it as window.__fakeUsage.
+	const usageSide = new FakeUsage("local:chat-next");
+	(window as unknown as { __fakeUsage?: FakeUsage }).__fakeUsage = usageSide;
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();
+	/** Folders whose .claude configuration is on (ProjectConfigSet); every other one is off. The e2e reads it as window.__fakeProjectConfig. */
+	const configOn = new Set<string>();
+	(window as unknown as { __fakeProjectConfig?: Set<string> }).__fakeProjectConfig = configOn;
+	const levelOf = (dir: string) => (configOn.has(dir) ? ProjectConfigLevel.FULL : ProjectConfigLevel.OFF);
 	const thread = {
 		id: DEMO_THREAD,
 		title: "Sửa giao diện Máy của tôi",
@@ -355,7 +363,19 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		open: true,
 		preview: "Mình xoá thư mục build cũ rồi chạy lại.",
 		previewTool: "",
+		projectConfig: ProjectConfigLevel.OFF,
 	};
+	const projectList = (): FrameBody => ({
+		case: "projectListResult",
+		value: {
+			projects: [
+				{ id: "pr1", name: "chat-next", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", pinned: true, git: { git: true, branch: "main", changed: 4, ahead: 2, upstream: true } },
+				{ id: "pr2", name: "localman-next", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", git: { git: true, branch: "feat/forward", changed: 0, behind: 1, upstream: true } },
+				{ id: "pr3", name: "auth-next", dir: "D:\\CONG VIEC\\hoandat-app\\auth-next", git: { git: true, branch: "main" } },
+			].map((p) => ({ ...p, projectConfig: levelOf(p.dir) })),
+			suggestions: [{ dir: "D:\\CONG VIEC\\hoandat-app\\kb-next", sessions: 6 }],
+		},
+	});
 	const others = [
 		{ id: "demo-running", title: "Viết test cho bảng Cần bạn", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", provider: "claude", model: "sonnet", state: ThreadState.RUNNING, pending: 0, updatedAt: BigInt(now - 60_000), open: true, preview: "", previewTool: "Bash" },
 		{ id: "demo-idle", title: "Rà soát quyền MCP của tunelo", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", provider: "claude", model: "opus", state: ThreadState.IDLE, pending: 0, updatedAt: BigInt(now - 3 * 3_600_000), open: false, preview: "Đã rà 12 tool MCP: tool ghi đều hỏi lại, tool đọc chạy thẳng.", previewTool: "" },
@@ -586,19 +606,19 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 				return stop !== undefined && Number(v.offset) + v.data.length > stop ? [] : [{ case: "ack", value: {} }];
 			}
 			case "projectList":
-				return [
-					{
-						case: "projectListResult",
-						value: {
-							projects: [
-								{ id: "pr1", name: "chat-next", dir: "D:\\CONG VIEC\\hoandat-app\\chat-next", pinned: true, git: { git: true, branch: "main", changed: 4, ahead: 2, upstream: true } },
-								{ id: "pr2", name: "localman-next", dir: "D:\\CONG VIEC\\hoandat-app\\localman-next", git: { git: true, branch: "feat/forward", changed: 0, behind: 1, upstream: true } },
-								{ id: "pr3", name: "auth-next", dir: "D:\\CONG VIEC\\hoandat-app\\auth-next", git: { git: true, branch: "main" } },
-							],
-							suggestions: [{ dir: "D:\\CONG VIEC\\hoandat-app\\kb-next", sessions: 6 }],
-						},
-					},
-				];
+				return [projectList()];
+			case "projectConfigSet": {
+				// As tunelo: the folder's level, then the new project list and the session's level (it waits, so it is idle).
+				const { dir, level } = frame.body.value;
+				if (level === ProjectConfigLevel.FULL) configOn.add(dir);
+				else configOn.delete(dir);
+				if (dir === thread.dir) thread.projectConfig = levelOf(dir);
+				setTimeout(() => {
+					machine.send(socket, projectList());
+					machine.send(socket, { case: "threadStatus", value: { thread } });
+				}, 0);
+				return [{ case: "projectConfig", value: { dir, level: levelOf(dir) } }];
+			}
 			case "threadSetArchived":
 				return [{ case: "ack", value: {} }];
 			case "attachmentCancel":
@@ -606,7 +626,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "attachmentFetch":
 				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
-				return workspace.handle(frame) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
+				return workspace.handle(frame) ?? usageSide.handle(frame) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
 		}
 	};
 	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.

@@ -262,7 +262,7 @@ describe("a session in chat or in its terminal", () => {
 		expect(within(group).getByRole("button", { name: "Trò chuyện" }).getAttribute("aria-pressed")).toBe("false");
 		await screen.findByRole("button", { name: "Kết thúc" });
 		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
-		expect(screen.queryByRole("status", { name: "Chạy ở nơi khác" })).toBeNull();
+		expect(screen.queryByRole("status", { name: "Đang mở ngoài app" })).toBeNull();
 	});
 
 	it("an AI without a terminal CLI: no switch, and the terminal address says so without opening anything", async () => {
@@ -280,7 +280,7 @@ describe("a session in chat or in its terminal", () => {
 		const bar = await screen.findByText("Claude Code đang mở phiên này trong terminal, chờ lệnh. Ở đây chỉ xem.");
 		expect(screen.getByRole("status", { name: "Mở trong terminal" })).toBeTruthy();
 		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
-		expect(screen.queryByRole("status", { name: "Chạy ở nơi khác" })).toBeNull();
+		expect(screen.queryByRole("status", { name: "Đang mở ngoài app" })).toBeNull();
 		const section = bar.closest("section");
 		expect(section).toBeTruthy();
 		expect(document.querySelector(".mx-composer.disabled")).toBeTruthy();

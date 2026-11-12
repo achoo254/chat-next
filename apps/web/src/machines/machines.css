@@ -186,6 +186,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-head .title strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title span { display: flex; align-items: center; gap: var(--space-1); min-width: 0; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title .mono { overflow: hidden; text-overflow: ellipsis; }
+.mx-pc-hint { padding: 0; border: 0; background: none; }
 .mx-back { display: none; }
 .mx-body { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) var(--space-5); }
 .mx-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); max-width: 760px; }

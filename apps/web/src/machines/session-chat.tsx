@@ -35,6 +35,7 @@ import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
 import { PageHead } from "./page-head.tsx";
+import { ProjectConfigHint } from "./project-config.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
@@ -169,8 +170,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	};
 
 	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere".
-	// In the terminal its pill and "Kết thúc" already say it runs there; in chat the chip says why it is read-only.
-	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : stateKey(thread);
+	// In the terminal its pill and "Kết thúc" already say it runs there, and the banner says when another process has the session open; in chat the chip says why it is read-only.
+	const chip = !online ? "offline" : thread === null ? null : thread.terminalSession > 0 ? (mode === "terminal" ? null : isRunning(thread) ? "terminal" : "terminalOpen") : mode === "terminal" && stateKey(thread) === "elsewhere" ? null : stateKey(thread);
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
@@ -226,6 +227,10 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						{placed !== null && placed.project.name !== workspace && <span className="hide-narrow">· {workspace}</span>}
 						{branch !== "" && <span className="hide-narrow">· {branch}</span>}
 						<span className="hide-narrow">· {machineName}</span>
+						{thread !== null && mode === "chat" && (
+							// The workspace's folder when the session is in one, so its switch shows the same level.
+							<ProjectConfigHint key={threadId} link={link} level={thread.projectConfig} dir={own?.dir ?? dir} ai={ai} online={online} />
+						)}
 					</>
 				}
 			>

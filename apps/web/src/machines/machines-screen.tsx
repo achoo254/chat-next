@@ -7,7 +7,7 @@
 // the same page under /ai. A machine's terminals (xterm and the dock) load
 // only when opened, and only on a machine that offers them. Loaded on demand
 // with its styles.
-import { Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { navigate, paths, usePathname, useSearch, type MachinesView } from "../router.tsx";
 import { AddMachine } from "./add-machine.tsx";
 import { terminalGate } from "./agent-version.ts";
@@ -24,6 +24,9 @@ import { SessionSidebar } from "./session-sidebar.tsx";
 import { useHub, useHubPresence, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import "./machines.css";
+
+/** "Hiệu quả": loaded, with its styles, the first time it opens. */
+const UsageScreen = lazy(() => import("./usage/usage-screen.tsx"));
 
 export default function MachinesScreen({ view }: { view: MachinesView }) {
 	const hub = useHub();
@@ -72,6 +75,13 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			break;
 		case "terminal":
 			main = <TerminalPage key={view.machine} machine={view.machine} openShellIn={new URLSearchParams(search).get("new") ?? undefined} />;
+			break;
+		case "usage":
+			main = (
+				<Suspense fallback={null}>
+					<UsageScreen key={`${view.machine}\n${view.key}`} machine={view.machine} repoKey={view.key} />
+				</Suspense>
+			);
 			break;
 	}
 	return (

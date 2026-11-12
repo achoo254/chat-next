@@ -103,9 +103,9 @@ describe("a session running elsewhere in the session column", () => {
 
 	it("words the chip and the header in every language, with no product name", () => {
 		const words = (c: typeof viMachines) => [c.chat.chip.elsewhere, c.sessions.state.elsewhere, c.transcript.activity.elsewhere];
-		expect(words(viMachines)).toEqual(["Chạy ở nơi khác", "Chạy ở nơi khác", "Chạy ở nơi khác"]);
-		expect(words(enMachines)).toEqual(["Running elsewhere", "Running elsewhere", "Running elsewhere"]);
-		expect(words(zhCNMachines)).toEqual(["在别处运行", "在别处运行", "在别处运行"]);
+		expect(words(viMachines)).toEqual(["Đang mở ngoài app", "Đang mở ngoài app", "Đang mở ngoài app"]);
+		expect(words(enMachines)).toEqual(["Open outside the app", "Open outside the app", "Open outside the app"]);
+		expect(words(zhCNMachines)).toEqual(["在应用外打开", "在应用外打开", "在应用外打开"]);
 		for (const c of [viMachines, enMachines, zhCNMachines]) {
 			const all = [...words(c), c.transcript.activity.thinking, c.transcript.activity.writing, c.transcript.activity.waiting, c.transcript.activity.tool("X"), c.transcript.activity.lastActive("1"), c.transcript.activity.tokens("1")];
 			for (const text of all) expect(text).not.toMatch(/claude|anthropic|tunelo/i);
@@ -146,11 +146,11 @@ describe("the activity line", () => {
 		const source = manualSource();
 		const thread = summary({ busyElsewhere: true, previewTool: "Bash", elsewhereActiveAt: BigInt(NOW - 12_000) });
 		line({ source, thread, running: false, startedAt: null });
-		expect(screen.getByRole("status").textContent).toBe("Chạy ở nơi khác · Đang chạy Bash · hoạt động 12 giây trước");
+		expect(screen.getByRole("status").textContent).toBe("Đang mở ngoài app · Đang chạy Bash · hoạt động 12 giây trước");
 		act(() => {
 			vi.advanceTimersByTime(3_000);
 		});
-		expect(screen.getByRole("status").textContent).toBe("Chạy ở nơi khác · Đang chạy Bash · hoạt động 15 giây trước");
+		expect(screen.getByRole("status").textContent).toBe("Đang mở ngoài app · Đang chạy Bash · hoạt động 15 giây trước");
 	});
 
 	it("keeps the plain working line for machines before the activity, hidden while the answer streams", () => {

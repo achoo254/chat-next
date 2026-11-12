@@ -6,6 +6,9 @@
 // folder and every folder inside it: the nearest folder set wins. Kept in
 // `project-config.json` in the core's data folder, written atomically, 0600.
 //
+// A folder set off is kept as set: it also overrides the older per-session
+// consent ("load .claude" ticked when the session was opened).
+//
 // Two levels only. A middle level, the project's skills and commands without
 // its hooks and permission rules, is not offered: Claude Code loads a
 // folder's configuration as a whole, and a project skill can itself carry
@@ -33,6 +36,15 @@ export class ProjectConfigStore {
 
   /** The level that applies in `dir`: its own, the nearest folder above it that has one, else off. */
   level(dir: string): ProjectConfigValue {
+    return this.chosen(dir) ?? "off";
+  }
+
+  /**
+   * The level a user chose for `dir` or the nearest folder above it, or
+   * undefined when none was ever set there. An explicit off is kept apart
+   * from never set: it also overrides the older per-session consent.
+   */
+  chosen(dir: string): ProjectConfigValue | undefined {
     const d = norm(dir);
     let best: { len: number; value: ProjectConfigValue } | undefined;
     for (const [folder, value] of Object.entries(this.levels)) {
@@ -40,20 +52,16 @@ export class ProjectConfigStore {
       const inside = d === f || d.startsWith(f.endsWith(sep) ? f : f + sep);
       if (inside && (!best || f.length > best.len)) best = { len: f.length, value };
     }
-    return best?.value ?? "off";
+    return best?.value;
   }
 
-  /**
-   * Sets `dir`'s own level. Off is kept only where a folder above it is on
-   * (to override it); otherwise the folder simply has none.
-   */
+  /** Sets `dir`'s own level, replacing the one it had (an off is kept: it is a choice, not the default). */
   set(dir: string, value: ProjectConfigValue): void {
     const full = resolve(dir);
     const next = Object.fromEntries(Object.entries(this.levels).filter(([folder]) => norm(folder) !== norm(full)));
     const before = this.levels;
+    next[full] = value;
     this.levels = next;
-    const inherited = this.level(full);
-    if (value === "full" || inherited === "full") next[full] = value;
     try {
       mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 });
       const tmp = `${this.file}.${process.pid}.tmp`;

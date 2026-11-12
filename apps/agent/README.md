@@ -293,7 +293,7 @@ dự án, như một thư mục đã tin trong terminal. Phiên rảnh đang m�
 đang chạy giữ mức cũ tới lúc đó. `ThreadSummary.project_config` cho thiết bị biết phiên đang chạy với mức nào (để hiện "chưa nạp
 skill của dự án" và nút bật). Nhật ký đồng ý ghi `project_settings` với thiết bị, thư mục và `level:full`/`level:off`. Thư mục
 nhạy cảm chỉ bật được trên máy (`tunelo trust`). Tick "Nạp cấu hình .claude" từng phiên (`Consent.project_settings`) vẫn chạy
-như cũ cho thiết bị cũ.
+cho thiết bị cũ ở thư mục chưa đặt mức; thư mục đã tắt (`OFF`) thì tắt cả phiên mở bằng tick đó, từ lượt kế tiếp của phiên.
 
 Không có mức "chỉ skill và lệnh": Claude Code nạp cấu hình dự án nguyên khối, và skill của dự án tự mang hook và `allowed-tools`
 trong front matter, có hiệu lực khi skill chạy kể cả khi chỉ nạp riêng skill (thử với `claude` thật:

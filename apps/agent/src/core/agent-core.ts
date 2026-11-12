@@ -1188,7 +1188,8 @@ export class AgentCore {
     // A session opened without a message is named by its first one.
     if (!t.meta.title) t.meta.title = firstLine(text);
     // Turns typed elsewhere since come first; an open session opens again so the AI reads them.
-    if (!t.running && this.syncHistory(t) > 0 && t.session) await this.park(t);
+    // It also opens again when its folder's level changed while it ran a turn.
+    if (!t.running && (this.syncHistory(t) > 0 || t.projectLoaded !== this.loadsProject(t)) && t.session) await this.park(t);
     const attachments = (prepared?.attachments ?? []).map((a) => ({ ...a, size: BigInt(a.size) }));
     this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId, attachments } });
     const images = prepared?.images ?? [];
@@ -2084,9 +2085,14 @@ export class AgentCore {
 
   // --- the folders' project configuration -------------------------------------
 
-  /** Whether the thread's next session loads its folder's project configuration: the folder's level, or the consent it was opened with. */
+  /**
+   * Whether the thread's next session loads its folder's project
+   * configuration: the level chosen for the folder (off wins over the consent
+   * the thread was opened with), else that consent.
+   */
   private loadsProject(t: Thread): boolean {
-    return t.meta.projectSettings || this.projectConfigs.level(t.meta.dir) === "full";
+    const chosen = this.projectConfigs.chosen(t.meta.dir);
+    return chosen === undefined ? t.meta.projectSettings : chosen === "full";
   }
 
   /** What the thread runs with: its open session's own, else what the next one opens with. */

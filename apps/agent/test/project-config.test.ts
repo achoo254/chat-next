@@ -187,13 +187,44 @@ describe("chat sessions in a folder follow its level", () => {
     expect(sdk.log.options[0]).toMatchObject({ settingSources: ALL_SOURCES, resume: t.sessionId });
   });
 
-  it("a thread opened with the per-session consent keeps loading it whatever the folder's level (the older devices' way)", async () => {
+  // Turning a folder off is the user's latest word on it, so it also covers
+  // the threads opened with the older per-session consent.
+  it("a thread opened with the per-session consent loads it until its folder is turned off, then not from its next turn", async () => {
     const { core, sdk, work } = setup({ trusted: () => true });
     const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hi", consent: { sensitive: false, projectSettings: true }, device: "phone" });
     await until(core, thread.id, turnsDone(1));
     expect(sdk.log.options[0]?.settingSources).toEqual(ALL_SOURCES);
-    await core.setProjectConfig({ dir: work, level: ProjectConfigLevel.OFF, device: "phone" });
     expect(level(core, thread.id)).toBe(ProjectConfigLevel.FULL);
+
+    await core.setProjectConfig({ dir: work, level: ProjectConfigLevel.OFF, device: "phone" });
+    expect(level(core, thread.id)).toBe(ProjectConfigLevel.OFF);
+    await core.send(thread.id, "again", "");
+    await until(core, thread.id, turnsDone(2));
+    expect(sdk.log.options[1]).toMatchObject({ settingSources: ["user"], resume: "claude-session-1" });
+  });
+
+  it("a folder never set leaves the per-session consent as it was", async () => {
+    const { core, sdk, work } = setup({ trusted: () => true });
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hi", consent: { sensitive: false, projectSettings: true }, device: "phone" });
+    await until(core, thread.id, turnsDone(1));
+    expect(core.projectConfig(work)).toBe(ProjectConfigLevel.OFF);
+    expect(level(core, thread.id)).toBe(ProjectConfigLevel.FULL);
+    expect(sdk.log.options[0]?.settingSources).toEqual(ALL_SOURCES);
+  });
+
+  it("a session running a turn when its folder changes keeps its level for that turn and switches at the next one", async () => {
+    const { core, sdk, work } = setup();
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "slow", consent: none, device: "phone" });
+    await until(core, thread.id, (items) => byCase(items, "turn").some((x) => x.body.value.state === TurnState.RUNNING));
+    await core.setProjectConfig({ dir: work, level: ProjectConfigLevel.FULL, device: "phone" });
+    // Still the open session's own level while it runs.
+    expect(level(core, thread.id)).toBe(ProjectConfigLevel.OFF);
+    await core.interrupt(thread.id);
+    await until(core, thread.id, turnsDone(1));
+    await core.send(thread.id, "next", "");
+    await until(core, thread.id, turnsDone(2));
+    expect(sdk.log.options.map((o) => o.settingSources)).toEqual([["user"], ALL_SOURCES]);
+    expect(sdk.log.options[1]?.resume).toBe("claude-session-1");
   });
 });
 

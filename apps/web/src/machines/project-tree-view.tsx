@@ -28,6 +28,7 @@ import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { aiName, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+import { projectUsagePath } from "./usage/usage-paths.ts";
 
 const dialogs = () => import("./agent-project-dialogs.tsx");
 const AddWorkspaceDialog = lazy(() => dialogs().then((m) => ({ default: m.AddWorkspaceDialog })));
@@ -256,6 +257,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 	const empty = project.workspaces.length === 0;
 	const labels = workspaceLabels(project.name, node.workspaces);
 	const offline = node.workspaces.length > 0 && node.workspaces.every((w) => w.offline);
+	const usage = projectUsagePath({ gitRemote: project.gitRemote, workspaces: node.workspaces.map((w) => ({ dir: w.workspace.dir, machine: w.machine?.entry.ref ?? null, online: !w.offline })) });
 	return (
 		<div className="mx-project" data-id="sidebar-project">
 			<div className="mx-project-head">
@@ -276,6 +278,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 						{ label: p.addWorkspace, icon: "plus", run: () => setDialog("add") },
 						{ label: p.rename, icon: "edit", run: () => setDialog("rename") },
 						{ label: p.link, icon: "link", run: () => setDialog("link") },
+						usage !== null ? { label: t.usage.open, icon: "database", run: () => navigate(usage) } : null,
 						{ label: p.remove, icon: "trash", run: () => setDialog("delete"), danger: true },
 					]}
 				/>

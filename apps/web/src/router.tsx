@@ -40,7 +40,13 @@ export type MachinesView =
 	| { readonly page: "terminal"; readonly machine: string }
 	| { readonly page: "session"; readonly machine: string; readonly threadId: string }
 	/** The session opened in its AI's own CLI, in the machine's terminal. */
-	| { readonly page: "session-terminal"; readonly machine: string; readonly threadId: string };
+	| { readonly page: "session-terminal"; readonly machine: string; readonly threadId: string }
+	/**
+	 * "Hiệu quả": the machine's AI usage of one repository, `key` its
+	 * canonical key ("host/path"), `local:<folder>` or `scratch`; "" for
+	 * every repository (/ai/<machine>/usage, where a usage hint push opens).
+	 */
+	| { readonly page: "usage"; readonly machine: string; readonly key: string };
 
 export type Route =
 	| { name: "home" }
@@ -224,7 +230,9 @@ function matchMachines(parts: readonly string[]): Route | null {
 	if (parts.length === 2 && parts[1] === "info") return route({ page: "info", machine });
 	if (parts.length === 2 && parts[1] === "pair" && !local) return route({ page: "pair", machine });
 	if (parts.length === 2 && parts[1] === "terminal") return route({ page: "terminal", machine });
+	// The third part: a thread id, or the repository key of the usage page (only a filter of the machine's own report).
 	const threadId = parts[2] === undefined ? "" : decodeURIComponent(parts[2]);
+	if (parts[1] === "usage") return route({ page: "usage", machine, key: threadId });
 	if (parts[1] !== "s" || !THREAD_ID.test(threadId)) return null;
 	if (parts.length === 3) return route({ page: "session", machine, threadId });
 	if (parts.length === 4 && parts[3] === "terminal") return route({ page: "session-terminal", machine, threadId });

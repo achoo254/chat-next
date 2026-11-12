@@ -1,12 +1,14 @@
 // What a machine knows about one of its folders (loaded when first opened):
 // a folder picker (typed, or browsed with git branches) and the settings a
-// new session in a workspace starts with (model, permission mode, the
-// project's own .claude settings), which the machine keeps for the folder.
+// new session in a workspace starts with (model, permission mode), which the
+// machine keeps for the folder, with the folder's .claude configuration switch
+// (or, on a machine before it, the per-session tick).
 import { useEffect, useState, type FormEvent } from "react";
-import type { DirListResult, MachineInfo, Project } from "@achoo254/chat-proto/remote/remote";
+import { ProjectConfigLevel, type DirListResult, type MachineInfo, type Project } from "@achoo254/chat-proto/remote/remote";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { projectConfigErrorText, projectConfigUnsupported, setProjectConfig } from "./project-config.tsx";
 import { errorText, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -157,12 +159,34 @@ export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { l
 	const [model, setModel] = useState(project.defaults?.model ?? "");
 	const [mode, setMode] = useState(project.defaults?.permissionMode ?? "");
 	const [settings, setSettings] = useState(project.defaults?.projectSettings ?? false);
+	// The folder's own switch where the machine has it; else the per-session tick of new sessions.
+	const [folderOffered, setFolderOffered] = useState(project.projectConfig !== ProjectConfigLevel.UNSPECIFIED);
+	const [folderOn, setFolderOn] = useState(project.projectConfig === ProjectConfigLevel.FULL);
+	const [switching, setSwitching] = useState(false);
+	const [folderNote, setFolderNote] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	const switchFolder = (on: boolean) => {
+		setSwitching(true);
+		setFolderNote("");
+		setProjectConfig(link, project.dir, on).then(
+			(level) => {
+				setSwitching(false);
+				setFolderOn(level === ProjectConfigLevel.FULL);
+			},
+			(err: unknown) => {
+				setSwitching(false);
+				if (projectConfigUnsupported(err)) setFolderOffered(false);
+				setFolderNote(projectConfigErrorText(t, err, project.dir, ai));
+			},
+		);
+	};
 	const save = (event: FormEvent) => {
 		event.preventDefault();
 		setBusy(true);
-		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { model, permissionMode: mode, projectSettings: settings } } }).then(onClose, (err: unknown) => {
+		// With the folder's switch, new sessions tick what it says, so they never ask to trust a folder that is off.
+		const projectSettings = folderOffered ? folderOn : settings;
+		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { model, permissionMode: mode, projectSettings } } }).then(onClose, (err: unknown) => {
 			setBusy(false);
 			setError(errorText(t, err, ai));
 		});
@@ -195,10 +219,25 @@ export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { l
 							))}
 						</select>
 					</label>
-					<label className="mx-check">
-						<input type="checkbox" checked={settings} disabled={project.sensitive} onChange={(event) => setSettings(event.target.checked)} />
-						<span>{p.projectSettings}</span>
-					</label>
+					{folderOffered ? (
+						<>
+							<label className="mx-check">
+								<input type="checkbox" checked={folderOn} disabled={switching} onChange={(event) => switchFolder(event.target.checked)} data-id="project-config-switch" />
+								<span>{t.projectConfig.label}</span>
+							</label>
+							<p className="muted">{t.projectConfig.hint}</p>
+						</>
+					) : (
+						<label className="mx-check">
+							<input type="checkbox" checked={settings} disabled={project.sensitive} onChange={(event) => setSettings(event.target.checked)} />
+							<span>{p.projectSettings}</span>
+						</label>
+					)}
+					{folderNote !== "" && (
+						<p className={folderOffered ? "mx-error" : "muted"} role={folderOffered ? "alert" : "status"}>
+							{folderNote}
+						</p>
+					)}
 					{error !== "" && (
 						<p className="mx-error" role="alert">
 							{error}

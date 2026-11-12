@@ -192,6 +192,11 @@ export function needsProjectTrust(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.PROJECT_SETTINGS_UNTRUSTED;
 }
 
+/** The machine's agent does not know the request (an older tunelo): the page asks to update it instead of failing. */
+export function unsupportedByMachine(err: unknown): boolean {
+	return err instanceof RemoteError && err.reason === ErrorReason.UNSUPPORTED_REQUEST;
+}
+
 /** The machine thinks the session is open elsewhere on it; asking the user first, then opening anyway, is fine. */
 export function openElsewhere(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE;
