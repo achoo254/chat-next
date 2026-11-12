@@ -244,6 +244,23 @@ jobs:
           for f in dist/"$PREFIX"-term-host-darwin-*; do
             sign "$f" com.hoandat.tunelo.term-host
           done
+          # macOS keeps the Full Disk Access a user granted only while the program's designated requirement
+          # (identifier, Apple anchor, team) stays the same across updates. The values are pinned in
+          # apps/agent/macos/designated-requirements.txt; a change (another certificate, identifier or way
+          # of signing) must be a deliberate edit of that file, never a silent loss of the users' permission.
+          check_requirement() {
+            f="$1" name="$2"
+            got="$(codesign -d -r- "$f" 2>&1 | sed -n 's/^designated => //p')"
+            want="$(sed -n "s/^$name: //p" apps/agent/macos/designated-requirements.txt)"
+            if [ -z "$want" ] || [ "$got" != "$want" ]; then
+              echo "designated requirement of $f changed:"
+              echo "  want: $want"
+              echo "  got:  $got"
+              exit 1
+            fi
+          }
+          for f in dist/"$PREFIX"-darwin-*; do check_requirement "$f" tunelo; done
+          for f in dist/"$PREFIX"-term-host-darwin-*; do check_requirement "$f" term-host; done
           # Runs under the hardened runtime (Bun's JIT needs the entitlements).
           "dist/$PREFIX-darwin-arm64" --version
       - name: Notarize
