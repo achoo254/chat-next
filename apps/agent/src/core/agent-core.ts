@@ -2205,7 +2205,15 @@ export class AgentCore {
       if (t.deleted) continue;
       const idle = t.session !== undefined && !t.running && !t.starting && !t.switching && t.pending.size === 0;
       if (idle && t.projectLoaded !== this.loadsProject(t)) await this.park(t);
-      if (this.threadProjectConfig(t) !== was) this.announce(t);
+      if (this.threadProjectConfig(t) === was) continue;
+      this.announce(t);
+      // Closed, its last session's commands are the old level's: devices get the folder's commands at the new level
+      // now (learned in the background), not after a reload. A running session keeps its own until it opens again.
+      if (t.session === undefined && t.info.commands !== undefined) {
+        delete t.info.commands;
+        this.saveMeta(t);
+      }
+      for (const fn of this.infoListeners) fn(t.meta.id);
     }
     for (const fn of this.projectConfigListeners) fn(dir);
     return dir;

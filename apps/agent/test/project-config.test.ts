@@ -171,6 +171,20 @@ describe("chat sessions in a folder follow its level", () => {
     expect(sdk.log.options[2]?.settingSources).toEqual(["user"]);
   });
 
+  it("turned on, a closed thread's commands become the folder's at once, without a reload", async () => {
+    const { core, provider, work } = setup();
+    provider.listCommands = async (req) => (req.projectSettings ? [{ name: "repo-skill", description: "", argumentHint: "", builtin: false }] : [{ name: "user-skill", description: "", argumentHint: "", builtin: false }]);
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hi", consent: none, device: "phone" });
+    await until(core, thread.id, turnsDone(1));
+    const told: string[] = [];
+    cleanup.push(core.onInfo((id) => told.push(id)));
+    await core.setProjectConfig({ dir: work, level: ProjectConfigLevel.FULL, device: "phone" });
+    expect(told).toContain(thread.id);
+    const names = () => core.info(thread.id).commands.map((c) => c.name);
+    for (let i = 0; i < 50 && !names().includes("repo-skill"); i++) await new Promise((r) => setTimeout(r, 10));
+    expect(names()).toContain("repo-skill");
+  });
+
   it("a session of the machine opened from a device (terminal, IDE) loads it too", async () => {
     const { core, sdk, work, claudeHome } = setup();
     await core.setProjectConfig({ dir: work, level: ProjectConfigLevel.FULL, device: "phone" });
