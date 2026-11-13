@@ -11,7 +11,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { create } from "@bufbuild/protobuf";
 import { ProjectSchema, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
@@ -293,5 +293,71 @@ describe("the project column", () => {
 		expect(card.closest(".mx-body")).toBeTruthy();
 		const folder = await screen.findByText("scratch", { selector: ".mx-session-row span" });
 		expect(folder.getAttribute("title")).toBe("/tmp/scratch");
+	});
+});
+
+describe("the projects' order", () => {
+	const names = (list: HTMLElement) => [...list.querySelectorAll("[data-project-id] .mx-project-toggle b")].map((b) => b.textContent);
+	const serverOrder = (server: ReturnType<typeof column>["server"]) => server.list().map((p) => p.name);
+
+	it("follows the user's order, not what needs the user; 'Lên trên' and 'Xuống dưới' move a project one place, on the server too", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs"]), WAIT);
+		await within(list).findByText("t1", undefined, WAIT);
+		const first = names(list);
+		expect(first).toEqual(serverOrder(server));
+		const [top, second] = first;
+		if (top == null || second == null) throw new Error("two projects expected");
+		// The first one cannot go up, the last one cannot go down.
+		await userEvent.click(within(list).getByRole("button", { name: `Tuỳ chọn cho dự án ${top}` }));
+		expect(within(list).queryByRole("menuitem", { name: "Lên trên" })).toBeNull();
+		await userEvent.click(within(list).getByRole("menuitem", { name: "Xuống dưới" }));
+		await waitFor(() => expect(names(list)).toEqual([second, top]), WAIT);
+		await waitFor(() => expect(serverOrder(server)).toEqual([second, top]), WAIT);
+		await userEvent.click(within(list).getByRole("button", { name: `Tuỳ chọn cho dự án ${top}` }));
+		expect(within(list).queryByRole("menuitem", { name: "Xuống dưới" })).toBeNull();
+		await userEvent.click(within(list).getByRole("menuitem", { name: "Lên trên" }));
+		await waitFor(() => expect(serverOrder(server)).toEqual([top, second]), WAIT);
+	});
+
+	it("a mouse drags a project by its row; the click ending the drag does not fold it, and a plain click still does", async () => {
+		HTMLElement.prototype.setPointerCapture = () => undefined;
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs"]), WAIT);
+		await within(list).findByText("t1", undefined, WAIT);
+		const [top, second] = names(list);
+		if (top == null || second == null) throw new Error("two projects expected");
+		const rows = [...list.querySelectorAll<HTMLElement>("[data-project-id]")];
+		rows.forEach((row, i) => (row.getBoundingClientRect = () => ({ top: i * 100, bottom: i * 100 + 80, height: 80, left: 0, right: 300, width: 300 }) as DOMRect));
+		const head = rows[0]?.querySelector<HTMLElement>(".mx-project-toggle");
+		if (head == null) throw new Error("no row");
+		const expanded = head.getAttribute("aria-expanded");
+		fireEvent.pointerDown(head, { button: 0, pointerId: 1, pointerType: "mouse", clientX: 10, clientY: 10 });
+		fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 40 });
+		expect(rows[0]?.dataset.drag).toBe("dragging");
+		fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 170 });
+		expect(rows[1]?.dataset.drag).toBe("after");
+		fireEvent.pointerUp(window, { pointerId: 1, clientX: 10, clientY: 170 });
+		fireEvent.click(head);
+		expect(head.getAttribute("aria-expanded")).toBe(expanded);
+		await waitFor(() => expect(names(list)).toEqual([second, top]), WAIT);
+		await waitFor(() => expect(serverOrder(server)).toEqual([second, top]), WAIT);
+		// No drag: a click folds or opens as before.
+		const moved = projectRow(list, top).querySelector<HTMLElement>(".mx-project-toggle");
+		const before = moved?.getAttribute("aria-expanded");
+		if (moved == null) throw new Error("no row");
+		await userEvent.click(moved);
+		expect(moved.getAttribute("aria-expanded")).not.toBe(before);
+	});
+
+	it("only with every project shown: the switch for what needs the user turns ordering off", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }]);
+		await waitFor(() => expect(server.projects).toHaveLength(2), WAIT);
+		await within(list).findByText("t1", undefined, WAIT);
+		await userEvent.click(within(list).getByRole("switch", { name: /Chỉ hiện cần bạn/ }));
+		const [only] = names(list);
+		await userEvent.click(within(list).getByRole("button", { name: `Tuỳ chọn cho dự án ${only ?? ""}` }));
+		expect(within(list).queryByRole("menuitem", { name: "Lên trên" })).toBeNull();
+		expect(within(list).queryByRole("menuitem", { name: "Xuống dưới" })).toBeNull();
 	});
 });

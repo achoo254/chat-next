@@ -994,6 +994,8 @@ export const viMachines = {
 			workspaceMenu: (name: string) => `Tuỳ chọn cho workspace ${name}`,
 			newCustom: "Phiên mới (tuỳ chỉnh)",
 			rename: "Đổi tên",
+			moveUp: "Lên trên",
+			moveDown: "Xuống dưới",
 			renameTitle: "Đổi tên dự án",
 			addWorkspace: "Thêm workspace",
 			addWorkspaceTitle: (name: string) => `Thêm workspace vào ${name}`,

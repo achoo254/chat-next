@@ -176,6 +176,26 @@ func (s *agentProjectsService) DeleteAgentProject(ctx context.Context, req *conn
 	return connect.NewResponse(&appv1.DeleteAgentProjectResponse{}), nil
 }
 
+func (s *agentProjectsService) ReorderAgentProjects(ctx context.Context, req *connect.Request[appv1.ReorderAgentProjectsRequest]) (*connect.Response[appv1.ReorderAgentProjectsResponse], error) {
+	sess, err := mustSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := req.Msg.GetProjectIds()
+	if len(ids) == 0 || len(ids) > store.MaxAgentProjects {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("project_ids must name 1 to 200 projects"))
+	}
+	err = s.store.ReorderAgentProjects(ctx, s.tenantID, sess.UserID, ids)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, errProjectNotFound()
+	case err != nil:
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
+	}
+	s.changed(ctx, sess.UserID)
+	return connect.NewResponse(&appv1.ReorderAgentProjectsResponse{}), nil
+}
+
 func (s *agentProjectsService) AttachAgentWorkspace(ctx context.Context, req *connect.Request[appv1.AttachAgentWorkspaceRequest]) (*connect.Response[appv1.AttachAgentWorkspaceResponse], error) {
 	sess, err := mustSession(ctx)
 	if err != nil {

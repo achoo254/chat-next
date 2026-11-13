@@ -106,6 +106,10 @@ func TestAgentProjects(t *testing.T) {
 			_, err := bobProjects.DeleteAgentProject(ctx, connect.NewRequest(&appv1.DeleteAgentProjectRequest{ProjectId: linked.GetId()}))
 			return err
 		},
+		"reorder": func() error {
+			_, err := bobProjects.ReorderAgentProjects(ctx, connect.NewRequest(&appv1.ReorderAgentProjectsRequest{ProjectIds: []int64{bobOwn.GetId(), linked.GetId()}}))
+			return err
+		},
 		"detach": func() error {
 			_, err := bobProjects.DetachAgentWorkspace(ctx, connect.NewRequest(&appv1.DetachAgentWorkspaceRequest{WorkspaceId: ws.GetId()}))
 			return err
@@ -176,6 +180,19 @@ func TestAgentProjects(t *testing.T) {
 	}
 	if changes != 2 {
 		t.Fatalf("%d agent_projects_changed updates after linking and unlinking", changes)
+	}
+	// Reordered by hand: the order every list gives from now on, announced; an empty list is refused.
+	if _, err := projects.ReorderAgentProjects(ctx, connect.NewRequest(&appv1.ReorderAgentProjectsRequest{})); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("empty reorder: %v", err)
+	}
+	beforeReorder := rpcOK(t, updates.GetState, &appv1.GetStateRequest{}).GetState()
+	rpcOK(t, projects.ReorderAgentProjects, &appv1.ReorderAgentProjectsRequest{ProjectIds: []int64{empty.GetId(), linked.GetId()}})
+	if l := rpcOK(t, projects.ListAgentProjects, &appv1.ListAgentProjectsRequest{}).GetProjects(); len(l) < 2 || l[0].GetId() != empty.GetId() || l[1].GetId() != linked.GetId() {
+		t.Fatalf("after reorder %+v", l)
+	}
+	diff = rpcOK(t, updates.GetDifference, &appv1.GetDifferenceRequest{Pts: beforeReorder.GetPts(), ServerEpoch: beforeReorder.GetServerEpoch()}).GetFull()
+	if len(diff.GetUpdates()) != 1 || diff.GetUpdates()[0].GetAgentProjectsChanged() == nil {
+		t.Fatalf("updates after reorder: %+v", diff.GetUpdates())
 	}
 	moved := rpcOK(t, projects.MoveAgentWorkspace, &appv1.MoveAgentWorkspaceRequest{WorkspaceId: ws.GetId(), ProjectId: empty.GetId()}).GetWorkspace()
 	if moved.GetProjectId() != empty.GetId() {

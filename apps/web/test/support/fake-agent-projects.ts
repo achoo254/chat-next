@@ -133,6 +133,19 @@ export class FakeAgentProjects {
 		this.log.push(`delete:${projectId}`);
 	}
 
+	/** As the server: the named ones first, then the rest in their order before; an unknown or repeated id changes nothing. */
+	async reorder(projectIds: readonly number[]): Promise<void> {
+		await tick();
+		if (new Set(projectIds).size !== projectIds.length) throw new ConnectError("project_not_found: project not found", Code.NotFound);
+		for (const id of projectIds) this.project(id);
+		const rest = [...this.projects]
+			.sort((a, b) => a.order - b.order || a.id - b.id)
+			.map((p) => p.id)
+			.filter((id) => !projectIds.includes(id));
+		[...projectIds, ...rest].forEach((id, i) => (this.project(id).order = i + 1));
+		this.log.push(`reorder:${projectIds.join(",")}`);
+	}
+
 	async detach(workspaceId: number): Promise<void> {
 		await tick();
 		this.ws(workspaceId);
@@ -160,6 +173,7 @@ export class FakeAgentProjects {
 			rename: async (id, name) => toProject(await this.rename(id, name)),
 			link: async (id, remote) => toProject(await this.update(id, undefined, remote)),
 			remove: (id) => this.remove(id),
+			reorder: (ids) => this.reorder(ids),
 			attach: async (id, w) => toWorkspace(this.wireWs(await this.attach(id, w))),
 			detach: (id) => this.detach(id),
 			move: async (id, projectId) => toWorkspace(this.wireWs(await this.move(id, projectId))),
@@ -174,6 +188,10 @@ export class FakeAgentProjects {
 			updateAgentProject: async (req) => ({ project: await this.update(Number(req.projectId), req.name, req.gitRemote) }),
 			deleteAgentProject: async (req) => {
 				await this.remove(Number(req.projectId));
+				return {};
+			},
+			reorderAgentProjects: async (req) => {
+				await this.reorder(req.projectIds.map(Number));
 				return {};
 			},
 			attachAgentWorkspace: async (req) => ({

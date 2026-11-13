@@ -984,6 +984,8 @@ export const enMachines: MachinesCopy = {
 			workspaceMenu: (name: string) => `Options for workspace ${name}`,
 			newCustom: "New session (custom)",
 			rename: "Rename",
+			moveUp: "Move up",
+			moveDown: "Move down",
 			renameTitle: "Rename project",
 			addWorkspace: "Add workspace",
 			addWorkspaceTitle: (name: string) => `Add a workspace to ${name}`,

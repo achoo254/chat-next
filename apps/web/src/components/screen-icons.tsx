@@ -46,6 +46,8 @@ export const SCREEN_PATHS = {
 	plug: <path d="M9.8 6L18 14.2l-2 2.1a5.8 5.8 0 1 1-8.3-8.3zM4 20l3.5-3.5M15 4l-3.5 3.5M20 9l-3.5 3.5" />,
 	"chevron-right": <path d="M9 6l6 6-6 6" />,
 	"chevron-down": <path d="M6 9l6 6 6-6" />,
+	"arrow-up": <path d="M12 19V5M6 11l6-6 6 6" />,
+	"arrow-down": <path d="M12 5v14M6 13l6 6 6-6" />,
 	refresh: <path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />,
 	minimize: <path d="M5 18h14" />,
 	sun: (

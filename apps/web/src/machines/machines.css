@@ -73,6 +73,14 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-project-toggle > .icon { flex: none; color: var(--c-icon-muted); }
 .mx-project-toggle[aria-expanded="true"] > .icon { color: var(--c-text-muted); }
 .mx-project-toggle .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
+/* Dragging a project (project-drag.ts): the header holds still for a long press, the dragged one fades, a line marks where it lands. */
+.mx-project-head { -webkit-touch-callout: none; user-select: none; }
+.mx-project { position: relative; }
+.mx-project[data-drag="dragging"] { opacity: 0.45; }
+.mx-project[data-drag="before"]::before, .mx-project[data-drag="after"]::after { content: ""; position: absolute; left: var(--space-2); right: var(--space-2); height: 2px; border-radius: 1px; background: var(--c-primary); pointer-events: none; }
+.mx-project[data-drag="before"]::before { top: calc(-1 * var(--space-3) / 2 - 1px); }
+.mx-project[data-drag="after"]::after { bottom: -3px; }
+.mx-groups[data-dragging] { cursor: grabbing; }
 .mx-project-head > .mx-row-menu { opacity: 0; }
 .mx-project-head:hover > .mx-row-menu, .mx-project-head:focus-within > .mx-row-menu, .mx-project-head > .mx-row-menu:has([aria-expanded="true"]) { opacity: 1; }
 .mx-ws { padding-left: 0; }

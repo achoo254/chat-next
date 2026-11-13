@@ -47,6 +47,11 @@ service AgentProjectsService {
   // folder or session on any machine is touched. not_found as
   // RenameAgentProject.
   rpc DeleteAgentProject(DeleteAgentProjectRequest) returns (DeleteAgentProjectResponse);
+  // Puts the caller's projects in the order of project_ids: those first,
+  // then the others in their order before. invalid_argument for an empty
+  // list or more than 200 ids, not_found for an id repeated or not the
+  // caller's project (nothing changes then).
+  rpc ReorderAgentProjects(ReorderAgentProjectsRequest) returns (ReorderAgentProjectsResponse);
   // Records a folder of one of the caller's machines as a workspace of one
   // of the caller's projects. Fails with invalid_argument for a bad dir,
   // branch or kind, not_found "project_not_found" or "machine_not_found"
@@ -153,6 +158,12 @@ message DeleteAgentProjectRequest {
 }
 
 message DeleteAgentProjectResponse {}
+
+message ReorderAgentProjectsRequest {
+  repeated int64 project_ids = 1 [jstype = JS_NUMBER];
+}
+
+message ReorderAgentProjectsResponse {}
 
 message AttachAgentWorkspaceRequest {
   int64 project_id = 1 [jstype = JS_NUMBER];

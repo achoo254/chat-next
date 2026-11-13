@@ -48,6 +48,9 @@ const (
 	// AgentProjectsServiceDeleteAgentProjectProcedure is the fully-qualified name of the
 	// AgentProjectsService's DeleteAgentProject RPC.
 	AgentProjectsServiceDeleteAgentProjectProcedure = "/app.v1.AgentProjectsService/DeleteAgentProject"
+	// AgentProjectsServiceReorderAgentProjectsProcedure is the fully-qualified name of the
+	// AgentProjectsService's ReorderAgentProjects RPC.
+	AgentProjectsServiceReorderAgentProjectsProcedure = "/app.v1.AgentProjectsService/ReorderAgentProjects"
 	// AgentProjectsServiceAttachAgentWorkspaceProcedure is the fully-qualified name of the
 	// AgentProjectsService's AttachAgentWorkspace RPC.
 	AgentProjectsServiceAttachAgentWorkspaceProcedure = "/app.v1.AgentProjectsService/AttachAgentWorkspace"
@@ -85,6 +88,11 @@ type AgentProjectsServiceClient interface {
 	// folder or session on any machine is touched. not_found as
 	// RenameAgentProject.
 	DeleteAgentProject(context.Context, *connect.Request[v1.DeleteAgentProjectRequest]) (*connect.Response[v1.DeleteAgentProjectResponse], error)
+	// Puts the caller's projects in the order of project_ids: those first,
+	// then the others in their order before. invalid_argument for an empty
+	// list or more than 200 ids, not_found for an id repeated or not the
+	// caller's project (nothing changes then).
+	ReorderAgentProjects(context.Context, *connect.Request[v1.ReorderAgentProjectsRequest]) (*connect.Response[v1.ReorderAgentProjectsResponse], error)
 	// Records a folder of one of the caller's machines as a workspace of one
 	// of the caller's projects. Fails with invalid_argument for a bad dir,
 	// branch or kind, not_found "project_not_found" or "machine_not_found"
@@ -142,6 +150,12 @@ func NewAgentProjectsServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(agentProjectsServiceMethods.ByName("DeleteAgentProject")),
 			connect.WithClientOptions(opts...),
 		),
+		reorderAgentProjects: connect.NewClient[v1.ReorderAgentProjectsRequest, v1.ReorderAgentProjectsResponse](
+			httpClient,
+			baseURL+AgentProjectsServiceReorderAgentProjectsProcedure,
+			connect.WithSchema(agentProjectsServiceMethods.ByName("ReorderAgentProjects")),
+			connect.WithClientOptions(opts...),
+		),
 		attachAgentWorkspace: connect.NewClient[v1.AttachAgentWorkspaceRequest, v1.AttachAgentWorkspaceResponse](
 			httpClient,
 			baseURL+AgentProjectsServiceAttachAgentWorkspaceProcedure,
@@ -170,6 +184,7 @@ type agentProjectsServiceClient struct {
 	renameAgentProject   *connect.Client[v1.RenameAgentProjectRequest, v1.RenameAgentProjectResponse]
 	updateAgentProject   *connect.Client[v1.UpdateAgentProjectRequest, v1.UpdateAgentProjectResponse]
 	deleteAgentProject   *connect.Client[v1.DeleteAgentProjectRequest, v1.DeleteAgentProjectResponse]
+	reorderAgentProjects *connect.Client[v1.ReorderAgentProjectsRequest, v1.ReorderAgentProjectsResponse]
 	attachAgentWorkspace *connect.Client[v1.AttachAgentWorkspaceRequest, v1.AttachAgentWorkspaceResponse]
 	detachAgentWorkspace *connect.Client[v1.DetachAgentWorkspaceRequest, v1.DetachAgentWorkspaceResponse]
 	moveAgentWorkspace   *connect.Client[v1.MoveAgentWorkspaceRequest, v1.MoveAgentWorkspaceResponse]
@@ -198,6 +213,11 @@ func (c *agentProjectsServiceClient) UpdateAgentProject(ctx context.Context, req
 // DeleteAgentProject calls app.v1.AgentProjectsService.DeleteAgentProject.
 func (c *agentProjectsServiceClient) DeleteAgentProject(ctx context.Context, req *connect.Request[v1.DeleteAgentProjectRequest]) (*connect.Response[v1.DeleteAgentProjectResponse], error) {
 	return c.deleteAgentProject.CallUnary(ctx, req)
+}
+
+// ReorderAgentProjects calls app.v1.AgentProjectsService.ReorderAgentProjects.
+func (c *agentProjectsServiceClient) ReorderAgentProjects(ctx context.Context, req *connect.Request[v1.ReorderAgentProjectsRequest]) (*connect.Response[v1.ReorderAgentProjectsResponse], error) {
+	return c.reorderAgentProjects.CallUnary(ctx, req)
 }
 
 // AttachAgentWorkspace calls app.v1.AgentProjectsService.AttachAgentWorkspace.
@@ -241,6 +261,11 @@ type AgentProjectsServiceHandler interface {
 	// folder or session on any machine is touched. not_found as
 	// RenameAgentProject.
 	DeleteAgentProject(context.Context, *connect.Request[v1.DeleteAgentProjectRequest]) (*connect.Response[v1.DeleteAgentProjectResponse], error)
+	// Puts the caller's projects in the order of project_ids: those first,
+	// then the others in their order before. invalid_argument for an empty
+	// list or more than 200 ids, not_found for an id repeated or not the
+	// caller's project (nothing changes then).
+	ReorderAgentProjects(context.Context, *connect.Request[v1.ReorderAgentProjectsRequest]) (*connect.Response[v1.ReorderAgentProjectsResponse], error)
 	// Records a folder of one of the caller's machines as a workspace of one
 	// of the caller's projects. Fails with invalid_argument for a bad dir,
 	// branch or kind, not_found "project_not_found" or "machine_not_found"
@@ -294,6 +319,12 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 		connect.WithSchema(agentProjectsServiceMethods.ByName("DeleteAgentProject")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentProjectsServiceReorderAgentProjectsHandler := connect.NewUnaryHandler(
+		AgentProjectsServiceReorderAgentProjectsProcedure,
+		svc.ReorderAgentProjects,
+		connect.WithSchema(agentProjectsServiceMethods.ByName("ReorderAgentProjects")),
+		connect.WithHandlerOptions(opts...),
+	)
 	agentProjectsServiceAttachAgentWorkspaceHandler := connect.NewUnaryHandler(
 		AgentProjectsServiceAttachAgentWorkspaceProcedure,
 		svc.AttachAgentWorkspace,
@@ -324,6 +355,8 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 			agentProjectsServiceUpdateAgentProjectHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceDeleteAgentProjectProcedure:
 			agentProjectsServiceDeleteAgentProjectHandler.ServeHTTP(w, r)
+		case AgentProjectsServiceReorderAgentProjectsProcedure:
+			agentProjectsServiceReorderAgentProjectsHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceAttachAgentWorkspaceProcedure:
 			agentProjectsServiceAttachAgentWorkspaceHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceDetachAgentWorkspaceProcedure:
@@ -357,6 +390,10 @@ func (UnimplementedAgentProjectsServiceHandler) UpdateAgentProject(context.Conte
 
 func (UnimplementedAgentProjectsServiceHandler) DeleteAgentProject(context.Context, *connect.Request[v1.DeleteAgentProjectRequest]) (*connect.Response[v1.DeleteAgentProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.DeleteAgentProject is not implemented"))
+}
+
+func (UnimplementedAgentProjectsServiceHandler) ReorderAgentProjects(context.Context, *connect.Request[v1.ReorderAgentProjectsRequest]) (*connect.Response[v1.ReorderAgentProjectsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.ReorderAgentProjects is not implemented"))
 }
 
 func (UnimplementedAgentProjectsServiceHandler) AttachAgentWorkspace(context.Context, *connect.Request[v1.AttachAgentWorkspaceRequest]) (*connect.Response[v1.AttachAgentWorkspaceResponse], error) {

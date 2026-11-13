@@ -92,6 +92,17 @@ export class AgentProjectsStore {
 		}
 	}
 
+	/**
+	 * Puts the projects in the order of `ids` at once (those left out follow),
+	 * then on the server; a refusal brings the server's order back.
+	 */
+	reorder(ids: readonly number[]): Promise<void> {
+		const rank = new Map(ids.map((id, i) => [id, i]));
+		const projects = [...this.state.projects].sort((a, b) => (rank.get(a.id) ?? ids.length) - (rank.get(b.id) ?? ids.length) || a.order - b.order).map((p, i) => ({ ...p, order: i + 1 }));
+		this.set({ status: this.state.status, projects });
+		return this.change((api) => api.reorder(ids));
+	}
+
 	/** While `run` runs, the sync leaves `folder` alone (the user is placing it). */
 	async claim<T>(folder: FolderKey, run: () => Promise<T>): Promise<T> {
 		this.claims.push(folder);

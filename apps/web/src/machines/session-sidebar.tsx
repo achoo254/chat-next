@@ -19,7 +19,8 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { isBlocked, type Conn } from "./machine-status.ts";
 import { useProjectSync, type SyncHost } from "./project-actions.ts";
 import { buildTree, locate, matches, type Filter } from "./project-tree.ts";
-import { LooseGroup, ProjectItem, type TreeContext } from "./project-tree-view.tsx";
+import { movedTo, useProjectDrag } from "./project-drag.ts";
+import { LooseGroup, ProjectItem, type ProjectPlace, type TreeContext } from "./project-tree-view.tsx";
 import { projectsSupported } from "./projects-view.ts";
 import { useSeen } from "./seen-sessions.ts";
 import { useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
@@ -197,6 +198,29 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		writeSession(OPEN_KEY, next);
 	};
 	const ctx: TreeContext = { store, projects: snapshot.projects, machines, now, seen, current };
+	// The user's order of the projects: dragged, or one place from a project's menu; only with every project shown.
+	const order = tree.projects.map((n) => n.project.id);
+	const reorderable = filter === "all" && snapshot.status === "ready";
+	const reorder = (ids: number[]) => {
+		store.reorder(ids).catch((err: unknown) => console.warn("ai: could not reorder the projects", err));
+	};
+	const { drag, onPointerDown } = useProjectDrag(groups, order, reorderable, reorder);
+	const placeOf = (id: number): ProjectPlace | undefined => {
+		if (!reorderable) return undefined;
+		const i = order.indexOf(id);
+		const from = drag === null ? -1 : order.indexOf(drag.id);
+		// No line where the dragged project would stay where it is.
+		const still = drag === null || drag.index === from || drag.index === from + 1;
+		let mark: ProjectPlace["drag"] = null;
+		if (drag?.id === id) mark = "dragging";
+		else if (!still && drag?.index === i) mark = "before";
+		else if (!still && drag?.index === order.length && i === order.length - 1) mark = "after";
+		return {
+			up: i > 0 ? () => reorder(movedTo(order, id, i - 1)) : null,
+			down: i < order.length - 1 ? () => reorder(movedTo(order, id, i + 2)) : null,
+			drag: mark,
+		};
+	};
 	const directory = hub.directory();
 	// Nothing to list yet (and every machine that can answer did): one empty state for the whole list.
 	const settled = snapshot.status !== "loading" && machines.every((m) => m.conn.kind !== "on" || m.state.listed);
@@ -239,7 +263,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				)}
 				<AddProject machines={machines} compact />
 			</div>
-			<div className="mx-groups" ref={groups} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
+			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
 				{snapshot.status === "loading" && machines.length > 0 && (
 					<ul className="mx-rows skeleton" aria-hidden="true">
 						<li />
@@ -248,7 +272,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				)}
 				{tree.projects.map((node) => {
 					const open = isOpen(node.project.id, node.need, node.status, node.project.workspaces.length === 0);
-					return <ProjectItem key={node.project.id} node={node} open={open} onToggle={() => toggle(node.project.id, open)} ctx={ctx} />;
+					return <ProjectItem key={node.project.id} node={node} open={open} onToggle={() => toggle(node.project.id, open)} ctx={ctx} place={placeOf(node.project.id)} />;
 				})}
 				{empty && (
 					<div className="mx-empty-list" data-id="sidebar-empty">

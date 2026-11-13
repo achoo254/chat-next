@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/agent_projects.proto.
  */
 export const file_app_v1_agent_projects: GenFile = /*@__PURE__*/
-  fileDesc("ChthcHAvdjEvYWdlbnRfcHJvamVjdHMucHJvdG8SBmFwcC52MSKTAQoMQWdlbnRQcm9qZWN0Eg4KAmlkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJEhIKCmdpdF9yZW1vdGUYAyABKAkSDQoFb3JkZXIYBCABKAUSFgoKY3JlYXRlZF9hdBgFIAEoA0ICMAISKgoKd29ya3NwYWNlcxgGIAMoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSKvAQoOQWdlbnRXb3Jrc3BhY2USDgoCaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACEhYKCm1hY2hpbmVfaWQYAyABKANCAjACEgsKA2RpchgEIAEoCRIOCgZicmFuY2gYBSABKAkSKAoEa2luZBgGIAEoDjIaLmFwcC52MS5BZ2VudFdvcmtzcGFjZUtpbmQSFgoKY3JlYXRlZF9hdBgHIAEoA0ICMAIiGgoYTGlzdEFnZW50UHJvamVjdHNSZXF1ZXN0IkMKGUxpc3RBZ2VudFByb2plY3RzUmVzcG9uc2USJgoIcHJvamVjdHMYASADKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0Ij0KGUNyZWF0ZUFnZW50UHJvamVjdFJlcXVlc3QSDAoEbmFtZRgBIAEoCRISCgpnaXRfcmVtb3RlGAIgASgJIkMKGkNyZWF0ZUFnZW50UHJvamVjdFJlc3BvbnNlEiUKB3Byb2plY3QYASABKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0IkEKGVJlbmFtZUFnZW50UHJvamVjdFJlcXVlc3QSFgoKcHJvamVjdF9pZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCSJDChpSZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRIlCgdwcm9qZWN0GAEgASgLMhQuYXBwLnYxLkFnZW50UHJvamVjdCJ3ChlVcGRhdGVBZ2VudFByb2plY3RSZXF1ZXN0EhYKCnByb2plY3RfaWQYASABKANCAjACEhEKBG5hbWUYAiABKAlIAIgBARIXCgpnaXRfcmVtb3RlGAMgASgJSAGIAQFCBwoFX25hbWVCDQoLX2dpdF9yZW1vdGUiQwoaVXBkYXRlQWdlbnRQcm9qZWN0UmVzcG9uc2USJQoHcHJvamVjdBgBIAEoCzIULmFwcC52MS5BZ2VudFByb2plY3QiMwoZRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAiIcChpEZWxldGVBZ2VudFByb2plY3RSZXNwb25zZSKUAQobQXR0YWNoQWdlbnRXb3Jrc3BhY2VSZXF1ZXN0EhYKCnByb2plY3RfaWQYASABKANCAjACEhYKCm1hY2hpbmVfaWQYAiABKANCAjACEgsKA2RpchgDIAEoCRIOCgZicmFuY2gYBCABKAkSKAoEa2luZBgFIAEoDjIaLmFwcC52MS5BZ2VudFdvcmtzcGFjZUtpbmQiSQocQXR0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRIpCgl3b3Jrc3BhY2UYASABKAsyFi5hcHAudjEuQWdlbnRXb3Jrc3BhY2UiNwobRGV0YWNoQWdlbnRXb3Jrc3BhY2VSZXF1ZXN0EhgKDHdvcmtzcGFjZV9pZBgBIAEoA0ICMAIiHgocRGV0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZSJNChlNb3ZlQWdlbnRXb3Jrc3BhY2VSZXF1ZXN0EhgKDHdvcmtzcGFjZV9pZBgBIAEoA0ICMAISFgoKcHJvamVjdF9pZBgCIAEoA0ICMAIiRwoaTW92ZUFnZW50V29ya3NwYWNlUmVzcG9uc2USKQoJd29ya3NwYWNlGAEgASgLMhYuYXBwLnYxLkFnZW50V29ya3NwYWNlKp4BChJBZ2VudFdvcmtzcGFjZUtpbmQSJAogQUdFTlRfV09SS1NQQUNFX0tJTkRfVU5TUEVDSUZJRUQQABIeChpBR0VOVF9XT1JLU1BBQ0VfS0lORF9DTE9ORRABEiEKHUFHRU5UX1dPUktTUEFDRV9LSU5EX1dPUktUUkVFEAISHwobQUdFTlRfV09SS1NQQUNFX0tJTkRfRk9MREVSEAMyhwYKFEFnZW50UHJvamVjdHNTZXJ2aWNlElgKEUxpc3RBZ2VudFByb2plY3RzEiAuYXBwLnYxLkxpc3RBZ2VudFByb2plY3RzUmVxdWVzdBohLmFwcC52MS5MaXN0QWdlbnRQcm9qZWN0c1Jlc3BvbnNlElsKEkNyZWF0ZUFnZW50UHJvamVjdBIhLmFwcC52MS5DcmVhdGVBZ2VudFByb2plY3RSZXF1ZXN0GiIuYXBwLnYxLkNyZWF0ZUFnZW50UHJvamVjdFJlc3BvbnNlElsKElJlbmFtZUFnZW50UHJvamVjdBIhLmFwcC52MS5SZW5hbWVBZ2VudFByb2plY3RSZXF1ZXN0GiIuYXBwLnYxLlJlbmFtZUFnZW50UHJvamVjdFJlc3BvbnNlElsKElVwZGF0ZUFnZW50UHJvamVjdBIhLmFwcC52MS5VcGRhdGVBZ2VudFByb2plY3RSZXF1ZXN0GiIuYXBwLnYxLlVwZGF0ZUFnZW50UHJvamVjdFJlc3BvbnNlElsKEkRlbGV0ZUFnZW50UHJvamVjdBIhLmFwcC52MS5EZWxldGVBZ2VudFByb2plY3RSZXF1ZXN0GiIuYXBwLnYxLkRlbGV0ZUFnZW50UHJvamVjdFJlc3BvbnNlEmEKFEF0dGFjaEFnZW50V29ya3NwYWNlEiMuYXBwLnYxLkF0dGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBokLmFwcC52MS5BdHRhY2hBZ2VudFdvcmtzcGFjZVJlc3BvbnNlEmEKFERldGFjaEFnZW50V29ya3NwYWNlEiMuYXBwLnYxLkRldGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBokLmFwcC52MS5EZXRhY2hBZ2VudFdvcmtzcGFjZVJlc3BvbnNlElsKEk1vdmVBZ2VudFdvcmtzcGFjZRIhLmFwcC52MS5Nb3ZlQWdlbnRXb3Jrc3BhY2VSZXF1ZXN0GiIuYXBwLnYxLk1vdmVBZ2VudFdvcmtzcGFjZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z");
+  fileDesc("ChthcHAvdjEvYWdlbnRfcHJvamVjdHMucHJvdG8SBmFwcC52MSKTAQoMQWdlbnRQcm9qZWN0Eg4KAmlkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJEhIKCmdpdF9yZW1vdGUYAyABKAkSDQoFb3JkZXIYBCABKAUSFgoKY3JlYXRlZF9hdBgFIAEoA0ICMAISKgoKd29ya3NwYWNlcxgGIAMoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSKvAQoOQWdlbnRXb3Jrc3BhY2USDgoCaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACEhYKCm1hY2hpbmVfaWQYAyABKANCAjACEgsKA2RpchgEIAEoCRIOCgZicmFuY2gYBSABKAkSKAoEa2luZBgGIAEoDjIaLmFwcC52MS5BZ2VudFdvcmtzcGFjZUtpbmQSFgoKY3JlYXRlZF9hdBgHIAEoA0ICMAIiGgoYTGlzdEFnZW50UHJvamVjdHNSZXF1ZXN0IkMKGUxpc3RBZ2VudFByb2plY3RzUmVzcG9uc2USJgoIcHJvamVjdHMYASADKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0Ij0KGUNyZWF0ZUFnZW50UHJvamVjdFJlcXVlc3QSDAoEbmFtZRgBIAEoCRISCgpnaXRfcmVtb3RlGAIgASgJIkMKGkNyZWF0ZUFnZW50UHJvamVjdFJlc3BvbnNlEiUKB3Byb2plY3QYASABKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0IkEKGVJlbmFtZUFnZW50UHJvamVjdFJlcXVlc3QSFgoKcHJvamVjdF9pZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCSJDChpSZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRIlCgdwcm9qZWN0GAEgASgLMhQuYXBwLnYxLkFnZW50UHJvamVjdCJ3ChlVcGRhdGVBZ2VudFByb2plY3RSZXF1ZXN0EhYKCnByb2plY3RfaWQYASABKANCAjACEhEKBG5hbWUYAiABKAlIAIgBARIXCgpnaXRfcmVtb3RlGAMgASgJSAGIAQFCBwoFX25hbWVCDQoLX2dpdF9yZW1vdGUiQwoaVXBkYXRlQWdlbnRQcm9qZWN0UmVzcG9uc2USJQoHcHJvamVjdBgBIAEoCzIULmFwcC52MS5BZ2VudFByb2plY3QiMwoZRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAiIcChpEZWxldGVBZ2VudFByb2plY3RSZXNwb25zZSI2ChtSZW9yZGVyQWdlbnRQcm9qZWN0c1JlcXVlc3QSFwoLcHJvamVjdF9pZHMYASADKANCAjACIh4KHFJlb3JkZXJBZ2VudFByb2plY3RzUmVzcG9uc2UilAEKG0F0dGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAhIWCgptYWNoaW5lX2lkGAIgASgDQgIwAhILCgNkaXIYAyABKAkSDgoGYnJhbmNoGAQgASgJEigKBGtpbmQYBSABKA4yGi5hcHAudjEuQWdlbnRXb3Jrc3BhY2VLaW5kIkkKHEF0dGFjaEFnZW50V29ya3NwYWNlUmVzcG9uc2USKQoJd29ya3NwYWNlGAEgASgLMhYuYXBwLnYxLkFnZW50V29ya3NwYWNlIjcKG0RldGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBIYCgx3b3Jrc3BhY2VfaWQYASABKANCAjACIh4KHERldGFjaEFnZW50V29ya3NwYWNlUmVzcG9uc2UiTQoZTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBIYCgx3b3Jrc3BhY2VfaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACIkcKGk1vdmVBZ2VudFdvcmtzcGFjZVJlc3BvbnNlEikKCXdvcmtzcGFjZRgBIAEoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSqeAQoSQWdlbnRXb3Jrc3BhY2VLaW5kEiQKIEFHRU5UX1dPUktTUEFDRV9LSU5EX1VOU1BFQ0lGSUVEEAASHgoaQUdFTlRfV09SS1NQQUNFX0tJTkRfQ0xPTkUQARIhCh1BR0VOVF9XT1JLU1BBQ0VfS0lORF9XT1JLVFJFRRACEh8KG0FHRU5UX1dPUktTUEFDRV9LSU5EX0ZPTERFUhADMuoGChRBZ2VudFByb2plY3RzU2VydmljZRJYChFMaXN0QWdlbnRQcm9qZWN0cxIgLmFwcC52MS5MaXN0QWdlbnRQcm9qZWN0c1JlcXVlc3QaIS5hcHAudjEuTGlzdEFnZW50UHJvamVjdHNSZXNwb25zZRJbChJDcmVhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuQ3JlYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5DcmVhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJSZW5hbWVBZ2VudFByb2plY3QSIS5hcHAudjEuUmVuYW1lQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5SZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRJbChJVcGRhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuVXBkYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5VcGRhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJEZWxldGVBZ2VudFByb2plY3QSIS5hcHAudjEuRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5EZWxldGVBZ2VudFByb2plY3RSZXNwb25zZRJhChRSZW9yZGVyQWdlbnRQcm9qZWN0cxIjLmFwcC52MS5SZW9yZGVyQWdlbnRQcm9qZWN0c1JlcXVlc3QaJC5hcHAudjEuUmVvcmRlckFnZW50UHJvamVjdHNSZXNwb25zZRJhChRBdHRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5BdHRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuQXR0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJhChREZXRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5EZXRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuRGV0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJbChJNb3ZlQWdlbnRXb3Jrc3BhY2USIS5hcHAudjEuTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBoiLmFwcC52MS5Nb3ZlQWdlbnRXb3Jrc3BhY2VSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.AgentProject
@@ -318,6 +318,36 @@ export const DeleteAgentProjectResponseSchema: GenMessage<DeleteAgentProjectResp
   messageDesc(file_app_v1_agent_projects, 11);
 
 /**
+ * @generated from message app.v1.ReorderAgentProjectsRequest
+ */
+export type ReorderAgentProjectsRequest = Message<"app.v1.ReorderAgentProjectsRequest"> & {
+  /**
+   * @generated from field: repeated int64 project_ids = 1 [jstype = JS_NUMBER];
+   */
+  projectIds: bigint[];
+};
+
+/**
+ * Describes the message app.v1.ReorderAgentProjectsRequest.
+ * Use `create(ReorderAgentProjectsRequestSchema)` to create a new message.
+ */
+export const ReorderAgentProjectsRequestSchema: GenMessage<ReorderAgentProjectsRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_agent_projects, 12);
+
+/**
+ * @generated from message app.v1.ReorderAgentProjectsResponse
+ */
+export type ReorderAgentProjectsResponse = Message<"app.v1.ReorderAgentProjectsResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.ReorderAgentProjectsResponse.
+ * Use `create(ReorderAgentProjectsResponseSchema)` to create a new message.
+ */
+export const ReorderAgentProjectsResponseSchema: GenMessage<ReorderAgentProjectsResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_agent_projects, 13);
+
+/**
  * @generated from message app.v1.AttachAgentWorkspaceRequest
  */
 export type AttachAgentWorkspaceRequest = Message<"app.v1.AttachAgentWorkspaceRequest"> & {
@@ -359,7 +389,7 @@ export type AttachAgentWorkspaceRequest = Message<"app.v1.AttachAgentWorkspaceRe
  * Use `create(AttachAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const AttachAgentWorkspaceRequestSchema: GenMessage<AttachAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 12);
+  messageDesc(file_app_v1_agent_projects, 14);
 
 /**
  * @generated from message app.v1.AttachAgentWorkspaceResponse
@@ -376,7 +406,7 @@ export type AttachAgentWorkspaceResponse = Message<"app.v1.AttachAgentWorkspaceR
  * Use `create(AttachAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const AttachAgentWorkspaceResponseSchema: GenMessage<AttachAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 13);
+  messageDesc(file_app_v1_agent_projects, 15);
 
 /**
  * @generated from message app.v1.DetachAgentWorkspaceRequest
@@ -393,7 +423,7 @@ export type DetachAgentWorkspaceRequest = Message<"app.v1.DetachAgentWorkspaceRe
  * Use `create(DetachAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const DetachAgentWorkspaceRequestSchema: GenMessage<DetachAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 14);
+  messageDesc(file_app_v1_agent_projects, 16);
 
 /**
  * @generated from message app.v1.DetachAgentWorkspaceResponse
@@ -406,7 +436,7 @@ export type DetachAgentWorkspaceResponse = Message<"app.v1.DetachAgentWorkspaceR
  * Use `create(DetachAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const DetachAgentWorkspaceResponseSchema: GenMessage<DetachAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 15);
+  messageDesc(file_app_v1_agent_projects, 17);
 
 /**
  * @generated from message app.v1.MoveAgentWorkspaceRequest
@@ -430,7 +460,7 @@ export type MoveAgentWorkspaceRequest = Message<"app.v1.MoveAgentWorkspaceReques
  * Use `create(MoveAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const MoveAgentWorkspaceRequestSchema: GenMessage<MoveAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 16);
+  messageDesc(file_app_v1_agent_projects, 18);
 
 /**
  * @generated from message app.v1.MoveAgentWorkspaceResponse
@@ -447,7 +477,7 @@ export type MoveAgentWorkspaceResponse = Message<"app.v1.MoveAgentWorkspaceRespo
  * Use `create(MoveAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const MoveAgentWorkspaceResponseSchema: GenMessage<MoveAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 17);
+  messageDesc(file_app_v1_agent_projects, 19);
 
 /**
  * What a workspace's folder is.
@@ -571,6 +601,19 @@ export const AgentProjectsService: GenService<{
     methodKind: "unary";
     input: typeof DeleteAgentProjectRequestSchema;
     output: typeof DeleteAgentProjectResponseSchema;
+  },
+  /**
+   * Puts the caller's projects in the order of project_ids: those first,
+   * then the others in their order before. invalid_argument for an empty
+   * list or more than 200 ids, not_found for an id repeated or not the
+   * caller's project (nothing changes then).
+   *
+   * @generated from rpc app.v1.AgentProjectsService.ReorderAgentProjects
+   */
+  reorderAgentProjects: {
+    methodKind: "unary";
+    input: typeof ReorderAgentProjectsRequestSchema;
+    output: typeof ReorderAgentProjectsResponseSchema;
   },
   /**
    * Records a folder of one of the caller's machines as a workspace of one

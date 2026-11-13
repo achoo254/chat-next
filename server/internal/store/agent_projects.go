@@ -306,6 +306,50 @@ func (s *Store) DeleteAgentProject(ctx context.Context, tenantID string, userID,
 	return nil
 }
 
+// ReorderAgentProjects puts the user's projects in the order of ids: those
+// first, then the rest in their order before (a project made meanwhile on
+// another device is not lost to a list that does not name it). ids must be
+// distinct and every one the user's project, else ErrNotFound and nothing
+// changes.
+func (s *Store) ReorderAgentProjects(ctx context.Context, tenantID string, userID int64, ids []int64) error {
+	seen := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return ErrNotFound
+		}
+		seen[id] = true
+	}
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := lockLiveUser(ctx, tx, tenantID, userID); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE agent_projects p SET sort_order = o.ord
+			FROM unnest($3::bigint[]) WITH ORDINALITY AS o(id, ord)
+			WHERE p.id = o.id AND p.tenant_id = $1 AND p.user_id = $2`, tenantID, userID, ids)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() != int64(len(ids)) {
+			return ErrNotFound
+		}
+		_, err = tx.Exec(ctx, `
+			WITH rest AS (
+				SELECT id, row_number() OVER (ORDER BY sort_order, id) AS rn FROM agent_projects
+				WHERE tenant_id = $1 AND user_id = $2 AND NOT (id = ANY($3::bigint[]))
+			)
+			UPDATE agent_projects p SET sort_order = $4 + rest.rn FROM rest WHERE p.id = rest.id`, tenantID, userID, ids, len(ids))
+		return err
+	})
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("store: reorder agent projects: %w", err)
+	}
+	return nil
+}
+
 // AttachAgentWorkspace records a folder of one of the user's machines (not
 // revoked) as a workspace of one of the user's projects. ErrNotFound when
 // the user is gone, ErrAgentProjectNotFound for the project,

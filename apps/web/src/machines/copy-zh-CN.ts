@@ -978,6 +978,8 @@ export const zhCNMachines: MachinesCopy = {
 			workspaceMenu: (name: string) => `工作区 ${name} 的选项`,
 			newCustom: "新建会话（自定义）",
 			rename: "重命名",
+			moveUp: "上移",
+			moveDown: "下移",
 			renameTitle: "重命名项目",
 			addWorkspace: "添加工作区",
 			addWorkspaceTitle: (name: string) => `向 ${name} 添加工作区`,

@@ -8,8 +8,8 @@
 // A workspace's state comes from its sessions: needs you > failed > running >
 // done (finished since the user last opened it) > idle; "offline" (its
 // machine is offline or removed) lies over the last state known, it does not
-// replace it. Projects: those needing the user first, then by their newest
-// session (a project made recently counts as active then).
+// replace it. Projects: in the user's order (a new one last), never moved by
+// what their sessions do.
 import { ThreadState, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "./agent-projects-client.ts";
 import { sortForList } from "./link/machine-link.ts";
@@ -101,7 +101,6 @@ export interface ProjectNode {
 	readonly status: WorkStatus;
 	/** Sessions waiting for the user. */
 	readonly need: number;
-	readonly activity: number;
 }
 
 /** A folder holding sessions that no workspace records ("Chưa phân loại"). */
@@ -174,12 +173,10 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 			workspaces,
 			status: worstStatus(workspaces.map((w) => w.status)),
 			need: everyThread.filter((t) => !t.archived && t.state === ThreadState.WAITING).length,
-			activity: Math.max(newest(everyThread), project.createdAt * 1000),
 		};
 	});
-	const shown = nodes
-		.filter((n) => filter === "all" || n.workspaces.length > 0)
-		.sort((a, b) => Number(b.need > 0) - Number(a.need > 0) || b.activity - a.activity || a.project.order - b.project.order);
+	// In the user's order (dragged, or "Lên trên"/"Xuống dưới"): a project never jumps on its own.
+	const shown = nodes.filter((n) => filter === "all" || n.workspaces.length > 0).sort((a, b) => a.project.order - b.project.order || a.project.id - b.project.id);
 	const folders = [...loose.values()]
 		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen) }))
 		.filter((g) => g.threads.length > 0)

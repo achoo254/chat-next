@@ -311,3 +311,65 @@ func TestAgentProjectsStoreMetadataOnly(t *testing.T) {
 		t.Fatalf("columns:\n%s\nwant:\n%s", strings.Join(got, " "), want)
 	}
 }
+
+func TestReorderAgentProjects(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	me := agentUser(t, s, "acc_me")
+	bob := agentUser(t, s, "acc_bob")
+	var ids []int64
+	for _, name := range []string{"a", "b", "c", "d"} {
+		p, err := s.CreateAgentProject(ctx, tenant, me, name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, p.ID)
+	}
+	bobProject, err := s.CreateAgentProject(ctx, tenant, bob, "x", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := func() string {
+		t.Helper()
+		list, err := s.ListAgentProjects(ctx, tenant, me)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := ""
+		for _, p := range list {
+			out += p.Name
+		}
+		return out
+	}
+
+	// The full list, in a new order.
+	if err := s.ReorderAgentProjects(ctx, tenant, me, []int64{ids[2], ids[0], ids[3], ids[1]}); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(); got != "cadb" {
+		t.Fatalf("order = %q", got)
+	}
+	// A list that leaves some out (made meanwhile elsewhere): those follow, in their order before.
+	if err := s.ReorderAgentProjects(ctx, tenant, me, []int64{ids[1]}); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(); got != "bcad" {
+		t.Fatalf("partial order = %q", got)
+	}
+	// A new project still comes last.
+	if _, err := s.CreateAgentProject(ctx, tenant, me, "e", ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(); got != "bcade" {
+		t.Fatalf("after create = %q", got)
+	}
+	// Another user's project, an unknown id or a repeated id: refused, nothing changes.
+	for _, bad := range [][]int64{{ids[0], bobProject.ID}, {ids[0], 999999}, {ids[0], ids[0]}} {
+		if err := s.ReorderAgentProjects(ctx, tenant, me, bad); !errors.Is(err, store.ErrNotFound) {
+			t.Fatalf("reorder %v: %v", bad, err)
+		}
+	}
+	if got := names(); got != "bcade" {
+		t.Fatalf("after refusals = %q", got)
+	}
+}

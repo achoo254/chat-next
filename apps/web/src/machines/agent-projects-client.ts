@@ -57,6 +57,8 @@ export interface AgentProjectsApi {
 	/** Links the repository of `gitRemote` (a URL; the server keeps its key) from now on; "" unlinks. */
 	link(projectId: number, gitRemote: string): Promise<AgentProject>;
 	remove(projectId: number): Promise<void>;
+	/** Puts the projects in this order (those left out follow, in their order before). */
+	reorder(projectIds: readonly number[]): Promise<void>;
 	attach(projectId: number, workspace: WorkspaceInput): Promise<AgentWorkspace>;
 	detach(workspaceId: number): Promise<void>;
 	move(workspaceId: number, projectId: number): Promise<AgentWorkspace>;
@@ -92,6 +94,9 @@ export function createAgentProjectsApi(transport: Transport): AgentProjectsApi {
 		link: async (projectId, gitRemote) => toProject(must((await client.updateAgentProject({ projectId: BigInt(projectId), gitRemote })).project, "link")),
 		remove: async (projectId) => {
 			await client.deleteAgentProject({ projectId: BigInt(projectId) });
+		},
+		reorder: async (projectIds) => {
+			await client.reorderAgentProjects({ projectIds: projectIds.map((id) => BigInt(id)) });
 		},
 		attach: async (projectId, w) =>
 			toWorkspace(must((await client.attachAgentWorkspace({ projectId: BigInt(projectId), machineId: BigInt(w.machineId), dir: w.dir, branch: w.branch, kind: w.kind })).workspace, "attach")),

@@ -244,7 +244,15 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 
 type ProjectDialog = "rename" | "link" | "delete" | "add" | null;
 
-export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; open: boolean; onToggle: () => void; ctx: TreeContext }) {
+/** Moving a project in the list: by one place from its menu (null where it cannot go), and how it shows while dragged. */
+export interface ProjectPlace {
+	readonly up: (() => void) | null;
+	readonly down: (() => void) | null;
+	/** "dragging": this one is dragged; "before"/"after": the dragged one would land on this side of it. */
+	readonly drag: "dragging" | "before" | "after" | null;
+}
+
+export function ProjectItem({ node, open, onToggle, ctx, place }: { node: ProjectNode; open: boolean; onToggle: () => void; ctx: TreeContext; place?: ProjectPlace | undefined }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const { project } = node;
@@ -258,7 +266,7 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 	const offline = node.workspaces.length > 0 && node.workspaces.every((w) => w.offline);
 	const usage = projectUsagePath({ gitRemote: project.gitRemote, workspaces: node.workspaces.map((w) => ({ dir: w.workspace.dir, machine: w.machine?.entry.ref ?? null, online: !w.offline })) });
 	return (
-		<div className="mx-project" data-id="sidebar-project">
+		<div className="mx-project" data-id="sidebar-project" data-project-id={project.id} data-drag={place?.drag ?? undefined}>
 			<div className="mx-project-head">
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
 					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
@@ -277,6 +285,8 @@ export function ProjectItem({ node, open, onToggle, ctx }: { node: ProjectNode; 
 						{ label: p.addWorkspace, icon: "plus", run: () => setDialog("add") },
 						{ label: p.rename, icon: "edit", run: () => setDialog("rename") },
 						{ label: p.link, icon: "link", run: () => setDialog("link") },
+						place?.up != null ? { label: p.moveUp, icon: "arrow-up", run: place.up } : null,
+						place?.down != null ? { label: p.moveDown, icon: "arrow-down", run: place.down } : null,
 						usage !== null ? { label: t.usage.open, icon: "database", run: () => navigate(usage) } : null,
 						{ label: p.remove, icon: "trash", run: () => setDialog("delete"), danger: true },
 					]}

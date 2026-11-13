@@ -126,11 +126,17 @@ describe("the tree", () => {
 		expect(shortHost("Máy nhà")).toBe("Máy nhà");
 	});
 
-	it("projects needing the user first, then the newest activity; a new empty project counts as recent", () => {
+	it("projects in the user's order, whatever needs the user or ran last", () => {
 		const m = machine(1, "Mac", [thread("old", "/w/a", ThreadState.IDLE, 1_000), thread("new", "/w/b", ThreadState.IDLE, 5_000), thread("wait", "/w/c", ThreadState.WAITING, 10)]);
-		const tree = buildTree([project(1, "A", [ws(1, 1, "/w/a")]), project(2, "B", [ws(2, 1, "/w/b")]), project(3, "C", [ws(3, 1, "/w/c")]), project(4, "Empty", [], 3)], [m], "all", none);
-		expect(tree.projects.map((p) => p.project.name)).toEqual(["C", "B", "Empty", "A"]);
-		expect(tree.projects[0]?.need).toBe(1);
+		const ordered = (p: AgentProject, order: number): AgentProject => ({ ...p, order });
+		const tree = buildTree(
+			[ordered(project(1, "A", [ws(1, 1, "/w/a")]), 2), ordered(project(2, "B", [ws(2, 1, "/w/b")]), 4), ordered(project(3, "C", [ws(3, 1, "/w/c")]), 3), ordered(project(4, "Empty", [], 3), 1)],
+			[m],
+			"all",
+			none,
+		);
+		expect(tree.projects.map((p) => p.project.name)).toEqual(["Empty", "A", "C", "B"]);
+		expect(tree.projects.find((p) => p.project.name === "C")?.need).toBe(1);
 	});
 
 	it("the branch comes from the machine when it keeps the folder, else as recorded", () => {
