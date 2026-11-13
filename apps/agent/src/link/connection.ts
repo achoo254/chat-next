@@ -40,6 +40,7 @@ import { ScreenShareLink } from "./screen-share-link.ts";
 import { wireItem } from "./wire.ts";
 import type { TerminalConnection } from "../terminal/terminal-connection.ts";
 import type { TerminalService } from "../terminal/terminal-service.ts";
+import type { CommitMessageRequest } from "../workspace/commit-message.ts";
 import type { Workspaces } from "../workspace/workspaces.ts";
 import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-link.ts";
 import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
@@ -87,6 +88,8 @@ export type LinkContext = {
   terminal?: TerminalService;
   /** Workspaces' files and git for the right panel; absent where the machine has none (tests). */
   workspaces?: Workspaces;
+  /** An AI of the machine writes a commit message for a workspace; absent where the machine has none (tests). */
+  commitMessage?: (req: CommitMessageRequest) => Promise<string>;
   /** The AIs' token usage on the machine; absent where the machine keeps none (tests). */
   usage?: UsageApi;
 };
@@ -372,7 +375,7 @@ export class Connection {
         () => this.device,
       );
     }
-    if (this.ctx.workspaces) this.workspaceLink = new WorkspaceLink(this.ctx.workspaces, (id, body) => this.send(id, body), () => this.device);
+    if (this.ctx.workspaces) this.workspaceLink = new WorkspaceLink(this.ctx.workspaces, (id, body) => this.send(id, body), () => this.device, this.ctx.commitMessage);
     if (this.ctx.terminal) {
       this.terminal = this.ctx.terminal.connection({
         send: (id, body) => this.send(id, body),
@@ -787,6 +790,7 @@ export class Connection {
         case "wsGitLog":
         case "wsGitBranchCompare":
         case "wsGitPrUrl":
+        case "wsGitCommitMessage":
           return this.workspaceFrame(id, b);
         case "usageReportRequest":
         case "usageSettingsGet":

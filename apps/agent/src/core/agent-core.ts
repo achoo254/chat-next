@@ -146,6 +146,9 @@ export type TerminalSpec = { shell: string; args: string[]; cwd: string; env: Re
 export type LocalSessionView = LocalSession & { threadId: string; busyElsewhere: boolean; sensitive: boolean };
 
 /** What the user agreed to on the device before a session opens (Consent in the protocol). */
+/** How long the commands learned for a folder hold before they are listed again (new skills show up). */
+const FOLDER_COMMANDS_MS = 5 * 60_000;
+
 export type ConsentGiven = { sensitive: boolean; projectSettings: boolean; trustProject?: boolean };
 
 /** Longest tool output kept from a transcript read back (live output is kept whole). */
@@ -323,6 +326,9 @@ export class AgentCore {
   private accounts = new Map<string, AccountState>();
   /** The latest command list any session reported, for threads that have none yet. */
   private lastCommands: NonNullable<ProviderInfo["commands"]> = [];
+  /** Commands a session in a folder would offer, learned without a session (listCommands), by commandsKey. */
+  private readonly folderCommands = new Map<string, { at: number; list: NonNullable<ProviderInfo["commands"]> }>();
+  private readonly learning = new Set<string>();
   private idleTimer: ReturnType<typeof setInterval> | undefined;
   private readonly maxSessions: number;
   private readonly idleMs: number;
@@ -488,6 +494,42 @@ export class AgentCore {
     return file;
   }
 
+  /**
+   * The commands of a thread whose session has not reported its own (it has
+   * not opened, e.g. a thread run in the terminal): those its AI lists for the
+   * folder, as the thread's session would load it, learned in the background
+   * and told to devices once known (again after FOLDER_COMMANDS_MS); the last
+   * commands any session reported meanwhile.
+   */
+  private commandsFor(t: Thread): NonNullable<ProviderInfo["commands"]> {
+    const provider = this.opts.providers.find((p) => p.id === t.meta.provider);
+    if (!provider?.listCommands) return this.lastCommands;
+    let accountDir: string | undefined;
+    try {
+      accountDir = this.opts.profile?.()?.accountDir;
+    } catch {
+      return this.lastCommands; // the profiles cannot be read: the session says so when it opens
+    }
+    const projectSettings = this.loadsProject(t);
+    const key = [provider.id, t.meta.dir, projectSettings ? "project" : "user", accountDir ?? ""].join("\n");
+    const known = this.folderCommands.get(key);
+    if ((!known || Date.now() - known.at > FOLDER_COMMANDS_MS) && !this.learning.has(key)) {
+      this.learning.add(key);
+      provider
+        .listCommands({ dir: t.meta.dir, projectSettings, ...(accountDir ? { accountDir } : {}) })
+        .then(
+          (list) => {
+            if (list.length === 0) return;
+            this.folderCommands.set(key, { at: Date.now(), list });
+            for (const fn of this.infoListeners) fn(t.meta.id);
+          },
+          () => undefined,
+        )
+        .finally(() => this.learning.delete(key));
+    }
+    return known?.list ?? this.lastCommands;
+  }
+
   /** The statusline data of a thread, for devices. */
   info(threadId: string): ThreadInfo {
     const t = this.thread(threadId);
@@ -505,7 +547,7 @@ export class AgentCore {
       gitBranch: gitBranch(t.meta.dir).branch,
       linesAdded: t.info.linesAdded ?? 0,
       linesRemoved: t.info.linesRemoved ?? 0,
-      commands: t.info.commands?.length ? t.info.commands : this.lastCommands,
+      commands: t.info.commands?.length ? t.info.commands : this.commandsFor(t),
       effort: t.info.effort ?? "",
       permissionModes: this.permissionModes(t),
       profileId,

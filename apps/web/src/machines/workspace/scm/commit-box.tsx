@@ -1,8 +1,9 @@
 // The commit message box (several lines; Cmd/Ctrl+Enter commits) with the
-// AI message button (shown, off until the machine can write one), "Commit",
+// AI message button (the session's AI writes the message from what is staged;
+// off, saying why, when that AI cannot or nothing is staged), "Commit",
 // the "Stage All" split button (its menu: unstage all, discard all) and the
 // note that commits made here skip git hooks.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MachineIcon } from "../../machine-icons.tsx";
 import { usePopover } from "../../use-popover.ts";
 import { PanelIcon } from "../panel-icons.tsx";
@@ -19,6 +20,11 @@ interface CommitBoxProps {
 	onStageAll: () => void;
 	onUnstageAll: () => void;
 	onDiscardAll: () => void;
+	/** The session's AI by name, for the AI button. */
+	ai: string;
+	/** Asks the session's AI for a message; undefined when that AI cannot write one. */
+	onWriteMessage: (() => Promise<string>) | undefined;
+	errorText: (err: unknown) => string;
 }
 
 /** Cmd+Enter on Apple systems, Ctrl+Enter elsewhere. */
@@ -28,12 +34,39 @@ export function isCommitKey(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrl
 
 const MAC = typeof navigator !== "undefined" && /Macintosh|Mac OS X|iPhone|iPad/.test(navigator.userAgent);
 
-export function CommitBox({ staged, unstaged, discardable, busy, online, onCommit, onStageAll, onUnstageAll, onDiscardAll }: CommitBoxProps) {
+export function CommitBox({ staged, unstaged, discardable, busy, online, onCommit, onStageAll, onUnstageAll, onDiscardAll, ai, onWriteMessage, errorText }: CommitBoxProps) {
 	const p = usePanelCopy();
 	const s = p.scm;
 	const [message, setMessage] = useState("");
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
 	const can = online && busy === null && staged > 0 && message.trim() !== "";
+	const [writing, setWriting] = useState(false);
+	const [writeError, setWriteError] = useState<string | null>(null);
+	/** Bumps on every ask and every cancel: only the latest ask's answer fills the box. */
+	const asked = useRef(0);
+	const canWrite = onWriteMessage !== undefined && online && staged > 0;
+	const aiLabel = writing ? s.aiWriting(ai) : onWriteMessage === undefined ? s.aiCannot : staged === 0 ? s.aiNeedsStaged : s.aiMessage(ai);
+	const writeMessage = () => {
+		const ticket = ++asked.current;
+		if (writing || onWriteMessage === undefined) {
+			setWriting(false);
+			return;
+		}
+		setWriting(true);
+		setWriteError(null);
+		onWriteMessage().then(
+			(text) => {
+				if (asked.current !== ticket) return;
+				setMessage(text);
+				setWriting(false);
+			},
+			(err: unknown) => {
+				if (asked.current !== ticket) return;
+				setWriteError(errorText(err));
+				setWriting(false);
+			},
+		);
+	};
 	const commit = () => {
 		if (can) onCommit(message, () => setMessage(""));
 	};
@@ -55,13 +88,18 @@ export function CommitBox({ staged, unstaged, discardable, busy, online, onCommi
 					spellCheck
 					data-id="workspace-commit-message"
 				/>
-				{/* The machine cannot write the message yet: shown off, its tooltip on a wrapper (a disabled button shows none). */}
-				<span className="ws-ai" title={`${s.aiMessage} · ${s.comingSoon}`}>
-					<button type="button" className="icon-btn" disabled aria-label={`${s.aiMessage} (${s.comingSoon})`}>
-						<MachineIcon name="spark" small />
+				{/* The tooltip sits on a wrapper: a disabled button shows none. */}
+				<span className="ws-ai" title={aiLabel}>
+					<button type="button" className="icon-btn" disabled={!writing && !canWrite} aria-label={aiLabel} aria-busy={writing} onClick={writeMessage} data-id="workspace-ai-message">
+						<MachineIcon name={writing ? "spinner" : "spark"} small />
 					</button>
 				</span>
 			</div>
+			{writeError !== null && (
+				<p className="ws-commit-error" role="alert">
+					{writeError}
+				</p>
+			)}
 			<div className="ws-commit-actions">
 				<button type="button" className="btn btn-sm btn-primary ws-commit-btn" disabled={!can} aria-busy={busy === "commit"} onClick={commit} title={staged === 0 ? s.nothingStaged : undefined} data-id="workspace-commit">
 					{busy === "commit" ? <MachineIcon name="spinner" small /> : <PanelIcon name="check" small />}

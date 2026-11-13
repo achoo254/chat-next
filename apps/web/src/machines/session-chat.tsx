@@ -190,6 +190,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			workspace={{ id: panel.workspace.id, name: panel.workspace.name || folderName(panel.workspace.dir), dir: panel.workspace.dir }}
 			online={online}
 			ai={ai}
+			writer={caps?.commitMessage === true ? provider : undefined}
 			prefs={panel.prefs}
 			onPrefs={panel.update}
 			onTerminal={toTerminal}

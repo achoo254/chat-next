@@ -204,6 +204,12 @@ export class Workspaces {
     return made;
   }
 
+  /** What is staged, for an AI to write the commit message from; secret files by name only. Reads only. */
+  async stagedChanges(id: string): Promise<ops.StagedChanges> {
+    const root = await this.gitRoot(id);
+    return ops.stagedChanges(this.run, root, this.sensitive(root));
+  }
+
   checkout(id: string, branch: string, device: string): Promise<WorkspaceStatus> {
     return this.write(id, device, "git_checkout", (root) => ops.checkout(this.run, root, branch).then(() => ""));
   }

@@ -8,7 +8,7 @@ import { RemoteError } from "../../link/machine-link.ts";
 import { PanelIcon } from "../panel-icons.tsx";
 import { usePanelCopy } from "../use-panel-copy.ts";
 import type { DiffTarget } from "../viewer/diff-view.tsx";
-import type { WsLink } from "../ws-client.ts";
+import { ask, type WsLink } from "../ws-client.ts";
 import { BranchBar } from "./branch-bar.tsx";
 import { ChangesSection } from "./changes-section.tsx";
 import { CommitBox } from "./commit-box.tsx";
@@ -28,19 +28,30 @@ interface SourceControlProps {
 	selected: string | null;
 	onView: (target: DiffTarget, key: string) => void;
 	errorText: (err: unknown) => string;
+	/** The session's AI by name. */
+	ai: string;
+	/** The session's AI (its id) when it writes commit messages; undefined when it cannot. */
+	writer: string | undefined;
 }
+
+/** The machine gives its AI up to 120 s to write a commit message; a little longer for the answer to arrive. */
+const AI_WRITE_TIMEOUT_MS = 130_000;
 
 /** Errors that mean "no git here" rather than "try again". */
 function notGit(err: unknown): boolean {
 	return err instanceof RemoteError && (err.reason === ErrorReason.NOT_A_GIT_REPOSITORY || err.reason === ErrorReason.WORKSPACE_NOT_REPOSITORY_ROOT);
 }
 
-export function SourceControl({ link, workspaceId, name, online, scm, selected, onView, errorText }: SourceControlProps) {
+export function SourceControl({ link, workspaceId, name, online, scm, selected, onView, errorText, ai, writer }: SourceControlProps) {
 	const p = usePanelCopy();
 	const status = scm.status;
 	const git = status?.git === true;
 	const history = useHistory(link, workspaceId, online, git, status?.branch ?? "", scm.history);
 	const [naming, setNaming] = useState(false);
+	const writeMessage =
+		writer === undefined
+			? undefined
+			: () => ask(link, { case: "wsGitCommitMessage", value: { workspaceId, provider: writer, model: "" } }, "wsGitCommitMessageResult", AI_WRITE_TIMEOUT_MS).then((r) => r.message);
 	const open = (entry: WsGitEntry) => {
 		const area = areaOf(entry);
 		const source = entry.area === WsGitArea.STAGED ? WsGitDiffSource.STAGED : WsGitDiffSource.UNSTAGED;
@@ -96,6 +107,9 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 					onStageAll={() => scm.stage("all")}
 					onUnstageAll={() => scm.unstage("all")}
 					onDiscardAll={() => scm.discard(discardableEntries(entries).map((e) => e.path))}
+					ai={ai}
+					onWriteMessage={writeMessage}
+					errorText={errorText}
 				/>
 				{scm.busy !== null && (
 					<p className="ws-msg muted" role="status">

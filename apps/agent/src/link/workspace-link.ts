@@ -8,6 +8,7 @@ import { AgentError } from "../core/agent-core.ts";
 import type { FileKind } from "../workspace/files.ts";
 import type { DiffSource, LogEntry } from "../workspace/git-ops.ts";
 import type { Area, FileState, StatusEntry, WorkspaceStatus } from "../workspace/git-status.ts";
+import type { CommitMessageRequest } from "../workspace/commit-message.ts";
 import type { Workspaces } from "../workspace/workspaces.ts";
 import { isDiskAccessDenial } from "../safety/disk-access.ts";
 import { OutsideFolderError } from "../safety/session-files.ts";
@@ -38,7 +39,8 @@ export type WorkspaceFrame = Extract<
       | "wsGitPush"
       | "wsGitLog"
       | "wsGitBranchCompare"
-      | "wsGitPrUrl";
+      | "wsGitPrUrl"
+      | "wsGitCommitMessage";
   }
 >;
 
@@ -117,6 +119,8 @@ export class WorkspaceLink {
     private readonly workspaces: Workspaces,
     private readonly send: (id: string, body: Body) => void,
     private readonly device: () => string,
+    /** An AI of the machine writes a commit message; absent where the machine has none (tests). */
+    private readonly commitMessage?: (req: CommitMessageRequest) => Promise<string>,
   ) {}
 
   close(): void {
@@ -214,6 +218,12 @@ export class WorkspaceLink {
       case "wsGitPrUrl": {
         const r = await w.prUrl(b.value.workspaceId, b.value.base);
         return this.send(id, { case: "wsGitPrUrlResult", value: { workspaceId: b.value.workspaceId, ...r } });
+      }
+      case "wsGitCommitMessage": {
+        const v = b.value;
+        if (!this.commitMessage) throw new AgentError(ErrorCode.INVALID, "this machine cannot write commit messages", { reason: ErrorReason.UNSUPPORTED_REQUEST });
+        const message = await this.commitMessage({ workspaceId: v.workspaceId, provider: v.provider, model: v.model });
+        return this.send(id, { case: "wsGitCommitMessageResult", value: { workspaceId: v.workspaceId, message } });
       }
     }
   }

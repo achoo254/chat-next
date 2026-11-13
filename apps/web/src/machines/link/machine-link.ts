@@ -373,8 +373,8 @@ export class MachineLink {
 
 	// --- requests ------------------------------------------------------------
 
-	/** Sends a request; resolves with the machine's answer, rejects with RemoteError or OfflineError. */
-	request(body: FrameBody): Promise<Frame> {
+	/** Sends a request; resolves with the machine's answer, rejects with RemoteError or OfflineError (also after `timeoutMs` without one). */
+	request(body: FrameBody, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Frame> {
 		const session = this.session;
 		const socket = this.socket;
 		if (session === null || socket === null || this.current.status.kind !== "open") return Promise.reject(new OfflineError());
@@ -383,7 +383,7 @@ export class MachineLink {
 			const timer = this.timers.setTimeout(() => {
 				this.waiters.delete(id);
 				reject(new OfflineError());
-			}, REQUEST_TIMEOUT_MS);
+			}, timeoutMs);
 			this.waiters.set(id, { resolve, reject, timer });
 			try {
 				socket.send(new Uint8Array(session.seal(create(FrameSchema, { id, body }))));

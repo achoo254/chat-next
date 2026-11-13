@@ -36,6 +36,7 @@ import type {
   AccountInfo,
   AgentProvider,
   AskUser,
+  CommandsRequest,
   Detected,
   DetectOptions,
   ImageInput,
@@ -45,12 +46,14 @@ import type {
   ProviderSession,
   Question,
   SessionPolicy,
+  SlashCommand,
   TerminalCommand,
   TerminalLaunch,
   TurnStats,
 } from "../types.ts";
 import { LocalSessions } from "./local-sessions.ts";
 import { MessageMapper } from "./message-mapper.ts";
+import { claudeWriter } from "./one-shot-writer.ts";
 import { ClaudeUsage } from "./usage-scan.ts";
 import { toolKind, toolPaths, toolSummary } from "./tool-map.ts";
 
@@ -123,6 +126,12 @@ export function createClaudeProvider(
     capabilities: CLAUDE_CAPABILITIES,
     history,
     usage: new ClaudeUsage({ homes }),
+    writer: claudeWriter(findBinary, CLAUDE_CAPABILITIES.models.map((m) => m.id)),
+
+    async listCommands(req) {
+      const bin = await findBinary();
+      return bin ? probeCommands(bin, req, queryFn) : [];
+    },
 
     async detect(opts: DetectOptions = {}): Promise<Detected> {
       const bin = await findBinary();
@@ -622,6 +631,52 @@ export async function probeUsage(
     return await Promise.race([read, timeout]);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
+    inbox.close();
+    abort.abort();
+    try {
+      q?.close();
+    } catch {
+      // already gone
+    }
+  }
+}
+
+/**
+ * The slash commands and skills a session in `req.dir` offers, from a session
+ * that starts with no prompt, reports them and closes: no message is sent and
+ * no turn runs. The setting sources are a session's own (the folder's skills
+ * only with projectSettings). Empty when unknown within `timeoutMs`; the
+ * claude it started is stopped in every case.
+ */
+export async function probeCommands(bin: string, req: CommandsRequest, queryFn: QueryFn = (p) => sdkQuery(p), timeoutMs = 15_000): Promise<SlashCommand[]> {
+  const inbox = new Channel<SDKUserMessage>();
+  const abort = new AbortController();
+  const options: Options = {
+    pathToClaudeCodeExecutable: bin,
+    cwd: req.dir,
+    settingSources: req.projectSettings ? ["user", "project", "local"] : ["user"],
+    strictMcpConfig: true,
+    mcpServers: {},
+    persistSession: false,
+    abortController: abort,
+  };
+  if (req.accountDir) options.env = claudeEnv(req.accountDir);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<SlashCommand[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), timeoutMs);
+  });
+  let q: Query | undefined;
+  try {
+    q = queryFn({ prompt: inbox, options });
+    const read = q.supportedCommands().then(
+      (list) => toCommands(list),
+      () => [],
+    );
+    return await Promise.race([read, timeout]);
+  } catch {
+    return [];
   } finally {
     clearTimeout(timer);
     inbox.close();

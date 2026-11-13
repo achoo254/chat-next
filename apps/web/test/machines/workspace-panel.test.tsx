@@ -58,7 +58,7 @@ beforeEach(async () => {
 
 afterEach(() => link.stop());
 
-function Panel({ initial, online = true, onTerminal }: { initial: PanelPrefs; online?: boolean; onTerminal?: () => void }) {
+function Panel({ initial, online = true, onTerminal, writer }: { initial: PanelPrefs; online?: boolean; onTerminal?: () => void; writer?: string }) {
 	const [prefs, setPrefs] = useState(initial);
 	return (
 		<WorkspacePanel
@@ -66,6 +66,7 @@ function Panel({ initial, online = true, onTerminal }: { initial: PanelPrefs; on
 			workspace={{ id: "pr1", name: "demo-app", dir: "/code/demo-app" }}
 			online={online}
 			ai="Claude Code"
+			writer={writer}
 			prefs={prefs}
 			onPrefs={(change) => setPrefs((x) => ({ ...x, ...change }))}
 			onTerminal={onTerminal}
@@ -75,7 +76,7 @@ function Panel({ initial, online = true, onTerminal }: { initial: PanelPrefs; on
 
 /** The diff card's copy button tells through the app's toasts. */
 const services = { toasts: { show: () => undefined } } as unknown as Services;
-const open = (tab: PanelPrefs["tab"], extra: { online?: boolean; onTerminal?: () => void } = {}) =>
+const open = (tab: PanelPrefs["tab"], extra: { online?: boolean; onTerminal?: () => void; writer?: string } = {}) =>
 	render(
 		<I18nProvider>
 			<ServicesContext value={services}>
@@ -281,13 +282,32 @@ describe("Source Control", () => {
 		open("scm");
 		const box = await screen.findByRole("textbox", { name: p.scm.message });
 		expect(screen.getByText(p.scm.hooksNote)).toBeTruthy();
-		expect(screen.getByRole("button", { name: `${p.scm.aiMessage} (${p.scm.comingSoon})` })).toHaveProperty("disabled", true);
+		// The session's AI cannot write commit messages here: the AI button is off and says so.
+		expect(screen.getByRole("button", { name: p.scm.aiCannot })).toHaveProperty("disabled", true);
 		await userEvent.type(box, "feat: panel{Control>}{Enter}{/Control}");
 		await waitFor(() => expect(sent("wsGitCommit")).toHaveLength(1));
 		const commit = sent("wsGitCommit")[0];
 		expect(commit?.case === "wsGitCommit" ? [commit.value.message, commit.value.allowDetached] : null).toEqual(["feat: panel", false]);
 		await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe(""));
 		await waitFor(() => expect(screen.getByText("feat: panel")).toBeTruthy());
+	});
+
+	it("asks the session's AI, by its id, for a message and fills the box with it", async () => {
+		open("scm", { writer: "claude" });
+		const box = await screen.findByRole("textbox", { name: p.scm.message });
+		await userEvent.click(screen.getByRole("button", { name: p.scm.aiMessage("Claude Code") }));
+		await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe("feat: written by claude"));
+		const asked = sent("wsGitCommitMessage")[0];
+		expect(asked?.case === "wsGitCommitMessage" ? [asked.value.provider, asked.value.model] : null).toEqual(["claude", ""]);
+		expect(sent("wsGitCommit")).toHaveLength(0);
+	});
+
+	it("says in words why the AI wrote no message", async () => {
+		ws.failures.set("wsGitCommitMessage", { reason: ErrorReason.NOTHING_STAGED });
+		open("scm", { writer: "claude" });
+		await screen.findByRole("textbox", { name: p.scm.message });
+		await userEvent.click(screen.getByRole("button", { name: p.scm.aiMessage("Claude Code") }));
+		expect((await screen.findByRole("alert")).textContent).toBe(viMachines.errors.reasons.nothingStaged);
 	});
 
 	it("asks before committing on a detached HEAD, then sends allow_detached", async () => {
@@ -352,6 +372,17 @@ describe("the panel", () => {
 		open("explorer", { online: false });
 		expect(screen.getByText(p.offline)).toBeTruthy();
 		expect(screen.queryByRole("tree")).toBeNull();
+	});
+
+	it("explains an icon-only button with a quick tip on hover, without the browser's own tooltip on top", async () => {
+		open("explorer");
+		const refresh = screen.getByRole("button", { name: p.explorer.refresh });
+		await userEvent.hover(refresh);
+		await waitFor(() => expect(document.querySelector(".ws-tip")?.textContent).toBe(p.explorer.refresh));
+		expect(refresh.getAttribute("title")).toBe("");
+		await userEvent.unhover(refresh);
+		expect(document.querySelector(".ws-tip")).toBeNull();
+		expect(refresh.getAttribute("title")).toBe(p.explorer.refresh);
 	});
 
 	it("says an older machine needs updating", async () => {

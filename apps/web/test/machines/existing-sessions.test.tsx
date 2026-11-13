@@ -3,12 +3,13 @@
 // came from; searched; a session that may be open elsewhere asks first, as
 // do a sensitive folder and untrusted project settings.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, LocalSessionSchema, ProjectSchema, type LocalSession, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LocalSessionSchema, ProjectConfigLevel, ProjectSchema, type LocalSession, type Project } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { NewSession } from "../../src/machines/new-session.tsx";
+import { loadsProjectConfig } from "../../src/machines/project-config.tsx";
 
 const HOME = "/Users/me";
 const NOW = Date.now();
@@ -132,7 +133,7 @@ describe("sessions on the machine", () => {
 			return undefined;
 		});
 		await openTab(link);
-		fireEvent.click(screen.getByRole("checkbox", { name: /Nạp cấu hình .claude của dự án/ }));
+		fireEvent.click(screen.getByRole("checkbox", { name: /Nạp cấu hình AI của dự án/ }));
 		fireEvent.click(await screen.findByRole("button", { name: "Mở: Thanh toán" }));
 		fireEvent.click(await screen.findByRole("button", { name: "Vẫn mở ở đây" }));
 		fireEvent.click(await screen.findByRole("button", { name: "Tin thư mục này và mở phiên" }));
@@ -174,6 +175,23 @@ describe("opened from a workspace or from the machine", () => {
 		...Array.from({ length: 35 }, (_, i) => session(`s${i}`, `${HOME}/shop`, `Shop ${i}`)),
 	];
 	const workspace = create(ProjectSchema, { id: "p", name: "shop", dir: `${HOME}/shop`, git: { git: true, branch: "main" } });
+
+	it("from a project set to load its own AI settings: both tabs start ticked and the session opens with them", async () => {
+		const { link, sent: list } = fakeLink(many);
+		await openTab(link, create(ProjectSchema, { ...workspace, projectConfig: ProjectConfigLevel.FULL }));
+		const tick = () => screen.getByRole("checkbox", { name: "Nạp cấu hình AI của dự án (hook, quyền tự cho phép) · có ghi nhật ký" }) as HTMLInputElement;
+		expect(tick().checked).toBe(true);
+		fireEvent.click(await screen.findByRole("button", { name: "Mở: Shop 0" }));
+		await waitFor(() => expect(sent(list, "sessionOpen")).toHaveLength(1));
+		expect(sent(list, "sessionOpen")[0]?.value).toMatchObject({ consent: { projectSettings: true } });
+	});
+
+	it("ticks a project's own AI settings when its folder loads them or its defaults say so, never for no project", () => {
+		expect(loadsProjectConfig(create(ProjectSchema, { projectConfig: ProjectConfigLevel.FULL }))).toBe(true);
+		expect(loadsProjectConfig(create(ProjectSchema, { defaults: { projectSettings: true } }))).toBe(true);
+		expect(loadsProjectConfig(create(ProjectSchema, { projectConfig: ProjectConfigLevel.OFF }))).toBe(false);
+		expect(loadsProjectConfig(undefined)).toBe(false);
+	});
 
 	it("from a workspace: named after its folder and branch, its sessions only, paged within the folder; widened for this open only", async () => {
 		const { link, sent: list } = fakeLink(many);

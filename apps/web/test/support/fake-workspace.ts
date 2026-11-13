@@ -299,6 +299,8 @@ export class FakeWorkspace {
 						},
 					},
 				];
+			case "wsGitCommitMessage":
+				return [{ case: "wsGitCommitMessageResult", value: { workspaceId: ws, message: `feat: written by ${b.value.provider}` } }];
 			case "wsGitPrUrl":
 				return [{ case: "wsGitPrUrlResult", value: { workspaceId: ws, url: `https://github.com/example/demo-app/compare/main...${encodeURIComponent(this.branch)}?expand=1`, provider: "github" } }];
 			default:

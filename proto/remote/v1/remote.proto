@@ -285,6 +285,13 @@ message Frame {
     AttachmentSave attachment_save = 161;
     // B → A
     AttachmentSaved attachment_saved = 162;
+
+    // A commit message written by one of the machine's AIs (tunelo 3.1.0+);
+    // see WsGitCommitMessage.
+    // A → B
+    WsGitCommitMessage ws_git_commit_message = 163;
+    // B → A
+    WsGitCommitMessageResult ws_git_commit_message_result = 164;
   }
 }
 
@@ -1257,6 +1264,8 @@ enum ErrorReason {
   // The usage ledger cannot be read, or a newer tunelo wrote it: it is left
   // as it is until deleted (UsageDelete, or `tunelo usage delete`).
   ERROR_REASON_USAGE_LEDGER_BLOCKED = 73;
+  // WsGitCommitMessage with nothing staged, or only secret files staged.
+  ERROR_REASON_NOTHING_STAGED = 74;
 }
 
 enum ErrorCode {
@@ -1653,6 +1662,8 @@ message ProviderCapabilities {
   // The AI's own CLI opens in the machine's terminal for a thread
   // (TermOpen.ai_session); needs MachineInfo.terminal AVAILABLE too.
   bool terminal = 12;
+  // The AI writes a commit message from what is staged (WsGitCommitMessage).
+  bool commit_message = 13;
 }
 
 message ModelOption {
@@ -2682,6 +2693,29 @@ message WsGitCommit {
   bool allow_detached = 3;
   // Staged secret files the user agreed, on the device, to commit.
   repeated string confirm_sensitive = 4;
+}
+
+// A → B: a commit message for what is staged, written by the AI named in
+// provider (an id of MachineInfo.providers whose capabilities say
+// commit_message; there is no default AI). The AI reads the staged file list
+// and patch (at most 200 000 characters, shared among the files; secret files by name
+// only, never their content) and nothing else: no tool, no project setting,
+// no saved session. It runs as the account picked on the machine. Refused
+// with ERROR_REASON_NOTHING_STAGED, UNKNOWN_AI, AI_NOT_INSTALLED,
+// AI_NEEDS_LOGIN, UNSUPPORTED_REQUEST (an AI that cannot) or AI_START_FAILED
+// (subject: its error). At most 120 s. Answered with
+// WsGitCommitMessageResult. Commits nothing; never logged.
+message WsGitCommitMessage {
+  string workspace_id = 1;
+  string provider = 2;
+  // One of the AI's models; empty: the AI's own choice for short writing.
+  string model = 3;
+}
+
+message WsGitCommitMessageResult {
+  string workspace_id = 1;
+  // A subject line, then a blank line and a body when the change needs one.
+  string message = 2;
 }
 
 message WsGitLogEntry {

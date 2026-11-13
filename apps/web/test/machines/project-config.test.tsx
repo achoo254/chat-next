@@ -1,4 +1,4 @@
-// A folder's .claude configuration on the machine: the switch in a
+// A folder's own AI configuration on the machine: the switch in a
 // workspace's settings, the hint over a chat session that runs without it,
 // and what an older machine (no per-folder level) or a sensitive folder gets.
 import { create } from "@bufbuild/protobuf";
@@ -46,8 +46,8 @@ const openDialog = (link: MachineLink, p: Project) =>
 		</I18nProvider>,
 	);
 
-const folderSwitch = () => screen.getByRole<HTMLInputElement>("checkbox", { name: /Dùng cấu hình \.claude của thư mục/ });
-const sessionTick = () => screen.queryByRole<HTMLInputElement>("checkbox", { name: "Nạp cấu hình .claude của dự án" });
+const folderSwitch = () => screen.getByRole<HTMLInputElement>("checkbox", { name: /Dùng cấu hình AI của thư mục/ });
+const sessionTick = () => screen.queryByRole<HTMLInputElement>("checkbox", { name: "Nạp cấu hình AI của dự án" });
 
 describe("the folder's switch in a workspace's settings", () => {
 	it("shows the folder's level, turns it on at once and says a running session switches after its turn", async () => {
@@ -77,7 +77,7 @@ describe("the folder's switch in a workspace's settings", () => {
 
 	it("keeps the per-session tick on a machine that does not tell the folder's level", () => {
 		openDialog(fakeLink().link, project(ProjectConfigLevel.UNSPECIFIED, true));
-		expect(screen.queryByRole("checkbox", { name: /Dùng cấu hình \.claude của thư mục/ })).toBeNull();
+		expect(screen.queryByRole("checkbox", { name: /Dùng cấu hình AI của thư mục/ })).toBeNull();
 		expect(sessionTick()?.checked).toBe(true);
 	});
 
@@ -87,7 +87,7 @@ describe("the folder's switch in a workspace's settings", () => {
 		await userEvent.click(folderSwitch());
 		expect((await screen.findByRole("status")).textContent).toContain("Máy chưa có cấu hình theo thư mục (cập nhật trên máy: tunelo update).");
 		expect(sessionTick()?.checked).toBe(false);
-		expect(screen.queryByRole("checkbox", { name: /Dùng cấu hình \.claude của thư mục/ })).toBeNull();
+		expect(screen.queryByRole("checkbox", { name: /Dùng cấu hình AI của thư mục/ })).toBeNull();
 	});
 
 	it("says why a sensitive folder is turned on only for a project inside it", async () => {

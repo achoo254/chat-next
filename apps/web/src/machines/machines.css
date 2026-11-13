@@ -292,6 +292,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-jump .count, .mx-changes-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--c-bar-track); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .mx-menu-note { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: var(--space-2); margin: 0; padding: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-menu-note.ok .icon { color: var(--c-success); }
+/* A text-only note has no icon to fill the 18px column, so the text takes the full width. */
+.mx-menu-note:not(:has(> *)) { display: block; }
 
 /* Answers of the AI: markdown. */
 .mx-agent { line-height: 1.6; overflow-wrap: anywhere; }

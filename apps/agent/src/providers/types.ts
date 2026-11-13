@@ -361,4 +361,36 @@ export interface AgentProvider {
   readonly terminal?: TerminalRunner;
   /** Token usage from the AI's own transcripts; absent when it keeps none tunelo can read. */
   readonly usage?: UsageSource;
+  /** Writes a short text in one go (a commit message); absent when the AI cannot. */
+  readonly writer?: TextWriter;
+  /**
+   * The AI's slash commands and skills in a folder, as a session there would
+   * offer them, without starting a turn (a thread whose session has not opened
+   * yet, e.g. one run in the terminal). Absent when the AI cannot tell.
+   */
+  listCommands?(req: CommandsRequest): Promise<SlashCommand[]>;
+}
+
+export type CommandsRequest = {
+  /** Absolute working directory. */
+  dir: string;
+  /** With the folder's own configuration (its skills and commands), as the thread's session loads it. */
+  projectSettings: boolean;
+  /** The AI's config folder of the account picked on the machine; unset for its default. */
+  accountDir?: string;
+};
+
+export type WriteRequest = {
+  /** Everything the AI reads: it gets no tool, no project setting and no file. */
+  prompt: string;
+  /** One of the AI's models; unset: the AI's own pick for short writing. */
+  model?: string;
+  /** The AI's config folder of the account picked on the machine; unset for its default. */
+  accountDir?: string;
+  timeoutMs: number;
+};
+
+/** One answer to one prompt, saving no session. Throws with the AI's own error when it fails. */
+export interface TextWriter {
+  write(req: WriteRequest): Promise<string>;
 }

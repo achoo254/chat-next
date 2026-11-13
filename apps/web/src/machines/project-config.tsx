@@ -6,7 +6,7 @@
 // turn. Machines before the per-folder level leave it unset (UNSPECIFIED) and
 // answer UNSUPPORTED_REQUEST: the per-session tick stays their way.
 import { useState } from "react";
-import { ErrorReason, ProjectConfigLevel } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ProjectConfigLevel, type Project } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { RemoteError, type MachineLink } from "./link/machine-link.ts";
 import { errorText } from "./use-machines.ts";
@@ -18,6 +18,15 @@ type ConfigLink = Pick<MachineLink, "request">;
 export async function setProjectConfig(link: ConfigLink, dir: string, on: boolean): Promise<ProjectConfigLevel> {
 	const frame = await link.request({ case: "projectConfigSet", value: { dir, level: on ? ProjectConfigLevel.FULL : ProjectConfigLevel.OFF } });
 	return frame.body.case === "projectConfig" ? frame.body.value.level : ProjectConfigLevel.UNSPECIFIED;
+}
+
+/**
+ * Whether a new or reopened session of `project` starts with its own AI
+ * configuration ticked: the folder is set to load it (FULL), or the project's
+ * defaults say so. The user can still untick it for one session.
+ */
+export function loadsProjectConfig(project: Project | undefined): boolean {
+	return project?.projectConfig === ProjectConfigLevel.FULL || project?.defaults?.projectSettings === true;
 }
 
 /** The machine does not know the per-folder level (before it): the per-session tick is the way there. */

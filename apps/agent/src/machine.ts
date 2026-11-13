@@ -38,6 +38,7 @@ import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
+import { writeCommitMessage } from "./workspace/commit-message.ts";
 import { Workspaces } from "./workspace/workspaces.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
@@ -492,6 +493,11 @@ export class Machine {
         updater: this.updater,
         terminal: this.terminal,
         workspaces: this.workspaces,
+        commitMessage: (req) =>
+          writeCommitMessage(
+            { providers: this.providers, staged: (id) => this.workspaces.stagedChanges(id), detect: (p) => this.detect(p), accountDir: () => this.profiles.selectedAccountDir() },
+            req,
+          ),
         usage: this.usageApi,
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
@@ -547,7 +553,7 @@ export class Machine {
         version: d.version ?? "",
         loginState: d.loginState === "ok" ? LoginState.OK : d.loginState === "needs-login" ? LoginState.NEEDS_LOGIN : LoginState.UNKNOWN,
         // Devices also check MachineInfo.terminal before offering it.
-        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined },
+        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, commitMessage: p.writer !== undefined },
         untestedVersion: Boolean(d.untestedVersion),
       });
     }

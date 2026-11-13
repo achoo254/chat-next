@@ -96,6 +96,11 @@ mật đã lưu, trình duyệt của máy, profile Claude và số liệu sử 
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
 
+Có gì ở 3.1.0: AI của phiên viết thông điệp commit từ phần đã stage (nút trong Source Control; chỉ AI nào khai báo được mới
+viết, không có AI mặc định; tệp bí mật chỉ gửi tên). Phiên chưa mở trên máy (chạy ở terminal, đang chờ tin đầu) vẫn có danh sách
+lệnh `/` và skill trong chat: tunelo hỏi AI danh sách của thư mục mà không gửi tin nào, theo đúng tài khoản và chế độ nạp cấu hình
+dự án của phiên.
+
 Có gì ở 3.0.0: tài khoản là gốc tin cậy (không còn ghép thiết bị, mã Authenticator hay khoá thiết bị trong lệnh cài), lệnh cài một
 dòng không tham số, `tunelo login` làm hết việc đăng ký máy, cây lệnh gọn (`logout` gỡ máy khỏi tài khoản, `uninstall` gỡ hẳn),
 release chỉ còn file nén. Giao thức lên 3 và Chat chỉ nhận `tunelo` 3.0.0 trở lên: máy 2.x không tự cập nhật lên được, chạy lại lệnh
@@ -275,6 +280,12 @@ Thiết bị xem tệp và git của một workspace (một dự án của máy)
   bisect (`ERROR_REASON_GIT_OPERATION_IN_PROGRESS`). Log phân trang, "committed on
   branch" so với `origin/HEAD` (rồi `origin/main`, `origin/master`, `main`, `master`), và URL trang tạo PR/MR của GitHub hoặc
   GitLab (chỉ https, không kèm thông tin đăng nhập).
+- **AI viết thông điệp commit (3.1.0)**: thiết bị gửi `WsGitCommitMessage` kèm id của AI (`provider`), lấy từ AI của phiên.
+  Không có AI mặc định: chỉ AI nào có `TextWriter` (khả năng `commit_message` trong `MachineInfo.providers`) mới viết được. Lúc
+  này mới có Claude, chạy `claude -p` từ thư mục home, không công cụ, không nguồn cài đặt (không hook, không `.claude`, không
+  CLAUDE.md của dự án), không MCP, không lệnh slash, không lưu phiên, bằng tài khoản đang chọn trên máy, model `haiku`, tối đa
+  120 giây. AI chỉ đọc danh sách tệp đã stage và patch đã stage (tối đa 200 000 ký tự chia đều theo tệp); tệp bí mật chỉ có tên,
+  không có nội dung. Không commit gì và không ghi nhật ký. Không có gì để đọc thì trả `ERROR_REASON_NOTHING_STAGED`.
 - **git không bao giờ chạy chương trình do repo chọn và không bao giờ hỏi**: không shell, mọi lệnh có hết giờ và trần đầu ra,
   `GIT_TERMINAL_PROMPT=0`, askpass không trả gì, ssh `BatchMode`, chỉ https/ssh. Trước mỗi lệnh, tunelo đọc cấu hình **của
   chính repo** (phạm vi local/worktree; cấu hình global/system của người dùng vẫn dùng): `credential.helper`, `core.sshCommand`,

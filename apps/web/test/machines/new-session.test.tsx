@@ -160,9 +160,9 @@ describe("new session", () => {
 		const { link, sent } = fakeLink("", "/w/chat-next");
 		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
-		fireEvent.click(screen.getByLabelText(/Nạp cấu hình .claude/));
+		fireEvent.click(screen.getByLabelText(/Nạp cấu hình AI/));
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
-		await screen.findByText("Máy chưa tin cấu hình .claude của /w/chat-next");
+		await screen.findByText("Máy chưa tin cấu hình AI của /w/chat-next");
 		expect(screen.queryByText(/not trusted/)).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Tin thư mục này và mở phiên" }));
 		await waitFor(() => expect(sent.filter((r) => r.case === "threadCreate")).toHaveLength(2));
@@ -173,7 +173,7 @@ describe("new session", () => {
 		const { link, sent } = fakeLink("", "/w/chat-next");
 		open(link, stateWith([thread("b", "/w/chat-next", 2)]));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
-		const setting = screen.getByLabelText(/Nạp cấu hình .claude/) as HTMLInputElement;
+		const setting = screen.getByLabelText(/Nạp cấu hình AI/) as HTMLInputElement;
 		fireEvent.click(setting);
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		fireEvent.click(await screen.findByRole("button", { name: "Không nạp cấu hình dự án" }));
@@ -202,10 +202,10 @@ describe("project settings in the home folder", () => {
 		const { link, sent } = fakeLink();
 		open(link, { ...stateWith([]), info: { home: HOME, providers: [], recentDirs: [], pinnedDirs: [] } } as unknown as LinkState);
 		await waitFor(() => expect(folderInput().value).toBe(HOME));
-		const box = screen.getByRole("checkbox", { name: /Nạp cấu hình .claude/ }) as HTMLInputElement;
+		const box = screen.getByRole("checkbox", { name: /Nạp cấu hình AI/ }) as HTMLInputElement;
 		expect(box.disabled).toBe(true);
 		expect(box.checked).toBe(false);
-		expect(screen.getByText(/Claude Code cũng không bao giờ tin cấu hình ở đó/)).toBeTruthy();
+		expect(screen.getByText(/chính AI cũng không bao giờ tin cấu hình ở đó/)).toBeTruthy();
 		fireEvent.change(folderInput(), { target: { value: `${HOME}/code/app` } });
 		expect(box.disabled).toBe(false);
 		fireEvent.click(box);

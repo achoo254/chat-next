@@ -215,6 +215,69 @@ async function noOperationInProgress(run: GitRunner, root: string): Promise<void
   }
 }
 
+/** What an AI reads to write a commit message: the staged files and their patch. */
+export type StagedChanges = { files: string; patch: string };
+
+/** Of the staged patch, at most this much, shared among the files; the file list at most `listChars`. */
+export const STAGED_LIMITS = { patchChars: 200_000, listChars: 6000 };
+
+/**
+ * The staged changes as `git diff --cached` shows them: one "M\tpath" line a
+ * file, then the patch of every file that is not secret (a secret file is
+ * named only). Each file gets an equal share of the patch budget, and what a
+ * small file leaves goes to the larger ones, so one generated file cannot take
+ * it all. Throws NOTHING_STAGED when no file, or only secret files, are staged.
+ */
+export async function stagedChanges(run: GitRunner, root: string, sensitive: SensitiveRel): Promise<StagedChanges> {
+  const fields = (await text(run, root, read(["diff", "--cached", "--name-status", "-z", "--no-renames", "--relative"]))).split("\0").filter(Boolean);
+  const entries: { state: string; path: string }[] = [];
+  for (let i = 0; i + 1 < fields.length; i += 2) entries.push({ state: fields[i] ?? "", path: fields[i + 1] ?? "" });
+  const open = entries.filter((e) => !sensitive(e.path)).map((e) => e.path);
+  if (open.length === 0) throw new AgentError(ErrorCode.INVALID, "nothing is staged", { reason: ErrorReason.NOTHING_STAGED });
+  const list = entries.map((e) => `${e.state}\t${e.path}${sensitive(e.path) ? " (secret file: content not shown)" : ""}`).join("\n");
+  // git diff takes no pathspec file: the paths go as arguments, in batches a Windows command line holds.
+  let out = "";
+  for (const batch of argBatches(open.slice(0, OPS_LIMITS.paths).map(gitPath), ARG_CHARS)) {
+    out += await text(run, root, read(["diff", "--cached", "--patch", "--minimal", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--relative", "--", ...batch]));
+  }
+  return { files: list.length > STAGED_LIMITS.listChars ? `${list.slice(0, STAGED_LIMITS.listChars)}\n…` : list, patch: shareBudget(out, STAGED_LIMITS.patchChars) };
+}
+
+/** Characters of paths one git command line takes (Windows allows about 32 000 in all). */
+const ARG_CHARS = 24_000;
+
+/** `paths` in batches of at most `max` characters (a longer path goes alone). */
+export function argBatches(paths: readonly string[], max: number): string[][] {
+  const batches: string[][] = [];
+  let batch: string[] = [];
+  let size = 0;
+  for (const p of paths) {
+    if (batch.length > 0 && size + p.length + 1 > max) {
+      batches.push(batch);
+      batch = [];
+      size = 0;
+    }
+    batch.push(p);
+    size += p.length + 1;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
+}
+
+/** A multi-file patch cut to `budget` characters, each file's part to its fair share. */
+export function shareBudget(patch: string, budget: number): string {
+  const parts = patch.split(/^(?=diff --git )/m).filter((p) => p !== "");
+  const order = parts.map((part, at) => ({ part, at })).sort((a, b) => a.part.length - b.part.length);
+  const kept: string[] = new Array<string>(parts.length).fill("");
+  let left = budget;
+  order.forEach(({ part, at }, i) => {
+    const share = Math.floor(left / (order.length - i));
+    kept[at] = part.length <= share ? part : `${part.slice(0, share)}\n… (cut: this file's change is longer)\n`;
+    left -= Math.min(part.length, share);
+  });
+  return kept.join("");
+}
+
 export type CommitOptions = { allowDetached?: boolean; confirmSensitive?: readonly string[] };
 
 export async function commit(run: GitRunner, root: string, message: string, sensitive: SensitiveRel, opts: CommitOptions = {}): Promise<LogEntry> {

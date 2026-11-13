@@ -30,6 +30,8 @@ export interface ExistingSessionsProps {
 	 * "Mọi thư mục" and the other folders still widen the list, for this open only.
 	 */
 	folder?: string | undefined;
+	/** The project's own AI configuration starts ticked (loadsProjectConfig of the project the dialog is for). */
+	loadsByDefault?: boolean;
 	onClose: () => void;
 }
 
@@ -100,7 +102,7 @@ function useSettled<T>(value: T, ms: number): T {
 	return settled;
 }
 
-export default function ExistingSessions({ machine, name, link, ai, home, folder, onClose }: ExistingSessionsProps) {
+export default function ExistingSessions({ machine, name, link, ai, home, folder, loadsByDefault = false, onClose }: ExistingSessionsProps) {
 	const t = useMachinesCopy();
 	const c = t.existing;
 	const now = useNow();
@@ -113,7 +115,7 @@ export default function ExistingSessions({ machine, name, link, ai, home, folder
 	const pages = more.key === filterKey ? more.pages : 1;
 	const requestKey = `${filterKey}\n${pages}`;
 	const [result, setResult] = useState<Listed>(EMPTY_LIST);
-	const [projectSettings, setProjectSettings] = useState(false);
+	const [projectSettings, setProjectSettings] = useState(loadsByDefault);
 	const [ask, setAsk] = useState<Ask | null>(null);
 	const [opening, setOpening] = useState("");
 	const [openError, setOpenError] = useState("");

@@ -156,6 +156,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.usageRangeInvalid;
 		case ErrorReason.USAGE_LEDGER_BLOCKED:
 			return r.usageLedgerBlocked;
+		case ErrorReason.NOTHING_STAGED:
+			return r.nothingStaged;
 		default:
 			return undefined;
 	}

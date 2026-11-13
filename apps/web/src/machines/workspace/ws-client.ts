@@ -19,8 +19,8 @@ export class UnexpectedAnswer extends Error {
 }
 
 /** Sends `body`; resolves with the value of the answer of kind `expect`. */
-export async function ask<K extends Case>(link: WsLink, body: Body, expect: K): Promise<ValueOf<K>> {
-	const frame = await link.request(body);
+export async function ask<K extends Case>(link: WsLink, body: Body, expect: K, timeoutMs?: number): Promise<ValueOf<K>> {
+	const frame = await link.request(body, timeoutMs);
 	if (frame.body.case !== expect) throw new UnexpectedAnswer(frame.body.case ?? "none");
 	return frame.body.value as ValueOf<K>;
 }

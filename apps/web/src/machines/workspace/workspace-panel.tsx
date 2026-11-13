@@ -5,7 +5,7 @@
 // in a drawer over the session's main area. On a phone the panel is a
 // full-height sheet. It watches the workspace while it shows. Loaded on
 // first open in its own chunk, with its copy and styles.
-import { useCallback, useEffect, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { MachineIcon } from "../machine-icons.tsx";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { Explorer } from "./explorer/explorer.tsx";
@@ -15,6 +15,7 @@ import type { PanelPrefs, PanelTab } from "./panel-prefs.ts";
 import { ResizeHandle } from "./resize-handle.tsx";
 import { SourceControl } from "./scm/source-control.tsx";
 import { useScm } from "./scm/use-scm.ts";
+import { useHoverTips } from "./use-hover-tips.ts";
 import { usePanelCopy } from "./use-panel-copy.ts";
 import { useWsWatch } from "./use-ws-watch.ts";
 import { Viewer, type Viewing } from "./viewer/viewer.tsx";
@@ -28,6 +29,8 @@ export interface WorkspacePanelProps {
 	workspace: { readonly id: string; readonly name: string; readonly dir: string };
 	online: boolean;
 	ai: string;
+	/** The session's AI (its id) when it writes commit messages (ProviderCapabilities.commit_message); undefined when it cannot. */
+	writer: string | undefined;
 	prefs: PanelPrefs;
 	onPrefs: (change: Partial<PanelPrefs>) => void;
 	/** Switches the session to its terminal; undefined when it has none or shows it already. */
@@ -36,7 +39,7 @@ export interface WorkspacePanelProps {
 
 const TABS: readonly PanelTab[] = ["explorer", "scm"];
 
-export default function WorkspacePanel({ link, workspace, online, ai, prefs, onPrefs, onTerminal }: WorkspacePanelProps) {
+export default function WorkspacePanel({ link, workspace, online, ai, writer, prefs, onPrefs, onTerminal }: WorkspacePanelProps) {
 	const p = usePanelCopy();
 	const t = useMachinesCopy();
 	const ws = workspace.id;
@@ -68,6 +71,8 @@ export default function WorkspacePanel({ link, workspace, online, ai, prefs, onP
 		pick(next);
 		event.currentTarget.parentElement?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus();
 	};
+	const panelRef = useRef<HTMLElement>(null);
+	useHoverTips(panelRef);
 	const width = dragWidth ?? prefs.width;
 	/** The panel's width, for the panel and for the drawer beside it. */
 	const panelWidth = { "--ws-w": `${width}px` } as CSSProperties;
@@ -92,7 +97,7 @@ export default function WorkspacePanel({ link, workspace, online, ai, prefs, onP
 				/>
 				</div>
 			)}
-			<aside className="ws-panel" aria-label={p.title} data-id="workspace-panel" style={panelWidth} data-own-keys="">
+			<aside ref={panelRef} className="ws-panel" aria-label={p.title} data-id="workspace-panel" style={panelWidth} data-own-keys="">
 				<ResizeHandle
 					width={width}
 					label={p.resize}
@@ -160,6 +165,8 @@ export default function WorkspacePanel({ link, workspace, online, ai, prefs, onP
 										selected={viewing?.view.kind === "diff" ? viewing.key : null}
 										onView={(target, key) => setViewing({ view: { kind: "diff", target }, key })}
 										errorText={errorText}
+										ai={ai}
+										writer={writer}
 									/>
 								))}
 						</div>

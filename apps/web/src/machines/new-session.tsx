@@ -27,6 +27,7 @@ import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf } from "./use-machines.ts";
 import { lastMode, modePath, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+import { loadsProjectConfig } from "./project-config.tsx";
 
 const ExistingSessions = lazy(() => import("./existing-sessions.tsx"));
 
@@ -75,7 +76,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 	const [going, setGoing] = useState("");
 	// The field is being typed in: show matching folders under it.
 	const [typing, setTyping] = useState(false);
-	const [projectSettings, setProjectSettings] = useState(project?.defaults?.projectSettings ?? false);
+	const [projectSettings, setProjectSettings] = useState(() => loadsProjectConfig(project));
 	// The first message is optional: empty opens the session waiting for one. An idea picked from the chips follows the folder until the user types.
 	const [hint, setHint] = useState<PromptHint | null>(null);
 	const [text, setText] = useState("");
@@ -229,7 +230,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 							</p>
 						}
 					>
-						<ExistingSessions machine={machine} name={name} link={link} ai={ai} home={state.info?.home ?? ""} folder={project?.dir} onClose={onClose} />
+						<ExistingSessions machine={machine} name={name} link={link} ai={ai} home={state.info?.home ?? ""} folder={project?.dir} loadsByDefault={loadsProjectConfig(projects.find((p) => p.id === projectId) ?? project)} onClose={onClose} />
 					</Suspense>
 				</div>
 			) : (
@@ -282,7 +283,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 									setMode(picked?.defaults?.permissionMode ?? "");
 									if (picked === undefined) return;
 									setModel(picked.defaults?.model ?? "");
-									setProjectSettings(picked.defaults?.projectSettings ?? false);
+									setProjectSettings(loadsProjectConfig(picked));
 									browse(picked.dir);
 								}}
 							>
