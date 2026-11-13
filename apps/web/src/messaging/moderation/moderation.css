@@ -69,3 +69,19 @@
 .an-time { font-size: 0.8125rem; flex: 1; min-width: 0; }
 .an-text { overflow-wrap: anywhere; min-width: 0; }
 .an-stats { font-size: 0.8125rem; overflow-wrap: anywhere; }
+
+/* The moderation pages' frame: header, body and tabs (moved out of the startup CSS). */
+.mod-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }
+.mod-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-5); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.mod-head h1 { flex: 1; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; }
+.mod-head .id { font-size: 0.8125rem; font-weight: 400; margin-left: var(--space-1); }
+.mod-head a.btn { text-decoration: none; }
+.mod-body { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) var(--space-5) var(--space-5); }
+.mod-body.narrow-body { max-width: 760px; }
+.mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
+.mod-tabs a { flex: 1; display: grid; place-items: center; min-height: 44px; color: var(--c-text-muted); font-weight: 500; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+.mod-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
+@media (max-width: 760px) {
+	.mod-head { padding: var(--space-2) var(--space-3); flex-wrap: wrap; }
+	.mod-body { padding: var(--space-3) var(--space-3) var(--space-4); }
+}
