@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { EcosystemAppSwitcher } from "../components/ecosystem-app-switcher.tsx";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { Link, paths, type Route } from "../router.tsx";
+import { inSettingsFrame, Link, paths, type Route } from "../router.tsx";
 
 interface ShellProps {
 	route: Route;
@@ -32,7 +32,7 @@ export function Shell({ route, nav, account, rail, children }: ShellProps) {
 				<Link
 					to={paths.settingsList}
 					className="icon-btn"
-					current={route.name === "settings"}
+					current={inSettingsFrame(route)}
 					aria-label={t.shell.settings}
 				>
 					<Icon name="settings" />

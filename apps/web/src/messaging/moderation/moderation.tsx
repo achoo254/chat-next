@@ -117,49 +117,22 @@ function actorName(operatorId: number, people: ReadonlyMap<number, Person>, self
 
 export default function Moderation({ view }: { view: ModerationView }) {
 	const copy = useScreensCopy();
-	const { t: app } = useI18n();
 	const { self } = useServices();
 	const scope = orgDomain(serverHost());
 	const t = copy.moderation;
 	const section = view.page === "feedback" || view.page === "announcements" || view.page === "log" ? view.page : "queue";
+	// Its pages are tabs: Kiểm duyệt opens in the settings frame (docs/settings-menu.md).
 	const nav = [
-		{ to: paths.moderation(), icon: "inbox" as const, label: t.queue, current: section === "queue" },
-		{ to: paths.feedback(), icon: "message-dot" as const, label: t.feedback, current: section === "feedback" },
-		{ to: paths.announcements(), icon: "megaphone" as const, label: t.announcements, current: section === "announcements" },
-		{ to: paths.moderationLog(), icon: "clock" as const, label: t.logNav, current: section === "log" },
+		{ to: paths.moderation(), label: t.queue, current: section === "queue" },
+		{ to: paths.feedback(), label: t.feedback, current: section === "feedback" },
+		{ to: paths.announcements(), label: t.announcements, current: section === "announcements" },
+		{ to: paths.moderationLog(), label: t.logNav, current: section === "log" },
 	];
 	return (
 		<div className="mod">
-			<nav className="mod-side" aria-label={t.title}>
-				{/* Moderation opens from Settings: the way back. */}
-				<Link to={paths.settingsList} className="nav mod-back" data-id="moderation-back">
-					<Icon name="chevron-left" />
-					<span>{app.settings.title}</span>
-				</Link>
-				<div className="mod-brand">
-					<Icon name="shield" />
-					<span>{t.title}</span>
-				</div>
-				{nav.map((item) => (
-					<Link key={item.to} to={item.to} className="nav" current={item.current}>
-						<Icon name={item.icon} />
-						<span>{item.label}</span>
-					</Link>
-				))}
-				<div className="me">
-					<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
-					<span>
-						{self.name}
-						<small>{t.scopeNote(scope)}</small>
-					</span>
-				</div>
-			</nav>
 			<div className="mod-main">
 				{self.isOperator && (
 					<nav className="mod-tabs" aria-label={t.title}>
-						<Link to={paths.settingsList} className="mod-back" aria-label={app.settings.title} data-id="moderation-back-tab">
-							<Icon name="chevron-left" />
-						</Link>
 						{nav.map((item) => (
 							<Link key={item.to} to={item.to} current={item.current}>
 								{item.label}

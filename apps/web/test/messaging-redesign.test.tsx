@@ -355,10 +355,10 @@ describe("moderation", () => {
 		const demo = seedDemo();
 		demo.fixture.operator = true;
 		renderMessaging(demo.fixture, "/moderation");
-		// The side navigation; narrow screens show the same links as tabs instead.
-		const [sideLink] = await screen.findAllByRole("link", { name: "Góp ý" }, LONG);
-		if (sideLink === undefined) throw new Error("no feedback link");
-		await userEvent.click(sideLink);
+		// Kiểm duyệt opens in the settings frame; its pages are tabs inside it
+		// (the settings menu has a "Góp ý" of its own: sending feedback).
+		const tabs = await screen.findByRole("navigation", { name: "Kiểm duyệt" }, LONG);
+		await userEvent.click(within(tabs).getByRole("link", { name: "Góp ý" }));
 		await waitFor(() => expect(window.location.pathname).toBe("/moderation/feedback"), LONG);
 		expect(await screen.findByText("Gửi ảnh trong nhóm bị treo ở 99%.", {}, LONG)).toBeTruthy();
 		expect(screen.getByText("Báo lỗi")).toBeTruthy();

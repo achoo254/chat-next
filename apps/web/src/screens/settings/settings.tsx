@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, type ReactNode } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { Avatar } from "../../components/avatar.tsx";
 import { LoaderBoundary } from "../../components/delayed-loader.tsx";
@@ -45,8 +45,19 @@ export interface MessagingSettings {
 	photo?: ReactNode;
 	/** The user's avatar with their photo, on the phone category list's account card. */
 	avatar?: ReactNode;
-	/** The "Góp ý" dialog (mockups/settings.html#feedback), shown over the current tab until closed. */
-	feedback?: (onClose: () => void) => ReactNode;
+	/** The "Góp ý" page: a settings tab like the others (docs/settings-menu.md). */
+	feedback?: ReactNode;
+}
+
+/**
+ * A settings entry with pages of its own (Developer Console, Kiểm duyệt):
+ * shown in the settings frame like a tab, its pages switched by tabs inside
+ * `content` (docs/settings-menu.md, rule 3).
+ */
+export interface SettingsSection {
+	readonly id: "console" | "moderation";
+	readonly title: string;
+	readonly content: ReactNode;
 }
 
 type TabGroups = readonly (readonly { tab: SettingsTab; icon: IconName }[])[];
@@ -63,21 +74,29 @@ interface SettingsProps {
 	messaging?: MessagingSettings;
 	/** "/settings" itself: phones show only the category list (mockups/mobile.html#settings). */
 	list?: boolean;
+	/** An entry with pages of its own, shown instead of `tab`. */
+	section?: SettingsSection;
 }
 
 /** Settings: category list plus the selected category; on phones one of the two at a time. */
-export function Settings({ tab, self, onSelfChange, messaging, list = false }: SettingsProps) {
+export function Settings({ tab, self, onSelfChange, messaging, list = false, section }: SettingsProps) {
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
-	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	// "Kết nối AI" and "Tài khoản" (export, and the link to deletion at the IdP) follow the Developer Console link (mockups/settings.html#export-delete).
 	const available =
-		groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && (tab === "mcp" || tab === "account"));
+		section !== undefined ||
+		groups.some((group) => group.some((item) => item.tab === tab)) ||
+		(messaging !== undefined && (tab === "mcp" || tab === "account")) ||
+		(tab === "feedback" && messaging?.feedback !== undefined);
+	/** Whether the entry for `item` is the one shown. */
+	const isCurrent = (item: SettingsTab): boolean => section === undefined && item === tab;
 	useEffect(() => {
 		if (!available) navigate(paths.settings("profile"), { replace: true });
 	}, [available]);
 	let content: ReactNode;
-	if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} photo={messaging?.photo} />;
+	if (section !== undefined) content = section.content;
+	else if (tab === "feedback") content = messaging?.feedback ?? null;
+	else if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} photo={messaging?.photo} />;
 	else if (tab === "sessions") content = <SessionsSettings />;
 	else content = messaging?.render(tab) ?? null;
 	return (
@@ -96,7 +115,7 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 					<Fragment key={group[0]?.tab ?? index}>
 						{index > 0 && <hr />}
 						{group.map((item) => (
-							<Link key={item.tab} to={paths.settings(item.tab)} current={item.tab === tab}>
+							<Link key={item.tab} to={paths.settings(item.tab)} current={isCurrent(item.tab)}>
 								<Icon name={item.icon} />
 								<span>{t.settings[item.tab]}</span>
 							</Link>
@@ -105,28 +124,28 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 				))}
 				{messaging !== undefined && (
 					<>
-						<Link to={paths.console()}>
+						<Link to={paths.console()} current={section?.id === "console"}>
 							<Icon name="robot" />
 							<span>{t.settings.console}</span>
 						</Link>
-						<Link to={paths.settings("mcp")} current={tab === "mcp"}>
+						<Link to={paths.settings("mcp")} current={isCurrent("mcp")}>
 							<Icon name="plug" />
 							<span>{t.settings.mcp}</span>
 						</Link>
-						<Link to={paths.settings("account")} current={tab === "account"}>
+						<Link to={paths.settings("account")} current={isCurrent("account")}>
 							<Icon name="key" />
 							<span>{t.settings.account}</span>
 						</Link>
 					</>
 				)}
 				{messaging?.feedback !== undefined && (
-					<button type="button" onClick={() => setFeedbackOpen(true)} aria-haspopup="dialog">
+					<Link to={paths.settings("feedback")} current={isCurrent("feedback")}>
 						<Icon name="message-dot" />
 						<span>{t.settings.feedback}</span>
-					</button>
+					</Link>
 				)}
 				{messaging?.moderation === true && (
-					<Link to={paths.moderation()}>
+					<Link to={paths.moderation()} current={section?.id === "moderation"}>
 						<Icon name="shield" />
 						<span>{t.settings.moderation}</span>
 					</Link>
@@ -159,12 +178,11 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 					<Link to={paths.settingsList} className="icon-btn set-back" aria-label={t.settings.back}>
 						<Icon name="back" />
 					</Link>
-					<h1>{t.settings[tab]}</h1>
+					<h1>{section?.title ?? t.settings[tab]}</h1>
 				</header>
 				{/* A tab that loads shows one loader under the header; the first showing waits for it (messaging-root.tsx). */}
-				<LoaderBoundary key={tab}>{content}</LoaderBoundary>
+				<LoaderBoundary key={section?.id ?? tab}>{content}</LoaderBoundary>
 			</main>
-			{feedbackOpen && messaging?.feedback?.(() => setFeedbackOpen(false))}
 		</div>
 	);
 }

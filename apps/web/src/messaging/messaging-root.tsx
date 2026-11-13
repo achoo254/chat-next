@@ -3,7 +3,7 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { Suspense, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { useApi } from "../api/api-context.tsx";
 import { loadAccountClient, loadConnectWeb, type Api } from "../api/client.ts";
@@ -12,7 +12,8 @@ import { LoaderBoundary, Ready } from "../components/delayed-loader.tsx";
 import { prefetchWhenIdle, preloadable, warm } from "../components/preload.ts";
 import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
+import { inSettingsFrame, Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
+import type { MessagingSettings, SettingsSection } from "../screens/settings/settings.tsx";
 import { sessionsData } from "../screens/settings/sessions-data.ts";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
@@ -31,6 +32,7 @@ import { loadPrivacyClient } from "./settings/privacy-api.ts";
 import { accountData, blockedData, myBotsData, notificationSettingsData, privacyData } from "./data/screen-data.ts";
 import { ServicesContext, Toasts, useServices, useUnreadTotals, type Services } from "./data/services.tsx";
 import { ChatStore } from "./data/store.ts";
+import type { ModerationView } from "./moderation/moderation.tsx";
 import { ChatScreen, chatPanePreloads } from "./ui/chat-screen.tsx";
 import { AccountMenuSlot } from "./ui/account-menu-slot.tsx";
 import { FolderRail } from "./ui/folder-rail.tsx";
@@ -48,13 +50,13 @@ const settingsExtraCode = preloadable(() => import("./settings/settings-extra.ts
 const moderationCode = preloadable(() => import("./moderation/moderation.tsx"));
 const consoleCode = preloadable(() => import("./bots/console.tsx"));
 const machinesCode = preloadable(() => import("../machines/machines-screen.tsx"));
-const feedbackDialogCode = preloadable(() => import("./settings/feedback-dialog.tsx"));
+const feedbackPageCode = preloadable(() => import("./settings/feedback-page.tsx"));
 const Settings = settingsCode.Component;
 const SettingsExtra = settingsExtraCode.Component;
 const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
 const MachinesScreen = machinesCode.Component;
-const FeedbackDialog = feedbackDialogCode.Component;
+const FeedbackPage = feedbackPageCode.Component;
 
 /**
  * Secondary screens (and the rarer parts of messages) whose code is fetched
@@ -64,7 +66,7 @@ const FeedbackDialog = feedbackDialogCode.Component;
 const IDLE_PREFETCH = [
 	settingsCode.preload,
 	settingsExtraCode.preload,
-	feedbackDialogCode.preload,
+	feedbackPageCode.preload,
 	consoleCode.preload,
 	...chatPanePreloads,
 	...messageExtrasPreloads,
@@ -107,13 +109,16 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 				case "account":
 					warm(loadConnectWeb, loadPrivacyClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), accountData(services.transport).promise];
+				case "feedback":
+					return [settingsCode.preload(), feedbackPageCode.preload()];
 			}
 			break;
 		case "console":
 			// The list's request waits for the bots client and the transport: fetch them with the screen.
 			warm(loadConnectWeb, loadBotsClient);
-			if (route.view.page === "new") return [consoleCode.preload()];
-			return [consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
+			// Shown in the settings frame (docs/settings-menu.md): its code with the console's.
+			if (route.view.page === "new") return [settingsCode.preload(), consoleCode.preload()];
+			return [settingsCode.preload(), consoleCode.preload(), myBotsData(services.bots, route.view.page === "bot" ? route.view.botId : 0).promise];
 		case "machines":
 			return [machinesCode.preload()];
 		case "moderation":
@@ -121,7 +126,7 @@ function screenParts(route: Route, services: Services, api: Api): Promise<unknow
 		case "announcements":
 		case "moderationLog":
 		case "moderationBot":
-			return [moderationCode.preload()];
+			return [settingsCode.preload(), moderationCode.preload()];
 	}
 	return [];
 }
@@ -325,6 +330,7 @@ interface ScreenProps {
 function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
 	const services = useServices();
 	const api = useApi();
+	const { t } = useI18n();
 	const [folder, setFolder] = useState<Folder>("all");
 	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
 		return <ChatScreen self={self} route={route} folder={folder} onFolder={setFolder} />;
@@ -335,47 +341,42 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 	};
 	// Started on every render: the requests are shared, so this only starts what a new route needs.
 	const parts = screenParts(route, services, api);
+	const messagingSettings: MessagingSettings = {
+		onSignOut,
+		moderation: moderator,
+		render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
+		photo: <SettingsExtra tab="profile" self={self} onSelfChange={onSelfChange} />,
+		avatar: <ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} />,
+		feedback: <FeedbackPage />,
+	};
+	/** Developer Console and Kiểm duyệt open in the settings frame (docs/settings-menu.md). */
+	const inSettings = (section: SettingsSection): ReactNode => (
+		<Settings tab="profile" self={self} onSelfChange={onSelfChange} messaging={messagingSettings} section={section} />
+	);
+	const moderation = (view: ModerationView): ReactNode =>
+		inSettings({ id: "moderation", title: t.settings.moderation, content: <Moderation view={view} /> });
 	let screen: ReactNode;
 	switch (route.name) {
 		case "settings":
-			screen = (
-				<Settings
-					tab={route.tab}
-					list={route.list === true}
-					self={self}
-					onSelfChange={onSelfChange}
-					messaging={{
-						onSignOut,
-						moderation: moderator,
-						render: (tab: SettingsTab): ReactNode => <SettingsExtra tab={tab} />,
-						photo: <SettingsExtra tab="profile" self={self} onSelfChange={onSelfChange} />,
-						avatar: <ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} />,
-						feedback: (onClose) => (
-							<Suspense fallback={null}>
-								<FeedbackDialog onClose={onClose} />
-							</Suspense>
-						),
-					}}
-				/>
-			);
+			screen = <Settings tab={route.tab} list={route.list === true} self={self} onSelfChange={onSelfChange} messaging={messagingSettings} />;
 			break;
 		case "console":
-			screen = <DeveloperConsole view={route.view} />;
+			screen = inSettings({ id: "console", title: t.settings.console, content: <DeveloperConsole view={route.view} /> });
 			break;
 		case "moderation":
-			screen = <Moderation view={route.reportId === null ? { page: "queue" } : { page: "report", reportId: route.reportId, actions: route.actions }} />;
+			screen = moderation(route.reportId === null ? { page: "queue" } : { page: "report", reportId: route.reportId, actions: route.actions });
 			break;
 		case "feedback":
-			screen = <Moderation view={{ page: "feedback" }} />;
+			screen = moderation({ page: "feedback" });
 			break;
 		case "announcements":
-			screen = <Moderation view={{ page: "announcements" }} />;
+			screen = moderation({ page: "announcements" });
 			break;
 		case "moderationLog":
-			screen = <Moderation view={{ page: "log" }} />;
+			screen = moderation({ page: "log" });
 			break;
 		case "moderationBot":
-			screen = <Moderation view={{ page: "bot", botId: route.botId }} />;
+			screen = moderation({ page: "bot", botId: route.botId });
 			break;
 		case "machines":
 			screen = <MachinesScreen view={route.view} />;
@@ -391,7 +392,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 				</>
 			}
 			account={<AccountMenuSlot self={self} />}
-			rail={<FolderRail self={self} folder={null} settings={route.name === "settings"} machines={route.name === "machines"} onFolder={openFolder} />}
+			rail={<FolderRail self={self} folder={null} settings={inSettingsFrame(route)} machines={route.name === "machines"} onFolder={openFolder} />}
 		>
 			<LoaderBoundary key={route.name}>
 				<Ready parts={parts}>{screen}</Ready>

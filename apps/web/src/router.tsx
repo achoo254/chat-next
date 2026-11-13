@@ -1,7 +1,7 @@
 // Minimal history-based routing: a handful of screens do not justify a router library.
 import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
-export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts" | "app" | "account" | "mcp";
+export type SettingsTab = "profile" | "sessions" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts" | "app" | "account" | "mcp" | "feedback";
 
 /**
  * What the chat column shows next to the conversation list: the chat, its
@@ -71,7 +71,14 @@ export type Route =
 	| { name: "bot"; username: string };
 
 /** Tabs that exist before messaging ships (release R0). */
-const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "app", "sessions", "account", "mcp"];
+/** Routes shown in the settings frame (docs/settings-menu.md): Settings is the current place for all of them. */
+const SETTINGS_FRAME: ReadonlySet<Route["name"]> = new Set(["settings", "console", "moderation", "feedback", "announcements", "moderationLog", "moderationBot"]);
+
+export function inSettingsFrame(route: Route): boolean {
+	return SETTINGS_FRAME.has(route.name);
+}
+
+const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "app", "sessions", "account", "mcp", "feedback"];
 
 export const paths = {
 	home: "/",

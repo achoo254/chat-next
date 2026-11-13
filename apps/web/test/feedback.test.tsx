@@ -15,44 +15,43 @@ function toastText(): string {
 }
 
 describe("Settings › Góp ý", () => {
-	it("sends an idea or a bug report from a dialog over the current tab", async () => {
+	it("is a settings page: sends an idea or a bug report and clears the form", async () => {
 		const fixture = new ChatFixture();
 		renderMessaging(fixture, "/settings/privacy");
-		await userEvent.click(await screen.findByRole("button", { name: "Góp ý" }, LONG));
-		const dialog = await screen.findByRole("dialog", { name: "Góp ý cho đội ngũ" }, LONG);
-		const send = within(dialog).getByRole("button", { name: "Gửi góp ý" });
+		// A settings entry like the others (docs/settings-menu.md), not a dialog over the tab.
+		await userEvent.click(await screen.findByRole("link", { name: "Góp ý" }, LONG));
+		await waitFor(() => expect(window.location.pathname).toBe("/settings/feedback"), LONG);
+		const form = await screen.findByRole("form", { name: "Góp ý cho đội ngũ" }, LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		const send = within(form).getByRole("button", { name: "Gửi góp ý" });
 		expect(send.hasAttribute("disabled")).toBe(true);
-		expect(within(dialog).getByRole("button", { name: "Góp ý" }).getAttribute("aria-pressed")).toBe("true");
+		expect(within(form).getByRole("button", { name: "Góp ý" }).getAttribute("aria-pressed")).toBe("true");
 
-		await userEvent.click(within(dialog).getByRole("button", { name: "Báo lỗi" }));
-		const box = within(dialog).getByRole("textbox", { name: "Nội dung" });
+		await userEvent.click(within(form).getByRole("button", { name: "Báo lỗi" }));
+		const box = within(form).getByRole("textbox", { name: "Nội dung" });
 		expect(box.getAttribute("placeholder")).toBe("Bạn gặp lỗi gì? Bạn đang làm gì và điều gì xảy ra?");
 		await userEvent.type(box, "  Ảnh không tải được  ");
-		expect(within(dialog).getByText("22/2000")).toBeTruthy();
+		expect(within(form).getByText("22/2000")).toBeTruthy();
 		await userEvent.click(send);
 
 		await waitFor(() => expect(toastText()).toBe("Đã gửi góp ý. Cảm ơn bạn!"), LONG);
-		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Góp ý cho đội ngũ" })).toBeNull(), LONG);
+		await waitFor(() => expect(box).toHaveProperty("value", ""), LONG);
 		expect(fixture.feedbackQueue).toEqual([
 			expect.objectContaining({ kind: FeedbackKind.BUG, text: "Ảnh không tải được", status: FeedbackStatus.OPEN, source: FeedbackSource.SETTINGS }),
 		]);
-		// The tab underneath stayed.
-		expect(window.location.pathname).toBe("/settings/privacy");
+		expect(window.location.pathname).toBe("/settings/feedback");
 	});
 
 	it("keeps the text and says so when sent too fast", async () => {
 		const fixture = new ChatFixture();
 		fixture.feedbackRateLimited = true;
-		renderMessaging(fixture, "/settings/profile");
-		await userEvent.click(await screen.findByRole("button", { name: "Góp ý" }, LONG));
-		const dialog = await screen.findByRole("dialog", { name: "Góp ý cho đội ngũ" }, LONG);
-		await userEvent.type(within(dialog).getByRole("textbox", { name: "Nội dung" }), "Thêm chế độ tối");
-		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi góp ý" }));
+		renderMessaging(fixture, "/settings/feedback");
+		const form = await screen.findByRole("form", { name: "Góp ý cho đội ngũ" }, LONG);
+		await userEvent.type(within(form).getByRole("textbox", { name: "Nội dung" }), "Thêm chế độ tối");
+		await userEvent.click(within(form).getByRole("button", { name: "Gửi góp ý" }));
 		await waitFor(() => expect(toastText()).toBe("Bạn gửi hơi nhanh, thử lại sau ít phút nhé."), LONG);
-		expect(within(dialog).getByRole("textbox", { name: "Nội dung" })).toHaveProperty("value", "Thêm chế độ tối");
+		expect(within(form).getByRole("textbox", { name: "Nội dung" })).toHaveProperty("value", "Thêm chế độ tối");
 		expect(fixture.feedbackQueue).toEqual([]);
-		await userEvent.click(within(dialog).getByRole("button", { name: "Huỷ" }));
-		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Góp ý cho đội ngũ" })).toBeNull());
 	});
 });
 

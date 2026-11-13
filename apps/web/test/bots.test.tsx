@@ -189,7 +189,7 @@ describe("Developer Console", () => {
 		expect(screen.queryByText(/bot\/v1\/updates/)).toBeNull();
 		expect(screen.getByRole("link", { name: "Cách nhận update" }).getAttribute("href")).toBe(`/console/${botId}/updates`);
 		// Another tab and back: the return from the sign-in is not acted on again.
-		await userEvent.click(screen.getByRole("link", { name: "Hồ sơ" }));
+		await userEvent.click(within(screen.getByRole("main")).getByRole("link", { name: "Hồ sơ" }));
 		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);
 		await userEvent.click(screen.getByRole("link", { name: "Token" }));
 		await screen.findByRole("button", { name: "Cấp lại token" }, LONG);
@@ -280,7 +280,7 @@ describe("Developer Console", () => {
 		await userEvent.click(within(confirm).getByRole("button", { name: "Huỷ" }));
 		await userEvent.click(screen.getByRole("link", { name: "Token" }));
 		await screen.findByRole("button", { name: "Cấp token" }, LONG);
-		await userEvent.click(screen.getByRole("link", { name: "Hồ sơ" }));
+		await userEvent.click(within(screen.getByRole("main")).getByRole("link", { name: "Hồ sơ" }));
 		await screen.findByRole("form", { name: "Hồ sơ bot" }, LONG);
 		expect(screen.queryByRole("dialog")).toBeNull();
 		expect(fake.calls).not.toContain(`DeleteBot ${botId}`);

@@ -52,7 +52,7 @@ scenario("a new account starts the assistant, gets the greeting and sends feedba
 scenario("the operator sees the feedback and answers through the assistant", () => [chi, giang], async () => {
 	await chi.page.goto(WEB_ORIGIN + "/settings/profile");
 	await chi.page.getByRole("link", { name: "Kiểm duyệt" }).click();
-	await chi.page.getByRole("link", { name: "Góp ý" }).click();
+	await chi.page.getByRole("navigation", { name: "Kiểm duyệt" }).getByRole("link", { name: "Góp ý" }).click();
 	const item = chi.page.locator(".fb-item", { hasText: FEEDBACK });
 	await item.getByText("Giang", { exact: true }).waitFor();
 	await item.getByText("Góp ý", { exact: true }).waitFor();

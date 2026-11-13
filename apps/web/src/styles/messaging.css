@@ -782,19 +782,8 @@ dialog.modal::backdrop { background: var(--c-backdrop); }
 .set-nav button { font: inherit; }
 
 /* ---------- Moderation ---------- */
-.mod { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; }
+.mod { display: flex; flex-direction: column; min-height: 0; }
 .mod > * { min-height: 0; }
-.mod-side { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-2); overflow-y: auto; background: var(--c-surface-subtle); border-right: 1px solid var(--c-border-subtle); }
-.mod-brand { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-weight: 600; }
-.mod-brand .icon { color: var(--c-primary); }
-.mod-side a.nav { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; }
-.mod-side a.nav .icon { color: var(--c-icon-muted); }
-.mod-side a.nav:hover { background: var(--c-hover); }
-.mod-side a.nav[aria-current="page"] { background: var(--c-selected); color: var(--c-primary); font-weight: 500; }
-.mod-side a.nav[aria-current="page"] .icon { color: var(--c-primary); }
-.mod-side .me { margin-top: auto; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-top: 1px solid var(--c-border-subtle); font-size: 0.8125rem; }
-.mod-side .me > span:last-child { display: grid; min-width: 0; }
-.mod-side .me small { color: var(--c-text-muted); }
 .mod-main { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; background: var(--c-bg); }
 .mod-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-5); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
 .mod-head h1 { flex: 1; min-width: 0; margin: 0; font-size: 1.125rem; font-weight: 600; }
@@ -832,11 +821,10 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 .pill.skip { background: var(--c-bar-track); color: var(--c-text-muted); }
 /* Feedback (mockups/moderation.html#feedback) */
 /* Reports and feedback on narrow screens, where the side navigation is hidden. */
-.mod-tabs { display: none; }
+.mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
 .mod-tabs a { flex: 1; display: grid; place-items: center; min-height: 44px; color: var(--c-text-muted); font-weight: 500; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
 .mod-tabs a[aria-current="page"] { color: var(--c-text); border-bottom-color: var(--c-primary-solid); }
-.mod-tabs a.mod-back { flex: none; padding: 0 var(--space-3); }
-.mod-side a.mod-back { color: var(--c-text-muted); }
+
 .fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .fb-item { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); min-width: 0; }
 .fb-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
@@ -1029,11 +1017,6 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 }
 @media (max-width: 1024px) {
 	.admin-grid { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 900px) {
-	.mod { grid-template-columns: minmax(0, 1fr); }
-	.mod-side { display: none; }
-	.mod-tabs { display: flex; background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
 }
 /* Narrow: one column at a time; the filter tabs stand in for the folder rail. */
 /* Narrow screens: a bot keyboard's toggle takes the emoji button's place (emoji stay on the system keyboard). */
