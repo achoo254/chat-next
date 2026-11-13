@@ -109,7 +109,7 @@ describe("status bar", () => {
 		expect(permissionMode("dontAsk")).toBeNull();
 	});
 
-	it("keeps model, mode and 5-hour usage in the line, the rest labelled in Chi tiết", async () => {
+	it("keeps model and mode in the line, usage only near its limit, the rest labelled in Chi tiết", async () => {
 		vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
 		try {
 			const user = userEvent.setup();
@@ -130,8 +130,8 @@ describe("status bar", () => {
 			const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 			expect(within(bar).getByText("mặc định")).toBeTruthy();
 			expect(within(bar).getByText("Bỏ qua quyền").closest(".mx-mode")?.classList.contains("warn")).toBe(true);
-			// 5 hours always; the week only once it nears its limit (80%), as a warning.
-			expect(within(bar).getByText("5 giờ")).toBeTruthy();
+			// Each usage window only once it nears its limit (80%), as a warning; both are always in Chi tiết.
+			expect(within(bar).queryByText("5 giờ")).toBeNull();
 			expect(within(bar).getByText("7 ngày").closest(".mx-usage")?.classList.contains("warn")).toBe(true);
 			expect(within(bar).queryByText("main")).toBeNull();
 			await user.click(within(bar).getByRole("button", { name: "Chi tiết" }));

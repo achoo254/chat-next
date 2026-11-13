@@ -9,7 +9,7 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 // "Chat | Terminal" in the header opens the same session in its AI's own CLI
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -41,14 +41,14 @@ import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
-import { aiName, errorText, folderName, modelName, providerOf, stateKey, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeSwitch, TerminalHeldBar, rememberMode, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { ModeSwitch, TerminalHeldBar, modePath, rememberMode, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
@@ -169,10 +169,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 		}
 	};
 
-	// Held by a terminal of the machine's own (TermOpen of the AI): it runs in the terminal, not "elsewhere", and
-	// no chip says so: in the terminal its pill and "Kết thúc" do, in chat the bar above the composer does (with
-	// the way to the terminal). In the terminal the banner says when another process has the session open.
-	const chip = !online ? "offline" : thread === null || thread.terminalSession > 0 ? null : mode === "terminal" && stateKey(thread) === "elsewhere" ? null : stateKey(thread);
+	// The header stays lean: only "offline" has a chip there. Waiting and running show in the conversation (the
+	// approval card, the live activity), and the terminal's pill and "Kết thúc" say when the terminal holds it.
+	const chip = online ? null : "offline";
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
@@ -234,9 +233,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						<span className="mono" title={dir}>
 							{placed?.project.name ?? workspace}
 						</span>
-						{placed !== null && placed.project.name !== workspace && <span className="hide-narrow">· {workspace}</span>}
 						{branch !== "" && <span className="hide-narrow">· {branch}</span>}
-						<span className="hide-narrow">· {machineName}</span>
 						{thread !== null && mode === "chat" && (
 							// The workspace's folder when the session is in one, so its switch shows the same level.
 							<ProjectConfigHint key={threadId} link={link} level={thread.projectConfig} dir={own?.dir ?? dir} ai={ai} online={online} />
@@ -280,6 +277,34 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					machine={machine}
 					machineName={machineName}
 					dir={dir}
+					narrowItems={
+						<>
+							{offered &&
+								(["chat", "terminal"] as const)
+									.filter((m) => m !== mode)
+									.map((m) => (
+										<button key={m} type="button" role="menuitem" onClick={() => {
+											rememberMode(machine, m);
+											navigate(modePath(machine, threadId, m));
+										}}>
+											<MachineIcon name={m === "terminal" ? "terminal" : "chat"} small />
+											<span>{t.terminal.mode[m]}</span>
+										</button>
+									))}
+							{thread !== null && mode === "chat" && (
+								<button type="button" role="menuitem" onClick={() => setChangesOpen((v) => !v)}>
+									<MachineIcon name="pencil" small />
+									<span>{changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}</span>
+								</button>
+							)}
+							{thread !== null && panel.workspace !== undefined && (
+								<button type="button" role="menuitem" onClick={() => panel.toggle()}>
+									<MachineIcon name="folder" small />
+									<span>{t.agent.header.panel}</span>
+								</button>
+							)}
+						</>
+					}
 					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai } } : {})}
 					{...(endTerminal !== undefined && online ? { endTerminal } : {})}
 				/>
@@ -334,6 +359,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
+					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} />}
+					<div className="mx-compose-box">
 					{!missing && (
 						<StatusBar
 							ai={ai}
@@ -360,7 +387,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							}
 						/>
 					)}
-					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} />}
 					<Composer
 						ai={ai}
 						machine={machineName}
@@ -380,6 +406,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}
 					/>
+					</div>
 				</div>
 				{screenOpen && <ScreenViewHost link={link} ai={ai} online={online} inSession onClose={() => setScreenOpen(false)} />}
 				{viewed !== undefined && <BrowserViewHost link={link} takeover={viewed} ai={ai} online={online} inSession onMinimize={() => setViewing(null)} />}
@@ -444,12 +471,15 @@ function HeadMenu({
 	machine,
 	machineName,
 	dir,
+	narrowItems,
 	manage,
 	endTerminal,
 }: {
 	machine: string;
 	machineName: string;
 	dir: string;
+	/** On a phone the header shows only the title and this menu: the mode, the changes and the panel come here. */
+	narrowItems?: ReactNode;
 	manage?: { link: MachineLink; thread: ThreadSummary; ai: string };
 	/** The session's AI runs in the terminal: "Kết thúc" stops it there. */
 	endTerminal?: () => Promise<void>;
@@ -464,6 +494,12 @@ function HeadMenu({
 			</button>
 			{open && (
 				<div className="mx-menu" role="menu" aria-label={t.agent.header.menu}>
+					{narrowItems !== undefined && (
+						<div className="mx-menu-narrow" onClickCapture={() => setOpen(false)}>
+							{narrowItems}
+							<hr />
+						</div>
+					)}
 					{manage !== undefined && (
 						<>
 							<ThreadMenuItems link={manage.link} thread={manage.thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />

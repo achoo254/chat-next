@@ -72,7 +72,7 @@ export function StatusBar({ ai, dir, machine, provider, model, context, info, li
 				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} effort={info?.effort ?? ""} disabled={!online} />
 				{mode !== null && <ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} link={link} threadId={threadId} disabled={!online} />}
 				{account}
-				{five !== null && (
+				{five !== null && five.pct >= USAGE_WARN && (
 					<span
 						className={five.pct >= USAGE_WARN ? "mx-st-item mx-usage warn" : "mx-st-item mx-usage"}
 						title={t.agent.status.usageValue(five.pct, countdown(t, five.left))}
