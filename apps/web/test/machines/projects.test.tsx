@@ -160,15 +160,22 @@ describe("Thêm workspace", () => {
 		expect(mac.sent.filter((r) => r.case === "projectAdd").map((r) => (r.case === "projectAdd" ? r.value.consent?.sensitive : undefined))).toEqual([false, true]);
 	});
 
-	it("refuses a folder of another repository than the project links, before asking the machine", async () => {
+	it("lists the recent folders of another repository last, marked and without Thêm", async () => {
 		const server = new FakeAgentProjects();
 		const project = server.seed("App", "git@github.com:a/app.git");
 		const store = new AgentProjectsStore(server.api());
-		const mac = machine(1, "Mac", [], { suggestions: [{ dir: "/w/other", sessions: 1, gitRemote: "https://github.com/a/other" }] });
+		const mac = machine(1, "Mac", [], {
+			suggestions: [
+				{ dir: "/w/other", sessions: 5, gitRemote: "https://github.com/a/other" },
+				{ dir: "/w/app", sessions: 1, gitRemote: "https://github.com/a/app" },
+			],
+		});
 		wrap(<AddWorkspaceDialog store={store} project={project} machines={[mac.view]} onClose={() => undefined} />);
-		await userEvent.click(screen.getByRole("button", { name: "Thêm other" }));
-		expect(await screen.findByText(/thuộc một repo khác với github.com\/a\/app/)).toBeTruthy();
-		expect(server.workspaces).toEqual([]);
+		const recent = screen.getByRole("region", { name: "Thư mục gần đây có phiên AI" });
+		const rows = within(recent).getAllByRole("listitem");
+		expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining("app"), expect.stringContaining("repo khác")]);
+		expect((screen.getByRole("button", { name: "Thêm other" }) as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByRole("button", { name: "Thêm app" }) as HTMLButtonElement).disabled).toBe(false);
 		expect(mac.sent.some((r) => r.case === "projectAdd")).toBe(false);
 	});
 });

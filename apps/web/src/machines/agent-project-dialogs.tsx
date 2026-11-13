@@ -171,15 +171,18 @@ function HostPicker({ hosts, value, onPick }: { hosts: readonly MachineView[]; v
  * browsed, or one of the folders with sessions in one tap (`onQuick`).
  * Switching machines keeps everything in place: the folder list and the
  * recent folders keep their size, the last folder shown on each machine comes
- * back at once, and nothing typed elsewhere in the dialog is lost.
+ * back at once, and nothing typed elsewhere in the dialog is lost. With a
+ * `projectRemote`, the recent folders of another repository come last, marked
+ * "repo khác" and without "Thêm": the project would refuse them.
  */
-function FolderChooser({ hosts, value, onChange, onQuick, busy }: { hosts: readonly MachineView[]; value: FolderChoice | null; onChange: (choice: FolderChoice) => void; onQuick: (choice: FolderChoice) => void; busy: boolean }) {
+function FolderChooser({ hosts, value, onChange, onQuick, busy, projectRemote = "" }: { hosts: readonly MachineView[]; value: FolderChoice | null; onChange: (choice: FolderChoice) => void; onQuick: (choice: FolderChoice) => void; busy: boolean; projectRemote?: string }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const [listings] = useState(() => new Map<string, DirListResult>());
 	const machine = value?.machine ?? hosts[0];
 	if (machine === undefined) return <p className="muted">{p.noHost}</p>;
-	const recent = machine.state.projects?.suggestions ?? [];
+	const recent = (machine.state.projects?.suggestions ?? []).map((r) => ({ ...r, other: remoteMismatch(projectRemote, r.gitRemote) }));
+	recent.sort((a, b) => Number(a.other) - Number(b.other));
 	// With several machines the recent list keeps its place even when one machine has none.
 	const showRecent = recent.length > 0 || hosts.length > 1;
 	return (
@@ -192,13 +195,16 @@ function FolderChooser({ hosts, value, onChange, onQuick, busy }: { hosts: reado
 					{recent.length === 0 && <p className="muted">{p.noRecent}</p>}
 					<ul>
 						{recent.map((r) => (
-							<li key={r.dir}>
+							<li key={r.dir} title={r.other ? p.mismatch(projectRemote) : undefined}>
 								<MachineIcon name="folder" small />
 								<span className="tx" title={r.dir}>
 									<b>{folderName(r.dir)}</b>
-									<small>{p.sessions(r.sessions)}</small>
+									<small>
+										{p.sessions(r.sessions)}
+										{r.other && ` · ${p.otherRepo}`}
+									</small>
 								</span>
-								<button type="button" className="btn btn-sm" aria-label={`${p.addRecent} ${folderName(r.dir)}`} disabled={busy} onClick={() => onQuick({ machine, dir: r.dir })}>
+								<button type="button" className="btn btn-sm" aria-label={`${p.addRecent} ${folderName(r.dir)}`} disabled={busy || r.other} onClick={() => onQuick({ machine, dir: r.dir })}>
 									{p.addRecent}
 								</button>
 							</li>
@@ -359,7 +365,7 @@ export function AddWorkspaceDialog({ store, project, machines, onClose }: { stor
 		<Modal labelledBy={id} onClose={onClose} className="mx-sheet">
 			<DialogHead id={id} title={p.addWorkspaceTitle(project.name)} onClose={onClose} />
 			<form className="dlg-body stack mx-add-project" onSubmit={submit}>
-				<FolderChooser hosts={hosts} value={choice} onChange={setChoice} onQuick={(c) => placing.place(c, {})} busy={placing.busy} />
+				<FolderChooser hosts={hosts} value={choice} onChange={setChoice} onQuick={(c) => placing.place(c, {})} busy={placing.busy} projectRemote={project.gitRemote} />
 				<Foot
 					error={placing.error}
 					busy={placing.busy || choice === null || choice.dir === ""}
