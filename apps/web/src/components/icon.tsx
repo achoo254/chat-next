@@ -124,6 +124,7 @@ export const PATHS = {
 	command: <path d="M7 9a2 2 0 1 1 2-2v10a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2V7a2 2 0 1 1 2 2H7" />,
 	megaphone: <path d="M18 8a3 3 0 0 1 0 6M10 8v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5M12 8l4.5-3.8a.9.9 0 0 1 1.5.7v12.2a.9.9 0 0 1-1.5.7L12 14H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h8" />,
 	hash: <path d="M5 9h14M5 15h14M11 4L7 20M17 4l-4 16" />,
+	"arrow-up": <path d="M12 19V5M18 11l-6-6M6 11l6-6" />,
 	"arrow-down": <path d="M12 5v14M18 13l-6 6M6 13l6 6" />,
 	database: (
 		<>
