@@ -4,8 +4,8 @@
 // nothing in a race is deleted again), merged by git repository across
 // machines, and never a project for sessions found running outside the app.
 import { create } from "@bufbuild/protobuf";
-import { ProjectSchema, ProjectSuggestionSchema, ThreadSummarySchema, type Frame, type Project, type ProjectSuggestion } from "@achoo254/chat-proto/remote/remote";
-import type { MachineLink } from "../../src/machines/link/machine-link.ts";
+import { ErrorCode, ProjectSchema, ProjectSuggestionSchema, ThreadSummarySchema, type Frame, type Project, type ProjectSuggestion } from "@achoo254/chat-proto/remote/remote";
+import { RemoteError, type MachineLink } from "../../src/machines/link/machine-link.ts";
 
 type FrameBody = Parameters<MachineLink["request"]>[0];
 import { afterEach, describe, expect, it } from "vitest";
@@ -162,11 +162,40 @@ describe("the sync and the app's own actions", () => {
 		await store.refresh();
 		const mac = host(1, []);
 		mac.state.projects?.suggestions.push(create(ProjectSuggestionSchema, { dir: "/w/chat", sessions: 1, gitRemote: "git@github.com:a/chat-next.git", branch: "main" }));
-		await adoptStarted(store, mac, "/w/chat");
+		await adoptStarted(store, mac, { dir: "/w/chat", gitRoot: "" });
 		expect(store.snapshot().projects.map((p) => [p.name, p.gitRemote, p.workspaces.map((w) => w.dir)])).toEqual([["chat-next", "github.com/a/chat-next", ["/w/chat"]]]);
 		// Inside a workspace already: nothing new.
-		await adoptStarted(store, mac, "/w/chat/src");
+		await adoptStarted(store, mac, { dir: "/w/chat/src", gitRoot: "/w/chat" });
 		expect(store.snapshot().projects).toHaveLength(1);
+	});
+
+	it("a session started in a folder inside a clone: the clone becomes the workspace, not the folder", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, []);
+		await adoptStarted(store, mac, { dir: "/w/panel/backend/src", gitRoot: "/w/panel" });
+		expect(store.snapshot().projects.flatMap((p) => p.workspaces.map((w) => w.dir))).toEqual(["/w/panel"]);
+		expect(mac.sent.map((b) => (b.case === "projectAdd" ? b.value.dir : b.case))).toEqual(["/w/panel"]);
+		// Another folder of the same clone: held by the clone's workspace already.
+		await adoptStarted(store, mac, { dir: "/w/panel/client", gitRoot: "/w/panel" });
+		expect(store.snapshot().projects.flatMap((p) => p.workspaces)).toHaveLength(1);
+	});
+
+	it("a sensitive work tree (a home folder kept in git) gives way to the session's own folder", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, []);
+		const remote = mac.link.request;
+		mac.link = {
+			request: async (body: FrameBody) => {
+				if (body.case === "projectAdd" && body.value.dir === "/home/me") throw new RemoteError(ErrorCode.NEEDS_CONSENT, "sensitive");
+				return remote(body);
+			},
+		};
+		await adoptStarted(store, mac, { dir: "/home/me/notes", gitRoot: "/home/me" });
+		expect(store.snapshot().projects.flatMap((p) => p.workspaces.map((w) => w.dir))).toEqual(["/home/me/notes"]);
 	});
 
 	it("attaching a folder of another repository is refused, and the machine forgets a folder it added for it", async () => {

@@ -6,14 +6,14 @@
 // of a session started from the app, and the background sync of the folders
 // every machine keeps (project-sync.ts).
 import { useEffect, useRef } from "react";
-import { ErrorCode, ErrorReason, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import type { AgentProject, AgentWorkspace } from "./agent-projects-client.ts";
 import type { AgentProjectsStore, ProjectsSnapshot } from "./agent-projects-store.ts";
 import { canonicalRemote, remoteMismatch, remoteUrlFor } from "./git-remote.ts";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { findWorkspace, placeFolder, projectForRemote, projectNameFor, remoteKey, repairWorkspaces, syncFolders, type FolderInfo, type KnownRemote, type Placement } from "./project-sync.ts";
 import { locate } from "./project-tree.ts";
-import { projectsSupported, samePath } from "./projects-view.ts";
+import { inFolder, projectsSupported, samePath } from "./projects-view.ts";
 
 /** A machine as these actions need it. */
 export interface Host {
@@ -130,19 +130,37 @@ export async function deleteProject(store: AgentProjectsStore, project: AgentPro
 }
 
 /**
- * A session started from the app in a folder no workspace holds: the folder
- * becomes a workspace of the project linking its repository, else of a new
- * project named after the repository or the folder. A sensitive folder (the
- * home folder, …) is left alone: its sessions wait under "Chưa phân loại".
+ * A session started from the app in a folder no workspace holds: the git
+ * work tree holding the folder (the folder itself outside git, or from
+ * machines that do not report it) becomes a workspace of the project linking
+ * its repository, else of a new project named after the repository or the
+ * folder. A session in a folder inside a clone so lands in the clone's
+ * workspace, never in one of its own. A sensitive work tree (a home folder
+ * kept in git, …) gives way to the folder; a sensitive folder is left
+ * alone: its sessions wait under "Chưa phân loại".
  */
-export async function adoptStarted(store: AgentProjectsStore, host: Host, dir: string): Promise<void> {
+export async function adoptStarted(store: AgentProjectsStore, host: Host, thread: Pick<ThreadSummary, "dir" | "gitRoot">): Promise<void> {
 	if (host.id <= 0 || store.snapshot().status !== "ready") return;
+	const { dir } = thread;
 	if (locate(store.snapshot().projects, host.id, dir) !== null) return;
+	const root = adoptedFolder(thread);
+	try {
+		await placeByHand(store, host, root, {});
+		return;
+	} catch (err) {
+		if (!isNeedsConsent(err)) return console.warn("ai: could not make a project of the session's folder", err);
+		if (root === dir) return;
+	}
 	try {
 		await placeByHand(store, host, dir, {});
 	} catch (err) {
 		if (!isNeedsConsent(err)) console.warn("ai: could not make a project of the session's folder", err);
 	}
+}
+
+/** The folder a started session's workspace records: its git work tree when the machine reports one holding it, else its own. */
+export function adoptedFolder(thread: Pick<ThreadSummary, "dir" | "gitRoot">): string {
+	return thread.gitRoot !== "" && inFolder(thread.dir, thread.gitRoot) ? thread.gitRoot : thread.dir;
 }
 
 /** One machine for the sync: online, in the directory, keeping projects, its list known. */

@@ -9630,6 +9630,12 @@ type ThreadSummary struct {
 	// A device may show "project skills not loaded" for OFF, with
 	// ProjectConfigSet to turn it on. UNSPECIFIED from older machines.
 	ProjectConfig ProjectConfigLevel `protobuf:"varint,16,opt,name=project_config,json=projectConfig,proto3,enum=remote.v1.ProjectConfigLevel" json:"project_config,omitempty"`
+	// The git work tree holding dir: the nearest folder from dir up that has
+	// a .git (a clone, a worktree or a submodule), dir itself when it has
+	// one. Empty outside git and from older machines. Devices record the
+	// work tree, not a folder inside it, as the workspace of a session
+	// started from the app.
+	GitRoot       string `protobuf:"bytes,17,opt,name=git_root,json=gitRoot,proto3" json:"git_root,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9774,6 +9780,13 @@ func (x *ThreadSummary) GetProjectConfig() ProjectConfigLevel {
 		return x.ProjectConfig
 	}
 	return ProjectConfigLevel_PROJECT_CONFIG_LEVEL_UNSPECIFIED
+}
+
+func (x *ThreadSummary) GetGitRoot() string {
+	if x != nil {
+		return x.GitRoot
+	}
+	return ""
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
@@ -19957,7 +19970,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\asubject\x18\x04 \x01(\tR\asubject\"0\n" +
 	"\x06Cursor\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\x95\x04\n" +
+	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xb0\x04\n" +
 	"\rThreadSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x10\n" +
@@ -19976,7 +19989,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0ebusy_elsewhere\x18\r \x01(\bR\rbusyElsewhere\x12.\n" +
 	"\x13elsewhere_active_at\x18\x0e \x01(\x03R\x11elsewhereActiveAt\x12)\n" +
 	"\x10terminal_session\x18\x0f \x01(\rR\x0fterminalSession\x12D\n" +
-	"\x0eproject_config\x18\x10 \x01(\x0e2\x1d.remote.v1.ProjectConfigLevelR\rprojectConfig\"\xd5\x01\n" +
+	"\x0eproject_config\x18\x10 \x01(\x0e2\x1d.remote.v1.ProjectConfigLevelR\rprojectConfig\x12\x19\n" +
+	"\bgit_root\x18\x11 \x01(\tR\agitRoot\"\xd5\x01\n" +
 	"\x0eThreadActivity\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12.\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x18.remote.v1.ActivityPhaseR\x05phase\x12\x12\n" +

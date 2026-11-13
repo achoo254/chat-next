@@ -145,7 +145,7 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 					setStarting(false);
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
-					adoptStarted(store, { id: machine.entry.id, link: machine.link, state: machine.state }, thread.dir).catch(() => undefined);
+					adoptStarted(store, { id: machine.entry.id, link: machine.link, state: machine.state }, thread).catch(() => undefined);
 					navigate(modePath(ref, thread.id, terminalOffered(machine.state.info, thread.provider) ? lastMode(ref) : "chat"));
 				},
 				() => {
@@ -245,7 +245,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 					link={machine.link}
 					state={machine.state}
 					project={local ?? create(ProjectSchema, { name, dir: workspace.dir })}
-					onStarted={(dir) => adoptStarted(ctx.store, { id: machine.entry.id, link: machine.link, state: machine.state }, dir).catch(() => undefined)}
+					onStarted={(thread) => adoptStarted(ctx.store, { id: machine.entry.id, link: machine.link, state: machine.state }, thread).catch(() => undefined)}
 					onClose={() => setDialog(null)}
 				/>
 			)}

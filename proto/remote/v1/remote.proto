@@ -1333,6 +1333,12 @@ message ThreadSummary {
   // A device may show "project skills not loaded" for OFF, with
   // ProjectConfigSet to turn it on. UNSPECIFIED from older machines.
   ProjectConfigLevel project_config = 16;
+  // The git work tree holding dir: the nearest folder from dir up that has
+  // a .git (a clone, a worktree or a submodule), dir itself when it has
+  // one. Empty outside git and from older machines. Devices record the
+  // work tree, not a folder inside it, as the workspace of a session
+  // started from the app.
+  string git_root = 17;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a

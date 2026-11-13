@@ -214,6 +214,22 @@ function pathTail(dir: string): string {
 const lastPart = (dir: string): string => dir.split(/[\\/]+/).filter((x) => x !== "").at(-1) ?? dir;
 
 /**
+ * A workspace's folder as its row says it: the path from the nearest other
+ * workspace of the project on the same machine holding it ("backend/src"
+ * under the clone's workspace), else the folder's own name.
+ */
+function shownFolder(w: AgentWorkspace, nodes: readonly Pick<WorkspaceNode, "workspace">[]): string {
+	let outer: AgentWorkspace | undefined;
+	for (const { workspace: o } of nodes) {
+		if (o.id === w.id || o.machineId !== w.machineId || samePath(o.dir, w.dir) || !inFolder(w.dir, o.dir)) continue;
+		if (outer === undefined || o.dir.length > outer.dir.length) outer = o;
+	}
+	if (outer === undefined) return lastPart(w.dir);
+	const inner = w.dir.slice(outer.dir.replace(/[\\/]+$/, "").length).split(/[\\/]+/).filter((x) => x !== "");
+	return inner.join("/") || lastPart(w.dir);
+}
+
+/**
  * Names for a project's workspace rows, as Orca does: the branch, with the
  * folder under it (unless it is the project's name); the folder when there is no branch or two workspaces
  * share it. A title equal to the project's name says more (the folder, or
@@ -228,7 +244,7 @@ export function workspaceLabels(projectName: string, nodes: readonly Pick<Worksp
 		.sort((a, b) => a.workspace.createdAt - b.workspace.createdAt || a.workspace.id - b.workspace.id)[0];
 	const out = new Map<number, WorkspaceLabel>();
 	for (const n of nodes) {
-		const folder = lastPart(n.workspace.dir);
+		const folder = shownFolder(n.workspace, nodes);
 		const shared = n.branch !== "" && nodes.some((o) => o !== n && o.branch === n.branch);
 		const byBranch = n.branch !== "" && !shared && !same(n.branch, projectName);
 		const title = byBranch ? n.branch : same(folder, projectName) ? pathTail(n.workspace.dir) : folder;

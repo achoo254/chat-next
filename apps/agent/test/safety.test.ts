@@ -1,7 +1,7 @@
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { listDir } from "../src/safety/dirs.ts";
+import { gitRoot, listDir } from "../src/safety/dirs.ts";
 import { createSensitiveCheck, mentionsSensitive } from "../src/safety/sensitive-paths.ts";
 import { tempDir } from "./harness.ts";
 
@@ -89,5 +89,31 @@ describe("folder browser", () => {
     expect(l.entries).toEqual([{ name: "repo", git: true, branch: "main", sensitive: false }]);
     expect(listDir(root, { showHidden: true, isSensitive: () => false }).entries.map((e) => e.name)).toEqual([".hidden", "repo"]);
     expect(JSON.stringify(l)).not.toContain("secret.txt");
+  });
+});
+
+describe("git work tree of a folder", () => {
+  it("is the nearest folder up with a .git, the folder itself included", () => {
+    const root = tempDir();
+    mkdirSync(join(root, "repo", ".git"), { recursive: true });
+    mkdirSync(join(root, "repo", "backend", "src"), { recursive: true });
+    expect(gitRoot(join(root, "repo", "backend", "src"))).toBe(join(root, "repo"));
+    expect(gitRoot(join(root, "repo"))).toBe(join(root, "repo"));
+  });
+
+  it("stops at a worktree or submodule (.git as a file)", () => {
+    const root = tempDir();
+    mkdirSync(join(root, "repo", ".git"), { recursive: true });
+    mkdirSync(join(root, "repo", "sub", "lib"), { recursive: true });
+    writeFileSync(join(root, "repo", "sub", ".git"), "gitdir: ../.git/modules/sub\n");
+    expect(gitRoot(join(root, "repo", "sub", "lib"))).toBe(join(root, "repo", "sub"));
+  });
+
+  it("is empty outside git", () => {
+    const root = tempDir();
+    mkdirSync(join(root, "plain", "deep"), { recursive: true });
+    // The temp folder lives outside any repository.
+    expect(gitRoot(join(root, "plain", "deep"))).toBe("");
+    expect(gitRoot("")).toBe("");
   });
 });

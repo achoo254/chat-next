@@ -15,7 +15,7 @@
 // opens in chat or in its own CLI in the machine's terminal (the last choice
 // on the machine comes first); a terminal session needs no first message.
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
-import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { PlainTextBox } from "../components/plain-text-box.tsx";
 import { navigate } from "../router.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
@@ -39,8 +39,8 @@ interface NewSessionProps {
 	onClose: () => void;
 	/** Start in this project, with its defaults (tunelo 2.0.7+). */
 	project?: Project | undefined;
-	/** The session started in `dir` (its folder may become a project's workspace). */
-	onStarted?: (dir: string) => void;
+	/** The session started (its folder's work tree, else its folder, may become a project's workspace). */
+	onStarted?: (thread: ThreadSummary) => void;
 }
 
 /** Folders that start with what was typed: the suggestions, then the folders shown; at most six. */
@@ -181,7 +181,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					setBusy(false);
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
-					onStarted?.(thread.dir);
+					onStarted?.(thread);
 					onClose();
 					if (offered) rememberMode(machine, openIn);
 					navigate(modePath(machine, thread.id, openIn));

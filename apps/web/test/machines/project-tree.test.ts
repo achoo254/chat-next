@@ -169,6 +169,14 @@ describe("workspace titles", () => {
 		expect(workspaceLabels("main", [node(1, "/w/site", "main")]).get(1)?.title).toBe("site");
 	});
 
+	it("a folder inside another workspace of the machine says its path from there; one of another machine does not count", () => {
+		const inner = { workspace: { ...ws(1, 1, "/w/panel/backend/src", "main"), id: 2 }, branch: "dev" };
+		const labels = workspaceLabels("panel", [node(1, "/w/panel", "main"), inner]);
+		expect(labels.get(2)?.sub).toBe("backend/src");
+		const elsewhere = { workspace: { ...ws(1, 2, "/w/panel/backend/src", "main"), id: 2 }, branch: "dev" };
+		expect(workspaceLabels("panel", [node(1, "/w/panel", "main"), elsewhere]).get(2)?.sub).toBe("src");
+	});
+
 	it("primary is the oldest checkout that is not a git worktree", () => {
 		const labels = workspaceLabels("x", [node(1, "/w/wt", "a", AgentWorkspaceKind.WORKTREE, 1), node(2, "/w/x", "b", AgentWorkspaceKind.CLONE, 5), node(3, "/w/y", "c", AgentWorkspaceKind.FOLDER, 9)]);
 		expect([...labels].filter(([, l]) => l.primary).map(([id]) => id)).toEqual([2]);

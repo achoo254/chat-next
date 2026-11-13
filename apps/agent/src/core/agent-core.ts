@@ -52,7 +52,7 @@ import type {
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
 import { type GitChangesResult, type GitFileChange, readGitChanges, readGitFileDiff } from "../threads/git-changes.ts";
-import { gitBranch } from "../safety/dirs.ts";
+import { gitBranch, gitRoot } from "../safety/dirs.ts";
 import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease } from "../mcp/session-tickets.ts";
@@ -2139,6 +2139,7 @@ export class AgentCore {
       elsewhereActiveAt: elsewhere ? BigInt(t.elsewhere?.since ?? 0) : 0n,
       terminalSession: t.meta.terminal?.session ?? 0,
       projectConfig: this.threadProjectConfig(t),
+      gitRoot: gitRoot(t.meta.dir),
     });
   }
 

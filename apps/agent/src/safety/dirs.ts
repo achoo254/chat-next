@@ -1,7 +1,7 @@
 // Folder browser for "new session": sub-folder names only, never file names.
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, parse, resolve } from "node:path";
+import { dirname, join, parse, resolve } from "node:path";
 
 export type DirEntry = { name: string; git: boolean; branch: string; sensitive: boolean };
 export type DirListing = { path: string; parent: string; entries: DirEntry[]; sensitive: boolean };
@@ -21,6 +21,22 @@ export function gitBranch(dir: string): { git: boolean; branch: string } {
     return { git: true, branch: ref?.[1] ?? head.slice(0, 8) };
   } catch {
     return { git: true, branch: "" };
+  }
+}
+
+/**
+ * The git work tree holding `dir`: the nearest folder from `dir` up that has
+ * a .git (a clone, a worktree or a submodule); "" outside git. Only looks for
+ * .git, runs nothing.
+ */
+export function gitRoot(dir: string): string {
+  if (dir === "") return "";
+  let at = resolve(dir);
+  for (;;) {
+    if (existsSync(join(at, ".git"))) return at;
+    const up = dirname(at);
+    if (up === at) return "";
+    at = up;
   }
 }
 

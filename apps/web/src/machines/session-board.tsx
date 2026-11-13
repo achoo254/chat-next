@@ -144,7 +144,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 					name={entry.name}
 					link={link}
 					state={state}
-					onStarted={(dir) => adoptStarted(projects, { id: entry.id, link, state }, dir).catch(() => undefined)}
+					onStarted={(thread) => adoptStarted(projects, { id: entry.id, link, state }, thread).catch(() => undefined)}
 					onClose={() => setCreating(false)}
 				/>
 			)}
