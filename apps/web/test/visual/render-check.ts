@@ -69,6 +69,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-home": "?at=machine-home",
 	"machine-need": "?at=machine-need",
 	"machine-unpaired": "?at=machine-unpaired",
+	"machine-offline": "?at=machine-offline",
 	"machine-list": "?at=machine-list",
 	"machine-markdown": "?at=machine-chat&open=markdown",
 	"machine-account": "?at=machine-chat&open=account-menu",

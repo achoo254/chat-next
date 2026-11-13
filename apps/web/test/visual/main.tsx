@@ -315,6 +315,8 @@ const SCREENS: Record<string, string> = {
 	"machine-home": paths.machines(),
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
+	// An offline machine's board: what to do on it, step by step.
+	"machine-offline": paths.machine("3"),
 	"machine-list": aiPaths.manage,
 	"machine-sessions": paths.machine("1"),
 	// The machine's terminal: the dock with a shell on the relay (the fake machine has no direct path).

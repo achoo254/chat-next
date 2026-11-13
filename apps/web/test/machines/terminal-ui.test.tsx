@@ -181,6 +181,12 @@ describe("where the terminal shows", () => {
 		expect(sent("termOpen")).toEqual([]);
 	});
 
+	it("the machine's overview (opened from Quản lý máy) goes back to that list, not to AI Agent", async () => {
+		screenAt({ page: "machine", machine: "1" });
+		const head = await screen.findByRole("region", { name: /Mac mini/ });
+		expect(within(head).getByRole("link", { name: "Quản lý máy" }).getAttribute("href")).toBe("/ai/machines");
+	});
+
 	it("the machine's terminal page opens a shell, on the relay, on its own connection", async () => {
 		screenAt({ page: "terminal", machine: "1" });
 		await until(() => sent("termOpen").length === 1, "a first terminal");

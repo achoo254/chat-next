@@ -9,6 +9,7 @@ import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, PromptState, ThreadState, type Decision, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths, useSearch } from "../router.tsx";
+import { aiPaths } from "./ai-paths.ts";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
@@ -18,6 +19,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { FirstMachine } from "./first-machine.tsx";
 import { isBlocked } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
+import { OfflineGuide } from "./offline-guide.tsx";
 import { PageHead } from "./page-head.tsx";
 import { connText } from "./session-row.tsx";
 import { useAgentProjects } from "./agent-projects-store.ts";
@@ -97,7 +99,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 	if (view === undefined) {
 		return (
 			<div className="mx-scroll">
-				<PageHead back={paths.machines()} backLabel={t.backToMachines} title={t.agent.title} />
+				<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={t.agent.title} />
 				<div className="mx-body">
 					<p className="muted">{hub.directory().status === "loading" ? "" : t.notFound}</p>
 				</div>
@@ -109,7 +111,8 @@ export function MachineBoard({ machine }: { machine: string }) {
 	const max = state.maxSessions;
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.agent.machineBoardOf(entry.name)}>
-			<PageHead back={paths.machines()} backLabel={t.backToMachines} title={entry.name} subtitle={connText(t, conn, now)}>
+			{/* Opened from the machines list (Quản lý máy), adding a machine or this machine: back goes to that list. */}
+			<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={entry.name} subtitle={connText(t, conn, now)}>
 				<Link to={paths.machineInfo(machine)} className="icon-btn" aria-label={t.agent.info}>
 					<Icon name="info" />
 				</Link>
@@ -129,7 +132,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 			<LinkBanner machine={machine} name={entry.name} status={state.status} />
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
-				{conn.kind === "offline" && <p className="muted">{t.agent.hint.offline}</p>}
+				{conn.kind === "offline" && <OfflineGuide />}
 				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && <p className="muted">{t.board.nothing}</p>}
 				<Tiles need={need} running={running} showMachine={false} />
 				<Recent list={idle.slice(0, RECENT)} showMachine={false} now={now} />
