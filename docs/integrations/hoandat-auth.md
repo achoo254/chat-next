@@ -13,6 +13,10 @@ Không có client desktop: trên máy tính, Chat chạy bản web cài dạng P
 
 Cả hai xin scope `openid profile email`, không có audience API: app chat tự cấp phiên của mình và chỉ đọc ID token và userinfo. Ngoại lệ duy nhất là endpoint MCP ([ADR 0012](../adr/0012-mcp-endpoint.md)): resource `https://chat.<domain>/mcp` với scope `chat:read`, `chat:write`, `bots:read`, `bots:write`, `bots:admin`, do client MCP tự đăng ký (DCR) ở IdP xin; chat chỉ xác minh access token đó offline bằng JWKS. Refresh token của `chat-mobile` không chết khi người dùng đăng xuất trong trình duyệt và không có trần 90 ngày; mỗi máy là một grant thu hồi được ở `/account` của IdP.
 
+## Endpoint Chat cho máy chủ IdP
+
+- `POST https://chat.<domain>/api/account-notices`, body `{"text": "..."}` (1–2000 ký tự), `Authorization: Bearer <token>` do IdP tự ký: `typ: at+jwt`, `aud` = URL của endpoint, `client_id: auth-account-notices`, scope `account-notices`. Chat gửi chữ cho người dùng có `idp_sub` = `sub` bằng bot trợ lý; trả `204` cả khi không có người dùng đó. Mã lỗi và lý do: [ADR 0015](../adr/0015-account-notices-from-idp.md).
+
 ## Cấu hình phía app chat
 
 - Issuer: `OIDC_ISSUER` của server (`https://auth.hoandat.com`), cùng giá trị với `primaryTenant.issuer` trong `brand.config.json` mà web app dùng. Domain trả cho client (`tenant_name` của `GetAuthConfig`) là `TENANT_DOMAIN`, mặc định `hoandat.com`.

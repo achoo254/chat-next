@@ -365,6 +365,28 @@ func (s *Service) NotifyModeration(ctx context.Context, userID int64, n chat.Mod
 	return err
 }
 
+// NotifyAccount sends a security notice of the user's IdP account (text
+// already written in the user's language by the IdP) in the assistant's
+// chat, which is opened for them when they never pressed Start. A user who
+// blocked the assistant or deleted its chat gets nothing, which is not an
+// error. text never reaches a log.
+func (s *Service) NotifyAccount(ctx context.Context, userID int64, text string) error {
+	chatID, err := s.chat.SystemBotNoticeChat(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if chatID == 0 {
+		s.logger.Info("account notice not delivered: no chat with the assistant", "user_id", userID)
+		return nil
+	}
+	_, err = s.api.SendAsSystemBot(ctx, s.botID, botapi.OutgoingMessage{ChatID: chatID, Text: text})
+	if connect.CodeOf(err) == connect.CodePermissionDenied {
+		s.logger.Info("account notice not delivered: the user blocked the assistant", "user_id", userID)
+		return nil
+	}
+	return err
+}
+
 // noticeText is the notice of n; empty when none of its actions concerns
 // the user.
 func (c copyText) noticeText(n chat.ModerationNotice) string {

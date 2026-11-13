@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"app.local/server/internal/accountnotice"
 	"app.local/server/internal/agentgrant"
 	"app.local/server/internal/assistant"
 	"app.local/server/internal/auth"
@@ -256,6 +257,17 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	// Security notices of the IdP go out through the assistant; without it
+	// they are accepted and dropped (ADR 0015).
+	var accountNotifier accountnotice.Notifier
+	if assistantSvc != nil {
+		accountNotifier = assistantSvc
+	}
+	accountNotices, err := accountnotice.New(accountnotice.Config{TenantID: cfg.TenantID, Audience: publicOrigin + accountnotice.Path},
+		st, idp, accountNotifier, limiter, logger.With("component", "accountnotice"))
+	if err != nil {
+		return nil, err
+	}
 	mcpHandler, err := newMCP(cfg, st, idp, origins, limiter, rpc.NewInProcess(rpcDeps), logger)
 	if err != nil {
 		return nil, err
@@ -277,6 +289,8 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	// tunelo sends no Origin and has no user session: its calls are
 	// not under /rpc (ADR 0013).
 	mux.Handle(machineapi.Prefix, machines.Handler())
+	// The IdP's server calls it with its own token, no session or Origin.
+	accountNotices.Register(mux)
 	mcpHandler.Register(mux)
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
