@@ -20,8 +20,16 @@ import { ProjectItem, type TreeContext } from "../../src/machines/project-tree-v
 import { inFolder, projectsSupported, samePath } from "../../src/machines/projects-view.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
+import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 
-const wrap = (node: ReactNode) => render(<I18nProvider>{node}</I18nProvider>);
+/** The app's toasts (a workspace's settings say there why the machine refused). */
+const services = { toasts: { show: () => undefined } } as unknown as Services;
+const wrap = (node: ReactNode) =>
+	render(
+		<I18nProvider>
+			<ServicesContext value={services}>{node}</ServicesContext>
+		</I18nProvider>,
+	);
 
 type Req = Parameters<MachineLink["request"]>[0];
 const ACK = { body: { case: "ack", value: {} } } as unknown as Frame;

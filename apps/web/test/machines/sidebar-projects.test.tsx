@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { MachineLinksProvider } from "../../src/machines/link/connection-provider.tsx";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
+import { AgentWorkspaceKind } from "../../src/machines/agent-projects-client.ts";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 import type { MachinesView } from "../../src/router.tsx";
 import { FakeMachines } from "../support/fake-machines.ts";
@@ -82,11 +83,12 @@ afterEach(() => {
 	window.WebSocket = NativeWebSocket;
 });
 
-function column(hosts: { name: string; online: boolean }[], view: MachinesView = { page: "machines" }) {
+function column(hosts: { name: string; online: boolean }[], view: MachinesView = { page: "machines" }, before?: (server: FakeMachines["projects"]) => void) {
 	const machines = new FakeMachines();
 	hosts.forEach((h, i) =>
 		machines.add({ name: h.name, tunnelUrl: h.online ? `wss://m-${i + 1}.tunnel.hoandat.com` : "", lastSeenAt: h.online ? BigInt(Math.floor(Date.now() / 1000)) : 0n, publicKey: machine.keys.publicKey }),
 	);
+	before?.(machines.projects);
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	render(
 		<I18nProvider>
@@ -175,6 +177,19 @@ describe("the project column", () => {
 		await waitFor(() => expect(server.projects.map((p) => [p.name, p.gitRemote])).toContainEqual(["scratch", "github.com/a/scratch"]), WAIT);
 		expect(machine.received.some((f) => f.body.case === "projectAdd" && f.body.value.dir === "/tmp/scratch")).toBe(true);
 		await waitFor(() => expect(within(list).queryByRole("button", { name: /Chưa phân loại/ })).toBeNull(), WAIT);
+	});
+
+	it("every workspace offers 'Cài đặt phiên mới': a folder the machine keeps no project for is added first, then its settings open", async () => {
+		// A workspace in a subfolder, added on another device: the machine keeps no project for it.
+		const { list, server } = column([{ name: "Mac mini", online: true }], { page: "machines" }, (s) => s.seed("panel", "", [{ machineId: 1, dir: "/w/panel/src", branch: "main", kind: AgentWorkspaceKind.FOLDER }]));
+		await waitFor(() => expect(server.projects.map((p) => p.name)).toContain("app"), WAIT);
+		await waitFor(() => projectRow(list, "panel"), WAIT);
+		const toggle = projectRow(list, "panel").querySelector<HTMLElement>(".mx-project-toggle");
+		if (toggle?.getAttribute("aria-expanded") === "false") await userEvent.click(toggle);
+		await userEvent.click(await within(list).findByRole("button", { name: "Tuỳ chọn cho workspace src" }, WAIT));
+		await userEvent.click(within(list).getByRole("menuitem", { name: "Cài đặt phiên mới" }));
+		await waitFor(() => expect(machine.received.some((f) => f.body.case === "projectAdd" && f.body.value.dir === "/w/panel/src")).toBe(true), WAIT);
+		expect(await screen.findByRole("dialog", { name: "Cài đặt phiên mới trong src" }, WAIT)).toBeTruthy();
 	});
 
 	it("'Thêm vào dự án…' refuses a project linking another repository", async () => {

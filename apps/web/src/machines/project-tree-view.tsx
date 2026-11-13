@@ -13,7 +13,7 @@
 // column's arrow keys. The dialogs load when opened.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { navigate } from "../router.tsx";
 import type { AgentProject } from "./agent-projects-client.ts";
@@ -25,7 +25,10 @@ import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace,
 import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, shortHost, unseenDone, workspaceLabels } from "./project-tree.ts";
 import { SessionRow, StatusGlyph } from "./session-row.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
-import { aiName, type MachineView } from "./use-machines.ts";
+import { RemoteError } from "./link/machine-link.ts";
+import { aiName, errorText, type MachineView } from "./use-machines.ts";
+import { samePath } from "./projects-view.ts";
+import { useServices } from "../messaging/data/services.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 import { projectUsagePath } from "./usage/usage-paths.ts";
@@ -155,6 +158,36 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 	return [starting, start];
 }
 
+/**
+ * "Cài đặt phiên mới" of a workspace: its defaults live in the machine's own
+ * project for the folder, so a workspace whose folder the machine does not
+ * keep as a project yet (a subfolder of a repository, a folder added on
+ * another device) makes it one first, then opens the settings with it.
+ */
+function useWorkspaceSettings(machine: MachineView | null, dir: string, name: string, local: Project | undefined, onOpen: () => void): { project: Project | undefined; open: () => void } {
+	const t = useMachinesCopy();
+	const { toasts } = useServices();
+	const [added, setAdded] = useState<Project | undefined>(undefined);
+	const open = () => {
+		if (local !== undefined || machine === null) return onOpen();
+		const link = machine.link;
+		link
+			.request({ case: "projectAdd", value: { dir, name, consent: { sensitive: false, projectSettings: false } } })
+			// Added meanwhile from elsewhere: the machine's list has it.
+			.catch((err: unknown) => (err instanceof RemoteError && err.reason === ErrorReason.PROJECT_EXISTS ? link.request({ case: "projectList", value: {} }) : Promise.reject(err)))
+			.then(
+				(frame) => {
+					const made = frame.body.case === "projectListResult" ? frame.body.value.projects.find((x) => samePath(x.dir, dir)) : undefined;
+					if (made === undefined) return;
+					setAdded(made);
+					onOpen();
+				},
+				(err: unknown) => toasts.show(errorText(t, err, aiName(machine.state.info, "claude"))),
+			);
+	};
+	return { project: local ?? added, open };
+}
+
 type WorkspaceDialog = "custom" | "settings" | "move" | "detach" | null;
 
 function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; label: WorkspaceLabel; project: AgentProject; ctx: TreeContext }) {
@@ -167,6 +200,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 	const online = !node.offline && machine !== null;
 	const [starting, start] = useQuickStart(machine, workspace.dir, local, ctx.store, () => setDialog("custom"));
 	const missing = local?.missing === true;
+	const settings = useWorkspaceSettings(machine, workspace.dir, name, local, () => setDialog("settings"));
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
 			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
@@ -188,7 +222,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 					label={p.workspaceMenu(name)}
 					items={[
 						online && !missing ? { label: p.newCustom, icon: "plus", run: () => setDialog("custom") } : null,
-						online && local !== undefined ? { label: p.settings, icon: "settings", run: () => setDialog("settings") } : null,
+						online && !missing ? { label: p.settings, icon: "settings", run: settings.open } : null,
 						ctx.projects.length > 1 ? { label: p.move, icon: "forward", run: () => setDialog("move") } : null,
 						project.workspaces.length > 1
 							? {
@@ -216,8 +250,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 				/>
 			)}
 			<Suspense fallback={null}>
-				{dialog === "settings" && machine !== null && local !== undefined && (
-					<ProjectSettingsDialog link={machine.link} project={local} state={machine.state} ai={aiName(machine.state.info, "claude")} onClose={() => setDialog(null)} />
+				{dialog === "settings" && machine !== null && settings.project !== undefined && (
+					<ProjectSettingsDialog link={machine.link} project={settings.project} state={machine.state} ai={aiName(machine.state.info, "claude")} onClose={() => setDialog(null)} />
 				)}
 				{dialog === "move" && (
 					<PickProjectDialog
