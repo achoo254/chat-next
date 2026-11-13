@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@achoo254/app-shell": "github:achoo254/shared-next#v0.14.0&path:/packages/app-shell",
-    "@achoo254/app-switcher": "github:achoo254/shared-next#v0.14.2&path:/packages/app-switcher",
+    "@achoo254/app-switcher": "github:achoo254/shared-next#v0.14.3&path:/packages/app-switcher",
     "@achoo254/brand": "github:achoo254/shared-next#v0.14.0&path:/packages/brand",
     "@achoo254/capacitor-system-auth": "github:achoo254/shared-next#v0.14.0&path:/packages/capacitor-system-auth",
     "@achoo254/chat-core": "workspace:*",
