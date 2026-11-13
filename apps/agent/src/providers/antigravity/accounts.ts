@@ -26,6 +26,7 @@ import { seal, unseal } from "../../keystore.ts";
 import type { AuditLog } from "../../safety/audit-log.ts";
 import type { AccountScopeRef, AccountsFacet, AccountsListener, AccountsView, AiAccountInfo, AccountInfo, ProviderInfo } from "../types.ts";
 import { ANTIGRAVITY_PROVIDER_ID } from "./agy.ts";
+import { AgyBusy } from "./acp-process.ts";
 import { type AgyKeychain, KeychainError, emailOf } from "./keychain.ts";
 
 const run = promisify(execFile);
@@ -53,8 +54,12 @@ export type AgyAccountsOptions = {
   keychain: AgyKeychain;
   /** Turns of tunelo's Antigravity sessions running now, by title. */
   busySessions: () => string[];
-  /** Stops tunelo's agy process (its idle sessions open again with their next message). */
-  stopAgy: () => Promise<void>;
+  /**
+   * Runs `fn` with tunelo's agy stopped and none starting until it ends (its
+   * idle sessions open again with their next message); throws AgyBusy, with
+   * nothing stopped, when a turn runs.
+   */
+  withAgyStopped: <T>(fn: () => Promise<T>) => Promise<T>;
   /** Other agy processes of the user running now (a terminal), by pid. */
   runningAgy?: () => Promise<number[]>;
   /** agy's plan usage of the sign-in now; null when it cannot tell. */
@@ -181,6 +186,20 @@ export class AgyAccounts implements AccountsFacet {
     return id;
   }
 
+  /** Writes `value` and reads it back; a wrong read puts `before` back (or says the sign-in may have changed when there was none). */
+  private async writeChecked(value: string, email: string, before: string | undefined): Promise<void> {
+    try {
+      await this.opts.keychain.write(value);
+      const back = await this.opts.keychain.read();
+      if (back === undefined || emailOf(back) !== email) throw new KeychainError("failed");
+    } catch (err) {
+      const kind = err instanceof KeychainError ? err.kind : "keychain";
+      if (!before) throw new AccountError("the switch could not be checked; agy's sign-in may have changed: look at the AI accounts screen", "switch-blocked", kind);
+      await this.opts.keychain.write(before).catch(() => this.opts.log("antigravity accounts: the sign-in before the switch could not be put back"));
+      throw new AccountError((err as Error).message, "switch-blocked", kind);
+    }
+  }
+
   listen(listener: AccountsListener): void {
     this.listener = listener;
   }
@@ -264,20 +283,19 @@ export class AgyAccounts implements AccountsFacet {
       const entry = this.readVault().entries.find((e) => e.id === id);
       if (!entry) throw new AccountError("this account's sign-in is not saved; sign in with agy and save it again", "not-found");
       const value = await unseal(this.opts.configDir, entry.sealed);
-      // tunelo's own agy goes first; any agy left is the user's own.
-      await this.opts.stopAgy();
-      const others = await (this.opts.runningAgy ?? pgrepAgy)();
-      if (others.length > 0) throw new AccountError("agy is running on the machine (a terminal); close it, then switch", "switch-blocked", `agy pid ${others[0]}`);
-      // The sign-in now is saved before it is replaced; without that, no switch.
-      if (before.value && before.email) await this.keep(before.value, before.email, device);
-      else if (before.value) throw new AccountError("agy's current sign-in is not one tunelo can save; nothing was switched", "switch-blocked");
       try {
-        await this.opts.keychain.write(value);
-        const back = await this.opts.keychain.read();
-        if (back === undefined || emailOf(back) !== target.email) throw new KeychainError("failed");
+        // tunelo's own agy stops and none starts meanwhile; any agy left is the user's own.
+        await this.opts.withAgyStopped(async () => {
+          const others = await (this.opts.runningAgy ?? pgrepAgy)();
+          if (others.length > 0) throw new AccountError("agy is running on the machine (a terminal); close it, then switch", "switch-blocked", `agy pid ${others[0]}`);
+          // The sign-in now is saved before it is replaced; without that, no switch.
+          if (before.value && before.email) await this.keep(before.value, before.email, device);
+          else if (before.value) throw new AccountError("agy's current sign-in is not one tunelo can save; nothing was switched", "switch-blocked");
+          await this.writeChecked(value, target.email, before.value);
+        });
       } catch (err) {
-        if (before.value) await this.opts.keychain.write(before.value).catch(() => this.opts.log("antigravity accounts: the sign-in before the switch could not be put back"));
-        throw new AccountError((err as Error).message, "switch-blocked", err instanceof KeychainError ? err.kind : "keychain");
+        if (err instanceof AgyBusy) throw new AccountError(err.message, "switch-blocked", err.title.slice(0, 100));
+        throw err;
       }
       this.currentEmail = target.email;
       this.opts.store.update((d) => {

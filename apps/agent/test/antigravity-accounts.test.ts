@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import { AccountError } from "../src/accounts/errors.ts";
 import { AccountsStore } from "../src/accounts/store.ts";
 import { AgyAccounts } from "../src/providers/antigravity/accounts.ts";
+import { AgyAcp, AgyBusy } from "../src/providers/antigravity/acp-process.ts";
+import { fakeAgy } from "./support/fake-agy.ts";
 import { type AgyKeychain, KeychainError, MAX_LINE, emailOf, writeLine } from "../src/providers/antigravity/keychain.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
 import { tempDir } from "./harness.ts";
@@ -38,8 +40,10 @@ function setup(initial = signIn("a@example.com")) {
     audit: new AuditLog(join(configDir, "audit.jsonl")),
     keychain,
     busySessions: () => state.busy,
-    stopAgy: async () => {
+    withAgyStopped: async (fn) => {
+      if (state.busy.length > 0) throw new AgyBusy(state.busy[0] ?? "");
       state.stops += 1;
+      return fn();
     },
     runningAgy: async () => state.others,
     log: () => undefined,
@@ -126,10 +130,33 @@ describe("Antigravity accounts", () => {
         write: async () => undefined,
       },
       busySessions: () => [],
-      stopAgy: async () => undefined,
+      withAgyStopped: (fn) => fn(),
       log: () => undefined,
     });
     await expect(accounts.captureCurrent("phone")).rejects.toMatchObject({ kind: "switch-blocked", subject: "locked" });
+  });
+});
+
+describe("tunelo's agy during a switch", () => {
+  it("starts no agy while a switch holds it stopped, and refuses with nothing stopped while a turn runs", async () => {
+    const agy = fakeAgy();
+    const acp = new AgyAcp({ findBinary: async () => "agy", log: () => undefined, spawnProcess: agy.spawnProcess });
+    await acp.get();
+    expect(agy.log.launches).toHaveLength(1);
+    let started = false;
+    await acp.whileStopped(
+      () => [],
+      async () => {
+        void acp.get().then(() => (started = true));
+        await new Promise((r) => setTimeout(r, 20));
+        expect(started).toBe(false);
+      },
+    );
+    await acp.get();
+    expect(agy.log.launches).toHaveLength(2);
+    await expect(acp.whileStopped(() => ["Fix the build"], async () => undefined)).rejects.toBeInstanceOf(AgyBusy);
+    expect(acp.openSessions()).toBe(0);
+    await acp.stop();
   });
 });
 

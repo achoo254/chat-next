@@ -13,6 +13,8 @@ import { agyHome } from "./agy.ts";
 export const LIST_TTL_MS = 30_000;
 /** "recent" reads at most this much of the end of a transcript. */
 const RECENT_BYTES = 512 * 1024;
+/** One read takes at most this much; the rest comes with the next read, from `end`. */
+const READ_MAX_BYTES = 8 * 1024 * 1024;
 /** A transcript changed this recently counts as busy. */
 const BUSY_MS = 60_000;
 
@@ -146,7 +148,7 @@ export class AgyHistory implements SessionHistory {
     const fd = openSync(file, "r");
     let text: string;
     try {
-      const buf = Buffer.alloc(st.size - start);
+      const buf = Buffer.alloc(Math.min(st.size - start, READ_MAX_BYTES));
       readSync(fd, buf, 0, buf.length, start);
       text = buf.toString("utf8");
     } finally {

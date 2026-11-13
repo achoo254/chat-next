@@ -69,7 +69,7 @@ export function createAntigravityProvider(
       ? new AgyAccounts({
           ...deps.accounts,
           keychain: macKeychain,
-          stopAgy: () => acp.stop(),
+          withAgyStopped: (fn) => acp.whileStopped(deps.accounts?.busySessions ?? (() => []), fn),
           probeUsage: async () => {
             const bin = await findBinary();
             return bin ? probeAgyUsage(bin) : null;

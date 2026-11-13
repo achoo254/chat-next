@@ -14,7 +14,7 @@ import { agyEnv } from "./agy.ts";
 /** Settings that let the AI only answer: every tool is denied, in every mode. */
 export const WRITER_SETTINGS = {
   toolPermission: "strict",
-  permissions: { deny: ["read_file(*)", "write_file(*)", "command(*)", "mcp(*)", "read_url(*)", "execute_url(*)"] },
+  permissions: { deny: ["read_file(*)", "write_file(*)", "command(*)", "mcp(*)", "read_url(*)", "execute_url(*)", "unsandboxed(*)"] },
 };
 
 export function writerArgs(): string[] {

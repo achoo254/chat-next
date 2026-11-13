@@ -1,7 +1,7 @@
 // agy's tool calls in the shared tool model: kind, one-line summary, the
 // paths they touch (for the sensitive label) and file edits as diffs. Tool
 // names and ACP kinds agy does not use yet fall back to "other".
-import { relative } from "node:path";
+import { relative, resolve } from "node:path";
 import type { ToolKind } from "../types.ts";
 import type { AcpToolCall } from "../acp/acp-session.ts";
 
@@ -39,14 +39,14 @@ export function toolKind(call: AcpToolCall): ToolKind {
   return BY_NAME[name] ?? BY_ACP_KIND[call.kind ?? ""] ?? "other";
 }
 
-/** Absolute paths a call names (its locations and path-like inputs). */
-export function toolPaths(call: AcpToolCall): string[] {
+/** Paths a call names (its locations and path-like inputs), made absolute against the session's folder. */
+export function toolPaths(call: AcpToolCall, dir: string): string[] {
   const input = obj(call.rawInput);
   const out = new Set<string>();
-  for (const l of call.locations ?? []) if (l.path) out.add(l.path);
+  for (const l of call.locations ?? []) if (l.path) out.add(resolve(dir, l.path));
   for (const key of ["Path", "AbsolutePath", "TargetFile", "path", "file_path", "Cwd"]) {
     const v = str(input[key]);
-    if (v.startsWith("/") || /^[A-Za-z]:[\\/]/.test(v)) out.add(v);
+    if (v) out.add(resolve(dir, v));
   }
   return [...out];
 }
@@ -61,7 +61,7 @@ export function toolSummary(call: AcpToolCall, dir: string): string {
   const input = obj(call.rawInput);
   const command = str(input.CommandLine);
   if (command) return command.slice(0, 300);
-  const path = toolPaths(call)[0];
+  const path = toolPaths(call, dir)[0];
   if (path && (call.title ?? "").startsWith("File ")) return shortPath(path, dir);
   return (call.title ?? call.name ?? "tool").slice(0, 300);
 }

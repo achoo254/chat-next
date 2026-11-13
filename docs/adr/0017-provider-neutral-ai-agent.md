@@ -22,7 +22,7 @@ cách Orca IDE làm, và không giữ tương thích với agent hoặc web bả
   lõi khoá theo `(provider, id)`, đổi tài khoản AI này không đụng phiên AI khác. Một tệp chung `ai-accounts/ai-accounts.json`
   không chứa credential; đường dẫn suy từ `(provider, id)` đã kiểm. Proto: `AiAccount`, `Account*`, `MachineAccounts`.
 - Push "cần bạn" mang `provider_id`; server tra tên từ bảng cố định của nó, id lạ hoặc nhiều AI gộp trong một cửa sổ thì nói
-  "AI". `claude_version` bị bỏ khỏi heartbeat, server và schema (migration `0040`).
+  "AI". `claude_version` bị bỏ khỏi heartbeat, server và schema (migration `0039`).
 - Antigravity chạy `agy acp` của máy qua một client ACP dùng chung (JSON-RPC theo dòng qua stdio), không tải binary ACP của
   Google. Một tiến trình `agy acp` cho mọi phiên. `toolPermission: "always-proceed"` của agy là "máy tự bật toàn quyền".
   "Luôn cho phép" chỉ nhớ phía tunelo. Bản đầu không có MCP `tunelo` và mật khẩu đã lưu cho Antigravity.

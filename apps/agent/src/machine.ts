@@ -65,7 +65,8 @@ export type MachineOptions = {
   config?: ConfigStore;
   providers?: AgentProvider[];
   /** Sends a content-free "needs you" push through the chat server. */
-  notify?: (thread: ThreadSummary, pending: number) => void;
+  /** `providerId`: the AI every waiting request belongs to; "" when they belong to several. */
+  notify?: (thread: ThreadSummary, pending: number, providerId: string) => void;
   /** Asks the chat server for a content-free "usage hint" push to the account's devices; rejects when it was not sent. */
   notifyUsage?: () => Promise<void>;
   log?: (line: string) => void;
@@ -388,7 +389,7 @@ export class Machine {
   }
 
   /** Wired once the machine is registered with the chat server. */
-  setNotify(fn: (thread: ThreadSummary, pending: number) => void): void {
+  setNotify(fn: (thread: ThreadSummary, pending: number, providerId: string) => void): void {
     this.opts.notify = fn;
   }
 
@@ -672,8 +673,10 @@ export class Machine {
       const now = this.core.list().find((t) => t.id === thread.id);
       if (!now || now.state !== ThreadState.WAITING) return;
       if (Date.now() - this.lastPing < PING_FRESH_MS) return;
-      const pending = this.core.list().reduce((n, t) => n + t.pending, 0);
-      if (this.opts.notify) this.opts.notify(now, pending);
+      const waiting = this.core.list().filter((t) => t.pending > 0);
+      const pending = waiting.reduce((n, t) => n + t.pending, 0);
+      const ais = new Set([now.provider, ...waiting.map((t) => t.provider)]);
+      if (this.opts.notify) this.opts.notify(now, pending, ais.size === 1 ? now.provider : "");
       else this.log(`needs you: "${now.title}" (${pending} waiting)`);
     }, PUSH_DELAY_MS).unref?.();
   }

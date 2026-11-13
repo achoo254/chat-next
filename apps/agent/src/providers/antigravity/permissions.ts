@@ -12,15 +12,18 @@ import { describe, toolPaths } from "./tool-map.ts";
 const CARD_INPUT_CHARS = 4_000;
 
 /**
- * The session rule of a call: the tool, and for a command the command
- * itself (the same command runs again without asking; another one asks).
+ * The session rule of a call: the tool with its command, or with the files
+ * it touches (the same command or file goes again without asking; another
+ * one asks).
  */
-export function ruleOf(p: AcpPermissionParams): string {
+export function ruleOf(p: AcpPermissionParams, dir: string): string {
   const call = p.toolCall ?? {};
   const name = call.name ?? call.kind ?? "tool";
   const input = (call.rawInput ?? {}) as Record<string, unknown>;
   const command = typeof input.CommandLine === "string" ? input.CommandLine : "";
-  return command ? `${name}:${command}` : name;
+  if (command) return `${name}:${command}`;
+  const paths = toolPaths(call, dir);
+  return paths.length > 0 ? `${name}:${paths.join("\n")}` : name;
 }
 
 function option(p: AcpPermissionParams, kinds: readonly string[], fallback: string): string {
@@ -38,13 +41,14 @@ export type PermissionContext = {
 };
 
 export async function answerPermission(p: AcpPermissionParams, ctx: PermissionContext, signal: AbortSignal): Promise<AcpPermissionOutcome> {
-  const allow = option(p, ["allow_once", "allow_always"], "allow");
-  const reject = option(p, ["reject_once", "reject_always"], "deny");
+  // Once only: agy never hears "always" (tunelo keeps the session's rules itself).
+  const allow = option(p, ["allow_once"], "allow");
+  const reject = option(p, ["reject_once"], "deny");
   const call = p.toolCall ?? {};
   const input = (call.rawInput ?? {}) as Record<string, unknown>;
   const command = typeof input.CommandLine === "string" ? input.CommandLine : "";
-  const sensitive = toolPaths(call).some(ctx.isSensitive) || (command !== "" && mentionsSensitive(command, ctx.isSensitive, { cwd: ctx.dir }));
-  const rule = ruleOf(p);
+  const sensitive = toolPaths(call, ctx.dir).some(ctx.isSensitive) || (command !== "" && mentionsSensitive(command, ctx.isSensitive, { cwd: ctx.dir }));
+  const rule = ruleOf(p, ctx.dir);
   if (!sensitive && ctx.rules.has(rule)) return { outcome: { outcome: "selected", optionId: allow } };
   const shown = describe(call, ctx.dir);
   const cut = shown.input.length > CARD_INPUT_CHARS ? `The input shown is cut: ${shown.input.length} characters in all.` : "";
