@@ -176,7 +176,7 @@ export const zhCN: MessagingCopy = {
 		reactionsHint: "点击添加或移除 · 右键单击或长按查看谁做了回应",
 		recalled: "消息已撤回",
 		unknownUser: "用户",
-		/** An account deleted by its owner (or waiting for deletion). */
+		/** An account deleted at the IdP (erased, or being erased). */
 		deletedAccount: "已删除的账号",
 		deleted: "消息已撤回",
 		quickActions: (name: string) => `${name} 的消息的快捷操作`,

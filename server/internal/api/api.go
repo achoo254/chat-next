@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"app.local/server/internal/accountdeleted"
 	"app.local/server/internal/accountnotice"
 	"app.local/server/internal/agentgrant"
 	"app.local/server/internal/assistant"
@@ -268,6 +269,13 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if err != nil {
 		return nil, err
 	}
+	// Accounts are deleted only at the IdP, which pushes the event here
+	// (ADR 0016).
+	accountDeleted, err := accountdeleted.New(accountdeleted.Config{Audience: publicOrigin + accountdeleted.Path},
+		idp, privacySvc, logger.With("component", "accountdeleted"))
+	if err != nil {
+		return nil, err
+	}
 	mcpHandler, err := newMCP(cfg, st, idp, origins, limiter, rpc.NewInProcess(rpcDeps), logger)
 	if err != nil {
 		return nil, err
@@ -291,6 +299,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	mux.Handle(machineapi.Prefix, machines.Handler())
 	// The IdP's server calls it with its own token, no session or Origin.
 	accountNotices.Register(mux)
+	accountDeleted.Register(mux)
 	mcpHandler.Register(mux)
 
 	loopCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))

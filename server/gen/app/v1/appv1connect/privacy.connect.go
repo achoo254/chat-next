@@ -42,18 +42,6 @@ const (
 	// PrivacyServiceGetDataExportUrlProcedure is the fully-qualified name of the PrivacyService's
 	// GetDataExportUrl RPC.
 	PrivacyServiceGetDataExportUrlProcedure = "/app.v1.PrivacyService/GetDataExportUrl"
-	// PrivacyServiceGetAccountDeletionProcedure is the fully-qualified name of the PrivacyService's
-	// GetAccountDeletion RPC.
-	PrivacyServiceGetAccountDeletionProcedure = "/app.v1.PrivacyService/GetAccountDeletion"
-	// PrivacyServiceSetAutoDeleteProcedure is the fully-qualified name of the PrivacyService's
-	// SetAutoDelete RPC.
-	PrivacyServiceSetAutoDeleteProcedure = "/app.v1.PrivacyService/SetAutoDelete"
-	// PrivacyServiceDeleteAccountProcedure is the fully-qualified name of the PrivacyService's
-	// DeleteAccount RPC.
-	PrivacyServiceDeleteAccountProcedure = "/app.v1.PrivacyService/DeleteAccount"
-	// PrivacyServiceCancelAccountDeletionProcedure is the fully-qualified name of the PrivacyService's
-	// CancelAccountDeletion RPC.
-	PrivacyServiceCancelAccountDeletionProcedure = "/app.v1.PrivacyService/CancelAccountDeletion"
 )
 
 // PrivacyServiceClient is a client for the app.v1.PrivacyService service.
@@ -67,21 +55,6 @@ type PrivacyServiceClient interface {
 	RequestDataExport(context.Context, *connect.Request[v1.RequestDataExportRequest]) (*connect.Response[v1.RequestDataExportResponse], error)
 	// A short-lived download URL on the media host for a ready export.
 	GetDataExportUrl(context.Context, *connect.Request[v1.GetDataExportUrlRequest]) (*connect.Response[v1.GetDataExportUrlResponse], error)
-	// What deleting the account involves: what blocks it, the bots it stops,
-	// the auto-delete setting and when the session last signed in at the IdP.
-	GetAccountDeletion(context.Context, *connect.Request[v1.GetAccountDeletionRequest]) (*connect.Response[v1.GetAccountDeletionResponse], error)
-	// Auto-delete after this many months without use: 0 (off), 6, 12 or 24.
-	SetAutoDelete(context.Context, *connect.Request[v1.SetAutoDeleteRequest]) (*connect.Response[v1.SetAutoDeleteResponse], error)
-	// Sensitive (ADR 0006): requires an IdP sign-in within the last 10
-	// minutes (failed_precondition "reauth_required" otherwise) and the
-	// caller's username as confirmation. Refused with failed_precondition
-	// "owns_chats" while the caller owns a group or channel. The account is
-	// locked at once (every session revoked with ACCOUNT_DELETED, IdP grants
-	// revoked, bots stopped, shown to others as deleted) and erased after the
-	// grace period unless cancelled.
-	DeleteAccount(context.Context, *connect.Request[v1.DeleteAccountRequest]) (*connect.Response[v1.DeleteAccountResponse], error)
-	// Ends the grace period of the caller's account: everything works again.
-	CancelAccountDeletion(context.Context, *connect.Request[v1.CancelAccountDeletionRequest]) (*connect.Response[v1.CancelAccountDeletionResponse], error)
 }
 
 // NewPrivacyServiceClient constructs a client for the app.v1.PrivacyService service. By default, it
@@ -113,42 +86,14 @@ func NewPrivacyServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(privacyServiceMethods.ByName("GetDataExportUrl")),
 			connect.WithClientOptions(opts...),
 		),
-		getAccountDeletion: connect.NewClient[v1.GetAccountDeletionRequest, v1.GetAccountDeletionResponse](
-			httpClient,
-			baseURL+PrivacyServiceGetAccountDeletionProcedure,
-			connect.WithSchema(privacyServiceMethods.ByName("GetAccountDeletion")),
-			connect.WithClientOptions(opts...),
-		),
-		setAutoDelete: connect.NewClient[v1.SetAutoDeleteRequest, v1.SetAutoDeleteResponse](
-			httpClient,
-			baseURL+PrivacyServiceSetAutoDeleteProcedure,
-			connect.WithSchema(privacyServiceMethods.ByName("SetAutoDelete")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteAccount: connect.NewClient[v1.DeleteAccountRequest, v1.DeleteAccountResponse](
-			httpClient,
-			baseURL+PrivacyServiceDeleteAccountProcedure,
-			connect.WithSchema(privacyServiceMethods.ByName("DeleteAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		cancelAccountDeletion: connect.NewClient[v1.CancelAccountDeletionRequest, v1.CancelAccountDeletionResponse](
-			httpClient,
-			baseURL+PrivacyServiceCancelAccountDeletionProcedure,
-			connect.WithSchema(privacyServiceMethods.ByName("CancelAccountDeletion")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // privacyServiceClient implements PrivacyServiceClient.
 type privacyServiceClient struct {
-	getDataExport         *connect.Client[v1.GetDataExportRequest, v1.GetDataExportResponse]
-	requestDataExport     *connect.Client[v1.RequestDataExportRequest, v1.RequestDataExportResponse]
-	getDataExportUrl      *connect.Client[v1.GetDataExportUrlRequest, v1.GetDataExportUrlResponse]
-	getAccountDeletion    *connect.Client[v1.GetAccountDeletionRequest, v1.GetAccountDeletionResponse]
-	setAutoDelete         *connect.Client[v1.SetAutoDeleteRequest, v1.SetAutoDeleteResponse]
-	deleteAccount         *connect.Client[v1.DeleteAccountRequest, v1.DeleteAccountResponse]
-	cancelAccountDeletion *connect.Client[v1.CancelAccountDeletionRequest, v1.CancelAccountDeletionResponse]
+	getDataExport     *connect.Client[v1.GetDataExportRequest, v1.GetDataExportResponse]
+	requestDataExport *connect.Client[v1.RequestDataExportRequest, v1.RequestDataExportResponse]
+	getDataExportUrl  *connect.Client[v1.GetDataExportUrlRequest, v1.GetDataExportUrlResponse]
 }
 
 // GetDataExport calls app.v1.PrivacyService.GetDataExport.
@@ -166,26 +111,6 @@ func (c *privacyServiceClient) GetDataExportUrl(ctx context.Context, req *connec
 	return c.getDataExportUrl.CallUnary(ctx, req)
 }
 
-// GetAccountDeletion calls app.v1.PrivacyService.GetAccountDeletion.
-func (c *privacyServiceClient) GetAccountDeletion(ctx context.Context, req *connect.Request[v1.GetAccountDeletionRequest]) (*connect.Response[v1.GetAccountDeletionResponse], error) {
-	return c.getAccountDeletion.CallUnary(ctx, req)
-}
-
-// SetAutoDelete calls app.v1.PrivacyService.SetAutoDelete.
-func (c *privacyServiceClient) SetAutoDelete(ctx context.Context, req *connect.Request[v1.SetAutoDeleteRequest]) (*connect.Response[v1.SetAutoDeleteResponse], error) {
-	return c.setAutoDelete.CallUnary(ctx, req)
-}
-
-// DeleteAccount calls app.v1.PrivacyService.DeleteAccount.
-func (c *privacyServiceClient) DeleteAccount(ctx context.Context, req *connect.Request[v1.DeleteAccountRequest]) (*connect.Response[v1.DeleteAccountResponse], error) {
-	return c.deleteAccount.CallUnary(ctx, req)
-}
-
-// CancelAccountDeletion calls app.v1.PrivacyService.CancelAccountDeletion.
-func (c *privacyServiceClient) CancelAccountDeletion(ctx context.Context, req *connect.Request[v1.CancelAccountDeletionRequest]) (*connect.Response[v1.CancelAccountDeletionResponse], error) {
-	return c.cancelAccountDeletion.CallUnary(ctx, req)
-}
-
 // PrivacyServiceHandler is an implementation of the app.v1.PrivacyService service.
 type PrivacyServiceHandler interface {
 	// The latest export and when a new one may be requested.
@@ -197,21 +122,6 @@ type PrivacyServiceHandler interface {
 	RequestDataExport(context.Context, *connect.Request[v1.RequestDataExportRequest]) (*connect.Response[v1.RequestDataExportResponse], error)
 	// A short-lived download URL on the media host for a ready export.
 	GetDataExportUrl(context.Context, *connect.Request[v1.GetDataExportUrlRequest]) (*connect.Response[v1.GetDataExportUrlResponse], error)
-	// What deleting the account involves: what blocks it, the bots it stops,
-	// the auto-delete setting and when the session last signed in at the IdP.
-	GetAccountDeletion(context.Context, *connect.Request[v1.GetAccountDeletionRequest]) (*connect.Response[v1.GetAccountDeletionResponse], error)
-	// Auto-delete after this many months without use: 0 (off), 6, 12 or 24.
-	SetAutoDelete(context.Context, *connect.Request[v1.SetAutoDeleteRequest]) (*connect.Response[v1.SetAutoDeleteResponse], error)
-	// Sensitive (ADR 0006): requires an IdP sign-in within the last 10
-	// minutes (failed_precondition "reauth_required" otherwise) and the
-	// caller's username as confirmation. Refused with failed_precondition
-	// "owns_chats" while the caller owns a group or channel. The account is
-	// locked at once (every session revoked with ACCOUNT_DELETED, IdP grants
-	// revoked, bots stopped, shown to others as deleted) and erased after the
-	// grace period unless cancelled.
-	DeleteAccount(context.Context, *connect.Request[v1.DeleteAccountRequest]) (*connect.Response[v1.DeleteAccountResponse], error)
-	// Ends the grace period of the caller's account: everything works again.
-	CancelAccountDeletion(context.Context, *connect.Request[v1.CancelAccountDeletionRequest]) (*connect.Response[v1.CancelAccountDeletionResponse], error)
 }
 
 // NewPrivacyServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -239,30 +149,6 @@ func NewPrivacyServiceHandler(svc PrivacyServiceHandler, opts ...connect.Handler
 		connect.WithSchema(privacyServiceMethods.ByName("GetDataExportUrl")),
 		connect.WithHandlerOptions(opts...),
 	)
-	privacyServiceGetAccountDeletionHandler := connect.NewUnaryHandler(
-		PrivacyServiceGetAccountDeletionProcedure,
-		svc.GetAccountDeletion,
-		connect.WithSchema(privacyServiceMethods.ByName("GetAccountDeletion")),
-		connect.WithHandlerOptions(opts...),
-	)
-	privacyServiceSetAutoDeleteHandler := connect.NewUnaryHandler(
-		PrivacyServiceSetAutoDeleteProcedure,
-		svc.SetAutoDelete,
-		connect.WithSchema(privacyServiceMethods.ByName("SetAutoDelete")),
-		connect.WithHandlerOptions(opts...),
-	)
-	privacyServiceDeleteAccountHandler := connect.NewUnaryHandler(
-		PrivacyServiceDeleteAccountProcedure,
-		svc.DeleteAccount,
-		connect.WithSchema(privacyServiceMethods.ByName("DeleteAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	privacyServiceCancelAccountDeletionHandler := connect.NewUnaryHandler(
-		PrivacyServiceCancelAccountDeletionProcedure,
-		svc.CancelAccountDeletion,
-		connect.WithSchema(privacyServiceMethods.ByName("CancelAccountDeletion")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/app.v1.PrivacyService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PrivacyServiceGetDataExportProcedure:
@@ -271,14 +157,6 @@ func NewPrivacyServiceHandler(svc PrivacyServiceHandler, opts ...connect.Handler
 			privacyServiceRequestDataExportHandler.ServeHTTP(w, r)
 		case PrivacyServiceGetDataExportUrlProcedure:
 			privacyServiceGetDataExportUrlHandler.ServeHTTP(w, r)
-		case PrivacyServiceGetAccountDeletionProcedure:
-			privacyServiceGetAccountDeletionHandler.ServeHTTP(w, r)
-		case PrivacyServiceSetAutoDeleteProcedure:
-			privacyServiceSetAutoDeleteHandler.ServeHTTP(w, r)
-		case PrivacyServiceDeleteAccountProcedure:
-			privacyServiceDeleteAccountHandler.ServeHTTP(w, r)
-		case PrivacyServiceCancelAccountDeletionProcedure:
-			privacyServiceCancelAccountDeletionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -298,20 +176,4 @@ func (UnimplementedPrivacyServiceHandler) RequestDataExport(context.Context, *co
 
 func (UnimplementedPrivacyServiceHandler) GetDataExportUrl(context.Context, *connect.Request[v1.GetDataExportUrlRequest]) (*connect.Response[v1.GetDataExportUrlResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.PrivacyService.GetDataExportUrl is not implemented"))
-}
-
-func (UnimplementedPrivacyServiceHandler) GetAccountDeletion(context.Context, *connect.Request[v1.GetAccountDeletionRequest]) (*connect.Response[v1.GetAccountDeletionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.PrivacyService.GetAccountDeletion is not implemented"))
-}
-
-func (UnimplementedPrivacyServiceHandler) SetAutoDelete(context.Context, *connect.Request[v1.SetAutoDeleteRequest]) (*connect.Response[v1.SetAutoDeleteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.PrivacyService.SetAutoDelete is not implemented"))
-}
-
-func (UnimplementedPrivacyServiceHandler) DeleteAccount(context.Context, *connect.Request[v1.DeleteAccountRequest]) (*connect.Response[v1.DeleteAccountResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.PrivacyService.DeleteAccount is not implemented"))
-}
-
-func (UnimplementedPrivacyServiceHandler) CancelAccountDeletion(context.Context, *connect.Request[v1.CancelAccountDeletionRequest]) (*connect.Response[v1.CancelAccountDeletionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.PrivacyService.CancelAccountDeletion is not implemented"))
 }

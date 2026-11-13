@@ -187,9 +187,8 @@ func (d *dispatcher) run(ctx context.Context) {
 }
 
 // ownerActive is the SQL predicate (on bots) of a bot whose owner's account
-// is not waiting for deletion: during the grace period the webhook is
-// paused (updates keep queuing until they expire) and it resumes on its own
-// at the next rescan when the owner cancels.
+// is not being erased: from the IdP's deletion until the erasure deletes
+// the bot, its webhook is paused.
 const ownerActive = `NOT EXISTS (SELECT 1 FROM users o WHERE o.id = bots.owner_id AND o.deletion_requested_at IS NOT NULL)`
 
 func (d *dispatcher) rescan(ctx context.Context) {

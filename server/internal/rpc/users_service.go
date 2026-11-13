@@ -9,7 +9,6 @@ import (
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/media"
-	"app.local/server/internal/privacy"
 	"app.local/server/internal/profile"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
@@ -57,10 +56,8 @@ func (s *usersService) GetSelf(ctx context.Context, req *connect.Request[appv1.G
 		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	if u.DeletionRequestedAt != nil {
-		// Waiting for deletion: the app shows only the screen to cancel it.
-		return connect.NewResponse(&appv1.GetSelfResponse{
-			User: selfUser(u), Deletion: privacy.Deletion(u.DeletionRequestedAt, u.DeletionReason),
-		}), nil
+		// Deleted at the IdP and being erased: the app signs out.
+		return nil, errUnauthenticated()
 	}
 	// Every app start makes sure "Cloud của tôi" exists, so accounts created
 	// before it get it without signing in again. A failure only delays it to

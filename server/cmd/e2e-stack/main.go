@@ -12,8 +12,8 @@
 // (pnpm --filter @app/web dev), which proxies /rpc, /auth and /ws here.
 // POST /e2e/realtime on the api port drops and restores the realtime
 // sockets (realtime_switch.go); POST /e2e/assistant turns the assistant
-// chat off and on (assistant_switch.go); POST /e2e/privacy erases the
-// accounts waiting for deletion at once (privacy_switch.go).
+// chat off and on (assistant_switch.go); POST /e2e/privacy plays the IdP
+// deleting an account (privacy_switch.go).
 package main
 
 import (
@@ -53,7 +53,7 @@ var Accounts = []idptest.Account{
 	{Sub: "acc_e2e_giang", SID: "sid-giang", PreferredUsername: "giang", Name: "Giang", Email: "giang@e2e.test", EmailVerified: true},
 	// An account that signed in before the assistant existed (/e2e/assistant).
 	{Sub: "acc_e2e_hanh", SID: "sid-hanh", PreferredUsername: "hanh", Name: "Hạnh", Email: "hanh@e2e.test", EmailVerified: true},
-	// The account the deletion scenario deletes (/e2e/privacy).
+	// The account the deletion scenario deletes at the IdP (/e2e/privacy).
 	{Sub: "acc_e2e_khoa", SID: "sid-khoa", PreferredUsername: "khoa", Name: "Khoa", Email: "khoa@e2e.test", EmailVerified: true},
 }
 
@@ -151,15 +151,10 @@ func serve(apiAddr, idpAddr string, pgPort uint32, public string, logger *slog.L
 		return fmt.Errorf("configuration: %w", err)
 	}
 
-	st, err := store.Open(ctx, dbURL)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
 	go announceReady(ctx, apiAddr, public, idp.Issuer())
 	realtime := newRealtimeSwitch()
 	return api.RunWrapped(ctx, cfg, logger, func(app *api.App, next http.Handler) http.Handler {
-		return privacySwitch(app, st, assistantSwitch(app, realtime.wrap(next)))
+		return privacySwitch(idp, public, assistantSwitch(app, realtime.wrap(next)))
 	})
 }
 

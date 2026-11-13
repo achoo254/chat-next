@@ -4,15 +4,13 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { User } from "./users_pb.ts";
-import { file_app_v1_users } from "./users_pb.ts";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file app/v1/privacy.proto.
  */
 export const file_app_v1_privacy: GenFile = /*@__PURE__*/
-  fileDesc("ChRhcHAvdjEvcHJpdmFjeS5wcm90bxIGYXBwLnYxIsMBCgpEYXRhRXhwb3J0Eg4KAmlkGAEgASgDQgIwAhIoCgZzdGF0dXMYAiABKA4yGC5hcHAudjEuRGF0YUV4cG9ydFN0YXR1cxIQCghwcm9ncmVzcxgDIAEoBRIQCgRzaXplGAQgASgDQgIwAhIRCglmaWxlX25hbWUYBSABKAkSFgoKY3JlYXRlZF9hdBgGIAEoA0ICMAISFAoIcmVhZHlfYXQYByABKANCAjACEhYKCmV4cGlyZXNfYXQYCCABKANCAjACIhYKFEdldERhdGFFeHBvcnRSZXF1ZXN0ImsKFUdldERhdGFFeHBvcnRSZXNwb25zZRIiCgZleHBvcnQYASABKAsyEi5hcHAudjEuRGF0YUV4cG9ydBIbCg9uZXh0X3JlcXVlc3RfYXQYAiABKANCAjACEhEKCWF2YWlsYWJsZRgDIAEoCCIaChhSZXF1ZXN0RGF0YUV4cG9ydFJlcXVlc3QiXAoZUmVxdWVzdERhdGFFeHBvcnRSZXNwb25zZRIiCgZleHBvcnQYASABKAsyEi5hcHAudjEuRGF0YUV4cG9ydBIbCg9uZXh0X3JlcXVlc3RfYXQYAiABKANCAjACIjAKF0dldERhdGFFeHBvcnRVcmxSZXF1ZXN0EhUKCWV4cG9ydF9pZBgBIAEoA0ICMAIiPwoYR2V0RGF0YUV4cG9ydFVybFJlc3BvbnNlEgsKA3VybBgBIAEoCRIWCgpleHBpcmVzX2F0GAIgASgDQgIwAiIbChlHZXRBY2NvdW50RGVsZXRpb25SZXF1ZXN0IlkKCU93bmVkQ2hhdBITCgdjaGF0X2lkGAEgASgDQgIwAhINCgV0aXRsZRgCIAEoCRISCgppc19jaGFubmVsGAMgASgIEhQKDG1lbWJlcl9jb3VudBgEIAEoBSI+CghPd25lZEJvdBISCgZib3RfaWQYASABKANCAjACEgwKBG5hbWUYAiABKAkSEAoIdXNlcm5hbWUYAyABKAkirgEKGkdldEFjY291bnREZWxldGlvblJlc3BvbnNlEiYKC293bmVkX2NoYXRzGAEgAygLMhEuYXBwLnYxLk93bmVkQ2hhdBIeCgRib3RzGAIgAygLMhAuYXBwLnYxLk93bmVkQm90EhoKEmF1dG9fZGVsZXRlX21vbnRocxgDIAEoBRIYCgxzaWduZWRfaW5fYXQYBCABKANCAjACEhIKCmdyYWNlX2RheXMYBSABKAUiJgoUU2V0QXV0b0RlbGV0ZVJlcXVlc3QSDgoGbW9udGhzGAEgASgFIicKFVNldEF1dG9EZWxldGVSZXNwb25zZRIOCgZtb250aHMYASABKAUiLAoURGVsZXRlQWNjb3VudFJlcXVlc3QSFAoMY29uZmlybWF0aW9uGAEgASgJIi0KFURlbGV0ZUFjY291bnRSZXNwb25zZRIUCghwdXJnZV9hdBgBIAEoA0ICMAIiHgocQ2FuY2VsQWNjb3VudERlbGV0aW9uUmVxdWVzdCI7Ch1DYW5jZWxBY2NvdW50RGVsZXRpb25SZXNwb25zZRIaCgR1c2VyGAEgASgLMgwuYXBwLnYxLlVzZXIq0wEKEERhdGFFeHBvcnRTdGF0dXMSIgoeREFUQV9FWFBPUlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHgoaREFUQV9FWFBPUlRfU1RBVFVTX1BFTkRJTkcQARIeChpEQVRBX0VYUE9SVF9TVEFUVVNfUlVOTklORxACEhwKGERBVEFfRVhQT1JUX1NUQVRVU19SRUFEWRADEh0KGURBVEFfRVhQT1JUX1NUQVRVU19GQUlMRUQQBBIeChpEQVRBX0VYUE9SVF9TVEFUVVNfRVhQSVJFRBAFMu4ECg5Qcml2YWN5U2VydmljZRJMCg1HZXREYXRhRXhwb3J0EhwuYXBwLnYxLkdldERhdGFFeHBvcnRSZXF1ZXN0Gh0uYXBwLnYxLkdldERhdGFFeHBvcnRSZXNwb25zZRJYChFSZXF1ZXN0RGF0YUV4cG9ydBIgLmFwcC52MS5SZXF1ZXN0RGF0YUV4cG9ydFJlcXVlc3QaIS5hcHAudjEuUmVxdWVzdERhdGFFeHBvcnRSZXNwb25zZRJVChBHZXREYXRhRXhwb3J0VXJsEh8uYXBwLnYxLkdldERhdGFFeHBvcnRVcmxSZXF1ZXN0GiAuYXBwLnYxLkdldERhdGFFeHBvcnRVcmxSZXNwb25zZRJbChJHZXRBY2NvdW50RGVsZXRpb24SIS5hcHAudjEuR2V0QWNjb3VudERlbGV0aW9uUmVxdWVzdBoiLmFwcC52MS5HZXRBY2NvdW50RGVsZXRpb25SZXNwb25zZRJMCg1TZXRBdXRvRGVsZXRlEhwuYXBwLnYxLlNldEF1dG9EZWxldGVSZXF1ZXN0Gh0uYXBwLnYxLlNldEF1dG9EZWxldGVSZXNwb25zZRJMCg1EZWxldGVBY2NvdW50EhwuYXBwLnYxLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gh0uYXBwLnYxLkRlbGV0ZUFjY291bnRSZXNwb25zZRJkChVDYW5jZWxBY2NvdW50RGVsZXRpb24SJC5hcHAudjEuQ2FuY2VsQWNjb3VudERlbGV0aW9uUmVxdWVzdBolLmFwcC52MS5DYW5jZWxBY2NvdW50RGVsZXRpb25SZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_users]);
+  fileDesc("ChRhcHAvdjEvcHJpdmFjeS5wcm90bxIGYXBwLnYxIsMBCgpEYXRhRXhwb3J0Eg4KAmlkGAEgASgDQgIwAhIoCgZzdGF0dXMYAiABKA4yGC5hcHAudjEuRGF0YUV4cG9ydFN0YXR1cxIQCghwcm9ncmVzcxgDIAEoBRIQCgRzaXplGAQgASgDQgIwAhIRCglmaWxlX25hbWUYBSABKAkSFgoKY3JlYXRlZF9hdBgGIAEoA0ICMAISFAoIcmVhZHlfYXQYByABKANCAjACEhYKCmV4cGlyZXNfYXQYCCABKANCAjACIhYKFEdldERhdGFFeHBvcnRSZXF1ZXN0ImsKFUdldERhdGFFeHBvcnRSZXNwb25zZRIiCgZleHBvcnQYASABKAsyEi5hcHAudjEuRGF0YUV4cG9ydBIbCg9uZXh0X3JlcXVlc3RfYXQYAiABKANCAjACEhEKCWF2YWlsYWJsZRgDIAEoCCIaChhSZXF1ZXN0RGF0YUV4cG9ydFJlcXVlc3QiXAoZUmVxdWVzdERhdGFFeHBvcnRSZXNwb25zZRIiCgZleHBvcnQYASABKAsyEi5hcHAudjEuRGF0YUV4cG9ydBIbCg9uZXh0X3JlcXVlc3RfYXQYAiABKANCAjACIjAKF0dldERhdGFFeHBvcnRVcmxSZXF1ZXN0EhUKCWV4cG9ydF9pZBgBIAEoA0ICMAIiPwoYR2V0RGF0YUV4cG9ydFVybFJlc3BvbnNlEgsKA3VybBgBIAEoCRIWCgpleHBpcmVzX2F0GAIgASgDQgIwAiI+CghPd25lZEJvdBISCgZib3RfaWQYASABKANCAjACEgwKBG5hbWUYAiABKAkSEAoIdXNlcm5hbWUYAyABKAkq0wEKEERhdGFFeHBvcnRTdGF0dXMSIgoeREFUQV9FWFBPUlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHgoaREFUQV9FWFBPUlRfU1RBVFVTX1BFTkRJTkcQARIeChpEQVRBX0VYUE9SVF9TVEFUVVNfUlVOTklORxACEhwKGERBVEFfRVhQT1JUX1NUQVRVU19SRUFEWRADEh0KGURBVEFfRVhQT1JUX1NUQVRVU19GQUlMRUQQBBIeChpEQVRBX0VYUE9SVF9TVEFUVVNfRVhQSVJFRBAFMo8CCg5Qcml2YWN5U2VydmljZRJMCg1HZXREYXRhRXhwb3J0EhwuYXBwLnYxLkdldERhdGFFeHBvcnRSZXF1ZXN0Gh0uYXBwLnYxLkdldERhdGFFeHBvcnRSZXNwb25zZRJYChFSZXF1ZXN0RGF0YUV4cG9ydBIgLmFwcC52MS5SZXF1ZXN0RGF0YUV4cG9ydFJlcXVlc3QaIS5hcHAudjEuUmVxdWVzdERhdGFFeHBvcnRSZXNwb25zZRJVChBHZXREYXRhRXhwb3J0VXJsEh8uYXBwLnYxLkdldERhdGFFeHBvcnRVcmxSZXF1ZXN0GiAuYXBwLnYxLkdldERhdGFFeHBvcnRVcmxSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.DataExport
@@ -197,56 +195,7 @@ export const GetDataExportUrlResponseSchema: GenMessage<GetDataExportUrlResponse
   messageDesc(file_app_v1_privacy, 6);
 
 /**
- * @generated from message app.v1.GetAccountDeletionRequest
- */
-export type GetAccountDeletionRequest = Message<"app.v1.GetAccountDeletionRequest"> & {
-};
-
-/**
- * Describes the message app.v1.GetAccountDeletionRequest.
- * Use `create(GetAccountDeletionRequestSchema)` to create a new message.
- */
-export const GetAccountDeletionRequestSchema: GenMessage<GetAccountDeletionRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 7);
-
-/**
- * A group or channel the caller owns: it blocks DeleteAccount until its
- * ownership passes to someone else or it is deleted.
- *
- * @generated from message app.v1.OwnedChat
- */
-export type OwnedChat = Message<"app.v1.OwnedChat"> & {
-  /**
-   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
-   */
-  chatId: bigint;
-
-  /**
-   * @generated from field: string title = 2;
-   */
-  title: string;
-
-  /**
-   * @generated from field: bool is_channel = 3;
-   */
-  isChannel: boolean;
-
-  /**
-   * @generated from field: int32 member_count = 4;
-   */
-  memberCount: number;
-};
-
-/**
- * Describes the message app.v1.OwnedChat.
- * Use `create(OwnedChatSchema)` to create a new message.
- */
-export const OwnedChatSchema: GenMessage<OwnedChat> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 8);
-
-/**
- * A bot of the caller: stopped during the grace period, deleted with the
- * account.
+ * A bot of the caller, as the data export lists it.
  *
  * @generated from message app.v1.OwnedBot
  */
@@ -272,153 +221,7 @@ export type OwnedBot = Message<"app.v1.OwnedBot"> & {
  * Use `create(OwnedBotSchema)` to create a new message.
  */
 export const OwnedBotSchema: GenMessage<OwnedBot> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 9);
-
-/**
- * @generated from message app.v1.GetAccountDeletionResponse
- */
-export type GetAccountDeletionResponse = Message<"app.v1.GetAccountDeletionResponse"> & {
-  /**
-   * @generated from field: repeated app.v1.OwnedChat owned_chats = 1;
-   */
-  ownedChats: OwnedChat[];
-
-  /**
-   * @generated from field: repeated app.v1.OwnedBot bots = 2;
-   */
-  bots: OwnedBot[];
-
-  /**
-   * 0 (off), 6, 12 or 24.
-   *
-   * @generated from field: int32 auto_delete_months = 3;
-   */
-  autoDeleteMonths: number;
-
-  /**
-   * Unix seconds of this session's IdP sign-in; 0 when unknown.
-   * DeleteAccount needs it within the last 10 minutes.
-   *
-   * @generated from field: int64 signed_in_at = 4 [jstype = JS_NUMBER];
-   */
-  signedInAt: bigint;
-
-  /**
-   * Days between DeleteAccount and the erasure.
-   *
-   * @generated from field: int32 grace_days = 5;
-   */
-  graceDays: number;
-};
-
-/**
- * Describes the message app.v1.GetAccountDeletionResponse.
- * Use `create(GetAccountDeletionResponseSchema)` to create a new message.
- */
-export const GetAccountDeletionResponseSchema: GenMessage<GetAccountDeletionResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 10);
-
-/**
- * @generated from message app.v1.SetAutoDeleteRequest
- */
-export type SetAutoDeleteRequest = Message<"app.v1.SetAutoDeleteRequest"> & {
-  /**
-   * @generated from field: int32 months = 1;
-   */
-  months: number;
-};
-
-/**
- * Describes the message app.v1.SetAutoDeleteRequest.
- * Use `create(SetAutoDeleteRequestSchema)` to create a new message.
- */
-export const SetAutoDeleteRequestSchema: GenMessage<SetAutoDeleteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 11);
-
-/**
- * @generated from message app.v1.SetAutoDeleteResponse
- */
-export type SetAutoDeleteResponse = Message<"app.v1.SetAutoDeleteResponse"> & {
-  /**
-   * @generated from field: int32 months = 1;
-   */
-  months: number;
-};
-
-/**
- * Describes the message app.v1.SetAutoDeleteResponse.
- * Use `create(SetAutoDeleteResponseSchema)` to create a new message.
- */
-export const SetAutoDeleteResponseSchema: GenMessage<SetAutoDeleteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 12);
-
-/**
- * @generated from message app.v1.DeleteAccountRequest
- */
-export type DeleteAccountRequest = Message<"app.v1.DeleteAccountRequest"> & {
-  /**
-   * The caller's username, typed by the user.
-   *
-   * @generated from field: string confirmation = 1;
-   */
-  confirmation: string;
-};
-
-/**
- * Describes the message app.v1.DeleteAccountRequest.
- * Use `create(DeleteAccountRequestSchema)` to create a new message.
- */
-export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 13);
-
-/**
- * @generated from message app.v1.DeleteAccountResponse
- */
-export type DeleteAccountResponse = Message<"app.v1.DeleteAccountResponse"> & {
-  /**
-   * Unix seconds when the account is erased unless cancelled.
-   *
-   * @generated from field: int64 purge_at = 1 [jstype = JS_NUMBER];
-   */
-  purgeAt: bigint;
-};
-
-/**
- * Describes the message app.v1.DeleteAccountResponse.
- * Use `create(DeleteAccountResponseSchema)` to create a new message.
- */
-export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 14);
-
-/**
- * @generated from message app.v1.CancelAccountDeletionRequest
- */
-export type CancelAccountDeletionRequest = Message<"app.v1.CancelAccountDeletionRequest"> & {
-};
-
-/**
- * Describes the message app.v1.CancelAccountDeletionRequest.
- * Use `create(CancelAccountDeletionRequestSchema)` to create a new message.
- */
-export const CancelAccountDeletionRequestSchema: GenMessage<CancelAccountDeletionRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 15);
-
-/**
- * @generated from message app.v1.CancelAccountDeletionResponse
- */
-export type CancelAccountDeletionResponse = Message<"app.v1.CancelAccountDeletionResponse"> & {
-  /**
-   * @generated from field: app.v1.User user = 1;
-   */
-  user?: User | undefined;
-};
-
-/**
- * Describes the message app.v1.CancelAccountDeletionResponse.
- * Use `create(CancelAccountDeletionResponseSchema)` to create a new message.
- */
-export const CancelAccountDeletionResponseSchema: GenMessage<CancelAccountDeletionResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_privacy, 16);
+  messageDesc(file_app_v1_privacy, 7);
 
 /**
  * @generated from enum app.v1.DataExportStatus
@@ -467,11 +270,11 @@ export const DataExportStatusSchema: GenEnum<DataExportStatus> = /*@__PURE__*/
  * ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
  * always holds a value < 2^53; the server asserts the bound when serializing.
  *
- * The user's rights over their chat data (Nghị định 13/2023/NĐ-CP):
- * a downloadable export, deletion when unused, and deletion of the chat
- * account. Only chat data is concerned: the hoandat account and its sign-in
- * methods belong to the IdP. Inventory and retention:
- * docs/privacy/data-inventory.md.
+ * The user's rights over their chat data (Nghị định 13/2023/NĐ-CP): a
+ * downloadable export. Only chat data is concerned: the hoandat account and
+ * its sign-in methods belong to the IdP. An account is deleted only at the
+ * IdP, which tells the chat to erase it (ADR 0016); there is no RPC for it.
+ * Inventory and retention: docs/privacy/data-inventory.md.
  *
  * @generated from service app.v1.PrivacyService
  */
@@ -508,53 +311,6 @@ export const PrivacyService: GenService<{
     methodKind: "unary";
     input: typeof GetDataExportUrlRequestSchema;
     output: typeof GetDataExportUrlResponseSchema;
-  },
-  /**
-   * What deleting the account involves: what blocks it, the bots it stops,
-   * the auto-delete setting and when the session last signed in at the IdP.
-   *
-   * @generated from rpc app.v1.PrivacyService.GetAccountDeletion
-   */
-  getAccountDeletion: {
-    methodKind: "unary";
-    input: typeof GetAccountDeletionRequestSchema;
-    output: typeof GetAccountDeletionResponseSchema;
-  },
-  /**
-   * Auto-delete after this many months without use: 0 (off), 6, 12 or 24.
-   *
-   * @generated from rpc app.v1.PrivacyService.SetAutoDelete
-   */
-  setAutoDelete: {
-    methodKind: "unary";
-    input: typeof SetAutoDeleteRequestSchema;
-    output: typeof SetAutoDeleteResponseSchema;
-  },
-  /**
-   * Sensitive (ADR 0006): requires an IdP sign-in within the last 10
-   * minutes (failed_precondition "reauth_required" otherwise) and the
-   * caller's username as confirmation. Refused with failed_precondition
-   * "owns_chats" while the caller owns a group or channel. The account is
-   * locked at once (every session revoked with ACCOUNT_DELETED, IdP grants
-   * revoked, bots stopped, shown to others as deleted) and erased after the
-   * grace period unless cancelled.
-   *
-   * @generated from rpc app.v1.PrivacyService.DeleteAccount
-   */
-  deleteAccount: {
-    methodKind: "unary";
-    input: typeof DeleteAccountRequestSchema;
-    output: typeof DeleteAccountResponseSchema;
-  },
-  /**
-   * Ends the grace period of the caller's account: everything works again.
-   *
-   * @generated from rpc app.v1.PrivacyService.CancelAccountDeletion
-   */
-  cancelAccountDeletion: {
-    methodKind: "unary";
-    input: typeof CancelAccountDeletionRequestSchema;
-    output: typeof CancelAccountDeletionResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_privacy, 0);

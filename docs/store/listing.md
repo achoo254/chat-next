@@ -208,7 +208,7 @@ Không thu: vị trí, danh bạ của máy (danh bạ của app là người d�
 
 ## Google Play Data safety
 
-- Thu thập: **Có**. Chia sẻ với bên thứ ba: **Không** (Cloudflare là nhà cung cấp xử lý thay nhà vận hành; tin gửi bot là người dùng chủ động gửi tới bot họ chọn, theo định nghĩa của Play không tính là chia sẻ). Mã hoá khi truyền: **Có** (HTTPS, WSS). Người dùng yêu cầu xoá được: **Có** (trong app: Cài đặt › Tài khoản › Xoá tài khoản chat; trên web: `https://chat.hoandat.com/delete-account`).
+- Thu thập: **Có**. Chia sẻ với bên thứ ba: **Không** (Cloudflare là nhà cung cấp xử lý thay nhà vận hành; tin gửi bot là người dùng chủ động gửi tới bot họ chọn, theo định nghĩa của Play không tính là chia sẻ). Mã hoá khi truyền: **Có** (HTTPS, WSS). Người dùng yêu cầu xoá được: **Có** (xoá tài khoản ở `https://auth.hoandat.com/account#account-delete`, link có ở Cài đặt › Tài khoản; hướng dẫn công khai: `https://chat.hoandat.com/delete-account`).
 - Cách tạo tài khoản: đăng nhập OAuth/OpenID Connect qua auth.hoandat.com (Google, GitHub, Apple).
 
 | Nhóm Play | Loại | Bắt buộc/tuỳ chọn | Mục đích |
@@ -239,7 +239,7 @@ SIGNING IN
 The reviewer account starts empty. To try messaging: tap "+" › "Tạo nhóm" (New group) to create a group, or open "Cloud của tôi" (My Cloud) to send yourself messages, photos and voice messages. The "Trợ lý" (Assistant) bot answers in a chat as well.
 
 ACCOUNT DELETION (Guideline 5.1.1(v))
-Cài đặt (Settings) › Tài khoản (Account) › "Xoá tài khoản chat" (Delete chat account). Deleting needs a sign-in within the last 10 minutes; if asked, sign in again with the same reviewer credentials, then type the username to confirm. The account is deleted after a 30-day grace period during which signing in offers only "cancel deletion". Public instructions: https://chat.hoandat.com/delete-account
+Cài đặt (Settings) › Tài khoản (Account) › the link "Xoá tài khoản hoandat.com ở auth.hoandat.com/account" opens the account page of the sign-in service, where the account is deleted (sign in with the same reviewer credentials if asked). The account and its chat data are deleted at once. Public instructions: https://chat.hoandat.com/delete-account
 
 USER-GENERATED CONTENT (Guideline 1.2)
 • Report: long-press a message › "Báo cáo" (Report); a person or chat: open its info › "Báo cáo".

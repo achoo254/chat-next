@@ -16,6 +16,7 @@ Cả hai xin scope `openid profile email`, không có audience API: app chat t�
 ## Endpoint Chat cho máy chủ IdP
 
 - `POST https://chat.<domain>/api/account-notices`, body `{"text": "..."}` (1–2000 ký tự), `Authorization: Bearer <token>` do IdP tự ký: `typ: at+jwt`, `aud` = URL của endpoint, `client_id: auth-account-notices`, scope `account-notices`. Chat gửi chữ cho người dùng có `idp_sub` = `sub` bằng bot trợ lý; trả `204` cả khi không có người dùng đó. Mã lỗi và lý do: [ADR 0015](../adr/0015-account-notices-from-idp.md).
+- `POST https://chat.<domain>/api/idp/account-deleted`, body là SET `account.deleted` (`Content-Type: application/secevent+jwt`) IdP ký bằng khoá chính: `typ: secevent+jwt`, `iss`, `aud` = URL của endpoint, `sub`, `jti`, `exp`, `events` có `urn:hoandat:auth:event:account.deleted`. Chat xoá ngay người dùng có `idp_sub` = `sub` (nhóm và kênh chuyển chủ, bot bị xoá) rồi trả `202`, cũng `202` khi không có người dùng đó; `400` body không phải SET, `401` SET hỏng, `503`/`500` để IdP thử lại. URL này phải nằm trong `ACCOUNT_DELETED_URLS` của IdP. Xoá tài khoản chỉ làm ở `/account` của IdP: Chat không có luồng xoá riêng. Chi tiết: [ADR 0016](../adr/0016-account-deletion-at-idp.md); phía IdP: ADR 0018 của `auth-next`.
 
 ## Cấu hình phía app chat
 

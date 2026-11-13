@@ -1,6 +1,5 @@
 // Simplified Chinese copy of the screens that load on demand; keys mirror vi-screens.ts.
 import { brand } from "../../brand.ts";
-import { deletionTicks } from "../../i18n/account-deletion.ts";
 import { pushServicesNote } from "../../i18n/push-services.ts";
 import { kind } from "./zh-CN.ts";
 import type { ScreensCopy } from "./vi-screens.ts";
@@ -1055,33 +1054,8 @@ export const zhCNScreens: ScreensCopy = {
 		requested: "已申请导出，进度会显示在这里",
 		rateLimited: "每 7 天只能申请一次",
 		unavailable: "此服务器暂不提供数据导出。",
-		autoDelete: "若在以下时间内未使用，则删除我的聊天账号",
-		autoDeleteHint: "从任一设备最后一次使用账号时开始计算。到期后，账号会再保留 30 天才被清除。",
-		autoDeleteOff: "关闭",
-		months: (n: number) => `${n} 个月`,
-		autoDeleteSaved: "自动删除设置已保存",
-		deleteTitle: "删除聊天账号",
-		deleteTicks: deletionTicks["zh-CN"],
-		ownsChats: (n: number) => `你拥有 ${n} 个群组和频道。请先转让其所有权或将其删除。`,
-		groupMembers: (n: number) => `群组 · ${n} 位成员`,
-		channelMembers: (n: number) => `频道 · ${n} 位订阅者`,
-		openGroup: "打开群组",
-		openChannel: "打开频道",
-		botsStop: (n: number, names: string, graceDays: number) =>
-			`你的 ${n} 个机器人（${names}）将立即停止：令牌会被拒绝，Webhook 暂停。它们会在 ${graceDays} 天后随账号一起删除；如果你取消删除，它们会恢复运行。`,
-		needsSignIn: `需要在最近 10 分钟内登录过 ${brand.domain}。`,
-		blockedByChats: "请先转让或删除你的群组和频道",
-		deleteButton: "删除聊天账号",
-		reauthBody: "删除聊天账号需要在最近 10 分钟内登录过。",
-		confirmTitle: "删除聊天账号？",
-		confirmedAt: (host: string, time: string) => `已于 ${time} 在 ${host} 重新确认`,
-		confirmBody: (date: string) =>
-			`账号将立即锁定，所有设备都会退出登录。聊天数据将于 ${date} 清除；在此之前重新登录即可取消。你的 ${brand.domain} 账号不会被删除。`,
-		typeToConfirm: "输入你的用户名以确认",
-		typeLabel: (username: string) => `输入 ${username} 以确认`,
-		mismatch: "用户名不匹配",
-		confirm: "删除账号",
-		deleting: "正在删除…",
+		deleteNote: `删除 ${brand.domain} 账号时，聊天数据会随之立即删除。`,
+		deleteLink: `在 ${brand.idpHost}/account 删除 ${brand.domain} 账号`,
 	},
 	topicList: {
 		more: "加载更多话题",

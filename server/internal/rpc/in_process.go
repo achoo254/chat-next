@@ -41,7 +41,7 @@ func NewInProcess(d Deps) *InProcess {
 
 // Invoke runs one handler method for the caller of sess, with the checks
 // the /rpc interceptors would apply after authentication: an account
-// waiting for deletion is refused, and the request and the response must
+// being erased is refused, and the request and the response must
 // keep the id contract (ADR 0001). Errors are connect errors, as /rpc
 // would answer them.
 func Invoke[Req, Resp any](ctx context.Context, sess store.Session,

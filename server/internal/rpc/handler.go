@@ -123,9 +123,7 @@ func NewHandler(d Deps) (http.Handler, error) {
 	mux.Handle(appv1connect.NewBotAdminServiceHandler(shared.BotAdmin, opts...))
 	mux.Handle(appv1connect.NewPushServiceHandler(&pushService{push: d.Push, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewFeedbackServiceHandler(&feedbackService{chat: d.Chat, logger: d.Logger}, opts...))
-	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{
-		privacy: d.Privacy, store: d.Store, tenantID: d.TenantID, logger: d.Logger,
-	}, opts...))
+	mux.Handle(appv1connect.NewPrivacyServiceHandler(&privacyService{privacy: d.Privacy, logger: d.Logger}, opts...))
 	mux.Handle(appv1connect.NewMachinesServiceHandler(&machinesService{
 		store: d.Store, sessions: d.Sessions, notifier: d.Push, keyProofs: d.KeyProofs, grants: d.MachineGrants,
 		tenantID: d.TenantID, logger: d.Logger,

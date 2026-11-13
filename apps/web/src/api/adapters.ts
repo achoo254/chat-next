@@ -19,16 +19,6 @@ export interface SelfUser {
 	photoId?: string;
 	/** https URL of the IdP account's picture (User.idp_picture), shown where there is no chat photo; absent without one. */
 	idpPicture?: string;
-	/** Set while the account waits for deletion (GetSelfResponse.deletion): the app then only offers to cancel it. */
-	deletion?: AccountDeletionInfo;
-}
-
-/** An account in its deletion grace period. */
-export interface AccountDeletionInfo {
-	/** Unix seconds when the account is erased unless cancelled. */
-	purgeAt: number;
-	/** "user": the user asked for it; "inactive": unused for the auto-delete period. */
-	reason: "user" | "inactive";
 }
 
 export type SessionPlatform = "web" | "ios" | "android" | "unknown";

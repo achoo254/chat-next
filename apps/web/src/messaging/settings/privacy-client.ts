@@ -1,14 +1,8 @@
 // Connect implementation of AccountApi (see privacy-api.ts), loaded with the "Tài khoản" tab.
 import { Code, ConnectError, createClient, type Transport } from "@connectrpc/connect";
 import { assertSafeId } from "@achoo254/chat-core";
-import {
-	DataExportStatus,
-	PrivacyService,
-	type DataExport as WireExport,
-	type GetDataExportResponse,
-	type GetAccountDeletionResponse,
-} from "@achoo254/chat-proto/privacy";
-import type { AccountData, AutoDeleteMonths, DataExport, DeletionInfo, ExportState, ExportStatus, AccountApi, PrivacyErrorKind } from "./privacy-api.ts";
+import { DataExportStatus, PrivacyService, type DataExport as WireExport, type GetDataExportResponse } from "@achoo254/chat-proto/privacy";
+import type { AccountData, DataExport, ExportState, ExportStatus, AccountApi, PrivacyErrorKind } from "./privacy-api.ts";
 
 const STATUSES: Partial<Record<DataExportStatus, ExportStatus>> = {
 	[DataExportStatus.PENDING]: "pending",
@@ -35,20 +29,6 @@ function toExportState(r: Pick<GetDataExportResponse, "export" | "nextRequestAt"
 	return { latest: r.export === undefined ? null : toExport(r.export), nextRequestAt: assertSafeId(r.nextRequestAt), available };
 }
 
-function toMonths(months: number): AutoDeleteMonths {
-	return months === 6 || months === 12 || months === 24 ? months : 0;
-}
-
-function toDeletion(r: GetAccountDeletionResponse): DeletionInfo {
-	return {
-		ownedChats: r.ownedChats.map((c) => ({ chatId: assertSafeId(c.chatId), title: c.title, isChannel: c.isChannel, memberCount: c.memberCount })),
-		bots: r.bots.map((b) => ({ botId: assertSafeId(b.botId), name: b.name, username: b.username })),
-		autoDeleteMonths: toMonths(r.autoDeleteMonths),
-		signedInAt: assertSafeId(r.signedInAt),
-		graceDays: r.graceDays,
-	};
-}
-
 const clients = new WeakMap<Transport, AccountApi>();
 
 /** The account calls on `transport`, one client per transport (the tab and its preloaded data share it). */
@@ -69,32 +49,22 @@ function createPrivacyClient(transport: Transport): AccountApi {
 	};
 	return {
 		// A session that ended is noticed by the realtime connection, which signs this device out.
-		account: async (): Promise<AccountData> => {
-			const [exports, deletion] = await Promise.all([exportState(), privacy.getAccountDeletion({})]);
-			return { exports, deletion: toDeletion(deletion) };
-		},
+		account: async (): Promise<AccountData> => ({ exports: await exportState() }),
 		exportState,
 		requestExport: async () => toExportState(await privacy.requestDataExport({}), true),
 		exportUrl: async (exportId) => (await privacy.getDataExportUrl({ exportId: BigInt(exportId) })).url,
-		setAutoDelete: async (months) => toMonths((await privacy.setAutoDelete({ months })).months),
-		deleteAccount: async (confirmation) => assertSafeId((await privacy.deleteAccount({ confirmation })).purgeAt),
 	};
 }
 
-/** The server's error codes ("reauth_required: …") ride at the start of the message. */
+/** The server's error codes ("export_unavailable: …") ride at the start of the message. */
 export function privacyErrorKind(err: unknown): PrivacyErrorKind {
 	if (!(err instanceof ConnectError)) return "other";
 	const message = err.rawMessage;
 	switch (err.code) {
 		case Code.FailedPrecondition:
-			if (message.startsWith("reauth_required")) return "reauth_required";
-			if (message.startsWith("owns_chats")) return "owns_chats";
-			if (message.startsWith("export_unavailable")) return "unavailable";
-			return "other";
+			return message.startsWith("export_unavailable") ? "unavailable" : "other";
 		case Code.ResourceExhausted:
 			return "rate_limited";
-		case Code.InvalidArgument:
-			return "invalid";
 		default:
 			return "other";
 	}

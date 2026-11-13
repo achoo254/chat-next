@@ -646,8 +646,8 @@ func (s *Service) OwnedBots(ctx context.Context, owner int64) ([]*appv1.OwnedBot
 }
 
 // DeleteOwnedBots deletes every bot of owner, as DeleteBot does, when the
-// owner's account is erased (no recent sign-in needed: the owner confirmed
-// the account deletion with one). It returns how many.
+// owner's account is erased (no recent sign-in needed: the account was
+// deleted at the IdP). It returns how many.
 func (s *Service) DeleteOwnedBots(ctx context.Context, owner int64) (int, error) {
 	n := 0
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -896,8 +896,7 @@ var ErrBadToken = errors.New("botadmin: invalid token")
 
 // Authenticate returns the live bot whose token is token; ErrBadToken when
 // the token is malformed, unknown, revoked, the bot is deleted or its
-// owner's account waits for deletion (the bot is stopped until the owner
-// cancels).
+// owner's account is being erased (the bot is deleted with it).
 func (s *Service) Authenticate(ctx context.Context, token string) (*Bot, error) {
 	botID, secret, ok := ParseToken(token)
 	if !ok {

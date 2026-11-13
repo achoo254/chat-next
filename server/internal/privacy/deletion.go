@@ -8,135 +8,86 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
-	"strings"
-	"time"
 
-	appv1 "app.local/server/gen/app/v1"
-	"app.local/server/internal/profile"
 	"github.com/jackc/pgx/v5"
 )
 
-// Deletion of the chat account.
-//
-// DeleteAccount (recent IdP sign-in, typed username, no owned group or
-// channel) sets users.deletion_requested_at: from then on the account is
-// locked (its sessions are revoked with their IdP grants, a new sign-in may
-// only cancel), others see it as "Tài khoản đã xoá", nobody can find or
-// write to it, and its bots are stopped. CancelAccountDeletion undoes all of
-// that. GracePeriod later the purge job erases it: the account leaves its
-// chats (LeaveAllChats), its saved chat and the private chats nobody alive
-// keeps are deleted, its personal rows go, its bots are deleted, and the
-// users row stays only as the anonymous author of the messages it sent in
-// other people's chats, with the username released and idp_sub cleared, so
-// signing in again creates a new, empty account. Files nobody references
-// any more are collected by the media lifecycle.
+// Deletion of the chat account follows the IdP: an account is deleted only
+// at the IdP's account page, which then tells every app (auth-next ADR 0018,
+// chat ADR 0016). DeleteIdPAccount queues the erasure durably by setting
+// users.deletion_requested_at, which locks the account at once (its
+// sessions are revoked with their IdP grants, others see it as "Tài khoản
+// đã xoá", nobody can find or write to it, its bots are stopped), and then
+// erases it: the account leaves its chats, handing every group and channel
+// it owns to the member with the highest role, then the earliest joiner,
+// or deleting it when nobody else is left (LeaveAllChats); its saved chat
+// and the private chats nobody alive keeps are deleted, its personal rows
+// go, its bots are deleted, and the users row stays only as the anonymous
+// author of the messages it sent in other people's chats, with the
+// username released and idp_sub cleared. An erasure cut short is finished
+// by the hourly job (eraseQueued). Files nobody references any more are
+// collected by the media lifecycle.
 
-// deletionReasons maps users.deletion_reason to the protocol.
-var deletionReasons = map[string]appv1.AccountDeletionReason{
-	"user":     appv1.AccountDeletionReason_ACCOUNT_DELETION_REASON_USER,
-	"inactive": appv1.AccountDeletionReason_ACCOUNT_DELETION_REASON_INACTIVE,
+// DeletionResult says what DeleteIdPAccount did.
+type DeletionResult struct {
+	// UserID is the chat user of the account; 0 when it has none (never
+	// had one, or already erased).
+	UserID int64
+	// Erased: the erasure finished now. When false with a UserID, it is
+	// queued and the job finishes it.
+	Erased bool
 }
 
-// Deletion describes an account in its grace period for GetSelf; nil when
-// requestedAt is nil.
-func Deletion(requestedAt *time.Time, reason string) *appv1.AccountDeletion {
-	if requestedAt == nil {
-		return nil
-	}
-	return &appv1.AccountDeletion{
-		RequestedAt: requestedAt.Unix(), PurgeAt: requestedAt.Add(GracePeriod).Unix(), Reason: deletionReasons[reason],
-	}
-}
-
-// DeletionInfo is what the delete screen shows: blockers, bots, the
-// auto-delete setting and when this session signed in at the IdP.
-func (s *Service) DeletionInfo(ctx context.Context, me int64, authTime time.Time) (*appv1.GetAccountDeletionResponse, error) {
-	owned, err := s.chat.OwnedChats(ctx, me)
-	if err != nil {
-		return nil, err
-	}
-	bots, err := s.bots.OwnedBots(ctx, me)
-	if err != nil {
-		return nil, err
-	}
-	var months int16
-	if err := s.pool.QueryRow(ctx, `SELECT auto_delete_months FROM users WHERE id = $1 AND tenant_id = $2`,
-		me, s.cfg.TenantID).Scan(&months); err != nil {
-		return nil, fmt.Errorf("privacy: auto-delete setting: %w", err)
-	}
-	resp := &appv1.GetAccountDeletionResponse{
-		OwnedChats: owned, Bots: bots, AutoDeleteMonths: int32(months), GraceDays: int32(GracePeriod / (24 * time.Hour)),
-	}
-	if !authTime.IsZero() {
-		resp.SignedInAt = authTime.Unix()
-	}
-	return resp, nil
-}
-
-// SetAutoDelete stores the auto-delete period (0, 6, 12 or 24 months).
-func (s *Service) SetAutoDelete(ctx context.Context, me int64, months int32) (int32, error) {
-	if !slices.Contains(AutoDeleteMonths, months) {
-		return 0, errInvalid("months must be 0, 6, 12 or 24")
-	}
-	if _, err := s.pool.Exec(ctx, `UPDATE users SET auto_delete_months = $3, updated_at = now() WHERE id = $1 AND tenant_id = $2`,
-		me, s.cfg.TenantID, months); err != nil {
-		return 0, fmt.Errorf("privacy: set auto-delete: %w", err)
-	}
-	return months, nil
-}
-
-// RequestDeletion starts the grace period of me's account. authTime is the
-// session's IdP sign-in; confirmation must be me's username.
-func (s *Service) RequestDeletion(ctx context.Context, me int64, authTime time.Time, confirmation string) (time.Time, error) {
-	if authTime.IsZero() || s.now().Sub(authTime) > RecentSignIn {
-		return time.Time{}, errReauth()
-	}
-	owned, err := s.chat.OwnedChats(ctx, me)
-	if err != nil {
-		return time.Time{}, err
-	}
-	if len(owned) > 0 {
-		return time.Time{}, errPrecondition("owns_chats: transfer the ownership of your groups and channels, or delete them, first")
-	}
-	var requested time.Time
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var username string
+// DeleteIdPAccount deletes the chat account of the IdP account sub. It
+// returns an error only when the deletion could not even be queued; once
+// queued, a failed erasure is logged and left to the job. Calling it again
+// for the same sub is harmless.
+func (s *Service) DeleteIdPAccount(ctx context.Context, sub string) (DeletionResult, error) {
+	var userID int64
+	var locked bool
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var pending bool
 		err := tx.QueryRow(ctx, `
-			SELECT username, deletion_requested_at IS NOT NULL FROM users
-			WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL AND NOT is_bot FOR UPDATE`,
-			me, s.cfg.TenantID).Scan(&username, &pending)
+			SELECT id, deletion_requested_at IS NOT NULL FROM users
+			WHERE tenant_id = $1 AND idp_sub = $2 AND deleted_at IS NULL AND NOT is_bot FOR UPDATE`,
+			s.cfg.TenantID, sub).Scan(&userID, &pending)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return errNotFound("user")
+			userID = 0
+			return nil
 		}
 		if err != nil {
 			return fmt.Errorf("privacy: load account: %w", err)
 		}
 		if pending {
-			return errPrecondition("account_pending_deletion: the account already waits for deletion")
+			return nil
 		}
-		typed := profile.NormalizeUsername(strings.TrimPrefix(strings.TrimSpace(confirmation), "@"))
-		if typed == "" || typed != username {
-			return errInvalid("confirmation must be your username")
-		}
-		return s.lock(ctx, tx, me, "user", &requested)
+		locked = true
+		return s.lock(ctx, tx, userID, "idp")
 	})
 	if err != nil {
-		return time.Time{}, err
+		return DeletionResult{}, err
 	}
-	s.afterLock(ctx, me)
-	s.logger.Info("account deletion requested", "user_id", me)
-	return requested.Add(GracePeriod), nil
+	if userID == 0 {
+		return DeletionResult{}, nil
+	}
+	if locked {
+		s.afterLock(ctx, userID)
+		s.logger.Info("account deleted at the IdP: erasure queued", "user_id", userID)
+	}
+	if err := s.Erase(ctx, userID); err != nil {
+		s.logger.Error("erasing an account deleted at the IdP failed; the job retries", "user_id", userID, "err", err)
+		return DeletionResult{UserID: userID}, nil
+	}
+	return DeletionResult{UserID: userID, Erased: true}, nil
 }
 
-// lock starts the grace period of a locked users row and cancels the
-// export being built.
-func (s *Service) lock(ctx context.Context, tx pgx.Tx, userID int64, reason string, requested *time.Time) error {
-	if err := tx.QueryRow(ctx, `
-		UPDATE users SET deletion_requested_at = now(), deletion_reason = $2, updated_at = now() WHERE id = $1
-		RETURNING deletion_requested_at`, userID, reason).Scan(requested); err != nil {
+// lock queues the erasure of a locked users row and cancels the export
+// being built.
+func (s *Service) lock(ctx context.Context, tx pgx.Tx, userID int64, reason string) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE users SET deletion_requested_at = now(), deletion_reason = $2, updated_at = now() WHERE id = $1`,
+		userID, reason); err != nil {
 		return fmt.Errorf("privacy: lock account: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -150,7 +101,8 @@ func (s *Service) lock(ctx context.Context, tx pgx.Tx, userID int64, reason stri
 // afterLock ends the sessions of a just-locked account (with their IdP
 // grants) and tells its chat partners. Both are retried by nothing: a
 // failure is logged, the lock itself already keeps the account out (its
-// sessions cannot be used, see store.ActiveSession).
+// sessions cannot be used, see store.ActiveSession), and the erasure
+// deletes the sessions and announces the account again.
 func (s *Service) afterLock(ctx context.Context, userID int64) {
 	if n, err := s.revoke.RevokeAll(ctx, userID); err != nil {
 		s.logger.Error("revoking the sessions of a deleted account failed", "user_id", userID, "err", err)
@@ -162,78 +114,21 @@ func (s *Service) afterLock(ctx context.Context, userID int64) {
 	}
 }
 
-// CancelDeletion ends the grace period of me's account: it works as before.
-func (s *Service) CancelDeletion(ctx context.Context, me int64) error {
-	tag, err := s.pool.Exec(ctx, `
-		UPDATE users SET deletion_requested_at = NULL, deletion_reason = NULL, updated_at = now()
-		WHERE id = $1 AND tenant_id = $2 AND deletion_requested_at IS NOT NULL AND deleted_at IS NULL`,
-		me, s.cfg.TenantID)
-	if err != nil {
-		return fmt.Errorf("privacy: cancel deletion: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return errPrecondition("not_pending: the account is not waiting for deletion")
-	}
-	if err := s.chat.AnnounceUserChanged(ctx, me); err != nil {
-		s.logger.Error("announcing a restored account failed", "user_id", me, "err", err)
-	}
-	s.logger.Info("account deletion cancelled", "user_id", me)
-	return nil
-}
-
-// scheduleInactive starts the grace period of the accounts that opted in to
-// auto-delete and have not used any session for that many months (an
-// account never used since sign-up counts from its creation).
-func (s *Service) scheduleInactive(ctx context.Context) (int, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT u.id FROM users u
-		WHERE u.tenant_id = $1 AND u.auto_delete_months > 0 AND u.deleted_at IS NULL AND u.deletion_requested_at IS NULL
-			AND NOT u.is_bot
-			AND greatest(u.created_at, (SELECT max(s.last_seen_at) FROM user_sessions s WHERE s.user_id = u.id))
-				< $2::timestamptz - make_interval(months => u.auto_delete_months)
-		ORDER BY u.id LIMIT 500`, s.cfg.TenantID, s.now())
-	if err != nil {
-		return 0, fmt.Errorf("privacy: unused accounts: %w", err)
-	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
-	if err != nil {
-		return 0, fmt.Errorf("privacy: unused accounts: %w", err)
-	}
-	for _, id := range ids {
-		var requested time.Time
-		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-			var pending bool
-			if err := tx.QueryRow(ctx, `SELECT deletion_requested_at IS NOT NULL FROM users WHERE id = $1 FOR UPDATE`, id).
-				Scan(&pending); err != nil {
-				return fmt.Errorf("privacy: load account: %w", err)
-			}
-			if pending {
-				return nil
-			}
-			return s.lock(ctx, tx, id, "inactive", &requested)
-		})
-		if err != nil {
-			return 0, err
-		}
-		s.afterLock(ctx, id)
-		s.logger.Info("unused account scheduled for deletion", "user_id", id)
-	}
-	return len(ids), nil
-}
-
-// purgeDue erases the accounts whose grace period has ended.
-func (s *Service) purgeDue(ctx context.Context) (int, error) {
+// eraseQueued erases the accounts whose erasure is queued and not done:
+// those an earlier erasure left part-way, and those that waited out the
+// 30-day grace period of the chat's former own deletion (they are finished
+// at once).
+func (s *Service) eraseQueued(ctx context.Context) (int, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id FROM users
 		WHERE tenant_id = $1 AND deletion_requested_at IS NOT NULL AND deleted_at IS NULL
-			AND deletion_requested_at <= $2::timestamptz - $3::interval
-		ORDER BY deletion_requested_at LIMIT 100`, s.cfg.TenantID, s.now(), GracePeriod)
+		ORDER BY deletion_requested_at LIMIT 100`, s.cfg.TenantID)
 	if err != nil {
-		return 0, fmt.Errorf("privacy: due accounts: %w", err)
+		return 0, fmt.Errorf("privacy: queued accounts: %w", err)
 	}
 	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
 	if err != nil {
-		return 0, fmt.Errorf("privacy: due accounts: %w", err)
+		return 0, fmt.Errorf("privacy: queued accounts: %w", err)
 	}
 	done := 0
 	for _, id := range ids {
@@ -267,8 +162,11 @@ var personalRows = []string{
 
 // Erase removes a deleted account for good (see the comment at the top).
 // Every step can run again, so an erasure cut short is finished by the next
-// run of the job.
+// run of the job. Erasures of this process run one at a time, so the IdP's
+// call and the job never work on the same account together.
 func (s *Service) Erase(ctx context.Context, userID int64) error {
+	s.erasing.Lock()
+	defer s.erasing.Unlock()
 	if err := s.chat.LeaveAllChats(ctx, userID); err != nil {
 		return err
 	}

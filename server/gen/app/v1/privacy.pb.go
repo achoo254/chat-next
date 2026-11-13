@@ -468,114 +468,7 @@ func (x *GetDataExportUrlResponse) GetExpiresAt() int64 {
 	return 0
 }
 
-type GetAccountDeletionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetAccountDeletionRequest) Reset() {
-	*x = GetAccountDeletionRequest{}
-	mi := &file_app_v1_privacy_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetAccountDeletionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetAccountDeletionRequest) ProtoMessage() {}
-
-func (x *GetAccountDeletionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetAccountDeletionRequest.ProtoReflect.Descriptor instead.
-func (*GetAccountDeletionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{7}
-}
-
-// A group or channel the caller owns: it blocks DeleteAccount until its
-// ownership passes to someone else or it is deleted.
-type OwnedChat struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	IsChannel     bool                   `protobuf:"varint,3,opt,name=is_channel,json=isChannel,proto3" json:"is_channel,omitempty"`
-	MemberCount   int32                  `protobuf:"varint,4,opt,name=member_count,json=memberCount,proto3" json:"member_count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *OwnedChat) Reset() {
-	*x = OwnedChat{}
-	mi := &file_app_v1_privacy_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *OwnedChat) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*OwnedChat) ProtoMessage() {}
-
-func (x *OwnedChat) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use OwnedChat.ProtoReflect.Descriptor instead.
-func (*OwnedChat) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *OwnedChat) GetChatId() int64 {
-	if x != nil {
-		return x.ChatId
-	}
-	return 0
-}
-
-func (x *OwnedChat) GetTitle() string {
-	if x != nil {
-		return x.Title
-	}
-	return ""
-}
-
-func (x *OwnedChat) GetIsChannel() bool {
-	if x != nil {
-		return x.IsChannel
-	}
-	return false
-}
-
-func (x *OwnedChat) GetMemberCount() int32 {
-	if x != nil {
-		return x.MemberCount
-	}
-	return 0
-}
-
-// A bot of the caller: stopped during the grace period, deleted with the
-// account.
+// A bot of the caller, as the data export lists it.
 type OwnedBot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BotId         int64                  `protobuf:"varint,1,opt,name=bot_id,json=botId,proto3" json:"bot_id,omitempty"`
@@ -587,7 +480,7 @@ type OwnedBot struct {
 
 func (x *OwnedBot) Reset() {
 	*x = OwnedBot{}
-	mi := &file_app_v1_privacy_proto_msgTypes[9]
+	mi := &file_app_v1_privacy_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -599,7 +492,7 @@ func (x *OwnedBot) String() string {
 func (*OwnedBot) ProtoMessage() {}
 
 func (x *OwnedBot) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[9]
+	mi := &file_app_v1_privacy_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -612,7 +505,7 @@ func (x *OwnedBot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OwnedBot.ProtoReflect.Descriptor instead.
 func (*OwnedBot) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_privacy_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *OwnedBot) GetBotId() int64 {
@@ -636,349 +529,11 @@ func (x *OwnedBot) GetUsername() string {
 	return ""
 }
 
-type GetAccountDeletionResponse struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	OwnedChats []*OwnedChat           `protobuf:"bytes,1,rep,name=owned_chats,json=ownedChats,proto3" json:"owned_chats,omitempty"`
-	Bots       []*OwnedBot            `protobuf:"bytes,2,rep,name=bots,proto3" json:"bots,omitempty"`
-	// 0 (off), 6, 12 or 24.
-	AutoDeleteMonths int32 `protobuf:"varint,3,opt,name=auto_delete_months,json=autoDeleteMonths,proto3" json:"auto_delete_months,omitempty"`
-	// Unix seconds of this session's IdP sign-in; 0 when unknown.
-	// DeleteAccount needs it within the last 10 minutes.
-	SignedInAt int64 `protobuf:"varint,4,opt,name=signed_in_at,json=signedInAt,proto3" json:"signed_in_at,omitempty"`
-	// Days between DeleteAccount and the erasure.
-	GraceDays     int32 `protobuf:"varint,5,opt,name=grace_days,json=graceDays,proto3" json:"grace_days,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetAccountDeletionResponse) Reset() {
-	*x = GetAccountDeletionResponse{}
-	mi := &file_app_v1_privacy_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetAccountDeletionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetAccountDeletionResponse) ProtoMessage() {}
-
-func (x *GetAccountDeletionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetAccountDeletionResponse.ProtoReflect.Descriptor instead.
-func (*GetAccountDeletionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *GetAccountDeletionResponse) GetOwnedChats() []*OwnedChat {
-	if x != nil {
-		return x.OwnedChats
-	}
-	return nil
-}
-
-func (x *GetAccountDeletionResponse) GetBots() []*OwnedBot {
-	if x != nil {
-		return x.Bots
-	}
-	return nil
-}
-
-func (x *GetAccountDeletionResponse) GetAutoDeleteMonths() int32 {
-	if x != nil {
-		return x.AutoDeleteMonths
-	}
-	return 0
-}
-
-func (x *GetAccountDeletionResponse) GetSignedInAt() int64 {
-	if x != nil {
-		return x.SignedInAt
-	}
-	return 0
-}
-
-func (x *GetAccountDeletionResponse) GetGraceDays() int32 {
-	if x != nil {
-		return x.GraceDays
-	}
-	return 0
-}
-
-type SetAutoDeleteRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Months        int32                  `protobuf:"varint,1,opt,name=months,proto3" json:"months,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetAutoDeleteRequest) Reset() {
-	*x = SetAutoDeleteRequest{}
-	mi := &file_app_v1_privacy_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetAutoDeleteRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetAutoDeleteRequest) ProtoMessage() {}
-
-func (x *SetAutoDeleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetAutoDeleteRequest.ProtoReflect.Descriptor instead.
-func (*SetAutoDeleteRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *SetAutoDeleteRequest) GetMonths() int32 {
-	if x != nil {
-		return x.Months
-	}
-	return 0
-}
-
-type SetAutoDeleteResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Months        int32                  `protobuf:"varint,1,opt,name=months,proto3" json:"months,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetAutoDeleteResponse) Reset() {
-	*x = SetAutoDeleteResponse{}
-	mi := &file_app_v1_privacy_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetAutoDeleteResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetAutoDeleteResponse) ProtoMessage() {}
-
-func (x *SetAutoDeleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetAutoDeleteResponse.ProtoReflect.Descriptor instead.
-func (*SetAutoDeleteResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *SetAutoDeleteResponse) GetMonths() int32 {
-	if x != nil {
-		return x.Months
-	}
-	return 0
-}
-
-type DeleteAccountRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The caller's username, typed by the user.
-	Confirmation  string `protobuf:"bytes,1,opt,name=confirmation,proto3" json:"confirmation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteAccountRequest) Reset() {
-	*x = DeleteAccountRequest{}
-	mi := &file_app_v1_privacy_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteAccountRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteAccountRequest) ProtoMessage() {}
-
-func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
-func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *DeleteAccountRequest) GetConfirmation() string {
-	if x != nil {
-		return x.Confirmation
-	}
-	return ""
-}
-
-type DeleteAccountResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Unix seconds when the account is erased unless cancelled.
-	PurgeAt       int64 `protobuf:"varint,1,opt,name=purge_at,json=purgeAt,proto3" json:"purge_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeleteAccountResponse) Reset() {
-	*x = DeleteAccountResponse{}
-	mi := &file_app_v1_privacy_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeleteAccountResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeleteAccountResponse) ProtoMessage() {}
-
-func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
-func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *DeleteAccountResponse) GetPurgeAt() int64 {
-	if x != nil {
-		return x.PurgeAt
-	}
-	return 0
-}
-
-type CancelAccountDeletionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CancelAccountDeletionRequest) Reset() {
-	*x = CancelAccountDeletionRequest{}
-	mi := &file_app_v1_privacy_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CancelAccountDeletionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CancelAccountDeletionRequest) ProtoMessage() {}
-
-func (x *CancelAccountDeletionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CancelAccountDeletionRequest.ProtoReflect.Descriptor instead.
-func (*CancelAccountDeletionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{15}
-}
-
-type CancelAccountDeletionResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CancelAccountDeletionResponse) Reset() {
-	*x = CancelAccountDeletionResponse{}
-	mi := &file_app_v1_privacy_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CancelAccountDeletionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CancelAccountDeletionResponse) ProtoMessage() {}
-
-func (x *CancelAccountDeletionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_privacy_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CancelAccountDeletionResponse.ProtoReflect.Descriptor instead.
-func (*CancelAccountDeletionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_privacy_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *CancelAccountDeletionResponse) GetUser() *User {
-	if x != nil {
-		return x.User
-	}
-	return nil
-}
-
 var File_app_v1_privacy_proto protoreflect.FileDescriptor
 
 const file_app_v1_privacy_proto_rawDesc = "" +
 	"\n" +
-	"\x14app/v1/privacy.proto\x12\x06app.v1\x1a\x12app/v1/users.proto\"\x88\x02\n" +
+	"\x14app/v1/privacy.proto\x12\x06app.v1\"\x88\x02\n" +
 	"\n" +
 	"DataExport\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x120\n" +
@@ -1005,53 +560,22 @@ const file_app_v1_privacy_proto_rawDesc = "" +
 	"\x18GetDataExportUrlResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12!\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\x03B\x020\x02R\texpiresAt\"\x1b\n" +
-	"\x19GetAccountDeletionRequest\"\x80\x01\n" +
-	"\tOwnedChat\x12\x1b\n" +
-	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
-	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1d\n" +
-	"\n" +
-	"is_channel\x18\x03 \x01(\bR\tisChannel\x12!\n" +
-	"\fmember_count\x18\x04 \x01(\x05R\vmemberCount\"U\n" +
+	"expires_at\x18\x02 \x01(\x03B\x020\x02R\texpiresAt\"U\n" +
 	"\bOwnedBot\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
-	"\busername\x18\x03 \x01(\tR\busername\"\xe9\x01\n" +
-	"\x1aGetAccountDeletionResponse\x122\n" +
-	"\vowned_chats\x18\x01 \x03(\v2\x11.app.v1.OwnedChatR\n" +
-	"ownedChats\x12$\n" +
-	"\x04bots\x18\x02 \x03(\v2\x10.app.v1.OwnedBotR\x04bots\x12,\n" +
-	"\x12auto_delete_months\x18\x03 \x01(\x05R\x10autoDeleteMonths\x12$\n" +
-	"\fsigned_in_at\x18\x04 \x01(\x03B\x020\x02R\n" +
-	"signedInAt\x12\x1d\n" +
-	"\n" +
-	"grace_days\x18\x05 \x01(\x05R\tgraceDays\".\n" +
-	"\x14SetAutoDeleteRequest\x12\x16\n" +
-	"\x06months\x18\x01 \x01(\x05R\x06months\"/\n" +
-	"\x15SetAutoDeleteResponse\x12\x16\n" +
-	"\x06months\x18\x01 \x01(\x05R\x06months\":\n" +
-	"\x14DeleteAccountRequest\x12\"\n" +
-	"\fconfirmation\x18\x01 \x01(\tR\fconfirmation\"6\n" +
-	"\x15DeleteAccountResponse\x12\x1d\n" +
-	"\bpurge_at\x18\x01 \x01(\x03B\x020\x02R\apurgeAt\"\x1e\n" +
-	"\x1cCancelAccountDeletionRequest\"A\n" +
-	"\x1dCancelAccountDeletionResponse\x12 \n" +
-	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user*\xd3\x01\n" +
+	"\busername\x18\x03 \x01(\tR\busername*\xd3\x01\n" +
 	"\x10DataExportStatus\x12\"\n" +
 	"\x1eDATA_EXPORT_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aDATA_EXPORT_STATUS_PENDING\x10\x01\x12\x1e\n" +
 	"\x1aDATA_EXPORT_STATUS_RUNNING\x10\x02\x12\x1c\n" +
 	"\x18DATA_EXPORT_STATUS_READY\x10\x03\x12\x1d\n" +
 	"\x19DATA_EXPORT_STATUS_FAILED\x10\x04\x12\x1e\n" +
-	"\x1aDATA_EXPORT_STATUS_EXPIRED\x10\x052\xee\x04\n" +
+	"\x1aDATA_EXPORT_STATUS_EXPIRED\x10\x052\x8f\x02\n" +
 	"\x0ePrivacyService\x12L\n" +
 	"\rGetDataExport\x12\x1c.app.v1.GetDataExportRequest\x1a\x1d.app.v1.GetDataExportResponse\x12X\n" +
 	"\x11RequestDataExport\x12 .app.v1.RequestDataExportRequest\x1a!.app.v1.RequestDataExportResponse\x12U\n" +
-	"\x10GetDataExportUrl\x12\x1f.app.v1.GetDataExportUrlRequest\x1a .app.v1.GetDataExportUrlResponse\x12[\n" +
-	"\x12GetAccountDeletion\x12!.app.v1.GetAccountDeletionRequest\x1a\".app.v1.GetAccountDeletionResponse\x12L\n" +
-	"\rSetAutoDelete\x12\x1c.app.v1.SetAutoDeleteRequest\x1a\x1d.app.v1.SetAutoDeleteResponse\x12L\n" +
-	"\rDeleteAccount\x12\x1c.app.v1.DeleteAccountRequest\x1a\x1d.app.v1.DeleteAccountResponse\x12d\n" +
-	"\x15CancelAccountDeletion\x12$.app.v1.CancelAccountDeletionRequest\x1a%.app.v1.CancelAccountDeletionResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\x10GetDataExportUrl\x12\x1f.app.v1.GetDataExportUrlRequest\x1a .app.v1.GetDataExportUrlResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_privacy_proto_rawDescOnce sync.Once
@@ -1066,54 +590,33 @@ func file_app_v1_privacy_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_privacy_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_app_v1_privacy_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_app_v1_privacy_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_app_v1_privacy_proto_goTypes = []any{
-	(DataExportStatus)(0),                 // 0: app.v1.DataExportStatus
-	(*DataExport)(nil),                    // 1: app.v1.DataExport
-	(*GetDataExportRequest)(nil),          // 2: app.v1.GetDataExportRequest
-	(*GetDataExportResponse)(nil),         // 3: app.v1.GetDataExportResponse
-	(*RequestDataExportRequest)(nil),      // 4: app.v1.RequestDataExportRequest
-	(*RequestDataExportResponse)(nil),     // 5: app.v1.RequestDataExportResponse
-	(*GetDataExportUrlRequest)(nil),       // 6: app.v1.GetDataExportUrlRequest
-	(*GetDataExportUrlResponse)(nil),      // 7: app.v1.GetDataExportUrlResponse
-	(*GetAccountDeletionRequest)(nil),     // 8: app.v1.GetAccountDeletionRequest
-	(*OwnedChat)(nil),                     // 9: app.v1.OwnedChat
-	(*OwnedBot)(nil),                      // 10: app.v1.OwnedBot
-	(*GetAccountDeletionResponse)(nil),    // 11: app.v1.GetAccountDeletionResponse
-	(*SetAutoDeleteRequest)(nil),          // 12: app.v1.SetAutoDeleteRequest
-	(*SetAutoDeleteResponse)(nil),         // 13: app.v1.SetAutoDeleteResponse
-	(*DeleteAccountRequest)(nil),          // 14: app.v1.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),         // 15: app.v1.DeleteAccountResponse
-	(*CancelAccountDeletionRequest)(nil),  // 16: app.v1.CancelAccountDeletionRequest
-	(*CancelAccountDeletionResponse)(nil), // 17: app.v1.CancelAccountDeletionResponse
-	(*User)(nil),                          // 18: app.v1.User
+	(DataExportStatus)(0),             // 0: app.v1.DataExportStatus
+	(*DataExport)(nil),                // 1: app.v1.DataExport
+	(*GetDataExportRequest)(nil),      // 2: app.v1.GetDataExportRequest
+	(*GetDataExportResponse)(nil),     // 3: app.v1.GetDataExportResponse
+	(*RequestDataExportRequest)(nil),  // 4: app.v1.RequestDataExportRequest
+	(*RequestDataExportResponse)(nil), // 5: app.v1.RequestDataExportResponse
+	(*GetDataExportUrlRequest)(nil),   // 6: app.v1.GetDataExportUrlRequest
+	(*GetDataExportUrlResponse)(nil),  // 7: app.v1.GetDataExportUrlResponse
+	(*OwnedBot)(nil),                  // 8: app.v1.OwnedBot
 }
 var file_app_v1_privacy_proto_depIdxs = []int32{
-	0,  // 0: app.v1.DataExport.status:type_name -> app.v1.DataExportStatus
-	1,  // 1: app.v1.GetDataExportResponse.export:type_name -> app.v1.DataExport
-	1,  // 2: app.v1.RequestDataExportResponse.export:type_name -> app.v1.DataExport
-	9,  // 3: app.v1.GetAccountDeletionResponse.owned_chats:type_name -> app.v1.OwnedChat
-	10, // 4: app.v1.GetAccountDeletionResponse.bots:type_name -> app.v1.OwnedBot
-	18, // 5: app.v1.CancelAccountDeletionResponse.user:type_name -> app.v1.User
-	2,  // 6: app.v1.PrivacyService.GetDataExport:input_type -> app.v1.GetDataExportRequest
-	4,  // 7: app.v1.PrivacyService.RequestDataExport:input_type -> app.v1.RequestDataExportRequest
-	6,  // 8: app.v1.PrivacyService.GetDataExportUrl:input_type -> app.v1.GetDataExportUrlRequest
-	8,  // 9: app.v1.PrivacyService.GetAccountDeletion:input_type -> app.v1.GetAccountDeletionRequest
-	12, // 10: app.v1.PrivacyService.SetAutoDelete:input_type -> app.v1.SetAutoDeleteRequest
-	14, // 11: app.v1.PrivacyService.DeleteAccount:input_type -> app.v1.DeleteAccountRequest
-	16, // 12: app.v1.PrivacyService.CancelAccountDeletion:input_type -> app.v1.CancelAccountDeletionRequest
-	3,  // 13: app.v1.PrivacyService.GetDataExport:output_type -> app.v1.GetDataExportResponse
-	5,  // 14: app.v1.PrivacyService.RequestDataExport:output_type -> app.v1.RequestDataExportResponse
-	7,  // 15: app.v1.PrivacyService.GetDataExportUrl:output_type -> app.v1.GetDataExportUrlResponse
-	11, // 16: app.v1.PrivacyService.GetAccountDeletion:output_type -> app.v1.GetAccountDeletionResponse
-	13, // 17: app.v1.PrivacyService.SetAutoDelete:output_type -> app.v1.SetAutoDeleteResponse
-	15, // 18: app.v1.PrivacyService.DeleteAccount:output_type -> app.v1.DeleteAccountResponse
-	17, // 19: app.v1.PrivacyService.CancelAccountDeletion:output_type -> app.v1.CancelAccountDeletionResponse
-	13, // [13:20] is the sub-list for method output_type
-	6,  // [6:13] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0, // 0: app.v1.DataExport.status:type_name -> app.v1.DataExportStatus
+	1, // 1: app.v1.GetDataExportResponse.export:type_name -> app.v1.DataExport
+	1, // 2: app.v1.RequestDataExportResponse.export:type_name -> app.v1.DataExport
+	2, // 3: app.v1.PrivacyService.GetDataExport:input_type -> app.v1.GetDataExportRequest
+	4, // 4: app.v1.PrivacyService.RequestDataExport:input_type -> app.v1.RequestDataExportRequest
+	6, // 5: app.v1.PrivacyService.GetDataExportUrl:input_type -> app.v1.GetDataExportUrlRequest
+	3, // 6: app.v1.PrivacyService.GetDataExport:output_type -> app.v1.GetDataExportResponse
+	5, // 7: app.v1.PrivacyService.RequestDataExport:output_type -> app.v1.RequestDataExportResponse
+	7, // 8: app.v1.PrivacyService.GetDataExportUrl:output_type -> app.v1.GetDataExportUrlResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_privacy_proto_init() }
@@ -1121,14 +624,13 @@ func file_app_v1_privacy_proto_init() {
 	if File_app_v1_privacy_proto != nil {
 		return
 	}
-	file_app_v1_users_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_privacy_proto_rawDesc), len(file_app_v1_privacy_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

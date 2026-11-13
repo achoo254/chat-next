@@ -298,7 +298,7 @@ type userRow struct {
 	IsBot    bool
 	// InlinePlaceholder: a bot with inline mode on ("" when off).
 	InlinePlaceholder string
-	// Deleted: the account waits for deletion or was erased; others see a
+	// Deleted: the account is being erased or was erased; others see a
 	// deleted account without profile.
 	Deleted bool
 	// PhotoID is the file_id of the profile photo ("" without one).

@@ -7,7 +7,7 @@
 import { Code } from "@connectrpc/connect";
 import { assertSafeId } from "@achoo254/chat-core";
 import { NATIVE_API_ORIGIN } from "../server-origin.ts";
-import type { AccountDeletionInfo, SelfUser } from "./adapters.ts";
+import type { SelfUser } from "./adapters.ts";
 
 /** Same-origin /rpc on the web; the configured server's /rpc in the native app. */
 export const RPC_BASE_URL = `${NATIVE_API_ORIGIN}/rpc`;
@@ -104,15 +104,7 @@ export function parseGetSelf(body: unknown): SelfUser {
 	if (photoId !== "") self.photoId = photoId;
 	const idpPicture = text(user, "idpPicture");
 	if (idpPicture !== "") self.idpPicture = idpPicture;
-	const deletion = parseDeletion(body.deletion);
-	return deletion === null ? self : { ...self, deletion };
-}
-
-/** GetSelfResponse.deletion; null when the account is not waiting for deletion. */
-function parseDeletion(value: unknown): AccountDeletionInfo | null {
-	if (value === undefined) return null;
-	if (!isRecord(value)) throw new RpcError(Code.Internal, "GetSelf: deletion is not an object");
-	return { purgeAt: int64(value, "purgeAt"), reason: value.reason === "ACCOUNT_DELETION_REASON_INACTIVE" ? "inactive" : "user" };
+	return self;
 }
 
 /**

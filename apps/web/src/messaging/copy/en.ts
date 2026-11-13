@@ -179,7 +179,7 @@ export const en: MessagingCopy = {
 		reactionsHint: "Click to add or remove · right-click or press and hold to see who reacted",
 		recalled: "Message recalled",
 		unknownUser: "User",
-		/** An account deleted by its owner (or waiting for deletion). */
+		/** An account deleted at the IdP (erased, or being erased). */
 		deletedAccount: "Deleted account",
 		deleted: "Message unsent",
 		quickActions: (name: string) => `Quick actions for ${name}'s message`,

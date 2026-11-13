@@ -43,7 +43,7 @@ const (
 	reasonRevokedByUser = "2"
 	reasonGrantEnded    = "3"
 	reasonReplaced      = "6"
-	// ReasonAccountDeleted: the account entered its deletion grace period.
+	// ReasonAccountDeleted: the account was deleted at the IdP.
 	reasonAccountDeleted = "7"
 )
 
@@ -63,9 +63,8 @@ type Session struct {
 	// AuthTime is when the user last authenticated at the IdP for this
 	// session (the ID token's auth_time at sign-in); zero when unknown.
 	AuthTime time.Time
-	// AccountLocked: the user's account waits for deletion. Only
-	// ActiveSession fills it; such a session may only cancel the deletion
-	// or sign out.
+	// AccountLocked: the user's account is being erased (deleted at the
+	// IdP). Only ActiveSession fills it; such a session may only sign out.
 	AccountLocked bool
 	// Platform is PlatformWeb, PlatformIOS or PlatformAndroid.
 	Platform int16
@@ -313,7 +312,7 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID
 
 // RevokeAllSessions revokes every session of the user that is not revoked
 // yet (expired ones too, so a native refresh token still held is revoked at
-// the IdP) because the account entered its deletion grace period.
+// the IdP) because the account was deleted at the IdP.
 func (s *Store) RevokeAllSessions(ctx context.Context, tenantID string, userID int64) ([]RevokedSession, error) {
 	rows, err := s.pool.Query(ctx, `
 		WITH target AS (

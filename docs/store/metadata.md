@@ -224,10 +224,10 @@ sign-in uses the system authentication session; camera, microphone and photo lib
 to send photos, videos and voice messages; group invite links can be shared with the share sheet.
 
 ACCOUNT DELETION (5.1.1(v))
-Cài đặt (Settings) › Tài khoản (Account) › "Xoá tài khoản chat" (Delete chat account). It needs
-a sign-in within the last 10 minutes; if asked, sign in again with the same reviewer credentials,
-then type the username to confirm. The account is locked at once and erased after 30 days; signing
-in during that time offers only "cancel deletion". Public instructions:
+Cài đặt (Settings) › Tài khoản (Account) › the link "Xoá tài khoản hoandat.com ở
+auth.hoandat.com/account" opens the account page of the sign-in service, where the account is
+deleted (sign in with the same reviewer credentials if asked). The account and its chat data are
+deleted at once. Public instructions:
 https://chat.hoandat.com/delete-account
 
 USER-GENERATED CONTENT (1.2)

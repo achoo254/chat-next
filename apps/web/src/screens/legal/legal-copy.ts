@@ -4,7 +4,7 @@
 // its source, and is where the owner's review is tracked. Change a fact
 // there and here together.
 import { brand } from "../../brand.ts";
-import { DELETION_GRACE_DAYS, deletionTicks } from "../../i18n/account-deletion.ts";
+import { deletionTicks } from "../../i18n/account-deletion.ts";
 import type { Locale } from "../../i18n/i18n.tsx";
 import { pushServicesNote } from "../../i18n/push-services.ts";
 import { paths, type LegalPage } from "../../router.tsx";
@@ -40,9 +40,9 @@ export interface LegalCopy {
 }
 
 /** When the text last changed (shown on every page). */
-export const LEGAL_UPDATED = { vi: "26/10/2026", en: "26 October 2026", "zh-CN": "2026年10月26日" } as const;
+export const LEGAL_UPDATED = { vi: "13/11/2026", en: "13 November 2026", "zh-CN": "2026年11月13日" } as const;
 
-const { appName, domain, webHost, idpHost, accountUrl } = brand;
+const { appName, domain, webHost, idpHost, deleteAccountUrl } = brand;
 
 /**
  * The operator's contact for privacy, terms and deletion requests. Its
@@ -73,7 +73,7 @@ const vi: LegalCopy = {
 						`Ảnh tài khoản: đường dẫn ảnh Google hoặc GitHub của tài khoản ${domain}, đọc lại mỗi lần đăng nhập (đăng nhập bằng Apple thì không có ảnh, vì Apple không chia sẻ ảnh). Chỉ bạn thấy, trên nút tài khoản, khi bạn chưa tải ảnh đại diện lên app chat.`,
 						"Phiên đăng nhập: địa chỉ IP, trình duyệt hoặc thiết bị và thời điểm dùng.",
 						"Tin nhắn, cảm xúc, tin ghim, trạng thái đã đọc và file bạn gửi (ảnh, video, file, tin thoại).",
-						"Danh bạ, người bạn đã chặn, và cài đặt quyền riêng tư, thông báo, tự xoá.",
+						"Danh bạ, người bạn đã chặn, và cài đặt quyền riêng tư, thông báo.",
 						"Đăng ký nhận thông báo đẩy của trình duyệt, khi bạn bật.",
 						"Góp ý bạn gửi, với email và số điện thoại trong đó đã được che.",
 						"Báo cáo bạn gửi về một tin, một người hoặc một chat.",
@@ -101,7 +101,7 @@ const vi: LegalCopy = {
 				{
 					title: "Giữ bao lâu",
 					items: [
-						"Hồ sơ, danh bạ, cài đặt và góp ý: tới khi bạn xoá tài khoản chat.",
+						`Hồ sơ, danh bạ, cài đặt và góp ý: tới khi bạn xoá tài khoản ${domain}.`,
 						"Tin nhắn: tới khi tin bị thu hồi hoặc chat bị xoá.",
 						"File: tới khi không còn tin nào dùng, rồi thêm 1 ngày.",
 						"Phiên đăng nhập trên web: hết hạn sau 30 ngày không dùng, dài nhất 90 ngày.",
@@ -141,8 +141,7 @@ const vi: LegalCopy = {
 						"Chọn ai thấy trạng thái hoạt động và ảnh đại diện, ai tìm được bạn, ai thêm bạn vào nhóm và ai nhắn tin cho bạn: Cài đặt › Quyền riêng tư.",
 						"Xem và đăng xuất các thiết bị: Cài đặt › Phiên đăng nhập.",
 						"Xuất dữ liệu: Cài đặt › Tài khoản. Bản xuất chạy nền, tải trong app, mỗi 7 ngày một lần và giữ 30 ngày. Gồm hồ sơ, danh bạ, người đã chặn, phiên, bot (không có token), danh sách chat, tin bạn gửi và file bạn gửi; không có tin của người khác.",
-						"Tự xoá tài khoản chat khi không dùng 6, 12 hoặc 24 tháng (mặc định tắt): Cài đặt › Tài khoản.",
-						"Xoá tài khoản chat bất cứ lúc nào.",
+						`Xoá tài khoản bất cứ lúc nào ở ${idpHost}/account; dữ liệu chat bị xoá theo ngay.`,
 					],
 					link: { href: paths.deleteAccount, label: "Cách xoá tài khoản" },
 				},
@@ -168,7 +167,7 @@ const vi: LegalCopy = {
 				{
 					title: "Tài khoản",
 					paragraphs: [
-						`Bạn dùng app bằng tài khoản ${domain}. Tài khoản chat là của riêng app này: xoá nó không xoá tài khoản ${domain}.`,
+						`Bạn dùng app bằng tài khoản ${domain}. Xoá tài khoản ${domain} thì tài khoản chat bị xoá theo; app chat không có cách xoá riêng.`,
 					],
 				},
 				{
@@ -196,17 +195,17 @@ const vi: LegalCopy = {
 				},
 				{
 					title: "Nhóm và kênh",
-					paragraphs: ["Muốn xoá tài khoản chat khi còn là chủ sở hữu nhóm hoặc kênh, bạn chuyển quyền sở hữu hoặc xoá chúng trước."],
+					paragraphs: ["Khi tài khoản của chủ sở hữu bị xoá, nhóm hoặc kênh được chuyển cho người còn lại có vai trò cao nhất, cùng vai trò thì người vào sớm nhất; không còn ai thì nhóm hoặc kênh bị xoá."],
 				},
 				{
 					title: "Bot",
 					paragraphs: [
-						"Bạn tạo bot ở Cài đặt › Developer Console. Token của bot chỉ hiện một lần; máy chủ chỉ giữ bản băm. Bot của bạn ngừng chạy ngay khi bạn bắt đầu xoá tài khoản và bị xoá cùng tài khoản.",
+						"Bạn tạo bot ở Cài đặt › Developer Console. Token của bot chỉ hiện một lần; máy chủ chỉ giữ bản băm. Bot của bạn bị xoá cùng tài khoản.",
 					],
 				},
 				{
 					title: "Ngừng dùng",
-					paragraphs: ["Bạn xoá tài khoản chat bất cứ lúc nào trong app."],
+					paragraphs: [`Bạn xoá tài khoản ${domain} bất cứ lúc nào ở ${idpHost}; tài khoản chat bị xoá theo.`],
 					link: { href: paths.deleteAccount, label: "Cách xoá tài khoản" },
 				},
 				{
@@ -224,28 +223,20 @@ const vi: LegalCopy = {
 		},
 		"delete-account": {
 			title: "Xoá tài khoản",
-			lede: `Cách xoá tài khoản chat của ${appName} và dữ liệu đi kèm.`,
+			lede: `Tài khoản chat của ${appName} chỉ xoá được cùng tài khoản ${domain}, ở trang tài khoản của ${idpHost}.`,
 			sections: [
 				{
 					title: "Cách xoá",
 					steps: [
-						`Đăng nhập ở ${webHost}.`,
-						"Mở Cài đặt › Tài khoản, đến mục Xoá tài khoản chat.",
-						`Nếu được hỏi, đăng nhập lại ở ${idpHost} (cần một lần đăng nhập trong 10 phút gần nhất).`,
-						"Gõ username của bạn để xác nhận, rồi bấm Xoá tài khoản.",
+						`Mở trang tài khoản ở ${idpHost}/account và đăng nhập nếu được hỏi.`,
+						"Đến mục Xoá tài khoản và làm theo hướng dẫn ở đó.",
 					],
-					paragraphs: ["Nếu bạn là chủ sở hữu nhóm hoặc kênh, chuyển quyền sở hữu hoặc xoá chúng trước."],
+					paragraphs: ["App chat không có nút xoá riêng: xoá tài khoản ở đó là xoá luôn dữ liệu chat."],
+					link: { href: deleteAccountUrl, label: `Xoá tài khoản ${domain}`, kind: "site" },
 				},
 				{
 					title: "Điều gì xảy ra",
-					items: [
-						...deletionTicks.vi(DELETION_GRACE_DAYS, idpHost),
-						"Mọi thiết bị đăng xuất. Bot của bạn ngừng chạy ngay và bị xoá cùng tài khoản.",
-					],
-				},
-				{
-					title: "Huỷ xoá",
-					paragraphs: [`Đăng nhập lại trong ${DELETION_GRACE_DAYS} ngày, app chỉ hiện một lựa chọn: Huỷ xoá tài khoản.`],
+					items: [...deletionTicks.vi, "Mọi thiết bị đăng xuất."],
 				},
 				{
 					title: "Dữ liệu còn lại sau khi xoá",
@@ -255,13 +246,8 @@ const vi: LegalCopy = {
 					],
 				},
 				{
-					title: `Tài khoản ${domain}`,
-					paragraphs: [`Xoá tài khoản chat không xoá tài khoản ${domain}. Muốn xoá tài khoản đó, vào trang tài khoản ở ${idpHost}.`],
-					link: { href: accountUrl, label: `Tài khoản ${domain}`, kind: "site" },
-				},
-				{
 					title: "Không đăng nhập được?",
-					paragraphs: [`Gửi yêu cầu xoá tài khoản chat tới ${OPERATOR_EMAIL}, ghi rõ username của bạn và email của tài khoản ${domain}.`],
+					paragraphs: [`Gửi yêu cầu xoá tài khoản tới ${OPERATOR_EMAIL}, ghi rõ username chat của bạn và email của tài khoản ${domain}.`],
 					link: mailto(OPERATOR_EMAIL),
 				},
 			],
@@ -291,7 +277,7 @@ const en: LegalCopy = {
 						`Account picture: the link to the Google or GitHub picture of your ${domain} account, read again at every sign-in (signing in with Apple gives no picture, because Apple does not share one). Only you see it, on the account button, while you have not uploaded a profile photo to the chat app.`,
 						"Sessions: IP address, browser or device, and when they were used.",
 						"Messages, reactions, pins, read state and the files you send (photos, videos, files, voice messages).",
-						"Contacts, people you blocked, and your privacy, notification and auto-delete settings.",
+						"Contacts, people you blocked, and your privacy and notification settings.",
 						"Your browser's push subscription, when you turn notifications on.",
 						"Feedback you send, with emails and phone numbers in it masked.",
 						"Reports you send about a message, a person or a chat.",
@@ -319,7 +305,7 @@ const en: LegalCopy = {
 				{
 					title: "How long it is kept",
 					items: [
-						"Profile, contacts, settings and feedback: until you delete your chat account.",
+						`Profile, contacts, settings and feedback: until you delete your ${domain} account.`,
 						"Messages: until they are unsent or the chat is deleted.",
 						"Files: until no message uses them, plus 1 day.",
 						"Web sessions: end after 30 days unused, 90 days at most.",
@@ -359,8 +345,7 @@ const en: LegalCopy = {
 						"Choose who sees your last seen and photo, who can find you, add you to groups and message you: Settings › Privacy.",
 						"See and sign out your devices: Settings › Sessions.",
 						"Export your data: Settings › Account. The export runs in the background, downloads in the app, once every 7 days, and is kept 30 days. It has your profile, contacts, blocked people, sessions, bots (no tokens), chat list, the messages and files you sent; no one else's messages.",
-						"Delete your chat account automatically after 6, 12 or 24 months unused (off by default): Settings › Account.",
-						"Delete your chat account at any time.",
+						`Delete your account at any time at ${idpHost}/account; your chat data is deleted with it at once.`,
 					],
 					link: { href: paths.deleteAccount, label: "How to delete your account" },
 				},
@@ -385,7 +370,7 @@ const en: LegalCopy = {
 			sections: [
 				{
 					title: "Your account",
-					paragraphs: [`You use the app with your ${domain} account. The chat account belongs to this app only: deleting it does not delete your ${domain} account.`],
+					paragraphs: [`You use the app with your ${domain} account. Deleting your ${domain} account deletes your chat account too; the chat app has no deletion of its own.`],
 				},
 				{
 					title: "Reporting content",
@@ -412,17 +397,17 @@ const en: LegalCopy = {
 				},
 				{
 					title: "Groups and channels",
-					paragraphs: ["To delete your chat account while you own groups or channels, transfer their ownership or delete them first."],
+					paragraphs: ["When an owner's account is deleted, the group or channel passes to the remaining person with the highest role, the earliest to join among equals; with nobody left, it is deleted."],
 				},
 				{
 					title: "Bots",
 					paragraphs: [
-						"You create bots in Settings › Developer Console. A bot token is shown once; the server keeps only a hash. Your bots stop as soon as you start deleting your account and are deleted with it.",
+						"You create bots in Settings › Developer Console. A bot token is shown once; the server keeps only a hash. Your bots are deleted with your account.",
 					],
 				},
 				{
 					title: "Leaving",
-					paragraphs: ["You can delete your chat account at any time in the app."],
+					paragraphs: [`You can delete your ${domain} account at any time at ${idpHost}; your chat account goes with it.`],
 					link: { href: paths.deleteAccount, label: "How to delete your account" },
 				},
 				{
@@ -440,28 +425,17 @@ const en: LegalCopy = {
 		},
 		"delete-account": {
 			title: "Delete your account",
-			lede: `How to delete your ${appName} chat account and the data that goes with it.`,
+			lede: `Your ${appName} chat account is deleted only together with your ${domain} account, on the account page at ${idpHost}.`,
 			sections: [
 				{
 					title: "How to delete it",
-					steps: [
-						`Sign in at ${webHost}.`,
-						"Open Settings › Account and go to Delete chat account.",
-						`If asked, sign in again at ${idpHost} (deleting needs a sign-in within the last 10 minutes).`,
-						"Type your username to confirm, then press Delete account.",
-					],
-					paragraphs: ["If you own groups or channels, transfer their ownership or delete them first."],
+					steps: [`Open the account page at ${idpHost}/account and sign in if asked.`, "Go to Delete account and follow the steps there."],
+					paragraphs: ["The chat app has no delete button of its own: deleting your account there deletes your chat data too."],
+					link: { href: deleteAccountUrl, label: `Delete your ${domain} account`, kind: "site" },
 				},
 				{
 					title: "What happens",
-					items: [
-						...deletionTicks.en(DELETION_GRACE_DAYS, idpHost),
-						"Every device is signed out. Your bots stop at once and are deleted with the account.",
-					],
-				},
-				{
-					title: "Cancelling",
-					paragraphs: [`Sign in again within ${DELETION_GRACE_DAYS} days and the app offers one choice: cancel the deletion.`],
+					items: [...deletionTicks.en, "Every device is signed out."],
 				},
 				{
 					title: "What remains after deletion",
@@ -471,13 +445,8 @@ const en: LegalCopy = {
 					],
 				},
 				{
-					title: `Your ${domain} account`,
-					paragraphs: [`Deleting your chat account does not delete your ${domain} account. To delete that, use its account page at ${idpHost}.`],
-					link: { href: accountUrl, label: `${domain} account`, kind: "site" },
-				},
-				{
 					title: "Can't sign in?",
-					paragraphs: [`Email your request to delete your chat account to ${OPERATOR_EMAIL}, with your username and your ${domain} account's email.`],
+					paragraphs: [`Email your request to delete your account to ${OPERATOR_EMAIL}, with your chat username and your ${domain} account's email.`],
 					link: mailto(OPERATOR_EMAIL),
 				},
 			],
@@ -507,7 +476,7 @@ const zhCN: LegalCopy = {
 						`账号头像：指向你的 ${domain} 账号在 Google 或 GitHub 上头像的链接，每次登录时重新读取（通过 Apple 登录则没有头像，因为 Apple 不提供）。在你尚未向聊天应用上传头像时，只有你能在账号按钮上看到它。`,
 						"会话：IP 地址、浏览器或设备，以及使用时间。",
 						"消息、表情回应、置顶、已读状态，以及你发送的文件（照片、视频、文件、语音消息）。",
-						"联系人、你屏蔽的人，以及你的隐私、通知和自动删除设置。",
+						"联系人、你屏蔽的人，以及你的隐私和通知设置。",
 						"开启通知时，你浏览器的推送订阅。",
 						"你发送的反馈，其中的电子邮箱和电话号码会被遮盖。",
 						"你针对某条消息、某个人或某个聊天提交的举报。",
@@ -535,7 +504,7 @@ const zhCN: LegalCopy = {
 				{
 					title: "保存期限",
 					items: [
-						"个人资料、联系人、设置和反馈：直到你删除聊天账号。",
+						`个人资料、联系人、设置和反馈：直到你删除 ${domain} 账号。`,
 						"消息：直到被撤回或聊天被删除。",
 						"文件：直到不再有消息使用它们，再加 1 天。",
 						"网页会话：30 天未使用即结束，最长 90 天。",
@@ -575,8 +544,7 @@ const zhCN: LegalCopy = {
 						"选择谁能看到你的最后在线时间和头像，谁能找到你、把你加入群组和给你发消息：设置 › 隐私。",
 						"查看你的设备并让其退出登录：设置 › 会话。",
 						"导出你的数据：设置 › 账号。导出在后台进行，在应用内下载，每 7 天一次，保留 30 天。其中包含你的个人资料、联系人、屏蔽的人、会话、机器人（不含令牌）、聊天列表，以及你发送的消息和文件；不含他人的消息。",
-						"在 6、12 或 24 个月未使用后自动删除你的聊天账号（默认关闭）：设置 › 账号。",
-						"随时删除你的聊天账号。",
+						`随时在 ${idpHost}/account 删除你的账号；你的聊天数据会随之立即删除。`,
 					],
 					link: { href: paths.deleteAccount, label: "如何删除账号" },
 				},
@@ -601,7 +569,7 @@ const zhCN: LegalCopy = {
 			sections: [
 				{
 					title: "你的账号",
-					paragraphs: [`你使用 ${domain} 账号使用本应用。聊天账号仅属于本应用：删除它不会删除你的 ${domain} 账号。`],
+					paragraphs: [`你使用 ${domain} 账号使用本应用。删除 ${domain} 账号时，聊天账号会随之删除；聊天应用没有单独的删除方式。`],
 				},
 				{
 					title: "举报内容",
@@ -628,17 +596,17 @@ const zhCN: LegalCopy = {
 				},
 				{
 					title: "群组和频道",
-					paragraphs: ["如果你拥有群组或频道，删除聊天账号前请先转让其所有权或将其删除。"],
+					paragraphs: ["所有者的账号被删除时，群组或频道会转给剩余成员中角色最高的人，角色相同则转给最早加入的人；若已无其他成员，则会被删除。"],
 				},
 				{
 					title: "机器人",
 					paragraphs: [
-						"你可以在 设置 › 开发者控制台 中创建机器人。机器人令牌只显示一次；服务器只保存其哈希值。你一开始删除账号，你的机器人就会停止运行，并随账号一起删除。",
+						"你可以在 设置 › 开发者控制台 中创建机器人。机器人令牌只显示一次；服务器只保存其哈希值。你的机器人会随账号一起删除。",
 					],
 				},
 				{
 					title: "离开",
-					paragraphs: ["你可以随时在应用内删除你的聊天账号。"],
+					paragraphs: [`你可以随时在 ${idpHost} 删除你的 ${domain} 账号；聊天账号会随之删除。`],
 					link: { href: paths.deleteAccount, label: "如何删除账号" },
 				},
 				{
@@ -656,28 +624,17 @@ const zhCN: LegalCopy = {
 		},
 		"delete-account": {
 			title: "删除账号",
-			lede: `如何删除你的 ${appName} 聊天账号及其相关数据。`,
+			lede: `${appName} 的聊天账号只能与你的 ${domain} 账号一起，在 ${idpHost} 的账号页面删除。`,
 			sections: [
 				{
 					title: "如何删除",
-					steps: [
-						`在 ${webHost} 登录。`,
-						"打开 设置 › 账号，进入“删除聊天账号”。",
-						`如有提示，请在 ${idpHost} 重新登录（删除需要最近 10 分钟内登录过）。`,
-						"输入你的用户名进行确认，然后点击“删除账号”。",
-					],
-					paragraphs: ["如果你拥有群组或频道，请先转让其所有权或将其删除。"],
+					steps: [`打开 ${idpHost}/account 账号页面，如有提示请登录。`, "进入“删除账号”，按其中的步骤操作。"],
+					paragraphs: ["聊天应用没有单独的删除按钮：在那里删除账号会同时删除你的聊天数据。"],
+					link: { href: deleteAccountUrl, label: `删除 ${domain} 账号`, kind: "site" },
 				},
 				{
 					title: "删除后会发生什么",
-					items: [
-						...deletionTicks["zh-CN"](DELETION_GRACE_DAYS, idpHost),
-						"所有设备都会退出登录。你的机器人会立即停止运行，并随账号一起删除。",
-					],
-				},
-				{
-					title: "取消删除",
-					paragraphs: [`在 ${DELETION_GRACE_DAYS} 天内重新登录，应用会提供一个选项：取消删除。`],
+					items: [...deletionTicks["zh-CN"], "所有设备都会退出登录。"],
 				},
 				{
 					title: "删除后仍保留的内容",
@@ -687,13 +644,8 @@ const zhCN: LegalCopy = {
 					],
 				},
 				{
-					title: `你的 ${domain} 账号`,
-					paragraphs: [`删除聊天账号不会删除你的 ${domain} 账号。如需删除该账号，请前往 ${idpHost} 的账号页面。`],
-					link: { href: accountUrl, label: `${domain} 账号`, kind: "site" },
-				},
-				{
 					title: "无法登录？",
-					paragraphs: [`请将删除聊天账号的请求发送至 ${OPERATOR_EMAIL}，并附上你的用户名和你 ${domain} 账号的电子邮箱。`],
+					paragraphs: [`请将删除账号的请求发送至 ${OPERATOR_EMAIL}，并附上你的聊天用户名和你 ${domain} 账号的电子邮箱。`],
 					link: mailto(OPERATOR_EMAIL),
 				},
 			],

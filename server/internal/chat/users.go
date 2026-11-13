@@ -35,7 +35,7 @@ const (
 )
 
 // liveUser is the SQL predicate (alias u) of an account that is neither
-// waiting for deletion nor erased: only those can be found.
+// being erased nor erased: only those can be found.
 const liveUser = `u.deletion_requested_at IS NULL AND u.deleted_at IS NULL`
 
 // findableUser (alias u) is a live user others may find by username, email

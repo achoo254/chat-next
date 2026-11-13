@@ -1,6 +1,5 @@
 // English copy of the screens that load on demand; keys mirror vi-screens.ts.
 import { brand } from "../../brand.ts";
-import { deletionTicks } from "../../i18n/account-deletion.ts";
 import { pushServicesNote } from "../../i18n/push-services.ts";
 import { kind, plural } from "./en.ts";
 import type { ScreensCopy } from "./vi-screens.ts";
@@ -1061,33 +1060,8 @@ export const enScreens: ScreensCopy = {
 		requested: "Export requested; its progress shows here",
 		rateLimited: "You can ask once every 7 days",
 		unavailable: "This server does not offer data exports yet.",
-		autoDelete: "Delete my chat account if unused for",
-		autoDeleteHint: "Counted from the last time any device used the account. When due, the account is kept 30 more days before it is erased.",
-		autoDeleteOff: "Off",
-		months: (n: number) => `${n} months`,
-		autoDeleteSaved: "Auto-delete saved",
-		deleteTitle: "Delete chat account",
-		deleteTicks: deletionTicks.en,
-		ownsChats: (n: number) => `You own ${n} groups and channels. Transfer their ownership or delete them first.`,
-		groupMembers: (n: number) => `Group · ${n} members`,
-		channelMembers: (n: number) => `Channel · ${n} subscribers`,
-		openGroup: "Open group",
-		openChannel: "Open channel",
-		botsStop: (n: number, names: string, graceDays: number) =>
-			`Your ${n} bots (${names}) stop at once: tokens are refused, webhooks paused. They are deleted with the account after ${graceDays} days and run again if you cancel.`,
-		needsSignIn: `Needs a ${brand.domain} sign-in within the last 10 minutes.`,
-		blockedByChats: "Transfer or delete your groups and channels first",
-		deleteButton: "Delete chat account",
-		reauthBody: "Deleting the chat account needs a sign-in within the last 10 minutes.",
-		confirmTitle: "Delete chat account?",
-		confirmedAt: (host: string, time: string) => `Confirmed again at ${host} at ${time}`,
-		confirmBody: (date: string) =>
-			`The account is locked at once and every device signs out. Chat data is erased on ${date}; sign in again before then to cancel. Your ${brand.domain} account is not deleted.`,
-		typeToConfirm: "Type your username to confirm",
-		typeLabel: (username: string) => `Type ${username} to confirm`,
-		mismatch: "The username does not match",
-		confirm: "Delete account",
-		deleting: "Deleting…",
+		deleteNote: `Your chat data is deleted with your ${brand.domain} account, as soon as you delete it.`,
+		deleteLink: `Delete your ${brand.domain} account at ${brand.idpHost}/account`,
 	},
 	topicList: {
 		more: "Load more topics",

@@ -428,8 +428,8 @@ func (m *Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int,
 	return len(list), nil
 }
 
-// RevokeAll revokes every session of the user (the account entered its
-// deletion grace period) and, in the background, their IdP refresh tokens,
+// RevokeAll revokes every session of the user (the account was deleted at
+// the IdP) and, in the background, their IdP refresh tokens,
 // which ends the app's grants at the IdP. It returns how many.
 func (m *Sessions) RevokeAll(ctx context.Context, userID int64) (int, error) {
 	list, err := m.store.RevokeAllSessions(ctx, m.tenantID, userID)

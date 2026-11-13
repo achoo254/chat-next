@@ -70,7 +70,7 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false }: S
 	const { t } = useI18n();
 	const groups = tabGroups(messaging);
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
-	// "Kết nối AI" and "Tài khoản" (export and deletion) follow the Developer Console link (mockups/settings.html#export-delete).
+	// "Kết nối AI" and "Tài khoản" (export, and the link to deletion at the IdP) follow the Developer Console link (mockups/settings.html#export-delete).
 	const available =
 		groups.some((group) => group.some((item) => item.tab === tab)) || (messaging !== undefined && (tab === "mcp" || tab === "account"));
 	useEffect(() => {

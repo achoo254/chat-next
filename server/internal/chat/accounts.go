@@ -8,31 +8,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// The chat side of deleting an account (package privacy runs the rest):
-// what blocks it, telling chat partners the account changed, and leaving
-// every chat when the account is erased.
-
-// OwnedChats lists the groups and channels me owns, oldest first: deleting
-// the account is refused while there is one.
-func (s *Service) OwnedChats(ctx context.Context, me int64) ([]*appv1.OwnedChat, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.title, c.type = 'channel', c.member_count FROM chat_members m JOIN chats c ON c.id = m.chat_id
-		WHERE m.user_id = $1 AND m.left_at IS NULL AND m.role = 'owner' AND c.type IN ('group', 'channel')
-			AND c.deleted_at IS NULL AND c.tenant_id = $2
-		ORDER BY c.created_at, c.id`, me, s.cfg.TenantID)
-	if err != nil {
-		return nil, fmt.Errorf("chat: owned chats: %w", err)
-	}
-	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*appv1.OwnedChat, error) {
-		c := &appv1.OwnedChat{}
-		err := r.Scan(&c.ChatId, &c.Title, &c.IsChannel, &c.MemberCount)
-		return c, err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("chat: owned chats: %w", err)
-	}
-	return list, nil
-}
+// The chat side of erasing an account (package privacy runs the rest):
+// telling chat partners the account changed, and leaving every chat, with
+// the ownership of its groups and channels handed on.
 
 // privatePeers returns the private chats of userID (not the saved chat)
 // with the other participant of each.
@@ -61,7 +39,7 @@ func (s *Service) privatePeers(ctx context.Context, q querier, userID int64) (ma
 }
 
 // AnnounceUserChanged tells others that the account of userID changed (it
-// waits for deletion, was restored or was erased): the other participant of
+// is locked for erasure or was erased): the other participant of
 // each private chat gets chat_updated, and the members of its groups and
 // channels get user_changed; both carry the user as they see it now.
 // Channels and groups of the large sync mode are left out: their members

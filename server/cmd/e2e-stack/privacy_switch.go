@@ -2,22 +2,26 @@ package main
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"time"
 
-	"app.local/server/internal/api"
-	"app.local/server/internal/store"
+	"app.local/server/internal/accountdeleted"
+	"app.local/server/internal/auth/idptest"
 )
 
-// privacyPath fast-forwards account deletion, so a scenario can see an
-// account erased without waiting 30 days:
+// privacyPath plays the IdP deleting an account, so a scenario can see the
+// chat erase it (ADR 0016):
 //
-//	POST /e2e/privacy?action=purge   end every running grace period and run
-//	                                 the privacy jobs (erasure, auto-delete
-//	                                 scan, export expiry) at once
+//	POST /e2e/privacy?action=idp-delete&sub=acc_e2e_khoa
 //
-// Like /e2e/realtime it is called on the api port, never through Vite.
+// signs the IdP's account.deleted SET for sub with the fake IdP's key and
+// hands it to the real endpoint (accountdeleted.Path), answering with its
+// status. Like /e2e/realtime it is called on the api port, never through
+// Vite.
 const privacyPath = "/e2e/privacy"
 
-func privacySwitch(app *api.App, st *store.Store, next http.Handler) http.Handler {
+func privacySwitch(idp *idptest.Provider, public string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != privacyPath {
 			next.ServeHTTP(w, r)
@@ -28,17 +32,26 @@ func privacySwitch(app *api.App, st *store.Store, next http.Handler) http.Handle
 			http.Error(w, "POST only", http.StatusMethodNotAllowed)
 			return
 		}
-		if r.URL.Query().Get("action") != "purge" {
-			http.Error(w, `action must be "purge"`, http.StatusBadRequest)
+		q := r.URL.Query()
+		sub := q.Get("sub")
+		if q.Get("action") != "idp-delete" || sub == "" {
+			http.Error(w, `action must be "idp-delete", with a sub`, http.StatusBadRequest)
 			return
 		}
-		if _, err := st.Pool().Exec(r.Context(), `
-			UPDATE users SET deletion_requested_at = deletion_requested_at - interval '31 days'
-			WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL`); err != nil {
+		now := time.Now()
+		set, err := idp.Sign(map[string]any{
+			"iss": idp.Issuer(), "aud": strings.TrimRight(public, "/") + accountdeleted.Path, "sub": sub, "jti": "e2e-" + sub,
+			"iat": now.Unix(), "exp": now.Add(10 * time.Minute).Unix(), "toe": now.Unix(),
+			"events": map[string]any{accountdeleted.Event: map[string]any{}},
+		}, "secevent+jwt")
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		app.Privacy.RunJobs(r.Context())
-		w.WriteHeader(http.StatusNoContent)
+		req := httptest.NewRequestWithContext(r.Context(), http.MethodPost, accountdeleted.Path, strings.NewReader(set))
+		req.Header.Set("Content-Type", "application/secevent+jwt")
+		rec := httptest.NewRecorder()
+		next.ServeHTTP(rec, req)
+		w.WriteHeader(rec.Code)
 	})
 }

@@ -117,7 +117,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if sess.AccountLocked {
-		// Waiting for deletion: no realtime until the user cancels it.
+		// Deleted at the IdP and being erased: no realtime.
 		http.Error(w, "account pending deletion", http.StatusForbidden)
 		return
 	}
@@ -245,7 +245,7 @@ func (g *Gateway) serve(ws *websocket.Conn, cookieSession *store.Session) {
 // helloSession returns the socket's session: the cookie's, or for a native
 // socket the native session of the hello's token. A native socket without a
 // valid token gets an UNAUTHENTICATED error frame (the client then ends its
-// local session) and is closed; one of an account waiting for deletion is
+// local session) and is closed; one of an account being erased is
 // closed like the web handshake refuses it.
 func (g *Gateway) helloSession(ctx context.Context, ws *websocket.Conn, cookieSession *store.Session, hello *appv1.ClientHelloFrame) (store.Session, bool) {
 	if cookieSession != nil {
@@ -270,7 +270,7 @@ func (g *Gateway) helloSession(ctx context.Context, ws *websocket.Conn, cookieSe
 		_ = ws.Close(websocket.StatusTryAgainLater, "try again")
 		return store.Session{}, false
 	case sess.AccountLocked:
-		// Waiting for deletion: no realtime until the user cancels it.
+		// Deleted at the IdP and being erased: no realtime.
 		_ = ws.Close(websocket.StatusPolicyViolation, "account pending deletion")
 		return store.Session{}, false
 	}

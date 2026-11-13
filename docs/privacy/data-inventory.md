@@ -6,10 +6,10 @@ Dữ liệu cá nhân app chat giữ, ở đâu, giữ bao lâu và vì sao (Ngh
 
 | Bên | Giữ gì | Ai quản lý |
 |---|---|---|
-| IdP `auth-next` | Danh tính Google/GitHub/Apple, email gốc, cách đăng nhập, grant của từng app | Người dùng ở `auth.<domain>/account`; xoá tài khoản hoandat.com ở đó |
-| App chat | Mọi thứ trong bảng dưới | Người dùng trong app: Cài đặt > Tài khoản (xuất, tự xoá, xoá tài khoản chat) |
+| IdP `auth-next` | Danh tính Google/GitHub/Apple, email gốc, cách đăng nhập, grant của từng app | Người dùng ở `auth.<domain>/account`; xoá tài khoản hoandat.com ở đó (cũng là chỗ duy nhất xoá dữ liệu chat) |
+| App chat | Mọi thứ trong bảng dưới | Người dùng trong app: Cài đặt > Tài khoản (xuất); xoá theo tài khoản hoandat.com |
 
-Xoá tài khoản chat không xoá tài khoản hoandat.com; nó thu hồi grant của app chat ở IdP. Đăng nhập lại sau khi xoá tạo một tài khoản chat mới, trống.
+Chat không có luồng xoá riêng (ADR 0016): xoá tài khoản hoandat.com ở `auth.<domain>/account` thì IdP báo Chat, và Chat xoá ngay dữ liệu chat của tài khoản đó như bảng dưới.
 
 ## Dữ liệu và thời hạn lưu
 
@@ -29,13 +29,13 @@ Cơ sở pháp lý: **HĐ** = thực hiện dịch vụ người dùng đăng k�
 | Thiết bị của tài khoản (trình duyệt, app): khoá công khai của thiết bị, tên do app đặt (trình duyệt + hệ điều hành, hoặc tên app), nền tảng, lúc thêm, lần mở máy cuối, lúc thu hồi; phiên chat đã đăng ký khoá | `account_devices` | Tới khi xoá tài khoản (xoá hẳn). Thu hồi (bởi người dùng, hoặc tự động khi phiên đăng ký nó kết thúc) chỉ đặt lúc thu hồi và giữ dòng, để khoá đó không bao giờ đăng ký lại được. Máy của chính người dùng nhận danh sách khoá sống (khoá, tên, nền tảng, lúc thêm) qua heartbeat và lưu trong `config.json` của nó (ADR 0013) | ĐY (người dùng mở khu Máy) |
 | Bản ghi cũ từ thời ghép thiết bị: khoá công khai thiết bị đã thu hồi theo máy, hash mã cài | `machine_revoked_devices`, `machine_install_codes` | Không còn được ghi; dòng cũ xoá hẳn khi xoá tài khoản, và cả hai bảng bị bỏ ở lần dọn schema sau tunelo 3.0 | ĐY |
 | Ngôn ngữ app đang hiện (`vi`, `en`, `zh-CN`), để bot Trợ lý nhắn đúng ngôn ngữ | `users.locale` | App gửi lại mỗi lần mở và khi đổi ngôn ngữ (`UsersService.SetLocale`); tới khi xoá tài khoản (dòng của tài khoản đã xoá còn giữ giá trị này, không định danh được ai); có trong `profile.json` của bản xuất (`locale`) | HĐ |
-| Cài đặt quyền riêng tư, thông báo, tự xoá | `privacy_settings`, `notification_settings`, `users.auto_delete_months` | Tới khi xoá tài khoản | HĐ |
+| Cài đặt quyền riêng tư, thông báo | `privacy_settings`, `notification_settings` | Tới khi xoá tài khoản | HĐ |
 | Danh bạ, người đã chặn | `contacts`, `blocks` | Tới khi người dùng gỡ hoặc xoá tài khoản (cả hai chiều) | HĐ |
 | Tin nhắn, cảm xúc, ghim, trạng thái đọc | `messages`, `message_reactions`, `chat_read_states`, `read_receipts` (7 ngày) | Tới khi thu hồi/xoá chat. Khi xoá tài khoản: tin gửi trong chat **của người khác** còn lại, người gửi hiện "Tài khoản đã xoá"; Cloud của tôi và chat riêng không còn ai giữ (bên kia là bot hoặc đã xoá) bị xoá | HĐ |
 | File media (ảnh, video, file, voice) | `/opt/chat/media` + bảng `files` | Tới khi không còn tin nào dùng và không còn là ảnh đại diện, rồi thêm 1 ngày (dọn tự động) | HĐ |
 | Ảnh đại diện của bot | `users.photo_file_id` (file trong bảng `files`, chủ bot tải lên ở Developer Console) | Tới khi chủ bot đổi hoặc xoá ảnh | HĐ |
 | Log cập nhật đồng bộ | `user_updates`, `chat_updates`, `outbox` | Partition theo ngày, xoá sau 30 ngày; của người dùng bị xoá thì xoá ngay | HĐ |
-| Bot của người dùng | `bots`, `users` (is_bot) | Dừng ngay khi bắt đầu xoá tài khoản, xoá cùng tài khoản | HĐ |
+| Bot của người dùng | `bots`, `users` (is_bot) | Xoá cùng tài khoản | HĐ |
 | Góp ý gửi trợ lý hoặc từ Cài đặt › Góp ý | `feedback` (trích tối đa 140 ký tự, đã che email và số điện thoại, đăng vào nhóm "Vận hành chat" của operator) | Tới khi xoá tài khoản | HĐ |
 | Lỗi phía trình duyệt (loại, thông điệp đã che email, URL, số; vị trí trong mã app; bản build; tên màn hình) | `client_errors`, chỉ số đếm theo ngày, không gắn user | 90 ngày (dọn tự động) | NV |
 | Inline query gửi bot (người hỏi, từ khoá, loại chat, câu trả lời của bot) | `bot_inline_queries` | 1 ngày (dọn tự động); kết quả và file của nó chỉ dùng được trong 1 giờ | HĐ (người dùng chủ động gõ @bot) |
@@ -71,8 +71,7 @@ Agent `tunelo` giữ, cho mỗi thư mục người dùng bật hay tắt cấu 
 ## Quyền của người dùng
 
 - **Xuất dữ liệu**: chạy nền, tải trong app (không email), giữ 30 ngày, mỗi 7 ngày một lần (lần lỗi không tính). ZIP gồm `profile.json`, `contacts.json`, `blocked.json`, `sessions.json`, `bots.json` (không token), `chats.json`, tin chính mình gửi theo từng chat (`messages/<chat>.json`, `chats/<chat>.html`), `index.html` xem offline và `media/` (file đính kèm tin mình gửi, tới 4 GB; phần vượt ghi `included: false`). Không có tin của người khác; người cùng chat chỉ xuất hiện qua tên và username. Link tải ký HMAC, sống 10 phút, trên host media.
-- **Xoá tài khoản chat**: cần đăng nhập IdP trong 10 phút gần nhất và gõ username; bị chặn khi còn là chủ sở hữu nhóm/kênh. Xác nhận xong: mọi phiên kết thúc, grant IdP bị thu hồi, bot dừng, người khác thấy "Tài khoản đã xoá", không ai tìm hay nhắn được. 30 ngày sau dữ liệu bị xoá như bảng trên; trong 30 ngày đó đăng nhập lại chỉ có "Huỷ xoá tài khoản".
-- **Tự xoá khi không dùng**: mặc định tắt; 6, 12 hoặc 24 tháng tính từ lần cuối có phiên được dùng. Đến hạn: như tự bấm xoá (cùng 30 ngày chờ), lần đăng nhập sau thấy lý do. Nếu người dùng là chủ nhóm/kênh, quyền chủ chuyển cho phó nhóm lâu nhất, không có thì thành viên lâu nhất; nhóm không còn ai thì bị xoá.
+- **Xoá tài khoản**: chỉ ở `auth.<domain>/account` (Cài đặt › Tài khoản trong app có link tới đó); app chat không có nút, màn hay API xoá, không có tự xoá khi không dùng (ADR 0016). IdP xoá tài khoản rồi báo Chat (`POST /api/idp/account-deleted`); Chat xoá ngay, không giữ để huỷ: mọi phiên kết thúc, grant IdP bị thu hồi, dữ liệu bị xoá như bảng trên, người khác thấy "Tài khoản đã xoá", không ai tìm hay nhắn được. Nhóm và kênh người đó làm chủ chuyển cho người còn lại có vai trò cao nhất (phó nhóm/admin trước), cùng vai trò thì người vào sớm nhất; không còn ai thì nhóm hoặc kênh bị xoá. Bot của người đó bị xoá.
 
 ## Chuyển dữ liệu ra nước ngoài
 

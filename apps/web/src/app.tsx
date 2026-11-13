@@ -13,8 +13,6 @@ import type { MessagingConnector } from "./messaging/data/connector.ts";
 
 // The signed-in app is its own chunk, so the welcome screen stays small.
 const MessagingRoot = lazy(() => import("./messaging/messaging-root.tsx"));
-// Shown instead of the app while the account waits for deletion.
-const DeletionPending = lazy(() => import("./screens/deletion-pending.tsx"));
 // Only a signed-out start shows it (welcome, or /login), so a signed-in start does not load it.
 const SignedOut = lazy(() => import("./screens/welcome.tsx"));
 // Privacy policy, terms and account deletion: public, so they never wait for sign-in.
@@ -31,8 +29,7 @@ type Boot =
 	| { status: "loading" }
 	| { status: "signedOut" }
 	| { status: "error" }
-	| { status: "ready"; self: SelfUser }
-	| { status: "deletionPending"; self: SelfUser };
+	| { status: "ready"; self: SelfUser };
 
 export function App({ rpcFetch = sameOriginFetch, messagingConnector }: AppProps) {
 	const legal = matchLegal(usePathname());
@@ -70,12 +67,6 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 		let active = true;
 		api.getSelf().then(
 			(self) => {
-				if (self.deletion !== undefined) {
-					// Locked: nothing of the app opens, not even offline.
-					forgetSelf();
-					if (active) setBoot({ status: "deletionPending", self });
-					return;
-				}
 				rememberSelf(self);
 				if (active) setBoot({ status: "ready", self });
 			},
@@ -119,12 +110,6 @@ function Root({ rpcFetch, messagingConnector }: { rpcFetch: RpcFetch; messagingC
 			);
 		case "error":
 			return <BootError onRetry={retry} />;
-		case "deletionPending":
-			return (
-				<Suspense fallback={<PageLoader />}>
-					<DeletionPending self={boot.self} rpcFetch={rpcFetch} onRestored={retry} />
-				</Suspense>
-			);
 		case "ready":
 			return (
 				<ApiContext value={api}>

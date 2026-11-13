@@ -1,9 +1,9 @@
 // Package privacy carries out the user's rights over their chat data
-// (Phase 12, Nghị định 13/2023): a downloadable export of personal data,
-// deletion of the chat account with a 30-day grace period, and
-// auto-deletion of accounts unused for the months the user chose. Only chat
-// data is concerned; the hoandat account belongs to the IdP.
-// docs/privacy/data-inventory.md lists what is kept, where and how long.
+// (Nghị định 13/2023): a downloadable export of personal data, and the
+// erasure of the chat account when its IdP account is deleted (the only
+// place an account is deleted, chat ADR 0016). Only chat data is concerned;
+// the hoandat account belongs to the IdP. docs/privacy/data-inventory.md
+// lists what is kept, where and how long.
 package privacy
 
 import (
@@ -23,28 +23,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Timing of the rights (Phase 12 requirements).
+// Timing of the rights.
 const (
-	// GracePeriod runs from the deletion request to the erasure; signing
-	// in during it offers to cancel.
-	GracePeriod = 30 * 24 * time.Hour
 	// ExportRetention keeps a ready export downloadable.
 	ExportRetention = 30 * 24 * time.Hour
 	// ExportInterval is the least time between two export requests
 	// (failed exports do not count).
 	ExportInterval = 7 * 24 * time.Hour
-	// RecentSignIn bounds the age of the IdP sign-in that confirms a
-	// deletion (ADR 0006).
-	RecentSignIn = 10 * time.Minute
-	// jobInterval runs the purge of due accounts, the inactivity scan and
-	// the expiry of old exports.
+	// jobInterval runs the erasure of queued accounts and the expiry of
+	// old exports.
 	jobInterval = time.Hour
 	// jobTimeout bounds one run of those jobs.
 	jobTimeout = 30 * time.Minute
 )
-
-// AutoDeleteMonths are the choices of the auto-delete setting (0 is off).
-var AutoDeleteMonths = []int32{0, 6, 12, 24}
 
 // SessionRevoker ends every session of an account and its IdP grants
 // (auth.Sessions).
@@ -52,7 +43,7 @@ type SessionRevoker interface {
 	RevokeAll(ctx context.Context, userID int64) (int, error)
 }
 
-// Bots are the owner's bots: listed on the delete screen, deleted with the
+// Bots are the owner's bots: listed in the export, deleted with the
 // account (botadmin.Service).
 type Bots interface {
 	OwnedBots(ctx context.Context, owner int64) ([]*appv1.OwnedBot, error)
@@ -111,8 +102,10 @@ type Service struct {
 	now    func() time.Time
 	// kick wakes the export builder after a request.
 	kick chan struct{}
-	// jobs serializes the purge, scan and expiry runs of this process.
+	// jobs serializes the erasure and expiry runs of this process.
 	jobs sync.Mutex
+	// erasing serializes Erase in this process.
+	erasing sync.Mutex
 }
 
 // New returns the Service; exports are on when cfg names an export
@@ -163,23 +156,17 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 
-// RunJobs runs the jobs once: erase the accounts whose grace period ended,
-// schedule the deletion of accounts unused for their auto-delete period,
-// and delete expired exports. Errors are logged; the next run retries.
+// RunJobs runs the jobs once: finish the erasure of queued accounts and
+// delete expired exports. Errors are logged; the next run retries.
 func (s *Service) RunJobs(ctx context.Context) {
 	s.jobs.Lock()
 	defer s.jobs.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, jobTimeout)
 	defer cancel()
-	if n, err := s.purgeDue(ctx); err != nil {
+	if n, err := s.eraseQueued(ctx); err != nil {
 		s.logger.Error("erasing deleted accounts failed", "err", err)
 	} else if n > 0 {
 		s.logger.Info("deleted accounts erased", "accounts", n)
-	}
-	if n, err := s.scheduleInactive(ctx); err != nil {
-		s.logger.Error("auto-delete scan failed", "err", err)
-	} else if n > 0 {
-		s.logger.Info("unused accounts scheduled for deletion", "accounts", n)
 	}
 	if n, err := s.expireExports(ctx); err != nil {
 		s.logger.Error("expiring data exports failed", "err", err)
@@ -188,18 +175,10 @@ func (s *Service) RunJobs(ctx context.Context) {
 	}
 }
 
-func errInvalid(format string, args ...any) error {
-	return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(format, args...))
-}
-
 func errPrecondition(format string, args ...any) error {
 	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf(format, args...))
 }
 
 func errNotFound(what string) error {
 	return connect.NewError(connect.CodeNotFound, fmt.Errorf("%s not found", what))
-}
-
-func errReauth() error {
-	return errPrecondition("reauth_required: sign in again (within the last 10 minutes) to do this")
 }

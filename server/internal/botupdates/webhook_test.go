@@ -696,9 +696,9 @@ func lastSeq(t *testing.T, env *bottest.Env, user, chatID int64) int64 {
 	return seq
 }
 
-// While the owner's account waits for deletion the bot is stopped: its
-// webhook gets nothing and updates queue; cancelling the deletion resumes
-// delivery on its own.
+// While the owner's account is locked for erasure the bot is stopped: its
+// webhook gets nothing and updates queue; the predicate is the lock alone,
+// so lifting it resumes delivery on its own.
 func TestWebhookPausedWhileTheOwnerAccountWaitsForDeletion(t *testing.T) {
 	env := bottest.New(t)
 	ctx := context.Background()
@@ -712,20 +712,20 @@ func TestWebhookPausedWhileTheOwnerAccountWaitsForDeletion(t *testing.T) {
 		t.Fatalf("delivery = %+v", d)
 	}
 
-	if _, err := env.Store.Pool().Exec(ctx, `UPDATE users SET deletion_requested_at = now(), deletion_reason = 'user' WHERE id = $1`, owner); err != nil {
+	if _, err := env.Store.Pool().Exec(ctx, `UPDATE users SET deletion_requested_at = now(), deletion_reason = 'idp' WHERE id = $1`, owner); err != nil {
 		t.Fatal(err)
 	}
 	send(t, env, owner, group, "during")
 	eventually(t, "the update queued", func() bool { return info(t, env, botID).Pending == 1 })
 	time.Sleep(6 * time.Second) // longer than the dispatcher's rescan
 	if got := rcv.list(); len(got) != 1 {
-		t.Fatalf("delivered while the owner waits for deletion: %+v", got)
+		t.Fatalf("delivered while the owner is locked: %+v", got)
 	}
 
 	if _, err := env.Store.Pool().Exec(ctx, `UPDATE users SET deletion_requested_at = NULL, deletion_reason = NULL WHERE id = $1`, owner); err != nil {
 		t.Fatal(err)
 	}
 	if d := rcv.wait(15 * time.Second); d.Text != "during" {
-		t.Fatalf("delivery after cancelling = %+v", d)
+		t.Fatalf("delivery after the lock lifted = %+v", d)
 	}
 }

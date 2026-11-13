@@ -1,7 +1,6 @@
 // Vietnamese copy of the screens that load on demand (dialogs, admin,
 // settings tabs, moderation). en-screens.ts must provide the same keys.
 import { brand } from "../../brand.ts";
-import { deletionTicks } from "../../i18n/account-deletion.ts";
 import { pushServicesNote } from "../../i18n/push-services.ts";
 
 /** The chat kind in copy that names it: channels are never called groups. */
@@ -1065,33 +1064,8 @@ export const viScreens = {
 		requested: "Đã yêu cầu bản xuất, tiến độ hiện ở đây",
 		rateLimited: "Mỗi 7 ngày chỉ yêu cầu được một lần",
 		unavailable: "Máy chủ này chưa bật xuất dữ liệu.",
-		autoDelete: "Tự xoá tài khoản chat nếu không dùng",
-		autoDeleteHint: "Tính từ lần cuối có thiết bị nào dùng tài khoản. Đến hạn, tài khoản được giữ thêm 30 ngày trước khi xoá hẳn.",
-		autoDeleteOff: "Tắt",
-		months: (n: number) => `${n} tháng`,
-		autoDeleteSaved: "Đã lưu cài đặt tự xoá",
-		deleteTitle: "Xoá tài khoản chat",
-		deleteTicks: deletionTicks.vi,
-		ownsChats: (n: number) => `Bạn đang là chủ sở hữu ${n} nhóm và kênh. Chuyển quyền sở hữu hoặc xoá chúng trước.`,
-		groupMembers: (n: number) => `Nhóm · ${n} thành viên`,
-		channelMembers: (n: number) => `Kênh · ${n} người theo dõi`,
-		openGroup: "Mở nhóm",
-		openChannel: "Mở kênh",
-		botsStop: (n: number, names: string, graceDays: number) =>
-			`${n} bot của bạn (${names}) ngừng chạy ngay: token bị từ chối, webhook tạm dừng. Chúng bị xoá cùng tài khoản sau ${graceDays} ngày và chạy lại nếu bạn huỷ xoá.`,
-		needsSignIn: `Cần đăng nhập lại ở ${brand.domain} trong 10 phút gần nhất.`,
-		blockedByChats: "Chuyển quyền sở hữu hoặc xoá nhóm và kênh trước",
-		deleteButton: "Xoá tài khoản chat",
-		reauthBody: "Xoá tài khoản chat cần đăng nhập trong 10 phút gần đây.",
-		confirmTitle: "Xoá tài khoản chat?",
-		confirmedAt: (host: string, time: string) => `Đã xác nhận lại ở ${host} lúc ${time}`,
-		confirmBody: (date: string) =>
-			`Tài khoản bị khoá ngay, mọi thiết bị đăng xuất. Dữ liệu chat bị xoá hẳn vào ${date}; đăng nhập lại trước ngày đó để huỷ. Tài khoản ${brand.domain} của bạn không bị xoá.`,
-		typeToConfirm: "Gõ username để xác nhận",
-		typeLabel: (username: string) => `Gõ ${username} để xác nhận`,
-		mismatch: "Username chưa khớp",
-		confirm: "Xoá tài khoản",
-		deleting: "Đang xoá…",
+		deleteNote: `Dữ liệu chat bị xoá cùng tài khoản ${brand.domain}, ngay khi bạn xoá nó.`,
+		deleteLink: `Xoá tài khoản ${brand.domain} ở ${brand.idpHost}/account`,
 	},
 	topicList: {
 		more: "Tải thêm chủ đề",

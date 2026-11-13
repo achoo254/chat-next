@@ -314,7 +314,7 @@ export class ChatFixture {
 	readonly bots: FakeBots;
 	/** PushService: this session's Web Push registration. */
 	readonly push = new FakePush();
-	/** PrivacyService: data export and account deletion. */
+	/** PrivacyService: data export. */
 	readonly privacy = new FakePrivacy();
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {

@@ -5,7 +5,7 @@ import { UsersService } from "@achoo254/chat-proto/users";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { deletionTicks, DELETION_GRACE_DAYS } from "../src/i18n/account-deletion.ts";
+import { deletionTicks } from "../src/i18n/account-deletion.ts";
 import { pushServicesNote } from "../src/i18n/push-services.ts";
 import { matchLegal, matchRoute, returnPathFor } from "../src/router.tsx";
 import { renderApp, SELF } from "./render-app.tsx";
@@ -76,19 +76,21 @@ describe("public pages", () => {
 		expect(await screen.findByRole("heading", { level: 1, name: "删除账号" })).toBeTruthy();
 		await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
 		const items = screen.getAllByRole("listitem").map((item) => item.textContent);
-		for (const line of deletionTicks["zh-CN"](DELETION_GRACE_DAYS, "auth.hoandat.com")) expect(items).toContain(line);
+		for (const line of deletionTicks["zh-CN"]) expect(items).toContain(line);
 		expect(within(screen.getByRole("navigation", { name: "政策" })).getByRole("link", { name: "隐私政策" })).toBeTruthy();
 	});
 
-	it("explains account deletion with the same lines as Settings › Tài khoản", async () => {
+	it("sends account deletion to the IdP's account page, the only place it happens", async () => {
 		renderApp(signedOut().routes, "/delete-account");
 		expect(await screen.findByRole("heading", { level: 1, name: "Xoá tài khoản" })).toBeTruthy();
 
 		const steps = screen.getAllByRole("listitem").map((item) => item.textContent);
-		expect(steps).toContain("Mở Cài đặt › Tài khoản, đến mục Xoá tài khoản chat.");
-		for (const line of deletionTicks.vi(DELETION_GRACE_DAYS, "auth.hoandat.com")) expect(steps).toContain(line);
-		const idp = screen.getByRole("link", { name: /Tài khoản hoandat\.com/ });
-		expect(idp.getAttribute("href")).toBe("https://auth.hoandat.com/account");
+		expect(steps).toContain("Mở trang tài khoản ở auth.hoandat.com/account và đăng nhập nếu được hỏi.");
+		for (const line of deletionTicks.vi) expect(steps).toContain(line);
+		expect(steps.some((line) => line?.includes("Cài đặt › Tài khoản"))).toBe(false);
+		expect(screen.queryByRole("heading", { level: 2, name: "Huỷ xoá" })).toBeNull();
+		const idp = screen.getByRole("link", { name: /Xoá tài khoản hoandat\.com/ });
+		expect(idp.getAttribute("href")).toBe("https://auth.hoandat.com/account#account-delete");
 		expect(idp.getAttribute("target")).toBe("_blank");
 	});
 

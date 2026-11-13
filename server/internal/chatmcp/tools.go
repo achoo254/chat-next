@@ -92,7 +92,7 @@ func callAs[Req, Resp any](ctx context.Context, t *toolset, approved bool,
 }
 
 // callSelf runs UsersService.GetSelf, which /rpc also serves to an account
-// waiting for deletion (lockedProcedures): it carries the deletion date.
+// being erased (lockedProcedures): it then answers Unauthenticated.
 func callSelf(ctx context.Context, t *toolset) (*appv1.GetSelfResponse, error) {
 	sess, err := t.c.session(t.h.cfg.TenantID, false)
 	if err != nil {

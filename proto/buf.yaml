@@ -9,3 +9,16 @@ lint:
 breaking:
   use:
     - FILE
+  # Account deletion moves to the IdP (ADR 0016): the deletion RPCs, their
+  # messages, GetSelfResponse.deletion and its enum go on purpose. Remove
+  # this block in the commit after the one that drops them.
+  ignore_only:
+    FIELD_NO_DELETE:
+      - app/v1/users.proto
+    ENUM_NO_DELETE:
+      - app/v1/users.proto
+    MESSAGE_NO_DELETE:
+      - app/v1/privacy.proto
+      - app/v1/users.proto
+    RPC_NO_DELETE:
+      - app/v1/privacy.proto

@@ -1,11 +1,10 @@
 // Settings > Tài khoản end to end. An asks for a personal data export,
 // waits for the background build and downloads the ZIP from the media host
-// (JSON, the offline HTML index and the message files). Khoa, who wrote to
-// Bình, deletes the chat account: a fresh IdP sign-in, the typed username,
-// then every device is signed out; signing in again within the grace period
-// offers only "Huỷ xoá tài khoản", which brings everything back. Khoa
-// deletes it again, the stack fast-forwards the 30 days (POST /e2e/privacy),
-// and Bình still has Khoa's message, now from "Tài khoản đã xoá".
+// (JSON, the offline HTML index and the message files); the tab has no
+// deletion of its own, only a link to the IdP's account page. Khoa, who
+// wrote to Bình, deletes the account at the IdP (the stack plays the IdP's
+// signed event, POST /e2e/privacy): Khoa's device is signed out at once and
+// Bình still has Khoa's message, now from "Tài khoản đã xoá".
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { after, before } from "node:test";
@@ -73,60 +72,24 @@ scenario("ask for a data export and download the ZIP", () => [an], async () => {
 	for (const name of ["README.txt", "profile.json", "chats.json", "index.html"]) {
 		assert.ok(zip.includes(Buffer.from(name)), `the ZIP holds ${name}`);
 	}
+	const idp = page.getByRole("link", { name: /^Xoá tài khoản hoandat\.com ở / });
+	assert.equal(await idp.getAttribute("href"), "https://auth.hoandat.com/account#account-delete");
+	assert.equal(await page.getByRole("button", { name: /Xoá tài khoản/ }).count(), 0, "no deletion button in the app");
 });
 
-/** Deletes the account from the open Tài khoản tab, through the reauth sign-in. */
-async function deleteAccount(person: Person): Promise<void> {
-	const { page } = person;
-	await page.getByRole("button", { name: "Xoá tài khoản chat" }).click();
-	const reauth = page.getByRole("dialog", { name: "Đăng nhập lại để tiếp tục" });
-	await reauth.getByRole("link", { name: "Đăng nhập lại" }).click();
-	await page.getByRole("link", { name: `Đăng nhập là ${person.name} @${person.username}` }).click();
-	// Back on the tab, the confirmation opens; it deletes only from its own button.
-	const confirm = page.getByRole("dialog", { name: "Xoá tài khoản chat?" });
-	await confirm.waitFor();
-	const submit = confirm.getByRole("button", { name: "Xoá tài khoản" });
-	assert.equal(await submit.isDisabled(), true);
-	await confirm.getByRole("textbox", { name: `Gõ ${person.username} để xác nhận` }).fill(person.username);
-	await submit.click();
-	await page.getByRole("link", { name: "Đăng nhập bằng hoandat.com" }).waitFor();
-}
-
-async function signInAgain(person: Person): Promise<void> {
-	const { page } = person;
-	await page.getByRole("link", { name: "Đăng nhập bằng hoandat.com" }).click();
-	await page.getByRole("link", { name: `Đăng nhập là ${person.name} @${person.username}` }).click();
-}
-
-scenario("delete the chat account, cancel within the grace period, delete again", () => [khoa, binh], async () => {
+scenario("the account is deleted at the IdP: erased at once", () => [khoa, binh], async () => {
 	const { page } = khoa;
 	await startPrivateChat(khoa, "binh");
 	await send(khoa, "Chào Bình, mình là Khoa");
-	await openAccount(page);
-	await deleteAccount(khoa);
 
-	// Signing in again within 30 days: only the way back.
-	await signInAgain(khoa);
-	await page.getByRole("heading", { name: "Tài khoản chat đang chờ xoá" }).waitFor();
-	await noSideScroll(page);
-	await page.getByRole("button", { name: "Huỷ xoá tài khoản" }).click();
-	await page.getByRole("searchbox", { name: /Tìm/ }).first().waitFor();
-	await openChat(khoa, "Bình");
-	await message(khoa, "Chào Bình, mình là Khoa").waitFor();
+	const deleted = await fetch(`${API_ORIGIN}/e2e/privacy?action=idp-delete&sub=acc_e2e_khoa`, { method: "POST" });
+	assert.equal(deleted.status, 202);
 
-	await openAccount(page);
-	await deleteAccount(khoa);
-	const purge = await fetch(`${API_ORIGIN}/e2e/privacy?action=purge`, { method: "POST" });
-	assert.equal(purge.status, 204);
-
+	// Every session ended: Khoa's device is back at the sign-in screen.
+	await page.getByRole("link", { name: "Đăng nhập bằng hoandat.com" }).waitFor();
 	// Bình keeps the message, from a deleted account.
 	await binh.page.goto(WEB_ORIGIN + "/");
 	await binh.page.getByRole("list", { name: "Danh sách chat" }).getByRole("link", { name: "Tài khoản đã xoá" }).first().click();
 	await message(binh, "Chào Bình, mình là Khoa").waitFor();
 	await binh.page.getByText("Không nhắn tin được cho tài khoản đã xoá.").waitFor();
-
-	// Signing in again now makes a new, empty account named after the IdP.
-	await signInAgain(khoa);
-	await page.getByRole("searchbox", { name: /Tìm/ }).first().waitFor();
-	assert.equal(await page.getByRole("heading", { name: "Tài khoản chat đang chờ xoá" }).count(), 0);
 });
