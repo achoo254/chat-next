@@ -200,7 +200,12 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-head .title strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title span { display: flex; align-items: center; gap: var(--space-1); min-width: 0; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title .mono { overflow: hidden; text-overflow: ellipsis; }
-.mx-pc-hint { padding: 0; border: 0; background: none; }
+/* The terminal's connection pill under the title is the phone's (its header has no room beside the title); elsewhere it sits with the actions. */
+.mx-head .title .mx-sub-pill { display: none; }
+/* The session header's "Nạp kỹ năng dự án": a small outlined button beside the folder and branch, not a sentence. */
+.mx-pc-hint { display: inline-flex; align-items: center; gap: 4px; margin-left: var(--space-1); padding: 1px var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: none; color: var(--c-primary); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.mx-pc-hint:hover:not(:disabled) { background: var(--c-hover); }
+.mx-pc-hint:disabled { opacity: 0.6; cursor: default; }
 .mx-back { display: none; }
 .mx-body { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) var(--space-5); }
 .mx-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); max-width: 760px; }
@@ -866,7 +871,6 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 	.mx-chat[data-mode="terminal"] .mx-end-btn { display: none; }
 	.mx-chat[data-mode="terminal"] > .mx-head .icon-btn { width: 44px; height: 44px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
 }
-.mx-sub-pill { display: none; }
 /* The session header's button of the workspace panel (the panel's own styles load with it). */
 .ws-toggle[aria-expanded="true"] { color: var(--c-primary); background: var(--c-selected); }
 /* One grid for project, workspace and session rows (the same left padding): each row has one 16 px icon column

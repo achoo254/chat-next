@@ -9,6 +9,7 @@ import { useState } from "react";
 import { ErrorReason, ProjectConfigLevel, type Project } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { RemoteError, type MachineLink } from "./link/machine-link.ts";
+import { MachineIcon } from "./machine-icons.tsx";
 import { errorText } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -43,7 +44,8 @@ export function projectConfigErrorText(t: MachinesCopy, err: unknown, dir: strin
 
 /**
  * In a session's header while it runs without its folder's configuration
- * (OFF): "Kỹ năng của dự án chưa nạp — bật", one tap turning the folder on.
+ * (OFF): a small "Nạp kỹ năng dự án" button turning the folder on in one
+ * tap, saying what is missing and what it does in its tooltip.
  * Nothing for a machine that does not say (UNSPECIFIED) or a session that has
  * it (FULL).
  */
@@ -69,8 +71,8 @@ export function ProjectConfigHint({ link, level, dir, ai, online }: { link: Conf
 	};
 	return (
 		<span data-id="session-project-config">
-			· {pc.notLoaded} —{" "}
-			<button type="button" className="link mx-pc-hint" title={pc.enableTitle(dir)} disabled={!online || state.kind === "busy"} onClick={enable} data-id="session-project-config-enable">
+			<button type="button" className="mx-pc-hint" title={`${pc.notLoaded}. ${pc.enableTitle(dir)}`} disabled={!online || state.kind === "busy"} onClick={enable} data-id="session-project-config-enable">
+				<MachineIcon name="spark" small />
 				{pc.enable}
 			</button>
 		</span>

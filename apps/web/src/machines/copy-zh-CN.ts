@@ -237,7 +237,7 @@ export const zhCNMachines: MachinesCopy = {
 		label: "使用该文件夹的 AI 配置（技能、命令、钩子、自动允许的工具）",
 		hint: "适用于此文件夹及其子文件夹中的所有聊天会话，并会记录日志。正在运行的会话在当前轮次结束后切换。",
 		notLoaded: "项目技能未加载",
-		enable: "开启",
+		enable: "加载项目技能",
 		enableTitle: (dir) => `让 ${dir} 中的所有聊天会话使用其 AI 配置`,
 		enabled: "已开启 · 从下一轮起加载",
 		trustOnMachine: (dir) => `${dir} 是敏感文件夹：在此开启等于信任其中的所有文件夹，因此无法从设备开启。请改为对其中的项目文件夹开启。`,

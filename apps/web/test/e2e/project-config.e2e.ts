@@ -38,7 +38,8 @@ test("the session's header offers to load the project's configuration, and turns
 	await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
 	const hint = page.locator("[data-id=session-project-config]");
 	await hint.waitFor({ timeout: 30_000 });
-	assert.match((await hint.textContent()) ?? "", /Kỹ năng của dự án chưa nạp/);
+	assert.match((await hint.textContent()) ?? "", /Nạp kỹ năng dự án/);
+	assert.match((await page.locator("[data-id=session-project-config-enable]").getAttribute("title")) ?? "", /Kỹ năng của dự án chưa nạp/);
 
 	await page.locator("[data-id=session-project-config-enable]").click();
 	await page

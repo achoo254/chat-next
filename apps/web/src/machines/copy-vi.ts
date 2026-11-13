@@ -244,7 +244,7 @@ export const viMachines = {
 		label: "Dùng cấu hình AI của thư mục (kỹ năng, lệnh, hook, quyền tự duyệt)",
 		hint: "Áp cho mọi phiên chat trong thư mục này và thư mục con, có ghi nhật ký. Phiên đang chạy đổi sau lượt hiện tại.",
 		notLoaded: "Kỹ năng của dự án chưa nạp",
-		enable: "bật",
+		enable: "Nạp kỹ năng dự án",
 		enableTitle: (dir: string) => `Dùng cấu hình AI của ${dir} cho mọi phiên chat ở đó`,
 		enabled: "Đã bật · nạp từ lượt sau",
 		trustOnMachine: (dir: string) => `${dir} là thư mục nhạy cảm: bật ở đây là tin mọi thư mục bên trong, nên không bật được từ thiết bị. Hãy bật cho thư mục dự án bên trong.`,

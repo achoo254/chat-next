@@ -240,7 +240,7 @@ export const enMachines: MachinesCopy = {
 		label: "Use the folder's AI configuration (skills, commands, hooks, auto-allowed tools)",
 		hint: "Applies to every chat session in this folder and the folders inside it, and is logged. A running session switches after its current turn.",
 		notLoaded: "Project skills not loaded",
-		enable: "turn on",
+		enable: "Load project skills",
 		enableTitle: (dir) => `Use the AI configuration of ${dir} for every chat session there`,
 		enabled: "On · loads from the next turn",
 		trustOnMachine: (dir) => `${dir} is a sensitive folder: turning it on would trust every folder inside it, so it cannot be turned on from a device. Turn it on for the project folder inside instead.`,
