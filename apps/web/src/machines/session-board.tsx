@@ -16,6 +16,7 @@ import type { MachineLink } from "./link/machine-link.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { locate } from "./project-tree.ts";
 import { FirstMachine } from "./first-machine.tsx";
 import { isBlocked } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
@@ -113,8 +114,10 @@ export function MachineBoard({ machine }: { machine: string }) {
 		<div className="mx-scroll" role="region" aria-label={t.agent.machineBoardOf(entry.name)}>
 			{/* Opened from the machines list (Quản lý máy), adding a machine or this machine: back goes to that list. */}
 			<PageHead back={aiPaths.manage} backLabel={t.agent.machinesTitle} title={entry.name} subtitle={connText(t, conn, now)}>
-				<Link to={paths.machineInfo(machine)} className="icon-btn" aria-label={t.agent.info}>
-					<Icon name="info" />
+				{/* The machine's settings, history and version: a labelled button, not an "i" read as help. */}
+				<Link to={paths.machineInfo(machine)} className="btn btn-sm mx-btn-ghost" aria-label={t.agent.info} title={t.agent.info} data-id="machine-settings-btn">
+					<Icon name="settings" small />
+					<span className="hide-narrow">{t.agent.info}</span>
 				</Link>
 				{!isBlocked(conn) && (
 					<button
@@ -133,7 +136,13 @@ export function MachineBoard({ machine }: { machine: string }) {
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
 				{conn.kind === "offline" && <OfflineGuide />}
-				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && <p className="muted">{t.board.nothing}</p>}
+				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && (
+					// The same calm card as the board of every machine.
+					<div className="mx-calm">
+						<Icon name="check" />
+						<strong>{t.board.nothing}</strong>
+					</div>
+				)}
 				<Tiles need={need} running={running} showMachine={false} />
 				<Recent list={idle.slice(0, RECENT)} showMachine={false} now={now} />
 				{max > 0 && <p className="note">{t.agent.capacity(state.openSessions, max)}</p>}
@@ -282,6 +291,7 @@ function WaitingTile({ machine, thread, showMachine }: { machine: MachineView; t
 
 function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachine: boolean; now: number }) {
 	const t = useMachinesCopy();
+	const [, projects] = useAgentProjects();
 	if (list.length === 0) return null;
 	return (
 		<>
@@ -296,7 +306,8 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 								<b>{thread.title || t.agent.newSession}</b>
 								<small>
 									{showMachine && `${machine.entry.name} · `}
-									{folderName(thread.dir)} · {timeAgo(t, Number(thread.updatedAt), now)}
+									{/* Its project, as the sidebar groups it; the folder when no project holds it. */}
+									{locate(projects.projects, machine.entry.id, thread.dir)?.project.name ?? folderName(thread.dir)} · {timeAgo(t, Number(thread.updatedAt), now)}
 								</small>
 							</span>
 							<span className="go">{t.agent.home.resume}</span>
