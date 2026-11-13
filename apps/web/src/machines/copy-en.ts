@@ -684,7 +684,7 @@ export const enMachines: MachinesCopy = {
 		mode: { label: "Open the session in", chat: "Conversation", terminal: "Terminal" },
 		openInTerminal: "Open in terminal",
 		held: (ai: string) => `${ai} is running this session in a terminal. View only here.`,
-		heldOpen: (ai: string) => `${ai} has this session open in a terminal, waiting for input. View only here.`,
+		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal. Keep typing there, or End it to chat here.`,
 		showTerminal: "Open terminal",
 		end: "End",
 		endHint: "Stop the session running in the terminal",

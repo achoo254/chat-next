@@ -120,7 +120,7 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 		);
 	};
 	return (
-		<section className="mx-limit" role="status" data-id="session-terminal-held">
+		<section className="mx-limit mx-held" role="status" data-id="session-terminal-held">
 			<div className="mx-limit-inner">
 				<MachineIcon name="terminal" />
 				<p>{isRunning(thread) ? t.terminal.held(ai) : t.terminal.heldOpen(ai)}</p>

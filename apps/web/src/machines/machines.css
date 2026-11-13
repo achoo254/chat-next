@@ -649,6 +649,9 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-limit-inner > .icon { flex: none; color: var(--c-warning); }
 .mx-limit-inner p { flex: 1 1 200px; margin: 0; }
 .mx-limit-inner .mx-error { flex-basis: 100%; }
+/* The session held by the terminal is a state, not a warning: neutral, unlike a usage limit. */
+.mx-held .mx-limit-inner { border-color: var(--c-border); background: var(--c-surface); }
+.mx-held .mx-limit-inner > .icon { color: var(--c-text-muted); }
 
 /* A narrow page column (tablets beside the sessions, phones): short labels in the header, the dock and the status line. */
 @container (max-width: 560px) {

@@ -692,7 +692,7 @@ export const viMachines = {
 		mode: { label: "Mở phiên bằng", chat: "Trò chuyện", terminal: "Terminal" },
 		openInTerminal: "Mở bằng terminal",
 		held: (ai: string) => `${ai} đang chạy phiên này trong terminal. Ở đây chỉ xem.`,
-		heldOpen: (ai: string) => `${ai} đang mở phiên này trong terminal, chờ lệnh. Ở đây chỉ xem.`,
+		heldOpen: (ai: string) => `Phiên này đang mở bằng ${ai} trong terminal. Gõ tiếp ở terminal, hoặc Kết thúc để trò chuyện ở đây.`,
 		showTerminal: "Mở terminal",
 		end: "Kết thúc",
 		endHint: "Dừng phiên đang chạy trong terminal",

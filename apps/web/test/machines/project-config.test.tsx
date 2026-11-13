@@ -110,8 +110,9 @@ describe("the hint over a chat session without its project's configuration", () 
 	it("offers to turn the folder on in one tap, then says it loads from the next turn", async () => {
 		const { link, sent } = fakeLink();
 		hint(link, ProjectConfigLevel.OFF);
-		expect(screen.getByText(/Kỹ năng của dự án chưa nạp/)).toBeTruthy();
-		await userEvent.click(screen.getByRole("button", { name: "bật" }));
+		const button = screen.getByRole("button", { name: "Nạp kỹ năng dự án" });
+		expect(button.getAttribute("title")).toMatch(/Kỹ năng của dự án chưa nạp/);
+		await userEvent.click(button);
 		expect((await screen.findByRole("status")).textContent).toContain("Đã bật · nạp từ lượt sau");
 		expect(sent).toEqual([{ case: "projectConfigSet", value: { dir: DIR, level: ProjectConfigLevel.FULL } }]);
 	});
@@ -126,7 +127,7 @@ describe("the hint over a chat session without its project's configuration", () 
 
 	it("says why the machine refused", async () => {
 		hint(fakeLink(ErrorReason.TRUST_ON_MACHINE).link, ProjectConfigLevel.OFF);
-		await userEvent.click(screen.getByRole("button", { name: "bật" }));
+		await userEvent.click(screen.getByRole("button", { name: "Nạp kỹ năng dự án" }));
 		expect((await screen.findByRole("alert")).textContent).toContain("không bật được từ thiết bị");
 	});
 });
