@@ -114,6 +114,17 @@ describe("messages", () => {
 		expect(await screen.findByText("Trả lời Quang Huy")).toBeTruthy();
 	});
 
+	it("the user's own message shows only the reaction button on hover; its menu still opens on a right click", async () => {
+		const { log } = await openChat(`/c/${seedDemo().ids.ops}`, "Mục 3 ổn, extension đã lên bản mới.");
+		const message = messageOf(log, "Mục 3 ổn, extension đã lên bản mới.");
+		expect(within(message).queryByRole("toolbar")).toBeNull();
+		expect(within(message).getByRole("button", { name: "Thả cảm xúc" })).toBeTruthy();
+		fireEvent.contextMenu(within(message).getByText("Mục 3 ổn, extension đã lên bản mới."));
+		const menu = await screen.findByRole("menu");
+		expect(within(menu).getByRole("menuitem", { name: /Trả lời/ })).toBeTruthy();
+		expect(within(menu).getByRole("menuitem", { name: /Chuyển tiếp/ })).toBeTruthy();
+	});
+
 	it("jumps to an unread mention with the @ button", async () => {
 		const demo = seedDemo();
 		const text = "@ductrung nhờ bạn duyệt bản phát hành.";

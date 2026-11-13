@@ -356,6 +356,7 @@ function QuickActions({
 	label,
 	canReply,
 	reactions,
+	mine,
 }: {
 	chatId: number;
 	itemKey: string;
@@ -365,6 +366,8 @@ function QuickActions({
 	label: string;
 	canReply: boolean;
 	reactions: StoredMessage["reactions"];
+	/** The user's own message: only the reaction button (reply, forward and the rest are in its menu: right click, long press). */
+	mine: boolean;
 }) {
 	"use no memo";
 	const copy = useCopy();
@@ -378,19 +381,21 @@ function QuickActions({
 	};
 	return (
 		<>
-			<div className="msg-actions" role="toolbar" aria-label={label}>
-				{canReply && (
-					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
-						<Icon name="reply" small />
+			{!mine && (
+				<div className="msg-actions" role="toolbar" aria-label={label}>
+					{canReply && (
+						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
+							<Icon name="reply" small />
+						</button>
+					)}
+					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
+						<Icon name="forward" small />
 					</button>
-				)}
-				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
-					<Icon name="forward" small />
-				</button>
-				<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
-					<Icon name="dots" small />
-				</button>
-			</div>
+					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
+						<Icon name="dots" small />
+					</button>
+				</div>
+			)}
 			{/* Telegram-style: the reaction button sits on its own under the bubble. */}
 			<button
 				type="button"
@@ -671,6 +676,7 @@ export function MessageBubble({
 							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
 							canReply={canReply}
+							mine={mine}
 							reactions={message.reactions}
 						/>
 					)}
