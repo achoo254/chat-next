@@ -111,6 +111,52 @@ function shareDir(home: string, claudeHome: string, name: string, warnings: stri
   linkDir(target, link);
 }
 
+/** Moves into `to` what only `from` has, folder by folder; a file both have stays where it is. */
+function moveMissing(from: string, to: string): void {
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    const src = join(from, entry.name);
+    const dst = join(to, entry.name);
+    if (!existsSync(dst)) {
+      renameSync(src, dst);
+    } else if (entry.isDirectory() && lstatSync(dst).isDirectory()) {
+      moveMissing(src, dst);
+      if (readdirSync(src).length === 0) rmdirSync(src);
+    }
+  }
+}
+
+/**
+ * Checks the shared folders of a profile at every session start, as the
+ * prompt history is: a profile made by an earlier version, or one where
+ * claude wrote a folder of its own before the link, would otherwise keep its
+ * sessions apart, and `claude --resume` under it finds no conversation
+ * started under another profile. What only the profile has moves into the
+ * machine's folder first, so nothing is lost; the rest is kept beside the
+ * link as at setup. Returns the folders linked again.
+ */
+export function ensureSharedDirs(home: string, claudeHome: string, warnings: string[]): string[] {
+  if (!sameVolume(home, claudeHome)) return []; // no link is possible: the profile keeps its own, as at setup
+  const repaired: string[] = [];
+  for (const name of SHARED_DIRS) {
+    const link = join(home, name);
+    const target = join(claudeHome, name);
+    let st;
+    try {
+      st = lstatSync(link);
+    } catch {
+      st = undefined;
+    }
+    if (st?.isSymbolicLink() && pointsTo(link, target)) continue;
+    if (st?.isDirectory() && !st.isSymbolicLink()) {
+      mkdirSync(target, { recursive: true, mode: 0o700 });
+      moveMissing(link, target);
+    }
+    shareDir(home, claudeHome, name, warnings);
+    repaired.push(name);
+  }
+  return repaired;
+}
+
 function readJson(file: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;

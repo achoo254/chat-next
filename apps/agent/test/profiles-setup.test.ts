@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { ensureHistoryLink, historyLinked } from "../src/profiles/history-link.ts";
 import { assertProfileId, assertSafeHome, makeProfileHome, profileDir } from "../src/profiles/paths.ts";
 import { removeTreeSafely } from "../src/profiles/remove.ts";
-import { SHARED_DIRS, setupProfileHome } from "../src/profiles/setup.ts";
+import { SHARED_DIRS, ensureSharedDirs, setupProfileHome } from "../src/profiles/setup.ts";
 import { tempDir } from "./harness.ts";
 
 const posix = process.platform !== "win32";
@@ -123,5 +123,35 @@ describe("shared prompt history", () => {
     expect(readFileSync(join(claudeHome, "history.jsonl"), "utf8")).toBe('{"display":"first"}\n{"display":"from the profile"}\n');
     expect(ensureHistoryLink(home, claudeHome)).toBe("linked");
     expect(existsSync(join(home, "..", "history-link.json"))).toBe(false);
+  });
+});
+
+describe.runIf(posix)("shared folders checked at session start", () => {
+  it("links a profile's own projects folder again, its sessions moved into the shared one", () => {
+    const { claudeHome, home } = machine();
+    setupProfileHome(home, claudeHome);
+    // claude (or an earlier version) left a folder of its own where the link was.
+    unlinkSync(join(home, "projects"));
+    mkdirSync(join(home, "projects", "-work-app"), { recursive: true });
+    writeFileSync(join(home, "projects", "-work-app", "s2.jsonl"), "{}\n");
+    writeFileSync(join(home, "projects", "-work-app", "s1.jsonl"), "profile copy\n");
+    const warnings: string[] = [];
+    expect(ensureSharedDirs(home, claudeHome, warnings)).toEqual(["projects"]);
+    expect(lstatSync(join(home, "projects")).isSymbolicLink()).toBe(true);
+    // A session started under the profile is now where any profile resumes it from.
+    expect(existsSync(join(claudeHome, "projects", "-work-app", "s2.jsonl"))).toBe(true);
+    // A file both had keeps the machine's copy; the profile's is kept aside, not lost.
+    expect(readFileSync(join(claudeHome, "projects", "-work-app", "s1.jsonl"), "utf8")).toBe("{}\n");
+    expect(readFileSync(join(`${join(home, "projects")}.merge`, "-work-app", "s1.jsonl"), "utf8")).toBe("profile copy\n");
+    // Once linked, nothing more to do.
+    expect(ensureSharedDirs(home, claudeHome, [])).toEqual([]);
+  });
+
+  it("links a shared folder the profile never had", () => {
+    const { claudeHome, home } = machine();
+    setupProfileHome(home, claudeHome);
+    unlinkSync(join(home, "skills"));
+    expect(ensureSharedDirs(home, claudeHome, [])).toEqual(["skills"]);
+    expect(realpathSync(join(home, "skills"))).toBe(realpathSync(join(claudeHome, "skills")));
   });
 });

@@ -17,7 +17,7 @@ import { type ClaudeAccount, readAccount, sameAccount, signOut } from "./account
 import { ensureHistoryLink } from "./history-link.ts";
 import { PROFILE_ID_RE, assertSafeHome, defaultClaudeHome, makeProfileHome, profileDir, profileHome, profilesRoot } from "./paths.ts";
 import { removeTreeSafely } from "./remove.ts";
-import { setupProfileHome, syncMachineSettings } from "./setup.ts";
+import { ensureSharedDirs, setupProfileHome, syncMachineSettings } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
 import { ProfileStore, type ProfileUsage } from "./store.ts";
 
@@ -225,7 +225,7 @@ export class ClaudeProfiles {
 
   /**
    * What a session opening now uses: the selected profile, with the
-   * machine's settings copied in and its history link checked. Throws when
+   * machine's settings copied in and its history and shared-folder links checked. Throws when
    * the profiles cannot be read, rather than run on another account.
    */
   sessionProfile(): SessionProfile {
@@ -239,6 +239,14 @@ export class ClaudeProfiles {
       if (state === "repaired") this.log("claude profiles: the shared prompt history link was made again");
     } catch (err) {
       this.log(`claude profiles: prompt history link not checked (${(err as Error).message})`);
+    }
+    try {
+      const warnings: string[] = [];
+      const repaired = ensureSharedDirs(home, this.claudeHome, warnings);
+      for (const w of warnings) this.log(`claude profiles: ${w}`);
+      if (repaired.length > 0) this.log(`claude profiles: shared folders linked again: ${repaired.join(", ")}`);
+    } catch (err) {
+      this.log(`claude profiles: shared folders not checked (${(err as Error).message})`);
     }
     return { id: p.id, accountDir: home };
   }
