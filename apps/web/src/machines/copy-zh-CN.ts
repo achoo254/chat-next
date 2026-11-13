@@ -683,6 +683,8 @@ export const zhCNMachines: MachinesCopy = {
 		end: "结束",
 		endHint: "停止在终端中运行的会话",
 		reopenAi: "在终端中重新打开",
+		lostAi: "这台机器找不到该会话的记录，无法在终端中重新打开。对话仍可在聊天中查看。",
+		backToChat: "返回聊天",
 		closePaneAi: "关闭窗格（会话继续运行）",
 		detached: "会话仍在设备上运行，但未在此显示。",
 		folderGone: "此会话的文件夹已不在机器上，无法打开终端。",

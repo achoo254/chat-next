@@ -52,7 +52,24 @@ import { FakeTerminalHost, serverFrames } from "./fake-terminal.ts";
 const screens = new Map<number, string>();
 
 vi.mock("../../src/terminal/terminal-view.tsx", () => ({
-	TerminalView: ({ link, session, label, onExit }: { link: TerminalLink; session: number; label: string; onExit: (code: number) => void }) => {
+	TerminalView: ({
+		link,
+		session,
+		label,
+		onExit,
+		register,
+	}: {
+		link: TerminalLink;
+		session: number;
+		label: string;
+		onExit: (code: number) => void;
+		register?: (handle: { text(): string } | null) => void;
+	}) => {
+		useEffect(() => {
+			// The dock reads a pane's text when its program exits; the stand-in's is what it received.
+			register?.({ text: () => screens.get(session) ?? "" });
+			return () => register?.(null);
+		}, [register, session]);
 		useEffect(() => {
 			const sink: TerminalSink = {
 				snapshot: (s) => screens.set(session, new TextDecoder().decode(s.vt).replace("\x1bc", "")),
@@ -505,6 +522,28 @@ describe("the dock", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
 		await until(() => sent("termOpen").length === 2, "the AI again");
 		expect(sent("termOpen")[1]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a session the machine's AI has no history of offers Chat instead of opening it again", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		host.print(1, "No conversation found with session ID: f8981ec1-ab88-44b9-a7ea-2f23be1956e7\r\n");
+		await waitFor(() => expect(screens.get(1) ?? "").toContain("No conversation found"));
+		host.exit(1, 1);
+		expect(await screen.findByText(/Máy không tìm thấy lịch sử của phiên này/)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Mở lại trong terminal" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Về Trò chuyện" }));
+		expect(window.location.pathname).toBe("/ai/1/s/t1");
 		parts.terminal.stop();
 		parts.link.stop();
 	});

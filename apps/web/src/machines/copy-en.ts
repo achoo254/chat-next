@@ -689,6 +689,8 @@ export const enMachines: MachinesCopy = {
 		end: "End",
 		endHint: "Stop the session running in the terminal",
 		reopenAi: "Open again in terminal",
+		lostAi: "The machine has no history of this session, so it cannot open again in the terminal. The conversation is still in Chat.",
+		backToChat: "Back to Chat",
 		closePaneAi: "Close pane (the session keeps running)",
 		detached: "The session still runs on the machine but is not shown here.",
 		folderGone: "This session's folder is no longer on the machine, so its terminal cannot open.",

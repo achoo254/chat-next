@@ -697,6 +697,8 @@ export const viMachines = {
 		end: "Kết thúc",
 		endHint: "Dừng phiên đang chạy trong terminal",
 		reopenAi: "Mở lại trong terminal",
+		lostAi: "Máy không tìm thấy lịch sử của phiên này nên không mở lại được trong terminal. Cuộc trò chuyện vẫn xem được ở Trò chuyện.",
+		backToChat: "Về Trò chuyện",
 		closePaneAi: "Đóng ô (phiên vẫn chạy)",
 		detached: "Phiên vẫn chạy trên máy nhưng không hiện ở đây.",
 		folderGone: "Thư mục của phiên này không còn trên máy, nên chưa mở được terminal.",

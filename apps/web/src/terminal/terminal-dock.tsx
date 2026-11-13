@@ -65,6 +65,7 @@ import { shortcutOf, TerminalTabs, type DockAction } from "./terminal-tabs.tsx";
 import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
 import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
 import { endedOnPurpose } from "./ended-sessions.ts";
+import { rememberMode } from "../machines/session-mode.tsx";
 import "./terminal.css";
 
 const SAVE_DELAY_MS = 300;
@@ -136,6 +137,9 @@ export interface DockThread {
  * `thread`: a session in terminal mode; otherwise the machine's plain shells,
  * opening one more in `openShellIn` ("" for the home folder) when set.
  */
+/** What Claude Code prints when `--resume` names a session it has no transcript of. */
+const LOST_SESSION = /No conversation found with session ID/;
+
 export default function TerminalScreen({ machine, thread, openShellIn }: { machine: string; thread?: DockThread | undefined; openShellIn?: string | undefined }) {
 	const hub = useHub();
 	const [link, state] = useLink(hub, machine);
@@ -211,6 +215,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [probe] = useState(() => latencyProbe());
 	const [mac] = useState(isMac);
 	const handles = useRef(new Map<string, PaneHandle>());
+	/** AI panes whose session the machine's AI no longer has: opening it again would fail the same way. */
+	const [lost, setLost] = useState<ReadonlySet<number>>(() => new Set());
 	const ime = useRef<HTMLTextAreaElement>(null);
 	const root = useRef<HTMLDivElement>(null);
 	const autoOpened = useRef(false);
@@ -499,7 +505,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					probe={probe}
 					onFocus={() => setLayout((l) => focusPane(l, pane.id))}
 					onTitle={(text) => setTitles((m) => new Map(m).set(pane.session, text))}
-					onExit={(exit) => setEnded((m) => new Map(m).set(pane.session, exit))}
+					onExit={(exit) => {
+						if (pane.ai === true && exit !== 0 && LOST_SESSION.test(handles.current.get(pane.id)?.text() ?? "")) setLost((s) => new Set(s).add(pane.session));
+						setEnded((m) => new Map(m).set(pane.session, exit));
+					}}
 					onGone={() => {
 						setLayout((l) => closeSession(l, pane.session));
 						setNotice(tt.gone);
@@ -513,13 +522,27 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				{code !== undefined && (
 					// Above xterm's layers; a tap here is for its buttons, not for focusing the pane.
 					<div className="tx-ended" role="status" onPointerUp={(event) => event.stopPropagation()}>
-						<span>{endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
+						<span>{lost.has(pane.session) ? tt.lostAi : endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
 						<button type="button" className="btn btn-sm" onClick={() => closePanes([pane.id])}>
 							{tt.closePane}
 						</button>
-						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void restart(pane)}>
-							{pane.ai === true ? tt.reopenAi : tt.newShell}
-						</button>
+						{lost.has(pane.session) && thread !== undefined ? (
+							// Opening it again would print the same error: the conversation is still readable in chat.
+							<button
+								type="button"
+								className="btn btn-sm btn-primary"
+								onClick={() => {
+									rememberMode(machine, "chat");
+									navigate(thread.chat);
+								}}
+							>
+								{tt.backToChat}
+							</button>
+						) : (
+							<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void restart(pane)}>
+								{pane.ai === true ? tt.reopenAi : tt.newShell}
+							</button>
+						)}
 					</div>
 				)}
 				{/* After the terminal, so xterm's layers never cover it. */}

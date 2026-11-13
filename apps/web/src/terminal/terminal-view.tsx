@@ -41,6 +41,8 @@ export interface PaneHandle {
 	claimSize(): void;
 	/** The caret's position in the pane, in CSS pixels. */
 	caret(): { readonly x: number; readonly y: number; readonly height: number } | null;
+	/** The pane's text, scrollback included: what the program printed before it exited. */
+	text(): string;
 }
 
 export interface TerminalViewProps {
@@ -294,6 +296,12 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				window.removeEventListener("focus", onFocus);
 				host.removeEventListener("pointerdown", onTouch);
 			};
+			const screenText = () => {
+				const buffer = term.buffer.active;
+				const lines: string[] = [];
+				for (let y = 0; y < buffer.length; y++) lines.push(buffer.getLine(y)?.translateToString(true) ?? "");
+				return lines.join("\n").trimEnd();
+			};
 			registerHandle({
 				focus: () => term.focus(),
 				appCursor: () => term.modes.applicationCursorKeysMode,
@@ -306,13 +314,9 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 					const buffer = term.buffer.active;
 					return { x: buffer.cursorX * width, y: buffer.cursorY * height, height };
 				},
+				text: screenText,
 			});
-			probe?.screen(session, () => {
-				const buffer = term.buffer.active;
-				const lines: string[] = [];
-				for (let y = 0; y < buffer.length; y++) lines.push(buffer.getLine(y)?.translateToString(true) ?? "");
-				return lines.join("\n").trimEnd();
-			});
+			probe?.screen(session, screenText);
 			cleanup = () => {
 				registerHandle(null);
 				probe?.screen(session, null);
