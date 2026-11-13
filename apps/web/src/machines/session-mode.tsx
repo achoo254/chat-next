@@ -124,19 +124,21 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 			<div className="mx-limit-inner">
 				<MachineIcon name="terminal" />
 				<p>{isRunning(thread) ? t.terminal.held(ai) : t.terminal.heldOpen(ai)}</p>
-				<button
-					type="button"
-					className="btn btn-sm btn-primary"
-					onClick={() => {
-						rememberMode(machine, "terminal");
-						navigate(aiPaths.sessionTerminal(machine, thread.id));
-					}}
-				>
-					{t.terminal.showTerminal}
-				</button>
-				<button type="button" className="btn btn-sm" disabled={busy} onClick={end} title={t.terminal.endHint}>
-					{t.terminal.end}
-				</button>
+				<div className="mx-limit-acts">
+					<button type="button" className="btn btn-sm mx-btn-ghost" disabled={busy} onClick={end} title={t.terminal.endHint}>
+						{t.terminal.end}
+					</button>
+					<button
+						type="button"
+						className="btn btn-sm btn-primary"
+						onClick={() => {
+							rememberMode(machine, "terminal");
+							navigate(aiPaths.sessionTerminal(machine, thread.id));
+						}}
+					>
+						{t.terminal.showTerminal}
+					</button>
+				</div>
 				{error !== "" && <p className="mx-error">{error}</p>}
 			</div>
 		</section>

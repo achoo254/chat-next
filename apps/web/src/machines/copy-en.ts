@@ -686,7 +686,7 @@ export const enMachines: MachinesCopy = {
 		mode: { label: "Open the session in", chat: "Conversation", terminal: "Terminal" },
 		openInTerminal: "Open in terminal",
 		held: (ai: string) => `${ai} is running this session in a terminal. View only here.`,
-		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal. Keep typing there, or End it to chat here.`,
+		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal.`,
 		showTerminal: "Open terminal",
 		end: "End",
 		endHint: "Stop the session running in the terminal",
@@ -874,6 +874,7 @@ export const enMachines: MachinesCopy = {
 		limit: {
 			text: (from, to, left) => (from === "" ? `Usage limit reached. ${to} has ${left}% left.` : `${from} reached its usage limit. ${to} has ${left}% left.`),
 			action: (to) => `Switch the whole machine to ${to}`,
+			short: "Switch account",
 		},
 		welcome: {
 			title: "Control Claude Code on your own computer",

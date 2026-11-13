@@ -694,7 +694,7 @@ export const viMachines = {
 		mode: { label: "Mở phiên bằng", chat: "Trò chuyện", terminal: "Terminal" },
 		openInTerminal: "Mở bằng terminal",
 		held: (ai: string) => `${ai} đang chạy phiên này trong terminal. Ở đây chỉ xem.`,
-		heldOpen: (ai: string) => `Phiên này đang mở bằng ${ai} trong terminal. Gõ tiếp ở terminal, hoặc Kết thúc để trò chuyện ở đây.`,
+		heldOpen: (ai: string) => `Phiên đang mở bằng ${ai} trong terminal.`,
 		showTerminal: "Mở terminal",
 		end: "Kết thúc",
 		endHint: "Dừng phiên đang chạy trong terminal",
@@ -881,8 +881,9 @@ export const viMachines = {
 			pending: (email: string) => `Sẽ chuyển sang ${email} sau lượt này`,
 		},
 		limit: {
-			text: (from: string, to: string, left: number) => (from === "" ? `Hết hạn mức. Còn ${to} (${left}%).` : `Hết hạn mức của ${from}. Còn ${to} (${left}%).`),
+			text: (from: string, to: string, left: number) => (from === "" ? `Hết hạn mức. ${to} còn ${left}%.` : `${from} hết hạn mức. ${to} còn ${left}%.`),
 			action: (to: string) => `Chuyển cả máy sang ${to}`,
+			short: "Chuyển tài khoản",
 		},
 		welcome: {
 			title: "Điều khiển Claude Code trên máy của bạn",

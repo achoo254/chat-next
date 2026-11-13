@@ -302,7 +302,7 @@ describe("a session in chat or in its terminal", () => {
 		held = 7;
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });
 		// Held by the machine's own terminal, its AI waiting at the prompt: open there, not running, not "elsewhere".
-		const bar = await screen.findByText("Phiên này đang mở bằng Claude Code trong terminal. Gõ tiếp ở terminal, hoặc Kết thúc để trò chuyện ở đây.");
+		const bar = await screen.findByText("Phiên đang mở bằng Claude Code trong terminal.");
 		// The bar says it is held; no header chip repeats it.
 		expect(screen.queryByRole("status", { name: "Mở trong terminal" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();

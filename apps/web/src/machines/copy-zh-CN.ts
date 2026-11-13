@@ -680,7 +680,7 @@ export const zhCNMachines: MachinesCopy = {
 		mode: { label: "打开会话方式", chat: "聊天", terminal: "终端" },
 		openInTerminal: "在终端中打开",
 		held: (ai: string) => `${ai} 正在终端中运行此会话。此处仅可查看。`,
-		heldOpen: (ai: string) => `此会话已在终端的 ${ai} 中打开。请在终端继续输入，或结束终端以在此聊天。`,
+		heldOpen: (ai: string) => `此会话已在终端的 ${ai} 中打开。`,
 		showTerminal: "打开终端",
 		end: "结束",
 		endHint: "停止在终端中运行的会话",
@@ -868,6 +868,7 @@ export const zhCNMachines: MachinesCopy = {
 		limit: {
 			text: (from, to, left) => (from === "" ? `已达用量上限。${to} 还剩 ${left}%。` : `${from} 已达用量上限。${to} 还剩 ${left}%。`),
 			action: (to) => `将整台电脑切换到 ${to}`,
+			short: "切换账号",
 		},
 		welcome: {
 			title: "在你自己的电脑上控制 Claude Code",

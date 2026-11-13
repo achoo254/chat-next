@@ -645,10 +645,14 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-profile-usage .warn .mx-bar i { background: var(--c-warning); }
 .mx-menu .mx-menu-row { grid-template-columns: 18px minmax(0, 1fr); }
 .mx-limit { padding: var(--space-2) var(--space-5) 0; background: var(--c-bg); }
-.mx-limit-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); max-width: var(--mx-col); margin-inline: auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--c-warning) 55%, var(--c-border)); background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); font-size: 0.875rem; }
-.mx-limit-inner > .icon { flex: none; color: var(--c-warning); }
-.mx-limit-inner p { flex: 1 1 200px; margin: 0; }
-.mx-limit-inner .mx-error { flex-basis: 100%; }
+.mx-limit + .mx-limit { padding-top: var(--space-1); }
+/* One row: icon, the sentence, the actions on the right; on a narrow column the actions drop under the sentence, still right-aligned. */
+.mx-limit-inner { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon text acts" "icon err err"; align-items: center; column-gap: var(--space-2); row-gap: var(--space-1); max-width: var(--mx-col); margin-inline: auto; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--c-warning) 55%, var(--c-border)); background: color-mix(in srgb, var(--c-warning) 10%, var(--c-surface)); font-size: 0.8125rem; line-height: 1.4; }
+.mx-limit-inner > .icon { grid-area: icon; color: var(--c-warning); }
+.mx-limit-inner > p { grid-area: text; margin: 0; overflow-wrap: anywhere; }
+.mx-limit-acts { grid-area: acts; display: flex; justify-content: flex-end; gap: var(--space-1); }
+.mx-limit-acts .btn { white-space: nowrap; }
+.mx-limit-inner > .mx-error { grid-area: err; }
 /* The session held by the terminal is a state, not a warning: neutral, unlike a usage limit. */
 .mx-held .mx-limit-inner { border-color: var(--c-border); background: var(--c-surface); }
 .mx-held .mx-limit-inner > .icon { color: var(--c-text-muted); }
@@ -662,6 +666,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-dock .acts { display: grid; grid-template-columns: 1fr 1fr; }
 	.mx-dock .mx-secret-expires { grid-column: 1 / -1; margin-left: 0; }
 	.mx-status-row { gap: var(--space-1); }
+	.mx-limit-inner { grid-template-areas: "icon text" "icon acts" "icon err"; grid-template-columns: auto minmax(0, 1fr); align-items: start; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); }
+	.mx-limit-inner > .icon { margin-top: 2px; }
 }
 /* Phones: one column at a time. */
 @media (max-width: 760px) {

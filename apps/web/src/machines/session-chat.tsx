@@ -446,24 +446,28 @@ export function LimitBar({ from, to, left, onSwitch, ai }: { from: string; to: s
 			<div className="mx-limit-inner">
 				<MachineIcon name="gauge" />
 				<p>{t.agent.limit.text(from, to, left)}</p>
-				<button
-					type="button"
-					className="btn btn-sm btn-primary"
-					disabled={busy}
-					onClick={() => {
-						setBusy(true);
-						setError("");
-						onSwitch().then(
-							() => setBusy(false),
-							(err: unknown) => {
-								setBusy(false);
-								setError(errorText(t, err, ai));
-							},
-						);
-					}}
-				>
-					{t.agent.limit.action(to)}
-				</button>
+				<div className="mx-limit-acts">
+					<button
+						type="button"
+						className="btn btn-sm btn-primary"
+						disabled={busy}
+						aria-label={t.agent.limit.action(to)}
+						title={t.agent.limit.action(to)}
+						onClick={() => {
+							setBusy(true);
+							setError("");
+							onSwitch().then(
+								() => setBusy(false),
+								(err: unknown) => {
+									setBusy(false);
+									setError(errorText(t, err, ai));
+								},
+							);
+						}}
+					>
+						{t.agent.limit.short}
+					</button>
+				</div>
 				{error !== "" && <p className="mx-error">{error}</p>}
 			</div>
 		</section>

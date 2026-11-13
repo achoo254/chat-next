@@ -125,7 +125,7 @@ describe("machine profile", () => {
 		const user = userEvent.setup();
 		const onSwitch = vi.fn(() => Promise.resolve());
 		wrap(<LimitBar from="team@example.com · Team" to="max@example.com" left={88} onSwitch={onSwitch} ai="Claude Code" />);
-		expect(screen.getByRole("alert").textContent).toContain("Hết hạn mức của team@example.com · Team. Còn max@example.com (88%).");
+		expect(screen.getByRole("alert").textContent).toContain("team@example.com · Team hết hạn mức. max@example.com còn 88%.");
 		await user.click(screen.getByRole("button", { name: "Chuyển cả máy sang max@example.com" }));
 		expect(onSwitch).toHaveBeenCalledTimes(1);
 	});
