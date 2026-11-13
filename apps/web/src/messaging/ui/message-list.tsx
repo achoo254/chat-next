@@ -166,6 +166,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const topicsLoaded = useBackendValue((pending) => pending.topics(chatId) !== null);
 	const scroller = useRef<HTMLDivElement>(null);
 	const anchor = useRef<{ key: string; offset: number } | null>(null);
+	// The first message on screen: where the reader is, kept when the chat is left scrolled up.
+	const keptRow = useRef<{ seq: number; offset: number } | null>(null);
 	const stick = useRef(true);
 	const positioned = useRef("");
 	const lastRead = useRef(0);
@@ -202,11 +204,16 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		const placement = `${window_.openings}:${window_.focusToken}`;
 		if (positioned.current !== placement) {
 			positioned.current = placement;
+			// Left scrolled up last time: back where the reader was, as Telegram does (a jump goes first).
+			const kept = window_.focusSeq === 0 ? store.position(chatId, topicId) : undefined;
+			const keptNode = kept === undefined ? null : element.querySelector<HTMLElement>(`[data-key][data-seq="${kept.seq}"]`);
 			const target =
 				window_.focusSeq !== 0
 					? element.querySelector<HTMLElement>(`[data-seq="${window_.focusSeq}"]`)
 					: element.querySelector<HTMLElement>(".unread-div");
-			if (target !== null) {
+			if (kept !== undefined && keptNode !== null) {
+				element.scrollTop = keptNode.offsetTop - kept.offset;
+			} else if (target !== null) {
 				element.scrollTop = Math.max(0, target.offsetTop - (window_.focusSeq !== 0 ? element.clientHeight / 3 : 8));
 				if (window_.focusSeq !== 0) target.classList.add("flash");
 			} else {
@@ -226,7 +233,23 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		if (saved === null) return;
 		const node = element.querySelector<HTMLElement>(`[data-key="${saved.key}"]`);
 		if (node !== null) element.scrollTop = node.offsetTop - saved.offset;
-	}, [window_, keys.length, lastKey, typing]);
+	}, [window_, keys.length, lastKey, typing, store, chatId, topicId]);
+
+	// Leaving the chat: remembered where the reader was unless at the newest message (then it opens at the first unread, or at the newest).
+	const live = useRef(false);
+	useLayoutEffect(() => {
+		live.current = window_?.live === true;
+	});
+	useLayoutEffect(
+		() => () => {
+			const at = keptRow.current;
+			// Not scrolled in this mount (the list came and went while opening): what was kept stays.
+			if (at === null) return;
+			const atNewest = stick.current && live.current;
+			store.rememberPosition(chatId, topicId, atNewest ? null : at);
+		},
+		[store, chatId, topicId],
+	);
 
 	const onScroll = () => {
 		const element = scroller.current;
@@ -238,6 +261,9 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 			(node) => node.offsetTop + node.offsetHeight > element.scrollTop,
 		);
 		anchor.current = first === undefined ? null : { key: first.dataset.key ?? "", offset: first.offsetTop - element.scrollTop };
+		// The first message on screen (a day or the unread divider is no message), remembered when the chat is left.
+		const firstMessage = [...element.querySelectorAll<HTMLElement>("[data-key][data-seq]")].find((node) => node.offsetTop + node.offsetHeight > element.scrollTop);
+		keptRow.current = firstMessage === undefined ? null : { seq: Number(firstMessage.dataset.seq), offset: firstMessage.offsetTop - element.scrollTop };
 		setShownSeq(newestShown(element));
 		if (element.scrollTop < EDGE_PX && window_.hasOlder) store.loadOlder(chatId);
 		if (fromBottom < EDGE_PX && window_.hasNewer) store.loadNewer(chatId);

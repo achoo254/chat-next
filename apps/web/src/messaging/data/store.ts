@@ -88,6 +88,14 @@ const PAGE = 40;
 const FIRST_PAGE = 60;
 const DIALOG_LIMIT = 1000;
 const KEPT_WINDOWS = 6;
+
+/** Where the reader left a list scrolled up: the first message on screen, and its top's distance above the list's top. */
+export interface KeptPosition {
+	readonly seq: number;
+	readonly offset: number;
+}
+
+const positionKey = (chatId: number, topicId: number) => `${chatId}:${topicId}`;
 /** Most users one GetUsers may ask for (server/internal/chat/users.go getUsersMax). */
 const GET_USERS_MAX = 200;
 
@@ -191,6 +199,7 @@ export class ChatStore {
 	private readonly users = new Map<number, User>();
 	private readonly chats = new Map<number, Chat | null>();
 	private readonly windows = new Map<number, WindowState>();
+	private readonly positions = new Map<string, KeptPosition>();
 	private readonly lookups = new Map<string, StoredMessage | null>();
 	private readonly lookupsInFlight = new Set<string>();
 	private readonly connection: ConnectionStatus;
@@ -781,7 +790,19 @@ export class ChatStore {
 	 */
 	openWindow(chatId: number, focusSeq = 0): void {
 		const existing = this.windows.get(chatId);
-		if (existing !== undefined && focusSeq === 0) {
+		// Where the reader left the chat scrolled up (rememberPosition): it opens there again, as Telegram does.
+		const keptSeq = focusSeq === 0 ? (this.positions.get(positionKey(chatId, 0))?.seq ?? 0) : 0;
+		if (existing !== undefined && keptSeq !== 0 && this.holds(existing, keptSeq)) {
+			this.windows.delete(chatId);
+			this.windows.set(chatId, existing);
+			const view = this.sourceViews.get(chatId);
+			this.unreadTracking.add(chatId);
+			this.ownReads.delete(chatId);
+			this.setWindow(existing, { ...existing.window, unreadFromSeq: view === undefined ? 0 : unreadFrom(view), openings: existing.window.openings + 1 });
+			if (existing.window.live) existing.refresh.run();
+			return;
+		}
+		if (existing !== undefined && focusSeq === 0 && keptSeq === 0) {
 			// Most recently used last, so the oldest cached window is dropped first.
 			this.windows.delete(chatId);
 			this.windows.set(chatId, existing);
@@ -835,7 +856,7 @@ export class ChatStore {
 			// Every opening recomputes the divider, so it is gone once the chat was read.
 			const unreadFromSeq = view === undefined ? 0 : unreadFrom(view);
 			state.window = { ...state.window, unreadFromSeq, openings: state.window.openings + 1 };
-			const anchor = focusSeq !== 0 ? focusSeq : unreadFromSeq;
+			const anchor = focusSeq !== 0 ? focusSeq : keptSeq !== 0 ? keptSeq : unreadFromSeq;
 			if (anchor !== 0) {
 				void this.load(chatId, { direction: "around", offsetSeq: anchor, limit: FIRST_PAGE }, "replace", focusSeq);
 			} else {
@@ -866,6 +887,28 @@ export class ChatStore {
 		if (state === undefined) return;
 		if (state.window.live) return;
 		void this.load(chatId, { direction: "older", offsetSeq: 0, limit: FIRST_PAGE }, "replace", 0);
+	}
+
+	/**
+	 * Remembers where the reader left a chat (or a forum topic) scrolled up:
+	 * the first message on screen and how far its top was above the list's
+	 * top; null when they left it at the newest message. Kept for this
+	 * session only, like the windows.
+	 */
+	rememberPosition(chatId: number, topicId: number, position: KeptPosition | null): void {
+		const key = positionKey(chatId, topicId);
+		if (position === null) this.positions.delete(key);
+		else this.positions.set(key, position);
+	}
+
+	position(chatId: number, topicId: number): KeptPosition | undefined {
+		return this.positions.get(positionKey(chatId, topicId));
+	}
+
+	/** The window holds message `seq`. */
+	private holds(state: WindowState, seq: number): boolean {
+		for (const item of state.items.values()) if (item.kind === "message" && item.message.seq === seq) return true;
+		return false;
 	}
 
 	private firstSeq(state: WindowState): number {

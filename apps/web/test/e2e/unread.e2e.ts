@@ -73,3 +73,42 @@ scenario("reading on one device clears the badges on the other", () => [hanh, gi
 	await hanhRow(giang).locator(".badge").waitFor({ state: "detached" });
 	await giang.page.waitForFunction(() => !document.title.startsWith("("));
 });
+
+scenario("switching chats keeps the place the reader left, as Telegram does; a chat left at its newest message opens there", () => [hanh, giang], async () => {
+	// Their chat is there from the scenarios above.
+	await openChat(hanh, "Giang");
+	for (let i = 1; i <= 40; i++) await send(hanh, `cuộn ${i}`);
+	await openChat(giang, "Hạnh");
+	const log = giang.page.getByRole("log", { name: "Tin nhắn" });
+	await message(giang, "cuộn 40").waitFor();
+	// The first message whose row is at the list's top, and how far its top sits above it.
+	const top = () =>
+		log.evaluate((list) => {
+			const rows = [...list.querySelectorAll<HTMLElement>("[data-key][data-seq]")];
+			const first = rows.find((row) => row.offsetTop + row.offsetHeight > list.scrollTop);
+			return { seq: first?.dataset.seq ?? "", offset: Math.round((first?.offsetTop ?? 0) - list.scrollTop), bottom: Math.round(list.scrollHeight - list.scrollTop - list.clientHeight) };
+		});
+	// Scrolled up to the middle, then another chat, then back: the same message at the same place.
+	await log.evaluate((list) => {
+		list.scrollTop = Math.round((list.scrollHeight - list.clientHeight) / 2);
+		list.dispatchEvent(new Event("scroll"));
+	});
+	const left = await top();
+	assert.ok(left.bottom > 200, "scrolled away from the newest message");
+	await startPrivateChat(giang, "chi");
+	await openChat(giang, "Hạnh");
+	await message(giang, "cuộn 40").waitFor({ state: "attached" });
+	await giang.page.waitForTimeout(300);
+	const back = await top();
+	assert.equal(back.seq, left.seq);
+	assert.ok(Math.abs(back.offset - left.offset) <= 2, `offset ${back.offset} vs ${left.offset}`);
+	// Back at the newest message and away again: it opens at the newest.
+	await log.evaluate((list) => {
+		list.scrollTop = list.scrollHeight;
+		list.dispatchEvent(new Event("scroll"));
+	});
+	await startPrivateChat(giang, "chi");
+	await openChat(giang, "Hạnh");
+	await giang.page.waitForTimeout(300);
+	assert.ok((await top()).bottom < 40, "opened at the newest message");
+});
