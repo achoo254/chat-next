@@ -23,7 +23,6 @@ import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
-import { RefreshMachine } from "./refresh-machine.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { sortForList } from "./link/machine-link.ts";
 import { aiName, folderName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
@@ -106,9 +105,8 @@ export function MachineDetail({ machine }: { machine: string }) {
 				backLabel={t.sessions.label(name)}
 				title={t.agent.info}
 				subtitle={`${name} · ${entry.os === "" ? entry.tunnelUrl : t.os(entry.os, entry.arch)}`}
-			>
-				<RefreshMachine machine={machine} />
-			</PageHead>
+			/>
+			{/* Refreshing is the link banner's: it shows, with its button, only when the machine's state needs it. */}
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} />
