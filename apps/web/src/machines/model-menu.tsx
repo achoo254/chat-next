@@ -6,7 +6,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { aiName, errorText, modelName, providerOf } from "./use-machines.ts";
+import { aiName, errorText, modelName, providerOf, readableModel } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -16,12 +16,14 @@ interface ModelMenuProps {
 	threadId: string;
 	provider: string;
 	model: string;
+	/** The model that answered the latest turn (the default resolved); "" when none did yet. */
+	answered: string;
 	/** The session's effort; "" for the machine's default. */
 	effort: string;
 	disabled: boolean;
 }
 
-export function ModelMenu({ link, info, threadId, provider, model, effort, disabled }: ModelMenuProps) {
+export function ModelMenu({ link, info, threadId, provider, model, answered, effort, disabled }: ModelMenuProps) {
 	const t = useMachinesCopy();
 	const { open, setOpen, ref: menu } = usePopover();
 	const [switchTo, setSwitchTo] = useState<string | null>(null);
@@ -47,7 +49,9 @@ export function ModelMenu({ link, info, threadId, provider, model, effort, disab
 		);
 	};
 	const many = (info?.providers.length ?? 0) > 1;
-	const name = model === "" ? t.statusBar.defaultModel : modelName(info, provider, model);
+	// The default says which model it is once a turn has answered: "mặc định · Opus 5.5".
+	const resolved = answered === "" ? "" : readableModel(answered);
+	const name = model !== "" ? modelName(info, provider, model) : resolved === "" ? t.statusBar.defaultModel : t.statusBar.defaultIs(resolved);
 	const label = many ? `${ai} · ${name}` : name;
 	return (
 		<div className="mx-model" ref={menu}>
@@ -68,6 +72,16 @@ export function ModelMenu({ link, info, threadId, provider, model, effort, disab
 			{open && (
 				<div className="mx-menu up" role="menu" aria-label={t.chat.modelMenu}>
 					<h5>{t.chat.modelsOf(ai)}</h5>
+					{model === "" && (
+						// The machine's default, checked, saying which model it is now (as the effort's default row).
+						<button type="button" role="menuitemradio" aria-checked disabled={busy} onClick={() => setOpen(false)}>
+							<Icon name="check" small />
+							<span>
+								{t.chat.effortDefault}
+								{resolved !== "" && <small>{t.chat.defaultNow(resolved)}</small>}
+							</span>
+						</button>
+					)}
 					{models.map((m) => (
 						<button
 							key={m.id}

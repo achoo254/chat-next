@@ -204,6 +204,20 @@ export function modelName(info: MachineInfo | null, provider: string, model: str
 	return found?.name || model;
 }
 
+/**
+ * A model id as the AI reports it, for people: "claude-opus-5-5" and
+ * "claude-sonnet-4-5-20250929" read "Opus 5.5" and "Sonnet 4.5" (a "[1m]"
+ * suffix dropped); any other id
+ * stays as it is.
+ */
+export function readableModel(id: string): string {
+	// A context-window suffix ("claude-opus-5-5[1m]") is not part of the name.
+	const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[^\]]*\])?$/.exec(id);
+	if (m === null) return id;
+	const family = m[1] ?? "";
+	return `${family.charAt(0).toUpperCase()}${family.slice(1)} ${m[2] ?? ""}${m[3] === undefined ? "" : `.${m[3]}`}`;
+}
+
 /** What to tell the user about a failed request, in the account's language (see machine-errors.ts). */
 export function errorText(t: MachinesCopy, err: unknown, ai: string): string {
 	return machineErrorText(t, err, ai);

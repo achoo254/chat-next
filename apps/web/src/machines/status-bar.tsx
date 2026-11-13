@@ -14,7 +14,7 @@ import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { ModelMenu } from "./model-menu.tsx";
 import { permissionMode, planName, usageOf, type Countdown } from "./status-line.ts";
-import { errorText, modelName, useNow } from "./use-machines.ts";
+import { errorText, modelName, readableModel, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -30,6 +30,8 @@ interface StatusBarProps {
 	provider: string;
 	/** The model id answering now; "" for the AI's default. */
 	model: string;
+	/** The model that answered the latest turn (the default resolved); "" when none did yet. */
+	answered: string;
 	/** Share of the context window used (0-1); null when unknown. */
 	context: number | null;
 	info: ThreadInfo | undefined;
@@ -54,7 +56,7 @@ function Bar({ pct }: { pct: number }) {
 	);
 }
 
-export function StatusBar({ ai, dir, machine, provider, model, context, info, link, threadId, online, account, switchingTo = "" }: StatusBarProps) {
+export function StatusBar({ ai, dir, machine, provider, model, answered, context, info, link, threadId, online, account, switchingTo = "" }: StatusBarProps) {
 	const t = useMachinesCopy();
 	const now = useNow(30_000);
 	const five = usageOf(info?.rateLimits?.fiveHour, now);
@@ -69,7 +71,7 @@ export function StatusBar({ ai, dir, machine, provider, model, context, info, li
 				</p>
 			)}
 			<div className="mx-status-row">
-				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} effort={info?.effort ?? ""} disabled={!online} />
+				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} answered={answered} effort={info?.effort ?? ""} disabled={!online} />
 				{mode !== null && <ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} link={link} threadId={threadId} disabled={!online} />}
 				{account}
 				{five !== null && five.pct >= USAGE_WARN && (
@@ -91,7 +93,7 @@ export function StatusBar({ ai, dir, machine, provider, model, context, info, li
 						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.week}: ${t.agent.status.usageValue(week.pct, countdown(t, week.left))}`}</span>
 					</span>
 				)}
-				<Details ai={ai} dir={dir} machine={machine} provider={provider} model={model} context={context} info={info} now={now} />
+				<Details ai={ai} dir={dir} machine={machine} provider={provider} model={model} answered={answered} context={context} info={info} now={now} />
 			</div>
 		</div>
 	);
@@ -103,13 +105,14 @@ interface DetailsProps {
 	machine: MachineInfo | null;
 	provider: string;
 	model: string;
+	answered: string;
 	context: number | null;
 	info: ThreadInfo | undefined;
 	now: number;
 }
 
 /** "Chi tiết": every statusline value with its name. */
-function Details({ ai, dir, machine, provider, model, context, info, now }: DetailsProps) {
+function Details({ ai, dir, machine, provider, model, answered, context, info, now }: DetailsProps) {
 	const t = useMachinesCopy();
 	const { locale } = useI18n();
 	const { open, setOpen, ref } = usePopover();
@@ -152,7 +155,7 @@ function Details({ ai, dir, machine, provider, model, context, info, now }: Deta
 							</>
 						)}
 						<dt>{t.agent.status.model}</dt>
-						<dd>{model === "" ? t.statusBar.defaultModel : `${ai} · ${modelName(machine, provider, model)}`}</dd>
+						<dd>{model === "" ? (answered === "" ? t.statusBar.defaultModel : t.statusBar.defaultIs(readableModel(answered))) : `${ai} · ${modelName(machine, provider, model)}`}</dd>
 						{effort !== "" && (
 							<>
 								<dt>{t.agent.status.effort}</dt>

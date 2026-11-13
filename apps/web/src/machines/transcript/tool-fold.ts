@@ -250,6 +250,15 @@ export function currentModel(items: readonly Item[], threadModel: string): strin
 	return "";
 }
 
+/** The model that answered the latest turn that says so (the AI's default resolved); "" when none did yet. */
+export function answeredModel(items: readonly Item[]): string {
+	for (let i = items.length - 1; i >= 0; i--) {
+		const b = items[i]?.body;
+		if (b?.case === "turn" && b.value.model !== "") return b.value.model;
+	}
+	return "";
+}
+
 /** When the newest turn began (Unix ms) while it still runs; null otherwise. */
 export function turnStartedAt(items: readonly Item[]): number | null {
 	for (let i = items.length - 1; i >= 0; i--) {

@@ -117,7 +117,7 @@ describe("machine profile", () => {
 
 	it("says a running session switches after its turn", () => {
 		const link = fakeLink(() => list("")).link;
-		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={undefined} link={link} threadId="t" online switchingTo="max@example.com" />);
+		wrap(<StatusBar answered="" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={undefined} link={link} threadId="t" online switchingTo="max@example.com" />);
 		expect(screen.getByRole("status").textContent).toBe("Sẽ chuyển sang max@example.com sau lượt này");
 	});
 

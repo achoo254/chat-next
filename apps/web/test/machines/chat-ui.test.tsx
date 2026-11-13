@@ -126,7 +126,7 @@ describe("status bar", () => {
 					sevenDay: { utilization: 80, resetsAt: BigInt(NOW + 2 * 86_400_000 + 60_000) },
 				},
 			});
-			wrap(<StatusBar ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} machine={null} provider="claude" model="" context={0.34} info={info} {...live} />);
+			wrap(<StatusBar answered="" ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} machine={null} provider="claude" model="" context={0.34} info={info} {...live} />);
 			const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 			expect(within(bar).getByText("mặc định")).toBeTruthy();
 			expect(within(bar).getByText("Bỏ qua quyền").closest(".mx-mode")?.classList.contains("warn")).toBe(true);
@@ -150,15 +150,21 @@ describe("status bar", () => {
 	});
 
 	it("leaves out what is not known yet", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="Opus" context={null} info={undefined} {...live} />);
+		wrap(<StatusBar answered="" ai="Claude Code" dir="" machine={null} provider="claude" model="Opus" context={null} info={undefined} {...live} />);
 		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 		expect(bar.querySelector(".mx-usage")).toBeNull();
 		expect(bar.querySelector(".mx-mode")).toBeNull();
 		expect(within(bar).getByText("Opus")).toBeTruthy();
 	});
 
+	it("the machine's default says which model it is once a turn has answered", () => {
+		wrap(<StatusBar answered="claude-opus-5-5" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={undefined} {...live} />);
+		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
+		expect(within(bar).getByText("mặc định · Opus 5.5")).toBeTruthy();
+	});
+
 	it("shows an unknown permission mode as is, without the warning", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} {...live} />);
+		wrap(<StatusBar answered="" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "dontAsk" })} {...live} />);
 		expect(screen.getByText("dontAsk").closest(".mx-mode")?.classList.contains("warn")).toBe(false);
 	});
 
@@ -166,7 +172,7 @@ describe("status bar", () => {
 		const user = userEvent.setup();
 		const { link, sent } = fakeLink();
 		const info = create(ThreadInfoSchema, { permissionMode: "default", permissionModes: ["default", "acceptEdits", "plan"] });
-		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={info} link={link} threadId="t1" online />);
+		wrap(<StatusBar answered="" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={info} link={link} threadId="t1" online />);
 		await user.click(screen.getByRole("button", { name: /Hỏi quyền/ }));
 		const menu = screen.getByRole("menu", { name: "Chế độ quyền của phiên" });
 		expect(within(menu).queryByText("Bỏ qua quyền")).toBeNull();
@@ -175,7 +181,7 @@ describe("status bar", () => {
 	});
 
 	it("keeps the mode read-only on a machine that offers no modes", () => {
-		wrap(<StatusBar ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "plan" })} {...live} />);
+		wrap(<StatusBar answered="" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={create(ThreadInfoSchema, { permissionMode: "plan" })} {...live} />);
 		expect(screen.queryByRole("button", { name: /Lập kế hoạch/ })).toBeNull();
 		expect(screen.getByText("Lập kế hoạch")).toBeTruthy();
 	});

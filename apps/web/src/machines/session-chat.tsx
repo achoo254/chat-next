@@ -40,7 +40,7 @@ import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
-import { contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
+import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
 import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -370,6 +370,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							machine={state.info}
 							provider={provider}
 							model={model}
+							answered={answeredModel(items)}
 							context={contextShare(items)}
 							info={threadInfo}
 							link={link}
