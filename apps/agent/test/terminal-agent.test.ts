@@ -27,7 +27,7 @@ afterEach(async () => {
   for (const c of cleanup.splice(0).reverse()) await c();
 });
 
-async function setup(extra: { claudeConfigDir?: () => string | undefined; orphanGraceMs?: number; minor?: number } = {}) {
+async function setup(extra: { shellEnv?: () => Record<string, string>; orphanGraceMs?: number; minor?: number } = {}) {
   const configDir = join(tempDir("term-"), "cfg");
   const host = new FakeTermHost(configDir);
   host.minor = extra.minor ?? 0;
@@ -36,7 +36,7 @@ async function setup(extra: { claudeConfigDir?: () => string | undefined; orphan
     unit,
     env,
     configDir,
-    ...(extra.claudeConfigDir ? { claudeConfigDir: extra.claudeConfigDir } : {}),
+    ...(extra.shellEnv ? { shellEnv: extra.shellEnv } : {}),
     ...(extra.orphanGraceMs !== undefined ? { orphanGraceMs: extra.orphanGraceMs } : {}),
   });
   cleanup.push(() => rmSync(dirname(configDir), { recursive: true, force: true }), () => m.terminal.stop(), () => host.stop());
@@ -248,7 +248,7 @@ describe("terminal sessions", () => {
   });
 
   it("gives a shell the selected Claude profile's folder only when it is not the default one", async () => {
-    const m = await setup({ claudeConfigDir: () => "/Users/someone/.config/tunelo/claude/p1" });
+    const m = await setup({ shellEnv: () => ({ CLAUDE_CONFIG_DIR: "/Users/someone/.config/tunelo/claude/p1" }) });
     const c = await m.connect(await m.pair());
     await c.request("1", { case: "termOpen", value: { cols: 80, rows: 24, cwd: "" } });
     expect(m.host.commands.find((x) => x.cmd === "open")?.env).toEqual({ CLAUDE_CONFIG_DIR: "/Users/someone/.config/tunelo/claude/p1" });

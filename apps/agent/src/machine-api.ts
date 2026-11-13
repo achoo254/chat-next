@@ -125,14 +125,13 @@ export const MAX_CONNECTED_KEYS = 50;
 
 export async function heartbeat(
   secret: string,
-  body: { tunnelUrl: string; agentVersion: string; claudeVersion: string; connectedDeviceKeys: Uint8Array[] },
+  body: { tunnelUrl: string; agentVersion: string; connectedDeviceKeys: Uint8Array[] },
 ): Promise<HeartbeatReply> {
   const r = await call<Record<string, unknown>>(
     "Heartbeat",
     {
       tunnelUrl: body.tunnelUrl,
       agentVersion: body.agentVersion,
-      claudeVersion: body.claudeVersion,
       connectedDeviceKeys: body.connectedDeviceKeys.slice(0, MAX_CONNECTED_KEYS).map(toStd64),
     },
     secret,

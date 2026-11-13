@@ -613,7 +613,7 @@ export class RemoteBrowser {
 			t.reject?.(outcome);
 			return;
 		}
-		this.opts.audit.write({ device: outcome.device, action: "browser_control", path: (page && originOf(page.url)) ?? "", detail: t.key ? "claude" : "user" });
+		this.opts.audit.write({ device: outcome.device, action: "browser_control", path: (page && originOf(page.url)) ?? "", detail: t.key ? "ai" : "user" });
 		t.resolve?.({
 			returned: true,
 			url: page?.url ?? "",

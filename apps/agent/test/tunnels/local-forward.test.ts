@@ -81,7 +81,7 @@ function makeForward(extra: { maxRequestBytes?: number; maxResponseBytes?: numbe
       listening: async () => listening,
       processes: async () => processes,
       runs: () => [],
-      claudeHomes: () => [claudeHome],
+      ideLockDirs: () => [join(claudeHome, "ide")],
     }),
     ...extra,
   });

@@ -110,7 +110,7 @@ describe("writing the message", () => {
     const ai = fakeAi("a", "fix: x");
     const mute = fakeAi("mute", "", { writer: false });
     const failing = fakeAi("f", new Error("rate limited"));
-    expect((await reasonOf(writeCommitMessage(deps([ai.provider], ws), { workspaceId: "w", provider: "", model: "" }))).reason).toBe(ErrorReason.UNKNOWN_AI);
+    expect((await reasonOf(writeCommitMessage(deps([ai.provider], ws), { workspaceId: "w", provider: "", model: "" }))).reason).toBe(ErrorReason.PROVIDER_REQUIRED);
     expect((await reasonOf(writeCommitMessage(deps([mute.provider], ws), { workspaceId: "w", provider: "mute", model: "" }))).reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
     expect((await reasonOf(writeCommitMessage(deps([ai.provider], ws, { installed: false, loginState: "unknown" }), { workspaceId: "w", provider: "a", model: "" }))).reason).toBe(ErrorReason.AI_NOT_INSTALLED);
     expect((await reasonOf(writeCommitMessage(deps([ai.provider], ws, { installed: true, loginState: "needs-login" }), { workspaceId: "w", provider: "a", model: "" }))).reason).toBe(ErrorReason.AI_NEEDS_LOGIN);

@@ -378,6 +378,10 @@ const (
 	ErrorReason_ERROR_REASON_USAGE_LEDGER_BLOCKED ErrorReason = 73
 	// WsGitCommitMessage with nothing staged, or only secret files staged.
 	ErrorReason_ERROR_REASON_NOTHING_STAGED ErrorReason = 74
+	// A request that opens or lists an AI's sessions names no provider, and the
+	// thread or project gives none either. An AI the machine does not know is
+	// ERROR_REASON_UNKNOWN_AI.
+	ErrorReason_ERROR_REASON_PROVIDER_REQUIRED ErrorReason = 75
 )
 
 // Enum value maps for ErrorReason.
@@ -457,6 +461,7 @@ var (
 		72: "ERROR_REASON_USAGE_RANGE_INVALID",
 		73: "ERROR_REASON_USAGE_LEDGER_BLOCKED",
 		74: "ERROR_REASON_NOTHING_STAGED",
+		75: "ERROR_REASON_PROVIDER_REQUIRED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                   0,
@@ -533,6 +538,7 @@ var (
 		"ERROR_REASON_USAGE_RANGE_INVALID":           72,
 		"ERROR_REASON_USAGE_LEDGER_BLOCKED":          73,
 		"ERROR_REASON_NOTHING_STAGED":                74,
+		"ERROR_REASON_PROVIDER_REQUIRED":             75,
 	}
 )
 
@@ -4691,7 +4697,8 @@ func (*ThreadList) Descriptor() ([]byte, []int) {
 
 type ThreadCreate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Adapter id from MachineInfo.providers, e.g. "claude".
+	// Required: an adapter id from MachineInfo.providers (empty is refused
+	// with ERROR_REASON_PROVIDER_REQUIRED).
 	Provider string `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
 	// Empty: the adapter's default model.
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
@@ -6018,7 +6025,8 @@ func (x *FileList) GetLimit() uint32 {
 // Answered with SessionListResult, newest first.
 type SessionList struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Adapter id; empty: "claude".
+	// Required: an adapter id from MachineInfo.providers (empty is refused
+	// with ERROR_REASON_PROVIDER_REQUIRED).
 	Provider string `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
 	// Only sessions started in this folder or below it; empty: every folder.
 	Dir string `protobuf:"bytes,2,opt,name=dir,proto3" json:"dir,omitempty"`
@@ -6343,7 +6351,8 @@ func (x *SessionListResult) GetDirs() []*SessionDir {
 // open_anyway is set.
 type SessionOpen struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Adapter id; empty: "claude".
+	// Required: an adapter id from MachineInfo.providers (empty is refused
+	// with ERROR_REASON_PROVIDER_REQUIRED).
 	Provider  string   `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
 	SessionId string   `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Consent   *Consent `protobuf:"bytes,3,opt,name=consent,proto3" json:"consent,omitempty"`
@@ -7510,6 +7519,9 @@ func (x *ProjectRemove) GetId() string {
 // What a new session of a project starts with.
 type ProjectDefaults struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
+	// The AI new sessions of the project open with (ProviderInfo.id); empty:
+	// the device picks one for each new session.
+	Provider string `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
 	// Empty: the AI's default.
 	Model string `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
 	// One of the AI's permission_modes; empty: the machine's own settings.
@@ -7548,6 +7560,13 @@ func (x *ProjectDefaults) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ProjectDefaults.ProtoReflect.Descriptor instead.
 func (*ProjectDefaults) Descriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ProjectDefaults) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
 }
 
 func (x *ProjectDefaults) GetModel() string {
@@ -11829,6 +11848,14 @@ type ProviderCapabilities struct {
 	Terminal bool `protobuf:"varint,12,opt,name=terminal,proto3" json:"terminal,omitempty"`
 	// The AI writes a commit message from what is staged (WsGitCommitMessage).
 	CommitMessage bool `protobuf:"varint,13,opt,name=commit_message,json=commitMessage,proto3" json:"commit_message,omitempty"`
+	// Permission modes a device may pick (ThreadCreate.permission_mode,
+	// ThreadSetPermissionMode), in the AI's own names.
+	PermissionModes []string `protobuf:"bytes,14,rep,name=permission_modes,json=permissionModes,proto3" json:"permission_modes,omitempty"`
+	// The AI's mode that skips every prompt; a device may pick it only for a
+	// thread whose machine starts there. Empty when the AI has none.
+	BypassModeId string `protobuf:"bytes,15,opt,name=bypass_mode_id,json=bypassModeId,proto3" json:"bypass_mode_id,omitempty"`
+	// Sessions take tunelo's own MCP (browser, saved sign-in secrets).
+	SessionMcp    bool `protobuf:"varint,16,opt,name=session_mcp,json=sessionMcp,proto3" json:"session_mcp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11950,6 +11977,27 @@ func (x *ProviderCapabilities) GetTerminal() bool {
 func (x *ProviderCapabilities) GetCommitMessage() bool {
 	if x != nil {
 		return x.CommitMessage
+	}
+	return false
+}
+
+func (x *ProviderCapabilities) GetPermissionModes() []string {
+	if x != nil {
+		return x.PermissionModes
+	}
+	return nil
+}
+
+func (x *ProviderCapabilities) GetBypassModeId() string {
+	if x != nil {
+		return x.BypassModeId
+	}
+	return ""
+}
+
+func (x *ProviderCapabilities) GetSessionMcp() bool {
+	if x != nil {
+		return x.SessionMcp
 	}
 	return false
 }
@@ -12768,7 +12816,7 @@ type AuditEntry struct {
 	// secret_use (path: the site; detail: the name and "fill" or "env"),
 	// secret_remove (path: the site; detail: the name),
 	// browser_control (a device gave the tunelo browser back or closed it;
-	// path: the site it showed; detail: "claude" or "user"),
+	// path: the site it showed; detail: "ai" or "user"),
 	// browser_clear (the tunelo browser's profile was deleted),
 	// screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
 	// agent_update (a device started an update of tunelo; detail: the version),
@@ -19832,8 +19880,9 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eProjectReorder\x12\x10\n" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\"\x1f\n" +
 	"\rProjectRemove\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"{\n" +
-	"\x0fProjectDefaults\x12\x14\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x97\x01\n" +
+	"\x0fProjectDefaults\x12\x1a\n" +
+	"\bprovider\x18\x04 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12'\n" +
 	"\x0fpermission_mode\x18\x02 \x01(\tR\x0epermissionMode\x12)\n" +
 	"\x10project_settings\x18\x03 \x01(\bR\x0fprojectSettings\"\x99\x01\n" +
@@ -20149,7 +20198,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x18\n" +
 	"\asummary\x18\x03 \x01(\tR\asummary\x12#\n" +
-	"\rfiles_changed\x18\x04 \x03(\tR\ffilesChanged\"\xac\x03\n" +
+	"\rfiles_changed\x18\x04 \x03(\tR\ffilesChanged\"\x9e\x04\n" +
 	"\x14ProviderCapabilities\x12\x1c\n" +
 	"\tinterrupt\x18\x01 \x01(\bR\tinterrupt\x12\x16\n" +
 	"\x06resume\x18\x02 \x01(\bR\x06resume\x12#\n" +
@@ -20166,7 +20215,11 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	" \x03(\v2\x16.remote.v1.ModelOptionR\x06models\x12#\n" +
 	"\reffort_levels\x18\v \x03(\tR\feffortLevels\x12\x1a\n" +
 	"\bterminal\x18\f \x01(\bR\bterminal\x12%\n" +
-	"\x0ecommit_message\x18\r \x01(\bR\rcommitMessage\"1\n" +
+	"\x0ecommit_message\x18\r \x01(\bR\rcommitMessage\x12)\n" +
+	"\x10permission_modes\x18\x0e \x03(\tR\x0fpermissionModes\x12$\n" +
+	"\x0ebypass_mode_id\x18\x0f \x01(\tR\fbypassModeId\x12\x1f\n" +
+	"\vsession_mcp\x18\x10 \x01(\bR\n" +
+	"sessionMcp\"1\n" +
 	"\vModelOption\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x99\x02\n" +
@@ -20743,7 +20796,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	" PROJECT_CONFIG_LEVEL_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18PROJECT_CONFIG_LEVEL_OFF\x10\x01\x12\x1f\n" +
 	"\x1bPROJECT_CONFIG_LEVEL_SKILLS\x10\x02\x12\x1d\n" +
-	"\x19PROJECT_CONFIG_LEVEL_FULL\x10\x03*\xa4\x15\n" +
+	"\x19PROJECT_CONFIG_LEVEL_FULL\x10\x03*\xc8\x15\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -20819,7 +20872,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	")ERROR_REASON_SENSITIVE_FILE_NOT_CONFIRMED\x10G\x12$\n" +
 	" ERROR_REASON_USAGE_RANGE_INVALID\x10H\x12%\n" +
 	"!ERROR_REASON_USAGE_LEDGER_BLOCKED\x10I\x12\x1f\n" +
-	"\x1bERROR_REASON_NOTHING_STAGED\x10J\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
+	"\x1bERROR_REASON_NOTHING_STAGED\x10J\x12\"\n" +
+	"\x1eERROR_REASON_PROVIDER_REQUIRED\x10K\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +

@@ -154,7 +154,7 @@ describe("taking over the browser from a device", () => {
 		const after = await click("i2", takeoverId);
 		expect(after.body.case === "error" && after.body.value.reason).toBe(ErrorReason.TAKEOVER_GONE);
 		expect(chrome.called("Input.dispatchMouseEvent")).toHaveLength(1);
-		expect(readFileSync(join(dir, "audit.jsonl"), "utf8")).toContain('"action":"browser_control","path":"https://example.org","detail":"claude"');
+		expect(readFileSync(join(dir, "audit.jsonl"), "utf8")).toContain('"action":"browser_control","path":"https://example.org","detail":"ai"');
 	});
 
 	it("never logs what the user types, in a password field or anywhere", async () => {

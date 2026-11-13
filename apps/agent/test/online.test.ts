@@ -93,7 +93,7 @@ function fakeMachine(config: ConfigStore): FakeMachine {
     trust: new DeviceTrust({ config }),
     setNotify: () => undefined,
     setNotifyUsage: () => undefined,
-    machineInfo: async () => ({ providers: [] }),
+
     connectedDeviceKeys: () => [new Uint8Array(32).fill(9)],
     applyTrustedDevices(list: TrustedDevice[]) {
       fake.applied.push(list);

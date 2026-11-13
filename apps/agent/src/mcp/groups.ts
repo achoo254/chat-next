@@ -10,7 +10,7 @@
  *
  * `writeTools` act for the user where others see it (a message, a request,
  * a public tunnel). In a session tunelo opens, they always go through an
- * approval card unless the session runs in bypassPermissions (see
+ * approval card unless the session runs in its AI's bypass mode (see
  * `needsApproval`). `twoStepTools` are write tools whose server first answers
  * a dry run with a `confirm_token`: only the call carrying it acts.
  */
@@ -186,14 +186,15 @@ export function exposedToolName(group: GroupName, tool: string): string {
 	return group === "tunnel" ? tool : `${group}_${tool}`;
 }
 
-/** The server name of tunelo's MCP in a claude session. */
+/** The server name of tunelo's MCP in an AI session. */
 export const SESSION_MCP_SERVER = "tunelo";
-const CLAUDE_PREFIX = `mcp__${SESSION_MCP_SERVER}__`;
 
-/** The group and tool behind a claude tool name such as `mcp__tunelo__chat_send_message`. */
-export function sessionTool(claudeName: string): { group: ToolGroup; tool: string } | undefined {
-	if (!claudeName.startsWith(CLAUDE_PREFIX)) return undefined;
-	const exposed = claudeName.slice(CLAUDE_PREFIX.length);
+/**
+ * The group and tool behind a tool name as tunelo's MCP serves it, such as
+ * `chat_send_message`. Each AI names the tool its own way (Claude:
+ * `mcp__tunelo__chat_send_message`); its adapter takes that off first.
+ */
+export function sessionTool(exposed: string): { group: ToolGroup; tool: string } | undefined {
 	for (const group of TOOL_GROUPS) {
 		for (const tool of group.allowedTools) {
 			if (exposedToolName(group.name, tool) === exposed) return { group, tool };
@@ -203,8 +204,8 @@ export function sessionTool(claudeName: string): { group: ToolGroup; tool: strin
 }
 
 /** A write tool of tunelo's MCP, whatever the input. */
-export function isWriteTool(claudeName: string): boolean {
-	const found = sessionTool(claudeName);
+export function isWriteTool(exposed: string): boolean {
+	const found = sessionTool(exposed);
 	return found !== undefined && found.group.writeTools.includes(found.tool);
 }
 
@@ -221,9 +222,9 @@ export function actsForUser(group: ToolGroup, tool: string, input: unknown): boo
 	return typeof token === "string" && token !== "";
 }
 
-/** actsForUser, for a claude tool name. */
-export function needsApproval(claudeName: string, input: unknown): boolean {
-	const found = sessionTool(claudeName);
+/** actsForUser, for a tool name as tunelo's MCP serves it. */
+export function needsApproval(exposed: string, input: unknown): boolean {
+	const found = sessionTool(exposed);
 	return found !== undefined && actsForUser(found.group, found.tool, input);
 }
 

@@ -505,9 +505,9 @@ export class Connection {
             id: v.id,
             ...(v.name !== undefined ? { name: v.name } : {}),
             ...(v.pinned !== undefined ? { pinned: v.pinned } : {}),
-            ...(d ? { defaults: { model: d.model, permissionMode: d.permissionMode, projectSettings: d.projectSettings } } : {}),
+            ...(d ? { defaults: { provider: d.provider, model: d.model, permissionMode: d.permissionMode, projectSettings: d.projectSettings } } : {}),
           },
-          this.ctx.core.aiPermissionModes("claude"),
+          (provider) => this.ctx.core.aiPermissionModes(provider),
         );
         return sendList();
       }

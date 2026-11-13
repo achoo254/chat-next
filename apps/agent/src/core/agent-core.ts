@@ -896,7 +896,7 @@ export class AgentCore {
     /** One of the AI's permission modes to start in; "" or unset follows the machine. */
     permissionMode?: string;
   }): Promise<ThreadSummary> {
-    const provider = this.provider(req.provider || "claude");
+    const provider = this.namedProvider(req.provider);
     const dir = resolve(req.dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     const mode = req.permissionMode ?? "";
@@ -961,13 +961,13 @@ export class AgentCore {
     if (trustNow) {
       // Trusting a sensitive folder (home, a disk root) from a device would trust everything under it.
       if (sensitive || !this.opts.trust) {
-        throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
+        throw new AgentError(ErrorCode.INVALID, `this folder's own AI settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
           reason: ErrorReason.TRUST_ON_MACHINE,
           subject: dir,
         });
       }
       if (!consent.trustProject) {
-        throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are not trusted on the machine; run there: tunelo trust "${dir}"`, {
+        throw new AgentError(ErrorCode.INVALID, `this folder's own AI settings are not trusted on the machine; run there: tunelo trust "${dir}"`, {
           reason: ErrorReason.PROJECT_SETTINGS_UNTRUSTED,
           subject: dir,
         });
@@ -1003,7 +1003,7 @@ export class AgentCore {
 
   /** The AI's sessions on the machine, with the thread that holds each one. */
   async localSessions(req: { provider: string } & SessionQuery): Promise<Omit<SessionPage, "sessions"> & { sessions: LocalSessionView[] }> {
-    const history = this.provider(req.provider || "claude").history;
+    const history = this.namedProvider(req.provider).history;
     if (!history) return { sessions: [], total: 0, dirs: [] };
     await history.prime?.();
     const page = history.list({ dir: req.dir, query: req.query, offset: req.offset, limit: req.limit });
@@ -1037,7 +1037,7 @@ export class AgentCore {
    * that thread, brought up to date.
    */
   async openLocal(req: { provider: string; sessionId: string; consent: ConsentGiven; openAnyway: boolean; device: string }): Promise<ThreadSummary> {
-    const provider = this.provider(req.provider || "claude");
+    const provider = this.namedProvider(req.provider);
     await provider.history?.prime?.();
     const found = provider.history?.find(req.sessionId);
     if (!provider.history || !found) {
@@ -1335,9 +1335,10 @@ export class AgentCore {
     this.touch(t);
   }
 
-  /** Permission modes a device may pick for sessions of this AI. */
-  aiPermissionModes(provider: string): string[] {
-    return [...(this.opts.providers.find((p) => p.id === provider)?.capabilities.permissionModes ?? [])];
+  /** Permission modes a device may pick for sessions of this AI; undefined for an AI the machine does not know. */
+  aiPermissionModes(provider: string): string[] | undefined {
+    const p = this.opts.providers.find((x) => x.id === provider);
+    return p ? [...p.capabilities.permissionModes] : undefined;
   }
 
   /** Hides a thread from the list on every device, or shows it again; nothing on disk changes. */
@@ -1473,9 +1474,24 @@ export class AgentCore {
   }
 
   private permissionModes(t: Thread): string[] {
-    const modes = [...this.provider(t.meta.provider).capabilities.permissionModes];
-    if (t.meta.machineMode === "bypassPermissions") modes.push("bypassPermissions");
+    const { permissionModes, bypassModeId } = this.provider(t.meta.provider).capabilities;
+    const modes = [...permissionModes];
+    if (this.machineBypasses(t) && bypassModeId) modes.push(bypassModeId);
     return modes;
+  }
+
+  /** The machine's own settings start the thread's AI in its mode that skips every prompt. */
+  private machineBypasses(t: Thread): boolean {
+    const bypass = this.opts.providers.find((p) => p.id === t.meta.provider)?.capabilities.bypassModeId;
+    return bypass !== undefined && t.meta.machineMode === bypass;
+  }
+
+  /** The thread's session runs in its AI's mode that skips every prompt now. */
+  bypassed(threadId: string): boolean {
+    const t = this.threads.get(threadId);
+    if (!t) return false;
+    const bypass = this.opts.providers.find((p) => p.id === t.meta.provider)?.capabilities.bypassModeId;
+    return bypass !== undefined && t.info.permissionMode === bypass;
   }
 
   async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
@@ -1497,7 +1513,7 @@ export class AgentCore {
   /** Hands the thread to another AI: summary + changed files as its first message. */
   async switchProvider(threadId: string, providerId: string, model: string): Promise<void> {
     const t = this.thread(threadId);
-    const target = this.provider(providerId);
+    const target = this.namedProvider(providerId);
     if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI", { reason: ErrorReason.SAME_AI });
     this.assertReady(target, await target.detect(this.detectOptions()));
     if (t.running) await this.interrupt(threadId);
@@ -1582,7 +1598,7 @@ export class AgentCore {
       profile = this.opts.profile?.() ?? { id: "" };
     } catch (err) {
       const why = (err as Error).message;
-      const message = `the Claude account picked on this machine cannot be used: ${why}`.slice(0, 500);
+      const message = `the ${provider.name} account picked on this machine cannot be used: ${why}`.slice(0, 500);
       this.put(t, `error:${randomUUID()}`, { case: "error", value: { message } });
       this.endTurn(t, TurnState.FAILED, 0);
       throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
@@ -1597,7 +1613,7 @@ export class AgentCore {
       ...(t.meta.model ? { model: t.meta.model } : {}),
       ...(t.meta.effort ? { effort: t.meta.effort } : {}),
       ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
-      ...(t.meta.machineMode === "bypassPermissions" ? { allowBypass: true } : {}),
+      ...(this.machineBypasses(t) ? { allowBypass: true } : {}),
       ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
       ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
     };
@@ -2047,6 +2063,12 @@ export class AgentCore {
     return t;
   }
 
+  /** The AI a request names: none named, or one the machine does not know, is refused. */
+  private namedProvider(id: string): AgentProvider {
+    if (id === "") throw new AgentError(ErrorCode.INVALID, "no AI named", { reason: ErrorReason.PROVIDER_REQUIRED });
+    return this.provider(id);
+  }
+
   private provider(id: string): AgentProvider {
     const p = this.opts.providers.find((x) => x.id === id);
     if (!p) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `unknown AI "${id}"`, { reason: ErrorReason.UNKNOWN_AI, subject: id });
@@ -2193,7 +2215,7 @@ export class AgentCore {
     }
     const full = req.level === ProjectConfigLevel.FULL;
     if (full && this.opts.isSensitive(dir)) {
-      throw new AgentError(ErrorCode.INVALID, `this folder's .claude settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
+      throw new AgentError(ErrorCode.INVALID, `this folder's own AI settings are trusted on the machine only; run there: tunelo trust "${dir}"`, {
         reason: ErrorReason.TRUST_ON_MACHINE,
         subject: dir,
       });
@@ -2248,7 +2270,7 @@ export class AgentCore {
       profile = this.opts.profile?.() ?? { id: "" };
     } catch (err) {
       const why = (err as Error).message;
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `the Claude account picked on this machine cannot be used: ${why}`.slice(0, 500), {
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `the ${provider.name} account picked on this machine cannot be used: ${why}`.slice(0, 500), {
         reason: ErrorReason.PROFILE_UNUSABLE,
         subject: why.slice(0, 300),
       });

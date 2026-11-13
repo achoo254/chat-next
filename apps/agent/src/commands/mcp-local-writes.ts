@@ -1,5 +1,5 @@
 // `tunelo config mcp-local-writes [on|off]`: whether MCP clients outside the
-// claude sessions tunelo opens may run write tools (mcp/local-writes.ts).
+// AI sessions tunelo opens may run write tools (mcp/local-writes.ts).
 // The command writes the setting itself; the running service reads it again
 // on the next call. Every change goes to the consent log.
 //
@@ -35,12 +35,12 @@ const CONFIRM_QUESTION = 'Any MCP client of this user could then send messages a
 export function describeLocalWrites(enabled: boolean): string[] {
 	return enabled
 		? [
-				"MCP writes outside tunelo's claude sessions: on.",
+				"MCP writes outside tunelo's AI sessions: on.",
 				"Any MCP client of this user (`claude mcp add tunelo -- tunelo mcp`, or a program that reads tunelo's control file) may send Chat messages, send Localman requests and open or close tunnels as you; only that client's own approval stands in the way.",
 				"Turn it off with `tunelo config mcp-local-writes off`.",
 			]
 		: [
-				"MCP writes outside tunelo's claude sessions: off (default). Such clients only read; sessions opened from your device still write, each write approved on the device.",
+				"MCP writes outside tunelo's AI sessions: off (default). Such clients only read; sessions opened from your device still write, each write approved on the device.",
 				"Turn it on with `tunelo config mcp-local-writes on` in a terminal.",
 			];
 }
@@ -92,7 +92,7 @@ export function registerMcpLocalWritesCommand(config: Command, exits: Exits): vo
 	config
 		.command("mcp-local-writes [action]", { hidden: true })
 		.description(
-			"let MCP clients outside tunelo's claude sessions use write tools (send messages, send requests, open tunnels): on (asks in a terminal), off (default); no action shows the state",
+			"let MCP clients outside tunelo's AI sessions use write tools (send messages, send requests, open tunnels): on (asks in a terminal), off (default); no action shows the state",
 		)
 		.action(exits((action: string | undefined) => runLocalWrites(action, configDir(), processTerminal())));
 }

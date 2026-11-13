@@ -167,7 +167,34 @@ describe("effort and permission mode from a device", () => {
     expect(q.log.starts[1]).toMatchObject({ permissionMode: "default", allowBypass: true });
     await m.core.setPermissionMode(u.id, "bypassPermissions", "phone");
     expect(m.core.info(u.id).permissionMode).toBe("bypassPermissions");
+    expect(m.core.bypassed(u.id)).toBe(true);
     await m.core.stop();
+  });
+
+  it("an AI without a bypass mode offers none, whatever mode the machine starts in", async () => {
+    const p = fakeProvider();
+    delete p.capabilities.bypassModeId;
+    p.log.machineMode = "bypassPermissions";
+    const { core, work } = makeCore([p]);
+    const t = await core.create({ provider: p.id, model: "", dir: work, text: "one", consent, device: "phone" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(core.info(t.id).permissionModes).toEqual(["default", "plan"]);
+    expect(core.bypassed(t.id)).toBe(false);
+    await core.stop();
+  });
+});
+
+describe("no default AI", () => {
+  it("refuses a session that names no AI, and names the AI it does not know", async () => {
+    const p = fakeProvider();
+    const { core, work } = makeCore([p]);
+    const reason = (q: Promise<unknown>) => q.then(() => undefined, (e: { reason?: ErrorReason }) => e.reason);
+    expect(await reason(core.create({ provider: "", model: "", dir: work, text: "hi", consent, device: "phone" }))).toBe(ErrorReason.PROVIDER_REQUIRED);
+    expect(await reason(core.create({ provider: "nope", model: "", dir: work, text: "hi", consent, device: "phone" }))).toBe(ErrorReason.UNKNOWN_AI);
+    expect(await reason(core.localSessions({ provider: "", dir: "", query: "", offset: 0, limit: 1 }))).toBe(ErrorReason.PROVIDER_REQUIRED);
+    expect(await reason(core.openLocal({ provider: "", sessionId: "s", consent, openAnyway: false, device: "phone" }))).toBe(ErrorReason.PROVIDER_REQUIRED);
+    expect(core.list()).toEqual([]);
+    await core.stop();
   });
 });
 

@@ -18,6 +18,7 @@ import { ErrorCode, ErrorReason, TerminalAvailability, type TermListResultSchema
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import { AgentError, type AgentCore, type TerminalSpec } from "../core/agent-core.ts";
+import type { ShellEnv } from "../providers/types.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { AGENT_VERSION } from "../version.ts";
 import { Grants, TerminalDenied } from "./grants.ts";
@@ -105,8 +106,12 @@ export type TerminalServiceOptions = {
   config: ConfigStore;
   audit: AuditLog;
   unit: TermHostUnit | undefined;
-  /** CLAUDE_CONFIG_DIR of the machine's selected Claude profile; undefined for the default one. */
-  claudeConfigDir?: () => string | undefined;
+  /**
+   * Environment a plain shell starts with so each AI's CLI typed there uses
+   * the account picked on the machine (AgentProvider.shellEnv); empty for
+   * the AIs' defaults. Throws when the accounts cannot be read.
+   */
+  shellEnv?: () => ShellEnv;
   /** Threads whose AI opens in the terminal; without it TermOpen.ai_session is refused. */
   ai?: AiTerminals;
   log: (line: string) => void;
@@ -264,14 +269,14 @@ export class TerminalService {
 
   async open(cols: number, rows: number, cwd: string): Promise<number> {
     await this.ensure();
-    let claude: string | undefined;
+    let env: ShellEnv = {};
     try {
-      claude = this.opts.claudeConfigDir?.();
+      env = this.opts.shellEnv?.() ?? {};
     } catch (err) {
-      // The profiles cannot be read: the shell starts with the user's own environment.
-      this.opts.log(`terminal: Claude profile not applied (${(err as Error).message})`);
+      // The accounts cannot be read: the shell starts with the user's own environment.
+      this.opts.log(`terminal: AI account not applied (${(err as Error).message})`);
     }
-    const r = await this.call("open", { cols, rows, cwd, ...(claude ? { env: { CLAUDE_CONFIG_DIR: claude } } : {}) });
+    const r = await this.call("open", { cols, rows, cwd, ...(Object.keys(env).length > 0 ? { env } : {}) });
     const session = (r as { session?: unknown }).session;
     if (typeof session !== "number") throw new Error("the terminal process did not name the session");
     this.cwds.set(session, cwd);

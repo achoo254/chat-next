@@ -54,7 +54,7 @@ describe("tunelo config mcp-local-writes", () => {
 		expect(await runLocalWrites("on", dir, t)).toBe(0);
 		expect(t.asked).toBe(1);
 		expect(enabled()).toBe(true);
-		expect(t.out.join("\n")).toContain("MCP writes outside tunelo's claude sessions: on.");
+		expect(t.out.join("\n")).toContain("MCP writes outside tunelo's AI sessions: on.");
 		expect(audit()).toMatch(/"action":"mcp_local_writes".*"detail":"on"/);
 	});
 

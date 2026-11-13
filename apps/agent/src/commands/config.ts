@@ -49,7 +49,7 @@ export function describeLocalForward(state: LocalForwardState, running: boolean)
   if (!running) lines.push("The background service is not running (`tunelo login` starts it): nothing is forwarded until it runs.");
   else if (state.enabled && !state.available) lines.push("The tunnel server does not carry these requests yet (or the machine tunnel is not connected): nothing is forwarded for now.");
   lines.push(
-    "Never forwarded: Docker, debug, database and admin ports of the built-in list, tunelo's own ports, Claude Code IDE ports, and debug ports of running processes.",
+    "Never forwarded: Docker, debug, database and admin ports of the built-in list, tunelo's own ports, AI IDE ports, and debug ports of running processes.",
   );
   if (state.blockedPorts.length > 0) lines.push(`Also never forwarded on this machine: ${state.blockedPorts.join(", ")}.`);
   return lines;

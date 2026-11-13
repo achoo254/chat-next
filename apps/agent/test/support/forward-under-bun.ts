@@ -45,7 +45,7 @@ const forward = new LocalForward({
   log: (l) => logs.push(l),
   maxRequestBytes: 10,
   maxResponseBytes: 100,
-  deny: new ForwardDenyList({ configDir: dir, ownPorts: () => [], extraPorts: () => [], listening: async () => [], processes: async () => [], runs: () => [], claudeHomes: () => [] }),
+  deny: new ForwardDenyList({ configDir: dir, ownPorts: () => [], extraPorts: () => [], listening: async () => [], processes: async () => [], runs: () => [], ideLockDirs: () => [] }),
 });
 forward.tunnelConnected(`wss://${HOST}/`, ["local-forward"]);
 const front = createServer((req, res) => {

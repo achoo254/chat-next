@@ -1,5 +1,5 @@
 /**
- * Tickets of the claude sessions tunelo opens. Each session's `tunelo mcp`
+ * Tickets of the AI sessions tunelo opens. Each session's `tunelo mcp`
  * gets one in `TUNELO_MCP_TICKET`, so the service knows which session a
  * tool call comes from. A ticket only names a session: it is no credential
  * and never turns into a token. It ends with the session.
@@ -13,12 +13,12 @@ export interface SessionMcp {
 	/** tunelo's config folder, for the `tunelo mcp` the session starts. */
 	configDir: string;
 	/** The user approved this call of a write tool on the device: the service lets it run once. */
-	approveWrite(claudeName: string, input: Record<string, unknown>): void;
+	approveWrite(exposed: string, input: Record<string, unknown>): void;
 	/** One line for a write's approval card (recipient, URL); undefined to keep the default. */
-	describeWrite(claudeName: string, input: Record<string, unknown>): Promise<string | undefined>;
+	describeWrite(exposed: string, input: Record<string, unknown>): Promise<string | undefined>;
 	/** The session's sign-in secrets in its commands; absent when the machine keeps none. */
 	secrets?: SessionSecretHooks;
-	/** What happened in the tunelo browser that Claude hears with its next tool result, taken once. */
+	/** What happened in the tunelo browser that the AI hears with its next tool result, taken once. */
 	browserNotices?: () => string[];
 }
 

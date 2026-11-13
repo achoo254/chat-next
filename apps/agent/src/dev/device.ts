@@ -1,7 +1,7 @@
 // Development stand-in for a device of the account (side A) in the terminal.
 //   node src/dev/device.ts key                       (prints the device's public key)
 //   node src/dev/device.ts machine <machine key>     (the machine key Chat lists, base64url)
-//   node src/dev/device.ts chat <ws-url> <folder> "<first message>" [--yes] [--model haiku]
+//   node src/dev/device.ts chat <ws-url> <folder> "<first message>" --ai <id> [--yes] [--model haiku]
 // The machine accepts the device only once Chat lists its key for the
 // account (RegisterDevice; the web does it). The device key and the machine
 // key live in $CHAT_DEV_DEVICE (default: ./dev-device.json). Approvals are
@@ -56,7 +56,7 @@ async function setMachineKey(machineKey: string) {
   console.log(`machine key ${machineKey.slice(0, 12)}… saved`);
 }
 
-async function chat(url: string, dir: string, text: string, yes: boolean, model: string) {
+async function chat(url: string, dir: string, text: string, yes: boolean, provider: string, model: string) {
   const { saved, pair: key } = await device();
   if (!saved.machineKey) throw new Error("save the machine key first (device.ts machine <key>)");
   const ws = await open(url);
@@ -129,7 +129,7 @@ async function chat(url: string, dir: string, text: string, yes: boolean, model:
     console.log(`[connection closed ${c}]`);
     process.exit(0);
   });
-  send(session, { id: "c", body: { case: "threadCreate", value: { provider: "claude", model, dir, text, consent: { sensitive: false, projectSettings: false } } } });
+  send(session, { id: "c", body: { case: "threadCreate", value: { provider, model, dir, text, consent: { sensitive: false, projectSettings: false } } } });
 }
 
 /** Round trips of sealed ping frames, to measure latency through the relay. */
@@ -161,8 +161,9 @@ async function ping(url: string, count: number) {
 
 const [cmd, url, a, b, ...rest] = process.argv.slice(2);
 const model = rest.includes("--model") ? (rest[rest.indexOf("--model") + 1] ?? "") : "";
+const ai = rest.includes("--ai") ? (rest[rest.indexOf("--ai") + 1] ?? "") : "";
 if (cmd === "ping" && url) await ping(url, Number(a ?? 50));
 else if (cmd === "key") await printKey();
 else if (cmd === "machine" && url) await setMachineKey(url);
-else if (cmd === "chat" && url && a && b) await chat(url, a, b, rest.includes("--yes"), model);
-else console.log("usage: device.ts key | machine <machine key> | ping <ws-url> [count] | chat <ws-url> <folder> <text> [--yes] [--model m]");
+else if (cmd === "chat" && url && a && b && ai) await chat(url, a, b, rest.includes("--yes"), ai, model);
+else console.log("usage: device.ts key | machine <machine key> | ping <ws-url> [count] | chat <ws-url> <folder> <text> --ai <id> [--yes] [--model m]");

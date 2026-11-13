@@ -300,7 +300,8 @@ message Frame {
 message ThreadList {}
 
 message ThreadCreate {
-  // Adapter id from MachineInfo.providers, e.g. "claude".
+  // Required: an adapter id from MachineInfo.providers (empty is refused
+  // with ERROR_REASON_PROVIDER_REQUIRED).
   string provider = 1;
   // Empty: the adapter's default model.
   string model = 2;
@@ -503,7 +504,8 @@ message FileList {
 
 // Answered with SessionListResult, newest first.
 message SessionList {
-  // Adapter id; empty: "claude".
+  // Required: an adapter id from MachineInfo.providers (empty is refused
+  // with ERROR_REASON_PROVIDER_REQUIRED).
   string provider = 1;
   // Only sessions started in this folder or below it; empty: every folder.
   string dir = 2;
@@ -563,7 +565,8 @@ message SessionListResult {
 // elsewhere is refused with ERROR_REASON_SESSION_OPEN_ELSEWHERE unless
 // open_anyway is set.
 message SessionOpen {
-  // Adapter id; empty: "claude".
+  // Required: an adapter id from MachineInfo.providers (empty is refused
+  // with ERROR_REASON_PROVIDER_REQUIRED).
   string provider = 1;
   string session_id = 2;
   Consent consent = 3;
@@ -758,6 +761,9 @@ message ProjectRemove {
 
 // What a new session of a project starts with.
 message ProjectDefaults {
+  // The AI new sessions of the project open with (ProviderInfo.id); empty:
+  // the device picks one for each new session.
+  string provider = 4;
   // Empty: the AI's default.
   string model = 1;
   // One of the AI's permission_modes; empty: the machine's own settings.
@@ -1266,6 +1272,10 @@ enum ErrorReason {
   ERROR_REASON_USAGE_LEDGER_BLOCKED = 73;
   // WsGitCommitMessage with nothing staged, or only secret files staged.
   ERROR_REASON_NOTHING_STAGED = 74;
+  // A request that opens or lists an AI's sessions names no provider, and the
+  // thread or project gives none either. An AI the machine does not know is
+  // ERROR_REASON_UNKNOWN_AI.
+  ERROR_REASON_PROVIDER_REQUIRED = 75;
 }
 
 enum ErrorCode {
@@ -1670,6 +1680,14 @@ message ProviderCapabilities {
   bool terminal = 12;
   // The AI writes a commit message from what is staged (WsGitCommitMessage).
   bool commit_message = 13;
+  // Permission modes a device may pick (ThreadCreate.permission_mode,
+  // ThreadSetPermissionMode), in the AI's own names.
+  repeated string permission_modes = 14;
+  // The AI's mode that skips every prompt; a device may pick it only for a
+  // thread whose machine starts there. Empty when the AI has none.
+  string bypass_mode_id = 15;
+  // Sessions take tunelo's own MCP (browser, saved sign-in secrets).
+  bool session_mcp = 16;
 }
 
 message ModelOption {
@@ -1826,7 +1844,7 @@ message AuditEntry {
   // secret_use (path: the site; detail: the name and "fill" or "env"),
   // secret_remove (path: the site; detail: the name),
   // browser_control (a device gave the tunelo browser back or closed it;
-  // path: the site it showed; detail: "claude" or "user"),
+  // path: the site it showed; detail: "ai" or "user"),
   // browser_clear (the tunelo browser's profile was deleted),
   // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
   // agent_update (a device started an update of tunelo; detail: the version),

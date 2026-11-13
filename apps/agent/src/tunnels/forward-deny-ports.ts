@@ -3,8 +3,8 @@
 // machine knows more of its own:
 // - every port of tunelo itself: the device link, the control channel, the
 //   inspectors of `tunelo http`, and anything a tunelo process listens on;
-// - the IDE ports of Claude Code, from `<claude folder>/ide/<port>.lock` of
-//   the machine's Claude folder, ~/.claude and every Claude profile;
+// - the IDE ports of the AIs, from `<port>.lock` files in the folders each
+//   adapter names (AgentProvider.ideLockDirs);
 // - the debug ports running processes were started with: `--inspect*`
 //   (9229 when no port is given), `--inspect-port`, `--remote-debugging-port`,
 //   a JVM's `jdwp` address, `kubectl proxy` (8001 unless given), also when
@@ -22,10 +22,9 @@
 // port on the command line (debugpy, Delve, JMX set in a config file), and
 // processes of other OS users that ps does not show in full.
 import { readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeniedForwardPort } from "@tunelo/client";
-import { defaultClaudeHome, profilesRoot } from "../profiles/paths.ts";
+import { builtinProviders } from "../providers/registry.ts";
 import { type ListeningPort, type ProcessLine, listeningPorts, processLines } from "./listening-ports.ts";
 import { listRecords } from "./run-registry.ts";
 
@@ -45,8 +44,8 @@ export type DenySources = {
   processes?: () => Promise<ProcessLine[]>;
   /** Inspector ports of running `tunelo http` processes, and their pids. */
   runs?: () => { pid: number; inspectorPort?: number }[];
-  /** Claude folders whose `ide` folder holds lock files. */
-  claudeHomes?: () => string[];
+  /** Folders holding the `<port>.lock` files of the AIs' IDE integrations; every built-in AI's when unset. */
+  ideLockDirs?: () => string[];
   /** Where a failed reading of the OS is reported. */
   log?: (line: string) => void;
   now?: () => number;
@@ -83,13 +82,13 @@ export function randomDebugPort(command: string): boolean {
   return /--inspect(?:-brk|-wait|-port)?=(?:\[[^\]]*\]:|[^\s:=]*:)?0+(?=\s|$)|--remote-debugging-port[=\s]0+(?=\s|$)/.test(command);
 }
 
-/** Ports of `<home>/ide/<port>.lock` files. */
-export function idePorts(claudeHomes: readonly string[]): number[] {
+/** Ports of `<dir>/<port>.lock` files. */
+export function idePorts(lockDirs: readonly string[]): number[] {
   const out: number[] = [];
-  for (const home of claudeHomes) {
+  for (const dir of lockDirs) {
     let names: string[];
     try {
-      names = readdirSync(join(home, "ide"));
+      names = readdirSync(dir);
     } catch {
       continue;
     }
@@ -102,17 +101,9 @@ export function idePorts(claudeHomes: readonly string[]): number[] {
   return out;
 }
 
-/** The machine's Claude folder, ~/.claude, and the home of every Claude profile. */
-function claudeHomesOf(configDir: string): string[] {
-  const homes = new Set([defaultClaudeHome(), join(homedir(), ".claude")]);
-  try {
-    for (const entry of readdirSync(profilesRoot(configDir), { withFileTypes: true })) {
-      if (entry.isDirectory()) homes.add(join(profilesRoot(configDir), entry.name, "home"));
-    }
-  } catch {
-    // no profiles yet
-  }
-  return [...homes];
+/** The lock folders every built-in AI names. */
+function builtinLockDirs(configDir: string): string[] {
+  return builtinProviders({ configDir }).flatMap((p) => p.ideLockDirs?.() ?? []);
 }
 
 /** The control channel's port, from control.json. */
@@ -179,7 +170,7 @@ export class ForwardDenyList {
     if (control !== null) denied.add(control);
     for (const r of runs) if (r.inspectorPort !== undefined) denied.add(r.inspectorPort);
     for (const l of listening) if (tuneloPids.has(l.pid) || isTuneloName(l.name)) denied.add(l.port);
-    for (const p of idePorts((s.claudeHomes ?? (() => claudeHomesOf(s.configDir)))())) denied.add(p);
+    for (const p of idePorts((s.ideLockDirs ?? (() => builtinLockDirs(s.configDir)))())) denied.add(p);
     if (this.lastProcesses === undefined) for (const p of FALLBACK_DEBUG_PORTS) denied.add(p);
     const randomPids = new Set<number>();
     for (const proc of processes) {

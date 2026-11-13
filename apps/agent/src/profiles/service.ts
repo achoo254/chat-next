@@ -108,6 +108,8 @@ export class ProfileError extends Error {
 }
 
 export class ClaudeProfiles {
+  /** The AI whose accounts these are. */
+  readonly provider = "claude";
   readonly store: ProfileStore;
   readonly claudeHome: string;
   private attempt: Attempt | undefined;

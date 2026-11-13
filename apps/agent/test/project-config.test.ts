@@ -113,7 +113,7 @@ describe("a folder's project configuration over the sealed link", () => {
   });
 
   it("the project list carries each project's level", () => {
-    const project = { id: "p", name: "w", dir: "/w", pinned: false, defaults: { model: "", permissionMode: "", projectSettings: false }, createdAt: 0, missing: false, sensitive: false };
+    const project = { id: "p", name: "w", dir: "/w", pinned: false, defaults: { provider: "", model: "", permissionMode: "", projectSettings: false }, createdAt: 0, missing: false, sensitive: false };
     const body = projectListBody({ projects: [project], suggestions: [] }, (dir) => (dir === "/w" ? ProjectConfigLevel.FULL : ProjectConfigLevel.OFF));
     expect(body.projects[0]?.projectConfig).toBe(ProjectConfigLevel.FULL);
     expect(projectListBody({ projects: [project], suggestions: [] }).projects[0]).not.toHaveProperty("projectConfig");

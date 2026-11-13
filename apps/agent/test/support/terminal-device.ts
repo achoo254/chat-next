@@ -39,7 +39,7 @@ export async function terminalMachine(opts: {
   unit: TermHostUnit | undefined;
   env?: NodeJS.ProcessEnv;
   providers?: AgentProvider[];
-  claudeConfigDir?: () => string | undefined;
+  shellEnv?: () => Record<string, string>;
   /** The machine's config folder; a new one when not given. */
   configDir?: string;
   /** Grace before the terminal closes connections an earlier agent run left. */
@@ -58,7 +58,7 @@ export async function terminalMachine(opts: {
     ai: aiTerminalsOf(core),
     log: (l) => logs.push(l),
     ...(opts.env ? { env: opts.env } : {}),
-    ...(opts.claudeConfigDir ? { claudeConfigDir: opts.claudeConfigDir } : {}),
+    ...(opts.shellEnv ? { shellEnv: opts.shellEnv } : {}),
     ...(opts.orphanGraceMs !== undefined ? { orphanGraceMs: opts.orphanGraceMs } : {}),
   });
 

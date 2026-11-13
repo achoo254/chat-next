@@ -251,21 +251,21 @@ describe("connection", () => {
     link.conn.receive(hs.hello);
     const { session } = await hs.finish((await link.next()) ?? new Uint8Array());
 
-    link.conn.receive(session.seal(create(FrameSchema, { id: "1", body: { case: "sessionList", value: { query: "readme" } } })));
+    link.conn.receive(session.seal(create(FrameSchema, { id: "1", body: { case: "sessionList", value: { provider: "claude", query: "readme" } } })));
     const listed = (await frames(session, link.next, (f) => f.id === "1")).at(-1)?.body;
     if (listed?.case !== "sessionListResult") throw new Error(`expected a list, got ${listed?.case}`);
     expect(listed.value.total).toBe(1);
     expect(listed.value.sessions[0]).toMatchObject({ sessionId: t.sessionId, dir: m.work, title: "Viết README", messages: 2, entrypoint: "cli", threadId: "", busyElsewhere: false });
     expect(listed.value.dirs).toEqual([expect.objectContaining({ dir: m.work, sessions: 1 })]);
 
-    link.conn.receive(session.seal(create(FrameSchema, { id: "2", body: { case: "sessionOpen", value: { sessionId: t.sessionId } } })));
+    link.conn.receive(session.seal(create(FrameSchema, { id: "2", body: { case: "sessionOpen", value: { provider: "claude", sessionId: t.sessionId } } })));
     const got = await frames(session, link.next, (f) => f.body.case === "threadItems");
     const created = got.find((f) => f.id === "2")?.body;
     expect(created?.case === "threadCreated" && created.value.thread?.title).toBe("Viết README");
     const items = got.flatMap((f) => (f.body.case === "threadItems" ? f.body.value.items : []));
     expect(items.flatMap((i) => (i.body.case === "text" ? [i.body.value.text] : []))).toEqual(["Viết README", "Xong README."]);
 
-    link.conn.receive(session.seal(create(FrameSchema, { id: "3", body: { case: "sessionOpen", value: { sessionId: randomUUID() } } })));
+    link.conn.receive(session.seal(create(FrameSchema, { id: "3", body: { case: "sessionOpen", value: { provider: "claude", sessionId: randomUUID() } } })));
     const missing = (await frames(session, link.next, (f) => f.id === "3")).at(-1)?.body;
     expect(missing?.case === "error" && [missing.value.code, missing.value.reason]).toEqual([ErrorCode.NOT_FOUND, ErrorReason.SESSION_NOT_FOUND]);
   });

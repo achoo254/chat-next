@@ -14,8 +14,8 @@ export type CommitMessageDeps = {
   providers: readonly AgentProvider[];
   staged: (workspaceId: string) => Promise<StagedChanges>;
   detect: (provider: AgentProvider) => Promise<Detected>;
-  /** The account folder picked on the machine; throws when the profiles cannot be read. */
-  accountDir: () => string | undefined;
+  /** The account folder picked on the machine for this AI; throws when its accounts cannot be read. */
+  accountDir: (providerId: string) => string | undefined;
 };
 
 export type CommitMessageRequest = { workspaceId: string; provider: string; model: string };
@@ -46,13 +46,14 @@ export function cleanMessage(answer: string): string {
 }
 
 export async function writeCommitMessage(deps: CommitMessageDeps, req: CommitMessageRequest): Promise<string> {
+  if (req.provider === "") throw new AgentError(ErrorCode.INVALID, "no AI named", { reason: ErrorReason.PROVIDER_REQUIRED });
   const provider = deps.providers.find((p) => p.id === req.provider);
   if (!provider) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `unknown AI "${req.provider}"`, { reason: ErrorReason.UNKNOWN_AI, subject: req.provider.slice(0, 100) });
   const writer = provider.writer;
   if (!writer) throw new AgentError(ErrorCode.INVALID, `${provider.name} cannot write a commit message`, { reason: ErrorReason.UNSUPPORTED_REQUEST });
   let accountDir: string | undefined;
   try {
-    accountDir = deps.accountDir();
+    accountDir = deps.accountDir(provider.id);
   } catch (err) {
     const why = (err as Error).message;
     throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });

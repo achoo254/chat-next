@@ -18,7 +18,8 @@ import { type GitStatus, cloneUrlName, gitBranch, gitEnv, gitOriginUrl, gitStatu
 
 const run = promisify(execFile);
 
-export type ProjectDefaults = { model: string; permissionMode: string; projectSettings: boolean };
+/** `provider`: the AI new sessions of the project open with; "" lets the device pick one each time. */
+export type ProjectDefaults = { provider: string; model: string; permissionMode: string; projectSettings: boolean };
 
 /** One project as tunelo's config keeps it. */
 export type ProjectRecord = { id: string; name: string; dir: string; pinned: boolean; defaults: ProjectDefaults; createdAt: number };
@@ -37,7 +38,7 @@ const STATUS_MS = 60_000;
 const NAME_MAX = 64;
 const SUGGESTIONS_MAX = 8;
 const CLONE_ID = /^[A-Za-z0-9_-]{8,64}$/;
-const NO_DEFAULTS: ProjectDefaults = { model: "", permissionMode: "", projectSettings: false };
+const NO_DEFAULTS: ProjectDefaults = { provider: "", model: "", permissionMode: "", projectSettings: false };
 
 const refuse = (reason: ErrorReason, message: string, subject = "") => new AgentError(ErrorCode.INVALID, message, { reason, subject });
 
@@ -112,7 +113,7 @@ export class Projects {
   }
 
   private records(): ProjectRecord[] {
-    return [...(this.opts.config.get().projects ?? [])];
+    return (this.opts.config.get().projects ?? []).map((p) => ({ ...p, defaults: { ...NO_DEFAULTS, ...p.defaults } }));
   }
 
   private save(records: ProjectRecord[]): void {
@@ -284,7 +285,8 @@ export class Projects {
     c.child.kill();
   }
 
-  update(req: { id: string; name?: string; pinned?: boolean; defaults?: ProjectDefaults }, permissionModes: readonly string[]): void {
+  /** `permissionModes`: the modes a device may pick for an AI; undefined for an AI the machine does not know. */
+  update(req: { id: string; name?: string; pinned?: boolean; defaults?: ProjectDefaults }, permissionModes: (provider: string) => readonly string[] | undefined): void {
     const records = this.records();
     const p = records.find((x) => x.id === req.id);
     if (!p) throw refuse(ErrorReason.PROJECT_NOT_FOUND, "no such project");
@@ -295,9 +297,13 @@ export class Projects {
     }
     if (req.pinned !== undefined) p.pinned = req.pinned;
     if (req.defaults) {
-      const mode = req.defaults.permissionMode;
-      if (mode !== "" && !permissionModes.includes(mode)) throw refuse(ErrorReason.PERMISSION_MODE_NOT_ALLOWED, "mode not allowed", mode);
-      p.defaults = { model: req.defaults.model.slice(0, 100), permissionMode: mode, projectSettings: req.defaults.projectSettings };
+      const { provider, model, permissionMode: mode, projectSettings } = req.defaults;
+      // A model or a mode belongs to one AI: it needs the AI named.
+      if (provider === "" && (mode !== "" || model !== "")) throw refuse(ErrorReason.PROVIDER_REQUIRED, "a model or permission mode needs an AI");
+      const modes = provider === "" ? [] : permissionModes(provider);
+      if (modes === undefined) throw refuse(ErrorReason.UNKNOWN_AI, "unknown AI", provider.slice(0, 100));
+      if (mode !== "" && !modes.includes(mode)) throw refuse(ErrorReason.PERMISSION_MODE_NOT_ALLOWED, "mode not allowed", mode);
+      p.defaults = { provider, model: model.slice(0, 100), permissionMode: mode, projectSettings };
     }
     this.save(records);
   }

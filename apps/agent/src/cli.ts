@@ -64,21 +64,21 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   if (running !== null) throw new Error(`tunelo is already running (pid ${running}, ${dir}); \`tunelo stop\` stops it`);
   await importLegacySignIns(dir);
   const config = new ConfigStore(dir);
-  // A session's writes need the device's approval, except in bypassPermissions (set on the machine only).
-  let sessionMode: (threadId: string) => string | undefined = () => undefined;
+  // A session's writes need the device's approval, except in its AI's bypass mode (set on the machine only).
+  let sessionBypassed: (threadId: string) => boolean = () => false;
   let secrets: () => SecretService | undefined = () => undefined;
   let browser: () => RemoteBrowser | undefined = () => undefined;
   const mcp = new McpHost(dir, {
     log,
     enabledGroups: () => config.get().mcpGroups,
-    sessionMode: (threadId) => sessionMode(threadId),
+    sessionBypassed: (threadId) => sessionBypassed(threadId),
     secrets: () => secrets(),
     browser: () => browser(),
   });
   const machine = new Machine({ config, mcp });
   secrets = () => machine.secrets;
   browser = () => machine.browser;
-  sessionMode = (threadId) => machine.core.permissionMode(threadId);
+  sessionBypassed = (threadId) => machine.core.bypassed(threadId);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;
   const port = await machine.start(portArg ? Number(portArg) : undefined);

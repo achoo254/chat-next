@@ -112,11 +112,9 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
   const beat = async (): Promise<void> => {
     if (stopped) return;
     try {
-      const info = await m.machineInfo();
       const r = await heartbeat(secret(), {
         tunnelUrl,
         agentVersion: AGENT_VERSION,
-        claudeVersion: info.providers[0]?.version ?? "",
         connectedDeviceKeys: m.connectedDeviceKeys(),
       });
       if (r.revoked) {

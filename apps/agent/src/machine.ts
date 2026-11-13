@@ -19,7 +19,7 @@ import { machineKey } from "./keystore.ts";
 import { Connection, profileListBody, projectListBody } from "./link/connection.ts";
 import { ClaudeProfiles, type ProfileList } from "./profiles/service.ts";
 import { findClaude, probeUsage } from "./providers/claude/index.ts";
-import { builtinProviders } from "./providers/registry.ts";
+import { builtinProviders, withHistory } from "./providers/registry.ts";
 import type { AgentProvider, Detected } from "./providers/types.ts";
 import { logFile } from "./log-tail.ts";
 import { startLogRotation } from "./log-rotate.ts";
@@ -146,7 +146,7 @@ export class Machine {
       log: this.log,
     });
     // Sessions kept on the machine are read from its own Claude folder and every profile's.
-    this.providers = opts.providers ?? builtinProviders(() => this.profiles.claudeHomes());
+    this.providers = opts.providers ?? builtinProviders({ configDir: dir, claudeHomes: () => this.profiles.claudeHomes() });
     this.usage = new UsageScheduler({
       configDir: dir,
       sources: () => this.providers.flatMap((p) => (p.usage ? [{ provider: p.id, usage: p.usage }] : [])),
@@ -188,6 +188,7 @@ export class Machine {
         configDir: dir,
         ownPorts: () => (this.port ? [this.port] : []),
         extraPorts: () => forwardSettings.read().blockedPorts,
+        ideLockDirs: () => this.providers.flatMap((p) => p.ideLockDirs?.() ?? []),
         log: this.log,
       }),
     });
@@ -224,8 +225,8 @@ export class Machine {
       config: this.config,
       audit: this.audit,
       unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),
-      // A shell runs `claude` on the machine's selected profile, as Chat's sessions do; the default one needs nothing.
-      claudeConfigDir: () => this.profiles.selectedAccountDir(),
+      // A shell runs each AI's CLI on the account picked on the machine, as Chat's sessions do; the default one needs nothing.
+      shellEnv: () => Object.assign({}, ...this.providers.map((p) => p.shellEnv?.(this.selectedAccountDir(p.id)) ?? {})),
       ai: aiTerminalsOf(this.core),
       log: this.log,
       onAvailability: () => void this.announceInfo(),
@@ -239,8 +240,10 @@ export class Machine {
       sessionDirs: async () => {
         const count = new Map<string, number>();
         for (const t of this.core.list()) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
-        for (const d of (await this.core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 1 })).dirs) {
-          count.set(d.dir, Math.max(count.get(d.dir) ?? 0, d.sessions));
+        for (const p of withHistory(this.providers)) {
+          for (const d of (await this.core.localSessions({ provider: p.id, dir: "", query: "", offset: 0, limit: 1 })).dirs) {
+            count.set(d.dir, Math.max(count.get(d.dir) ?? 0, d.sessions));
+          }
         }
         return [...count].map(([dir, sessions]) => ({ dir, sessions }));
       },
@@ -495,7 +498,7 @@ export class Machine {
         workspaces: this.workspaces,
         commitMessage: (req) =>
           writeCommitMessage(
-            { providers: this.providers, staged: (id) => this.workspaces.stagedChanges(id), detect: (p) => this.detect(p), accountDir: () => this.profiles.selectedAccountDir() },
+            { providers: this.providers, staged: (id) => this.workspaces.stagedChanges(id), detect: (p) => this.detect(p), accountDir: (providerId) => (providerId === this.profiles.provider ? this.profiles.selectedAccountDir() : undefined) },
             req,
           ),
         usage: this.usageApi,
@@ -524,14 +527,19 @@ export class Machine {
     ws.on("error", () => conn.close());
   }
 
-  /** What a provider reports, for the selected Claude profile; cached a minute. */
-  private async detect(p: AgentProvider): Promise<Detected> {
-    let accountDir: string | undefined;
+  /** The account folder picked on the machine for this AI; undefined for its default, or when the accounts cannot be read. */
+  private selectedAccountDir(providerId: string): string | undefined {
+    if (providerId !== this.profiles.provider) return undefined;
     try {
-      accountDir = this.profiles.selectedAccountDir();
+      return this.profiles.selectedAccountDir();
     } catch {
-      accountDir = undefined; // the profiles cannot be read: sessions say so when they open
+      return undefined; // the profiles cannot be read: sessions say so when they open
     }
+  }
+
+  /** What a provider reports, for the account picked on the machine; cached a minute. */
+  private async detect(p: AgentProvider): Promise<Detected> {
+    const accountDir = this.selectedAccountDir(p.id);
     const key = `${p.id}\n${accountDir ?? ""}`;
     const hit = this.detected.get(key);
     if (hit && Date.now() - hit.at < 60_000) return hit.value;
@@ -691,8 +699,8 @@ export function sessionMcpFor(
     return {
       ticket,
       configDir: config.dir,
-      approveWrite: (claudeName, input) => mcp.approve(ticket, claudeName, input),
-      describeWrite: (claudeName, input) => mcp.describeWrite(claudeName, input),
+      approveWrite: (exposed, input) => mcp.approve(ticket, exposed, input),
+      describeWrite: (exposed, input) => mcp.describeWrite(exposed, input),
       ...(env ? { secrets: env } : {}),
       ...(browser ? { browserNotices: () => browser.takeNotices(ticket) } : {}),
       release: () => {

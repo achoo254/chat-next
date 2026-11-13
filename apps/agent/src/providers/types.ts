@@ -26,6 +26,12 @@ export type ProviderCapabilities = {
   effortLevels: string[];
   /** Permission modes a device may pick; never one that skips every prompt. */
   permissionModes: string[];
+  /**
+   * The AI's mode that skips every prompt, in its own name. A device may
+   * pick it only for a thread whose machine starts sessions there; unset
+   * when the AI has none.
+   */
+  bypassModeId?: string;
   /** Sessions take tunelo's own MCP (and its ticket). */
   sessionMcp?: boolean;
 };
@@ -158,9 +164,9 @@ export type SessionPolicy = {
   /** Picked from a device; unset keeps the machine's own settings. */
   effort?: string;
   permissionMode?: string;
-  /** The machine's own settings start sessions in bypassPermissions, so a device may return to it. */
+  /** The machine's own settings start sessions in the AI's bypass mode, so a device may return to it. */
   allowBypass?: boolean;
-  /** The AI's config folder of the account picked on the machine (Claude: CLAUDE_CONFIG_DIR); unset for its default. */
+  /** The AI's config folder of the account picked on the machine; unset for its default. */
   accountDir?: string;
   /** tunelo's own MCP for this session (its ticket ends with the session). */
   sessionMcp?: SessionMcp;
@@ -241,7 +247,7 @@ export type HistoryEntry = { at: number } & (
 /** Where a session's transcript ends now; read() continues from such a position. */
 export type HistoryRead = { entries: HistoryEntry[]; end: number };
 
-/** The AI's own record of its sessions on this machine (Claude: ~/.claude/projects). */
+/** The AI's own record of its sessions on this machine. */
 export interface SessionHistory {
   /** Brings what tells busy sessions apart up to date before list() or find(); quick, never fails. */
   prime?(): Promise<void>;
@@ -288,7 +294,7 @@ export type TerminalLaunch = {
 export type TerminalCommand = {
   file: string;
   args: string[];
-  /** Environment the AI needs (the terminal process accepts CLAUDE_CONFIG_DIR only). */
+  /** Environment the AI needs; only names the terminal process accepts (see ShellEnv). */
   env: Record<string, string>;
   /** The new session's id, when the CLI lets the caller pick it (so the thread knows it at once). */
   sessionId?: string;
@@ -344,7 +350,7 @@ export type UsageLineStats = {
 /** `end`: the byte after the last whole line read; a line still being written is left for the next read. */
 export type UsageRead = { turns: UsageTurn[]; end: number; stats: UsageLineStats };
 
-/** The AI's token usage as its own transcripts on the machine record it (Claude: ~/.claude/projects). */
+/** The AI's token usage as its own transcripts on the machine record it. */
 export interface UsageSource {
   /** Every transcript file, each once (links are not followed). */
   files(): Promise<UsageFile[]>;
@@ -356,10 +362,25 @@ export interface UsageSource {
   read(file: UsageFile, from: number, onChunk?: (bytes: number) => void): Promise<UsageRead>;
 }
 
+/**
+ * Environment a plain shell of the machine's terminal takes so the AI's own
+ * CLI typed there uses the account picked on the machine. Only names the
+ * terminal process accepts (apps/term-host: its fixed list).
+ */
+export type ShellEnv = Partial<Record<"CLAUDE_CONFIG_DIR", string>>;
+
 export interface AgentProvider {
   readonly id: string;
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
+  /** For a plain shell, the environment of the account folder picked on the machine (unset: the AI's default). */
+  shellEnv?(accountDir: string | undefined): ShellEnv;
+  /**
+   * Files of the AI's IDE integrations that name local ports the AI's IDE
+   * extension listens on (Claude: ~/.claude/ide/*.lock), so tunnels never
+   * forward them. Absent when the AI keeps none.
+   */
+  ideLockDirs?(): string[];
   detect(opts?: DetectOptions): Promise<Detected>;
   start(opts: { policy: SessionPolicy; resumeId?: string; askUser: AskUser }): Promise<ProviderSession>;
   /** Sessions the AI keeps on the machine; absent when it keeps none tunelo can read. */

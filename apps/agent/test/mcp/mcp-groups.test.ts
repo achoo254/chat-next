@@ -50,18 +50,18 @@ describe("the tool groups", () => {
 	test("no two groups expose the same name", () => {
 		const names = TOOL_GROUPS.flatMap((g) => g.allowedTools.map((t) => exposedToolName(g.name, t)));
 		expect(new Set(names).size).toBe(names.length);
-		expect(sessionTool("mcp__tunelo__chat_send_message")).toMatchObject({ tool: "send_message", group: { name: "chat" } });
-		expect(sessionTool("mcp__tunelo__whoami")).toMatchObject({ tool: "whoami", group: { name: "tunnel" } });
-		expect(sessionTool("mcp__tunelo__chat_delete_messages")).toBeUndefined();
+		expect(sessionTool("chat_send_message")).toMatchObject({ tool: "send_message", group: { name: "chat" } });
+		expect(sessionTool("whoami")).toMatchObject({ tool: "whoami", group: { name: "tunnel" } });
+		expect(sessionTool("chat_delete_messages")).toBeUndefined();
 	});
 
 	test("approval: write tools, two-step ones only with their confirm token", () => {
-		expect(needsApproval("mcp__tunelo__chat_send_message", {})).toBe(true);
-		expect(needsApproval("mcp__tunelo__localman_send_request", {})).toBe(true);
-		expect(needsApproval("mcp__tunelo__chat_list_chats", {})).toBe(false);
-		expect(needsApproval("mcp__tunelo__revoke_linked_machine", { dry_run: true })).toBe(false);
-		expect(needsApproval("mcp__tunelo__revoke_linked_machine", { confirm_token: "" })).toBe(false);
-		expect(needsApproval("mcp__tunelo__revoke_linked_machine", { confirm_token: "t" })).toBe(true);
+		expect(needsApproval("chat_send_message", {})).toBe(true);
+		expect(needsApproval("localman_send_request", {})).toBe(true);
+		expect(needsApproval("chat_list_chats", {})).toBe(false);
+		expect(needsApproval("revoke_linked_machine", { dry_run: true })).toBe(false);
+		expect(needsApproval("revoke_linked_machine", { confirm_token: "" })).toBe(false);
+		expect(needsApproval("revoke_linked_machine", { confirm_token: "t" })).toBe(true);
 	});
 });
 
@@ -98,7 +98,7 @@ describe("the service's MCP host", () => {
 		expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved on the device/);
 		expect(sent()).toBe(0);
 
-		h.approve(ticket, "mcp__tunelo__chat_send_message", SEND);
+		h.approve(ticket, "chat_send_message", SEND);
 		expect(textOf(await h.call(id, "chat", "send_message", { ...SEND, text: "other" }))).toMatch(/not approved/);
 		expect((await h.call(id, "chat", "send_message", { text: "hi", chat_id: 7 })).isError).toBeUndefined();
 		expect(sent()).toBe(1);
@@ -108,7 +108,7 @@ describe("the service's MCP host", () => {
 
 		// Another session's approval does not count.
 		const other = h.tickets.issue("thread-2");
-		h.approve(other, "mcp__tunelo__chat_send_message", SEND);
+		h.approve(other, "chat_send_message", SEND);
 		expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
 		h.endAll();
 	});
@@ -118,11 +118,11 @@ describe("the service's MCP host", () => {
 		const { h } = host(undefined, { approvals: new WriteApprovals(() => now) });
 		const ticket = h.tickets.issue("thread-1");
 		const id = h.open("wss://tunnel.example", ticket);
-		h.approve(ticket, "mcp__tunelo__chat_send_message", SEND);
+		h.approve(ticket, "chat_send_message", SEND);
 		now = 60_001;
 		expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
 		now = 0;
-		h.approve(ticket, "mcp__tunelo__chat_send_message", SEND);
+		h.approve(ticket, "chat_send_message", SEND);
 		h.release(ticket);
 		const again = h.tickets.issue("thread-1");
 		const id2 = h.open("wss://tunnel.example", again);
@@ -130,8 +130,8 @@ describe("the service's MCP host", () => {
 		h.endAll();
 	});
 
-	test("reads and dry runs need no approval; bypassPermissions needs none", async () => {
-		const { h } = host(undefined, { sessionMode: (who) => (who === "bypassed" ? "bypassPermissions" : "auto") });
+	test("reads and dry runs need no approval; a bypassed session needs none", async () => {
+		const { h } = host(undefined, { sessionBypassed: (who) => who === "bypassed" });
 		const ticket = h.tickets.issue("thread-1");
 		const id = h.open("wss://tunnel.example", ticket);
 		expect((await h.call(id, "chat", "list_chats", {})).isError).toBeUndefined();
@@ -168,7 +168,7 @@ describe("the service's MCP host", () => {
 		const session = h.open("wss://tunnel.example", ticket);
 		expect((await h.remoteTools(ticket)).tools.map((t) => t.exposed)).toContain("chat_send_message");
 		expect(textOf(await h.call(session, "chat", "send_message", SEND))).toMatch(/not approved on the device/);
-		h.approve(ticket, "mcp__tunelo__chat_send_message", SEND);
+		h.approve(ticket, "chat_send_message", SEND);
 		expect((await h.call(session, "chat", "send_message", SEND)).isError).toBeUndefined();
 		await new LocalWritesSetting(dir).set(true);
 		expect(textOf(await h.call(session, "chat", "send_message", SEND))).toMatch(/not approved on the device/);
@@ -200,13 +200,13 @@ describe("the service's MCP host", () => {
 
 	test("a card names the chat a message goes to, or the request sent", async () => {
 		const { h } = host();
-		expect(await h.describeWrite("mcp__tunelo__chat_send_message", SEND)).toBe("Send to «Team» (12 members): hi");
+		expect(await h.describeWrite("chat_send_message", SEND)).toBe("Send to «Team» (12 members): hi");
 		const long = "x".repeat(400);
-		expect(await h.describeWrite("mcp__tunelo__chat_send_message", { chat_id: 7, text: long })).toMatch(/… \(400 characters\)$/);
-		expect(await h.describeWrite("mcp__tunelo__localman_send_request", { method: "post", url: "http://localhost:5173/api" })).toBe("POST http://localhost:5173/api");
+		expect(await h.describeWrite("chat_send_message", { chat_id: 7, text: long })).toMatch(/… \(400 characters\)$/);
+		expect(await h.describeWrite("localman_send_request", { method: "post", url: "http://localhost:5173/api" })).toBe("POST http://localhost:5173/api");
 		chat.accepted.delete(CHAT_TOKEN);
 		const { h: refused } = host();
-		expect(await refused.describeWrite("mcp__tunelo__chat_send_message", SEND)).toBe("Send to chat 7: hi");
+		expect(await refused.describeWrite("chat_send_message", SEND)).toBe("Send to chat 7: hi");
 		chat.accepted.add(CHAT_TOKEN);
 		h.endAll();
 		refused.endAll();

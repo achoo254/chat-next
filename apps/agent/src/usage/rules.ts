@@ -23,7 +23,11 @@ import { type Turn, contextOf } from "./ledger.ts";
 export const RULE_CODES = ["context", "turns", "mechanical", "subagents"] as const;
 export type RuleCode = (typeof RULE_CODES)[number];
 
-/** Tools that read, search or run a command: what the mechanical rule counts. */
+/**
+ * Tools that read, search or run a command: what the mechanical rule counts.
+ * The names are Claude Code's, the only AI whose transcripts feed the usage
+ * ledger (AgentProvider.usage); an AI that adds a UsageSource names its own here.
+ */
 export const MECHANICAL_TOOLS: readonly string[] = ["Read", "Grep", "Glob", "LS", "Bash", "BashOutput", "NotebookRead"];
 
 /** Every threshold of the rules, in one place; `enabled` is each rule's default. */

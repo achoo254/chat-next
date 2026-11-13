@@ -199,7 +199,8 @@ describe("write tools in a session", () => {
       const { approved, sessionMcp } = lease();
       const r = await run("auto", ["mcp__tunelo__*"], [SEND], Decision.ALLOW, sessionMcp);
       expect(r.summaries).toEqual(["Send to «Team» (12 members): test"]);
-      expect(approved).toEqual([SEND]);
+      // The adapter hands tunelo the tool's name as tunelo's MCP serves it.
+      expect(approved).toEqual([["chat_send_message", SEND[1]]]);
     });
 
     it("a refused card approves nothing", async () => {

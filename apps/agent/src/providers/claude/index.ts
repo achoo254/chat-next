@@ -3,7 +3,7 @@
 // calls the Anthropic API itself.
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -28,7 +28,7 @@ import { redactDeep } from "../../mcp/redact.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
 import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
 import { claudeEnv, readAccount } from "../../profiles/account.ts";
-import { defaultClaudeHome } from "../../profiles/paths.ts";
+import { defaultClaudeHome, profilesRoot } from "../../profiles/paths.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import { selfCommand } from "../../service.ts";
 import { Channel } from "../../util/channel.ts";
@@ -61,6 +61,9 @@ export { MessageMapper };
 
 const run = promisify(execFile);
 
+/** Claude's mode that skips every prompt: a device may only return to it when the machine starts there. */
+const BYPASS_MODE = "bypassPermissions";
+
 /** `claude` versions this agent was tested with (major.minor). */
 const TESTED = ["2.1"];
 
@@ -83,6 +86,7 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   // bypassPermissions and dontAsk are left out: a device may only return to
   // bypass when the machine's own settings start sessions in it.
   permissionModes: ["default", "acceptEdits", "plan", "auto"],
+  bypassModeId: BYPASS_MODE,
   sessionMcp: true,
 };
 
@@ -121,6 +125,19 @@ export async function findClaude(): Promise<string | null> {
 
 export type QueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => Query;
 
+/** The machine's Claude folder and the home of every Claude profile under tunelo's config folder `configDir`. */
+export function claudeHomesIn(configDir: string): string[] {
+  const homes = [defaultClaudeHome()];
+  try {
+    for (const entry of readdirSync(profilesRoot(configDir), { withFileTypes: true })) {
+      if (entry.isDirectory()) homes.push(join(profilesRoot(configDir), entry.name, "home"));
+    }
+  } catch {
+    // no profiles yet
+  }
+  return homes;
+}
+
 export function createClaudeProvider(
   deps: {
     query?: QueryFn;
@@ -138,6 +155,9 @@ export function createClaudeProvider(
     id: "claude",
     name: "Claude Code",
     capabilities: CLAUDE_CAPABILITIES,
+    shellEnv: (accountDir) => (accountDir ? { CLAUDE_CONFIG_DIR: accountDir } : {}),
+    // Claude Code's IDE extensions leave <claude folder>/ide/<port>.lock; ~/.claude too when CLAUDE_CONFIG_DIR moved it.
+    ideLockDirs: () => [...new Set([...homes(), join(homedir(), ".claude")])].map((h) => join(h, "ide")),
     history,
     usage: new ClaudeUsage({ homes }),
     writer: claudeWriter(findBinary, CLAUDE_CAPABILITIES.models.map((m) => m.id)),
@@ -246,12 +266,19 @@ const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the intern
  */
 export const writeApprovalHook: HookCallback = async (input) => {
   if (input.hook_event_name !== "PreToolUse") return {};
-  if (input.permission_mode === "bypassPermissions") return {};
-  if (!needsApproval(input.tool_name, input.tool_input)) return {};
+  if (input.permission_mode === BYPASS_MODE) return {};
+  if (!needsApproval(tuneloTool(input.tool_name), input.tool_input)) return {};
   return {
     hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: WRITE_APPROVAL_REASON },
   };
 };
+
+const TUNELO_PREFIX = `mcp__${SESSION_MCP_SERVER}__`;
+
+/** A Claude tool name as tunelo's MCP serves it (`mcp__tunelo__chat_send_message` → `chat_send_message`); "" for any other tool. */
+export function tuneloTool(claudeName: string): string {
+  return claudeName.startsWith(TUNELO_PREFIX) ? claudeName.slice(TUNELO_PREFIX.length) : "";
+}
 
 /** Tools whose own card on the device is the question to the user: no approval card before them. */
 const ASKS_ON_DEVICE = new Set(["request_secret", "request_takeover"].map((tool) => `mcp__${SESSION_MCP_SERVER}__${tool}`));
@@ -295,7 +322,7 @@ export function secretCommandHook(secrets: SessionSecretHooks): HookCallback {
     const note = missing.length
       ? { additionalContext: `${missing.map(envName).join(", ")} ${missing.length > 1 ? "are" : "is"} not set: get the secret with request_secret first.` }
       : {};
-    if (given.length > 0 && input.permission_mode !== "bypassPermissions") {
+    if (given.length > 0 && input.permission_mode !== BYPASS_MODE) {
       // No reason in words: the device says it in the user's language, from the command itself.
       return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", ...note } };
     }
@@ -338,7 +365,7 @@ export function replayableRule(rule: string): boolean {
   if (tool === "" || tool.includes("*")) return false;
   const ownServer = `mcp__${SESSION_MCP_SERVER}`;
   if (tool === ownServer || tool === `${ownServer}__`) return false;
-  return !isWriteTool(tool);
+  return !isWriteTool(tuneloTool(tool));
 }
 
 /** What Claude reads as the tool's answer: like the terminal's "No, and tell Claude what to do differently". */
@@ -392,8 +419,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     const command = typeof input.command === "string" ? input.command : "";
     const sensitive = paths.some(policy.isSensitive) || (command !== "" && mentionsSensitive(command, policy.isSensitive, { cwd: policy.dir }));
     // A write of tunelo's MCP: the card names what it does, and the service runs it only once approved here.
-    const write = policy.sessionMcp && needsApproval(toolName, input) ? policy.sessionMcp : undefined;
-    const summary = (write && (await write.describeWrite(toolName, input).catch(() => undefined))) || toolSummary(toolName, input, policy.dir);
+    const ownTool = tuneloTool(toolName);
+    const write = policy.sessionMcp && needsApproval(ownTool, input) ? policy.sessionMcp : undefined;
+    const summary = (write && (await write.describeWrite(ownTool, input).catch(() => undefined))) || toolSummary(toolName, input, policy.dir);
     const full = JSON.stringify(input);
     const cut = full.length > CARD_INPUT_CHARS ? `The input shown is cut: ${full.length} characters in all.` : "";
     // A command reading a sign-in secret: the device words why it asks (from $TUNELO_SECRET_* in the input).
@@ -414,12 +442,12 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     const answer = await askUser(req, opts.signal);
     if (answer.decision === "deny") return { behavior: "deny", message: denialText(answer.message) };
     const { decision } = answer;
-    write?.approveWrite(toolName, input);
+    write?.approveWrite(ownTool, input);
     // Approved: the secrets the command names go where its shell loads them, until it ends.
     if (secrets && toolName === "Bash" && opts.toolUseID) await secrets.beforeCommand(opts.toolUseID, command);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
     // A command reading a sign-in secret is asked about every time: an older device's "allow for the session" counts once.
-    if (decision === "allow-session" && !sensitive && !isWriteTool(toolName) && !usesSecret) {
+    if (decision === "allow-session" && !sensitive && !isWriteTool(ownTool) && !usesSecret) {
       // Only allow rules for this session: a remote "allow for the session"
       // must never switch the permission mode or add directories.
       const suggested = (opts.suggestions ?? []).filter((s) => s.type === "addRules" && s.behavior === "allow");

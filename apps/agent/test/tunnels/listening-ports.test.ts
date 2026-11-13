@@ -134,7 +134,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("ports the machine refuses", () => {
-  test("IDE lock files of every Claude folder", () => {
+  test("IDE lock files of every lock folder", () => {
     const a = join(dir, "a");
     const b = join(dir, "b");
     mkdirSync(join(a, "ide"), { recursive: true });
@@ -143,7 +143,7 @@ describe("ports the machine refuses", () => {
     writeFileSync(join(b, "ide", "51000.lock"), "{}");
     writeFileSync(join(b, "ide", "notes.lock"), "{}");
     writeFileSync(join(b, "ide", "99999.lock"), "{}");
-    expect(idePorts([a, b, join(dir, "missing")]).sort()).toEqual([45123, 51000]);
+    expect(idePorts([join(a, "ide"), join(b, "ide"), join(dir, "missing")]).sort()).toEqual([45123, 51000]);
   });
 
   test("the profiles' IDE locks, the control port, tunelo's processes, debug ports; read once per few seconds", async () => {
@@ -194,7 +194,7 @@ describe("ports the machine refuses", () => {
       ],
       processes: async () => [{ pid: 10, command: "node --inspect=0 app.js" }],
       runs: () => [],
-      claudeHomes: () => [],
+      ideLockDirs: () => [],
     });
     expect([await deny.denies(41000), await deny.denies(41001), await deny.denies(41002)]).toEqual([true, true, false]);
   });
@@ -213,7 +213,7 @@ describe("ports the machine refuses", () => {
         return [{ pid: 5, command: "node --inspect=42000 x.js" }];
       },
       runs: () => [],
-      claudeHomes: () => [],
+      ideLockDirs: () => [],
       log: (l) => logs.push(l),
       now: () => now,
     });
@@ -241,7 +241,7 @@ describe("ports the machine refuses", () => {
         throw new Error("ps missing");
       },
       runs: () => [],
-      claudeHomes: () => [],
+      ideLockDirs: () => [],
     });
     expect(await deny.denies(49000)).toBe(true);
     expect(await deny.denies(9229)).toBe(true);

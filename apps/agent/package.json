@@ -7,8 +7,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "start": "bun src/cli.ts run",
-    "spike": "bun src/spike.ts"
+    "start": "bun src/cli.ts run"
   },
   "dependencies": {
     "@achoo254/chat-proto": "workspace:*",

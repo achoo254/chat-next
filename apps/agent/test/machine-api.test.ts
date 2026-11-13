@@ -88,7 +88,7 @@ describe("machine API", () => {
       },
     });
     calls.length = 0;
-    const r = await heartbeat("secret", { tunnelUrl: "wss://x", agentVersion: "3.0.0", claudeVersion: "", connectedDeviceKeys: Array.from({ length: 60 }, () => good) });
+    const r = await heartbeat("secret", { tunnelUrl: "wss://x", agentVersion: "3.0.0", connectedDeviceKeys: Array.from({ length: 60 }, () => good) });
     expect(r).toEqual({
       revoked: false,
       minAgentVersion: "3.0.0",

@@ -34,6 +34,7 @@ export function fakeProvider(id = "fake", log: FakeLog = { starts: [], sent: [],
       models: [{ id: "small", name: "Small" }],
       effortLevels: ["low", "high"],
       permissionModes: ["default", "plan"],
+      bypassModeId: "bypassPermissions",
     },
     async detect() {
       return { installed: true, version: "1.0.0", loginState: "ok" };

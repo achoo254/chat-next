@@ -8,7 +8,7 @@
  * session's ticket. The ticket only names the session (any process of the
  * user can read it): a write of a session runs only with the approval the
  * user gave on the device for that exact call (write-approvals.ts), or
- * when the session runs in bypassPermissions. A client started elsewhere
+ * when the session runs in its AI's bypass mode. A client started elsewhere
  * (`claude mcp add tunelo -- tunelo mcp`) has no ticket and acts as this OS
  * user and only reads, unless the owner turned writes on for such clients
  * (`tunelo config mcp-local-writes on`, local-writes.ts). A ticket that is no
@@ -76,8 +76,8 @@ export interface McpHostOptions {
 	approvals?: WriteApprovals;
 	/** The groups turned on on this machine; all when unset. */
 	enabledGroups?: () => readonly GroupName[] | undefined;
-	/** The permission mode a session (by the label of its ticket) runs in now. */
-	sessionMode?: (owner: string) => string | undefined;
+	/** A session (by the label of its ticket) runs in its AI's mode that skips every prompt now. */
+	sessionBypassed?: (owner: string) => boolean;
 	/** Whether a client without a ticket may run write tools; mcp-local-writes.json when unset. */
 	localWrites?: () => boolean;
 	/** The machine's sign-in secrets; without them a session has no secret tools. */
@@ -203,7 +203,7 @@ export class McpHost {
 	private writeRefusal(ticket: string | undefined, who: string, group: ToolGroup, tool: string, args: Record<string, unknown>): string | undefined {
 		if (!actsForUser(group, tool, args)) return undefined;
 		if (!ticket) return this.localWrites() ? undefined : LOCAL_WRITES_OFF;
-		if (this.options.sessionMode?.(who) === "bypassPermissions") return undefined;
+		if (this.options.sessionBypassed?.(who) === true) return undefined;
 		return this.approvals.consume(ticket, group.name, tool, args) ? undefined : NOT_APPROVED;
 	}
 
@@ -218,9 +218,9 @@ export class McpHost {
 		return { ...result, content };
 	}
 
-	/** The user approved this call of a claude tool on the device: it may run once. */
-	approve(ticket: string, claudeName: string, input: unknown): void {
-		const found = sessionTool(claudeName);
+	/** The user approved this call of a tool (as tunelo's MCP names it) on the device: it may run once. */
+	approve(ticket: string, exposed: string, input: unknown): void {
+		const found = sessionTool(exposed);
 		if (found) this.approvals.grant(ticket, found.group.name, found.tool, input);
 	}
 
@@ -237,8 +237,8 @@ export class McpHost {
 	 * the chat a message goes to (by name when Chat answers in time) and
 	 * the start of the text, or the method and URL of a request.
 	 */
-	async describeWrite(claudeName: string, input: Record<string, unknown>): Promise<string | undefined> {
-		const found = sessionTool(claudeName);
+	async describeWrite(exposed: string, input: Record<string, unknown>): Promise<string | undefined> {
+		const found = sessionTool(exposed);
 		if (!found) return undefined;
 		const text = (v: unknown) => (typeof v === "string" ? v : "");
 		if (found.group.name === "chat" && found.tool === "send_message") {
