@@ -419,6 +419,9 @@ export const viMachines = {
 			profileSignOutFailed: (id: string) =>
 				`Claude không đăng xuất được tài khoản này nên chưa xoá gì. Muốn xoá hẳn, trên máy chạy: tunelo claude profiles remove ${id} --force`,
 			profilesDamaged: "Danh sách tài khoản Claude trên máy bị hỏng. Sửa hoặc xoá nó trên máy rồi khởi động lại tunelo.",
+			accountSwitchBlocked: (ai: string, what: string) =>
+				what === "" ? `Chưa đổi được tài khoản ${ai} lúc này: ${ai} đang chạy trên máy.` : `Chưa đổi được tài khoản ${ai} lúc này: ${what} đang dùng ${ai} trên máy. Đóng nó rồi thử lại.`,
+			providerRequired: "Chưa chọn AI cho việc này. Chọn một AI rồi thử lại.",
 			aiCliMissing: (ai: string) => `${ai} chưa được cài trên máy này.`,
 			noLocalForward: "Máy này không chuyển tiếp tới localhost.",
 			unsupportedRequest: "Máy chưa hỗ trợ việc này. Cập nhật trên máy: tunelo update.",

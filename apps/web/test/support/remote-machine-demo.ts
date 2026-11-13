@@ -16,7 +16,7 @@
 // paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { Decision, GitFileState, ItemSchema, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { AccountStatus, Decision, GitFileState, ItemSchema, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
@@ -395,19 +395,20 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	machines.add({ name: "Mac mini", os: "darwin", arch: "arm64", tunnelUrl: `wss://other.tunnel.${brand.domain}`, lastSeenAt: BigInt(Math.floor(now / 1000)), agentVersion: "2.0.1" });
 	machines.add({ name: "Máy nhà", os: "linux", arch: "x64", tunnelUrl: "", lastSeenAt: BigInt(Math.floor(now / 1000) - 2 * 3600), agentVersion: "2.0.1" });
 	const usage = (five: number, week: number) => ({ fiveHour: { utilization: five, resetsAt: BigInt(now + 3_600_000) }, sevenDay: { utilization: week, resetsAt: BigInt(now + 3 * 86_400_000) } });
-	const profiles = {
-		selectedId: "p2",
-		profiles: [
-			{ id: "", email: "user@example.com", organization: "Acme", plan: "team", signedIn: true, lastUsage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
-			{ id: "p2", email: "user.max@example.com", plan: "max", signedIn: true, lastUsage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
-			{ id: "p3", email: "user.pro@example.com", plan: "pro", signedIn: false },
+	const accounts = {
+		selectedByProvider: { claude: "p2" },
+		actions: [{ provider: "claude", signIn: true, usage: true }],
+		accounts: [
+			{ provider: "claude", id: "", email: "user@example.com", organization: "Acme", plan: "team", status: AccountStatus.OK, usage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
+			{ provider: "claude", id: "p2", email: "user.max@example.com", plan: "max", status: AccountStatus.OK, usage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
+			{ provider: "claude", id: "p3", email: "user.pro@example.com", plan: "pro", status: AccountStatus.NEEDS_SIGN_IN },
 		],
 	};
 	machine.handler = (frame, socket) => {
 		switch (frame.body.case) {
-			case "profileList":
-			case "profileSelect":
-				return [{ case: "profileListResult", value: profiles }];
+			case "accountList":
+			case "accountSelect":
+				return [{ case: "accountListResult", value: accounts }];
 			case "machineInfoRequest":
 				// Claude waits for a sign-in secret in the idle demo session (?at=machine-secret).
 				if (new URLSearchParams(window.location.search).get("at") === "machine-secret") {
@@ -435,17 +436,17 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						0,
 					);
 				}
-				// The machine announces its profiles unasked (id "") to every device.
+				// The machine announces its accounts unasked (id "") to every device.
 				setTimeout(
 					() =>
 						machine.send(socket, {
-							case: "machineProfile",
+							case: "machineAccounts",
 							value: {
-								profiles,
+								accounts,
 								sessions: [
-									{ threadId: DEMO_THREAD, profileId: "", switchPending: true },
-									{ threadId: "demo-running", profileId: "", switchPending: false },
-									{ threadId: "demo-idle", profileId: "p2", switchPending: false },
+									{ threadId: DEMO_THREAD, accountId: "", switchPending: true, provider: "claude" },
+									{ threadId: "demo-running", accountId: "", switchPending: false, provider: "claude" },
+									{ threadId: "demo-idle", accountId: "p2", switchPending: false, provider: "claude" },
 								],
 							},
 						}),
@@ -465,7 +466,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							terminal: TerminalAvailability.AVAILABLE,
 							maxSessions: 3,
 							openSessions: 1,
-							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, terminal: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, terminal: true, accounts: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
 							attachments: { fileMaxBytes: 25n * 1024n * 1024n, messageMaxBytes: 50n * 1024n * 1024n, messageMaxFiles: 10, imageMaxBytes: 3_932_160n, pieceMaxBytes: 64 * 1024 },
 							devices: [
 								{ publicKey: device.publicKey, name: "Chrome · Windows", addedAt: BigInt(now - 3 * 86_400_000) },
@@ -484,12 +485,12 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							case: "threadInfo",
 							value: {
 								threadId,
-								profileId: "",
-								machineProfileId: "p2",
+								accountId: "",
+								machineAccountId: "p2",
 								account: { email: "user@example.com", organization: "Acme", plan: "team" },
-								profileSwitchPending: threadId === DEMO_THREAD,
+								accountSwitchPending: threadId === DEMO_THREAD,
 								...(threadId === DEMO_THREAD ? { nextAccount: { email: "user.max@example.com", plan: "max" } } : {}),
-								...(threadId === "demo-running" ? { profileSuggestion: { profileId: "p2", email: "user.max@example.com", remaining: 20 } } : {}),
+								...(threadId === "demo-running" ? { accountSuggestion: { accountId: "p2", email: "user.max@example.com", remaining: 20, provider: "claude" } } : {}),
 								permissionMode: "acceptEdits",
 								gitBranch: "main",
 								linesAdded: 22,

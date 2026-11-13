@@ -4,7 +4,7 @@
 // by name); it commits nothing, and nothing of it is logged.
 import { ErrorCode, ErrorReason } from "@achoo254/chat-proto/remote/remote";
 import { AgentError } from "../core/agent-core.ts";
-import type { AgentProvider, Detected } from "../providers/types.ts";
+import type { AccountScopeRef, AgentProvider, Detected } from "../providers/types.ts";
 import { OPS_LIMITS, type StagedChanges } from "./git-ops.ts";
 
 /** Longest the AI may take. */
@@ -14,8 +14,8 @@ export type CommitMessageDeps = {
   providers: readonly AgentProvider[];
   staged: (workspaceId: string) => Promise<StagedChanges>;
   detect: (provider: AgentProvider) => Promise<Detected>;
-  /** The account folder picked on the machine for this AI; throws when its accounts cannot be read. */
-  accountDir: (providerId: string) => string | undefined;
+  /** The account picked on the machine for this AI; throws when its accounts cannot be read. */
+  account: (providerId: string) => AccountScopeRef | undefined;
 };
 
 export type CommitMessageRequest = { workspaceId: string; provider: string; model: string };
@@ -51,12 +51,12 @@ export async function writeCommitMessage(deps: CommitMessageDeps, req: CommitMes
   if (!provider) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `unknown AI "${req.provider}"`, { reason: ErrorReason.UNKNOWN_AI, subject: req.provider.slice(0, 100) });
   const writer = provider.writer;
   if (!writer) throw new AgentError(ErrorCode.INVALID, `${provider.name} cannot write a commit message`, { reason: ErrorReason.UNSUPPORTED_REQUEST });
-  let accountDir: string | undefined;
+  let account: AccountScopeRef | undefined;
   try {
-    accountDir = deps.accountDir(provider.id);
+    account = deps.account(provider.id);
   } catch (err) {
     const why = (err as Error).message;
-    throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
+    throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.ACCOUNT_UNUSABLE, subject: why.slice(0, 300) });
   }
   const detected = await deps.detect(provider);
   if (!detected.installed) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
@@ -67,7 +67,7 @@ export async function writeCommitMessage(deps: CommitMessageDeps, req: CommitMes
     answer = await writer.write({
       prompt: commitMessagePrompt(staged),
       ...(req.model !== "" ? { model: req.model } : {}),
-      ...(accountDir ? { accountDir } : {}),
+      ...(account ? { account } : {}),
       timeoutMs: WRITE_TIMEOUT_MS,
     });
   } catch (err) {

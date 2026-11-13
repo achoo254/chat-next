@@ -21,7 +21,6 @@ export interface MachineEntry {
 	readonly os: string;
 	readonly arch: string;
 	readonly agentVersion: string;
-	readonly claudeVersion: string;
 	/** "" while the tunnel is down. */
 	readonly tunnelUrl: string;
 	/** Unix seconds. */
@@ -74,7 +73,6 @@ export function toEntry(m: Machine): MachineEntry {
 		os: m.os,
 		arch: m.arch,
 		agentVersion: m.agentVersion,
-		claudeVersion: m.claudeVersion,
 		tunnelUrl: m.tunnelUrl,
 		createdAt: Number(m.createdAt),
 		lastSeenAt: Number(m.lastSeenAt),

@@ -8,8 +8,8 @@ import type { ConfigStore } from "../../src/config.ts";
 import type { AgentCore } from "../../src/core/agent-core.ts";
 import { DeviceTrust } from "../../src/device-trust.ts";
 import { Connection } from "../../src/link/connection.ts";
+import type { AgentProvider } from "../../src/providers/types.ts";
 import { trustDevice } from "./trusted-devices.ts";
-import type { ClaudeProfiles } from "../../src/profiles/service.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
 import type { LocalForward } from "../../src/tunnels/forward.ts";
 import type { SecretService } from "../../src/sign-in-secrets/secret-service.ts";
@@ -33,7 +33,8 @@ export async function pairedDevice(ctx: {
   core: AgentCore;
   config: ConfigStore;
   audit: AuditLog;
-  profiles?: ClaudeProfiles;
+  /** The machine's AIs; those with accounts answer the account requests. */
+  providers?: readonly AgentProvider[];
   localForward?: LocalForward;
   secrets?: SecretService;
   browser?: RemoteBrowser;
@@ -59,7 +60,7 @@ export async function pairedDevice(ctx: {
       core: ctx.core,
       config: ctx.config,
       audit: ctx.audit,
-      ...(ctx.profiles ? { profiles: ctx.profiles } : {}),
+      ...(ctx.providers ? { providers: ctx.providers } : {}),
       ...(ctx.localForward ? { localForward: ctx.localForward } : {}),
       ...(ctx.secrets ? { secrets: ctx.secrets } : {}),
       ...(ctx.browser ? { browser: ctx.browser } : {}),

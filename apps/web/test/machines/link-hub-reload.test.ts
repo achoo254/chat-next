@@ -21,7 +21,6 @@ const entry: MachineEntry = {
 	os: "linux",
 	arch: "x64",
 	agentVersion: "3.0.0",
-	claudeVersion: "",
 	tunnelUrl: "wss://m-5.tunnel.hoandat.com",
 	createdAt: 0,
 	lastSeenAt: 0,

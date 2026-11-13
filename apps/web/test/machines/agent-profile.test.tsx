@@ -4,14 +4,15 @@
 // limit bar's one-tap switch, and the session column's preview line.
 import { create } from "@bufbuild/protobuf";
 import {
-	ClaudeProfileSchema,
-	MachineProfileSchema,
-	ProfileListResultSchema,
+	AccountListResultSchema,
+	AccountStatus,
+	AiAccountSchema,
+	MachineAccountsSchema,
 	ThreadInfoSchema,
 	ThreadState,
-	type MachineProfile,
+	type AccountListResult,
+	type MachineAccounts,
 	type ThreadSummary,
-	type ProfileListResult,
 } from "@achoo254/chat-proto/remote/remote";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,54 +23,60 @@ import { AccountMenu } from "../../src/machines/account-menu.tsx";
 import { enMachines } from "../../src/machines/copy-en.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import type { MachineLink } from "../../src/machines/link/machine-link.ts";
-import { sessionProfileId, switchPending, usable, useProfiles } from "../../src/machines/machine-profile.ts";
+import { accountsOf, sessionProfileId, switchPending, usable, useProfiles } from "../../src/machines/machine-profile.ts";
 import { LimitBar } from "../../src/machines/session-chat.tsx";
 import { rowLine } from "../../src/machines/session-sidebar.tsx";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
 
 const wrap = (node: ReactNode) => render(<I18nProvider>{node}</I18nProvider>);
 
-const list = (selectedId: string): ProfileListResult =>
-	create(ProfileListResultSchema, {
-		selectedId,
-		profiles: [
-			create(ClaudeProfileSchema, { id: "", email: "team@example.com", plan: "team", signedIn: true, lastUsage: { fiveHour: { utilization: 100 }, sevenDay: { utilization: 40 } } }),
-			create(ClaudeProfileSchema, { id: "p2", email: "max@example.com", plan: "max", signedIn: true, lastUsage: { fiveHour: { utilization: 12 } }, usageUpdatedAt: 1n }),
-			create(ClaudeProfileSchema, { id: "p3", email: "old@example.com", signedIn: false }),
+const OK = AccountStatus.OK;
+const list = (selectedId: string): AccountListResult =>
+	create(AccountListResultSchema, {
+		selectedByProvider: { claude: selectedId },
+		actions: [{ provider: "claude", signIn: true, usage: true }],
+		accounts: [
+			create(AiAccountSchema, { provider: "claude", id: "", email: "team@example.com", plan: "team", status: OK, usage: { fiveHour: { utilization: 100 }, sevenDay: { utilization: 40 } } }),
+			create(AiAccountSchema, { provider: "claude", id: "p2", email: "max@example.com", plan: "max", status: OK, usage: { fiveHour: { utilization: 12 } }, usageUpdatedAt: 1n }),
+			create(AiAccountSchema, { provider: "claude", id: "p3", email: "old@example.com", status: AccountStatus.NEEDS_SIGN_IN }),
+			// Another AI's account never shows among Claude's.
+			create(AiAccountSchema, { provider: "antigravity", id: "", email: "agy@example.com", status: OK }),
 		],
 	});
-const announce = (selectedId: string, sessions: { threadId: string; profileId: string; switchPending?: boolean }[] = []): MachineProfile =>
-	create(MachineProfileSchema, { profiles: list(selectedId), sessions });
+const announce = (selectedId: string, sessions: { threadId: string; accountId: string; switchPending?: boolean }[] = []): MachineAccounts =>
+	create(MachineAccountsSchema, { accounts: list(selectedId), sessions: sessions.map((s) => ({ ...s, provider: "claude" })) });
 
-/** A link that answers ProfileList/ProfileSelect with `answer` and records requests. */
-const fakeLink = (answer: () => ProfileListResult) => {
+/** A link that answers AccountList/AccountSelect with `answer` and records requests. */
+const fakeLink = (answer: () => AccountListResult) => {
 	const sent: { case: string; value: unknown }[] = [];
 	const link = {
 		request: (body: { case: string; value: unknown }) => {
 			sent.push(body);
-			return Promise.resolve({ body: { case: "profileListResult", value: answer() } });
+			return Promise.resolve({ body: { case: "accountListResult", value: answer() } });
 		},
 	} as unknown as MachineLink;
 	return { link, sent };
 };
 
 /** The account menu fed by useProfiles, the announced frame settable from outside. */
-function Harness({ link, announced }: { link: MachineLink; announced: MachineProfile | null }) {
-	const profiles = useProfiles(link, announced, true);
+function Harness({ link, announced }: { link: MachineLink; announced: MachineAccounts | null }) {
+	const profiles = useProfiles(link, announced, true, "claude");
 	return <AccountMenu ai="Claude Code" machine="1" link={link} profiles={profiles} current={profiles.list?.selectedId ?? ""} fallbackEmail="" disabled={false} />;
 }
 
 describe("machine profile", () => {
 	it("reads a session's profile and pending switch from what the machine announced, else from the session", () => {
-		const announced = announce("p2", [{ threadId: "t", profileId: "", switchPending: true }]);
-		expect(sessionProfileId(announced, "t", undefined, announced.profiles ?? null)).toBe("");
+		const announced = announce("p2", [{ threadId: "t", accountId: "", switchPending: true }]);
+		expect(sessionProfileId(announced, "t", undefined, accountsOf(announced.accounts ?? null, "claude"))).toBe("");
 		expect(switchPending(announced, "t", undefined)).toBe(true);
-		const info = create(ThreadInfoSchema, { threadId: "t", profileId: "p2", profileSwitchPending: false, account: { email: "max@example.com" } });
+		const info = create(ThreadInfoSchema, { threadId: "t", accountId: "p2", accountSwitchPending: false, account: { email: "max@example.com" } });
 		expect(sessionProfileId(null, "t", info, null)).toBe("p2");
 		expect(switchPending(null, "t", info)).toBe(false);
-		expect(sessionProfileId(null, "t", undefined, list("p3"))).toBe("p3");
-		expect(usable(list("").profiles[2] ?? create(ClaudeProfileSchema))).toBe(false);
-		expect(usable(create(ClaudeProfileSchema, { id: "", signedIn: false }))).toBe(true);
+		expect(sessionProfileId(null, "t", undefined, accountsOf(list("p3"), "claude"))).toBe("p3");
+		expect(accountsOf(list(""), "claude")?.accounts.map((a) => a.email)).toEqual(["team@example.com", "max@example.com", "old@example.com"]);
+		expect(accountsOf(list(""), "codex")).toBeNull();
+		expect(usable(list("").accounts[2] ?? create(AiAccountSchema))).toBe(false);
+		expect(usable(create(AiAccountSchema, { id: "", status: AccountStatus.NEEDS_SIGN_IN }))).toBe(true);
 	});
 
 	it("switches the whole machine in one tap from the account menu", async () => {
@@ -84,7 +91,7 @@ describe("machine profile", () => {
 		expect((items[2] as HTMLButtonElement).disabled).toBe(true);
 		expect(within(items[2] as HTMLElement).getByText("Cần đăng nhập lại")).toBeTruthy();
 		await user.click(within(menu).getByRole("menuitemradio", { name: "Chuyển cả máy sang max@example.com" }));
-		expect(sent).toEqual([{ case: "profileSelect", value: { id: "p2" } }]);
+		expect(sent).toEqual([{ case: "accountSelect", value: { id: "p2", provider: "claude" } }]);
 		expect(screen.queryByRole("menu")).toBeNull();
 	});
 
@@ -112,7 +119,7 @@ describe("machine profile", () => {
 		const { link, sent } = fakeLink(() => list("p2"));
 		wrap(<Harness link={link} announced={null} />);
 		expect(await screen.findByRole("button", { name: /max@example.com/ })).toBeTruthy();
-		expect(sent).toEqual([{ case: "profileList", value: {} }]);
+		expect(sent).toEqual([{ case: "accountList", value: {} }]);
 	});
 
 	it("says a running session switches after its turn", () => {

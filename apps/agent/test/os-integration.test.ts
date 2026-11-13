@@ -8,7 +8,7 @@ import { createServer, type Server } from "node:net";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { machineKey, seal, unseal } from "../src/keystore.ts";
-import { removeTreeSafely } from "../src/profiles/remove.ts";
+import { removeTreeSafely } from "../src/accounts/remove.ts";
 import { listeningPorts, processLines } from "../src/tunnels/listening-ports.ts";
 import { tempDir } from "./harness.ts";
 

@@ -4,7 +4,7 @@
 // service log lines. Callers restore CLAUDE_CONFIG_DIR after each test.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { ClaudeProfiles, type ClaudeProfilesOptions, type RateLimits } from "../../src/profiles/service.ts";
+import { ClaudeProfiles, type ClaudeProfilesOptions, type RateLimits } from "../../src/providers/claude/accounts/service.ts";
 import { AuditLog } from "../../src/safety/audit-log.ts";
 import { tempDir } from "../harness.ts";
 import { fakeClaude, signInDefault } from "./fake-claude.ts";

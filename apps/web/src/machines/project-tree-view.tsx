@@ -13,7 +13,7 @@
 // column's arrow keys. The dialogs load when opened.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { ErrorReason, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, LoginState, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { navigate } from "../router.tsx";
 import type { AgentProject } from "./agent-projects-client.ts";
@@ -135,10 +135,13 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 		setStarting(true);
 		const d = local?.defaults;
 		const ref = machine.entry.ref;
+		// The project's own AI, else the machine's first signed-in one (as a new session picks it).
+		const providers = machine.state.info?.providers ?? [];
+		const provider = d?.provider || (providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? providers[0]?.id ?? "");
 		machine.link
 			.request({
 				case: "threadCreate",
-				value: { provider: "claude", model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode: d?.permissionMode ?? "" },
+				value: { provider, model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode: d?.permissionMode ?? "" },
 			})
 			.then(
 				(frame) => {

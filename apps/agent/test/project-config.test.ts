@@ -245,7 +245,7 @@ describe("chat sessions in a folder follow its level", () => {
 describe("the AI's own CLI in a terminal", () => {
   it("is never restricted to some setting sources, and keeps the session, model, permission mode and account arguments", () => {
     const id = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
-    const resumed = terminalCommand("/bin/claude", { dir: "/w", resumeId: id, accountDir: "/p1", model: "opus", permissionMode: "plan" }, () => "x");
+    const resumed = terminalCommand("/bin/claude", { dir: "/w", resumeId: id, account: { id: "p1", dir: "/p1" }, model: "opus", permissionMode: "plan" }, () => "x");
     expect(resumed).toEqual({ file: "/bin/claude", args: ["--resume", id, "--model", "opus", "--permission-mode", "plan"], env: { CLAUDE_CONFIG_DIR: "/p1" } });
     const fresh = terminalCommand("/bin/claude", { dir: "/w" }, () => id);
     expect(fresh.args).toEqual(["--session-id", id]);

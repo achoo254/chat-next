@@ -16,11 +16,11 @@ import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
 import { DeviceTrust } from "./device-trust.ts";
 import { AgentCore } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
-import { Connection, profileListBody, projectListBody } from "./link/connection.ts";
-import { ClaudeProfiles, type ProfileList } from "./profiles/service.ts";
-import { findClaude, probeUsage } from "./providers/claude/index.ts";
-import { builtinProviders, withHistory } from "./providers/registry.ts";
-import type { AgentProvider, Detected } from "./providers/types.ts";
+import { AccountsStore } from "./accounts/store.ts";
+import { accountListBody, readAccounts } from "./link/accounts-link.ts";
+import { Connection, projectListBody } from "./link/connection.ts";
+import { builtinProviders, withAccounts, withHistory } from "./providers/registry.ts";
+import type { AccountScopeRef, AccountsFacet, AgentProvider, Detected } from "./providers/types.ts";
 import { logFile } from "./log-tail.ts";
 import { startLogRotation } from "./log-rotate.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
@@ -58,14 +58,12 @@ const IDLE_TIMEOUT_MS = 45_000;
 const PING_FRESH_MS = 15_000;
 /** …and the prompt is still waiting after this long. */
 const PUSH_DELAY_MS = 20_000;
-/** Profile changes this close together reach devices as one MachineProfile. */
+/** Account changes this close together reach devices as one MachineAccounts. */
 const ANNOUNCE_DELAY_MS = 50;
 
 export type MachineOptions = {
   config?: ConfigStore;
   providers?: AgentProvider[];
-  /** The Claude profiles; built from the config folder when not given. */
-  profiles?: ClaudeProfiles;
   /** Sends a content-free "needs you" push through the chat server. */
   notify?: (thread: ThreadSummary, pending: number) => void;
   /** Asks the chat server for a content-free "usage hint" push to the account's devices; rejects when it was not sent. */
@@ -93,7 +91,6 @@ export class Machine {
   readonly core: AgentCore;
   readonly audit: AuditLog;
   readonly isSensitive: (p: string) => boolean;
-  readonly profiles: ClaudeProfiles;
   readonly projects: Projects;
   readonly secrets: SecretService;
   readonly browser: RemoteBrowser;
@@ -145,12 +142,26 @@ export class Machine {
       restart: () => setTimeout(() => process.exit(0), 500),
       log: this.log,
     });
-    // Sessions kept on the machine are read from its own Claude folder and every profile's.
-    this.providers = opts.providers ?? builtinProviders({ configDir: dir, claudeHomes: () => this.profiles.claudeHomes() });
+    // One store of every AI's accounts; each AI keeps its own list and pick in it.
+    this.providers =
+      opts.providers ??
+      builtinProviders({
+        configDir: dir,
+        accounts: {
+          store: new AccountsStore(dir),
+          audit: this.audit,
+          inUse: (provider, id) => this.core.accountInUse(provider, id),
+          onUsage: (provider, id, usage) => {
+            this.core.setAccountUsage(provider, id, usage);
+            if (this.providerById(provider)?.usage) this.usage.recordQuota(id, usage);
+          },
+          log: this.log,
+        },
+      });
     this.usage = new UsageScheduler({
       configDir: dir,
       sources: () => this.providers.flatMap((p) => (p.usage ? [{ provider: p.id, usage: p.usage }] : [])),
-      refreshQuota: () => this.refreshProfileUsage(),
+      refreshQuota: () => this.refreshAccountUsage(),
       afterScan: async (scan) => {
         await this.usageNotifier.check(scan.read > 0);
       },
@@ -165,20 +176,6 @@ export class Machine {
     this.usageApi = usageApiOf({ ledger: this.usage.ledger, config: this.config, audit: this.audit, deleteLedger: () => this.usage.deleteLedger() });
     const c = this.config.get();
     this.trust = new DeviceTrust({ config: this.config });
-    this.profiles =
-      opts.profiles ??
-      new ClaudeProfiles({
-        configDir: dir,
-        audit: this.audit,
-        findBinary: findClaude,
-        probeUsage: (bin, accountDir) => probeUsage(bin, accountDir),
-        inUse: (id) => this.core.profileInUse(id),
-        onUsage: (id, usage) => {
-          this.core.setProfileUsage(id, usage);
-          this.usage.recordQuota(id, usage);
-        },
-        log: this.log,
-      });
     const forwardSettings = new ForwardSettings(dir);
     this.localForward = new LocalForward({
       settings: forwardSettings,
@@ -206,27 +203,29 @@ export class Machine {
       maxSessions: c.maxSessions,
       idleMs: c.idleMinutes * 60_000,
       onNeedsInput: (t) => this.maybePush(t),
-      profile: () => this.profiles.sessionProfile(),
-      selectedAccountDir: () => this.profiles.selectedAccountDir(),
-      selectedProfileId: () => this.profiles.selectedId(),
-      profileAccount: (id) => this.profiles.account(id),
-      suggestProfile: (id) => this.profiles.suggestion(id),
-      onSessionProfile: () => this.announceProfiles(),
-      onProfileUsage: (id, usage) => {
-        this.profiles.recordUsage(id, usage);
-        this.usage.recordQuota(id, usage, "user");
+      sessionAccount: (provider) => this.accountsOf(provider)?.sessionAccount() ?? { id: "" },
+      selectedScope: (provider) => this.accountsOf(provider)?.selectedScope(),
+      selectedAccountId: (provider) => this.accountsOf(provider)?.selectedId(),
+      accountInfo: (provider, id) => this.accountsOf(provider)?.account(id),
+      suggestAccount: async (provider, id) => this.accountsOf(provider)?.suggestion(id),
+      onSessionAccount: () => this.announceAccounts(),
+      onAccountUsage: (provider, id, usage) => {
+        this.accountsOf(provider)?.recordUsage(id, usage);
+        if (this.providerById(provider)?.usage) this.usage.recordQuota(id, usage, "user");
       },
       onSessionId: (provider, sessionId) => this.usage.launched.add(provider, sessionId),
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
     });
-    this.profiles.listen({ onSelect: () => this.core.followMachineProfile(), onChange: () => this.announceProfiles() });
+    for (const p of withAccounts(this.providers)) {
+      p.accounts?.listen({ onSelect: () => this.core.followMachineAccount(p.id), onChange: () => this.announceAccounts() });
+    }
     this.terminal = new TerminalService({
       configDir: dir,
       config: this.config,
       audit: this.audit,
       unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),
       // A shell runs each AI's CLI on the account picked on the machine, as Chat's sessions do; the default one needs nothing.
-      shellEnv: () => Object.assign({}, ...this.providers.map((p) => p.shellEnv?.(this.selectedAccountDir(p.id)) ?? {})),
+      shellEnv: () => Object.assign({}, ...this.providers.map((p) => p.shellEnv?.(this.selectedScope(p.id)) ?? {})),
       ai: aiTerminalsOf(this.core),
       log: this.log,
       onAvailability: () => void this.announceInfo(),
@@ -272,11 +271,30 @@ export class Machine {
     });
   }
 
-  /** Reads the plan usage of every signed-in profile again, one after another. */
-  private async refreshProfileUsage(): Promise<void> {
-    for (const p of this.profiles.view().profiles) {
-      if (!p.signedIn) continue;
-      await this.profiles.refreshUsage(p.id).catch((err: unknown) => this.log(`usage: plan usage of a profile not read (${(err as Error).message})`));
+  private providerById(id: string): AgentProvider | undefined {
+    return this.providers.find((p) => p.id === id);
+  }
+
+  /** The accounts of an AI; undefined for an AI that keeps none (or one the machine does not know). */
+  private accountsOf(provider: string): AccountsFacet | undefined {
+    return this.providerById(provider)?.accounts;
+  }
+
+  /** Reads the plan usage of every signed-in account of the AIs whose transcripts feed the usage ledger, one after another. */
+  private async refreshAccountUsage(): Promise<void> {
+    for (const p of this.providers) {
+      const accounts = p.accounts;
+      if (!p.usage || !accounts?.refreshUsage) continue;
+      let view;
+      try {
+        view = accounts.view();
+      } catch {
+        continue; // its accounts cannot be read: nothing to refresh
+      }
+      for (const a of view.accounts) {
+        if (a.status !== "ok") continue;
+        await accounts.refreshUsage(a.id).catch((err: unknown) => this.log(`usage: plan usage of a ${p.name} account not read (${(err as Error).message})`));
+      }
     }
   }
 
@@ -307,7 +325,7 @@ export class Machine {
     this.core.start();
     // Saved values are hidden from every output from the start, not only once used.
     void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
-    void this.profiles.cleanLeftovers();
+    for (const p of this.providers) void p.accounts?.cleanLeftovers?.();
     this.browser.start();
     const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
     this.wss = wss;
@@ -361,7 +379,7 @@ export class Machine {
     this.server?.closeAllConnections?.();
     await new Promise<void>((r) => (this.server ? this.server.close(() => r()) : r()));
     await this.usage.stop();
-    await this.profiles.stop();
+    for (const p of this.providers) await p.accounts?.stop?.();
     clearTimeout(this.announcingProjects);
     this.projects.stop();
     this.workspaces.stop();
@@ -487,7 +505,7 @@ export class Machine {
         onRefused: (key, verdict) => this.log(`refused a device (${deviceLabel(key)}): ${refusalReason(verdict)}`),
         machineInfo: () => this.machineInfo(),
         isSensitive: this.isSensitive,
-        profiles: this.profiles,
+        providers: this.providers,
         projects: this.projects,
         localForward: this.localForward,
         secrets: this.secrets,
@@ -498,7 +516,7 @@ export class Machine {
         workspaces: this.workspaces,
         commitMessage: (req) =>
           writeCommitMessage(
-            { providers: this.providers, staged: (id) => this.workspaces.stagedChanges(id), detect: (p) => this.detect(p), accountDir: (providerId) => (providerId === this.profiles.provider ? this.profiles.selectedAccountDir() : undefined) },
+            { providers: this.providers, staged: (id) => this.workspaces.stagedChanges(id), detect: (p) => this.detect(p), account: (providerId) => this.accountsOf(providerId)?.selectedScope() },
             req,
           ),
         usage: this.usageApi,
@@ -527,23 +545,22 @@ export class Machine {
     ws.on("error", () => conn.close());
   }
 
-  /** The account folder picked on the machine for this AI; undefined for its default, or when the accounts cannot be read. */
-  private selectedAccountDir(providerId: string): string | undefined {
-    if (providerId !== this.profiles.provider) return undefined;
+  /** The account picked on the machine for this AI; undefined for its own sign-in, or when its accounts cannot be read. */
+  private selectedScope(providerId: string): AccountScopeRef | undefined {
     try {
-      return this.profiles.selectedAccountDir();
+      return this.accountsOf(providerId)?.selectedScope();
     } catch {
-      return undefined; // the profiles cannot be read: sessions say so when they open
+      return undefined; // the accounts cannot be read: sessions say so when they open
     }
   }
 
   /** What a provider reports, for the account picked on the machine; cached a minute. */
   private async detect(p: AgentProvider): Promise<Detected> {
-    const accountDir = this.selectedAccountDir(p.id);
-    const key = `${p.id}\n${accountDir ?? ""}`;
+    const account = this.selectedScope(p.id);
+    const key = `${p.id}\n${account?.dir ?? ""}`;
     const hit = this.detected.get(key);
     if (hit && Date.now() - hit.at < 60_000) return hit.value;
-    const value = await p.detect(accountDir ? { accountDir } : {});
+    const value = await p.detect(account ? { account } : {});
     this.detected.set(key, { at: Date.now(), value });
     return value;
   }
@@ -594,11 +611,6 @@ export class Machine {
     });
   }
 
-  /**
-   * Tells every connected device the machine's profile, the profiles' accounts
-   * and usage, and where each session stands. Changes that come together go
-   * out as one.
-   */
   /** Watches for the owner granting Full Disk Access while it is missing. */
   private readonly diskWatch = new DiskAccessWatch({
     check: () => diskAccess(),
@@ -638,19 +650,18 @@ export class Machine {
     }
   }
 
-  private announceProfiles(): void {
+  /**
+   * Tells every connected device each AI's accounts, its pick and usage, and
+   * where each session stands. Changes that come together go out as one.
+   */
+  private announceAccounts(): void {
     if (this.announcing) return;
     this.announcing = setTimeout(() => {
       this.announcing = undefined;
-      let profiles: ProfileList;
-      try {
-        profiles = this.profiles.view();
-      } catch (err) {
-        this.log(`claude profiles: not announced (${(err as Error).message})`);
-        return;
-      }
-      const value = { profiles: profileListBody(profiles), sessions: this.core.profileStates() };
-      for (const c of this.connections) if (c.isOpen) c.announce({ case: "machineProfile", value });
+      void readAccounts(this.providers, (f) => f.view()).then((reads) => {
+        const value = { accounts: accountListBody(reads), sessions: this.core.accountStates() };
+        for (const c of this.connections) if (c.isOpen) c.announce({ case: "machineAccounts", value });
+      });
     }, ANNOUNCE_DELAY_MS);
     this.announcing.unref?.();
   }

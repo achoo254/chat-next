@@ -1,47 +1,65 @@
-// The machine's Claude profiles as every AI Agent screen shows them. A
-// machine on tunelo 2.0.2+ announces them whole (MachineProfile) whenever
+// The machine's accounts of one AI as every AI Agent screen shows them. The
+// machine announces every AI's accounts whole (MachineAccounts) whenever
 // anything changes, from any device or its own terminal, so the status bar,
-// the account menu and the machine's page follow without asking. An older
-// machine never does: then the list is asked once (ProfileList) and kept
-// from the answers of the requests made here.
-import { useCallback, useEffect, useState } from "react";
-import type { ClaudeProfile, Frame, MachineProfile, ProfileListResult, ThreadInfo } from "@achoo254/chat-proto/remote/remote";
+// the account menu and the machine's page follow without asking. Until it
+// does, the list is asked once (AccountList) and kept from the answers of
+// the requests made here. Every screen sees only the accounts of its own AI.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AccountStatus, type AccountListResult, type AiAccount, type Frame, type MachineAccounts, type ThreadInfo } from "@achoo254/chat-proto/remote/remote";
 import type { MachineLink } from "./link/machine-link.ts";
 
 type FrameBody = Parameters<MachineLink["request"]>[0];
 
-export function listOf(frame: Frame): ProfileListResult | null {
-	return frame.body.case === "profileListResult" ? frame.body.value : null;
+export function listOf(frame: Frame): AccountListResult | null {
+	return frame.body.case === "accountListResult" ? frame.body.value : null;
+}
+
+/** The accounts of one AI and the one picked for it on the machine. */
+export interface ProviderAccounts {
+	readonly accounts: readonly AiAccount[];
+	/** The picked account ("" for the AI's own sign-in). */
+	readonly selectedId: string;
+}
+
+/** The accounts of `provider` in `list`; null when the list is unknown or the machine keeps no accounts for that AI. */
+export function accountsOf(list: AccountListResult | null, provider: string): ProviderAccounts | null {
+	if (list === null || provider === "") return null;
+	const accounts = list.accounts.filter((a) => a.provider === provider);
+	const offered = list.actions.some((a) => a.provider === provider);
+	if (accounts.length === 0 && !offered) return null;
+	return { accounts, selectedId: list.selectedByProvider[provider] ?? "" };
 }
 
 export interface Profiles {
-	/** The profiles and the machine's pick; null until known. */
-	readonly list: ProfileListResult | null;
-	/** Sends a profile request; its answer (a ProfileListResult) replaces the list until the machine announces the next. */
+	/** The AI (ProviderInfo.id) these accounts belong to; every request names it. */
+	readonly provider: string;
+	/** The AI's accounts and the machine's pick; null until known. */
+	readonly list: ProviderAccounts | null;
+	/** Sends an account request; its answer (an AccountListResult) replaces the list until the machine announces the next. */
 	readonly request: (body: FrameBody) => Promise<void>;
 	/** Asks the list again (a machine that does not announce it). */
 	readonly reload: () => void;
 }
 
-export function useProfiles(link: MachineLink, announced: MachineProfile | null, online: boolean): Profiles {
-	const [asked, setAsked] = useState<ProfileListResult | null>(null);
+export function useProfiles(link: MachineLink, announced: MachineAccounts | null, online: boolean, provider: string): Profiles {
+	const [asked, setAsked] = useState<AccountListResult | null>(null);
 	const [round, setRound] = useState(0);
 	useEffect(() => {
-		// A machine that announces its profiles needs no question.
-		if (!online || announced !== null) return;
+		// A machine that announces its accounts needs no question; nor does a screen without an AI.
+		if (!online || announced !== null || provider === "") return;
 		let live = true;
-		link.request({ case: "profileList", value: {} }).then(
+		link.request({ case: "accountList", value: {} }).then(
 			(frame) => {
 				const next = listOf(frame);
 				if (live && next !== null) setAsked(next);
 			},
-			// Unknown on this machine (no Claude, or offline meanwhile): nothing to show.
+			// Unknown on this machine (no accounts, or offline meanwhile): nothing to show.
 			() => undefined,
 		);
 		return () => {
 			live = false;
 		};
-	}, [link, online, announced, round]);
+	}, [link, online, announced, provider, round]);
 	const request = useCallback(
 		async (body: FrameBody) => {
 			const next = listOf(await link.request(body));
@@ -50,28 +68,35 @@ export function useProfiles(link: MachineLink, announced: MachineProfile | null,
 		[link],
 	);
 	const reload = useCallback(() => setRound((n) => n + 1), []);
-	return { list: announced?.profiles ?? asked, request, reload };
+	const whole = announced?.accounts ?? asked;
+	const list = useMemo(() => accountsOf(whole, provider), [whole, provider]);
+	return { provider, list, request, reload };
 }
 
-/** The profile `id` ("" for the default one) in `list`. */
-export function profileById(list: ProfileListResult | null, id: string): ClaudeProfile | undefined {
-	return list?.profiles.find((p) => p.id === id);
+/** The account `id` ("" for the AI's own sign-in) in `list`. */
+export function profileById(list: ProviderAccounts | null, id: string): AiAccount | undefined {
+	return list?.accounts.find((p) => p.id === id);
 }
 
-/** The profile a session runs with: as the machine announced it, else as the session reported it, else the machine's pick. */
-export function sessionProfileId(announced: MachineProfile | null, threadId: string, info: ThreadInfo | undefined, list: ProfileListResult | null): string {
+/** The account a session runs with: as the machine announced it, else as the session reported it, else the machine's pick. */
+export function sessionProfileId(announced: MachineAccounts | null, threadId: string, info: ThreadInfo | undefined, list: ProviderAccounts | null): string {
 	const session = announced?.sessions.find((s) => s.threadId === threadId);
-	if (session !== undefined) return session.profileId;
-	if (info !== undefined && (info.profileId !== "" || info.account !== undefined)) return info.profileId;
+	if (session !== undefined) return session.accountId;
+	if (info !== undefined && (info.accountId !== "" || info.account !== undefined)) return info.accountId;
 	return list?.selectedId ?? "";
 }
 
-/** The session moves to the machine's profile once its turn ends. */
-export function switchPending(announced: MachineProfile | null, threadId: string, info: ThreadInfo | undefined): boolean {
-	return announced?.sessions.find((s) => s.threadId === threadId)?.switchPending ?? info?.profileSwitchPending ?? false;
+/** The session moves to the machine's account once its turn ends. */
+export function switchPending(announced: MachineAccounts | null, threadId: string, info: ThreadInfo | undefined): boolean {
+	return announced?.sessions.find((s) => s.threadId === threadId)?.switchPending ?? info?.accountSwitchPending ?? false;
 }
 
-/** A profile can be picked for the machine: an added one must still be signed in. */
-export function usable(profile: ClaudeProfile): boolean {
-	return profile.id === "" || profile.signedIn;
+/** The AI reports the account signed in. */
+export function signedIn(profile: AiAccount): boolean {
+	return profile.status === AccountStatus.OK;
+}
+
+/** An account can be picked for the machine: an added one must still be signed in. */
+export function usable(profile: AiAccount): boolean {
+	return profile.id === "" || signedIn(profile);
 }

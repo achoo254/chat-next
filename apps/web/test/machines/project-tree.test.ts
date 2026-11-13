@@ -26,7 +26,7 @@ function machine(id: number, name: string, threads: ThreadSummary[], online = tr
 		info: null,
 	} as unknown as LinkState;
 	const conn = (online ? { kind: "on" } : { kind: "offline", lastSeenMs: 1 }) as Conn;
-	return { entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", claudeVersion: "", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, publicKey: new Uint8Array(32) }, link: {} as MachineLink, state, conn };
+	return { entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, publicKey: new Uint8Array(32) }, link: {} as MachineLink, state, conn };
 }
 
 const none = new Map<string, number>();

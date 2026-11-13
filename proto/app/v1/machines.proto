@@ -102,8 +102,8 @@ service MachineAgentService {
 
 // A machine of the directory.
 message Machine {
-  reserved 11;
-  reserved "claimed";
+  reserved 6, 11;
+  reserved "claude_version", "claimed";
   int64 id = 1 [jstype = JS_NUMBER];
   // Up to 64 characters, chosen at install and changed with RenameMachine.
   string name = 2;
@@ -111,9 +111,8 @@ message Machine {
   // "linux"; "arm64" or "x64".
   string os = 3;
   string arch = 4;
-  // As last reported by the agent; claude_version is empty when unknown.
+  // As last reported by the agent.
   string agent_version = 5;
-  string claude_version = 6;
   // The machine's X25519 static public key (32 bytes): the key devices
   // expect in the handshake; the server is the source of trust for it. The
   // machine proved it holds the key when it registered.
@@ -257,13 +256,12 @@ message RegisterMachineResponse {
 }
 
 message HeartbeatRequest {
+  reserved 3;
+  reserved "claude_version";
   // wss://<subdomain>.tunnel.<domain> (optionally with a trailing slash), or
   // empty while the tunnel is down.
   string tunnel_url = 1;
   string agent_version = 2;
-  // `claude --version` of the machine, up to 64 characters; empty when
-  // unknown.
-  string claude_version = 3;
   // Public keys (32 bytes each, at most 50) of the devices connected to the
   // machine now: their last_seen_at moves to now.
   repeated bytes connected_device_keys = 4;
@@ -322,6 +320,11 @@ message NotifyNeedsInputRequest {
   // [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
   // for USAGE_HINT.
   string session_id = 3;
+  // The AI of the waiting thread (the agent's provider id, e.g. "claude"):
+  // up to 32 characters of [a-z0-9-]; anything else is dropped. The
+  // notification names the AI from the server's own list, "AI" when the id
+  // is empty or unknown, or when merged notices name different AIs.
+  string provider_id = 4;
 }
 
 message NotifyNeedsInputResponse {}

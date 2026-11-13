@@ -186,7 +186,7 @@ func TestMachineDirectory(t *testing.T) {
 	mac, macSecret := register("Mac mini", 7)
 	pc, _ := register("PC", 8)
 
-	devices, err := s.MachineHeartbeat(ctx, tenant, mac.ID, "wss://dat.tunnel.hoandat.com", "3.0.0", "2.1.319 (Claude Code)", nil)
+	devices, err := s.MachineHeartbeat(ctx, tenant, mac.ID, "wss://dat.tunnel.hoandat.com", "3.0.0", nil)
 	if err != nil || len(devices) != 0 {
 		t.Fatalf("heartbeat: %v %v", devices, err)
 	}
@@ -195,7 +195,7 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(list) != 2 || list[0].ID != mac.ID || list[0].TunnelURL != "wss://dat.tunnel.hoandat.com" ||
-		list[0].AgentVersion != "3.0.0" || list[0].ClaudeVersion != "2.1.319 (Claude Code)" || list[1].ID != pc.ID {
+		list[0].AgentVersion != "3.0.0" || list[1].ID != pc.ID {
 		t.Fatalf("list %+v", list)
 	}
 	if list, _ := s.ListMachines(ctx, tenant, other.ID); len(list) != 0 {
@@ -227,7 +227,7 @@ func TestMachineDirectory(t *testing.T) {
 	if err != nil || !got.Revoked {
 		t.Fatalf("revoked machine: %+v %v", got, err)
 	}
-	if _, err := s.MachineHeartbeat(ctx, tenant, mac.ID, "", "3.0.0", "", nil); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.MachineHeartbeat(ctx, tenant, mac.ID, "", "3.0.0", nil); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("heartbeat of a revoked machine: %v", err)
 	}
 	if _, err := s.RenameMachine(ctx, tenant, u.ID, mac.ID, "x"); !errors.Is(err, store.ErrNotFound) {

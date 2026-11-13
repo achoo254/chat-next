@@ -147,7 +147,7 @@ describe("ports the machine refuses", () => {
   });
 
   test("the profiles' IDE locks, the control port, tunelo's processes, debug ports; read once per few seconds", async () => {
-    const home = join(dir, "claude-profiles", "p1", "home", "ide");
+    const home = join(dir, "ai-accounts", "claude", "p1", "home", "ide");
     mkdirSync(home, { recursive: true });
     writeFileSync(join(home, "47000.lock"), "{}");
     writeFileSync(join(dir, "control.json"), JSON.stringify({ port: 48000, token: "t", pid: process.pid }));

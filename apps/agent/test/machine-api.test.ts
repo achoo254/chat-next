@@ -99,6 +99,16 @@ describe("machine API", () => {
     expect((calls[0]?.body.connectedDeviceKeys as string[]).length).toBe(50);
   });
 
+  test("a needs-you push names the waiting thread's AI, never its content", async () => {
+    const { notifyNeedsInput } = await api();
+    answer = () => ({ status: 200, json: {} });
+    calls.length = 0;
+    await notifyNeedsInput("secret", { kind: "question", pendingCount: 2, sessionId: "t_1", providerId: "antigravity" });
+    expect(calls).toEqual([
+      { method: "NotifyNeedsInput", auth: "Bearer secret", body: { kind: "NEEDS_INPUT_KIND_QUESTION", pendingCount: 2, sessionId: "t_1", providerId: "antigravity" } },
+    ]);
+  });
+
   test("unregisters with the machine secret", async () => {
     const { unregisterMachine } = await api();
     answer = () => ({ status: 200, json: {} });

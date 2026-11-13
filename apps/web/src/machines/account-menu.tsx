@@ -6,14 +6,14 @@
 // every device). Adding an account opens the sign-in dialog; the machine's
 // page keeps the full management.
 import { useState } from "react";
-import type { ClaudeProfile } from "@achoo254/chat-proto/remote/remote";
+import type { AiAccount } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, paths } from "../router.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { usable, type Profiles } from "./machine-profile.ts";
+import { signedIn, usable, type Profiles } from "./machine-profile.ts";
 import { SignInCodeDialog } from "./sign-in-code-dialog.tsx";
 import { planName, usageOf } from "./status-line.ts";
 import { errorText, useNow } from "./use-machines.ts";
@@ -33,7 +33,7 @@ interface AccountMenuProps {
 }
 
 /** "me@x.com · Max", or the profile's kind when no account is known. */
-export function profileName(t: MachinesCopy, profile: ClaudeProfile | undefined, fallback: string): string {
+export function profileName(t: MachinesCopy, profile: AiAccount | undefined, fallback: string): string {
 	const email = profile?.email || fallback;
 	if (email === "") return profile?.id === "" ? t.agent.account.defaultName : t.agent.account.notSignedIn;
 	const plan = planName(profile?.plan ?? "");
@@ -47,14 +47,14 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 	const [error, setError] = useState("");
 	const [adding, setAdding] = useState(false);
 	const list = profiles.list;
-	const mine = list?.profiles.find((p) => p.id === current);
+	const mine = list?.accounts.find((p) => p.id === current);
 	const label = profileName(t, mine, fallbackEmail);
 	if (list === null && fallbackEmail === "") return null;
-	const pick = (profile: ClaudeProfile) => {
+	const pick = (profile: AiAccount) => {
 		if (profile.id === list?.selectedId) return setOpen(false);
 		setBusy(profile.id);
 		setError("");
-		profiles.request({ case: "profileSelect", value: { id: profile.id } }).then(
+		profiles.request({ case: "accountSelect", value: { id: profile.id, provider: profiles.provider } }).then(
 			() => {
 				setBusy(null);
 				setOpen(false);
@@ -85,7 +85,7 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 				<div className="mx-menu up mx-pop mx-profiles" role="menu" aria-label={t.agent.account.title}>
 					<h5>{t.agent.account.title}</h5>
 					<p className="mx-menu-hint">{t.agent.account.note}</p>
-					{list.profiles.map((profile) => (
+					{list.accounts.map((profile) => (
 						<ProfileItem
 							key={profile.id || "default"}
 							profile={profile}
@@ -120,13 +120,13 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 					)}
 				</div>
 			)}
-			{adding && <SignInCodeDialog link={link} ai={ai} onAdded={profiles.reload} onClose={() => setAdding(false)} />}
+			{adding && <SignInCodeDialog link={link} ai={ai} provider={profiles.provider} onAdded={profiles.reload} onClose={() => setAdding(false)} />}
 		</div>
 	);
 }
 
 interface ProfileItemProps {
-	profile: ClaudeProfile;
+	profile: AiAccount;
 	selected: boolean;
 	busy: boolean;
 	disabled: boolean;
@@ -138,10 +138,10 @@ function ProfileItem({ profile, selected, busy, disabled, onPick }: ProfileItemP
 	const a = t.agent.account;
 	const { locale } = useI18n();
 	const now = useNow(60_000);
-	const five = usageOf(profile.lastUsage?.fiveHour, now);
-	const week = usageOf(profile.lastUsage?.sevenDay, now);
+	const five = usageOf(profile.usage?.fiveHour, now);
+	const week = usageOf(profile.usage?.sevenDay, now);
 	const updated = Number(profile.usageUpdatedAt);
-	const needsSignIn = profile.id !== "" && !profile.signedIn;
+	const needsSignIn = profile.id !== "" && !signedIn(profile);
 	const email = profile.email !== "" ? profile.email : profile.id === "" ? a.defaultName : a.notSignedIn;
 	const sub = [profile.id === "" ? a.defaultName : "", profile.organization, planName(profile.plan)].filter((x) => x !== "" && x !== email).join(" · ");
 	return (

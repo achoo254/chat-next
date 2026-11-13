@@ -1,4 +1,4 @@
-// Claude profile requests that wait on claude do not hold the device's link:
+// Claude account requests that wait on claude do not hold the device's link:
 // a usage refresh that hangs still lets pings and other requests through,
 // and the usage probe itself gives up after its time limit and stops the
 // claude it started.
@@ -33,15 +33,16 @@ describe("profile requests on the device link", () => {
     const root = tempDir();
     mkdirSync(join(root, "home"), { recursive: true });
     const core = new AgentCore({ dataDir: join(root, "data"), providers: [fakeProvider()], audit: f.audit, isSensitive: createSensitiveCheck({ home: join(root, "home") }) });
-    const device = await pairedDevice({ core, config: new ConfigStore(join(root, "cfg")), audit: f.audit, profiles: f.profiles });
-    const usage = device.request("u", { case: "usageRefresh", value: { id: "" } });
+    const claude = { ...fakeProvider("claude"), accounts: f.profiles };
+    const device = await pairedDevice({ core, config: new ConfigStore(join(root, "cfg")), audit: f.audit, providers: [claude] });
+    const usage = device.request("u", { case: "usageRefresh", value: { provider: "claude", id: "" } });
     const pong = await device.request("p", { case: "ping", value: {} });
     expect(pong.body.case).toBe("pong");
     const threads = await device.request("t", { case: "threadList", value: {} });
     expect(threads.body.case).toBe("threadListResult");
     expect(device.received.some((frame) => frame.id === "u")).toBe(false);
     release();
-    expect((await usage).body.case).toBe("profileListResult");
+    expect((await usage).body.case).toBe("accountListResult");
     await core.stop();
   });
 });

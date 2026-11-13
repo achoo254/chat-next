@@ -689,7 +689,7 @@ func TestNotifyUserMachine(t *testing.T) {
 		t.Fatalf("%d pushes to the phone", len(got))
 	}
 	p := payloadOf(t, got[0], phone)
-	want := Payload{Kind: KindMachine, MachineID: 42, SessionID: "t_1", Title: appName, Body: "Claude trên Mac mini cần bạn duyệt",
+	want := Payload{Kind: KindMachine, MachineID: 42, SessionID: "t_1", Title: appName, Body: "AI trên Mac mini cần bạn duyệt",
 		Tag: "machine:42", URL: "/machines/42?session=t_1", Timestamp: p.Timestamp}
 	if p != want || p.Timestamp == 0 || strings.Contains(string(got[0].notification.Payload), "chat_id") {
 		t.Fatalf("payload %+v", p)
@@ -697,7 +697,7 @@ func TestNotifyUserMachine(t *testing.T) {
 	if msg := got[0].notification; msg.Urgency != webpush.UrgencyHigh || msg.Topic != "machine42" || msg.TTL != machineTTL {
 		t.Fatalf("message options %+v", msg)
 	}
-	if p := payloadOf(t, jobsFor(jobs, laptop)[0], laptop); p.Body != "Claude on Mac mini needs your approval" {
+	if p := payloadOf(t, jobsFor(jobs, laptop)[0], laptop); p.Body != "AI on Mac mini needs your approval" {
 		t.Fatalf("English body %q", p.Body)
 	}
 
@@ -706,13 +706,15 @@ func TestNotifyUserMachine(t *testing.T) {
 		locale string
 		body   string
 	}{
-		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleVI, "Claude trên PC cần bạn trả lời"},
-		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleEN, "Claude on PC needs your answer"},
-		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3}, LocaleVI, "Claude trên PC có 3 việc cần bạn"},
-		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3}, LocaleEN, "Claude on PC has 3 requests waiting for you"},
-		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你批准"},
-		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1}, LocaleZhCN, "PC 上的 Claude 需要你回答"},
-		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 2}, LocaleZhCN, "PC 上的 Claude 有 2 个请求等你处理"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1, Provider: "claude"}, LocaleVI, "Claude Code trên PC cần bạn trả lời"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1, Provider: "antigravity"}, LocaleEN, "Antigravity on PC needs your answer"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3, Provider: "claude"}, LocaleVI, "Claude Code trên PC có 3 việc cần bạn"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 3}, LocaleEN, "AI on PC has 3 requests waiting for you"},
+		{MachineNotice{MachineName: "PC", Kind: MachineApproval, Pending: 1, Provider: "antigravity"}, LocaleZhCN, "PC 上的 Antigravity 需要你批准"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1, Provider: "claude"}, LocaleZhCN, "PC 上的 Claude Code 需要你回答"},
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 2}, LocaleZhCN, "PC 上的 AI 有 2 个请求等你处理"},
+		// An id the server does not list is never shown: the push says "AI".
+		{MachineNotice{MachineName: "PC", Kind: MachineQuestion, Pending: 1, Provider: "evil-name"}, LocaleVI, "AI trên PC cần bạn trả lời"},
 	} {
 		var p Payload
 		if err := json.Unmarshal(e.svc.machineNotification(c.notice, c.locale).Payload, &p); err != nil {

@@ -21,7 +21,9 @@ import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updat
 import { AttachmentError } from "../attachments/uploads.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import type { TrustVerdict } from "../device-trust.ts";
-import { type ClaudeProfiles, type ProfileErrorKind, type ProfileList, ProfileError } from "../profiles/service.ts";
+import { AccountError } from "../accounts/errors.ts";
+import type { AgentProvider } from "../providers/types.ts";
+import { ACCOUNT_REASONS, accountListBody, accountsOf, readAccounts } from "./accounts-link.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
@@ -68,8 +70,8 @@ export type LinkContext = {
   isSensitive: (p: string) => boolean;
   /** A device is looking at the machine (for push decisions). */
   onPing: () => void;
-  /** The Claude profiles of the machine; absent where the machine has none (tests). */
-  profiles?: ClaudeProfiles;
+  /** The machine's AIs; those with accounts answer AccountList and the requests beside it. */
+  providers?: readonly AgentProvider[];
   /** The machine's projects; absent where the machine has none (tests). */
   projects?: Projects;
   /** Localman's requests for localhost; absent where the machine has none (tests). */
@@ -94,20 +96,11 @@ export type LinkContext = {
   usage?: UsageApi;
 };
 
-const PROFILE_REASONS: Record<ProfileErrorKind, ErrorReason> = {
-  damaged: ErrorReason.PROFILES_DAMAGED,
-  "not-found": ErrorReason.PROFILE_NOT_FOUND,
-  "default-permanent": ErrorReason.DEFAULT_PROFILE_PERMANENT,
-  "in-use": ErrorReason.PROFILE_IN_USE,
-  "sign-out-failed": ErrorReason.PROFILE_SIGN_OUT_FAILED,
-  "cli-missing": ErrorReason.AI_CLI_MISSING,
-};
-
 /** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
 export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string } {
   const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
   if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
-  if (err instanceof ProfileError) return { code: ErrorCode.INVALID, message, reason: PROFILE_REASONS[err.kind], subject: err.subject };
+  if (err instanceof AccountError) return { code: ErrorCode.INVALID, message, reason: ACCOUNT_REASONS[err.kind], subject: err.subject };
   if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
   if (err instanceof OutsideFolderError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.PATH_OUTSIDE_FOLDER, subject: "" };
   if (err instanceof SecretPromptGone) return { code: ErrorCode.NOT_FOUND, message, reason: ErrorReason.SECRET_PROMPT_GONE, subject: "" };
@@ -143,31 +136,6 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
 const FOLLOW_MS = 1_500;
 
 const refusal = (message: string, reason: ErrorReason) => ({ code: ErrorCode.INVALID, message, reason, subject: "" });
-
-const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
-
-/** The profile list as devices get it: accounts and usage, never a credential. */
-export function profileListBody(list: ProfileList) {
-  return {
-    selectedId: list.selectedId,
-    profiles: list.profiles.map((p) => {
-      const u = p.lastUsage;
-      const fiveHour = window(u?.fiveHour);
-      const sevenDay = window(u?.sevenDay);
-      return {
-        id: p.id,
-        email: p.email,
-        organization: p.organization,
-        plan: p.plan,
-        signedIn: p.signedIn,
-        loginExpiresAt: BigInt(p.loginExpiresAt),
-        createdAt: BigInt(p.createdAt),
-        usageUpdatedAt: BigInt(u?.updatedAt ?? 0),
-        ...(u ? { lastUsage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
-      };
-    }),
-  };
-}
 
 /** A thread's uncommitted changes as devices get them (only over the sealed link). */
 export function gitChangesBody(threadId: string, r: GitChangesResult) {
@@ -441,36 +409,48 @@ export class Connection {
     this.send(id, { case: "threadItems", value: { threadId, items: items.map(wireItem), cursor } });
   }
 
-  /** Claude profiles: the sign-in code is handed on and dropped, never kept or logged. */
-  private async profileFrame(id: string, b: ProfileFrame): Promise<void> {
-    const profiles = this.ctx.profiles;
-    if (!profiles) return this.send(id, { case: "error", value: refusal("this machine has no Claude profiles", ErrorReason.NO_PROFILES) });
-    const sendList = async () => this.send(id, { case: "profileListResult", value: profileListBody(await profiles.list()) });
+  /** Every AI's accounts: a sign-in code is handed to the AI's CLI and dropped, never kept or logged. */
+  private async accountFrame(id: string, b: AccountFrame): Promise<void> {
+    const providers = this.ctx.providers ?? [];
+    const sendList = async () => this.send(id, { case: "accountListResult", value: accountListBody(await readAccounts(providers, (f) => f.list())) });
     switch (b.case) {
-      case "profileList":
+      case "accountList":
         return sendList();
-      case "profileSelect":
-        await profiles.select(b.value.id, this.device);
+      case "accountSelect":
+        await accountsOf(providers, b.value.provider).select(b.value.id, this.device);
         return sendList();
-      case "profileSignInBegin": {
-        const r = await profiles.beginRemote();
-        if (!r.ok) return this.send(id, { case: "profileSignInResult", value: { ok: false, error: r.error } });
-        return this.send(id, { case: "profileSignInPrompt", value: { attemptId: r.attemptId, url: r.url, expiresAt: BigInt(r.expiresAt) } });
+      case "accountSignInBegin": {
+        const signIn = accountsOf(providers, b.value.provider).signIn;
+        if (!signIn) return this.send(id, { case: "error", value: refusal("this AI does not sign in from a device", ErrorReason.UNSUPPORTED_REQUEST) });
+        const r = await signIn.begin();
+        if (!r.ok) return this.send(id, { case: "accountSignInResult", value: { provider: b.value.provider, ok: false, error: r.error } });
+        return this.send(id, { case: "accountSignInPrompt", value: { provider: b.value.provider, attemptId: r.attemptId, url: r.url, expiresAt: BigInt(r.expiresAt) } });
       }
-      case "profileSignInCode": {
-        const r = await profiles.submitCode(b.value.attemptId, b.value.code);
-        const value = r.ok ? { ok: true, id: r.id, email: r.email, organization: r.organization } : { ok: false, error: r.error };
-        return this.send(id, { case: "profileSignInResult", value });
+      case "accountSignInCode": {
+        const signIn = accountsOf(providers, b.value.provider).signIn;
+        if (!signIn) return this.send(id, { case: "error", value: refusal("this AI does not sign in from a device", ErrorReason.UNSUPPORTED_REQUEST) });
+        const r = await signIn.code(b.value.attemptId, b.value.code);
+        const value = r.ok ? { provider: b.value.provider, ok: true, id: r.id, email: r.email, organization: r.organization } : { provider: b.value.provider, ok: false, error: r.error };
+        return this.send(id, { case: "accountSignInResult", value });
       }
-      case "profileSignInCancel":
-        await profiles.cancel(b.value.attemptId);
+      case "accountSignInCancel":
+        await accountsOf(providers, b.value.provider).signIn?.cancel(b.value.attemptId);
         return this.send(id, { case: "ack", value: {} });
-      case "profileRemove":
-        await profiles.remove(b.value.id, this.device);
+      case "accountRemove":
+        await accountsOf(providers, b.value.provider).remove(b.value.id, this.device);
         return sendList();
-      case "usageRefresh":
-        await profiles.refreshUsage(b.value.id);
+      case "accountCaptureCurrent": {
+        const accounts = accountsOf(providers, b.value.provider);
+        if (!accounts.captureCurrent) return this.send(id, { case: "error", value: refusal("this AI cannot keep its current sign-in", ErrorReason.UNSUPPORTED_REQUEST) });
+        await accounts.captureCurrent(this.device);
         return sendList();
+      }
+      case "usageRefresh": {
+        const accounts = accountsOf(providers, b.value.provider);
+        if (!accounts.refreshUsage) return this.send(id, { case: "error", value: refusal("this AI cannot read its usage outside a session", ErrorReason.UNSUPPORTED_REQUEST) });
+        await accounts.refreshUsage(b.value.id);
+        return sendList();
+      }
     }
   }
 
@@ -719,16 +699,17 @@ export class Connection {
           const entries = this.ctx.audit.list(b.value.limit || 100).map((e) => ({ ...e, at: BigInt(e.at) }));
           return this.send(id, { case: "auditListResult", value: { entries } });
         }
-        case "profileList":
-        case "profileSelect":
-        case "profileSignInBegin":
-        case "profileSignInCode":
-        case "profileSignInCancel":
-        case "profileRemove":
+        case "accountList":
+        case "accountSelect":
+        case "accountSignInBegin":
+        case "accountSignInCode":
+        case "accountSignInCancel":
+        case "accountRemove":
+        case "accountCaptureCurrent":
         case "usageRefresh":
-          // These may wait on claude for seconds: they answer later, by id, and the
+          // These may wait on an AI's CLI for seconds: they answer later, by id, and the
           // frames after them (pings, threads) go on meanwhile.
-          void this.profileFrame(id, b).catch((err: unknown) => this.sendError(id, err));
+          void this.accountFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
         case "secretProvide":
         case "secretDecline":
@@ -854,9 +835,11 @@ type ProjectFrame = Extract<
 
 type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
 
-type ProfileFrame = Extract<
+type AccountFrame = Extract<
   Frame["body"],
-  { case: "profileList" | "profileSelect" | "profileSignInBegin" | "profileSignInCode" | "profileSignInCancel" | "profileRemove" | "usageRefresh" }
+  {
+    case: "accountList" | "accountSelect" | "accountSignInBegin" | "accountSignInCode" | "accountSignInCancel" | "accountRemove" | "accountCaptureCurrent" | "usageRefresh";
+  }
 >;
 
 function isFsError(err: unknown): boolean {

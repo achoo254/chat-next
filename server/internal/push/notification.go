@@ -34,9 +34,11 @@ const (
 // copyText is the server-written text of notifications, per locale.
 type copyText struct {
 	hidden, photo, video, audio, voice, file string
-	// Machine pushes (fmt formats): the machine's name, and for
-	// machinePending also the number of waiting requests.
+	// Machine pushes (fmt formats): the AI's name and the machine's name,
+	// and for machinePending also the number of waiting requests.
 	machineApproval, machineQuestion, machinePending string
+	// anyAI names the AI when the notice names none the server knows.
+	anyAI string
 	// usageHint names the machine only (fmt format).
 	usageHint string
 	// accountDevice: a device key was added to the account (fmt format: the
@@ -46,20 +48,20 @@ type copyText struct {
 
 var copies = map[string]copyText{
 	LocaleVI: {hidden: "Bạn có tin nhắn mới", photo: "Ảnh", video: "Video", audio: "Âm thanh", voice: "Tin nhắn thoại", file: "Tệp",
-		machineApproval: "Claude trên %s cần bạn duyệt", machineQuestion: "Claude trên %s cần bạn trả lời",
-		machinePending: "Claude trên %s có %d việc cần bạn",
-		usageHint:      "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên %s",
-		accountDevice:  "Thiết bị mới được thêm vào tài khoản: %s (%s). Không phải bạn? Thu hồi ngay trong AI Agent"},
+		machineApproval: "%s trên %s cần bạn duyệt", machineQuestion: "%s trên %s cần bạn trả lời",
+		machinePending: "%s trên %s có %d việc cần bạn", anyAI: "AI",
+		usageHint:     "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên %s",
+		accountDevice: "Thiết bị mới được thêm vào tài khoản: %s (%s). Không phải bạn? Thu hồi ngay trong AI Agent"},
 	LocaleEN: {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File",
-		machineApproval: "Claude on %s needs your approval", machineQuestion: "Claude on %s needs your answer",
-		machinePending: "Claude on %s has %d requests waiting for you",
-		usageHint:      "A tip to use the AI more efficiently in a session on %s",
-		accountDevice:  "A new device was added to your account: %s (%s). Not you? Revoke it in AI Agent"},
+		machineApproval: "%s on %s needs your approval", machineQuestion: "%s on %s needs your answer",
+		machinePending: "%s on %s has %d requests waiting for you", anyAI: "AI",
+		usageHint:     "A tip to use the AI more efficiently in a session on %s",
+		accountDevice: "A new device was added to your account: %s (%s). Not you? Revoke it in AI Agent"},
 	LocaleZhCN: {hidden: "你有一条新消息", photo: "照片", video: "视频", audio: "音频", voice: "语音消息", file: "文件",
-		machineApproval: "%s 上的 Claude 需要你批准", machineQuestion: "%s 上的 Claude 需要你回答",
-		machinePending: "%s 上的 Claude 有 %d 个请求等你处理",
-		usageHint:      "%s 上的一个会话有更省用量的建议",
-		accountDevice:  "你的账号添加了新设备：%s（%s）。不是你？请在 AI Agent 中撤销"},
+		machineApproval: "%[2]s 上的 %[1]s 需要你批准", machineQuestion: "%[2]s 上的 %[1]s 需要你回答",
+		machinePending: "%[2]s 上的 %[1]s 有 %[3]d 个请求等你处理", anyAI: "AI",
+		usageHint:     "%s 上的一个会话有更省用量的建议",
+		accountDevice: "你的账号添加了新设备：%s（%s）。不是你？请在 AI Agent 中撤销"},
 }
 
 // Payload is the JSON the service worker receives (apps/web/src/sw). A
@@ -179,7 +181,17 @@ type MachineNotice struct {
 	// gives the count instead of the kind.
 	Pending   int
 	SessionID string
-	At        time.Time
+	// Provider is the waiting thread's AI as the agent named it (checked by
+	// the caller); "" when unknown or when merged notices named different AIs.
+	Provider string
+	At       time.Time
+}
+
+// aiNames are the names pushes give the agent's provider ids. The server
+// never shows an agent's own text: an id not listed here reads as "AI".
+var aiNames = map[string]string{
+	"claude":      "Claude Code",
+	"antigravity": "Antigravity",
 }
 
 // machineNotification is the push message of n in locale.
@@ -196,14 +208,18 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 		payload, _ := json.Marshal(p)
 		return webpush.Message{Payload: payload, TTL: usageHintTTL, Urgency: webpush.UrgencyNormal, Topic: "machineusage" + id}
 	}
+	ai, known := aiNames[n.Provider]
+	if !known {
+		ai = text.anyAI
+	}
 	var body string
 	switch {
 	case n.Pending > 1:
-		body = fmt.Sprintf(text.machinePending, n.MachineName, n.Pending)
+		body = fmt.Sprintf(text.machinePending, ai, n.MachineName, n.Pending)
 	case n.Kind == MachineQuestion:
-		body = fmt.Sprintf(text.machineQuestion, n.MachineName)
+		body = fmt.Sprintf(text.machineQuestion, ai, n.MachineName)
 	default:
-		body = fmt.Sprintf(text.machineApproval, n.MachineName)
+		body = fmt.Sprintf(text.machineApproval, ai, n.MachineName)
 	}
 	url := "/machines/" + id
 	if n.SessionID != "" {

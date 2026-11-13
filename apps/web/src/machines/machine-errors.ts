@@ -32,7 +32,7 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.sameAi;
 		case ErrorReason.AI_START_FAILED:
 			return r.aiStartFailed(ai, s);
-		case ErrorReason.PROFILE_UNUSABLE:
+		case ErrorReason.ACCOUNT_UNUSABLE:
 			return r.profileUnusable(s);
 		case ErrorReason.THREAD_NOT_FOUND:
 			return r.threadNotFound;
@@ -46,18 +46,22 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.unknownEffort(s);
 		case ErrorReason.PERMISSION_MODE_NOT_ALLOWED:
 			return r.permissionModeNotAllowed(s);
-		case ErrorReason.NO_PROFILES:
+		case ErrorReason.NO_ACCOUNTS:
 			return r.noProfiles;
-		case ErrorReason.PROFILE_NOT_FOUND:
+		case ErrorReason.ACCOUNT_NOT_FOUND:
 			return r.profileNotFound;
-		case ErrorReason.DEFAULT_PROFILE_PERMANENT:
+		case ErrorReason.DEFAULT_ACCOUNT_PERMANENT:
 			return r.defaultProfilePermanent;
-		case ErrorReason.PROFILE_IN_USE:
+		case ErrorReason.ACCOUNT_IN_USE:
 			return r.profileInUse;
-		case ErrorReason.PROFILE_SIGN_OUT_FAILED:
+		case ErrorReason.ACCOUNT_SIGN_OUT_FAILED:
 			return r.profileSignOutFailed(s);
-		case ErrorReason.PROFILES_DAMAGED:
+		case ErrorReason.ACCOUNTS_DAMAGED:
 			return r.profilesDamaged;
+		case ErrorReason.ACCOUNT_SWITCH_BLOCKED:
+			return r.accountSwitchBlocked(ai, s);
+		case ErrorReason.PROVIDER_REQUIRED:
+			return r.providerRequired;
 		case ErrorReason.AI_CLI_MISSING:
 			return r.aiCliMissing(ai);
 		case ErrorReason.NO_LOCAL_FORWARD:

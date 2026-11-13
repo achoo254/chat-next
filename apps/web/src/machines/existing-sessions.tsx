@@ -23,6 +23,8 @@ export interface ExistingSessionsProps {
 	link: MachineLink;
 	/** The AI's name, as the machine reports it. */
 	ai: string;
+	/** The AI (ProviderInfo.id) whose sessions are listed and opened. */
+	provider: string;
 	/** The machine's home folder ("" when unknown). */
 	home: string;
 	/**
@@ -102,7 +104,7 @@ function useSettled<T>(value: T, ms: number): T {
 	return settled;
 }
 
-export default function ExistingSessions({ machine, name, link, ai, home, folder, loadsByDefault = false, onClose }: ExistingSessionsProps) {
+export default function ExistingSessions({ machine, name, link, ai, provider, home, folder, loadsByDefault = false, onClose }: ExistingSessionsProps) {
 	const t = useMachinesCopy();
 	const c = t.existing;
 	const now = useNow();
@@ -111,7 +113,7 @@ export default function ExistingSessions({ machine, name, link, ai, home, folder
 	const [dir, setDir] = useState(folder ?? "");
 	// Pages asked for, for this search and folder; another search or folder starts again at one.
 	const [more, setMore] = useState({ key: "", pages: 1 });
-	const filterKey = `${search}\n${dir}`;
+	const filterKey = `${provider}\n${search}\n${dir}`;
 	const pages = more.key === filterKey ? more.pages : 1;
 	const requestKey = `${filterKey}\n${pages}`;
 	const [result, setResult] = useState<Listed>(EMPTY_LIST);
@@ -124,7 +126,7 @@ export default function ExistingSessions({ machine, name, link, ai, home, folder
 		// An answer to an older search or page is dropped.
 		let current = true;
 		const offset = (pages - 1) * PAGE;
-		link.request({ case: "sessionList", value: { query: search, dir, offset, limit: PAGE } }).then(
+		link.request({ case: "sessionList", value: { provider, query: search, dir, offset, limit: PAGE } }).then(
 			(frame) => {
 				if (!current || frame.body.case !== "sessionListResult") return;
 				const page = frame.body.value;
@@ -143,7 +145,7 @@ export default function ExistingSessions({ machine, name, link, ai, home, folder
 		return () => {
 			current = false;
 		};
-	}, [link, search, dir, pages, requestKey, t, ai]);
+	}, [link, provider, search, dir, pages, requestKey, t, ai]);
 	const loading = result.key !== requestKey;
 	const { sessions, dirs, total, error: listError } = result;
 
@@ -164,6 +166,7 @@ export default function ExistingSessions({ machine, name, link, ai, home, folder
 			.request({
 				case: "sessionOpen",
 				value: {
+					provider,
 					sessionId: session.sessionId,
 					consent: { sensitive: agreed.sensitive, projectSettings: loadProject, trustProject: loadProject && agreed.trust },
 					openAnyway: agreed.anyway,

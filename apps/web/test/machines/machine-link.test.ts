@@ -237,10 +237,10 @@ describe("MachineLink", () => {
 	});
 
 	it("forgets the rate limits of the profile a session left", () => {
-		const onTeam = create(ThreadInfoSchema, { threadId: "t", profileId: "", rateLimits: { fiveHour: { utilization: 100 } } });
-		const sameProfile = create(ThreadInfoSchema, { threadId: "t", profileId: "" });
+		const onTeam = create(ThreadInfoSchema, { threadId: "t", accountId: "", rateLimits: { fiveHour: { utilization: 100 } } });
+		const sameProfile = create(ThreadInfoSchema, { threadId: "t", accountId: "" });
 		expect(mergeThreadInfo(onTeam, sameProfile).rateLimits?.fiveHour?.utilization).toBe(100);
-		const moved = create(ThreadInfoSchema, { threadId: "t", profileId: "p2", machineProfileId: "p2" });
+		const moved = create(ThreadInfoSchema, { threadId: "t", accountId: "p2", machineAccountId: "p2" });
 		expect(mergeThreadInfo(onTeam, moved).rateLimits).toBeUndefined();
 	});
 
@@ -249,14 +249,20 @@ describe("MachineLink", () => {
 			if (frame.body.case === "machineInfoRequest") {
 				setTimeout(() => {
 					machine.send(socket, {
-						case: "machineProfile",
-						value: { profiles: { selectedId: "", profiles: [{ id: "", email: "team@example.com" }] }, sessions: [{ threadId: "t1", profileId: "" }] },
+						case: "machineAccounts",
+						value: { accounts: { accounts: [{ provider: "claude", id: "", email: "team@example.com" }] }, sessions: [{ threadId: "t1", accountId: "", provider: "claude" }] },
 					});
 					machine.send(socket, {
-						case: "machineProfile",
+						case: "machineAccounts",
 						value: {
-							profiles: { selectedId: "p2", profiles: [{ id: "", email: "team@example.com" }, { id: "p2", email: "max@example.com" }] },
-							sessions: [{ threadId: "t1", profileId: "", switchPending: true }],
+							accounts: {
+								selectedByProvider: { claude: "p2" },
+								accounts: [
+									{ provider: "claude", id: "", email: "team@example.com" },
+									{ provider: "claude", id: "p2", email: "max@example.com" },
+								],
+							},
+							sessions: [{ threadId: "t1", accountId: "", switchPending: true, provider: "claude" }],
 						},
 					});
 				}, 0);
@@ -264,10 +270,10 @@ describe("MachineLink", () => {
 			return defaultAnswerOf(frame);
 		};
 		const l = link();
-		expect(l.snapshot().machineProfile).toBeNull();
+		expect(l.snapshot().machineAccounts).toBeNull();
 		l.start();
-		await until(() => l.snapshot().machineProfile?.profiles?.selectedId === "p2", "announced profile");
-		expect(l.snapshot().machineProfile?.sessions).toMatchObject([{ threadId: "t1", profileId: "", switchPending: true }]);
+		await until(() => l.snapshot().machineAccounts?.accounts?.selectedByProvider.claude === "p2", "announced accounts");
+		expect(l.snapshot().machineAccounts?.sessions).toMatchObject([{ threadId: "t1", accountId: "", switchPending: true }]);
 		l.stop();
 	});
 

@@ -85,7 +85,7 @@ describe("writing the message", () => {
     providers,
     staged: (id: string) => ws.stagedChanges(id),
     detect: () => Promise.resolve(detected),
-    accountDir: () => "/profiles/work",
+    account: () => ({ id: "work", dir: "/profiles/work" }),
   });
 
   it("asks the AI the device names, as the picked account, and cleans its answer", async () => {
@@ -98,7 +98,7 @@ describe("writing the message", () => {
     expect(message).toBe("fix: change a");
     expect(first.asked).toEqual([]);
     expect(named.asked).toHaveLength(1);
-    expect(named.asked[0]).toMatchObject({ accountDir: "/profiles/work" });
+    expect(named.asked[0]).toMatchObject({ account: { id: "work", dir: "/profiles/work" } });
     expect(named.asked[0]?.model).toBeUndefined();
     expect(named.asked[0]?.prompt).toContain("M\ta.txt");
   });

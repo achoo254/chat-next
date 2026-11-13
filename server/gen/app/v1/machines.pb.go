@@ -92,9 +92,8 @@ type Machine struct {
 	// "linux"; "arm64" or "x64".
 	Os   string `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
 	Arch string `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
-	// As last reported by the agent; claude_version is empty when unknown.
-	AgentVersion  string `protobuf:"bytes,5,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
-	ClaudeVersion string `protobuf:"bytes,6,opt,name=claude_version,json=claudeVersion,proto3" json:"claude_version,omitempty"`
+	// As last reported by the agent.
+	AgentVersion string `protobuf:"bytes,5,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	// The machine's X25519 static public key (32 bytes): the key devices
 	// expect in the handshake; the server is the source of trust for it. The
 	// machine proved it holds the key when it registered.
@@ -169,13 +168,6 @@ func (x *Machine) GetArch() string {
 func (x *Machine) GetAgentVersion() string {
 	if x != nil {
 		return x.AgentVersion
-	}
-	return ""
-}
-
-func (x *Machine) GetClaudeVersion() string {
-	if x != nil {
-		return x.ClaudeVersion
 	}
 	return ""
 }
@@ -1280,9 +1272,6 @@ type HeartbeatRequest struct {
 	// empty while the tunnel is down.
 	TunnelUrl    string `protobuf:"bytes,1,opt,name=tunnel_url,json=tunnelUrl,proto3" json:"tunnel_url,omitempty"`
 	AgentVersion string `protobuf:"bytes,2,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
-	// `claude --version` of the machine, up to 64 characters; empty when
-	// unknown.
-	ClaudeVersion string `protobuf:"bytes,3,opt,name=claude_version,json=claudeVersion,proto3" json:"claude_version,omitempty"`
 	// Public keys (32 bytes each, at most 50) of the devices connected to the
 	// machine now: their last_seen_at moves to now.
 	ConnectedDeviceKeys [][]byte `protobuf:"bytes,4,rep,name=connected_device_keys,json=connectedDeviceKeys,proto3" json:"connected_device_keys,omitempty"`
@@ -1330,13 +1319,6 @@ func (x *HeartbeatRequest) GetTunnelUrl() string {
 func (x *HeartbeatRequest) GetAgentVersion() string {
 	if x != nil {
 		return x.AgentVersion
-	}
-	return ""
-}
-
-func (x *HeartbeatRequest) GetClaudeVersion() string {
-	if x != nil {
-		return x.ClaudeVersion
 	}
 	return ""
 }
@@ -1503,7 +1485,12 @@ type NotifyNeedsInputRequest struct {
 	// The waiting thread, so the notification opens it: up to 64 characters of
 	// [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
 	// for USAGE_HINT.
-	SessionId     string `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	SessionId string `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	// The AI of the waiting thread (the agent's provider id, e.g. "claude"):
+	// up to 32 characters of [a-z0-9-]; anything else is dropped. The
+	// notification names the AI from the server's own list, "AI" when the id
+	// is empty or unknown, or when merged notices name different AIs.
+	ProviderId    string `protobuf:"bytes,4,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1555,6 +1542,13 @@ func (x *NotifyNeedsInputRequest) GetPendingCount() int32 {
 func (x *NotifyNeedsInputRequest) GetSessionId() string {
 	if x != nil {
 		return x.SessionId
+	}
+	return ""
+}
+
+func (x *NotifyNeedsInputRequest) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
 	}
 	return ""
 }
@@ -1671,14 +1665,13 @@ var File_app_v1_machines_proto protoreflect.FileDescriptor
 
 const file_app_v1_machines_proto_rawDesc = "" +
 	"\n" +
-	"\x15app/v1/machines.proto\x12\x06app.v1\"\xb7\x02\n" +
+	"\x15app/v1/machines.proto\x12\x06app.v1\"\xa6\x02\n" +
 	"\aMachine\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x03 \x01(\tR\x02os\x12\x12\n" +
 	"\x04arch\x18\x04 \x01(\tR\x04arch\x12#\n" +
-	"\ragent_version\x18\x05 \x01(\tR\fagentVersion\x12%\n" +
-	"\x0eclaude_version\x18\x06 \x01(\tR\rclaudeVersion\x12\x1d\n" +
+	"\ragent_version\x18\x05 \x01(\tR\fagentVersion\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\a \x01(\fR\tpublicKey\x12\x1d\n" +
 	"\n" +
@@ -1687,7 +1680,7 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\x03B\x020\x02R\tcreatedAt\x12$\n" +
 	"\flast_seen_at\x18\n" +
 	" \x01(\x03B\x020\x02R\n" +
-	"lastSeenAtJ\x04\b\v\x10\fR\aclaimed\"f\n" +
+	"lastSeenAtJ\x04\b\x06\x10\aJ\x04\b\v\x10\fR\x0eclaude_versionR\aclaimed\"f\n" +
 	"\fKeyChallenge\x12\x1d\n" +
 	"\n" +
 	"server_key\x18\x01 \x01(\fR\tserverKey\x12\x14\n" +
@@ -1754,13 +1747,12 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\x17RegisterMachineResponse\x12!\n" +
 	"\n" +
 	"machine_id\x18\x01 \x01(\x03B\x020\x02R\tmachineId\x12%\n" +
-	"\x0emachine_secret\x18\x02 \x01(\tR\rmachineSecret\"\xb1\x01\n" +
+	"\x0emachine_secret\x18\x02 \x01(\tR\rmachineSecret\"\xa0\x01\n" +
 	"\x10HeartbeatRequest\x12\x1d\n" +
 	"\n" +
 	"tunnel_url\x18\x01 \x01(\tR\ttunnelUrl\x12#\n" +
-	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x12%\n" +
-	"\x0eclaude_version\x18\x03 \x01(\tR\rclaudeVersion\x122\n" +
-	"\x15connected_device_keys\x18\x04 \x03(\fR\x13connectedDeviceKeys\"\x81\x01\n" +
+	"\ragent_version\x18\x02 \x01(\tR\fagentVersion\x122\n" +
+	"\x15connected_device_keys\x18\x04 \x03(\fR\x13connectedDeviceKeysJ\x04\b\x03\x10\x04R\x0eclaude_version\"\x81\x01\n" +
 	"\rTrustedDevice\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fR\tpublicKey\x12\x12\n" +
@@ -1772,12 +1764,14 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"\arevoked\x18\x01 \x01(\bR\arevoked\x12*\n" +
 	"\x11min_agent_version\x18\x03 \x01(\tR\x0fminAgentVersion\x12%\n" +
 	"\x0etunnel_refused\x18\x05 \x01(\bR\rtunnelRefused\x12>\n" +
-	"\x0ftrusted_devices\x18\x06 \x03(\v2\x15.app.v1.TrustedDeviceR\x0etrustedDevicesJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05R\x13revoked_device_keysR\aclaimed\"\x89\x01\n" +
+	"\x0ftrusted_devices\x18\x06 \x03(\v2\x15.app.v1.TrustedDeviceR\x0etrustedDevicesJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05R\x13revoked_device_keysR\aclaimed\"\xaa\x01\n" +
 	"\x17NotifyNeedsInputRequest\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.app.v1.NeedsInputKindR\x04kind\x12#\n" +
 	"\rpending_count\x18\x02 \x01(\x05R\fpendingCount\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x03 \x01(\tR\tsessionId\"\x1a\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vprovider_id\x18\x04 \x01(\tR\n" +
+	"providerId\"\x1a\n" +
 	"\x18NotifyNeedsInputResponse\"\x1a\n" +
 	"\x18UnregisterMachineRequest\"\x1b\n" +
 	"\x19UnregisterMachineResponse*\xb7\x01\n" +

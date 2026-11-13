@@ -109,12 +109,12 @@ message Frame {
     ThreadClose thread_close = 23;
     ThreadSetPermissionMode thread_set_permission_mode = 24;
     ThreadSetEffort thread_set_effort = 25;
-    ProfileList profile_list = 26;
-    ProfileSelect profile_select = 27;
-    ProfileSignInBegin profile_sign_in_begin = 28;
-    ProfileSignInCode profile_sign_in_code = 29;
-    ProfileSignInCancel profile_sign_in_cancel = 30;
-    ProfileRemove profile_remove = 31;
+    AccountList account_list = 26;
+    AccountSelect account_select = 27;
+    AccountSignInBegin account_sign_in_begin = 28;
+    AccountSignInCode account_sign_in_code = 29;
+    AccountSignInCancel account_sign_in_cancel = 30;
+    AccountRemove account_remove = 31;
     UsageRefresh usage_refresh = 32;
     MachineSettingsSet machine_settings_set = 33;
     FileList file_list = 34;
@@ -138,11 +138,11 @@ message Frame {
     Ack ack = 50;
     Error error = 51;
     ThreadInfo thread_info = 52;
-    ProfileListResult profile_list_result = 53;
-    ProfileSignInPrompt profile_sign_in_prompt = 54;
-    ProfileSignInResult profile_sign_in_result = 55;
+    AccountListResult account_list_result = 53;
+    AccountSignInPrompt account_sign_in_prompt = 54;
+    AccountSignInResult account_sign_in_result = 55;
     FileListResult file_list_result = 56;
-    MachineProfile machine_profile = 57;
+    MachineAccounts machine_accounts = 57;
     SessionListResult session_list_result = 58;
     AttachmentData attachment_data = 59;
 
@@ -292,6 +292,9 @@ message Frame {
     WsGitCommitMessage ws_git_commit_message = 163;
     // B → A
     WsGitCommitMessageResult ws_git_commit_message_result = 164;
+
+    // A → B
+    AccountCaptureCurrent account_capture_current = 165;
   }
 }
 
@@ -871,55 +874,75 @@ message ProjectListResult {
   repeated ProjectSuggestion suggestions = 2;
 }
 
-// --- AI accounts (Claude profiles) ------------------------------------------
+// --- AI accounts ----------------------------------------------------------
 //
-// A machine may hold several Claude accounts. Each one is a profile: a folder
-// of its own that the machine's `claude` signs in to. The default profile is
-// the machine's own Claude folder. The selected profile is the machine's: every
-// session moves to it. A parked session opens with it next time; an open, idle
-// one restarts at once on it (resumed, same conversation); one in the middle
-// of a turn moves when that turn ends. B announces every change to every
-// connected device with MachineProfile. B never reads, keeps or sends a Claude
-// credential: the account shown is what `claude auth status` reports.
+// A machine may hold several accounts of each AI whose ProviderInfo
+// capabilities say `accounts`. Each AI has its own list and its own pick:
+// the account with id "" is the AI's own sign-in on the machine (Claude: its
+// own folder; Antigravity: whoever agy is signed in as). The picked account
+// of an AI is the machine's for that AI: every session of that AI moves to
+// it, and sessions of other AIs never do. A parked session opens with it next
+// time; an open, idle one restarts at once on it (resumed, same
+// conversation); one in the middle of a turn moves when that turn ends. B
+// announces every change to every connected device with MachineAccounts. B
+// never sends a credential: an account is shown as the AI's CLI reports it.
 
-// Answered with ProfileListResult.
-message ProfileList {}
+// Answered with AccountListResult: every AI's accounts.
+message AccountList {}
 
-// Picks the machine's profile; every session moves to it (see above).
-// Answered with ProfileListResult. B writes it to the consent log.
-message ProfileSelect {
-  // Empty: the default profile.
+// Picks an AI's account on the machine; every session of that AI moves to
+// it (see above). Answered with AccountListResult. B writes it to the
+// consent log. Refused with ERROR_REASON_ACCOUNT_SWITCH_BLOCKED when the AI
+// cannot switch now (subject: what holds it).
+message AccountSelect {
+  // Empty: the AI's own sign-in on the machine.
   string id = 1;
+  // Required: the AI (ProviderInfo.id).
+  string provider = 2;
 }
 
-// Starts signing in a new account. B answers with ProfileSignInPrompt, or
-// with ProfileSignInResult carrying an error. A new attempt cancels the one
+// Starts signing in a new account of an AI whose AiAccount list offers it
+// (AccountListResult.sign_in). B answers with AccountSignInPrompt, or with
+// AccountSignInResult carrying an error. A new attempt cancels the one
 // before it; an attempt left alone ends after 10 minutes.
-message ProfileSignInBegin {}
+message AccountSignInBegin {
+  string provider = 1;
+}
 
-// The code the sign-in page showed. B hands it to `claude` and forgets it; it
-// is never stored or logged. Answered with ProfileSignInResult.
-message ProfileSignInCode {
+// The code the sign-in page showed. B hands it to the AI's CLI and forgets
+// it; it is never stored or logged. Answered with AccountSignInResult.
+message AccountSignInCode {
   string attempt_id = 1;
   string code = 2;
+  string provider = 3;
 }
 
 // Answered with Ack.
-message ProfileSignInCancel {
+message AccountSignInCancel {
   string attempt_id = 1;
+  string provider = 2;
 }
 
-// Signs the profile out and deletes its folder. Answered with
-// ProfileListResult. The default profile cannot be removed.
-message ProfileRemove {
+// Signs the account out and deletes what tunelo kept of it. Answered with
+// AccountListResult. The AI's own sign-in (id "") cannot be removed.
+message AccountRemove {
   string id = 1;
+  string provider = 2;
 }
 
-// Reads the plan usage of a profile without sending a message. Answered with
-// ProfileListResult.
+// Reads the plan usage of an account without sending a message. Answered
+// with AccountListResult.
 message UsageRefresh {
-  // Empty: the default profile.
+  // Empty: the AI's own sign-in on the machine.
   string id = 1;
+  string provider = 2;
+}
+
+// Keeps the account the AI is signed in as on the machine now as one of its
+// saved accounts, for AIs whose AccountListResult offers capture_current.
+// Answered with AccountListResult.
+message AccountCaptureCurrent {
+  string provider = 1;
 }
 
 // --- machine settings -------------------------------------------------------
@@ -962,33 +985,35 @@ message ThreadInfo {
   AccountInfo account = 9;
   // Permission modes a device may pick for this session.
   repeated string permission_modes = 10;
-  // The Claude profile the session runs with; empty for the default one. A
-  // parked session shows the profile it opens with next.
-  string profile_id = 11;
-  // The profile picked on the machine; empty for the default one. Unset by
-  // tunelo before 2.0.2 (then profile_id is all there is).
-  string machine_profile_id = 12;
-  // The session runs on another profile than the machine's and moves to it
+  // The account (AiAccount.id) of the thread's AI the session runs with;
+  // empty for the AI's own sign-in. A parked session shows the account it
+  // opens with next.
+  string account_id = 11;
+  // The account of the thread's AI picked on the machine; empty for the AI's
+  // own sign-in.
+  string machine_account_id = 12;
+  // The session runs on another account than the machine's and moves to it
   // when its current turn ends (or, waiting for an approval, once that turn
   // is over).
-  bool profile_switch_pending = 13;
-  // The account of machine_profile_id while profile_switch_pending, for
+  bool account_switch_pending = 13;
+  // The account of machine_account_id while account_switch_pending, for
   // "moves to <email> after this turn"; unset otherwise.
   AccountInfo next_account = 14;
-  // The session hit its profile's usage limit and another profile of the
-  // machine has room: offer to move the whole machine there. Only a hint; B
-  // never switches by itself. Unset otherwise.
-  ProfileSuggestion profile_suggestion = 15;
+  // The session hit its account's usage limit and another account of the
+  // same AI has room: offer to move that AI there. Only a hint; B never
+  // switches by itself. Unset otherwise.
+  AccountSuggestion account_suggestion = 15;
 }
 
-// Another profile to move the machine to when a session's profile is out of
-// usage.
-message ProfileSuggestion {
-  // Empty: the default profile.
-  string profile_id = 1;
+// Another account of the same AI to move to when a session's account is out
+// of usage.
+message AccountSuggestion {
+  // Empty: the AI's own sign-in on the machine.
+  string account_id = 1;
   string email = 2;
   // Percent of usage left, 0-100: the tighter of its 5-hour and weekly windows.
   uint32 remaining = 3;
+  string provider = 4;
 }
 
 // Who the AI on the machine is signed in as, as the AI's CLI reports it.
@@ -1021,72 +1046,107 @@ message RateWindow {
   int64 resets_at = 2;
 }
 
-message ClaudeProfile {
-  // Empty: the default profile (the machine's own Claude folder).
-  string id = 1;
-  // As `claude auth status` reports it; for an added profile, the account it
-  // was added with even when it needs to sign in again.
-  string email = 2;
-  string organization = 3;
-  // The plan, e.g. "max" or "pro".
-  string plan = 4;
-  // Last `claude auth status` of the profile: signed in and not past
-  // login_expires_at. False means it needs to sign in again.
-  bool signed_in = 5;
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  // Signed in by the AI's last report.
+  ACCOUNT_STATUS_OK = 1;
+  // Needs to sign in again (the sign-in ended or was revoked).
+  ACCOUNT_STATUS_NEEDS_SIGN_IN = 2;
+  // The AI could not tell (its CLI failed or is missing).
+  ACCOUNT_STATUS_ERROR = 3;
+}
+
+message AiAccount {
+  // ProviderInfo.id of the AI the account belongs to.
+  string provider = 1;
+  // Empty: the AI's own sign-in on the machine.
+  string id = 2;
+  // A name for the account when it has no email to show; may be empty.
+  string label = 3;
+  // As the AI's CLI reports it; for a saved account, the account it was
+  // saved with even when it needs to sign in again.
+  string email = 4;
+  string organization = 5;
+  // The plan, e.g. "max" or "pro"; empty when the AI does not tell.
+  string plan = 6;
+  AccountStatus status = 7;
+  // The account picked on the machine for its AI.
+  bool current = 8;
   // Last known plan usage; unset when unknown.
-  RateLimits last_usage = 6;
-  // Unix milliseconds of last_usage; 0 when unknown.
-  int64 usage_updated_at = 7;
-  // Unix milliseconds; 0 for the default profile.
-  int64 created_at = 8;
-  // Unix milliseconds when the sign-in ends, as claude reports it; 0 when unknown.
-  int64 login_expires_at = 9;
+  RateLimits usage = 9;
+  // Unix milliseconds of usage; 0 when unknown.
+  int64 usage_updated_at = 10;
+  // Unix milliseconds; 0 for the AI's own sign-in.
+  int64 created_at = 11;
+  // Unix milliseconds when the sign-in ends, as the AI reports it; 0 when unknown.
+  int64 login_expires_at = 12;
 }
 
-message ProfileListResult {
-  repeated ClaudeProfile profiles = 1;
-  // Empty: the default profile.
-  string selected_id = 2;
+// What one AI offers on its accounts.
+message AccountActions {
+  string provider = 1;
+  // A new account signs in from a device (AccountSignInBegin).
+  bool sign_in = 2;
+  // The account the AI is signed in as now can be kept (AccountCaptureCurrent).
+  bool capture_current = 3;
+  // Plan usage can be read again (UsageRefresh).
+  bool usage = 4;
 }
 
-// Sent unasked to every connected device whenever the machine's profile
-// changes, a session finishes moving to another profile, or a profile's usage
-// is read again. Each one is the whole picture: a device replaces what it had.
-message MachineProfile {
-  // Profiles with accounts and usage, and the machine's pick (as ProfileList
-  // answers it).
-  ProfileListResult profiles = 1;
-  // Every session of the machine and the profile it runs with.
-  repeated SessionProfile sessions = 2;
+message AccountListResult {
+  // Every account of every AI with the `accounts` capability, the AI's own
+  // sign-in (id "") first.
+  repeated AiAccount accounts = 1;
+  // The picked account of each AI, by ProviderInfo.id; empty or missing: the
+  // AI's own sign-in.
+  map<string, string> selected_by_provider = 2;
+  repeated AccountActions actions = 3;
+  // AIs whose saved accounts cannot be read now (subject of the error, in
+  // English), by ProviderInfo.id.
+  map<string, string> damaged = 4;
 }
 
-message SessionProfile {
+// Sent unasked to every connected device whenever an AI's picked account
+// changes, a session finishes moving to another account, or an account's
+// usage is read again. Each one is the whole picture: a device replaces what
+// it had.
+message MachineAccounts {
+  // As AccountList answers it.
+  AccountListResult accounts = 1;
+  // Every session of the machine and the account it runs with.
+  repeated SessionAccount sessions = 2;
+}
+
+message SessionAccount {
   string thread_id = 1;
-  // The profile the session runs with (a parked one: opens with next); empty
-  // for the default one.
-  string profile_id = 2;
-  // Moves to the machine's profile when its current turn ends.
+  // The account the session runs with (a parked one: opens with next); empty
+  // for the AI's own sign-in.
+  string account_id = 2;
+  // Moves to the machine's account when its current turn ends.
   bool switch_pending = 3;
+  string provider = 4;
 }
 
-message ProfileSignInPrompt {
+message AccountSignInPrompt {
   string attempt_id = 1;
-  // The Claude sign-in page; it shows a code to paste back.
+  // The AI's sign-in page; it shows a code to paste back.
   string url = 2;
   // Unix milliseconds.
   int64 expires_at = 3;
+  string provider = 4;
 }
 
-message ProfileSignInResult {
+message AccountSignInResult {
   bool ok = 1;
   string email = 2;
   string organization = 3;
-  // The new profile on success.
+  // The new account on success.
   string id = 4;
   // On failure: code-rejected, duplicate, expired, cancelled, busy,
-  // sign-in-on-machine (this machine's claude cannot sign in from a device;
-  // run `tunelo claude profiles add` on the machine), or failed.
+  // sign-in-on-machine (this machine's CLI cannot sign in from a device;
+  // run `tunelo ai accounts add --provider <id>` on the machine), or failed.
   string error = 5;
+  string provider = 6;
 }
 
 message Pong {}
@@ -1127,8 +1187,8 @@ enum ErrorReason {
   ERROR_REASON_SAME_AI = 9;
   // The AI could not start (subject: its own error, in English).
   ERROR_REASON_AI_START_FAILED = 10;
-  // The Claude account picked on B cannot be used (subject: why, in English).
-  ERROR_REASON_PROFILE_UNUSABLE = 11;
+  // The account of the AI picked on B cannot be used (subject: why, in English).
+  ERROR_REASON_ACCOUNT_UNUSABLE = 11;
   ERROR_REASON_THREAD_NOT_FOUND = 12;
   ERROR_REASON_ITEM_NOT_FOUND = 13;
   // The approval or question changed or was answered elsewhere.
@@ -1139,15 +1199,17 @@ enum ErrorReason {
   ERROR_REASON_UNKNOWN_EFFORT = 16;
   // Subject: the mode.
   ERROR_REASON_PERMISSION_MODE_NOT_ALLOWED = 17;
-  ERROR_REASON_NO_PROFILES = 18;
-  ERROR_REASON_PROFILE_NOT_FOUND = 19;
-  ERROR_REASON_DEFAULT_PROFILE_PERMANENT = 20;
-  ERROR_REASON_PROFILE_IN_USE = 21;
-  // claude could not sign the account out, so nothing was deleted (subject:
-  // the profile id, for `tunelo claude profiles remove <id> --force`).
-  ERROR_REASON_PROFILE_SIGN_OUT_FAILED = 22;
-  // B's list of Claude profiles cannot be read; repair it on the machine.
-  ERROR_REASON_PROFILES_DAMAGED = 23;
+  // The AI keeps no accounts tunelo can switch (subject: the AI id).
+  ERROR_REASON_NO_ACCOUNTS = 18;
+  ERROR_REASON_ACCOUNT_NOT_FOUND = 19;
+  // The AI's own sign-in on the machine (id "") cannot be removed.
+  ERROR_REASON_DEFAULT_ACCOUNT_PERMANENT = 20;
+  ERROR_REASON_ACCOUNT_IN_USE = 21;
+  // The AI's CLI could not sign the account out, so nothing was deleted
+  // (subject: the account id, for `tunelo ai accounts remove --force`).
+  ERROR_REASON_ACCOUNT_SIGN_OUT_FAILED = 22;
+  // B's saved accounts cannot be read; repair them on the machine.
+  ERROR_REASON_ACCOUNTS_DAMAGED = 23;
   ERROR_REASON_AI_CLI_MISSING = 24;
   // B does not forward to localhost.
   ERROR_REASON_NO_LOCAL_FORWARD = 25;
@@ -1276,6 +1338,10 @@ enum ErrorReason {
   // thread or project gives none either. An AI the machine does not know is
   // ERROR_REASON_UNKNOWN_AI.
   ERROR_REASON_PROVIDER_REQUIRED = 75;
+  // AccountSelect while the AI cannot switch accounts now: one of its CLIs
+  // runs on the machine (subject: what runs, e.g. a terminal or a session's
+  // title). Nothing changed.
+  ERROR_REASON_ACCOUNT_SWITCH_BLOCKED = 76;
 }
 
 enum ErrorCode {
@@ -1688,6 +1754,9 @@ message ProviderCapabilities {
   string bypass_mode_id = 15;
   // Sessions take tunelo's own MCP (browser, saved sign-in secrets).
   bool session_mcp = 16;
+  // The machine keeps several accounts of the AI and picks one
+  // (AccountList, AccountSelect).
+  bool accounts = 17;
 }
 
 message ModelOption {
@@ -1837,7 +1906,8 @@ message AuditEntry {
   string device = 2;
   // open_sensitive, project_settings (detail "trust" when a device trusted
   // the folder), approve_sensitive, revoke (the account revoked a connected device),
-  // permission_mode, profile_add, profile_select, profile_remove,
+  // permission_mode, profile_add, profile_select, profile_remove (detail:
+  // the AI id, then the account),
   // delete_session (path: the folder; detail: the session ids),
   // project_add (a sensitive folder added as a project),
   // secret_add (path: the site; detail: the name, "saved" or "once"),
@@ -2995,7 +3065,8 @@ message UsageSuggestion {
 }
 
 message UsageQuotaPoint {
-  // ClaudeProfile.id; empty: the default profile.
+  // AiAccount.id of the AI whose transcripts feed the ledger; empty: its
+  // own sign-in on the machine.
   string profile_id = 1;
   int64 at = 2;
   // Read by B's own schedule; false: a session or a person asked.

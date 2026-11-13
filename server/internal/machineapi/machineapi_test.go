@@ -533,8 +533,8 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 func TestAgentCallFields(t *testing.T) {
 	for msg, want := range map[proto.Message][]string{
 		&appv1.RegisterMachineRequest{}:   {"name", "os", "arch", "agent_version", "public_key", "proof"},
-		&appv1.HeartbeatRequest{}:         {"tunnel_url", "agent_version", "claude_version", "connected_device_keys"},
-		&appv1.NotifyNeedsInputRequest{}:  {"kind", "pending_count", "session_id"},
+		&appv1.HeartbeatRequest{}:         {"tunnel_url", "agent_version", "connected_device_keys"},
+		&appv1.NotifyNeedsInputRequest{}:  {"kind", "pending_count", "session_id", "provider_id"},
 		&appv1.UnregisterMachineRequest{}: nil,
 	} {
 		fields := msg.ProtoReflect().Descriptor().Fields()
@@ -569,7 +569,7 @@ func TestHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	id, secret := e.register()
 	tunnel := machineTunnel(ownerSub, id)
-	beat := &appv1.HeartbeatRequest{TunnelUrl: tunnel + "/", AgentVersion: "3.0.1", ClaudeVersion: "2.1.319"}
+	beat := &appv1.HeartbeatRequest{TunnelUrl: tunnel + "/", AgentVersion: "3.0.1"}
 
 	for name, header := range map[string]string{"none": "", "not bearer": "Basic " + secret, "wrong": "Bearer " + wrong(secret)} {
 		req := connect.NewRequest(beat)
@@ -608,7 +608,7 @@ func TestHeartbeat(t *testing.T) {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, _ := e.store.ListMachines(ctx, tenant, e.userID)
-	if list[0].TunnelURL != tunnel || list[0].AgentVersion != "3.0.1" || list[0].ClaudeVersion != "2.1.319" {
+	if list[0].TunnelURL != tunnel || list[0].AgentVersion != "3.0.1" {
 		t.Fatalf("recorded %+v", list[0])
 	}
 
@@ -767,6 +767,52 @@ func TestNotifyNeedsInputMerges(t *testing.T) {
 	e.pending()[1].fire()
 	if sent := e.notifier.take(); len(sent) != 0 {
 		t.Fatalf("pushed after Close: %+v", sent)
+	}
+}
+
+// The push names the waiting thread's AI only by an id the server checks;
+// notices of one window that name different AIs merge into "AI" (empty).
+func TestNotifyNeedsInputNamesTheAI(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	_, secret := e.register()
+	notify := func(pending int32, provider string) {
+		t.Helper()
+		if _, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+			Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, PendingCount: pending, ProviderId: provider}, secret)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	notify(1, "antigravity")
+	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Provider != "antigravity" {
+		t.Fatalf("first push %+v", sent)
+	}
+	// A malformed id is dropped, never refused.
+	e.advance(31 * time.Second)
+	notify(1, "Claude Code!")
+	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Provider != "" {
+		t.Fatalf("malformed id %+v", sent)
+	}
+	// One AI kept within the window keeps its name.
+	e.advance(31 * time.Second)
+	notify(1, "claude")
+	e.notifier.take()
+	e.advance(5 * time.Second)
+	notify(2, "claude")
+	e.pending()[len(e.pending())-1].fire()
+	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Provider != "claude" {
+		t.Fatalf("same AI merged %+v", sent)
+	}
+	// Two AIs kept within one window: the push names neither.
+	e.advance(31 * time.Second)
+	notify(1, "claude")
+	e.notifier.take()
+	e.advance(5 * time.Second)
+	notify(2, "claude")
+	notify(3, "antigravity")
+	e.pending()[len(e.pending())-1].fire()
+	if sent := e.notifier.take(); len(sent) != 1 || sent[0].Provider != "" || sent[0].Pending != 3 {
+		t.Fatalf("different AIs merged %+v", sent)
 	}
 }
 

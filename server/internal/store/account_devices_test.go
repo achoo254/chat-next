@@ -165,7 +165,7 @@ func TestSessionEndRevokesItsDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	trusted, err := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", "", nil)
+	trusted, err := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", nil)
 	if err != nil || !sameKeys(keysOf(trusted), 4) {
 		t.Fatalf("trusted after the sessions ended: %x %v", keysOf(trusted), err)
 	}
@@ -186,7 +186,7 @@ func TestSessionEndRevokesItsDevices(t *testing.T) {
 	if _, err := s.RevokeAllSessions(ctx, tenant, u.ID); err != nil {
 		t.Fatal(err)
 	}
-	if trusted, _ := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", "", nil); len(trusted) != 0 {
+	if trusted, _ := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", nil); len(trusted) != 0 {
 		t.Fatalf("trusted after revoking every session: %x", keysOf(trusted))
 	}
 	theirList, err := s.ListAccountDevices(ctx, tenant, other.ID)
@@ -224,7 +224,7 @@ func TestHeartbeatTrustedDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A connected key of another account is not touched.
-	trusted, err := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", "",
+	trusted, err := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0",
 		[][]byte{bytes.Repeat([]byte{2}, 32), bytes.Repeat([]byte{3}, 32)})
 	if err != nil || !sameKeys(keysOf(trusted), 1, 2) {
 		t.Fatalf("trusted %x %v", keysOf(trusted), err)

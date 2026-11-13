@@ -4,7 +4,7 @@
 // the machine, from the home folder, never in the workspace.
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { claudeEnv } from "../../profiles/account.ts";
+import { claudeEnv } from "./accounts/account.ts";
 import type { TextWriter, WriteRequest } from "../types.ts";
 
 /** Claude's pick for short writing: quick, and light on the plan's usage. */
@@ -30,7 +30,7 @@ export function claudeWriter(findBinary: () => Promise<string | null>, models: r
 
 function runOnce(bin: string, args: string[], req: WriteRequest): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { cwd: homedir(), env: claudeEnv(req.accountDir), stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(bin, args, { cwd: homedir(), env: claudeEnv(req.account?.dir), stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
     let out = "";
     let err = "";
     const timer = setTimeout(() => {

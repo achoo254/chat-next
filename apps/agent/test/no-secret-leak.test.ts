@@ -4,7 +4,7 @@
 // pick, a usage refresh and a removal, no file tunelo owns, no log line and
 // no frame the device got (but the sign-in link itself) holds the sign-in
 // code, the token claude stored or the link's state. claude's own store,
-// claude-profiles/*/home, is left out: that is where claude keeps its
+// ai-accounts/claude/*/home, is left out: that is where claude keeps its
 // sign-in. Skipped on Windows only because the fake claude is a script
 // (a .cmd cannot run without a shell there).
 import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -60,55 +60,58 @@ describe.skipIf(process.platform === "win32")("no Claude secret outside claude's
     const f = profilesFixture({ configDir });
     const home = join(f.root, "home");
     mkdirSync(join(home, "work"), { recursive: true });
+    // Claude's accounts are the machine's Claude provider; its sessions take the account picked on the machine.
+    const claude = { ...fakeProvider("claude"), accounts: f.profiles };
     const core = new AgentCore({
       dataDir: join(configDir, "data"),
-      providers: [fakeProvider()],
+      providers: [claude],
       audit: f.audit,
       isSensitive: createSensitiveCheck({ home }),
-      profile: () => f.profiles.sessionProfile(),
-      selectedAccountDir: () => f.profiles.selectedAccountDir(),
+      sessionAccount: () => f.profiles.sessionAccount(),
+      selectedScope: () => f.profiles.selectedScope(),
     });
     const config = new ConfigStore(configDir);
-    const device = await pairedDevice({ core, config, audit: f.audit, profiles: f.profiles });
+    const device = await pairedDevice({ core, config, audit: f.audit, providers: [claude] });
     let n = 0;
     const ask = (body: Parameters<typeof device.request>[1]) => device.request(String(++n), body);
+    const provider = "claude";
 
-    const wrong = await ask({ case: "profileSignInBegin", value: {} });
-    if (wrong.body.case !== "profileSignInPrompt") throw new Error(`expected a prompt, got ${wrong.body.case}`);
+    const wrong = await ask({ case: "accountSignInBegin", value: { provider } });
+    if (wrong.body.case !== "accountSignInPrompt") throw new Error(`expected a prompt, got ${wrong.body.case}`);
     expect(wrong.body.value.url).toContain(FAKE_URL_STATE);
-    expect((await ask({ case: "profileSignInCode", value: { attemptId: wrong.body.value.attemptId, code: WRONG_CODE } })).body).toMatchObject({
-      case: "profileSignInResult",
+    expect((await ask({ case: "accountSignInCode", value: { provider, attemptId: wrong.body.value.attemptId, code: WRONG_CODE } })).body).toMatchObject({
+      case: "accountSignInResult",
       value: { ok: false, error: "code-rejected" },
     });
-    const cancelled = await ask({ case: "profileSignInBegin", value: {} });
-    if (cancelled.body.case !== "profileSignInPrompt") throw new Error("expected a prompt");
-    await ask({ case: "profileSignInCancel", value: { attemptId: cancelled.body.value.attemptId } });
+    const cancelled = await ask({ case: "accountSignInBegin", value: { provider } });
+    if (cancelled.body.case !== "accountSignInPrompt") throw new Error("expected a prompt");
+    await ask({ case: "accountSignInCancel", value: { provider, attemptId: cancelled.body.value.attemptId } });
 
-    const kept = await ask({ case: "profileSignInBegin", value: {} });
-    if (kept.body.case !== "profileSignInPrompt") throw new Error("expected a prompt");
+    const kept = await ask({ case: "accountSignInBegin", value: { provider } });
+    if (kept.body.case !== "accountSignInPrompt") throw new Error("expected a prompt");
     const attemptId = kept.body.value.attemptId;
     // Two codes at once: one is kept, the other finds the attempt over.
     const [a, b] = await Promise.all([
-      ask({ case: "profileSignInCode", value: { attemptId, code: GOOD_CODE } }),
-      ask({ case: "profileSignInCode", value: { attemptId, code: GOOD_CODE } }),
+      ask({ case: "accountSignInCode", value: { provider, attemptId, code: GOOD_CODE } }),
+      ask({ case: "accountSignInCode", value: { provider, attemptId, code: GOOD_CODE } }),
     ]);
-    const results = [a.body, b.body].map((x) => (x.case === "profileSignInResult" ? x.value.error || "ok" : x.case));
+    const results = [a.body, b.body].map((x) => (x.case === "accountSignInResult" ? x.value.error || "ok" : x.case));
     expect(results.sort()).toEqual(["expired", "ok"]);
 
     process.env.FAKE_CLAUDE_EMAIL = "third@example.com";
-    const third = await ask({ case: "profileSignInBegin", value: {} });
-    if (third.body.case !== "profileSignInPrompt") throw new Error("expected a prompt");
-    const added = await ask({ case: "profileSignInCode", value: { attemptId: third.body.value.attemptId, code: GOOD_CODE } });
-    if (added.body.case !== "profileSignInResult" || !added.body.value.ok) throw new Error("third account not added");
+    const third = await ask({ case: "accountSignInBegin", value: { provider } });
+    if (third.body.case !== "accountSignInPrompt") throw new Error("expected a prompt");
+    const added = await ask({ case: "accountSignInCode", value: { provider, attemptId: third.body.value.attemptId, code: GOOD_CODE } });
+    if (added.body.case !== "accountSignInResult" || !added.body.value.ok) throw new Error("third account not added");
 
-    await ask({ case: "profileSelect", value: { id: attemptId } });
-    await ask({ case: "usageRefresh", value: { id: attemptId } });
-    await ask({ case: "profileRemove", value: { id: added.body.value.id } });
-    const list = await ask({ case: "profileList", value: {} });
-    expect(list.body.case).toBe("profileListResult");
+    await ask({ case: "accountSelect", value: { provider, id: attemptId } });
+    await ask({ case: "usageRefresh", value: { provider, id: attemptId } });
+    await ask({ case: "accountRemove", value: { provider, id: added.body.value.id } });
+    const list = await ask({ case: "accountList", value: {} });
+    expect(list.body.case).toBe("accountListResult");
 
-    // A session in the profile, so the journal and state.json exist too.
-    const thread = await core.create({ provider: "fake", model: "", dir: join(home, "work"), text: "hello", consent: { sensitive: false, projectSettings: false }, device: "phone" });
+    // A session in the account, so the journal and state.json exist too.
+    const thread = await core.create({ provider, model: "", dir: join(home, "work"), text: "hello", consent: { sensitive: false, projectSettings: false }, device: "phone" });
     await until(core, thread.id, (items) => items.some((i) => i.body.case === "turn" && i.body.value.state !== TurnState.RUNNING));
     await core.stop();
     // What the service printed goes to its log file, as under its supervisor.
@@ -116,10 +119,10 @@ describe.skipIf(process.platform === "win32")("no Claude secret outside claude's
 
     const store = (path: string) => {
       const parts = relative(configDir, path).split(sep);
-      return parts[0] === "claude-profiles" && parts[2] === "home";
+      return parts[0] === "ai-accounts" && parts[1] === "claude" && parts[3] === "home";
     };
     const owned = files(configDir, store);
-    for (const expected of ["profiles.json", "audit.jsonl", "journal.jsonl", "state.json", "config.json", "tunelo.log"]) {
+    for (const expected of ["ai-accounts.json", "audit.jsonl", "journal.jsonl", "state.json", "config.json", "tunelo.log"]) {
       expect(owned.some((p) => p.endsWith(expected)), expected).toBe(true);
     }
     for (const path of owned) {
@@ -130,9 +133,9 @@ describe.skipIf(process.platform === "win32")("no Claude secret outside claude's
     for (const frame of device.received) {
       const bytes = Buffer.from(toBinary(FrameSchema, frame)).toString("latin1");
       for (const secret of [GOOD_CODE, WRONG_CODE, FAKE_TOKEN]) expect(bytes.includes(secret), `${secret} in a ${frame.body.case} frame`).toBe(false);
-      if (frame.body.case !== "profileSignInPrompt") expect(bytes.includes(FAKE_URL_STATE), `link state in a ${frame.body.case} frame`).toBe(false);
+      if (frame.body.case !== "accountSignInPrompt") expect(bytes.includes(FAKE_URL_STATE), `link state in a ${frame.body.case} frame`).toBe(false);
     }
     // The check would see it: claude itself did store the token, in its own folder.
-    expect(readFileSync(join(configDir, "claude-profiles", attemptId, "home", ".credentials.json"), "utf8")).toContain(FAKE_TOKEN);
+    expect(readFileSync(join(configDir, "ai-accounts", "claude", attemptId, "home", ".credentials.json"), "utf8")).toContain(FAKE_TOKEN);
   });
 });

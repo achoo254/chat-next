@@ -27,8 +27,11 @@ import { type SessionMcp, TICKET_ENV } from "../../mcp/session-tickets.ts";
 import { redactDeep } from "../../mcp/redact.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
 import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
-import { claudeEnv, readAccount } from "../../profiles/account.ts";
-import { defaultClaudeHome, profilesRoot } from "../../profiles/paths.ts";
+import type { AccountsStore } from "../../accounts/store.ts";
+import type { AuditLog } from "../../safety/audit-log.ts";
+import { claudeEnv, readAccount } from "./accounts/account.ts";
+import { CLAUDE_PROVIDER_ID, defaultClaudeHome, profilesRoot } from "./accounts/paths.ts";
+import { ClaudeProfiles } from "./accounts/service.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import { selfCommand } from "../../service.ts";
 import { Channel } from "../../util/channel.ts";
@@ -138,24 +141,52 @@ export function claudeHomesIn(configDir: string): string[] {
   return homes;
 }
 
+/** What Claude's accounts need from the machine (see AccountsFacet). */
+export type ClaudeAccountsDeps = {
+  configDir: string;
+  store: AccountsStore;
+  audit: AuditLog;
+  /** A session of this AI is open with this account (it may not be removed then). */
+  inUse: (id: string) => boolean;
+  /** Usage just read for an account, for the sessions' status line. */
+  onUsage: (id: string, usage: NonNullable<RateLimits>) => void;
+  log: (line: string) => void;
+};
+
 export function createClaudeProvider(
   deps: {
     query?: QueryFn;
     findBinary?: () => Promise<string | null>;
-    /** The machine's Claude folders whose sessions are listed (its own, then each profile's). */
+    /** The machine's Claude folders whose sessions are listed; its own, then each account's when `accounts` is given. */
     homes?: () => string[];
+    /** Several Claude accounts on the machine; without it, only the machine's own sign-in. */
+    accounts?: ClaudeAccountsDeps;
   } = {},
 ): AgentProvider {
   const queryFn: QueryFn = deps.query ?? ((p) => sdkQuery(p));
   const findBinary = deps.findBinary ?? findClaude;
-  const homes = deps.homes ?? (() => [defaultClaudeHome()]);
+  const a = deps.accounts;
+  const accounts = a
+    ? new ClaudeProfiles({
+        configDir: a.configDir,
+        store: a.store,
+        audit: a.audit,
+        findBinary,
+        probeUsage: (bin, dir) => probeUsage(bin, dir, queryFn),
+        inUse: a.inUse,
+        onUsage: a.onUsage,
+        log: a.log,
+      })
+    : undefined;
+  const homes = deps.homes ?? (accounts ? () => accounts.claudeHomes() : () => [defaultClaudeHome()]);
   const history = new LocalSessions({ homes });
 
   return {
-    id: "claude",
+    id: CLAUDE_PROVIDER_ID,
     name: "Claude Code",
     capabilities: CLAUDE_CAPABILITIES,
-    shellEnv: (accountDir) => (accountDir ? { CLAUDE_CONFIG_DIR: accountDir } : {}),
+    ...(accounts ? { accounts } : {}),
+    shellEnv: (account) => (account ? { CLAUDE_CONFIG_DIR: account.dir } : {}),
     // Claude Code's IDE extensions leave <claude folder>/ide/<port>.lock; ~/.claude too when CLAUDE_CONFIG_DIR moved it.
     ideLockDirs: () => [...new Set([...homes(), join(homedir(), ".claude")])].map((h) => join(h, "ide")),
     history,
@@ -177,12 +208,12 @@ export function createClaudeProvider(
         return { installed: false, loginState: "unknown" };
       }
       // The CLI's own status report (exit 1 when signed out); the agent never opens credential files.
-      const account = await readAccount(bin, opts.accountDir);
+      const account = await readAccount(bin, opts.account?.dir);
       const loginState: Detected["loginState"] = account === null ? "unknown" : account.loggedIn ? "ok" : "needs-login";
       const minor = version?.split(".").slice(0, 2).join(".");
       const out: Detected = { installed: true, loginState, untestedVersion: !minor || !TESTED.includes(minor) };
       if (version) out.version = version;
-      const defaultModel = settingsModel(opts.accountDir ?? defaultClaudeHome());
+      const defaultModel = settingsModel(opts.account?.dir ?? defaultClaudeHome());
       if (defaultModel) out.defaultModel = defaultModel;
       return out;
     },
@@ -225,7 +256,7 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
   }
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
-  return { file: bin, args, env: req.accountDir ? { CLAUDE_CONFIG_DIR: req.accountDir } : {}, ...(sessionId ? { sessionId } : {}) };
+  return { file: bin, args, env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {}, ...(sessionId ? { sessionId } : {}) };
 }
 
 /**
@@ -485,7 +516,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     canUseTool,
   };
   // A profile picked on the machine: its own sign-in, the shared projects.
-  if (policy.accountDir) options.env = claudeEnv(policy.accountDir);
+  if (policy.account) options.env = claudeEnv(policy.account.dir);
   // Claude Code runs this before every Bash command: the secrets a running command may read (secret-env.ts).
   if (secrets) options.env = { ...(options.env ?? claudeEnv(undefined)), CLAUDE_ENV_FILE: secrets.loader };
   if (policy.model) options.model = policy.model;
@@ -706,7 +737,7 @@ export async function probeCommands(bin: string, req: CommandsRequest, queryFn: 
     persistSession: false,
     abortController: abort,
   };
-  if (req.accountDir) options.env = claudeEnv(req.accountDir);
+  if (req.account) options.env = claudeEnv(req.account.dir);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<SlashCommand[]>((resolve) => {
     timer = setTimeout(() => resolve([]), timeoutMs);

@@ -6,7 +6,7 @@
 // takes effect at the machine's next heartbeat (about a minute). The devices
 // that may use it are the account's (account-devices.tsx, on the machines
 // page).
-import { useEffect, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useState, type FormEvent } from "react";
 import type { AuditEntry } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -96,8 +96,9 @@ export function MachineDetail({ machine }: { machine: string }) {
 			</div>
 		);
 	}
-	const claude = providerVersion(state);
-	const hasClaude = state.info?.providers.some((p) => p.id === "claude") ?? false;
+	const ais = providerVersions(state);
+	/** The AI whose accounts the machine keeps; its accounts block shows below. */
+	const accountsAi = state.info?.providers.find((p) => p.capabilities?.accounts === true)?.id ?? "";
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.agent.infoOf(name)}>
 			<PageHead
@@ -126,7 +127,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</Link>
 					))}
 				</section>
-				{online && hasClaude && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, "claude")} announced={state.machineProfile} />}
+				{online && accountsAi !== "" && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, accountsAi)} provider={accountsAi} announced={state.machineAccounts} />}
 				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={aiName(state.info, "claude")} />}
 				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={aiName(state.info, "claude")} />}
@@ -166,17 +167,14 @@ export function MachineDetail({ machine }: { machine: string }) {
 								<dd>{t.os(entry.os, entry.arch)}</dd>
 							</>
 						)}
-						{(claude !== null || entry.claudeVersion !== "") && (
-							<>
-								<dt>{claude?.name ?? t.detail.claude}</dt>
+						{ais.map((ai) => (
+							<Fragment key={ai.id}>
+								<dt>{ai.name}</dt>
 								<dd className="mono">
-									{claude?.version ?? entry.claudeVersion}{" "}
-									{claude !== null && (
-										<span className={claude.untested ? "chip mx-chip warn" : "chip mx-chip ok"}>{claude.untested ? t.detail.untested : t.detail.tested}</span>
-									)}
+									{ai.version} <span className={ai.untested ? "chip mx-chip warn" : "chip mx-chip ok"}>{ai.untested ? t.detail.untested : t.detail.tested}</span>
 								</dd>
-							</>
-						)}
+							</Fragment>
+						))}
 						<dt>{t.detail.agent}</dt>
 						<dd className="mono">
 							tunelo {state.info?.agentVersion || entry.agentVersion || "—"}{" "}
@@ -235,9 +233,9 @@ export function MachineDetail({ machine }: { machine: string }) {
 	);
 }
 
-function providerVersion(state: ReturnType<typeof useLink>[1]): { name: string; version: string; untested: boolean } | null {
-	const p = state.info?.providers[0];
-	return p === undefined ? null : { name: aiName(state.info, p.id), version: p.version, untested: p.untestedVersion };
+/** Every AI installed on the machine, with the version it reported. */
+function providerVersions(state: ReturnType<typeof useLink>[1]): { id: string; name: string; version: string; untested: boolean }[] {
+	return (state.info?.providers ?? []).map((p) => ({ id: p.id, name: aiName(state.info, p.id), version: p.version, untested: p.untestedVersion }));
 }
 
 function RenameDialog({ current, busy, error, onSave, onClose }: { current: string; busy: boolean; error: string; onSave: (name: string) => void; onClose: () => void }) {

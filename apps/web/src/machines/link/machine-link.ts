@@ -26,7 +26,7 @@ import {
 	type GitChanges,
 	type Item,
 	type MachineInfo,
-	type MachineProfile,
+	type MachineAccounts,
 	type PasskeyNotice,
 	type AgentUpdateProgress,
 	type ProjectCloneProgress,
@@ -99,11 +99,11 @@ export interface LinkState {
 	/** Each watched thread's statusline data (ThreadInfo), by thread id. */
 	readonly threadInfo: ReadonlyMap<string, ThreadInfo>;
 	/**
-	 * The machine's Claude profile, its profiles and the profile each session
-	 * runs with, as the machine last announced them (whole, unasked); null
-	 * until it does (tunelo before 2.0.2 never does).
+	 * Every AI's accounts on the machine, the pick of each and the account
+	 * each session runs with, as the machine last announced them (whole,
+	 * unasked); null until it does.
 	 */
-	readonly machineProfile: MachineProfile | null;
+	readonly machineAccounts: MachineAccounts | null;
 	/** The machine's projects as it last sent them (tunelo 2.0.7+); null until it does. */
 	readonly projects: ProjectListResult | null;
 	/** Clones this device started, by clone id, as their progress last said. */
@@ -217,7 +217,7 @@ const INITIAL: LinkState = {
 	full: new Map(),
 	pending: new Map(),
 	threadInfo: new Map(),
-	machineProfile: null,
+	machineAccounts: null,
 	projects: null,
 	clones: new Map(),
 	agentUpdate: null,
@@ -706,8 +706,8 @@ export class MachineLink {
 				this.set({ threadInfo });
 				break;
 			}
-			case "machineProfile":
-				this.set({ machineProfile: b.value });
+			case "machineAccounts":
+				this.set({ machineAccounts: b.value });
 				break;
 			case "projectListResult":
 				this.set({ projects: b.value });
@@ -830,12 +830,12 @@ export class MachineLink {
 /**
  * A newer ThreadInfo replaces the older one, except for what it does not
  * know: unset rate limits (the AI reports them only now and then) keep the
- * previous ones while the session stays on the same Claude profile, and an
+ * previous ones while the session stays on the same account, and an
  * empty command list (not listed yet) keeps the previous one.
  */
 export function mergeThreadInfo(previous: ThreadInfo | undefined, next: ThreadInfo): ThreadInfo {
 	if (previous === undefined) return next;
-	const rateLimits = next.rateLimits ?? (previous.profileId === next.profileId ? previous.rateLimits : undefined);
+	const rateLimits = next.rateLimits ?? (previous.accountId === next.accountId ? previous.rateLimits : undefined);
 	const commands = next.commands.length > 0 ? next.commands : previous.commands;
 	if (rateLimits === next.rateLimits && commands === next.commands) return next;
 	return { ...next, rateLimits, commands };

@@ -138,7 +138,7 @@ function host(id: number, name: string) {
 	const link = { request: (req: Req) => (sent.push(req), Promise.resolve(ACK)), activity: () => undefined, onActivity: () => () => undefined } as unknown as MachineLink;
 	const state = { info: { agentVersion: "2.6.0", providers: [], home: "/w" }, threads: [], projects: null, threadInfo: new Map(), status: { kind: "open" } } as unknown as LinkState;
 	const view = {
-		entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", claudeVersion: "", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, claimed: true },
+		entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, claimed: true },
 		link,
 		state,
 		conn: { kind: "on" } as Conn,

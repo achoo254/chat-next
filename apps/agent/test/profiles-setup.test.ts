@@ -6,10 +6,10 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ensureHistoryLink, historyLinked } from "../src/profiles/history-link.ts";
-import { assertProfileId, assertSafeHome, makeProfileHome, profileDir } from "../src/profiles/paths.ts";
-import { removeTreeSafely } from "../src/profiles/remove.ts";
-import { SHARED_DIRS, ensureSharedDirs, setupProfileHome } from "../src/profiles/setup.ts";
+import { ensureHistoryLink, historyLinked } from "../src/providers/claude/accounts/history-link.ts";
+import { assertProfileId, assertSafeHome, makeProfileHome, profileDir } from "../src/providers/claude/accounts/paths.ts";
+import { removeTreeSafely } from "../src/accounts/remove.ts";
+import { SHARED_DIRS, ensureSharedDirs, setupProfileHome } from "../src/providers/claude/accounts/setup.ts";
 import { tempDir } from "./harness.ts";
 
 const posix = process.platform !== "win32";
@@ -79,15 +79,15 @@ describe("profile setup", () => {
     expect(() => assertProfileId("../x")).toThrow();
     expect(() => assertProfileId("")).toThrow();
     expect(() => assertSafeHome(configDir, join(claudeHome, "p"), claudeHome)).toThrow(/inside/);
-    expect(() => assertSafeHome(configDir, join(configDir, "elsewhere", "home"), claudeHome)).toThrow(/claude-profiles/);
-    expect(() => makeProfileHome(join(claudeHome, "nested-config"), "p2", join(claudeHome, "nested-config", "claude-profiles", "p2"))).toThrow();
+    expect(() => assertSafeHome(configDir, join(configDir, "elsewhere", "home"), claudeHome)).toThrow(/ai-accounts/);
+    expect(() => makeProfileHome(join(claudeHome, "nested-config"), "p2", join(claudeHome, "nested-config", "ai-accounts", "claude", "p2"))).toThrow();
   });
 
   it.skipIf(!posix)("refuses a profile reached through a link", () => {
     const { root, configDir, claudeHome } = machine();
     const elsewhere = join(root, "elsewhere");
     mkdirSync(elsewhere);
-    symlinkSync(elsewhere, join(configDir, "claude-profiles", "p3"), "dir");
+    symlinkSync(elsewhere, join(configDir, "ai-accounts", "claude", "p3"), "dir");
     expect(() => makeProfileHome(configDir, "p3", claudeHome)).toThrow(/link/);
   });
 });

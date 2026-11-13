@@ -37,8 +37,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
@@ -76,7 +74,6 @@ const (
 	// sweepAbove: past this many machines the ended windows are forgotten.
 	sweepAbove   = 256
 	maxPending   = 1000
-	maxClaudeLen = 64
 	maxTunnelLen = 256
 )
 
@@ -97,7 +94,9 @@ var (
 	// Base64url without padding of 32 bytes.
 	secretRE    = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 	sessionIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]{0,64}$`)
-	versionRE   = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})(-[0-9A-Za-z.-]{1,16})?$`)
+	// providerIDRE: an agent's provider id; anything else is dropped, never refused.
+	providerIDRE = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+	versionRE    = regexp.MustCompile(`^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})(-[0-9A-Za-z.-]{1,16})?$`)
 )
 
 // Notifier sends a machine's notice to its owner's devices (push.Service).
@@ -320,10 +319,6 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 		s.logger.Warn("heartbeat with a tunnel of another account", "machine_id", machine.ID)
 		tunnel = ""
 	}
-	claude := m.GetClaudeVersion()
-	if !cleanLabel(claude, maxClaudeLen) {
-		return nil, invalid("claude_version must be at most 64 characters without control characters")
-	}
 	connected := m.GetConnectedDeviceKeys()
 	if len(connected) > store.MaxConnectedDeviceKeys {
 		return nil, invalid(fmt.Sprintf("connected_device_keys holds at most %d keys", store.MaxConnectedDeviceKeys))
@@ -333,7 +328,7 @@ func (s *Service) Heartbeat(ctx context.Context, req *connect.Request[appv1.Hear
 			return nil, invalid("connected_device_keys must be 32 bytes each")
 		}
 	}
-	devices, err := s.store.MachineHeartbeat(ctx, s.cfg.TenantID, machine.ID, tunnel, m.GetAgentVersion(), claude, connected)
+	devices, err := s.store.MachineHeartbeat(ctx, s.cfg.TenantID, machine.ID, tunnel, m.GetAgentVersion(), connected)
 	if errors.Is(err, store.ErrNotFound) {
 		// Revoked between authentication and the update.
 		return connect.NewResponse(&appv1.HeartbeatResponse{Revoked: true, MinAgentVersion: MinAgentVersion}), nil
@@ -384,9 +379,13 @@ func (s *Service) NotifyNeedsInput(ctx context.Context, req *connect.Request[app
 	if !sessionIDRE.MatchString(m.GetSessionId()) {
 		return nil, invalid("session_id must be up to 64 characters of A-Z, a-z, 0-9, _ and -")
 	}
+	provider := m.GetProviderId()
+	if !providerIDRE.MatchString(provider) {
+		provider = ""
+	}
 	s.notify(machine.UserID, push.MachineNotice{
 		MachineID: machine.ID, MachineName: machine.Name, Kind: kind, Pending: int(m.GetPendingCount()),
-		SessionID: m.GetSessionId(),
+		SessionID: m.GetSessionId(), Provider: provider,
 	})
 	return connect.NewResponse(&appv1.NotifyNeedsInputResponse{}), nil
 }
@@ -415,6 +414,10 @@ func (s *Service) notify(userID int64, n push.MachineNotice) {
 		s.mu.Unlock()
 		s.send(context.Background(), userID, n)
 		return
+	}
+	// Notices kept in one window that name different AIs push as "AI".
+	if st.next != nil && st.next.Provider != n.Provider {
+		n.Provider = ""
 	}
 	st.next = &n
 	if st.timer == nil {
@@ -590,20 +593,6 @@ func parseVersion(v string) ([3]int, bool) {
 		out[i] = n
 	}
 	return out, true
-}
-
-// cleanLabel: valid UTF-8 of at most maxLen characters without control
-// characters ("" passes).
-func cleanLabel(s string, maxLen int) bool {
-	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > maxLen {
-		return false
-	}
-	for _, r := range s {
-		if unicode.IsControl(r) {
-			return false
-		}
-	}
-	return true
 }
 
 // idsInterceptor enforces the JS safe-integer contract (ADR 0001) on the

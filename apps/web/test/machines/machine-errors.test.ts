@@ -25,7 +25,7 @@ describe("machine errors", () => {
 
 	it("puts the subject where the reason names it", () => {
 		expect(machineErrorText(viMachines, refused(ErrorReason.TRUST_ON_MACHINE, "/Users/me"), "Claude")).toContain('tunelo trust "/Users/me"');
-		expect(machineErrorText(enMachines, refused(ErrorReason.PROFILE_SIGN_OUT_FAILED, "p1"), "Claude")).toContain("remove p1 --force");
+		expect(machineErrorText(enMachines, refused(ErrorReason.ACCOUNT_SIGN_OUT_FAILED, "p1"), "Claude")).toContain("remove p1 --force");
 		expect(machineErrorText(zhCNMachines, refused(ErrorReason.AI_NOT_INSTALLED, "Codex"), "Claude")).toContain("Codex");
 		expect(machineErrorText(viMachines, refused(ErrorReason.AI_START_FAILED, "boom"), "Claude")).toBe("Claude không khởi động được trên máy: boom");
 	});

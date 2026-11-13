@@ -4,11 +4,11 @@
 // refreshing usage, adding (sign-in-code-dialog) and removing one. Everything goes to the machine over the encrypted link;
 // the machine never sends a credential, only what claude reports.
 import { useCallback, useState } from "react";
-import type { ClaudeProfile, MachineProfile } from "@achoo254/chat-proto/remote/remote";
+import type { AiAccount, MachineAccounts } from "@achoo254/chat-proto/remote/remote";
 import { useI18n } from "../i18n/i18n.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
-import { useProfiles } from "./machine-profile.ts";
+import { signedIn, useProfiles } from "./machine-profile.ts";
 import { SignInCodeDialog } from "./sign-in-code-dialog.tsx";
 import { planName, usageOf } from "./status-line.ts";
 import { errorText, useNow } from "./use-machines.ts";
@@ -18,23 +18,25 @@ interface ClaudeProfilesProps {
 	link: MachineLink;
 	online: boolean;
 	ai: string;
+	/** The AI (ProviderInfo.id) whose accounts these are. */
+	provider: string;
 	/** What the machine announced last (tunelo 2.0.2+); null makes the list asked once. */
-	announced: MachineProfile | null;
+	announced: MachineAccounts | null;
 }
 
 type FrameBody = Parameters<MachineLink["request"]>[0];
 
-export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesProps) {
+export function ClaudeProfiles({ link, online, ai, provider, announced }: ClaudeProfilesProps) {
 	const t = useMachinesCopy();
 	const p = t.profiles;
 	const { locale } = useI18n();
-	const profiles = useProfiles(link, announced, online);
+	const profiles = useProfiles(link, announced, online, provider);
 	const list = profiles.list;
 	/** What is running: "select:<id>", "usage:<id>", "remove:<id>"; "" when idle. */
 	const [busy, setBusy] = useState("");
 	const [error, setError] = useState("");
 	const [adding, setAdding] = useState(false);
-	const [removing, setRemoving] = useState<ClaudeProfile | null>(null);
+	const [removing, setRemoving] = useState<AiAccount | null>(null);
 
 	const run = useCallback(
 		(what: string, body: FrameBody) => {
@@ -69,12 +71,12 @@ export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesPr
 			{online && list === null && error === "" && <p className="muted">{p.loading}</p>}
 			{list !== null && (
 				<ul className="mx-device-list">
-					{list.profiles.map((profile) => {
+					{list.accounts.map((profile) => {
 						const selected = profile.id === list.selectedId;
 						// An added profile keeps its e-mail when it needs to sign in again; the default one shows what claude says now.
-						const name = profile.email !== "" && (profile.signedIn || profile.id !== "") ? profile.email : p.notSignedIn;
-						const needsSignIn = profile.id !== "" && !profile.signedIn;
-						const usage = profile.lastUsage;
+						const name = profile.email !== "" && (signedIn(profile) || profile.id !== "") ? profile.email : p.notSignedIn;
+						const needsSignIn = profile.id !== "" && !signedIn(profile);
+						const usage = profile.usage;
 						const updated = Number(profile.usageUpdatedAt);
 						const expires = Number(profile.loginExpiresAt);
 						return (
@@ -103,7 +105,7 @@ export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesPr
 											type="button"
 											className="btn btn-sm"
 											disabled={!online || busy !== "" || needsSignIn}
-											onClick={() => void run(`select:${profile.id}`, { case: "profileSelect", value: { id: profile.id } })}
+											onClick={() => void run(`select:${profile.id}`, { case: "accountSelect", value: { id: profile.id, provider } })}
 										>
 											{p.select}
 										</button>
@@ -111,8 +113,8 @@ export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesPr
 									<button
 										type="button"
 										className="btn btn-sm"
-										disabled={!online || busy !== "" || (profile.id === "" && !profile.signedIn)}
-										onClick={() => void run(`usage:${profile.id}`, { case: "usageRefresh", value: { id: profile.id } })}
+										disabled={!online || busy !== "" || (profile.id === "" && !signedIn(profile))}
+										onClick={() => void run(`usage:${profile.id}`, { case: "usageRefresh", value: { id: profile.id, provider } })}
 									>
 										{p.refresh}
 									</button>
@@ -141,6 +143,7 @@ export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesPr
 				<SignInCodeDialog
 					link={link}
 					ai={ai}
+					provider={provider}
 					onAdded={profiles.reload}
 					onClose={() => setAdding(false)}
 				/>
@@ -163,7 +166,7 @@ export function ClaudeProfiles({ link, online, ai, announced }: ClaudeProfilesPr
 					busy={busy.startsWith("remove:")}
 					danger
 					onConfirm={() =>
-						void run(`remove:${removing.id}`, { case: "profileRemove", value: { id: removing.id } }).then((ok) => {
+						void run(`remove:${removing.id}`, { case: "accountRemove", value: { id: removing.id, provider } }).then((ok) => {
 							if (ok) setRemoving(null);
 						})
 					}

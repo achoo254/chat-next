@@ -155,7 +155,7 @@ func TestMachineDirectory(t *testing.T) {
 	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("tunelo.%d", id)) + ".tunnel.hoandat.com"
 	heartbeat := func() *appv1.HeartbeatResponse {
 		t.Helper()
-		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.0.0", ClaudeVersion: "2.1.319"})
+		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.0.0"})
 		req.Header().Set("Authorization", "Bearer "+secret)
 		resp, err := agent.Heartbeat(ctx, req)
 		if err != nil {
@@ -180,7 +180,7 @@ func TestMachineDirectory(t *testing.T) {
 		t.Fatalf("machines %+v", list.Msg)
 	}
 	m := list.Msg.GetMachines()[0]
-	if m.GetId() != id || m.GetName() != "Mac mini" || m.GetTunnelUrl() != tunnel || m.GetClaudeVersion() != "2.1.319" ||
+	if m.GetId() != id || m.GetName() != "Mac mini" || m.GetTunnelUrl() != tunnel ||
 		string(m.GetPublicKey()) != string(machineKey.PublicKey().Bytes()) || m.GetLastSeenAt() == 0 {
 		t.Fatalf("machine %+v", m)
 	}

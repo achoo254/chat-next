@@ -1,4 +1,4 @@
-// The Claude profiles of this machine, as the service runs them: listing,
+// Claude's accounts (profiles) of this machine, as the service runs them: listing,
 // picking the machine's profile (every session moves to it), signing a new account in (from a device
 // with a pasted code, or in the terminal on the machine), refusing an account
 // that is already there, plan usage, and removal.
@@ -11,53 +11,34 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RateWindow } from "../providers/types.ts";
-import type { AuditLog } from "../safety/audit-log.ts";
+import { AccountError } from "../../../accounts/errors.ts";
+import { removeTreeSafely } from "../../../accounts/remove.ts";
+import { AccountsStore } from "../../../accounts/store.ts";
+import type { AuditLog } from "../../../safety/audit-log.ts";
+import type {
+  AccountScopeRef,
+  AccountSuggestion,
+  AccountsFacet,
+  AccountsListener,
+  AccountsView,
+  AiAccountInfo,
+  RateWindow,
+  SignInOutcome,
+  SignInStart,
+} from "../../types.ts";
 import { type ClaudeAccount, readAccount, sameAccount, signOut } from "./account.ts";
 import { ensureHistoryLink } from "./history-link.ts";
 import { PROFILE_ID_RE, assertSafeHome, defaultClaudeHome, makeProfileHome, profileDir, profileHome, profilesRoot } from "./paths.ts";
-import { removeTreeSafely } from "./remove.ts";
 import { ensureSharedDirs, setupProfileHome, syncMachineSettings } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
 import { ProfileStore, type ProfileUsage } from "./store.ts";
 
 export type RateLimits = { fiveHour?: RateWindow; sevenDay?: RateWindow };
 
-export type SignInError = "code-rejected" | "duplicate" | "expired" | "cancelled" | "busy" | "sign-in-on-machine" | "failed";
-
-export type SignInOutcome = { ok: true; id: string; email: string; organization: string } | { ok: false; error: SignInError };
-
-export type ProfileView = {
-  /** "" for the default profile. */
-  id: string;
-  email: string;
-  organization: string;
-  plan: string;
-  /** Signed in by claude's last report and not past loginExpiresAt; false: needs to sign in again. */
-  signedIn: boolean;
-  /** Unix milliseconds; 0 when unknown. */
-  loginExpiresAt: number;
-  lastUsage?: ProfileUsage;
-  createdAt: number;
-};
-
-export type ProfileList = { profiles: ProfileView[]; selectedId: string };
-
-/** Another profile with usage left, offered when a session's profile ran out. */
-export type ProfileSuggestion = { id: string; email: string; remaining: number };
-
-/** The account folder of a session: none for the default profile. */
-export type SessionProfile = { id: string; accountDir?: string };
-
-export type ProfileListener = {
-  /** The machine's profile changed (picked, or unselected by a removal): sessions move to it. */
-  onSelect?: (id: string) => void;
-  /** What devices see of the profiles changed (picked, added, removed, usage read). */
-  onChange?: () => void;
-};
-
 export type ClaudeProfilesOptions = {
   configDir: string;
+  /** The machine's one store of every AI's accounts; read from configDir when unset. */
+  store?: AccountsStore;
   audit: AuditLog;
   findBinary: () => Promise<string | null>;
   /** Plan usage of an account folder (undefined: the default one), without a message. */
@@ -93,23 +74,7 @@ const SIGN_IN_CHECK_MS = 5 * 60_000;
 /** In a profile folder (beside home) while its sign-in has not finished. */
 const ATTEMPT_MARKER = "attempt";
 
-/** Why a profile request was refused; devices word it in the user's language. */
-export type ProfileErrorKind = "damaged" | "not-found" | "default-permanent" | "in-use" | "sign-out-failed" | "cli-missing";
-
-export class ProfileError extends Error {
-  constructor(
-    message: string,
-    readonly kind: ProfileErrorKind,
-    /** The variable part the kind names (a profile id), when it has one. */
-    readonly subject = "",
-  ) {
-    super(message);
-  }
-}
-
-export class ClaudeProfiles {
-  /** The AI whose accounts these are. */
-  readonly provider = "claude";
+export class ClaudeProfiles implements AccountsFacet {
   readonly store: ProfileStore;
   readonly claudeHome: string;
   private attempt: Attempt | undefined;
@@ -120,18 +85,24 @@ export class ClaudeProfiles {
   private defaultSignIn: { signedIn: boolean; loginExpiresAt: number } | undefined;
   private readonly now: () => number;
   private readonly log: (line: string) => void;
-  private listener: ProfileListener = {};
+  private listener: AccountsListener = {};
+  /** A new account signs in from a device: claude's link, then the code its page shows. */
+  readonly signIn = {
+    begin: (): Promise<SignInStart> => this.beginRemote(),
+    code: (attemptId: string, code: string): Promise<SignInOutcome> => this.submitCode(attemptId, code),
+    cancel: (attemptId: string): Promise<void> => this.cancel(attemptId),
+  };
 
   constructor(private readonly opts: ClaudeProfilesOptions) {
     this.now = opts.now ?? Date.now;
-    this.store = new ProfileStore(opts.configDir, this.now);
+    this.store = new ProfileStore(opts.store ?? new AccountsStore(opts.configDir, this.now));
     this.claudeHome = opts.claudeHome ?? defaultClaudeHome();
     this.log = opts.log ?? (() => undefined);
     if (this.store.damaged) this.log(`claude profiles: ${this.store.damaged}`);
   }
 
   /** Who hears about changes (the machine: its sessions and devices); one listener, the last set. */
-  listen(listener: ProfileListener): void {
+  listen(listener: AccountsListener): void {
     this.listener = listener;
   }
 
@@ -143,7 +114,7 @@ export class ClaudeProfiles {
   }
 
   private readable(): void {
-    if (this.store.damaged) throw new ProfileError(this.store.damaged, "damaged");
+    if (this.store.damaged) throw new AccountError(this.store.damaged, "damaged");
   }
 
   private home(id: string): string {
@@ -154,7 +125,7 @@ export class ClaudeProfiles {
 
   private async bin(): Promise<string> {
     const bin = await this.opts.findBinary();
-    if (!bin) throw new ProfileError("claude is not installed on this machine", "cli-missing");
+    if (!bin) throw new AccountError("claude is not installed on this machine", "cli-missing");
     return bin;
   }
 
@@ -218,11 +189,11 @@ export class ClaudeProfiles {
     return homes;
   }
 
-  /** The account folder new sessions would use; only looks it up. */
-  selectedAccountDir(): string | undefined {
+  /** The account new sessions would use; only looks it up. */
+  selectedScope(): AccountScopeRef | undefined {
     this.readable();
     const p = this.store.selected();
-    return p ? this.home(p.id) : undefined;
+    return p ? { id: p.id, dir: this.home(p.id) } : undefined;
   }
 
   /**
@@ -230,7 +201,7 @@ export class ClaudeProfiles {
    * machine's settings copied in and its history and shared-folder links checked. Throws when
    * the profiles cannot be read, rather than run on another account.
    */
-  sessionProfile(): SessionProfile {
+  sessionAccount(): { id: string; scope?: AccountScopeRef } {
     this.readable();
     const p = this.store.selected();
     if (!p) return { id: "" };
@@ -250,7 +221,7 @@ export class ClaudeProfiles {
     } catch (err) {
       this.log(`claude profiles: shared folders not checked (${(err as Error).message})`);
     }
-    return { id: p.id, accountDir: home };
+    return { id: p.id, scope: { id: p.id, dir: home } };
   }
 
   /** Asks claude whether a profile is still signed in, and keeps the answer. No answer keeps the last one. */
@@ -283,7 +254,7 @@ export class ClaudeProfiles {
   }
 
   /** The profiles as devices see them; added profiles' sign-ins are checked with claude when their last check is old. */
-  async list(): Promise<ProfileList> {
+  async list(): Promise<AccountsView> {
     this.readable();
     const bin = await this.opts.findBinary();
     const account = bin ? await readAccount(bin, undefined) : null;
@@ -305,33 +276,35 @@ export class ClaudeProfiles {
    * change to every device. The default profile's sign-in is as list() last
    * saw it (before that: signed in when an account is known).
    */
-  view(): ProfileList {
+  view(): AccountsView {
     this.readable();
     const known = this.store.get().defaultProfile;
     const signIn = this.defaultSignIn ?? { signedIn: Boolean(known.email), loginExpiresAt: 0 };
-    const def: ProfileView = {
+    const def: AiAccountInfo = {
       id: "",
+      label: "",
       email: signIn.signedIn ? (known.email ?? "") : "",
       organization: signIn.signedIn ? (known.orgName ?? "") : "",
       plan: signIn.signedIn ? (known.plan ?? "") : "",
-      signedIn: signIn.signedIn,
+      status: signIn.signedIn ? "ok" : "needs-sign-in",
       loginExpiresAt: signIn.loginExpiresAt,
       createdAt: 0,
-      ...(known.lastUsage ? { lastUsage: known.lastUsage } : {}),
+      ...(known.lastUsage ? { usage: known.lastUsage } : {}),
     };
     const rest = this.store.get().profiles.map(
-      (p): ProfileView => ({
+      (p): AiAccountInfo => ({
         id: p.id,
+        label: "",
         email: p.email,
         organization: p.orgName,
         plan: p.plan,
-        signedIn: this.signedIn(p.signIn),
+        status: this.signedIn(p.signIn) ? "ok" : "needs-sign-in",
         loginExpiresAt: p.signIn?.loginExpiresAt ?? 0,
         createdAt: p.createdAt,
-        ...(p.lastUsage ? { lastUsage: p.lastUsage } : {}),
+        ...(p.lastUsage ? { usage: p.lastUsage } : {}),
       }),
     );
-    return { profiles: [def, ...rest], selectedId: this.store.selected()?.id ?? "" };
+    return { accounts: [def, ...rest], selectedId: this.store.selected()?.id ?? "" };
   }
 
   /**
@@ -344,7 +317,7 @@ export class ClaudeProfiles {
     return this.serial(async () => {
       this.readable();
       const p = id === "" ? null : this.store.find(id);
-      if (id !== "" && !p) throw new ProfileError("no such profile", "not-found");
+      if (id !== "" && !p) throw new AccountError("no such profile", "not-found");
       const changed = (this.store.get().selectedProfileId ?? "") !== id;
       this.store.update((d) => {
         d.selectedProfileId = id === "" ? null : id;
@@ -378,14 +351,14 @@ export class ClaudeProfiles {
    * profile with the most usage left (each read again first, within the
    * minimum interval), or undefined when none has room or its usage is unknown.
    */
-  async suggestion(exhaustedId: string): Promise<ProfileSuggestion | undefined> {
+  async suggestion(exhaustedId: string): Promise<AccountSuggestion | undefined> {
     if (this.store.damaged) return undefined;
-    const others = this.view().profiles.filter((p) => p.id !== exhaustedId && p.signedIn && p.email !== "");
+    const others = this.view().accounts.filter((p) => p.id !== exhaustedId && p.status === "ok" && p.email !== "");
     await Promise.allSettled(others.map((p) => this.refreshUsage(p.id)));
-    let best: ProfileSuggestion | undefined;
-    for (const p of this.view().profiles) {
-      if (p.id === exhaustedId || !p.signedIn || p.email === "" || !p.lastUsage) continue;
-      const remaining = usageLeft(p.lastUsage, this.now());
+    let best: AccountSuggestion | undefined;
+    for (const p of this.view().accounts) {
+      if (p.id === exhaustedId || p.status !== "ok" || p.email === "" || !p.usage) continue;
+      const remaining = usageLeft(p.usage, this.now());
       if (remaining > 0 && (!best || remaining > best.remaining)) best = { id: p.id, email: p.email, remaining };
     }
     return best;
@@ -402,7 +375,7 @@ export class ClaudeProfiles {
    */
   refreshUsage(id: string): Promise<void> {
     this.readable();
-    if (id !== "" && !this.store.find(id)) return Promise.reject(new ProfileError("no such profile", "not-found"));
+    if (id !== "" && !this.store.find(id)) return Promise.reject(new AccountError("no such profile", "not-found"));
     const last = this.lastUsage(id);
     if (last && this.now() - last.updatedAt < (this.opts.usageMinIntervalMs ?? USAGE_MIN_INTERVAL_MS)) return Promise.resolve();
     const running = this.usageInFlight.get(id);
@@ -452,7 +425,7 @@ export class ClaudeProfiles {
    * claude cannot sign in without a terminal, the answer says to do it on the
    * machine.
    */
-  beginRemote(): Promise<{ ok: true; attemptId: string; url: string; expiresAt: number } | { ok: false; error: SignInError }> {
+  beginRemote(): Promise<SignInStart> {
     return this.serial(async () => {
       const bin = await this.bin();
       const { id, home } = await this.newAttempt("remote");
@@ -581,10 +554,10 @@ export class ClaudeProfiles {
   remove(id: string, device: string, options: { force?: boolean } = {}): Promise<void> {
     return this.serial(async () => {
       this.readable();
-      if (id === "") throw new ProfileError("the default profile cannot be removed", "default-permanent");
+      if (id === "") throw new AccountError("the default profile cannot be removed", "default-permanent");
       const p = this.store.find(id);
-      if (!p) throw new ProfileError("no such profile", "not-found");
-      if (this.opts.inUse?.(id)) throw new ProfileError("a session is open with this profile; close it first", "in-use");
+      if (!p) throw new AccountError("no such profile", "not-found");
+      if (this.opts.inUse?.(id)) throw new AccountError("a session is open with this profile; close it first", "in-use");
       // Unselected at once: no new session can open with it while it is signed out.
       const wasSelected = this.store.get().selectedProfileId === id;
       if (wasSelected) {
@@ -601,7 +574,7 @@ export class ClaudeProfiles {
             d.selectedProfileId = id;
           });
         }
-        throw new ProfileError(
+        throw new AccountError(
           "claude could not sign this account out, so nothing was deleted; try again once claude can reach its server",
           "sign-out-failed",
           id,

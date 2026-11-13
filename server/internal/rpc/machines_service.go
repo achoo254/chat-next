@@ -231,7 +231,7 @@ func (s *machinesService) RevokeDevice(ctx context.Context, req *connect.Request
 
 func machineProto(m store.Machine) *appv1.Machine {
 	return &appv1.Machine{
-		Id: m.ID, Name: m.Name, Os: m.OS, Arch: m.Arch, AgentVersion: m.AgentVersion, ClaudeVersion: m.ClaudeVersion,
+		Id: m.ID, Name: m.Name, Os: m.OS, Arch: m.Arch, AgentVersion: m.AgentVersion,
 		PublicKey: m.PublicKey, TunnelUrl: m.TunnelURL, CreatedAt: m.CreatedAt.Unix(), LastSeenAt: m.LastSeenAt.Unix(),
 	}
 }

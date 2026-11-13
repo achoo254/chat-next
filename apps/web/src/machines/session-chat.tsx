@@ -105,12 +105,12 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const machineName = entry?.name ?? "";
 	const missing = online && state.listed && thread === null && items.length === 0;
 	const modern = versionAtLeast(state.info?.agentVersion ?? "", AGENT_2_0_1);
-	const profiles = useProfiles(link, state.machineProfile, online);
-	const profileId = sessionProfileId(state.machineProfile, threadId, threadInfo, profiles.list);
-	const pending = switchPending(state.machineProfile, threadId, threadInfo);
+	const profiles = useProfiles(link, state.machineAccounts, online, provider);
+	const profileId = sessionProfileId(state.machineAccounts, threadId, threadInfo, profiles.list);
+	const pending = switchPending(state.machineAccounts, threadId, threadInfo);
 	const nextProfile = profileById(profiles.list, profiles.list?.selectedId ?? "");
 	const switchingTo = !pending ? "" : threadInfo?.nextAccount?.email || nextProfile?.email || t.agent.account.defaultName;
-	const suggestion = pending ? undefined : threadInfo?.profileSuggestion;
+	const suggestion = pending ? undefined : threadInfo?.accountSuggestion;
 	const limits = limitsOf(state.info?.attachments);
 	const attach = useAttachments(link, threadId, limits, caps?.images ?? false, ai);
 	const drop = useFileDrop(online && !missing, (files) => {
@@ -352,7 +352,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							from={profileName(t, profileById(profiles.list, profileId), threadInfo?.account?.email ?? "")}
 							to={suggestion.email}
 							left={suggestion.remaining}
-							onSwitch={() => profiles.request({ case: "profileSelect", value: { id: suggestion.profileId } })}
+							onSwitch={() => profiles.request({ case: "accountSelect", value: { id: suggestion.accountId, provider: suggestion.provider || provider } })}
 							ai={ai}
 						/>
 					)}

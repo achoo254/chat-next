@@ -1,17 +1,17 @@
-// The machine's Claude profile seen from devices: picking one (from a device
-// or from the machine's own terminal) reaches every connected device as a
-// MachineProfile, then again when each session has moved and when the new
-// profile's usage is read. And the profile offered when a session runs out:
+// The machine's Claude account seen from devices: picking one (from a device
+// or from the machine's own terminal) reaches every connected device as
+// MachineAccounts, then again when each session has moved and when the new
+// account's usage is read. And the account offered when a session runs out:
 // the signed-in one with the most usage left.
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { type MachineProfile, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { type MachineAccounts, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { Machine } from "../src/machine.ts";
-import { makeProfileHome } from "../src/profiles/paths.ts";
-import { usageLeft } from "../src/profiles/service.ts";
-import { setupProfileHome } from "../src/profiles/setup.ts";
+import { makeProfileHome } from "../src/providers/claude/accounts/paths.ts";
+import { usageLeft } from "../src/providers/claude/accounts/service.ts";
+import { setupProfileHome } from "../src/providers/claude/accounts/setup.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { byCase, until } from "./harness.ts";
 import { signInDefault } from "./support/fake-claude.ts";
@@ -28,7 +28,7 @@ afterEach(async () => {
 
 type Fixture = ReturnType<typeof profilesFixture>;
 
-/** Adds a signed-in profile to the store, as a finished sign-in leaves it. */
+/** Adds a signed-in account to the store, as a finished sign-in leaves it. */
 function addProfile(f: Fixture, id: string, email: string): void {
   const home = makeProfileHome(f.configDir, id, f.claudeHome);
   setupProfileHome(home, f.claudeHome);
@@ -38,9 +38,10 @@ function addProfile(f: Fixture, id: string, email: string): void {
   });
 }
 
-const announced = (d: Device): MachineProfile[] => d.frames.flatMap((f) => (f.body.case === "machineProfile" && f.id === "" ? [f.body.value] : []));
+/** Every MachineAccounts announcement a device heard, in order. */
+const announced = (d: Device): MachineAccounts[] => d.frames.flatMap((f) => (f.body.case === "machineAccounts" && f.id === "" ? [f.body.value] : []));
 
-describe("the machine's profile on every device", () => {
+describe("the machine's Claude account on every device", () => {
   it("announces a pick from a device or from the machine to every device, then each session moved and the new usage", async () => {
     const f = profilesFixture({ defaultEmail: "team@example.com" });
     addProfile(f, "p2", "max@example.com");
@@ -48,46 +49,49 @@ describe("the machine's profile on every device", () => {
     const home = join(f.root, "home");
     const work = join(home, "work");
     mkdirSync(work, { recursive: true });
-    const machine = new Machine({ config: new ConfigStore(f.configDir), providers: [fakeProvider()], profiles: f.profiles, log: () => undefined });
+    const claude = { ...fakeProvider("claude"), accounts: f.profiles };
+    const machine = new Machine({ config: new ConfigStore(f.configDir), providers: [claude], log: () => undefined });
     const port = await machine.start(0);
     cleanup.push(() => machine.stop());
     const phone = await connectDevice(machine, port, "phone");
     const laptop = await connectDevice(machine, port, "laptop");
     cleanup.push(() => phone.close(), () => laptop.close());
 
-    const t = await machine.core.create({ provider: "fake", model: "", dir: work, text: "hello", consent: { sensitive: false, projectSettings: false }, device: "test" });
+    const t = await machine.core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: { sensitive: false, projectSettings: false }, device: "test" });
     await until(machine.core, t.id, (items) => byCase(items, "turn").some((x) => x.body.value.state === TurnState.COMPLETED));
 
     // From the phone: both devices hear the pick, the session on p2 and p2's fresh usage.
-    phone.request("pick", { case: "profileSelect", value: { id: "p2" } });
+    phone.request("pick", { case: "accountSelect", value: { provider: "claude", id: "p2" } });
     for (const d of [phone, laptop]) {
       await waitFor(() =>
         announced(d).some(
           (m) =>
-            m.profiles?.selectedId === "p2" &&
-            m.sessions.some((s) => s.threadId === t.id && s.profileId === "p2" && !s.switchPending) &&
-            m.profiles.profiles.find((p) => p.id === "p2")?.lastUsage?.fiveHour?.utilization === 12,
+            m.accounts?.selectedByProvider["claude"] === "p2" &&
+            m.sessions.some((s) => s.threadId === t.id && s.provider === "claude" && s.accountId === "p2" && !s.switchPending) &&
+            m.accounts?.accounts.find((a) => a.provider === "claude" && a.id === "p2")?.usage?.fiveHour?.utilization === 12,
         ),
       );
     }
     // The answer to the pick may come after the announcements: wait for it.
-    await waitFor(() => phone.frames.some((x) => x.id === "pick" && x.body.case === "profileListResult"));
+    await waitFor(() => phone.frames.some((x) => x.id === "pick" && x.body.case === "accountListResult"));
     expect(laptop.frames.some((x) => x.id === "pick")).toBe(false);
     const last = announced(laptop).at(-1);
-    expect(last?.profiles?.profiles.map((p) => p.email)).toEqual(["team@example.com", "max@example.com"]);
+    expect(last?.accounts?.accounts.filter((a) => a.provider === "claude").map((a) => a.email)).toEqual(["team@example.com", "max@example.com"]);
     expect(machine.core.list()[0]?.open).toBe(true);
-    expect(f.probed).toContain(join(f.configDir, "claude-profiles", "p2", "home"));
+    expect(f.probed).toContain(join(f.configDir, "ai-accounts", "claude", "p2", "home"));
 
-    // From the machine's terminal (`tunelo claude profiles select default`): the same, back to the default.
-    await machine.profiles.select("", "local");
+    // From the machine's own terminal: the same, back to the default account.
+    await f.profiles.select("", "local");
     for (const d of [phone, laptop]) {
-      await waitFor(() => announced(d).at(-1)?.profiles?.selectedId === "" && announced(d).at(-1)?.sessions.every((s) => s.profileId === "") === true);
+      await waitFor(
+        () => announced(d).at(-1)?.accounts?.selectedByProvider["claude"] === "" && announced(d).at(-1)?.sessions.every((s) => s.accountId === "") === true,
+      );
     }
   });
 });
 
-describe("the profile offered when a session runs out", () => {
-  it("is the signed-in profile with the most usage left, read again first", async () => {
+describe("the account offered when a session runs out", () => {
+  it("is the signed-in account with the most usage left, read again first", async () => {
     const now = Date.now();
     const usage: Record<string, number> = { default: 97, p2: 30, p3: 10 };
     const f = profilesFixture({
@@ -100,11 +104,11 @@ describe("the profile offered when a session runs out", () => {
     addProfile(f, "p2", "max@example.com");
     addProfile(f, "p3", "gone@example.com");
     // p3 signed out since it was added: claude says so when its usage is read.
-    rmSync(join(f.configDir, "claude-profiles", "p3", "home", "fake-auth.json"));
+    rmSync(join(f.configDir, "ai-accounts", "claude", "p3", "home", "fake-auth.json"));
     await f.profiles.list();
 
     expect(await f.profiles.suggestion("")).toEqual({ id: "p2", email: "max@example.com", remaining: 70 });
-    expect(f.profiles.view().profiles.find((p) => p.id === "p3")?.signedIn).toBe(false);
+    expect(f.profiles.view().accounts.find((a) => a.id === "p3")?.status).toBe("needs-sign-in");
 
     // On p2 and out: the default has 3% left.
     usage.p2 = 100;

@@ -64,7 +64,7 @@ function machine(
 	} as unknown as MachineLink;
 	const state = { info: { agentVersion: "2.6.0", providers: [{ id: "claude", name: "Claude Code" }], home: "/w", ...options.info }, threads: options.threads ?? [], projects, threadInfo: new Map(), status: { kind: "open" } } as unknown as LinkState;
 	const view: MachineView = {
-		entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", claudeVersion: "", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, publicKey: new Uint8Array(32) },
+		entry: { ref: String(id), id, name, os: "darwin", arch: "arm64", agentVersion: "2.6.0", tunnelUrl: "", createdAt: 0, lastSeenAt: 0, publicKey: new Uint8Array(32) },
 		link,
 		state,
 		conn: { kind: "on" } as Conn,

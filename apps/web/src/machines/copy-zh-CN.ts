@@ -409,6 +409,9 @@ export const zhCNMachines: MachinesCopy = {
 			profileInUse: "有会话正在使用此账号。请先关闭该会话。",
 			profileSignOutFailed: (id) => `Claude 无法退出此账号，因此未删除任何内容。如仍要删除，请在电脑上运行：tunelo claude profiles remove ${id} --force`,
 			profilesDamaged: "电脑上的 Claude 账号列表已损坏。请在电脑上修复或删除它，然后重启 tunelo。",
+			accountSwitchBlocked: (ai, what) =>
+				what === "" ? `暂时无法切换 ${ai} 账号：${ai} 正在电脑上运行。` : `暂时无法切换 ${ai} 账号：${what} 正在电脑上使用 ${ai}。请先关闭它，然后重试。`,
+			providerRequired: "尚未为此选择 AI。请选择一个 AI 后重试。",
 			aiCliMissing: (ai) => `这台电脑上没有安装 ${ai}。`,
 			noLocalForward: "这台电脑不转发到 localhost。",
 			unsupportedRequest: "电脑暂不支持此操作。请在电脑上更新：tunelo update。",

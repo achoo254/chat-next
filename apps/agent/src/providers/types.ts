@@ -56,6 +56,13 @@ export type RateWindow = { utilization: number; resetsAt: number };
 /** Who the AI is signed in as, from the CLI itself; never a credential. */
 export type AccountInfo = { email: string; organization: string; plan: string };
 
+/**
+ * The account of an AI a session, a check or a CLI runs with, as the AI's
+ * accounts facet hands it out: its id and the folder the adapter keeps it in
+ * (Claude: CLAUDE_CONFIG_DIR). Unset everywhere for the AI's own sign-in.
+ */
+export type AccountScopeRef = { id: string; dir: string };
+
 /** Statusline data; each field present only when it changed or is known. */
 export type ProviderInfo = {
   permissionMode?: string;
@@ -166,8 +173,8 @@ export type SessionPolicy = {
   permissionMode?: string;
   /** The machine's own settings start sessions in the AI's bypass mode, so a device may return to it. */
   allowBypass?: boolean;
-  /** The AI's config folder of the account picked on the machine; unset for its default. */
-  accountDir?: string;
+  /** The account picked on the machine for this AI; unset for its own sign-in. */
+  account?: AccountScopeRef;
   /** tunelo's own MCP for this session (its ticket ends with the session). */
   sessionMcp?: SessionMcp;
   /**
@@ -179,8 +186,8 @@ export type SessionPolicy = {
 };
 
 export type DetectOptions = {
-  /** Check the sign-in of this account folder instead of the AI's default one. */
-  accountDir?: string;
+  /** Check the sign-in of this account instead of the AI's own one. */
+  account?: AccountScopeRef;
 };
 
 /** An image going with a message, to an AI whose capabilities say `images`. */
@@ -283,8 +290,8 @@ export type TerminalLaunch = {
   dir: string;
   /** The session to resume; unset starts a new one. */
   resumeId?: string;
-  /** The AI's config folder of the account picked on the machine; unset for its default. */
-  accountDir?: string;
+  /** The account picked on the machine for this AI; unset for its own sign-in. */
+  account?: AccountScopeRef;
   model?: string;
   /** One of the AI's own permission modes (never one that skips every prompt). */
   permissionMode?: string;
@@ -373,8 +380,10 @@ export interface AgentProvider {
   readonly id: string;
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
-  /** For a plain shell, the environment of the account folder picked on the machine (unset: the AI's default). */
-  shellEnv?(accountDir: string | undefined): ShellEnv;
+  /** For a plain shell, the environment of the account picked on the machine (unset: the AI's own sign-in). */
+  shellEnv?(account: AccountScopeRef | undefined): ShellEnv;
+  /** Several accounts of the AI kept on the machine, one picked; absent when the AI has none to switch. */
+  readonly accounts?: AccountsFacet;
   /**
    * Files of the AI's IDE integrations that name local ports the AI's IDE
    * extension listens on (Claude: ~/.claude/ide/*.lock), so tunnels never
@@ -404,8 +413,8 @@ export type CommandsRequest = {
   dir: string;
   /** With the folder's own configuration (its skills and commands), as the thread's session loads it. */
   projectSettings: boolean;
-  /** The AI's config folder of the account picked on the machine; unset for its default. */
-  accountDir?: string;
+  /** The account picked on the machine for this AI; unset for its own sign-in. */
+  account?: AccountScopeRef;
 };
 
 export type WriteRequest = {
@@ -413,12 +422,96 @@ export type WriteRequest = {
   prompt: string;
   /** One of the AI's models; unset: the AI's own pick for short writing. */
   model?: string;
-  /** The AI's config folder of the account picked on the machine; unset for its default. */
-  accountDir?: string;
+  /** The account picked on the machine for this AI; unset for its own sign-in. */
+  account?: AccountScopeRef;
   timeoutMs: number;
 };
 
 /** One answer to one prompt, saving no session. Throws with the AI's own error when it fails. */
 export interface TextWriter {
   write(req: WriteRequest): Promise<string>;
+}
+
+// --- accounts ------------------------------------------------------------------
+
+export type AccountStatus = "ok" | "needs-sign-in" | "error";
+
+/** Plan usage last read for an account; `updatedAt` in Unix milliseconds. */
+export type AccountUsage = { fiveHour?: RateWindow | undefined; sevenDay?: RateWindow | undefined; updatedAt: number };
+
+/** One account of an AI as devices see it; never a credential. */
+export type AiAccountInfo = {
+  /** "" for the AI's own sign-in on the machine. */
+  id: string;
+  /** A name when there is no email to show; may be "". */
+  label: string;
+  email: string;
+  organization: string;
+  plan: string;
+  status: AccountStatus;
+  /** Unix milliseconds; 0 for the AI's own sign-in. */
+  createdAt: number;
+  /** Unix milliseconds the sign-in ends; 0 when unknown. */
+  loginExpiresAt: number;
+  usage?: AccountUsage;
+};
+
+/** Every account of one AI, its own sign-in first, and the one picked ("" for its own). */
+export type AccountsView = { accounts: AiAccountInfo[]; selectedId: string };
+
+/** Another account of the same AI with usage left, for a session whose account ran out. */
+export type AccountSuggestion = { id: string; email: string; remaining: number };
+
+export type SignInError = "code-rejected" | "duplicate" | "expired" | "cancelled" | "busy" | "sign-in-on-machine" | "failed";
+export type SignInStart = { ok: true; attemptId: string; url: string; expiresAt: number } | { ok: false; error: SignInError };
+export type SignInOutcome = { ok: true; id: string; email: string; organization: string } | { ok: false; error: SignInError };
+
+export type AccountsListener = {
+  /** The AI's picked account changed (picked, or unselected by a removal): its sessions move to it. */
+  onSelect?: (id: string) => void;
+  /** What devices see of the accounts changed (picked, added, removed, usage read). */
+  onChange?: () => void;
+};
+
+/**
+ * The accounts of one AI on the machine. Each AI keeps its own list and its
+ * own pick; nothing here touches another AI's sessions. Methods that read the
+ * kept list throw an AccountError ("damaged") when it cannot be read, rather
+ * than run on another account.
+ */
+export interface AccountsFacet {
+  /** Every account, asking the AI's CLI where what is kept is old. */
+  list(): Promise<AccountsView>;
+  /** Every account from what is kept, without asking the CLI (for announcing a change). */
+  view(): AccountsView;
+  /** The picked account ("" for the AI's own sign-in); undefined when the list cannot be read. */
+  selectedId(): string | undefined;
+  /** The picked account, only looked up (checking its sign-in); undefined for the AI's own. Throws when unreadable. */
+  selectedScope(): AccountScopeRef | undefined;
+  /** What a session opening now runs with, made ready for it. Throws when unreadable. */
+  sessionAccount(): { id: string; scope?: AccountScopeRef };
+  /** Who an account is signed in as, from what is kept; undefined when unknown. */
+  account(id: string): AccountInfo | undefined;
+  /** Usage a session or a refresh reported for an account. */
+  recordUsage(id: string, usage: NonNullable<ProviderInfo["rateLimits"]>): void;
+  /** For a session whose account ran out: another one with room, or undefined. */
+  suggestion(exhaustedId: string): Promise<AccountSuggestion | undefined>;
+  select(id: string, device: string): Promise<void>;
+  remove(id: string, device: string, options?: { force?: boolean }): Promise<void>;
+  /** Reads an account's plan usage now; absent when the AI cannot tell it outside a session. */
+  refreshUsage?(id: string): Promise<void>;
+  /** A new account signs in from a device (a link, then a pasted code). */
+  readonly signIn?: {
+    begin(): Promise<SignInStart>;
+    code(attemptId: string, code: string): Promise<SignInOutcome>;
+    cancel(attemptId: string): Promise<void>;
+  };
+  /** Keeps the account the AI is signed in as now as a saved one. */
+  captureCurrent?(device: string): Promise<void>;
+  /** Who hears about changes (the machine); one listener, the last set. */
+  listen(listener: AccountsListener): void;
+  /** Leftovers of an unfinished sign-in a crash left: cleaned at start. */
+  cleanLeftovers?(): Promise<void>;
+  /** The service is stopping: a sign-in in progress ends. */
+  stop?(): Promise<void>;
 }

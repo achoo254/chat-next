@@ -230,7 +230,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 							</p>
 						}
 					>
-						<ExistingSessions machine={machine} name={name} link={link} ai={ai} home={state.info?.home ?? ""} folder={project?.dir} loadsByDefault={loadsProjectConfig(projects.find((p) => p.id === projectId) ?? project)} onClose={onClose} />
+						<ExistingSessions machine={machine} name={name} link={link} ai={ai} provider={provider} home={state.info?.home ?? ""} folder={project?.dir} loadsByDefault={loadsProjectConfig(projects.find((p) => p.id === projectId) ?? project)} onClose={onClose} />
 					</Suspense>
 				</div>
 			) : (

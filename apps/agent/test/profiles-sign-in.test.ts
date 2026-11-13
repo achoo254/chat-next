@@ -1,17 +1,17 @@
-// Claude profiles against a fake `claude` that prints its sign-in link and
+// Claude accounts against a fake `claude` that prints its sign-in link and
 // waits for a code: signing in from a device, a wrong code, an account that
 // is already there, one attempt at a time (also when two start together),
-// a cancel or expiry while a profile is being kept, expiry, a claude that
+// a cancel or expiry while an account is being kept, expiry, a claude that
 // shows no link, the terminal way, picking, usage limits, settings that
 // follow the machine, removal (refused when the sign-out fails), a damaged
-// profiles.json, and that no claude process outlives its attempt.
+// ai-accounts.json, and that no claude process outlives its attempt.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { claudeEnv, expiryMs } from "../src/profiles/account.ts";
-import { profileDir, profileHome } from "../src/profiles/paths.ts";
-import { ClaudeProfiles } from "../src/profiles/service.ts";
-import { extractSignInUrl, validCode } from "../src/profiles/sign-in.ts";
+import { claudeEnv, expiryMs } from "../src/providers/claude/accounts/account.ts";
+import { profileDir, profileHome, profilesRoot } from "../src/providers/claude/accounts/paths.ts";
+import { ClaudeProfiles } from "../src/providers/claude/accounts/service.ts";
+import { extractSignInUrl, validCode } from "../src/providers/claude/accounts/sign-in.ts";
 import { GOOD_CODE, LOGIN_EXPIRES, livePids, signInDefault } from "./support/fake-claude.ts";
 import { profilesFixture } from "./support/profiles-fixture.ts";
 
@@ -37,10 +37,10 @@ async function addProfile(profiles: ClaudeProfiles) {
   return profiles.submitCode(begun.attemptId, GOOD_CODE);
 }
 
-/** Every kept profile has its folder, signed in. */
+/** Every kept account has its folder, signed in. */
 function consistent(f: ReturnType<typeof profilesFixture>): void {
   for (const p of f.profiles.store.get().profiles) {
-    expect(existsSync(join(profileHome(f.configDir, p.id), "fake-auth.json")), `profile ${p.id} has its signed-in folder`).toBe(true);
+    expect(existsSync(join(profileHome(f.configDir, p.id), "fake-auth.json")), `account ${p.id} has its signed-in folder`).toBe(true);
   }
 }
 
@@ -65,16 +65,16 @@ describe("sign-in link", () => {
     expect(validCode("line\nbreak-123456")).toBe(false);
   });
 
-  it("runs a profile's claude on its own sign-in only, not on account variables of the service", () => {
+  it("runs an account's claude on its own sign-in only, not on account variables of the service", () => {
     const env = { ...process.env };
     process.env.ANTHROPIC_API_KEY = "sk-ant-api-x";
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "oat-x";
     process.env.ANTHROPIC_AUTH_TOKEN = "auth-x";
     try {
-      const forProfile = claudeEnv("/p/home");
-      expect(forProfile.CLAUDE_CONFIG_DIR).toBe("/p/home");
-      expect([forProfile.ANTHROPIC_API_KEY, forProfile.CLAUDE_CODE_OAUTH_TOKEN, forProfile.ANTHROPIC_AUTH_TOKEN]).toEqual([undefined, undefined, undefined]);
-      // The default profile runs as the machine set it up.
+      const forAccount = claudeEnv("/p/home");
+      expect(forAccount.CLAUDE_CONFIG_DIR).toBe("/p/home");
+      expect([forAccount.ANTHROPIC_API_KEY, forAccount.CLAUDE_CODE_OAUTH_TOKEN, forAccount.ANTHROPIC_AUTH_TOKEN]).toEqual([undefined, undefined, undefined]);
+      // The default account runs as the machine set it up.
       expect(claudeEnv(undefined).ANTHROPIC_API_KEY).toBe("sk-ant-api-x");
     } finally {
       for (const k of ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN"]) {
@@ -97,7 +97,7 @@ describe.skipIf(!posix)("signing in from a device", () => {
     expect(existsSync(join(profileDir(f.configDir, begun.attemptId), "attempt"))).toBe(false);
     const list = await f.profiles.list();
     expect(list.selectedId).toBe("");
-    expect(list.profiles.map((p) => [p.id === "" ? "default" : "added", p.email, p.signedIn])).toEqual([
+    expect(list.accounts.map((a) => [a.id === "" ? "default" : "added", a.email, a.status === "ok"])).toEqual([
       ["default", "owner@example.com", true],
       ["added", "second@example.com", true],
     ]);
@@ -114,10 +114,10 @@ describe.skipIf(!posix)("signing in from a device", () => {
     expect(existsSync(profileDir(f.configDir, begun.attemptId))).toBe(false);
     expect(livePids(f.pidDir)).toEqual([]);
     expect(await f.profiles.submitCode(begun.attemptId, GOOD_CODE)).toEqual({ ok: false, error: "expired" });
-    expect((await f.profiles.list()).profiles).toHaveLength(1);
+    expect((await f.profiles.list()).accounts).toHaveLength(1);
   });
 
-  it("refuses the account of the default profile, ignoring the e-mail's case, and signs the copy out", async () => {
+  it("refuses the account of the default one, ignoring the e-mail's case, and signs the copy out", async () => {
     const f = profilesFixture({ defaultEmail: "Owner@Example.com" });
     process.env.FAKE_CLAUDE_EMAIL = "owner@example.com";
     const begun = await f.profiles.beginRemote();
@@ -127,13 +127,13 @@ describe.skipIf(!posix)("signing in from a device", () => {
     expect(readFileSync(join(f.claudeHome, "fake-auth.json"), "utf8")).toContain("Owner@Example.com");
   });
 
-  it("refuses an account another profile has, but takes the same e-mail in another organization", async () => {
+  it("refuses an account another one has, but takes the same e-mail in another organization", async () => {
     const f = profilesFixture();
     expect((await addProfile(f.profiles)).ok).toBe(true);
     expect(await addProfile(f.profiles)).toEqual({ ok: false, error: "duplicate" });
     process.env.FAKE_CLAUDE_ORG = "org-2";
     expect((await addProfile(f.profiles)).ok).toBe(true);
-    expect((await f.profiles.list()).profiles).toHaveLength(3);
+    expect((await f.profiles.list()).accounts).toHaveLength(3);
   });
 
   it("runs one attempt at a time: a new one cancels the one before, its folder and its claude", async () => {
@@ -151,14 +151,13 @@ describe.skipIf(!posix)("signing in from a device", () => {
     const f = profilesFixture();
     const [a, b] = await Promise.all([f.profiles.beginRemote(), f.profiles.beginRemote()]);
     if (!a.ok || !b.ok) throw new Error("no link");
-    const folders = readdirSync(join(f.configDir, "claude-profiles")).filter((n) => n !== "profiles.json");
-    expect(folders).toEqual([b.attemptId]);
+    expect(readdirSync(profilesRoot(f.configDir))).toEqual([b.attemptId]);
     expect(livePids(f.pidDir)).toHaveLength(1);
     expect((await f.profiles.submitCode(b.attemptId, GOOD_CODE)).ok).toBe(true);
     expect(livePids(f.pidDir)).toEqual([]);
   });
 
-  it("never keeps a profile whose folder a cancel or the expiry removed while it was being kept", async () => {
+  it("never keeps an account whose folder a cancel or the expiry removed while it was being kept", async () => {
     const f = profilesFixture({ ttlMs: 1_500 });
     const begun = await f.profiles.beginRemote();
     if (!begun.ok) throw new Error(begun.error);
@@ -192,7 +191,7 @@ describe.skipIf(!posix)("signing in from a device", () => {
     const f = profilesFixture({ urlTimeoutMs: 500 });
     process.env.FAKE_CLAUDE_SILENT = "1";
     expect(await f.profiles.beginRemote()).toEqual({ ok: false, error: "sign-in-on-machine" });
-    expect(readdirSync(join(f.configDir, "claude-profiles")).filter((n) => n !== "profiles.json")).toEqual([]);
+    expect(readdirSync(profilesRoot(f.configDir))).toEqual([]);
     expect(livePids(f.pidDir)).toEqual([]);
   });
 
@@ -206,7 +205,7 @@ describe.skipIf(!posix)("signing in from a device", () => {
   });
 });
 
-describe.skipIf(!posix)("leftovers and a damaged profiles.json", () => {
+describe.skipIf(!posix)("leftovers and a damaged ai-accounts.json", () => {
   it("cleans only folders marked as an unfinished sign-in", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
@@ -220,30 +219,31 @@ describe.skipIf(!posix)("leftovers and a damaged profiles.json", () => {
     expect(existsSync(profileDir(f.configDir, added.id))).toBe(true);
   });
 
-  it("keeps the file and every profile when profiles.json is damaged, and says so", async () => {
+  it("keeps the file and every account when ai-accounts.json is damaged, and says so", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
     await f.profiles.select(added.id, "x");
-    const file = join(f.configDir, "claude-profiles", "profiles.json");
+    const file = join(f.configDir, "ai-accounts", "ai-accounts.json");
     const damaged = readFileSync(file, "utf8").replace(/"createdAt": \d+/, '"createdAt": "soon"');
     writeFileSync(file, damaged);
     const again = new ClaudeProfiles({ configDir: f.configDir, audit: f.audit, claudeHome: f.claudeHome, findBinary: async () => f.bin, probeUsage: async () => null });
     expect(again.store.damaged).toMatch(/damaged/);
     await again.cleanLeftovers();
     expect(readFileSync(file, "utf8")).toBe(damaged);
-    expect(readdirSync(join(f.configDir, "claude-profiles")).some((n) => n.startsWith("profiles.json.corrupt-"))).toBe(true);
+    expect(readdirSync(join(f.configDir, "ai-accounts")).some((n) => n.startsWith("ai-accounts.json.corrupt-"))).toBe(true);
     // Not signed out, not deleted.
     expect(existsSync(join(profileHome(f.configDir, added.id), "fake-auth.json"))).toBe(true);
-    await expect(again.list()).rejects.toThrow(/damaged/);
-    await expect(again.select("", "x")).rejects.toThrow(/damaged/);
-    await expect(again.beginRemote()).rejects.toThrow(/damaged/);
-    await expect(again.remove(added.id, "x")).rejects.toThrow(/damaged/);
-    expect(() => again.sessionProfile()).toThrow(/damaged/);
+    // Every change is refused with the "damaged" kind, so nothing runs on another account.
+    await expect(again.list()).rejects.toMatchObject({ kind: "damaged" });
+    await expect(again.select("", "x")).rejects.toMatchObject({ kind: "damaged" });
+    await expect(again.beginRemote()).rejects.toMatchObject({ kind: "damaged" });
+    await expect(again.remove(added.id, "x")).rejects.toMatchObject({ kind: "damaged" });
+    expect(() => again.sessionAccount()).toThrow(/damaged/);
   });
 });
 
-describe.skipIf(!posix)("profiles on the machine", () => {
+describe.skipIf(!posix)("accounts on the machine", () => {
   it("adds through the terminal way: a prepared folder, then a check of the account", async () => {
     const f = profilesFixture();
     const { id, home } = await f.profiles.prepareTerminal();
@@ -254,21 +254,21 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect(await f.profiles.finishTerminal(again.id)).toMatchObject({ ok: true, email: "terminal@example.com" });
   });
 
-  it("picks a profile for new sessions, logs it, and gives sessions its folder", async () => {
+  it("picks an account for new sessions, logs it, and gives sessions its folder", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
-    expect(f.profiles.sessionProfile()).toEqual({ id: "" });
+    expect(f.profiles.sessionAccount()).toEqual({ id: "" });
     await f.profiles.select(added.id, "phone (abcd1234)");
-    expect(f.profiles.sessionProfile()).toEqual({ id: added.id, accountDir: profileHome(f.configDir, added.id) });
-    expect(f.profiles.selectedAccountDir()).toBe(profileHome(f.configDir, added.id));
+    expect(f.profiles.sessionAccount()).toEqual({ id: added.id, scope: { id: added.id, dir: profileHome(f.configDir, added.id) } });
+    expect(f.profiles.selectedScope()).toEqual({ id: added.id, dir: profileHome(f.configDir, added.id) });
     expect(f.audit.list()[0]).toMatchObject({ device: "phone (abcd1234)", action: "profile_select", detail: "second@example.com" });
     await expect(f.profiles.select("nope", "x")).rejects.toThrow(/no such profile/);
     await f.profiles.select("", "x");
-    expect(f.profiles.sessionProfile()).toEqual({ id: "" });
+    expect(f.profiles.sessionAccount()).toEqual({ id: "" });
   });
 
-  it("brings the machine's settings to the profile at every session start", async () => {
+  it("brings the machine's settings to the account at every session start", async () => {
     const f = profilesFixture();
     writeFileSync(join(f.claudeHome, "settings.json"), JSON.stringify({ permissions: { defaultMode: "bypassPermissions" } }));
     const added = await addProfile(f.profiles);
@@ -278,15 +278,15 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect(JSON.parse(readFileSync(own, "utf8"))).toEqual({ permissions: { defaultMode: "bypassPermissions" } });
     const safer = { permissions: { deny: ["Bash(rm:*)"] }, hooks: { PreToolUse: [] } };
     writeFileSync(join(f.claudeHome, "settings.json"), JSON.stringify(safer));
-    f.profiles.sessionProfile();
+    f.profiles.sessionAccount();
     expect(JSON.parse(readFileSync(own, "utf8"))).toEqual(safer);
-    // The machine dropped its settings: the profile keeps none either.
+    // The machine dropped its settings: the account keeps none either.
     writeFileSync(join(f.claudeHome, "settings.json"), "{}");
-    f.profiles.sessionProfile();
+    f.profiles.sessionAccount();
     expect(readFileSync(own, "utf8")).toBe("{}");
   });
 
-  it("reads usage at most once per interval and once at a time per profile", async () => {
+  it("reads usage at most once per interval and once at a time per account", async () => {
     let calls = 0;
     let release: () => void = () => undefined;
     const f = profilesFixture({
@@ -304,10 +304,10 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     await f.profiles.refreshUsage("");
     expect(calls).toBe(1);
     const list = await f.profiles.list();
-    expect(list.profiles[0]?.lastUsage?.fiveHour?.utilization).toBe(12);
+    expect(list.accounts[0]?.usage?.fiveHour?.utilization).toBe(12);
   });
 
-  it("refreshes usage per profile and keeps it with the time", async () => {
+  it("refreshes usage per account and keeps it with the time", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
@@ -315,13 +315,13 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     await f.profiles.refreshUsage("");
     expect(f.probed).toEqual([profileHome(f.configDir, added.id), undefined]);
     expect(f.pushed.map(([id]) => id)).toEqual([added.id, ""]);
-    for (const p of (await f.profiles.list()).profiles) {
-      expect(p.lastUsage?.fiveHour?.utilization).toBe(12);
-      expect(p.lastUsage?.updatedAt).toBeGreaterThan(0);
+    for (const a of (await f.profiles.list()).accounts) {
+      expect(a.usage?.fiveHour?.utilization).toBe(12);
+      expect(a.usage?.updatedAt).toBeGreaterThan(0);
     }
   });
 
-  it("removes a profile: signed out, folder gone, the shared folder intact, selection back to default", async () => {
+  it("removes an account: signed out, folder gone, the shared folder intact, selection back to default", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
@@ -339,26 +339,26 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect(f.audit.list()[0]).toMatchObject({ action: "profile_remove", detail: "second@example.com" });
   });
 
-  it("tells from claude whether an added profile is still signed in, checked again once the last check is old", async () => {
+  it("tells from claude whether an added account is still signed in, checked again once the last check is old", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);
-    const view = async () => (await f.profiles.list()).profiles.find((p) => p.id === added.id);
-    expect(await view()).toMatchObject({ signedIn: true, loginExpiresAt: Date.parse(LOGIN_EXPIRES) });
+    const view = async () => (await f.profiles.list()).accounts.find((a) => a.id === added.id);
+    expect(await view()).toMatchObject({ status: "ok", loginExpiresAt: Date.parse(LOGIN_EXPIRES) });
     // Signed out behind tunelo's back: the recent check still stands…
     const auth = join(profileHome(f.configDir, added.id), "fake-auth.json");
     const kept = readFileSync(auth, "utf8");
     rmSync(auth);
-    expect((await view())?.signedIn).toBe(true);
+    expect((await view())?.status).toBe("ok");
     // …until a refresh asks claude again.
     await f.profiles.refreshUsage(added.id);
-    expect(await view()).toMatchObject({ signedIn: false, email: "second@example.com" });
+    expect(await view()).toMatchObject({ status: "needs-sign-in", email: "second@example.com" });
     // Signed in again but past its expiry: it needs to sign in again too.
     writeFileSync(auth, kept.replace(LOGIN_EXPIRES, "2020-01-01T00:00:00.000Z"));
     const fresh = new ClaudeProfiles({ configDir: f.configDir, audit: f.audit, claudeHome: f.claudeHome, findBinary: async () => f.bin, probeUsage: async () => null, signInCheckMs: 0 });
-    expect((await fresh.list()).profiles.find((p) => p.id === added.id)).toMatchObject({ signedIn: false, loginExpiresAt: Date.parse("2020-01-01T00:00:00.000Z") });
+    expect((await fresh.list()).accounts.find((a) => a.id === added.id)).toMatchObject({ status: "needs-sign-in", loginExpiresAt: Date.parse("2020-01-01T00:00:00.000Z") });
     writeFileSync(auth, kept);
-    expect((await fresh.list()).profiles.find((p) => p.id === added.id)?.signedIn).toBe(true);
+    expect((await fresh.list()).accounts.find((a) => a.id === added.id)?.status).toBe("ok");
   });
 
   it("reads claude's sign-in expiry as text, seconds or milliseconds", () => {
@@ -368,7 +368,7 @@ describe.skipIf(!posix)("profiles on the machine", () => {
     expect([expiryMs(null), expiryMs(undefined), expiryMs(""), expiryMs("soon")]).toEqual([0, 0, 0, 0]);
   });
 
-  it("refuses to remove a profile claude cannot sign out, unless forced", async () => {
+  it("refuses to remove an account claude cannot sign out, unless forced", async () => {
     const f = profilesFixture();
     const added = await addProfile(f.profiles);
     if (!added.ok) throw new Error(added.error);

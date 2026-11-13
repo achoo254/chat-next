@@ -54,7 +54,6 @@ function localEntry(local: LocalMachine, name: string, listed: MachineEntry | un
 		os: listed?.os ?? "",
 		arch: listed?.arch ?? "",
 		agentVersion: listed?.agentVersion ?? "",
-		claudeVersion: listed?.claudeVersion ?? "",
 		tunnelUrl: `ws://127.0.0.1:${local.port}`,
 		createdAt: 0,
 		lastSeenAt: 0,

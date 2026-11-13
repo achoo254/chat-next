@@ -149,10 +149,16 @@ export function unregisterMachine(secret: string) {
   return call<Record<string, never>>("UnregisterMachine", {}, secret);
 }
 
-export function notifyNeedsInput(secret: string, body: { kind: "approval" | "question"; pendingCount: number; sessionId: string }) {
+/** `providerId`: the waiting thread's AI, so the push names it (the server words it from its own list). */
+export function notifyNeedsInput(secret: string, body: { kind: "approval" | "question"; pendingCount: number; sessionId: string; providerId: string }) {
   return call<Record<string, never>>(
     "NotifyNeedsInput",
-    { kind: body.kind === "question" ? "NEEDS_INPUT_KIND_QUESTION" : "NEEDS_INPUT_KIND_APPROVAL", pendingCount: Math.min(1000, Math.max(1, body.pendingCount)), sessionId: body.sessionId },
+    {
+      kind: body.kind === "question" ? "NEEDS_INPUT_KIND_QUESTION" : "NEEDS_INPUT_KIND_APPROVAL",
+      pendingCount: Math.min(1000, Math.max(1, body.pendingCount)),
+      sessionId: body.sessionId,
+      providerId: body.providerId,
+    },
     secret,
   );
 }

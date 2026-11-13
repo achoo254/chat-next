@@ -85,7 +85,9 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
   let closeTunnel: () => void = () => undefined;
 
   m.setNotify((thread, pending) => {
-    notifyNeedsInput(secret(), { kind: "approval", pendingCount: pending, sessionId: thread.id }).catch((e: Error) => log(`push failed: ${e.message}`));
+    notifyNeedsInput(secret(), { kind: "approval", pendingCount: pending, sessionId: thread.id, providerId: thread.provider }).catch((e: Error) =>
+      log(`push failed: ${e.message}`),
+    );
   });
   // A chat server without usage hint pushes refuses the kind: not asked again until tunelo restarts.
   let usagePushRefused = false;

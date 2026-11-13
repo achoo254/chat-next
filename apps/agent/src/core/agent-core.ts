@@ -38,6 +38,9 @@ import type {
   HistoryEntry,
   ImageInput,
   LocalSession,
+  AccountScopeRef,
+  AccountSuggestion,
+  DetectOptions,
   ProviderEvent,
   ProviderInfo,
   ProviderSession,
@@ -99,14 +102,14 @@ type ThreadMeta = {
   permissionMode?: string;
   /** The mode the machine's own settings started the last session in. */
   machineMode?: string;
-  /** The AI account profile the last session opened with; unset for the default one. */
-  profileId?: string;
+  /** The account of the thread's AI the last session opened with; unset for the AI's own sign-in. */
+  accountId?: string;
   /** Last statusline data, kept so a parked or restarted thread still shows it. */
   info?: Omit<ProviderInfo, "rateLimits" | "account">;
   /**
    * Allow rules the user gave "for the session" on this thread (the AI's own
-   * rule syntax), handed back whenever its session opens again: after a
-   * profile switch, parking or a restart of the service. Cleared when the
+   * rule syntax), handed back whenever its session opens again: after an
+   * account switch, parking or a restart of the service. Cleared when the
    * thread moves to another AI.
    */
   sessionRules?: string[];
@@ -157,7 +160,7 @@ const HISTORY_OUTPUT_MAX = 64 * 1024;
 /** At most this many session allow rules per thread; the oldest go first. */
 const SESSION_RULES_MAX = 200;
 
-/** Last statusline data of one AI account profile. */
+/** Last statusline data of one account of an AI. */
 type AccountState = { rateLimits?: ProviderInfo["rateLimits"]; account?: ProviderInfo["account"] };
 
 type Pending = {
@@ -190,12 +193,12 @@ type Thread = {
   clientMsgIds: Set<string>;
   /** The open session has not reported its permission mode yet. */
   modeUnseen: boolean;
-  /** The idle session is closing to open again on the machine's profile. */
+  /** The idle session is closing to open again on the machine's account of its AI. */
   switching?: Promise<void>;
   /** This turn already reported running out of usage. */
   limitSeen: boolean;
-  /** Another profile with room, offered after this session's profile ran out. */
-  suggestion?: ProfileSuggestion;
+  /** Another account of the same AI with room, offered after this session's account ran out. */
+  suggestion?: AccountSuggestion;
   /** One line of the last user or AI text (ThreadSummary.preview). */
   preview: string;
   /** The tool call running now, for "Running: <tool>". */
@@ -243,11 +246,11 @@ const OWN_WRITE_SLACK_MS = 5_000;
 /** How long a thread's git changes are reused before git runs again. */
 const GIT_CHANGES_TTL_MS = 2_000;
 
-/** Another AI account profile with usage left (see ThreadInfo.profile_suggestion). */
-export type ProfileSuggestion = { id: string; email: string; remaining: number };
+/** Where one thread stands against the machine's account of its AI (see MachineAccounts.sessions). */
+export type SessionAccountState = { threadId: string; provider: string; accountId: string; switchPending: boolean };
 
-/** Where one thread stands against the machine's profile (see MachineProfile.sessions). */
-export type SessionProfileState = { threadId: string; profileId: string; switchPending: boolean };
+/** One account of one AI, as a map key. */
+const accountKey = (provider: string, id: string): string => `${provider}\n${id}`;
 
 export type CoreOptions = {
   dataDir: string;
@@ -263,26 +266,30 @@ export type CoreOptions = {
   idleMs?: number;
   /** Called when a thread starts waiting for the user. */
   onNeedsInput?: (thread: ThreadSummary) => void;
-  /** The AI account profile a new session opens with; the default one when unset. Throws when it cannot tell. */
-  profile?: () => { id: string; accountDir?: string };
-  /** The account folder of the selected profile, only looked up (for checking its sign-in). */
-  selectedAccountDir?: () => string | undefined;
   /**
-   * The machine's profile ("" for the default one), only looked up; undefined
-   * when it cannot be told. Every session follows it: unset, sessions keep
-   * the profile they opened with.
+   * The account of an AI a new session opens with, made ready for it; the
+   * AI's own sign-in ({ id: "" }) when unset or the AI keeps no accounts.
+   * Throws when it cannot tell.
    */
-  selectedProfileId?: () => string | undefined;
-  /** Who a profile is signed in as, from what the machine keeps. */
-  profileAccount?: (profileId: string) => ProviderInfo["account"] | undefined;
-  /** Another profile with room, for a session whose profile ran out of usage. */
-  suggestProfile?: (exhaustedId: string) => Promise<ProfileSuggestion | undefined>;
-  /** A session finished moving to the machine's profile. */
-  onSessionProfile?: (threadId: string) => void;
+  sessionAccount?: (provider: string) => { id: string; scope?: AccountScopeRef };
+  /** The picked account of an AI, only looked up (for checking its sign-in). Throws when it cannot tell. */
+  selectedScope?: (provider: string) => AccountScopeRef | undefined;
+  /**
+   * The machine's account of an AI ("" for its own sign-in), only looked up;
+   * undefined when it cannot be told or the AI keeps none. Every session of
+   * that AI follows it.
+   */
+  selectedAccountId?: (provider: string) => string | undefined;
+  /** Who an account of an AI is signed in as, from what the machine keeps. */
+  accountInfo?: (provider: string, id: string) => ProviderInfo["account"] | undefined;
+  /** Another account of the same AI with room, for a session whose account ran out of usage. */
+  suggestAccount?: (provider: string, exhaustedId: string) => Promise<AccountSuggestion | undefined>;
+  /** A session finished moving to the machine's account of its AI. */
+  onSessionAccount?: (threadId: string) => void;
   /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
-  /** A session reported plan usage for its profile ("" for the default one). */
-  onProfileUsage?: (profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
+  /** A session reported plan usage for its account ("" for the AI's own sign-in). */
+  onAccountUsage?: (provider: string, id: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   /** A session this machine opened (chat, resume, terminal) has this id of its AI; may come more than once. */
   onSessionId?: (provider: string, sessionId: string) => void;
   /** Smaller limits for files sent with a message (tests); ATTACHMENT_LIMITS otherwise. */
@@ -322,10 +329,10 @@ export class AgentCore {
   private pendingTerminalSession = new Map<string, string>();
   /** The latest git changes of each thread's folder (or the read under way), reused for GIT_CHANGES_TTL_MS. */
   private gitReads = new Map<string, { at: number; read: Promise<GitChangesResult> }>();
-  /** Plan usage and account of each AI account profile ("" for the default one), shared by its threads. */
+  /** Plan usage and account of each account of each AI (accountKey; "" for the AI's own sign-in), shared by its threads. */
   private accounts = new Map<string, AccountState>();
-  /** The latest command list any session reported, for threads that have none yet. */
-  private lastCommands: NonNullable<ProviderInfo["commands"]> = [];
+  /** The latest command list any session of each AI reported, for that AI's threads that have none yet. */
+  private lastCommands = new Map<string, NonNullable<ProviderInfo["commands"]>>();
   /** Commands a session in a folder would offer, learned without a session (listCommands), by commandsKey. */
   private readonly folderCommands = new Map<string, { at: number; list: NonNullable<ProviderInfo["commands"]> }>();
   private readonly learning = new Set<string>();
@@ -360,11 +367,8 @@ export class AgentCore {
   private bumpEpoch(): bigint {
     let state: {
       epoch?: number;
-      /** Before profiles: the one account of the machine. */
-      rateLimits?: ProviderInfo["rateLimits"];
-      account?: ProviderInfo["account"];
       accounts?: Record<string, AccountState>;
-      commands?: ProviderInfo["commands"];
+      commands?: Record<string, NonNullable<ProviderInfo["commands"]>>;
     } = {};
     try {
       state = JSON.parse(readFileSync(this.stateFile, "utf8")) as typeof state;
@@ -372,17 +376,16 @@ export class AgentCore {
       // first start
     }
     const epoch = (state.epoch ?? 0) + 1;
-    this.accounts = new Map(Object.entries(state.accounts ?? {}));
-    if (!state.accounts && (state.rateLimits || state.account)) {
-      this.accounts.set("", { ...(state.rateLimits ? { rateLimits: state.rateLimits } : {}), ...(state.account ? { account: state.account } : {}) });
-    }
-    this.lastCommands = state.commands ?? [];
-    writeFileSync(this.stateFile, JSON.stringify({ epoch, accounts: Object.fromEntries(this.accounts), commands: this.lastCommands }), { mode: 0o600 });
+    // Kept by AI (accountKey); a state.json of an older tunelo keeps its epoch only.
+    const byAi = (r: unknown): r is Record<string, unknown> => typeof r === "object" && r !== null && !Array.isArray(r);
+    this.accounts = new Map(Object.entries(byAi(state.accounts) ? state.accounts : {}).filter(([k]) => k.includes("\n")));
+    this.lastCommands = new Map(byAi(state.commands) ? Object.entries(state.commands).filter(([, v]) => Array.isArray(v)) : []);
+    writeFileSync(this.stateFile, JSON.stringify({ epoch, accounts: Object.fromEntries(this.accounts), commands: Object.fromEntries(this.lastCommands) }), { mode: 0o600 });
     return BigInt(epoch);
   }
 
   private saveState(): void {
-    const state = { epoch: Number(this.epoch), accounts: Object.fromEntries(this.accounts), commands: this.lastCommands };
+    const state = { epoch: Number(this.epoch), accounts: Object.fromEntries(this.accounts), commands: Object.fromEntries(this.lastCommands) };
     writeFileSync(this.stateFile, JSON.stringify(state), { mode: 0o600 });
   }
 
@@ -445,7 +448,7 @@ export class AgentCore {
     for (const t of this.threads.values()) this.endActivity(t);
     // Prompts waiting for the user expire with the service; its next start asks the questions again.
     for (const t of this.threads.values()) this.expirePending(t);
-    // A session moving to another profile opens first, then closes with the rest.
+    // A session moving to another account opens first, then closes with the rest.
     await Promise.all([...this.threads.values()].map((t) => t.switching));
     await Promise.all([...this.threads.values()].map((t) => this.park(t)));
   }
@@ -502,21 +505,22 @@ export class AgentCore {
    * commands any session reported meanwhile.
    */
   private commandsFor(t: Thread): NonNullable<ProviderInfo["commands"]> {
+    const last = this.lastCommands.get(t.meta.provider) ?? [];
     const provider = this.opts.providers.find((p) => p.id === t.meta.provider);
-    if (!provider?.listCommands) return this.lastCommands;
-    let accountDir: string | undefined;
+    if (!provider?.listCommands) return last;
+    let account: AccountScopeRef | undefined;
     try {
-      accountDir = this.opts.profile?.()?.accountDir;
+      account = this.opts.selectedScope?.(provider.id);
     } catch {
-      return this.lastCommands; // the profiles cannot be read: the session says so when it opens
+      return last; // the accounts cannot be read: the session says so when it opens
     }
     const projectSettings = this.loadsProject(t);
-    const key = [provider.id, t.meta.dir, projectSettings ? "project" : "user", accountDir ?? ""].join("\n");
+    const key = [provider.id, t.meta.dir, projectSettings ? "project" : "user", account?.dir ?? ""].join("\n");
     const known = this.folderCommands.get(key);
     if ((!known || Date.now() - known.at > FOLDER_COMMANDS_MS) && !this.learning.has(key)) {
       this.learning.add(key);
       provider
-        .listCommands({ dir: t.meta.dir, projectSettings, ...(accountDir ? { accountDir } : {}) })
+        .listCommands({ dir: t.meta.dir, projectSettings, ...(account ? { account } : {}) })
         .then(
           (list) => {
             if (list.length === 0) return;
@@ -527,17 +531,18 @@ export class AgentCore {
         )
         .finally(() => this.learning.delete(key));
     }
-    return known?.list ?? this.lastCommands;
+    return known?.list ?? last;
   }
 
   /** The statusline data of a thread, for devices. */
   info(threadId: string): ThreadInfo {
     const t = this.thread(threadId);
-    const machineProfileId = this.machineProfile();
-    const profileId = this.profileOf(t, machineProfileId);
-    const switchPending = this.switchPending(t, machineProfileId);
-    const nextAccount = switchPending && machineProfileId !== undefined ? this.accountOf(machineProfileId) : undefined;
-    const { rateLimits: r, account } = this.accounts.get(profileId) ?? {};
+    const ai = t.meta.provider;
+    const machineAccountId = this.machineAccount(ai);
+    const accountId = this.accountOf(t, machineAccountId);
+    const switchPending = this.switchPending(t, machineAccountId);
+    const nextAccount = switchPending && machineAccountId !== undefined ? this.signedInAs(ai, machineAccountId) : undefined;
+    const { rateLimits: r, account } = this.accounts.get(accountKey(ai, accountId)) ?? {};
     const win = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
     const fiveHour = win(r?.fiveHour);
     const sevenDay = win(r?.sevenDay);
@@ -550,11 +555,11 @@ export class AgentCore {
       commands: t.info.commands?.length ? t.info.commands : this.commandsFor(t),
       effort: t.info.effort ?? "",
       permissionModes: this.permissionModes(t),
-      profileId,
-      machineProfileId: machineProfileId ?? "",
-      profileSwitchPending: switchPending,
+      accountId,
+      machineAccountId: machineAccountId ?? "",
+      accountSwitchPending: switchPending,
       ...(nextAccount ? { nextAccount } : {}),
-      ...(t.suggestion ? { profileSuggestion: { profileId: t.suggestion.id, email: t.suggestion.email, remaining: t.suggestion.remaining } } : {}),
+      ...(t.suggestion ? { accountSuggestion: { provider: ai, accountId: t.suggestion.id, email: t.suggestion.email, remaining: t.suggestion.remaining } } : {}),
       ...(account ? { account } : {}),
       ...(r ? { rateLimits: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),
     });
@@ -699,17 +704,24 @@ export class AgentCore {
     return out;
   }
 
-  /** True when an open session runs with this AI account profile. */
-  profileInUse(profileId: string): boolean {
-    return [...this.threads.values()].some((t) => (t.session || t.starting || t.switching) && (t.meta.profileId ?? "") === profileId);
+  /** True when an open session of `provider` runs with this account. */
+  accountInUse(provider: string, id: string): boolean {
+    return [...this.threads.values()].some((t) => this.isOpen(t) && t.meta.provider === provider && (t.meta.accountId ?? "") === id);
   }
 
-  // --- the machine's profile -----------------------------------------------
+  /** Open sessions of `provider` and whether each runs a turn now (an AI whose shared sign-in changes for all of them). */
+  openSessionsOf(provider: string): { threadId: string; title: string; busy: boolean }[] {
+    return [...this.threads.values()]
+      .filter((t) => this.isOpen(t) && t.meta.provider === provider)
+      .map((t) => ({ threadId: t.meta.id, title: t.meta.title, busy: t.running || t.pending.size > 0 || Boolean(t.starting) || Boolean(t.switching) }));
+  }
 
-  /** The machine's profile; undefined when unknown (or sessions do not follow one). */
-  private machineProfile(): string | undefined {
+  // --- the machine's account of each AI ------------------------------------------
+
+  /** The machine's account of an AI; undefined when unknown (or its sessions do not follow one). */
+  private machineAccount(provider: string): string | undefined {
     try {
-      return this.opts.selectedProfileId?.();
+      return this.opts.selectedAccountId?.(provider);
     } catch {
       return undefined;
     }
@@ -719,36 +731,31 @@ export class AgentCore {
     return Boolean(t.session || t.starting || t.switching);
   }
 
-  /** The profile a thread runs with; a parked one opens with the machine's next. */
-  private profileOf(t: Thread, machineProfileId = this.machineProfile()): string {
-    if (!this.isOpen(t) && machineProfileId !== undefined) return machineProfileId;
-    return t.meta.profileId ?? "";
+  /** The account a thread runs with; a parked one opens with the machine's next. */
+  private accountOf(t: Thread, machineAccountId = this.machineAccount(t.meta.provider)): string {
+    if (!this.isOpen(t) && machineAccountId !== undefined) return machineAccountId;
+    return t.meta.accountId ?? "";
   }
 
-  /** An open session on another profile than the machine's: it moves when it can. */
-  private switchPending(t: Thread, machineProfileId = this.machineProfile()): boolean {
-    return machineProfileId !== undefined && this.isOpen(t) && (t.meta.profileId ?? "") !== machineProfileId;
+  /** An open session on another account than the machine's of its AI: it moves when it can. */
+  private switchPending(t: Thread, machineAccountId = this.machineAccount(t.meta.provider)): boolean {
+    return machineAccountId !== undefined && this.isOpen(t) && (t.meta.accountId ?? "") !== machineAccountId;
   }
 
-  private accountOf(profileId: string): ProviderInfo["account"] | undefined {
-    return this.accounts.get(profileId)?.account ?? this.opts.profileAccount?.(profileId);
+  private signedInAs(provider: string, id: string): ProviderInfo["account"] | undefined {
+    return this.accounts.get(accountKey(provider, id))?.account ?? this.opts.accountInfo?.(provider, id);
   }
 
-  /** Every thread and the profile it runs with, for devices. */
-  profileStates(): SessionProfileState[] {
-    const machineProfileId = this.machineProfile();
+  /** Every thread and the account it runs with, for devices. */
+  accountStates(): SessionAccountState[] {
     return [...this.threads.values()].map((t) => ({
       threadId: t.meta.id,
-      profileId: this.profileOf(t, machineProfileId),
-      switchPending: this.switchPending(t, machineProfileId),
+      provider: t.meta.provider,
+      accountId: this.accountOf(t),
+      switchPending: this.switchPending(t),
     }));
   }
 
-  /**
-   * The machine's profile changed: idle sessions restart on it now (resumed,
-   * same conversation), busy ones when their turn ends, parked ones open with
-   * it. Devices hear about every thread.
-   */
   /**
    * How many prompts outside the transcript (sign-in secrets) a thread waits
    * on: it shows as waiting while there are any, and a new one may push.
@@ -763,27 +770,33 @@ export class AgentCore {
     if (count !== before) this.markActivity(t);
   }
 
-  followMachineProfile(): void {
-    const machineProfileId = this.machineProfile();
+  /**
+   * The machine's account of `provider` changed: that AI's idle sessions
+   * restart on it now (resumed, same conversation), busy ones when their turn
+   * ends, parked ones open with it. Sessions of other AIs are not touched.
+   */
+  followMachineAccount(provider: string): void {
+    const machineAccountId = this.machineAccount(provider);
     for (const t of this.threads.values()) {
-      if (t.suggestion && t.suggestion.id === machineProfileId) delete t.suggestion;
+      if (t.meta.provider !== provider) continue;
+      if (t.suggestion && t.suggestion.id === machineAccountId) delete t.suggestion;
       void this.follow(t);
       for (const fn of this.infoListeners) fn(t.meta.id);
     }
   }
 
   /**
-   * Moves an open, idle session to the machine's profile: closes it and opens
-   * it again resumed (same session id, model, effort, permission mode, folder;
-   * a new MCP ticket). Without room or a session id to resume it stays
-   * parked and opens on the machine's profile next time. Never touches a
+   * Moves an open, idle session to the machine's account of its AI: closes
+   * it and opens it again resumed (same session id, model, effort, permission
+   * mode, folder; a new MCP ticket). Without room or a session id to resume
+   * it stays parked and opens on that account next time. Never touches a
    * session in the middle of a turn or waiting for an answer.
    */
   private async follow(t: Thread): Promise<void> {
-    const target = this.machineProfile();
+    const target = this.machineAccount(t.meta.provider);
     const s = t.session;
     if (target === undefined || !s || t.switching || t.starting || t.running || t.pending.size > 0) return;
-    if ((t.meta.profileId ?? "") === target) return;
+    if ((t.meta.accountId ?? "") === target) return;
     t.switching = (async () => {
       delete t.session;
       await s.close();
@@ -803,23 +816,23 @@ export class AgentCore {
     delete t.suggestion;
     this.touch(t);
     for (const fn of this.infoListeners) fn(t.meta.id);
-    this.opts.onSessionProfile?.(t.meta.id);
+    this.opts.onSessionAccount?.(t.meta.id);
     if (!t.session) void this.dequeue();
     // The machine may have switched again meanwhile.
     void this.follow(t);
   }
 
-  /** Usage read outside a session (a refresh): shown on the profile's threads. */
-  setProfileUsage(profileId: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>): void {
-    this.accounts.set(profileId, { ...this.accounts.get(profileId), rateLimits });
+  /** Usage read outside a session (a refresh): shown on the threads of that account. */
+  setAccountUsage(provider: string, id: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>): void {
+    const key = accountKey(provider, id);
+    this.accounts.set(key, { ...this.accounts.get(key), rateLimits });
     this.saveState();
-    this.notifyProfile(profileId);
+    this.notifyAccount(provider, id);
   }
 
-  private notifyProfile(profileId: string): void {
-    const machineProfileId = this.machineProfile();
+  private notifyAccount(provider: string, id: string): void {
     for (const t of this.threads.values()) {
-      if (this.profileOf(t, machineProfileId) !== profileId) continue;
+      if (t.meta.provider !== provider || this.accountOf(t) !== id) continue;
       for (const fn of this.infoListeners) fn(t.meta.id);
     }
   }
@@ -953,7 +966,7 @@ export class AgentCore {
   private async admit(provider: AgentProvider, dir: string, consent: ConsentGiven, device: string): Promise<void> {
     const sensitive = this.opts.isSensitive(dir);
     if (sensitive && !consent.sensitive) throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder", { reason: ErrorReason.SENSITIVE_FOLDER, subject: dir });
-    const detected = await provider.detect(this.detectOptions());
+    const detected = await provider.detect(this.detectOptions(provider));
     this.assertReady(provider, detected);
 
     const trusted = (this.opts.isTrusted?.(dir) ?? false) || this.projectConfigs.level(dir) === "full";
@@ -1515,7 +1528,7 @@ export class AgentCore {
     const t = this.thread(threadId);
     const target = this.namedProvider(providerId);
     if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI", { reason: ErrorReason.SAME_AI });
-    this.assertReady(target, await target.detect(this.detectOptions()));
+    this.assertReady(target, await target.detect(this.detectOptions(target)));
     if (t.running) await this.interrupt(threadId);
     this.cancelPending(t);
     await this.park(t);
@@ -1554,20 +1567,20 @@ export class AgentCore {
     }
   }
 
-  /** The sign-in to check before a new session: that of the selected profile. */
-  private detectOptions(): { accountDir?: string } {
-    let dir: string | undefined;
+  /** The sign-in to check before a new session: that of the AI's picked account. */
+  private detectOptions(provider: AgentProvider): DetectOptions {
+    let account: AccountScopeRef | undefined;
     try {
-      dir = this.opts.selectedAccountDir?.();
+      account = this.opts.selectedScope?.(provider.id);
     } catch (err) {
       const why = (err as Error).message;
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, why, { reason: ErrorReason.ACCOUNT_UNUSABLE, subject: why.slice(0, 300) });
     }
-    return dir ? { accountDir: dir } : {};
+    return account ? { account } : {};
   }
 
   private async ensureSession(t: Thread): Promise<void> {
-    // Moving to the machine's profile: the message goes to the session it opens.
+    // Moving to the machine's account: the message goes to the session it opens.
     if (t.switching) await t.switching;
     if (t.session) return this.flushOutbox(t);
     if (t.starting) return;
@@ -1586,25 +1599,25 @@ export class AgentCore {
     await this.openSession(t);
   }
 
-  /** Opens the thread's session (resumed when it had one) on the machine's profile and sends what waits. */
+  /** Opens the thread's session (resumed when it had one) on the machine's account of its AI and sends what waits. */
   private async openSession(t: Thread): Promise<void> {
     const provider = this.provider(t.meta.provider);
     const seg = t.meta.segments.at(-1);
     const askUser = ((req: ApprovalRequest | QuestionRequest, signal: AbortSignal) => this.ask(t, req, signal)) as AskUser;
-    // A session opens on the machine's profile now; an open one moves to it when idle.
+    // A session opens on the machine's account of its AI now; an open one moves to it when idle.
     // When the selection cannot be read, the turn fails: never another account quietly.
-    let profile: { id: string; accountDir?: string };
+    let account: { id: string; scope?: AccountScopeRef };
     try {
-      profile = this.opts.profile?.() ?? { id: "" };
+      account = this.opts.sessionAccount?.(provider.id) ?? { id: "" };
     } catch (err) {
       const why = (err as Error).message;
       const message = `the ${provider.name} account picked on this machine cannot be used: ${why}`.slice(0, 500);
       this.put(t, `error:${randomUUID()}`, { case: "error", value: { message } });
       this.endTurn(t, TurnState.FAILED, 0);
-      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message, { reason: ErrorReason.PROFILE_UNUSABLE, subject: why.slice(0, 300) });
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, message, { reason: ErrorReason.ACCOUNT_UNUSABLE, subject: why.slice(0, 300) });
     }
-    if (profile.id) t.meta.profileId = profile.id;
-    else delete t.meta.profileId;
+    if (account.id) t.meta.accountId = account.id;
+    else delete t.meta.accountId;
     const policy = {
       dir: t.meta.dir,
       mcpServers: this.opts.mcpServers ?? {},
@@ -1614,7 +1627,7 @@ export class AgentCore {
       ...(t.meta.effort ? { effort: t.meta.effort } : {}),
       ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
       ...(this.machineBypasses(t) ? { allowBypass: true } : {}),
-      ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
+      ...(account.scope ? { account: account.scope } : {}),
       ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
     };
     // Its ticket lives as long as this session.
@@ -1634,7 +1647,7 @@ export class AgentCore {
     } finally {
       delete t.starting;
     }
-    void this.consume(t, t.session, profile.id).finally(() => lease?.release());
+    void this.consume(t, t.session, account.id).finally(() => lease?.release());
     await this.flushOutbox(t);
   }
 
@@ -1685,12 +1698,12 @@ export class AgentCore {
     }
   }
 
-  /** Events of one session; usage and account it reports belong to the profile it opened with. */
-  private async consume(t: Thread, session: ProviderSession, profileId: string): Promise<void> {
+  /** Events of one session; usage and account it reports belong to the account it opened with. */
+  private async consume(t: Thread, session: ProviderSession, accountId: string): Promise<void> {
     for await (const e of session.events) {
       // A deleted thread hears nothing more from the session it had.
       if (t.deleted) return;
-      this.handle(t, e, profileId);
+      this.handle(t, e, accountId);
     }
     if (t.deleted) return;
     if (t.session === session) {
@@ -1701,7 +1714,7 @@ export class AgentCore {
     }
   }
 
-  private handle(t: Thread, e: ProviderEvent, profileId: string): void {
+  private handle(t: Thread, e: ProviderEvent, accountId: string): void {
     t.lastActive = this.now();
     switch (e.type) {
       case "session": {
@@ -1766,14 +1779,15 @@ export class AgentCore {
         }
         Object.assign(t.info, rest);
         this.saveMeta(t);
-        if (rest.commands?.length) this.lastCommands = rest.commands;
+        if (rest.commands?.length) this.lastCommands.set(t.meta.provider, rest.commands);
         if (rateLimits || rest.commands?.length) this.saveState();
         if (rateLimits || account) {
-          const prev = this.accounts.get(profileId);
-          this.accounts.set(profileId, { ...prev, ...(rateLimits ? { rateLimits } : {}), ...(account ? { account } : {}) });
+          const key = accountKey(t.meta.provider, accountId);
+          const prev = this.accounts.get(key);
+          this.accounts.set(key, { ...prev, ...(rateLimits ? { rateLimits } : {}), ...(account ? { account } : {}) });
           this.saveState();
-          if (rateLimits) this.opts.onProfileUsage?.(profileId, rateLimits);
-          this.notifyProfile(profileId);
+          if (rateLimits) this.opts.onAccountUsage?.(t.meta.provider, accountId, rateLimits);
+          this.notifyAccount(t.meta.provider, accountId);
         } else {
           for (const fn of this.infoListeners) fn(t.meta.id);
         }
@@ -1816,21 +1830,21 @@ export class AgentCore {
       case "limit-reached":
         if (t.limitSeen) return;
         t.limitSeen = true;
-        void this.suggest(t, profileId);
+        void this.suggest(t, accountId);
         return;
     }
   }
 
-  /** The session's profile ran out: offer another one with room (a hint for devices, never a switch). */
-  private async suggest(t: Thread, profileId: string): Promise<void> {
-    let suggestion: ProfileSuggestion | undefined;
+  /** The session's account ran out: offer another one of the same AI with room (a hint for devices, never a switch). */
+  private async suggest(t: Thread, accountId: string): Promise<void> {
+    let suggestion: AccountSuggestion | undefined;
     try {
-      suggestion = await this.opts.suggestProfile?.(profileId);
+      suggestion = await this.opts.suggestAccount?.(t.meta.provider, accountId);
     } catch {
       return;
     }
     // Already moved on (or the machine moved there): nothing to offer.
-    if (!suggestion || this.profileOf(t) !== profileId || this.machineProfile() === suggestion.id) return;
+    if (!suggestion || this.accountOf(t) !== accountId || this.machineAccount(t.meta.provider) === suggestion.id) return;
     t.suggestion = suggestion;
     for (const fn of this.infoListeners) fn(t.meta.id);
   }
@@ -1882,7 +1896,7 @@ export class AgentCore {
     delete t.runningTool;
     this.endActivity(t);
     this.markHistory(t);
-    // A turn that went through: the profile has room again.
+    // A turn that went through: the account has room again.
     if (state === TurnState.COMPLETED && t.suggestion && !t.limitSeen) {
       delete t.suggestion;
       for (const fn of this.infoListeners) fn(t.meta.id);
@@ -1891,7 +1905,7 @@ export class AgentCore {
     this.gitReads.delete(t.meta.id);
     for (const fn of this.turnEndListeners) fn(t.meta.id);
     void this.dequeue();
-    // The machine switched profile during the turn: move now.
+    // The machine switched account during the turn: move now.
     void this.follow(t);
   }
 
@@ -2264,14 +2278,14 @@ export class AgentCore {
     }
     const dir = t.meta.dir;
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
-    this.assertReady(provider, await provider.detect(this.detectOptions()));
-    let profile: { id: string; accountDir?: string };
+    this.assertReady(provider, await provider.detect(this.detectOptions(provider)));
+    let account: { id: string; scope?: AccountScopeRef };
     try {
-      profile = this.opts.profile?.() ?? { id: "" };
+      account = this.opts.sessionAccount?.(provider.id) ?? { id: "" };
     } catch (err) {
       const why = (err as Error).message;
       throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `the ${provider.name} account picked on this machine cannot be used: ${why}`.slice(0, 500), {
-        reason: ErrorReason.PROFILE_UNUSABLE,
+        reason: ErrorReason.ACCOUNT_UNUSABLE,
         subject: why.slice(0, 300),
       });
     }
@@ -2280,13 +2294,13 @@ export class AgentCore {
     const command = await provider.terminal.command({
       dir,
       ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
-      ...(profile.accountDir ? { accountDir: profile.accountDir } : {}),
+      ...(account.scope ? { account: account.scope } : {}),
       ...(t.meta.model ? { model: t.meta.model } : {}),
       ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
     });
     if (!command) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
-    if (profile.id) t.meta.profileId = profile.id;
-    else delete t.meta.profileId;
+    if (account.id) t.meta.accountId = account.id;
+    else delete t.meta.accountId;
     // The CLI starts the new session with this id: the thread holds it from now on.
     if (seg && !seg.sessionId && command.sessionId) {
       seg.sessionId = command.sessionId;

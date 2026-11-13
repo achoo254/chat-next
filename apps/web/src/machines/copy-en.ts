@@ -413,6 +413,9 @@ export const enMachines: MachinesCopy = {
 			profileSignOutFailed: (id) =>
 				`Claude could not sign this account out, so nothing was deleted. To delete it anyway, run on the machine: tunelo claude profiles remove ${id} --force`,
 			profilesDamaged: "The list of Claude accounts on the machine is damaged. Repair or remove it on the machine, then restart tunelo.",
+			accountSwitchBlocked: (ai, what) =>
+				what === "" ? `The ${ai} account cannot change right now: ${ai} is running on the machine.` : `The ${ai} account cannot change right now: ${what} is using ${ai} on the machine. Close it, then try again.`,
+			providerRequired: "No AI was picked for this. Pick an AI, then try again.",
 			aiCliMissing: (ai) => `${ai} is not installed on this machine.`,
 			noLocalForward: "This machine does not forward to localhost.",
 			unsupportedRequest: "The machine cannot do this yet. Update it on the machine: tunelo update.",

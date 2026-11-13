@@ -41,7 +41,6 @@ function entry(id: number, name: string, online: boolean, createdAt = 1): Machin
 		os: "darwin",
 		arch: "arm64",
 		agentVersion: "3.0.0",
-		claudeVersion: "",
 		tunnelUrl: online ? `wss://m-${id}.tunnel.hoandat.com` : "",
 		createdAt,
 		lastSeenAt: online ? Number(nowSeconds()) : 0,

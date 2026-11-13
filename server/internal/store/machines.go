@@ -32,18 +32,17 @@ var (
 
 // Machine is a row of the machine directory, without its secret.
 type Machine struct {
-	ID            int64
-	TenantID      string
-	UserID        int64
-	Name          string
-	OS            string
-	Arch          string
-	AgentVersion  string
-	ClaudeVersion string
-	PublicKey     []byte
-	TunnelURL     string
-	CreatedAt     time.Time
-	LastSeenAt    time.Time
+	ID           int64
+	TenantID     string
+	UserID       int64
+	Name         string
+	OS           string
+	Arch         string
+	AgentVersion string
+	PublicKey    []byte
+	TunnelURL    string
+	CreatedAt    time.Time
+	LastSeenAt   time.Time
 	// Revoked: the user removed the machine; only its heartbeat still
 	// authenticates, to be told so.
 	Revoked bool
@@ -73,12 +72,12 @@ type NewMachine struct {
 	GrantID string
 }
 
-const machineColumns = `m.id, m.tenant_id, m.user_id, m.name, m.os, m.arch, m.agent_version, m.claude_version,
+const machineColumns = `m.id, m.tenant_id, m.user_id, m.name, m.os, m.arch, m.agent_version,
 	m.public_key, m.tunnel_url, m.created_at, m.last_seen_at, m.revoked_at IS NOT NULL, m.claimed_at IS NOT NULL`
 
 func scanMachine(row pgx.Row) (Machine, error) {
 	var m Machine
-	err := row.Scan(&m.ID, &m.TenantID, &m.UserID, &m.Name, &m.OS, &m.Arch, &m.AgentVersion, &m.ClaudeVersion,
+	err := row.Scan(&m.ID, &m.TenantID, &m.UserID, &m.Name, &m.OS, &m.Arch, &m.AgentVersion,
 		&m.PublicKey, &m.TunnelURL, &m.CreatedAt, &m.LastSeenAt, &m.Revoked, &m.Claimed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Machine{}, ErrNotFound
@@ -182,7 +181,7 @@ func (s *Store) AuthenticateMachine(ctx context.Context, tenantID, secret string
 		SELECT `+machineColumns+`, u.idp_sub FROM machines m JOIN users u ON u.id = m.user_id
 		WHERE m.tenant_id = $1 AND m.secret_hash = $2 AND u.deleted_at IS NULL`,
 		tenantID, machineTokenHash(secret)).Scan(&a.ID, &a.TenantID, &a.UserID, &a.Name, &a.OS, &a.Arch, &a.AgentVersion,
-		&a.ClaudeVersion, &a.PublicKey, &a.TunnelURL, &a.CreatedAt, &a.LastSeenAt, &a.Revoked, &a.Claimed, &sub)
+		&a.PublicKey, &a.TunnelURL, &a.CreatedAt, &a.LastSeenAt, &a.Revoked, &a.Claimed, &sub)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return AuthenticatedMachine{}, ErrNotFound
 	}
@@ -200,16 +199,16 @@ func (s *Store) AuthenticateMachine(ctx context.Context, tenantID, secret string
 // (connected: at most MaxConnectedDeviceKeys keys) and returns the owner's
 // trusted devices: live keys with a usable session, oldest first.
 // ErrNotFound when the machine is revoked (or unknown).
-func (s *Store) MachineHeartbeat(ctx context.Context, tenantID string, machineID int64, tunnelURL, agentVersion, claudeVersion string,
+func (s *Store) MachineHeartbeat(ctx context.Context, tenantID string, machineID int64, tunnelURL, agentVersion string,
 	connected [][]byte) ([]AccountDevice, error) {
 	var trusted []AccountDevice
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var userID int64
 		err := tx.QueryRow(ctx, `
-			UPDATE machines SET tunnel_url = $3, agent_version = $4, claude_version = $5, last_seen_at = now()
+			UPDATE machines SET tunnel_url = $3, agent_version = $4, last_seen_at = now()
 			WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL
 			RETURNING user_id`,
-			machineID, tenantID, tunnelURL, agentVersion, claudeVersion).Scan(&userID)
+			machineID, tenantID, tunnelURL, agentVersion).Scan(&userID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
