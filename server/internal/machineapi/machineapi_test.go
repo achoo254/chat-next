@@ -246,7 +246,7 @@ func (e *env) registerRequestFor(key *ecdh.PrivateKey) *appv1.RegisterMachineReq
 		e.t.Fatal(err)
 	}
 	return &appv1.RegisterMachineRequest{Name: " Mac mini ", Os: "darwin", Arch: "arm64",
-		AgentVersion: "3.0.0", PublicKey: key.PublicKey().Bytes(), Proof: prove(e.t, key, c)}
+		AgentVersion: "3.3.0", PublicKey: key.PublicKey().Bytes(), Proof: prove(e.t, key, c)}
 }
 
 func (e *env) registerRequest() *appv1.RegisterMachineRequest {
@@ -314,11 +314,11 @@ func TestRegisterMachine(t *testing.T) {
 
 	tok := e.token(ownerSub)
 	for name, msg := range map[string]*appv1.RegisterMachineRequest{
-		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
-		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
-		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "3.0.0", PublicKey: make([]byte, 32)},
+		"no name":     {Os: "darwin", Arch: "arm64", AgentVersion: "3.3.0", PublicKey: make([]byte, 32)},
+		"bad os":      {Name: "m", Os: "freebsd", Arch: "arm64", AgentVersion: "3.3.0", PublicKey: make([]byte, 32)},
+		"bad arch":    {Name: "m", Os: "darwin", Arch: "ia32", AgentVersion: "3.3.0", PublicKey: make([]byte, 32)},
 		"bad version": {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "v1", PublicKey: make([]byte, 32)},
-		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: make([]byte, 31)},
+		"short key":   {Name: "m", Os: "darwin", Arch: "arm64", AgentVersion: "3.3.0", PublicKey: make([]byte, 31)},
 	} {
 		if _, err := e.client.RegisterMachine(ctx, withSecret(msg, tok)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -384,13 +384,13 @@ func TestRegisterMachineAgainWithChallenge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := &appv1.RegisterMachineRequest{Name: "new host name", Os: "darwin", Arch: "arm64", AgentVersion: "3.0.1",
+	req := &appv1.RegisterMachineRequest{Name: "new host name", Os: "darwin", Arch: "arm64", AgentVersion: "3.3.1",
 		PublicKey: e.machineKey.PublicKey().Bytes(), Proof: prove(t, e.machineKey, c.Msg.GetChallenge())}
 	resp, err := e.client.RegisterMachine(ctx, withSecret(req, e.token(ownerSub)))
 	if err != nil || resp.Msg.GetMachineId() != id || resp.Msg.GetMachineSecret() == oldSecret {
 		t.Fatalf("registered again: %+v %v", resp, err)
 	}
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.1"}, oldSecret)); connect.CodeOf(err) != connect.CodeUnauthenticated {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.3.1"}, oldSecret)); connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("the old secret still works: %v", err)
 	}
 	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); len(list) != 1 || list[0].Name != "Mac mini" {
@@ -503,7 +503,7 @@ func TestRegisteredMachineTunnelIsChecked(t *testing.T) {
 	ctx := context.Background()
 	id, secret := e.register()
 	beat := func(tunnel string) (bool, error) {
-		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.0.0"}, secret))
+		r, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.3.0"}, secret))
 		if err != nil {
 			return false, err
 		}
@@ -569,7 +569,7 @@ func TestHeartbeat(t *testing.T) {
 	ctx := context.Background()
 	id, secret := e.register()
 	tunnel := machineTunnel(ownerSub, id)
-	beat := &appv1.HeartbeatRequest{TunnelUrl: tunnel + "/", AgentVersion: "3.0.1"}
+	beat := &appv1.HeartbeatRequest{TunnelUrl: tunnel + "/", AgentVersion: "3.3.1"}
 
 	for name, header := range map[string]string{"none": "", "not bearer": "Basic " + secret, "wrong": "Bearer " + wrong(secret)} {
 		req := connect.NewRequest(beat)
@@ -584,7 +584,7 @@ func TestHeartbeat(t *testing.T) {
 		"https://dat.tunnel.hoandat.com", "wss://dat.tunnel.evil.com", "wss://a.b.tunnel.hoandat.com",
 		"wss://DAT.tunnel.hoandat.com", "wss://dat.tunnel.hoandat.com/x", "wss://dat.tunnel.hoandat.com.evil.com",
 	} {
-		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "3.0.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{TunnelUrl: url, AgentVersion: "3.3.0"}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("tunnel %q: %v", url, err)
 		}
 	}
@@ -592,7 +592,7 @@ func TestHeartbeat(t *testing.T) {
 		"short key": {make([]byte, 31)},
 		"too many":  slices.Repeat([][]byte{make([]byte, 32)}, store.MaxConnectedDeviceKeys+1),
 	} {
-		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0", ConnectedDeviceKeys: keys}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.3.0", ConnectedDeviceKeys: keys}, secret)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -608,7 +608,7 @@ func TestHeartbeat(t *testing.T) {
 		t.Fatalf("answer %+v", resp.Msg)
 	}
 	list, _ := e.store.ListMachines(ctx, tenant, e.userID)
-	if list[0].TunnelURL != tunnel || list[0].AgentVersion != "3.0.1" {
+	if list[0].TunnelURL != tunnel || list[0].AgentVersion != "3.3.1" {
 		t.Fatalf("recorded %+v", list[0])
 	}
 
@@ -684,7 +684,7 @@ func TestUnregisterMachine(t *testing.T) {
 	if list, _ := e.store.ListMachines(ctx, tenant, e.userID); len(list) != 0 {
 		t.Fatalf("still listed: %+v", list)
 	}
-	if resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, secret)); err != nil || !resp.Msg.GetRevoked() {
+	if resp, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.3.0"}, secret)); err != nil || !resp.Msg.GetRevoked() {
 		t.Fatalf("heartbeat after unregistering: %+v %v", resp, err)
 	}
 	pending, err := e.store.PendingGrantRevocations(ctx, tenant, 10)
@@ -876,20 +876,21 @@ func TestFailedAuthenticationsAreLimited(t *testing.T) {
 	_, secret := e.register()
 	var last error
 	for range 25 {
-		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, wrong(secret)))
+		_, last = e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.3.0"}, wrong(secret)))
 	}
 	if connect.CodeOf(last) != connect.CodeResourceExhausted {
 		t.Fatalf("after many failures: %v", last)
 	}
 	// A valid secret still passes.
-	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.0.0"}, secret)); err != nil {
+	if _, err := e.client.Heartbeat(ctx, withSecret(&appv1.HeartbeatRequest{AgentVersion: "3.3.0"}, secret)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCheckVersion(t *testing.T) {
 	for v, want := range map[string]connect.Code{
-		"3.0.0": 0, "3.0.1": 0, "3.1.0": 0, "4.0.0": 0, "3.0.0-beta.1": 0,
+		"3.3.0": 0, "3.3.1": 0, "3.4.0": 0, "4.0.0": 0, "3.3.0-beta.1": 0,
+		"3.2.2": connect.CodeFailedPrecondition, "3.0.0": connect.CodeFailedPrecondition,
 		// Older than the minimum: refused with what to do.
 		"2.7.1": connect.CodeFailedPrecondition, "2.2.2": connect.CodeFailedPrecondition, "2.0.15": connect.CodeFailedPrecondition,
 		"1.9.1": connect.CodeFailedPrecondition, "0.1.0": connect.CodeFailedPrecondition,
@@ -902,7 +903,7 @@ func TestCheckVersion(t *testing.T) {
 	}
 	// An older tunelo reads what to do from the message.
 	if err := checkVersion("2.7.1"); err == nil ||
-		!strings.Contains(err.Error(), "agent_update_required: tunelo 3.0.0 or newer is required; run the install command on the chat's Machines page again") {
+		!strings.Contains(err.Error(), "agent_update_required: tunelo 3.3.0 or newer is required; run the install command on the chat's Machines page again") {
 		t.Errorf("old agent message: %v", err)
 	}
 }

@@ -105,7 +105,7 @@ func registerMachine(t *testing.T, agent appv1connect.MachineAgentServiceClient,
 		t.Fatal(err)
 	}
 	register := connect.NewRequest(&appv1.RegisterMachineRequest{
-		Name: name, Os: "darwin", Arch: "arm64", AgentVersion: "3.0.0", PublicKey: key.PublicKey().Bytes(),
+		Name: name, Os: "darwin", Arch: "arm64", AgentVersion: "3.3.0", PublicKey: key.PublicKey().Bytes(),
 		Proof: proveKey(t, key, ch.Msg.GetChallenge()),
 	})
 	register.Header().Set("Authorization", "Bearer "+token)
@@ -155,7 +155,7 @@ func TestMachineDirectory(t *testing.T) {
 	tunnel := "wss://" + machineapi.MachineSubdomain("acc_test", fmt.Sprintf("tunelo.%d", id)) + ".tunnel.hoandat.com"
 	heartbeat := func() *appv1.HeartbeatResponse {
 		t.Helper()
-		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.0.0"})
+		req := connect.NewRequest(&appv1.HeartbeatRequest{TunnelUrl: tunnel, AgentVersion: "3.3.0"})
 		req.Header().Set("Authorization", "Bearer "+secret)
 		resp, err := agent.Heartbeat(ctx, req)
 		if err != nil {

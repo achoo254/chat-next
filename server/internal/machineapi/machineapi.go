@@ -55,10 +55,10 @@ import (
 const Prefix = "/machine-api/"
 
 // MinAgentVersion is the oldest machine agent (tunelo) the server accepts:
-// 3.0.0 speaks device link protocol 3 (devices trusted through the owner's
-// account), which devices require. Older agents cannot update themselves
-// into it and are told to run the install command again.
-const MinAgentVersion = "3.0.0"
+// 3.3.0 names its AI in every request and keeps accounts per AI (ADR 0017),
+// which the web requires. Older agents are told to run the install command
+// again.
+const MinAgentVersion = "3.3.0"
 
 // MachinesScope is the scope an access token needs to register a machine;
 // the IdP grants it to the tunelo-agent client only.
