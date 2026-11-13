@@ -151,6 +151,7 @@ export class Machine {
           store: new AccountsStore(dir),
           audit: this.audit,
           inUse: (provider, id) => this.core.accountInUse(provider, id),
+          busySessions: (provider) => this.core.openSessionsOf(provider).flatMap((s) => (s.busy ? [s.title] : [])),
           onUsage: (provider, id, usage) => {
             this.core.setAccountUsage(provider, id, usage);
             if (this.providerById(provider)?.usage) this.usage.recordQuota(id, usage);

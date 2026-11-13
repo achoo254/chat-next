@@ -205,8 +205,11 @@ export class AcpSession implements ProviderSession {
     this.closed = true;
     this.endAsking();
     this.deps.router.remove(this.deps.sessionId);
-    this.emit({ type: "error", message: why });
-    if (this.running) this.emit({ type: "turn-end", state: "failed", durationMs: 0 });
+    // An idle session just ends (it opens again with its next message); a running turn says why it failed.
+    if (this.running) {
+      this.emit({ type: "error", message: why });
+      this.emit({ type: "turn-end", state: "failed", durationMs: 0 });
+    }
     this.channel.close();
   }
 

@@ -3,6 +3,7 @@
 import type { AccountsStore } from "../accounts/store.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { CLAUDE_PROVIDER_ID } from "./claude/accounts/paths.ts";
+import { ANTIGRAVITY_PROVIDER_ID } from "./antigravity/agy.ts";
 import { createAntigravityProvider } from "./antigravity/index.ts";
 import { claudeHomesIn, createClaudeProvider } from "./claude/index.ts";
 import type { AgentProvider, ProviderInfo } from "./types.ts";
@@ -13,6 +14,8 @@ export type AccountsHost = {
   audit: AuditLog;
   /** A session of `provider` is open with this account. */
   inUse: (provider: string, id: string) => boolean;
+  /** Titles of `provider`'s sessions running a turn now. */
+  busySessions: (provider: string) => string[];
   /** Usage just read for an account of `provider`. */
   onUsage: (provider: string, id: string, usage: NonNullable<ProviderInfo["rateLimits"]>) => void;
   log: (line: string) => void;
@@ -41,7 +44,20 @@ export function builtinProviders(src: ProviderSources): AgentProvider[] {
         }
       : { homes: () => claudeHomesIn(src.configDir) },
   );
-  const antigravity = createAntigravityProvider(a ? { log: a.log } : {});
+  const antigravity = createAntigravityProvider(
+    a
+      ? {
+          log: a.log,
+          accounts: {
+            configDir: src.configDir,
+            store: a.store,
+            audit: a.audit,
+            busySessions: () => a.busySessions(ANTIGRAVITY_PROVIDER_ID),
+            onUsage: (id, usage) => a.onUsage(ANTIGRAVITY_PROVIDER_ID, id, usage),
+          },
+        }
+      : {},
+  );
   return [claude, antigravity];
 }
 

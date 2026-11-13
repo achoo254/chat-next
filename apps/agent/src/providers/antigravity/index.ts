@@ -9,7 +9,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { AcpSession } from "../acp/acp-session.ts";
 import type { AgentProvider, Detected, ProviderCapabilities, ProviderSession, SessionPolicy, AskUser, TerminalCommand, TerminalLaunch } from "../types.ts";
+import { AgyAccounts, type AgyAccountsOptions } from "./accounts.ts";
 import { AgyAcp } from "./acp-process.ts";
+import { macKeychain } from "./keychain.ts";
+import { probeAgyUsage } from "./quota.ts";
 import { ANTIGRAVITY_PROVIDER_ID, agyVersion, findAgy, supported, toolPermission } from "./agy.ts";
 import { AgyHistory, type ListedSession } from "./history.ts";
 import { answerPermission } from "./permissions.ts";
@@ -52,10 +55,28 @@ async function signedIn(): Promise<Detected["loginState"]> {
   }
 }
 
-export function createAntigravityProvider(deps: { findBinary?: () => Promise<string | null>; acp?: AgyAcp; log?: (line: string) => void; toolPermission?: () => string } = {}): AgentProvider {
+/** What Antigravity's accounts need from the machine (macOS only: agy keeps its sign-in in the Keychain). */
+export type AgyAccountsDeps = Pick<AgyAccountsOptions, "configDir" | "store" | "audit" | "busySessions" | "onUsage">;
+
+export function createAntigravityProvider(
+  deps: { findBinary?: () => Promise<string | null>; acp?: AgyAcp; log?: (line: string) => void; toolPermission?: () => string; accounts?: AgyAccountsDeps } = {},
+): AgentProvider {
   const findBinary = deps.findBinary ?? findAgy;
   const log = deps.log ?? (() => undefined);
   const acp = deps.acp ?? new AgyAcp({ findBinary, log });
+  const accounts =
+    deps.accounts && process.platform === "darwin"
+      ? new AgyAccounts({
+          ...deps.accounts,
+          keychain: macKeychain,
+          stopAgy: () => acp.stop(),
+          probeUsage: async () => {
+            const bin = await findBinary();
+            return bin ? probeAgyUsage(bin) : null;
+          },
+          log,
+        })
+      : undefined;
   const permission = deps.toolPermission ?? (() => toolPermission());
   const capabilities: ProviderCapabilities = {
     interrupt: true,
@@ -96,6 +117,7 @@ export function createAntigravityProvider(deps: { findBinary?: () => Promise<str
     id: ANTIGRAVITY_PROVIDER_ID,
     name: "Antigravity",
     capabilities,
+    ...(accounts ? { accounts } : {}),
     history,
     writer: agyWriter(findBinary),
     terminal: {
