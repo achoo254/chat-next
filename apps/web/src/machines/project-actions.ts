@@ -101,9 +101,11 @@ async function forget(host: Host, dir: string): Promise<void> {
 }
 
 /**
- * After a workspace left the app: its machine drops the folder too, now when
- * it is online, else when it is back (remembered on this device), so the
- * sync does not record it again. `host` null: the machine is offline or gone.
+ * Before a workspace leaves the app: its machine drops the folder too, now
+ * when it is online, else when it is back (remembered on this device), so
+ * the sync does not record it again. `host` null: the machine is offline or
+ * gone. The machine goes first: until its list no longer holds the folder,
+ * a sync pass (here or on another device) would record it again.
  */
 async function release(store: AgentProjectsStore, workspace: AgentWorkspace, host: Host | null): Promise<void> {
 	const key = { machineId: workspace.machineId, dir: workspace.dir };
@@ -117,14 +119,14 @@ async function release(store: AgentProjectsStore, workspace: AgentWorkspace, hos
 }
 
 export async function detachWorkspace(store: AgentProjectsStore, workspace: AgentWorkspace, host: Host | null): Promise<void> {
-	await store.change((api) => api.detach(workspace.id));
 	await release(store, workspace, host);
+	await store.change((api) => api.detach(workspace.id));
 }
 
 /** Deletes the project's record and its workspaces' (never a file or a session). */
 export async function deleteProject(store: AgentProjectsStore, project: AgentProject, hostOf: (machineId: number) => Host | null): Promise<void> {
-	await store.change((api) => api.remove(project.id));
 	await Promise.all(project.workspaces.map((w) => release(store, w, hostOf(w.machineId))));
+	await store.change((api) => api.remove(project.id));
 }
 
 /**

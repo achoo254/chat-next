@@ -193,6 +193,28 @@ describe("the sync and the app's own actions", () => {
 		expect(store.snapshot().projects[0]?.workspaces).toEqual([]);
 	});
 
+	it("a sync pass while a workspace is being detached does not record it again", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, [own("/w/app")]);
+		await syncHosts(store, [mac]);
+		const workspace = store.snapshot().projects[0]?.workspaces[0];
+		if (workspace === undefined) throw new Error("no workspace");
+		// The machine answers projectRemove only when let go; meanwhile a sync pass runs.
+		let answer = (): void => undefined;
+		const request = mac.link.request;
+		const slow = { ...mac, link: { ...mac.link, request: (body: FrameBody) => new Promise<Frame>((resolve) => (answer = () => resolve(request(body)))) } } as SyncHost;
+		const detaching = detachWorkspace(store, workspace, slow);
+		await Promise.resolve();
+		expect(await syncHosts(store, [mac])).toBe(0);
+		answer();
+		await detaching;
+		expect(await syncHosts(store, [mac])).toBe(0);
+		expect(server.workspaces).toEqual([]);
+		expect(mac.projects).toEqual([]);
+	});
+
 	it("a workspace detached while its machine is offline is not added again: the machine drops it when back", async () => {
 		const server = new FakeAgentProjects();
 		const store = new AgentProjectsStore(server.api());
