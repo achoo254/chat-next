@@ -2,7 +2,9 @@
 // parts: "Chưa commit trong thư mục" (git's view of the folder, edits by
 // shell commands or outside the AI included) and "<AI> đã sửa" (each edit
 // the AI made with its file tools, subagents included: transcript/changes.ts).
-// Older machines only have the second part. A file opens its diffs. A panel
+// Older machines only have the second part; where Source Control (the
+// workspace panel) lists the folder's uncommitted files, only the second
+// part shows here. A file opens its diffs. A panel
 // beside the chat on wide screens, a sheet from the bottom on phones; Esc or
 // "Đóng" closes it.
 import { useEffect, useState } from "react";
@@ -24,6 +26,8 @@ interface ChangesPanelProps {
 	gitSupported: boolean;
 	/** The folder's git changes as last sent; null until they arrive. */
 	git: GitChanges | null;
+	/** The folder's uncommitted files show in Source Control (the workspace panel): only the AI's edits are listed here. */
+	gitElsewhere: boolean;
 	/** Items fetched in full, by id. */
 	full: ReadonlyMap<string, Item>;
 	onFetchFull: (itemId: string) => Promise<void>;
@@ -62,7 +66,7 @@ export function asDiff(file: GitFileChange): DiffItem {
 	return create(DiffItemSchema, { path: file.path, unified: file.unified, added: file.added, removed: file.removed, truncated: file.truncated });
 }
 
-export function ChangesPanel({ ai, changes, gitSupported, git, full, onFetchFull, onGitFileDiff, onClose }: ChangesPanelProps) {
+export function ChangesPanel({ ai, changes, gitSupported, git, gitElsewhere, full, onFetchFull, onGitFileDiff, onClose }: ChangesPanelProps) {
 	const t = useMachinesCopy();
 	const [open, setOpen] = useState<Open | null>(null);
 	/** Git files fetched whole, by path; null: git no longer lists it. */
@@ -70,7 +74,7 @@ export function ChangesPanel({ ai, changes, gitSupported, git, full, onFetchFull
 	const history = open?.from === "history" ? (changes.find((c) => c.path === open.path) ?? null) : null;
 	const gitFile = open?.from === "git" ? (git?.files.find((f) => f.path === open.path) ?? null) : null;
 	const shown = history ?? gitFile;
-	const inGit = gitSupported && git?.git === true;
+	const inGit = gitSupported && !gitElsewhere && git?.git === true;
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -120,7 +124,7 @@ export function ChangesPanel({ ai, changes, gitSupported, git, full, onFetchFull
 						<GitFileView file={gitFile} whole={gitFull.get(gitFile.path)} onFetch={() => fetchGitFile(gitFile.path)} />
 					) : (
 						<>
-							{gitSupported && <GitSection git={git} onOpen={(path) => setOpen({ from: "git", path })} />}
+							{gitSupported && !gitElsewhere && <GitSection git={git} onOpen={(path) => setOpen({ from: "git", path })} />}
 							<section className="mx-changes-sec" aria-label={gitSupported ? t.agent.changes.historyTitle(ai) : t.agent.changes.title}>
 								{gitSupported && <h3>{t.agent.changes.historyTitle(ai)}</h3>}
 								{changes.length === 0 ? (

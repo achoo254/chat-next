@@ -157,6 +157,7 @@ describe("the changes panel", () => {
 		const asked: string[] = [];
 		wrap(
 			<ChangesPanel
+				gitElsewhere={false}
 				ai="Claude"
 				changes={history}
 				gitSupported
@@ -183,25 +184,33 @@ describe("the changes panel", () => {
 		expect(screen.getByText("File nhạy cảm nên không hiện nội dung.")).toBeTruthy();
 	});
 
+	it("where Source Control lists the folder's uncommitted files, only the AI's edits, counted alone", () => {
+		const git = create(GitChangesSchema, { threadId: "t", git: true, files: [gitFile("made-by-shell.txt", GitFileState.UNTRACKED), gitFile("b.txt", GitFileState.MODIFIED)] });
+		wrap(<ChangesPanel gitElsewhere ai="Claude" changes={history} gitSupported git={git} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
+		expect(screen.queryByRole("heading", { name: "Chưa commit trong thư mục" })).toBeNull();
+		expect(screen.getByRole("heading", { name: "Claude đã sửa" })).toBeTruthy();
+		expect(screen.getByText("1 file")).toBeTruthy();
+	});
+
 	it("outside git, and on an older machine, only the AI's part", () => {
 		const { unmount } = wrap(
-			<ChangesPanel ai="Claude" changes={[]} gitSupported git={create(GitChangesSchema, { threadId: "t", git: false })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
+			<ChangesPanel gitElsewhere={false} ai="Claude" changes={[]} gitSupported git={create(GitChangesSchema, { threadId: "t", git: false })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
 		);
 		expect(screen.getByText("Thư mục này không dùng git, nên chỉ có các lần sửa ở dưới.")).toBeTruthy();
 		expect(screen.getByText(/Claude chưa sửa file nào bằng công cụ sửa file/)).toBeTruthy();
 		expect(screen.queryByRole("heading", { name: "Chưa commit trong thư mục" })).toBeNull();
 		unmount();
-		wrap(<ChangesPanel ai="Claude" changes={[]} gitSupported={false} git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
+		wrap(<ChangesPanel gitElsewhere={false} ai="Claude" changes={[]} gitSupported={false} git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
 		expect(screen.getByText("Claude chưa sửa file nào trong phiên này.")).toBeTruthy();
 		expect(screen.queryByRole("heading")).toBeNull();
 	});
 
 	it("says it is asking git until the list arrives, and when nothing waits to be committed", () => {
-		const { unmount } = wrap(<ChangesPanel ai="Claude" changes={history} gitSupported git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
+		const { unmount } = wrap(<ChangesPanel gitElsewhere={false} ai="Claude" changes={history} gitSupported git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
 		expect(screen.getByText("Đang hỏi git…")).toBeTruthy();
 		unmount();
 		wrap(
-			<ChangesPanel ai="Claude" changes={history} gitSupported git={create(GitChangesSchema, { threadId: "t", git: true })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
+			<ChangesPanel gitElsewhere={false} ai="Claude" changes={history} gitSupported git={create(GitChangesSchema, { threadId: "t", git: true })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
 		);
 		expect(screen.getByText("Không có thay đổi nào chưa commit.")).toBeTruthy();
 	});

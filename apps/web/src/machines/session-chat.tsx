@@ -95,7 +95,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const changes = sessionChanges(items);
 	const gitSupported = state.info?.gitChanges === true;
 	const git = state.gitChanges.get(threadId) ?? null;
-	const changeCount = changesCount(changes, gitSupported ? git : null);
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
 	const caps = providerOf(state.info, provider)?.capabilities;
@@ -177,6 +176,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
+	// Source Control lists the folder's uncommitted files: "Thay đổi" keeps to the AI's own edits.
+	const gitElsewhere = panel.workspace !== undefined;
+	const changeCount = changesCount(changes, gitSupported && !gitElsewhere ? git : null);
 	const toTerminal = offered && mode === "chat" && thread !== null
 		? () => {
 				rememberMode(machine, "terminal");
@@ -416,6 +418,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						changes={changes}
 						gitSupported={gitSupported}
 						git={git}
+						gitElsewhere={gitElsewhere}
 						full={state.full}
 						onFetchFull={fetchFull}
 						onGitFileDiff={gitFileDiff}
