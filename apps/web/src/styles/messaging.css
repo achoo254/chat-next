@@ -671,13 +671,38 @@ aside.info { display: flex; flex-direction: column; min-width: 0; overflow-y: au
 .row.export-file { flex-wrap: wrap; }
 .set-body .row.export-file > .grow { flex: 1 1 220px; }
 
-/* ---------- Dialogs (native <dialog>) ---------- */
+/* ---------- Dialogs (native <dialog>) ----------
+ * Layout rule shared by every app: hoandat-app/docs/modal-popup-design.md.
+ * Sizes: S = .narrow (a confirm), M = default (a short form), L = .large
+ * (two columns on a landscape screen, one column on a phone). The head and
+ * the foot stay in view while the rest scrolls, so the actions never leave
+ * the screen. */
 dialog.modal {
 	width: min(560px, calc(100vw - 2 * var(--space-4))); max-height: calc(100dvh - 2 * var(--space-6)); padding: 0; border: 0;
 	border-radius: var(--radius-lg); background: var(--c-surface); color: var(--c-text); box-shadow: var(--shadow-lg); overflow: auto;
 }
 dialog.modal.narrow { width: min(440px, calc(100vw - 2 * var(--space-4))); }
+dialog.modal.large { width: min(960px, calc(100vw - 2 * var(--space-4))); }
 dialog.modal::backdrop { background: var(--c-backdrop); }
+.modal .dlg-head { position: sticky; top: 0; z-index: 1; background: var(--c-surface); }
+.modal .dlg-foot { position: sticky; bottom: 0; z-index: 1; background: var(--c-surface); }
+/* L: the main part on the left, the secondary part on the right; each a column of its own. */
+.dlg-body.dlg-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3) var(--space-5); align-items: start; padding-top: var(--space-4); }
+.dlg-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-content: start; min-width: 0; }
+/* A list that would make the dialog taller scrolls in its own box beside the other column. */
+dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); overflow-y: auto; }
+/* L without body padding: a side panel (avatar, actions) and the details, split by a line. */
+.dlg-split { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: start; }
+.dlg-split > .dlg-pane + .dlg-pane { border-left: 1px solid var(--c-border-subtle); }
+/* Folder dialogs of AI Agent: the machine and the folder browser on the left, the recent folders on the right. */
+dialog.modal.large .mx-add-project:has(> .mx-recent-folders) { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); column-gap: var(--space-5); }
+dialog.modal.large .mx-add-project:has(> .mx-recent-folders) > * { grid-column: 1; }
+dialog.modal.large .mx-add-project:has(> .mx-recent-folders) > .mx-recent-folders { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
+dialog.modal.large .mx-add-project:has(> .mx-recent-folders) > .dlg-foot { grid-column: 1 / -1; }
+/* Ways side by side when there is room, stacked on a phone. */
+.way-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.way-pair > .remove-way { padding: var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); }
+.way-pair > .remove-way + .remove-way { padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
 .dlg-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--c-border-subtle); }
 .dlg-head h2 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
 .dlg-head .step { font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
@@ -1062,6 +1087,13 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.dlg-head, .dlg-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
 	.dlg-body { padding-left: var(--space-4); padding-right: var(--space-4); }
 	.dlg-foot .btn { flex: 1 1 auto; }
+	/* Phone held upright: a form or a list is a sheet from the bottom, one column; a confirm (S) stays a centered box. */
+	dialog.modal:not(.narrow, .viewer, .popup) { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 92dvh; }
+	dialog.modal:not(.narrow, .viewer, .popup, .mx-sheet) .dlg-foot { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+	.dlg-body.dlg-cols, .dlg-split, dialog.modal.large .mx-add-project:has(> .mx-recent-folders) { grid-template-columns: minmax(0, 1fr); }
+	dialog.modal.large .mx-add-project:has(> .mx-recent-folders) > .mx-recent-folders { grid-column: 1; grid-row: auto; }
+	.dlg-split > .dlg-pane + .dlg-pane { border-left: 0; border-top: 1px solid var(--c-border-subtle); }
+	dialog.modal.large .pick-list { max-height: none; overflow: visible; }
 	.admin-grid { padding: var(--space-3); }
 	.sub-bar .btn { min-width: 0; flex: 1 1 auto; }
 	.mod-head { padding: var(--space-2) var(--space-3); flex-wrap: wrap; }

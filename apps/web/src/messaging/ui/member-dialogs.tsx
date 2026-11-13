@@ -213,35 +213,37 @@ export function RemoveMemberDialog({ chatId, userId, back, onClose }: RemoveProp
 						{detail !== "" && <small>{detail}</small>}
 					</span>
 				</div>
-				<div className="remove-way">
-					<h3>{t.banWay}</h3>
-					<ul className="effects">
-						<li>
-							<Icon name="ban" />
-							<span>{t.banNoReturn(name)}</span>
-						</li>
-						<li>
-							<Icon name="link" />
-							<span>{t.banLinks(name)}</span>
-						</li>
-						<li>
-							<Glyph name="refresh" />
-							<span>{t.banUndo(channel)}</span>
-						</li>
-					</ul>
-				</div>
-				<div className="remove-way">
-					<h3>{t.onlyWay}</h3>
-					<ul className="effects">
-						<li>
-							<Glyph name="user-minus" />
-							<span>{t.onlyReturn(name, channel)}</span>
-						</li>
-						<li>
-							<Icon name="link" />
-							<span>{t.onlyLinks(name)}</span>
-						</li>
-					</ul>
+				<div className="way-pair">
+					<div className="remove-way">
+						<h3>{t.banWay}</h3>
+						<ul className="effects">
+							<li>
+								<Icon name="ban" />
+								<span>{t.banNoReturn(name)}</span>
+							</li>
+							<li>
+								<Icon name="link" />
+								<span>{t.banLinks(name)}</span>
+							</li>
+							<li>
+								<Glyph name="refresh" />
+								<span>{t.banUndo(channel)}</span>
+							</li>
+						</ul>
+					</div>
+					<div className="remove-way">
+						<h3>{t.onlyWay}</h3>
+						<ul className="effects">
+							<li>
+								<Glyph name="user-minus" />
+								<span>{t.onlyReturn(name, channel)}</span>
+							</li>
+							<li>
+								<Icon name="link" />
+								<span>{t.onlyLinks(name)}</span>
+							</li>
+						</ul>
+					</div>
 				</div>
 			</div>
 			<div className="dlg-foot">

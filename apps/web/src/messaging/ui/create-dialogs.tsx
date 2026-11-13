@@ -351,7 +351,7 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 
 	const presetName = preset?.name ?? "";
 	return (
-		<Modal labelledBy={id} onClose={onClose}>
+		<Modal labelledBy={id} onClose={onClose} className="large">
 			<DialogHead
 				id={id}
 				title={withUserId === 0 ? copy.newGroup.title : copy.newGroup.titleWith(presetName)}
@@ -360,53 +360,57 @@ export function NewGroupDialog({ withUserId, onClose }: CloseProps & { withUserI
 					: { onBack: () => ui.dialog.set({ kind: "profile", userId: withUserId }), backLabel: copy.newGroup.backToProfile(presetName) })}
 				onClose={onClose}
 			/>
-			<div className="dlg-body stack">
-				<div className="name-row">
-					<button type="button" className="photo-pick" aria-label={(name.trim() || auto) === "" ? copy.photo.choose : copy.photo.pick(name.trim() || auto)} onClick={photo.open}>
-						{photo.draft !== null ? <img className="avatar-photo" src={photo.draft.url} alt="" /> : <Icon name="camera" />}
-					</button>
-					<div className="field">
-						<label htmlFor={`${id}-name`}>
-							{copy.newGroup.name} <span className="muted">{copy.newGroup.optional}</span>
-						</label>
-						<input
-							id={`${id}-name`}
-							className="input"
-							maxLength={TITLE_MAX}
-							value={name}
-							placeholder={auto}
-							aria-describedby={`${id}-hint`}
-							onChange={(event) => setName(event.target.value)}
-						/>
-						<span className="hint" id={`${id}-hint`}>
-							{copy.newGroup.nameHint}
-						</span>
+			<div className="dlg-body dlg-cols">
+				<div className="dlg-col">
+					<div className="name-row">
+						<button type="button" className="photo-pick" aria-label={(name.trim() || auto) === "" ? copy.photo.choose : copy.photo.pick(name.trim() || auto)} onClick={photo.open}>
+							{photo.draft !== null ? <img className="avatar-photo" src={photo.draft.url} alt="" /> : <Icon name="camera" />}
+						</button>
+						<div className="field">
+							<label htmlFor={`${id}-name`}>
+								{copy.newGroup.name} <span className="muted">{copy.newGroup.optional}</span>
+							</label>
+							<input
+								id={`${id}-name`}
+								className="input"
+								maxLength={TITLE_MAX}
+								value={name}
+								placeholder={auto}
+								aria-describedby={`${id}-hint`}
+								onChange={(event) => setName(event.target.value)}
+							/>
+							<span className="hint" id={`${id}-hint`}>
+								{copy.newGroup.nameHint}
+							</span>
+						</div>
 					</div>
+					{photo.error !== "" && (
+						<span className="error-text" role="alert">
+							{photo.error}
+						</span>
+					)}
+					<div className="row">
+						<span className="grow">
+							{copy.newGroup.history}
+							<small>{copy.newGroup.historyHint}</small>
+						</span>
+						<Switch checked={history} label={copy.newGroup.history} onChange={setHistory} />
+					</div>
+					<div className="row">
+						<span className="grow">
+							{copy.newGroup.topics}
+							<small>{copy.newGroup.topicsHint}</small>
+						</span>
+						<Switch checked={topics} label={copy.newGroup.topics} onChange={setTopics} />
+					</div>
+					<p className="note">
+						<Icon name="info" />
+						<span>{selected.size === 0 ? copy.newGroup.aloneHint : copy.newGroup.suggestions}</span>
+					</p>
 				</div>
-				{photo.error !== "" && (
-					<span className="error-text" role="alert">
-						{photo.error}
-					</span>
-				)}
-				<PeoplePicker selected={selected} onToggle={toggle} />
-				<div className="row">
-					<span className="grow">
-						{copy.newGroup.history}
-						<small>{copy.newGroup.historyHint}</small>
-					</span>
-					<Switch checked={history} label={copy.newGroup.history} onChange={setHistory} />
+				<div className="dlg-col">
+					<PeoplePicker selected={selected} onToggle={toggle} />
 				</div>
-				<div className="row">
-					<span className="grow">
-						{copy.newGroup.topics}
-						<small>{copy.newGroup.topicsHint}</small>
-					</span>
-					<Switch checked={topics} label={copy.newGroup.topics} onChange={setTopics} />
-				</div>
-				<p className="note">
-					<Icon name="info" />
-					<span>{selected.size === 0 ? copy.newGroup.aloneHint : copy.newGroup.suggestions}</span>
-				</p>
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
@@ -595,54 +599,58 @@ export function ForwardDialog({ chatId, seq, seqs, onClose }: CloseProps & { cha
 	};
 
 	return (
-		<Modal labelledBy={id} onClose={onClose}>
+		<Modal labelledBy={id} onClose={onClose} className="large">
 			<DialogHead id={id} title={copy.forward.title} onClose={onClose} />
-			<div className="dlg-body stack">
-				{message != null && (
-					<div className="quote">
-						<b>{nameOf(message.fromId)}</b>
-						{messagePreview(message, nameOf, copy, channel)}
+			<div className="dlg-body dlg-cols">
+				<div className="dlg-col">
+					<label className="search-field">
+						<Icon name="search" small />
+						<span className="sr-only">{copy.forward.search}</span>
+						<input type="search" placeholder={copy.forward.search} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
+					</label>
+					<Chips items={[...selected.values()]} onRemove={toggle} />
+					<div className="pick-list" role="group" aria-label={copy.forward.targets}>
+						{shown.map((target) => (
+							<button key={target.id} type="button" className="pick" role="checkbox" aria-checked={selected.has(target.id)} onClick={() => toggle(target)}>
+								<ChatAvatar id={target.id} name={target.name} bot={target.isBot} />
+								<span>
+									<b>{target.name}</b>
+									<small>{target.detail}</small>
+								</span>
+								<span className="tick">
+									<Icon name="check" />
+								</span>
+							</button>
+						))}
 					</div>
-				)}
-				<label className="search-field">
-					<Icon name="search" small />
-					<span className="sr-only">{copy.forward.search}</span>
-					<input type="search" placeholder={copy.forward.search} autoComplete="off" value={query} onChange={(event) => setQuery(event.target.value)} />
-				</label>
-				<Chips items={[...selected.values()]} onRemove={toggle} />
-				<div className="pick-list" role="group" aria-label={copy.forward.targets}>
-					{shown.map((target) => (
-						<button key={target.id} type="button" className="pick" role="checkbox" aria-checked={selected.has(target.id)} onClick={() => toggle(target)}>
-							<ChatAvatar id={target.id} name={target.name} bot={target.isBot} />
-							<span>
-								<b>{target.name}</b>
-								<small>{target.detail}</small>
-							</span>
-							<span className="tick">
-								<Icon name="check" />
-							</span>
-						</button>
-					))}
+					{shown.length === 0 && (
+						<div className="empty compact">
+							<strong>{copy.forward.emptyTitle}</strong>
+							<span>{copy.forward.emptyBody}</span>
+						</div>
+					)}
 				</div>
-				{shown.length === 0 && (
-					<div className="empty compact">
-						<strong>{copy.forward.emptyTitle}</strong>
-						<span>{copy.forward.emptyBody}</span>
+				<div className="dlg-col">
+					{message != null && (
+						<div className="quote">
+							<b>{nameOf(message.fromId)}</b>
+							{messagePreview(message, nameOf, copy, channel)}
+						</div>
+					)}
+					<div className="field">
+						{/* Sent with the forward as a message: the shared message box (Enter breaks the line), named by this label. */}
+						<span className="label" id={`${id}-comment`}>
+							{copy.forward.comment}
+						</span>
+						<PlainTextBox
+							className="input"
+							ariaLabel={copy.forward.comment}
+							aria-labelledby={`${id}-comment`}
+							placeholder={copy.forward.commentPlaceholder}
+							value={comment}
+							onValueChange={setComment}
+						/>
 					</div>
-				)}
-				<div className="field">
-					{/* Sent with the forward as a message: the shared message box (Enter breaks the line), named by this label. */}
-					<span className="label" id={`${id}-comment`}>
-						{copy.forward.comment}
-					</span>
-					<PlainTextBox
-						className="input"
-						ariaLabel={copy.forward.comment}
-						aria-labelledby={`${id}-comment`}
-						placeholder={copy.forward.commentPlaceholder}
-						value={comment}
-						onValueChange={setComment}
-					/>
 				</div>
 			</div>
 			<div className="dlg-foot">

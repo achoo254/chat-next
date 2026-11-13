@@ -369,69 +369,75 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 		);
 	};
 	return (
-		<Modal labelledBy={id} onClose={onClose} className="narrow">
+		<Modal labelledBy={id} onClose={onClose} className="large">
 			<DialogHead id={id} title={user === undefined ? copy.profile.title : copy.profile.titleOf(name)} onClose={onClose} />
-			<div className="hero">
-				<ChatAvatar id={userId} name={name} size="lg" bot={user?.isBot === true} />
-				<h2>{self ? `${name} (${copy.common.you})` : name}</h2>
-				<p>{user?.isBot === true ? copy.info.bot : presenceLabel}</p>
-			</div>
-			{!self && (
-				<div className="profile-actions">
-					<button type="button" className="btn btn-primary" aria-busy={opening} disabled={opening} onClick={message}>
-						<Icon name="message" />
-						{copy.info.message}
-					</button>
-					<button type="button" className="btn" onClick={toggleBlock}>
-						<Icon name="ban" />
-						{isBlocked ? copy.info.unblock : copy.info.block}
-					</button>
-					{backend.features.has("report") && (
-						<button
-							type="button"
-							className="btn danger-text"
-							onClick={() => ui.dialog.set({ kind: "report", target: { kind: "user", userId }, name, blockUserId: userId })}
-						>
-							<Icon name="flag" />
-							{copy.info.report}
-						</button>
+			<div className="dlg-split">
+				<div className="dlg-pane">
+					<div className="hero">
+						<ChatAvatar id={userId} name={name} size="lg" bot={user?.isBot === true} />
+						<h2>{self ? `${name} (${copy.common.you})` : name}</h2>
+						<p>{user?.isBot === true ? copy.info.bot : presenceLabel}</p>
+					</div>
+					{!self && (
+						<div className="profile-actions">
+							<button type="button" className="btn btn-primary" aria-busy={opening} disabled={opening} onClick={message}>
+								<Icon name="message" />
+								{copy.info.message}
+							</button>
+							<button type="button" className="btn" onClick={toggleBlock}>
+								<Icon name="ban" />
+								{isBlocked ? copy.info.unblock : copy.info.block}
+							</button>
+							{backend.features.has("report") && (
+								<button
+									type="button"
+									className="btn danger-text"
+									onClick={() => ui.dialog.set({ kind: "report", target: { kind: "user", userId }, name, blockUserId: userId })}
+								>
+									<Icon name="flag" />
+									{copy.info.report}
+								</button>
+							)}
+						</div>
+					)}
+					{!self && user !== undefined && !user.isBot && (
+						<div className="profile-sec">
+							<ContactRow userId={userId} name={name} />
+						</div>
 					)}
 				</div>
-			)}
-			{!self && user !== undefined && !user.isBot && (
-				<div className="profile-sec">
-					<ContactRow userId={userId} name={name} />
+				<div className="dlg-pane">
+					<div className="info-sec">
+						{user !== undefined && user.username !== "" && (
+							<div className="row">
+								<Icon name="user" />
+								<span className="grow">
+									<MiddleTruncate text={`@${user.username}`} tail={4} />
+									<small>{copy.info.username}</small>
+								</span>
+								<CopyButton text={`@${user.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(user.username)} />
+							</div>
+						)}
+						{user !== undefined && user.bio !== "" && (
+							<div className="row">
+								<Icon name="info" />
+								<span className="grow">
+									{user.bio}
+									<small>{copy.info.bio}</small>
+								</span>
+							</div>
+						)}
+						{!self && user !== undefined && !user.isBot && (
+							<button type="button" className="row link-row" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: userId })}>
+								<Icon name="users" />
+								<span className="grow">{copy.profile.createGroupWith(name)}</span>
+								<Icon name="chevron-right" small />
+							</button>
+						)}
+					</div>
+					{!self && user !== undefined && <CommonChatsSection userId={userId} bot={user.isBot} />}
 				</div>
-			)}
-			<div className="info-sec">
-				{user !== undefined && user.username !== "" && (
-					<div className="row">
-						<Icon name="user" />
-						<span className="grow">
-							<MiddleTruncate text={`@${user.username}`} tail={4} />
-							<small>{copy.info.username}</small>
-						</span>
-						<CopyButton text={`@${user.username}`} label={copy.info.copyUsername} copiedLabel={copy.info.copiedUsername(user.username)} />
-					</div>
-				)}
-				{user !== undefined && user.bio !== "" && (
-					<div className="row">
-						<Icon name="info" />
-						<span className="grow">
-							{user.bio}
-							<small>{copy.info.bio}</small>
-						</span>
-					</div>
-				)}
-				{!self && user !== undefined && !user.isBot && (
-					<button type="button" className="row link-row" onClick={() => ui.dialog.set({ kind: "newGroup", withUserId: userId })}>
-						<Icon name="users" />
-						<span className="grow">{copy.profile.createGroupWith(name)}</span>
-						<Icon name="chevron-right" small />
-					</button>
-				)}
 			</div>
-			{!self && user !== undefined && <CommonChatsSection userId={userId} bot={user.isBot} />}
 		</Modal>
 	);
 }

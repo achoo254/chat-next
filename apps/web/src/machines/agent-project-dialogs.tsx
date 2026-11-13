@@ -295,7 +295,7 @@ export function AddAgentProjectDialog({ store, machines, onClose }: { store: Age
 	};
 	const sensitive = placing.ask;
 	return (
-		<Modal labelledBy={id} onClose={onClose} className="mx-sheet">
+		<Modal labelledBy={id} onClose={onClose} className={folderMode ? "mx-sheet large" : "mx-sheet"}>
 			<DialogHead id={id} title={p.addTitle} onClose={onClose} />
 			<form className="dlg-body stack mx-add-project" onSubmit={submit}>
 				<label className="mx-field-row">
@@ -362,7 +362,7 @@ export function AddWorkspaceDialog({ store, project, machines, onClose }: { stor
 		if (choice !== null && choice.dir !== "") placing.place(choice, {});
 	};
 	return (
-		<Modal labelledBy={id} onClose={onClose} className="mx-sheet">
+		<Modal labelledBy={id} onClose={onClose} className="mx-sheet large">
 			<DialogHead id={id} title={p.addWorkspaceTitle(project.name)} onClose={onClose} />
 			<form className="dlg-body stack mx-add-project" onSubmit={submit}>
 				<FolderChooser hosts={hosts} value={choice} onChange={setChoice} onQuick={(c) => placing.place(c, {})} busy={placing.busy} projectRemote={project.gitRemote} />
