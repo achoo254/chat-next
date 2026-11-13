@@ -7,7 +7,10 @@ import { join } from "node:path";
 import { SessionTickets } from "../src/mcp/session-tickets.ts";
 import { createClaudeProvider, denialText } from "../src/providers/claude/index.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
+import { AgyAcp } from "../src/providers/antigravity/acp-process.ts";
+import { createAntigravityProvider } from "../src/providers/antigravity/index.ts";
 import { fakeProvider } from "./fake-provider.ts";
+import { fakeAgy } from "./support/fake-agy.ts";
 import { fakeQuery } from "./fake-sdk.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
 
@@ -21,6 +24,22 @@ const adapters: [string, () => { provider: AgentProvider; resumeIds: () => (stri
       const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
       provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
       return { provider, resumeIds: () => sdk.log.options.map((o) => o.resume) };
+    },
+  ],
+  [
+    "antigravity (fake agy acp)",
+    () => {
+      const agy = fakeAgy();
+      const provider = createAntigravityProvider({
+        findBinary: async () => "agy",
+        acp: new AgyAcp({ findBinary: async () => "agy", log: () => undefined, spawnProcess: agy.spawnProcess }),
+        toolPermission: () => "request-review",
+      });
+      provider.detect = async () => ({ installed: true, version: "1.5.8", loginState: "ok" });
+      return {
+        provider,
+        resumeIds: () => agy.log.requests.filter((r) => r.method === "session/new" || r.method === "session/resume").map((r) => (r.method === "session/resume" ? String(r.params.sessionId) : undefined)),
+      };
     },
   ],
   [
@@ -247,6 +266,7 @@ describe.each(adapters)("provider contract: %s", (_name, make) => {
 
   it("answers a question", async () => {
     const { provider } = make();
+    if (!provider.capabilities.questions) return; // an AI that asks no questions
     const { core, work } = makeCore([provider]);
     const t = await core.create({ provider: provider.id, model: "", dir: work, text: "question", consent, device: "test" });
     const pending = await until(core, t.id, (i) => byCase(i, "question").length > 0);

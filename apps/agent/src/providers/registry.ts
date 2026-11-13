@@ -3,6 +3,7 @@
 import type { AccountsStore } from "../accounts/store.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { CLAUDE_PROVIDER_ID } from "./claude/accounts/paths.ts";
+import { createAntigravityProvider } from "./antigravity/index.ts";
 import { claudeHomesIn, createClaudeProvider } from "./claude/index.ts";
 import type { AgentProvider, ProviderInfo } from "./types.ts";
 
@@ -40,7 +41,8 @@ export function builtinProviders(src: ProviderSources): AgentProvider[] {
         }
       : { homes: () => claudeHomesIn(src.configDir) },
   );
-  return [claude];
+  const antigravity = createAntigravityProvider(a ? { log: a.log } : {});
+  return [claude, antigravity];
 }
 
 /** The AI with this id among `providers`; undefined when there is none. */
