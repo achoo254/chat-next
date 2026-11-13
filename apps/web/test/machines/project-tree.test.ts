@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../../src/machines/agent-projects-client.ts";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
-import { buildTree, locate, shortHost, statusOf, threadStatus, unseenDone, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
+import { buildTree, locate, projectIcon, shortHost, statusOf, threadStatus, unseenDone, workspaceIcon, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
@@ -180,5 +180,20 @@ describe("workspace titles", () => {
 	it("primary is the oldest checkout that is not a git worktree", () => {
 		const labels = workspaceLabels("x", [node(1, "/w/wt", "a", AgentWorkspaceKind.WORKTREE, 1), node(2, "/w/x", "b", AgentWorkspaceKind.CLONE, 5), node(3, "/w/y", "c", AgentWorkspaceKind.FOLDER, 9)]);
 		expect([...labels].filter(([, l]) => l.primary).map(([id]) => id)).toEqual([2]);
+	});
+});
+
+describe("row icons", () => {
+	it("a project linking a repository shows a repository, one without a plain project", () => {
+		expect(projectIcon({ gitRemote: "github.com/a/app" })).toBe("repo");
+		expect(projectIcon({ gitRemote: "" })).toBe("box");
+	});
+
+	it("a workspace shows what its folder is: a worktree, a git checkout or a plain folder", () => {
+		const of = (kind: AgentWorkspaceKind, branch: string) => workspaceIcon({ workspace: { ...ws(1, 1, "/w/a", branch), kind }, branch });
+		expect(of(AgentWorkspaceKind.WORKTREE, "fix")).toBe("worktree");
+		expect(of(AgentWorkspaceKind.CLONE, "")).toBe("branch");
+		expect(of(AgentWorkspaceKind.FOLDER, "main")).toBe("branch");
+		expect(of(AgentWorkspaceKind.FOLDER, "")).toBe("folder");
 	});
 });

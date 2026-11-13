@@ -54,6 +54,24 @@ const PATHS = {
 			<path d="M6 8v8M18 10a6 6 0 0 1-6 6H8" />
 		</>
 	),
+	// A project with a git repository.
+	repo: (
+		<>
+			<path d="M5 19V5a2 2 0 0 1 2-2h12v14H7a2 2 0 0 0-2 2a2 2 0 0 0 2 2h12" />
+			<path d="M9 7h6" />
+		</>
+	),
+	// A project without one.
+	box: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5" />,
+	// A git worktree.
+	worktree: (
+		<>
+			<circle cx="12" cy="18" r="2" />
+			<circle cx="7" cy="6" r="2" />
+			<circle cx="17" cy="6" r="2" />
+			<path d="M7 8v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8M12 12v4" />
+		</>
+	),
 	list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
 	user: (
 		<>

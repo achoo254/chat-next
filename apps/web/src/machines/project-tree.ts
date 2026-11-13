@@ -195,6 +195,17 @@ export function locate(projects: readonly AgentProject[], machineId: number, dir
 	return w === undefined || project === undefined ? null : { project, workspace: w };
 }
 
+/** A project row's own icon: a repository when it links one, else a plain project. */
+export function projectIcon(project: Pick<AgentProject, "gitRemote">): "repo" | "box" {
+	return project.gitRemote !== "" ? "repo" : "box";
+}
+
+/** A workspace row's own icon, by what the folder is: a git worktree, a git checkout, or a plain folder. */
+export function workspaceIcon(node: Pick<WorkspaceNode, "workspace" | "branch">): "worktree" | "branch" | "folder" {
+	if (node.workspace.kind === AgentWorkspaceKind.WORKTREE) return "worktree";
+	return node.workspace.kind === AgentWorkspaceKind.CLONE || node.branch !== "" ? "branch" : "folder";
+}
+
 /** How a workspace row names itself. */
 export interface WorkspaceLabel {
 	/** The branch, else the folder (two workspaces on one branch, no branch); never just the project's name. */

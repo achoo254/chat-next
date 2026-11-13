@@ -22,7 +22,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { NewSession } from "./new-session.tsx";
 import { folderName } from "./new-session-hints.ts";
 import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace, workspaceRemote } from "./project-actions.ts";
-import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, shortHost, unseenDone, workspaceLabels } from "./project-tree.ts";
+import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, projectIcon, shortHost, unseenDone, workspaceIcon, workspaceLabels } from "./project-tree.ts";
 import { SessionRow, StatusGlyph } from "./session-row.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
@@ -206,8 +206,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
 				<span className="mx-ws-name">
 					<span className="mx-ws-title">
-						{/* Its branch or its folder, or its state in that place. */}
-						<StatusGlyph status={node.status} icon={label.byBranch ? "branch" : "folder"} offline={node.offline} />
+						{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
+						<StatusGlyph status={node.status} icon={workspaceIcon(node)} offline={node.offline} />
 						<b>{label.title}</b>
 						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
@@ -304,8 +304,8 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 			<div className="mx-project-head">
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
 					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
-					{/* Its folder, or in that place the most urgent state of its workspaces. */}
-					<StatusGlyph status={node.status} icon="folder" offline={offline} />
+					{/* A repository or a plain project, or in that place the most urgent state of its workspaces. */}
+					<StatusGlyph status={node.status} icon={projectIcon(project)} offline={offline} />
 					<b>{project.name}</b>
 					{node.need > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(node.need)}>
