@@ -233,8 +233,8 @@ main() {
 		TUNELO_DISK_ACCESS_HINT=script "$bin" login </dev/null || signed_in=$?
 	fi
 	if [ "$signed_in" -ne 0 ]; then
-		say "Chưa đăng nhập được; chạy lại tunelo login khi sẵn sàng." \
-			"Not signed in yet; run tunelo login when you are ready." "尚未登录；准备好后请运行 tunelo login。"
+		say "Chưa kết nối xong máy này; xem lý do ở trên, hoặc chạy tunelo status." \
+			"This machine is not connected yet; see the reason above, or run tunelo status." "此机器尚未连接完成；原因见上方，或运行 tunelo status。"
 		return 0
 	fi
 	linger_hint

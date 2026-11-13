@@ -58,7 +58,7 @@ const LOGIN_HINT = "run `tunelo login`";
 /** Chat's state from what is stored, when no call to Chat is needed (or possible). */
 function storedChatState(config: ConfigStore, session: AppSession): AppState | undefined {
   const c = config.get();
-  if (c.machineRemoved) return { status: "off", detail: `removed on the web; ${LOGIN_HINT} to add it again` };
+  if (c.machineRemoved) return { status: "off", detail: `removed on the web; run \`tunelo login --force\` to add it again` };
   if (c.machineId && c.machineSecret) return { status: "ok", detail: `in AI Agent (machine ${c.machineId})` };
   if (!session.covers("chat")) return { status: "sign-in", detail: `${LOGIN_HINT} to add this machine to AI Agent` };
   return undefined;

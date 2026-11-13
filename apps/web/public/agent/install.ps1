@@ -218,7 +218,7 @@
 		'Signing tunelo in with your account (tunnel, Chat, Localman)…' '正在用你的账号登录 tunelo（隧道、Chat、Localman）…')
 	& $exe login
 	if ($LASTEXITCODE -ne 0) {
-		Write-Host (Get-Text 'Chưa đăng nhập được; chạy lại tunelo login khi sẵn sàng.' `
-			'Not signed in yet; run tunelo login when you are ready.' '尚未登录；准备好后请运行 tunelo login。')
+		Write-Host (Get-Text 'Chưa kết nối xong máy này; xem lý do ở trên, hoặc chạy tunelo status.' `
+			'This machine is not connected yet; see the reason above, or run tunelo status.' '此机器尚未连接完成；原因见上方，或运行 tunelo status。')
 	}
 }
