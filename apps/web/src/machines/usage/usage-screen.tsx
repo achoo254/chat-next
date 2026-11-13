@@ -189,5 +189,5 @@ export default function UsageScreen({ machine, repoKey }: { machine: string; rep
 	const [link, state] = useLink(hub, machine);
 	const entry = useEntry(hub, machine);
 	const name = entry?.name ?? state.info?.name ?? machine;
-	return <UsageView link={link} online={state.status.kind === "open"} machine={machine} machineName={name} ai={aiName(state.info, "claude")} repoKey={repoKey} />;
+	return <UsageView link={link} online={state.status.kind === "open"} machine={machine} machineName={name} ai={aiName(state.info, "")} repoKey={repoKey} />;
 }

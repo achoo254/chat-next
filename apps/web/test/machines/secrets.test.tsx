@@ -152,7 +152,7 @@ describe("the approval card of a command that uses a secret", () => {
 		);
 		expect(screen.getByText(/Lệnh này dùng bí mật đăng nhập GH_PASSWORD/)).toBeTruthy();
 		expect(screen.queryByText(english)).toBeNull();
-		expect(screen.queryByRole("button", { name: /Cho phép cả phiên/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Cho phép trong phiên này/ })).toBeNull();
 		await userEvent.keyboard("2");
 		expect(decided).toEqual([]);
 		await userEvent.click(screen.getByRole("button", { name: /^1?Cho phép$/ }));
@@ -165,7 +165,7 @@ describe("the approval card of a command that uses a secret", () => {
 				<ApprovalCard approval={command("npm test")} ai="Claude" sessionAllow onDecide={async () => undefined} />
 			</I18nProvider>,
 		);
-		expect(screen.getByRole("button", { name: /Cho phép cả phiên/ })).toBeTruthy();
+		expect(screen.getByRole("button", { name: /Cho phép trong phiên này/ })).toBeTruthy();
 	});
 
 	it("finds each secret a shell command names, once", () => {

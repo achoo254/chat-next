@@ -1,4 +1,4 @@
-// A machine's page: its sessions, its Claude accounts (claude-profiles.tsx),
+// A machine's page: its sessions, a way to its AI accounts (ai-accounts/),
 // whether Localman may send requests to localhost on it (local-forward-setting.tsx),
 // the consent log kept on the machine (opening sensitive folders, loading
 // project settings, approving sensitive tools, devices the account added or
@@ -14,8 +14,8 @@ import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { Link, navigate, paths } from "../router.tsx";
 import { AuditEntryText } from "./audit-entry-text.tsx";
-import { ClaudeProfiles } from "./claude-profiles.tsx";
 import { LOCAL_REF, setLocalMachine } from "./link/link-hub.ts";
+import { cachedProviders } from "./link/provider-cache.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { LocalForwardSetting } from "./local-forward-setting.tsx";
@@ -25,7 +25,7 @@ import { MachineScreen } from "./screen/machine-screen.tsx";
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { sortForList } from "./link/machine-link.ts";
-import { aiName, folderName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
+import { aiName, folderName, mcpAiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
@@ -96,9 +96,10 @@ export function MachineDetail({ machine }: { machine: string }) {
 			</div>
 		);
 	}
-	const ais = providerVersions(state);
-	/** The AI whose accounts the machine keeps; its accounts block shows below. */
-	const accountsAi = state.info?.providers.find((p) => p.capabilities?.accounts === true)?.id ?? "";
+	const ais = providerVersions(machine, state);
+	/** Some AI of the machine keeps several accounts: "Tài khoản AI" has a block for it. */
+	const hasAccounts = state.info?.providers.some((p) => p.capabilities?.accounts === true) === true;
+	const mcpAi = mcpAiName(state.info);
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.agent.infoOf(name)}>
 			<PageHead
@@ -127,11 +128,22 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</Link>
 					))}
 				</section>
-				{online && accountsAi !== "" && <ClaudeProfiles link={link} online={online} ai={aiName(state.info, accountsAi)} provider={accountsAi} announced={state.machineAccounts} />}
+				{hasAccounts && (
+					<section className="card pad mx-card" data-id="machine-ai-accounts">
+						<h3>{t.aiAccounts.title}</h3>
+						<p className="note">{t.aiAccounts.entryNote}</p>
+						<div className="acts">
+							<Link to={paths.machineAccounts(machine)} className="btn btn-sm" data-id="machine-ai-accounts-open">
+								<Icon name="key" small />
+								{t.aiAccounts.title}
+							</Link>
+						</div>
+					</section>
+				)}
 				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
-				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={aiName(state.info, "claude")} />}
-				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={aiName(state.info, "claude")} />}
-				{state.info?.screenShare === true && <MachineScreen link={link} state={state} ai={aiName(state.info, "claude")} />}
+				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={mcpAi} />}
+				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={mcpAi} />}
+				{state.info?.screenShare === true && <MachineScreen link={link} state={state} ai={mcpAi} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>
@@ -233,9 +245,10 @@ export function MachineDetail({ machine }: { machine: string }) {
 	);
 }
 
-/** Every AI installed on the machine, with the version it reported. */
-function providerVersions(state: ReturnType<typeof useLink>[1]): { id: string; name: string; version: string; untested: boolean }[] {
-	return (state.info?.providers ?? []).map((p) => ({ id: p.id, name: aiName(state.info, p.id), version: p.version, untested: p.untestedVersion }));
+/** Every AI installed on the machine, with the version it reported; while it is offline, as it reported them last. */
+function providerVersions(machine: string, state: ReturnType<typeof useLink>[1]): { id: string; name: string; version: string; untested: boolean }[] {
+	if (state.info === null) return cachedProviders(machine).map((p) => ({ ...p, name: p.name || p.id }));
+	return state.info.providers.map((p) => ({ id: p.id, name: aiName(state.info, p.id), version: p.version, untested: p.untestedVersion }));
 }
 
 function RenameDialog({ current, busy, error, onSave, onClose }: { current: string; busy: boolean; error: string; onSave: (name: string) => void; onClose: () => void }) {

@@ -1,10 +1,11 @@
-// The account item of the status bar: who the session's Claude is signed in
-// as, and a menu of the machine's profiles (account, plan, 5-hour and weekly
-// usage, when it was read, whether it must sign in again). Picking another
-// one switches the whole machine in one tap: idle sessions move at once,
-// running ones after their turn (the machine does it and announces it to
-// every device). Adding an account opens the sign-in dialog; the machine's
-// page keeps the full management.
+// The account item of the status bar: who the session's AI is signed in
+// as, and a menu of that AI's accounts on the machine (account, plan, 5-hour
+// and weekly usage, when it was read, whether it must sign in again). Picking
+// another one switches every session of that AI in one tap: idle sessions
+// move at once, running ones after their turn (the machine does it and
+// announces it to every device). Adding an account opens the sign-in dialog
+// where the AI offers one; "Tài khoản AI" of the machine keeps the full
+// management.
 import { useState } from "react";
 import type { AiAccount } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -70,8 +71,8 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 			<button
 				type="button"
 				className="mx-st-btn"
-				title={t.agent.account.label(label)}
-				aria-label={t.agent.account.label(label)}
+				title={t.agent.account.label(ai, label)}
+				aria-label={t.agent.account.label(ai, label)}
 				aria-haspopup="menu"
 				aria-expanded={open}
 				disabled={disabled || list === null}
@@ -82,8 +83,8 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 				<MachineIcon name="chevron-down" small />
 			</button>
 			{open && list !== null && (
-				<div className="mx-menu up mx-pop mx-profiles" role="menu" aria-label={t.agent.account.title}>
-					<h5>{t.agent.account.title}</h5>
+				<div className="mx-menu up mx-pop mx-profiles" role="menu" aria-label={t.agent.account.title(ai)}>
+					<h5>{t.agent.account.title(ai)}</h5>
 					<p className="mx-menu-hint">{t.agent.account.note}</p>
 					{list.accounts.map((profile) => (
 						<ProfileItem
@@ -96,20 +97,22 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 						/>
 					))}
 					<hr />
-					<button
-						type="button"
-						role="menuitem"
-						className="mx-menu-row"
-						disabled={busy !== null}
-						onClick={() => {
-							setOpen(false);
-							setAdding(true);
-						}}
-					>
-						<Icon name="plus" small />
-						<span>{t.agent.account.add}</span>
-					</button>
-					<Link to={paths.machineInfo(machine)} className="mx-menu-link">
+					{list.actions?.signIn === true && (
+						<button
+							type="button"
+							role="menuitem"
+							className="mx-menu-row"
+							disabled={busy !== null}
+							onClick={() => {
+								setOpen(false);
+								setAdding(true);
+							}}
+						>
+							<Icon name="plus" small />
+							<span>{t.agent.account.add(ai)}</span>
+						</button>
+					)}
+					<Link to={paths.machineAccounts(machine)} className="mx-menu-link">
 						<Icon name="settings" small />
 						<span>{t.agent.account.manage}</span>
 					</Link>
@@ -175,7 +178,8 @@ function ProfileItem({ profile, selected, busy, disabled, onPick }: ProfileItemP
 	);
 }
 
-function Usage({ label, pct }: { label: string; pct: number }) {
+/** One usage window as a labelled bar, warning from 80%. */
+export function Usage({ label, pct }: { label: string; pct: number }) {
 	return (
 		<span className={pct >= 80 ? "mx-st-item warn" : "mx-st-item"}>
 			<span>{label}</span>

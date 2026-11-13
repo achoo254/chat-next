@@ -323,6 +323,8 @@ const SCREENS: Record<string, string> = {
 	"machine-terminal": paths.machineTerminal("1"),
 	"machine-session-terminal": `/ai/1/s/${encodeURIComponent(DEMO_THREAD)}/terminal`,
 	"machine-info": paths.machineInfo("1"),
+	// "Tài khoản AI" of the demo machine: a Claude block and an Antigravity block.
+	"machine-ai-accounts": paths.machineAccounts("1"),
 	// "Hiệu quả" of the demo folder (test/support/fake-usage.ts).
 	"machine-usage": `/ai/1/usage/${encodeURIComponent("local:chat-next")}`,
 	"machine-add": paths.machinesAdd(),

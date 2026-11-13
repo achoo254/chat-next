@@ -5,7 +5,7 @@
 // does, the list is asked once (AccountList) and kept from the answers of
 // the requests made here. Every screen sees only the accounts of its own AI.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AccountStatus, type AccountListResult, type AiAccount, type Frame, type MachineAccounts, type ThreadInfo } from "@achoo254/chat-proto/remote/remote";
+import { AccountStatus, type AccountActions, type AccountListResult, type AiAccount, type Frame, type MachineAccounts, type ThreadInfo } from "@achoo254/chat-proto/remote/remote";
 import type { MachineLink } from "./link/machine-link.ts";
 
 type FrameBody = Parameters<MachineLink["request"]>[0];
@@ -19,15 +19,19 @@ export interface ProviderAccounts {
 	readonly accounts: readonly AiAccount[];
 	/** The picked account ("" for the AI's own sign-in). */
 	readonly selectedId: string;
+	/** What the AI offers on its accounts (adding one, keeping its current sign-in, reading usage). */
+	readonly actions: AccountActions | undefined;
+	/** Why its saved accounts cannot be read now (in English); "" when they can. */
+	readonly damaged: string;
 }
 
 /** The accounts of `provider` in `list`; null when the list is unknown or the machine keeps no accounts for that AI. */
 export function accountsOf(list: AccountListResult | null, provider: string): ProviderAccounts | null {
 	if (list === null || provider === "") return null;
 	const accounts = list.accounts.filter((a) => a.provider === provider);
-	const offered = list.actions.some((a) => a.provider === provider);
-	if (accounts.length === 0 && !offered) return null;
-	return { accounts, selectedId: list.selectedByProvider[provider] ?? "" };
+	const actions = list.actions.find((a) => a.provider === provider);
+	if (accounts.length === 0 && actions === undefined) return null;
+	return { accounts, selectedId: list.selectedByProvider[provider] ?? "", actions, damaged: list.damaged[provider] ?? "" };
 }
 
 export interface Profiles {
@@ -41,12 +45,23 @@ export interface Profiles {
 	readonly reload: () => void;
 }
 
-export function useProfiles(link: MachineLink, announced: MachineAccounts | null, online: boolean, provider: string): Profiles {
+/** Every AI's accounts on the machine, as announced or asked once, and the requests that change them. */
+export interface AccountList {
+	/** null until known. */
+	readonly whole: AccountListResult | null;
+	/** Sends an account request; its answer (an AccountListResult) replaces the list until the machine announces the next. */
+	readonly request: (body: FrameBody) => Promise<void>;
+	/** Asks the list again (a machine that does not announce it). */
+	readonly reload: () => void;
+}
+
+/** `ask`: false for a screen without an AI to show, which needs no list. */
+export function useAccountList(link: MachineLink, announced: MachineAccounts | null, online: boolean, ask = true): AccountList {
 	const [asked, setAsked] = useState<AccountListResult | null>(null);
 	const [round, setRound] = useState(0);
 	useEffect(() => {
-		// A machine that announces its accounts needs no question; nor does a screen without an AI.
-		if (!online || announced !== null || provider === "") return;
+		// A machine that announces its accounts needs no question.
+		if (!online || announced !== null || !ask) return;
 		let live = true;
 		link.request({ case: "accountList", value: {} }).then(
 			(frame) => {
@@ -59,7 +74,7 @@ export function useProfiles(link: MachineLink, announced: MachineAccounts | null
 		return () => {
 			live = false;
 		};
-	}, [link, online, announced, provider, round]);
+	}, [link, online, announced, ask, round]);
 	const request = useCallback(
 		async (body: FrameBody) => {
 			const next = listOf(await link.request(body));
@@ -68,9 +83,19 @@ export function useProfiles(link: MachineLink, announced: MachineAccounts | null
 		[link],
 	);
 	const reload = useCallback(() => setRound((n) => n + 1), []);
-	const whole = announced?.accounts ?? asked;
+	return { whole: announced?.accounts ?? asked, request, reload };
+}
+
+/** The accounts of one AI out of `all`. */
+export function profilesOf(all: AccountList, provider: string): Profiles {
+	return { provider, list: accountsOf(all.whole, provider), request: all.request, reload: all.reload };
+}
+
+export function useProfiles(link: MachineLink, announced: MachineAccounts | null, online: boolean, provider: string): Profiles {
+	const all = useAccountList(link, announced, online, provider !== "");
+	const { whole, request, reload } = all;
 	const list = useMemo(() => accountsOf(whole, provider), [whole, provider]);
-	return { provider, list, request, reload };
+	return useMemo(() => ({ provider, list, request, reload }), [provider, list, request, reload]);
 }
 
 /** The account `id` ("" for the AI's own sign-in) in `list`. */

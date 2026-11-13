@@ -215,9 +215,9 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 						id={`tell-${approval.toolId}`}
 						ref={field}
 						className="mx-field"
-						ariaLabel={t.agent.dock.tellLabel}
+						ariaLabel={t.agent.dock.tellLabel(ai)}
 						maxLength={DENY_MESSAGE_MAX}
-						placeholder={t.agent.dock.tellPlaceholder}
+						placeholder={t.agent.dock.tellPlaceholder(ai)}
 						value={message}
 						disabled={busy}
 						onValueChange={setMessage}
@@ -257,7 +257,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 					{!compact && (
 						<button type="button" className="btn btn-sm" disabled={busy} onClick={tell}>
 							{key("3")}
-							{t.agent.dock.denyTell}
+							{t.agent.dock.denyTell(ai)}
 						</button>
 					)}
 					<button type="button" className="btn btn-sm danger-outline" disabled={busy} onClick={() => decide(Decision.DENY)}>

@@ -16,7 +16,7 @@
 // paired with and one that is offline.
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { AccountStatus, Decision, GitFileState, ItemSchema, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
+import { AccountStatus, Decision, GitFileState, ItemSchema, LoginState, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
@@ -396,9 +396,14 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	machines.add({ name: "Máy nhà", os: "linux", arch: "x64", tunnelUrl: "", lastSeenAt: BigInt(Math.floor(now / 1000) - 2 * 3600), agentVersion: "2.0.1" });
 	const usage = (five: number, week: number) => ({ fiveHour: { utilization: five, resetsAt: BigInt(now + 3_600_000) }, sevenDay: { utilization: week, resetsAt: BigInt(now + 3 * 86_400_000) } });
 	const accounts = {
-		selectedByProvider: { claude: "p2" },
-		actions: [{ provider: "claude", signIn: true, usage: true }],
+		selectedByProvider: { claude: "p2", antigravity: "" },
+		actions: [
+			{ provider: "claude", signIn: true, usage: true },
+			{ provider: "antigravity", captureCurrent: true },
+		],
 		accounts: [
+			{ provider: "antigravity", id: "", email: "user@gmail.com", status: AccountStatus.OK, current: true },
+			{ provider: "antigravity", id: "g2", email: "work@example.com", status: AccountStatus.OK, createdAt: BigInt(now - 86_400_000) },
 			{ provider: "claude", id: "", email: "user@example.com", organization: "Acme", plan: "team", status: AccountStatus.OK, usage: usage(100, 64), usageUpdatedAt: BigInt(now - 120_000) },
 			{ provider: "claude", id: "p2", email: "user.max@example.com", plan: "max", status: AccountStatus.OK, usage: usage(4, 80), usageUpdatedAt: BigInt(now - 60_000) },
 			{ provider: "claude", id: "p3", email: "user.pro@example.com", plan: "pro", status: AccountStatus.NEEDS_SIGN_IN },
@@ -408,6 +413,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		switch (frame.body.case) {
 			case "accountList":
 			case "accountSelect":
+			case "accountCaptureCurrent":
+			case "usageRefresh":
 				return [{ case: "accountListResult", value: accounts }];
 			case "machineInfoRequest":
 				// Claude waits for a sign-in secret in the idle demo session (?at=machine-secret).
@@ -466,7 +473,31 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							terminal: TerminalAvailability.AVAILABLE,
 							maxSessions: 3,
 							openSessions: 1,
-							providers: [{ id: "claude", name: "Claude Code", version: "2.1.0", capabilities: { sessionAllow: true, images: true, terminal: true, accounts: true, models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }] } }],
+							providers: [
+								{
+									id: "claude",
+									name: "Claude Code",
+									version: "2.1.0",
+									loginState: LoginState.OK,
+									capabilities: {
+										sessionAllow: true,
+										images: true,
+										terminal: true,
+										accounts: true,
+										sessionMcp: true,
+										permissionModes: ["default", "acceptEdits", "plan", "auto"],
+										bypassModeId: "bypassPermissions",
+										models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }],
+									},
+								},
+								{
+									id: "antigravity",
+									name: "Antigravity",
+									version: "1.5.8",
+									loginState: LoginState.OK,
+									capabilities: { sessionAllow: true, accounts: true, terminal: true, permissionModes: ["default", "accept-edits", "auto", "plan"], bypassModeId: "full-access" },
+								},
+							],
 							attachments: { fileMaxBytes: 25n * 1024n * 1024n, messageMaxBytes: 50n * 1024n * 1024n, messageMaxFiles: 10, imageMaxBytes: 3_932_160n, pieceMaxBytes: 64 * 1024 },
 							devices: [
 								{ publicKey: device.publicKey, name: "Chrome · Windows", addedAt: BigInt(now - 3 * 86_400_000) },

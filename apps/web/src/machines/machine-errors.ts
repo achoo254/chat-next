@@ -8,6 +8,24 @@ import type { MachinesCopy } from "./copy-vi.ts";
 
 type Reasons = MachinesCopy["errors"]["reasons"];
 
+/** Keychain kinds the machine names when it could not switch an AI's sign-in. */
+const KEYCHAIN_SUBJECTS = new Set(["too-long", "failed", "keychain"]);
+
+/**
+ * Why an AI's account could not switch, by what holds it (ErrorReason.ACCOUNT_SWITCH_BLOCKED's
+ * subject): a running process ("<cli> pid N"), the machine's locked Keychain, the Keychain
+ * refusing, a session's title, or nothing named.
+ */
+function switchBlocked(r: Reasons, ai: string, subject: string): string {
+	const b = r.accountSwitchBlocked;
+	if (subject === "") return b.running(ai);
+	const pid = /^\S+ pid (\d+)$/.exec(subject);
+	if (pid !== null) return b.process(ai, pid[1] ?? "");
+	if (subject === "locked") return b.locked(ai);
+	if (KEYCHAIN_SUBJECTS.has(subject)) return b.keychain(ai);
+	return b.session(ai, subject);
+}
+
 /** The sentence for a reason; undefined when this page does not know it. */
 function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefined {
 	const s = err.subject;
@@ -33,7 +51,7 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 		case ErrorReason.AI_START_FAILED:
 			return r.aiStartFailed(ai, s);
 		case ErrorReason.ACCOUNT_UNUSABLE:
-			return r.profileUnusable(s);
+			return r.profileUnusable(ai, s);
 		case ErrorReason.THREAD_NOT_FOUND:
 			return r.threadNotFound;
 		case ErrorReason.ITEM_NOT_FOUND:
@@ -47,19 +65,19 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 		case ErrorReason.PERMISSION_MODE_NOT_ALLOWED:
 			return r.permissionModeNotAllowed(s);
 		case ErrorReason.NO_ACCOUNTS:
-			return r.noProfiles;
+			return r.noProfiles(ai);
 		case ErrorReason.ACCOUNT_NOT_FOUND:
-			return r.profileNotFound;
+			return r.profileNotFound(ai);
 		case ErrorReason.DEFAULT_ACCOUNT_PERMANENT:
 			return r.defaultProfilePermanent;
 		case ErrorReason.ACCOUNT_IN_USE:
 			return r.profileInUse;
 		case ErrorReason.ACCOUNT_SIGN_OUT_FAILED:
-			return r.profileSignOutFailed(s);
+			return r.profileSignOutFailed(ai);
 		case ErrorReason.ACCOUNTS_DAMAGED:
-			return r.profilesDamaged;
+			return r.profilesDamaged(ai);
 		case ErrorReason.ACCOUNT_SWITCH_BLOCKED:
-			return r.accountSwitchBlocked(ai, s);
+			return switchBlocked(r, ai, s);
 		case ErrorReason.PROVIDER_REQUIRED:
 			return r.providerRequired;
 		case ErrorReason.AI_CLI_MISSING:
@@ -111,7 +129,7 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 		case ErrorReason.TAKEOVER_GONE:
 			return r.takeoverGone;
 		case ErrorReason.BROWSER_NOT_RUNNING:
-			return r.browserNotRunning;
+			return r.browserNotRunning(ai);
 		case ErrorReason.SCREEN_SHARING_OFF:
 			return r.screenSharingOff;
 		case ErrorReason.SCREEN_SHARE_BUSY:

@@ -82,22 +82,24 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const all = foldTranscript(items, state.pending.get(threadId) ?? []);
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
-	const secretPrompts = [...state.secretPrompts.values()].filter((p) => p.threadId === threadId);
-	const takeovers = [...state.takeovers.values()].filter((x) => x.threadId === threadId);
-	const passkeys = state.passkeyNotices.filter((n) => n.threadId === threadId);
 	/** The takeover whose live view shows over the session. */
 	const [viewing, setViewing] = useState<string | null>(null);
 	const viewed = viewing === null ? undefined : state.takeovers.get(viewing);
 	/** The machine's whole screen shows over the session. */
 	const [screenOpen, setScreenOpen] = useState(false);
 	const openScreen = state.info?.screenShare === true ? () => setScreenOpen(true) : undefined;
-	const outside = secretPrompts.length + takeovers.length;
 	const changes = sessionChanges(items);
 	const gitSupported = state.info?.gitChanges === true;
 	const git = state.gitChanges.get(threadId) ?? null;
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
 	const caps = providerOf(state.info, provider)?.capabilities;
+	// Sign-in secrets, browser takeovers and passkey notices come from tunelo's own MCP: only for an AI whose sessions take it.
+	const mcp = caps?.sessionMcp === true;
+	const secretPrompts = mcp ? [...state.secretPrompts.values()].filter((p) => p.threadId === threadId) : [];
+	const takeovers = mcp ? [...state.takeovers.values()].filter((x) => x.threadId === threadId) : [];
+	const passkeys = mcp ? state.passkeyNotices.filter((n) => n.threadId === threadId) : [];
+	const outside = secretPrompts.length + takeovers.length;
 	const online = state.status.kind === "open";
 	const running = turnRunning(items) || thread?.state === ThreadState.RUNNING || thread?.state === ThreadState.WAITING || thread?.state === ThreadState.QUEUED;
 	const threadInfo = state.threadInfo.get(threadId);

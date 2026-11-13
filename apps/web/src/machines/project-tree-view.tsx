@@ -13,7 +13,7 @@
 // column's arrow keys. The dialogs load when opened.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { ErrorReason, LoginState, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { navigate } from "../router.tsx";
 import type { AgentProject } from "./agent-projects-client.ts";
@@ -26,7 +26,7 @@ import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, 
 import { SessionRow, StatusGlyph } from "./session-row.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
-import { aiName, errorText, type MachineView } from "./use-machines.ts";
+import { aiName, errorText, sessionProvider, type MachineView } from "./use-machines.ts";
 import { samePath } from "./projects-view.ts";
 import { useServices } from "../messaging/data/services.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -132,16 +132,18 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 	const start = () => {
 		if (machine === null) return;
 		if (local?.sensitive === true) return onAsk();
-		setStarting(true);
 		const d = local?.defaults;
 		const ref = machine.entry.ref;
-		// The project's own AI, else the machine's first signed-in one (as a new session picks it).
-		const providers = machine.state.info?.providers ?? [];
-		const provider = d?.provider || (providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? providers[0]?.id ?? "");
+		// The project's own AI, else the machine's first signed-in one (as a new session picks it); none: the dialog says why.
+		const provider = sessionProvider(machine.state.info, d?.provider ?? "");
+		if (provider === "") return onAsk();
+		setStarting(true);
+		// The project's mode is its own AI's: another AI starts as the machine has it.
+		const permissionMode = d !== undefined && provider === d.provider ? d.permissionMode : "";
 		machine.link
 			.request({
 				case: "threadCreate",
-				value: { provider, model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode: d?.permissionMode ?? "" },
+				value: { provider, model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode },
 			})
 			.then(
 				(frame) => {
@@ -185,7 +187,7 @@ function useWorkspaceSettings(machine: MachineView | null, dir: string, name: st
 					setAdded(made);
 					onOpen();
 				},
-				(err: unknown) => toasts.show(errorText(t, err, aiName(machine.state.info, "claude"))),
+				(err: unknown) => toasts.show(errorText(t, err, aiName(machine.state.info, ""))),
 			);
 	};
 	return { project: local ?? added, open };
@@ -254,7 +256,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 			)}
 			<Suspense fallback={null}>
 				{dialog === "settings" && machine !== null && settings.project !== undefined && (
-					<ProjectSettingsDialog link={machine.link} project={settings.project} state={machine.state} ai={aiName(machine.state.info, "claude")} onClose={() => setDialog(null)} />
+					<ProjectSettingsDialog link={machine.link} project={settings.project} state={machine.state} onClose={() => setDialog(null)} />
 				)}
 				{dialog === "move" && (
 					<PickProjectDialog

@@ -13,8 +13,8 @@ import type { MachinesCopy } from "./copy-vi.ts";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { ModelMenu } from "./model-menu.tsx";
-import { permissionMode, planName, usageOf, type Countdown } from "./status-line.ts";
-import { defaultModelName, errorText, modelName, useNow } from "./use-machines.ts";
+import { modeKey, modeLabel, planName, usageOf, type Countdown } from "./status-line.ts";
+import { defaultModelName, errorText, modelName, providerOf, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -77,7 +77,9 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 			)}
 			<div className="mx-status-row">
 				<ModelMenu link={link} info={machine} threadId={threadId} provider={provider} model={model} answered={answered} effort={info?.effort ?? ""} disabled={!online} />
-				{mode !== null && <ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} link={link} threadId={threadId} disabled={!online} />}
+				{mode !== null && (
+					<ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} bypass={providerOf(machine, provider)?.capabilities?.bypassModeId ?? ""} link={link} threadId={threadId} disabled={!online} />
+				)}
 				{account}
 				{five !== null && five.pct >= USAGE_WARN && (
 					<span
@@ -204,22 +206,21 @@ interface ModeMenuProps {
 	mode: string;
 	/** Modes the machine lets a device pick; empty on an agent too old to switch. */
 	modes: readonly string[];
+	/** The AI's mode that skips every prompt (ProviderCapabilities.bypass_mode_id); "" when it has none. */
+	bypass: string;
 	link: MachineLink;
 	threadId: string;
 	disabled: boolean;
 }
 
 /** The session's permission mode; a menu of the allowed modes when the machine offers any. */
-function ModeMenu({ ai, mode, modes, link, threadId, disabled }: ModeMenuProps) {
+function ModeMenu({ ai, mode, modes, bypass, link, threadId, disabled }: ModeMenuProps) {
 	const t = useMachinesCopy();
 	const { open, setOpen, ref } = usePopover();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
-	const label = (m: string) => {
-		const known = permissionMode(m);
-		return known === null ? m : t.statusBar.modes[known];
-	};
-	const className = permissionMode(mode) === "bypassPermissions" ? "mx-mode warn" : "mx-mode";
+	const label = (m: string) => modeLabel(t.statusBar.modes, m, bypass);
+	const className = modeKey(mode, bypass) === "bypass" ? "mx-mode warn" : "mx-mode";
 	if (modes.length === 0) {
 		return (
 			<span className={className} title={t.agent.status.mode}>
@@ -254,7 +255,7 @@ function ModeMenu({ ai, mode, modes, link, threadId, disabled }: ModeMenuProps) 
 				<div className="mx-menu up" role="menu" aria-label={t.statusBar.modeMenu}>
 					<h5>{t.statusBar.modeMenu}</h5>
 					{modes.map((m) => {
-						const known = permissionMode(m);
+						const known = modeKey(m, bypass);
 						return (
 							<button key={m} type="button" role="menuitemradio" aria-checked={m === mode} disabled={busy} onClick={() => pick(m)}>
 								{m === mode ? <Icon name="check" small /> : <span className="mx-menu-gap" />}

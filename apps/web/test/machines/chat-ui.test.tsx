@@ -5,6 +5,7 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	Decision,
+	MachineInfoSchema,
 	PromptState,
 	SlashCommandSchema,
 	ThreadInfoSchema,
@@ -24,7 +25,7 @@ import { filterCommands, flatCommands } from "../../src/machines/slash-commands.
 import { commandToken } from "../../src/components/plain-text-box.tsx";
 import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
-import { permissionMode, resetIn, usageOf } from "../../src/machines/status-line.ts";
+import { modeKey, modeLabel, resetIn, usageOf } from "../../src/machines/status-line.ts";
 import type { ToolRun } from "../../src/machines/transcript/tool-fold.ts";
 import { boxValue } from "../support/plain-text-box.ts";
 
@@ -103,10 +104,19 @@ describe("status bar", () => {
 		expect(usageOf({ utilization: 140, resetsAt: 0n } as never, NOW)).toMatchObject({ pct: 100, left: null });
 	});
 
-	it("knows Claude's permission modes and keeps others as they are", () => {
-		expect(permissionMode("acceptEdits")).toBe("acceptEdits");
-		expect(permissionMode("bypassPermissions")).toBe("bypassPermissions");
-		expect(permissionMode("dontAsk")).toBeNull();
+	it("labels the modes it knows, the AI's own bypass mode as bypass, and keeps others as the AI names them", () => {
+		expect(modeKey("acceptEdits", "bypassPermissions")).toBe("acceptEdits");
+		expect(modeKey("accept-edits", "full-access")).toBe("acceptEdits");
+		expect(modeKey("bypassPermissions", "bypassPermissions")).toBe("bypass");
+		expect(modeKey("full-access", "full-access")).toBe("bypass");
+		// Another AI's bypass id is not this one's.
+		expect(modeKey("full-access", "bypassPermissions")).toBeNull();
+		expect(modeKey("dontAsk", "")).toBeNull();
+		expect(modeKey("", "")).toBeNull();
+		expect(modeKey("toString", "")).toBeNull();
+		const labels = { default: "D", acceptEdits: "E", plan: "P", auto: "A", bypass: "B" };
+		expect(modeLabel(labels, "full-access", "full-access")).toBe("B");
+		expect(modeLabel(labels, "yolo", "full-access")).toBe("yolo");
 	});
 
 	it("keeps model and mode in the line, usage only near its limit, the rest labelled in Chi tiết", async () => {
@@ -126,7 +136,8 @@ describe("status bar", () => {
 					sevenDay: { utilization: 80, resetsAt: BigInt(NOW + 2 * 86_400_000 + 60_000) },
 				},
 			});
-			wrap(<StatusBar answered="" ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} machine={null} provider="claude" model="" context={0.34} info={info} {...live} />);
+			const machine = create(MachineInfoSchema, { providers: [{ id: "claude", name: "Claude Code", capabilities: { bypassModeId: "bypassPermissions" } }] });
+			wrap(<StatusBar answered="" ai="Claude Code" dir={"D:\\CONG VIEC\\chat-next"} machine={machine} provider="claude" model="" context={0.34} info={info} {...live} />);
 			const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 			expect(within(bar).getByText("mặc định")).toBeTruthy();
 			expect(within(bar).getByText("Bỏ qua quyền").closest(".mx-mode")?.classList.contains("warn")).toBe(true);
@@ -161,6 +172,22 @@ describe("status bar", () => {
 		wrap(<StatusBar answered="claude-opus-5-5" ai="Claude Code" dir="" machine={null} provider="claude" model="" context={null} info={undefined} {...live} />);
 		const bar = screen.getByRole("group", { name: "Trạng thái phiên" });
 		expect(within(bar).getByText("mặc định · Opus 5.5")).toBeTruthy();
+	});
+
+	it("reads full access from the session's own AI, with that AI's mode names", async () => {
+		const user = userEvent.setup();
+		const machine = create(MachineInfoSchema, {
+			providers: [
+				{ id: "claude", name: "Claude Code", capabilities: { bypassModeId: "bypassPermissions" } },
+				{ id: "antigravity", name: "Antigravity", capabilities: { bypassModeId: "full-access" } },
+			],
+		});
+		const info = create(ThreadInfoSchema, { permissionMode: "full-access", permissionModes: ["default", "accept-edits", "auto", "plan", "full-access"] });
+		wrap(<StatusBar answered="" ai="Antigravity" dir="" machine={machine} provider="antigravity" model="" context={null} info={info} {...live} />);
+		expect(screen.getByRole("button", { name: /Bỏ qua quyền/ }).classList.contains("warn")).toBe(true);
+		await user.click(screen.getByRole("button", { name: /Bỏ qua quyền/ }));
+		const menu = screen.getByRole("menu", { name: "Chế độ quyền của phiên" });
+		expect(within(menu).getByRole("menuitemradio", { name: /Tự sửa file/ })).toBeTruthy();
 	});
 
 	it("shows an unknown permission mode as is, without the warning", () => {

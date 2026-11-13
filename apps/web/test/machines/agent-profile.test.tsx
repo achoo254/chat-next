@@ -83,8 +83,8 @@ describe("machine profile", () => {
 		const user = userEvent.setup();
 		const { link, sent } = fakeLink(() => list("p2"));
 		wrap(<Harness link={link} announced={announce("")} />);
-		await user.click(screen.getByRole("button", { name: /Tài khoản Claude: team@example.com · Team/ }));
-		const menu = screen.getByRole("menu", { name: "Tài khoản Claude của máy" });
+		await user.click(screen.getByRole("button", { name: /Tài khoản Claude Code: team@example.com · Team/ }));
+		const menu = screen.getByRole("menu", { name: "Tài khoản Claude Code của máy" });
 		const items = within(menu).getAllByRole("menuitemradio");
 		expect(items[0]?.getAttribute("aria-checked")).toBe("true");
 		expect(within(items[0] as HTMLElement).getByText("100%")).toBeTruthy();
@@ -111,7 +111,7 @@ describe("machine profile", () => {
 		wrap(<Live />);
 		expect(screen.getByRole("button", { name: /team@example.com/ })).toBeTruthy();
 		act(() => screen.getByRole("button", { name: "push" }).click());
-		expect(screen.getByRole("button", { name: /Tài khoản Claude: max@example.com · Max/ })).toBeTruthy();
+		expect(screen.getByRole("button", { name: /Tài khoản Claude Code: max@example.com · Max/ })).toBeTruthy();
 		expect(sent).toEqual([]);
 	});
 

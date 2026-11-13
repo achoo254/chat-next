@@ -35,6 +35,8 @@ export type MachinesView =
 	/** The machine's sessions and their board. */
 	| { readonly page: "machine"; readonly machine: string }
 	| { readonly page: "info"; readonly machine: string }
+	/** "Tài khoản AI": the accounts each AI of the machine keeps. */
+	| { readonly page: "accounts"; readonly machine: string }
 	/** The machine's plain shells (tunelo 2.4.0+ with its terminal process); ?new=<folder> opens one more. */
 	| { readonly page: "terminal"; readonly machine: string }
 	| { readonly page: "session"; readonly machine: string; readonly threadId: string }
@@ -110,6 +112,7 @@ export const paths = {
 	machinesLocal: () => "/ai/local/setup",
 	machine: (machine: string) => `/ai/${machine}`,
 	machineInfo: (machine: string) => `/ai/${machine}/info`,
+	machineAccounts: (machine: string) => `/ai/${machine}/accounts`,
 	machineTerminal: (machine: string) => `/ai/${machine}/terminal`,
 	machineSession: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}`,
 	/** The sign-in card alone, for visitors (the header's "Đăng nhập"); signed in, it opens the chats. */
@@ -233,6 +236,7 @@ function matchMachines(parts: readonly string[]): Route | null {
 	if (machine === null) return null;
 	if (parts.length === 1) return route({ page: "machine", machine });
 	if (parts.length === 2 && parts[1] === "info") return route({ page: "info", machine });
+	if (parts.length === 2 && parts[1] === "accounts") return route({ page: "accounts", machine });
 	if (parts.length === 2 && parts[1] === "terminal") return route({ page: "terminal", machine });
 	// The third part: a thread id, or the repository key of the usage page (only a filter of the machine's own report).
 	const threadId = parts[2] === undefined ? "" : decodeURIComponent(parts[2]);
@@ -310,6 +314,8 @@ interface LinkProps {
 	className?: string;
 	current?: boolean;
 	"aria-label"?: string;
+	/** An address for the element (tests, people pointing at it); never styling. */
+	"data-id"?: string;
 	title?: string;
 	children: ReactNode;
 }
@@ -332,6 +338,7 @@ export function Link({ to, className, current, title, children, ...rest }: LinkP
 			title={title}
 			aria-current={current ? "page" : undefined}
 			aria-label={rest["aria-label"]}
+			data-id={rest["data-id"]}
 			onClick={onClick}
 		>
 			{children}

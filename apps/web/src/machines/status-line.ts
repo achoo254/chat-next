@@ -1,6 +1,6 @@
 // What the status bar above the composer reads, as plain functions: the
 // countdown to a usage window's reset, a usage window shown or not, and the
-// session's permission mode as one of the known Claude modes.
+// session's permission mode by the label it shows.
 import type { RateWindow } from "@achoo254/chat-proto/remote/remote";
 
 export interface Countdown {
@@ -27,13 +27,32 @@ export function usageOf(window: RateWindow | undefined, nowMs: number): { readon
 	return { pct, left: resetIn(window.resetsAt, nowMs), resetsAt: Number(window.resetsAt) };
 }
 
-export type PermissionMode = "default" | "acceptEdits" | "plan" | "bypassPermissions" | "auto";
+/** The permission modes this page has a label for (status-bar.tsx); the AI's own bypass mode reads "bypass". */
+export type ModeKey = "default" | "acceptEdits" | "plan" | "auto" | "bypass";
 
-const MODES: readonly PermissionMode[] = ["default", "acceptEdits", "plan", "bypassPermissions", "auto"];
+/** Mode ids as the AIs name them, by the label they share. */
+const KNOWN_MODES: Readonly<Record<string, Exclude<ModeKey, "bypass">>> = {
+	default: "default",
+	acceptEdits: "acceptEdits",
+	"accept-edits": "acceptEdits",
+	plan: "plan",
+	auto: "auto",
+};
 
-/** A known mode, or null for a value this page does not know (shown as is). */
-export function permissionMode(value: string): PermissionMode | null {
-	return (MODES as readonly string[]).includes(value) ? (value as PermissionMode) : null;
+/**
+ * The label of a session's permission mode: "bypass" for the AI's mode that
+ * skips every prompt (ProviderCapabilities.bypass_mode_id), a known mode, or
+ * null for one this page does not know (shown as the AI names it).
+ */
+export function modeKey(value: string, bypassModeId: string): ModeKey | null {
+	if (value !== "" && value === bypassModeId) return "bypass";
+	return Object.hasOwn(KNOWN_MODES, value) ? (KNOWN_MODES[value] ?? null) : null;
+}
+
+/** A mode as people read it: its translated label, else the id the AI gave it. */
+export function modeLabel(labels: Readonly<Record<ModeKey, string>>, value: string, bypassModeId: string): string {
+	const key = modeKey(value, bypassModeId);
+	return key === null ? value : labels[key];
 }
 
 /** "max" becomes "Max": the plan as the AI's CLI names it, capitalised; "" stays "". */

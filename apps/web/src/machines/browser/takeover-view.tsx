@@ -319,7 +319,7 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 	const current = tabs.find((x) => x.targetId === shown);
 	const url = current?.url ?? takeover.url;
 	const expires = new Date(Number(takeover.expiresAt)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-	const forClaude = takeover.threadId !== "";
+	const forSession = takeover.threadId !== "";
 	return (
 		<div className={`mx-browser${inSession ? " in-session" : ""}`} role="dialog" aria-modal={!inSession} aria-labelledby={`${id}-title`} data-id="browser-view">
 			<header className="mx-browser-head">
@@ -328,7 +328,7 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 						<Icon name="globe" />
 						<span>{b.viewTitle}</span>
 					</h3>
-					{forClaude && takeover.reason !== "" && <p className="mx-browser-reason">{takeover.reason}</p>}
+					{forSession && takeover.reason !== "" && <p className="mx-browser-reason">{takeover.reason}</p>}
 				</div>
 				<span className={`chip mx-browser-live${online ? " on" : ""}`} role="status">
 					{online ? (rtt === null ? b.liveNoMs : b.live(rtt)) : b.connecting}
@@ -430,7 +430,7 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 					<span className="muted">{b.expires(expires)}</span>
 				</p>
 				<button type="button" className="btn btn-primary btn-sm" disabled={ending} onClick={giveBack} data-id="browser-view-give-back">
-					{forClaude ? b.giveBack(ai) : b.close}
+					{forSession ? b.giveBack(ai) : b.close}
 				</button>
 			</footer>
 			{error !== "" && (

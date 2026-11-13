@@ -1,9 +1,9 @@
-// Adding a Claude account to a machine from this device: the machine starts
-// claude's own sign-in and sends its page link here (end to end encrypted);
-// the user signs in on that page and pastes back the code it shows, which
-// goes to the machine the same way and is not kept anywhere. When the
-// machine's claude cannot sign in from a device, the dialog shows the
-// command to run on the machine instead.
+// Adding an account of an AI that signs in from a device (AccountActions.sign_in;
+// Claude today) to a machine from this device: the machine starts the AI's own
+// sign-in and sends its page link here (end to end encrypted); the user signs
+// in on that page and pastes back the code it shows, which goes to the machine
+// the same way and is not kept anywhere. When the machine's AI cannot sign in
+// from a device, the dialog says to sign in on the machine instead.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
@@ -30,7 +30,7 @@ interface SignInCodeDialogProps {
 
 /** What a failed sign-in says, by the machine's error code. */
 function failedText(t: MachinesCopy, error: string): string {
-	return t.profiles.signIn.errors[error] ?? t.errors.generic;
+	return t.aiAccounts.signIn.errors[error] ?? t.errors.generic;
 }
 
 /** Only a Claude page opens from here, whatever the machine sent. */
@@ -46,8 +46,8 @@ export function safeSignInUrl(url: string): string | null {
 
 export function SignInCodeDialog({ link, ai, provider, onAdded, onClose }: SignInCodeDialogProps) {
 	const t = useMachinesCopy();
-	const s = t.profiles.signIn;
-	const id = useDomId("claude-sign-in");
+	const s = t.aiAccounts.signIn;
+	const id = useDomId("ai-sign-in");
 	const [step, setStep] = useState<Step>({ kind: "starting" });
 	const [code, setCode] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -123,11 +123,11 @@ export function SignInCodeDialog({ link, ai, provider, onAdded, onClose }: SignI
 
 	return (
 		<Modal labelledBy={id} onClose={close}>
-			<DialogHead id={id} title={s.title} onClose={close} />
+			<DialogHead id={id} title={s.title(ai)} onClose={close} />
 			{step.kind === "prompt" ? (
 				<form onSubmit={submit}>
 					<div className="dlg-body stack">
-						<p>{s.step1}</p>
+						<p>{s.step1(ai)}</p>
 						<a className="btn" href={step.url} target="_blank" rel="noopener noreferrer">
 							{s.open}
 						</a>
@@ -172,8 +172,7 @@ export function SignInCodeDialog({ link, ai, provider, onAdded, onClose }: SignI
 						{step.kind === "on-machine" && (
 							<>
 								<h3>{s.onMachineTitle}</h3>
-								<p>{s.onMachine}</p>
-								<pre className="mono">{s.command}</pre>
+								<p>{s.onMachine(ai)}</p>
 							</>
 						)}
 					</div>

@@ -3,7 +3,7 @@
 // the folder, and opens the session waiting when no message is given. Project settings
 // in a folder the machine does not trust yet ask to trust it right there.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LoginState, ProjectSchema, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -14,12 +14,16 @@ import { folderName, inDiskAccessFolder, pathCrumbs, recentFolders } from "../..
 import { boxValue } from "../support/plain-text-box.ts";
 
 const HOME = "/Users/me";
+/** The AIs of the machine: one signed in. */
+const AIS = [{ id: "claude", name: "Claude Code", version: "2.1.0", loginState: LoginState.OK }];
+/** What a current machine reports, unless a test says otherwise. */
+const INFO = { agentVersion: "9.9.9", providers: AIS, pinnedDirs: [], recentDirs: [] };
 const thread = (id: string, dir: string, updatedAt: number): ThreadSummary =>
 	create(ThreadSummarySchema, { id, dir, title: id, updatedAt: BigInt(updatedAt) });
 
 interface Request {
 	case: string;
-	value: { path?: string; text?: string; dir?: string; consent?: { projectSettings?: boolean; trustProject?: boolean } };
+	value: { path?: string; text?: string; dir?: string; provider?: string; consent?: { projectSettings?: boolean; trustProject?: boolean } };
 }
 
 /** A machine that lists any folder under HOME (not `missing`) and creates threads; `untrusted` needs trust for project settings. */
@@ -46,7 +50,7 @@ const fakeLink = (missing = "", untrusted = "") => {
 	return { link, sent };
 };
 
-const stateWith = (threads: ThreadSummary[], listed = true, info: unknown = null): LinkState =>
+const stateWith = (threads: ThreadSummary[], listed = true, info: unknown = INFO): LinkState =>
 	({
 		status: { kind: "open" },
 		info,
@@ -126,7 +130,7 @@ describe("new session", () => {
 
 	it("a machine before tunelo 2.0.9 refuses an empty message, so it gets the default idea", async () => {
 		const { link, sent } = fakeLink();
-		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, { agentVersion: "2.0.8", providers: [], pinnedDirs: [], recentDirs: [], home: "/Users/x" }));
+		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, { agentVersion: "2.0.8", providers: AIS, pinnedDirs: [], recentDirs: [], home: "/Users/x" }));
 		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		await waitFor(() => expect(sent.find((r) => r.case === "threadCreate")?.value.text).toContain("chat-next"));
@@ -200,7 +204,7 @@ describe("new session", () => {
 describe("project settings in the home folder", () => {
 	it("are off and locked in the home or a sensitive folder, with the reason, and free in a project", async () => {
 		const { link, sent } = fakeLink();
-		open(link, { ...stateWith([]), info: { home: HOME, providers: [], recentDirs: [], pinnedDirs: [] } } as unknown as LinkState);
+		open(link, { ...stateWith([]), info: { home: HOME, providers: AIS, recentDirs: [], pinnedDirs: [] } } as unknown as LinkState);
 		await waitFor(() => expect(folderInput().value).toBe(HOME));
 		const box = screen.getByRole("checkbox", { name: /Nạp cấu hình AI/ }) as HTMLInputElement;
 		expect(box.disabled).toBe(true);
@@ -285,7 +289,7 @@ describe("folders that need Full Disk Access", () => {
 
 	it("warn in the dialog only while the machine lacks it", async () => {
 		const { link } = fakeLink();
-		const info = { home: HOME, needsFullDiskAccess: true, providers: [], pinnedDirs: [], recentDirs: [] };
+		const info = { home: HOME, needsFullDiskAccess: true, providers: AIS, pinnedDirs: [], recentDirs: [] };
 		const view = open(link, stateWith([thread("a", "/Users/me/Downloads/x", 1)], true, info));
 		await waitFor(() => expect(folderInput().value).toBe("/Users/me/Downloads/x"));
 		expect(screen.getByRole("note").textContent).toMatch(/Full Disk Access/);
@@ -313,7 +317,7 @@ describe("the folder field and the path above the list", () => {
 
 	it("is a breadcrumb whose folders each go there, from home, with a text label", async () => {
 		const { link, sent } = fakeLink();
-		const info = { home: HOME, providers: [], pinnedDirs: [], recentDirs: [] };
+		const info = { home: HOME, providers: AIS, pinnedDirs: [], recentDirs: [] };
 		open(link, stateWith([thread("a", "/Users/me/projects/chat-next", 1)], true, info));
 		const nav = await screen.findByRole("navigation", { name: "Đường dẫn thư mục" });
 		await waitFor(() => expect(nav.textContent).toBe("meprojectschat-next"));
@@ -336,7 +340,7 @@ describe("the folder field and the path above the list", () => {
 
 it("names every button, and an icon on its own also has a tooltip", async () => {
 	const { link } = fakeLink();
-	const info = { home: HOME, providers: [], pinnedDirs: ["/w/pinned"], recentDirs: [] };
+	const info = { home: HOME, providers: AIS, pinnedDirs: ["/w/pinned"], recentDirs: [] };
 	open(link, stateWith([thread("a", "/Users/me/projects/chat-next", 1)], true, info));
 	await screen.findByRole("navigation", { name: "Đường dẫn thư mục" });
 	fireEvent.change(folderInput(), { target: { value: "/w/p" } });
@@ -346,4 +350,64 @@ it("names every button, and an icon on its own also has a tooltip", async () => 
 		expect(text !== "" || label !== "", button.outerHTML).toBe(true);
 		if (text === "") expect(button.getAttribute("title"), button.outerHTML).toBeTruthy();
 	}
+});
+
+describe("the AI of a new session", () => {
+	const two = (claude: LoginState, antigravity: LoginState) => ({
+		agentVersion: "9.9.9",
+		pinnedDirs: [],
+		recentDirs: [],
+		providers: [
+			{ id: "claude", name: "Claude Code", version: "2.1.0", loginState: claude },
+			{ id: "antigravity", name: "Antigravity", version: "1.5.8", loginState: antigravity },
+		],
+	});
+	const created = (sent: Request[]) => sent.find((r) => r.case === "threadCreate") as (Request & { value: { provider: string; permissionMode: string } }) | undefined;
+
+	it("is the machine's first signed-in AI, never a fixed one", async () => {
+		const { link, sent } = fakeLink();
+		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, two(LoginState.NEEDS_LOGIN, LoginState.OK)));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(created(sent)?.value.provider).toBe("antigravity"));
+	});
+
+	it("is the project's own AI, with the project's mode; another AI picked drops that mode", async () => {
+		const { link, sent } = fakeLink();
+		const project = create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { provider: "antigravity", permissionMode: "accept-edits" } });
+		const state = { ...stateWith([], true, two(LoginState.OK, LoginState.OK)), projects: { projects: [project] } } as unknown as LinkState;
+		const view = render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={link} state={state} project={project} onClose={() => {}} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		expect(screen.getByRole<HTMLInputElement>("radio", { name: /Antigravity/ }).checked).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(created(sent)?.value).toMatchObject({ provider: "antigravity", permissionMode: "accept-edits" }));
+		view.unmount();
+
+		const again = fakeLink();
+		render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={again.link} state={state} project={project} onClose={() => {}} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		fireEvent.click(screen.getByRole("radio", { name: /Claude Code/ }));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(created(again.sent)?.value).toMatchObject({ provider: "claude", permissionMode: "" }));
+	});
+
+	it("is never sent empty: without a signed-in AI the dialog says why and starts nothing", async () => {
+		const { link, sent } = fakeLink();
+		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, two(LoginState.NEEDS_LOGIN, LoginState.NEEDS_LOGIN)));
+		await waitFor(() => expect(folderInput().value).toBe("/w/chat-next"));
+		expect(screen.getByText(/Máy chưa có AI nào đã đăng nhập/)).toBeTruthy();
+		const start = screen.getByRole<HTMLButtonElement>("button", { name: "Bắt đầu" });
+		expect(start.disabled).toBe(true);
+		fireEvent.submit(start.closest("form") as HTMLFormElement);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(created(sent)).toBeUndefined();
+	});
 });

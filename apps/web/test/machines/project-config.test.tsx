@@ -2,7 +2,7 @@
 // workspace's settings, the hint over a chat session that runs without it,
 // and what an older machine (no per-folder level) or a sensitive folder gets.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, ProjectConfigLevel, ProjectSchema, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, MachineInfoSchema, ProjectConfigLevel, ProjectSchema, type Project } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -42,7 +42,7 @@ const project = (level: ProjectConfigLevel, projectSettings = false): Project =>
 const openDialog = (link: MachineLink, p: Project) =>
 	render(
 		<I18nProvider>
-			<ProjectSettingsDialog link={link} project={p} state={state} ai="Claude Code" onClose={() => {}} />
+			<ProjectSettingsDialog link={link} project={p} state={state} onClose={() => {}} />
 		</I18nProvider>,
 	);
 
@@ -129,5 +129,49 @@ describe("the hint over a chat session without its project's configuration", () 
 		hint(fakeLink(ErrorReason.TRUST_ON_MACHINE).link, ProjectConfigLevel.OFF);
 		await userEvent.click(screen.getByRole("button", { name: "Nạp kỹ năng dự án" }));
 		expect((await screen.findByRole("alert")).textContent).toContain("không bật được từ thiết bị");
+	});
+});
+
+describe("the AI of a workspace's new sessions", () => {
+	const withAis = {
+		...state,
+		info: create(MachineInfoSchema, {
+			providers: [
+				{ id: "claude", name: "Claude Code", capabilities: { models: [{ id: "opus", name: "Opus" }], permissionModes: ["default", "acceptEdits", "plan"], bypassModeId: "bypassPermissions" } },
+				{ id: "antigravity", name: "Antigravity", capabilities: { permissionModes: ["default", "accept-edits", "auto", "plan"], bypassModeId: "full-access" } },
+			],
+		}),
+	} as unknown as LinkState;
+	const open = (link: MachineLink, p: Project) =>
+		render(
+			<I18nProvider>
+				<ProjectSettingsDialog link={link} project={p} state={withAis} onClose={() => {}} />
+			</I18nProvider>,
+		);
+
+	it("saves the AI picked, with that AI's own modes and models", async () => {
+		const { link, sent } = fakeLink();
+		open(link, create(ProjectSchema, { id: "p1", name: "app", dir: DIR, defaults: { provider: "claude", model: "opus", permissionMode: "plan" } }));
+		const ai = screen.getByRole<HTMLSelectElement>("combobox", { name: "AI" });
+		expect(ai.value).toBe("claude");
+		await userEvent.selectOptions(ai, "antigravity");
+		// Another AI: the model and mode picked were the old one's.
+		const mode = screen.getByRole<HTMLSelectElement>("combobox", { name: "Chế độ quyền mặc định" });
+		expect(mode.value).toBe("");
+		expect([...mode.options].map((o) => o.value)).toEqual(["", "default", "accept-edits", "auto", "plan"]);
+		expect([...mode.options].map((o) => o.text)).toContain("Tự sửa file");
+		await userEvent.selectOptions(mode, "auto");
+		await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+		await waitFor(() => expect(sent.find((r) => r.case === "projectUpdate")).toBeTruthy());
+		const update = sent.find((r) => r.case === "projectUpdate") as unknown as { value: { defaults: { provider: string; model: string; permissionMode: string } } };
+		expect(update.value.defaults).toMatchObject({ provider: "antigravity", model: "", permissionMode: "auto" });
+	});
+
+	it("lets each session pick when no AI is set, with nothing to pick for model or mode", () => {
+		const { link } = fakeLink();
+		open(link, create(ProjectSchema, { id: "p1", name: "app", dir: DIR }));
+		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "AI" }).value).toBe("");
+		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Chế độ quyền mặc định" }).disabled).toBe(true);
+		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Model mặc định" }).disabled).toBe(true);
 	});
 });

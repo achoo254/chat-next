@@ -24,7 +24,7 @@ import { MachineIcon } from "./machine-icons.tsx";
 import { AGENT_PARKED_SESSION, versionAtLeast } from "./agent-version.ts";
 import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
-import { aiName, providerOf } from "./use-machines.ts";
+import { aiName, providerOf, sessionProvider } from "./use-machines.ts";
 import { lastMode, modePath, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { loadsProjectConfig } from "./project-config.tsx";
@@ -62,12 +62,16 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 	const [tab, setTab] = useState<"new" | "existing">("new");
 	const suggestId = useDomId("dir-suggestions");
 	const providers = state.info?.providers ?? [];
-	const [provider, setProvider] = useState(() => providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? providers[0]?.id ?? "claude");
 	const [model, setModel] = useState(project?.defaults?.model ?? "");
 	// The project picked (its defaults apply); "" for none.
 	const [projectId, setProjectId] = useState(project?.id ?? "");
 	const [mode, setMode] = useState(project?.defaults?.permissionMode ?? "");
 	const projects = state.projects?.projects.filter((p) => !p.missing) ?? [];
+	// The AI of the project picked ("" when it lets each session pick).
+	const [projectAi, setProjectAi] = useState(project?.defaults?.provider ?? "");
+	// The AI the user picked here; until then the project's, else the machine's first signed-in one (never a fixed one).
+	const [chosen, setProvider] = useState("");
+	const provider = chosen !== "" ? chosen : sessionProvider(state.info, projectAi);
 	const [path, setPath] = useState("");
 	const [listing, setListing] = useState<DirListResult | null>(null);
 	// Why the folder typed or picked could not be listed; empty when it could.
@@ -152,6 +156,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 
 	// `consent`: the user agreed to the sensitive folder; `trust`: to trusting its project settings.
 	const start = (consent: boolean, trust = false) => {
+		if (provider === "") return setError(t.newSession.noAi);
 		if (path.trim() === "") return setError(t.newSession.needFolder);
 		// Machines before tunelo 2.0.9 refuse an empty first message: they get the default idea instead.
 		const parkable = state.info === null || versionAtLeast(state.info.agentVersion, AGENT_PARKED_SESSION);
@@ -173,7 +178,8 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					dir,
 					text: first,
 					consent: { sensitive: consent, projectSettings: loadProject, trustProject: loadProject && trust },
-					permissionMode: projectId === "" ? "" : mode,
+					// The project's mode is its own AI's: another AI starts as the machine has it.
+					permissionMode: projectId !== "" && provider === projectAi ? mode : "",
 				},
 			})
 			.then(
@@ -230,7 +236,13 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 							</p>
 						}
 					>
-						<ExistingSessions machine={machine} name={name} link={link} ai={ai} provider={provider} home={state.info?.home ?? ""} folder={project?.dir} loadsByDefault={loadsProjectConfig(projects.find((p) => p.id === projectId) ?? project)} onClose={onClose} />
+						{provider === "" ? (
+							<p className="dlg-body muted" role="status">
+								{t.newSession.noAi}
+							</p>
+						) : (
+							<ExistingSessions machine={machine} name={name} link={link} ai={ai} provider={provider} home={state.info?.home ?? ""} folder={project?.dir} loadsByDefault={loadsProjectConfig(projects.find((p) => p.id === projectId) ?? project)} onClose={onClose} />
+						)}
 					</Suspense>
 				</div>
 			) : (
@@ -281,6 +293,9 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 									const picked = projects.find((p) => p.id === event.target.value);
 									setProjectId(picked?.id ?? "");
 									setMode(picked?.defaults?.permissionMode ?? "");
+									// The project's own AI takes over again from what was picked before.
+									setProjectAi(picked?.defaults?.provider ?? "");
+									setProvider("");
 									if (picked === undefined) return;
 									setModel(picked.defaults?.model ?? "");
 									setProjectSettings(loadsProjectConfig(picked));
@@ -504,6 +519,11 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					/>
 					</>
 					)}
+					{provider === "" && state.info !== null && (
+						<p className="mx-warn" role="note" data-id="new-session-no-ai">
+							{t.newSession.noAi}
+						</p>
+					)}
 					{full && <p className="note mx-hint">{victim !== undefined ? t.newSession.park(victim.title) : t.newSession.queue}</p>}
 					{error !== "" && (
 						<p className="mx-error" role="alert">
@@ -514,7 +534,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 						<button type="button" className="btn" onClick={onClose}>
 							{t.newSession.cancel}
 						</button>
-						<button type="submit" className="btn btn-primary" disabled={busy}>
+						<button type="submit" className="btn btn-primary" disabled={busy || provider === ""}>
 							{busy ? t.newSession.starting : t.newSession.start}
 						</button>
 					</div>

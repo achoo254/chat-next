@@ -65,7 +65,7 @@ export function MachineBrowser({ link, state, ai }: MachineBrowserProps) {
 	return (
 		<section className="card pad mx-card" data-id="machine-browser">
 			<h3>{b.machineTitle}</h3>
-			<p className="note">{b.machineNote}</p>
+			<p className="note">{b.machineNote(ai)}</p>
 			{running ? (
 				<div>
 					<button type="button" className="btn btn-sm" disabled={!online || busy} onClick={open} data-id="machine-browser-open">
@@ -74,7 +74,7 @@ export function MachineBrowser({ link, state, ai }: MachineBrowserProps) {
 					</button>
 				</div>
 			) : (
-				<p className="muted">{b.machineIdle}</p>
+				<p className="muted">{b.machineIdle(ai)}</p>
 			)}
 			{state.info?.browser?.clearable === true && (
 				<div>

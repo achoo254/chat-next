@@ -5,7 +5,7 @@ import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
 import { brand } from "../brand.ts";
 import { isStandalone } from "../install-prompt.ts";
 import { IS_NATIVE } from "../server-origin.ts";
-import { ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { LoginState, ThreadState, type MachineInfo, type ProviderInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { useServices } from "../messaging/data/services.tsx";
 import { setAgentNeeds } from "./agent-needs.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
@@ -196,6 +196,23 @@ export function providerOf(info: MachineInfo | null, id: string): ProviderInfo |
 /** The AI's display name: as the machine names it, else its id. */
 export function aiName(info: MachineInfo | null, id: string): string {
 	return providerOf(info, id)?.name || id || "AI";
+}
+
+/**
+ * The AI a new session opens with: `preferred` (a project's own) when the
+ * machine has it (or has not said yet which it has), else the machine's
+ * first signed-in AI; "" when there is none, so nothing is sent without one.
+ */
+export function sessionProvider(info: MachineInfo | null, preferred: string): string {
+	const providers = info?.providers ?? [];
+	if (preferred !== "" && (info === null || providers.some((p) => p.id === preferred))) return preferred;
+	return providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? "";
+}
+
+/** The names of the AIs whose sessions take tunelo's own MCP (browser, saved sign-in secrets); "AI" when none says. */
+export function mcpAiName(info: MachineInfo | null): string {
+	const names = (info?.providers ?? []).filter((p) => p.capabilities?.sessionMcp === true).map((p) => p.name || p.id);
+	return names.length === 0 ? "AI" : names.join(", ");
 }
 
 /** A model's display name from the provider's list, else its id. */

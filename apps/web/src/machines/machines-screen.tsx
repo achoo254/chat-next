@@ -26,6 +26,7 @@ import "./machines.css";
 
 /** "Hiệu quả": loaded, with its styles, the first time it opens. */
 const UsageScreen = lazy(() => import("./usage/usage-screen.tsx"));
+const AiAccountsScreen = lazy(() => import("./ai-accounts/ai-accounts-screen.tsx"));
 
 export default function MachinesScreen({ view }: { view: MachinesView }) {
 	const hub = useHub();
@@ -59,6 +60,13 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			break;
 		case "info":
 			main = <MachineDetail key={view.machine} machine={view.machine} />;
+			break;
+		case "accounts":
+			main = (
+				<Suspense fallback={null}>
+					<AiAccountsScreen key={view.machine} machine={view.machine} />
+				</Suspense>
+			);
 			break;
 		case "machine":
 			main = <MachineBoard key={view.machine} machine={view.machine} />;

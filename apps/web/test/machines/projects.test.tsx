@@ -107,7 +107,7 @@ describe("a workspace row", () => {
 
 	it("'+' opens a session at once in the folder, with its defaults, in the mode last used on the machine; no dialog", async () => {
 		window.localStorage.setItem("ai:mode:1", "terminal");
-		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { model: "sonnet", permissionMode: "plan", projectSettings: true }, git: { git: true, branch: "main" } })];
+		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { provider: "claude", model: "sonnet", permissionMode: "plan", projectSettings: true }, git: { git: true, branch: "main" } })];
 		const mac = machine(1, "Mac", own, {
 			info: terminal,
 			answer: async (req) => (req.case === "threadCreate" ? ({ body: { case: "threadCreated", value: { thread: { id: "t9", provider: "claude", dir: "/w/app" } } } } as unknown as Frame) : null),
@@ -120,7 +120,7 @@ describe("a workspace row", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Phiên mới trong app" }));
 		await waitFor(() => expect(window.location.pathname).toBe("/ai/1/s/t9/terminal"));
 		const create_ = mac.sent.find((r) => r.case === "threadCreate");
-		expect(create_?.case === "threadCreate" ? [create_.value.dir, create_.value.model, create_.value.permissionMode] : null).toEqual(["/w/app", "sonnet", "plan"]);
+		expect(create_?.case === "threadCreate" ? [create_.value.provider, create_.value.dir, create_.value.model, create_.value.permissionMode] : null).toEqual(["claude", "/w/app", "sonnet", "plan"]);
 		expect(document.querySelector("[role=dialog]")).toBeNull();
 	});
 

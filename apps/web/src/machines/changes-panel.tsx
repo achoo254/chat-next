@@ -124,11 +124,11 @@ export function ChangesPanel({ ai, changes, gitSupported, git, gitElsewhere, ful
 						<GitFileView file={gitFile} whole={gitFull.get(gitFile.path)} onFetch={() => fetchGitFile(gitFile.path)} />
 					) : (
 						<>
-							{gitSupported && !gitElsewhere && <GitSection git={git} onOpen={(path) => setOpen({ from: "git", path })} />}
+							{gitSupported && !gitElsewhere && <GitSection ai={ai} git={git} onOpen={(path) => setOpen({ from: "git", path })} />}
 							<section className="mx-changes-sec" aria-label={gitSupported ? t.agent.changes.historyTitle(ai) : t.agent.changes.title}>
 								{gitSupported && <h3>{t.agent.changes.historyTitle(ai)}</h3>}
 								{changes.length === 0 ? (
-									<p className="muted">{gitSupported ? t.agent.changes.historyEmpty(ai) : t.agent.changes.empty}</p>
+									<p className="muted">{gitSupported ? t.agent.changes.historyEmpty(ai) : t.agent.changes.empty(ai)}</p>
 								) : (
 									<>
 										<ul className="mx-files">
@@ -148,7 +148,7 @@ export function ChangesPanel({ ai, changes, gitSupported, git, gitElsewhere, ful
 												</li>
 											))}
 										</ul>
-										<p className="note">{t.agent.changes.note}</p>
+										<p className="note">{t.agent.changes.note(ai)}</p>
 									</>
 								)}
 							</section>
@@ -160,7 +160,7 @@ export function ChangesPanel({ ai, changes, gitSupported, git, gitElsewhere, ful
 	);
 }
 
-function GitSection({ git, onOpen }: { git: GitChanges | null; onOpen: (path: string) => void }) {
+function GitSection({ ai, git, onOpen }: { ai: string; git: GitChanges | null; onOpen: (path: string) => void }) {
 	const t = useMachinesCopy();
 	const c = t.agent.changes;
 	if (git === null) {
@@ -206,7 +206,7 @@ function GitSection({ git, onOpen }: { git: GitChanges | null; onOpen: (path: st
 					{git.partial && <p className="note">{c.gitPartial}</p>}
 				</>
 			)}
-			<p className="note">{c.gitNote}</p>
+			<p className="note">{c.gitNote(ai)}</p>
 		</section>
 	);
 }

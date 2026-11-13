@@ -1,4 +1,4 @@
-// "Phiên có sẵn trên máy": the Claude Code sessions the machine keeps, opened
+// "Phiên có sẵn trên máy": the sessions of the picked AI the machine keeps, opened
 // as a thread from the "Phiên mới" dialog. Listed by folder with where each
 // came from; searched; a session that may be open elsewhere asks first, as
 // do a sensitive folder and untrusted project settings.
@@ -110,7 +110,9 @@ describe("sessions on the machine", () => {
 		expect(sent(requests, "sessionOpen")).toHaveLength(0);
 		fireEvent.click(screen.getByRole("button", { name: "Mở: Thanh toán" }));
 		await waitFor(() => expect(window.location.pathname).toBe("/ai/1/s/opened"));
-		expect(sent(requests, "sessionOpen")[0]?.value).toMatchObject({ sessionId: "a", openAnyway: false, consent: { sensitive: false, projectSettings: false } });
+		// Both name the AI whose sessions they are.
+		expect(sent(requests, "sessionList")[0]?.value.provider).toBe("claude");
+		expect(sent(requests, "sessionOpen")[0]?.value).toMatchObject({ provider: "claude", sessionId: "a", openAnyway: false, consent: { sensitive: false, projectSettings: false } });
 	});
 
 	it("asks before opening one that may be open elsewhere, and goes on when the user says so", async () => {

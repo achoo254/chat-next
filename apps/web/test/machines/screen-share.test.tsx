@@ -317,8 +317,8 @@ describe("a first machine", () => {
 				<FirstMachine />
 			</I18nProvider>,
 		);
-		expect(screen.getByRole("heading", { name: "Điều khiển Claude Code trên máy của bạn" })).toBeTruthy();
-		expect(screen.getByText(/đã cài và đăng nhập Claude Code/)).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Điều khiển AI lập trình trên máy của bạn" })).toBeTruthy();
+		expect(screen.getByText(/đã cài và đăng nhập một AI lập trình/)).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Hướng dẫn cài Claude Code" })).toBeTruthy();
 		expect(screen.getByText(/mở trang này trên máy tính bạn muốn điều khiển/)).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Kết nối máy đầu tiên" }).getAttribute("href")).toMatch(/add/);

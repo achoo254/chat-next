@@ -245,7 +245,7 @@ describe("the approval of a command reading sign-in secrets", () => {
 		expect(screen.getByText("github.com").tagName).toBe("STRONG");
 		expect(screen.getByText("phiên chưa có bí mật này")).toBeTruthy();
 		expect(screen.getByText(/Lệnh này dùng bí mật đăng nhập GH, LOCAL/)).toBeTruthy();
-		expect(screen.queryByRole("button", { name: /Cho phép cả phiên/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Cho phép trong phiên này/ })).toBeNull();
 		expect(siteLabel("http://localhost:3000")).toBe("http://localhost:3000");
 	});
 

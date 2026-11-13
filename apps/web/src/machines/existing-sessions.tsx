@@ -1,4 +1,4 @@
-// "Phiên có sẵn trên máy" in the "Phiên mới" dialog: the Claude Code sessions
+// "Phiên có sẵn trên máy" in the "Phiên mới" dialog: the sessions of the picked AI
 // the machine keeps, whatever started them (a terminal, an IDE, Claude
 // Desktop, Chat itself), grouped by folder, newest first, searchable, a page
 // at a time. Opening one makes it a thread with its history shown at once;

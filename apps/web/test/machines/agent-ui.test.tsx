@@ -209,18 +209,18 @@ describe("prompt card above the composer", () => {
 		const user = userEvent.setup();
 		const onDecide = vi.fn((_d: Decision, _m?: string) => Promise.resolve());
 		wrap(<ApprovalCard hotkeys approval={approval} ai="Claude Code" sessionAllow={false} onDecide={onDecide} />);
-		expect(screen.queryByRole("button", { name: /Cho phép cả phiên/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: /Cho phép trong phiên này/ })).toBeNull();
 		await user.keyboard("3");
-		const field = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude" });
+		const field = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude Code" });
 		expect(field.tagName).toBe("DIV");
 		await waitFor(() => expect(document.activeElement).toBe(field));
-		expect(field.getAttribute("aria-placeholder")).toBe("Bảo Claude nên làm gì thay vào đó");
+		expect(field.getAttribute("aria-placeholder")).toBe("Bảo Claude Code nên làm gì thay vào đó");
 		// Esc closes the message without denying; 3 opens it again.
 		await user.keyboard("{Escape}");
-		expect(screen.queryByRole("textbox", { name: "Lời nhắn cho Claude" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "Lời nhắn cho Claude Code" })).toBeNull();
 		expect(onDecide).not.toHaveBeenCalled();
 		await user.keyboard("3");
-		const again = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude" });
+		const again = await screen.findByRole("textbox", { name: "Lời nhắn cho Claude Code" });
 		await user.type(again, "chỉ xoá{Shift>}{Enter}{/Shift}dist/cache{Enter}");
 		expect(onDecide).toHaveBeenCalledWith(Decision.DENY, "chỉ xoá\ndist/cache");
 	});

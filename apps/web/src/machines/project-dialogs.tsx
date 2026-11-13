@@ -1,21 +1,20 @@
 // What a machine knows about one of its folders (loaded when first opened):
 // a folder picker (typed, or browsed with git branches) and the settings a
-// new session in a workspace starts with (model, permission mode), which the
-// machine keeps for the folder, with the folder's .claude configuration switch
-// (or, on a machine before it, the per-session tick).
+// new session in a workspace starts with (the AI, its model and permission
+// mode, as that AI offers them), which the machine keeps for the folder, with
+// the folder's AI configuration switch (or, on a machine before it, the
+// per-session tick).
 import { useEffect, useState, type FormEvent } from "react";
 import { ProjectConfigLevel, type DirListResult, type MachineInfo, type Project } from "@achoo254/chat-proto/remote/remote";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { projectConfigErrorText, projectConfigUnsupported, setProjectConfig } from "./project-config.tsx";
-import { errorText, providerOf } from "./use-machines.ts";
+import { modeLabel } from "./status-line.ts";
+import { aiName, errorText, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 type ProjectLink = Pick<MachineLink, "request">;
-
-/** The permission modes Claude offers a device, when no session told them yet. */
-const CLAUDE_MODES = ["default", "acceptEdits", "plan", "auto"];
 
 /**
  * A folder on the machine: typed, or picked from the list of the one shown.
@@ -149,13 +148,19 @@ export function FolderPicker({
 	);
 }
 
-export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { link: ProjectLink; project: Project; state: LinkState; ai: string; onClose: () => void }) {
+export function ProjectSettingsDialog({ link, project, state, onClose }: { link: ProjectLink; project: Project; state: LinkState; onClose: () => void }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const id = useDomId("project-settings");
 	const info: MachineInfo | null = state.info;
-	const models = providerOf(info, "claude")?.capabilities?.models ?? [];
-	const modes = [...state.threadInfo.values()].find((x) => x.permissionModes.length > 0)?.permissionModes ?? CLAUDE_MODES;
+	const providers = info?.providers ?? [];
+	// The project's AI ("" lets each new session pick one); its models and modes are that AI's own.
+	const [provider, setProvider] = useState(project.defaults?.provider ?? "");
+	const caps = providerOf(info, provider)?.capabilities;
+	const models = caps?.models ?? [];
+	const modes = caps?.permissionModes ?? [];
+	const bypass = caps?.bypassModeId ?? "";
+	const ai = aiName(info, provider);
 	const [model, setModel] = useState(project.defaults?.model ?? "");
 	const [mode, setMode] = useState(project.defaults?.permissionMode ?? "");
 	const [settings, setSettings] = useState(project.defaults?.projectSettings ?? false);
@@ -186,7 +191,7 @@ export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { l
 		setBusy(true);
 		// With the folder's switch, new sessions tick what it says, so they never ask to trust a folder that is off.
 		const projectSettings = folderOffered ? folderOn : settings;
-		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { model, permissionMode: mode, projectSettings } } }).then(onClose, (err: unknown) => {
+		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { provider, model, permissionMode: mode, projectSettings } } }).then(onClose, (err: unknown) => {
 			setBusy(false);
 			setError(errorText(t, err, ai));
 		});
@@ -198,8 +203,31 @@ export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { l
 				<div className="dlg-body stack">
 					<p className="muted">{p.settingsHint}</p>
 					<label className="mx-field-row">
+						<span>{p.ai}</span>
+						<select
+							className="input"
+							value={provider}
+							onChange={(event) => {
+								// Another AI: the model and mode picked were the old one's.
+								setProvider(event.target.value);
+								setModel("");
+								setMode("");
+							}}
+							data-id="project-settings-ai"
+						>
+							<option value="">{p.aiAny}</option>
+							{/* An AI the machine no longer reports stays pickable as it is saved. */}
+							{provider !== "" && providerOf(info, provider) === null && <option value={provider}>{provider}</option>}
+							{providers.map((x) => (
+								<option key={x.id} value={x.id}>
+									{x.name || x.id}
+								</option>
+							))}
+						</select>
+					</label>
+					<label className="mx-field-row">
 						<span>{p.model}</span>
-						<select className="input" value={model} onChange={(event) => setModel(event.target.value)}>
+						<select className="input" value={model} disabled={provider === ""} onChange={(event) => setModel(event.target.value)}>
 							<option value="">{p.modelDefault(ai)}</option>
 							{models.map((m) => (
 								<option key={m.id} value={m.id}>
@@ -210,11 +238,11 @@ export function ProjectSettingsDialog({ link, project, state, ai, onClose }: { l
 					</label>
 					<label className="mx-field-row">
 						<span>{p.mode}</span>
-						<select className="input" value={mode} onChange={(event) => setMode(event.target.value)}>
+						<select className="input" value={mode} disabled={provider === ""} onChange={(event) => setMode(event.target.value)}>
 							<option value="">{p.modeMachine}</option>
 							{modes.map((m) => (
 								<option key={m} value={m}>
-									{t.statusBar.modes[m as keyof typeof t.statusBar.modes] ?? m}
+									{modeLabel(t.statusBar.modes, m, bypass)}
 								</option>
 							))}
 						</select>

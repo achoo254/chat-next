@@ -9,6 +9,7 @@ import type { MachineEntry, MachinesDirectory } from "../machines-client.ts";
 import type { DeviceKeyStore } from "./device-keys.ts";
 import { registeredDevice, type DeviceIdentity } from "./device-registration.ts";
 import { MachineLink } from "./machine-link.ts";
+import { forgetProviders, rememberProviders } from "./provider-cache.ts";
 import type { SocketFactory } from "./socket.ts";
 
 export const LOCAL_REF = "local";
@@ -135,9 +136,18 @@ export class LinkHub {
 	link(ref: string): MachineLink {
 		let link = this.links.get(ref);
 		if (link === undefined) {
-			link = this.makeLink(ref, "chat");
-			link.setActive(this.active);
-			this.links.set(ref, link);
+			const made = this.makeLink(ref, "chat");
+			made.setActive(this.active);
+			// Each new MachineInfo: kept for the machine's page while it is offline (provider-cache.ts).
+			let seen: unknown = null;
+			made.subscribe(() => {
+				const info = made.snapshot().info;
+				if (info === null || info === seen) return;
+				seen = info;
+				rememberProviders(ref, info.providers);
+			});
+			this.links.set(ref, made);
+			link = made;
 		}
 		return link;
 	}
@@ -205,6 +215,7 @@ export class LinkHub {
 		this.links.get(ref)?.stop();
 		this.links.delete(ref);
 		this.carriers.get(ref)?.stop();
+		forgetProviders(ref);
 		await this.deps.keys.forgetMachineKey(ref);
 	}
 
