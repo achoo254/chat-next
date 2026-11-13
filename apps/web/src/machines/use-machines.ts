@@ -218,6 +218,16 @@ export function readableModel(id: string): string {
 	return `${family.charAt(0).toUpperCase()}${family.slice(1)} ${m[2] ?? ""}${m[3] === undefined ? "" : `.${m[3]}`}`;
 }
 
+/**
+ * Which model the AI's default is, for people: the model the latest turn
+ * reports answering (it names the exact version), else the one the AI's
+ * settings on the machine pick ("Opus"); "" when neither is known.
+ */
+export function defaultModelName(info: MachineInfo | null, provider: string, answered: string): string {
+	const id = answered !== "" ? answered : (providerOf(info, provider)?.defaultModel ?? "");
+	return id === "" ? "" : readableModel(modelName(info, provider, id));
+}
+
 /** What to tell the user about a failed request, in the account's language (see machine-errors.ts). */
 export function errorText(t: MachinesCopy, err: unknown, ai: string): string {
 	return machineErrorText(t, err, ai);

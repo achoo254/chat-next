@@ -14,7 +14,7 @@ import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { ModelMenu } from "./model-menu.tsx";
 import { permissionMode, planName, usageOf, type Countdown } from "./status-line.ts";
-import { errorText, modelName, readableModel, useNow } from "./use-machines.ts";
+import { defaultModelName, errorText, modelName, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -42,6 +42,11 @@ interface StatusBarProps {
 	account?: ReactNode;
 	/** The account the session moves to after this turn; "" when it stays. */
 	switchingTo?: string;
+}
+
+/** "mặc định · Opus 5.5", or "mặc định" while which model it is is not known. */
+function defaultLabel(t: MachinesCopy, name: string): string {
+	return name === "" ? t.statusBar.defaultModel : t.statusBar.defaultIs(name);
 }
 
 function countdown(t: MachinesCopy, left: Countdown | null): string {
@@ -155,7 +160,7 @@ function Details({ ai, dir, machine, provider, model, answered, context, info, n
 							</>
 						)}
 						<dt>{t.agent.status.model}</dt>
-						<dd>{model === "" ? (answered === "" ? t.statusBar.defaultModel : t.statusBar.defaultIs(readableModel(answered))) : `${ai} · ${modelName(machine, provider, model)}`}</dd>
+						<dd>{model === "" ? defaultLabel(t, defaultModelName(machine, provider, answered)) : `${ai} · ${modelName(machine, provider, model)}`}</dd>
 						{effort !== "" && (
 							<>
 								<dt>{t.agent.status.effort}</dt>

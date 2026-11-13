@@ -12015,8 +12015,13 @@ type ProviderInfo struct {
 	Capabilities *ProviderCapabilities  `protobuf:"bytes,5,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// The installed CLI is outside the range this agent was tested with.
 	UntestedVersion bool `protobuf:"varint,6,opt,name=untested_version,json=untestedVersion,proto3" json:"untested_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The model a session takes when it picks none (ThreadSummary.model
+	// empty), as the AI's own settings on the machine name it (Claude: the
+	// "model" of its settings.json, e.g. "opus"); empty when they name none
+	// (the AI's built-in default) and from older machines.
+	DefaultModel  string `protobuf:"bytes,7,opt,name=default_model,json=defaultModel,proto3" json:"default_model,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProviderInfo) Reset() {
@@ -12089,6 +12094,13 @@ func (x *ProviderInfo) GetUntestedVersion() bool {
 		return x.UntestedVersion
 	}
 	return false
+}
+
+func (x *ProviderInfo) GetDefaultModel() string {
+	if x != nil {
+		return x.DefaultModel
+	}
+	return ""
 }
 
 type MachineInfo struct {
@@ -20157,7 +20169,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0ecommit_message\x18\r \x01(\bR\rcommitMessage\"1\n" +
 	"\vModelOption\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xf4\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x99\x02\n" +
 	"\fProviderInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -20165,7 +20177,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vlogin_state\x18\x04 \x01(\x0e2\x15.remote.v1.LoginStateR\n" +
 	"loginState\x12C\n" +
 	"\fcapabilities\x18\x05 \x01(\v2\x1f.remote.v1.ProviderCapabilitiesR\fcapabilities\x12)\n" +
-	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\"\x8b\a\n" +
+	"\x10untested_version\x18\x06 \x01(\bR\x0funtestedVersion\x12#\n" +
+	"\rdefault_model\x18\a \x01(\tR\fdefaultModel\"\x8b\a\n" +
 	"\vMachineInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x12\n" +

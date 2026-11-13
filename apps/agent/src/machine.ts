@@ -555,6 +555,7 @@ export class Machine {
         // Devices also check MachineInfo.terminal before offering it.
         capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, commitMessage: p.writer !== undefined },
         untestedVersion: Boolean(d.untestedVersion),
+        defaultModel: d.defaultModel ?? "",
       });
     }
     const needsDiskAccess = diskAccess() === "needed";

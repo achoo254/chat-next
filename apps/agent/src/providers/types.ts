@@ -32,7 +32,14 @@ export type ProviderCapabilities = {
 
 export type LoginState = "ok" | "needs-login" | "unknown";
 
-export type Detected = { installed: boolean; version?: string; loginState: LoginState; untestedVersion?: boolean };
+export type Detected = {
+  installed: boolean;
+  version?: string;
+  loginState: LoginState;
+  untestedVersion?: boolean;
+  /** The model the AI's own settings on the machine pick for a session that picks none; unset when they pick none. */
+  defaultModel?: string;
+};
 
 export type TodoEntry = { text: string; state: "pending" | "in-progress" | "done" };
 

@@ -6,7 +6,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
-import { aiName, errorText, modelName, providerOf, readableModel } from "./use-machines.ts";
+import { aiName, defaultModelName, errorText, modelName, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -50,7 +50,7 @@ export function ModelMenu({ link, info, threadId, provider, model, answered, eff
 	};
 	const many = (info?.providers.length ?? 0) > 1;
 	// The default says which model it is once a turn has answered: "mặc định · Opus 5.5".
-	const resolved = answered === "" ? "" : readableModel(answered);
+	const resolved = defaultModelName(info, provider, answered);
 	const name = model !== "" ? modelName(info, provider, model) : resolved === "" ? t.statusBar.defaultModel : t.statusBar.defaultIs(resolved);
 	const label = many ? `${ai} · ${name}` : name;
 	return (

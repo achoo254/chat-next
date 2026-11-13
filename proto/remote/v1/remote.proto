@@ -1692,6 +1692,11 @@ message ProviderInfo {
   ProviderCapabilities capabilities = 5;
   // The installed CLI is outside the range this agent was tested with.
   bool untested_version = 6;
+  // The model a session takes when it picks none (ThreadSummary.model
+  // empty), as the AI's own settings on the machine name it (Claude: the
+  // "model" of its settings.json, e.g. "opus"); empty when they name none
+  // (the AI's built-in default) and from older machines.
+  string default_model = 7;
 }
 
 message MachineInfo {

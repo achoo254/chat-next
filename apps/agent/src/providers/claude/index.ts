@@ -3,7 +3,7 @@
 // calls the Anthropic API itself.
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -86,6 +86,20 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   sessionMcp: true,
 };
 
+/**
+ * The "model" of the account folder's settings.json (what a session that
+ * picks none runs with); undefined without one, or when it is not a short
+ * plain name. Reads only that setting, never a credential.
+ */
+export function settingsModel(home: string): string | undefined {
+  try {
+    const model: unknown = (JSON.parse(readFileSync(join(home, "settings.json"), "utf8")) as { model?: unknown }).model;
+    return typeof model === "string" && /^[\w.:[\]-]{1,80}$/.test(model.trim()) ? model.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The CLI's account report, without any token source. */
 export function toAccount(a: SdkAccountInfo): AccountInfo | undefined {
   if (!a.email && !a.organization && !a.subscriptionType) return undefined;
@@ -148,6 +162,8 @@ export function createClaudeProvider(
       const minor = version?.split(".").slice(0, 2).join(".");
       const out: Detected = { installed: true, loginState, untestedVersion: !minor || !TESTED.includes(minor) };
       if (version) out.version = version;
+      const defaultModel = settingsModel(opts.accountDir ?? defaultClaudeHome());
+      if (defaultModel) out.defaultModel = defaultModel;
       return out;
     },
 
