@@ -6,7 +6,7 @@
 // profile asks first; an account with no machine is shown how to start; the
 // pairing page offers the quick install for the machine's system.
 import { create } from "@bufbuild/protobuf";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { MachineInfoSchema } from "@achoo254/chat-proto/remote/remote";
@@ -213,6 +213,30 @@ describe("the screen view's window and keyboard", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Mở lại" }));
 		expect(root.classList.contains("min")).toBe(false);
 		expect(sent("screenShareOpen")).toHaveLength(1);
+		l.stop();
+	});
+
+	it("moves by its header on a computer; a press on a header button stays a click", async () => {
+		HTMLElement.prototype.setPointerCapture = () => undefined;
+		const l = await openLink();
+		const { container } = render(
+			<I18nProvider>
+				<ScreenView link={l} ai="Claude Code" online inSession={false} onClose={() => undefined} />
+			</I18nProvider>,
+		);
+		await screen.findByLabelText("Mật khẩu Mac");
+		const root = container.querySelector(".mx-screen") as HTMLElement;
+		const head = container.querySelector(".mx-screen-head") as HTMLElement;
+		root.getBoundingClientRect = () => ({ left: 16, top: 16, width: 900, height: 700 }) as DOMRect;
+		fireEvent.pointerDown(head, { button: 0, clientX: 100, clientY: 100, pointerId: 1 });
+		fireEvent.pointerMove(head, { clientX: 160, clientY: 130, pointerId: 1 });
+		fireEvent.pointerUp(head, { pointerId: 1 });
+		expect(root.style.transform).toBe("translate(60px, 30px)");
+		fireEvent.pointerMove(head, { clientX: 400, clientY: 400, pointerId: 1 });
+		expect(root.style.transform).toBe("translate(60px, 30px)");
+		await userEvent.click(screen.getByRole("button", { name: "Thu nhỏ" }));
+		expect(root.classList.contains("min")).toBe(true);
+		expect(root.style.transform).toBe("");
 		l.stop();
 	});
 

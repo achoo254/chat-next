@@ -8,7 +8,7 @@
 // and leave this page's state at once. Desktop: a large area; phone: full
 // screen, noVNC's own gestures (tap, two-finger scroll, pinch) and a
 // "Bàn phím" button. It closes after 10 minutes without input here.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type RFB from "@novnc/novnc";
 import type { ScreenShareStatus } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../../components/screen-icons.tsx";
@@ -39,6 +39,41 @@ interface ScreenViewProps {
 	online: boolean;
 	inSession: boolean;
 	onClose: () => void;
+}
+
+/** Header px kept on screen while the window is dragged, so it can always be grabbed again. */
+const KEEP_VISIBLE = 80;
+const HEAD_HEIGHT = 48;
+
+/**
+ * The floating window moves by its header (pointer drag; a press on a button
+ * there stays a click). Off on a phone, where it covers the whole screen.
+ */
+function useWindowDrag(enabled: boolean) {
+	const [offset, setOffset] = useState({ x: 0, y: 0 });
+	const drag = useRef<{ px: number; py: number; ox: number; oy: number; left: number; top: number; width: number } | null>(null);
+	// The same width as screen.css's phone layout.
+	const usable = enabled && window.innerWidth > 760;
+	const onPointerDown = (e: PointerEvent<HTMLElement>) => {
+		if (!usable || e.button !== 0 || (e.target as HTMLElement).closest("button") !== null) return;
+		const box = e.currentTarget.parentElement?.getBoundingClientRect();
+		if (box === undefined) return;
+		e.preventDefault();
+		e.currentTarget.setPointerCapture(e.pointerId);
+		drag.current = { px: e.clientX, py: e.clientY, ox: offset.x, oy: offset.y, left: box.left - offset.x, top: box.top - offset.y, width: box.width };
+	};
+	const onPointerMove = (e: PointerEvent<HTMLElement>) => {
+		const d = drag.current;
+		if (d === null) return;
+		const x = Math.min(Math.max(d.ox + e.clientX - d.px, KEEP_VISIBLE - d.left - d.width), window.innerWidth - KEEP_VISIBLE - d.left);
+		const y = Math.min(Math.max(d.oy + e.clientY - d.py, -d.top), window.innerHeight - HEAD_HEIGHT - d.top);
+		setOffset({ x, y });
+	};
+	const onPointerUp = () => {
+		drag.current = null;
+	};
+	const style: CSSProperties | undefined = usable && (offset.x !== 0 || offset.y !== 0) ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : undefined;
+	return { style, handle: usable ? { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, "data-drag": "" } : {} };
 }
 
 export default function ScreenView({ link, ai, online, inSession, onClose }: ScreenViewProps) {
@@ -217,6 +252,7 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 	};
 
 	const live = phase.kind === "live";
+	const move = useWindowDrag(!inSession && !minimized);
 	return (
 		<div
 			className={`mx-screen${inSession ? " in-session" : ""}${minimized ? " min" : ""}`}
@@ -225,9 +261,10 @@ export default function ScreenView({ link, ai, online, inSession, onClose }: Scr
 			aria-labelledby={`${id}-title`}
 			onFocus={(e) => setKeys(e.target === typing.current || e.target instanceof HTMLCanvasElement)}
 			onBlur={() => setKeys(false)}
+			style={move.style}
 			data-id="screen-view"
 		>
-			<header className="mx-screen-head">
+			<header className="mx-screen-head" {...move.handle}>
 				<h3 id={`${id}-title`}>
 					<MachineIcon name="monitor" />
 					<span>{s.title}</span>

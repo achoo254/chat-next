@@ -4,6 +4,9 @@
 .mx-screen { position: fixed; inset: var(--space-4); z-index: 41; display: flex; flex-direction: column; border-radius: var(--radius-lg); border: 1px solid var(--c-border); background: var(--c-surface); box-shadow: var(--shadow-lg); overflow: hidden; }
 .mx-screen.in-session { position: absolute; inset: 0; border-radius: 0; border: 0; box-shadow: none; z-index: 27; }
 .mx-screen-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+/* The floating window moves by its header. */
+.mx-screen-head[data-drag] { cursor: grab; user-select: none; touch-action: none; }
+.mx-screen-head[data-drag]:active { cursor: grabbing; }
 .mx-screen-head h3 { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.9375rem; }
 .mx-screen-warn { flex: none; margin: var(--space-2) var(--space-3) 0; }
 .mx-screen-warn p { margin: var(--space-1) 0 0; }
