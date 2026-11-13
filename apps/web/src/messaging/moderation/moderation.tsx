@@ -117,6 +117,7 @@ function actorName(operatorId: number, people: ReadonlyMap<number, Person>, self
 
 export default function Moderation({ view }: { view: ModerationView }) {
 	const copy = useScreensCopy();
+	const { t: app } = useI18n();
 	const { self } = useServices();
 	const scope = orgDomain(serverHost());
 	const t = copy.moderation;
@@ -130,6 +131,11 @@ export default function Moderation({ view }: { view: ModerationView }) {
 	return (
 		<div className="mod">
 			<nav className="mod-side" aria-label={t.title}>
+				{/* Moderation opens from Settings: the way back. */}
+				<Link to={paths.settingsList} className="nav mod-back" data-id="moderation-back">
+					<Icon name="chevron-left" />
+					<span>{app.settings.title}</span>
+				</Link>
 				<div className="mod-brand">
 					<Icon name="shield" />
 					<span>{t.title}</span>
@@ -151,6 +157,9 @@ export default function Moderation({ view }: { view: ModerationView }) {
 			<div className="mod-main">
 				{self.isOperator && (
 					<nav className="mod-tabs" aria-label={t.title}>
+						<Link to={paths.settingsList} className="mod-back" aria-label={app.settings.title} data-id="moderation-back-tab">
+							<Icon name="chevron-left" />
+						</Link>
 						{nav.map((item) => (
 							<Link key={item.to} to={item.to} current={item.current}>
 								{item.label}
