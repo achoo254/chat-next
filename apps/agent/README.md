@@ -1,7 +1,7 @@
 # tunelo
 
-Tiến trình máy của hệ sinh thái hoandat: tunnel tới `localhost` (CLI Tunelo), AI Agent trong Chat (chat với claude trên máy từ
-thiết bị khác, mã hoá đầu-cuối), Localman gọi `localhost` của máy, MCP `tunelo` cho claude. Thiết kế:
+Tiến trình máy của hệ sinh thái hoandat: tunnel tới `localhost` (CLI Tunelo), AI Agent trong Chat (chat với AI cài trên máy từ
+thiết bị khác, mã hoá đầu-cuối: Claude Code hoặc Antigravity), Localman gọi `localhost` của máy, MCP `tunelo` cho Claude Code. Thiết kế:
 [ADR 0013](../../docs/adr/0013-remote-machines.md), [ADR 0014](../../docs/adr/0014-tunelo-machine-agent.md).
 
 Chạy trên macOS (arm64, x64), Windows x64 và Linux x64, arm64 (glibc, có systemd; từ 2.2.0). Một file chạy do Bun build, ký minisign, phát hành ở GitHub Releases của repo này
@@ -90,7 +90,7 @@ Lệnh ẩn khỏi help nhưng vẫn chạy:
 Thiết bị (trình duyệt, app điện thoại) không ghép với máy: mọi thiết bị đã đăng nhập cùng tài khoản tự đăng ký khoá khi vào khu Máy,
 và máy tin các khoá Chat liệt kê. Xem, thu hồi thiết bị: "Thiết bị của tài khoản" ở trang Quản lý máy trong Chat. Mô hình tin cậy,
 đánh đổi và biện pháp bù: [ADR 0013](../../docs/adr/0013-remote-machines.md), mục "Tài khoản là gốc tin cậy". Nhật ký đồng ý, bí
-mật đã lưu, trình duyệt của máy, profile Claude và số liệu sử dụng xem và quản lý trên trang máy trong Chat.
+mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử dụng xem và quản lý trên trang máy trong Chat.
 
 ## Cập nhật
 
@@ -136,6 +136,30 @@ Có gì ở 2.6.0:
   (`MachineInfo.agent_binary`) để banner trên web chỉ đúng tệp cần kéo vào danh sách.
 
 Script cài thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
+
+## AI hỗ trợ và tài khoản AI
+
+AI Agent không có AI mặc định: mỗi phiên, dự án và yêu cầu liệt kê phiên phải nêu AI (`provider`), thiếu thì máy từ chối
+(`ERROR_REASON_PROVIDER_REQUIRED`). Mỗi AI là một adapter trong [`src/providers/`](src/providers/) theo hợp đồng
+[`types.ts`](src/providers/types.ts) (`AgentProvider`, `AccountsFacet`); lõi và web chỉ đọc capability, không rẽ nhánh theo id.
+Bộ test hợp đồng ([`test/provider-contract.test.ts`](test/provider-contract.test.ts)) chạy cho mọi adapter.
+
+- **Claude Code**: `claude` của máy qua Agent SDK. Nhiều tài khoản: mỗi tài khoản một thư mục `CLAUDE_CONFIG_DIR` ở
+  `ai-accounts/claude/<id>/home`, đăng nhập từ thiết bị bằng cách dán mã.
+- **Antigravity**: `agy` của máy (1.5.2 trở lên) qua `agy acp` ([client ACP dùng chung](src/providers/acp/)). Một tiến trình
+  `agy acp` phục vụ mọi phiên; chế độ quyền và model lấy từ agy. Cài đặt `toolPermission: "always-proceed"` của agy
+  (`~/.gemini/antigravity-cli/settings.json`) chạy mọi công cụ không hỏi, nên phiên của máy đó là toàn quyền (`full-access`) và
+  thiết bị không chọn chế độ khác được; muốn được hỏi thì đổi cài đặt đó trong agy. tunelo chỉ đọc cài đặt của agy, không ghi.
+  "Luôn cho phép" chỉ nhớ trong phiên ở phía tunelo, agy không nhận "always". Bản này chưa có MCP `tunelo` và mật khẩu đã lưu
+  cho Antigravity. Thông điệp commit chạy `agy --sandbox` với mọi công cụ bị chặn; hook toàn cục của công cụ khác trong
+  `~/.gemini/config/hooks.json` vẫn chạy (agy không tắt được cho một lần chạy). tunelo không cài hook nào vào agy.
+- **Tài khoản AI** (trang "Tài khoản AI" của máy): mỗi AI một danh sách và một lựa chọn riêng; đổi tài khoản của AI này không
+  đụng phiên AI khác. Tất cả ghi trong `ai-accounts/ai-accounts.json` (không chứa credential).
+  - Antigravity lưu đăng nhập trong Keychain chung của người dùng (`gemini`/`antigravity`), nên đổi tài khoản là ghi đăng nhập
+    đã lưu vào đó qua `security -i` (giá trị dạng hex, không đi qua dòng lệnh), đọc lại để kiểm, sai thì đặt lại bản cũ. Bản lưu
+    nằm ở `ai-accounts/antigravity/vault.json` (0600, mỗi đăng nhập được bọc bằng khoá của tunelo). Thêm tài khoản: đăng nhập
+    bằng `agy` trên máy rồi bấm "Lưu tài khoản đang đăng nhập". Đổi bị từ chối khi đang có lượt Antigravity chạy hoặc `agy`
+    mở trong terminal (agy tự ghi lại token khi làm mới); phiên rảnh của tunelo tự mở lại trên tài khoản mới. Chỉ macOS.
 
 ## Phiên Claude Code hai chiều giữa Chat và máy
 
@@ -427,8 +451,14 @@ Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ
   - Windows: bỏ `%LOCALAPPDATA%\tunelo` khỏi PATH của người dùng, rồi một tiến trình tách rời xoá `%APPDATA%\tunelo` và
     `%LOCALAPPDATA%\tunelo` vài giây sau khi `tunelo` thoát (Windows không xoá được tệp đang chạy).
 
-Profile Claude nằm trong thư mục cấu hình (`claude-profiles/`), nên `uninstall` xoá luôn chúng mà không đăng xuất từng profile;
-xoá profile trên trang máy trước để claude thu hồi phiên đăng nhập của nó. `~/.claude` của máy không bị đụng.
+Tài khoản AI nằm trong thư mục cấu hình (`ai-accounts/`, và `claude-profiles/` của bản trước 3.3), nên `uninstall` xoá luôn
+chúng mà không đăng xuất từng tài khoản; xoá tài khoản Claude trên trang "Tài khoản AI" trước để claude thu hồi phiên đăng nhập
+của nó. `~/.claude`, `~/.gemini` và mục Keychain của agy không bị đụng (agy giữ đăng nhập đang dùng lúc gỡ).
+
+### Lên bản có tài khoản AI theo từng AI
+
+Bản này không đọc dữ liệu của bản cũ và không chạy với web bản cũ. Trên máy đang có tunelo cũ: chạy `tunelo uninstall` của bản
+cũ, chạy lại lệnh cài ở mục [Cài](#cài), `tunelo login`, rồi đăng nhập lại các tài khoản Claude trên trang "Tài khoản AI".
 
 ## Phát triển
 

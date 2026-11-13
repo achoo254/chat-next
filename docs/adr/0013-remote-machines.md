@@ -3,6 +3,7 @@
 - Trạng thái: Đã chấp nhận
 - Ngày: 2026-11-08
 - Bổ sung bởi [ADR 0014](./0014-tunelo-machine-agent.md): Tunelo là tiến trình máy duy nhất, máy đăng ký theo tài khoản (không còn mã cài), profile Claude, Localman gọi `localhost` của máy.
+- Bổ sung bởi [ADR 0017](./0017-provider-neutral-ai-agent.md): không AI mặc định, tài khoản theo từng AI, Antigravity.
 - Sửa ngày 2026-11-12 (tunelo 3.0): tài khoản là gốc tin cậy cả hai chiều, thay ghép thiết bị bằng lệnh cài và mã Authenticator (mục "Tài khoản là gốc tin cậy").
 
 ## Bối cảnh

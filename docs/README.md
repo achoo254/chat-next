@@ -24,6 +24,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0014 Tunelo, tiến trình máy](./adr/0014-tunelo-machine-agent.md) | `tunelo` gộp CLI Tunelo, một lần đăng nhập cho tunnel/Chat/Localman, máy theo tài khoản (`tunelo login` đăng ký có chứng minh khoá, không mã cài), cây lệnh gọn có lệnh ẩn, `logout`/`uninstall`, profile Claude và đăng nhập từ xa, Localman gọi `localhost` của máy qua `/.tunelo/forward`. |
 | [0015 Thông báo bảo mật từ IdP](./adr/0015-account-notices-from-idp.md) | `POST /api/account-notices`: IdP gửi thông báo bảo mật bằng token tự ký (`client_id` `auth-account-notices`, scope `account-notices`), Chat chuyển qua bot trợ lý; `204` cả khi không có người dùng để IdP không dò được tài khoản. |
 | [0016 Xoá tài khoản chỉ ở IdP](./adr/0016-account-deletion-at-idp.md) | Chat không còn luồng xoá, giữ 30 ngày hay tự xoá; IdP gửi SET `account.deleted` tới `POST /api/idp/account-deleted` (kiểm JWKS, `typ: secevent+jwt`, `aud` = URL endpoint), Chat xoá ngay, nhóm và kênh chuyển cho người vai trò cao nhất rồi vào sớm nhất, bot bị xoá; `202` cả khi `sub` không có. |
+| [0017 AI Agent không gắn với một AI](./adr/0017-provider-neutral-ai-agent.md) | Không AI mặc định, capability thay rẽ nhánh theo id, tài khoản theo từng AI, Antigravity qua `agy acp`. |
 
 Đổi một quyết định: viết ADR mới mang số kế tiếp, ghi ADR cũ là "Bị thay thế bởi ADR NNNN" trong dòng trạng thái, và làm theo mục "Cách thay đổi" của ADR cũ.
 
