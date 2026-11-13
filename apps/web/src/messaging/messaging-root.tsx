@@ -5,8 +5,7 @@
 import type { Transport } from "@connectrpc/connect";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
-import { useApi } from "../api/api-context.tsx";
-import { loadAccountClient, loadConnectWeb, type Api } from "../api/client.ts";
+import { loadAccountClient, loadConnectWeb } from "../api/client.ts";
 import { PageLoader } from "../components/brand-loader.tsx";
 import { LoaderBoundary, Ready } from "../components/delayed-loader.tsx";
 import { prefetchWhenIdle, preloadable, warm } from "../components/preload.ts";
@@ -14,7 +13,6 @@ import { Icon } from "../components/icon.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { inSettingsFrame, Link, navigate, paths, type Route, type SettingsTab } from "../router.tsx";
 import type { MessagingSettings, SettingsSection } from "../screens/settings/settings.tsx";
-import { sessionsData } from "../screens/settings/sessions-data.ts";
 import { Shell } from "../screens/shell.tsx";
 import "../styles/messaging.css";
 import { useCopy } from "./copy/use-copy.ts";
@@ -82,15 +80,12 @@ const IDLE_PREFETCH = [
  * started together: its code and its first data. The screen shows once, with
  * one loader while any of it is missing.
  */
-function screenParts(route: Route, services: Services, api: Api): Promise<unknown>[] {
+function screenParts(route: Route, services: Services): Promise<unknown>[] {
 	switch (route.name) {
 		case "settings":
 			switch (route.tab) {
 				case "profile":
 					return [settingsCode.preload(), settingsExtraCode.preload()];
-				case "sessions":
-					warm(loadConnectWeb, loadAccountClient);
-					return [settingsCode.preload(), sessionsData(api).promise];
 				case "privacy":
 					warm(loadConnectWeb, loadRemoteClient);
 					return [settingsCode.preload(), settingsExtraCode.preload(), privacyData(services.remote).promise];
@@ -329,7 +324,6 @@ interface ScreenProps {
 
 function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
 	const services = useServices();
-	const api = useApi();
 	const { t } = useI18n();
 	const [folder, setFolder] = useState<Folder>("all");
 	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
@@ -340,7 +334,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 		navigate(paths.home);
 	};
 	// Started on every render: the requests are shared, so this only starts what a new route needs.
-	const parts = screenParts(route, services, api);
+	const parts = screenParts(route, services);
 	const messagingSettings: MessagingSettings = {
 		onSignOut,
 		moderation: moderator,

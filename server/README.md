@@ -327,7 +327,7 @@ Xuất dữ liệu (`PrivacyService`, [`proto/app/v1/privacy.proto`](../proto/ap
 
 Web đăng xuất bằng một form `POST /auth/logout` (điều hướng cấp cao nhất, để trình duyệt theo redirect 303 tới IdP; `fetch` không theo được redirect khác origin). Nếu muốn gọi `AuthService.SignOut` trước (ví dụ để dọn dữ liệu local), `SignOut` chỉ thu hồi phiên và refresh token mà **không** xoá cookie; `/auth/logout` sau đó vẫn dùng cookie đó một lần để lấy ID token làm `id_token_hint`, rồi xoá cookie. ID token không bao giờ tới JavaScript.
 
-Chỉ phiên tự thu hồi chính nó (request mang cookie của chính phiên đó: `SignOut`, hoặc `RevokeSession` với id của mình) mới giữ ID token cho bước trên. Phiên bị thu hồi từ phiên khác (`RevokeSession`, `RevokeOtherSessions`), do back-channel logout hay do kiểm grant thì mất luôn ID token, nên cookie bị đánh cắp của phiên đó không lấy được ID token qua `/auth/logout` (chỉ được redirect về `/`).
+Chỉ phiên tự thu hồi chính nó (request mang cookie của chính phiên đó: `SignOut`) mới giữ ID token cho bước trên. Phiên bị thu hồi từ nơi khác (gỡ thiết bị của tài khoản bằng `MachinesService.RevokeDevice`), do back-channel logout hay do kiểm grant thì mất luôn ID token, nên cookie bị đánh cắp của phiên đó không lấy được ID token qua `/auth/logout` (chỉ được redirect về `/`).
 
 ## Phiên và kiểm grant
 

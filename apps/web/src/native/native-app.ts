@@ -39,8 +39,10 @@ export function nativeChatOptions(): NativeChatOptions {
 	return {
 		native: { sessionToken: sessionToken(), client: nativePlatform() },
 		appVersion: APP_VERSION,
-		// The core already ended the session (SignOut) and wiped this device's data.
-		leave: () => void restartSignedOut(),
+		// The core wiped this device's data; the session still has to end on
+		// the server, which revokes the device's grant at the IdP so the app
+		// leaves the account's "Nơi đang đăng nhập" (ADR 0006).
+		leave: () => void signOutAndRestart(),
 		onForegroundChange: subscribeAppState,
 	};
 }

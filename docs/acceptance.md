@@ -24,7 +24,7 @@ Cột "Kết quả" để người nghiệm thu ghi Đạt / Không đạt kèm 
 | A1 | Đăng nhập lần đầu | Vào app; có "Cloud của tôi" ghim đầu danh sách và chat với bot Trợ lý | |
 | A2 | Cài đặt › Hồ sơ: đổi tên hiển thị, username, ảnh đại diện (cắt ảnh) | Lưu được; người khác thấy theo luật riêng tư | |
 | A3 | Cài đặt › Quyền riêng tư: đổi "Ai thấy ảnh đại diện", "Trạng thái hoạt động" | Người khác thấy đúng theo lựa chọn | |
-| A4 | Cài đặt › Phiên đăng nhập: đăng xuất một phiên khác | Phiên đó bị đăng xuất | |
+| A4 | Cài đặt › Tài khoản: bấm "Quản lý nơi đang đăng nhập", đăng xuất một thiết bị khác ở trang tài khoản của IdP; rồi bấm "Đăng xuất" trong app trên một thiết bị | Mở `auth.hoandat.com/account#account-sessions` ở tab mới; thiết bị kia bị đăng xuất; thiết bị vừa đăng xuất biến khỏi "Nơi đang đăng nhập" | |
 | A5 | Cài đặt › Thông báo: bật thông báo khi đã đóng app | Đóng tab, nhờ người khác nhắn: có thông báo | |
 | A6 | Cài đặt › Tài khoản: xuất dữ liệu | Tải được tệp dữ liệu của mình | |
 

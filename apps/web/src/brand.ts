@@ -17,6 +17,8 @@ export const brand = {
 	idpHost: idp.host,
 	/** IdP account page: sign-in methods, app grants, devices. */
 	accountUrl: new URL("/account", idp).toString(),
+	/** Where the account is signed in, listed and ended only at the IdP ("Nơi đang đăng nhập"; the app has no sessions page). */
+	sessionsUrl: new URL("/account#account-sessions", idp).toString(),
 	/** Where an account is deleted: the IdP account page's deletion card (the app has no deletion of its own). */
 	deleteAccountUrl: new URL("/account#account-delete", idp).toString(),
 	/** App URL scheme; links with it pass the allowlist (ADR 0004). */

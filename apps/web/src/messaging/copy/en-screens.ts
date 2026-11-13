@@ -1060,6 +1060,8 @@ export const enScreens: ScreensCopy = {
 		requested: "Export requested; its progress shows here",
 		rateLimited: "You can ask once every 7 days",
 		unavailable: "This server does not offer data exports yet.",
+		sessionsNote: `The devices signed in to your ${brand.domain} account are listed and signed out on the account page.`,
+		sessionsLink: "Manage where you're signed in",
 		deleteNote: `Your chat data is deleted with your ${brand.domain} account, as soon as you delete it.`,
 		deleteLink: `Delete your ${brand.domain} account at ${brand.idpHost}/account`,
 	},

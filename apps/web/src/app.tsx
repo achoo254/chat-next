@@ -139,8 +139,10 @@ function SignedIn({ self, onSelfChange, onSignedOut, transport, messagingConnect
 	const known = route !== null;
 
 	useEffect(() => {
-		if (!known) navigate(paths.home, { replace: true });
-	}, [known]);
+		// An unknown settings page (one that was removed, such as the old
+		// /settings/sessions) opens the profile tab; anything else goes home.
+		if (!known) navigate(pathname.startsWith("/settings/") ? paths.settings("profile") : paths.home, { replace: true });
+	}, [known, pathname]);
 
 	if (!route) return null;
 	return (

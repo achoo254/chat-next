@@ -47,8 +47,8 @@ func TestRPCUnauthenticated(t *testing.T) {
 			t.Fatalf("cookie %q: %v", v, err)
 		}
 	}
-	if _, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{})); codeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("ListSessions: %v", err)
+	if _, err := cl.auth.SignOut(context.Background(), connect.NewRequest(&appv1.SignOutRequest{})); codeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("SignOut: %v", err)
 	}
 }
 
@@ -175,73 +175,10 @@ func TestProfileRPCs(t *testing.T) {
 	}
 }
 
-func TestSessionRPCs(t *testing.T) {
-	e := newEnv(t)
-	first, _ := e.signedIn(t)
-	second, _ := e.signedIn(t)
-	third, _ := e.signedIn(t)
-	ctx := context.Background()
-
-	list, err := second.auth.ListSessions(ctx, connect.NewRequest(&appv1.ListSessionsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sessions := list.Msg.GetSessions()
-	if len(sessions) != 3 {
-		t.Fatalf("sessions = %v", sessions)
-	}
-	current := 0
-	for _, s := range sessions {
-		if s.GetCurrent() {
-			current++
-			if s.GetNewLogin() {
-				t.Errorf("current session marked new_login")
-			}
-		} else if !s.GetNewLogin() {
-			t.Errorf("fresh session %d not marked new_login", s.GetId())
-		}
-		if s.GetPlatform() != appv1.ClientPlatform_CLIENT_PLATFORM_WEB || s.GetCreatedAt() <= 0 || s.GetLastActiveAt() <= 0 {
-			t.Errorf("session = %v", s)
-		}
-	}
-	if current != 1 {
-		t.Fatalf("%d current sessions", current)
-	}
-
-	firstID := currentSessionID(t, first)
-	if _, err := second.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: firstID})); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := getSelf(t, first); codeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("revoked session still works: %v", err)
-	}
-	if _, err := second.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: firstID})); codeOf(err) != connect.CodeNotFound {
-		t.Fatalf("revoking twice: %v", err)
-	}
-	if _, err := second.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{})); codeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("revoking id 0: %v", err)
-	}
-
-	resp, err := second.auth.RevokeOtherSessions(ctx, connect.NewRequest(&appv1.RevokeOtherSessionsRequest{}))
-	if err != nil || resp.Msg.GetRevokedCount() != 1 {
-		t.Fatalf("RevokeOtherSessions = %v, %v", resp, err)
-	}
-	if _, err := getSelf(t, third); codeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("other session still works: %v", err)
-	}
-	if _, err := getSelf(t, second); err != nil {
-		t.Fatalf("current session revoked: %v", err)
-	}
-	e.app.Sessions.Wait()
-	if n := len(e.idp.Revoked()); n != 2 {
-		t.Fatalf("revoked at IdP = %d tokens, want 2", n)
-	}
-}
-
 func TestRequestIDsGuard(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	_, err := cl.auth.RevokeSession(context.Background(), connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: ids.MaxSafeID + 1}))
+	_, err := cl.users.GetUsers(context.Background(), connect.NewRequest(&appv1.GetUsersRequest{UserIds: []int64{ids.MaxSafeID + 1}}))
 	if codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("unsafe id: %v", err)
 	}

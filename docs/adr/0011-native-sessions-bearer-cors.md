@@ -25,7 +25,7 @@ App iOS và Android là chính web app (`apps/web`) đóng trong Capacitor (`app
 | Cách | Khi nào có hiệu lực |
 |---|---|
 | Đăng xuất trong app (`SignOut` bằng bearer) | Ngay; refresh token bị thu hồi ở IdP bằng client `chat-mobile` |
-| Thu hồi từ phiên khác (`RevokeSession`, `RevokeOtherSessions`), xoá tài khoản, operator | Ngay; outbox `session_revoked` đóng socket của phiên trong ≤ 1 s |
+| Thu hồi từ nơi khác (gỡ thiết bị của tài khoản ở AI Agent; `RevokeSession` và `RevokeOtherSessions` đã bỏ 13/11/2026, danh sách phiên chỉ còn ở IdP), xoá tài khoản, operator | Ngay; outbox `session_revoked` đóng socket của phiên trong ≤ 1 s |
 | Gỡ thiết bị hoặc grant hết ở `/account` của IdP | Lần kiểm grant kế tiếp: refresh trả `invalid_grant` thì phiên bị thu hồi. Phiên đang dùng được kiểm mỗi giờ; phiên không dùng được kiểm ở request đầu tiên khi app mở lại (request đó vẫn chạy, việc kiểm chạy nền ngay sau). Job kiểm grant 24 giờ của ADR 0006 chưa có cho cả web lẫn native |
 | Không dùng 30 ngày | Tự hết hạn; không có trần 90 ngày |
 | Back-channel logout `aud` `chat-mobile` (theo `sid`, hoặc theo `sub` khi không có `sid`) | Ngay. IdP hiện **không** gửi: `nativeChatClient` trong `auth-next/src/oidc/chat-clients.ts` không khai `backchannel_logout_uri`. Server nhận sẵn để IdP bật mà không cần đổi chat; bật nghĩa là đăng xuất IdP trên trình duyệt cũng đăng xuất app, trái với mục "Native theo grant của từng thiết bị" của ADR 0006, nên cần quyết định riêng ở IdP |

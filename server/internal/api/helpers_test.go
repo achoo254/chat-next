@@ -3,6 +3,8 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
@@ -20,6 +22,7 @@ import (
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
 	"app.local/server/internal/api"
+	"app.local/server/internal/auth"
 	"app.local/server/internal/auth/idptest"
 	"app.local/server/internal/config"
 	"app.local/server/internal/logging/redact"
@@ -276,15 +279,19 @@ type clients struct {
 	auth   appv1connect.AuthServiceClient
 	users  appv1connect.UsersServiceClient
 	config appv1connect.ConfigServiceClient
+	// browser is the HTTP client whose cookie jar holds the web session;
+	// nil for native clients.
+	browser *http.Client
 }
 
 func (e *env) rpc(c *http.Client, origin string) clients {
 	base := e.srv.URL + "/rpc"
 	opt := withOrigin(origin)
 	return clients{
-		auth:   appv1connect.NewAuthServiceClient(c, base, opt),
-		users:  appv1connect.NewUsersServiceClient(c, base, opt),
-		config: appv1connect.NewConfigServiceClient(c, base, opt),
+		browser: c,
+		auth:    appv1connect.NewAuthServiceClient(c, base, opt),
+		users:   appv1connect.NewUsersServiceClient(c, base, opt),
+		config:  appv1connect.NewConfigServiceClient(c, base, opt),
 	}
 }
 
@@ -314,20 +321,55 @@ func getSelf(t *testing.T, cl clients) (*appv1.User, error) {
 	return resp.Msg.GetUser(), nil
 }
 
-// currentSessionID returns the id of the session the clients use.
-func currentSessionID(t *testing.T, cl clients) int64 {
+// currentSessionID returns the id of the session whose cookie the browser
+// behind the web clients cl holds.
+func (e *env) currentSessionID(t *testing.T, cl clients) int64 {
 	t.Helper()
-	resp, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
+	if cl.browser == nil {
+		t.Fatal("currentSessionID needs web clients")
+	}
+	cookie := e.cookie(t, cl.browser, auth.SessionCookieName)
+	if cookie == nil {
+		t.Fatal("no session cookie")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		t.Fatalf("session cookie: %v", err)
+	}
+	hash := sha256.Sum256(raw)
+	var id int64
+	if err := e.store.Pool().QueryRow(context.Background(),
+		`SELECT id FROM user_sessions WHERE token_hash = $1`, hash[:]).Scan(&id); err != nil {
+		t.Fatalf("session of the cookie: %v", err)
+	}
+	return id
+}
+
+// activeSessionIDs returns the not yet revoked sessions of the user the
+// clients cl are signed in as.
+func (e *env) activeSessionIDs(t *testing.T, cl clients) []int64 {
+	t.Helper()
+	self, err := getSelf(t, cl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range resp.Msg.GetSessions() {
-		if s.GetCurrent() {
-			return s.GetId()
-		}
+	rows, err := e.store.Pool().Query(context.Background(),
+		`SELECT id FROM user_sessions WHERE user_id = $1 AND revoked_at IS NULL ORDER BY id`, self.GetId())
+	if err != nil {
+		t.Fatal(err)
 	}
-	t.Fatal("no current session")
-	return 0
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return ids
 }
 
 // makeGrantDue backdates the session's last grant check by two hours.

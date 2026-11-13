@@ -8,15 +8,9 @@ import { SignOutForm } from "../../components/sign-out-form.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths, type SettingsTab } from "../../router.tsx";
 import { ProfileSettings } from "./profile-settings.tsx";
-import { SessionsSettings } from "./sessions-settings.tsx";
 
 /** Tabs per group; groups are separated by a rule (mockups/settings.html). */
-const R0_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[])[] = [
-	[
-		{ tab: "profile", icon: "user" },
-		{ tab: "sessions", icon: "laptop" },
-	],
-];
+const R0_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[])[] = [[{ tab: "profile", icon: "user" }]];
 
 const MESSAGING_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[])[] = [
 	[
@@ -30,7 +24,6 @@ const MESSAGING_GROUPS: readonly (readonly { tab: SettingsTab; icon: IconName }[
 		{ tab: "shortcuts", icon: "command" },
 		{ tab: "app", icon: "download" },
 	],
-	[{ tab: "sessions", icon: "laptop" }],
 ];
 
 /** Settings added by the messaging UI (release R1). */
@@ -97,7 +90,6 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false, sec
 	if (section !== undefined) content = section.content;
 	else if (tab === "feedback") content = messaging?.feedback ?? null;
 	else if (tab === "profile") content = <ProfileSettings self={self} onSelfChange={onSelfChange} photo={messaging?.photo} />;
-	else if (tab === "sessions") content = <SessionsSettings />;
 	else content = messaging?.render(tab) ?? null;
 	return (
 		<div className="set" data-view={list ? "list" : "page"}>

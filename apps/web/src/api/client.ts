@@ -1,5 +1,4 @@
-// Typed façade over the account calls of the web app (GetSelf, profile,
-// sessions). Components call these methods and only ever see client models
+// Typed façade over the account calls of the web app (GetSelf, profile). Components call these methods and only ever see client models
 // from ./adapters.
 //
 // Startup carries no protobuf runtime: GetSelf, the one call every start
@@ -8,7 +7,7 @@
 // other account calls load on their first use (account-client.ts). Every
 // RPC goes through one fetch function, so tests serve them all in memory.
 import { Code, type Transport } from "@connectrpc/connect";
-import type { SelfUser, SessionView } from "./adapters.ts";
+import type { SelfUser } from "./adapters.ts";
 import { fetchSelf, RPC_BASE_URL } from "./get-self.ts";
 
 export interface ProfileChanges {
@@ -22,10 +21,6 @@ export interface Api {
 	getSelf(): Promise<SelfUser>;
 	updateProfile(changes: ProfileChanges): Promise<SelfUser>;
 	setUsername(username: string): Promise<SelfUser>;
-	listSessions(): Promise<SessionView[]>;
-	revokeSession(id: number): Promise<void>;
-	/** Returns how many sessions were revoked. */
-	revokeOtherSessions(): Promise<number>;
 }
 
 /** The account calls other than GetSelf, implemented in account-client.ts. */
@@ -50,7 +45,7 @@ function once<T>(load: () => Promise<T>): () => Promise<T> {
 /** Connect-Web's code; fetched ahead by screens whose first data comes through the web transport. */
 export const loadConnectWeb = () => import("@connectrpc/connect-web");
 
-/** The account calls' code (sessions, profile); fetched ahead like loadConnectWeb. */
+/** The account calls' code (profile, username); fetched ahead like loadConnectWeb. */
 export const loadAccountClient = () => import("./account-client.ts");
 
 /**
@@ -106,8 +101,5 @@ export function createApi(transport: Transport, rpcFetch: RpcFetch, onUnauthenti
 		getSelf: () => call(() => fetchSelf(rpcFetch)),
 		updateProfile: (changes) => call(async () => (await account()).updateProfile(changes)),
 		setUsername: (username) => call(async () => (await account()).setUsername(username)),
-		listSessions: () => call(async () => (await account()).listSessions()),
-		revokeSession: (id) => call(async () => (await account()).revokeSession(id)),
-		revokeOtherSessions: () => call(async () => (await account()).revokeOtherSessions()),
 	};
 }

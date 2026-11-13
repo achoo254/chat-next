@@ -84,21 +84,6 @@ const sessionColumns = `s.id, s.tenant_id, s.user_id, s.token_hash, coalesce(s.i
 	s.idp_checked_at, s.created_at, s.last_seen_at, s.user_agent, coalesce(host(s.ip), ''), s.auth_time,
 	s.platform, s.device_name, s.app_version`
 
-func scanSession(row pgx.Row) (Session, error) {
-	var x Session
-	var authTime *time.Time
-	err := row.Scan(&x.ID, &x.TenantID, &x.UserID, &x.TokenHash, &x.IdPSID, &x.IdPClientID,
-		&x.IdPCheckedAt, &x.CreatedAt, &x.LastSeenAt, &x.UserAgent, &x.IP, &authTime,
-		&x.Platform, &x.DeviceName, &x.AppVersion)
-	if authTime != nil {
-		x.AuthTime = *authTime
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Session{}, ErrNotFound
-	}
-	return x, err
-}
-
 // NewSession is the data of a session at sign-in. The token encryptions are
 // sealed by the caller.
 type NewSession struct {
@@ -215,24 +200,6 @@ func (s *Store) TouchSession(ctx context.Context, id int64, minInterval time.Dur
 	return st, nil
 }
 
-// ListActiveSessions returns the usable sessions of a user, the most
-// recently active first (as Telegram lists devices).
-func (s *Store) ListActiveSessions(ctx context.Context, tenantID string, userID int64) ([]Session, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT `+sessionColumns+` FROM user_sessions s
-		WHERE s.tenant_id = $1 AND s.user_id = $2 AND `+activeSession+`
-		ORDER BY s.last_seen_at DESC, s.id DESC`,
-		tenantID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("store: list sessions: %w", err)
-	}
-	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Session, error) { return scanSession(row) })
-	if err != nil {
-		return nil, fmt.Errorf("store: list sessions: %w", err)
-	}
-	return list, nil
-}
-
 // RevokedSession carries what a caller needs to revoke the IdP grant of a
 // session that was just revoked: the sealed refresh token and the token hash
 // it is bound to. IDTokenEnc is only returned by EndSessionForLogout.
@@ -286,28 +253,6 @@ func (s *Store) RevokeSession(ctx context.Context, tenantID string, userID, sess
 		return RevokedSession{}, ErrNotFound
 	}
 	return list[0], nil
-}
-
-// RevokeOtherSessions revokes every active session of the user except keepID.
-func (s *Store) RevokeOtherSessions(ctx context.Context, tenantID string, userID, keepID int64) ([]RevokedSession, error) {
-	rows, err := s.pool.Query(ctx, `
-		WITH target AS (
-			SELECT s.id, s.token_hash, s.refresh_token_enc FROM user_sessions s
-			WHERE s.tenant_id = $1 AND s.user_id = $2 AND s.id <> $3 AND `+activeSession+`
-			FOR UPDATE)
-		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
-			revoke_reason = `+reasonRevokedByUser+`
-		FROM target WHERE u.id = target.id
-		RETURNING u.id, target.token_hash, target.refresh_token_enc, u.idp_client_id`,
-		tenantID, userID, keepID)
-	if err != nil {
-		return nil, fmt.Errorf("store: revoke other sessions: %w", err)
-	}
-	list, err := collectRevoked(rows)
-	if err != nil {
-		return nil, fmt.Errorf("store: revoke other sessions: %w", err)
-	}
-	return list, nil
 }
 
 // RevokeAllSessions revokes every session of the user that is not revoked

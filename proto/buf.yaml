@@ -9,3 +9,12 @@ lint:
 breaking:
   use:
     - FILE
+  # Sign-in sessions are listed and ended only at the IdP (ADR 0006,
+  # 13/11/2026): ListSessions, RevokeSession, RevokeOtherSessions and their
+  # messages go on purpose. Remove this block in the commit after the one
+  # that drops them.
+  ignore_only:
+    MESSAGE_NO_DELETE:
+      - app/v1/auth.proto
+    RPC_NO_DELETE:
+      - app/v1/auth.proto

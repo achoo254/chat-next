@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/auth/idptest"
 	"connectrpc.com/connect"
 )
@@ -16,7 +15,7 @@ import (
 func TestGrantCheckInvalidGrantRevokes(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetRefresh(idptest.RefreshInvalidGrant, 0)
 
@@ -37,7 +36,7 @@ func TestGrantCheckInvalidGrantRevokes(t *testing.T) {
 func TestGrantCheckServerErrorKeepsSession(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetRefresh(idptest.RefreshServerError, 0)
 
@@ -58,7 +57,7 @@ func TestGrantCheckServerErrorKeepsSession(t *testing.T) {
 func TestGrantCheckConcurrentRequestsRefreshOnce(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetRefresh(idptest.RefreshOK, 200*time.Millisecond)
 
@@ -101,7 +100,7 @@ func TestGrantCheckConcurrentRequestsRefreshOnce(t *testing.T) {
 func TestGrantCheckRefreshesEmail(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetAccount(idptest.Account{Sub: "acc_test", SID: "sid-1", PreferredUsername: "tester",
 		Email: "tester@example.com", EmailVerified: false})
@@ -124,7 +123,7 @@ func TestGrantCheckRefreshesIdPPicture(t *testing.T) {
 		t.Fatalf("picture before the IdP has one: %v, %v", u, err)
 	}
 	const picture = "https://avatars.githubusercontent.com/u/1"
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetAccount(idptest.Account{Sub: "acc_test", SID: "sid-1", PreferredUsername: "tester",
 		Email: "tester@example.com", EmailVerified: true, Picture: picture})
@@ -139,7 +138,7 @@ func TestGrantCheckRefreshesIdPPicture(t *testing.T) {
 func TestGrantCheckStoresRotatedTokenWhenClaimsFail(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	// The token endpoint rotates the refresh token, but the ID token does
 	// not verify (as with a JWKS outage).
@@ -175,7 +174,7 @@ func TestGrantCheckStoresRotatedTokenWhenClaimsFail(t *testing.T) {
 func TestGrantCheckRejectedClientLogsError(t *testing.T) {
 	e := newEnv(t)
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	e.makeGrantDue(t, id)
 	e.idp.SetRefresh(idptest.RefreshInvalidClient, 0)
 	if ran, err := e.app.Sessions.CheckGrant(context.Background(), id); err != nil || !ran {
@@ -206,8 +205,11 @@ func TestGrantCheckRejectedClientLogsError(t *testing.T) {
 func TestGrantCheckHoldsNoLockDuringIdPCall(t *testing.T) {
 	e := newEnv(t)
 	victim, victimBrowser := e.signedIn(t)
-	other, _ := e.signedIn(t)
-	id := currentSessionID(t, victim)
+	self, err := getSelf(t, victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := e.currentSessionID(t, victim)
 	e.makeGrantDue(t, id)
 	arrived, release := e.idp.HoldRefresh(t)
 
@@ -230,11 +232,13 @@ func TestGrantCheckHoldsNoLockDuringIdPCall(t *testing.T) {
 	// logout of the session go through without waiting for it.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if _, err := other.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: id})); err != nil {
-		t.Fatalf("RevokeSession during the IdP call: %v", err)
+	// Revoked from elsewhere, as removing the account's device under AI
+	// Agent does.
+	if err := e.app.Sessions.Revoke(ctx, self.GetId(), id); err != nil {
+		t.Fatalf("revocation during the IdP call: %v", err)
 	}
 	if loc := e.postLogout(t, victimBrowser); loc != "/" {
-		t.Fatalf("logout of a session revoked by another one redirected to %q", loc)
+		t.Fatalf("logout of a session revoked from elsewhere redirected to %q", loc)
 	}
 	if code := postLogoutToken(t, e, e.idp.LogoutToken(t, e.idp.LogoutClaims("sid-1"))); code != http.StatusOK {
 		t.Fatalf("back-channel logout status %d", code)
@@ -252,7 +256,7 @@ func TestGrantCheckHoldsNoLockDuringIdPCall(t *testing.T) {
 	if _, err := getSelf(t, victim); codeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("grant check revived a revoked session: %v", err)
 	}
-	// The original token was revoked by RevokeSession, and the token the IdP
+	// The original token was revoked with the session, and the token the IdP
 	// rotated during the check, which could no longer be stored, by the check.
 	e.app.Sessions.Wait()
 	if got := e.idp.Revoked(); len(got) != 2 || got[0] == got[1] {

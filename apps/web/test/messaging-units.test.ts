@@ -20,7 +20,7 @@ import { zhCNMedia } from "../src/messaging/media/copy-zh-CN.ts";
 import { vi as shellVi } from "../src/i18n/vi.ts";
 import { zhCN as shellZhCN } from "../src/i18n/zh-CN.ts";
 import { viScreens } from "../src/messaging/copy/vi-screens.ts";
-import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain, recentTime } from "../src/messaging/data/format.ts";
+import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, listTime, oneLine, orgDomain } from "../src/messaging/data/format.ts";
 import { highlight } from "../src/messaging/data/highlight.ts";
 import type { Remote, ServerTopic } from "../src/messaging/data/remote.ts";
 import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../src/messaging/data/topic-mapping.ts";
@@ -52,17 +52,6 @@ describe("format", () => {
 		expect(dayLabel(at(2026, 9, 14), NOW, "zh-CN", zhCN)).toBe("今天");
 		expect(dayLabel(at(2026, 9, 12), NOW, "zh-CN", zhCN)).toBe("10月12日 星期一");
 		expect(dayLabel(at(2025, 11, 31), NOW, "zh-CN", zhCN)).toBe("2025年12月31日 星期三");
-		expect(recentTime(at(2026, 9, 13, 21, 52), NOW, "zh-CN", { today: "今天", yesterday: "昨天" })).toBe("昨天 21:52");
-	});
-
-	it("formats recent times for session rows: today and yesterday with the clock, else the full date", () => {
-		const viWords = { today: "hôm nay", yesterday: "hôm qua" };
-		expect(recentTime(at(2026, 9, 14, 16, 40), NOW, "vi", viWords)).toBe("hôm nay 16:40");
-		expect(recentTime(at(2026, 9, 13, 21, 52), NOW, "vi", viWords)).toBe("hôm qua 21:52");
-		expect(recentTime(at(2026, 9, 12, 8, 5), NOW, "vi", viWords)).toBe("12/10/2026");
-		expect(recentTime(at(2025, 11, 31), NOW, "vi", viWords)).toBe("31/12/2025");
-		expect(recentTime(at(2026, 9, 13, 21, 52), NOW, "en", { today: "today", yesterday: "yesterday" })).toBe("yesterday 21:52");
-		expect(recentTime(at(2026, 9, 2), NOW, "en", { today: "today", yesterday: "yesterday" })).toBe("10/02/2026");
 	});
 
 	it("maps chats to folders; channels only show under All and, when unread, Unread", () => {

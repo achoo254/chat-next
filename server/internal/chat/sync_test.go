@@ -297,7 +297,7 @@ func TestSweeperDeliversWhatTheDispatcherMissed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.st.RevokeOtherSessions(ctx, testTenant, a, 0); err != nil {
+	if _, err := h.st.RevokeSession(ctx, testTenant, a, sessID, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	// Young rows wait for the dispatcher; age them past the grace period.

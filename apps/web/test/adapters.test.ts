@@ -1,8 +1,7 @@
 import { create } from "@bufbuild/protobuf";
-import { ClientPlatform, SessionSchema } from "@achoo254/chat-proto/auth";
 import { UserSchema } from "@achoo254/chat-proto/users";
 import { describe, expect, it } from "vitest";
-import { toSelfUser, toSessionView } from "../src/api/adapters.ts";
+import { toSelfUser } from "../src/api/adapters.ts";
 
 describe("protocol adapters", () => {
 	it("maps a user's bigint id to a number", () => {
@@ -20,25 +19,5 @@ describe("protocol adapters", () => {
 	it("rejects a user id at or above 2^53", () => {
 		expect(() => toSelfUser(create(UserSchema, { id: 2n ** 53n }))).toThrow(RangeError);
 		expect(() => toSelfUser(create(UserSchema, { id: 2n ** 60n }))).toThrow(RangeError);
-	});
-
-	it("maps a session and rejects unsafe session ids and timestamps", () => {
-		const session = create(SessionSchema, {
-			id: 7n,
-			platform: ClientPlatform.IOS,
-			deviceName: "iPhone 15",
-			createdAt: 1_760_000_000n,
-			lastActiveAt: 1_760_000_500n,
-			current: true,
-		});
-		expect(toSessionView(session)).toMatchObject({
-			id: 7,
-			platform: "ios",
-			createdAt: 1_760_000_000,
-			lastActiveAt: 1_760_000_500,
-			current: true,
-		});
-		expect(() => toSessionView(create(SessionSchema, { id: 2n ** 53n }))).toThrow(RangeError);
-		expect(() => toSessionView(create(SessionSchema, { id: 1n, lastActiveAt: 2n ** 63n - 1n }))).toThrow(RangeError);
 	});
 });

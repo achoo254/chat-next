@@ -206,4 +206,15 @@ describe("boot", () => {
 		expect(window.location.pathname).toBe("/settings");
 		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" })).toBeTruthy();
 	});
+
+	it("opens the profile tab for a settings page that no longer exists, such as the old sign-in sessions", async () => {
+		renderApp((router) => {
+			router.service(UsersService, { getSelf: () => ({ user: SELF }) });
+		}, "/settings/sessions");
+
+		expect(await screen.findByRole("heading", { level: 1, name: "Hồ sơ" }, { timeout: 5000 })).toBeTruthy();
+		expect(window.location.pathname).toBe("/settings/profile");
+		const nav = screen.getByRole("navigation", { name: "Danh mục cài đặt" });
+		expect(within(nav).queryByRole("link", { name: "Phiên đăng nhập" })).toBeNull();
+	});
 });

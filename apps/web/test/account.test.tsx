@@ -66,6 +66,18 @@ describe("data export", () => {
 	});
 });
 
+describe("where the account is signed in", () => {
+	it("is managed at the IdP only: one link to its account page, no sessions page in Chat", async () => {
+		const fixture = new ChatFixture();
+		renderMessaging(fixture, "/settings/account");
+		const link = await screen.findByRole("link", { name: /^Quản lý nơi đang đăng nhập/ }, LONG);
+		expect(link.getAttribute("href")).toBe("https://auth.hoandat.com/account#account-sessions");
+		expect(link.getAttribute("target")).toBe("_blank");
+		const nav = screen.getByRole("navigation", { name: "Danh mục cài đặt" });
+		expect(within(nav).queryByRole("link", { name: "Phiên đăng nhập" })).toBeNull();
+	});
+});
+
 describe("deleting the account", () => {
 	it("has no deletion of its own, only a link to the IdP's account page", async () => {
 		const fixture = new ChatFixture();

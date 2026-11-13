@@ -1064,6 +1064,8 @@ export const viScreens = {
 		requested: "Đã yêu cầu bản xuất, tiến độ hiện ở đây",
 		rateLimited: "Mỗi 7 ngày chỉ yêu cầu được một lần",
 		unavailable: "Máy chủ này chưa bật xuất dữ liệu.",
+		sessionsNote: `Các thiết bị đang đăng nhập tài khoản ${brand.domain} được xem và đăng xuất ở trang tài khoản.`,
+		sessionsLink: "Quản lý nơi đang đăng nhập",
 		deleteNote: `Dữ liệu chat bị xoá cùng tài khoản ${brand.domain}, ngay khi bạn xoá nó.`,
 		deleteLink: `Xoá tài khoản ${brand.domain} ở ${brand.idpHost}/account`,
 	},

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"math"
-	"time"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/gen/app/v1/appv1connect"
@@ -14,25 +12,14 @@ import (
 	"connectrpc.com/connect"
 )
 
-// newLoginWindow marks sessions signed in this recently as new_login, so
-// the other sessions can warn about them.
-const newLoginWindow = 24 * time.Hour
-
-// isNewLogin reports whether a session is flagged as a new sign-in: created
-// within newLoginWindow, and never the session asking (you know you just
-// signed in there).
-func isNewLogin(createdAt, now time.Time, current bool) bool {
-	return !current && now.Sub(createdAt) < newLoginWindow
-}
-
-// authService implements AuthService.
+// authService implements AuthService. It has no session list: where the
+// account is signed in is listed and ended only at the IdP's account page
+// (ADR 0006).
 type authService struct {
 	appv1connect.UnimplementedAuthServiceHandler
 	idp        *auth.IdP
 	sessions   *auth.Sessions
 	signIn     *auth.Routes
-	store      *store.Store
-	tenantID   string
 	tenantName string
 	logger     *slog.Logger
 }
@@ -154,81 +141,4 @@ func (s *authService) SignOut(ctx context.Context, req *connect.Request[appv1.Si
 		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
 	}
 	return connect.NewResponse(&appv1.SignOutResponse{}), nil
-}
-
-// ListSessions lists the caller's active sessions, newest first.
-func (s *authService) ListSessions(ctx context.Context, req *connect.Request[appv1.ListSessionsRequest]) (*connect.Response[appv1.ListSessionsResponse], error) {
-	sess, err := mustSession(ctx)
-	if err != nil {
-		return nil, err
-	}
-	list, err := s.store.ListActiveSessions(ctx, s.tenantID, sess.UserID)
-	if err != nil {
-		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
-	}
-	now := time.Now()
-	out := make([]*appv1.Session, 0, len(list))
-	for _, x := range list {
-		current := x.ID == sess.ID
-		device := DeviceName(x.UserAgent)
-		if x.Native() && x.DeviceName != "" {
-			device = x.DeviceName
-		}
-		out = append(out, &appv1.Session{
-			Id:           x.ID,
-			Platform:     platformOf(x),
-			DeviceName:   device,
-			AppVersion:   x.AppVersion,
-			CreatedAt:    x.CreatedAt.Unix(),
-			LastActiveAt: x.LastSeenAt.Unix(),
-			Current:      current,
-			NewLogin:     isNewLogin(x.CreatedAt, now, current),
-		})
-	}
-	return connect.NewResponse(&appv1.ListSessionsResponse{Sessions: out}), nil
-}
-
-// platformOf is the platform a session signed in from.
-func platformOf(x store.Session) appv1.ClientPlatform {
-	switch x.Platform {
-	case store.PlatformIOS:
-		return appv1.ClientPlatform_CLIENT_PLATFORM_IOS
-	case store.PlatformAndroid:
-		return appv1.ClientPlatform_CLIENT_PLATFORM_ANDROID
-	default:
-		return appv1.ClientPlatform_CLIENT_PLATFORM_WEB
-	}
-}
-
-// RevokeSession revokes one of the caller's sessions (the current one
-// included).
-func (s *authService) RevokeSession(ctx context.Context, req *connect.Request[appv1.RevokeSessionRequest]) (*connect.Response[appv1.RevokeSessionResponse], error) {
-	sess, err := mustSession(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if req.Msg.GetSessionId() <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("session_id is required"))
-	}
-	err = s.sessions.Revoke(ctx, sess.UserID, req.Msg.GetSessionId())
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("session not found"))
-	case err != nil:
-		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
-	}
-	return connect.NewResponse(&appv1.RevokeSessionResponse{}), nil
-}
-
-// RevokeOtherSessions revokes every session of the caller except this one.
-func (s *authService) RevokeOtherSessions(ctx context.Context, req *connect.Request[appv1.RevokeOtherSessionsRequest]) (*connect.Response[appv1.RevokeOtherSessionsResponse], error) {
-	sess, err := mustSession(ctx)
-	if err != nil {
-		return nil, err
-	}
-	n, err := s.sessions.RevokeOthers(ctx, sess.UserID, sess.ID)
-	if err != nil {
-		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
-	}
-	return connect.NewResponse(&appv1.RevokeOtherSessionsResponse{RevokedCount: int32(min(n, math.MaxInt32))}), nil
 }

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/auth"
@@ -285,50 +287,30 @@ func TestSignInWithInvalidUTF8UserAgent(t *testing.T) {
 	c.Transport = userAgentTransport{ua: "Mozilla/5.0 \xff\xfe\xc3 " + strings.Repeat("ữ", 400), next: c.Transport}
 	e.mustSignIn(t, c)
 	cl := e.rpc(c, e.srv.URL)
-	resp, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
-	if err != nil || len(resp.Msg.GetSessions()) != 1 {
-		t.Fatalf("ListSessions = %v, %v", resp, err)
+	if ids := e.activeSessionIDs(t, cl); len(ids) != 1 {
+		t.Fatalf("sessions = %v, want the new one", ids)
+	}
+	var ua string
+	if err := e.store.Pool().QueryRow(context.Background(), `SELECT user_agent FROM user_sessions WHERE id = $1`,
+		e.currentSessionID(t, cl)).Scan(&ua); err != nil || !utf8.ValidString(ua) || len(ua) > 512 {
+		t.Fatalf("stored User-Agent = %q, %v", ua, err)
 	}
 }
 
+// A session revoked from elsewhere (removing the account's device under AI
+// Agent) keeps no ID token: its cookie no longer yields an id_token_hint.
 func TestRevokedSessionsLoseIDToken(t *testing.T) {
 	e := newEnv(t)
 	victim, victimBrowser := e.signedIn(t)
-	bystander, bystanderBrowser := e.signedIn(t)
-	actor, _ := e.signedIn(t)
-	ctx := context.Background()
-
-	// Revoked from another session: its cookie no longer yields the ID token.
-	id := currentSessionID(t, victim)
-	if _, err := actor.auth.RevokeSession(ctx, connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: id})); err != nil {
+	self, err := getSelf(t, victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.app.Sessions.Revoke(context.Background(), self.GetId(), e.currentSessionID(t, victim)); err != nil {
 		t.Fatal(err)
 	}
 	if loc := e.postLogout(t, victimBrowser); loc != "/" {
-		t.Fatalf("logout after revocation by another session redirected to %q", loc)
-	}
-
-	// Same for every session ended by RevokeOtherSessions.
-	if _, err := actor.auth.RevokeOtherSessions(ctx, connect.NewRequest(&appv1.RevokeOtherSessionsRequest{})); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := getSelf(t, bystander); codeOf(err) != connect.CodeUnauthenticated {
-		t.Fatalf("other session still works: %v", err)
-	}
-	if loc := e.postLogout(t, bystanderBrowser); loc != "/" {
-		t.Fatalf("logout after RevokeOtherSessions redirected to %q", loc)
-	}
-}
-
-func TestRevokingOwnSessionKeepsLogoutHint(t *testing.T) {
-	e := newEnv(t)
-	cl, c := e.signedIn(t)
-	id := currentSessionID(t, cl)
-	if _, err := cl.auth.RevokeSession(context.Background(), connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: id})); err != nil {
-		t.Fatal(err)
-	}
-	loc, err := url.Parse(e.postLogout(t, c))
-	if err != nil || loc.Query().Get("id_token_hint") == "" {
-		t.Fatalf("logout after revoking the own session = %v, %v", loc, err)
+		t.Fatalf("logout after revocation from elsewhere redirected to %q", loc)
 	}
 }
 
@@ -357,21 +339,11 @@ func TestSignInReturnsToPage(t *testing.T) {
 	}
 }
 
-// listSessions returns the active sessions the clients' user sees.
-func listSessions(t *testing.T, cl clients) []*appv1.Session {
-	t.Helper()
-	resp, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resp.Msg.GetSessions()
-}
-
 func TestSignInAgainReplacesTheBrowsersSession(t *testing.T) {
 	e := newEnv(t)
 	other, _ := e.signedIn(t) // another browser of the same user
 	cl, c := e.signedIn(t)
-	before := currentSessionID(t, cl)
+	before := e.currentSessionID(t, cl)
 
 	// Confirming a sensitive action signs in again in the same browser and
 	// the same IdP session: the old session goes, the IdP grant they share stays.
@@ -379,18 +351,16 @@ func TestSignInAgainReplacesTheBrowsersSession(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("re-sign-in status %d: %s", resp.StatusCode, body)
 	}
-	sessions := listSessions(t, cl)
+	sessions := e.activeSessionIDs(t, cl)
 	if len(sessions) != 2 {
 		t.Fatalf("sessions after re-sign-in = %d, want this browser once and the other browser", len(sessions))
 	}
-	after := currentSessionID(t, cl)
+	after := e.currentSessionID(t, cl)
 	if after == before {
 		t.Fatal("re-sign-in kept the old session current")
 	}
-	for _, s := range sessions {
-		if s.GetId() == before {
-			t.Fatal("the replaced session is still listed")
-		}
+	if slices.Contains(sessions, before) {
+		t.Fatal("the replaced session is still active")
 	}
 	if _, err := getSelf(t, other); err != nil {
 		t.Fatalf("the other browser's session ended: %v", err)
@@ -405,7 +375,7 @@ func TestSignInAgainReplacesTheBrowsersSession(t *testing.T) {
 	e.idp.SetAccount(idptest.Account{Sub: "acc_test", SID: "sid-other", PreferredUsername: "tester", Name: "Người Thử",
 		Email: "tester@example.com", EmailVerified: true})
 	e.mustSignIn(t, c)
-	if n := len(listSessions(t, cl)); n != 2 {
+	if n := len(e.activeSessionIDs(t, cl)); n != 2 {
 		t.Fatalf("sessions after a sign-in under a new IdP session = %d, want 2", n)
 	}
 	e.app.Sessions.Wait()
@@ -418,7 +388,7 @@ func TestSignInWithoutASessionCookieReplacesNothing(t *testing.T) {
 	e := newEnv(t)
 	first, _ := e.signedIn(t)
 	second, _ := e.signedIn(t)
-	if n := len(listSessions(t, first)); n != 2 {
+	if n := len(e.activeSessionIDs(t, first)); n != 2 {
 		t.Fatalf("sessions = %d, want one per browser", n)
 	}
 	if _, err := getSelf(t, second); err != nil {
@@ -444,7 +414,7 @@ func (e *env) sessionRevokeState(t *testing.T, id int64) (revoked bool, reason i
 func TestSignInAgainSendsTheNewCookieBeforeRevokingTheOldSession(t *testing.T) {
 	e := newEnv(t)
 	cl, c := e.signedIn(t)
-	before := currentSessionID(t, cl)
+	before := e.currentSessionID(t, cl)
 	oldCookie := e.cookie(t, c, auth.SessionCookieName).Value
 
 	// Hold the old session's row: revoking it waits until the lock goes.
@@ -495,7 +465,7 @@ func TestSignInAgainSendsTheNewCookieBeforeRevokingTheOldSession(t *testing.T) {
 func TestSignInAsAnotherUserOnTheSameBrowser(t *testing.T) {
 	e := newEnv(t)
 	cl, c := e.signedIn(t)
-	before := currentSessionID(t, cl)
+	before := e.currentSessionID(t, cl)
 
 	e.idp.SetAccount(idptest.Account{Sub: "acc_bob", SID: "sid-bob", PreferredUsername: "bob", Name: "Bob"})
 	e.mustSignIn(t, c)
@@ -521,7 +491,7 @@ func TestSignInAsAnotherUserOnTheSameBrowser(t *testing.T) {
 func TestSignInAgainAfterTheOldSessionWasRevoked(t *testing.T) {
 	e := newEnv(t)
 	cl, c := e.signedIn(t)
-	before := currentSessionID(t, cl)
+	before := e.currentSessionID(t, cl)
 	if _, err := e.store.Pool().Exec(context.Background(),
 		`UPDATE user_sessions SET revoked_at = now() WHERE id = $1`, before); err != nil {
 		t.Fatal(err)
@@ -531,7 +501,7 @@ func TestSignInAgainAfterTheOldSessionWasRevoked(t *testing.T) {
 	if _, err := getSelf(t, cl); err != nil {
 		t.Fatalf("the new session does not work: %v", err)
 	}
-	if n := len(listSessions(t, cl)); n != 1 {
+	if n := len(e.activeSessionIDs(t, cl)); n != 1 {
 		t.Fatalf("sessions = %d, want only the new one", n)
 	}
 	e.app.Sessions.Wait()

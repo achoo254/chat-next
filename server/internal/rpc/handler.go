@@ -107,8 +107,8 @@ func NewHandler(d Deps) (http.Handler, error) {
 	shared := NewInProcess(d)
 	mux := http.NewServeMux()
 	mux.Handle(appv1connect.NewAuthServiceHandler(&authService{
-		idp: d.IdP, sessions: d.Sessions, signIn: d.SignIn, store: d.Store,
-		tenantID: d.TenantID, tenantName: d.TenantName, logger: d.Logger,
+		idp: d.IdP, sessions: d.Sessions, signIn: d.SignIn,
+		tenantName: d.TenantName, logger: d.Logger,
 	}, opts...))
 	mux.Handle(appv1connect.NewUsersServiceHandler(shared.Users, opts...))
 	mux.Handle(appv1connect.NewConfigServiceHandler(&configService{config: appConfig}, opts...))

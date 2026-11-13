@@ -1,7 +1,7 @@
 // "Tài khoản" (mockups/settings.html#export-delete): personal data export
-// (background build, download here, 30 days, once per 7 days), and one
-// line leading to the IdP's account page, the only place an account is
-// deleted (ADR 0016).
+// (background build, download here, 30 days, once per 7 days), and lines
+// leading to the IdP's account page, the only place where the account's
+// sign-ins are listed and ended (ADR 0006) and where it is deleted (ADR 0016).
 import { useEffect, useEffectEvent, useState } from "react";
 import { brand } from "../../brand.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
@@ -53,7 +53,7 @@ export function AccountSettings() {
 	return (
 		<div className="set-body">
 			<ExportCard state={load.value.exports} onState={(exports) => update((current) => ({ ...current, exports }))} />
-			<DeleteAtIdpCard />
+			<AtIdpCard />
 		</div>
 	);
 }
@@ -177,11 +177,21 @@ function ExportCard({ state, onState }: { state: ExportState; onState: (state: E
 	);
 }
 
-/** The account is deleted only at the IdP (ADR 0016): one line that leads there. */
-function DeleteAtIdpCard() {
+/**
+ * Account-wide things live at the IdP (docs/settings-menu.md, rule 8): where
+ * the account is signed in (ADR 0006) and its deletion (ADR 0016), one line
+ * each that leads there.
+ */
+function AtIdpCard() {
 	const t = useScreensCopy().account;
 	return (
 		<div className="card">
+			<p className="note pad-x">
+				{t.sessionsNote}{" "}
+				<ExternalLink className="link" href={brand.sessionsUrl}>
+					{t.sessionsLink}
+				</ExternalLink>
+			</p>
 			<p className="note pad-x pad-b">
 				{t.deleteNote}{" "}
 				<ExternalLink className="link" href={brand.deleteAccountUrl}>

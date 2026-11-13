@@ -52,14 +52,15 @@ describe("account menu", () => {
 		expect(within(menu).getByText("thang@example.com")).toBeTruthy();
 		const href = (dataId: string): string | null => menu.querySelector(`[data-id="${dataId}"]`)?.getAttribute("href") ?? null;
 		expect(href("account-menu-profile")).toBe("/settings/profile");
-		expect(href("account-menu-sessions")).toBe("/settings/sessions");
+		// Where the account is signed in is managed at the IdP only: Chat has no sessions page.
+		expect(menu.querySelector('[data-id="account-menu-sessions"]')).toBeNull();
 		expect(href("account-menu-settings")).toBe("/settings");
 		expect(href("account-menu-idp-email")).toBe("https://auth.hoandat.com/account#account-email");
 		expect(href("account-menu-idp-sign-in")).toBe("https://auth.hoandat.com/account#account-sign-in");
 
 		// A Chat page opens in place and closes the menu.
-		await userEvent.click(within(menu).getByRole("link", { name: "Phiên đăng nhập" }));
-		expect(window.location.pathname).toBe("/settings/sessions");
+		await userEvent.click(within(menu).getByRole("link", { name: "Hồ sơ" }));
+		expect(window.location.pathname).toBe("/settings/profile");
 		expect(menu.open).toBe(false);
 	});
 

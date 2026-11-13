@@ -1054,6 +1054,8 @@ export const zhCNScreens: ScreensCopy = {
 		requested: "已申请导出，进度会显示在这里",
 		rateLimited: "每 7 天只能申请一次",
 		unavailable: "此服务器暂不提供数据导出。",
+		sessionsNote: `已登录 ${brand.domain} 账号的设备在账号页面查看和退出。`,
+		sessionsLink: "管理登录位置",
 		deleteNote: `删除 ${brand.domain} 账号时，聊天数据会随之立即删除。`,
 		deleteLink: `在 ${brand.idpHost}/account 删除 ${brand.domain} 账号`,
 	},

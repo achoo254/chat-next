@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/auth.proto.
  */
 export const file_app_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChFhcHAvdjEvYXV0aC5wcm90bxIGYXBwLnYxIkAKFEdldEF1dGhDb25maWdSZXF1ZXN0EigKCHBsYXRmb3JtGAEgASgOMhYuYXBwLnYxLkNsaWVudFBsYXRmb3JtIpUBChVHZXRBdXRoQ29uZmlnUmVzcG9uc2USDgoGaXNzdWVyGAEgASgJEhEKCWNsaWVudF9pZBgCIAEoCRIeChZhdXRob3JpemF0aW9uX2VuZHBvaW50GAMgASgJEg4KBnNjb3BlcxgEIAMoCRITCgt0ZW5hbnRfbmFtZRgFIAEoCRIUCgxyZWRpcmVjdF91cmkYBiABKAkiuwEKGUV4Y2hhbmdlTmF0aXZlQ29kZVJlcXVlc3QSDAoEY29kZRgBIAEoCRIVCg1jb2RlX3ZlcmlmaWVyGAIgASgJEhQKDHJlZGlyZWN0X3VyaRgDIAEoCRIoCghwbGF0Zm9ybRgFIAEoDjIWLmFwcC52MS5DbGllbnRQbGF0Zm9ybRITCgtkZXZpY2VfbmFtZRgGIAEoCRITCgthcHBfdmVyc2lvbhgHIAEoCUoECAQQBVIJY2xpZW50X2lkImcKGkV4Y2hhbmdlTmF0aXZlQ29kZVJlc3BvbnNlEhUKDXNlc3Npb25fdG9rZW4YASABKAkSFgoKc2Vzc2lvbl9pZBgCIAEoA0ICMAISGgoEdXNlchgDIAEoCzIMLmFwcC52MS5Vc2VyIhAKDlNpZ25PdXRSZXF1ZXN0IigKD1NpZ25PdXRSZXNwb25zZUoECAEQAlIPZW5kX3Nlc3Npb25fdXJsItcBCgdTZXNzaW9uEg4KAmlkGAEgASgDQgIwAhIoCghwbGF0Zm9ybRgCIAEoDjIWLmFwcC52MS5DbGllbnRQbGF0Zm9ybRITCgtkZXZpY2VfbmFtZRgDIAEoCRITCgthcHBfdmVyc2lvbhgEIAEoCRIQCghsb2NhdGlvbhgFIAEoCRIWCgpjcmVhdGVkX2F0GAYgASgDQgIwAhIaCg5sYXN0X2FjdGl2ZV9hdBgHIAEoA0ICMAISDwoHY3VycmVudBgIIAEoCBIRCgluZXdfbG9naW4YCSABKAgiFQoTTGlzdFNlc3Npb25zUmVxdWVzdCI5ChRMaXN0U2Vzc2lvbnNSZXNwb25zZRIhCghzZXNzaW9ucxgBIAMoCzIPLmFwcC52MS5TZXNzaW9uIi4KFFJldm9rZVNlc3Npb25SZXF1ZXN0EhYKCnNlc3Npb25faWQYASABKANCAjACIhcKFVJldm9rZVNlc3Npb25SZXNwb25zZSIcChpSZXZva2VPdGhlclNlc3Npb25zUmVxdWVzdCI0ChtSZXZva2VPdGhlclNlc3Npb25zUmVzcG9uc2USFQoNcmV2b2tlZF9jb3VudBgBIAEoBSqdAQoOQ2xpZW50UGxhdGZvcm0SHwobQ0xJRU5UX1BMQVRGT1JNX1VOU1BFQ0lGSUVEEAASFwoTQ0xJRU5UX1BMQVRGT1JNX1dFQhABEhcKE0NMSUVOVF9QTEFURk9STV9JT1MQAhIbChdDTElFTlRfUExBVEZPUk1fQU5EUk9JRBADEhsKF0NMSUVOVF9QTEFURk9STV9ERVNLVE9QEAQqywIKE1Nlc3Npb25SZXZva2VSZWFzb24SJQohU0VTU0lPTl9SRVZPS0VfUkVBU09OX1VOU1BFQ0lGSUVEEAASJAogU0VTU0lPTl9SRVZPS0VfUkVBU09OX1NJR05FRF9PVVQQARIpCiVTRVNTSU9OX1JFVk9LRV9SRUFTT05fUkVWT0tFRF9CWV9VU0VSEAISKQolU0VTU0lPTl9SRVZPS0VfUkVBU09OX0lEUF9HUkFOVF9FTkRFRBADEiEKHVNFU1NJT05fUkVWT0tFX1JFQVNPTl9FWFBJUkVEEAQSHwobU0VTU0lPTl9SRVZPS0VfUkVBU09OX0FETUlOEAUSIgoeU0VTU0lPTl9SRVZPS0VfUkVBU09OX1JFUExBQ0VEEAYSKQolU0VTU0lPTl9SRVZPS0VfUkVBU09OX0FDQ09VTlRfREVMRVRFRBAHMu0DCgtBdXRoU2VydmljZRJMCg1HZXRBdXRoQ29uZmlnEhwuYXBwLnYxLkdldEF1dGhDb25maWdSZXF1ZXN0Gh0uYXBwLnYxLkdldEF1dGhDb25maWdSZXNwb25zZRJbChJFeGNoYW5nZU5hdGl2ZUNvZGUSIS5hcHAudjEuRXhjaGFuZ2VOYXRpdmVDb2RlUmVxdWVzdBoiLmFwcC52MS5FeGNoYW5nZU5hdGl2ZUNvZGVSZXNwb25zZRI6CgdTaWduT3V0EhYuYXBwLnYxLlNpZ25PdXRSZXF1ZXN0GhcuYXBwLnYxLlNpZ25PdXRSZXNwb25zZRJJCgxMaXN0U2Vzc2lvbnMSGy5hcHAudjEuTGlzdFNlc3Npb25zUmVxdWVzdBocLmFwcC52MS5MaXN0U2Vzc2lvbnNSZXNwb25zZRJMCg1SZXZva2VTZXNzaW9uEhwuYXBwLnYxLlJldm9rZVNlc3Npb25SZXF1ZXN0Gh0uYXBwLnYxLlJldm9rZVNlc3Npb25SZXNwb25zZRJeChNSZXZva2VPdGhlclNlc3Npb25zEiIuYXBwLnYxLlJldm9rZU90aGVyU2Vzc2lvbnNSZXF1ZXN0GiMuYXBwLnYxLlJldm9rZU90aGVyU2Vzc2lvbnNSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw", [file_app_v1_users]);
+  fileDesc("ChFhcHAvdjEvYXV0aC5wcm90bxIGYXBwLnYxIkAKFEdldEF1dGhDb25maWdSZXF1ZXN0EigKCHBsYXRmb3JtGAEgASgOMhYuYXBwLnYxLkNsaWVudFBsYXRmb3JtIpUBChVHZXRBdXRoQ29uZmlnUmVzcG9uc2USDgoGaXNzdWVyGAEgASgJEhEKCWNsaWVudF9pZBgCIAEoCRIeChZhdXRob3JpemF0aW9uX2VuZHBvaW50GAMgASgJEg4KBnNjb3BlcxgEIAMoCRITCgt0ZW5hbnRfbmFtZRgFIAEoCRIUCgxyZWRpcmVjdF91cmkYBiABKAkiuwEKGUV4Y2hhbmdlTmF0aXZlQ29kZVJlcXVlc3QSDAoEY29kZRgBIAEoCRIVCg1jb2RlX3ZlcmlmaWVyGAIgASgJEhQKDHJlZGlyZWN0X3VyaRgDIAEoCRIoCghwbGF0Zm9ybRgFIAEoDjIWLmFwcC52MS5DbGllbnRQbGF0Zm9ybRITCgtkZXZpY2VfbmFtZRgGIAEoCRITCgthcHBfdmVyc2lvbhgHIAEoCUoECAQQBVIJY2xpZW50X2lkImcKGkV4Y2hhbmdlTmF0aXZlQ29kZVJlc3BvbnNlEhUKDXNlc3Npb25fdG9rZW4YASABKAkSFgoKc2Vzc2lvbl9pZBgCIAEoA0ICMAISGgoEdXNlchgDIAEoCzIMLmFwcC52MS5Vc2VyIhAKDlNpZ25PdXRSZXF1ZXN0IigKD1NpZ25PdXRSZXNwb25zZUoECAEQAlIPZW5kX3Nlc3Npb25fdXJsKp0BCg5DbGllbnRQbGF0Zm9ybRIfChtDTElFTlRfUExBVEZPUk1fVU5TUEVDSUZJRUQQABIXChNDTElFTlRfUExBVEZPUk1fV0VCEAESFwoTQ0xJRU5UX1BMQVRGT1JNX0lPUxACEhsKF0NMSUVOVF9QTEFURk9STV9BTkRST0lEEAMSGwoXQ0xJRU5UX1BMQVRGT1JNX0RFU0tUT1AQBCrLAgoTU2Vzc2lvblJldm9rZVJlYXNvbhIlCiFTRVNTSU9OX1JFVk9LRV9SRUFTT05fVU5TUEVDSUZJRUQQABIkCiBTRVNTSU9OX1JFVk9LRV9SRUFTT05fU0lHTkVEX09VVBABEikKJVNFU1NJT05fUkVWT0tFX1JFQVNPTl9SRVZPS0VEX0JZX1VTRVIQAhIpCiVTRVNTSU9OX1JFVk9LRV9SRUFTT05fSURQX0dSQU5UX0VOREVEEAMSIQodU0VTU0lPTl9SRVZPS0VfUkVBU09OX0VYUElSRUQQBBIfChtTRVNTSU9OX1JFVk9LRV9SRUFTT05fQURNSU4QBRIiCh5TRVNTSU9OX1JFVk9LRV9SRUFTT05fUkVQTEFDRUQQBhIpCiVTRVNTSU9OX1JFVk9LRV9SRUFTT05fQUNDT1VOVF9ERUxFVEVEEAcy9AEKC0F1dGhTZXJ2aWNlEkwKDUdldEF1dGhDb25maWcSHC5hcHAudjEuR2V0QXV0aENvbmZpZ1JlcXVlc3QaHS5hcHAudjEuR2V0QXV0aENvbmZpZ1Jlc3BvbnNlElsKEkV4Y2hhbmdlTmF0aXZlQ29kZRIhLmFwcC52MS5FeGNoYW5nZU5hdGl2ZUNvZGVSZXF1ZXN0GiIuYXBwLnYxLkV4Y2hhbmdlTmF0aXZlQ29kZVJlc3BvbnNlEjoKB1NpZ25PdXQSFi5hcHAudjEuU2lnbk91dFJlcXVlc3QaFy5hcHAudjEuU2lnbk91dFJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_users]);
 
 /**
  * @generated from message app.v1.GetAuthConfigRequest
@@ -108,7 +108,7 @@ export type ExchangeNativeCodeRequest = Message<"app.v1.ExchangeNativeCodeReques
   platform: ClientPlatform;
 
   /**
-   * Human-readable device label shown in ListSessions.
+   * Human-readable device label kept with the session.
    *
    * @generated from field: string device_name = 6;
    */
@@ -183,159 +183,6 @@ export const SignOutResponseSchema: GenMessage<SignOutResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_auth, 5);
 
 /**
- * @generated from message app.v1.Session
- */
-export type Session = Message<"app.v1.Session"> & {
-  /**
-   * @generated from field: int64 id = 1 [jstype = JS_NUMBER];
-   */
-  id: bigint;
-
-  /**
-   * @generated from field: app.v1.ClientPlatform platform = 2;
-   */
-  platform: ClientPlatform;
-
-  /**
-   * @generated from field: string device_name = 3;
-   */
-  deviceName: string;
-
-  /**
-   * @generated from field: string app_version = 4;
-   */
-  appVersion: string;
-
-  /**
-   * Coarse location derived from the last IP.
-   *
-   * @generated from field: string location = 5;
-   */
-  location: string;
-
-  /**
-   * @generated from field: int64 created_at = 6 [jstype = JS_NUMBER];
-   */
-  createdAt: bigint;
-
-  /**
-   * @generated from field: int64 last_active_at = 7 [jstype = JS_NUMBER];
-   */
-  lastActiveAt: bigint;
-
-  /**
-   * The session making this call.
-   *
-   * @generated from field: bool current = 8;
-   */
-  current: boolean;
-
-  /**
-   * Recently signed-in device that other sessions should be warned about.
-   *
-   * @generated from field: bool new_login = 9;
-   */
-  newLogin: boolean;
-};
-
-/**
- * Describes the message app.v1.Session.
- * Use `create(SessionSchema)` to create a new message.
- */
-export const SessionSchema: GenMessage<Session> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 6);
-
-/**
- * @generated from message app.v1.ListSessionsRequest
- */
-export type ListSessionsRequest = Message<"app.v1.ListSessionsRequest"> & {
-};
-
-/**
- * Describes the message app.v1.ListSessionsRequest.
- * Use `create(ListSessionsRequestSchema)` to create a new message.
- */
-export const ListSessionsRequestSchema: GenMessage<ListSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 7);
-
-/**
- * @generated from message app.v1.ListSessionsResponse
- */
-export type ListSessionsResponse = Message<"app.v1.ListSessionsResponse"> & {
-  /**
-   * @generated from field: repeated app.v1.Session sessions = 1;
-   */
-  sessions: Session[];
-};
-
-/**
- * Describes the message app.v1.ListSessionsResponse.
- * Use `create(ListSessionsResponseSchema)` to create a new message.
- */
-export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 8);
-
-/**
- * @generated from message app.v1.RevokeSessionRequest
- */
-export type RevokeSessionRequest = Message<"app.v1.RevokeSessionRequest"> & {
-  /**
-   * @generated from field: int64 session_id = 1 [jstype = JS_NUMBER];
-   */
-  sessionId: bigint;
-};
-
-/**
- * Describes the message app.v1.RevokeSessionRequest.
- * Use `create(RevokeSessionRequestSchema)` to create a new message.
- */
-export const RevokeSessionRequestSchema: GenMessage<RevokeSessionRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 9);
-
-/**
- * @generated from message app.v1.RevokeSessionResponse
- */
-export type RevokeSessionResponse = Message<"app.v1.RevokeSessionResponse"> & {
-};
-
-/**
- * Describes the message app.v1.RevokeSessionResponse.
- * Use `create(RevokeSessionResponseSchema)` to create a new message.
- */
-export const RevokeSessionResponseSchema: GenMessage<RevokeSessionResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 10);
-
-/**
- * @generated from message app.v1.RevokeOtherSessionsRequest
- */
-export type RevokeOtherSessionsRequest = Message<"app.v1.RevokeOtherSessionsRequest"> & {
-};
-
-/**
- * Describes the message app.v1.RevokeOtherSessionsRequest.
- * Use `create(RevokeOtherSessionsRequestSchema)` to create a new message.
- */
-export const RevokeOtherSessionsRequestSchema: GenMessage<RevokeOtherSessionsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 11);
-
-/**
- * @generated from message app.v1.RevokeOtherSessionsResponse
- */
-export type RevokeOtherSessionsResponse = Message<"app.v1.RevokeOtherSessionsResponse"> & {
-  /**
-   * @generated from field: int32 revoked_count = 1;
-   */
-  revokedCount: number;
-};
-
-/**
- * Describes the message app.v1.RevokeOtherSessionsResponse.
- * Use `create(RevokeOtherSessionsResponseSchema)` to create a new message.
- */
-export const RevokeOtherSessionsResponseSchema: GenMessage<RevokeOtherSessionsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_auth, 12);
-
-/**
  * @generated from enum app.v1.ClientPlatform
  */
 export enum ClientPlatform {
@@ -394,7 +241,8 @@ export enum SessionRevokeReason {
   SIGNED_OUT = 1,
 
   /**
-   * Revoked from another session of the same user.
+   * Revoked from another session of the same user (removing one of the
+   * account's devices under AI Agent).
    *
    * @generated from enum value: SESSION_REVOKE_REASON_REVOKED_BY_USER = 2;
    */
@@ -479,39 +327,15 @@ export const AuthService: GenService<{
    * out with the HTTP route /auth/logout instead (302 to the IdP
    * end_session_endpoint), so the id_token_hint never reaches JavaScript.
    *
+   * There is no session list here: where the account is signed in is listed
+   * and ended only at the IdP's account page (ADR 0006, 13/11/2026).
+   *
    * @generated from rpc app.v1.AuthService.SignOut
    */
   signOut: {
     methodKind: "unary";
     input: typeof SignOutRequestSchema;
     output: typeof SignOutResponseSchema;
-  },
-  /**
-   * @generated from rpc app.v1.AuthService.ListSessions
-   */
-  listSessions: {
-    methodKind: "unary";
-    input: typeof ListSessionsRequestSchema;
-    output: typeof ListSessionsResponseSchema;
-  },
-  /**
-   * @generated from rpc app.v1.AuthService.RevokeSession
-   */
-  revokeSession: {
-    methodKind: "unary";
-    input: typeof RevokeSessionRequestSchema;
-    output: typeof RevokeSessionResponseSchema;
-  },
-  /**
-   * Sensitive: requires an IdP sign-in within the last 10 minutes
-   * (prompt=login, max_age=600, auth_time checked).
-   *
-   * @generated from rpc app.v1.AuthService.RevokeOtherSessions
-   */
-  revokeOtherSessions: {
-    methodKind: "unary";
-    input: typeof RevokeOtherSessionsRequestSchema;
-    output: typeof RevokeOtherSessionsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_auth, 0);

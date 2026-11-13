@@ -61,7 +61,7 @@ func resealSessions(t *testing.T, e *env, previous []byte) sealbox.Count {
 func TestSessionTokensAcrossAKeyRotation(t *testing.T) {
 	e := newEnv(t, func(c *config.Config, _ *api.Options) { c.SessionKey, c.SessionKeyPrevious = newKey, oldKey })
 	cl, _ := e.signedIn(t)
-	id := currentSessionID(t, cl)
+	id := e.currentSessionID(t, cl)
 	refresh, _ := sealbox.New(newKey, "idp refresh token")
 
 	// On use: a grant check seals the tokens again.

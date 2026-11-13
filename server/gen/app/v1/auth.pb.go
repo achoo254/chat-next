@@ -86,7 +86,8 @@ const (
 	SessionRevokeReason_SESSION_REVOKE_REASON_UNSPECIFIED SessionRevokeReason = 0
 	// The user signed out on this session.
 	SessionRevokeReason_SESSION_REVOKE_REASON_SIGNED_OUT SessionRevokeReason = 1
-	// Revoked from another session of the same user.
+	// Revoked from another session of the same user (removing one of the
+	// account's devices under AI Agent).
 	SessionRevokeReason_SESSION_REVOKE_REASON_REVOKED_BY_USER SessionRevokeReason = 2
 	// IdP back-channel logout, or refresh returned invalid_grant.
 	SessionRevokeReason_SESSION_REVOKE_REASON_IDP_GRANT_ENDED SessionRevokeReason = 3
@@ -295,7 +296,7 @@ type ExchangeNativeCodeRequest struct {
 	RedirectUri  string                 `protobuf:"bytes,3,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
 	// IOS or ANDROID; selects the IdP client (see GetAuthConfig).
 	Platform ClientPlatform `protobuf:"varint,5,opt,name=platform,proto3,enum=app.v1.ClientPlatform" json:"platform,omitempty"`
-	// Human-readable device label shown in ListSessions.
+	// Human-readable device label kept with the session.
 	DeviceName    string `protobuf:"bytes,6,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
 	AppVersion    string `protobuf:"bytes,7,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -507,357 +508,6 @@ func (*SignOutResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_auth_proto_rawDescGZIP(), []int{5}
 }
 
-type Session struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Platform   ClientPlatform         `protobuf:"varint,2,opt,name=platform,proto3,enum=app.v1.ClientPlatform" json:"platform,omitempty"`
-	DeviceName string                 `protobuf:"bytes,3,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
-	AppVersion string                 `protobuf:"bytes,4,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
-	// Coarse location derived from the last IP.
-	Location     string `protobuf:"bytes,5,opt,name=location,proto3" json:"location,omitempty"`
-	CreatedAt    int64  `protobuf:"varint,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	LastActiveAt int64  `protobuf:"varint,7,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
-	// The session making this call.
-	Current bool `protobuf:"varint,8,opt,name=current,proto3" json:"current,omitempty"`
-	// Recently signed-in device that other sessions should be warned about.
-	NewLogin      bool `protobuf:"varint,9,opt,name=new_login,json=newLogin,proto3" json:"new_login,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Session) Reset() {
-	*x = Session{}
-	mi := &file_app_v1_auth_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Session) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Session) ProtoMessage() {}
-
-func (x *Session) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Session.ProtoReflect.Descriptor instead.
-func (*Session) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *Session) GetId() int64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-func (x *Session) GetPlatform() ClientPlatform {
-	if x != nil {
-		return x.Platform
-	}
-	return ClientPlatform_CLIENT_PLATFORM_UNSPECIFIED
-}
-
-func (x *Session) GetDeviceName() string {
-	if x != nil {
-		return x.DeviceName
-	}
-	return ""
-}
-
-func (x *Session) GetAppVersion() string {
-	if x != nil {
-		return x.AppVersion
-	}
-	return ""
-}
-
-func (x *Session) GetLocation() string {
-	if x != nil {
-		return x.Location
-	}
-	return ""
-}
-
-func (x *Session) GetCreatedAt() int64 {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return 0
-}
-
-func (x *Session) GetLastActiveAt() int64 {
-	if x != nil {
-		return x.LastActiveAt
-	}
-	return 0
-}
-
-func (x *Session) GetCurrent() bool {
-	if x != nil {
-		return x.Current
-	}
-	return false
-}
-
-func (x *Session) GetNewLogin() bool {
-	if x != nil {
-		return x.NewLogin
-	}
-	return false
-}
-
-type ListSessionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSessionsRequest) Reset() {
-	*x = ListSessionsRequest{}
-	mi := &file_app_v1_auth_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSessionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSessionsRequest) ProtoMessage() {}
-
-func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
-func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{7}
-}
-
-type ListSessionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sessions      []*Session             `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSessionsResponse) Reset() {
-	*x = ListSessionsResponse{}
-	mi := &file_app_v1_auth_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSessionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSessionsResponse) ProtoMessage() {}
-
-func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
-func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *ListSessionsResponse) GetSessions() []*Session {
-	if x != nil {
-		return x.Sessions
-	}
-	return nil
-}
-
-type RevokeSessionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeSessionRequest) Reset() {
-	*x = RevokeSessionRequest{}
-	mi := &file_app_v1_auth_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeSessionRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeSessionRequest) ProtoMessage() {}
-
-func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
-func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *RevokeSessionRequest) GetSessionId() int64 {
-	if x != nil {
-		return x.SessionId
-	}
-	return 0
-}
-
-type RevokeSessionResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeSessionResponse) Reset() {
-	*x = RevokeSessionResponse{}
-	mi := &file_app_v1_auth_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeSessionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeSessionResponse) ProtoMessage() {}
-
-func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeSessionResponse.ProtoReflect.Descriptor instead.
-func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{10}
-}
-
-type RevokeOtherSessionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeOtherSessionsRequest) Reset() {
-	*x = RevokeOtherSessionsRequest{}
-	mi := &file_app_v1_auth_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeOtherSessionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeOtherSessionsRequest) ProtoMessage() {}
-
-func (x *RevokeOtherSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeOtherSessionsRequest.ProtoReflect.Descriptor instead.
-func (*RevokeOtherSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{11}
-}
-
-type RevokeOtherSessionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RevokedCount  int32                  `protobuf:"varint,1,opt,name=revoked_count,json=revokedCount,proto3" json:"revoked_count,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RevokeOtherSessionsResponse) Reset() {
-	*x = RevokeOtherSessionsResponse{}
-	mi := &file_app_v1_auth_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevokeOtherSessionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevokeOtherSessionsResponse) ProtoMessage() {}
-
-func (x *RevokeOtherSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_auth_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevokeOtherSessionsResponse.ProtoReflect.Descriptor instead.
-func (*RevokeOtherSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_auth_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *RevokeOtherSessionsResponse) GetRevokedCount() int32 {
-	if x != nil {
-		return x.RevokedCount
-	}
-	return 0
-}
-
 var File_app_v1_auth_proto protoreflect.FileDescriptor
 
 const file_app_v1_auth_proto_rawDesc = "" +
@@ -888,30 +538,7 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"session_id\x18\x02 \x01(\x03B\x020\x02R\tsessionId\x12 \n" +
 	"\x04user\x18\x03 \x01(\v2\f.app.v1.UserR\x04user\"\x10\n" +
 	"\x0eSignOutRequest\"(\n" +
-	"\x0fSignOutResponseJ\x04\b\x01\x10\x02R\x0fend_session_url\"\xb3\x02\n" +
-	"\aSession\x12\x12\n" +
-	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x122\n" +
-	"\bplatform\x18\x02 \x01(\x0e2\x16.app.v1.ClientPlatformR\bplatform\x12\x1f\n" +
-	"\vdevice_name\x18\x03 \x01(\tR\n" +
-	"deviceName\x12\x1f\n" +
-	"\vapp_version\x18\x04 \x01(\tR\n" +
-	"appVersion\x12\x1a\n" +
-	"\blocation\x18\x05 \x01(\tR\blocation\x12!\n" +
-	"\n" +
-	"created_at\x18\x06 \x01(\x03B\x020\x02R\tcreatedAt\x12(\n" +
-	"\x0elast_active_at\x18\a \x01(\x03B\x020\x02R\flastActiveAt\x12\x18\n" +
-	"\acurrent\x18\b \x01(\bR\acurrent\x12\x1b\n" +
-	"\tnew_login\x18\t \x01(\bR\bnewLogin\"\x15\n" +
-	"\x13ListSessionsRequest\"C\n" +
-	"\x14ListSessionsResponse\x12+\n" +
-	"\bsessions\x18\x01 \x03(\v2\x0f.app.v1.SessionR\bsessions\"9\n" +
-	"\x14RevokeSessionRequest\x12!\n" +
-	"\n" +
-	"session_id\x18\x01 \x01(\x03B\x020\x02R\tsessionId\"\x17\n" +
-	"\x15RevokeSessionResponse\"\x1c\n" +
-	"\x1aRevokeOtherSessionsRequest\"B\n" +
-	"\x1bRevokeOtherSessionsResponse\x12#\n" +
-	"\rrevoked_count\x18\x01 \x01(\x05R\frevokedCount*\x9d\x01\n" +
+	"\x0fSignOutResponseJ\x04\b\x01\x10\x02R\x0fend_session_url*\x9d\x01\n" +
 	"\x0eClientPlatform\x12\x1f\n" +
 	"\x1bCLIENT_PLATFORM_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13CLIENT_PLATFORM_WEB\x10\x01\x12\x17\n" +
@@ -926,14 +553,11 @@ const file_app_v1_auth_proto_rawDesc = "" +
 	"\x1dSESSION_REVOKE_REASON_EXPIRED\x10\x04\x12\x1f\n" +
 	"\x1bSESSION_REVOKE_REASON_ADMIN\x10\x05\x12\"\n" +
 	"\x1eSESSION_REVOKE_REASON_REPLACED\x10\x06\x12)\n" +
-	"%SESSION_REVOKE_REASON_ACCOUNT_DELETED\x10\a2\xed\x03\n" +
+	"%SESSION_REVOKE_REASON_ACCOUNT_DELETED\x10\a2\xf4\x01\n" +
 	"\vAuthService\x12L\n" +
 	"\rGetAuthConfig\x12\x1c.app.v1.GetAuthConfigRequest\x1a\x1d.app.v1.GetAuthConfigResponse\x12[\n" +
 	"\x12ExchangeNativeCode\x12!.app.v1.ExchangeNativeCodeRequest\x1a\".app.v1.ExchangeNativeCodeResponse\x12:\n" +
-	"\aSignOut\x12\x16.app.v1.SignOutRequest\x1a\x17.app.v1.SignOutResponse\x12I\n" +
-	"\fListSessions\x12\x1b.app.v1.ListSessionsRequest\x1a\x1c.app.v1.ListSessionsResponse\x12L\n" +
-	"\rRevokeSession\x12\x1c.app.v1.RevokeSessionRequest\x1a\x1d.app.v1.RevokeSessionResponse\x12^\n" +
-	"\x13RevokeOtherSessions\x12\".app.v1.RevokeOtherSessionsRequest\x1a#.app.v1.RevokeOtherSessionsResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\aSignOut\x12\x16.app.v1.SignOutRequest\x1a\x17.app.v1.SignOutResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_auth_proto_rawDescOnce sync.Once
@@ -948,48 +572,33 @@ func file_app_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_app_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_app_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_app_v1_auth_proto_goTypes = []any{
-	(ClientPlatform)(0),                 // 0: app.v1.ClientPlatform
-	(SessionRevokeReason)(0),            // 1: app.v1.SessionRevokeReason
-	(*GetAuthConfigRequest)(nil),        // 2: app.v1.GetAuthConfigRequest
-	(*GetAuthConfigResponse)(nil),       // 3: app.v1.GetAuthConfigResponse
-	(*ExchangeNativeCodeRequest)(nil),   // 4: app.v1.ExchangeNativeCodeRequest
-	(*ExchangeNativeCodeResponse)(nil),  // 5: app.v1.ExchangeNativeCodeResponse
-	(*SignOutRequest)(nil),              // 6: app.v1.SignOutRequest
-	(*SignOutResponse)(nil),             // 7: app.v1.SignOutResponse
-	(*Session)(nil),                     // 8: app.v1.Session
-	(*ListSessionsRequest)(nil),         // 9: app.v1.ListSessionsRequest
-	(*ListSessionsResponse)(nil),        // 10: app.v1.ListSessionsResponse
-	(*RevokeSessionRequest)(nil),        // 11: app.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),       // 12: app.v1.RevokeSessionResponse
-	(*RevokeOtherSessionsRequest)(nil),  // 13: app.v1.RevokeOtherSessionsRequest
-	(*RevokeOtherSessionsResponse)(nil), // 14: app.v1.RevokeOtherSessionsResponse
-	(*User)(nil),                        // 15: app.v1.User
+	(ClientPlatform)(0),                // 0: app.v1.ClientPlatform
+	(SessionRevokeReason)(0),           // 1: app.v1.SessionRevokeReason
+	(*GetAuthConfigRequest)(nil),       // 2: app.v1.GetAuthConfigRequest
+	(*GetAuthConfigResponse)(nil),      // 3: app.v1.GetAuthConfigResponse
+	(*ExchangeNativeCodeRequest)(nil),  // 4: app.v1.ExchangeNativeCodeRequest
+	(*ExchangeNativeCodeResponse)(nil), // 5: app.v1.ExchangeNativeCodeResponse
+	(*SignOutRequest)(nil),             // 6: app.v1.SignOutRequest
+	(*SignOutResponse)(nil),            // 7: app.v1.SignOutResponse
+	(*User)(nil),                       // 8: app.v1.User
 }
 var file_app_v1_auth_proto_depIdxs = []int32{
-	0,  // 0: app.v1.GetAuthConfigRequest.platform:type_name -> app.v1.ClientPlatform
-	0,  // 1: app.v1.ExchangeNativeCodeRequest.platform:type_name -> app.v1.ClientPlatform
-	15, // 2: app.v1.ExchangeNativeCodeResponse.user:type_name -> app.v1.User
-	0,  // 3: app.v1.Session.platform:type_name -> app.v1.ClientPlatform
-	8,  // 4: app.v1.ListSessionsResponse.sessions:type_name -> app.v1.Session
-	2,  // 5: app.v1.AuthService.GetAuthConfig:input_type -> app.v1.GetAuthConfigRequest
-	4,  // 6: app.v1.AuthService.ExchangeNativeCode:input_type -> app.v1.ExchangeNativeCodeRequest
-	6,  // 7: app.v1.AuthService.SignOut:input_type -> app.v1.SignOutRequest
-	9,  // 8: app.v1.AuthService.ListSessions:input_type -> app.v1.ListSessionsRequest
-	11, // 9: app.v1.AuthService.RevokeSession:input_type -> app.v1.RevokeSessionRequest
-	13, // 10: app.v1.AuthService.RevokeOtherSessions:input_type -> app.v1.RevokeOtherSessionsRequest
-	3,  // 11: app.v1.AuthService.GetAuthConfig:output_type -> app.v1.GetAuthConfigResponse
-	5,  // 12: app.v1.AuthService.ExchangeNativeCode:output_type -> app.v1.ExchangeNativeCodeResponse
-	7,  // 13: app.v1.AuthService.SignOut:output_type -> app.v1.SignOutResponse
-	10, // 14: app.v1.AuthService.ListSessions:output_type -> app.v1.ListSessionsResponse
-	12, // 15: app.v1.AuthService.RevokeSession:output_type -> app.v1.RevokeSessionResponse
-	14, // 16: app.v1.AuthService.RevokeOtherSessions:output_type -> app.v1.RevokeOtherSessionsResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	0, // 0: app.v1.GetAuthConfigRequest.platform:type_name -> app.v1.ClientPlatform
+	0, // 1: app.v1.ExchangeNativeCodeRequest.platform:type_name -> app.v1.ClientPlatform
+	8, // 2: app.v1.ExchangeNativeCodeResponse.user:type_name -> app.v1.User
+	2, // 3: app.v1.AuthService.GetAuthConfig:input_type -> app.v1.GetAuthConfigRequest
+	4, // 4: app.v1.AuthService.ExchangeNativeCode:input_type -> app.v1.ExchangeNativeCodeRequest
+	6, // 5: app.v1.AuthService.SignOut:input_type -> app.v1.SignOutRequest
+	3, // 6: app.v1.AuthService.GetAuthConfig:output_type -> app.v1.GetAuthConfigResponse
+	5, // 7: app.v1.AuthService.ExchangeNativeCode:output_type -> app.v1.ExchangeNativeCodeResponse
+	7, // 8: app.v1.AuthService.SignOut:output_type -> app.v1.SignOutResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_auth_proto_init() }
@@ -1004,7 +613,7 @@ func file_app_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_auth_proto_rawDesc), len(file_app_v1_auth_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   13,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

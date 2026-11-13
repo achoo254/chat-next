@@ -241,8 +241,6 @@ button { cursor: pointer; }
 .callout .icon { margin-top: 2px; }
 .callout p { margin: 0; }
 .device { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-icon-muted); flex: none; }
-.current { font-size: 0.6875rem; font-weight: 600; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); margin-left: var(--space-1); }
-.fresh { font-size: 0.6875rem; font-weight: 600; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-warning) 14%, transparent); color: var(--c-warning-text); margin-left: var(--space-1); }
 .row form { margin: 0; }
 
 /* Form fields */

@@ -27,11 +27,8 @@ service AuthService {
   // out with the HTTP route /auth/logout instead (302 to the IdP
   // end_session_endpoint), so the id_token_hint never reaches JavaScript.
   rpc SignOut(SignOutRequest) returns (SignOutResponse);
-  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
-  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
-  // Sensitive: requires an IdP sign-in within the last 10 minutes
-  // (prompt=login, max_age=600, auth_time checked).
-  rpc RevokeOtherSessions(RevokeOtherSessionsRequest) returns (RevokeOtherSessionsResponse);
+  // There is no session list here: where the account is signed in is listed
+  // and ended only at the IdP's account page (ADR 0006, 13/11/2026).
 }
 
 enum ClientPlatform {
@@ -50,7 +47,8 @@ enum SessionRevokeReason {
   SESSION_REVOKE_REASON_UNSPECIFIED = 0;
   // The user signed out on this session.
   SESSION_REVOKE_REASON_SIGNED_OUT = 1;
-  // Revoked from another session of the same user.
+  // Revoked from another session of the same user (removing one of the
+  // account's devices under AI Agent).
   SESSION_REVOKE_REASON_REVOKED_BY_USER = 2;
   // IdP back-channel logout, or refresh returned invalid_grant.
   SESSION_REVOKE_REASON_IDP_GRANT_ENDED = 3;
@@ -96,7 +94,7 @@ message ExchangeNativeCodeRequest {
   string redirect_uri = 3;
   // IOS or ANDROID; selects the IdP client (see GetAuthConfig).
   ClientPlatform platform = 5;
-  // Human-readable device label shown in ListSessions.
+  // Human-readable device label kept with the session.
   string device_name = 6;
   string app_version = 7;
 }
@@ -116,37 +114,4 @@ message SignOutResponse {
   // end_session_endpoint server-side.
   reserved 1;
   reserved "end_session_url";
-}
-
-message Session {
-  int64 id = 1 [jstype = JS_NUMBER];
-  ClientPlatform platform = 2;
-  string device_name = 3;
-  string app_version = 4;
-  // Coarse location derived from the last IP.
-  string location = 5;
-  int64 created_at = 6 [jstype = JS_NUMBER];
-  int64 last_active_at = 7 [jstype = JS_NUMBER];
-  // The session making this call.
-  bool current = 8;
-  // Recently signed-in device that other sessions should be warned about.
-  bool new_login = 9;
-}
-
-message ListSessionsRequest {}
-
-message ListSessionsResponse {
-  repeated Session sessions = 1;
-}
-
-message RevokeSessionRequest {
-  int64 session_id = 1 [jstype = JS_NUMBER];
-}
-
-message RevokeSessionResponse {}
-
-message RevokeOtherSessionsRequest {}
-
-message RevokeOtherSessionsResponse {
-  int32 revoked_count = 1;
 }

@@ -139,7 +139,7 @@ const vi: LegalCopy = {
 					title: "Quyền của bạn",
 					items: [
 						"Chọn ai thấy trạng thái hoạt động và ảnh đại diện, ai tìm được bạn, ai thêm bạn vào nhóm và ai nhắn tin cho bạn: Cài đặt › Quyền riêng tư.",
-						"Xem và đăng xuất các thiết bị: Cài đặt › Phiên đăng nhập.",
+						`Xem và đăng xuất các thiết bị đang đăng nhập tài khoản: mục Nơi đang đăng nhập ở ${idpHost}/account.`,
 						"Xuất dữ liệu: Cài đặt › Tài khoản. Bản xuất chạy nền, tải trong app, mỗi 7 ngày một lần và giữ 30 ngày. Gồm hồ sơ, danh bạ, người đã chặn, phiên, bot (không có token), danh sách chat, tin bạn gửi và file bạn gửi; không có tin của người khác.",
 						`Xoá tài khoản bất cứ lúc nào ở ${idpHost}/account; dữ liệu chat bị xoá theo ngay.`,
 					],
@@ -343,7 +343,7 @@ const en: LegalCopy = {
 					title: "Your rights",
 					items: [
 						"Choose who sees your last seen and photo, who can find you, add you to groups and message you: Settings › Privacy.",
-						"See and sign out your devices: Settings › Sessions.",
+						`See and sign out the devices signed in to your account: Where you're signed in, at ${idpHost}/account.`,
 						"Export your data: Settings › Account. The export runs in the background, downloads in the app, once every 7 days, and is kept 30 days. It has your profile, contacts, blocked people, sessions, bots (no tokens), chat list, the messages and files you sent; no one else's messages.",
 						`Delete your account at any time at ${idpHost}/account; your chat data is deleted with it at once.`,
 					],
@@ -542,7 +542,7 @@ const zhCN: LegalCopy = {
 					title: "你的权利",
 					items: [
 						"选择谁能看到你的最后在线时间和头像，谁能找到你、把你加入群组和给你发消息：设置 › 隐私。",
-						"查看你的设备并让其退出登录：设置 › 会话。",
+						`查看已登录你账号的设备并让其退出登录：${idpHost}/account 的登录位置。`,
 						"导出你的数据：设置 › 账号。导出在后台进行，在应用内下载，每 7 天一次，保留 30 天。其中包含你的个人资料、联系人、屏蔽的人、会话、机器人（不含令牌）、聊天列表，以及你发送的消息和文件；不含他人的消息。",
 						`随时在 ${idpHost}/account 删除你的账号；你的聊天数据会随之立即删除。`,
 					],

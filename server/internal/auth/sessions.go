@@ -418,16 +418,6 @@ func (m *Sessions) Replace(ctx context.Context, replacedHash []byte, newID, user
 	return nil
 }
 
-// RevokeOthers revokes every other session of the user and returns how many.
-func (m *Sessions) RevokeOthers(ctx context.Context, userID, keepID int64) (int, error) {
-	list, err := m.store.RevokeOtherSessions(ctx, m.tenantID, userID, keepID)
-	if err != nil {
-		return 0, err
-	}
-	m.revokeAtIdP(list)
-	return len(list), nil
-}
-
 // RevokeAll revokes every session of the user (the account was deleted at
 // the IdP) and, in the background, their IdP refresh tokens,
 // which ends the app's grants at the IdP. It returns how many.

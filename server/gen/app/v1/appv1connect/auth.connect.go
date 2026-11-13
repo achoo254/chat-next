@@ -41,15 +41,6 @@ const (
 	AuthServiceExchangeNativeCodeProcedure = "/app.v1.AuthService/ExchangeNativeCode"
 	// AuthServiceSignOutProcedure is the fully-qualified name of the AuthService's SignOut RPC.
 	AuthServiceSignOutProcedure = "/app.v1.AuthService/SignOut"
-	// AuthServiceListSessionsProcedure is the fully-qualified name of the AuthService's ListSessions
-	// RPC.
-	AuthServiceListSessionsProcedure = "/app.v1.AuthService/ListSessions"
-	// AuthServiceRevokeSessionProcedure is the fully-qualified name of the AuthService's RevokeSession
-	// RPC.
-	AuthServiceRevokeSessionProcedure = "/app.v1.AuthService/RevokeSession"
-	// AuthServiceRevokeOtherSessionsProcedure is the fully-qualified name of the AuthService's
-	// RevokeOtherSessions RPC.
-	AuthServiceRevokeOtherSessionsProcedure = "/app.v1.AuthService/RevokeOtherSessions"
 )
 
 // AuthServiceClient is a client for the app.v1.AuthService service.
@@ -64,11 +55,6 @@ type AuthServiceClient interface {
 	// out with the HTTP route /auth/logout instead (302 to the IdP
 	// end_session_endpoint), so the id_token_hint never reaches JavaScript.
 	SignOut(context.Context, *connect.Request[v1.SignOutRequest]) (*connect.Response[v1.SignOutResponse], error)
-	ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
-	RevokeSession(context.Context, *connect.Request[v1.RevokeSessionRequest]) (*connect.Response[v1.RevokeSessionResponse], error)
-	// Sensitive: requires an IdP sign-in within the last 10 minutes
-	// (prompt=login, max_age=600, auth_time checked).
-	RevokeOtherSessions(context.Context, *connect.Request[v1.RevokeOtherSessionsRequest]) (*connect.Response[v1.RevokeOtherSessionsResponse], error)
 }
 
 // NewAuthServiceClient constructs a client for the app.v1.AuthService service. By default, it uses
@@ -100,35 +86,14 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceMethods.ByName("SignOut")),
 			connect.WithClientOptions(opts...),
 		),
-		listSessions: connect.NewClient[v1.ListSessionsRequest, v1.ListSessionsResponse](
-			httpClient,
-			baseURL+AuthServiceListSessionsProcedure,
-			connect.WithSchema(authServiceMethods.ByName("ListSessions")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeSession: connect.NewClient[v1.RevokeSessionRequest, v1.RevokeSessionResponse](
-			httpClient,
-			baseURL+AuthServiceRevokeSessionProcedure,
-			connect.WithSchema(authServiceMethods.ByName("RevokeSession")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeOtherSessions: connect.NewClient[v1.RevokeOtherSessionsRequest, v1.RevokeOtherSessionsResponse](
-			httpClient,
-			baseURL+AuthServiceRevokeOtherSessionsProcedure,
-			connect.WithSchema(authServiceMethods.ByName("RevokeOtherSessions")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // authServiceClient implements AuthServiceClient.
 type authServiceClient struct {
-	getAuthConfig       *connect.Client[v1.GetAuthConfigRequest, v1.GetAuthConfigResponse]
-	exchangeNativeCode  *connect.Client[v1.ExchangeNativeCodeRequest, v1.ExchangeNativeCodeResponse]
-	signOut             *connect.Client[v1.SignOutRequest, v1.SignOutResponse]
-	listSessions        *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
-	revokeSession       *connect.Client[v1.RevokeSessionRequest, v1.RevokeSessionResponse]
-	revokeOtherSessions *connect.Client[v1.RevokeOtherSessionsRequest, v1.RevokeOtherSessionsResponse]
+	getAuthConfig      *connect.Client[v1.GetAuthConfigRequest, v1.GetAuthConfigResponse]
+	exchangeNativeCode *connect.Client[v1.ExchangeNativeCodeRequest, v1.ExchangeNativeCodeResponse]
+	signOut            *connect.Client[v1.SignOutRequest, v1.SignOutResponse]
 }
 
 // GetAuthConfig calls app.v1.AuthService.GetAuthConfig.
@@ -146,21 +111,6 @@ func (c *authServiceClient) SignOut(ctx context.Context, req *connect.Request[v1
 	return c.signOut.CallUnary(ctx, req)
 }
 
-// ListSessions calls app.v1.AuthService.ListSessions.
-func (c *authServiceClient) ListSessions(ctx context.Context, req *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
-	return c.listSessions.CallUnary(ctx, req)
-}
-
-// RevokeSession calls app.v1.AuthService.RevokeSession.
-func (c *authServiceClient) RevokeSession(ctx context.Context, req *connect.Request[v1.RevokeSessionRequest]) (*connect.Response[v1.RevokeSessionResponse], error) {
-	return c.revokeSession.CallUnary(ctx, req)
-}
-
-// RevokeOtherSessions calls app.v1.AuthService.RevokeOtherSessions.
-func (c *authServiceClient) RevokeOtherSessions(ctx context.Context, req *connect.Request[v1.RevokeOtherSessionsRequest]) (*connect.Response[v1.RevokeOtherSessionsResponse], error) {
-	return c.revokeOtherSessions.CallUnary(ctx, req)
-}
-
 // AuthServiceHandler is an implementation of the app.v1.AuthService service.
 type AuthServiceHandler interface {
 	// IdP parameters a native client needs to start Code + PKCE for the tenant
@@ -173,11 +123,6 @@ type AuthServiceHandler interface {
 	// out with the HTTP route /auth/logout instead (302 to the IdP
 	// end_session_endpoint), so the id_token_hint never reaches JavaScript.
 	SignOut(context.Context, *connect.Request[v1.SignOutRequest]) (*connect.Response[v1.SignOutResponse], error)
-	ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
-	RevokeSession(context.Context, *connect.Request[v1.RevokeSessionRequest]) (*connect.Response[v1.RevokeSessionResponse], error)
-	// Sensitive: requires an IdP sign-in within the last 10 minutes
-	// (prompt=login, max_age=600, auth_time checked).
-	RevokeOtherSessions(context.Context, *connect.Request[v1.RevokeOtherSessionsRequest]) (*connect.Response[v1.RevokeOtherSessionsResponse], error)
 }
 
 // NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -205,24 +150,6 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceMethods.ByName("SignOut")),
 		connect.WithHandlerOptions(opts...),
 	)
-	authServiceListSessionsHandler := connect.NewUnaryHandler(
-		AuthServiceListSessionsProcedure,
-		svc.ListSessions,
-		connect.WithSchema(authServiceMethods.ByName("ListSessions")),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceRevokeSessionHandler := connect.NewUnaryHandler(
-		AuthServiceRevokeSessionProcedure,
-		svc.RevokeSession,
-		connect.WithSchema(authServiceMethods.ByName("RevokeSession")),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceRevokeOtherSessionsHandler := connect.NewUnaryHandler(
-		AuthServiceRevokeOtherSessionsProcedure,
-		svc.RevokeOtherSessions,
-		connect.WithSchema(authServiceMethods.ByName("RevokeOtherSessions")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/app.v1.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthServiceGetAuthConfigProcedure:
@@ -231,12 +158,6 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 			authServiceExchangeNativeCodeHandler.ServeHTTP(w, r)
 		case AuthServiceSignOutProcedure:
 			authServiceSignOutHandler.ServeHTTP(w, r)
-		case AuthServiceListSessionsProcedure:
-			authServiceListSessionsHandler.ServeHTTP(w, r)
-		case AuthServiceRevokeSessionProcedure:
-			authServiceRevokeSessionHandler.ServeHTTP(w, r)
-		case AuthServiceRevokeOtherSessionsProcedure:
-			authServiceRevokeOtherSessionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -256,16 +177,4 @@ func (UnimplementedAuthServiceHandler) ExchangeNativeCode(context.Context, *conn
 
 func (UnimplementedAuthServiceHandler) SignOut(context.Context, *connect.Request[v1.SignOutRequest]) (*connect.Response[v1.SignOutResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AuthService.SignOut is not implemented"))
-}
-
-func (UnimplementedAuthServiceHandler) ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AuthService.ListSessions is not implemented"))
-}
-
-func (UnimplementedAuthServiceHandler) RevokeSession(context.Context, *connect.Request[v1.RevokeSessionRequest]) (*connect.Response[v1.RevokeSessionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AuthService.RevokeSession is not implemented"))
-}
-
-func (UnimplementedAuthServiceHandler) RevokeOtherSessions(context.Context, *connect.Request[v1.RevokeOtherSessionsRequest]) (*connect.Response[v1.RevokeOtherSessionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AuthService.RevokeOtherSessions is not implemented"))
 }

@@ -50,7 +50,7 @@ Email liên hệ, vị trí máy chủ và Cloudflare là sự thật của dị
 | Mini App là trang của người tạo bot, app hiện tên miền | [`apps/web/src/messaging/bots/mini-app.tsx`](../../apps/web/src/messaging/bots/mini-app.tsx) (`ma-origin`); CSP `frame-src https:` trong conf nginx |
 | Bản sao chat trong trình duyệt không mã hoá, tách theo tài khoản, xoá khi đăng xuất | [ADR 0009](../adr/0009-local-storage.md) |
 | Cài đặt quyền riêng tư (ai thấy, ai tìm, ai thêm vào nhóm, ai nhắn) | `PrivacySettings` trong settings-extra.tsx |
-| Xem và đăng xuất phiên | [`sessions-settings.tsx`](../../apps/web/src/screens/settings/sessions-settings.tsx) |
+| Xem và đăng xuất các thiết bị đang đăng nhập: mục "Nơi đang đăng nhập" ở `auth.<domain>/account` (app không có trang phiên riêng) | [ADR 0006](../adr/0006-sign-in-and-chat-sessions.md) (ghi chú 13/11/2026); `brand.sessionsUrl` trong [`brand.ts`](../../apps/web/src/brand.ts) |
 | Xoá tài khoản bất cứ lúc nào ở `auth.<domain>/account`, dữ liệu chat xoá theo ngay | [ADR 0016](../adr/0016-account-deletion-at-idp.md); data-inventory.md "Quyền của người dùng" |
 | Liên hệ: email ở mục "Thông tin vận hành"; trong app qua Cài đặt › Góp ý, trả lời qua bot Trợ lý | `feedback.hint` trong vi-screens.ts |
 | "Đang cập nhật": tên pháp nhân vận hành | Chưa có trong repo (xem "Còn thiếu") |

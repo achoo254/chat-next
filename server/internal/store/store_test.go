@@ -302,13 +302,17 @@ func TestSessionsLifecycle(t *testing.T) {
 	if st, err := s.TouchSession(ctx, 1<<40, time.Minute); err != nil || st.Active {
 		t.Fatalf("TouchSession of a missing session = %+v, %v", st, err)
 	}
-	others, err := s.RevokeOtherSessions(ctx, tenant, u.ID, id1)
-	if err != nil || len(others) != 1 || others[0].ID != id3 {
-		t.Fatalf("RevokeOtherSessions = %+v, %v", others, err)
+	// Revoked from another session (removing a device under AI Agent).
+	if r, err := s.RevokeSession(ctx, tenant, u.ID, id3, hashOf("one"), true); err != nil || r.ID != id3 {
+		t.Fatalf("RevokeSession from another session = %+v, %v", r, err)
 	}
-	list, err := s.ListActiveSessions(ctx, tenant, u.ID)
-	if err != nil || len(list) != 1 || list[0].ID != id1 {
-		t.Fatalf("ListActiveSessions = %+v, %v", list, err)
+	if st, err := s.TouchSession(ctx, id3, time.Minute); err != nil || st.Active || st.RevokeReason != 2 {
+		t.Fatalf("TouchSession of a session revoked from another = %+v, %v", st, err)
+	}
+	for token, want := range map[string]bool{"one": true, "two": false, "three": false} {
+		if _, err := s.ActiveSession(ctx, tenant, hashOf(token)); (err == nil) != want {
+			t.Fatalf("ActiveSession(%s) err = %v, want active %v", token, err, want)
+		}
 	}
 
 	// Logout hands the ID token out once, even after the session was revoked.
@@ -367,9 +371,10 @@ func TestBackchannelLogout(t *testing.T) {
 	if err != nil || !fresh || n != 3 {
 		t.Fatalf("by sub = %v, %d, %v", fresh, n, err)
 	}
-	list, err := s.ListActiveSessions(ctx, tenant, u.ID)
-	if err != nil || len(list) != 0 {
-		t.Fatalf("left after logout = %+v, %v", list, err)
+	for _, token := range []string{"a", "b", "c", "na", "nb"} {
+		if _, err := s.ActiveSession(ctx, tenant, hashOf(token)); !errors.Is(err, store.ErrNotFound) {
+			t.Fatalf("session %s left after logout: %v", token, err)
+		}
 	}
 }
 

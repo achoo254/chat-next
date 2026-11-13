@@ -16,6 +16,7 @@ import (
 	"app.local/server/internal/auth"
 	"app.local/server/internal/auth/idptest"
 	"app.local/server/internal/config"
+	"app.local/server/internal/store"
 	"connectrpc.com/connect"
 	"github.com/coder/websocket"
 	"golang.org/x/oauth2"
@@ -162,14 +163,17 @@ func TestNativeSignInAndBearer(t *testing.T) {
 	if _, err := chats.GetDialogs(ctx, connect.NewRequest(&appv1.GetDialogsRequest{Limit: 10})); err != nil {
 		t.Fatalf("GetDialogs with bearer: %v", err)
 	}
-	list, err := cl.auth.ListSessions(ctx, connect.NewRequest(&appv1.ListSessionsRequest{}))
-	if err != nil || len(list.Msg.GetSessions()) != 1 {
-		t.Fatalf("ListSessions = %v, %v", list, err)
+	if ids := e.activeSessionIDs(t, cl); len(ids) != 1 || ids[0] != out.GetSessionId() {
+		t.Fatalf("sessions = %v, want %d", ids, out.GetSessionId())
 	}
-	s := list.Msg.GetSessions()[0]
-	if s.GetPlatform() != appv1.ClientPlatform_CLIENT_PLATFORM_IOS || s.GetDeviceName() != "iPhone của An" ||
-		s.GetAppVersion() != "1.0.0 (7)" || !s.GetCurrent() || s.GetId() != out.GetSessionId() {
-		t.Fatalf("native session = %v", s)
+	var (
+		platform           int16
+		device, appVersion string
+	)
+	if err := e.store.Pool().QueryRow(ctx, `SELECT platform, device_name, app_version FROM user_sessions WHERE id = $1`,
+		out.GetSessionId()).Scan(&platform, &device, &appVersion); err != nil ||
+		platform != store.PlatformIOS || device != "iPhone của An" || appVersion != "1.0.0 (7)" {
+		t.Fatalf("native session = %d %q %q, %v", platform, device, appVersion, err)
 	}
 	// The bearer works from the Android origin and the tenant's own origin
 	// too (a cross-site page cannot attach it).
@@ -263,9 +267,8 @@ func TestNativeSignInAgainReplacesSession(t *testing.T) {
 		t.Fatalf("replaced session still works: %v", err)
 	}
 	cl, _ := e.nativeRPC(auth.NativeOriginIOS, second.GetSessionToken())
-	list, err := cl.auth.ListSessions(context.Background(), connect.NewRequest(&appv1.ListSessionsRequest{}))
-	if err != nil || len(list.Msg.GetSessions()) != 1 {
-		t.Fatalf("sessions after signing in again = %v, %v", list, err)
+	if ids := e.activeSessionIDs(t, cl); len(ids) != 1 || ids[0] != second.GetSessionId() {
+		t.Fatalf("sessions after signing in again = %v", ids)
 	}
 	// Another user's bearer is never replaced.
 	e.idp.SetAccount(idptest.Account{Sub: "acc_other", SID: "sid-other", PreferredUsername: "other"})
@@ -434,10 +437,9 @@ func TestNativeRealtime(t *testing.T) {
 		bad.closed(t)
 	}
 
-	// Revoking the native session (here: from the web session of the same
-	// user) closes its socket with SessionRevoked.
-	web := e.rpc(browser, e.srv.URL)
-	if _, err := web.auth.RevokeSession(context.Background(), connect.NewRequest(&appv1.RevokeSessionRequest{SessionId: out.GetSessionId()})); err != nil {
+	// Revoking the native session from elsewhere (removing the account's
+	// device under AI Agent) closes its socket with SessionRevoked.
+	if err := e.app.Sessions.Revoke(context.Background(), out.GetUser().GetId(), out.GetSessionId()); err != nil {
 		t.Fatal(err)
 	}
 	// How fast is TestRealtimeEndToEnd's business; on a loaded machine the

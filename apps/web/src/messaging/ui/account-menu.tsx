@@ -1,7 +1,8 @@
 // The signed-in user's avatar as the button of the shared account menu
 // (@achoo254/app-shell AccountMenu, as on Localman's top bar): name and
-// email, Hồ sơ, Phiên đăng nhập, Cài đặt, the hoandat.com account pages
-// (system browser in the native app) and Đăng xuất. In the folder rail, the
+// email, Hồ sơ, Cài đặt, the hoandat.com account pages (system browser in
+// the native app; where the account is signed in is managed only there) and
+// Đăng xuất. In the folder rail, the
 // compact rail of the settings screens and the narrow chat list's top bar
 // (account-menu-slot.tsx, which loads this module); where its panel opens
 // there is set in messaging.css and app.css.
@@ -37,7 +38,6 @@ export default function ChatAccountMenu({ self, onOpenExternal, photo }: ChatAcc
 	const services = useServices();
 	const entries: readonly AccountMenuEntry[] = [
 		{ label: t.settings.profile, dataId: "account-menu-profile", href: paths.settings("profile"), icon: <Icon name="user" small /> },
-		{ label: t.settings.sessions, dataId: "account-menu-sessions", href: paths.settings("sessions"), icon: <Icon name="laptop" small /> },
 		{ label: t.shell.settings, dataId: "account-menu-settings", href: paths.settingsList, icon: <Icon name="settings" small /> },
 	];
 	return (
