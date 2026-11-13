@@ -9,21 +9,3 @@ lint:
 breaking:
   use:
     - FILE
-  # The AI Agent names its AI everywhere and keeps accounts per AI (ADR 0017,
-  # 13/11/2026): Claude profiles become AI accounts (renamed messages and
-  # fields, reused numbers) and claude_version goes, on purpose; agent, web
-  # and server ship together. Remove this block in the commit after the one
-  # that makes these changes.
-  ignore_only:
-    ENUM_VALUE_SAME_NAME:
-      - remote/v1/remote.proto
-    FIELD_SAME_JSON_NAME:
-      - remote/v1/remote.proto
-    FIELD_SAME_NAME:
-      - remote/v1/remote.proto
-    FIELD_SAME_TYPE:
-      - remote/v1/remote.proto
-    MESSAGE_NO_DELETE:
-      - remote/v1/remote.proto
-    FIELD_NO_DELETE:
-      - app/v1/machines.proto
