@@ -64,8 +64,12 @@ export default function DeveloperConsole({ view }: { view: ConsolePage }) {
 	}
 }
 
+/**
+ * The way back from a bot's page or the new-bot form to the list. The list
+ * itself has none: it opens in the settings frame, whose menu and title
+ * already say where it is (docs/settings-menu.md).
+ */
 function ConsoleHead({ back, backLabel, parent, current }: { back: string; backLabel: string; parent: string; current: string }) {
-	const { self } = useServices();
 	return (
 		<header className="c-head">
 			<Link to={back} className="icon-btn" aria-label={backLabel}>
@@ -75,12 +79,6 @@ function ConsoleHead({ back, backLabel, parent, current }: { back: string; backL
 				<span>{parent}</span>
 				<Icon name="chevron-right" small />
 				<b>{current}</b>
-			</span>
-			<span className="who-chip">
-				<ChatAvatar id={self.id} name={self.name} photoOf={self.id} photoId={self.photoId} size="sm" />
-				<span>
-					{self.name} · {orgDomain(serverHost())}
-				</span>
 			</span>
 		</header>
 	);
@@ -113,7 +111,6 @@ function BotList() {
 	const full = bots.length >= BOTS_MAX;
 	return (
 		<section className="console" aria-labelledby={titleId}>
-			<ConsoleHead back={paths.settingsList} backLabel={t.console.backToSettings} parent={t.console.settings} current={t.console.title} />
 			<div className="c-body">
 				<div className="c-title">
 					<h1 id={titleId}>{t.console.myBots}</h1>
