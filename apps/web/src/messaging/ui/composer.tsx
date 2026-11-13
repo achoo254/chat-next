@@ -15,7 +15,7 @@
 // command menu of the group's bots. A draft "@bot_username query" is inline
 // mode: the box finds it (bots/inline-token.ts) and the bot's results show as
 // a list attached to the box (bots/inline-results.tsx).
-import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { hasFinePointer } from "../../components/fine-pointer.ts";
@@ -52,6 +52,14 @@ interface BotBar {
 }
 
 const NO_BOT_BAR: BotBar = { menu: null, keyboard: null, placeholder: null, app: null };
+
+/**
+ * The bot buttons each chat showed last, by chat. The composer mounts again
+ * for every chat it opens and the bot layer reports its buttons only once it
+ * has loaded, so without them the buttons would pop in after the first frame
+ * and push the text box aside. Menus are kept closed.
+ */
+const lastBotBar = new Map<number, BotBar>();
 
 /** What the composer calls in the bot layer (bots/bot-chat.tsx BotActions). */
 interface BotActions {
@@ -111,7 +119,14 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 	const [editingSeq, setEditingSeq] = useState(0);
 	const area = useRef<PlainTextBoxHandle>(null);
 	// The bot layer: its buttons' state, and its key handling (command menu) asked before the composer's own.
-	const [botBar, setBotBar] = useState<BotBar>(NO_BOT_BAR);
+	const [botBar, setBotBarState] = useState<BotBar>(() => lastBotBar.get(chatId) ?? NO_BOT_BAR);
+	const setBotBar = useCallback(
+		(bar: BotBar, gone = false) => {
+			setBotBarState(bar);
+			if (!gone) lastBotBar.set(chatId, { ...bar, menu: bar.menu === null ? null : false });
+		},
+		[chatId],
+	);
 	const botActions = useRef<BotActions | null>(null);
 	// "/command" typed as the whole message, which the bot layer's command menu follows.
 	const [command, setCommand] = useState<OpenToken | null>(null);
@@ -428,8 +443,9 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 					</button>
 				)}
 				{botBar.app !== null && (
-					<button type="button" className="btn btn-sm app-open" onClick={() => botActions.current?.openApp()}>
-						{botBar.app}
+					// An icon the size of the others, the bot's own label as its name: switching chats keeps the row in place.
+					<button type="button" className="icon-btn" aria-label={botBar.app} title={botBar.app} onClick={() => botActions.current?.openApp()}>
+						<Icon name="apps" />
 					</button>
 				)}
 				{mediaOn && limits !== null && (

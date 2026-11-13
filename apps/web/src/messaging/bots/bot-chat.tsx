@@ -281,7 +281,8 @@ export interface BotLayerProps {
 	/** The text box, to close its "/" token or open it again (the menu button). */
 	box: { readonly current: Pick<PlainTextBoxHandle, "closeSuggestions" | "reopenSuggestions"> | null };
 	/** The layer's current state for the composer's buttons (called when it changes). */
-	onBar: (bar: BotBar) => void;
+	/** `gone`: the layer is leaving (the composer then forgets nothing it remembers of the chat). */
+	onBar: (bar: BotBar, gone?: boolean) => void;
 	actionsRef: { current: BotActions | null };
 }
 
@@ -440,10 +441,12 @@ export function BotLayer(props: BotLayerProps) {
 	const keyboardState = active === null ? null : padShown;
 	const placeholder = padShown && active.keyboard.placeholder !== "" ? active.keyboard.placeholder : null;
 	const app = info !== null && info.miniAppUrl !== "" ? t.miniApp.open : null;
+	// Told once the bot's info is known: until then the composer keeps the buttons this chat showed last.
+	const known = info !== null;
 	useLayoutEffect(() => {
-		onBar({ menu: menuState, keyboard: keyboardState, placeholder, app });
-	}, [onBar, menuState, keyboardState, placeholder, app]);
-	useLayoutEffect(() => () => onBar(NO_BAR), [onBar]);
+		if (known) onBar({ menu: menuState, keyboard: keyboardState, placeholder, app });
+	}, [onBar, known, menuState, keyboardState, placeholder, app]);
+	useLayoutEffect(() => () => onBar(NO_BAR, true), [onBar]);
 
 	return (
 		<>
@@ -521,7 +524,7 @@ export function GroupBotLayer(props: GroupBotLayerProps) {
 	useLayoutEffect(() => {
 		onBar({ ...NO_BAR, menu: menuState });
 	}, [onBar, menuState]);
-	useLayoutEffect(() => () => onBar(NO_BAR), [onBar]);
+	useLayoutEffect(() => () => onBar(NO_BAR, true), [onBar]);
 	return <CommandMenu chatId={chatId} menu={menu} head={t.menu.groupHead} owners />;
 }
 

@@ -304,6 +304,18 @@ describe("Mini App container", () => {
 		await waitFor(() => expect(screen.queryByRole("region", { name: "Mini App của Deploy Bot" })).toBeNull());
 	});
 
+	it("keeps the bot's buttons in place when coming back to its chat, from the first frame", async () => {
+		const demo = seedDemo();
+		demo.fixture.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false, miniAppUrl: "https://release.deploytools.vn/app" });
+		renderMessaging(demo.fixture, `/c/${demo.ids.bot}`);
+		await screen.findByRole("button", { name: "Mở app" }, LONG);
+		act(() => navigate(paths.chat(demo.ids.ops)));
+		await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG);
+		act(() => navigate(paths.chat(demo.ids.bot)));
+		// Not waited for: the composer draws the buttons this chat showed last.
+		expect(screen.getByRole("button", { name: "Mở app" })).toBeTruthy();
+	});
+
 	it("shows no Mở app for a bot without a Mini App", async () => {
 		const demo = seedDemo();
 		demo.fixture.bots.adopt(demo.ids.users.deployBot, "Deploy Bot", "deploy_bot", { owned: false });
