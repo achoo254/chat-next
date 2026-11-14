@@ -218,6 +218,8 @@ type Thread = {
   background?: number;
   /** Where the AI's record of the session ended at the last look for activity elsewhere. */
   seenEnd?: number;
+  /** The last verdict traceLook wrote, so a steady state logs once. */
+  lookNote?: string;
   /** What the turn the machine runs is doing, for ThreadActivity; set only while it runs. */
   activity?: TurnActivity;
   /** Whether the open session loaded the folder's project configuration (meaningful only while it is open). */
@@ -258,6 +260,8 @@ const accountKey = (provider: string, id: string): string => `${provider}\n${id}
 
 export type CoreOptions = {
   dataDir: string;
+  /** Diagnostics: one line per call. */
+  log?: (line: string) => void;
   providers: AgentProvider[];
   audit: AuditLog;
   isSensitive: (path: string) => boolean;
@@ -649,27 +653,34 @@ export class AgentCore {
   private async lookAt(t: Thread): Promise<void> {
     const seg = t.meta.segments.at(-1);
     const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
-    if (t.deleted || this.isOpen(t) || t.running || t.queued || !seg?.sessionId || !history?.liveness) {
+    const gone = (why: string) => {
       delete t.elsewhere;
-      return;
-    }
+      this.traceLook(t, `none: ${why}`);
+    };
+    if (t.deleted || this.isOpen(t) || t.running || t.queued || !seg?.sessionId || !history?.liveness) return gone(`skipped (open=${this.isOpen(t)} running=${t.running} queued=${t.queued} session=${Boolean(seg?.sessionId)} liveness=${Boolean(history?.liveness)})`);
     const end = history.end(seg.sessionId);
-    if (end === undefined) {
-      delete t.elsewhere;
-      return;
-    }
+    if (end === undefined) return gone("transcript not found");
     if (!t.elsewhere && t.seenEnd !== undefined && end === t.seenEnd) return;
     t.seenEnd = end;
     const live = await history.liveness(seg.sessionId);
     // The machine may have started the thread meanwhile.
-    if (this.isOpen(t) || t.running || t.queued) {
-      delete t.elsewhere;
-      return;
-    }
+    if (this.isOpen(t) || t.running || t.queued) return gone("the machine started it meanwhile");
     const since = live.since ?? this.now();
     const ownAt = Math.max(t.lastActive, t.meta.closedAt ?? 0);
-    if (live.state === "busy" && since > ownAt + OWN_WRITE_SLACK_MS) t.elsewhere = { since, tool: live.tool ?? "" };
+    const busy = live.state === "busy" && since > ownAt + OWN_WRITE_SLACK_MS;
+    if (busy) t.elsewhere = { since, tool: live.tool ?? "" };
     else delete t.elsewhere;
+    this.traceLook(t, `${busy ? "busy" : "none"}: liveness=${live.state} via=${live.via} held=${live.held === true} turnOpen=${live.turnOpen === true} tool=${live.tool ?? ""} sinceAgeMs=${this.now() - since} sinceMinusOwnMs=${since - ownAt}`);
+  }
+
+  /** Diagnostics: one log line each time the verdict on a terminal-held or elsewhere-running thread changes (the line's numbers are not compared). */
+  private traceLook(t: Thread, note: string): void {
+    if (!t.meta.terminal && t.elsewhere === undefined && t.lookNote === undefined) return;
+    const kind = note.split(":")[0] ?? "";
+    const reason = note.startsWith("none: skipped") || note.startsWith("none: transcript") || note.startsWith("none: the machine") ? note : kind;
+    if (t.lookNote === reason) return;
+    t.lookNote = reason;
+    this.opts.log?.(`look ${t.meta.id.slice(0, 8)} ${note}`);
   }
 
   /**

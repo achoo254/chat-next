@@ -193,6 +193,7 @@ export class Machine {
     });
     this.core = new AgentCore({
       dataDir: join(dir, "data"),
+      log: this.log,
       providers: this.providers,
       audit: this.audit,
       isSensitive: this.isSensitive,
