@@ -212,6 +212,8 @@ type Thread = {
   reasks: Map<string, Question[]>;
   /** The session runs a turn somewhere else on the machine: since when it was last active there, and its tool ("" when unknown). */
   elsewhere?: { since: number; tool: string };
+  /** Background shells and subagents its AI still runs (see lookBackground); unset when none. */
+  background?: number;
   /** Where the AI's record of the session ended at the last look for activity elsewhere. */
   seenEnd?: number;
   /** What the turn the machine runs is doing, for ThreadActivity; set only while it runs. */
@@ -601,6 +603,7 @@ export class AgentCore {
           } catch {
             delete t.elsewhere;
           }
+          await this.lookBackground(t);
           if (!t.deleted && elsewhereKey(this.summary(t)) !== before) this.announce(t);
         }
       } finally {
@@ -634,6 +637,34 @@ export class AgentCore {
     const ownAt = Math.max(t.lastActive, t.meta.closedAt ?? 0);
     if (live.state === "busy" && since > ownAt + OWN_WRITE_SLACK_MS) t.elsewhere = { since, tool: live.tool ?? "" };
     else delete t.elsewhere;
+  }
+
+  /**
+   * The background shells and subagents the thread's AI still runs, as its
+   * record tells, counted only while something alive holds the session: this
+   * machine's own session, a terminal of the machine, or a running process of
+   * the AI (an AI that quit takes its background work with it, and says
+   * nothing). Never fails.
+   */
+  private async lookBackground(t: Thread): Promise<void> {
+    let count = 0;
+    // Only a thread something holds or that showed background work: reading every old thread's record would cost far more than it tells.
+    const alive = this.isOpen(t) || t.meta.terminal !== undefined || t.elsewhere !== undefined || t.background !== undefined;
+    try {
+      const sessionId = t.meta.segments.at(-1)?.sessionId;
+      const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+      if (alive && !t.deleted && sessionId && history?.backgroundTasks) {
+        count = history.backgroundTasks(sessionId);
+        if (count > 0 && !this.isOpen(t) && !t.meta.terminal) {
+          await history.prime?.();
+          if (history.holds?.(sessionId) !== true) count = 0;
+        }
+      }
+    } catch {
+      count = 0;
+    }
+    if (count > 0) t.background = count;
+    else delete t.background;
   }
 
   /** Runs a turn elsewhere, and never while the machine itself runs or holds the thread's session. */
@@ -2184,6 +2215,7 @@ export class AgentCore {
       busyElsewhere: elsewhere,
       elsewhereActiveAt: elsewhere ? BigInt(t.elsewhere?.since ?? 0) : 0n,
       terminalSession: t.meta.terminal?.session ?? 0,
+      backgroundTasks: t.background ?? 0,
       projectConfig: this.threadProjectConfig(t),
       gitRoot: gitRoot(t.meta.dir),
     });
@@ -2413,7 +2445,7 @@ export class AgentCore {
 
 /** What devices see of a thread's activity elsewhere, to tell when it changed. */
 function elsewhereKey(s: ThreadSummary): string {
-  return s.busyElsewhere ? `${s.elsewhereActiveAt}:${s.previewTool}` : "";
+  return `${s.busyElsewhere ? `${s.elsewhereActiveAt}:${s.previewTool}` : ""}|${s.backgroundTasks}`;
 }
 
 /** A session's name from a message: its first line, at most 80 characters. */

@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } fro
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { describe, expect, test } from "vitest";
-import { LocalSessions, RECENT_BYTES } from "../src/providers/claude/local-sessions.ts";
+import { LocalSessions, RECENT_BYTES, noteBackground } from "../src/providers/claude/local-sessions.ts";
 import { cleanPrompt } from "../src/providers/claude/transcript.ts";
 import { tempDir } from "./harness.ts";
 import { Transcript } from "./support/claude-transcript.ts";
@@ -281,6 +281,75 @@ describe("reading a session back", () => {
   test("an id that is not one of claude's is never looked for", () => {
     expect(sessions(["/nowhere"]).end("claude-session-1")).toBeUndefined();
     expect(sessions(["/nowhere"]).find(randomUUID())).toBeUndefined();
+  });
+});
+
+describe("background shells and subagents", () => {
+  const launchAgent = (t: Transcript, id: string) =>
+    t.user([{ tool_use_id: "toolu_a", type: "tool_result", content: [{ type: "text", text: `Async agent launched successfully.
+agentId: ${id} (internal ID)
+The agent is working in the background.` }] }]);
+  const launchShell = (t: Transcript, id: string) => t.toolResult("toolu_s", `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}). Output is being written to: /tmp/${id}.output`);
+  const finished = (t: Transcript, id: string, status = "completed") => t.user(`<task-notification>
+<task-id>${id}</task-id>
+<status>${status}</status>
+<summary>done</summary>
+</task-notification>`);
+
+  test("a launch counts until its task-notification, whatever the task's end (finished, failed, stopped)", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    t.user("deploy it");
+    launchShell(t, "b1x9");
+    launchAgent(t, "a77e01");
+    t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(2);
+    // The shell's end and the subagent's stop each take their own task off; a status that is only progress keeps it.
+    finished(t, "b1x9");
+    finished(t, "a77e01", "running");
+    t.write(home);
+    expect(s.backgroundTasks(id)).toBe(1);
+    finished(t, "a77e01", "killed");
+    t.write(home);
+    expect(s.backgroundTasks(id)).toBe(0);
+  });
+
+  test("reads only what was appended, and starts over when the transcript was replaced by a shorter one", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    launchShell(t, "b1x9");
+    const file = t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(1);
+    appendFileSync(file, "garbage that is not a record\n");
+    expect(s.backgroundTasks(id)).toBe(1);
+    const fresh = new Transcript(id, "/w/x");
+    fresh.user("hi");
+    fresh.write(home);
+    expect(s.backgroundTasks(id)).toBe(0);
+  });
+
+  test("a subagent's own records, the AI's words about tasks and a notification without a task are not launches or ends", () => {
+    const running = new Set<string>();
+    noteBackground(running, JSON.stringify({ type: "user", isSidechain: true, message: { role: "user", content: [{ type: "tool_result", content: "moved to the background (ID: side1)" }] } }));
+    noteBackground(running, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Async agent launched successfully. agentId: said1" }] } }));
+    expect(running.size).toBe(0);
+    noteBackground(running, JSON.stringify({ type: "user", isSidechain: false, message: { role: "user", content: [{ type: "tool_result", content: "Command running in background with ID: b2" }] } }));
+    noteBackground(running, JSON.stringify({ type: "user", isSidechain: false, message: { role: "user", content: "<task-notification>\n<status>completed</status>\n</task-notification>" } }));
+    expect([...running]).toEqual(["b2"]);
+  });
+
+  test("a long tool output after the markers does not hide them", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    t.toolResult("toolu_s", `Command running in background with ID: big1
+${"x".repeat(1024 * 1024)}`);
+    t.write(home);
+    expect(sessions([home]).backgroundTasks(id)).toBe(1);
   });
 });
 

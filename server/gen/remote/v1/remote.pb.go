@@ -9984,9 +9984,15 @@ type ThreadSummary struct {
 	// one. Empty outside git and from older machines. Devices record the
 	// work tree, not a folder inside it, as the workspace of a session
 	// started from the app.
-	GitRoot       string `protobuf:"bytes,17,opt,name=git_root,json=gitRoot,proto3" json:"git_root,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	GitRoot string `protobuf:"bytes,17,opt,name=git_root,json=gitRoot,proto3" json:"git_root,omitempty"`
+	// Shells and subagents the thread's AI started in the background and that
+	// have not reported finishing, while a process or session of the machine
+	// still holds the thread's session (an AI that quit takes them with it).
+	// The thread may be IDLE meanwhile: a device shows it as still working.
+	// 0 when none, and from tunelo before 3.3.7.
+	BackgroundTasks uint32 `protobuf:"varint,18,opt,name=background_tasks,json=backgroundTasks,proto3" json:"background_tasks,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ThreadSummary) Reset() {
@@ -10136,6 +10142,13 @@ func (x *ThreadSummary) GetGitRoot() string {
 		return x.GitRoot
 	}
 	return ""
+}
+
+func (x *ThreadSummary) GetBackgroundTasks() uint32 {
+	if x != nil {
+		return x.BackgroundTasks
+	}
+	return 0
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
@@ -20401,7 +20414,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\asubject\x18\x04 \x01(\tR\asubject\"0\n" +
 	"\x06Cursor\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x10\n" +
-	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xb0\x04\n" +
+	"\x03seq\x18\x02 \x01(\x04R\x03seq\"\xdb\x04\n" +
 	"\rThreadSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x10\n" +
@@ -20421,7 +20434,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x13elsewhere_active_at\x18\x0e \x01(\x03R\x11elsewhereActiveAt\x12)\n" +
 	"\x10terminal_session\x18\x0f \x01(\rR\x0fterminalSession\x12D\n" +
 	"\x0eproject_config\x18\x10 \x01(\x0e2\x1d.remote.v1.ProjectConfigLevelR\rprojectConfig\x12\x19\n" +
-	"\bgit_root\x18\x11 \x01(\tR\agitRoot\"\xd5\x01\n" +
+	"\bgit_root\x18\x11 \x01(\tR\agitRoot\x12)\n" +
+	"\x10background_tasks\x18\x12 \x01(\rR\x0fbackgroundTasks\"\xd5\x01\n" +
 	"\x0eThreadActivity\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12.\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x18.remote.v1.ActivityPhaseR\x05phase\x12\x12\n" +

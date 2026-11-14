@@ -1415,6 +1415,12 @@ message ThreadSummary {
   // work tree, not a folder inside it, as the workspace of a session
   // started from the app.
   string git_root = 17;
+  // Shells and subagents the thread's AI started in the background and that
+  // have not reported finishing, while a process or session of the machine
+  // still holds the thread's session (an AI that quit takes them with it).
+  // The thread may be IDLE meanwhile: a device shows it as still working.
+  // 0 when none, and from tunelo before 3.3.7.
+  uint32 background_tasks = 18;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a

@@ -46,6 +46,16 @@ export const REQUEST_BUSY_MS = 30 * 60_000;
 const MESSAGE_TYPE = /"type":"(?:user|assistant)"/;
 /** The end of a transcript read for a tool call that has no result yet. */
 const TOOL_TAIL_BYTES = 256 * 1024;
+/** The end of a transcript read the first time for background work: older launches are not seen. */
+const BACKGROUND_TAIL_BYTES = 4 * 1024 * 1024;
+/** Bytes of a line read for background work: the markers sit at its start, a long tool output after them. */
+const BACKGROUND_KEEP = 8 * 1024;
+const TASK_ID = /<task-id>([A-Za-z0-9_-]+)<\/task-id>/;
+const TASK_STATUS = /<status>([a-z_]+)<\/status>/;
+/** What the result of a background subagent's launch says: its agentId. */
+const AGENT_LAUNCHED = /Async agent launched successfully[\s\S]{0,600}?agentId: ([A-Za-z0-9]+)/;
+/** What the result of a shell put in the background says (on purpose, or after its timeout): its id. */
+const SHELL_BACKGROUND = /(?:moved to the background \(ID: |running in background with ID: )([A-Za-z0-9_-]+)/;
 const TITLE_MAX = 120;
 const DIRS_MAX = 50;
 export const PAGE_DEFAULT = 30;
@@ -60,7 +70,13 @@ type Count = { scanned: number; messages: number };
  * last message and has not answered (it writes nothing while it thinks).
  */
 type OpenTool = { size: number; mtimeMs: number; name: string; request: boolean };
-type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool };
+/**
+ * The shells and subagents the session started in the background that its
+ * transcript does not show finished, read from `pos` on (the part before it is
+ * done with).
+ */
+type Background = { pos: number; running: Set<string> };
+type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool; background?: Background };
 
 export type LocalSessionsOptions = {
   /** Claude folders of the machine (its own, then each profile's); their projects and running sessions are read. */
@@ -211,6 +227,40 @@ export class LocalSessions implements SessionHistory {
     if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, turnOpen, via: "transcript" };
     if (!pending) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
     return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, turnOpen, via: "process" } : { state: "idle", since, turnOpen, via: "process" };
+  }
+
+  /**
+   * Background shells and subagents started in the session with no finish
+   * reported (a task-notification of theirs), from the transcript: read once
+   * from its end, then only what was appended. Whether claude still runs to
+   * finish them is holds(). Never fails.
+   */
+  backgroundTasks(sessionId: string): number {
+    try {
+      const k = this.locate(sessionId);
+      if (!k) return 0;
+      let bg = k.background;
+      if (bg && k.size < bg.pos) bg = undefined;
+      const first = bg === undefined;
+      bg ??= { pos: Math.max(0, k.size - BACKGROUND_TAIL_BYTES), running: new Set<string>() };
+      if (bg.pos < k.size) {
+        const running = bg.running;
+        bg.pos = withFile(k.file, (fd) => scanLines(fd, bg.pos, k.size, BACKGROUND_KEEP, (line) => noteBackground(running, line.toString("utf8")), first && bg.pos > 0));
+      }
+      k.background = bg;
+      return bg.running.size;
+    } catch {
+      return 0;
+    }
+  }
+
+  holds(sessionId: string): boolean {
+    try {
+      const k = this.locate(sessionId);
+      return k !== undefined && this.held(k);
+    } catch {
+      return false;
+    }
   }
 
   /** A running claude holds the session (as of the last read of the processes); never fails. */
@@ -517,6 +567,24 @@ export class LocalSessions implements SessionHistory {
       busy: this.now() - k.mtimeMs < BUSY_MS || running.has(k.sessionId),
     };
   }
+}
+
+/**
+ * One transcript line's mark on the background work: a user record that
+ * carries the result of a launch adds the task it names; a task-notification
+ * (the CLI telling the model a task ended or was stopped) takes it off. A
+ * subagent's own records are not the session's.
+ */
+export function noteBackground(running: Set<string>, line: string): void {
+  if (!line.includes('"type":"user"') || line.includes('"isSidechain":true')) return;
+  if (line.includes('"content":"<task-notification>')) {
+    const id = TASK_ID.exec(line)?.[1];
+    const status = TASK_STATUS.exec(line)?.[1];
+    if (id !== undefined && status !== undefined && status !== "running") running.delete(id);
+    return;
+  }
+  const launched = AGENT_LAUNCHED.exec(line)?.[1] ?? SHELL_BACKGROUND.exec(line)?.[1];
+  if (launched !== undefined) running.add(launched);
 }
 
 function entries(dir: string): Dirent[] {

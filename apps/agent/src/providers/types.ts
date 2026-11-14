@@ -277,6 +277,15 @@ export interface SessionHistory {
    */
   sessionFiles?(sessionId: string): string[];
   /**
+   * Shells and subagents the AI started in the background in the session and
+   * that its record does not show finished: a count, from the record only
+   * (whether anything still holds the session is holds()). 0 when none or no
+   * record. Never fails.
+   */
+  backgroundTasks?(sessionId: string): number;
+  /** Whether a running process of the AI holds the session, as of the last prime(). Never fails. */
+  holds?(sessionId: string): boolean;
+  /**
    * Whether the session is running a turn right now, wherever it runs (a
    * terminal, an IDE, another app, or this machine's own session: telling
    * those apart is the core's job), and whether a running process of the AI

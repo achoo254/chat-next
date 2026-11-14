@@ -198,6 +198,34 @@ describe("a session running elsewhere", () => {
     expect(seen.at(-1)?.busyElsewhere).toBe(false);
   });
 
+  test("tells the background shells and subagents of a session held by a terminal of the machine, and clears them with their notifications", async () => {
+    const { core, claudeHome, work } = setup();
+    const t = terminalSession(work, claudeHome);
+    const thread = await core.openLocal({ provider: "claude", sessionId: t.sessionId, consent: none, openAnyway: false, device: "phone" });
+    await core.close(thread.id);
+    // Nothing holds the session: a launch in its record says nothing about work still running.
+    let lines = t.lines.length;
+    t.toolResult("toolu_b", "Command running in background with ID: bg01");
+    setTime(t.appendFrom(claudeHome, lines), Date.now() - 120_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)).toMatchObject({ backgroundTasks: 0, state: ThreadState.IDLE });
+
+    // The machine's terminal holds it now.
+    const seen: ThreadSummary[] = [];
+    core.onStatus((s) => s.id === thread.id && seen.push(s));
+    core.terminalStarted(thread.id, 1, 4242);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)?.backgroundTasks).toBe(1);
+    expect(seen.at(-1)?.backgroundTasks).toBe(1);
+
+    lines = t.lines.length;
+    t.user("<task-notification>\n<task-id>bg01</task-id>\n<status>completed</status>\n</task-notification>");
+    setTime(t.appendFrom(claudeHome, lines), Date.now() - 100_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)?.backgroundTasks).toBe(0);
+    expect(seen.at(-1)?.backgroundTasks).toBe(0);
+  });
+
   test("is never set while the machine runs or holds the thread's session, nor for the writes of its own session", async () => {
     const id = randomUUID();
     const { core, claudeHome, work } = setup(id);
