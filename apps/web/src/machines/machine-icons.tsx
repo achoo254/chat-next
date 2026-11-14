@@ -103,6 +103,20 @@ const PATHS = {
 	circle: <circle cx="12" cy="12" r="8" />,
 	// The session's AI (any provider): a spark.
 	spark: <path d="M12 3c.5 4.5 2 6.5 6.5 7-.1.1 0 0 0 0-4.5.5-6 2.5-6.5 7-.5-4.5-2-6.5-6.5-7 4.5-.5 6-2.5 6.5-7z" />,
+	// Each AI's own mark while it works (status-glyph; its motion is in machines.css): Claude's burst, Codex's ring of dots, and a star for
+	// Antigravity that machines.css hides under its AI-drawn mark (run-antigravity.webp), kept for a browser without CSS masks.
+	"run-claude": <path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.8 2.8M15.2 15.2L18 18M6 18l2.8-2.8M15.2 8.8L18 6" />,
+	"run-antigravity": <path d="M12 3c.5 4.5 2 6.5 6.5 7-4.5.5-6 2.5-6.5 7-.5-4.5-2-6.5-6.5-7 4.5-.5 6-2.5 6.5-7z" />,
+	"run-codex": (
+		<>
+			<circle cx="12" cy="4" r="1.6" fill="currentColor" stroke="none" />
+			<circle cx="18.9" cy="8" r="1.6" fill="currentColor" stroke="none" opacity="0.8" />
+			<circle cx="18.9" cy="16" r="1.6" fill="currentColor" stroke="none" opacity="0.6" />
+			<circle cx="12" cy="20" r="1.6" fill="currentColor" stroke="none" opacity="0.45" />
+			<circle cx="5.1" cy="16" r="1.6" fill="currentColor" stroke="none" opacity="0.3" />
+			<circle cx="5.1" cy="8" r="1.6" fill="currentColor" stroke="none" opacity="0.18" />
+		</>
+	),
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 } satisfies Record<string, ReactElement>;
 

@@ -62,7 +62,8 @@ describe("the terminal's text", () => {
 
 	it("every colour but black reads on the background at 4.5:1 or better, Claude Code's grey (bright black) included", () => {
 		for (const [name, colour] of Object.entries(THEME)) {
-			if (["background", "black", "cursorAccent", "selectionBackground"].includes(name)) continue;
+			// Backgrounds, and the scrollbar slider (no text on it), are not text colours.
+			if (["background", "black", "cursorAccent", "selectionBackground"].includes(name) || name.startsWith("scrollbarSlider")) continue;
 			expect(contrast(colour, THEME.background), name).toBeGreaterThanOrEqual(4.5);
 		}
 		// xterm's own bright black does not.

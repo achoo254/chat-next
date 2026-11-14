@@ -35,6 +35,10 @@ export const THEME = {
 	cursor: "#e6e8ee",
 	cursorAccent: "#111318",
 	selectionBackground: "#3a4256",
+	// The scrollbar shows over the text while scrolling or hovering; xterm's 20% foreground hardly shows on this background.
+	scrollbarSliderBackground: "rgba(230, 232, 238, 0.4)",
+	scrollbarSliderHoverBackground: "rgba(230, 232, 238, 0.55)",
+	scrollbarSliderActiveBackground: "rgba(230, 232, 238, 0.65)",
 	black: "#3b4252",
 	red: "#f0787a",
 	green: "#8fd18b",

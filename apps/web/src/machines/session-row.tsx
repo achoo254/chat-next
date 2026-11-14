@@ -56,20 +56,31 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
 
 /**
  * A row's own icon (folder, branch, the AI's spark), or its state in its place
- * while it has one to show: spinner, check, alert or cross; dimmed while
- * offline. One column carries both, so a calm list wastes no space on an empty
- * status column. `who` (the AI's name on a session) leads the label.
+ * while it has one to show: the AI's own loading mark (`ai`: its id) or a
+ * spinner, check, alert or cross; dimmed while offline. One column carries
+ * both, so a calm list wastes no space on an empty status column. `who` (the
+ * AI's name on a session) leads the label.
  */
-export function StatusGlyph({ status, icon, who, offline = false }: { status: WorkStatus; icon: MachineIconName; who?: string; offline?: boolean }) {
+export function StatusGlyph({ status, icon, who, ai, offline = false }: { status: WorkStatus; icon: MachineIconName; who?: string; ai?: string; offline?: boolean }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
 	const state = offline ? p.offlineStatus(p.status[status]) : p.status[status];
 	const label = who === undefined ? state : `${who} · ${state}`;
+	const run = status === "running" ? runGlyph(ai) : undefined;
 	return (
-		<span className={`mx-glyph ${status}`} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label}>
-			<MachineIcon name={GLYPHS[status] ?? icon} small />
+		<span className={`mx-glyph ${status}`} data-ai={run?.ai} data-offline={offline ? "" : undefined} role="img" aria-label={label} title={label}>
+			<MachineIcon name={run?.icon ?? GLYPHS[status] ?? icon} small />
 		</span>
 	);
+}
+
+/** Each AI's own loading mark, by its id; machines.css gives each its motion. */
+const RUN_GLYPHS: Record<string, MachineIconName> = { claude: "run-claude", antigravity: "run-antigravity", codex: "run-codex" };
+
+/** What a running row shows: the AI's own mark (and its id, for the motion), or the plain spinner for an AI without one and for a workspace or a project. */
+export function runGlyph(ai: string | undefined): { icon: MachineIconName; ai: string | undefined } {
+	const icon = ai === undefined ? undefined : RUN_GLYPHS[ai];
+	return icon === undefined ? { icon: "spinner", ai: undefined } : { icon, ai };
 }
 
 /** The list's clock is coarse (it ticks every 30 s): an activity older than the turn by more than this is an earlier turn's. */
@@ -137,7 +148,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 		<>
 			<span className="tx">
 				<span className="line">
-					<StatusGlyph status={status} icon="spark" who={ai} offline={machine.conn.kind !== "on"} />
+					<StatusGlyph status={status} icon="spark" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} />
 					<span className="name">{thread.title || t.agent.newSession}</span>
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>

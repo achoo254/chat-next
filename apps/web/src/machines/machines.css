@@ -116,11 +116,24 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-glyph.failed { color: var(--c-error); }
 .mx-glyph.running { color: var(--c-primary); }
 .mx-glyph.running .icon { animation: spin 0.9s linear infinite; }
+/* Each AI's own motion while it works (status-glyph's data-ai): Claude's burst blooms, Antigravity's lifted A floats, Codex's dots step round.
+   Antigravity's mark is an AI-drawn mask painted in the glyph's colour; its SVG stays underneath, hidden, for a browser without masks.
+   run-antigravity.webp: AI-generated for the hoandat ecosystem; owned by hoandat, all rights reserved (not CC0). */
+.mx-glyph.running[data-ai="claude"] .icon { animation: mx-bloom 1.2s ease-in-out infinite; }
+.mx-glyph.running[data-ai="antigravity"] { background-color: currentColor; -webkit-mask: url("./run-antigravity.webp") center / 15px no-repeat; mask: url("./run-antigravity.webp") center / 15px no-repeat; animation: mx-lift 1.1s ease-in-out infinite; }
+.mx-glyph.running[data-ai="antigravity"] .icon { visibility: hidden; animation: none; }
+@supports not ((mask-image: none) or (-webkit-mask-image: none)) {
+	.mx-glyph.running[data-ai="antigravity"] { background: none; animation: none; }
+	.mx-glyph.running[data-ai="antigravity"] .icon { visibility: visible; animation: spin 1.8s linear infinite; }
+}
+@keyframes mx-lift { 0%, 100% { transform: translateY(1.5px); } 50% { transform: translateY(-1.5px); } }
+.mx-glyph.running[data-ai="codex"] .icon { animation: spin 1.2s steps(6) infinite; }
+@keyframes mx-bloom { 0%, 100% { transform: scale(0.55) rotate(0deg); opacity: 0.55; } 50% { transform: scale(1) rotate(45deg); opacity: 1; } }
 .mx-glyph.done { color: var(--c-success); }
 /* Idle, or held at its prompt in a terminal (the row's second line shows the terminal icon): nothing to look at, so the
    column stays blank; the label still names the state for a screen reader and on hover. */
 .mx-glyph[data-offline] { opacity: 0.45; }
-@media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .mx-glyph.running .icon, .mx-glyph.running[data-ai] .icon, .mx-glyph.running[data-ai="antigravity"] { animation: none; } }
 /* Arrow keys move between rows: one is in the tab order, focus shows. */
 .mx-groups [data-row]:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; border-radius: var(--radius-sm); }
 .mx-ws .mx-rows { flex: none; overflow: visible; padding: 0 0 2px; }
