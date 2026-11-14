@@ -35,7 +35,7 @@ export const THEME = {
 	cursor: "#e6e8ee",
 	cursorAccent: "#111318",
 	selectionBackground: "#3a4256",
-	// The scrollbar shows over the text while scrolling or hovering; xterm's 20% foreground hardly shows on this background.
+	// The scrollbar thumb's colours. xterm paints them through an injected <style> that the site's CSP refuses (style-src 'self'), so terminal.css sets the same colours; these cover a page without that CSP.
 	scrollbarSliderBackground: "rgba(230, 232, 238, 0.4)",
 	scrollbarSliderHoverBackground: "rgba(230, 232, 238, 0.55)",
 	scrollbarSliderActiveBackground: "rgba(230, 232, 238, 0.65)",

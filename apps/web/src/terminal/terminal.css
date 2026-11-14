@@ -75,6 +75,11 @@
 .tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
 /* xterm fades its overlay scrollbar out after a moment; with history to scroll (terminal-scrollbar.ts) it stays, with a faint track. */
 .tx-term[data-scrollable] .xterm-scrollable-element > .scrollbar.vertical { opacity: 1 !important; pointer-events: auto !important; transition: none !important; background: rgb(230 232 238 / 0.06); }
+/* The thumb's colours live here, not in xterm's theme: xterm paints them with a <style> it injects, and the site's CSP (style-src 'self') refuses
+   that element, which left the thumb transparent. The 3px transparent border insets an 8px rounded thumb in the 14px track. */
+.tx-term .xterm-scrollable-element > .scrollbar > .slider { box-sizing: border-box; border: 3px solid transparent; border-radius: 7px; background: rgb(230 232 238 / 0.45) padding-box; }
+.tx-term .xterm-scrollable-element > .scrollbar > .slider:hover { background: rgb(230 232 238 / 0.65) padding-box; }
+.tx-term .xterm-scrollable-element > .scrollbar > .slider.active { background: rgb(230 232 238 / 0.8) padding-box; }
 .tx-divider { position: absolute; z-index: 2; touch-action: none; }
 .tx-divider.row { width: 8px; margin-left: -4px; cursor: col-resize; }
 .tx-divider.column { height: 8px; margin-top: -4px; cursor: row-resize; }
