@@ -264,7 +264,7 @@ export function ReportDialog({ target, name, blockUserId, onClose }: ReportProps
 	if (done !== null) {
 		return (
 			<Modal labelledBy={id} onClose={onClose}>
-				<div className="done">
+				<div className="report-done">
 					<span className="done-mark">
 						<Icon name="check" />
 					</span>
