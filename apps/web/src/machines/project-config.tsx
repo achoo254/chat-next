@@ -72,7 +72,7 @@ export function ProjectConfigHint({ link, level, dir, ai, online }: { link: Conf
 	return (
 		<span data-id="session-project-config">
 			<button type="button" className="mx-pc-hint" title={`${pc.notLoaded}. ${pc.enableTitle(dir)}`} disabled={!online || state.kind === "busy"} onClick={enable} data-id="session-project-config-enable">
-				<MachineIcon name="spark" small />
+				<MachineIcon name="ai-skills" small />
 				{pc.enable}
 			</button>
 		</span>

@@ -4,13 +4,15 @@
 // all rights reserved (not CC0).
 import type { CSSProperties } from "react";
 import accountUrl from "./ai-marks/ai-account.webp";
+import changesUrl from "./ai-marks/ai-changes.webp";
 import agentUrl from "./ai-marks/ai-agent.webp";
 import modelUrl from "./ai-marks/ai-model.webp";
 import permissionUrl from "./ai-marks/ai-permission.webp";
 import projectUrl from "./ai-marks/ai-project.webp";
 import sessionUrl from "./ai-marks/ai-session.webp";
+import skillsUrl from "./ai-marks/ai-skills.webp";
 
-const MARKS = { agent: agentUrl, session: sessionUrl, project: projectUrl, model: modelUrl, permission: permissionUrl, account: accountUrl } as const;
+const MARKS = { agent: agentUrl, session: sessionUrl, project: projectUrl, model: modelUrl, permission: permissionUrl, account: accountUrl, changes: changesUrl, skills: skillsUrl } as const;
 
 export type AiMarkName = keyof typeof MARKS;
 

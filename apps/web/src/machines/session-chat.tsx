@@ -274,7 +274,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						aria-expanded={changesOpen}
 						onClick={() => setChangesOpen((v) => !v)}
 					>
-						<MachineIcon name="pencil" small />
+						<MachineIcon name="ai-changes" small />
 						<span className="hide-narrow">{t.agent.header.changes}</span>
 						{changeCount > 0 && <span className="count">{changeCount}</span>}
 					</button>
@@ -304,7 +304,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 									close();
 									setChangesOpen((v) => !v);
 								}}>
-									<MachineIcon name="pencil" small />
+									<MachineIcon name="ai-changes" small />
 									<span>{changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}</span>
 								</button>
 							)}
