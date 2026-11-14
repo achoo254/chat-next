@@ -32,8 +32,8 @@
 	$ErrorActionPreference = 'Stop'
 	$ProgressPreference = 'SilentlyContinue'
 
-	$TuneloVersion = '3.3.1'
-	$Sha256WindowsX64 = '86a5833f972d347ccc37713143c1fe9d35ae7c19af2dc31cebeea6c3528670f5'
+	$TuneloVersion = '3.3.2'
+	$Sha256WindowsX64 = 'e63cb684bfe74dc330f692808ce05a3ac44dd33b82da4a1a1f6a74c708a4c15b'
 	$MinisignPubKey = 'RWRFawlh5bQHAM2aPa3OjWqc80YoE0B31Rzcvz5QpG6J5R4vdgnJhf6D'
 	$Releases = 'https://github.com/achoo254/chat-next/releases/download'
 	$Archive = 'tunelo-windows-x64.zip'
