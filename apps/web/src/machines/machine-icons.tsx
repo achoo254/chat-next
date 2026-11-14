@@ -2,6 +2,7 @@
 // shared sets. The chat's startup draws only "cpu", from cpu-icon.tsx.
 import type { ReactElement } from "react";
 import { iconSvg } from "../components/icon.tsx";
+import { AiMark, type AiMarkName } from "./ai-mark.tsx";
 import { CPU_PATH } from "./cpu-icon.tsx";
 
 const PATHS = {
@@ -62,8 +63,6 @@ const PATHS = {
 			<path d="M9 7h6" />
 		</>
 	),
-	// A project without one.
-	box: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5" />,
 	// A git worktree.
 	worktree: (
 		<>
@@ -121,9 +120,14 @@ const PATHS = {
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 } satisfies Record<string, ReactElement>;
 
-export type MachineIconName = keyof typeof PATHS;
+// Marks the offline image model drew (ai-mark.tsx): a session with an AI, a project that is a plain folder.
+const MARKS: Record<string, AiMarkName> = { "ai-session": "session", "ai-project": "project" };
+
+export type MachineIconName = keyof typeof PATHS | keyof typeof MARKS;
 
 /** Decorative icon; the surrounding control carries the accessible name. */
 export function MachineIcon({ name, small = false }: { name: MachineIconName; small?: boolean }) {
-	return iconSvg(PATHS[name], small);
+	const mark = MARKS[name];
+	if (mark !== undefined) return <AiMark name={mark} small={small} />;
+	return iconSvg(PATHS[name as keyof typeof PATHS], small);
 }

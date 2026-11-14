@@ -1,6 +1,8 @@
-// The AI Agent's mark (a chip), on its own so the chat's startup bundle (the
-// folder rail, the agent entry) does not carry every icon of AI Agent.
+// The AI Agent's mark (a terminal window with a spark, drawn by the offline
+// image model) and the CPU line icon, on their own so the chat's startup
+// bundle (the folder rail, the agent entry) does not carry every icon of AI Agent.
 import { iconSvg } from "../components/icon.tsx";
+import { AiMark } from "./ai-mark.tsx";
 
 export const CPU_PATH = (
 	<>
@@ -9,7 +11,12 @@ export const CPU_PATH = (
 	</>
 );
 
-/** Decorative; the surrounding control carries the accessible name. */
+/** The AI Agent entry's mark. Decorative; the surrounding control carries the accessible name. */
+export function AgentIcon({ small = false }: { small?: boolean }) {
+	return <AiMark name="agent" small={small} />;
+}
+
+/** A processor, for CPU load. Decorative; the surrounding control carries the accessible name. */
 export function CpuIcon({ small = false }: { small?: boolean }) {
 	return iconSvg(CPU_PATH, small);
 }

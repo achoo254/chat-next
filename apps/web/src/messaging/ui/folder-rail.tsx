@@ -16,7 +16,7 @@ import { countLabel, FOLDERS, type Folder } from "../data/format.ts";
 import { useFolderCounts } from "../data/services.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
-import { CpuIcon } from "../../machines/cpu-icon.tsx";
+import { AgentIcon } from "../../machines/cpu-icon.tsx";
 import { useAgentNeeds } from "../../machines/agent-needs.ts";
 
 const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user", group: "users", bot: "robot", unread: "message-dot" };
@@ -62,7 +62,7 @@ export function FolderRail({ self, folder, settings = false, machines = false, o
 				</button>
 			))}
 			<Link to={paths.machines()} className="folder" current={machines}>
-				<CpuIcon />
+				<AgentIcon />
 				{copy.folders.machines}
 				<AgentBadge />
 			</Link>

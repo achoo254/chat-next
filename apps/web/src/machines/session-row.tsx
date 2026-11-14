@@ -148,7 +148,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 		<>
 			<span className="tx">
 				<span className="line">
-					<StatusGlyph status={status} icon="spark" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} />
+					<StatusGlyph status={status} icon="ai-session" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} />
 					<span className="name">{thread.title || t.agent.newSession}</span>
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>

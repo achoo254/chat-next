@@ -45,6 +45,9 @@ button { cursor: pointer; }
 .plain-text-box[aria-busy="true"]:empty::before { content: attr(aria-placeholder); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }
 .icon { width: 20px; height: 20px; flex: none; stroke: currentColor; stroke-width: var(--icon-stroke); fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .icon-sm { width: 16px; height: 16px; }
+/* An icon the image model drew (machines/ai-mark.tsx): its alpha is a mask over the text color. */
+.ai-mark { display: inline-block; flex: none; width: 22px; height: 22px; background-color: currentColor; -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat; }
+.ai-mark-sm { width: 18px; height: 18px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
 .muted { color: var(--c-text-muted); }

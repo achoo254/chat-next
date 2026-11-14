@@ -196,8 +196,8 @@ export function locate(projects: readonly AgentProject[], machineId: number, dir
 }
 
 /** A project row's own icon: a repository when it links one, else a plain project. */
-export function projectIcon(project: Pick<AgentProject, "gitRemote">): "repo" | "box" {
-	return project.gitRemote !== "" ? "repo" : "box";
+export function projectIcon(project: Pick<AgentProject, "gitRemote">): "repo" | "ai-project" {
+	return project.gitRemote !== "" ? "repo" : "ai-project";
 }
 
 /** A workspace row's own icon, by what the folder is: a git worktree, a git checkout, or a plain folder. */

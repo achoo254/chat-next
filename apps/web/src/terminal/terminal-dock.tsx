@@ -66,6 +66,7 @@ import { shortcutOf, TerminalTabs, type DockAction } from "./terminal-tabs.tsx";
 import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
 import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
 import { endedOnPurpose } from "./ended-sessions.ts";
+import { TerminalLoading } from "./terminal-loading.tsx";
 import { rememberMode } from "../machines/session-mode.tsx";
 import "./terminal.css";
 
@@ -666,7 +667,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						<TerminalSplits root={x.root} label={() => tt.resize} renderPane={renderPane} onRatio={(id, ratio) => setLayout((l) => setRatio(l, id, ratio))} />
 					</div>
 				))}
-				{!ready && <p className="tx-empty">{online ? t.terminal.loading : tt.offline}</p>}
+				{!ready && (online ? <TerminalLoading label={t.terminal.loading} /> : <p className="tx-empty">{tt.offline}</p>)}
 				{ready && view.tabs.length === 0 && (
 					<div className="tx-empty">
 						<p role="status">{emptyText}</p>

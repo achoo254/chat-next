@@ -186,7 +186,7 @@ describe("workspace titles", () => {
 describe("row icons", () => {
 	it("a project linking a repository shows a repository, one without a plain project", () => {
 		expect(projectIcon({ gitRemote: "github.com/a/app" })).toBe("repo");
-		expect(projectIcon({ gitRemote: "" })).toBe("box");
+		expect(projectIcon({ gitRemote: "" })).toBe("ai-project");
 	});
 
 	it("a workspace shows what its folder is: a worktree, a git checkout or a plain folder", () => {
