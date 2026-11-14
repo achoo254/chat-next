@@ -293,6 +293,16 @@ export interface SessionHistory {
    * never fails.
    */
   liveness?(sessionId: string): Promise<Liveness>;
+  /**
+   * The session that the AI's CLI a terminal of the machine started holds
+   * now, as the AI's own record of its running processes tells: the CLI may
+   * have gone on in another session than the one it started with (Claude:
+   * /resume, /clear). The CLI is told apart by working folder `dir` and its
+   * start (`startedAt`, Unix ms, give or take a few seconds), or by still
+   * holding `sessionId`. Undefined unless exactly one running process
+   * matches. Never fails.
+   */
+  terminalHeldSession?(cli: { dir: string; startedAt: number; sessionId?: string }): string | undefined;
 }
 
 /** What a thread's session needs to open in the AI's own CLI, as the core knows it. */

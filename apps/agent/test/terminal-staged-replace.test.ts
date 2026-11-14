@@ -21,14 +21,15 @@ afterEach(async () => {
   for (const c of cleanup.splice(0).reverse()) await c();
 });
 
-/** The fake AI with a CLI and a transcript whose liveness the test sets. */
-function cliProvider(live: { now: Liveness }): AgentProvider {
+/** The fake AI with a CLI and a transcript whose liveness the test sets; `held` is the session its CLI in the thread's folder holds now, as the AI tells. */
+function cliProvider(live: { now: Liveness; held?: { dir: string; sessionId: string } }): AgentProvider {
   const history: SessionHistory = {
     list: () => ({ sessions: [], total: 0, dirs: [] }),
     find: () => undefined,
     end: () => 1,
     read: () => undefined,
     liveness: async () => live.now,
+    terminalHeldSession: (cli) => (live.held && live.held.dir === cli.dir && Math.abs(Date.now() - cli.startedAt) < 60_000 ? live.held.sessionId : undefined),
   };
   return {
     ...fakeProvider(),
@@ -47,7 +48,7 @@ const idleFor = (ms: number): Liveness => ({ state: "idle", since: Date.now() - 
 const consent = { sensitive: false, projectSettings: false };
 
 async function setup() {
-  const live = { now: idleFor(5 * QUIET_MS) };
+  const live: { now: Liveness; held?: { dir: string; sessionId: string } } = { now: idleFor(5 * QUIET_MS) };
   const configDir = join(tempDir("term-replace-"), "cfg");
   const bin = join(configDir, "term-host", "bin");
   mkdirSync(join(bin, "current"), { recursive: true });
@@ -104,6 +105,17 @@ describe("a staged terminal process", () => {
     expect(opens[1]).toMatchObject({ cols: 90, rows: 25, shell: "/opt/fake-ai", args: ["--resume", "fake-session-1"], cwd: m.work });
     expect(m.core.terminalSession(threadId, host.pid)).toBe(1);
     expect(m.logs.some((l) => l.includes("switching to the newer terminal process (1 idle AI session(s)"))).toBe(true);
+  });
+
+  it("opens the AI again in the session its CLI went on in (/resume, /clear), not the one it was started with", async () => {
+    const { m, host, live, stage, threadId } = await setup();
+    // The AI's record of running processes: the CLI the terminal started in the thread's folder holds another session now.
+    live.held = { dir: m.work, sessionId: "fake-session-2" };
+    stage();
+    await m.terminal.replaceWhenIdle();
+    expect(host.commands.filter((x) => x.cmd === "shutdown")).toHaveLength(1);
+    expect(host.commands.filter((x) => x.cmd === "open").at(-1)).toMatchObject({ cols: 90, rows: 25, args: ["--resume", "fake-session-2"] });
+    expect(m.core.terminalSession(threadId, host.pid)).toBe(1);
   });
 
   it("waits while an AI runs a turn, waits on a tool however long, was active too recently, or no longer holds the session", async () => {

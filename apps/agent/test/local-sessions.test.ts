@@ -169,6 +169,53 @@ describe("open elsewhere", () => {
   });
 });
 
+describe("the session a claude started in a terminal holds now", () => {
+  const STARTED = NOW - HOUR;
+  function registers() {
+    const home = tempDir("claude-home-");
+    const profile = tempDir("claude-profile-");
+    mkdirSync(join(home, "sessions"));
+    mkdirSync(join(profile, "sessions"));
+    const register = (dir: string, pid: number, body: Record<string, unknown> | string) =>
+      writeFileSync(join(dir, "sessions", `${pid}.json`), typeof body === "string" ? body : JSON.stringify({ pid, kind: "interactive", ...body }));
+    return { home, profile, register };
+  }
+
+  test("the running claude working in the folder that started with the terminal's CLI, in any Claude folder: the session it went on in (/resume, /clear)", () => {
+    const { home, profile, register } = registers();
+    const launched = randomUUID();
+    const now = randomUUID();
+    register(profile, 4242, { sessionId: now.toUpperCase(), cwd: "/w/x", startedAt: STARTED + 1_500 });
+    // Another claude in another folder, or started long before in the same one, is not the terminal's.
+    register(home, 5151, { sessionId: randomUUID(), cwd: "/w/y", startedAt: STARTED });
+    register(home, 6161, { sessionId: randomUUID(), cwd: "/w/x", startedAt: STARTED - HOUR });
+    // Garbage and records with no start or folder count for nothing.
+    register(home, 7171, "{being writ");
+    register(home, 8181, { sessionId: randomUUID() });
+    const s = sessions([home, profile], () => true);
+    expect(s.terminalHeldSession({ dir: "/w/x", startedAt: STARTED, sessionId: launched })).toBe(now);
+    expect(s.terminalHeldSession({ dir: "/w/x/", startedAt: STARTED })).toBe(now);
+    // Nothing matches: a start too far off, another folder.
+    expect(s.terminalHeldSession({ dir: "/w/x", startedAt: STARTED + 30_000 })).toBeUndefined();
+    expect(s.terminalHeldSession({ dir: "/w/z", startedAt: STARTED })).toBeUndefined();
+    // A process that still holds the thread's session matches without its start.
+    expect(s.terminalHeldSession({ dir: "/w/z", startedAt: 0, sessionId: now })).toBe(now);
+  });
+
+  test("two claudes that could be the terminal's, or one that no longer runs: nothing", () => {
+    const { home, register } = registers();
+    const held = randomUUID();
+    register(home, 4242, { sessionId: randomUUID(), cwd: "/w/x", startedAt: STARTED + 2_000 });
+    register(home, 4343, { sessionId: randomUUID(), cwd: "/w/x", startedAt: STARTED - 3_000 });
+    expect(sessions([home], () => true).terminalHeldSession({ dir: "/w/x", startedAt: STARTED })).toBeUndefined();
+    // One started in the window, another still holding the thread's session: two processes, nothing.
+    register(home, 4343, { sessionId: held, cwd: "/w/y", startedAt: STARTED - HOUR });
+    expect(sessions([home], () => true).terminalHeldSession({ dir: "/w/x", startedAt: STARTED, sessionId: held })).toBeUndefined();
+    // The terminal's claude ended (its record left behind): nothing.
+    expect(sessions([home], (pid) => pid !== 4242).terminalHeldSession({ dir: "/w/x", startedAt: STARTED })).toBeUndefined();
+  });
+});
+
 describe("reading little", () => {
   test("a large transcript: the start and the end give the folder and the title; the count covers the whole file once, then only what was added", () => {
     const home = tempDir("claude-home-");

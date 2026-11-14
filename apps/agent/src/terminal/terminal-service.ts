@@ -100,6 +100,8 @@ export interface AiTerminals {
   alive(pid: number, sessions: ReadonlySet<number>): void;
   /** The thread's AI can close and open again resumed with nothing lost (no turn, quiet for `quietMs`). */
   idle(threadId: string, quietMs: number): Promise<boolean>;
+  /** The thread takes the session its CLI holds now (it may have gone on in another); true when it changed. */
+  follow(threadId: string): boolean;
 }
 
 /** The core as the terminal sees it. */
@@ -112,6 +114,7 @@ export function aiTerminalsOf(core: AgentCore): AiTerminals {
     ended: (session, pid) => core.terminalEnded(session, pid),
     alive: (pid, sessions) => core.terminalAlive(pid, sessions),
     idle: (threadId, quietMs) => core.terminalIdle(threadId, quietMs),
+    follow: (threadId) => core.terminalFollow(threadId),
   };
 }
 
@@ -531,14 +534,18 @@ export class TerminalService {
     const reopen: { session: number; threadId: string; cols: number; rows: number }[] = [];
     for (const s of sessions) {
       const threadId = ai.threadOf(s.session, this.hostPid);
-      // A plain shell, or an AI in a turn: the old process stays until it ends.
-      if (!threadId || !(await ai.idle(threadId, quietMs))) return;
+      if (!threadId) return; // a plain shell: the old process stays until it ends
+      // The CLI may have gone on in another conversation: that one is what is judged, and what opens again.
+      ai.follow(threadId);
+      // An AI in a turn: the old process stays until it ends.
+      if (!(await ai.idle(threadId, quietMs))) return;
       reopen.push({ session: s.session, threadId, cols: s.cols, rows: s.rows });
     }
-    // Looked again right before: nothing opened or ended meanwhile, nothing being opened, still running.
+    // Looked again right before: nothing opened or ended meanwhile, nothing being opened, still running, no CLI gone on in another session.
     const again = await live();
     const same = again.length === sessions.length && again.every((s) => sessions.some((x) => x.session === s.session));
     if (!same || this.aiOpening.size > 0 || this.stopped || !this.supervisor.link.isReady) return;
+    if (reopen.some((r) => ai.follow(r.threadId))) return;
     const oldPid = this.hostPid;
     this.opts.log(`terminal: switching to the newer terminal process (${reopen.length} idle AI session(s) open again resumed)`);
     try {

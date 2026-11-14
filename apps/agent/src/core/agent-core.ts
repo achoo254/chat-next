@@ -137,9 +137,11 @@ type ThreadMeta = {
    * The thread's AI runs in this session of the terminal process `pid` (its
    * own CLI, opened from a device): the terminal is the only writer then.
    * `newSession`: the session id the CLI was started with, undone when it
-   * ended before writing a transcript.
+   * ended before writing a transcript. `startedAt`: Unix ms when the
+   * terminal started the CLI, to tell its process apart in the AI's record
+   * of running processes (see AgentCore.followTerminal).
    */
-  terminal?: { session: number; pid: number; newSession?: string };
+  terminal?: { session: number; pid: number; newSession?: string; startedAt?: number };
 };
 
 /** What the terminal process runs for a thread's AI in its terminal (see TerminalRunner). */
@@ -631,6 +633,13 @@ export class AgentCore {
     const seg = t.meta.segments.at(-1);
     const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
     if (t.deleted || (!t.meta.terminal && t.elsewhere === undefined) || !seg?.sessionId || !history) return;
+    // The CLI in the terminal may have moved to another session (/resume, /clear): the thread takes it first, so
+    // its name and last message come from the conversation on screen, not from the one it was launched with.
+    if (t.meta.terminal && this.followTerminal(t)) {
+      this.syncHistory(t);
+      this.announce(t);
+      return;
+    }
     const end = history.end(seg.sessionId);
     if (end === undefined) return;
     if (t.meta.history?.sessionId === seg.sessionId && t.meta.history.end === end) return;
@@ -2420,9 +2429,63 @@ export class AgentCore {
     if (!t || t.deleted) return;
     const newSession = this.pendingTerminalSession.get(threadId);
     this.pendingTerminalSession.delete(threadId);
-    t.meta.terminal = { session, pid, ...(newSession ? { newSession } : {}) };
+    t.meta.terminal = { session, pid, startedAt: this.now(), ...(newSession ? { newSession } : {}) };
     this.saveMeta(t);
     this.announce(t);
+  }
+
+  /**
+   * Before the terminal process is replaced and the thread's CLI opens again
+   * resumed: the thread takes the session that CLI holds now (see
+   * followTerminal), so it opens in the conversation that was on screen.
+   * True when the thread changed session. Never fails.
+   */
+  terminalFollow(threadId: string): boolean {
+    const t = this.threads.get(threadId);
+    if (!t?.meta.terminal || t.deleted || !this.followTerminal(t)) return false;
+    try {
+      this.syncHistory(t);
+    } catch {
+      // read again on the next look
+    }
+    this.announce(t);
+    return true;
+  }
+
+  /**
+   * The CLI in the thread's terminal may have gone on in another session
+   * than the one the thread holds (Claude: /resume to another conversation,
+   * /clear for a new one), as the AI's record of its running processes tells
+   * (matched by folder and start time, or by still holding the thread's
+   * session; nothing when no single process matches). Once that session has
+   * a transcript the thread takes it: in place of a launch session that never
+   * got one, else as a new segment. True when the thread changed session.
+   * Never fails.
+   */
+  private followTerminal(t: Thread): boolean {
+    const at = t.meta.terminal;
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (!at?.startedAt || !seg || t.deleted || t.running || t.starting || t.switching || !history?.terminalHeldSession) return false;
+    let held: string | undefined;
+    let before: number | undefined;
+    try {
+      held = history.terminalHeldSession({ dir: t.meta.dir, startedAt: at.startedAt, ...(seg.sessionId ? { sessionId: seg.sessionId } : {}) })?.toLowerCase();
+      if (!held || held === seg.sessionId?.toLowerCase() || history.end(held) === undefined) return false;
+      before = seg.sessionId ? history.end(seg.sessionId) : undefined;
+    } catch {
+      return false;
+    }
+    if (seg.sessionId && before !== undefined) {
+      t.meta.segments.push({ provider: seg.provider, model: seg.model, sessionId: held, startedSeq: String(this.lastSeq(t.meta.id) + 1n) });
+    } else {
+      seg.sessionId = held;
+    }
+    // The session the CLI was started with is not the thread's any more: nothing of it is undone when the terminal ends.
+    delete at.newSession;
+    this.opts.onSessionId?.(seg.provider, held);
+    this.saveMeta(t);
+    return true;
   }
 
   /** `session` of terminal process `pid` ended (its AI exited, or it was closed). */
@@ -2442,6 +2505,8 @@ export class AgentCore {
 
   /** The terminal let go of the thread: chat may write again; what the CLI wrote comes in. */
   private endTerminal(t: Thread): void {
+    // A CLI still running (closed from a device) may have gone on in another session: the thread keeps that one.
+    this.followTerminal(t);
     const started = t.meta.terminal?.newSession;
     delete t.meta.terminal;
     t.meta.closedAt = this.now();

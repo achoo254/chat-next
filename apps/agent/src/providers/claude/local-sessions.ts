@@ -72,6 +72,10 @@ type OpenTool = { size: number; mtimeMs: number; name: string; request: boolean 
  * done with).
  */
 type Background = { pos: number; running: Set<string> };
+/** A running claude's record in its Claude folder's register: the session it holds now, where it works, when it started (Unix ms). */
+type Register = { pid: number; sessionId: string; cwd?: string; startedAt?: number };
+/** How far a claude's recorded start may be from when the terminal said it started the CLI. */
+export const TERMINAL_START_SLACK_MS = 10_000;
 type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool; background?: Background };
 
 export type LocalSessionsOptions = {
@@ -247,6 +251,29 @@ export class LocalSessions implements SessionHistory {
       return bg.running.size;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * The session a claude started in a terminal of the machine holds now,
+   * from the register running claudes keep (<claude folder>/sessions/
+   * <pid>.json), which claude rewrites when it goes on in another session
+   * (/resume, /clear): the one running claude still holding `sessionId`, or
+   * else working in `dir` and started within TERMINAL_START_SLACK_MS of
+   * `startedAt`. Undefined unless exactly one process matches. Never fails.
+   */
+  terminalHeldSession(cli: { dir: string; startedAt: number; sessionId?: string }): string | undefined {
+    try {
+      const same = dirComparer();
+      const held = cli.sessionId?.toLowerCase();
+      const matches = new Map<number, string>();
+      for (const rec of this.registers()) {
+        const started = rec.startedAt !== undefined && Math.abs(rec.startedAt - cli.startedAt) <= TERMINAL_START_SLACK_MS;
+        if (rec.sessionId === held || (started && rec.cwd !== undefined && same(rec.cwd, cli.dir))) matches.set(rec.pid, rec.sessionId);
+      }
+      return matches.size === 1 ? [...matches.values()][0] : undefined;
+    } catch {
+      return undefined;
     }
   }
 
@@ -532,6 +559,13 @@ export class LocalSessions implements SessionHistory {
     const sessions = known.flatMap((k) => (k.head?.dir ? [{ sessionId: k.sessionId, dir: k.head.dir, mtimeMs: k.mtimeMs }] : []));
     const procs = this.processes.current;
     const ids = procs.length ? heldSessions(procs, sessions, dirComparer()) : new Set<string>();
+    for (const rec of this.registers()) ids.add(rec.sessionId);
+    return ids;
+  }
+
+  /** The records running claudes keep in each Claude folder's register (sessions/<pid>.json), of processes that still run. */
+  private registers(): Register[] {
+    const out: Register[] = [];
     const seen = new Set<string>();
     for (const home of this.opts.homes()) {
       const dir = join(home, "sessions");
@@ -541,14 +575,20 @@ export class LocalSessions implements SessionHistory {
         // Only the small <pid>.json records; never anything else in that folder.
         if (!f.isFile() || !PROCESS_FILE.test(f.name)) continue;
         try {
-          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown };
-          if (typeof rec.pid === "number" && typeof rec.sessionId === "string" && this.alive(rec.pid)) ids.add(rec.sessionId.toLowerCase());
+          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown; cwd?: unknown; startedAt?: unknown };
+          if (typeof rec.pid !== "number" || typeof rec.sessionId !== "string" || !this.alive(rec.pid)) continue;
+          out.push({
+            pid: rec.pid,
+            sessionId: rec.sessionId.toLowerCase(),
+            ...(typeof rec.cwd === "string" ? { cwd: rec.cwd } : {}),
+            ...(typeof rec.startedAt === "number" ? { startedAt: rec.startedAt } : {}),
+          });
         } catch {
           // being written, or gone
         }
       }
     }
-    return ids;
+    return out;
   }
 
   private view(k: Known, head: Head, title: string, running: Set<string>): LocalSession {
