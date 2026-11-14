@@ -71,6 +71,7 @@ import { useAgentProjects } from "../machines/agent-projects-store.ts";
 import { adoptStarted } from "../machines/project-actions.ts";
 import { machineErrorText, needsProjectTrust } from "../machines/machine-errors.ts";
 import { agentChoices, type AgentChoice } from "./new-tab-actions.ts";
+import { TabSheet } from "./tab-sheet.tsx";
 import "./terminal.css";
 
 const SAVE_DELAY_MS = 300;
@@ -112,6 +113,9 @@ function defaultStore(): LayoutStore {
 	sharedStore ??= layoutStore();
 	return sharedStore;
 }
+
+/** How often a phone in front asks the machine which terminals it runs. */
+const RELIST_MS = 30_000;
 
 function isTouch(): boolean {
 	return typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
@@ -483,6 +487,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	// session's dock sits in the session view, which does the same for its header and the dock together.
 	const keyboard = useViewportFit(root, touch && thread === undefined);
 	const [imeOpen, setImeOpen] = useState(false);
+	/** The phone's tab sheet is open: the moment it opened (for "today" in its list), else 0. */
+	const [tabsOpen, setTabsOpen] = useState(0);
 
 	const view = layout;
 	const tab = activeTab(view);
@@ -491,10 +497,20 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
 	// A session's dock lists the shells and its own AI; the machine's lists the shells.
 	const hidden = listed.filter((s) => !shown.has(s.session) && (s.threadId === "" || s.threadId === threadId));
-	// On a phone a session shows just its AI, as long as that is all there is. Once there is more to reach (tabs
-	// opened here, or shells and sessions the machine runs, most often opened on a computer) the tab bar shows
-	// under the session header, its "+" listing what the machine runs; it steps aside while the keyboard is up.
-	const tabBar = !touch || thread === undefined || layout.tabs.length > 1 || hidden.length > 0;
+	// A phone's session has no tab bar (its header is the session's, and the keyboard takes the rest). Once there is
+	// more to reach than its AI (tabs opened here, or shells and sessions the machine runs, most often opened on a
+	// computer) the key row gets a tab key, in thumb reach and still there while typing; it opens the tab sheet.
+	const tabBar = !touch || thread === undefined;
+	const moreTabs = touch && thread !== undefined && (layout.tabs.length > 1 || hidden.length > 0);
+	const tabViews = layout.tabs.map((x, i) => {
+		const pane = panesOf(x.root).find((p) => p.id === x.focus);
+		return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
+	});
+	const closeTabById = (id: string) => {
+		const closing = layout.tabs.find((x) => x.id === id);
+		if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
+	};
+	const reopen = (session: number) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)));
 	/** The machine's sessions again (a phone that was away, or the "+" menu opening). */
 	const relist = () => {
 		link.request({ case: "termListRequest", value: {} }).then(
@@ -504,14 +520,18 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			() => undefined,
 		);
 	};
-	// A phone coming back to the front learns what a computer opened meanwhile.
+	// A phone learns what a computer opened meanwhile: when it comes back to the front, and every half minute it is in front.
 	useEffect(() => {
 		if (!touch || thread === undefined || !ready) return;
 		const onVisible = () => {
 			if (document.visibilityState === "visible") relist();
 		};
 		document.addEventListener("visibilitychange", onVisible);
-		return () => document.removeEventListener("visibilitychange", onVisible);
+		const timer = window.setInterval(onVisible, RELIST_MS);
+		return () => {
+			document.removeEventListener("visibilitychange", onVisible);
+			window.clearInterval(timer);
+		};
 		// `relist` only reads the link, which this effect already depends on.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [touch, thread === undefined, ready, link]);
@@ -710,10 +730,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					t={tt}
 					back={back}
 					backLabel={t.back}
-					tabs={layout.tabs.map((x, i) => {
-						const pane = panesOf(x.root).find((p) => p.id === x.focus);
-						return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
-					})}
+					tabs={tabViews}
 					active={tab?.id ?? ""}
 					hidden={hidden}
 					agents={agents?.choices ?? []}
@@ -726,12 +743,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					// A session shows the pill in its header.
 					pill={thread === undefined ? <StatusPill t={tt} status={status} online={online} /> : null}
 					onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
-					onClose={(id) => {
-						const closing = layout.tabs.find((x) => x.id === id);
-						if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
-					}}
+					onClose={closeTabById}
 					onAction={(action) => void run(action)}
-					onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
+					onReopen={reopen}
 					onStartAgent={(provider) => void startAgent(provider)}
 					onMenu={relist}
 				/>
@@ -782,6 +796,19 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						keyboard={keyboardUp}
 						row={rowOf(keyPrefs)}
 						custom={keyPrefs.custom}
+						{...(moreTabs
+							? {
+									tabs: {
+										count: layout.tabs.length,
+										label: tt.tabsOpen(layout.tabs.length),
+										more: hidden.length > 0,
+										onOpen: () => {
+											relist();
+											setTabsOpen(Date.now());
+										},
+									},
+								}
+							: {})}
 						onToggle={toggle}
 						onKey={barKey}
 						onText={send}
@@ -790,6 +817,25 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						onKeyboard={toggleKeyboard}
 						onMore={() => setSheet(true)}
 					/>
+					{tabsOpen !== 0 && (
+						<TabSheet
+							t={tt}
+							tabs={tabViews}
+							active={tab?.id ?? ""}
+							busy={busy || !online}
+							startingAgent={startingAgent}
+							noFolder={thread === undefined}
+							agents={agents?.choices ?? []}
+							hidden={hidden}
+							now={tabsOpen}
+							onNewTab={() => void run({ kind: "new-tab" })}
+							onStartAgent={(provider) => void startAgent(provider)}
+							onReopen={reopen}
+							onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
+							onClose={closeTabById}
+							onDone={() => setTabsOpen(0)}
+						/>
+					)}
 					{!keyboardUp && <LiveInput labels={tt.keys} dictation={dictation} image={liveImage} onKeyboard={toggleKeyboard} />}
 					{sheet && (
 						<KeySheet

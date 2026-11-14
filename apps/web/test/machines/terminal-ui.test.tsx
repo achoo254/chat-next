@@ -455,7 +455,7 @@ describe("the dock", () => {
 		expect(screen.queryByRole("button", { name: "Terminal mới" })).toBeNull();
 	});
 
-	it("a session's dock on a phone: the tab bar shows once the machine runs more than the AI (opened on a computer), with the AI's tab first", async () => {
+	it("a session's dock on a phone: a tab key joins the key row once the machine runs more than the AI, and its sheet reaches the other tabs", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");
 		render(
@@ -465,23 +465,63 @@ describe("the dock", () => {
 		);
 		await until(() => sent("termOpen").length === 1, "the AI");
 		await waitFor(() => expect(document.querySelectorAll(".tx-pane")).toHaveLength(1));
+		// Only its AI: no tab bar, no tab key.
 		expect(screen.queryByRole("tablist")).toBeNull();
+		expect(screen.queryByRole("button", { name: /^Các tab terminal/ })).toBeNull();
 		// A computer opens a shell on the machine; the phone hears of it when it comes back to the front.
 		host.open();
 		act(() => {
 			document.dispatchEvent(new Event("visibilitychange"));
 		});
-		const tabs = await screen.findByRole("tablist");
-		expect(within(tabs).getAllByRole("tab")).toHaveLength(1);
-		// "+" lists what the machine runs; the shell opens as a tab of its own.
-		await userEvent.click(screen.getByRole("button", { name: "Mở mới" }));
-		const running = await screen.findByRole("group", { name: "Phiên đang chạy trên máy" });
-		await userEvent.click(await within(running).findByRole("menuitem", { name: /Shell/ }));
-		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
-		// Still one pane per tab, and the split button is one the phone's stylesheet hides.
-		expect(screen.getByRole("button", { name: "Chia sang phải" }).classList.contains("hide-touch")).toBe(true);
+		const key = await screen.findByRole("button", { name: "Các tab terminal (1)" });
+		// Still no bar above the terminal: the key row carries it, with a dot for what no tab shows.
+		expect(screen.queryByRole("tablist")).toBeNull();
+		expect(key.hasAttribute("data-more")).toBe(true);
+		await userEvent.click(key);
+		const sheet = await screen.findByRole("dialog", { name: "Các terminal" });
+		expect(within(within(sheet).getByRole("list", { name: "Các terminal" })).getAllByRole("listitem")).toHaveLength(1);
+		// The machine's shell is listed; picking it opens it as a tab of its own and closes the sheet.
+		const running = within(sheet).getByRole("group", { name: "Phiên đang chạy trên máy" });
+		await userEvent.click(within(running).getByRole("button", { name: /Shell/ }));
+		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Các terminal" })).toBeNull());
+		await waitFor(() => expect(document.querySelectorAll(".tx-pane")).toHaveLength(2));
+		const again = await screen.findByRole("button", { name: "Các tab terminal (2)" });
+		expect(again.hasAttribute("data-more")).toBe(false);
+		// Back in the sheet: switching to the first tab, and closing the other one.
+		await userEvent.click(again);
+		const second = await screen.findByRole("dialog", { name: "Các terminal" });
+		const rows = within(second).getAllByRole("listitem");
+		expect(rows).toHaveLength(2);
+		await userEvent.click(within(rows[1] as HTMLElement).getByRole("button", { name: /^Đóng / }));
+		await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Các terminal" })).getAllByRole("listitem")).toHaveLength(1));
 		parts.terminal.stop();
 		parts.link.stop();
+	});
+
+	it("a phone in front asks the machine for its terminals every half minute", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			const parts = links();
+			await until(() => parts.link.snapshot().status.kind === "open", "link open");
+			render(
+				<I18nProvider>
+					<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch />
+				</I18nProvider>,
+			);
+			await until(() => sent("termOpen").length === 1, "the AI");
+			await waitFor(() => expect(document.querySelectorAll(".tx-pane")).toHaveLength(1));
+			const before = sent("termListRequest").length;
+			host.open();
+			await act(async () => {
+				vi.advanceTimersByTime(30_000);
+			});
+			await waitFor(() => expect(sent("termListRequest").length).toBeGreaterThan(before));
+			expect(await screen.findByRole("button", { name: "Các tab terminal (1)" })).toBeTruthy();
+			parts.terminal.stop();
+			parts.link.stop();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("a session's dock: its AI first; shells in its folder; closing the AI's pane only detaches it", async () => {

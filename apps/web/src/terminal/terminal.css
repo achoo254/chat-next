@@ -188,8 +188,6 @@
 .tx-live-field:focus-visible, .tx-live-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
 /* Tabs on a phone (after Orca's): pill tabs, round actions; the session header already says when it goes through the relay. */
 .tx-dock.touch .tx-head { gap: var(--space-2); min-height: 56px; padding: 0 var(--space-2); }
-/* In a session the header above already has the way back: the bar is just the tabs and "+". */
-.tx-dock.touch.embedded .tx-head { min-height: 52px; }
 .tx-dock.touch .tx-tabs { gap: var(--space-1); }
 .tx-dock.touch .tx-tab { margin: 6px 0; border-radius: var(--radius-full); }
 .tx-dock.touch .tx-tab[data-active] { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
@@ -244,6 +242,15 @@
 .tx-sheet-row strong { font-size: 1rem; font-weight: 500; }
 .tx-sheet-row small { font-size: 0.8125rem; color: var(--c-text-muted); }
 .tx-sheet-row > span:last-child { font-size: 1.25rem; color: var(--c-text-muted); }
+/* The key row's tab key (its count, and a dot while the machine runs sessions no tab shows) and the tab sheet's rows. */
+.tx-key.tabs { position: relative; display: inline-flex; align-items: center; gap: var(--space-1); }
+.tx-key.tabs[data-more]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--c-primary); }
+.tx-sheet-heading { margin: 0 0 var(--space-1) var(--space-2); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
+.tx-sheet-row.tab { padding: 0; }
+.tx-sheet-row.tab[data-active] { background: color-mix(in srgb, var(--c-primary) 12%, transparent); }
+.tx-sheet-pick { display: flex; flex: 1; align-items: center; gap: var(--space-3); min-width: 0; min-height: 64px; padding: 0 var(--space-4); border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tx-sheet-pick > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.tx-sheet-x { display: grid; place-items: center; flex: none; width: 56px; height: 64px; border: 0; background: none; color: var(--c-text-muted); cursor: pointer; }
 .tx-sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: var(--space-2); }
 .tx-sheet-grid .tx-key { width: 100%; }
 .tx-sheet-grid.small { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }

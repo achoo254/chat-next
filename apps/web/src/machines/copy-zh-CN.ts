@@ -696,6 +696,7 @@ export const zhCNMachines: MachinesCopy = {
 		mode: { label: "打开会话方式", chat: "聊天", terminal: "终端" },
 		openInTerminal: "在终端中打开",
 		scrollLatest: "回到最新一行",
+		tabsOpen: (n: number) => `终端标签页（${n}）`,
 		held: (ai: string) => `${ai} 正在终端中运行此会话。此处仅可查看。`,
 		heldOpen: (ai: string) => `此会话已在终端的 ${ai} 中打开。`,
 		showTerminal: "打开终端",

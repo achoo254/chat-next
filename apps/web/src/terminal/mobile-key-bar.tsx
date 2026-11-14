@@ -12,6 +12,7 @@
 import { useEffect, useRef, type MouseEvent } from "react";
 import { Icon } from "../components/icon.tsx";
 import { Icon as ScreenIcon } from "../components/screen-icons.tsx";
+import { MachineIcon } from "../machines/machine-icons.tsx";
 import type { Dictation } from "./dictation.ts";
 import type { CustomKey } from "./key-prefs.ts";
 
@@ -226,6 +227,8 @@ interface MobileKeyBarProps {
 	/** The ids the row shows, in order (key-prefs.ts rowOf). */
 	row: readonly string[];
 	custom: readonly CustomKey[];
+	/** A session's terminal on a phone with more tabs than its AI: the key that opens them (terminal-dock.tsx). */
+	tabs?: { readonly count: number; readonly label: string; readonly more: boolean; onOpen(): void };
 }
 
 type Item = { key: BarKey; text: string; label?: keyof BarLabels; className?: string };
@@ -278,7 +281,7 @@ export function keyText(id: string, labels: BarLabels, custom: readonly CustomKe
 /** Keeps the focus (and the phone keyboard) where it is. */
 export const keepFocus = (event: MouseEvent) => event.preventDefault();
 
-export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, onKey, onText, onPaste, onCopy, onKeyboard, onMore }: MobileKeyBarProps) {
+export function MobileKeyBar({ labels, mods, keyboard, row, custom, tabs, onToggle, onKey, onText, onPaste, onCopy, onKeyboard, onMore }: MobileKeyBarProps) {
 	const lastTap = useRef<Record<Modifier, number>>({ ctrl: 0, alt: 0 });
 	const stopRepeat = useRef<(() => void) | null>(null);
 	const stop = () => {
@@ -370,6 +373,12 @@ export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, on
 			{keyboard && (
 				<button type="button" className="tx-key kbd" aria-label={labels.hideKeyboard} title={labels.hideKeyboard} onMouseDown={keepFocus} onClick={onKeyboard}>
 					<Icon name="keyboard" small />
+				</button>
+			)}
+			{tabs !== undefined && (
+				<button type="button" className="tx-key tabs" aria-label={tabs.label} aria-haspopup="dialog" data-more={tabs.more ? "" : undefined} onMouseDown={keepFocus} onClick={tabs.onOpen} data-id="terminal-tabs-key">
+					<MachineIcon name="terminal" small />
+					<span>{tabs.count}</span>
 				</button>
 			)}
 			{row.map(byId)}
