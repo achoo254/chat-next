@@ -255,6 +255,8 @@ export class FakeTerminalHost {
 	private readonly conns = new Map<string, Conn>();
 	private nextSession = 1;
 	maxSessions = 20;
+	/** Threads whose turn runs in chat: opening their AI in a terminal is refused (THREAD_RUNNING), as the agent does. */
+	readonly runningTurns = new Set<string>();
 
 	constructor(
 		private readonly machine: FakeMachine,
@@ -291,6 +293,7 @@ export class FakeTerminalHost {
 				const threadId = b.value.aiSession?.threadId ?? "";
 				const running = [...this.aiThreads].find(([, t]) => t === threadId)?.[0];
 				if (threadId !== "" && running !== undefined && this.sessions.get(running)?.exited === null) return [{ case: "termOpened", value: { session: running } }];
+				if (this.runningTurns.has(threadId)) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "a turn runs", reason: ErrorReason.THREAD_RUNNING } }];
 				if (this.sessions.size >= this.maxSessions) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "limit", reason: ErrorReason.TERMINAL_SESSION_LIMIT } }];
 				const session = this.open(b.value.cols, b.value.rows);
 				if (threadId !== "") this.aiThreads.set(session, threadId);

@@ -554,6 +554,133 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a turn running in chat: the AI's terminal waits with the button off, then opens by itself when the turn ends", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const thread = (running: boolean) => ({ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", running, inTerminal: false });
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={thread(true)} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		expect(await screen.findByText("Phiên đang chạy một lượt ở Trò chuyện. Terminal tự mở khi lượt xong.")).toBeTruthy();
+		expect((screen.getByRole("button", { name: "Mở trong terminal" }) as HTMLButtonElement).disabled).toBe(true);
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		// Nothing asked of the machine while the turn runs, and no error line.
+		expect(sent("termOpen")).toEqual([]);
+		expect(screen.queryByText("Phiên đang chạy một lượt. Dừng lượt đó trước.")).toBeNull();
+		view.rerender(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={thread(false)} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI after the turn");
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a refusal the page could not foresee says to try again (button on, no retry loop); once the page sees the turn run and end, it opens once", async () => {
+		host.runningTurns.add("t1");
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const dockFor = (running: boolean) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", running }} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		const view = render(dockFor(false));
+		await until(() => sent("termOpen").length === 1, "the refused try");
+		expect(await screen.findByText("Máy đang bận với phiên này nên chưa mở được terminal. Thử lại sau giây lát.")).toBeTruthy();
+		expect(screen.queryByText("Phiên đang chạy một lượt. Dừng lượt đó trước.")).toBeNull();
+		expect((screen.getByRole("button", { name: "Mở trong terminal" }) as HTMLButtonElement).disabled).toBe(false);
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("termOpen")).toHaveLength(1);
+		// The page now sees the turn: it waits with the button off.
+		view.rerender(dockFor(true));
+		expect(await screen.findByText("Phiên đang chạy một lượt ở Trò chuyện. Terminal tự mở khi lượt xong.")).toBeTruthy();
+		expect((screen.getByRole("button", { name: "Mở trong terminal" }) as HTMLButtonElement).disabled).toBe(true);
+		// The turn ends: the AI opens, once.
+		host.runningTurns.delete("t1");
+		view.rerender(dockFor(false));
+		await until(() => sent("termOpen").length === 2, "the AI after the turn");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("termOpen")).toHaveLength(2);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a turn that ends while the machine is offline opens the AI's terminal once it is back", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const dockFor = (running: boolean, online: boolean) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online={online} terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", running }} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		const view = render(dockFor(true, true));
+		expect(await screen.findByText("Phiên đang chạy một lượt ở Trò chuyện. Terminal tự mở khi lượt xong.")).toBeTruthy();
+		view.rerender(dockFor(false, false));
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("termOpen")).toEqual([]);
+		view.rerender(dockFor(false, true));
+		await until(() => sent("termOpen").length === 1, "the AI once back online");
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a shell opened while the turn runs does not keep the AI's terminal from opening after it", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const dockFor = (running: boolean) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", running }} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		const view = render(dockFor(true));
+		expect(await screen.findByText("Phiên đang chạy một lượt ở Trò chuyện. Terminal tự mở khi lượt xong.")).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Chia sang phải" }));
+		await until(() => sent("termOpen").length === 1, "a shell");
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ cwd: "/w/app" });
+		view.rerender(dockFor(false));
+		await until(() => sent("termOpen").length === 2, "the AI after the turn");
+		expect(sent("termOpen")[1]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("an empty session dock says whether its AI was never opened in a terminal or runs in one not shown here", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const dockFor = (inTerminal: boolean) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", inTerminal }} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		// Never opened: the machine had no room, so the AI is in no terminal.
+		host.maxSessions = 0;
+		const view = render(dockFor(false));
+		expect(await screen.findByText("Phiên này chưa mở trong terminal.")).toBeTruthy();
+		host.maxSessions = 20;
+		await userEvent.click(screen.getByRole("button", { name: "Mở trong terminal" }));
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		// Opened, the machine says the AI runs in a terminal; closing its pane only detaches it.
+		view.rerender(dockFor(true));
+		const tabClose = screen.getAllByRole("button", { name: /^Đóng / }).find((b) => b.classList.contains("tx-tab-x"));
+		await userEvent.click(tabClose as HTMLElement);
+		expect(await screen.findByText("Phiên vẫn chạy trên máy nhưng không hiện ở đây.")).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		expect(sent("termClose")).toEqual([]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+
 	it("says when the machine has no room for another terminal", async () => {
 		host.maxSessions = 0;
 		await dock(refusing());

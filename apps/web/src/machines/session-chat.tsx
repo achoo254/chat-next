@@ -102,6 +102,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const outside = secretPrompts.length + takeovers.length;
 	const online = state.status.kind === "open";
 	const running = turnRunning(items) || thread?.state === ThreadState.RUNNING || thread?.state === ThreadState.WAITING || thread?.state === ThreadState.QUEUED;
+	// What keeps the machine from opening the AI in a terminal: a turn (an approval waits inside one) or a queued
+	// message. A question asked again after a restart is WAITING with no turn, and the terminal may open then.
+	const turnHolds = turnRunning(items) || thread?.state === ThreadState.RUNNING || thread?.state === ThreadState.QUEUED;
 	const threadInfo = state.threadInfo.get(threadId);
 	const model = currentModel(items, thread?.model ?? "");
 	const machineName = entry?.name ?? "";
@@ -319,7 +322,10 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (
 						<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
-							<TerminalScreen machine={machine} thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId) }} />
+							<TerminalScreen
+								machine={machine}
+								thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId), running: turnHolds, inTerminal: thread.terminalSession !== 0 }}
+							/>
 						</Suspense>
 					) : (
 						<p className="note mx-group-note" role="status">

@@ -701,6 +701,10 @@ export const enMachines: MachinesCopy = {
 		backToChat: "Back to Chat",
 		closePaneAi: "Close pane (the session keeps running)",
 		detached: "The session still runs on the machine but is not shown here.",
+		notOpened: "This session is not open in a terminal yet.",
+		openAi: "Open in terminal",
+		waitTurn: "A turn of this session is running in Chat. The terminal opens by itself when it ends.",
+		busyRetry: "The machine is busy with this session, so the terminal could not open yet. Try again in a moment.",
 		folderGone: "This session's folder is no longer on the machine, so its terminal cannot open.",
 		offerFailed: "This machine cannot open sessions in a terminal yet.",
 		keys: {

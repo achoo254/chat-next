@@ -130,6 +130,10 @@ export interface DockThread {
 	readonly dir: string;
 	/** Back to the chat view (phones, where the dock covers the session header). */
 	readonly chat: string;
+	/** A turn runs in chat: the machine refuses the AI's terminal until it ends. */
+	readonly running?: boolean | undefined;
+	/** The AI already runs in a terminal of the machine (shown here or not). */
+	readonly inTerminal?: boolean | undefined;
 }
 
 /**
@@ -199,6 +203,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [notice, setNotice] = useState("");
 	/** The session's folder is gone from the machine: its AI cannot open there, so it is not "still running". */
 	const [folderGone, setFolderGone] = useState(false);
+	/** The AI's terminal waits for the chat's turn to end, then opens by itself. */
+	const [waitingTurn, setWaitingTurn] = useState(false);
 	const [titles, setTitles] = useState<ReadonlyMap<number, string>>(() => new Map());
 	const [ended, setEnded] = useState<ReadonlyMap<number, number>>(() => new Map());
 	const [listed, setListed] = useState<readonly TermSessionInfo[]>([]);
@@ -226,6 +232,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const threadId = thread?.id;
 	/** Shells start in the session's folder, or the home folder. */
 	const shellDir = thread?.dir ?? "";
+	/** A turn runs in chat and the AI is in no terminal yet: the machine would refuse to open it. */
+	const turnBusy = thread?.running === true && thread.inTerminal !== true;
 
 	useEffect(() => {
 		terminal.start();
@@ -273,6 +281,11 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			if (frame.body.case !== "termOpened") throw new Error("the machine did not open a terminal");
 			return frame.body.value.session;
 		} catch (err) {
+			// A turn still running in chat is not an error: the terminal opens once it ends.
+			if (ai && err instanceof RemoteError && err.reason === ErrorReason.THREAD_RUNNING) {
+				setWaitingTurn(true);
+				return null;
+			}
 			setNotice(openErrorText(t, err));
 			setFolderGone(err instanceof RemoteError && err.reason === ErrorReason.FOLDER_NOT_FOUND);
 			return null;
@@ -304,7 +317,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			return;
 		}
 		const session = await openSession(shellDir, true);
-		if (session !== null) setLayout((l) => (aiPane(l) === null ? addTab(l, session, true) : l));
+		if (session === null) return;
+		setWaitingTurn(false);
+		setLayout((l) => (aiPane(l) === null ? addTab(l, session, true) : l));
 	};
 
 	const run = async (action: DockAction): Promise<void> => {
@@ -337,16 +352,35 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		}
 	};
 
-	// A session opens with its AI; a machine with no terminal open here starts with one shell.
+	// A session opens with its AI (after the chat's turn, when one runs); a machine with no terminal open here starts with one shell.
 	const openFirst = useEffectEvent(() => {
-		if (threadId !== undefined) void showAi();
-		else if (openShellIn === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
+		if (threadId !== undefined) {
+			if (turnBusy) setWaitingTurn(true);
+			else void showAi();
+		} else if (openShellIn === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
 	});
 	useEffect(() => {
 		if (!ready || autoOpened.current) return;
 		autoOpened.current = true;
 		openFirst();
 	}, [ready]);
+
+	// The chat's turn ended: the AI's terminal that waited for it opens now, once, even beside open shells
+	// (showAi adds no second AI tab). A turn that ends while the machine is offline opens it when it is back.
+	// It opens only after the page saw the turn run, so a refusal it could not foresee never retries in a loop.
+	const sawTurn = useRef(false);
+	const openAfterTurn = useEffectEvent(() => {
+		if (turnBusy) {
+			sawTurn.current = true;
+			return;
+		}
+		if (!sawTurn.current || !ready || !online || !waitingTurn || busy) return;
+		sawTurn.current = false;
+		void showAi();
+	});
+	useEffect(() => {
+		openAfterTurn();
+	}, [turnBusy, online, ready]);
 
 	// "Terminal mới" from a menu: one more shell in that folder.
 	const openShell = useEffectEvent(async (cwd: string) => {
@@ -567,6 +601,20 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	};
 
 	const relayNote = status.kind === "open" && status.path === "relay" && status.directIssue !== "";
+	// A dock with no pane: the session's folder is gone, its AI runs in a terminal not shown here, a chat
+	// turn holds it (opens by itself after), the machine said it is busy though the page sees no turn
+	// (starting, switching accounts: try again), or it was never opened in one; the machine's own dock has no terminal yet.
+	const emptyText = folderGone
+		? tt.folderGone
+		: threadId === undefined
+			? tt.none
+			: thread?.inTerminal === true
+				? tt.detached
+				: turnBusy
+					? tt.waitTurn
+					: waitingTurn
+						? tt.busyRetry
+						: tt.notOpened;
 	return (
 		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock" data-typing={touch && keyboardUp ? "" : undefined}>
 			<TerminalTabs
@@ -615,10 +663,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 				{!ready && <p className="tx-empty">{online ? t.terminal.loading : tt.offline}</p>}
 				{ready && layout.tabs.length === 0 && (
 					<div className="tx-empty">
-						<p>{folderGone ? tt.folderGone : threadId !== undefined ? tt.detached : tt.none}</p>
+						<p role="status">{emptyText}</p>
 						{folderGone ? null : threadId !== undefined ? (
-							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void showAi()}>
-								{tt.reopenAi}
+							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online || turnBusy} onClick={() => void showAi()}>
+								{thread?.inTerminal === true ? tt.reopenAi : tt.openAi}
 							</button>
 						) : (
 							<button type="button" className="btn btn-primary btn-sm" disabled={busy || !online} onClick={() => void run({ kind: "new-tab" })}>
