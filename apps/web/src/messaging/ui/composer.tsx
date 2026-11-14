@@ -18,6 +18,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
+import { AiMark } from "../../machines/ai-mark.tsx";
 import { hasFinePointer } from "../../components/fine-pointer.ts";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -439,7 +440,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={() => botActions.current?.toggleMenu()}
 					>
-						<Icon name="command" />
+						<AiMark name="commands" />
 					</button>
 				)}
 				{botBar.app !== null && (

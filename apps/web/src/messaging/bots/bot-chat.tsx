@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
 import { cryptoRandomId } from "@achoo254/chat-platform";
 import { Icon } from "../../components/icon.tsx";
+import { AiMark } from "../../machines/ai-mark.tsx";
 import type { OpenToken, PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -355,7 +356,7 @@ function CommandMenu({ chatId, menu, head, owners }: { chatId: number; menu: Com
 	return (
 		<div className="cmd-menu">
 			<div className="menu-head">
-				<Icon name="command" small />
+				<AiMark name="commands" small />
 				{head}
 			</div>
 			<ul role="listbox" id={BOT_MENU_ID(chatId)} aria-label={t.menu.button}>

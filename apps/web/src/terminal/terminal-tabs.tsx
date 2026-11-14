@@ -119,7 +119,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 				{tabs.map((tab) => (
 					<div key={tab.id} className="tx-tab" data-active={tab.id === active ? "" : undefined}>
 						<button type="button" role="tab" aria-selected={tab.id === active} title={tab.title} onClick={() => onSelect(tab.id)}>
-							<MachineIcon name={tab.ai === true ? "spark" : "terminal"} small />
+							<MachineIcon name={tab.ai === true ? "ai-session" : "terminal"} small />
 							<span>{tab.title}</span>
 						</button>
 						<button type="button" className="tx-tab-x" aria-label={t.closeTab(tab.title)} title={t.closeTab(tab.title)} onClick={() => onClose(tab.id)}>
@@ -164,7 +164,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 										onReopen(s.session);
 									}}
 								>
-									<MachineIcon name={s.threadId === "" ? "terminal" : "spark"} small />
+									<MachineIcon name={s.threadId === "" ? "terminal" : "ai-session"} small />
 									<span>
 										{s.title || (s.threadId === "" ? t.shellSession : t.aiSession)}
 										<small>

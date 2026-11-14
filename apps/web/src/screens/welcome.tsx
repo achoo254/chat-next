@@ -1,6 +1,7 @@
 import { FeatureList, Hero } from "@achoo254/app-shell";
 import { ChatPublicPage } from "../components/chat-public-page.tsx";
 import { Icon, type IconName } from "../components/icon.tsx";
+import { AiMark } from "../machines/ai-mark.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { matchSignIn, usePathname } from "../router.tsx";
 import { ChatSignInCard } from "./chat-sign-in-card.tsx";
@@ -30,7 +31,7 @@ function Welcome() {
 					id,
 					title: features[id].title,
 					description: features[id].body,
-					icon: <Icon name={icon} small />,
+					icon: id === "sync" ? <AiMark name="sync" small /> : <Icon name={icon} small />,
 				}))}
 			/>
 		</ChatPublicPage>
