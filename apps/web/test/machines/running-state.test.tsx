@@ -14,7 +14,7 @@ import { ActivityLine, tokenCount, type ActivitySource } from "../../src/machine
 import { enMachines } from "../../src/machines/copy-en.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import { zhCNMachines } from "../../src/machines/copy-zh-CN.ts";
-import { MachineLink, sortForList, type LinkState } from "../../src/machines/link/machine-link.ts";
+import { MachineLink, keepOrder, sortForList, type LinkState } from "../../src/machines/link/machine-link.ts";
 import { TRANSCRIPT_PAGE, Transcript } from "../../src/machines/session-chat.tsx";
 import { matches, rowLine } from "../../src/machines/session-sidebar.tsx";
 import type { Block } from "../../src/machines/transcript/tool-fold.ts";
@@ -93,12 +93,14 @@ describe("a session running elsewhere in the session column", () => {
 		expect(zhCNMachines.sessions.running(2)).toBe("运行中（2）");
 	});
 
-	it("shows the tool running there as its line, and sorts with the running sessions", () => {
+	it("shows the tool running there as its line, and a running session keeps its place in the list", () => {
 		const there = summary({ id: "e", busyElsewhere: true, previewTool: "Bash", preview: "On it.", updatedAt: 1n });
 		expect(rowLine(viMachines, there, null)).toBe("Đang chạy: Bash");
 		expect(rowLine(viMachines, summary({ preview: "On it." }), null)).toBe("On it.");
 		const idle = summary({ id: "i", updatedAt: 5n });
-		expect(sortForList([idle, there]).map((x) => x.id)).toEqual(["e", "i"]);
+		expect(sortForList([idle, there]).map((x) => x.id)).toEqual(["i", "e"]);
+		const fresh = [summary({ id: "n", updatedAt: 9n }), { ...there, busyElsewhere: false, updatedAt: 99n }, idle];
+		expect(keepOrder([idle, there], fresh).map((x) => x.id)).toEqual(["n", "i", "e"]);
 	});
 
 	it("words the chip and the header in every language, with no product name", () => {

@@ -87,7 +87,7 @@ export interface WorkspaceNode {
 	/** The machine's own entry for the folder (git branch, defaults), when it keeps it. */
 	readonly local: Project | undefined;
 	readonly branch: string;
-	/** Sessions shown under the filter, most urgent and newest first. */
+	/** Sessions shown under the filter, in the order the device holds them (never moved by state). */
 	readonly threads: ThreadSummary[];
 	readonly status: WorkStatus;
 	readonly offline: boolean;
@@ -166,7 +166,7 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 				};
 			})
 			.filter((w) => filter === "all" || w.threads.length > 0)
-			.sort((a, b) => b.activity - a.activity || a.workspace.createdAt - b.workspace.createdAt);
+			.sort((a, b) => a.workspace.createdAt - b.workspace.createdAt || a.workspace.id - b.workspace.id);
 		const everyThread = project.workspaces.flatMap((w) => held.get(w.id) ?? []);
 		return {
 			project,
@@ -180,7 +180,7 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 	const folders = [...loose.values()]
 		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen) }))
 		.filter((g) => g.threads.length > 0)
-		.sort((a, b) => newest(b.threads) - newest(a.threads));
+		.sort((a, b) => a.dir.localeCompare(b.dir));
 	return { projects: shown, loose: folders };
 }
 

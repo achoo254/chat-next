@@ -20,7 +20,6 @@ import {
 	ErrorReason,
 	FrameSchema,
 	HandshakeErrorCode,
-	ThreadState,
 	type BrowserTakeover,
 	type Frame,
 	type Item,
@@ -730,7 +729,7 @@ export class MachineLink {
 				if (b.value.thread !== undefined) this.putThread(b.value.thread);
 				break;
 			case "threadListResult":
-				this.set({ threads: b.value.threads, listed: true, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
+				this.set({ threads: keepOrder(this.current.threads, b.value.threads), listed: true, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
 				break;
 			case "machineInfo":
 				this.set({ info: b.value, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
@@ -848,8 +847,9 @@ export class MachineLink {
 	}
 
 	private putThread(thread: ThreadSummary): void {
-		const others = this.current.threads.filter((t) => t.id !== thread.id);
-		const threads = [thread, ...others].sort((a, b) => (a.updatedAt === b.updatedAt ? 0 : a.updatedAt > b.updatedAt ? -1 : 1));
+		// A known session keeps its place however its state or time changed; a new one comes first.
+		const known = this.current.threads.some((t) => t.id === thread.id);
+		const threads = known ? this.current.threads.map((t) => (t.id === thread.id ? thread : t)) : [thread, ...this.current.threads];
 		const open = threads.filter((t) => t.open).length;
 		this.set({ threads, openSessions: Math.max(open, 0) });
 	}
@@ -869,8 +869,19 @@ export function mergeThreadInfo(previous: ThreadInfo | undefined, next: ThreadIn
 	return { ...next, rateLimits, commands };
 }
 
-/** Threads that need the user first, then running ones, then the rest by last change. */
+/**
+ * The machine's fresh list in the order the device already shows: a session
+ * keeps its place while it runs, waits or finishes; the new ones come first
+ * (in the machine's order); the gone ones drop out.
+ */
+export function keepOrder(shown: readonly ThreadSummary[], fresh: readonly ThreadSummary[]): ThreadSummary[] {
+	const byId = new Map(fresh.map((t) => [t.id, t]));
+	const kept = shown.flatMap((t) => byId.get(t.id) ?? []);
+	const keptIds = new Set(kept.map((t) => t.id));
+	return [...fresh.filter((t) => !keptIds.has(t.id)), ...kept];
+}
+
+/** The list as the device holds it: no state or time moves a session; the user places it (drag and drop). */
 export function sortForList(threads: readonly ThreadSummary[]): ThreadSummary[] {
-	const rank = (t: ThreadSummary) => (t.state === ThreadState.WAITING ? 0 : t.state === ThreadState.RUNNING || t.state === ThreadState.QUEUED || t.busyElsewhere ? 1 : 2);
-	return [...threads].sort((a, b) => rank(a) - rank(b) || (a.updatedAt === b.updatedAt ? 0 : a.updatedAt > b.updatedAt ? -1 : 1));
+	return [...threads];
 }
