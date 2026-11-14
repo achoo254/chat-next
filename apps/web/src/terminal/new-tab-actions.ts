@@ -38,6 +38,18 @@ export interface NewTabAction {
 	readonly disabled?: boolean;
 	/** More text the search matches besides the label and the hint (a session's full folder). */
 	readonly keywords?: string;
+	/** A second action at the row's end: stopping the machine's session (asks once more before it runs). */
+	readonly stop?: StopAction;
+	run(): void;
+}
+
+export interface StopAction {
+	/** The button's name ("Dừng <title>"). */
+	readonly label: string;
+	/** The session already ended: the button only drops it from the machine's list. */
+	readonly exited: boolean;
+	/** Offline, or a terminal opening: nothing reaches the machine now. */
+	readonly disabled: boolean;
 	run(): void;
 }
 
@@ -102,6 +114,8 @@ export interface NewTabInput {
 	onNewTab(): void;
 	onStartAgent(provider: string): void;
 	onReopen(session: number): void;
+	/** Stops the session on the machine (TermClose), freeing what it holds; none: rows have no stop button. */
+	onStop?(session: number): void;
 }
 
 function sessionHint(t: TerminalCopy, s: TermSessionInfo, now: number): string {
@@ -143,19 +157,22 @@ export function buildNewTabActions(input: NewTabInput): NewTabAction[] {
 			run: () => input.onStartAgent(ai.id),
 		};
 	});
-	const sessionRows = hidden.map(
-		(s): NewTabAction => ({
+	const sessionRows = hidden.map((s): NewTabAction => {
+		const label = s.title || (s.threadId === "" ? t.shellSession : t.aiSession);
+		const onStop = input.onStop;
+		return {
 			id: `session:${s.session}`,
 			group: "session",
-			label: s.title || (s.threadId === "" ? t.shellSession : t.aiSession),
+			label,
 			hint: sessionHint(t, s, now),
 			...(s.cwd === "" ? {} : { title: s.cwd, keywords: s.cwd }),
 			icon: s.threadId === "" ? "terminal" : "ai-session",
 			// Offline, or a terminal opening: a reopened tab would only fail to attach.
 			disabled: busy,
+			...(onStop === undefined ? {} : { stop: { label: s.exited ? t.manage.remove : t.manage.stopOf(label), exited: s.exited, disabled: busy, run: () => onStop(s.session) } }),
 			run: () => input.onReopen(s.session),
-		}),
-	);
+		};
+	});
 	return [terminal, ...agentRows, ...sessionRows];
 }
 

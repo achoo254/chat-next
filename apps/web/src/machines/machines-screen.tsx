@@ -78,7 +78,7 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} mode="terminal" />;
 			break;
 		case "terminal":
-			main = <TerminalPage key={view.machine} machine={view.machine} openShellIn={new URLSearchParams(search).get("new") ?? undefined} />;
+			main = <TerminalPage key={view.machine} machine={view.machine} openShellIn={new URLSearchParams(search).get("new") ?? undefined} showSession={sessionParam(search)} />;
 			break;
 		case "usage":
 			main = (
@@ -97,7 +97,13 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 }
 
 /** The machine's plain shells when it offers them; otherwise what to do on the machine first. */
-function TerminalPage({ machine, openShellIn }: { machine: string; openShellIn: string | undefined }) {
+/** `?open=<session>`: one of the machine's terminal sessions to show (from the machine's page). */
+function sessionParam(search: string): number | undefined {
+	const n = Number(new URLSearchParams(search).get("open") ?? "");
+	return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+function TerminalPage({ machine, openShellIn, showSession }: { machine: string; openShellIn: string | undefined; showSession: number | undefined }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const [, state] = useLink(hub, machine);
@@ -105,7 +111,7 @@ function TerminalPage({ machine, openShellIn }: { machine: string; openShellIn: 
 	if (gate === "available") {
 		return (
 			<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
-				<TerminalScreen machine={machine} openShellIn={openShellIn} />
+				<TerminalScreen machine={machine} openShellIn={openShellIn} showSession={showSession} />
 			</Suspense>
 		);
 	}

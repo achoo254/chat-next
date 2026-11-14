@@ -12,6 +12,8 @@ export const aiPaths = {
 	sessionTerminal: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}/terminal`,
 	/** The machine's terminal opening one more plain shell in `cwd` ("" for the home folder). */
 	newShell: (machine: string, cwd: string) => `/ai/${machine}/terminal?new=${encodeURIComponent(cwd)}`,
+	/** The machine's terminal showing one of its sessions (a plain shell no tab here shows). */
+	showSession: (machine: string, session: number) => `/ai/${machine}/terminal?open=${session}`,
 } as const;
 
 /** The /ai path for an old /machines one (with its query); null for any other path. */

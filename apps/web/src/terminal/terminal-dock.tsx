@@ -64,7 +64,7 @@ import { TerminalSplits } from "./terminal-splits.tsx";
 import { shortcutOf, TerminalTabs, type DockAction } from "./terminal-tabs.tsx";
 import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
 import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
-import { endedOnPurpose } from "./ended-sessions.ts";
+import { endedOnPurpose, endOnPurpose, forgetEnded } from "./ended-sessions.ts";
 import { TerminalLoading } from "./terminal-loading.tsx";
 import { modePath, rememberMode } from "../machines/session-mode.tsx";
 import { useAgentProjects } from "../machines/agent-projects-store.ts";
@@ -150,10 +150,20 @@ export interface DockThread {
  * `thread`: a session in terminal mode; otherwise the machine's plain shells,
  * opening one more in `openShellIn` ("" for the home folder) when set.
  */
+/**
+ * The layout with the machine's shell `session` in front: the tab that shows it, else a new tab for it; null when the
+ * machine no longer runs it as a shell (it ended meanwhile, or it is an AI's session, which opens in its own thread).
+ */
+function showInLayout(layout: DockLayout, session: number, listed: readonly TermSessionInfo[]): DockLayout | null {
+	const pane = layout.tabs.flatMap((x) => panesOf(x.root)).find((p) => p.session === session);
+	if (pane !== undefined) return focusPane(layout, pane.id);
+	return listed.some((s) => s.session === session && s.threadId === "" && !s.exited) ? addTab(layout, session, false) : null;
+}
+
 /** What Claude Code prints when `--resume` names a session it has no transcript of. */
 const LOST_SESSION = /No conversation found with session ID/;
 
-export default function TerminalScreen({ machine, thread, openShellIn }: { machine: string; thread?: DockThread | undefined; openShellIn?: string | undefined }) {
+export default function TerminalScreen({ machine, thread, openShellIn, showSession }: { machine: string; thread?: DockThread | undefined; openShellIn?: string | undefined; showSession?: number | undefined }) {
 	const hub = useHub();
 	const [link, state] = useLink(hub, machine);
 	const terminal = terminalLinkFor(hub, machine);
@@ -179,6 +189,7 @@ export default function TerminalScreen({ machine, thread, openShellIn }: { machi
 			imageLimits={imageLimits}
 			agents={agents}
 			openShellIn={openShellIn}
+			showSession={showSession}
 			// The request is done: the address goes back to the plain terminal page.
 			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
 		/>
@@ -205,6 +216,8 @@ export interface TerminalDockProps {
 	back?: string | undefined;
 	thread?: DockThread | undefined;
 	openShellIn?: string | undefined;
+	/** One of the machine's sessions to show in a tab ("Mở" on the machine's page). */
+	showSession?: number | undefined;
 	onShellOpened?: () => void;
 	store?: LayoutStore;
 	touch?: boolean;
@@ -221,7 +234,7 @@ export interface DockAgents {
 	onStarted?(thread: ThreadSummary): void;
 }
 
-export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null, agents }: TerminalDockProps) {
+export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, showSession, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null, agents }: TerminalDockProps) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
@@ -268,6 +281,11 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		return () => terminal.release();
 	}, [terminal]);
 
+	// "Mở" on the machine's page names a session to show: read once, when the machine's list first comes in (the page
+	// mounts the dock afresh for each such visit), then the address goes back to the plain terminal page.
+	const showAtStart = useRef(showSession);
+	const afterShow = useEffectEvent(() => onShellOpened?.());
+
 	// The stored layout, without the sessions the machine no longer has.
 	useEffect(() => {
 		if (!online || ready) return;
@@ -284,8 +302,13 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			if (!live) return;
 			// Without the machine's list the stored layout stays as it is (a session that is gone says so when attached).
 			setListed(list ?? []);
-			setLayout(list === null ? (stored ?? EMPTY_LAYOUT) : pruneForScope(stored ?? EMPTY_LAYOUT, list, threadId));
+			const pruned = list === null ? (stored ?? EMPTY_LAYOUT) : pruneForScope(stored ?? EMPTY_LAYOUT, list, threadId);
+			const wanted = showAtStart.current;
+			const shown = wanted === undefined ? pruned : showInLayout(pruned, wanted, list ?? []);
+			setLayout(shown ?? pruned);
+			if (shown === null) setNotice(t.terminal.gone);
 			setReady(true);
+			if (showAtStart.current !== undefined) afterShow();
 		})();
 		return () => {
 			live = false;
@@ -418,7 +441,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		if (threadId !== undefined) {
 			if (turnBusy) setWaitingTurn(true);
 			else void showAi();
-		} else if (openShellIn === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
+		} else if (openShellIn === undefined && showAtStart.current === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
 	});
 	useEffect(() => {
 		if (!ready || autoOpened.current) return;
@@ -511,6 +534,21 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
 	};
 	const reopen = (session: number) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)));
+
+	/**
+	 * Stops a session no pane shows (the "+" menu, the tab sheet): hung up on the machine, which frees the
+	 * memory it holds; an AI's conversation stays and opens again. Gone from the list at once, back on a refusal.
+	 */
+	const stopListed = (session: number) => {
+		endOnPurpose(machine, session);
+		setListed((list) => list.filter((s) => s.session !== session));
+		// Asked again either way: a list asked before the stop (the menu opening) must not bring the session back.
+		link.request({ case: "termClose", value: { session } }).then(relist, () => {
+			forgetEnded(machine, session);
+			setNotice(tt.manage.failed);
+			relist();
+		});
+	};
 	/** The machine's sessions again (a phone that was away, or the "+" menu opening). */
 	const relist = () => {
 		link.request({ case: "termListRequest", value: {} }).then(
@@ -746,6 +784,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					onClose={closeTabById}
 					onAction={(action) => void run(action)}
 					onReopen={reopen}
+					onStop={stopListed}
 					onStartAgent={(provider) => void startAgent(provider)}
 					onMenu={relist}
 				/>
@@ -831,6 +870,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 							onNewTab={() => void run({ kind: "new-tab" })}
 							onStartAgent={(provider) => void startAgent(provider)}
 							onReopen={reopen}
+							onStop={stopListed}
 							onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
 							onClose={closeTabById}
 							onDone={() => setTabsOpen(0)}

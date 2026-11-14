@@ -478,6 +478,32 @@ function typeInto(field: HTMLElement, text: string): void {
 	document.execCommand("insertText", false, text);
 }
 
+/** Sessions on the fake machine's terminal (a shell, two AIs, one ended), shown on the machine's page. */
+async function seedTerminalSessions(onMachinePage = true): Promise<void> {
+	type FakeSession = { title: string; exited: { code: number; signal: number } | null; createdAt: number; cwd: string };
+	type Fake = { open(cols?: number, rows?: number, cwd?: string): number; sessions: Map<number, FakeSession>; aiThreads: Map<number, string> };
+	const fake = (window as unknown as { __fakeTerminal?: Fake }).__fakeTerminal;
+	if (fake === undefined) throw new Error("harness: no fake terminal");
+	const hour = 3_600_000;
+	const add = (title: string, cwd: string, hoursAgo: number, thread = "") => {
+		const id = fake.open(80, 24, cwd);
+		const s = fake.sessions.get(id);
+		if (s !== undefined) Object.assign(s, { title, createdAt: Date.now() - hoursAgo * hour });
+		if (thread !== "") fake.aiThreads.set(id, thread);
+		return id;
+	};
+	add("", "D:\\CONG VIEC\\hoandat-app\\chat-next", 13, "demo-idle");
+	add("pnpm dev", "D:\\CONG VIEC\\hoandat-app\\chat-next\\apps\\web", 5);
+	add("✳ Kế hoạch provider AI tunelo", "D:\\CONG VIEC\\hoandat-app", 12, "demo-running");
+	const ended = add("bash", "D:\\CONG VIEC\\hoandat-app", 9);
+	const gone = fake.sessions.get(ended);
+	if (gone !== undefined) gone.exited = { code: 129, signal: 0 };
+	if (!onMachinePage) return;
+	(await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-terminals-refresh]:not(:disabled)"))).click();
+	const list = await find(() => document.querySelector(".mx-terms-list"));
+	list.closest(".mx-card")?.scrollIntoView({ block: "start" });
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
 	// The composer's "/" picker of the demo session's commands and skills.
 	slash: async () => {
@@ -604,6 +630,23 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		const open = await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-browser-open]:not(:disabled)"));
 		open.click();
 		await find(() => document.querySelector(".mx-browser-surface img"));
+	},
+	// "Terminal đang chạy trên máy" on the machine's page: the fake machine runs a few sessions, then the list is asked again.
+	"terminal-sessions": async () => {
+		await seedTerminalSessions();
+	},
+	// "Dừng N phiên không ai xem": the confirmation listing them.
+	"terminal-stop-idle": async () => {
+		await seedTerminalSessions();
+		(await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-terminals-stop-idle]"))).click();
+		await find(() => document.querySelector(".modal .btn-danger"));
+	},
+	"terminal-menu-stop": async () => {
+		await find(() => document.querySelector(".tx-pane .xterm"));
+		await seedTerminalSessions(false);
+		(await find(() => document.querySelector<HTMLButtonElement>("[data-id=terminal-new]"))).click();
+		(await find(() => document.querySelector<HTMLButtonElement>(".tx-new-row .tx-new-stop"))).click();
+		await find(() => document.querySelector(".tx-new-stop[data-armed]"));
 	},
 	// "Bí mật đã lưu" on the machine's page, scrolled into view.
 	"saved-secrets": async () => {

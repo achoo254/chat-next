@@ -16,6 +16,7 @@ import { threadStatus, type WorkStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
 import { rememberMode, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -208,6 +209,25 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 						>
 							<MachineIcon name="terminal" small />
 							<span>{t.terminal.openInTerminal}</span>
+						</button>
+					)}
+					{thread.terminalSession > 0 && machine.conn.kind === "on" && (
+						// Its AI runs in the machine's terminal and keeps its memory until stopped: stopped from the row too.
+						<button
+							type="button"
+							role="menuitem"
+							title={t.agent.thread.stopTerminalHint}
+							onClick={() => {
+								setOpen(false);
+								const session = thread.terminalSession;
+								endOnPurpose(ref_, session);
+								// Refused: its exit later is its own; the row still says it runs in the terminal, so it can be tried again.
+								machine.link.request({ case: "termClose", value: { session } }).catch(() => forgetEnded(ref_, session));
+							}}
+							data-id="thread-stop-terminal"
+						>
+							<MachineIcon name="power" small />
+							<span>{t.agent.thread.stopTerminal}</span>
 						</button>
 					)}
 					<ThreadMenuItems link={machine.link} thread={thread} info={machine.state.info} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />

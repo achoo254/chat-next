@@ -8,6 +8,11 @@ export function endOnPurpose(machine: string, session: number): void {
 	ended.add(key(machine, session));
 }
 
+/** The stop was refused: an exit of the session later is its own again, not ours. */
+export function forgetEnded(machine: string, session: number): void {
+	ended.delete(key(machine, session));
+}
+
 export function endedOnPurpose(machine: string, session: number): boolean {
 	return ended.has(key(machine, session));
 }

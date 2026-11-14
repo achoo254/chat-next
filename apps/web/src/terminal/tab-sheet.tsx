@@ -8,6 +8,7 @@ import { MachineIcon } from "../machines/machine-icons.tsx";
 import { Icon } from "../components/screen-icons.tsx";
 import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { buildNewTabActions, groupNewTabActions, NEW_TAB_GROUPS, type AgentChoice, type NewTabAction } from "./new-tab-actions.ts";
+import { StopSessionButton } from "./stop-session-button.tsx";
 import type { TabView } from "./terminal-tabs.tsx";
 
 interface TabSheetProps {
@@ -26,14 +27,16 @@ interface TabSheetProps {
 	onNewTab(): void;
 	onStartAgent(provider: string): void;
 	onReopen(session: number): void;
+	/** Stops one of the machine's sessions the sheet lists. */
+	onStop(session: number): void;
 	onSelect(id: string): void;
 	onClose(id: string): void;
 	/** The sheet is done: it closes. */
 	onDone(): void;
 }
 
-export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen, onSelect, onClose, onDone }: TabSheetProps) {
-	const actions = buildNewTabActions({ t, prefix: "", busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen });
+export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen, onStop, onSelect, onClose, onDone }: TabSheetProps) {
+	const actions = buildNewTabActions({ t, prefix: "", busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen, onStop });
 	const run = (action: NewTabAction) => {
 		if (action.disabled === true) return;
 		// Closed first: an entry that navigates must not leave the sheet behind.
@@ -79,15 +82,32 @@ export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agent
 						<section key={group.id} role="group" aria-label={heading}>
 							<h3 className="tx-sheet-heading">{heading}</h3>
 							<div className="tx-sheet-group">
-								{group.actions.map((action) => (
-									<button key={action.id} type="button" className="tx-sheet-row" disabled={action.disabled === true} onClick={() => run(action)} data-id={`terminal-sheet-${action.id}`}>
-										<MachineIcon name={action.icon} small />
-										<span>
-											<strong>{action.label}</strong>
-											{action.hint !== undefined && <small>{action.hint}</small>}
-										</span>
-									</button>
-								))}
+								{group.actions.map((action) => {
+									const row = (
+										<>
+											<MachineIcon name={action.icon} small />
+											<span>
+												<strong>{action.label}</strong>
+												{action.hint !== undefined && <small>{action.hint}</small>}
+											</span>
+										</>
+									);
+									if (action.stop === undefined)
+										return (
+											<button key={action.id} type="button" className="tx-sheet-row" disabled={action.disabled === true} onClick={() => run(action)} data-id={`terminal-sheet-${action.id}`}>
+												{row}
+											</button>
+										);
+									// A machine session: reopening it is the row, stopping it the button at its end.
+									return (
+										<div key={action.id} className="tx-sheet-row tab">
+											<button type="button" className="tx-sheet-pick" disabled={action.disabled === true} onClick={() => run(action)} data-id={`terminal-sheet-${action.id}`}>
+												{row}
+											</button>
+											<StopSessionButton t={t} stop={action.stop} className="tx-sheet-x tx-stop" />
+										</div>
+									);
+								})}
 							</div>
 						</section>
 					);

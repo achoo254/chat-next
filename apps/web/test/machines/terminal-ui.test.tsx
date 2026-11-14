@@ -482,7 +482,7 @@ describe("the dock", () => {
 		expect(within(within(sheet).getByRole("list", { name: "Các terminal" })).getAllByRole("listitem")).toHaveLength(1);
 		// The machine's shell is listed; picking it opens it as a tab of its own and closes the sheet.
 		const running = within(sheet).getByRole("group", { name: "Phiên đang chạy trên máy" });
-		await userEvent.click(within(running).getByRole("button", { name: /Shell/ }));
+		await userEvent.click(within(running).getByRole("button", { name: /^Shell/ }));
 		await waitFor(() => expect(screen.queryByRole("dialog", { name: "Các terminal" })).toBeNull());
 		await waitFor(() => expect(document.querySelectorAll(".tx-pane")).toHaveLength(2));
 		const again = await screen.findByRole("button", { name: "Các tab terminal (2)" });
@@ -548,7 +548,7 @@ describe("the dock", () => {
 		// The "+" menu lists it under "Phiên đang chạy trên máy".
 		await userEvent.click(screen.getByRole("button", { name: "Mở mới" }));
 		const running = await screen.findByRole("group", { name: "Phiên đang chạy trên máy" });
-		await userEvent.click(await within(running).findByRole("menuitem", { name: /Phiên AI|Terminal/ }));
+		await userEvent.click(await within(running).findByRole("menuitem", { name: /^(Phiên AI|Terminal)/ }));
 		// A tab of its own again (every tab keeps its panes mounted).
 		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
 		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2);
@@ -574,6 +574,39 @@ describe("the dock", () => {
 		);
 		await until(() => done === 1, "shell opened");
 		expect(sent("termOpen").map((f) => f.body.value)).toEqual([expect.objectContaining({ cwd: "/w/proj" })]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("Mở from the machine's page: that shell in a tab, nothing new opened, then the request is done", async () => {
+		const shell = host.open();
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		let done = 0;
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} back="/ai/1" showSession={shell} onShellOpened={() => (done += 1)} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => done === 1, "session shown");
+		await waitFor(() => expect(document.querySelectorAll(".tx-pane")).toHaveLength(1));
+		expect(sent("termOpen")).toEqual([]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("Mở of a session that ended meanwhile says so and starts no shell in its place", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		let done = 0;
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} back="/ai/1" showSession={42} onShellOpened={() => (done += 1)} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => done === 1, "request done");
+		expect(await screen.findByText("Phiên này không còn trên máy.")).toBeTruthy();
+		expect(sent("termOpen")).toEqual([]);
 		parts.terminal.stop();
 		parts.link.stop();
 	});

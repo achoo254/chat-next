@@ -22,6 +22,8 @@ import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
+import { MachineTerminalSessions } from "./machine-terminal-sessions.tsx";
+import { terminalGate } from "./agent-version.ts";
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { sortForList } from "./link/machine-link.ts";
@@ -128,6 +130,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</Link>
 					))}
 				</section>
+				{terminalGate(state.info) === "available" && <MachineTerminalSessions machine={machine} link={link} online={online} threads={state.threads} />}
 				{hasAccounts && (
 					<section className="card pad mx-card" data-id="machine-ai-accounts">
 						<h3>{t.aiAccounts.title}</h3>

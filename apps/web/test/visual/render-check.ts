@@ -76,6 +76,11 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-limit": "?at=machine-limit",
 	"machine-secret": "?at=machine-secret&open=secret-card",
 	"machine-info-secrets": "?at=machine-info&open=saved-secrets",
+	// "Terminal đang chạy trên máy" on the machine's page: shells and AIs, open on a device, unwatched and exited.
+	"machine-info-terminals": "?at=machine-info&open=terminal-sessions",
+	"machine-info-terminals-stop": "?at=machine-info&open=terminal-stop-idle",
+	// The terminal's "+" menu with the machine's sessions no tab shows, one stop button armed ("Dừng?").
+	"machine-terminal-menu": "?at=machine-terminal&open=terminal-menu-stop",
 	// The machine's browser: Claude's takeover card, the live view (desktop: over the session; phone: full screen),
 	// a page asking for a passkey, and the view opened from the machine's page.
 	"machine-takeover": "?at=machine-takeover&open=takeover-card",

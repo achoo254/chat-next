@@ -212,6 +212,9 @@ interface Session {
 	rows: number;
 	title: string;
 	exited: { code: number; signal: number } | null;
+	/** When it opened (Unix ms) and in which folder, as TermSessionInfo reports them. */
+	createdAt: number;
+	cwd: string;
 }
 
 interface Conn {
@@ -277,7 +280,8 @@ export class FakeTerminalHost {
 								title: s.title,
 								cols: s.cols,
 								rows: s.rows,
-								createdAt: 0n,
+								createdAt: BigInt(s.createdAt),
+								cwd: s.cwd,
 								attached: [...this.conns.values()].some((c) => c.attached.has(s.id)),
 								exited: s.exited !== null,
 								exitCode: s.exited?.code ?? 0,
@@ -295,7 +299,7 @@ export class FakeTerminalHost {
 				if (threadId !== "" && running !== undefined && this.sessions.get(running)?.exited === null) return [{ case: "termOpened", value: { session: running } }];
 				if (this.runningTurns.has(threadId)) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "a turn runs", reason: ErrorReason.THREAD_RUNNING } }];
 				if (this.sessions.size >= this.maxSessions) return [{ case: "error", value: { code: ErrorCode.INVALID, message: "limit", reason: ErrorReason.TERMINAL_SESSION_LIMIT } }];
-				const session = this.open(b.value.cols, b.value.rows);
+				const session = this.open(b.value.cols, b.value.rows, threadId === "" ? b.value.cwd : "");
 				if (threadId !== "") this.aiThreads.set(session, threadId);
 				return [{ case: "termOpened", value: { session } }];
 			}
@@ -315,9 +319,9 @@ export class FakeTerminalHost {
 	}
 
 	/** A new session with an empty screen; returns its id. */
-	open(cols = 80, rows = 24): number {
+	open(cols = 80, rows = 24, cwd = ""): number {
 		const id = this.nextSession++;
-		this.sessions.set(id, { id, log: [...enc.encode(this.greeting)], cols, rows, title: "", exited: null });
+		this.sessions.set(id, { id, log: [...enc.encode(this.greeting)], cols, rows, title: "", exited: null, createdAt: Date.now(), cwd });
 		return id;
 	}
 

@@ -155,3 +155,26 @@ describe("agentChoices", () => {
 		expect(agentChoices(info(TerminalAvailability.AVAILABLE, { id: "claude", name: "Claude Code (beta)", terminal: true }))[0]?.name).toBe("Claude Code (beta)");
 	});
 });
+
+describe("stopping the machine's sessions from the menu", () => {
+	it("gives each session row a stop action that stops that session", () => {
+		const onStop = vi.fn();
+		const actions = buildNewTabActions(input({ hidden: [session({ session: 7, title: "vim" })], onStop }));
+		const row = actions.find((a) => a.id === "session:7");
+		expect(row?.stop).toMatchObject({ label: t.manage.stopOf("vim"), exited: false, disabled: false });
+		expect(buildNewTabActions(input({ busy: true, hidden: [session({ session: 7 })], onStop })).find((a) => a.id === "session:7")?.stop?.disabled).toBe(true);
+		row?.stop?.run();
+		expect(onStop).toHaveBeenCalledWith(7);
+	});
+
+	it("only offers to drop an exited session from the list", () => {
+		const actions = buildNewTabActions(input({ hidden: [session({ session: 3, exited: true, exitCode: 0 })], onStop: () => undefined }));
+		expect(actions.find((a) => a.id === "session:3")?.stop).toMatchObject({ label: t.manage.remove, exited: true });
+	});
+
+	it("leaves the stop out where nothing can stop sessions, and off the other groups", () => {
+		expect(buildNewTabActions(input({ hidden: [session({ session: 2 })] })).some((a) => a.stop !== undefined)).toBe(false);
+		const withStop = buildNewTabActions(input({ agents: [READY], hidden: [session({ session: 2 })], onStop: () => undefined }));
+		expect(withStop.filter((a) => a.stop !== undefined).map((a) => a.id)).toEqual(["session:2"]);
+	});
+});

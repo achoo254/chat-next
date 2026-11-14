@@ -99,20 +99,22 @@ interface TabsProps {
 	onClose(id: string): void;
 	onAction(action: DockAction): void;
 	onReopen(session: number): void;
+	/** Stops one of the machine's sessions the menu lists. */
+	onStop(session: number): void;
 	/** A new session of the AI `provider`, opened in terminal mode. */
 	onStartAgent(provider: string): void;
 	/** The "+" menu opens: the machine's list of sessions is refreshed. */
 	onMenu(): void;
 }
 
-export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents, startingAgent, noFolder, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onStartAgent, onMenu }: TabsProps) {
+export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents, startingAgent, noFolder, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onStop, onStartAgent, onMenu }: TabsProps) {
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
 	// "Today" for the sessions in the menu: the moment it opened.
 	const [menuAt, setMenuAt] = useState(0);
 	const { open: helpOpen, setOpen: setHelpOpen, ref: helpRef } = usePopover();
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
 	const actions = menuOpen
-		? buildNewTabActions({ t, prefix, busy, startingAgent, noFolder, agents, hidden, now: menuAt, onNewTab: () => onAction({ kind: "new-tab" }), onStartAgent, onReopen })
+		? buildNewTabActions({ t, prefix, busy, startingAgent, noFolder, agents, hidden, now: menuAt, onNewTab: () => onAction({ kind: "new-tab" }), onStartAgent, onReopen, onStop })
 		: [];
 	// Closed by Esc or a click on nothing: the search field that had the focus is gone, and the focus would
 	// fall to the page; it goes back to "+". An entry that ran, or a click on something focusable, keeps theirs.

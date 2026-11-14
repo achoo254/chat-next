@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
 import { MachineIcon } from "../machines/machine-icons.tsx";
+import { StopSessionButton } from "./stop-session-button.tsx";
 import { filterNewTabActions, groupNewTabActions, NEW_TAB_GROUPS, type NewTabAction } from "./new-tab-actions.ts";
 
 interface NewTabMenuProps {
@@ -76,7 +77,8 @@ export function NewTabMenu({ t, actions, onDone }: NewTabMenuProps) {
 					return (
 						<div key={group.id} role="group" aria-label={heading}>
 							<h5 aria-hidden="true">{heading}</h5>
-							{group.actions.map((action) => (
+							{group.actions.map((action) => {
+								const row = (
 								<button
 									key={action.id}
 									type="button"
@@ -98,7 +100,16 @@ export function NewTabMenu({ t, actions, onDone }: NewTabMenuProps) {
 										</kbd>
 									)}
 								</button>
-							))}
+								);
+								if (action.stop === undefined) return row;
+								// A machine session: the row reopens it, the button at its end stops it (and the menu stays open).
+								return (
+									<div key={action.id} className="tx-new-row">
+										{row}
+										<StopSessionButton t={t} stop={action.stop} className="tx-new-stop tx-stop" role="menuitem" onStopped={() => search.current?.focus()} />
+									</div>
+								);
+							})}
 						</div>
 					);
 				})}
