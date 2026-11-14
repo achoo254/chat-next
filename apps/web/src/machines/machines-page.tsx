@@ -116,7 +116,7 @@ function MachineCard({ machine, now }: { machine: MachineView; now: number }) {
 			<p className="mx-mcard-facts">{facts(t, machine).join(" · ")}</p>
 			<div className="mx-mcard-acts" role="group" aria-label={m.actions(short)}>
 				<Link to={paths.machine(entry.ref)} className="btn btn-sm">
-					<Icon name="inbox" small />
+					<MachineIcon name="ai-board" small />
 					{t.agent.machineBoard}
 				</Link>
 				{/* A disabled button shows no tooltip: the reason sits on its wrapper (and in its accessible name). */}

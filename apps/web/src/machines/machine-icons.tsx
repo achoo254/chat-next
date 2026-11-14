@@ -120,8 +120,8 @@ const PATHS = {
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 } satisfies Record<string, ReactElement>;
 
-// Marks the offline image model drew (ai-mark.tsx): a session with an AI, a project that is a plain folder, and the status bar's model, permission mode and AI account, the session's changed files, and loading a project's skills.
-const MARKS: Record<string, AiMarkName> = { "ai-session": "session", "ai-project": "project", "ai-model": "model", "ai-permission": "permission", "ai-account": "account", "ai-changes": "changes", "ai-skills": "skills" };
+// Marks the offline image model drew (ai-mark.tsx): a session with an AI, a project that is a plain folder, and the status bar's model, permission mode and AI account, the session's changed files, loading a project's skills, and a machine's session board.
+const MARKS: Record<string, AiMarkName> = { "ai-session": "session", "ai-project": "project", "ai-model": "model", "ai-permission": "permission", "ai-account": "account", "ai-changes": "changes", "ai-skills": "skills", "ai-board": "board" };
 
 export type MachineIconName = keyof typeof PATHS | keyof typeof MARKS;
 
