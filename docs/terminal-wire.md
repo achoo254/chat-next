@@ -76,6 +76,7 @@ Chi tiết `Snapshot`:
 - `offset` là **ranh giới an toàn** gần nhất không lớn hơn offset hiện tại: emulator chỉ được nạp tới chỗ không nằm giữa một chuỗi điều khiển hay một ký tự UTF-8. Phần đuôi dở dang (tối đa 4 KiB) đến sau trong `Output` từ `offset`, nên chuỗi bị cắt giữa hai lần đọc PTY vẫn tới client nguyên vẹn.
 - Chuỗi VT tự đủ: bắt đầu bằng `ESC c` (RIS), rồi `ESC[?1049h` nếu `altScreen` = 1, rồi `OSC 2` tiêu đề nếu có, rồi nội dung màn hình có thuộc tính, vị trí và trạng thái ẩn/hiện con trỏ, và các chế độ nhập (application cursor/keypad, bracketed paste, chuột). Client đổi cỡ về `cols`×`rows` rồi ghi nguyên chuỗi.
   Màn hình thường nằm dưới màn hình thay thế không được dựng lại (client thấy màn hình thường trống khi chương trình thoát màn hình thay thế).
+- Trên màn hình thường, trước nội dung màn hình là lịch sử: các dòng đã cuộn khỏi đỉnh (daemon giữ tối đa 1.000 dòng), mỗi dòng một dòng có thuộc tính, lấy những dòng mới nhất vừa phần còn lại của khung, rồi đủ `LF` để chúng cuộn hết vào scrollback của client. Client mở lại terminal (đổi tab, Trò chuyện ⟷ Terminal, tải lại trang) vẫn cuộn lên xem được. `ESC[3J` (xoá scrollback, Claude Code gửi khi vẽ lại toàn bộ) cũng xoá lịch sử daemon giữ, để client không thấy cuộc hội thoại hai lần.
 - Nếu chuỗi đủ thuộc tính vượt một khung, daemon gửi bản rút gọn: chữ không màu của các dòng dưới cùng vừa khung, vị trí con trỏ và các chế độ nhập.
 - Nếu byte mà client còn cần đã rời vòng đệm (chỉ xảy ra khi cấu hình vòng đệm sai), daemon gửi `Snapshot` mới để đồng bộ lại thay vì để hở.
 

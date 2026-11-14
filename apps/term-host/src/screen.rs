@@ -12,6 +12,13 @@ use crate::wire::{MAX_DIM, MAX_SNAPSHOT_VT, MIN_DIM};
 const MAX_HELD: usize = 4096;
 /// Longest window title kept for `list`.
 const MAX_TITLE: usize = 256;
+/// Rows of the normal screen kept after they scroll off its top, so a client
+/// that attaches later can scroll back to them (as many as fit a frame).
+pub const SCROLLBACK_ROWS: usize = 1000;
+/// Erase the scrollback (ED 3), which vt100 ignores: a program sends it with a
+/// full redraw (Claude Code reprints its whole conversation after it), so the
+/// history kept must go too or a client would see that conversation twice.
+const ERASE_SCROLLBACK: &[u8] = b"\x1b[3J";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScanState {
@@ -155,7 +162,12 @@ pub struct Screen {
 impl Screen {
     pub fn new(rows: u16, cols: u16) -> Self {
         Screen {
-            parser: vt100::Parser::new_with_callbacks(rows, cols, 0, TitleCapture::default()),
+            parser: vt100::Parser::new_with_callbacks(
+                rows,
+                cols,
+                SCROLLBACK_ROWS,
+                TitleCapture::default(),
+            ),
             scanner: BoundaryScanner::default(),
             held: Vec::new(),
             fed: 0,
@@ -167,12 +179,12 @@ impl Screen {
         let safe = self.scanner.scan(data);
         if safe > 0 {
             if self.held.is_empty() {
-                self.parser.process(&data[..safe]);
+                self.feed(&data[..safe]);
             } else {
                 self.held.extend_from_slice(&data[..safe]);
-                self.parser.process(&self.held);
-                self.fed += self.held.len() as u64 - safe as u64;
-                self.held.clear();
+                let held = std::mem::take(&mut self.held);
+                self.feed(&held);
+                self.fed += held.len() as u64 - safe as u64;
             }
             self.fed += safe as u64;
             self.held.extend_from_slice(&data[safe..]);
@@ -181,11 +193,43 @@ impl Screen {
         }
         if self.held.len() > MAX_HELD {
             // A sequence that never ends: give up waiting for it.
-            self.parser.process(&self.held);
-            self.fed += self.held.len() as u64;
-            self.held.clear();
+            let held = std::mem::take(&mut self.held);
+            self.feed(&held);
+            self.fed += held.len() as u64;
             self.scanner.reset();
         }
+    }
+
+    /// Hands bytes to the emulator, dropping the history kept at each ED 3
+    /// (complete sequences only: callers feed up to a safe boundary).
+    fn feed(&mut self, mut data: &[u8]) {
+        while let Some(at) = data
+            .windows(ERASE_SCROLLBACK.len())
+            .position(|w| w == ERASE_SCROLLBACK)
+        {
+            let end = at + ERASE_SCROLLBACK.len();
+            self.parser.process(&data[..end]);
+            self.drop_scrollback();
+            data = &data[end..];
+        }
+        self.parser.process(data);
+    }
+
+    /// Forgets the rows above the normal screen: a new emulator takes over the
+    /// screen as it is (contents, cursor, modes, title). The history of a
+    /// program on the alternate screen stays, as its screen would be lost.
+    fn drop_scrollback(&mut self) {
+        let screen = self.parser.screen();
+        if screen.alternate_screen() {
+            return;
+        }
+        let (rows, cols) = screen.size();
+        let state = screen.state_formatted();
+        let title = std::mem::take(&mut self.parser.callbacks_mut().title);
+        let mut parser =
+            vt100::Parser::new_with_callbacks(rows, cols, SCROLLBACK_ROWS, TitleCapture { title });
+        parser.process(&state);
+        self.parser = parser;
     }
 
     /// Offset the next snapshot would carry.
@@ -203,7 +247,9 @@ impl Screen {
 
     /// VT bytes that rebuild the screen on a client that writes them right
     /// after resizing to `cols`x`rows`. Begins with RIS so the client state is
-    /// fully replaced; enters the alternate screen when the app uses it.
+    /// fully replaced; enters the alternate screen when the app uses it. On the
+    /// normal screen the newest rows of history that fit the frame come first,
+    /// scrolled off the top, so the client can scroll back to them.
     pub fn snapshot(&self) -> Snapshot {
         let screen = self.parser.screen();
         let (rows, cols) = screen.size();
@@ -220,10 +266,14 @@ impl Screen {
             vt.push(0x07);
         }
         let prefix = vt.len();
-        vt.extend_from_slice(&screen.state_formatted());
-        if vt.len() > MAX_SNAPSHOT_VT {
-            vt.truncate(prefix);
+        let state = screen.state_formatted();
+        if prefix + state.len() > MAX_SNAPSHOT_VT {
             plain_rows(screen, cols, MAX_SNAPSHOT_VT, &mut vt);
+        } else {
+            if !alt_screen {
+                history(screen, MAX_SNAPSHOT_VT - prefix - state.len(), &mut vt);
+            }
+            vt.extend_from_slice(&state);
         }
         Snapshot {
             offset: self.fed,
@@ -233,6 +283,42 @@ impl Screen {
             vt,
         }
     }
+}
+
+/// The newest rows above the normal screen that fit `budget` bytes, oldest
+/// first, each on its own line, then enough line feeds that every one of them
+/// has scrolled off the top of a client that starts at the home position.
+/// Nothing when there is no history or not even one row fits.
+fn history(screen: &vt100::Screen, budget: usize, out: &mut Vec<u8>) {
+    let (rows, cols) = screen.size();
+    let mut view = screen.clone();
+    view.set_scrollback(usize::MAX);
+    let total = view.scrollback();
+    if total == 0 {
+        return;
+    }
+    // Line feeds after the rows, pushing the last of them off the screen.
+    let push = usize::from(rows.saturating_sub(1));
+    let mut lines: Vec<Vec<u8>> = Vec::new();
+    let mut used = push;
+    // Newest first: at scrollback offset `n` the view's top row is history row `total - n`.
+    for offset in 1..=total {
+        view.set_scrollback(offset);
+        let mut line = view.rows_formatted(0, cols).next().unwrap_or_default();
+        line.extend_from_slice(b"\x1b[m\r\n");
+        if used + line.len() > budget {
+            break;
+        }
+        used += line.len();
+        lines.push(line);
+    }
+    if lines.is_empty() {
+        return;
+    }
+    for line in lines.iter().rev() {
+        out.extend_from_slice(line);
+    }
+    out.extend(std::iter::repeat_n(b'\n', push));
 }
 
 /// Degraded snapshot that fits a frame: plain text of the bottom rows that
@@ -357,6 +443,87 @@ mod tests {
         // The bottom row survives in plain text.
         let last: String = p.screen().rows(0, 400).last().unwrap_or_default();
         assert!(last.starts_with("abcdefghij"));
+    }
+
+    /// What a client keeps after writing a snapshot on a fresh emulator: its history rows (oldest first) and its screen.
+    fn client_history(snap: &Snapshot) -> (Vec<String>, String) {
+        let mut p = vt100::Parser::new(snap.rows, snap.cols, 500);
+        p.process(&snap.vt);
+        let contents = p.screen().contents();
+        let mut view = p.screen().clone();
+        view.set_scrollback(usize::MAX);
+        let total = view.scrollback();
+        let rows = (1..=total)
+            .rev()
+            .map(|offset| {
+                view.set_scrollback(offset);
+                view.rows(0, snap.cols).next().unwrap_or_default()
+            })
+            .collect();
+        (rows, contents)
+    }
+
+    #[test]
+    fn snapshot_carries_the_history_above_the_screen() {
+        let mut screen = Screen::new(5, 30);
+        for i in 1..=40 {
+            screen.process(format!("\x1b[32mline {i}\x1b[m\r\n").as_bytes());
+        }
+        screen.process(b"prompt> ");
+        let snap = screen.snapshot();
+        let (rows, contents) = client_history(&snap);
+        let want: Vec<String> = (1..=36).map(|i| format!("line {i}")).collect();
+        assert_eq!(rows, want);
+        assert_eq!(contents, "line 37\nline 38\nline 39\nline 40\nprompt> ");
+        assert_eq!(client_view(&snap, b"").1, (4, 8));
+    }
+
+    #[test]
+    fn snapshot_history_keeps_the_newest_rows_that_fit_a_frame() {
+        let mut screen = Screen::new(5, 400);
+        let wide = "x".repeat(390);
+        for i in 0..SCROLLBACK_ROWS {
+            screen.process(format!("{i:05} {wide}\r\n").as_bytes());
+        }
+        let snap = screen.snapshot();
+        assert!(snap.vt.len() <= MAX_SNAPSHOT_VT);
+        let (rows, _) = client_history(&snap);
+        assert!(
+            rows.len() > 100 && rows.len() < SCROLLBACK_ROWS - 4,
+            "{} rows",
+            rows.len()
+        );
+        let newest = format!("{:05}", SCROLLBACK_ROWS - 5);
+        assert!(rows.last().is_some_and(|r| r.starts_with(&newest)));
+    }
+
+    #[test]
+    fn erase_scrollback_forgets_the_history_but_not_the_screen() {
+        let mut screen = Screen::new(5, 30);
+        screen.process(b"\x1b]2;claude\x07");
+        for i in 1..=20 {
+            screen.process(format!("old {i}\r\n").as_bytes());
+        }
+        // A full redraw split across reads: clear, then the reprint.
+        screen.process(b"\x1b[2J\x1b[3");
+        screen.process(b"J\x1b[Hnew 1\r\nnew 2\r\nnew 3\r\nnew 4\r\nnew 5\r\nnew 6\r\n");
+        let snap = screen.snapshot();
+        let (rows, contents) = client_history(&snap);
+        assert_eq!(rows, vec!["new 1".to_string(), "new 2".to_string()]);
+        assert!(contents.starts_with("new 3"));
+        assert_eq!(screen.title(), "claude");
+    }
+
+    #[test]
+    fn alternate_screen_snapshot_has_no_history() {
+        let mut screen = Screen::new(5, 30);
+        for i in 1..=20 {
+            screen.process(format!("old {i}\r\n").as_bytes());
+        }
+        screen.process(b"\x1b[?1049hfull screen");
+        let snap = screen.snapshot();
+        assert!(snap.alt_screen);
+        assert!(!String::from_utf8_lossy(&snap.vt).contains("old 1"));
     }
 
     #[test]
