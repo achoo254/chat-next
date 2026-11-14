@@ -7,6 +7,7 @@ mod frames;
 mod output;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{select_biased, Receiver, RecvTimeoutError, Sender};
@@ -29,6 +30,9 @@ const FINAL_WAIT: Duration = Duration::from_secs(1);
 
 pub struct HubConfig {
     pub ring_bytes: usize,
+    /// Where sessions keep their output logs; None when the directory could
+    /// not be prepared (sessions then run without one).
+    pub output_dir: Option<PathBuf>,
     pub idle_timeout: Duration,
     pub max_sessions: usize,
     pub rtc: RtcSettings,
@@ -245,11 +249,7 @@ impl Hub {
     fn on_pty(&mut self, event: PtyEvent) {
         let now = Instant::now();
         match event {
-            PtyEvent::Output { session, data } => {
-                if let Some(s) = self.sessions.get_mut(&session) {
-                    s.ingest(&data);
-                }
-            }
+            PtyEvent::Output { session, data } => self.ingest(session, &data),
             PtyEvent::Eof { session } => {
                 if let Some(s) = self.sessions.get_mut(&session) {
                     s.eof = true;
@@ -268,6 +268,16 @@ impl Hub {
                         s.finalize_at = Some(now + crate::session::EXIT_DRAIN);
                     }
                 }
+            }
+        }
+    }
+
+    fn ingest(&mut self, session: u32, data: &[u8]) {
+        if let Some(s) = self.sessions.get_mut(&session) {
+            if let Err(e) = s.ingest(data) {
+                self.cfg.log.warn(&format!(
+                    "session {session}: output log failed ({e}), dropped; late clients get a rendered snapshot"
+                ));
             }
         }
     }
@@ -557,11 +567,7 @@ impl Hub {
                         s.exit = Some(exit);
                     }
                 }
-                Ok(PtyEvent::Output { session, data }) => {
-                    if let Some(s) = self.sessions.get_mut(&session) {
-                        s.ingest(&data);
-                    }
-                }
+                Ok(PtyEvent::Output { session, data }) => self.ingest(session, &data),
                 Ok(PtyEvent::Eof { .. }) => {}
                 Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => break,
             }

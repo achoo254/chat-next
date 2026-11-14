@@ -6,8 +6,9 @@ use std::time::{Duration, Instant};
 use super::Hub;
 use crate::conn::{Attachment, FrameSink, SinkClosed};
 use crate::flow::{effective_window, flush_decision, Flush, PathKind, RelayBudget, ECHO_WINDOW};
-use crate::session::Session;
+use crate::session::{snapshot_frame, Session};
 use crate::wire::{ServerFrame, MAX_OUTPUT_DATA};
+use crate::Logger;
 
 /// Skip a connection whose transport already holds this much.
 const SINK_HIGH_WATER: usize = 1024 * 1024;
@@ -24,6 +25,7 @@ impl Hub {
             budget,
             scratch,
             flush_deadline,
+            cfg,
             ..
         } = self;
         *flush_deadline = None;
@@ -41,14 +43,14 @@ impl Hub {
                 continue;
             };
             for (&sid, att) in conn.attachments.iter_mut() {
-                let Some(s) = sessions.get(&sid) else {
+                let Some(s) = sessions.get_mut(&sid) else {
                     continue;
                 };
                 if crowded && att.sent < s.end() {
                     merge(flush_deadline, Some(now + SINK_RETRY));
                     continue;
                 }
-                match flush_attachment(s, att, sink, path, budget, scratch, now) {
+                match flush_attachment(s, att, sink, path, budget, scratch, now, &cfg.log) {
                     Ok(next) => merge(flush_deadline, next),
                     Err(SinkClosed) => {
                         dead.push(conn.id);
@@ -93,28 +95,26 @@ fn merge(slot: &mut Option<Instant>, t: Option<Instant>) {
 }
 
 /// Send the due part of one session's output to one client. Returns when to
-/// look again (None: nothing pending or waiting for an Ack).
+/// look again (None: nothing pending or waiting for an Ack). Bytes that left
+/// the ring come from the session's output log, at most one window per call,
+/// so a long replay advances with the acks and never holds up the hub.
+#[allow(clippy::too_many_arguments)]
 fn flush_attachment(
-    s: &Session,
+    s: &mut Session,
     att: &mut Attachment,
     sink: &mut dyn FrameSink,
     path: PathKind,
     budget: &mut RelayBudget,
     scratch: &mut Vec<u8>,
     now: Instant,
+    log: &Logger,
 ) -> Result<Option<Instant>, SinkClosed> {
     let end = s.end();
-    if att.sent < s.ring.start() {
-        // The bytes this client still needs left the ring: resync.
+    if att.sent < s.held_start() {
+        // Only without an output log: the bytes this client still needs left
+        // the ring, so resync with a rendered snapshot.
         let snap = s.snapshot();
-        sink.send(&ServerFrame::Snapshot {
-            session: s.id,
-            offset: snap.offset,
-            cols: snap.cols,
-            rows: snap.rows,
-            alt_screen: snap.alt_screen,
-            vt: &snap.vt,
-        })?;
+        sink.send(&snapshot_frame(s.id, &snap))?;
         att.sent = snap.offset;
         att.acked = snap.offset;
         att.clock.reset(snap.offset);
@@ -139,7 +139,18 @@ fn flush_attachment(
             }
             scratch.clear();
             let want = ((limit - att.sent) as usize).min(MAX_OUTPUT_DATA);
-            let n = s.ring.read_into(att.sent, want, scratch);
+            let n = match s.read_output_into(att.sent, want, scratch) {
+                Ok(n) => n,
+                Err(e) => {
+                    // The log is dropped now; the next pass resyncs this
+                    // client with a rendered snapshot.
+                    log.warn(&format!(
+                        "session {}: output log unreadable ({e}), dropped; late clients get a rendered snapshot",
+                        s.id
+                    ));
+                    return Ok(Some(now));
+                }
+            };
             if n == 0 {
                 break;
             }

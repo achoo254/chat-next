@@ -182,7 +182,10 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				// Unicode 11 widths are a proposed API in xterm 6.
 				allowProposedApi: true,
 				...textOptions(fontSize(fallbackSize)),
-				scrollback: 5_000,
+				// The owner's rule: no line of a session's history is cut, here or on the machine (which replays every
+				// byte since the session opened). xterm needs a finite cap; it allocates rows only as output fills them,
+				// so memory grows with real output, not with this number.
+				scrollback: 1_000_000,
 				cursorBlink: true,
 				macOptionIsMeta: true,
 				// A link a program sets itself (OSC 8) opens as a plain one does, without xterm's own confirm box.

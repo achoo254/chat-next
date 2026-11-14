@@ -8,6 +8,7 @@ use super::Hub;
 use crate::audit::AuditKind;
 use crate::commands::{self, code, CmdError, Command, SignalKind};
 use crate::conn::{Conn, DeviceKey, RelaySink};
+use crate::output_log::OutputLog;
 use crate::pty::OpenSpec;
 use crate::rtc;
 use crate::session::Session;
@@ -150,10 +151,27 @@ impl Hub {
         self.next_session = id
             .checked_add(1)
             .ok_or_else(|| err(code::INTERNAL, "session ids exhausted"))?;
-        let s = Session::open(id, spec, self.cfg.ring_bytes, self.pty_tx.clone()).map_err(|e| {
-            self.cfg.log.warn(&format!("session open failed: {e}"));
-            err(code::INTERNAL, e)
-        })?;
+        // Without a log the session still works, with the ring and rendered
+        // snapshots only (the behaviour before output logs).
+        let log = self
+            .cfg
+            .output_dir
+            .as_deref()
+            .and_then(|dir| match OutputLog::create(dir, id) {
+                Ok(log) => Some(log),
+                Err(e) => {
+                    self.cfg.log.warn(&format!(
+                        "session {id}: no output log ({e}); late clients get a rendered snapshot"
+                    ));
+                    None
+                }
+            });
+        let s = Session::open(id, spec, self.cfg.ring_bytes, log, self.pty_tx.clone()).map_err(
+            |e| {
+                self.cfg.log.warn(&format!("session open failed: {e}"));
+                err(code::INTERNAL, e)
+            },
+        )?;
         self.cfg.log.info(&format!(
             "session {id} opened (pid {})",
             s.pid().map_or(-1, i64::from)

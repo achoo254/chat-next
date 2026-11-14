@@ -1,4 +1,7 @@
-//! Headless emulator that keeps the screen of a session for `Snapshot`.
+//! Headless emulator that keeps the screen of a session: the window title for
+//! `list`, and the rendered `Snapshot` of the fallback used only when the
+//! session's output log failed (clients normally get the raw stream replayed
+//! from offset 0, never this rendering).
 //!
 //! The emulator is only fed up to a *safe boundary*: a byte offset where the
 //! stream is not inside an escape sequence or a UTF-8 character. A snapshot is

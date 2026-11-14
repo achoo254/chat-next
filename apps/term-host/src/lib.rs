@@ -19,6 +19,7 @@ pub mod flow;
 mod home;
 mod hub;
 pub mod nic;
+pub mod output_log;
 pub mod pty;
 pub mod ring;
 pub mod rtc;
@@ -180,8 +181,35 @@ impl Daemon {
         let _ = control::connect(&self.endpoint);
         let _ = self.listener.join();
         self.home.remove_endpoint();
+        // Every session dropped its log with the hub; remove the empty dir.
+        let _ = std::fs::remove_dir(self.home.dir().join(output_log::DIR_NAME));
         self.log.info(&format!("exited ({reason})"));
         reason
+    }
+}
+
+/// Every session holds its PTY and its output log open: lift the soft
+/// descriptor limit (256 by default on macOS) to what the hard limit allows,
+/// so the session limit is reached before the descriptor limit.
+#[cfg(unix)]
+fn raise_fd_limit(log: &Logger) {
+    use nix::sys::resource::{getrlimit, setrlimit, Resource};
+    let Ok((soft, hard)) = getrlimit(Resource::RLIMIT_NOFILE) else {
+        return;
+    };
+    // macOS refuses a soft limit above OPEN_MAX even when the hard one is
+    // unlimited.
+    let target = if cfg!(target_os = "macos") {
+        hard.min(10240)
+    } else {
+        hard
+    };
+    if soft < target {
+        if let Err(e) = setrlimit(Resource::RLIMIT_NOFILE, target, hard) {
+            log.warn(&format!(
+                "cannot raise the open file limit from {soft}: {e}"
+            ));
+        }
     }
 }
 
@@ -189,6 +217,19 @@ impl Daemon {
 pub fn start(config: Config) -> Result<Daemon, StartError> {
     let log = config.logger.clone();
     let home = home::take(&config.home)?;
+    #[cfg(unix)]
+    raise_fd_limit(&log);
+    // Sessions keep every output byte on disk here. Not fatal: without it
+    // sessions fall back to the ring and rendered snapshots.
+    let output_dir = match output_log::prepare_dir(home.dir()) {
+        Ok(dir) => Some(dir),
+        Err(e) => {
+            log.warn(&format!(
+                "output log dir unusable ({e}); late clients get rendered snapshots"
+            ));
+            None
+        }
+    };
     let token: Arc<str> = home::random_hex(32).map_err(StartError::Io)?.into();
 
     #[cfg(unix)]
@@ -226,6 +267,7 @@ pub fn start(config: Config) -> Result<Daemon, StartError> {
     let hub = hub::Hub::new(
         hub::HubConfig {
             ring_bytes: config.ring_bytes,
+            output_dir,
             idle_timeout: config.idle_timeout,
             max_sessions: config.max_sessions,
             rtc: rtc::RtcSettings {

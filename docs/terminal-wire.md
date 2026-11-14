@@ -45,7 +45,7 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 |---|---|---|
 | `0x81` | Hello | `version u8` · `maxFrame u32` (=65536). Trả lời `Hello`; `session` = 0. |
 | `0x90` | Output | `offset u64` · byte đầu ra thô. |
-| `0x91` | Snapshot | `offset u64` · `cols u16` · `rows u16` · `altScreen u8` (0/1) · chuỗi VT dựng lại màn hình (mục 4). `offset` là offset mà `Output` kế tiếp sẽ bắt đầu. |
+| `0x91` | Snapshot | `offset u64` · `cols u16` · `rows u16` · `altScreen u8` (0/1) · chuỗi VT: chỉ RIS khi bắt đầu phát lại từ offset 0, hoặc màn hình dựng lại trong chế độ dự phòng (mục 4). `offset` là offset mà `Output` kế tiếp sẽ bắt đầu. |
 | `0x92` | Exit | `code i32` (-1 nếu bị tín hiệu giết) · `signal u8` (0 nếu không). Gửi ngay sau khung `Output` cuối cùng của phiên (đầu ra còn bị window giữ thì đi trước). |
 | `0x95` | Pong | `clientMicros u64` (nguyên giá trị của `Ping`); `session` = 0. |
 | `0x9F` | Error | `code u16` · thông điệp UTF-8. `session` là phiên liên quan, 0 nếu lỗi cấp kết nối. |
@@ -58,10 +58,18 @@ Sau `Error 6` daemon đóng kết nối; khung đến sau đó của kết nối
 
 ## 4. Mở lại phiên (reattach)
 
-Client gửi `Attach{lastOffset}`. Daemon giữ vòng đệm byte thô tối đa **1 MiB mỗi phiên** (giá trị mặc định, cấu hình được, tối thiểu 256 KiB) và một emulator không đầu giữ trạng thái màn hình.
+Quy tắc của chủ sở hữu: daemon không tự cắt dòng nào. Việc của nó chỉ là nhận nguyên luồng byte chương trình (vd Claude Code) ghi ra PTY và chuyển tới client; không dựng lại màn hình, không giới hạn lịch sử, không xử lý riêng `ESC[3J` hay chuỗi nào khác.
 
-1. Nếu `lastOffset` > 0 và vòng đệm còn giữ byte từ `lastOffset` trở đi (kể cả `lastOffset` bằng offset hiện tại): gửi `Output` bắt đầu từ `lastOffset`, rồi tiếp tục luồng sống.
-2. Ngược lại (kể cả `lastOffset` lớn hơn offset hiện tại): gửi `Snapshot`, rồi `Output` từ offset của nó.
+Client gửi `Attach{lastOffset}`. Mỗi phiên daemon giữ:
+- **Nhật ký đầu ra trên đĩa**: mọi byte từ offset 0 (lúc mở phiên) tới hiện tại, chỉ ghi nối, không bao giờ cắt khi phiên còn sống. Nằm ở `<config dir>/term-host/output/session-<id>.log` (thư mục trạng thái riêng của daemon: thư mục 0700 và file 0600 trên Unix; trên Windows thừa hưởng DACL chỉ chủ sở hữu của `term-host/`). Xoá khi phiên đóng/dọn hoặc daemon tắt; khi daemon khởi động, thư mục `output/` còn sót (daemon trước chết đột ngột) bị xoá sạch.
+- Vòng đệm byte thô **1 MiB** (mặc định, cấu hình được, tối thiểu 256 KiB): phần đuôi trong bộ nhớ, đọc nhanh; byte đã rời vòng đệm đọc từ nhật ký.
+- Một emulator không đầu: chỉ để lấy tiêu đề cửa sổ cho `list`, và dựng `Snapshot` trong chế độ dự phòng bên dưới.
+
+1. Nếu `lastOffset` > 0 và daemon còn giữ byte từ `lastOffset` (với nhật ký nguyên vẹn là mọi `lastOffset` từ 1 tới offset hiện tại): gửi `Output` bắt đầu từ `lastOffset`, rồi tiếp tục luồng sống.
+2. Ngược lại (`lastOffset` = 0, hoặc lớn hơn offset hiện tại): gửi `Snapshot` **đầu luồng**: `offset` 0, `cols`×`rows` là cỡ hiện tại của phiên, `altScreen` 0, chuỗi VT chỉ là `ESC c` (RIS) để client xoá sạch terminal; rồi `Output` từ offset 0. Client nhận đúng từng byte chương trình đã ghi kể từ lúc mở phiên.
+3. Dự phòng, chỉ khi nhật ký không tạo được hoặc hỏng giữa chừng (lỗi đĩa; daemon ghi cảnh báo và phiên vẫn chạy): daemon chỉ còn giữ những gì vòng đệm có. Khi byte cần đã rời vòng đệm, daemon gửi `Snapshot` dựng bởi emulator (chi tiết bên dưới), rồi `Output` từ offset của nó.
+
+Giới hạn đã biết: luồng phát lại được client vẽ ở cỡ hiện tại của nó, không theo từng cỡ cũ lúc byte được ghi (giao thức không mang mốc đổi cỡ trong luồng). Nhật ký lớn dần theo đầu ra thật của phiên (vd `yes` chạy khi không có client nào gắn thì đĩa lớn theo), tới khi phiên đóng.
 
 Snapshot và các `Output` sau nó không bao giờ chồng lấn hay bỏ sót byte. Đổi đường giữa chừng (WebRTC ⟷ relay) dùng đúng quy tắc này: client gửi lại `Attach` với offset đã áp dụng.
 `Attach` lại một phiên đang gắn thay trạng thái gắn cũ (offset, window) bằng trạng thái mới.
@@ -72,21 +80,21 @@ Snapshot và các `Output` sau nó không bao giờ chồng lấn hay bỏ sót 
 - Ngay khi đường mới dùng được, client gửi `Attach{applied}` **trên đường mới** cho mọi phiên đang gắn. Daemon phát lại từ đó (vòng đệm luôn còn giữ vì `applied` ≥ `ackedOffset` ≥ offset hiện tại − window).
 - **Thứ tự phím**: hai đường có thể đảo thứ tự nhau. Khi chuyển từ relay còn sống sang đường thẳng, client gửi một `Ping` (giá trị riêng) trên relay sau khung cuối cùng của relay và chỉ gửi gì trên đường thẳng sau khi nhận đúng `Pong` đó (daemon xử lý khung relay theo thứ tự, nên mọi phím trước đó đã tới PTY); phím gõ trong lúc chờ (vài ms) được giữ lại rồi gửi trên đường thẳng. Khi đường thẳng chết, phím đang bay trên nó có thể mất (client không biết đã tới hay chưa); client không gửi lại.
 
-Chi tiết `Snapshot`:
+Chi tiết `Snapshot` dựng bởi emulator (chỉ trong chế độ dự phòng ở trên):
 - `offset` là **ranh giới an toàn** gần nhất không lớn hơn offset hiện tại: emulator chỉ được nạp tới chỗ không nằm giữa một chuỗi điều khiển hay một ký tự UTF-8. Phần đuôi dở dang (tối đa 4 KiB) đến sau trong `Output` từ `offset`, nên chuỗi bị cắt giữa hai lần đọc PTY vẫn tới client nguyên vẹn.
 - Chuỗi VT tự đủ: bắt đầu bằng `ESC c` (RIS), rồi `ESC[?1049h` nếu `altScreen` = 1, rồi `OSC 2` tiêu đề nếu có, rồi nội dung màn hình có thuộc tính, vị trí và trạng thái ẩn/hiện con trỏ, và các chế độ nhập (application cursor/keypad, bracketed paste, chuột). Client đổi cỡ về `cols`×`rows` rồi ghi nguyên chuỗi.
   Màn hình thường nằm dưới màn hình thay thế không được dựng lại (client thấy màn hình thường trống khi chương trình thoát màn hình thay thế).
 - Trên màn hình thường, trước nội dung màn hình là lịch sử: các dòng đã cuộn khỏi đỉnh (daemon giữ tối đa 500 dòng), mỗi dòng một dòng có thuộc tính, lấy những dòng mới nhất vừa phần còn lại của khung, rồi đủ `LF` để chúng cuộn hết vào scrollback của client. Client mở lại terminal (đổi tab, Trò chuyện ⟷ Terminal, tải lại trang) vẫn cuộn lên xem được. `ESC[3J` (xoá scrollback, Claude Code gửi khi vẽ lại toàn bộ) cũng xoá lịch sử daemon giữ, để client không thấy cuộc hội thoại hai lần; emulator mới chỉ mang theo những gì `state_formatted` dựng lại, nên scroll region (DECSTBM), origin mode và con trỏ đã lưu mất tới khi chương trình đặt lại.
 - Nếu chuỗi đủ thuộc tính vượt một khung, daemon gửi bản rút gọn: chữ không màu của các dòng dưới cùng vừa khung, vị trí con trỏ và các chế độ nhập.
-- Nếu byte mà client còn cần đã rời vòng đệm (chỉ xảy ra khi cấu hình vòng đệm sai), daemon gửi `Snapshot` mới để đồng bộ lại thay vì để hở.
+- Nếu byte mà client còn cần đã rời vòng đệm và không còn nhật ký, daemon gửi `Snapshot` mới để đồng bộ lại thay vì để hở. Khi nhật ký nguyên vẹn, client tụt sau vòng đệm được phát lại từ nhật ký, đúng từng byte.
 
 ## 5. Điều khiển luồng
 
 - Daemon theo dõi cho từng (kết nối, phiên) `inflight = sentOffset − ackedOffset` và `outstanding = readOffset − ackedOffset` (`readOffset` là offset hiện tại của phiên, gồm cả byte đã đọc nhưng còn đang gom hoặc chờ ngân sách relay).
   - Daemon không bao giờ gửi quá `ackedOffset + window`, nên `inflight ≤ window`.
-  - Khi `outstanding ≥ window` của bất kỳ kết nối nào đang gắn, daemon **ngừng đọc PTY** của phiên đó; kernel đầy bộ đệm nên chương trình bên trong chậm lại như terminal thật. Phiên không có kết nối nào gắn thì đọc tự do (vòng đệm ghi đè byte cũ).
+  - Khi `outstanding ≥ window` của bất kỳ kết nối nào đang gắn, daemon **ngừng đọc PTY** của phiên đó; kernel đầy bộ đệm nên chương trình bên trong chậm lại như terminal thật. Phiên không có kết nối nào gắn thì đọc tự do (vòng đệm ghi đè byte cũ; nhật ký vẫn giữ). Client mới gắn vào phiên có nhật ký dài cũng tuân theo quy tắc này: trong lúc nó còn phát lại, `outstanding` lớn nên PTY tạm ngừng đọc tới khi nó theo kịp. Phát lại đi theo `window` và `Ack` như luồng sống: mỗi lượt hub gửi tối đa một window, mỗi khung tối đa một `Output`, nên phát lại dài không chặn phiên khác hay vòng lặp hub.
 - `window` khởi đầu **64 KiB**, giới hạn từ **16 KiB** đến **1 MiB**, và không vượt dung lượng vòng đệm trừ 128 KiB (chỗ cho byte đọc thêm sau khi window đầy; với vòng đệm mặc định 1 MiB thì window hiệu lực tối đa 896 KiB).
-  Thiếu giới hạn này, byte đã đọc mà chưa gửi có thể rời vòng đệm và client phải nhận `Snapshot` giữa chừng.
+  Thiếu giới hạn này, byte đã đọc mà chưa gửi có thể rời vòng đệm; với nhật ký chúng được đọc lại từ đĩa, không có nhật ký thì client phải nhận `Snapshot` giữa chừng.
 - Thích ứng theo độ trễ, đo bằng `Ack` (daemon không thấy RTT của `Ping`, vì `Pong` chỉ về client): daemon ghi thời điểm gửi mỗi khung `Output`; khi một `Ack` kết thúc đúng ở cuối một khung và phủ thêm ≥ 16 KiB
   (tức là ack theo ngưỡng, không phải theo bộ hẹn 50 ms) thì `rtt = lúc nhận Ack − lúc gửi khung đó`. Daemon giữ `rttMin` (cửa sổ trượt 10 giây) và tính `queueDelay = rtt − rttMin`.
   Mỗi RTT tối đa một lần đổi: nếu `queueDelay` < 10 ms và `window` đã dùng hết (`inflight` chạm `window`) thì tăng 16 KiB; nếu `queueDelay` > 40 ms thì giảm một nửa (tối thiểu 16 KiB).

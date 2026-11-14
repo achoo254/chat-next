@@ -47,18 +47,27 @@ fn direct_echo_resize_snapshot_events_and_no_typed_bytes_leak() {
         }
     }
 
-    // A second direct client attaching from scratch gets a Snapshot.
+    // A second direct client attaching from scratch gets the stream-start
+    // Snapshot, then the whole output from offset 0.
     let mut t2 = agent.grant_term(2, &key(2)).expect("grant 2");
     t2.connect_direct(LOOPBACK, T).expect("direct 2");
     t2.hello().expect("hello 2");
     t2.attach(s, 0).expect("attach 2");
     match t2.recv_acking(T) {
-        Some(Frame::Snapshot { cols, rows, vt, .. }) => {
-            assert_eq!((cols, rows), (100, 30));
-            assert!(contains(&vt, b"s3cr3t_42"), "snapshot shows earlier output");
+        Some(Frame::Snapshot {
+            offset,
+            cols,
+            rows,
+            vt,
+            ..
+        }) => {
+            assert_eq!((offset, cols, rows), (0, 100, 30));
+            assert_eq!(vt, b"\x1bc");
         }
         other => panic!("expected snapshot, got {other:?}"),
     }
+    t2.read_until(s, T, |b| contains(b, b"s3cr3t_42"))
+        .expect("replay shows earlier output");
 
     // Frame errors come back on the direct path too.
     t2.send(&ClientFrame::Attach {
@@ -66,11 +75,16 @@ fn direct_echo_resize_snapshot_events_and_no_typed_bytes_leak() {
         last_offset: 0,
     })
     .expect("attach missing");
-    match t2.recv_acking(T) {
-        Some(Frame::Error { code, session, .. }) => {
-            assert_eq!((code, session), (error_code::NO_SUCH_SESSION, 999));
+    loop {
+        match t2.recv_acking(T) {
+            // The rest of the replay may still be on its way.
+            Some(Frame::Output { session, .. }) if session == s => {}
+            Some(Frame::Error { code, session, .. }) => {
+                assert_eq!((code, session), (error_code::NO_SUCH_SESSION, 999));
+                break;
+            }
+            other => panic!("expected error, got {other:?}"),
         }
-        other => panic!("expected error, got {other:?}"),
     }
 
     let states: Vec<String> = events_for(&agent, "conn_state", 1)
@@ -251,9 +265,16 @@ fn session_limit_and_many_sessions_on_one_direct_connection() {
     // A second session on the same direct connection.
     let other = ids[7];
     t.attach(other, 0).expect("attach other");
-    match t.recv_acking(T) {
-        Some(Frame::Snapshot { session, .. }) => assert_eq!(session, other),
-        other => panic!("expected snapshot, got {other:?}"),
+    loop {
+        match t.recv_acking(T) {
+            // The first session's own output (its prompt) may come first.
+            Some(Frame::Output { session, .. }) if session == first => {}
+            Some(Frame::Snapshot { session, .. }) => {
+                assert_eq!(session, other);
+                break;
+            }
+            other => panic!("expected snapshot, got {other:?}"),
+        }
     }
     run(&mut t, other, "echo second_$((2*2))\r", "second_4");
     run(&mut t, first, "echo first_$((1*1))\r", "first_1");

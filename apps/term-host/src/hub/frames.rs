@@ -6,7 +6,7 @@ use super::Hub;
 use crate::audit::AuditKind;
 use crate::conn::{Attachment, Conn};
 use crate::pty::WriteJob;
-use crate::session::{attach_plan, AttachPlan};
+use crate::session::{attach_plan, snapshot_frame, AttachPlan};
 use crate::wire::{self, error_code, ClientFrame, DecodeError, ServerFrame};
 
 fn send_error(conn: &mut Conn, session: u32, code: u16, message: &str) {
@@ -147,23 +147,21 @@ impl Hub {
                     );
                     return;
                 };
-                let att = match attach_plan(last_offset, &s.ring) {
-                    AttachPlan::Replay { from } => Attachment::new(from),
-                    AttachPlan::Snapshot => {
-                        let snap = s.snapshot();
+                let from = match attach_plan(last_offset, s.held_start(), s.end()) {
+                    AttachPlan::Replay { from } => from,
+                    plan => {
+                        let snap = if plan == AttachPlan::FromStart {
+                            s.start_snapshot()
+                        } else {
+                            s.snapshot()
+                        };
                         if let Some(sink) = conn.sink() {
-                            let _ = sink.send(&ServerFrame::Snapshot {
-                                session,
-                                offset: snap.offset,
-                                cols: snap.cols,
-                                rows: snap.rows,
-                                alt_screen: snap.alt_screen,
-                                vt: &snap.vt,
-                            });
+                            let _ = sink.send(&snapshot_frame(session, &snap));
                         }
-                        Attachment::new(snap.offset)
+                        snap.offset
                     }
                 };
+                let att = Attachment::new(from);
                 let is_new = conn.attachments.insert(session, att).is_none();
                 if is_new {
                     let key = conn.device_key;

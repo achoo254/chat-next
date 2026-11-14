@@ -39,17 +39,27 @@ fn shell_echo_resize_snapshot_and_replay() {
     assert_eq!(list[0]["cols"], 90);
     assert_eq!(list[0]["attached"], true);
 
-    // A second client attaching from scratch gets a Snapshot of the screen.
+    // A second client attaching from scratch gets the stream-start Snapshot
+    // (a bare reset at the current size), then every byte from offset 0.
     let mut t2 = agent.open_relay(2, &key(2)).expect("relay 2");
     t2.hello().expect("hello 2");
     t2.attach(s, 0).expect("attach 2");
     match t2.recv_acking(T) {
-        Some(Frame::Snapshot { cols, rows, vt, .. }) => {
-            assert_eq!((cols, rows), (90, 20));
-            assert!(contains(&vt, b"marker_42"), "snapshot shows earlier output");
+        Some(Frame::Snapshot {
+            offset,
+            cols,
+            rows,
+            alt_screen,
+            vt,
+            ..
+        }) => {
+            assert_eq!((offset, cols, rows, alt_screen), (0, 90, 20, false));
+            assert_eq!(vt, b"\x1bc");
         }
         other => panic!("expected snapshot, got {other:?}"),
     }
+    t2.read_until(s, T, |b| contains(b, b"marker_42"))
+        .expect("replay shows earlier output");
 
     // Reattach of the first client with its applied offset: replay, no
     // snapshot, starting exactly where it left off.

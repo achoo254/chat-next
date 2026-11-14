@@ -24,7 +24,7 @@ serde_json = "1"
 vt100 = "0.16"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.28", features = ["socket", "user", "signal", "fs", "net"] }
+nix = { version = "0.28", features = ["socket", "user", "signal", "fs", "net", "resource"] }
 signal-hook = "0.3"
 # WebRTC (sans-IO). Crypto backend per OS, as measured in the phase 1 spike.
 str0m = { version = "0.25", default-features = false, features = ["aws-lc-rs"] }
