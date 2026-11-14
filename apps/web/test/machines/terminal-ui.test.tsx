@@ -436,6 +436,21 @@ describe("the dock", () => {
 		expect(screen.queryAllByRole("tab")).toHaveLength(0);
 	});
 
+	it("a session's dock on a phone: one terminal, its AI, and no tab bar to open more", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		expect(sent("termOpen")[0]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		await waitFor(() => expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(1));
+		expect(screen.queryByRole("tablist")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Terminal mới" })).toBeNull();
+	});
+
 	it("a session's dock: its AI first; shells in its folder; closing the AI's pane only detaches it", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");

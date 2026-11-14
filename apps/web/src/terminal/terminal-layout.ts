@@ -83,6 +83,12 @@ export function activeTab(layout: DockLayout): TerminalTab | null {
 	return layout.tabs.find((t) => t.id === layout.active) ?? layout.tabs[0] ?? null;
 }
 
+/** Only the tab running the session's AI, shown (a phone shows a session one terminal, its AI); no tab without it. */
+export function aiOnly(layout: DockLayout): DockLayout {
+	const tab = layout.tabs.find((x) => panesOf(x.root).some((p) => p.ai === true));
+	return tab === undefined ? EMPTY_LAYOUT : { tabs: [tab], active: tab.id };
+}
+
 /** A new tab with one pane showing `session`, made the active one. */
 export function addTab(layout: DockLayout, session: number, ai = false): DockLayout {
 	const pane: PaneNode = { kind: "pane", id: newId("pane"), session, ...(ai ? { ai: true as const } : {}) };

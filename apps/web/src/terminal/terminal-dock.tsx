@@ -40,6 +40,7 @@ import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.t
 import {
 	activeTab,
 	addTab,
+	aiOnly,
 	aiPane,
 	closePane,
 	closeSession,
@@ -427,7 +428,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const keyboard = useViewportFit(root, touch && thread === undefined);
 	const [imeOpen, setImeOpen] = useState(false);
 
-	const tab = activeTab(layout);
+	// On a phone a session runs one terminal, its AI: no tab bar, no shells of its own (they stay for a computer).
+	const single = touch && thread !== undefined;
+	const view = single ? aiOnly(layout) : layout;
+	const tab = activeTab(view);
 	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
 	const shown = sessionsOf(layout);
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
@@ -617,51 +621,53 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						: tt.notOpened;
 	return (
 		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock" data-typing={touch && keyboardUp ? "" : undefined}>
-			<TerminalTabs
-				t={tt}
-				back={back}
-				backLabel={t.back}
-				tabs={layout.tabs.map((x, i) => {
-					const pane = panesOf(x.root).find((p) => p.id === x.focus);
-					return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
-				})}
-				active={tab?.id ?? ""}
-				hidden={hidden}
-				busy={busy || !online}
-				mac={mac}
-				textSize={textSize}
-				onTextSize={changeSize}
-				// A session shows the pill in its header.
-				pill={thread === undefined ? <StatusPill t={tt} status={status} online={online} /> : null}
-				onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
-				onClose={(id) => {
-					const closing = layout.tabs.find((x) => x.id === id);
-					if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
-				}}
-				onAction={(action) => void run(action)}
-				onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
-				onMenu={() => {
-					link.request({ case: "termListRequest", value: {} }).then(
-						(frame) => {
-							if (frame.body.case === "termListResult") setListed(frame.body.value.sessions);
-						},
-						() => undefined,
-					);
-				}}
-			/>
+			{!single && (
+				<TerminalTabs
+					t={tt}
+					back={back}
+					backLabel={t.back}
+					tabs={layout.tabs.map((x, i) => {
+						const pane = panesOf(x.root).find((p) => p.id === x.focus);
+						return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
+					})}
+					active={tab?.id ?? ""}
+					hidden={hidden}
+					busy={busy || !online}
+					mac={mac}
+					textSize={textSize}
+					onTextSize={changeSize}
+					// A session shows the pill in its header.
+					pill={thread === undefined ? <StatusPill t={tt} status={status} online={online} /> : null}
+					onSelect={(id) => setLayout((l) => ({ ...l, active: id }))}
+					onClose={(id) => {
+						const closing = layout.tabs.find((x) => x.id === id);
+						if (closing !== undefined) closePanes(panesOf(closing.root).map((p) => p.id));
+					}}
+					onAction={(action) => void run(action)}
+					onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
+					onMenu={() => {
+						link.request({ case: "termListRequest", value: {} }).then(
+							(frame) => {
+								if (frame.body.case === "termListResult") setListed(frame.body.value.sessions);
+							},
+							() => undefined,
+						);
+					}}
+				/>
+			)}
 			{(notice !== "" || relayNote) && (
 				<p className={notice !== "" ? "tx-note" : "tx-note relay"} role="status">
 					{notice !== "" ? notice : tt.fellBack}
 				</p>
 			)}
 			<div className="tx-body">
-				{layout.tabs.map((x) => (
+				{view.tabs.map((x) => (
 					<div key={x.id} className="tx-tab-body" hidden={x.id !== tab?.id}>
 						<TerminalSplits root={x.root} label={() => tt.resize} renderPane={renderPane} onRatio={(id, ratio) => setLayout((l) => setRatio(l, id, ratio))} />
 					</div>
 				))}
 				{!ready && <p className="tx-empty">{online ? t.terminal.loading : tt.offline}</p>}
-				{ready && layout.tabs.length === 0 && (
+				{ready && view.tabs.length === 0 && (
 					<div className="tx-empty">
 						<p role="status">{emptyText}</p>
 						{folderGone ? null : threadId !== undefined ? (
