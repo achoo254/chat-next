@@ -4,10 +4,15 @@
 // agy's own setting `toolPermission: always-proceed` runs every tool without
 // asking, so such a machine's sessions run in full access ("full-access", as
 // Claude's bypass), which a device may only keep, never pick elsewhere.
-// tunelo's own MCP and saved sign-in secrets are not offered to agy yet.
+// A session gets tunelo's own MCP (`tunelo mcp` with the session's ticket);
+// its writes go through the approval card (permissions.ts). Saved sign-in
+// secrets in agy's own commands are not offered yet.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { AcpSession } from "../acp/acp-session.ts";
+import { SESSION_MCP_SERVER } from "../../mcp/groups.ts";
+import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
+import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import type { AgentProvider, Detected, ProviderCapabilities, ProviderSession, SessionPolicy, AskUser, TerminalCommand, TerminalLaunch } from "../types.ts";
 import { AgyAccounts, type AgyAccountsOptions } from "./accounts.ts";
 import { AgyAcp } from "./acp-process.ts";
@@ -26,6 +31,12 @@ export const FULL_ACCESS = "full-access";
 
 /** The modes agy 1.5.8 offers; replaced by what `session/new` says once a session opened. */
 const AGY_MODES = ["default", "accept-edits", "auto", "plan"];
+
+/** tunelo's own MCP as ACP names an MCP server: stdio, with its environment as name/value pairs. */
+export function acpSessionMcpServer(mcp: SessionMcp): { name: string; command: string; args: string[]; env: { name: string; value: string }[] } {
+  const launch = sessionMcpLaunch(mcp);
+  return { name: SESSION_MCP_SERVER, command: launch.command, args: launch.args, env: Object.entries(launch.env).map(([name, value]) => ({ name, value })) };
+}
 
 type SessionAnswer = {
   sessionId?: string;
@@ -59,7 +70,15 @@ async function signedIn(): Promise<Detected["loginState"]> {
 export type AgyAccountsDeps = Pick<AgyAccountsOptions, "configDir" | "store" | "audit" | "busySessions" | "onUsage">;
 
 export function createAntigravityProvider(
-  deps: { findBinary?: () => Promise<string | null>; acp?: AgyAcp; log?: (line: string) => void; toolPermission?: () => string; accounts?: AgyAccountsDeps } = {},
+  deps: {
+    findBinary?: () => Promise<string | null>;
+    acp?: AgyAcp;
+    log?: (line: string) => void;
+    toolPermission?: () => string;
+    /** The version of the agy found (`agy --version`). */
+    version?: (bin: string) => Promise<string | undefined>;
+    accounts?: AgyAccountsDeps;
+  } = {},
 ): AgentProvider {
   const findBinary = deps.findBinary ?? findAgy;
   const log = deps.log ?? (() => undefined);
@@ -78,6 +97,7 @@ export function createAntigravityProvider(
         })
       : undefined;
   const permission = deps.toolPermission ?? (() => toolPermission());
+  const versionOf = deps.version ?? agyVersion;
   const capabilities: ProviderCapabilities = {
     interrupt: true,
     resume: true,
@@ -92,7 +112,7 @@ export function createAntigravityProvider(
     effortLevels: [],
     permissionModes: [...AGY_MODES],
     bypassModeId: FULL_ACCESS,
-    sessionMcp: false,
+    sessionMcp: true,
   };
   const listSessions = async (): Promise<ListedSession[]> => {
     const live = await acp.get();
@@ -132,7 +152,7 @@ export function createAntigravityProvider(
     async detect(): Promise<Detected> {
       const bin = await findBinary();
       if (!bin) return { installed: false, loginState: "unknown" };
-      const version = await agyVersion(bin);
+      const version = await versionOf(bin);
       return {
         installed: true,
         ...(version ? { version } : {}),
@@ -146,13 +166,13 @@ export function createAntigravityProvider(
       const { policy } = opts;
       const bin = await findBinary();
       if (!bin) throw new Error("agy is not installed");
-      const version = await agyVersion(bin);
+      const version = await versionOf(bin);
       if (version && !supported(version)) throw new Error(`agy ${version} is too old: update agy (1.5.2 or later)`);
       const alwaysProceed = permission() === "always-proceed";
       const refused = modeRefusal(alwaysProceed, policy.permissionMode);
       if (refused) throw new Error(refused);
       const live = await acp.get();
-      const params = { cwd: policy.dir, mcpServers: [] };
+      const params = { cwd: policy.dir, mcpServers: policy.sessionMcp ? [acpSessionMcpServer(policy.sessionMcp)] : [] };
       const r = opts.resumeId
         ? await live.client.request<SessionAnswer>("session/resume", { sessionId: opts.resumeId, ...params }, 120_000)
         : await live.client.request<SessionAnswer>("session/new", params, 120_000);
@@ -172,7 +192,14 @@ export function createAntigravityProvider(
         permission: (p, signal) =>
           answerPermission(
             p,
-            { dir: policy.dir, askUser: opts.askUser, isSensitive: policy.isSensitive, rules, onRule: () => ref.session?.emit({ type: "session-rules", rules: [...rules] }) },
+            {
+              dir: policy.dir,
+              askUser: opts.askUser,
+              isSensitive: policy.isSensitive,
+              rules,
+              onRule: () => ref.session?.emit({ type: "session-rules", rules: [...rules] }),
+              ...(policy.sessionMcp ? { sessionMcp: policy.sessionMcp } : {}),
+            },
             signal,
           ),
         model: () => model,

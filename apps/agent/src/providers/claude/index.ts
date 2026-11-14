@@ -23,7 +23,8 @@ import {
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
-import { type SessionMcp, TICKET_ENV } from "../../mcp/session-tickets.ts";
+import type { SessionMcp } from "../../mcp/session-tickets.ts";
+import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import { redactDeep } from "../../mcp/redact.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
 import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
@@ -33,7 +34,6 @@ import { claudeEnv, readAccount } from "./accounts/account.ts";
 import { CLAUDE_PROVIDER_ID, defaultClaudeHome, profilesRoot } from "./accounts/paths.ts";
 import { ClaudeProfiles } from "./accounts/service.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
-import { selfCommand } from "../../service.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
   AccountInfo,
@@ -264,8 +264,7 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
  * session's ticket. It holds no token; the service adds them.
  */
 export function sessionMcpServer(mcp: SessionMcp): McpServerConfig {
-  const [command = process.execPath, ...args] = selfCommand("mcp");
-  return { type: "stdio", command, args, env: { [TICKET_ENV]: mcp.ticket, TUNELO_HOME: mcp.configDir } };
+  return { type: "stdio", ...sessionMcpLaunch(mcp) };
 }
 
 /** How much of a tool's input an approval card shows. */
