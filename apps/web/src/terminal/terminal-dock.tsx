@@ -14,7 +14,7 @@
 // Tab, Ctrl, Alt and the arrows. This module and xterm load only when a
 // terminal opens.
 import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ErrorReason, type TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type TermSessionInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../brand.ts";
 import { useI18n } from "../i18n/i18n.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
@@ -67,7 +67,11 @@ import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
 import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
 import { endedOnPurpose } from "./ended-sessions.ts";
 import { TerminalLoading } from "./terminal-loading.tsx";
-import { rememberMode } from "../machines/session-mode.tsx";
+import { modePath, rememberMode } from "../machines/session-mode.tsx";
+import { useAgentProjects } from "../machines/agent-projects-store.ts";
+import { adoptStarted } from "../machines/project-actions.ts";
+import { machineErrorText, needsProjectTrust } from "../machines/machine-errors.ts";
+import { agentChoices, type AgentChoice } from "./new-tab-actions.ts";
 import "./terminal.css";
 
 const SAVE_DELAY_MS = 300;
@@ -152,6 +156,15 @@ export default function TerminalScreen({ machine, thread, openShellIn }: { machi
 	const terminal = terminalLinkFor(hub, machine);
 	const imageLimits = thread !== undefined && versionAtLeast(state.info?.agentVersion ?? "", AGENT_TERMINAL_IMAGES) ? limitsOf(state.info?.attachments) : null;
 	const machinePage = machine === LOCAL_REF ? paths.machines() : paths.machine(machine);
+	const [projects] = useAgentProjects();
+	const agents: DockAgents = {
+		choices: agentChoices(state.info),
+		// Filed under its folder's project, as the tree's quick start does (a machine the directory does not know yet: left as it is).
+		onStarted: (started) => {
+			const entry = hub.entry(machine);
+			if (entry !== null) adoptStarted(projects, { id: entry.id, link, state }, started).catch(() => undefined);
+		},
+	};
 	return (
 		<TerminalDock
 			machine={machine}
@@ -161,6 +174,7 @@ export default function TerminalScreen({ machine, thread, openShellIn }: { machi
 			back={thread === undefined ? machinePage : undefined}
 			thread={thread}
 			imageLimits={imageLimits}
+			agents={agents}
 			openShellIn={openShellIn}
 			// The request is done: the address goes back to the plain terminal page.
 			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
@@ -193,9 +207,18 @@ export interface TerminalDockProps {
 	touch?: boolean;
 	/** What the machine takes, when it saves an image for the session's terminal (tunelo 2.7.1+). */
 	imageLimits?: Limits | null;
+	/** The AIs the "+" menu starts new sessions of; none: its "Agent AI" group is left out. */
+	agents?: DockAgents | undefined;
 }
 
-export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null }: TerminalDockProps) {
+/** What the dock needs to start a new AI session from its "+" menu. */
+export interface DockAgents {
+	readonly choices: readonly AgentChoice[];
+	/** A session just started from the menu, before the page moves to it. */
+	onStarted?(thread: ThreadSummary): void;
+}
+
+export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null, agents }: TerminalDockProps) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
@@ -351,6 +374,39 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			case "pane":
 				setLayout((l) => cycleFocus(l, action.delta));
 				return;
+		}
+	};
+
+	/** A new AI session from the "+" menu is on its way: one at a time, apart from the terminals' `busy`. */
+	const startingAgentRef = useRef(false);
+	const [startingAgent, setStartingAgent] = useState(false);
+	/**
+	 * A new session of the AI `provider` from the "+" menu, in this session's folder, opened in terminal
+	 * mode: the same request as the project tree's quick start. The machine's own dock has no folder (its
+	 * home needs a consent this menu has no dialog for), so its AI rows are greyed and never get here.
+	 */
+	const startAgent = async (provider: string): Promise<void> => {
+		if (agents === undefined || thread === undefined || startingAgentRef.current) return;
+		startingAgentRef.current = true;
+		setStartingAgent(true);
+		setNotice("");
+		try {
+			const frame = await link.request({
+				case: "threadCreate",
+				value: { provider, model: "", dir: thread.dir, text: "", consent: { sensitive: false, projectSettings: false, trustProject: false }, permissionMode: "" },
+			});
+			const started = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
+			if (started === undefined) throw new Error("the machine did not start a session");
+			agents.onStarted?.(started);
+			navigate(modePath(machine, started.id, "terminal"));
+		} catch (err) {
+			// A folder to confirm first (sensitive, or a project whose own settings need trust) has its dialog
+			// in the new-session flow, not here: say where to go. Anything else as the machine said it.
+			const ai = agents.choices.find((c) => c.id === provider)?.name ?? provider;
+			setNotice((err instanceof RemoteError && err.code === ErrorCode.NEEDS_CONSENT) || needsProjectTrust(err) ? tt.agentNeedsConsent : machineErrorText(t, err, ai));
+		} finally {
+			startingAgentRef.current = false;
+			setStartingAgent(false);
 		}
 	};
 
@@ -638,6 +694,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					})}
 					active={tab?.id ?? ""}
 					hidden={hidden}
+					agents={agents?.choices ?? []}
+					startingAgent={startingAgent}
+					noFolder={thread === undefined}
 					busy={busy || !online}
 					mac={mac}
 					textSize={textSize}
@@ -651,6 +710,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					}}
 					onAction={(action) => void run(action)}
 					onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
+					onStartAgent={(provider) => void startAgent(provider)}
 					onMenu={() => {
 						link.request({ case: "termListRequest", value: {} }).then(
 							(frame) => {

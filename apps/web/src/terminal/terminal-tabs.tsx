@@ -1,17 +1,19 @@
 // The dock's top row: back to the machine, one tab per terminal (its title is
-// what the program set, else "Terminal N"), a new terminal, the machine's
-// sessions this page does not show (opened elsewhere, or closed tabs whose
-// shell still runs), splitting the pane with the keyboard, and the path pill.
-// The keyboard shortcuts work like Orca's, with Alt+Shift (⌥⇧ on macOS) so
-// they never take a key a shell or the browser needs.
-import { useState, type ReactNode } from "react";
+// what the program set, else "Terminal N"), the "+" menu (a new terminal, a
+// new session of an AI, the machine's sessions this page does not show:
+// opened elsewhere, or closed tabs whose shell still runs), splitting the
+// pane with the keyboard, and the path pill. The keyboard shortcuts work
+// like Orca's, with Alt+Shift (⌥⇧ on macOS) so they never take a key a shell
+// or the browser needs; Alt+Shift+T still opens a terminal at once.
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
 import { MachineIcon } from "../machines/machine-icons.tsx";
-import { folderName } from "../machines/new-session-hints.ts";
 import { usePopover } from "../machines/use-popover.ts";
 import { Link } from "../router.tsx";
+import { buildNewTabActions, type AgentChoice } from "./new-tab-actions.ts";
+import { NewTabMenu } from "./new-tab-menu.tsx";
 import type { SplitDir } from "./terminal-layout.ts";
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "./terminal-font.ts";
 
@@ -65,13 +67,6 @@ export function shortcutList(t: MachinesCopy["terminal"]): readonly { keys: stri
 	];
 }
 
-/** "21:05" today, else "12/11 21:05": when a session on the machine was opened. */
-export function openedTime(ms: number, now: number): string {
-	const at = new Date(ms);
-	const time = at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-	return at.toDateString() === new Date(now).toDateString() ? time : `${at.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })} ${time}`;
-}
-
 export interface TabView {
 	readonly id: string;
 	readonly title: string;
@@ -88,6 +83,12 @@ interface TabsProps {
 	active: string;
 	/** The machine's sessions no pane shows. */
 	hidden: readonly TermSessionInfo[];
+	/** The known AIs against the machine, for "Agent AI" in the "+" menu (none: the group is left out). */
+	agents: readonly AgentChoice[];
+	/** A new AI session from the menu is on its way: its rows wait. */
+	startingAgent: boolean;
+	/** The machine's own dock: no folder for an AI to start in (see NewTabInput.noFolder). */
+	noFolder: boolean;
 	busy: boolean;
 	mac: boolean;
 	/** The terminal text size (px) and its change (A−, A+, back to the default). */
@@ -98,15 +99,37 @@ interface TabsProps {
 	onClose(id: string): void;
 	onAction(action: DockAction): void;
 	onReopen(session: number): void;
+	/** A new session of the AI `provider`, opened in terminal mode. */
+	onStartAgent(provider: string): void;
+	/** The "+" menu opens: the machine's list of sessions is refreshed. */
 	onMenu(): void;
 }
 
-export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onMenu }: TabsProps) {
+export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents, startingAgent, noFolder, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onStartAgent, onMenu }: TabsProps) {
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
-	// "Today" for the sessions menu: the moment it opened.
+	// "Today" for the sessions in the menu: the moment it opened.
 	const [menuAt, setMenuAt] = useState(0);
 	const { open: helpOpen, setOpen: setHelpOpen, ref: helpRef } = usePopover();
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
+	const actions = menuOpen
+		? buildNewTabActions({ t, prefix, busy, startingAgent, noFolder, agents, hidden, now: menuAt, onNewTab: () => onAction({ kind: "new-tab" }), onStartAgent, onReopen })
+		: [];
+	// Closed by Esc or a click on nothing: the search field that had the focus is gone, and the focus would
+	// fall to the page; it goes back to "+". An entry that ran, or a click on something focusable, keeps theirs.
+	const plusRef = useRef<HTMLButtonElement>(null);
+	const ranEntry = useRef(false);
+	const wasOpen = useRef(false);
+	useEffect(() => {
+		if (menuOpen) {
+			wasOpen.current = true;
+			ranEntry.current = false;
+			return;
+		}
+		if (!wasOpen.current) return;
+		wasOpen.current = false;
+		const lost = document.activeElement === null || document.activeElement === document.body;
+		if (!ranEntry.current && lost) plusRef.current?.focus();
+	}, [menuOpen]);
 	return (
 		<div className="tx-head">
 			{back !== undefined && (
@@ -129,14 +152,12 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 				))}
 			</div>
 			<div className="tx-actions">
-				<button type="button" className="icon-btn" aria-label={t.newTab} title={`${t.newTab} (${prefix}T)`} disabled={busy} onClick={() => onAction({ kind: "new-tab" })} data-id="terminal-new">
-					<Icon name="plus" small />
-				</button>
 				<div className="mx-model" ref={menuRef}>
 					<button
 						type="button"
 						className="icon-btn"
-						aria-label={t.sessionsOnMachine}
+						aria-label={t.newMenu}
+						title={t.newMenu}
 						aria-haspopup="menu"
 						aria-expanded={menuOpen}
 						onClick={() => {
@@ -146,40 +167,20 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, busy, m
 							}
 							setMenuOpen((v) => !v);
 						}}
+						data-id="terminal-new"
+						ref={plusRef}
 					>
-						<MachineIcon name="chevron-down" small />
+						<Icon name="plus" small />
 					</button>
 					{menuOpen && (
-						<div className="mx-menu tx-menu" role="menu" aria-label={t.sessionsOnMachine}>
-							<h5>{t.sessionsOnMachine}</h5>
-							{hidden.length === 0 && <p className="note">{t.noHiddenSessions}</p>}
-							{hidden.map((s) => (
-								<button
-									key={s.session}
-									type="button"
-									role="menuitem"
-									title={s.cwd === "" ? undefined : s.cwd}
-									onClick={() => {
-										setMenuOpen(false);
-										onReopen(s.session);
-									}}
-								>
-									<MachineIcon name={s.threadId === "" ? "terminal" : "ai-session"} small />
-									<span>
-										{s.title || (s.threadId === "" ? t.shellSession : t.aiSession)}
-										<small>
-											{[
-												s.cwd === "" ? "" : folderName(s.cwd),
-												s.createdAt > 0n ? t.openedAt(openedTime(Number(s.createdAt), menuAt)) : "",
-												s.exited ? t.exitedShort(s.exitCode) : s.attached ? t.openElsewhere : t.running,
-											]
-												.filter((x) => x !== "")
-												.join(" · ")}
-										</small>
-									</span>
-								</button>
-							))}
-						</div>
+						<NewTabMenu
+							t={t}
+							actions={actions}
+							onDone={() => {
+								ranEntry.current = true;
+								setMenuOpen(false);
+							}}
+						/>
 					)}
 				</div>
 				<button type="button" className="icon-btn hide-touch" aria-label={t.splitRight} title={`${t.splitRight} (${prefix}D)`} disabled={busy} onClick={() => onAction({ kind: "split", dir: "row" })}>

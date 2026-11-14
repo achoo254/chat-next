@@ -23,6 +23,14 @@
 .tx-split-ico.to-below::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
 .tx-menu { right: 0; left: auto; min-width: 240px; }
 .tx-menu .note { margin: 0; padding: var(--space-2) var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
+/* The "+" menu (new-tab-menu.tsx): the search field, then the groups; a long list scrolls under the field. */
+.tx-new { width: 320px; }
+.tx-new-search.input { min-height: 36px; font-size: 0.875rem; }
+.tx-new-list { display: grid; gap: 2px; max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain; }
+.tx-new-list > [role="group"] { display: grid; gap: 2px; }
+.tx-new button[role="menuitem"] { grid-template-columns: 18px minmax(0, 1fr) auto; }
+.tx-new button[role="menuitem"] small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-new-key { font: inherit; font-size: 0.75rem; color: var(--c-text-muted); white-space: nowrap; }
 
 .tx-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: var(--space-1); padding: 2px var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tx-pill .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
@@ -194,6 +202,12 @@
 /* On a phone the sessions menu is the app's bottom sheet (machines.css): the tab row's popover offsets must not push it aside. */
 @media (max-width: 760px), (pointer: coarse) {
 	.tx-dock .tx-menu { left: 0; right: 0; min-width: 0; }
+	/* The sheet sets its own height: the list inside it need not stop short; a finger gets 44px rows. */
+	.tx-dock .tx-new { width: auto; }
+	.tx-new-list { max-height: none; overflow: visible; }
+	.tx-new-search.input, .tx-new button[role="menuitem"] { min-height: 44px; }
+	/* No keyboard shortcut to remind of on a phone. */
+	.tx-dock.touch .tx-new-key { display: none; }
 }
 
 /* The key row's "more" sheet (key-sheet.tsx), after Orca's "Add Shortcut". */

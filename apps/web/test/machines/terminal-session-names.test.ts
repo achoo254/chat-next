@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { openedTime } from "../../src/terminal/terminal-tabs.tsx";
+import { openedTime } from "../../src/terminal/new-tab-actions.ts";
 
 describe("when a session on the machine was opened", () => {
 	it("says the time today, and the day too for an older one", () => {

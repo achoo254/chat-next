@@ -6,7 +6,7 @@
 // turns what an input method typed into keystrokes. xterm itself is replaced
 // by a stand-in that records what reached the screen (jsdom has no canvas).
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { TerminalAvailability, type Frame } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, TerminalAvailability, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,7 +22,7 @@ import { afterSentinel, ImeInput, inputDelta, keyOf } from "../../src/terminal/i
 import { endOnPurpose } from "../../src/terminal/ended-sessions.ts";
 import { NO_AUTOFILL, noAutofill } from "../../src/terminal/no-autofill.ts";
 import { keySequence, withModifiers } from "../../src/terminal/mobile-key-bar.tsx";
-import { TerminalDock } from "../../src/terminal/terminal-dock.tsx";
+import { TerminalDock, type DockAgents } from "../../src/terminal/terminal-dock.tsx";
 import {
 	addTab,
 	aiPane,
@@ -381,8 +381,11 @@ describe("the dock", () => {
 		const store = refusing();
 		const first = await dock(store);
 		await until(() => sent("termOpen").length === 1, "first terminal");
-		await userEvent.click(await screen.findByRole("button", { name: "Terminal mới" }));
+		// "+" opens the menu; its "Terminal mới" opens the shell.
+		await userEvent.click(await screen.findByRole("button", { name: "Mở mới" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Terminal mới" }));
 		await until(() => sent("termOpen").length === 2, "second terminal");
+		expect(screen.queryByRole("menu")).toBeNull();
 		await userEvent.click(screen.getByRole("button", { name: "Chia xuống dưới" }));
 		await until(() => sent("termOpen").length === 3, "third terminal");
 		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
@@ -473,8 +476,10 @@ describe("the dock", () => {
 		await act(() => new Promise((r) => setTimeout(r, 50)));
 		expect(sent("termClose")).toEqual([]);
 		// Its AI is listed for coming back to (it still runs), and comes back as the same session.
-		await userEvent.click(screen.getByRole("button", { name: "Phiên đang chạy trên máy" }));
-		await userEvent.click(await screen.findByRole("menuitem", { name: /Phiên AI|Terminal/ }));
+		// The "+" menu lists it under "Phiên đang chạy trên máy".
+		await userEvent.click(screen.getByRole("button", { name: "Mở mới" }));
+		const running = await screen.findByRole("group", { name: "Phiên đang chạy trên máy" });
+		await userEvent.click(await within(running).findByRole("menuitem", { name: /Phiên AI|Terminal/ }));
 		// A tab of its own again (every tab keeps its panes mounted).
 		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
 		expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(2);
@@ -502,6 +507,138 @@ describe("the dock", () => {
 		expect(sent("termOpen").map((f) => f.body.value)).toEqual([expect.objectContaining({ cwd: "/w/proj" })]);
 		parts.terminal.stop();
 		parts.link.stop();
+	});
+
+	const AGENTS = (onStarted?: (thread: { id: string }) => void): DockAgents => ({
+		choices: [
+			{ id: "claude", name: "Claude Code", icon: "run-claude", availability: "ready" },
+			{ id: "antigravity", name: "Antigravity", icon: "run-antigravity", availability: "not-installed" },
+		],
+		...(onStarted === undefined ? {} : { onStarted }),
+	});
+
+	/** The machine answers a new session with `answer` (nothing: it never answers). */
+	function answerThreadCreate(answer: (dir: string) => ReturnType<FakeMachine["handler"]>): void {
+		const base = machine.handler;
+		machine.handler = (frame, socket) => (frame.body.case === "threadCreate" ? answer(frame.body.value.dir) : base(frame, socket));
+	}
+
+	/** A session's dock (folder /w/app) with the known AIs, once its AI's terminal opened. */
+	async function sessionDock(agents = AGENTS()) {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} agents={agents} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		return parts;
+	}
+
+	async function startClaude(): Promise<void> {
+		await userEvent.click(await screen.findByRole("button", { name: "Mở mới" }));
+		await userEvent.click(within(await screen.findByRole("group", { name: "Agent AI" })).getByRole("menuitem", { name: "Claude Code" }));
+	}
+
+	it("the + menu starts a new AI session in the session's folder and moves to it in terminal mode", async () => {
+		answerThreadCreate((dir) => [{ case: "threadCreated", value: { thread: { id: "t9", provider: "claude", dir } } }]);
+		let adopted = "";
+		const parts = await sessionDock(AGENTS((thread) => (adopted = thread.id)));
+		await userEvent.click(await screen.findByRole("button", { name: "Mở mới" }));
+		const ai = await screen.findByRole("group", { name: "Agent AI" });
+		// An AI the machine does not have is shown, greyed, with why.
+		expect((within(ai).getByRole("menuitem", { name: /Antigravity/ }) as HTMLButtonElement).disabled).toBe(true);
+		expect(within(ai).getByText("Chưa cài")).toBeTruthy();
+		await userEvent.click(within(ai).getByRole("menuitem", { name: "Claude Code" }));
+		await until(() => sent("threadCreate").length === 1, "the new session");
+		expect(sent("threadCreate")[0]?.body.value).toMatchObject({ provider: "claude", dir: "/w/app", text: "", consent: { sensitive: false } });
+		await waitFor(() => expect(window.location.pathname).toBe(aiPaths.sessionTerminal("1", "t9")));
+		expect(adopted).toBe("t9");
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("the machine's own dock has no folder for an AI: its rows are greyed and say to open a project", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} back="/ai/1" agents={AGENTS()} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "first terminal");
+		await userEvent.click(await screen.findByRole("button", { name: "Mở mới" }));
+		const claude = await screen.findByRole("menuitem", { name: /^Claude Code/ });
+		expect((claude as HTMLButtonElement).disabled).toBe(true);
+		expect(claude.textContent).toContain("Mở trong một dự án để chạy agent");
+		await userEvent.click(claude);
+		await act(() => new Promise((r) => setTimeout(r, 50)));
+		expect(sent("threadCreate")).toEqual([]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a folder the machine wants confirmed first: the dock says to start from its project, nothing sensitive is sent", async () => {
+		answerThreadCreate(() => [{ case: "error", value: { code: ErrorCode.NEEDS_CONSENT, message: "sensitive", reason: ErrorReason.SENSITIVE_FOLDER } }]);
+		const parts = await sessionDock();
+		const before = window.location.pathname;
+		await startClaude();
+		expect(await screen.findByText("Thư mục này cần bạn xác nhận trước khi chạy AI. Hãy mở phiên mới từ dự án của nó.")).toBeTruthy();
+		expect(sent("threadCreate")).toHaveLength(1);
+		expect(sent("threadCreate")[0]?.body.value).toMatchObject({ consent: { sensitive: false } });
+		expect(window.location.pathname).toBe(before);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("any other refusal says what the machine said (an AI signed out)", async () => {
+		answerThreadCreate(() => [{ case: "error", value: { code: ErrorCode.NEEDS_LOGIN, message: "login" } }]);
+		const parts = await sessionDock();
+		await startClaude();
+		expect(await screen.findByText("Claude Code trên máy chưa đăng nhập. Trên máy đó, mở Terminal và đăng nhập một lần.")).toBeTruthy();
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("one AI session at a time: its rows wait while one starts, the terminal shortcut still works", async () => {
+		// The machine takes its time: no answer.
+		answerThreadCreate(() => []);
+		const parts = await sessionDock();
+		await startClaude();
+		await until(() => sent("threadCreate").length === 1, "the request");
+		await userEvent.click(screen.getByRole("button", { name: "Mở mới" }));
+		const claude = await screen.findByRole("menuitem", { name: "Claude Code" });
+		expect((claude as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.click(claude);
+		await userEvent.keyboard("{Escape}");
+		await userEvent.keyboard("{Alt>}{Shift>}T{/Shift}{/Alt}");
+		await until(() => sent("termOpen").length === 2, "a shell meanwhile");
+		expect(sent("threadCreate")).toHaveLength(1);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("the + menu's search filters every group, accents aside, and Esc gives the focus back to +", async () => {
+		const { link, terminal } = await dock(refusing());
+		await until(() => sent("termOpen").length === 1, "first terminal");
+		const plus = await screen.findByRole("button", { name: "Mở mới" });
+		await userEvent.click(plus);
+		const search = await screen.findByRole("searchbox", { name: "Tìm phiên, thư mục, agent…" });
+		await waitFor(() => expect(document.activeElement).toBe(search));
+		// A dock given no AIs has no Agent AI group.
+		expect(screen.queryByRole("group", { name: "Agent AI" })).toBeNull();
+		await userEvent.type(search, "terminal moi");
+		expect(screen.getByRole("menuitem", { name: "Terminal mới" })).toBeTruthy();
+		await userEvent.clear(search);
+		await userEvent.type(search, "zzz");
+		expect(screen.queryByRole("menuitem")).toBeNull();
+		expect(screen.getByText("Không có mục nào khớp.")).toBeTruthy();
+		await userEvent.keyboard("{Escape}");
+		await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+		await waitFor(() => expect(document.activeElement).toBe(plus));
+		terminal.stop();
+		link.stop();
 	});
 
 	it("a program that ended: the bar above the screen opens a new shell or closes the pane", async () => {
