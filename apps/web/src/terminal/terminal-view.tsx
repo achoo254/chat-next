@@ -17,6 +17,7 @@ import "@xterm/xterm/css/xterm.css";
 import type { LatencyProbe } from "./latency-probe.ts";
 import { TouchScroller } from "./touch-scroll.ts";
 import { noAutofill } from "./no-autofill.ts";
+import { openWebLink } from "./open-web-link.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 import { showCursorWithoutFocus } from "./terminal-cursor.ts";
@@ -177,6 +178,14 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				scrollback: 5_000,
 				cursorBlink: true,
 				macOptionIsMeta: true,
+				// A link a program sets itself (OSC 8) opens as a plain one does, without xterm's own confirm box.
+				linkHandler: {
+					allowNonHttpProtocols: false,
+					activate: (event, uri) => {
+						event.preventDefault();
+						openWebLink(uri);
+					},
+				},
 			});
 			termRef.current = term;
 			const fit = new FitAddon();
@@ -186,7 +195,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 			term.loadAddon(
 				new WebLinksAddon((event, uri) => {
 					event.preventDefault();
-					window.open(uri, "_blank", "noopener,noreferrer");
+					openWebLink(uri);
 				}),
 			);
 			term.open(host);
