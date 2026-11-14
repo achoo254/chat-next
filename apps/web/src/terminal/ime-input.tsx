@@ -8,7 +8,9 @@
 // arrows go as terminal keys. The field always starts with one space that is
 // never sent: phone keyboards report Backspace in an empty field to no one,
 // but deleting that space is an edit like any other (one DEL), after which
-// the space comes back.
+// the space comes back. The caret stays after that space (iOS may open the
+// keyboard with it in front); letters that still land in front are read as
+// typed after it.
 import { useRef, type CompositionEvent, type FormEvent, type KeyboardEvent, type Ref } from "react";
 
 const DEL = "\x7f";
@@ -24,6 +26,21 @@ export function inputDelta(sent: string, now: string): string {
 	let same = 0;
 	while (same < a.length && same < b.length && a[same] === b[same]) same++;
 	return DEL.repeat(a.length - same) + b.slice(same).join("");
+}
+
+/**
+ * The field's text as if typed after the sentinel. iOS can open the keyboard
+ * with the caret before it, so the first letters land in front of it ("/" + " "
+ * instead of " " + "/"); read as such, the sentinel itself would be sent.
+ */
+export function afterSentinel(sent: string, now: string): string {
+	if (sent === SENTINEL && now.length > SENTINEL.length && now.endsWith(SENTINEL) && !now.startsWith(SENTINEL)) return SENTINEL + now.slice(0, -SENTINEL.length);
+	return now;
+}
+
+/** The caret after the field's text, where typing goes after the sentinel. */
+function caretToEnd(field: HTMLTextAreaElement): void {
+	field.setSelectionRange(field.value.length, field.value.length);
 }
 
 /** A key that goes to the terminal as such (not as text); null for the rest (Backspace edits the field). */
@@ -68,9 +85,14 @@ export function ImeInput({ label, onSend, appCursor, inputRef, at, onOpen }: Ime
 	const clear = (field: HTMLTextAreaElement) => {
 		field.value = SENTINEL;
 		sent.current = SENTINEL;
+		caretToEnd(field);
 	};
 	const sync = (field: HTMLTextAreaElement) => {
-		const now = field.value;
+		const now = afterSentinel(sent.current, field.value);
+		if (now !== field.value) {
+			field.value = now;
+			caretToEnd(field);
+		}
 		// Some keyboards type Enter as a line break in the field.
 		const delta = inputDelta(sent.current, now).replace(/\n/g, "\r");
 		sent.current = now;
@@ -124,7 +146,10 @@ export function ImeInput({ label, onSend, appCursor, inputRef, at, onOpen }: Ime
 			onCompositionStart={onCompositionStart}
 			onCompositionEnd={onCompositionEnd}
 			onKeyDown={onKeyDown}
-			onFocus={() => onOpen?.(true)}
+			onFocus={(event) => {
+				caretToEnd(event.currentTarget);
+				onOpen?.(true);
+			}}
 			onBlur={(event) => {
 				clear(event.currentTarget);
 				onOpen?.(false);

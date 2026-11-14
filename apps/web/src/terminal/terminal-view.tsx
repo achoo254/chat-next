@@ -19,6 +19,7 @@ import { TouchScroller } from "./touch-scroll.ts";
 import { noAutofill } from "./no-autofill.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
+import { showCursorWithoutFocus } from "./terminal-cursor.ts";
 
 /** Output smaller than this is written at once. */
 const SMALL_WRITE = 4 * 1024;
@@ -221,6 +222,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 					textarea.readOnly = true;
 					textarea.setAttribute("inputmode", "none");
 					textarea.tabIndex = -1;
+					showCursorWithoutFocus(term);
 				}
 			}
 			const writer = new OutputWriter(term, session, probe);

@@ -8,7 +8,7 @@
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { TerminalAvailability, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,7 +18,7 @@ import { MachineLinksProvider } from "../../src/machines/link/connection-provide
 import { MachineLink } from "../../src/machines/link/machine-link.ts";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
-import { ImeInput, inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
+import { afterSentinel, ImeInput, inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
 import { endOnPurpose } from "../../src/terminal/ended-sessions.ts";
 import { NO_AUTOFILL, noAutofill } from "../../src/terminal/no-autofill.ts";
 import { keySequence, withModifiers } from "../../src/terminal/mobile-key-bar.tsx";
@@ -820,5 +820,36 @@ describe("keys", () => {
 		expect(keyOf("ArrowDown")).toBe("\x1b[B");
 		expect(keyOf("Backspace")).toBeNull();
 		expect(keyOf("a")).toBeNull();
+	});
+
+	it("letters typed in front of the field's leading space (iOS opens the keyboard with the caret there) go as typed, without a space", async () => {
+		const sent: string[] = [];
+		render(<ImeInput label="Gõ vào terminal" inputRef={{ current: null }} at={null} onSend={(text) => sent.push(text)} appCursor={() => false} />);
+		const field = screen.getByRole("textbox", { name: "Gõ vào terminal" }) as HTMLTextAreaElement;
+		// iOS: the caret before the space, then "/" and "c".
+		field.setSelectionRange(0, 0);
+		field.value = "/ ";
+		fireEvent.input(field);
+		expect(field.value).toBe(" /");
+		expect(field.selectionStart).toBe(2);
+		field.value = " /c";
+		fireEvent.input(field);
+		expect(sent.join("")).toBe("/c");
+		// Focus puts the caret after the space.
+		field.value = " ";
+		field.setSelectionRange(0, 0);
+		fireEvent.focus(field);
+		expect(field.selectionStart).toBe(1);
+	});
+
+	it("reads text in front of the leading space as typed after it, only on an empty field", () => {
+		expect(afterSentinel(" ", "/ ")).toBe(" /");
+		expect(afterSentinel(" ", "tiếng ")).toBe(" tiếng");
+		// Typed after the space: as it is.
+		expect(afterSentinel(" ", " /")).toBe(" /");
+		// The space deleted (Backspace) is an edit, not text in front.
+		expect(afterSentinel(" ", "")).toBe("");
+		// A field with text already: as it is.
+		expect(afterSentinel(" ab", "x ab")).toBe("x ab");
 	});
 });
