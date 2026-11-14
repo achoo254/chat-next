@@ -710,6 +710,7 @@ export const zhCNMachines: MachinesCopy = {
 			interrupt: "Ctrl+C（停止）",
 			backspace: "退格",
 			paste: "粘贴",
+			copy: "复制",
 			liveInput: "直接输入",
 			tapToType: "轻触显示键盘",
 			hideKeyboard: "收起键盘",
@@ -1053,6 +1054,8 @@ export const zhCNMachines: MachinesCopy = {
 			status: { need: "需要你", failed: "出错", running: "运行中", done: "已完成，未查看", open: "在终端中打开，等待输入", idle: "空闲" },
 			machineOffline: "设备离线",
 			offlineStatus: (status: string) => `离线 · ${status}`,
+			/** The AI's turn is over but shells or subagents it started keep running. */
+			backgroundStatus: (n: number) => `后台运行中 · ${n} 个任务`,
 			settings: "新会话设置",
 			settingsTitle: (name: string) => `${name} 中的新会话`,
 			settingsHint: "工作区的新会话（+ 按钮）会使用这些设置。",

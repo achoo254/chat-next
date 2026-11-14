@@ -715,6 +715,7 @@ export const enMachines: MachinesCopy = {
 			interrupt: "Ctrl+C (stop)",
 			backspace: "Backspace",
 			paste: "Paste",
+			copy: "Copy",
 			liveInput: "Live input",
 			tapToType: "Tap to show the keyboard",
 			hideKeyboard: "Hide the keyboard",
@@ -1059,6 +1060,8 @@ export const enMachines: MachinesCopy = {
 			status: { need: "Needs you", failed: "Failed", running: "Running", done: "Done, not seen", open: "Open in a terminal, waiting for input", idle: "Idle" },
 			machineOffline: "Machine offline",
 			offlineStatus: (status: string) => `Offline · ${status}`,
+			/** The AI's turn is over but shells or subagents it started keep running. */
+			backgroundStatus: (n: number) => `Running in the background · ${n} ${n === 1 ? "task" : "tasks"}`,
 			settings: "New session settings",
 			settingsTitle: (name: string) => `New sessions in ${name}`,
 			settingsHint: "A new session of the workspace (the + button) starts with these.",

@@ -23,7 +23,6 @@ import {
 	ThreadState,
 	type BrowserTakeover,
 	type Frame,
-	type GitChanges,
 	type Item,
 	type MachineInfo,
 	type MachineAccounts,
@@ -117,11 +116,6 @@ export interface LinkState {
 	 * no thread items: never in a journal, and dropped when answered anywhere.
 	 */
 	readonly secretPrompts: ReadonlyMap<string, SecretPrompt>;
-	/**
-	 * What is not committed in each watched thread's folder, as the machine
-	 * last sent it (tunelo 2.0.11+: asked, and unasked after each turn).
-	 */
-	readonly gitChanges: ReadonlyMap<string, GitChanges>;
 	/**
 	 * Takeovers of the machine's browser open now (tunelo 2.0.12+), by id: the
 	 * AI waits for the user on a page, or a device opened the browser itself.
@@ -224,7 +218,6 @@ const INITIAL: LinkState = {
 	clones: new Map(),
 	agentUpdate: null,
 	secretPrompts: new Map(),
-	gitChanges: new Map(),
 	takeovers: new Map(),
 	passkeyNotices: [],
 };
@@ -787,12 +780,6 @@ export class MachineLink {
 			case "passkeyNotice":
 				this.set({ passkeyNotices: [...this.current.passkeyNotices, b.value].slice(-MAX_PASSKEY_NOTICES) });
 				break;
-			case "gitChanges": {
-				const gitChanges = new Map(this.current.gitChanges);
-				gitChanges.set(b.value.threadId, b.value);
-				this.set({ gitChanges });
-				break;
-			}
 			case "threadActivity":
 				this.setActivity(b.value.threadId, b.value);
 				break;
@@ -857,7 +844,6 @@ export class MachineLink {
 			journals: without(this.current.journals),
 			pending: without(this.current.pending),
 			threadInfo: without(this.current.threadInfo),
-			gitChanges: without(this.current.gitChanges),
 		});
 	}
 

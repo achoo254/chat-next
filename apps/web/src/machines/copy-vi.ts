@@ -724,6 +724,7 @@ export const viMachines = {
 			interrupt: "Ctrl+C (dừng)",
 			backspace: "Xoá lùi",
 			paste: "Dán",
+			copy: "Sao chép",
 			liveInput: "Nhập trực tiếp",
 			tapToType: "Chạm để hiện bàn phím",
 			hideKeyboard: "Ẩn bàn phím",
@@ -1071,6 +1072,8 @@ export const viMachines = {
 			status: { need: "Cần bạn", failed: "Có lỗi", running: "Đang chạy", done: "Xong, chưa xem", open: "Mở trong terminal, đang chờ lệnh", idle: "Rảnh" },
 			machineOffline: "Máy ngoại tuyến",
 			offlineStatus: (status: string) => `Ngoại tuyến · ${status}`,
+			/** The AI's turn is over but shells or subagents it started keep running. */
+			backgroundStatus: (n: number) => `Đang chạy nền · ${n} việc`,
 			settings: "Cài đặt phiên mới",
 			settingsTitle: (name: string) => `Cài đặt phiên mới trong ${name}`,
 			settingsHint: "Phiên mới của workspace (nút +) bắt đầu với các cài đặt này.",

@@ -10,13 +10,13 @@ import { describe, expect, it } from "vitest";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../../src/machines/agent-projects-client.ts";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
-import { buildTree, locate, projectIcon, shortHost, statusOf, threadStatus, unseenDone, workspaceIcon, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
+import { buildTree, locate, matches, projectIcon, shortHost, statusOf, threadStatus, unseenDone, workspaceIcon, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
 const ws = (projectId: number, machineId: number, dir: string, branch = ""): AgentWorkspace => ({ id: nextId++, projectId, machineId, dir, branch, kind: AgentWorkspaceKind.FOLDER, createdAt: 1 });
 const project = (id: number, name: string, workspaces: AgentWorkspace[], createdAt = 1): AgentProject => ({ id, name, gitRemote: "", order: id, createdAt, workspaces });
-const thread = (id: string, dir: string, state: ThreadState, updatedAt = 1000, extra: { busyElsewhere?: boolean; terminalSession?: number; archived?: boolean } = {}): ThreadSummary =>
+const thread = (id: string, dir: string, state: ThreadState, updatedAt = 1000, extra: { busyElsewhere?: boolean; terminalSession?: number; archived?: boolean; backgroundTasks?: number } = {}): ThreadSummary =>
 	create(ThreadSummarySchema, { id, title: id, dir, state, updatedAt: BigInt(updatedAt), ...extra });
 
 function machine(id: number, name: string, threads: ThreadSummary[], online = true, own: { dir: string; branch: string }[] = []): MachineView {
@@ -56,6 +56,15 @@ describe("a workspace's state", () => {
 		expect(statusOf([held, done], seen)).toBe("done");
 		expect(statusOf([held, running], seen)).toBe("running");
 		expect(statusOf([held, waiting], seen)).toBe("need");
+		// Its turn is over but shells or subagents it started run on: still working, in a terminal or not, and kept by the "needs you / running" filter.
+		const background = thread("b", "/w", ThreadState.IDLE, 1, { terminalSession: 3, backgroundTasks: 2 });
+		expect(threadStatus(background, false)).toBe("running");
+		expect(threadStatus(thread("c", "/w", ThreadState.IDLE, 1, { backgroundTasks: 1 }), true)).toBe("running");
+		expect(statusOf([background, held], seen)).toBe("running");
+		expect(matches("attention", background)).toBe(true);
+		expect(matches("attention", held)).toBe(false);
+		// A session waiting for the user still says so first.
+		expect(threadStatus(thread("w", "/w", ThreadState.WAITING, 1, { backgroundTasks: 1 }), false)).toBe("need");
 		// A new session opened in the terminal and never used yet: still not working.
 		expect(threadStatus(thread("new", "/w", ThreadState.IDLE, 1, { terminalSession: 9 }), false)).toBe("open");
 		expect(worstStatus(["idle", "open", "done"])).toBe("done");

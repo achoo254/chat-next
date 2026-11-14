@@ -61,10 +61,10 @@ export function rowLine(t: MachinesCopy, thread: ThreadSummary, info: MachineInf
  * both, so a calm list wastes no space on an empty status column. `who` (the
  * AI's name on a session) leads the label.
  */
-export function StatusGlyph({ status, icon, who, ai, offline = false }: { status: WorkStatus; icon: MachineIconName; who?: string; ai?: string; offline?: boolean }) {
+export function StatusGlyph({ status, icon, who, ai, offline = false, detail }: { status: WorkStatus; icon: MachineIconName; who?: string; ai?: string; offline?: boolean; detail?: string }) {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
-	const state = offline ? p.offlineStatus(p.status[status]) : p.status[status];
+	const state = offline ? p.offlineStatus(detail ?? p.status[status]) : (detail ?? p.status[status]);
 	const label = who === undefined ? state : `${who} · ${state}`;
 	const run = status === "running" ? runGlyph(ai) : undefined;
 	return (
@@ -148,7 +148,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 		<>
 			<span className="tx">
 				<span className="line">
-					<StatusGlyph status={status} icon="ai-session" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} />
+					<StatusGlyph status={status} icon="ai-session" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} {...(status === "running" && !isRunning(thread) ? { detail: t.agent.projects.backgroundStatus(thread.backgroundTasks) } : {})} />
 					<span className="name">{thread.title || t.agent.newSession}</span>
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>

@@ -30,7 +30,7 @@ export type WorkStatus = "need" | "failed" | "running" | "done" | "open" | "idle
 /** When the user last saw each session (its updatedAt then), by thread id. */
 export type SeenMap = ReadonlyMap<string, number>;
 
-type Matched = Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere" | "terminalSession">>;
+type Matched = Pick<ThreadSummary, "state" | "archived"> & Partial<Pick<ThreadSummary, "busyElsewhere" | "terminalSession" | "backgroundTasks">>;
 
 /** The session matches the filter: "all" leaves archived ones out, "archived" shows only them. */
 /**
@@ -46,7 +46,7 @@ export function shortHost(name: string): string {
 }
 
 export function matches(filter: Filter, thread: Matched): boolean {
-	if (filter === "attention") return thread.state === ThreadState.WAITING || isRunning(thread);
+	if (filter === "attention") return thread.state === ThreadState.WAITING || isRunning(thread) || (thread.backgroundTasks ?? 0) > 0;
 	if (filter === "archived") return thread.archived;
 	return !thread.archived;
 }
@@ -65,8 +65,8 @@ const RANK: Record<WorkStatus, number> = { need: 0, failed: 1, running: 2, done:
 export function threadStatus(thread: ThreadSummary, done: boolean): WorkStatus {
 	if (thread.state === ThreadState.WAITING) return "need";
 	if (thread.state === ThreadState.ERROR) return "failed";
-	// Working means a turn runs; a terminal holding the session at its prompt is not work.
-	if (isRunning(thread)) return "running";
+	// Working means a turn runs, or shells and subagents the AI started keep running after it; a terminal holding the session at its prompt is not work.
+	if (isRunning(thread) || thread.backgroundTasks > 0) return "running";
 	if (done) return "done";
 	return thread.terminalSession > 0 ? "open" : "idle";
 }
