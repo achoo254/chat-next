@@ -94,9 +94,17 @@ export function placeByHand(store: AgentProjectsStore, host: Host, dir: string, 
 	});
 }
 
-/** The machine drops `dir` from its own list (the folder and its sessions stay). */
+/**
+ * The machine drops `dir` from its own list (the folder and its sessions
+ * stay). The list is asked again, not read from this device's copy: a copy
+ * that is old or not loaded yet would show no such folder, nothing would be
+ * dropped, and the sync would record the workspace again right after it left.
+ * Throws when the machine does not answer, so the caller remembers to retry.
+ */
 async function forget(host: Host, dir: string): Promise<void> {
-	const own = host.state.projects?.projects.find((p) => samePath(p.dir, dir));
+	const frame = await host.link.request({ case: "projectList", value: {} });
+	if (frame.body.case !== "projectListResult") throw new Error("the machine did not list its projects");
+	const own = frame.body.value.projects.find((p) => samePath(p.dir, dir));
 	if (own !== undefined) await host.link.request({ case: "projectRemove", value: { id: own.id } });
 }
 

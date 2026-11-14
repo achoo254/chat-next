@@ -241,7 +241,7 @@ describe("the sync and the app's own actions", () => {
 			},
 		};
 		await expect(placeByHand(store, mac, "/w/other", { target })).rejects.toBeInstanceOf(RemoteMismatchError);
-		expect(mac.sent.map((b) => b.case)).toEqual(["projectAdd", "projectRemove"]);
+		expect(mac.sent.map((b) => b.case)).toEqual(["projectAdd", "projectList", "projectRemove"]);
 		expect(store.snapshot().projects[0]?.workspaces).toEqual([]);
 	});
 
@@ -256,15 +256,30 @@ describe("the sync and the app's own actions", () => {
 		// The machine answers projectRemove only when let go; meanwhile a sync pass runs.
 		let answer = (): void => undefined;
 		const request = mac.link.request;
-		const slow = { ...mac, link: { ...mac.link, request: (body: FrameBody) => new Promise<Frame>((resolve) => (answer = () => resolve(request(body)))) } } as SyncHost;
+		const slow = { ...mac, link: { ...mac.link, request: (body: FrameBody) => (body.case === "projectRemove" ? new Promise<Frame>((resolve) => (answer = () => resolve(request(body)))) : request(body)) } } as SyncHost;
 		const detaching = detachWorkspace(store, workspace, slow);
-		await Promise.resolve();
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(await syncHosts(store, [mac])).toBe(0);
 		answer();
 		await detaching;
 		expect(await syncHosts(store, [mac])).toBe(0);
 		expect(server.workspaces).toEqual([]);
 		expect(mac.projects).toEqual([]);
+	});
+
+	it("detaching drops the folder from the machine even when this device's copy of its list is empty", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, [own("/w/app")]);
+		await syncHosts(store, [mac]);
+		const workspace = store.snapshot().projects[0]?.workspaces[0];
+		if (workspace === undefined) throw new Error("no workspace");
+		const stale = { ...mac, state: { projects: undefined, info: {} } } as unknown as SyncHost;
+		await detachWorkspace(store, workspace, stale);
+		expect(mac.projects).toEqual([]);
+		expect(await syncHosts(store, [mac])).toBe(0);
+		expect(server.workspaces).toEqual([]);
 	});
 
 	it("a workspace detached while its machine is offline is not added again: the machine drops it when back", async () => {
