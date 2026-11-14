@@ -13,6 +13,13 @@
 // lists and this run does not hold are orphans; those still orphaned after a
 // grace period are closed with `conn_close`. Sessions are never touched: the
 // device re-links and Attaches with its last offset.
+//
+// A newer terminal process staged by an update would otherwise wait until no
+// terminal runs, which on a machine that keeps its AIs open is never. So the
+// running one is replaced as soon as every program in it is a thread's AI
+// sitting idle (its AI says no turn runs, quiet for REPLACE_QUIET_MS): each
+// opens again in the new process, resumed, the same conversation. A plain
+// shell, or an AI in a turn, keeps the old process until it ends.
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, TerminalAvailability, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
@@ -36,6 +43,10 @@ const FLUSH_TURN = 8;
 export const MAX_TERMINAL_SESSIONS = 20;
 /** How long a connection left by an earlier agent run may live before this run closes it. */
 export const ORPHAN_GRACE_MS = 30_000;
+/** How often a staged terminal process looks for its moment to replace the running one. */
+export const REPLACE_CHECK_MS = 60_000;
+/** How long a thread's AI must have been quiet before it is closed and opened again in a newer terminal process. */
+export const REPLACE_QUIET_MS = 10 * 60_000;
 
 /** A token bucket: `rate` tokens a second, at most `burst` saved. */
 export class TokenBucket {
@@ -87,6 +98,8 @@ export interface AiTerminals {
   ended(session: number, pid: number): void;
   /** Only these sessions still run in terminal process `pid`. */
   alive(pid: number, sessions: ReadonlySet<number>): void;
+  /** The thread's AI can close and open again resumed with nothing lost (no turn, quiet for `quietMs`). */
+  idle(threadId: string, quietMs: number): Promise<boolean>;
 }
 
 /** The core as the terminal sees it. */
@@ -98,6 +111,7 @@ export function aiTerminalsOf(core: AgentCore): AiTerminals {
     started: (threadId, session, pid) => core.terminalStarted(threadId, session, pid),
     ended: (session, pid) => core.terminalEnded(session, pid),
     alive: (pid, sessions) => core.terminalAlive(pid, sessions),
+    idle: (threadId, quietMs) => core.terminalIdle(threadId, quietMs),
   };
 }
 
@@ -121,6 +135,9 @@ export type TerminalServiceOptions = {
   execPath?: string;
   /** Grace before closing connections this run does not hold (default ORPHAN_GRACE_MS; tests shorten it). */
   orphanGraceMs?: number;
+  /** REPLACE_CHECK_MS and REPLACE_QUIET_MS (tests shorten them). */
+  replaceCheckMs?: number;
+  replaceQuietMs?: number;
 };
 
 type Route = { owner: TerminalConnection; link: number };
@@ -147,6 +164,11 @@ export class TerminalService {
   private readonly aiOpening = new Map<string, Promise<number>>();
   /** The folder each session opened in (the terminal process does not keep it). */
   private readonly cwds = new Map<number, string>();
+  private replaceTimer: ReturnType<typeof setTimeout> | undefined;
+  private replacing: Promise<void> | undefined;
+  private stopped = false;
+  /** A switch to the staged terminal process failed: no more tries this run (each would end the AIs again). */
+  private replaceFailed = false;
 
   constructor(private readonly opts: TerminalServiceOptions) {
     this.supervisor = new HostSupervisor({
@@ -186,6 +208,9 @@ export class TerminalService {
   stop(): void {
     clearTimeout(this.drainTimer);
     clearTimeout(this.orphanTimer);
+    this.stopped = true;
+    clearTimeout(this.replaceTimer);
+    this.replaceTimer = undefined;
     this.orphans.clear();
     this.supervisor.stop();
   }
@@ -463,6 +488,80 @@ export class TerminalService {
     this.opts.log(`terminal: connected (terminal process ${hello.daemonVersion}, ${hello.sessions.length} session(s))`);
     this.opts.ai?.alive(hello.pid, new Set(hello.sessions.filter((s) => s.exited === undefined).map((s) => s.session)));
     this.audit(hello.pendingAudit);
+    this.watchStaged();
+  }
+
+  /** While a newer terminal process is staged, looks now and then for the moment to switch to it. */
+  private watchStaged(): void {
+    if (this.stopped || this.replaceFailed || this.replaceTimer || !this.supervisor.hasStaged()) return;
+    this.replaceTimer = setTimeout(() => {
+      this.replaceWhenIdle().then(
+        () => {
+          this.replaceTimer = undefined;
+          this.watchStaged();
+        },
+        (err: unknown) => {
+          this.replaceTimer = undefined;
+          this.opts.log(`terminal: could not switch to the newer terminal process (${(err as Error).message})`);
+          this.watchStaged();
+        },
+      );
+    }, this.opts.replaceCheckMs ?? REPLACE_CHECK_MS);
+    this.replaceTimer.unref?.();
+  }
+
+  /**
+   * Replaces the running terminal process with the staged one when every
+   * program in it is a thread's idle AI, then opens those AIs again (resumed,
+   * same size). Returns without a change otherwise.
+   */
+  replaceWhenIdle(): Promise<void> {
+    this.replacing ??= this.replaceIfIdle().finally(() => {
+      this.replacing = undefined;
+    });
+    return this.replacing;
+  }
+
+  private async replaceIfIdle(): Promise<void> {
+    const ai = this.opts.ai;
+    if (!ai || this.stopped || this.replaceFailed || !this.supervisor.hasStaged() || !this.supervisor.link.isReady) return;
+    const quietMs = this.opts.replaceQuietMs ?? REPLACE_QUIET_MS;
+    const live = async () => sessionListSchema.parse(await this.call("list", {})).filter((s) => s.exited === undefined);
+    const sessions = await live();
+    const reopen: { session: number; threadId: string; cols: number; rows: number }[] = [];
+    for (const s of sessions) {
+      const threadId = ai.threadOf(s.session, this.hostPid);
+      // A plain shell, or an AI in a turn: the old process stays until it ends.
+      if (!threadId || !(await ai.idle(threadId, quietMs))) return;
+      reopen.push({ session: s.session, threadId, cols: s.cols, rows: s.rows });
+    }
+    // Looked again right before: nothing opened or ended meanwhile, nothing being opened, still running.
+    const again = await live();
+    const same = again.length === sessions.length && again.every((s) => sessions.some((x) => x.session === s.session));
+    if (!same || this.aiOpening.size > 0 || this.stopped || !this.supervisor.link.isReady) return;
+    const oldPid = this.hostPid;
+    this.opts.log(`terminal: switching to the newer terminal process (${reopen.length} idle AI session(s) open again resumed)`);
+    try {
+      await this.supervisor.replace();
+    } catch (err) {
+      this.replaceFailed = true;
+      throw err;
+    } finally {
+      for (const r of reopen) {
+        try {
+          await this.openAi(r.threadId, r.cols, r.rows);
+        } catch (err) {
+          // No terminal process runs: chat may write to the thread again; a device opens its AI from the terminal tab.
+          if (!this.supervisor.link.isReady) ai.ended(r.session, oldPid);
+          this.opts.log(`terminal: could not open thread ${r.threadId}'s AI again (${(err as Error).message})`);
+        }
+      }
+    }
+    if (this.supervisor.hasStaged()) {
+      // The switch did not take (the binary could not be moved): the old process runs again.
+      this.replaceFailed = true;
+      this.opts.log("terminal: the newer terminal process is still not in use; trying again after the agent restarts");
+    }
   }
 
   private onEvent(e: DaemonEvent): void {

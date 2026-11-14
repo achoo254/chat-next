@@ -2317,6 +2317,31 @@ export class AgentCore {
     return at && at.pid === pid ? at.session : undefined;
   }
 
+  /**
+   * The thread's AI in the terminal can be closed and opened again resumed
+   * without losing anything: its session has a transcript to resume, its AI
+   * says no turn runs and the transcript ends outside a turn (no tool call
+   * waiting for its result or a prompt, however old), a running process of
+   * the AI still holds that very session (not another one after a /clear),
+   * nothing was written to it for `quietMs` and the thread waits on no
+   * prompt. False whenever it cannot tell.
+   */
+  async terminalIdle(threadId: string, quietMs: number): Promise<boolean> {
+    const t = this.threads.get(threadId);
+    const seg = t?.meta.segments.at(-1);
+    const history = t ? this.opts.providers.find((p) => p.id === t.meta.provider)?.history : undefined;
+    if (!t || t.deleted || !t.meta.terminal || !seg?.sessionId || !history?.liveness) return false;
+    if (t.running || t.queued || t.pending.size > 0 || (t.outsidePrompts ?? 0) > 0) return false;
+    try {
+      if (history.end(seg.sessionId) === undefined) return false;
+      await history.prime?.();
+      const live = await history.liveness(seg.sessionId);
+      return live.state === "idle" && live.turnOpen === false && live.held === true && live.since !== undefined && this.now() - live.since >= quietMs;
+    } catch {
+      return false;
+    }
+  }
+
   /** The thread whose AI runs in `session` of terminal process `pid`; "" when none. */
   terminalThread(session: number, pid: number): string {
     for (const t of this.threads.values()) if (t.meta.terminal?.session === session && t.meta.terminal.pid === pid) return t.meta.id;

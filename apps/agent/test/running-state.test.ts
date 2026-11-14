@@ -75,14 +75,14 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     const { home, t, file } = session("open");
     setTime(file, NOW - 10_000);
     const live = await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).liveness(t.sessionId);
-    expect(live).toEqual({ state: "busy", since: NOW - 10_000, tool: "Bash", via: "transcript" });
+    expect(live).toEqual({ state: "busy", since: NOW - 10_000, tool: "Bash", turnOpen: true, via: "transcript" });
   });
 
   test("a finished tool is not reported; nothing on record is unknown", async () => {
     const { home, t, file } = session("done");
     setTime(file, NOW - 10_000);
     const sessions = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
-    expect(await sessions.liveness(t.sessionId)).toEqual({ state: "busy", since: NOW - 10_000, via: "transcript" });
+    expect(await sessions.liveness(t.sessionId)).toEqual({ state: "busy", since: NOW - 10_000, turnOpen: false, via: "transcript" });
     expect(await sessions.liveness(randomUUID())).toEqual({ state: "unknown", via: "transcript" });
   });
 
@@ -94,12 +94,13 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
       since: NOW - 5 * 60_000,
       tool: "Bash",
       held: true,
+      turnOpen: true,
       via: "process",
     });
     expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).liveness(t.sessionId)).state).toBe("idle");
-    // Past the longest a command may run without a word: idle even while held.
+    // Past the longest a command may run without a word: idle even while held, though its turn is still open.
     setTime(file, NOW - TOOL_BUSY_MS - 1_000);
-    expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) }).liveness(t.sessionId)).state).toBe("idle");
+    expect(await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) }).liveness(t.sessionId)).toMatchObject({ state: "idle", turnOpen: true });
   });
 
   test("the model asked and not answered yet: busy while a running claude holds the session, however long it thinks (to a limit)", async () => {
@@ -110,7 +111,7 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     t.write(home);
     setTime(file, NOW - 5 * 60_000);
     const held = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) });
-    expect(await held.liveness(t.sessionId)).toEqual({ state: "busy", since: NOW - 5 * 60_000, held: true, via: "process" });
+    expect(await held.liveness(t.sessionId)).toEqual({ state: "busy", since: NOW - 5 * 60_000, held: true, turnOpen: true, via: "process" });
     const free = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
     expect((await free.liveness(t.sessionId)).state).toBe("idle");
     setTime(file, NOW - REQUEST_BUSY_MS - 1_000);
@@ -141,10 +142,10 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     setTime(file, NOW - 5 * 60_000);
     const sessions = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) });
     await sessions.prime();
-    expect(await sessions.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, held: true, via: "transcript" });
+    expect(await sessions.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, held: true, turnOpen: false, via: "transcript" });
     const free = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
     await free.prime();
-    expect(await free.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, via: "transcript" });
+    expect(await free.liveness(t.sessionId)).toEqual({ state: "idle", since: NOW - 5 * 60_000, turnOpen: false, via: "transcript" });
   });
 
   test("quiet for minutes with no tool running: idle without asking for the processes", async () => {

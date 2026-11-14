@@ -44,6 +44,8 @@ export async function terminalMachine(opts: {
   configDir?: string;
   /** Grace before the terminal closes connections an earlier agent run left. */
   orphanGraceMs?: number;
+  /** How long a thread's AI must be quiet before a staged terminal process replaces the running one. */
+  replaceQuietMs?: number;
 }) {
   const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()]);
   const config = new ConfigStore(opts.configDir ?? join(tempDir("term-"), "cfg"));
@@ -60,6 +62,7 @@ export async function terminalMachine(opts: {
     ...(opts.env ? { env: opts.env } : {}),
     ...(opts.shellEnv ? { shellEnv: opts.shellEnv } : {}),
     ...(opts.orphanGraceMs !== undefined ? { orphanGraceMs: opts.orphanGraceMs } : {}),
+    ...(opts.replaceQuietMs !== undefined ? { replaceQuietMs: opts.replaceQuietMs } : {}),
   });
 
   const connect = async (device: KeyPair, buffered: () => number = () => 0): Promise<DeviceConnection> => {

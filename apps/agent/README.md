@@ -42,7 +42,8 @@ vào `~/.profile`, `~/.bashrc` (nếu có) và `~/.zshrc` (nếu shell là zsh) 
 của người dùng. Alpine và bản musl khác bị từ chối.
 
 Máy đã có bản term-host do `tunelo update` đặt trong `<thư mục cấu hình>/term-host/bin/current/` thì bản mới được đặt sẵn ở
-`term-host/bin/next/`, tunelo chuyển sang khi không còn terminal nào mở. Giấy phép các thư viện của nó:
+`term-host/bin/next/`. Tunelo chuyển sang bản mới khi không còn terminal nào mở. Nếu mọi terminal đang mở đều là AI của một phiên
+đã nghỉ ít nhất 10 phút, tunelo cũng chuyển ngay, rồi mở lại từng AI tiếp tục đúng cuộc trò chuyện cũ. Giấy phép các thư viện của nó:
 [`docs/term-host-licenses.md`](../../docs/term-host-licenses.md).
 
 Windows, tuỳ chọn: terminal nối thẳng cần UDP vào. Không có quy tắc tường lửa thì kết nối thử chiều ra trước, không được thì đi qua
@@ -95,6 +96,10 @@ mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử
 ## Cập nhật
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
+
+Có gì ở 3.3.3: không phải chờ đóng hết terminal mới dùng được `tunelo-term-host` mới tải về. Khi mọi terminal đang mở đều là AI
+của một phiên đã nghỉ ít nhất 10 phút, tunelo chuyển sang bản mới rồi mở lại từng AI, nối tiếp đúng cuộc trò chuyện cũ. Còn
+shell thường đang mở hoặc AI đang chạy thì vẫn chờ như trước.
 
 Có gì ở 3.3.1: phiên Claude chạy trong terminal của máy vẫn báo "đang chạy" khi model nghĩ lâu mà chưa ghi gì (cột AI Agent
 hiện biểu tượng đang chạy riêng của từng AI). Terminal mở lại từ thiết bị (đổi tab, Trò chuyện ⟷ Terminal, tải lại trang) cuộn

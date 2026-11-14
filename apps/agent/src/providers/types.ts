@@ -236,9 +236,11 @@ export type SessionQuery = {
  * running now, by its name, when known; `via`: what told it. `held`: a
  * running process of the AI holds the session open, busy or idle (a terminal
  * left open on it); absent when none does or the AI cannot tell. It never
- * changes `state`: an idle held session is still "idle".
+ * changes `state`: an idle held session is still "idle". `turnOpen`: the
+ * transcript ends inside a turn (a tool call without its result, a request
+ * without its answer) however long ago; absent when the AI cannot tell.
  */
-export type Liveness = { state: "busy" | "idle" | "unknown"; since?: number; tool?: string; held?: boolean; via: "transcript" | "process" | "api" };
+export type Liveness = { state: "busy" | "idle" | "unknown"; since?: number; tool?: string; held?: boolean; turnOpen?: boolean; via: "transcript" | "process" | "api" };
 
 export type SessionPage = { sessions: LocalSession[]; total: number; dirs: { dir: string; sessions: number }[] };
 

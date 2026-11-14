@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { defaultConfigDir } from "../src/config.ts";
 import { registerLaunchAgent, termHostPlist, termHostWindowsLoop, unregisterLaunchAgent } from "../src/service.ts";
 import { termHostSystemdUnit } from "../src/systemd-service.ts";
-import { TERM_HOST_BINARY, locateTermHost, switchStagedTermHost } from "../src/terminal/host-supervisor.ts";
+import { TERM_HOST_BINARY, locateTermHost, restorePreviousTermHost, switchStagedTermHost } from "../src/terminal/host-supervisor.ts";
 import { tempDir } from "./harness.ts";
 
 const run = promisify(execFile);
@@ -119,7 +119,7 @@ describe("which terminal process binary runs", () => {
     expect(locateTermHost(cfg, { TUNELO_TERM_HOST_BIN: execPath }, execPath)).toBe(execPath);
   });
 
-  it("a staged newer binary becomes the current one (only called while none runs)", () => {
+  it("a staged newer binary becomes the current one, the old one kept to go back to (only called while none runs)", () => {
     const cfg = tempDir("bin-");
     const bin = join(cfg, "term-host", "bin");
     expect(switchStagedTermHost(cfg)).toBe(false);
@@ -130,6 +130,10 @@ describe("which terminal process binary runs", () => {
     expect(switchStagedTermHost(cfg)).toBe(true);
     expect(readFileSync(join(bin, "current", TERM_HOST_BINARY), "utf8")).toBe("new");
     expect(existsSync(join(bin, "next"))).toBe(false);
+    expect(readFileSync(join(bin, "previous", TERM_HOST_BINARY), "utf8")).toBe("old");
+    // The new one does not start: back to the old one.
+    restorePreviousTermHost(cfg);
+    expect(readFileSync(join(bin, "current", TERM_HOST_BINARY), "utf8")).toBe("old");
     expect(existsSync(join(bin, "previous"))).toBe(false);
   });
 });

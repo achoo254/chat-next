@@ -185,7 +185,9 @@ export class LocalSessions implements SessionHistory {
    * model has not answered the last request (for REQUEST_BUSY_MS at most)
    * and a running claude holds the session. `held` tells a running claude
    * holds it, from the processes as last read (prime() reads them again;
-   * only something still to come makes this read them itself). Never fails.
+   * only something still to come makes this read them itself). `turnOpen`
+   * tells a tool call without its result or a request without its answer,
+   * however old (a long subagent, a prompt waiting for the user). Never fails.
    */
   async liveness(sessionId: string): Promise<Liveness> {
     let k: Known | undefined;
@@ -197,16 +199,18 @@ export class LocalSessions implements SessionHistory {
     if (!k) return { state: "unknown", via: "transcript" };
     const since = Math.round(k.mtimeMs);
     const quiet = this.now() - k.mtimeMs;
-    const work = quiet < REQUEST_BUSY_MS ? this.openWork(k) : { name: "", request: false };
+    const open = this.openWork(k);
+    const turnOpen = open.name !== "" || open.request;
+    const work = quiet < REQUEST_BUSY_MS ? open : { name: "", request: false };
     const tool = quiet < TOOL_BUSY_MS ? work.name : "";
     // Something still to come: a tool's result, or the model's answer.
     const pending = tool !== "" || work.request;
     if (pending && quiet >= BUSY_MS) await this.processes.refresh();
     const held = this.held(k);
     const withHeld = held ? { held } : {};
-    if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, via: "transcript" };
-    if (!pending) return { state: "idle", since, ...withHeld, via: "transcript" };
-    return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, via: "process" } : { state: "idle", since, via: "process" };
+    if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, turnOpen, via: "transcript" };
+    if (!pending) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
+    return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, turnOpen, via: "process" } : { state: "idle", since, turnOpen, via: "process" };
   }
 
   /** A running claude holds the session (as of the last read of the processes); never fails. */

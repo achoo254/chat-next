@@ -2,7 +2,7 @@
 // (docs/terminal-wire.md section 6) on a Unix socket in a test config
 // folder: control.json with a token, `[length u32][kind u8][payload]` frames,
 // hello/set_revoked/grant/relay_open/signal/list/open/close/resize/
-// conn_close/revoke_device/ack_audit. With `minor` 1 the hello result lists
+// conn_close/revoke_device/ack_audit/shutdown. With `minor` 1 the hello result lists
 // the live connections, as the real one does. On the relay path it answers Hello
 // and echoes Input as Output, so a test sees a keystroke come back.
 import { randomBytes } from "node:crypto";
@@ -27,6 +27,8 @@ export class FakeTermHost {
   major = 1;
   /** Control minor: 0 answers hello without `connections`, 1 lists them. */
   minor = 0;
+  /** The pid in control.json and hello; `shutdown` ends this process and the next start gets a new one. */
+  pid = 999_999;
   /** Holds every relay echo this long (ms). */
   echoDelay = 0;
   private server: Server | undefined;
@@ -49,7 +51,7 @@ export class FakeTermHost {
     this.server = server;
     writeFileSync(
       join(this.dir, "control.json"),
-      JSON.stringify({ token: this.token, pid: 999_999, major: this.major, minor: this.minor, daemonVersion: "fake", socket: this.sock }),
+      JSON.stringify({ token: this.token, pid: this.pid, major: this.major, minor: this.minor, daemonVersion: "fake", socket: this.sock }),
       { mode: 0o600 },
     );
   }
@@ -151,7 +153,7 @@ export class FakeTermHost {
           major: this.major,
           minor: this.minor,
           daemonVersion: "fake",
-          pid: 999_999,
+          pid: this.pid,
           sessions: this.sessions,
           pendingAudit: this.pendingAudit,
           ...(this.minor >= 1
@@ -224,6 +226,15 @@ export class FakeTermHost {
         if (m.cmd === "close") this.sessions = this.sessions.filter((x) => x.session !== m.session);
         return this.reply(s, m.id, {});
       }
+      case "shutdown":
+        // Every program ends with the process; the next one starts empty.
+        this.reply(s, m.id, {});
+        this.sessions = [];
+        this.nextSession = 1;
+        this.conns.clear();
+        this.pid++;
+        setTimeout(() => void this.stop(true), 10);
+        return;
       case "ack_audit":
         this.pendingAudit = this.pendingAudit.filter((e) => (e.seq as number) > (m.upTo as number));
         return this.reply(s, m.id, {});

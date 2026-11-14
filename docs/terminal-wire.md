@@ -285,7 +285,7 @@ Peer cũ ấy bị agent mới đóng sau thời gian chờ (xem "Kết nối m�
 
 ### Agent giám sát daemon
 
-- Binary: `TUNELO_TERM_HOST_BIN`, rồi `<thư mục cấu hình>/term-host/bin/current/tunelo-term-host[.exe]`, rồi thư mục chứa binary agent. Bản mới được đặt sẵn ở `term-host/bin/next/` (bước tải của phase phát hành); agent chuyển `next` → `current` chỉ khi không có daemon nào chạy (trước khi khởi động daemon), nên cập nhật không cắt shell đang mở.
+- Binary: `TUNELO_TERM_HOST_BIN`, rồi `<thư mục cấu hình>/term-host/bin/current/tunelo-term-host[.exe]`, rồi thư mục chứa binary agent. Bản mới được đặt sẵn ở `term-host/bin/next/` (bước tải của phase phát hành); agent chuyển `next` → `current` chỉ khi không có daemon nào chạy (trước khi khởi động daemon), nên cập nhật không cắt shell đang mở. Daemon đang chạy được thay sớm hơn khi mọi phiên còn sống trong nó đều là AI của một thread và AI đó nghỉ: AI báo không có lượt nào đang chạy, và transcript không đổi trong 10 phút. Khi đó agent gửi `shutdown`, khởi động bản mới, rồi mở lại từng AI với `--resume` theo đúng kích thước cũ. Còn một shell thường hoặc một AI đang chạy lượt thì daemon cũ vẫn giữ nguyên.
 - Đơn vị giám sát riêng, agent ghi khi dùng terminal lần đầu (máy đã cài không cần cài lại) và chỉ ghi lại khi không có daemon chạy:
   - macOS: LaunchAgent `com.hoandat.tunelo.term-host`, `KeepAlive {SuccessfulExit: false}` (chạy lại sau khi sập, không chạy lại sau khi thoát sạch), `ProcessType Interactive`; khởi động bằng `launchctl kickstart`.
   - Linux: `~/.config/systemd/user/tunelo-term-host.service`, `Restart=on-failure`, `RestartPreventExitStatus=3`, `KillMode=mixed`, không có `[Install]` (agent `systemctl --user start` khi cần).
