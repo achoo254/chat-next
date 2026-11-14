@@ -12,7 +12,7 @@ export interface CustomKey {
 }
 
 export interface KeyPrefs {
-	/** Ids of the row in order: built-in keys, "ctrl", "alt", "paste" and custom ids. */
+	/** Ids of the row in order: built-in keys, "ctrl", "alt", "copy", "paste" and custom ids. */
 	readonly order: readonly string[];
 	readonly hidden: readonly string[];
 	readonly custom: readonly CustomKey[];
@@ -41,6 +41,7 @@ export const DEFAULT_ORDER: readonly string[] = [
 	"ctrl-d",
 	"ctrl-l",
 	"ctrl-r",
+	"copy",
 	"paste",
 ];
 

@@ -18,6 +18,7 @@ import type { LatencyProbe } from "./latency-probe.ts";
 import { TouchScroller } from "./touch-scroll.ts";
 import { noAutofill } from "./no-autofill.ts";
 import { openWebLink } from "./open-web-link.ts";
+import { keepScrollbarVisible } from "./terminal-scrollbar.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 import { showCursorWithoutFocus } from "./terminal-cursor.ts";
@@ -45,6 +46,8 @@ export interface PaneHandle {
 	caret(): { readonly x: number; readonly y: number; readonly height: number } | null;
 	/** The pane's text, scrollback included: what the program printed before it exited. */
 	text(): string;
+	/** The text selected in the pane, "" when none. */
+	selection(): string;
 }
 
 export interface TerminalViewProps {
@@ -269,8 +272,18 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				term.onBinary((data) => link.input(session, Uint8Array.from(data, (c) => c.charCodeAt(0) & 0xff))),
 				term.onResize(({ cols, rows }) => link.resize(session, cols, rows)),
 				term.onTitleChange((text) => title(text)),
+				keepScrollbarVisible(host, term),
 			];
-			term.attachCustomKeyEventHandler((event) => !(event.type === "keydown" && shortcut(event)));
+			term.attachCustomKeyEventHandler((event) => {
+				// Ctrl+Shift+C copies the selection (Ctrl+C alone stays the program's interrupt); with nothing selected it does nothing.
+				if (event.type === "keydown" && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === "KeyC") {
+					event.preventDefault();
+					const selected = term.getSelection();
+					if (selected !== "") void navigator.clipboard?.writeText(selected).catch(() => undefined);
+					return false;
+				}
+				return !(event.type === "keydown" && shortcut(event));
+			});
 			const observer = new ResizeObserver(fitSoon);
 			observer.observe(host);
 			// A finger scrolls the terminal itself (touch-scroll.ts): the history of the normal screen, or arrow
@@ -326,6 +339,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 					return { x: buffer.cursorX * width, y: buffer.cursorY * height, height };
 				},
 				text: screenText,
+				selection: () => term.getSelection(),
 			});
 			probe?.screen(session, screenText);
 			cleanup = () => {

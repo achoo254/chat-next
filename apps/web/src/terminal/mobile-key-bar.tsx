@@ -3,7 +3,7 @@
 // orders them: hiding the keyboard (while it is up), Esc, Tab, Shift+Tab (Claude
 // Code's permission modes), Ctrl and Alt (tap: the next key; tap twice: held
 // until tapped again), the arrows, Enter, Ctrl+C on its own, then / - | ~ $ >
-// and Backspace, Ctrl+D, Ctrl+L, Ctrl+R, paste, and "more" for Del, Home,
+// and Backspace, Ctrl+D, Ctrl+L, Ctrl+R, copy, paste, and "more" for Del, Home,
 // End, PgUp, PgDn and F1 to F12. Arrows, Backspace and Del repeat while held
 // (after 400 ms, every 45 ms). A key never takes the focus from the
 // terminal's input, so the phone keyboard stays up: its mousedown is
@@ -193,6 +193,7 @@ export interface BarLabels {
 	readonly interrupt: string;
 	readonly backspace: string;
 	readonly paste: string;
+	readonly copy: string;
 	readonly more: string;
 	readonly liveInput: string;
 	readonly tapToType: string;
@@ -217,6 +218,8 @@ interface MobileKeyBarProps {
 	/** A key of the user's own: its text as typed (the dock applies held Ctrl/Alt). */
 	onText(text: string): void;
 	onPaste(): void;
+	/** Copy the focused pane's selected text to the clipboard. */
+	onCopy(): void;
 	onKeyboard(): void;
 	/** The "more" key: the sheet of other keys, combos, macros and managing the row. */
 	onMore(): void;
@@ -266,6 +269,7 @@ export function keyText(id: string, labels: BarLabels, custom: readonly CustomKe
 	if (id === "ctrl") return labels.ctrl;
 	if (id === "alt") return labels.alt;
 	if (id === "paste") return labels.paste;
+	if (id === "copy") return labels.copy;
 	const item = ITEM_BY_ID.get(id);
 	if (item !== undefined) return item.text;
 	return custom.find((c) => c.id === id)?.label ?? id;
@@ -274,7 +278,7 @@ export function keyText(id: string, labels: BarLabels, custom: readonly CustomKe
 /** Keeps the focus (and the phone keyboard) where it is. */
 export const keepFocus = (event: MouseEvent) => event.preventDefault();
 
-export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, onKey, onText, onPaste, onKeyboard, onMore }: MobileKeyBarProps) {
+export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, onKey, onText, onPaste, onCopy, onKeyboard, onMore }: MobileKeyBarProps) {
 	const lastTap = useRef<Record<Modifier, number>>({ ctrl: 0, alt: 0 });
 	const stopRepeat = useRef<(() => void) | null>(null);
 	const stop = () => {
@@ -343,10 +347,11 @@ export function MobileKeyBar({ labels, mods, keyboard, row, custom, onToggle, on
 	};
 	const byId = (id: string) => {
 		if (id === "ctrl" || id === "alt") return modKey(id);
-		if (id === "paste") {
+		// Copy and Paste say their word: an icon for either is hard to tell apart.
+		if (id === "paste" || id === "copy") {
 			return (
-				<button key={id} type="button" className="tx-key" aria-label={labels.paste} onMouseDown={keepFocus} onClick={onPaste}>
-					⎘
+				<button key={id} type="button" className="tx-key" data-key={id} onMouseDown={keepFocus} onClick={id === "paste" ? onPaste : onCopy}>
+					{labels[id]}
 				</button>
 			);
 		}

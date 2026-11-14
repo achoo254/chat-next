@@ -166,6 +166,7 @@ describe("the terminal's key row", () => {
 		interrupt: "Ctrl+C (dừng)",
 		backspace: "Xoá lùi",
 		paste: "Dán",
+		copy: "Sao chép",
 		more: "Thêm phím",
 		liveInput: "Nhập trực tiếp",
 		tapToType: "Chạm để hiện bàn phím",
@@ -184,6 +185,7 @@ describe("the terminal's key row", () => {
 		const toggles: [string, number][] = [];
 		let keyboard = 0;
 		let pasted = 0;
+		let copied = 0;
 		let more = 0;
 		const texts: string[] = [];
 		const { rerender } = render(
@@ -197,6 +199,7 @@ describe("the terminal's key row", () => {
 				onKey={(k) => keys.push(k)}
 				onText={(text) => texts.push(text)}
 				onPaste={() => (pasted += 1)}
+				onCopy={() => (copied += 1)}
 				onKeyboard={() => (keyboard += 1)}
 				onMore={() => (more += 1)}
 			/>,
@@ -207,6 +210,13 @@ describe("the terminal's key row", () => {
 		expect(screen.queryByRole("button", { name: "Ẩn bàn phím" })).toBeNull();
 		expect(names).toContain("Ctrl+C (dừng)");
 		expect(screen.queryByText("F5")).toBeNull();
+		// Copy and Paste are words on the keys, not icons, and each does its own job.
+		expect(screen.getByRole("button", { name: "Sao chép" }).textContent).toBe("Sao chép");
+		expect(screen.getByRole("button", { name: "Dán" }).textContent).toBe("Dán");
+		await userEvent.click(screen.getByRole("button", { name: "Sao chép" }));
+		await userEvent.click(screen.getByRole("button", { name: "Dán" }));
+		expect([copied, pasted]).toEqual([1, 1]);
+		pasted = 0;
 		await userEvent.click(screen.getByRole("button", { name: "Shift+Tab" }));
 		await userEvent.click(screen.getByRole("button", { name: "Ctrl+C (dừng)" }));
 		expect(keys).toEqual(["shift-tab", "ctrl-c"]);
@@ -226,6 +236,7 @@ describe("the terminal's key row", () => {
 				onKey={() => undefined}
 				onText={(text) => texts.push(text)}
 				onPaste={() => undefined}
+				onCopy={() => undefined}
 				onKeyboard={() => undefined}
 				onMore={() => (more += 1)}
 			/>,

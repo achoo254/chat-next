@@ -55,6 +55,8 @@
 .tx-term .xterm { height: 100%; }
 /* The leftover pixels under the last row show the viewport; xterm leaves it black, so it takes the terminal colour. */
 .tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
+/* xterm fades its overlay scrollbar out after a moment; with history to scroll (terminal-scrollbar.ts) it stays, with a faint track. */
+.tx-term[data-scrollable] .xterm-scrollable-element > .scrollbar.vertical { opacity: 1 !important; pointer-events: auto !important; transition: none !important; background: rgb(230 232 238 / 0.06); }
 .tx-divider { position: absolute; z-index: 2; touch-action: none; }
 .tx-divider.row { width: 8px; margin-left: -4px; cursor: col-resize; }
 .tx-divider.column { height: 8px; margin-top: -4px; cursor: row-resize; }

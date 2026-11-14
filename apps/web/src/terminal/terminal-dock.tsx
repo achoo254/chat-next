@@ -494,6 +494,11 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			() => undefined,
 		);
 	};
+	/** Copy the focused pane's selection to the clipboard (nothing selected: nothing happens). */
+	const copy = () => {
+		const selected = focused === null ? "" : (handles.current.get(focused.id)?.selection() ?? "");
+		if (selected !== "") void navigator.clipboard?.writeText(selected).catch(() => undefined);
+	};
 	const keyboardUp = imeOpen || keyboard > 0;
 	/** The keyboard key and the live input: up when it is down (at the caret), down when it is up. */
 	const toggleKeyboard = () => {
@@ -706,6 +711,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						onKey={barKey}
 						onText={send}
 						onPaste={paste}
+						onCopy={copy}
 						onKeyboard={toggleKeyboard}
 						onMore={() => setSheet(true)}
 					/>
