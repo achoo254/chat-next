@@ -5,9 +5,6 @@
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import {
 	ApprovalItemSchema,
-	GitChangesSchema,
-	GitFileChangeSchema,
-	GitFileState,
 	ItemSchema,
 	PromptState,
 	QuestionItemSchema,
@@ -15,10 +12,9 @@ import {
 	ToolKind,
 	TurnItemSchema,
 	TurnState,
-	type GitFileChange,
 	type Item,
 } from "@achoo254/chat-proto/remote/remote";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
@@ -27,11 +23,9 @@ import { ServicesContext, type Services } from "../../src/messaging/data/service
 import { ApprovalCard, siteLabel } from "../../src/machines/cards/approval.tsx";
 import { QuestionCard } from "../../src/machines/cards/question.tsx";
 import { TurnLine, costText, durationText, turnText } from "../../src/machines/cards/turn-line.tsx";
-import { ChangesPanel, changesCount } from "../../src/machines/changes-panel.tsx";
 import { enMachines } from "../../src/machines/copy-en.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import { zhCNMachines } from "../../src/machines/copy-zh-CN.ts";
-import { sessionChanges } from "../../src/machines/transcript/changes.ts";
 import { foldTranscript } from "../../src/machines/transcript/tool-fold.ts";
 
 type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
@@ -82,11 +76,6 @@ describe("a turn's line", () => {
 		expect(blocks.filter((b) => b.kind === "diff").map((b) => b.id)).toEqual(["diff:b"]);
 		const runs = blocks.flatMap((b) => (b.kind === "tools" ? b.runs : []));
 		expect(runs.find((r) => r.call?.toolId === "task")?.subagentFiles).toEqual(["src/b.ts", "src/a.ts"]);
-		// "Thay đổi" keeps every edit, the subagent's too.
-		expect(sessionChanges(items).map((c) => [c.path, c.edits.length])).toEqual([
-			["src/a.ts", 2],
-			["src/b.ts", 1],
-		]);
 		if (turn?.kind !== "turn") throw new Error("no turn");
 		expect(turnText(turn.turn, turn.tools, turn.files, viMachines, "vi")).toBe("Xong · 1 phút 17 giây · 3 tool · 2 file");
 	});
@@ -128,91 +117,6 @@ describe("a turn's line", () => {
 		const { container } = wrap(<TurnLine turn={turn} tools={0} files={0} t={viMachines} locale="vi" />);
 		expect(container.querySelector("details")).toBeNull();
 		expect(screen.getByText("Xong · 1,2 giây")).toBeTruthy();
-	});
-});
-
-const gitFile = (path: string, state: GitFileState, extra: { truncated?: boolean; sensitive?: boolean; unified?: string } = {}): GitFileChange =>
-	create(GitFileChangeSchema, {
-		path,
-		state,
-		added: 2,
-		removed: 1,
-		unified: extra.unified ?? `--- a/${path}\n+++ b/${path}\n@@ -1 +1,2 @@\n-a\n+b\n+c`,
-		truncated: extra.truncated ?? false,
-		sensitive: extra.sensitive ?? false,
-	});
-
-describe("the changes panel", () => {
-	const history = sessionChanges([item("diff:1", 1, diff("e1", "src/a.ts"))]);
-	const noop = async () => undefined;
-
-	it("shows git's part and the AI's part; the count follows git", async () => {
-		const git = create(GitChangesSchema, {
-			threadId: "t",
-			git: true,
-			files: [gitFile("made-by-shell.txt", GitFileState.UNTRACKED, { truncated: true }), gitFile(".env", GitFileState.MODIFIED, { sensitive: true, unified: "" })],
-		});
-		expect(changesCount(history, git)).toBe(2);
-		expect(changesCount(history, null)).toBe(1);
-		const asked: string[] = [];
-		wrap(
-			<ChangesPanel
-				gitElsewhere={false}
-				ai="Claude"
-				changes={history}
-				gitSupported
-				git={git}
-				full={new Map()}
-				onFetchFull={noop}
-				onGitFileDiff={async (path) => {
-					asked.push(path);
-					return gitFile(path, GitFileState.UNTRACKED, { unified: "--- /dev/null\n+++ b/made-by-shell.txt\n@@ -0,0 +1,3 @@\n+x\n+y\n+whole" });
-				}}
-				onClose={() => undefined}
-			/>,
-		);
-		expect(screen.getByRole("heading", { name: "Chưa commit trong thư mục" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Claude đã sửa" })).toBeTruthy();
-		expect(screen.getByText("2 file")).toBeTruthy();
-		expect(screen.getByText("Mới")).toBeTruthy();
-		await userEvent.click(screen.getByRole("button", { name: /made-by-shell\.txt/ }));
-		await userEvent.click(screen.getByRole("button", { name: /Xem đủ/ }));
-		await waitFor(() => expect(asked).toEqual(["made-by-shell.txt"]));
-		await waitFor(() => expect(document.body.textContent).toContain("whole"));
-		await userEvent.click(screen.getByRole("button", { name: "Danh sách file" }));
-		await userEvent.click(screen.getByRole("button", { name: /\.env/ }));
-		expect(screen.getByText("File nhạy cảm nên không hiện nội dung.")).toBeTruthy();
-	});
-
-	it("where Source Control lists the folder's uncommitted files, only the AI's edits, counted alone", () => {
-		const git = create(GitChangesSchema, { threadId: "t", git: true, files: [gitFile("made-by-shell.txt", GitFileState.UNTRACKED), gitFile("b.txt", GitFileState.MODIFIED)] });
-		wrap(<ChangesPanel gitElsewhere ai="Claude" changes={history} gitSupported git={git} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
-		expect(screen.queryByRole("heading", { name: "Chưa commit trong thư mục" })).toBeNull();
-		expect(screen.getByRole("heading", { name: "Claude đã sửa" })).toBeTruthy();
-		expect(screen.getByText("1 file")).toBeTruthy();
-	});
-
-	it("outside git, and on an older machine, only the AI's part", () => {
-		const { unmount } = wrap(
-			<ChangesPanel gitElsewhere={false} ai="Claude" changes={[]} gitSupported git={create(GitChangesSchema, { threadId: "t", git: false })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
-		);
-		expect(screen.getByText("Thư mục này không dùng git, nên chỉ có các lần sửa ở dưới.")).toBeTruthy();
-		expect(screen.getByText(/Claude chưa sửa file nào bằng công cụ sửa file/)).toBeTruthy();
-		expect(screen.queryByRole("heading", { name: "Chưa commit trong thư mục" })).toBeNull();
-		unmount();
-		wrap(<ChangesPanel gitElsewhere={false} ai="Claude" changes={[]} gitSupported={false} git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
-		expect(screen.getByText("Claude chưa sửa file nào trong phiên này.")).toBeTruthy();
-		expect(screen.queryByRole("heading")).toBeNull();
-	});
-
-	it("says it is asking git until the list arrives, and when nothing waits to be committed", () => {
-		const { unmount } = wrap(<ChangesPanel gitElsewhere={false} ai="Claude" changes={history} gitSupported git={null} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />);
-		expect(screen.getByText("Đang hỏi git…")).toBeTruthy();
-		unmount();
-		wrap(
-			<ChangesPanel gitElsewhere={false} ai="Claude" changes={history} gitSupported git={create(GitChangesSchema, { threadId: "t", git: true })} full={new Map()} onFetchFull={noop} onGitFileDiff={async () => null} onClose={() => undefined} />,
-		);
-		expect(screen.getByText("Không có thay đổi nào chưa commit.")).toBeTruthy();
 	});
 });
 

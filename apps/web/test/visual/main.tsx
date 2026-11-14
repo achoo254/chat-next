@@ -656,26 +656,6 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".mx-details button", /Chi tiết/);
 		await find(() => document.querySelector(".mx-pop"));
 	},
-	// The files Claude changed in the session, then one file's diffs.
-	changes: async () => {
-		await find(() => document.querySelector(".mx-status .mx-mode"));
-		await click(".mx-changes-btn", /Thay đổi/);
-		await find(() => document.querySelector(".mx-file"));
-	},
-	"changes-file": async () => {
-		await find(() => document.querySelector(".mx-status .mx-mode"));
-		await click(".mx-changes-btn", /Thay đổi/);
-		await click(".mx-file", /tool-run/);
-		await find(() => document.querySelector(".mx-changes .mx-diff"));
-	},
-	// One file of the folder's git changes, fetched whole with "Xem đủ".
-	"changes-git-file": async () => {
-		await find(() => document.querySelector(".mx-status .mx-mode"));
-		await click(".mx-changes-btn", /Thay đổi/);
-		await click(".mx-file", /build-log/);
-		await click(".mx-changes .mx-diff button", /Xem đủ/);
-		await find(() => [...document.querySelectorAll(".mx-changes .mx-diff")].find((el) => el.textContent?.includes("1440")) ?? null);
-	},
 	// The workspace panel (Alt+Shift+E): the Explorer with two folders open, git's marks, an ignored folder dimmed.
 	"workspace-explorer": async () => {
 		await openWorkspacePanel();

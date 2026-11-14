@@ -4,12 +4,17 @@
 // A secret file never asks (the machine would send no content anyway); a
 // very long diff draws its first lines and says so.
 import { useEffect, useState } from "react";
-import type { GitFileChange, WsGitDiffSource } from "@achoo254/chat-proto/remote/remote";
+import { create } from "@bufbuild/protobuf";
+import { DiffItemSchema, type DiffItem, type GitFileChange, type WsGitDiffSource } from "@achoo254/chat-proto/remote/remote";
 import { DiffCard } from "../../cards/diff.tsx";
-import { asDiff } from "../../changes-panel.tsx";
 import { useMachinesCopy } from "../../use-machines-copy.ts";
 import { usePanelCopy } from "../use-panel-copy.ts";
 import { ask, type WsLink } from "../ws-client.ts";
+
+/** A git file's diff in the shape the diff card draws. */
+function asDiff(file: GitFileChange): DiffItem {
+	return create(DiffItemSchema, { path: file.path, unified: file.unified, added: file.added, removed: file.removed, truncated: file.truncated });
+}
 
 /** Lines a diff draws at most; the machine already caps it at 1 MiB. */
 export const MAX_DIFF_LINES = 3000;

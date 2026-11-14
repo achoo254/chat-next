@@ -317,7 +317,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-messages-wrap { position: relative; display: flex; flex: 1; min-height: 0; }
 .mx-messages { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 .mx-jump { position: absolute; left: 50%; bottom: var(--space-3); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--c-border); border-radius: var(--radius-full); background: var(--c-surface); color: var(--c-text); font-size: 0.8125rem; box-shadow: var(--shadow-md); cursor: pointer; }
-.mx-jump .count, .mx-changes-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--c-bar-track); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+.mx-jump .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--c-bar-track); font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 .mx-menu-note { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: var(--space-2); margin: 0; padding: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-menu-note.ok .icon { color: var(--c-success); }
 /* A text-only note has no icon to fill the 18px column, so the text takes the full width. */
@@ -578,26 +578,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-slash .arg { color: var(--c-text-muted); }
 .mx-slash small { color: var(--c-text-muted); font-size: 0.75rem; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 
-/* Changes of the session: a panel at the right, a sheet on phones. */
-.mx-changes-backdrop { display: none; }
-.mx-changes { display: flex; flex-direction: column; width: min(440px, 45%); flex: none; min-height: 0; border-left: 1px solid var(--c-border-subtle); background: var(--c-surface); }
-.mx-changes-head { display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
-.mx-changes-head .title { flex: 1; display: grid; min-width: 0; }
-.mx-changes-head .title strong, .mx-changes-head .title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mx-changes-head .title span { font-size: 0.75rem; color: var(--c-text-muted); font-family: var(--font-mono); }
-.mx-changes-body { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: var(--space-3); padding: var(--space-3); }
-.mx-changes-body .note, .mx-changes-body .muted { margin: 0; }
-.mx-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.mx-file { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); width: 100%; min-height: 52px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text); text-align: left; cursor: pointer; }
-.mx-file:hover { background: var(--c-hover); }
-.mx-file .tx { display: grid; min-width: 0; }
-.mx-file b, .mx-file small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mx-file b { font-weight: 500; }
-.mx-file small { font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
-.mx-file .nums { display: grid; justify-items: end; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-.mx-file .add, .mx-st-lines .add { color: var(--c-success-text); }
-.mx-file .del, .mx-st-lines .del { color: var(--c-error-text); }
-.mx-file .nums small { font-family: inherit; }
+.mx-st-lines .add { color: var(--c-success-text); }
+.mx-st-lines .del { color: var(--c-error-text); }
 
 /* New session */
 .modal.mx-sheet { width: min(640px, calc(100vw - 32px)); }
@@ -675,7 +657,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 /* A narrow page column (tablets beside the sessions, phones): short labels in the header, the dock and the status line. */
 @container (max-width: 560px) {
 	.mx-head .mx-chip { padding: 0; width: 24px; justify-content: center; border: 0; }
-	.mx-account .mx-st-btn > span, .mx-head .mx-chip > span, .mx-head .title .hide-narrow, .mx-changes-btn .hide-narrow, .mx-details .mx-st-btn > span, .mx-kbd { display: none; }
+	.mx-account .mx-st-btn > span, .mx-head .mx-chip > span, .mx-head .title .hide-narrow, .mx-details .mx-st-btn > span, .mx-kbd { display: none; }
 	.mx-usage .mx-bar, .mx-st-btn > span + .icon, .mx-mode > span + .icon { display: none; }
 	.mx-status-row .mx-mode .icon:first-child { display: none; }
 	.mx-dock .acts { display: grid; grid-template-columns: 1fr 1fr; }
@@ -686,8 +668,8 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 }
 /* Phones: one column at a time. */
 @media (max-width: 760px) {
-	/* Phone: the session header is the way back, the title and one menu; the mode, the changes and the panel are in it. */
-	.mx-chat > .mx-head .mx-view-switch, .mx-chat > .mx-head .mx-changes-btn, .mx-chat > .mx-head .ws-toggle { display: none; }
+	/* Phone: the session header is the way back, the title and one menu; the mode and the panel are in it. */
+	.mx-chat > .mx-head .mx-view-switch, .mx-chat > .mx-head .ws-toggle { display: none; }
 	.mx-menu-narrow { display: contents; }
 	.mx-compose-box { width: calc(100% - 2 * var(--space-3)); margin-bottom: calc(var(--space-2) + env(safe-area-inset-bottom)); }
 	.mx { grid-template-columns: minmax(0, 1fr); }
@@ -709,12 +691,9 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-dock .acts { display: grid; grid-template-columns: 1fr 1fr; }
 	.mx-kbd { display: none; }
 	.mx-head .mx-chip { padding: 0; width: 24px; justify-content: center; border: 0; }
-	.mx-changes-btn { min-width: 44px; padding-inline: var(--space-2); }
 	.mx-status-row { gap: var(--space-1); }
 	.mx-st-btn { padding: 0 var(--space-1); }
 	.mx-pop { width: auto; }
-	.mx-changes-backdrop { display: block; position: fixed; inset: 0; z-index: 30; border: 0; background: var(--c-backdrop); }
-	.mx-changes { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; width: auto; max-height: 85dvh; border-left: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-lg); padding-bottom: env(safe-area-inset-bottom); }
 	.mx-composer { padding: var(--space-2) var(--space-3); }
 	.mx-tray-item { width: 100%; }
 	.mx-sent-img { width: 96px; height: 96px; }
@@ -777,10 +756,6 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-turn dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .mx-turn dd small { display: block; color: var(--c-text-muted); }
 
-/* "Thay đổi": the git part and the AI's part. */
-.mx-changes-sec { display: grid; gap: var(--space-2); }
-.mx-changes-sec h3 { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
-.mx-file .nums .mx-tag { justify-self: end; }
 
 /* The sites of the sign-in secrets a command reads. */
 .mx-secret-sites { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
@@ -892,7 +867,6 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 	.mx-chat[data-mode="terminal"] .mx-sub-pill { display: inline-flex; min-width: 0; }
 	.mx-chat[data-mode="terminal"] .mx-sub-pill .tx-pill { display: inline-flex; margin: 0; padding: 0; border: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 	.mx-chat[data-mode="terminal"] .mx-sub-pill:has(.tx-pill) ~ * { display: none; }
-	.mx-chat[data-mode="terminal"] .mx-end-btn { display: none; }
 	.mx-chat[data-mode="terminal"] > .mx-head .icon-btn { width: 44px; height: 44px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
 }
 /* The session header's button of the workspace panel (the panel's own styles load with it). */

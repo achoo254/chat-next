@@ -3,8 +3,7 @@
 // answers, code highlighting, diffs with line numbers, the session's
 // changed files, the prompt card's keys and "deny and tell", and the
 // composer's single send/stop button and "@" files.
-import { create } from "@bufbuild/protobuf";
-import { Decision, ItemSchema, PromptState, ThreadState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
+import { Decision, PromptState, ThreadState, ToolKind, type ApprovalItem } from "@achoo254/chat-proto/remote/remote";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -20,7 +19,6 @@ import { highlight, languageOfPath } from "../../src/machines/rich/highlight.ts"
 import Markdown, { safeHref } from "../../src/machines/rich/markdown.tsx";
 import { versionAtLeast } from "../../src/machines/session-chat.tsx";
 import { matches } from "../../src/machines/session-sidebar.tsx";
-import { sessionChanges } from "../../src/machines/transcript/changes.ts";
 import { canonicalAiPath } from "../../src/machines/ai-paths.ts";
 import { matchRoute, paths } from "../../src/router.tsx";
 import { boxValue } from "../support/plain-text-box.ts";
@@ -156,7 +154,7 @@ describe("highlighting", () => {
 	});
 });
 
-describe("diffs and changes", () => {
+describe("diffs", () => {
 	it("numbers old and new lines from each hunk", () => {
 		const lines = diffLines("--- a/x\n+++ b/x\n@@ -10,3 +10,3 @@\n a\n-b\n+c\n d\n");
 		expect(lines.map((l) => [l.kind, l.old, l.new])).toEqual([
@@ -167,17 +165,6 @@ describe("diffs and changes", () => {
 			["del", 11, null],
 			["add", null, 11],
 			["ctx", 12, 12],
-		]);
-	});
-
-	it("gathers the session's edits by file, in the order first changed", () => {
-		const diff = (id: string, path: string, added: number, removed: number) =>
-			create(ItemSchema, { id, body: { case: "diff", value: { path, unified: "", added, removed } } });
-		const text = create(ItemSchema, { id: "t", body: { case: "text", value: { text: "hi" } } });
-		const changes = sessionChanges([diff("1", "b.ts", 2, 1), text, diff("2", "a.ts", 1, 0), diff("3", "b.ts", 3, 3)]);
-		expect(changes.map((c) => [c.path, c.added, c.removed, c.edits.map((e) => e.id)])).toEqual([
-			["b.ts", 5, 4, ["1", "3"]],
-			["a.ts", 1, 0, ["2"]],
 		]);
 	});
 });

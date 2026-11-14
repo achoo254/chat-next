@@ -278,14 +278,15 @@ describe("a session in chat or in its terminal", () => {
 		expect(screen.queryByRole("status", { name: "Mở trong terminal" })).toBeNull();
 	});
 
-	it("in terminal mode the header has no 'running in the terminal' chip (the pill and Kết thúc say it); the switch shows which side is on", async () => {
+	it("in terminal mode the header has no 'running in the terminal' chip and no Kết thúc button (the pill says it); the switch shows which side is on", async () => {
 		held = 1;
 		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
 		const group = await screen.findByRole("group", { name: "Mở phiên bằng" });
 		expect(group.className).toBe("mx-view-switch");
 		expect(within(group).getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe("true");
 		expect(within(group).getByRole("button", { name: "Trò chuyện" }).getAttribute("aria-pressed")).toBe("false");
-		await screen.findByRole("button", { name: "Kết thúc" });
+		await screen.findByRole("group", { name: "Mở phiên bằng" });
+		expect(screen.queryByRole("button", { name: "Kết thúc" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Đang chạy trong terminal" })).toBeNull();
 		expect(screen.queryByRole("status", { name: "Đang mở ngoài app" })).toBeNull();
 	});

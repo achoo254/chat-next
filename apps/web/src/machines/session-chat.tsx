@@ -11,7 +11,7 @@
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../router.tsx";
@@ -25,10 +25,9 @@ import { TurnLine } from "./cards/turn-line.tsx";
 import { AccountMenu, profileName } from "./account-menu.tsx";
 import { limitsOf, type UploadLink } from "./attachments.ts";
 import { DropZone, MessageAttachments, useFileDrop } from "./attachment-tray.tsx";
-import { ChangesPanel, changesCount } from "./changes-panel.tsx";
 import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
-import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
+import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
@@ -38,7 +37,6 @@ import { PageHead } from "./page-head.tsx";
 import { ProjectConfigHint } from "./project-config.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
-import { sessionChanges } from "./transcript/changes.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
 import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
@@ -76,7 +74,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const [, projects] = useAgentProjects();
 	const [link, state] = useLink(hub, machine);
 	useWatch(link, threadId);
-	const [changesOpen, setChangesOpen] = useState(false);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
 	const all = foldTranscript(items, state.pending.get(threadId) ?? []);
@@ -88,9 +85,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	/** The machine's whole screen shows over the session. */
 	const [screenOpen, setScreenOpen] = useState(false);
 	const openScreen = state.info?.screenShare === true ? () => setScreenOpen(true) : undefined;
-	const changes = sessionChanges(items);
-	const gitSupported = state.info?.gitChanges === true;
-	const git = state.gitChanges.get(threadId) ?? null;
 	const provider = thread?.provider ?? items.at(-1)?.provider ?? "";
 	const ai = aiName(state.info, provider);
 	const caps = providerOf(state.info, provider)?.capabilities;
@@ -155,23 +149,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 		},
 		[link, threadId],
 	);
-	const closeChanges = useCallback(() => setChangesOpen(false), []);
-	// The folder's git changes: once the session shows (for the count), again whenever the panel opens.
-	const hasThread = thread !== null;
-	useEffect(() => {
-		if (!online || !gitSupported || !hasThread) return;
-		link.request({ case: "threadGitChanges", value: { threadId } }).catch(() => undefined);
-	}, [link, threadId, online, gitSupported, hasThread, changesOpen]);
-	const gitFileDiff = async (path: string): Promise<GitFileChange | null> => {
-		try {
-			const frame = await link.request({ case: "gitFileDiff", value: { threadId, path } });
-			return frame.body.case === "gitFileDiffResult" ? (frame.body.value.file ?? null) : null;
-		} catch (err) {
-			// The file has no uncommitted change any more.
-			if (err instanceof RemoteError && err.code === ErrorCode.NOT_FOUND) return null;
-			throw err;
-		}
-	};
 
 	// The header stays lean: only "offline" has a chip there. Waiting and running show in the conversation (the
 	// approval card, the live activity), and the terminal's pill and "Kết thúc" say when the terminal holds it.
@@ -181,9 +158,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
-	// Source Control lists the folder's uncommitted files: "Thay đổi" keeps to the AI's own edits.
-	const gitElsewhere = panel.workspace !== undefined;
-	const changeCount = changesCount(changes, gitSupported && !gitElsewhere ? git : null);
 	const toTerminal = offered && mode === "chat" && thread !== null
 		? () => {
 				rememberMode(machine, "terminal");
@@ -221,7 +195,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			}
 		: undefined;
 	return (
-		<div className="mx-chat" ref={chatRef} data-mode={mode} data-changes={changesOpen ? "open" : undefined} {...drop.handlers}>
+		<div className="mx-chat" ref={chatRef} data-mode={mode} {...drop.handlers}>
 			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
 			<PageHead
 				back={paths.machines()}
@@ -254,30 +228,12 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						<TerminalPill machine={machine} />
 					</Suspense>
 				)}
-				{mode === "terminal" && endTerminal !== undefined && (
-					<button type="button" className="btn btn-sm mx-end-btn" title={t.terminal.endHint} onClick={() => void endTerminal().catch(() => undefined)} data-id="session-terminal-end-btn">
-						{t.terminal.end}
-					</button>
-				)}
 				{chip !== null && (
 					<span className={`chip mx-chip ${chip}`} role="status" aria-label={t.chat.chip[chip]} title={t.chat.chip[chip]}>
 						<span className="hide-narrow" aria-hidden="true">
 							{t.chat.chip[chip]}
 						</span>
 					</span>
-				)}
-				{thread !== null && mode === "chat" && (
-					<button
-						type="button"
-						className="btn btn-sm mx-changes-btn"
-						aria-label={changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}
-						aria-expanded={changesOpen}
-						onClick={() => setChangesOpen((v) => !v)}
-					>
-						<MachineIcon name="ai-changes" small />
-						<span className="hide-narrow">{t.agent.header.changes}</span>
-						{changeCount > 0 && <span className="count">{changeCount}</span>}
-					</button>
 				)}
 				{thread !== null && <PanelToggle panel={panel} />}
 				<HeadMenu
@@ -299,15 +255,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 											<span>{t.terminal.mode[m]}</span>
 										</button>
 									))}
-							{thread !== null && mode === "chat" && (
-								<button type="button" role="menuitem" onClick={() => {
-									close();
-									setChangesOpen((v) => !v);
-								}}>
-									<MachineIcon name="ai-changes" small />
-									<span>{changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}</span>
-								</button>
-							)}
 							{thread !== null && panel.workspace !== undefined && (
 								<button type="button" role="menuitem" onClick={() => {
 									close();
@@ -428,19 +375,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				</div>
 				{screenOpen && <ScreenViewHost link={link} ai={ai} online={online} inSession onClose={() => setScreenOpen(false)} />}
 				{viewed !== undefined && <BrowserViewHost link={link} takeover={viewed} ai={ai} online={online} inSession onMinimize={() => setViewing(null)} />}
-				{changesOpen && (
-					<ChangesPanel
-						ai={ai}
-						changes={changes}
-						gitSupported={gitSupported}
-						git={git}
-						gitElsewhere={gitElsewhere}
-						full={state.full}
-						onFetchFull={fetchFull}
-						onGitFileDiff={gitFileDiff}
-						onClose={closeChanges}
-					/>
-				)}
 				{workspacePanel}
 			</div>
 			)}
@@ -502,7 +436,7 @@ function HeadMenu({
 	machineName: string;
 	dir: string;
 	/**
-	 * On a phone the header shows only the title and this menu: the mode, the changes and the panel come here.
+	 * On a phone the header shows only the title and this menu: the mode and the panel come here.
 	 * Each item closes the menu itself (`close`) when tapped.
 	 */
 	narrowItems?: (close: () => void) => ReactNode;
