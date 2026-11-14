@@ -28,6 +28,7 @@ import { aiName, providerOf, sessionProvider } from "./use-machines.ts";
 import { lastMode, modePath, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { loadsProjectConfig } from "./project-config.tsx";
+import { samePath } from "./projects-view.ts";
 
 const ExistingSessions = lazy(() => import("./existing-sessions.tsx"));
 
@@ -154,6 +155,17 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 				.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0))[0]
 		: undefined;
 
+	// The AI picked here becomes the project's own when the project had none, so the next session
+	// opened from the project in one tap uses it too (without it, that tap opens the machine's first AI).
+	const rememberAi = (dir: string) => {
+		const picked = projects.find((p) => p.id === projectId);
+		// The project as the machine lists it now: a device that gave it an AI meanwhile keeps its own.
+		if (chosen === "" || (picked?.defaults?.provider ?? "") !== "" || picked === undefined || !samePath(picked.dir, dir)) return;
+		const defaults = { provider, model: "", permissionMode: "", projectSettings: picked.defaults?.projectSettings ?? false };
+		// Nothing depends on it: a refusal leaves the project as it was.
+		link.request({ case: "projectUpdate", value: { id: picked.id, defaults } }).catch(() => undefined);
+	};
+
 	// `consent`: the user agreed to the sensitive folder; `trust`: to trusting its project settings.
 	const start = (consent: boolean, trust = false) => {
 		if (provider === "") return setError(t.newSession.noAi);
@@ -188,6 +200,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
 					onStarted?.(thread);
+					rememberAi(dir);
 					onClose();
 					if (offered) rememberMode(machine, openIn);
 					navigate(modePath(machine, thread.id, openIn));

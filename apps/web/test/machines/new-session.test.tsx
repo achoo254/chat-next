@@ -3,7 +3,7 @@
 // the folder, and opens the session waiting when no message is given. Project settings
 // in a folder the machine does not trust yet ask to trust it right there.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, LoginState, ProjectSchema, ThreadSummarySchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LoginState, ProjectSchema, ThreadSummarySchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -397,6 +397,51 @@ describe("the AI of a new session", () => {
 		fireEvent.click(screen.getByRole("radio", { name: /Claude Code/ }));
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		await waitFor(() => expect(created(again.sent)?.value).toMatchObject({ provider: "claude", permissionMode: "" }));
+	});
+
+	it("is kept by a project that had none, so the next one-tap session uses it", async () => {
+		const state = (project: Project) => ({ ...stateWith([], true, two(LoginState.OK, LoginState.OK)), projects: { projects: [project] } }) as unknown as LinkState;
+		const updates = (sent: Request[]) => sent.filter((r) => r.case === "projectUpdate") as (Request & { value: { id: string; defaults: { provider: string; model: string; permissionMode: string; projectSettings: boolean } } })[];
+		const mount = (link: MachineLink, project: Project) =>
+			render(
+				<I18nProvider>
+					<NewSession machine="1" name="Mac mini" link={link} state={state(project)} project={project} onClose={() => {}} />
+				</I18nProvider>,
+			);
+
+		// No AI of its own: the one picked is saved, with the project's other settings kept.
+		const bare = create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { projectSettings: true } });
+		const first = fakeLink();
+		const view = mount(first.link, bare);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		fireEvent.click(screen.getByRole("radio", { name: /Antigravity/ }));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(updates(first.sent)).toHaveLength(1));
+		expect(updates(first.sent)[0]?.value).toEqual({ id: "p", defaults: { provider: "antigravity", model: "", permissionMode: "", projectSettings: true } });
+		view.unmount();
+
+		// The AI left as it was offered is not a pick: nothing is saved.
+		const untouched = fakeLink();
+		const view2 = mount(untouched.link, bare);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(created(untouched.sent)).toBeDefined());
+		expect(updates(untouched.sent)).toHaveLength(0);
+		view2.unmount();
+
+		// A project with an AI of its own keeps it, whatever AI this one session picked.
+		const owned = create(ProjectSchema, { id: "q", name: "web", dir: "/w/web", defaults: { provider: "claude" } });
+		const other = fakeLink();
+		render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={other.link} state={state(owned)} project={owned} onClose={() => {}} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(folderInput().value).toBe("/w/web"));
+		fireEvent.click(screen.getByRole("radio", { name: /Antigravity/ }));
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(created(other.sent)?.value.provider).toBe("antigravity"));
+		expect(updates(other.sent)).toHaveLength(0);
 	});
 
 	it("is never sent empty: without a signed-in AI the dialog says why and starts nothing", async () => {
