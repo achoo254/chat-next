@@ -78,7 +78,7 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 				disabled={disabled || list === null}
 				onClick={() => setOpen((v) => !v)}
 			>
-				<MachineIcon name="user" small />
+				<MachineIcon name="ai-account" small />
 				<span>{label}</span>
 				<MachineIcon name="chevron-down" small />
 			</button>

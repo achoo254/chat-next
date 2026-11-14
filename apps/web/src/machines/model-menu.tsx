@@ -65,7 +65,7 @@ export function ModelMenu({ link, info, threadId, provider, model, answered, eff
 				disabled={disabled}
 				onClick={() => setOpen((v) => !v)}
 			>
-				<MachineIcon name="cpu" small />
+				<MachineIcon name="ai-model" small />
 				<span>{name}</span>
 				<MachineIcon name="chevron-down" small />
 			</button>

@@ -71,7 +71,7 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 		<div className="mx-status" role="group" aria-label={t.statusBar.label}>
 			{switchingTo !== "" && (
 				<p className="mx-status-note" role="status">
-					<MachineIcon name="user" small />
+					<MachineIcon name="ai-account" small />
 					{t.agent.account.pending(switchingTo)}
 				</p>
 			)}
@@ -224,7 +224,7 @@ function ModeMenu({ ai, mode, modes, bypass, link, threadId, disabled }: ModeMen
 	if (modes.length === 0) {
 		return (
 			<span className={className} title={t.agent.status.mode}>
-				<MachineIcon name="shield" small />
+				<MachineIcon name="ai-permission" small />
 				<span>{label(mode)}</span>
 			</span>
 		);
@@ -247,7 +247,7 @@ function ModeMenu({ ai, mode, modes, bypass, link, threadId, disabled }: ModeMen
 	return (
 		<div className="mx-model" ref={ref}>
 			<button type="button" className={className} title={t.statusBar.modeHint(ai)} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
-				<MachineIcon name="shield" small />
+				<MachineIcon name="ai-permission" small />
 				<span>{label(mode)}</span>
 				<MachineIcon name="chevron-down" small />
 			</button>
