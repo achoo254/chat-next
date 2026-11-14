@@ -98,7 +98,7 @@ mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử
 
 Có gì ở 3.3.1: phiên Claude chạy trong terminal của máy vẫn báo "đang chạy" khi model nghĩ lâu mà chưa ghi gì (cột AI Agent
 hiện biểu tượng đang chạy riêng của từng AI). Terminal mở lại từ thiết bị (đổi tab, Trò chuyện ⟷ Terminal, tải lại trang) cuộn
-lên được: `tunelo-term-host` giữ 1.000 dòng lịch sử và gửi kèm những dòng mới nhất vừa một khung.
+lên được: `tunelo-term-host` giữ 500 dòng lịch sử và gửi kèm những dòng mới nhất vừa một khung.
 
 Có gì ở 3.1.0: AI của phiên viết thông điệp commit từ phần đã stage (nút trong Source Control; chỉ AI nào khai báo được mới
 viết, không có AI mặc định; tệp bí mật chỉ gửi tên). Phiên chưa mở trên máy (chạy ở terminal, đang chờ tin đầu) vẫn có danh sách

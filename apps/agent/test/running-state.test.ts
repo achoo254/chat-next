@@ -128,6 +128,12 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     interrupted.t.user("[Request interrupted by user]");
     setTime(interrupted.t.write(interrupted.home), NOW - 5 * 60_000);
     expect((await new LocalSessions({ homes: () => [interrupted.home], now: () => NOW, processes: probe(interrupted.t.sessionId) }).liveness(interrupted.t.sessionId)).state).toBe("idle");
+    // An answer too long to read whole still ends the wait.
+    const long = session("done");
+    long.t.apiRequest();
+    long.t.assistant([{ type: "text", text: "y".repeat(300 * 1024) }]);
+    setTime(long.t.write(long.home), NOW - 5 * 60_000);
+    expect((await new LocalSessions({ homes: () => [long.home], now: () => NOW, processes: probe(long.t.sessionId) }).liveness(long.t.sessionId)).state).toBe("idle");
   });
 
   test("held open by a running claude while quiet: idle, and told as held once the processes were read", async () => {

@@ -42,6 +42,8 @@ const BUSY_MS = 60_000;
 export const TOOL_BUSY_MS = 10 * 60_000;
 /** How long a request to the model with no answer yet (an api-request record after the last message) keeps a held session busy. */
 export const REQUEST_BUSY_MS = 30 * 60_000;
+/** A record of the conversation itself (its top-level type; nested blocks are typed text, tool_use, ...). */
+const MESSAGE_TYPE = /"type":"(?:user|assistant)"/;
 /** The end of a transcript read for a tool call that has no result yet. */
 const TOOL_TAIL_BYTES = 256 * 1024;
 const TITLE_MAX = 120;
@@ -238,7 +240,10 @@ export class LocalSessions implements SessionHistory {
           COUNT_KEEP,
           (line, whole) => {
             if (!whole) {
-              for (const m of line.subarray(0, 4096).toString("utf8").matchAll(resultIds)) if (m[1]) open.delete(m[1]);
+              const head = line.subarray(0, 4096).toString("utf8");
+              for (const m of head.matchAll(resultIds)) if (m[1]) open.delete(m[1]);
+              // A message too long to keep whole (a huge answer or tool output) still ends a wait for the model.
+              if (MESSAGE_TYPE.test(head)) request = false;
               return;
             }
             const rec = parseRecord(line);

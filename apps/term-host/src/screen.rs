@@ -13,8 +13,10 @@ const MAX_HELD: usize = 4096;
 /// Longest window title kept for `list`.
 const MAX_TITLE: usize = 256;
 /// Rows of the normal screen kept after they scroll off its top, so a client
-/// that attaches later can scroll back to them (as many as fit a frame).
-pub const SCROLLBACK_ROWS: usize = 1000;
+/// that attaches later can scroll back to them (as many as fit a frame: a few
+/// hundred rows with colours, so keeping more would only cost memory, about
+/// 32 bytes per cell: 3.2 MB for a session 200 columns wide).
+pub const SCROLLBACK_ROWS: usize = 500;
 /// Erase the scrollback (ED 3), which vt100 ignores: a program sends it with a
 /// full redraw (Claude Code reprints its whole conversation after it), so the
 /// history kept must go too or a client would see that conversation twice.
@@ -216,8 +218,12 @@ impl Screen {
     }
 
     /// Forgets the rows above the normal screen: a new emulator takes over the
-    /// screen as it is (contents, cursor, modes, title). The history of a
-    /// program on the alternate screen stays, as its screen would be lost.
+    /// screen as it is (contents, cursor and its visibility, attributes, input
+    /// modes, title). What state_formatted() does not carry is lost: a scroll
+    /// region (DECSTBM), origin mode and a saved cursor, until the program sets
+    /// them again (Claude Code and a shell's `clear` use none of them). The
+    /// history of a program on the alternate screen stays, as its screen would
+    /// be lost.
     fn drop_scrollback(&mut self) {
         let screen = self.parser.screen();
         if screen.alternate_screen() {
@@ -512,6 +518,26 @@ mod tests {
         assert_eq!(rows, vec!["new 1".to_string(), "new 2".to_string()]);
         assert!(contents.starts_with("new 3"));
         assert_eq!(screen.title(), "claude");
+    }
+
+    #[test]
+    fn erase_scrollback_keeps_the_cursor_attributes_and_input_modes() {
+        let mut screen = Screen::new(5, 30);
+        for i in 1..=8 {
+            screen.process(format!("old {i}\r\n").as_bytes());
+        }
+        // Hidden cursor, bracketed paste, application cursor keys, bold red pen, cursor at row 3 col 5.
+        screen.process(b"\x1b[?25l\x1b[?2004h\x1b[?1h\x1b[1;31m\x1b[3J\x1b[3;5H");
+        screen.process(b"x");
+        let s = screen.parser.screen();
+        assert!(s.hide_cursor());
+        assert!(s.bracketed_paste());
+        assert!(s.application_cursor());
+        assert_eq!(s.cursor_position(), (2, 5));
+        let cell = s.cell(2, 4).map(|c| (c.contents(), c.bold(), c.fgcolor()));
+        assert_eq!(cell, Some(("x", true, vt100::Color::Idx(1))));
+        let (rows, _) = client_history(&screen.snapshot());
+        assert!(rows.is_empty());
     }
 
     #[test]
