@@ -89,7 +89,7 @@ export function placeByHand(store: AgentProjectsStore, host: Host, dir: string, 
 			if (added) await forget(host, folder.dir).catch(() => undefined);
 			throw new RemoteMismatchError();
 		}
-		store.setDetached({ machineId: host.id, dir: folder.dir }, false);
+		await store.setDetached({ machineId: host.id, dir: folder.dir }, false);
 		return store.change((api) => placeFolder(api, [...known], folder, options.target?.id));
 	});
 }
@@ -122,7 +122,7 @@ async function release(store: AgentProjectsStore, workspace: AgentWorkspace, hos
 	try {
 		await forget(host, workspace.dir);
 	} catch {
-		store.setDetached(key, true);
+		await store.setDetached(key, true);
 	}
 }
 
@@ -192,6 +192,10 @@ async function currentProjects(host: Host): Promise<readonly Project[] | undefin
 	}
 }
 
+function warnMark(err: unknown): void {
+	console.warn("ai: could not update the mark of a dropped folder", err);
+}
+
 /** One pass over `hosts`: folders they keep that no workspace records become workspaces. */
 export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncHost[]): Promise<number> {
 	const snapshot = store.snapshot();
@@ -211,14 +215,18 @@ export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncH
 			if (!store.isDetached(key)) continue;
 			// Placed again since (on another device): it stays.
 			if (findWorkspace(known, host.id, p.dir) !== undefined) {
-				store.setDetached(key, false);
+				await store.setDetached(key, false).catch(warnMark);
 				continue;
 			}
 			dropped.add(p.id);
 			await host.link.request({ case: "projectRemove", value: { id: p.id } }).then(
-				() => store.setDetached(key, false),
+				() => store.setDetached(key, false).catch(warnMark),
 				(err: unknown) => console.warn("ai: the machine did not drop a detached folder", err),
 			);
+		}
+		// A mark for a folder the machine no longer keeps: it dropped the folder (this device or another did it), so nothing is left to wait for.
+		for (const mark of store.detachedOf(host.id)) {
+			if (!own.some((p) => samePath(p.dir, mark.dir))) await store.setDetached(mark, false).catch(warnMark);
 		}
 		const result = await syncFolders(
 			store.api,

@@ -3,9 +3,10 @@
 // agent_projects_changed update), when the app comes back to the front and
 // after each change made here. One store per signed-in app, kept with the
 // link hub. It also remembers, on this device, the folders the user is
-// placing by hand right now (the sync leaves them alone) and the workspaces
-// detached while their machine was offline (the machine is told when it is
-// back, so the sync does not add them again).
+// placing by hand right now (the sync leaves them alone). The folders dropped
+// while their machine was offline (the machine is told when it is back, so
+// the sync does not add them again) are marked on the server, so every
+// device of the user leaves them alone, not only the one that dropped them.
 import { useEffect, useSyncExternalStore } from "react";
 import { EventKeys } from "@achoo254/chat-core";
 import { useServices, type Services } from "../messaging/data/services.tsx";
@@ -20,29 +21,9 @@ export interface ProjectsSnapshot {
 	readonly projects: readonly AgentProject[];
 }
 
-const DETACHED_KEY = "ai:detached";
-
 export interface FolderKey {
 	readonly machineId: number;
 	readonly dir: string;
-}
-
-function readDetached(): FolderKey[] {
-	try {
-		const parsed: unknown = JSON.parse(window.localStorage.getItem(DETACHED_KEY) ?? "[]");
-		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((x): x is FolderKey => typeof x === "object" && x !== null && typeof (x as FolderKey).machineId === "number" && typeof (x as FolderKey).dir === "string");
-	} catch {
-		return [];
-	}
-}
-
-function writeDetached(list: readonly FolderKey[]): void {
-	try {
-		window.localStorage.setItem(DETACHED_KEY, JSON.stringify(list));
-	} catch {
-		// Private mode: the machine is still told while this page stays open.
-	}
 }
 
 export class AgentProjectsStore {
@@ -51,7 +32,8 @@ export class AgentProjectsStore {
 	private loading: Promise<void> | null = null;
 	private again = false;
 	private readonly claims: FolderKey[] = [];
-	private detached: FolderKey[] = readDetached();
+	/** The folders marked as dropped: as the server listed them, and what this device marked since. */
+	private marks: FolderKey[] = [];
 
 	constructor(readonly api: AgentProjectsApi) {}
 
@@ -72,7 +54,9 @@ export class AgentProjectsStore {
 			do {
 				this.again = false;
 				try {
-					this.set({ status: "ready", projects: await this.api.list() });
+					const { projects, detached } = await this.api.listAll();
+					this.marks = [...detached];
+					this.set({ status: "ready", projects });
 				} catch {
 					// Shown as "error" with what was known; the next change, focus or update lists again.
 					this.set({ status: "error", projects: this.state.projects });
@@ -117,15 +101,32 @@ export class AgentProjectsStore {
 		return this.claims.some((c) => c.machineId === folder.machineId && samePath(c.dir, folder.dir));
 	}
 
-	/** Detached here while its machine could not be told. */
+	/** Dropped by the user while its machine could not be told (marked on the server, so by any device). */
 	isDetached(folder: FolderKey): boolean {
-		return this.detached.some((d) => d.machineId === folder.machineId && samePath(d.dir, folder.dir));
+		return this.marks.some((d) => d.machineId === folder.machineId && samePath(d.dir, folder.dir));
 	}
 
-	setDetached(folder: FolderKey, detached: boolean): void {
-		this.detached = this.detached.filter((d) => !(d.machineId === folder.machineId && samePath(d.dir, folder.dir)));
-		if (detached) this.detached.push({ machineId: folder.machineId, dir: folder.dir });
-		writeDetached(this.detached);
+	/** The folders of machine `machineId` marked as dropped. */
+	detachedOf(machineId: number): readonly FolderKey[] {
+		return this.marks.filter((d) => d.machineId === machineId);
+	}
+
+	/**
+	 * Marks a folder as dropped (its machine could not be told), or takes the
+	 * mark off (the machine dropped it, or it is recorded again). Takes effect
+	 * here at once, then on the server; the list that follows brings the
+	 * server's marks back, also when the server refused. Nothing is sent when
+	 * the mark is already as asked.
+	 */
+	async setDetached(folder: FolderKey, detached: boolean): Promise<void> {
+		if (this.isDetached(folder) === detached) return;
+		this.marks = this.marks.filter((d) => !(d.machineId === folder.machineId && samePath(d.dir, folder.dir)));
+		if (detached) this.marks.push({ machineId: folder.machineId, dir: folder.dir });
+		try {
+			await this.api.setFolderDetached(folder.machineId, folder.dir, detached);
+		} finally {
+			await this.refresh();
+		}
 	}
 
 	private set(next: ProjectsSnapshot): void {

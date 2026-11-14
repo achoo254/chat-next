@@ -49,8 +49,18 @@ export interface WorkspaceInput {
 	readonly kind: AgentWorkspaceKind;
 }
 
+/** A folder the user dropped while its machine could not be told (kept by the server). */
+export interface DetachedFolder {
+	readonly machineId: number;
+	readonly dir: string;
+}
+
 export interface AgentProjectsApi {
 	list(): Promise<AgentProject[]>;
+	/** The projects and, in the same call, the folders marked as dropped. */
+	listAll(): Promise<{ projects: AgentProject[]; detached: DetachedFolder[] }>;
+	/** Marks (or unmarks) a folder of a machine as dropped while the machine could not be told. */
+	setFolderDetached(machineId: number, dir: string, detached: boolean): Promise<void>;
 	/** `gitRemote`: a URL (the server keeps its key), or "" for none. */
 	create(name: string, gitRemote: string): Promise<AgentProject>;
 	rename(projectId: number, name: string): Promise<AgentProject>;
@@ -89,6 +99,13 @@ export function createAgentProjectsApi(transport: Transport): AgentProjectsApi {
 	const client = createClient(AgentProjectsService, transport);
 	return {
 		list: async () => (await client.listAgentProjects({})).projects.map(toProject),
+		listAll: async () => {
+			const reply = await client.listAgentProjects({});
+			return { projects: reply.projects.map(toProject), detached: reply.detachedFolders.map((f) => ({ machineId: Number(f.machineId), dir: f.dir })) };
+		},
+		setFolderDetached: async (machineId, dir, detached) => {
+			await client.setAgentFolderDetached({ machineId: BigInt(machineId), dir, detached });
+		},
 		create: async (name, gitRemote) => toProject(must((await client.createAgentProject({ name, gitRemote })).project, "create")),
 		rename: async (projectId, name) => toProject(must((await client.renameAgentProject({ projectId: BigInt(projectId), name })).project, "rename")),
 		link: async (projectId, gitRemote) => toProject(must((await client.updateAgentProject({ projectId: BigInt(projectId), gitRemote })).project, "link")),

@@ -10,7 +10,7 @@ import { RemoteError, type MachineLink } from "../../src/machines/link/machine-l
 type FrameBody = Parameters<MachineLink["request"]>[0];
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentProjectsStore } from "../../src/machines/agent-projects-store.ts";
-import { adoptStarted, detachWorkspace, linkRepository, placeByHand, RemoteMismatchError, splitWorkspace, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
+import { adoptStarted, deleteProject, detachWorkspace, linkRepository, placeByHand, RemoteMismatchError, splitWorkspace, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
 import { misplaced, placeFolder, syncFolders, type FolderInfo } from "../../src/machines/project-sync.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
 
@@ -457,5 +457,68 @@ describe("repairing workspaces grouped with another repository", () => {
 		]);
 		expect(store.snapshot().projects.find((p) => p.id === mixed.id)).toBeTruthy();
 		expect(server.log.filter((x) => x.startsWith("detach:") || x.startsWith("delete:"))).toEqual([]);
+	});
+});
+
+describe("a folder dropped while its machine was offline to the device that dropped it", () => {
+	it("stays dropped for the user's other devices, and the machine drops it when one of them reaches it", async () => {
+		const server = new FakeAgentProjects();
+		const phone = new AgentProjectsStore(server.api());
+		const pc = new AgentProjectsStore(server.api());
+		await Promise.all([phone.refresh(), pc.refresh()]);
+		const mac = host(1, [own("/w/app")]);
+		await syncHosts(phone, [mac]);
+		await pc.refresh();
+		const project = phone.snapshot().projects[0];
+		if (project === undefined) throw new Error("no project");
+
+		// The phone deletes the project while it cannot reach the machine: the folder is marked on the server.
+		await deleteProject(phone, project, () => null);
+		expect(server.projects).toEqual([]);
+		expect(server.detached).toEqual([{ machineId: 1, dir: "/w/app" }]);
+
+		// The PC reaches the machine, which still keeps the folder: it is not recorded again, and the machine drops it.
+		await pc.refresh();
+		expect(pc.isDetached({ machineId: 1, dir: "/w/app" })).toBe(true);
+		expect(await syncHosts(pc, [mac])).toBe(0);
+		expect(server.projects).toEqual([]);
+		expect(server.workspaces).toEqual([]);
+		expect(mac.projects).toEqual([]);
+		// Nothing is left marked once the machine has dropped it.
+		expect(server.detached).toEqual([]);
+	});
+
+	it("a mark for a folder the machine no longer keeps is taken off, and one for a folder it still keeps is not", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		server.detached = [
+			{ machineId: 1, dir: "/w/gone" },
+			{ machineId: 1, dir: "/w/kept" },
+		];
+		await store.refresh();
+		// The machine did not answer: nothing is judged from a list not asked for.
+		const silent = { ...host(1, [own("/w/kept")]), link: { request: () => Promise.reject(new Error("link closed")) } } as SyncHost;
+		await syncHosts(store, [silent]);
+		expect(server.detached).toHaveLength(2);
+		const mac = host(1, [own("/w/kept")]);
+		await syncHosts(store, [mac]);
+		// The kept folder is dropped by the machine now (a mark means the user dropped it); the gone one only had its mark left.
+		expect(mac.projects).toEqual([]);
+		expect(server.detached).toEqual([]);
+		expect(server.workspaces).toEqual([]);
+	});
+
+	it("recording the folder by hand takes its mark off, and marking twice sends one request", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		await store.setDetached({ machineId: 1, dir: "/w/app" }, true);
+		await store.setDetached({ machineId: 1, dir: "/w/app" }, true);
+		expect(server.log.filter((x) => x.startsWith("detached:"))).toEqual(["detached:1:/w/app:true"]);
+		const mac = host(1, [own("/w/app")]);
+		await placeByHand(store, mac as unknown as Parameters<typeof placeByHand>[1], "/w/app", {});
+		expect(store.isDetached({ machineId: 1, dir: "/w/app" })).toBe(false);
+		expect(server.detached).toEqual([]);
+		expect(server.workspaces.map((w) => w.dir)).toEqual(["/w/app"]);
 	});
 });

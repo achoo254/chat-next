@@ -8,7 +8,7 @@
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import { AgentProjectSchema, AgentProjectsService, AgentWorkspaceSchema, type AgentProject as WireProject } from "@achoo254/chat-proto/agent_projects";
-import { toProject, toWorkspace, type AgentProject, type AgentProjectsApi, type WorkspaceInput } from "../../src/machines/agent-projects-client.ts";
+import { toProject, toWorkspace, type AgentProject, type AgentProjectsApi, type DetachedFolder, type WorkspaceInput } from "../../src/machines/agent-projects-client.ts";
 import { canonicalRemote } from "../../src/machines/git-remote.ts";
 
 interface Row {
@@ -30,6 +30,8 @@ const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 export class FakeAgentProjects {
 	projects: Row[] = [];
 	workspaces: WsRow[] = [];
+	/** The folders marked as dropped (SetAgentFolderDetached). */
+	detached: DetachedFolder[] = [];
 	/** Every change, in order ("create:app", "attach:1:/w/app", …). */
 	readonly log: string[] = [];
 	private next = 1;
@@ -88,6 +90,8 @@ export class FakeAgentProjects {
 		if (this.workspaces.some((x) => x.machineId === w.machineId && x.dir === w.dir)) throw new ConnectError("workspace_exists: the folder of this machine is a workspace already", Code.AlreadyExists);
 		const row: WsRow = { ...w, id: this.next++, projectId, createdAt: Math.floor(Date.now() / 1000) };
 		this.workspaces.push(row);
+		// Recorded again: the folder is no longer one the user dropped.
+		this.detached = this.detached.filter((d) => !(d.machineId === w.machineId && d.dir === w.dir));
 		this.log.push(`attach:${projectId}:${w.dir}`);
 		return row;
 	}
@@ -146,6 +150,16 @@ export class FakeAgentProjects {
 		this.log.push(`reorder:${projectIds.join(",")}`);
 	}
 
+	/** As the server: a mark already there changes nothing, and marks only on a machine in the directory. */
+	async setDetached(machineId: number, dir: string, detached: boolean): Promise<void> {
+		await tick();
+		if (!this.liveMachine(machineId)) throw new ConnectError("machine_not_found: no such machine", Code.NotFound);
+		const had = this.detached.some((d) => d.machineId === machineId && d.dir === dir);
+		if (detached === had) return;
+		this.detached = detached ? [...this.detached, { machineId, dir }] : this.detached.filter((d) => !(d.machineId === machineId && d.dir === dir));
+		this.log.push(`detached:${machineId}:${dir}:${detached}`);
+	}
+
 	async detach(workspaceId: number): Promise<void> {
 		await tick();
 		this.ws(workspaceId);
@@ -169,6 +183,11 @@ export class FakeAgentProjects {
 				await tick();
 				return this.list().map(toProject);
 			},
+			listAll: async () => {
+				await tick();
+				return { projects: this.list().map(toProject), detached: [...this.detached] };
+			},
+			setFolderDetached: (machineId, dir, detached) => this.setDetached(machineId, dir, detached),
 			create: async (name, remote) => toProject(await this.createProject(name, remote)),
 			rename: async (id, name) => toProject(await this.rename(id, name)),
 			link: async (id, remote) => toProject(await this.update(id, undefined, remote)),
@@ -182,7 +201,11 @@ export class FakeAgentProjects {
 
 	routes(router: ConnectRouter): void {
 		router.service(AgentProjectsService, {
-			listAgentProjects: () => ({ projects: this.list() }),
+			listAgentProjects: () => ({ projects: this.list(), detachedFolders: this.detached.map((d) => ({ machineId: BigInt(d.machineId), dir: d.dir })) }),
+			setAgentFolderDetached: async (req) => {
+				await this.setDetached(Number(req.machineId), req.dir, req.detached);
+				return {};
+			},
 			createAgentProject: async (req) => ({ project: await this.createProject(req.name, req.gitRemote) }),
 			renameAgentProject: async (req) => ({ project: await this.rename(Number(req.projectId), req.name) }),
 			updateAgentProject: async (req) => ({ project: await this.update(Number(req.projectId), req.name, req.gitRemote) }),
