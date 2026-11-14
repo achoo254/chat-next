@@ -10,7 +10,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { AgentCore } from "../src/core/agent-core.ts";
 import { ACTIVITY_MS } from "../src/core/agent-core.ts";
 import { createClaudeProvider } from "../src/providers/claude/index.ts";
-import { LocalSessions, TOOL_BUSY_MS } from "../src/providers/claude/local-sessions.ts";
+import { LocalSessions, REQUEST_BUSY_MS, TOOL_BUSY_MS } from "../src/providers/claude/local-sessions.ts";
 import { ClaudeProcesses } from "../src/providers/claude/running-claude.ts";
 import type { AgentProvider, ProviderEvent } from "../src/providers/types.ts";
 import { Channel } from "../src/util/channel.ts";
@@ -100,6 +100,34 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     // Past the longest a command may run without a word: idle even while held.
     setTime(file, NOW - TOOL_BUSY_MS - 1_000);
     expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) }).liveness(t.sessionId)).state).toBe("idle");
+  });
+
+  test("the model asked and not answered yet: busy while a running claude holds the session, however long it thinks (to a limit)", async () => {
+    const { home, t, file } = session("done");
+    // The request's body records are big (one is longer than the tail read); the request record itself is last.
+    t.blob(300 * 1024);
+    t.apiRequest();
+    t.write(home);
+    setTime(file, NOW - 5 * 60_000);
+    const held = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) });
+    expect(await held.liveness(t.sessionId)).toEqual({ state: "busy", since: NOW - 5 * 60_000, held: true, via: "process" });
+    const free = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
+    expect((await free.liveness(t.sessionId)).state).toBe("idle");
+    setTime(file, NOW - REQUEST_BUSY_MS - 1_000);
+    expect((await held.liveness(t.sessionId)).state).toBe("idle");
+  });
+
+  test("the model's answer, or a message after the request (an interruption): idle while quiet, even held", async () => {
+    const answered = session("done");
+    answered.t.apiRequest();
+    answered.t.assistant([{ type: "text", text: "All set." }]);
+    setTime(answered.t.write(answered.home), NOW - 5 * 60_000);
+    expect((await new LocalSessions({ homes: () => [answered.home], now: () => NOW, processes: probe(answered.t.sessionId) }).liveness(answered.t.sessionId)).state).toBe("idle");
+    const interrupted = session("done");
+    interrupted.t.apiRequest();
+    interrupted.t.user("[Request interrupted by user]");
+    setTime(interrupted.t.write(interrupted.home), NOW - 5 * 60_000);
+    expect((await new LocalSessions({ homes: () => [interrupted.home], now: () => NOW, processes: probe(interrupted.t.sessionId) }).liveness(interrupted.t.sessionId)).state).toBe("idle");
   });
 
   test("held open by a running claude while quiet: idle, and told as held once the processes were read", async () => {
@@ -217,6 +245,37 @@ describe("a session running elsewhere", () => {
     setTime(file, Date.now() - TOOL_BUSY_MS - 60_000);
     await again.core.lookElsewhere();
     expect(summaryOf(again.core, thread.id)?.busyElsewhere).toBe(false);
+  });
+});
+
+describe("a session the machine opened in its terminal", () => {
+  test("shows as busy elsewhere while the CLI writes its transcript, and while its model thinks, with the terminal still held", async () => {
+    const claudeHome = tempDir("claude-home-");
+    const provider = createClaudeProvider({ query: fakeQuery().fn, findBinary: async () => "claude", homes: () => [claudeHome] });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const { core, work } = makeCore([provider]);
+    cores.push(core);
+    // Opened with no message, then handed to the terminal: the CLI starts the session with the id the thread keeps.
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "", consent: none, device: "phone" });
+    const spec = await core.terminalLaunch(thread.id);
+    const sessionId = spec.args[spec.args.indexOf("--session-id") + 1] ?? "";
+    expect(sessionId).not.toBe("");
+    core.terminalStarted(thread.id, 1, 4242);
+    expect(summaryOf(core, thread.id)).toMatchObject({ terminalSession: 1, busyElsewhere: false });
+    // The CLI runs a command now, some seconds after the launch.
+    const t = new Transcript(sessionId, work, "cli").opening();
+    t.user("deploy it");
+    t.assistant([{ type: "tool_use", id: "toolu_7", name: "Bash", input: { command: "make deploy" } }]);
+    setTime(t.write(claudeHome), Date.now() + 10_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)).toMatchObject({ state: ThreadState.IDLE, busyElsewhere: true, previewTool: "Bash", terminalSession: 1 });
+    // The command ended minutes ago and the model thinks since, writing nothing: still a turn while the CLI holds the session.
+    const lines = t.lines.length;
+    t.toolResult("toolu_7", "deployed");
+    t.apiRequest();
+    setTime(t.appendFrom(claudeHome, lines), Date.now() - 5 * 60_000);
+    const processes = new ClaudeProcesses({ platform: "darwin", selfPid: 1, exec: async (cmd) => (cmd === "ps" ? `  42  77  09:00 claude claude --session-id ${sessionId}\n` : `p42\nfcwd\nn${work}\n`) });
+    expect((await new LocalSessions({ homes: () => [claudeHome], processes }).liveness(sessionId)).state).toBe("busy");
   });
 });
 

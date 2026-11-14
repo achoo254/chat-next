@@ -110,6 +110,11 @@ export class Transcript {
     return this.push(rec);
   }
 
+  /** claude asked the model after the last message and waits for its answer. */
+  apiRequest(): this {
+    return this.push({ type: "api-request", sessionId: this.sessionId, id: randomUUID(), timestamp: this.stamp(), version: "2.1.319", querySource: "repl_main" });
+  }
+
   aiTitle(title: string): this {
     return this.push({ type: "ai-title", aiTitle: title, sessionId: this.sessionId });
   }

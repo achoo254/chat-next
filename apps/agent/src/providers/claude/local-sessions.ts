@@ -40,6 +40,8 @@ const LINE_MAX = 8 * 1024 * 1024;
 const BUSY_MS = 60_000;
 /** How long a tool call with no result keeps a held session busy without the transcript changing (Bash's longest timeout). */
 export const TOOL_BUSY_MS = 10 * 60_000;
+/** How long a request to the model with no answer yet (an api-request record after the last message) keeps a held session busy. */
+export const REQUEST_BUSY_MS = 30 * 60_000;
 /** The end of a transcript read for a tool call that has no result yet. */
 const TOOL_TAIL_BYTES = 256 * 1024;
 const TITLE_MAX = 120;
@@ -50,8 +52,12 @@ export const PAGE_MAX = 100;
 type Head = { end: number; dir: string; prompt: string; entrypoint: string };
 type Tail = { size: number; mtimeMs: number; title: string };
 type Count = { scanned: number; messages: number };
-/** The tool call of the transcript still waiting for its result, as of `size`; "" when none. */
-type OpenTool = { size: number; mtimeMs: number; name: string };
+/**
+ * What the transcript's end still waits on, as of `size`: the tool call with
+ * no result yet ("" when none), and whether the model was asked after the
+ * last message and has not answered (it writes nothing while it thinks).
+ */
+type OpenTool = { size: number; mtimeMs: number; name: string; request: boolean };
 type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool };
 
 export type LocalSessionsOptions = {
@@ -173,10 +179,11 @@ export class LocalSessions implements SessionHistory {
 
   /**
    * Busy while the transcript was written in the last minute; past that,
-   * while a tool call has no result yet (for TOOL_BUSY_MS at most) and a
-   * running claude holds the session. `held` tells a running claude holds
-   * it, from the processes as last read (prime() reads them again; only a
-   * tool call with no result makes this read them itself). Never fails.
+   * while a tool call has no result yet (for TOOL_BUSY_MS at most) or the
+   * model has not answered the last request (for REQUEST_BUSY_MS at most)
+   * and a running claude holds the session. `held` tells a running claude
+   * holds it, from the processes as last read (prime() reads them again;
+   * only something still to come makes this read them itself). Never fails.
    */
   async liveness(sessionId: string): Promise<Liveness> {
     let k: Known | undefined;
@@ -188,14 +195,16 @@ export class LocalSessions implements SessionHistory {
     if (!k) return { state: "unknown", via: "transcript" };
     const since = Math.round(k.mtimeMs);
     const quiet = this.now() - k.mtimeMs;
-    const tool = quiet < TOOL_BUSY_MS ? this.openTool(k) : "";
-    if (tool && quiet >= BUSY_MS) await this.processes.refresh();
+    const work = quiet < REQUEST_BUSY_MS ? this.openWork(k) : { name: "", request: false };
+    const tool = quiet < TOOL_BUSY_MS ? work.name : "";
+    // Something still to come: a tool's result, or the model's answer.
+    const pending = tool !== "" || work.request;
+    if (pending && quiet >= BUSY_MS) await this.processes.refresh();
     const held = this.held(k);
     const withHeld = held ? { held } : {};
-    if (quiet >= TOOL_BUSY_MS) return { state: "idle", since, ...withHeld, via: "transcript" };
     if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, via: "transcript" };
-    if (!tool) return { state: "idle", since, ...withHeld, via: "transcript" };
-    return held ? { state: "busy", since, tool, held, via: "process" } : { state: "idle", since, via: "process" };
+    if (!pending) return { state: "idle", since, ...withHeld, via: "transcript" };
+    return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, via: "process" } : { state: "idle", since, via: "process" };
   }
 
   /** A running claude holds the session (as of the last read of the processes); never fails. */
@@ -210,13 +219,16 @@ export class LocalSessions implements SessionHistory {
 
   /**
    * The newest tool call of the conversation with no result yet, from the
-   * end of the transcript ("" when none); kept until the file changes. A
-   * result too long to keep whole is still told by the id at its start.
+   * end of the transcript ("" when none), and whether the newest message or
+   * request record is a request to the model (its answer, or a message after
+   * it, ends the wait); kept until the file changes. A result too long to
+   * keep whole is still told by the id at its start.
    */
-  private openTool(k: Known): string {
-    if (k.tool && k.tool.size === k.size && k.tool.mtimeMs === k.mtimeMs) return k.tool.name;
+  private openWork(k: Known): OpenTool {
+    if (k.tool && k.tool.size === k.size && k.tool.mtimeMs === k.mtimeMs) return k.tool;
     const open = new Map<string, string>();
     const resultIds = /"tool_use_id":"([^"]+)"/g;
+    let request = false;
     try {
       withFile(k.file, (fd) =>
         scanLines(
@@ -230,7 +242,9 @@ export class LocalSessions implements SessionHistory {
               return;
             }
             const rec = parseRecord(line);
-            if (!rec || rec.isSidechain === true || !Array.isArray(rec.message?.content)) return;
+            if (!rec || rec.isSidechain === true) return;
+            if (rec.type === "api-request" || rec.type === "user" || rec.type === "assistant") request = rec.type === "api-request";
+            if (!Array.isArray(rec.message?.content)) return;
             for (const block of rec.message.content as { type?: unknown; id?: unknown; name?: unknown; tool_use_id?: unknown }[]) {
               if (rec.type === "assistant" && block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
                 open.delete(block.id);
@@ -244,11 +258,10 @@ export class LocalSessions implements SessionHistory {
         ),
       );
     } catch {
-      return "";
+      return { size: k.size, mtimeMs: k.mtimeMs, name: "", request: false };
     }
-    const name = [...open.values()].at(-1) ?? "";
-    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name };
-    return name;
+    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name: [...open.values()].at(-1) ?? "", request };
+    return k.tool;
   }
 
   read(sessionId: string, from: number | "recent"): HistoryRead | undefined {
