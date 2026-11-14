@@ -579,8 +579,8 @@ export class Machine {
         name: p.name,
         version: d.version ?? "",
         loginState: d.loginState === "ok" ? LoginState.OK : d.loginState === "needs-login" ? LoginState.NEEDS_LOGIN : LoginState.UNKNOWN,
-        // Devices also check MachineInfo.terminal before offering it.
-        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, commitMessage: p.writer !== undefined },
+        // Devices also check MachineInfo.terminal before offering it. What the facets give is said from the facets.
+        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, commitMessage: p.writer !== undefined, accounts: p.accounts !== undefined },
         untestedVersion: Boolean(d.untestedVersion),
         defaultModel: d.defaultModel ?? "",
       });
