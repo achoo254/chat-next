@@ -168,15 +168,34 @@ export interface SyncHost extends Host {
 	readonly ready: boolean;
 }
 
+/**
+ * The projects the machine keeps right now, asked again: the list this device
+ * holds can be older than the machine's (a device that was away, or whose
+ * link was cut, while another removed a folder). Recording a folder from an
+ * old list would bring back a project just deleted. undefined when the
+ * machine does not answer: the pass leaves it for the next one.
+ */
+async function currentProjects(host: Host): Promise<readonly Project[] | undefined> {
+	try {
+		const frame = await host.link.request({ case: "projectList", value: {} });
+		return frame.body.case === "projectListResult" ? frame.body.value.projects : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** One pass over `hosts`: folders they keep that no workspace records become workspaces. */
 export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncHost[]): Promise<number> {
 	const snapshot = store.snapshot();
 	if (snapshot.status !== "ready") return 0;
 	const known = [...snapshot.projects];
 	let placed = 0;
+	// Every machine is asked at once: one that is slow to answer holds up only itself.
+	const lists = new Map(await Promise.all(hosts.filter((h) => h.ready && h.id > 0).map(async (h) => [h, await currentProjects(h)] as const)));
 	for (const host of hosts) {
-		if (!host.ready || host.id <= 0) continue;
-		const own = (host.state.projects?.projects ?? []).filter((p) => !p.missing);
+		const listed = lists.get(host);
+		if (listed === undefined) continue;
+		const own = listed.filter((p) => !p.missing);
 		const dropped = new Set<string>();
 		// Detached here while the machine was offline: it drops the folder now.
 		for (const p of own) {

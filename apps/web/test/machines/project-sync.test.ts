@@ -133,16 +133,39 @@ describe("placing folders", () => {
 });
 
 describe("the sync and the app's own actions", () => {
-	it("first connect: the machine's folders become projects and workspaces, without asking", async () => {
+	it("first connect: the machine's folders become projects and workspaces, asking the machine only for its list", async () => {
 		const server = new FakeAgentProjects();
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
 		const mac = host(1, [own("/w/app", "git@github.com:a/app.git"), own("/w/notes")]);
 		expect(await syncHosts(store, [mac])).toBe(2);
 		expect(store.snapshot().projects.map((p) => p.name)).toEqual(["app", "notes"]);
-		// Nothing was asked of the machine.
-		expect(mac.sent).toEqual([]);
+		// Only its list was asked, once per pass.
+		expect(mac.sent.map((b) => b.case)).toEqual(["projectList"]);
 		expect(await syncHosts(store, [mac])).toBe(0);
+	});
+
+	it("a list this device holds from before a folder was removed does not bring the folder back", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		// The machine keeps nothing now; this device never heard (its link was away when the machine told).
+		const mac = host(1, []);
+		(mac.state as { projects: unknown }).projects = { projects: [own("/w/gone")], suggestions: [] };
+		expect(await syncHosts(store, [mac])).toBe(0);
+		expect(store.snapshot().projects).toEqual([]);
+		expect(server.workspaces).toEqual([]);
+	});
+
+	it("a machine that does not answer is left for the next pass, never recorded from the list held", async () => {
+		const server = new FakeAgentProjects();
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, [own("/w/app")]);
+		const silent = { ...mac, link: { request: () => Promise.reject(new Error("link closed")) } } as SyncHost;
+		expect(await syncHosts(store, [silent])).toBe(0);
+		expect(store.snapshot().projects).toEqual([]);
+		expect(await syncHosts(store, [mac])).toBe(1);
 	});
 
 	it("sessions found running outside the app make no project: only folders the machine keeps are synced", async () => {
@@ -254,7 +277,7 @@ describe("the sync and the app's own actions", () => {
 		if (workspace === undefined) throw new Error("no workspace");
 		await detachWorkspace(store, workspace, null);
 		expect(await syncHosts(store, [mac])).toBe(0);
-		expect(mac.sent.map((b) => b.case)).toEqual(["projectRemove"]);
+		expect(mac.sent.map((b) => b.case).filter((c) => c !== "projectList")).toEqual(["projectRemove"]);
 		expect(store.isDetached({ machineId: 1, dir: "/w/app" })).toBe(false);
 		expect(store.snapshot().projects[0]?.workspaces).toEqual([]);
 	});
@@ -330,9 +353,9 @@ describe("repairing workspaces grouped with another repository", () => {
 			["acme-records-portal", "gitlab.example.com/scm/team/acme-records", ["1:/w/acme-records-portal", "2:/root"]],
 			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
 		]);
-		// Only moves: no workspace or project removed, nothing asked of the machines.
+		// Only moves: no workspace or project removed, nothing asked of the machines but their lists.
 		expect(server.log.filter((x) => x.startsWith("detach:") || x.startsWith("delete:"))).toEqual([]);
-		expect([...mac.sent, ...cloud.sent]).toEqual([]);
+		expect([...mac.sent, ...cloud.sent].map((b) => b.case)).toEqual(["projectList", "projectList"]);
 		expect(store.snapshot().projects.find((p) => p.id === wrong.id)).toBeTruthy();
 		// A second pass finds nothing to do.
 		expect(await syncHosts(store, [mac, cloud])).toBe(0);
