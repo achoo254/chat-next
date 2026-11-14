@@ -8,7 +8,7 @@ import { ErrorCode, HandshakeErrorCode, ItemSchema, Role, ThreadInfoSchema, type
 import { encodeHandshakeError, generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DeviceRegistrationRefused } from "../../src/machines/link/device-registration.ts";
-import { MachineLink, mergeThreadInfo, RemoteError, UNKNOWN_DEVICE_WAITS_MS, UNSYNCED_RETRY_MS, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
+import { MachineLink, mergeThreadInfo, RemoteError, UNKNOWN_DEVICE_WAITS_MS, UNSYNCED_RETRY_MS, WAKE_PROBE_MS, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
 import { orderedItems } from "../../src/machines/transcript/reducer.ts";
 import { defaultAnswer as defaultAnswerOf, FakeMachine, until, type FakeSocket } from "./fake-machine.ts";
 
@@ -143,6 +143,34 @@ describe("MachineLink", () => {
 		l.setActive(false);
 		timers.tick(10_000);
 		expect(machine.sent("ping")).toHaveLength(2);
+		l.stop();
+	});
+
+	it("back in the foreground, asks an open link with a ping and connects again at once when it died meanwhile", async () => {
+		// The probe's wait runs when the test says, after the ping had its chance to be answered.
+		let probe: (() => void) | null = null;
+		const t = { ...timers, setTimeout: (fn: () => void, ms: number) => (ms === WAKE_PROBE_MS ? ((probe = fn), fn) : timers.setTimeout(fn, ms)) };
+		const l = link({ timers: t });
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+
+		// The machine answers: the link stays.
+		l.wake();
+		await until(() => machine.sent("ping").length === 1, "the ping");
+		timers.tick(0);
+		await until(() => probe !== null, "the probe's wait");
+		await new Promise((r) => setTimeout(r, 20));
+		(probe as (() => void) | null)?.();
+		probe = null;
+		expect(machine.sockets).toHaveLength(1);
+
+		// The socket died in the background (iOS), unnoticed: nothing answers, so a new one opens without waiting out the silence.
+		machine.handler = (frame) => (frame.body.case === "ping" ? undefined : defaultAnswerOf(frame));
+		l.wake();
+		await until(() => machine.sent("ping").length === 2, "the second ping");
+		await until(() => probe !== null, "the probe's wait");
+		(probe as (() => void) | null)?.();
+		await until(() => machine.sockets.length === 2 && l.snapshot().status.kind === "open", "connected again");
 		l.stop();
 	});
 

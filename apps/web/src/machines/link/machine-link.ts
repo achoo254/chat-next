@@ -46,6 +46,8 @@ export const PING_MS = 10_000;
 /** No frame for this long while pinging: the link is dead. */
 const SILENCE_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+/** Back in the foreground: an open link that does not answer a ping this fast died meanwhile. */
+export const WAKE_PROBE_MS = 3_000;
 const BACKOFF = { baseMs: 1_000, maxMs: 30_000 };
 /** After this many failed attempts in a row, ask the directory for a new address. */
 const REFRESH_AFTER = 3;
@@ -254,7 +256,11 @@ export class MachineLink {
 	private expected: Uint8Array | null = null;
 	private retryTimer: unknown = null;
 	private pingTimer: unknown = null;
+	/** The ping asked on wake() waits for its answer. */
+	private probeTimer: unknown = null;
 	private lastHeard = 0;
+	/** Frames heard so far: the probe tells whether any came after its ping. */
+	private heard = 0;
 	private active = false;
 	private stopped = true;
 	private serial = 0;
@@ -333,7 +339,14 @@ export class MachineLink {
 		this.set({ status: { kind: "idle" } });
 	}
 
-	/** Reconnect now instead of waiting for the backoff (app back in the foreground, network back). */
+	/**
+	 * Reconnect now instead of waiting for the backoff (app back in the
+	 * foreground, network back). A link that still says it is open may have
+	 * died while the app was in the background (iOS drops sockets without
+	 * telling the page): it is asked with a ping, and connects again at once
+	 * if nothing answers within WAKE_PROBE_MS, instead of waiting out the
+	 * silence the ticks watch for.
+	 */
 	wake(): void {
 		if (this.stopped) return;
 		const kind = this.current.status.kind;
@@ -341,7 +354,19 @@ export class MachineLink {
 			this.timers.clearTimeout(this.retryTimer);
 			this.retryTimer = null;
 			void this.connect();
-		}
+		} else if (kind === "open") this.probe();
+	}
+
+	private probe(): void {
+		const socket = this.socket;
+		if (socket === null || this.probeTimer !== null) return;
+		const before = this.heard;
+		this.ping();
+		this.probeTimer = this.timers.setTimeout(() => {
+			this.probeTimer = null;
+			if (this.socket !== socket || this.stopped || this.heard > before) return;
+			void this.connect();
+		}, WAKE_PROBE_MS);
 	}
 
 	/**
@@ -520,6 +545,7 @@ export class MachineLink {
 				.then(async () => {
 					if (!mine()) return;
 					this.lastHeard = this.timers.now();
+					this.heard += 1;
 					if (this.session === null) {
 						if (handshake === null) throw new Error("message before the handshake started");
 						const { session } = await handshake.finish(bytes);
@@ -657,6 +683,8 @@ export class MachineLink {
 	private dropSocket(): void {
 		this.timers.clearInterval(this.pingTimer);
 		this.pingTimer = null;
+		this.timers.clearTimeout(this.probeTimer);
+		this.probeTimer = null;
 		const socket = this.socket;
 		this.socket = null;
 		this.session = null;

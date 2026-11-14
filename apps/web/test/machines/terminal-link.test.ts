@@ -330,6 +330,26 @@ describe("the direct path", () => {
 		expect(peers.last.closed).toBe(true);
 	});
 
+	it("after the connection drops, shows the screen on the relay at once and goes direct when the new path opens", async () => {
+		const session = host.open();
+		const screen = new Screen();
+		await openDirect(session, screen);
+		host.print(session, "one ");
+		await until(() => screen.text === "one ", "one");
+		// The app back from the background: the connection had died. No 5 s wait for the direct path this time.
+		machine.socket.drop();
+		await until(() => status().kind !== "open", "lost");
+		host.print(session, "two ");
+		await until(() => screen.text === "one two ", "replayed on the relay");
+		expect(path()).toBe("relay");
+		await until(() => peers.made.length === 2 && peers.last.remoteSdp !== "", "a new offer");
+		host.connectDirect(peers.last);
+		await until(() => path() === "direct", "direct again");
+		host.print(session, "three");
+		await until(() => screen.text === "one two three", "live");
+		expect(screen.snapshots).toBe(1);
+	});
+
 	it("uses the relay at once when the machine ends the peer (DTLS fingerprint mismatch)", async () => {
 		host.endOffersWith = "dtls_failed";
 		const session = host.open();

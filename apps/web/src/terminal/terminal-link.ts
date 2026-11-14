@@ -415,6 +415,9 @@ export class TerminalLink {
 	// --- generations: one link id each, from Hello to its end ---------------------------------
 
 	private beginGeneration(): void {
+		// A link again after one dropped (the app back from the background): the screen should come back at once,
+		// so the relay carries it now and the direct path takes over once it opens, instead of a wait for it first.
+		const back = this.relinks > 0;
 		const gen: Generation = {
 			linkId: 1 + Math.floor(this.random() * 0xfffffffe),
 			sendPath: null,
@@ -433,6 +436,7 @@ export class TerminalLink {
 			this.startPath(gen, "relay");
 			return;
 		}
+		if (back) this.startPath(gen, "relay");
 		this.startDirect(gen);
 		gen.fallbackTimer = this.timers.setTimeout(() => this.giveUpDirect(gen, "timeout"), DIRECT_WAIT_MS);
 	}
