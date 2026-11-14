@@ -134,8 +134,8 @@ importers:
         specifier: github:achoo254/shared-next#v0.14.0&path:/packages/app-shell
         version: https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/app-shell(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand)(react@19.3.0)
       '@achoo254/app-switcher':
-        specifier: github:achoo254/shared-next#v0.14.3&path:/packages/app-switcher
-        version: https://codeload.github.com/achoo254/shared-next/tar.gz/f4b42a259a66732952af7956df222c7e3c05a354#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand)(react@19.3.0)
+        specifier: github:achoo254/shared-next#v0.15.0&path:/packages/app-switcher
+        version: https://codeload.github.com/achoo254/shared-next/tar.gz/64e44732dbb801399f4a1e39cb80e9411ba6e45c#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand)(react@19.3.0)
       '@achoo254/brand':
         specifier: github:achoo254/shared-next#v0.14.0&path:/packages/brand
         version: https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand
@@ -361,9 +361,9 @@ packages:
       '@achoo254/brand': '>=0.3.0 <1'
       react: ^19.0.0
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/f4b42a259a66732952af7956df222c7e3c05a354#path:/packages/app-switcher':
-    resolution: {gitHosted: true, integrity: sha512-wS8OxiBPTTIdTLTa+gB8IdwsdhIeFxJE5xluGn6uvrHYYquiov7z2kDnY8m81NGlkqeer/rmExp4A82vEkkhBw==, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/f4b42a259a66732952af7956df222c7e3c05a354}
-    version: 0.7.3
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/64e44732dbb801399f4a1e39cb80e9411ba6e45c#path:/packages/app-switcher':
+    resolution: {gitHosted: true, integrity: sha512-m4Zo0m2+dXKAOA0Pxh/WXqjBBYi5opAZ8ET94lCEBsZx0Cgc2M0syT78nODHWDyLm6WKukybKjIVHnIyY49PVg==, path: /packages/app-switcher, tarball: https://codeload.github.com/achoo254/shared-next/tar.gz/64e44732dbb801399f4a1e39cb80e9411ba6e45c}
+    version: 0.8.0
     engines: {node: '>=22.12'}
     peerDependencies:
       '@achoo254/brand': '>=0.3.0 <1'
@@ -3137,7 +3137,7 @@ snapshots:
       '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand
       react: 19.3.0
 
-  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/f4b42a259a66732952af7956df222c7e3c05a354#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand)(react@19.3.0)':
+  '@achoo254/app-switcher@https://codeload.github.com/achoo254/shared-next/tar.gz/64e44732dbb801399f4a1e39cb80e9411ba6e45c#path:/packages/app-switcher(@achoo254/brand@https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand)(react@19.3.0)':
     dependencies:
       '@achoo254/brand': https://codeload.github.com/achoo254/shared-next/tar.gz/543c6b3281765182c962d75defe9e837b5687a16#path:/packages/brand
       react: 19.3.0
