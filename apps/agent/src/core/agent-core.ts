@@ -1342,8 +1342,16 @@ export class AgentCore {
     else if (t.running) this.endTurn(t, TurnState.INTERRUPTED, 0);
   }
 
+  /**
+   * Closes a thread's session and keeps its history (a device's "close
+   * session"); the next message opens it again. Refused while anything goes
+   * on in it: closing would cut a turn off and leave it running for good.
+   */
   async close(threadId: string): Promise<void> {
     const t = this.thread(threadId);
+    if (t.running || t.queued || t.pending.size > 0 || t.reasks.size > 0 || t.starting || t.switching) {
+      throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    }
     await this.park(t);
     this.touch(t);
   }

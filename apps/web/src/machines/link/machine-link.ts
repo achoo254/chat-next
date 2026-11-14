@@ -373,6 +373,20 @@ export class MachineLink {
 
 	// --- requests ------------------------------------------------------------
 
+	/**
+	 * Closes a thread's AI session on the machine and keeps its history: the
+	 * next message opens it again. The machine stops following the thread for
+	 * this device on close, so a thread still shown here is followed again.
+	 */
+	async closeThread(threadId: string): Promise<void> {
+		try {
+			await this.request({ case: "threadClose", value: { threadId } });
+		} finally {
+			// Also when the answer is late or refused: following twice does no harm, not following leaves the view stale.
+			if (this.watched.has(threadId)) this.subscribeThread(threadId);
+		}
+	}
+
 	/** Sends a request; resolves with the machine's answer, rejects with RemoteError or OfflineError (also after `timeoutMs` without one). */
 	request(body: FrameBody, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Frame> {
 		const session = this.session;

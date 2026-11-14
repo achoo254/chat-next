@@ -5,7 +5,7 @@
 // once it ended. Made-up transcripts stand in for what claude writes.
 import { randomUUID } from "node:crypto";
 import { utimesSync } from "node:fs";
-import { ActivityPhase, ThreadState, TurnState, type ThreadActivity, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ActivityPhase, ErrorReason, ThreadState, TurnState, type ThreadActivity, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { AgentCore } from "../src/core/agent-core.ts";
 import { ACTIVITY_MS } from "../src/core/agent-core.ts";
@@ -330,6 +330,26 @@ function manualProvider(): AgentProvider & { push: (e: ProviderEvent) => void } 
     },
   };
 }
+
+describe("closing a session from a device, keeping its history", () => {
+  test("is refused while a turn runs, and parks the session once it is over", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"], now: Date.parse("2026-11-14T08:00:00.000Z") });
+    const ai = manualProvider();
+    const { core, work } = makeCore([ai]);
+    cores.push(core);
+    const thread = await core.create({ provider: "manual", model: "", dir: work, text: "go", consent: none, device: "phone" });
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(core.close(thread.id)).rejects.toMatchObject({ reason: ErrorReason.THREAD_RUNNING });
+    expect(summaryOf(core, thread.id)).toMatchObject({ open: true, state: ThreadState.RUNNING });
+
+    ai.push({ type: "text-delta", blockId: "b1", role: "assistant", text: "done" });
+    ai.push({ type: "turn-end", state: "completed", durationMs: 1 });
+    await vi.advanceTimersByTimeAsync(0);
+    await core.close(thread.id);
+    expect(summaryOf(core, thread.id)).toMatchObject({ open: false, state: ThreadState.IDLE });
+    expect(summaryOf(core, thread.id)?.preview).toBe("done");
+  });
+});
 
 describe("the activity of a turn the machine runs", () => {
   async function running() {

@@ -5,11 +5,12 @@
 // Trash, where they can be restored. A session running a turn asks to stop
 // it first; one that seems open elsewhere on the machine warns before going on.
 import { useState } from "react";
-import { ErrorReason, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
-import { AGENT_THREAD_ACTIONS, versionAtLeast } from "./agent-version.ts";
+import { AGENT_SAFE_CLOSE, AGENT_THREAD_ACTIONS, versionAtLeast } from "./agent-version.ts";
 import { RemoteError, type MachineLink } from "./link/machine-link.ts";
+import { MachineIcon } from "./machine-icons.tsx";
 import { errorText } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -20,15 +21,30 @@ export function threadActionsSupported(info: MachineInfo | null): boolean {
 	return versionAtLeast(info?.agentVersion ?? "", AGENT_THREAD_ACTIONS);
 }
 
-/** "Lưu trữ" / "Bỏ lưu trữ" and "Xoá phiên", as items of an open menu. */
+/**
+ * The session's AI is open on the machine with nothing going on, so it can be
+ * closed (its history kept): not mid-turn, not waiting for the user, not
+ * queued, and not held by a terminal (which has its own way to stop it).
+ */
+export function threadClosable(thread: Pick<ThreadSummary, "open" | "state" | "pending" | "terminalSession">, info: Pick<MachineInfo, "agentVersion"> | null): boolean {
+	// An older machine closes even a running session, cutting its turn off: not offered there.
+	if (!versionAtLeast(info?.agentVersion ?? "", AGENT_SAFE_CLOSE)) return false;
+	const quiet = thread.state === ThreadState.IDLE || thread.state === ThreadState.ERROR || thread.state === ThreadState.UNSPECIFIED;
+	return thread.open && quiet && thread.pending === 0 && thread.terminalSession === 0;
+}
+
+/** "Đóng phiên" (when it can be closed), "Lưu trữ" / "Bỏ lưu trữ" and "Xoá phiên", as items of an open menu. */
 export function ThreadMenuItems({
 	link,
 	thread,
+	info,
 	onDelete,
 	onDone,
 }: {
-	link: ThreadLink;
-	thread: Pick<ThreadSummary, "id" | "archived">;
+	link: ThreadLink & Pick<MachineLink, "closeThread">;
+	thread: Pick<ThreadSummary, "id" | "archived" | "open" | "state" | "pending" | "terminalSession">;
+	/** The machine, for what its tunelo offers. */
+	info: Pick<MachineInfo, "agentVersion"> | null;
 	onDelete: () => void;
 	/** The menu closes. */
 	onDone: () => void;
@@ -36,6 +52,21 @@ export function ThreadMenuItems({
 	const t = useMachinesCopy();
 	return (
 		<>
+			{threadClosable(thread, info) && (
+				<button
+					type="button"
+					role="menuitem"
+					title={t.agent.thread.closeHint}
+					onClick={() => {
+						onDone();
+						link.closeThread(thread.id).catch(() => undefined);
+					}}
+					data-id="thread-close"
+				>
+					<MachineIcon name="power" small />
+					<span>{t.agent.thread.close}</span>
+				</button>
+			)}
 			<button
 				type="button"
 				role="menuitem"

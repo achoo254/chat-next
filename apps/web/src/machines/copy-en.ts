@@ -1078,6 +1078,8 @@ export const enMachines: MachinesCopy = {
 		thread: {
 			archive: "Archive",
 			unarchive: "Unarchive",
+			close: "Close session",
+			closeHint: "Stops the session's AI on the machine and keeps its history. Send a message to open it again.",
 			delete: "Delete session",
 			deleting: "Deleting…",
 			deleteTitle: "Delete this session?",

@@ -11,7 +11,7 @@
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
 import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, ErrorCode, PromptState, ThreadState, type GitFileChange, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../router.tsx";
@@ -319,7 +319,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							)}
 						</>
 					)}
-					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai } } : {})}
+					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai, info: state.info } } : {})}
 					{...(endTerminal !== undefined && online ? { endTerminal } : {})}
 				/>
 			</PageHead>
@@ -506,7 +506,7 @@ function HeadMenu({
 	 * Each item closes the menu itself (`close`) when tapped.
 	 */
 	narrowItems?: (close: () => void) => ReactNode;
-	manage?: { link: MachineLink; thread: ThreadSummary; ai: string };
+	manage?: { link: MachineLink; thread: ThreadSummary; ai: string; info: MachineInfo | null };
 	/** The session's AI runs in the terminal: "Kết thúc" stops it there. */
 	endTerminal?: () => Promise<void>;
 }) {
@@ -529,7 +529,7 @@ function HeadMenu({
 					)}
 					{manage !== undefined && (
 						<>
-							<ThreadMenuItems link={manage.link} thread={manage.thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
+							<ThreadMenuItems link={manage.link} thread={manage.thread} info={manage.info} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
 							<hr />
 						</>
 					)}

@@ -29,6 +29,7 @@ const PATHS = {
 	folder: <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z" />,
 	project: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM4 7.5l8 4.5 8-4.5M12 12v9" />,
 	stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+	power: <path d="M12 4v8M7.05 6.05a7 7 0 1 0 9.9 0" />,
 	help: (
 		<>
 			<circle cx="12" cy="12" r="9" />

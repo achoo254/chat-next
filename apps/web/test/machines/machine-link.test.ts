@@ -174,6 +174,27 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("closes a thread's session and keeps following it while it is shown", async () => {
+		machine.handler = (frame) => {
+			if (frame.body.case !== "threadSubscribe") return defaultAnswerOf(frame);
+			return [{ case: "threadItems", value: { threadId: "t1", items: [textItem("a", 1n, "one")], cursor: { epoch: 7n, seq: 1n } } }];
+		};
+		const l = link();
+		const unwatch = l.watch("t1");
+		l.start();
+		await until(() => l.journal("t1").items.size === 1, "first items");
+		// The machine stops following a closed thread for this device: it is followed again, from its cursor.
+		await l.closeThread("t1");
+		expect(machine.sent("threadClose")).toEqual([expect.objectContaining({ threadId: "t1" })]);
+		await until(() => machine.sent("threadSubscribe").length === 2, "followed again");
+		expect(machine.sent("threadSubscribe")[1]?.cursor).toMatchObject({ epoch: 7n, seq: 1n });
+		// A thread no longer shown is only closed.
+		await l.closeThread("t2");
+		expect(machine.sent("threadSubscribe").filter((s) => s.threadId === "t2")).toEqual([]);
+		unwatch();
+		l.stop();
+	});
+
 	it("asks the directory at once when the first attempt has no address yet", async () => {
 		let refreshed = 0;
 		const l = link({

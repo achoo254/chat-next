@@ -210,7 +210,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 							<span>{t.terminal.openInTerminal}</span>
 						</button>
 					)}
-					<ThreadMenuItems link={machine.link} thread={thread} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
+					<ThreadMenuItems link={machine.link} thread={thread} info={machine.state.info} onDelete={() => setDeleting(true)} onDone={() => setOpen(false)} />
 				</div>
 			)}
 			{deleting && (

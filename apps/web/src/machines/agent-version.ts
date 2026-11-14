@@ -31,6 +31,9 @@ export const AGENT_LIVE_ACTIVITY = [2, 5, 0] as const;
 /** Images saved in the session's folder for its terminal (AttachmentSave). */
 export const AGENT_TERMINAL_IMAGES = [2, 7, 1] as const;
 
+/** The first tunelo that refuses ThreadClose while anything goes on in the session, so a device may offer "close session". */
+export const AGENT_SAFE_CLOSE = [3, 3, 5] as const;
+
 /**
  * Whether the machine offers a terminal: "available" (tunelo 2.4.0+ with its
  * terminal process), "missing" (the process is not installed yet: update),

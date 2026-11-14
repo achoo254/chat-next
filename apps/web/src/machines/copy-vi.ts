@@ -1090,6 +1090,8 @@ export const viMachines = {
 		thread: {
 			archive: "Lưu trữ",
 			unarchive: "Bỏ lưu trữ",
+			close: "Đóng phiên",
+			closeHint: "Tắt AI của phiên trên máy, giữ nguyên lịch sử. Nhắn tiếp là phiên mở lại.",
 			delete: "Xoá phiên",
 			deleting: "Đang xoá…",
 			deleteTitle: "Xoá phiên này?",
