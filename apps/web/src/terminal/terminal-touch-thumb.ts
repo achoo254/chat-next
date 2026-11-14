@@ -31,6 +31,12 @@ export function thumbGeometry(rows: number, baseY: number, viewportY: number, tr
 	return { visible: true, height, top: (track - height) * place };
 }
 
+/** Lines as the button shows them: whole up to 999, then thousands with one decimal ("1.2k"). */
+export function formatLines(lines: number): string {
+	if (lines < 1000) return String(Math.max(0, Math.round(lines)));
+	return `${(lines / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+}
+
 /** Adds the thumb and the "back to the newest" button to `host`; `latestLabel` names the button. */
 export function showTouchThumb(host: HTMLElement, term: Terminal, latestLabel: string): IDisposable {
 	const thumb = document.createElement("div");
@@ -40,6 +46,9 @@ export function showTouchThumb(host: HTMLElement, term: Terminal, latestLabel: s
 	latest.type = "button";
 	latest.className = "tx-latest";
 	latest.hidden = true;
+	const count = document.createElement("span");
+	count.className = "tx-latest-n";
+	latest.append(count);
 	latest.setAttribute("aria-label", latestLabel);
 	latest.title = latestLabel;
 	// A tap on the button is not a scroll of the pane nor a tap that brings the keyboard up.
@@ -70,6 +79,11 @@ export function showTouchThumb(host: HTMLElement, term: Terminal, latestLabel: s
 		}
 		const atBottom = buffer.viewportY >= buffer.baseY;
 		latest.hidden = !geometry.visible || atBottom;
+		// How far the view is from the newest line, on the button itself.
+		const away = Math.max(0, buffer.baseY - buffer.viewportY);
+		count.textContent = formatLines(away);
+		latest.setAttribute("aria-label", `${latestLabel} (${away})`);
+		latest.title = `${latestLabel} (${away})`;
 		// Output that scrolls along at the bottom does not flash it; a finger, or being away from the bottom, does.
 		if (geometry.visible && buffer.viewportY !== lastY && !(atBottom && wasBottom)) flash();
 		lastY = buffer.viewportY;

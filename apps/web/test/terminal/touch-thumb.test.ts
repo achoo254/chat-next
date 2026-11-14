@@ -1,6 +1,6 @@
 import type { Terminal } from "@xterm/xterm";
 import { describe, expect, it, vi } from "vitest";
-import { showTouchThumb, thumbGeometry } from "../../src/terminal/terminal-touch-thumb.ts";
+import { formatLines, showTouchThumb, thumbGeometry } from "../../src/terminal/terminal-touch-thumb.ts";
 
 describe("the thumb of a touch screen's history", () => {
 	it("has none without history, or without room", () => {
@@ -28,6 +28,14 @@ describe("the thumb of a touch screen's history", () => {
 		// A position outside the history stays on the track.
 		expect(thumbGeometry(24, 100, -5, 600).top).toBe(0);
 		expect(thumbGeometry(24, 100, 500, 600).top).toBeCloseTo(600 - bottom.height);
+	});
+});
+
+describe("the lines the button shows", () => {
+	it("says whole lines up to 999, then thousands with one decimal", () => {
+		expect([0, 1, 42, 999].map(formatLines)).toEqual(["0", "1", "42", "999"]);
+		expect([1000, 1240, 1250, 9999, 12_400, 100_000].map(formatLines)).toEqual(["1k", "1.2k", "1.3k", "10k", "12.4k", "100k"]);
+		expect(formatLines(-3)).toBe("0");
 	});
 });
 
@@ -86,7 +94,12 @@ describe("the thumb and the way back on a touch screen", () => {
 		m.fire();
 		expect(m.thumb()?.hasAttribute("data-active")).toBe(true);
 		expect(m.latest()?.hidden).toBe(false);
-		expect(m.latest()?.getAttribute("aria-label")).toBe("Back to the newest line");
+		expect(m.latest()?.getAttribute("aria-label")).toBe("Back to the newest line (80)");
+		expect(m.latest()?.textContent).toBe("80");
+		// Further up: the count follows.
+		m.buffer.viewportY = 0;
+		m.fire();
+		expect(m.latest()?.textContent).toBe("200");
 
 		// The button goes to the newest output, and is gone once there.
 		m.latest()?.click();
