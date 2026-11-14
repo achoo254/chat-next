@@ -281,7 +281,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				const now = performance.now();
 				if (!force && now - claimedAt < CLAIM_EVERY_MS) return;
 				claimedAt = now;
-				link.resize(session, term.cols, term.rows);
+				link.resize(session, term.cols, term.rows, true);
 			};
 			const onShow = () => {
 				if (document.visibilityState === "visible") claimSize(true);

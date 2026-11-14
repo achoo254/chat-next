@@ -353,10 +353,15 @@ export class TerminalLink {
 		}
 	}
 
-	resize(session: number, cols: number, rows: number): void {
+	/**
+	 * The size `session` should have. Unchanged sizes are not sent again, except a `claim`: another device may
+	 * have resized the session since (the machine does not tell this page), so the device in use sends its size
+	 * anyway; the machine resizing to the size it already has wakes nothing.
+	 */
+	resize(session: number, cols: number, rows: number, claim = false): void {
 		const s = this.sessions.get(session);
 		if (s === undefined || !validDim(cols) || !validDim(rows)) return;
-		if (s.size?.cols === cols && s.size.rows === rows) return;
+		if (!claim && s.size?.cols === cols && s.size.rows === rows) return;
 		s.size = { cols, rows };
 		const gen = this.gen;
 		if (gen?.sendPath != null) this.send(gen, encodeResize(session, cols, rows));
@@ -793,6 +798,9 @@ export class TerminalLink {
 				s.epoch += 1;
 				s.applied = s.written = s.acked = frame.offset;
 				s.gap = false;
+				// The session's size on the machine now (another device may have set it): the pane fitting itself
+				// after the snapshot sends its own size when it differs, instead of taking it for already sent.
+				s.size = { cols: frame.cols, rows: frame.rows };
 				this.timers.clearTimeout(s.ackTimer);
 				s.ackTimer = null;
 				s.sink.snapshot({ cols: frame.cols, rows: frame.rows, altScreen: frame.altScreen, vt: frame.vt });

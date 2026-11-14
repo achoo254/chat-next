@@ -146,6 +146,24 @@ describe("the relay path", () => {
 		expect(host.keystrokes).toEqual([{ session, text: "ls\r", path: "relay" }]);
 	});
 
+	it("sends a claimed size again although unchanged, and a size that differs from the snapshot's", async () => {
+		// Another device left the session at 90 × 20; this page's pane is 200 × 50.
+		const session = host.open(90, 20);
+		link.start();
+		const screen = new Screen();
+		link.attach(session, screen);
+		await until(() => screen.snapshots === 1, "snapshot");
+		link.resize(session, 90, 20);
+		link.resize(session, 200, 50);
+		await until(() => host.resizes.length === 1, "the pane's own size");
+		expect(host.resizes).toEqual([{ session, cols: 200, rows: 50 }]);
+		// The machine took another device's size since: a plain resize of the same size stays quiet, a claim is sent.
+		link.resize(session, 200, 50);
+		link.resize(session, 200, 50, true);
+		await until(() => host.resizes.length === 2, "the claim");
+		expect(host.resizes[1]).toEqual({ session, cols: 200, rows: 50 });
+	});
+
 	it("applies output by offset: a gap is dropped and asked again, duplicates are cut", async () => {
 		const session = host.open();
 		host.print(session, "abc");
