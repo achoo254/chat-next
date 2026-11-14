@@ -74,7 +74,8 @@ export class Transcript {
 
   /** One assistant message; claude writes one record per content block. */
   assistant(blocks: ({ type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: object } | { type: "thinking"; thinking: string })[]): string {
-    const id = `msg_${String(++this.msg).padStart(4, "0")}`;
+    // The API's message ids are unique across sessions, as the journal's item ids made from them assume.
+    const id = `msg_${this.sessionId.slice(0, 8)}_${String(++this.msg).padStart(4, "0")}`;
     blocks.forEach((block, index) => {
       const uuid = randomUUID();
       this.push({

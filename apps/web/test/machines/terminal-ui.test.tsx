@@ -299,6 +299,17 @@ describe("a session in chat or in its terminal", () => {
 		expect(sent("termOpen")).toEqual([]);
 	});
 
+	it("a session another window on the machine has open: Terminal mode says so and points to the chat tab", async () => {
+		const base = machine.handler;
+		machine.handler = (frame, socket) =>
+			frame.body.case === "termOpen"
+				? [{ case: "error", value: { code: ErrorCode.INVALID, message: "open elsewhere", reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: "/w/app" } }]
+				: base(frame, socket);
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
+		expect(await screen.findByText("Phiên này đang mở trong một cửa sổ khác trên máy. Dùng tab Trò chuyện, hoặc đóng cửa sổ đó trước.")).toBeTruthy();
+		expect(sent("termOpen")).toHaveLength(1);
+	});
+
 	it("while the terminal holds it, chat is read-only, points to the terminal, and can end it there", async () => {
 		held = 7;
 		sessionAt({ page: "session", machine: "1", threadId: "t1" });

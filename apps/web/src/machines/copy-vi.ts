@@ -302,6 +302,8 @@ export const viMachines = {
 	},
 	transcript: {
 		earlier: (n: number) => `Xem ${n} mục trước`,
+		/** The row folding the conversations before the AI's CLI went on in another one (/clear). */
+		previous: (n: number) => `Cuộc trò chuyện trước (${n} tin nhắn)`,
 		ranTools: (n: number) => `Đã chạy ${n} tool`,
 		runningTool: (name: string) => `Đang chạy ${name}`,
 		runningFor: (time: string) => `Chạy được ${time}`,
@@ -664,6 +666,7 @@ export const viMachines = {
 			revoked: "Thiết bị này đã bị thu hồi khỏi tài khoản nên máy đóng terminal.",
 			unavailable: "Phần terminal trên máy chưa chạy được. Thử lại, hoặc chạy tunelo login trên máy.",
 			unsupported: "Phần terminal trên máy khác phiên bản với trang này. Cập nhật tunelo trên máy.",
+			openElsewhere: "Phiên này đang mở trong một cửa sổ khác trên máy. Dùng tab Trò chuyện, hoặc đóng cửa sổ đó trước.",
 		},
 		retry: "Thử lại",
 		tabs: "Các terminal",

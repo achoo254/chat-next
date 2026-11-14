@@ -1,6 +1,7 @@
-import { ResetReason } from "@achoo254/chat-proto/remote/remote";
+import { create } from "@bufbuild/protobuf";
+import { ItemSchema, ResetReason, StatusItemSchema } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { answerIsCurrent, isContiguous, newer, resumeFrom } from "../src/index.ts";
+import { answerIsCurrent, conversationBreakItem, isContiguous, isConversationBreak, newer, resumeFrom } from "../src/index.ts";
 
 const bounds = { epoch: 3n, firstSeq: 10n, lastSeq: 20n };
 
@@ -37,5 +38,15 @@ describe("item merge", () => {
     expect(answerIsCurrent({ id: "q", revision: 2, pending: true }, 2)).toBe(true);
     expect(answerIsCurrent({ id: "q", revision: 3, pending: true }, 2)).toBe(false);
     expect(answerIsCurrent({ id: "q", revision: 2, pending: false }, 2)).toBe(false);
+  });
+});
+
+describe("conversation breaks", () => {
+  it("are status items with no text under the reserved id prefix, told apart from other status items", () => {
+    const b = conversationBreakItem(2, "abc");
+    expect(b).toEqual({ id: "conversation-break:2:abc", body: { case: "status", value: { text: "" } } });
+    expect(isConversationBreak(create(ItemSchema, b))).toBe(true);
+    expect(isConversationBreak({ id: "status:1", body: { case: "status", value: create(StatusItemSchema, { text: "" }) } })).toBe(false);
+    expect(isConversationBreak({ id: "conversation-break:x", body: { case: "status", value: create(StatusItemSchema, { text: "Compacted" }) } })).toBe(false);
   });
 });

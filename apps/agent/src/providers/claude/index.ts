@@ -55,6 +55,7 @@ import type {
   TurnStats,
 } from "../types.ts";
 import { LocalSessions } from "./local-sessions.ts";
+import type { ProcessStartLookup } from "./process-start.ts";
 import { MessageMapper } from "./message-mapper.ts";
 import { claudeWriter } from "./one-shot-writer.ts";
 import { ClaudeUsage } from "./usage-scan.ts";
@@ -161,6 +162,8 @@ export function createClaudeProvider(
     homes?: () => string[];
     /** Several Claude accounts on the machine; without it, only the machine's own sign-in. */
     accounts?: ClaudeAccountsDeps;
+    /** When a running process started, as the system tells (LocalSessionsOptions.processStart); tests replace it. */
+    processStart?: ProcessStartLookup;
   } = {},
 ): AgentProvider {
   const queryFn: QueryFn = deps.query ?? ((p) => sdkQuery(p));
@@ -179,7 +182,7 @@ export function createClaudeProvider(
       })
     : undefined;
   const homes = deps.homes ?? (accounts ? () => accounts.claudeHomes() : () => [defaultClaudeHome()]);
-  const history = new LocalSessions({ homes });
+  const history = new LocalSessions({ homes, ...(deps.processStart ? { processStart: deps.processStart } : {}) });
 
   return {
     id: CLAUDE_PROVIDER_ID,

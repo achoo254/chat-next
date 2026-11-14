@@ -128,6 +128,8 @@ function isMac(): boolean {
 /** Why a terminal could not open, in the user's language (a refusal names the terminal, not the AI). */
 function openErrorText(t: MachinesCopy, err: unknown): string {
 	if (err instanceof RemoteError && err.reason === ErrorReason.ACCESS_DENIED) return t.terminal.failed.refused;
+	// The session's AI: another process of it on the machine has the session open (a window of the owner's own).
+	if (err instanceof RemoteError && err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE) return t.terminal.failed.openElsewhere;
 	return errorText(t, err, "");
 }
 

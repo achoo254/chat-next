@@ -95,6 +95,8 @@ export interface AiTerminals {
   /** "" when no thread's AI runs in it. */
   threadOf(session: number, pid: number): string;
   started(threadId: string, session: number, pid: number): void;
+  /** What launch said to run did not start (the terminal process refused or failed): chat may write to the thread again. */
+  abandoned(threadId: string): void;
   ended(session: number, pid: number): void;
   /** Only these sessions still run in terminal process `pid`. */
   alive(pid: number, sessions: ReadonlySet<number>): void;
@@ -111,6 +113,7 @@ export function aiTerminalsOf(core: AgentCore): AiTerminals {
     sessionOf: (threadId, pid) => core.terminalSession(threadId, pid),
     threadOf: (session, pid) => core.terminalThread(session, pid),
     started: (threadId, session, pid) => core.terminalStarted(threadId, session, pid),
+    abandoned: (threadId) => core.terminalAbandoned(threadId),
     ended: (session, pid) => core.terminalEnded(session, pid),
     alive: (pid, sessions) => core.terminalAlive(pid, sessions),
     idle: (threadId, quietMs) => core.terminalIdle(threadId, quietMs),
@@ -327,9 +330,15 @@ export class TerminalService {
       if (running !== undefined) return running;
       const { shell, args, cwd, env: vars } = await ai.launch(threadId);
       const withVars = Object.keys(vars).length > 0 ? { env: vars } : {};
-      const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars });
-      const session = (r as { session?: unknown }).session;
-      if (typeof session !== "number") throw new Error("the terminal process did not name the session");
+      let session: unknown;
+      try {
+        const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars });
+        session = (r as { session?: unknown }).session;
+        if (typeof session !== "number") throw new Error("the terminal process did not name the session");
+      } catch (err) {
+        ai.abandoned(threadId);
+        throw err;
+      }
       this.cwds.set(session, cwd);
       ai.started(threadId, session, this.hostPid);
       return session;

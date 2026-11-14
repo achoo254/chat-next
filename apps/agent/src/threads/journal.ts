@@ -27,7 +27,9 @@ export class Journal {
       const line = raw.subarray(start, nl).toString("utf8");
       if (line.trim()) {
         try {
-          const item = fromJsonString(ItemSchema, line);
+          // An item type a newer agent wrote (before going back to this one) is kept without its body, never taken
+          // for a torn line: that would cut it and everything after it off the journal.
+          const item = fromJsonString(ItemSchema, line, { ignoreUnknownFields: true });
           this.items.set(item.id, item);
           if (item.seq > this.lastSeq) this.lastSeq = item.seq;
         } catch {

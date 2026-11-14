@@ -39,6 +39,7 @@ import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
+import { messageCount, splitConversations } from "./transcript/conversation-break.ts";
 import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -76,9 +77,15 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useWatch(link, threadId);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
-	const all = foldTranscript(items, state.pending.get(threadId) ?? []);
+	// After the AI's CLI went on in another conversation (/clear), the session shows that one; earlier ones fold away.
+	const conversations = splitConversations(items);
+	const all = foldTranscript(conversations.current, state.pending.get(threadId) ?? []);
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
+	const previous: PreviousConversation | null =
+		conversations.previous.length === 0
+			? null
+			: { blocks: foldTranscript(conversations.previous).filter((b) => !isPending(b)), messages: messageCount(conversations.previous), breakId: conversations.breakId };
 	/** The takeover whose live view shows over the session. */
 	const [viewing, setViewing] = useState<string | null>(null);
 	const viewed = viewing === null ? undefined : state.takeovers.get(viewing);
@@ -298,6 +305,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					) : (
 						<Transcript
 							blocks={blocks}
+							previous={previous}
 							state={state}
 							running={running}
 							startedAt={turnStartedAt(items)}
@@ -333,7 +341,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							provider={provider}
 							model={model}
 							answered={answeredModel(items)}
-							context={contextShare(items)}
+							context={contextShare(conversations.current)}
 							info={threadInfo}
 							link={link}
 							threadId={threadId}
@@ -574,8 +582,19 @@ function Dock({ prompts, ai, sessionAllow, decide, answer }: DockProps) {
 	);
 }
 
+/** The conversations before the latest break (the AI's CLI went on in another one): folded away until asked for. */
+export interface PreviousConversation {
+	readonly blocks: readonly Block[];
+	/** Messages of the user and the AI in them. */
+	readonly messages: number;
+	/** The latest break: another one means the CLI went on in yet another conversation. */
+	readonly breakId: string;
+}
+
 interface TranscriptProps {
+	/** The conversation the session is in now. */
 	blocks: readonly Block[];
+	previous?: PreviousConversation | null;
 	state: LinkState;
 	running: boolean;
 	/** When the running turn began (Unix ms); null when none runs. */
@@ -598,7 +617,7 @@ export const TRANSCRIPT_PAGE = 40;
 const EARLIER_PX = 600;
 
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
-export function Transcript({ blocks, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live }: TranscriptProps) {
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -607,10 +626,28 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 	// A long session opens on its last blocks only (drawing hundreds took seconds on a slower device); earlier ones
 	// come in pages as the user scrolls up. While following, the window is the last page; once the user scrolls up
 	// its first block stays put, so blocks arriving meanwhile never shift what is being read.
-	const [from, setFrom] = useState<{ threadId: string; start: number | null }>({ threadId, start: null });
-	const fixed = from.threadId === threadId ? from.start : null;
-	const start = fixed ?? Math.max(0, blocks.length - TRANSCRIPT_PAGE);
-	const shown = start > 0 ? blocks.slice(start) : blocks;
+	// The window and the opened earlier conversations belong to one conversation of the session: when the CLI goes
+	// on in another one (/clear), the current one starts over, shorter than the window kept for the one before.
+	const view = `${threadId}\u0000${previous?.breakId ?? ""}`;
+	const [from, setFrom] = useState<{ view: string; start: number | null }>({ view, start: null });
+	// The earlier conversations, once opened, come before the current one and page like it; the row that opens
+	// and closes them stays where the current one begins.
+	const [openedFor, setOpenedFor] = useState<string | null>(null);
+	const opened = previous !== null && openedFor === view;
+	const before = opened ? previous.blocks.length : 0;
+	const all = opened ? [...previous.blocks, ...blocks] : blocks;
+	const fixed = from.view === view && from.start !== null && from.start < all.length ? from.start : null;
+	const start = fixed ?? Math.max(0, all.length - TRANSCRIPT_PAGE);
+	const shown = start > 0 ? all.slice(start) : all;
+	const togglePrevious = () => {
+		if (previous === null) return;
+		const n = previous.blocks.length;
+		// Opened: the last page of the earlier conversations shows above the row, read down into the current one.
+		// Closed: the window keeps its place in the current conversation.
+		if (opened) setFrom({ view, start: fixed === null ? null : Math.max(0, fixed - n) });
+		else setFrom({ view, start: Math.max(0, n - TRANSCRIPT_PAGE) });
+		setOpenedFor(opened ? null : view);
+	};
 	/** The scroll height before earlier blocks came in: the reading position is kept across them. */
 	const heightBefore = useRef<number | null>(null);
 	useLayoutEffect(() => {
@@ -623,7 +660,7 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 		const el = scroller.current;
 		if (start === 0 || heightBefore.current !== null) return;
 		heightBefore.current = el?.scrollHeight ?? null;
-		setFrom({ threadId, start: Math.max(0, start - TRANSCRIPT_PAGE) });
+		setFrom({ view, start: Math.max(0, start - TRANSCRIPT_PAGE) });
 	};
 	const last = blocks.at(-1);
 	const tail = last === undefined ? "" : `${blocks.length}:${last.kind === "text" ? last.text.length : last.id}`;
@@ -632,6 +669,16 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 		const el = scroller.current;
 		if (el !== null && stick.current) el.scrollTop = el.scrollHeight;
 	}, [tail]);
+	// The CLI went on in another conversation while the user read further up: the new one shows from its end.
+	const shownView = useRef(view);
+	useEffect(() => {
+		if (shownView.current === view) return;
+		shownView.current = view;
+		stick.current = true;
+		setSeenAt(null);
+		const el = scroller.current;
+		if (el !== null) el.scrollTop = el.scrollHeight;
+	}, [view]);
 	// A width change (the changes panel, a rotated phone) keeps a following transcript at the bottom.
 	const lastTop = useRef(0);
 	useEffect(() => {
@@ -669,20 +716,26 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 						// Only the user scrolling up stops the following; content growing does not.
 						stick.current = false;
 						setSeenAt((seen) => seen ?? blocks.length);
-						if (fixed === null) setFrom({ threadId, start });
+						if (fixed === null) setFrom({ view, start });
 					}
 					if (up && el.scrollTop < EARLIER_PX) showEarlier();
 				}}
 			>
-				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
 				{start > 0 && (
 					<button type="button" className="btn btn-sm mx-earlier" onClick={showEarlier} data-id="transcript-earlier">
 						{t.transcript.earlier(Math.min(start, TRANSCRIPT_PAGE))}
 					</button>
 				)}
-				{shown.map((block) => (
-					<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
-				))}
+				{withPreviousRow(
+					shown.map((block) => (
+						<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
+					)),
+					previous === null || before < start ? null : (
+						<PreviousRow key="previous-conversation" messages={previous.messages} opened={opened} onToggle={togglePrevious} t={t} />
+					),
+					before - start,
+				)}
+				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
 				<ActivityLine
 					source={link}
 					threadId={threadId}
@@ -703,6 +756,22 @@ export function Transcript({ blocks, state, running, startedAt, waiting, fetchFu
 				</button>
 			)}
 		</div>
+	);
+}
+
+/** The drawn blocks with the earlier conversations' row placed at `at` (where the current conversation begins); none when off the window. */
+function withPreviousRow(views: ReactNode[], row: ReactNode, at: number): ReactNode[] {
+	if (row === null) return views;
+	return [...views.slice(0, at), row, ...views.slice(at)];
+}
+
+/** One small row where the current conversation begins: "Cuộc trò chuyện trước (n tin nhắn)", opening the earlier ones above it. */
+function PreviousRow({ messages, opened, onToggle, t }: { messages: number; opened: boolean; onToggle: () => void; t: MachinesCopy }) {
+	return (
+		<button type="button" className="mx-previous" aria-expanded={opened} onClick={onToggle} data-id="transcript-previous">
+			<MachineIcon name="chevron-right" small />
+			<span>{t.transcript.previous(messages)}</span>
+		</button>
 	);
 }
 

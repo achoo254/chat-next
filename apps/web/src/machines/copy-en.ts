@@ -297,6 +297,7 @@ export const enMachines: MachinesCopy = {
 	},
 	transcript: {
 		earlier: (n: number) => (n === 1 ? "Show 1 earlier item" : `Show ${n} earlier items`),
+		previous: (n: number) => (n === 1 ? "Previous conversation (1 message)" : `Previous conversation (${n} messages)`),
 		ranTools: (n) => (n === 1 ? "Ran 1 tool" : `Ran ${n} tools`),
 		runningTool: (name) => `Running ${name}`,
 		runningFor: (time) => `Running for ${time}`,
@@ -655,6 +656,7 @@ export const enMachines: MachinesCopy = {
 			revoked: "This device was revoked from the account, so the machine closed the terminal.",
 			unavailable: "The machine's terminal part does not run yet. Retry, or run tunelo login on the machine.",
 			unsupported: "The machine's terminal part is another version than this page. Update tunelo on the machine.",
+			openElsewhere: "This session is open in another window on this machine. Use the Conversation tab, or close that window first.",
 		},
 		retry: "Retry",
 		tabs: "Terminals",

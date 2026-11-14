@@ -294,6 +294,7 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	transcript: {
 		earlier: (n: number) => `查看之前的 ${n} 项`,
+		previous: (n: number) => `之前的对话（${n} 条消息）`,
 		ranTools: (n) => `已运行 ${n} 个工具`,
 		runningTool: (name) => `正在运行 ${name}`,
 		runningFor: (time) => `已运行 ${time}`,
@@ -650,6 +651,7 @@ export const zhCNMachines: MachinesCopy = {
 			revoked: "此设备已从账号中撤销，因此电脑关闭了终端。",
 			unavailable: "机器上的终端组件尚未运行。请重试，或在机器上运行 tunelo login。",
 			unsupported: "机器上的终端组件与此页面版本不同。请更新机器上的 tunelo。",
+			openElsewhere: "此会话已在这台电脑上的另一个窗口中打开。请使用聊天标签页，或先关闭那个窗口。",
 		},
 		retry: "重试",
 		tabs: "终端列表",

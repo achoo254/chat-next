@@ -21,6 +21,7 @@
 import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
+import { type ProcessStartLookup, windowsProcessStart } from "./process-start.ts";
 import { ClaudeProcesses, heldSessions } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
 
@@ -72,8 +73,16 @@ type OpenTool = { size: number; mtimeMs: number; name: string; request: boolean 
  * done with).
  */
 type Background = { pos: number; running: Set<string> };
-/** A running claude's record in its Claude folder's register: the session it holds now, where it works, when it started (Unix ms). */
-type Register = { pid: number; sessionId: string; cwd?: string; startedAt?: number };
+/**
+ * A running claude's record in its Claude folder's register: the session it
+ * holds now, where it works, when it started (Unix ms), its process's
+ * creation time as the system gave it (`procStart`; on Windows a FILETIME),
+ * and what started it (`entrypoint`: "cli" in a terminal, "sdk-…" for a
+ * program driving it, such as this machine's own chat sessions).
+ */
+type Register = { pid: number; sessionId: string; cwd?: string; startedAt?: number; procStart?: string; entrypoint?: string };
+/** How far a process's creation time may be from the `procStart` claude recorded (FILETIME steps of 100 ns: one second). */
+const PROC_START_SLACK = 10_000_000n;
 /** How far a claude's recorded start may be from when the terminal said it started the CLI. */
 export const TERMINAL_START_SLACK_MS = 10_000;
 type Known = { file: string; sessionId: string; ino: number; size: number; mtimeMs: number; head?: Head; tail?: Tail; count?: Count; tool?: OpenTool; background?: Background };
@@ -86,6 +95,8 @@ export type LocalSessionsOptions = {
   alive?: (pid: number) => boolean;
   /** The running Claude processes; tests replace it. */
   processes?: ClaudeProcesses;
+  /** When a running process started, as the system tells; tests replace it. By default PowerShell on Windows, the running Claude processes elsewhere. */
+  processStart?: ProcessStartLookup;
 };
 
 function processAlive(pid: number): boolean {
@@ -138,11 +149,15 @@ export class LocalSessions implements SessionHistory {
   private readonly now: () => number;
   private readonly alive: (pid: number) => boolean;
   private readonly processes: ClaudeProcesses;
+  private readonly processStart: ProcessStartLookup;
 
   constructor(private readonly opts: LocalSessionsOptions) {
     this.now = opts.now ?? Date.now;
     this.alive = opts.alive ?? processAlive;
     this.processes = opts.processes ?? new ClaudeProcesses();
+    this.processStart =
+      opts.processStart ??
+      (process.platform === "win32" ? (pid) => windowsProcessStart(pid) : async (pid) => this.processes.current.find((p) => p.pid === pid));
   }
 
   /** Reads the running Claude processes again when the last read is old; cheap, and never fails. */
@@ -275,6 +290,51 @@ export class LocalSessions implements SessionHistory {
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * From the register (a running claude's own record of the session it holds
+   * now), else from the session a claude keeping no record names on its
+   * command line (--resume, --session-id); `except`, the terminal's CLI, is
+   * told apart as in terminalHeldSession. A record counts only when its
+   * process is the claude that wrote it (see runsAsRecorded) and no program
+   * drives it (an "sdk-…" entrypoint: this machine's own chat sessions).
+   * Never fails.
+   */
+  async openInOtherProcess(sessionId: string, except?: { dir: string; startedAt: number }): Promise<boolean> {
+    try {
+      const id = sessionId.toLowerCase();
+      const same = dirComparer();
+      const isExcept = (cwd: string | undefined, startedAt: number | undefined): boolean =>
+        except !== undefined && cwd !== undefined && startedAt !== undefined && Math.abs(startedAt - except.startedAt) <= TERMINAL_START_SLACK_MS && same(cwd, except.dir);
+      const registers = this.registers();
+      for (const rec of registers) {
+        if (rec.sessionId !== id || isExcept(rec.cwd, rec.startedAt) || rec.entrypoint?.startsWith("sdk")) continue;
+        if (await this.runsAsRecorded(rec)) return true;
+      }
+      // A claude with a register entry said where it is now: its command line may name the session it left (/clear).
+      const registered = new Set(registers.map((rec) => rec.pid));
+      return this.processes.current.some((p) => !registered.has(p.pid) && p.sessionId.toLowerCase() === id && !isExcept(p.cwd, p.startedAt));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The record's pid still belongs to the claude that wrote it: the
+   * process's start as the system tells matches the record's (`procStart`
+   * when both are FILETIMEs, else `startedAt`). A pid given out again to
+   * another program, or a process whose start cannot be told, does not:
+   * better to let a terminal open than to refuse it for a window that is gone.
+   */
+  private async runsAsRecorded(rec: Register): Promise<boolean> {
+    const start = await this.processStart(rec.pid);
+    if (!start) return false;
+    if (start.fileTime !== undefined && rec.procStart !== undefined && /^\d{1,24}$/.test(rec.procStart)) {
+      const gap = BigInt(rec.procStart) - start.fileTime;
+      return (gap < 0n ? -gap : gap) <= PROC_START_SLACK;
+    }
+    return rec.startedAt !== undefined && Math.abs(rec.startedAt - start.startedAt) <= TERMINAL_START_SLACK_MS;
   }
 
   holds(sessionId: string): boolean {
@@ -575,13 +635,15 @@ export class LocalSessions implements SessionHistory {
         // Only the small <pid>.json records; never anything else in that folder.
         if (!f.isFile() || !PROCESS_FILE.test(f.name)) continue;
         try {
-          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown; cwd?: unknown; startedAt?: unknown };
+          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown; cwd?: unknown; startedAt?: unknown; procStart?: unknown; entrypoint?: unknown };
           if (typeof rec.pid !== "number" || typeof rec.sessionId !== "string" || !this.alive(rec.pid)) continue;
           out.push({
             pid: rec.pid,
             sessionId: rec.sessionId.toLowerCase(),
             ...(typeof rec.cwd === "string" ? { cwd: rec.cwd } : {}),
             ...(typeof rec.startedAt === "number" ? { startedAt: rec.startedAt } : {}),
+            ...(typeof rec.procStart === "string" ? { procStart: rec.procStart } : {}),
+            ...(typeof rec.entrypoint === "string" ? { entrypoint: rec.entrypoint } : {}),
           });
         } catch {
           // being written, or gone

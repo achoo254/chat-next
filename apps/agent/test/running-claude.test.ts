@@ -5,6 +5,7 @@ import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LocalSessions } from "../src/providers/claude/local-sessions.ts";
+import { windowsProcessStart } from "../src/providers/claude/process-start.ts";
 import { ClaudeProcesses, elapsedMs, heldSessions, isClaudeCommand, parseLsofCwd, parsePs, sessionIdOf } from "../src/providers/claude/running-claude.ts";
 import { tempDir } from "./harness.ts";
 
@@ -134,5 +135,70 @@ describe("the session list", () => {
     expect(after.find((s) => s.sessionId === B)?.busy).toBe(true);
     expect(after.find((s) => s.sessionId === A)?.busy).toBe(false);
     expect(sessions.find(B)?.busy).toBe(true);
+  });
+});
+
+describe("a session another running claude has open", () => {
+  it("counts a claude naming it on its command line, not the terminal's own CLI nor one only working in its folder", async () => {
+    const now = 10_000_000;
+    const processes = new ClaudeProcesses({
+      platform: "darwin",
+      now: () => now,
+      exec: async (cmd) => (cmd === "ps" ? `  42  1  01:00:00 claude claude --resume ${A}\n` : "p42\nfcwd\nn/work/x\n"),
+    });
+    const sessions = new LocalSessions({ homes: () => [tempDir()], now: () => now, processes });
+    // Started an hour ago with --resume A: the owner's own window.
+    await sessions.prime();
+    expect(await sessions.openInOtherProcess(A)).toBe(true);
+    expect(await sessions.openInOtherProcess(B)).toBe(false);
+    // The terminal's CLI: started with the terminal (to the second), in the thread's folder.
+    expect(await sessions.openInOtherProcess(A, { dir: "/work/x", startedAt: now - 3_600_000 + 400 })).toBe(false);
+    expect(await sessions.openInOtherProcess(A, { dir: "/work/y", startedAt: now - 3_600_000 })).toBe(true);
+    // A claude in the folder that names no session is never taken for one holding it.
+    const later = new ClaudeProcesses({ platform: "darwin", now: () => now, exec: async (cmd) => (cmd === "ps" ? "  43  1  00:10 claude claude\n" : "p43\nfcwd\nn/work/x\n") });
+    const other = new LocalSessions({ homes: () => [tempDir()], now: () => now, processes: later });
+    await other.prime();
+    expect(await other.openInOtherProcess(A)).toBe(false);
+  });
+
+  it("counts a register entry only while its pid is the claude that wrote it, as its creation time (procStart) tells", async () => {
+    const home = tempDir();
+    mkdirSync(join(home, "sessions"));
+    const pid = process.pid;
+    const record = (extra: Record<string, unknown>) =>
+      writeFileSync(join(home, "sessions", `${pid}.json`), JSON.stringify({ pid, sessionId: A, cwd: "/work/x", startedAt: 1_700_000_000_000, kind: "interactive", entrypoint: "cli", ...extra }));
+    let start: { startedAt: number; fileTime?: bigint } | undefined = { startedAt: 1_700_000_000_000, fileTime: 134_391_447_150_113_910n };
+    const sessions = new LocalSessions({ homes: () => [home], processStart: async () => start });
+    record({ procStart: "134391447150113910" });
+    expect(await sessions.openInOtherProcess(A)).toBe(true);
+    // The pid now belongs to a program created a minute later: the record was left behind.
+    start = { startedAt: 1_700_000_060_000, fileTime: 134_391_447_750_113_910n };
+    expect(await sessions.openInOtherProcess(A)).toBe(false);
+    // No procStart (an older claude): its recorded start is compared instead.
+    record({});
+    expect(await sessions.openInOtherProcess(A)).toBe(false);
+    start = { startedAt: 1_700_000_001_500 };
+    expect(await sessions.openInOtherProcess(A)).toBe(true);
+    // A process whose start cannot be told, or one a program drives: not counted.
+    start = undefined;
+    expect(await sessions.openInOtherProcess(A)).toBe(false);
+    start = { startedAt: 1_700_000_000_000 };
+    record({ entrypoint: "sdk-ts" });
+    expect(await sessions.openInOtherProcess(A)).toBe(false);
+  });
+
+  it("tells a process's start on Windows from its creation time, only ever for a plain pid", async () => {
+    const calls: string[][] = [];
+    const exec = async (cmd: string, args: string[]) => {
+      calls.push([cmd, ...args]);
+      return "134391447150113910\r\n";
+    };
+    expect(await windowsProcessStart(20964, exec)).toEqual({ fileTime: 134_391_447_150_113_910n, startedAt: 1_794_671_115_011 });
+    expect(calls[0]?.at(-1)).toBe("(Get-Process -Id 20964 -ErrorAction Stop).StartTime.ToFileTimeUtc()");
+    expect(await windowsProcessStart(-1, exec)).toBeUndefined();
+    expect(await windowsProcessStart(1.5, exec)).toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(await windowsProcessStart(7, async () => Promise.reject(new Error("no such process")))).toBeUndefined();
+    expect(await windowsProcessStart(7, async () => "")).toBeUndefined();
   });
 });

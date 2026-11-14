@@ -7,58 +7,23 @@
 // Made-up transcripts and registers stand in for what claude writes; this
 // test process (and its parent) stand in for running claudes.
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, test } from "vitest";
 import type { AgentCore } from "../src/core/agent-core.ts";
-import { createClaudeProvider } from "../src/providers/claude/index.ts";
-import { fakeQuery } from "./fake-sdk.ts";
-import { makeCore, tempDir } from "./harness.ts";
-import { Transcript } from "./support/claude-transcript.ts";
-
-const none = { sensitive: false, projectSettings: false };
-const HOST_PID = 4242;
+import { isConversationBreak } from "@achoo254/chat-remote-protocol";
+import type { AgentProvider } from "../src/providers/types.ts";
+import { fakeProvider } from "./fake-provider.ts";
+import { byCase, tempDir, until } from "./harness.ts";
+import { HOST_PID, heldByTerminal as heldWith } from "./support/claude-terminal-thread.ts";
 
 const cores: AgentCore[] = [];
 afterEach(async () => {
   await Promise.all(cores.splice(0).map((c) => c.stop()));
 });
 
-/** What the test reads of a thread's saved record. */
-type SavedMeta = { segments: { sessionId?: string }[]; terminal?: { startedAt?: number } };
-
 const summaryOf = (core: AgentCore, id: string): ThreadSummary | undefined => core.list().find((s) => s.id === id);
-
-/** A thread opened with no message and handed to the terminal: the CLI starts a new session with the id the thread keeps. */
-async function heldByTerminal() {
-  const claudeHome = tempDir("claude-home-");
-  mkdirSync(join(claudeHome, "sessions"));
-  const provider = createClaudeProvider({ query: fakeQuery().fn, findBinary: async () => "claude", homes: () => [claudeHome] });
-  provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
-  const { core, work, dataDir } = makeCore([provider]);
-  cores.push(core);
-  const thread = await core.create({ provider: "claude", model: "", dir: work, text: "", consent: none, device: "phone" });
-  const spec = await core.terminalLaunch(thread.id);
-  const launched = spec.args[spec.args.indexOf("--session-id") + 1] ?? "";
-  core.terminalStarted(thread.id, 1, HOST_PID);
-  const meta = (): SavedMeta => JSON.parse(readFileSync(join(dataDir, "threads", thread.id, "meta.json"), "utf8")) as SavedMeta;
-  const startedAt = meta().terminal?.startedAt ?? 0;
-  /** A running claude's record in the register: by default the terminal's CLI (this folder, started with the terminal). */
-  const register = (pid: number, sessionId: string, at = startedAt + 1_200, cwd = work) =>
-    writeFileSync(join(claudeHome, "sessions", `${pid}.json`), JSON.stringify({ pid, sessionId, cwd, startedAt: at, kind: "interactive" }));
-  /** A session kept on the machine, written an hour ago. */
-  const conversation = (id: string, user: string, answer: string) => {
-    const t = new Transcript(id, work, "cli").opening();
-    t.user(user);
-    t.assistant([{ type: "text", text: answer }]);
-    const file = t.write(claudeHome);
-    const hourAgo = new Date(Date.now() - 3_600_000);
-    utimesSync(file, hourAgo, hourAgo);
-  };
-  const segments = () => meta().segments.map((s) => s.sessionId);
-  return { core, thread, launched, startedAt, register, conversation, segments };
-}
+const heldByTerminal = (...others: AgentProvider[]) => heldWith(cores, others);
 
 describe("a CLI in the terminal that went on in another session", () => {
   test("/resume, then the terminal is closed: the thread keeps the conversation that was on screen, and opens in it again", async () => {
@@ -146,5 +111,109 @@ describe("a CLI in the terminal that went on in another session", () => {
     // Ending the terminal then undoes the launch session that never got a transcript, as it always did.
     m.core.terminalEnded(1, HOST_PID);
     expect(m.segments()).toEqual([undefined]);
+  });
+});
+
+describe("the conversation a thread shows after its CLI went on in another one", () => {
+  type Items = ReturnType<AgentCore["snapshot"]>;
+  /** The texts of the items, in the journal's order (by seq). */
+  const texts = (items: Items): string[] => items.flatMap((i) => (i.body.case === "text" ? [i.body.value.text] : []));
+  const breaks = (items: Items): Items => items.filter((i) => isConversationBreak(i));
+  /** What a device shows: the items after the latest break. */
+  const shown = (items: Items): Items => {
+    const from = breaks(items).at(-1)?.seq ?? 0n;
+    return items.filter((i) => i.seq > from);
+  };
+
+  test("/clear: one break comes before the new conversation, and the earlier one stays in the journal", async () => {
+    const m = await heldByTerminal();
+    m.conversation(m.launched, "build it", "Built.");
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    expect(texts(m.core.snapshot(m.thread.id))).toEqual(["build it", "Built."]);
+    const fresh = randomUUID();
+    m.conversation(fresh, "now the docs", "Docs written.");
+    m.register(process.pid, fresh);
+    await m.core.lookElsewhere();
+    const items = m.core.snapshot(m.thread.id);
+    expect(breaks(items)).toHaveLength(1);
+    // A status item with no text, which every released agent and device reads and draws as nothing.
+    expect(breaks(items)[0]?.body).toMatchObject({ case: "status", value: { text: "" } });
+    const at = items.findIndex((i) => isConversationBreak(i));
+    expect(texts(items.slice(0, at))).toEqual(["build it", "Built."]);
+    expect(texts(items.slice(at + 1))).toEqual(["now the docs", "Docs written."]);
+    // Looked at again, followed again and ended: still one break, nothing read twice.
+    await m.core.lookElsewhere();
+    expect(m.core.terminalFollow(m.thread.id)).toBe(false);
+    m.core.terminalEnded(1, HOST_PID);
+    expect(breaks(m.core.snapshot(m.thread.id))).toHaveLength(1);
+    expect(texts(m.core.snapshot(m.thread.id))).toEqual(["build it", "Built.", "now the docs", "Docs written."]);
+  });
+
+  test("the last turn written moments before /clear is read in before the break", async () => {
+    const m = await heldByTerminal();
+    m.conversation(m.launched, "build it", "Built.");
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    // Typed and answered, then /clear, all between two looks.
+    m.reply(m.launched, "and test it", "Tested.");
+    const fresh = randomUUID();
+    m.conversation(fresh, "now the docs", "Docs written.");
+    m.register(process.pid, fresh);
+    await m.core.lookElsewhere();
+    const items = m.core.snapshot(m.thread.id);
+    const at = items.findIndex((i) => isConversationBreak(i));
+    expect(texts(items.slice(0, at))).toEqual(["build it", "Built.", "and test it", "Tested."]);
+    expect(texts(items.slice(at + 1))).toEqual(["now the docs", "Docs written."]);
+  });
+
+  test("a launch session that never got a transcript is replaced without a break while nothing was shown", async () => {
+    const m = await heldByTerminal();
+    const other = randomUUID();
+    m.conversation(other, "fix the login bug", "Fixed.");
+    m.register(process.pid, other);
+    await m.core.lookElsewhere();
+    expect(m.segments()).toEqual([other]);
+    const items = m.core.snapshot(m.thread.id);
+    expect(breaks(items)).toEqual([]);
+    expect(texts(items)).toEqual(["fix the login bug", "Fixed."]);
+  });
+
+  test("/resume back to a conversation shown before: a new break, and that conversation shows again after it", async () => {
+    const m = await heldByTerminal();
+    m.conversation(m.launched, "build it", "Built.");
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    const fresh = randomUUID();
+    m.conversation(fresh, "build it", "Built again.");
+    m.register(process.pid, fresh);
+    await m.core.lookElsewhere();
+    // The same words in the new conversation are its own message, not the earlier one's.
+    expect(texts(shown(m.core.snapshot(m.thread.id)))).toEqual(["build it", "Built again."]);
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    expect(m.segments()).toEqual([m.launched, fresh, m.launched]);
+    const items = m.core.snapshot(m.thread.id);
+    expect(breaks(items)).toHaveLength(2);
+    expect(texts(shown(items))).toEqual(["build it", "Built."]);
+  });
+
+  test("handing over to another AI after /clear passes on only the conversation shown", async () => {
+    const other = fakeProvider("other");
+    const m = await heldByTerminal(other);
+    m.conversation(m.launched, "the old task", "Old done.");
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    const fresh = randomUUID();
+    m.conversation(fresh, "the new task", "New done.");
+    m.register(process.pid, fresh);
+    await m.core.lookElsewhere();
+    m.core.terminalEnded(1, HOST_PID);
+    await m.core.switchProvider(m.thread.id, "other", "");
+    const items = await until(m.core, m.thread.id, (i) => byCase(i, "agentHandoff").length === 1 && other.log.sent.length > 0);
+    const summary = byCase(items, "agentHandoff")[0]?.body.value.summary ?? "";
+    expect(summary).toContain("the new task");
+    expect(summary).not.toContain("the old task");
+    expect(other.log.sent[0]).not.toContain("the old task");
   });
 });

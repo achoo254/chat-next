@@ -27,7 +27,7 @@ import {
   ToolKind,
   TurnState,
 } from "@achoo254/chat-proto/remote/remote";
-import { type Resume, resumeFrom } from "@achoo254/chat-remote-protocol";
+import { type Resume, conversationBreakItem, isConversationBreak, resumeFrom } from "@achoo254/chat-remote-protocol";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { mentionsSensitive } from "../safety/sensitive-paths.ts";
 import type {
@@ -51,6 +51,7 @@ import type {
   SessionPage,
   SessionQuery,
   ToolKind as Kind,
+  TerminalRunner,
   TurnStats,
 } from "../providers/types.ts";
 import { buildHandoff, gitChanges } from "../threads/handoff.ts";
@@ -224,6 +225,19 @@ type Thread = {
   activity?: TurnActivity;
   /** Whether the open session loaded the folder's project configuration (meaningful only while it is open). */
   projectLoaded?: boolean;
+  /**
+   * The thread's last terminal, now ended: when it started its CLI
+   * (ThreadMeta.terminal.startedAt) and when it ended (Unix ms). For
+   * OWN_CLI_EXIT_MS after that the CLI may still be exiting, and its holding
+   * the session is not another process holding it.
+   */
+  lastTerminal?: { startedAt: number; endedAt: number };
+  /**
+   * The thread's CLI is being started in a terminal (terminalLaunch said what
+   * runs; terminalStarted or terminalAbandoned comes next): no message goes
+   * to the machine's own session meanwhile, so two processes never write it.
+   */
+  launching?: boolean;
 };
 
 /** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
@@ -248,6 +262,18 @@ export const ELSEWHERE_POLL_MS = 5_000;
  * not for something running elsewhere.
  */
 const OWN_WRITE_SLACK_MS = 5_000;
+
+/**
+ * How long the AI's process of the machine's own session, just closed so the
+ * terminal can open the thread, may take to exit before still having the
+ * session open counts as another process having it; and how often it is
+ * looked at meanwhile.
+ */
+const PARKED_EXIT_MS = 3_000;
+const PARKED_EXIT_POLL_MS = 250;
+
+/** How long after its terminal ended the thread's own CLI may still be exiting, still holding its session. */
+const OWN_CLI_EXIT_MS = 15_000;
 
 /** How long a thread's git changes are reused before git runs again. */
 const GIT_CHANGES_TTL_MS = 2_000;
@@ -1220,9 +1246,12 @@ export class AgentCore {
   }
 
   private importHistory(t: Thread, entries: HistoryEntry[], skipEqualTexts: boolean): number {
+    // Only what came after the latest conversation break is on screen: an item of a conversation the CLI went
+    // back to (/resume) is written again after it, and an equal text of an earlier conversation is not this one's.
+    const shownFrom = latestBreakSeq(t.journal);
     const texts = new Map<string, number>();
     if (skipEqualTexts) {
-      for (const item of t.journal.all()) {
+      for (const item of t.journal.since(shownFrom)) {
         if (item.body.case === "text") {
           const key = `${item.body.value.role}:${item.body.value.text}`;
           texts.set(key, (texts.get(key) ?? 0) + 1);
@@ -1232,7 +1261,8 @@ export class AgentCore {
     const items: Item[] = [];
     for (const e of entries) {
       const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
-      const prev = t.journal.get(entry.id);
+      const found = t.journal.get(entry.id);
+      const prev = found && found.seq > shownFrom ? found : undefined;
       // The same item seen live or read before; a subagent may have finished, a todo list changed since.
       if (prev && !(e.type === "todo" || (e.type === "subagent" && e.done && prev.body.case === "subagent" && !prev.body.value.done))) continue;
       if (e.type === "subagent" && prev?.body.case === "subagent") entry.body = { case: "subagent", value: { ...prev.body.value, done: true } };
@@ -1311,7 +1341,7 @@ export class AgentCore {
     const t = this.thread(threadId);
     if (!text.trim() && attachmentIds.length === 0) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
     // No two views write to one session: while its AI runs in a terminal, that is where to type.
-    if (t.meta.terminal) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+    if (t.meta.terminal || t.launching) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
     if (clientMsgId && t.clientMsgIds.has(clientMsgId)) return;
     // Placed before anything else changes: a refused file refuses the whole message.
     const taken = this.uploads.take(threadId, attachmentIds);
@@ -1619,7 +1649,7 @@ export class AgentCore {
     await this.park(t);
     const from = this.provider(t.meta.provider).name;
     const git = await gitChanges(t.meta.dir);
-    const summary = buildHandoff({ from, to: target.name, dir: t.meta.dir, items: t.journal.all(), gitStat: git.stat });
+    const summary = buildHandoff({ from, to: target.name, dir: t.meta.dir, items: t.journal.since(latestBreakSeq(t.journal)), gitStat: git.stat });
     t.meta.provider = target.id;
     t.meta.model = model;
     // Another AI: rules in the old one's syntax mean nothing there.
@@ -2348,7 +2378,8 @@ export class AgentCore {
    * own CLI: the program and arguments come from the AI's adapter, the folder
    * and account from the thread and the machine, never from a device. The
    * machine's own idle session of the thread closes first, so only the
-   * terminal writes to it. Refused while a turn runs here or elsewhere.
+   * terminal writes to it. Refused while a turn runs here or elsewhere, and
+   * while another process of the AI has the session open even idle.
    */
   async terminalLaunch(threadId: string): Promise<TerminalSpec> {
     const t = this.thread(threadId);
@@ -2356,9 +2387,7 @@ export class AgentCore {
     if (!provider.terminal) {
       throw new AgentError(ErrorCode.INVALID, `${provider.name} does not open in a terminal`, { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: provider.name });
     }
-    if (t.running || t.queued || t.pending.size > 0 || t.starting || t.switching) {
-      throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
-    }
+    if (this.turnHolds(t)) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
     if (this.busyElsewhere(t)) {
       throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
     }
@@ -2377,14 +2406,27 @@ export class AgentCore {
     }
     await this.park(t);
     const seg = t.meta.segments.at(-1);
-    const command = await provider.terminal.command({
-      dir,
-      ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
-      ...(account.scope ? { account: account.scope } : {}),
-      ...(t.meta.model ? { model: t.meta.model } : {}),
-      ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
-    });
-    if (!command) throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
+    if (seg?.sessionId) await this.refuseOpenInOtherProcess(t, provider.history, seg.sessionId);
+    if (t.session || this.turnHolds(t)) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    // From here until the terminal runs the CLI (terminalStarted) or gives up (terminalAbandoned), chat sends nothing.
+    t.launching = true;
+    let command: Awaited<ReturnType<TerminalRunner["command"]>>;
+    try {
+      command = await provider.terminal.command({
+        dir,
+        ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
+        ...(account.scope ? { account: account.scope } : {}),
+        ...(t.meta.model ? { model: t.meta.model } : {}),
+        ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
+      });
+    } catch (err) {
+      delete t.launching;
+      throw err;
+    }
+    if (!command) {
+      delete t.launching;
+      throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
+    }
     if (account.id) t.meta.accountId = account.id;
     else delete t.meta.accountId;
     // The CLI starts the new session with this id: the thread holds it from now on.
@@ -2395,6 +2437,59 @@ export class AgentCore {
     if (seg?.sessionId) this.opts.onSessionId?.(seg.provider, seg.sessionId);
     this.saveMeta(t);
     return { shell: command.file, args: command.args, cwd: dir, env: command.env };
+  }
+
+  /**
+   * Something the thread waits on that only chat can carry on: a turn here,
+   * a message queued or about to go, an approval or question waiting, a
+   * question asked again after a restart (answered as a chat message).
+   */
+  private turnHolds(t: Thread): boolean {
+    return t.running || t.queued || t.pending.size > 0 || t.reasks.size > 0 || Boolean(t.starting) || Boolean(t.switching);
+  }
+
+  /**
+   * Refuses to start the thread's CLI on a session another running process
+   * of its AI has open, busy or idle (the owner's own terminal window, say):
+   * two processes writing one transcript would each show their own
+   * conversation. Not counted: the thread's own CLI from its terminal, which
+   * may still be exiting (see ownCli), and the machine's own session closed
+   * in the last PARKED_EXIT_MS (here, or when it went idle), given that long
+   * to exit. A message that opens the machine's own session meanwhile is a
+   * turn, not another window: THREAD_RUNNING. An AI that cannot tell never
+   * refuses.
+   */
+  private async refuseOpenInOtherProcess(t: Thread, history: SessionHistory | undefined, sessionId: string): Promise<void> {
+    if (!history?.openInOtherProcess) return;
+    const except = this.ownCli(t);
+    const grace = t.meta.closedAt === undefined ? 0 : Math.max(0, t.meta.closedAt + PARKED_EXIT_MS - this.now());
+    for (let waited = 0; ; waited += PARKED_EXIT_POLL_MS) {
+      if (t.session || this.turnHolds(t)) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+      await history.prime?.();
+      if (!(await history.openInOtherProcess(sessionId, except))) return;
+      if (waited >= grace) {
+        throw new AgentError(ErrorCode.INVALID, "another process of the AI on the machine has this session open", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+      }
+      await new Promise((resolve) => setTimeout(resolve, PARKED_EXIT_POLL_MS));
+    }
+  }
+
+  /**
+   * The thread's own CLI as the AI's record of running processes tells it
+   * apart (folder and start): the one its terminal runs, or the one its
+   * terminal ran until moments ago (it may still be exiting). Undefined when
+   * neither.
+   */
+  private ownCli(t: Thread): { dir: string; startedAt: number } | undefined {
+    const last = t.lastTerminal && this.now() - t.lastTerminal.endedAt < OWN_CLI_EXIT_MS ? t.lastTerminal.startedAt : undefined;
+    const startedAt = t.meta.terminal?.startedAt ?? last;
+    return startedAt === undefined ? undefined : { dir: t.meta.dir, startedAt };
+  }
+
+  /** Starting the thread's CLI in a terminal did not go through: chat may write to the thread again. */
+  terminalAbandoned(threadId: string): void {
+    const t = this.threads.get(threadId);
+    if (t) delete t.launching;
   }
 
   /** The terminal session of terminal process `pid` running the thread's AI; undefined when none. */
@@ -2440,6 +2535,8 @@ export class AgentCore {
     if (!t || t.deleted) return;
     const newSession = this.pendingTerminalSession.get(threadId);
     this.pendingTerminalSession.delete(threadId);
+    delete t.launching;
+    delete t.lastTerminal;
     t.meta.terminal = { session, pid, startedAt: this.now(), ...(newSession ? { newSession } : {}) };
     this.saveMeta(t);
     this.announce(t);
@@ -2488,15 +2585,41 @@ export class AgentCore {
       return false;
     }
     if (seg.sessionId && before !== undefined) {
+      // The conversation left behind keeps its last turn, written moments before the switch.
+      try {
+        this.syncHistory(t);
+      } catch {
+        // read again on the next look
+      }
       t.meta.segments.push({ provider: seg.provider, model: seg.model, sessionId: held, startedSeq: String(this.lastSeq(t.meta.id) + 1n) });
     } else {
       seg.sessionId = held;
     }
+    // Also in place of a launch session that never got a transcript: a conversation gone on in (/resume) starts
+    // apart from what an earlier segment showed.
+    this.breakConversation(t, held);
     // The session the CLI was started with is not the thread's any more: nothing of it is undone when the terminal ends.
     delete at.newSession;
     this.opts.onSessionId?.(seg.provider, held);
     this.saveMeta(t);
     return true;
+  }
+
+  /**
+   * The thread's journal moves on to the conversation `sessionId` its CLI
+   * went on in: one break item, written before any item of that conversation
+   * is read in, so devices tell the two apart by seq and show the new one
+   * alone. Nothing earlier is removed. A thread that showed nothing yet needs
+   * no break. Its id names the segment it opens: followTerminal moves the
+   * thread once per segment, so a break is never written twice, and coming
+   * back to a conversation left earlier writes a new one.
+   */
+  private breakConversation(t: Thread, sessionId: string): void {
+    if (!t.journal.since(latestBreakSeq(t.journal)).some(isMessage)) return;
+    const { id, body } = conversationBreakItem(t.meta.segments.length - 1, sessionId);
+    if (t.journal.get(id)) return;
+    const item = t.journal.put(id, body, { provider: t.meta.provider, model: t.meta.model, now: this.now() });
+    for (const fn of this.listeners) fn(t.meta.id, [item]);
   }
 
   /** `session` of terminal process `pid` ended (its AI exited, or it was closed). */
@@ -2518,6 +2641,7 @@ export class AgentCore {
   private endTerminal(t: Thread): void {
     // A CLI still running (closed from a device) may have gone on in another session: the thread keeps that one.
     this.followTerminal(t);
+    if (t.meta.terminal?.startedAt !== undefined) t.lastTerminal = { startedAt: t.meta.terminal.startedAt, endedAt: this.now() };
     const started = t.meta.terminal?.newSession;
     delete t.meta.terminal;
     t.meta.closedAt = this.now();
@@ -2560,6 +2684,19 @@ function previewOf(item: Item): string | undefined {
   // A message of files only: their names.
   const line = previewLine(b.value.text) || previewLine(b.value.attachments.map((a) => a.name).join(", "));
   return line === "" ? undefined : line;
+}
+
+/** The seq of the journal's latest conversation break (see AgentCore.breakConversation); 0 when it has none. */
+function latestBreakSeq(journal: Journal): bigint {
+  let seq = 0n;
+  for (const item of journal.all()) if (isConversationBreak(item) && item.seq > seq) seq = item.seq;
+  return seq;
+}
+
+/** A message of the user or the AI (what the chat counts as one), not a thought, a tool or a note. */
+function isMessage(item: Item): boolean {
+  const b = item.body;
+  return b.case === "text" && (b.value.role === Role.USER || b.value.role === Role.ASSISTANT) && (b.value.text !== "" || b.value.attachments.length > 0);
 }
 
 /** The preview of a loaded thread: its last user or AI text. */

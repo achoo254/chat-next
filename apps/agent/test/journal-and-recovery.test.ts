@@ -1,6 +1,8 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PromptState, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { fromJsonString } from "@bufbuild/protobuf";
+import { ItemSchema, PromptState, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { conversationBreakItem } from "@achoo254/chat-remote-protocol";
 import { ResetReason } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { Journal } from "../src/threads/journal.ts";
@@ -41,6 +43,44 @@ describe("journal", () => {
       ["c", 2n],
     ]);
     expect(readFileSync(file, "utf8").endsWith("\n")).toBe(true);
+  });
+
+  it("a conversation break is read whole by the loader of agents released before it, which cut a journal at a line it cannot read", () => {
+    const file = join(tempDir(), "j.jsonl");
+    const j = new Journal(file);
+    j.put("u1", { case: "text", value: { role: Role.USER, text: "build it" } }, meta);
+    const brk = conversationBreakItem(1, "abc");
+    j.put(brk.id, brk.body, meta);
+    j.put("u2", { case: "text", value: { role: Role.USER, text: "now the docs" } }, meta);
+    const before = readFileSync(file);
+    // The released loader, line by line: strict JSON (no unknown fields), stop and cut at the first line that fails.
+    const read: string[] = [];
+    let good = 0;
+    for (let start = 0, nl = before.indexOf(0x0a); nl >= 0; start = nl + 1, nl = before.indexOf(0x0a, start)) {
+      try {
+        read.push(fromJsonString(ItemSchema, before.subarray(start, nl).toString("utf8")).id);
+      } catch {
+        break;
+      }
+      good = nl + 1;
+    }
+    expect(read).toEqual(["u1", brk.id, "u2"]);
+    expect(good).toBe(before.length);
+  });
+
+  it("keeps an item of a type a newer agent wrote, and everything after it", () => {
+    const file = join(tempDir(), "j.jsonl");
+    const j = new Journal(file);
+    j.put("a", { case: "status", value: { text: "one" } }, meta);
+    appendFileSync(file, '{"id":"b","seq":"2","revision":1,"somethingNewer":{}}\n');
+    appendFileSync(file, '{"id":"c","seq":"3","revision":1,"status":{"text":"three"}}\n');
+    const again = new Journal(file);
+    again.load();
+    expect(again.all().map((i) => [i.id, i.body.case])).toEqual([
+      ["a", "status"],
+      ["b", undefined],
+      ["c", "status"],
+    ]);
   });
 });
 

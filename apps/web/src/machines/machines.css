@@ -425,6 +425,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-line.error { color: var(--c-error); }
 .mx-divider { display: flex; align-items: center; gap: var(--space-2); font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-divider::before, .mx-divider::after { content: ""; flex: 1; border-top: 1px solid var(--c-border-subtle); }
+.mx-previous { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 0.75rem; color: var(--c-text-muted); cursor: pointer; }
+.mx-previous::before, .mx-previous::after { content: ""; flex: 1; border-top: 1px solid var(--c-border-subtle); }
+.mx-previous:hover { color: var(--c-text); }
+.mx-previous:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+.mx-previous[aria-expanded="true"] .icon { transform: rotate(90deg); }
 .mx-handoff { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); border: 1px dashed var(--c-border-strong); background: var(--c-surface); font-size: 0.875rem; }
 .mx-handoff summary { display: flex; align-items: center; gap: var(--space-1); font-weight: 600; cursor: pointer; }
 .mx-handoff ul { margin: 0; padding-left: var(--space-5); }

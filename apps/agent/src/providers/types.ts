@@ -303,6 +303,19 @@ export interface SessionHistory {
    * matches. Never fails.
    */
   terminalHeldSession?(cli: { dir: string; startedAt: number; sessionId?: string }): string | undefined;
+  /**
+   * Whether a running process of the AI has the session open, busy or idle,
+   * as the process itself tells (the AI's register of running processes, or
+   * the session its command line names when it keeps no register entry),
+   * not counting `except`: the CLI a terminal of the machine started, told
+   * apart by folder and start as in terminalHeldSession. Unlike holds(), no
+   * guess from a folder and when its transcripts changed, so another
+   * conversation open in the same folder never counts; nor does a record
+   * whose process cannot be confirmed to be the one that wrote it, or one of
+   * a process a program drives (this machine's own chat sessions). As of the
+   * last prime(). Never fails.
+   */
+  openInOtherProcess?(sessionId: string, except?: { dir: string; startedAt: number }): Promise<boolean>;
 }
 
 /** What a thread's session needs to open in the AI's own CLI, as the core knows it. */
