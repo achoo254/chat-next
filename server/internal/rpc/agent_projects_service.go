@@ -67,7 +67,40 @@ func (s *agentProjectsService) ListAgentProjects(ctx context.Context, req *conne
 	for i, p := range projects {
 		out[i] = agentProjectProto(p)
 	}
-	return connect.NewResponse(&appv1.ListAgentProjectsResponse{Projects: out}), nil
+	detached, err := s.store.ListAgentDetachedFolders(ctx, s.tenantID, sess.UserID)
+	if err != nil {
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
+	}
+	folders := make([]*appv1.AgentDetachedFolder, len(detached))
+	for i, f := range detached {
+		folders[i] = &appv1.AgentDetachedFolder{MachineId: f.MachineID, Dir: f.Dir}
+	}
+	return connect.NewResponse(&appv1.ListAgentProjectsResponse{Projects: out, DetachedFolders: folders}), nil
+}
+
+func (s *agentProjectsService) SetAgentFolderDetached(ctx context.Context, req *connect.Request[appv1.SetAgentFolderDetachedRequest]) (*connect.Response[appv1.SetAgentFolderDetachedResponse], error) {
+	sess, err := mustSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m := req.Msg
+	if !store.CleanAgentWorkspaceDir(m.GetDir()) {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			errors.New("dir must be an absolute path of up to 1024 characters without control characters"))
+	}
+	err = s.store.SetAgentFolderDetached(ctx, s.tenantID, sess.UserID, m.GetMachineId(), m.GetDir(), m.GetDetached())
+	switch {
+	case errors.Is(err, store.ErrAgentMachineNotFound):
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("machine_not_found: machine not found"))
+	case errors.Is(err, store.ErrTooManyDetachedFolders):
+		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too_many_detached_folders: unmark a folder first"))
+	case errors.Is(err, store.ErrNotFound):
+		return nil, errUnauthenticated()
+	case err != nil:
+		return nil, internal(ctx, s.logger, req.Spec().Procedure, err)
+	}
+	s.changed(ctx, sess.UserID)
+	return connect.NewResponse(&appv1.SetAgentFolderDetachedResponse{}), nil
 }
 
 func (s *agentProjectsService) CreateAgentProject(ctx context.Context, req *connect.Request[appv1.CreateAgentProjectRequest]) (*connect.Response[appv1.CreateAgentProjectResponse], error) {

@@ -15,13 +15,14 @@ import (
 
 // Limits of the AI Agent projects (AgentProjectsService).
 const (
-	MaxAgentProjects      = 200
-	MaxAgentWorkspaces    = 1000
-	MaxAgentProjectName   = 64
-	MaxAgentWorkspaceDir  = 1024
-	MaxAgentWorkspaceRef  = 255
-	agentProjectsRemoteIx = "agent_projects_remote_key"
-	agentWorkspacesDirKey = "agent_workspaces_dir_key"
+	MaxAgentProjects        = 200
+	MaxAgentWorkspaces      = 1000
+	MaxAgentProjectName     = 64
+	MaxAgentWorkspaceDir    = 1024
+	MaxAgentWorkspaceRef    = 255
+	MaxAgentDetachedFolders = 1000
+	agentProjectsRemoteIx   = "agent_projects_remote_key"
+	agentWorkspacesDirKey   = "agent_workspaces_dir_key"
 )
 
 // Workspace kinds, as stored.
@@ -41,6 +42,7 @@ var (
 	ErrAgentMachineNotFound     = errors.New("store: machine not found")
 	ErrTooManyAgentProjects     = errors.New("store: too many projects")
 	ErrTooManyAgentWorkspaces   = errors.New("store: too many workspaces")
+	ErrTooManyDetachedFolders   = errors.New("store: too many detached folders")
 )
 
 // AgentProject is a project of the AI Agent with its workspaces.
@@ -67,6 +69,14 @@ type AgentWorkspace struct {
 	Branch    string
 	Kind      string
 	CreatedAt time.Time
+}
+
+// AgentDetachedFolder is a folder the user dropped from the app while its
+// machine could not be told (SetAgentFolderDetached).
+type AgentDetachedFolder struct {
+	// MachineID is the owner's live machine with the folder's machine key.
+	MachineID int64
+	Dir       string
 }
 
 // NewAgentWorkspace is a folder to attach; the fields must be validated by
@@ -391,6 +401,12 @@ func (s *Store) AttachAgentWorkspace(ctx context.Context, tenantID string, userI
 			INSERT INTO agent_workspaces AS w (project_id, tenant_id, user_id, machine_key, dir, branch, kind)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			RETURNING `+workspaceColumns, n.ProjectID, tenantID, userID, key, n.Dir, n.Branch, n.Kind))
+		if err != nil {
+			return err
+		}
+		// Recorded again: the folder is no longer one the user dropped.
+		_, err = tx.Exec(ctx, `DELETE FROM agent_detached_folders WHERE tenant_id = $1 AND user_id = $2 AND machine_key = $3 AND dir = $4`,
+			tenantID, userID, key, n.Dir)
 		return err
 	})
 	switch {
@@ -403,6 +419,81 @@ func (s *Store) AttachAgentWorkspace(ctx context.Context, tenantID string, userI
 		return AgentWorkspace{}, fmt.Errorf("store: attach agent workspace: %w", err)
 	}
 	return w, nil
+}
+
+// ListAgentDetachedFolders returns the folders the user marked as dropped
+// (SetAgentFolderDetached) on machines that are not removed, oldest first.
+func (s *Store) ListAgentDetachedFolders(ctx context.Context, tenantID string, userID int64) ([]AgentDetachedFolder, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT coalesce((
+			SELECT m.id FROM machines m
+			WHERE m.tenant_id = d.tenant_id AND m.user_id = d.user_id AND m.public_key = d.machine_key AND m.revoked_at IS NULL
+			ORDER BY m.last_seen_at DESC, m.id DESC LIMIT 1), 0), d.dir
+		FROM agent_detached_folders d
+		WHERE d.tenant_id = $1 AND d.user_id = $2 ORDER BY d.created_at, d.dir`, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list agent detached folders: %w", err)
+	}
+	all, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (AgentDetachedFolder, error) {
+		var f AgentDetachedFolder
+		return f, r.Scan(&f.MachineID, &f.Dir)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("store: list agent detached folders: %w", err)
+	}
+	live := all[:0]
+	for _, f := range all {
+		if f.MachineID != 0 {
+			live = append(live, f)
+		}
+	}
+	return live, nil
+}
+
+// SetAgentFolderDetached marks the folder of one of the user's machines as
+// dropped (detached true) or takes the mark off. A mark already there (or
+// none to take off) is not an error. ErrNotFound when the user is gone,
+// ErrAgentMachineNotFound for the machine, ErrTooManyDetachedFolders at the
+// limit.
+func (s *Store) SetAgentFolderDetached(ctx context.Context, tenantID string, userID, machineID int64, dir string, detached bool) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := lockLiveUser(ctx, tx, tenantID, userID); err != nil {
+			return err
+		}
+		var key []byte
+		err := tx.QueryRow(ctx, `SELECT public_key FROM machines WHERE id = $1 AND tenant_id = $2 AND user_id = $3 AND revoked_at IS NULL`,
+			machineID, tenantID, userID).Scan(&key)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrAgentMachineNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if !detached {
+			_, err = tx.Exec(ctx, `DELETE FROM agent_detached_folders WHERE tenant_id = $1 AND user_id = $2 AND machine_key = $3 AND dir = $4`,
+				tenantID, userID, key, dir)
+			return err
+		}
+		var count int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM agent_detached_folders WHERE tenant_id = $1 AND user_id = $2`,
+			tenantID, userID).Scan(&count); err != nil {
+			return err
+		}
+		if count >= MaxAgentDetachedFolders {
+			return ErrTooManyDetachedFolders
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO agent_detached_folders (tenant_id, user_id, machine_key, dir) VALUES ($1, $2, $3, $4)
+			ON CONFLICT DO NOTHING`, tenantID, userID, key, dir)
+		return err
+	})
+	switch {
+	case errors.Is(err, ErrNotFound), errors.Is(err, ErrAgentMachineNotFound), errors.Is(err, ErrTooManyDetachedFolders):
+		return err
+	case err != nil:
+		return fmt.Errorf("store: set agent folder detached: %w", err)
+	}
+	return nil
 }
 
 // DetachAgentWorkspace drops one of the user's workspace records

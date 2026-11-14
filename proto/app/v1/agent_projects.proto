@@ -66,6 +66,17 @@ service AgentProjectsService {
   // Moves one of the caller's workspaces to another of the caller's
   // projects. not_found "workspace_not_found" or "project_not_found".
   rpc MoveAgentWorkspace(MoveAgentWorkspaceRequest) returns (MoveAgentWorkspaceResponse);
+  // Marks or unmarks a folder of one of the caller's machines as dropped by
+  // the user while the machine could not be told (it was offline to the
+  // device that deleted the project or workspace). Devices record no
+  // workspace for a marked folder when they sync the machine's folders, so a
+  // deleted project does not come back through another device; the machine
+  // drops the folder when it is back, and the device that finds it gone
+  // unmarks it. Recording the folder as a workspace unmarks it too.
+  // invalid_argument for a bad dir, not_found "machine_not_found" (another
+  // user's, or a removed machine), resource_exhausted
+  // "too_many_detached_folders" at 1000 marks.
+  rpc SetAgentFolderDetached(SetAgentFolderDetachedRequest) returns (SetAgentFolderDetachedResponse);
 }
 
 // What a workspace's folder is.
@@ -115,6 +126,14 @@ message ListAgentProjectsRequest {}
 
 message ListAgentProjectsResponse {
   repeated AgentProject projects = 1;
+  // Folders marked by SetAgentFolderDetached, of the caller's machines that
+  // are not removed. Unset from servers before this field.
+  repeated AgentDetachedFolder detached_folders = 2;
+}
+
+message AgentDetachedFolder {
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+  string dir = 2;
 }
 
 message CreateAgentProjectRequest {
@@ -186,6 +205,16 @@ message DetachAgentWorkspaceRequest {
 }
 
 message DetachAgentWorkspaceResponse {}
+
+message SetAgentFolderDetachedRequest {
+  // Machine.id of one of the caller's machines.
+  int64 machine_id = 1 [jstype = JS_NUMBER];
+  // As AttachAgentWorkspaceRequest.dir.
+  string dir = 2;
+  bool detached = 3;
+}
+
+message SetAgentFolderDetachedResponse {}
 
 message MoveAgentWorkspaceRequest {
   int64 workspace_id = 1 [jstype = JS_NUMBER];

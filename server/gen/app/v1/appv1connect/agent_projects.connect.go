@@ -60,6 +60,9 @@ const (
 	// AgentProjectsServiceMoveAgentWorkspaceProcedure is the fully-qualified name of the
 	// AgentProjectsService's MoveAgentWorkspace RPC.
 	AgentProjectsServiceMoveAgentWorkspaceProcedure = "/app.v1.AgentProjectsService/MoveAgentWorkspace"
+	// AgentProjectsServiceSetAgentFolderDetachedProcedure is the fully-qualified name of the
+	// AgentProjectsService's SetAgentFolderDetached RPC.
+	AgentProjectsServiceSetAgentFolderDetachedProcedure = "/app.v1.AgentProjectsService/SetAgentFolderDetached"
 )
 
 // AgentProjectsServiceClient is a client for the app.v1.AgentProjectsService service.
@@ -107,6 +110,17 @@ type AgentProjectsServiceClient interface {
 	// Moves one of the caller's workspaces to another of the caller's
 	// projects. not_found "workspace_not_found" or "project_not_found".
 	MoveAgentWorkspace(context.Context, *connect.Request[v1.MoveAgentWorkspaceRequest]) (*connect.Response[v1.MoveAgentWorkspaceResponse], error)
+	// Marks or unmarks a folder of one of the caller's machines as dropped by
+	// the user while the machine could not be told (it was offline to the
+	// device that deleted the project or workspace). Devices record no
+	// workspace for a marked folder when they sync the machine's folders, so a
+	// deleted project does not come back through another device; the machine
+	// drops the folder when it is back, and the device that finds it gone
+	// unmarks it. Recording the folder as a workspace unmarks it too.
+	// invalid_argument for a bad dir, not_found "machine_not_found" (another
+	// user's, or a removed machine), resource_exhausted
+	// "too_many_detached_folders" at 1000 marks.
+	SetAgentFolderDetached(context.Context, *connect.Request[v1.SetAgentFolderDetachedRequest]) (*connect.Response[v1.SetAgentFolderDetachedResponse], error)
 }
 
 // NewAgentProjectsServiceClient constructs a client for the app.v1.AgentProjectsService service. By
@@ -174,20 +188,27 @@ func NewAgentProjectsServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(agentProjectsServiceMethods.ByName("MoveAgentWorkspace")),
 			connect.WithClientOptions(opts...),
 		),
+		setAgentFolderDetached: connect.NewClient[v1.SetAgentFolderDetachedRequest, v1.SetAgentFolderDetachedResponse](
+			httpClient,
+			baseURL+AgentProjectsServiceSetAgentFolderDetachedProcedure,
+			connect.WithSchema(agentProjectsServiceMethods.ByName("SetAgentFolderDetached")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // agentProjectsServiceClient implements AgentProjectsServiceClient.
 type agentProjectsServiceClient struct {
-	listAgentProjects    *connect.Client[v1.ListAgentProjectsRequest, v1.ListAgentProjectsResponse]
-	createAgentProject   *connect.Client[v1.CreateAgentProjectRequest, v1.CreateAgentProjectResponse]
-	renameAgentProject   *connect.Client[v1.RenameAgentProjectRequest, v1.RenameAgentProjectResponse]
-	updateAgentProject   *connect.Client[v1.UpdateAgentProjectRequest, v1.UpdateAgentProjectResponse]
-	deleteAgentProject   *connect.Client[v1.DeleteAgentProjectRequest, v1.DeleteAgentProjectResponse]
-	reorderAgentProjects *connect.Client[v1.ReorderAgentProjectsRequest, v1.ReorderAgentProjectsResponse]
-	attachAgentWorkspace *connect.Client[v1.AttachAgentWorkspaceRequest, v1.AttachAgentWorkspaceResponse]
-	detachAgentWorkspace *connect.Client[v1.DetachAgentWorkspaceRequest, v1.DetachAgentWorkspaceResponse]
-	moveAgentWorkspace   *connect.Client[v1.MoveAgentWorkspaceRequest, v1.MoveAgentWorkspaceResponse]
+	listAgentProjects      *connect.Client[v1.ListAgentProjectsRequest, v1.ListAgentProjectsResponse]
+	createAgentProject     *connect.Client[v1.CreateAgentProjectRequest, v1.CreateAgentProjectResponse]
+	renameAgentProject     *connect.Client[v1.RenameAgentProjectRequest, v1.RenameAgentProjectResponse]
+	updateAgentProject     *connect.Client[v1.UpdateAgentProjectRequest, v1.UpdateAgentProjectResponse]
+	deleteAgentProject     *connect.Client[v1.DeleteAgentProjectRequest, v1.DeleteAgentProjectResponse]
+	reorderAgentProjects   *connect.Client[v1.ReorderAgentProjectsRequest, v1.ReorderAgentProjectsResponse]
+	attachAgentWorkspace   *connect.Client[v1.AttachAgentWorkspaceRequest, v1.AttachAgentWorkspaceResponse]
+	detachAgentWorkspace   *connect.Client[v1.DetachAgentWorkspaceRequest, v1.DetachAgentWorkspaceResponse]
+	moveAgentWorkspace     *connect.Client[v1.MoveAgentWorkspaceRequest, v1.MoveAgentWorkspaceResponse]
+	setAgentFolderDetached *connect.Client[v1.SetAgentFolderDetachedRequest, v1.SetAgentFolderDetachedResponse]
 }
 
 // ListAgentProjects calls app.v1.AgentProjectsService.ListAgentProjects.
@@ -235,6 +256,11 @@ func (c *agentProjectsServiceClient) MoveAgentWorkspace(ctx context.Context, req
 	return c.moveAgentWorkspace.CallUnary(ctx, req)
 }
 
+// SetAgentFolderDetached calls app.v1.AgentProjectsService.SetAgentFolderDetached.
+func (c *agentProjectsServiceClient) SetAgentFolderDetached(ctx context.Context, req *connect.Request[v1.SetAgentFolderDetachedRequest]) (*connect.Response[v1.SetAgentFolderDetachedResponse], error) {
+	return c.setAgentFolderDetached.CallUnary(ctx, req)
+}
+
 // AgentProjectsServiceHandler is an implementation of the app.v1.AgentProjectsService service.
 type AgentProjectsServiceHandler interface {
 	// The caller's projects in the user's order (then oldest first), each
@@ -280,6 +306,17 @@ type AgentProjectsServiceHandler interface {
 	// Moves one of the caller's workspaces to another of the caller's
 	// projects. not_found "workspace_not_found" or "project_not_found".
 	MoveAgentWorkspace(context.Context, *connect.Request[v1.MoveAgentWorkspaceRequest]) (*connect.Response[v1.MoveAgentWorkspaceResponse], error)
+	// Marks or unmarks a folder of one of the caller's machines as dropped by
+	// the user while the machine could not be told (it was offline to the
+	// device that deleted the project or workspace). Devices record no
+	// workspace for a marked folder when they sync the machine's folders, so a
+	// deleted project does not come back through another device; the machine
+	// drops the folder when it is back, and the device that finds it gone
+	// unmarks it. Recording the folder as a workspace unmarks it too.
+	// invalid_argument for a bad dir, not_found "machine_not_found" (another
+	// user's, or a removed machine), resource_exhausted
+	// "too_many_detached_folders" at 1000 marks.
+	SetAgentFolderDetached(context.Context, *connect.Request[v1.SetAgentFolderDetachedRequest]) (*connect.Response[v1.SetAgentFolderDetachedResponse], error)
 }
 
 // NewAgentProjectsServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -343,6 +380,12 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 		connect.WithSchema(agentProjectsServiceMethods.ByName("MoveAgentWorkspace")),
 		connect.WithHandlerOptions(opts...),
 	)
+	agentProjectsServiceSetAgentFolderDetachedHandler := connect.NewUnaryHandler(
+		AgentProjectsServiceSetAgentFolderDetachedProcedure,
+		svc.SetAgentFolderDetached,
+		connect.WithSchema(agentProjectsServiceMethods.ByName("SetAgentFolderDetached")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.AgentProjectsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AgentProjectsServiceListAgentProjectsProcedure:
@@ -363,6 +406,8 @@ func NewAgentProjectsServiceHandler(svc AgentProjectsServiceHandler, opts ...con
 			agentProjectsServiceDetachAgentWorkspaceHandler.ServeHTTP(w, r)
 		case AgentProjectsServiceMoveAgentWorkspaceProcedure:
 			agentProjectsServiceMoveAgentWorkspaceHandler.ServeHTTP(w, r)
+		case AgentProjectsServiceSetAgentFolderDetachedProcedure:
+			agentProjectsServiceSetAgentFolderDetachedHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -406,4 +451,8 @@ func (UnimplementedAgentProjectsServiceHandler) DetachAgentWorkspace(context.Con
 
 func (UnimplementedAgentProjectsServiceHandler) MoveAgentWorkspace(context.Context, *connect.Request[v1.MoveAgentWorkspaceRequest]) (*connect.Response[v1.MoveAgentWorkspaceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.MoveAgentWorkspace is not implemented"))
+}
+
+func (UnimplementedAgentProjectsServiceHandler) SetAgentFolderDetached(context.Context, *connect.Request[v1.SetAgentFolderDetachedRequest]) (*connect.Response[v1.SetAgentFolderDetachedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.AgentProjectsService.SetAgentFolderDetached is not implemented"))
 }

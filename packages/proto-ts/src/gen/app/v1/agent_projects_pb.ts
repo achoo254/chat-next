@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/agent_projects.proto.
  */
 export const file_app_v1_agent_projects: GenFile = /*@__PURE__*/
-  fileDesc("ChthcHAvdjEvYWdlbnRfcHJvamVjdHMucHJvdG8SBmFwcC52MSKTAQoMQWdlbnRQcm9qZWN0Eg4KAmlkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJEhIKCmdpdF9yZW1vdGUYAyABKAkSDQoFb3JkZXIYBCABKAUSFgoKY3JlYXRlZF9hdBgFIAEoA0ICMAISKgoKd29ya3NwYWNlcxgGIAMoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSKvAQoOQWdlbnRXb3Jrc3BhY2USDgoCaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACEhYKCm1hY2hpbmVfaWQYAyABKANCAjACEgsKA2RpchgEIAEoCRIOCgZicmFuY2gYBSABKAkSKAoEa2luZBgGIAEoDjIaLmFwcC52MS5BZ2VudFdvcmtzcGFjZUtpbmQSFgoKY3JlYXRlZF9hdBgHIAEoA0ICMAIiGgoYTGlzdEFnZW50UHJvamVjdHNSZXF1ZXN0IkMKGUxpc3RBZ2VudFByb2plY3RzUmVzcG9uc2USJgoIcHJvamVjdHMYASADKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0Ij0KGUNyZWF0ZUFnZW50UHJvamVjdFJlcXVlc3QSDAoEbmFtZRgBIAEoCRISCgpnaXRfcmVtb3RlGAIgASgJIkMKGkNyZWF0ZUFnZW50UHJvamVjdFJlc3BvbnNlEiUKB3Byb2plY3QYASABKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0IkEKGVJlbmFtZUFnZW50UHJvamVjdFJlcXVlc3QSFgoKcHJvamVjdF9pZBgBIAEoA0ICMAISDAoEbmFtZRgCIAEoCSJDChpSZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRIlCgdwcm9qZWN0GAEgASgLMhQuYXBwLnYxLkFnZW50UHJvamVjdCJ3ChlVcGRhdGVBZ2VudFByb2plY3RSZXF1ZXN0EhYKCnByb2plY3RfaWQYASABKANCAjACEhEKBG5hbWUYAiABKAlIAIgBARIXCgpnaXRfcmVtb3RlGAMgASgJSAGIAQFCBwoFX25hbWVCDQoLX2dpdF9yZW1vdGUiQwoaVXBkYXRlQWdlbnRQcm9qZWN0UmVzcG9uc2USJQoHcHJvamVjdBgBIAEoCzIULmFwcC52MS5BZ2VudFByb2plY3QiMwoZRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAiIcChpEZWxldGVBZ2VudFByb2plY3RSZXNwb25zZSI2ChtSZW9yZGVyQWdlbnRQcm9qZWN0c1JlcXVlc3QSFwoLcHJvamVjdF9pZHMYASADKANCAjACIh4KHFJlb3JkZXJBZ2VudFByb2plY3RzUmVzcG9uc2UilAEKG0F0dGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAhIWCgptYWNoaW5lX2lkGAIgASgDQgIwAhILCgNkaXIYAyABKAkSDgoGYnJhbmNoGAQgASgJEigKBGtpbmQYBSABKA4yGi5hcHAudjEuQWdlbnRXb3Jrc3BhY2VLaW5kIkkKHEF0dGFjaEFnZW50V29ya3NwYWNlUmVzcG9uc2USKQoJd29ya3NwYWNlGAEgASgLMhYuYXBwLnYxLkFnZW50V29ya3NwYWNlIjcKG0RldGFjaEFnZW50V29ya3NwYWNlUmVxdWVzdBIYCgx3b3Jrc3BhY2VfaWQYASABKANCAjACIh4KHERldGFjaEFnZW50V29ya3NwYWNlUmVzcG9uc2UiTQoZTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBIYCgx3b3Jrc3BhY2VfaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACIkcKGk1vdmVBZ2VudFdvcmtzcGFjZVJlc3BvbnNlEikKCXdvcmtzcGFjZRgBIAEoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSqeAQoSQWdlbnRXb3Jrc3BhY2VLaW5kEiQKIEFHRU5UX1dPUktTUEFDRV9LSU5EX1VOU1BFQ0lGSUVEEAASHgoaQUdFTlRfV09SS1NQQUNFX0tJTkRfQ0xPTkUQARIhCh1BR0VOVF9XT1JLU1BBQ0VfS0lORF9XT1JLVFJFRRACEh8KG0FHRU5UX1dPUktTUEFDRV9LSU5EX0ZPTERFUhADMuoGChRBZ2VudFByb2plY3RzU2VydmljZRJYChFMaXN0QWdlbnRQcm9qZWN0cxIgLmFwcC52MS5MaXN0QWdlbnRQcm9qZWN0c1JlcXVlc3QaIS5hcHAudjEuTGlzdEFnZW50UHJvamVjdHNSZXNwb25zZRJbChJDcmVhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuQ3JlYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5DcmVhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJSZW5hbWVBZ2VudFByb2plY3QSIS5hcHAudjEuUmVuYW1lQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5SZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRJbChJVcGRhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuVXBkYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5VcGRhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJEZWxldGVBZ2VudFByb2plY3QSIS5hcHAudjEuRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5EZWxldGVBZ2VudFByb2plY3RSZXNwb25zZRJhChRSZW9yZGVyQWdlbnRQcm9qZWN0cxIjLmFwcC52MS5SZW9yZGVyQWdlbnRQcm9qZWN0c1JlcXVlc3QaJC5hcHAudjEuUmVvcmRlckFnZW50UHJvamVjdHNSZXNwb25zZRJhChRBdHRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5BdHRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuQXR0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJhChREZXRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5EZXRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuRGV0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJbChJNb3ZlQWdlbnRXb3Jrc3BhY2USIS5hcHAudjEuTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBoiLmFwcC52MS5Nb3ZlQWdlbnRXb3Jrc3BhY2VSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
+  fileDesc("ChthcHAvdjEvYWdlbnRfcHJvamVjdHMucHJvdG8SBmFwcC52MSKTAQoMQWdlbnRQcm9qZWN0Eg4KAmlkGAEgASgDQgIwAhIMCgRuYW1lGAIgASgJEhIKCmdpdF9yZW1vdGUYAyABKAkSDQoFb3JkZXIYBCABKAUSFgoKY3JlYXRlZF9hdBgFIAEoA0ICMAISKgoKd29ya3NwYWNlcxgGIAMoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSKvAQoOQWdlbnRXb3Jrc3BhY2USDgoCaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACEhYKCm1hY2hpbmVfaWQYAyABKANCAjACEgsKA2RpchgEIAEoCRIOCgZicmFuY2gYBSABKAkSKAoEa2luZBgGIAEoDjIaLmFwcC52MS5BZ2VudFdvcmtzcGFjZUtpbmQSFgoKY3JlYXRlZF9hdBgHIAEoA0ICMAIiGgoYTGlzdEFnZW50UHJvamVjdHNSZXF1ZXN0InoKGUxpc3RBZ2VudFByb2plY3RzUmVzcG9uc2USJgoIcHJvamVjdHMYASADKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0EjUKEGRldGFjaGVkX2ZvbGRlcnMYAiADKAsyGy5hcHAudjEuQWdlbnREZXRhY2hlZEZvbGRlciI6ChNBZ2VudERldGFjaGVkRm9sZGVyEhYKCm1hY2hpbmVfaWQYASABKANCAjACEgsKA2RpchgCIAEoCSI9ChlDcmVhdGVBZ2VudFByb2plY3RSZXF1ZXN0EgwKBG5hbWUYASABKAkSEgoKZ2l0X3JlbW90ZRgCIAEoCSJDChpDcmVhdGVBZ2VudFByb2plY3RSZXNwb25zZRIlCgdwcm9qZWN0GAEgASgLMhQuYXBwLnYxLkFnZW50UHJvamVjdCJBChlSZW5hbWVBZ2VudFByb2plY3RSZXF1ZXN0EhYKCnByb2plY3RfaWQYASABKANCAjACEgwKBG5hbWUYAiABKAkiQwoaUmVuYW1lQWdlbnRQcm9qZWN0UmVzcG9uc2USJQoHcHJvamVjdBgBIAEoCzIULmFwcC52MS5BZ2VudFByb2plY3QidwoZVXBkYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBIWCgpwcm9qZWN0X2lkGAEgASgDQgIwAhIRCgRuYW1lGAIgASgJSACIAQESFwoKZ2l0X3JlbW90ZRgDIAEoCUgBiAEBQgcKBV9uYW1lQg0KC19naXRfcmVtb3RlIkMKGlVwZGF0ZUFnZW50UHJvamVjdFJlc3BvbnNlEiUKB3Byb2plY3QYASABKAsyFC5hcHAudjEuQWdlbnRQcm9qZWN0IjMKGURlbGV0ZUFnZW50UHJvamVjdFJlcXVlc3QSFgoKcHJvamVjdF9pZBgBIAEoA0ICMAIiHAoaRGVsZXRlQWdlbnRQcm9qZWN0UmVzcG9uc2UiNgobUmVvcmRlckFnZW50UHJvamVjdHNSZXF1ZXN0EhcKC3Byb2plY3RfaWRzGAEgAygDQgIwAiIeChxSZW9yZGVyQWdlbnRQcm9qZWN0c1Jlc3BvbnNlIpQBChtBdHRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QSFgoKcHJvamVjdF9pZBgBIAEoA0ICMAISFgoKbWFjaGluZV9pZBgCIAEoA0ICMAISCwoDZGlyGAMgASgJEg4KBmJyYW5jaBgEIAEoCRIoCgRraW5kGAUgASgOMhouYXBwLnYxLkFnZW50V29ya3NwYWNlS2luZCJJChxBdHRhY2hBZ2VudFdvcmtzcGFjZVJlc3BvbnNlEikKCXdvcmtzcGFjZRgBIAEoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSI3ChtEZXRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QSGAoMd29ya3NwYWNlX2lkGAEgASgDQgIwAiIeChxEZXRhY2hBZ2VudFdvcmtzcGFjZVJlc3BvbnNlIlYKHVNldEFnZW50Rm9sZGVyRGV0YWNoZWRSZXF1ZXN0EhYKCm1hY2hpbmVfaWQYASABKANCAjACEgsKA2RpchgCIAEoCRIQCghkZXRhY2hlZBgDIAEoCCIgCh5TZXRBZ2VudEZvbGRlckRldGFjaGVkUmVzcG9uc2UiTQoZTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBIYCgx3b3Jrc3BhY2VfaWQYASABKANCAjACEhYKCnByb2plY3RfaWQYAiABKANCAjACIkcKGk1vdmVBZ2VudFdvcmtzcGFjZVJlc3BvbnNlEikKCXdvcmtzcGFjZRgBIAEoCzIWLmFwcC52MS5BZ2VudFdvcmtzcGFjZSqeAQoSQWdlbnRXb3Jrc3BhY2VLaW5kEiQKIEFHRU5UX1dPUktTUEFDRV9LSU5EX1VOU1BFQ0lGSUVEEAASHgoaQUdFTlRfV09SS1NQQUNFX0tJTkRfQ0xPTkUQARIhCh1BR0VOVF9XT1JLU1BBQ0VfS0lORF9XT1JLVFJFRRACEh8KG0FHRU5UX1dPUktTUEFDRV9LSU5EX0ZPTERFUhADMtMHChRBZ2VudFByb2plY3RzU2VydmljZRJYChFMaXN0QWdlbnRQcm9qZWN0cxIgLmFwcC52MS5MaXN0QWdlbnRQcm9qZWN0c1JlcXVlc3QaIS5hcHAudjEuTGlzdEFnZW50UHJvamVjdHNSZXNwb25zZRJbChJDcmVhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuQ3JlYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5DcmVhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJSZW5hbWVBZ2VudFByb2plY3QSIS5hcHAudjEuUmVuYW1lQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5SZW5hbWVBZ2VudFByb2plY3RSZXNwb25zZRJbChJVcGRhdGVBZ2VudFByb2plY3QSIS5hcHAudjEuVXBkYXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5VcGRhdGVBZ2VudFByb2plY3RSZXNwb25zZRJbChJEZWxldGVBZ2VudFByb2plY3QSIS5hcHAudjEuRGVsZXRlQWdlbnRQcm9qZWN0UmVxdWVzdBoiLmFwcC52MS5EZWxldGVBZ2VudFByb2plY3RSZXNwb25zZRJhChRSZW9yZGVyQWdlbnRQcm9qZWN0cxIjLmFwcC52MS5SZW9yZGVyQWdlbnRQcm9qZWN0c1JlcXVlc3QaJC5hcHAudjEuUmVvcmRlckFnZW50UHJvamVjdHNSZXNwb25zZRJhChRBdHRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5BdHRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuQXR0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJhChREZXRhY2hBZ2VudFdvcmtzcGFjZRIjLmFwcC52MS5EZXRhY2hBZ2VudFdvcmtzcGFjZVJlcXVlc3QaJC5hcHAudjEuRGV0YWNoQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJbChJNb3ZlQWdlbnRXb3Jrc3BhY2USIS5hcHAudjEuTW92ZUFnZW50V29ya3NwYWNlUmVxdWVzdBoiLmFwcC52MS5Nb3ZlQWdlbnRXb3Jrc3BhY2VSZXNwb25zZRJnChZTZXRBZ2VudEZvbGRlckRldGFjaGVkEiUuYXBwLnYxLlNldEFnZW50Rm9sZGVyRGV0YWNoZWRSZXF1ZXN0GiYuYXBwLnYxLlNldEFnZW50Rm9sZGVyRGV0YWNoZWRSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.AgentProject
@@ -143,6 +143,14 @@ export type ListAgentProjectsResponse = Message<"app.v1.ListAgentProjectsRespons
    * @generated from field: repeated app.v1.AgentProject projects = 1;
    */
   projects: AgentProject[];
+
+  /**
+   * Folders marked by SetAgentFolderDetached, of the caller's machines that
+   * are not removed. Unset from servers before this field.
+   *
+   * @generated from field: repeated app.v1.AgentDetachedFolder detached_folders = 2;
+   */
+  detachedFolders: AgentDetachedFolder[];
 };
 
 /**
@@ -151,6 +159,28 @@ export type ListAgentProjectsResponse = Message<"app.v1.ListAgentProjectsRespons
  */
 export const ListAgentProjectsResponseSchema: GenMessage<ListAgentProjectsResponse> = /*@__PURE__*/
   messageDesc(file_app_v1_agent_projects, 3);
+
+/**
+ * @generated from message app.v1.AgentDetachedFolder
+ */
+export type AgentDetachedFolder = Message<"app.v1.AgentDetachedFolder"> & {
+  /**
+   * @generated from field: int64 machine_id = 1 [jstype = JS_NUMBER];
+   */
+  machineId: bigint;
+
+  /**
+   * @generated from field: string dir = 2;
+   */
+  dir: string;
+};
+
+/**
+ * Describes the message app.v1.AgentDetachedFolder.
+ * Use `create(AgentDetachedFolderSchema)` to create a new message.
+ */
+export const AgentDetachedFolderSchema: GenMessage<AgentDetachedFolder> = /*@__PURE__*/
+  messageDesc(file_app_v1_agent_projects, 4);
 
 /**
  * @generated from message app.v1.CreateAgentProjectRequest
@@ -178,7 +208,7 @@ export type CreateAgentProjectRequest = Message<"app.v1.CreateAgentProjectReques
  * Use `create(CreateAgentProjectRequestSchema)` to create a new message.
  */
 export const CreateAgentProjectRequestSchema: GenMessage<CreateAgentProjectRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 4);
+  messageDesc(file_app_v1_agent_projects, 5);
 
 /**
  * @generated from message app.v1.CreateAgentProjectResponse
@@ -195,7 +225,7 @@ export type CreateAgentProjectResponse = Message<"app.v1.CreateAgentProjectRespo
  * Use `create(CreateAgentProjectResponseSchema)` to create a new message.
  */
 export const CreateAgentProjectResponseSchema: GenMessage<CreateAgentProjectResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 5);
+  messageDesc(file_app_v1_agent_projects, 6);
 
 /**
  * @generated from message app.v1.RenameAgentProjectRequest
@@ -219,7 +249,7 @@ export type RenameAgentProjectRequest = Message<"app.v1.RenameAgentProjectReques
  * Use `create(RenameAgentProjectRequestSchema)` to create a new message.
  */
 export const RenameAgentProjectRequestSchema: GenMessage<RenameAgentProjectRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 6);
+  messageDesc(file_app_v1_agent_projects, 7);
 
 /**
  * @generated from message app.v1.RenameAgentProjectResponse
@@ -236,7 +266,7 @@ export type RenameAgentProjectResponse = Message<"app.v1.RenameAgentProjectRespo
  * Use `create(RenameAgentProjectResponseSchema)` to create a new message.
  */
 export const RenameAgentProjectResponseSchema: GenMessage<RenameAgentProjectResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 7);
+  messageDesc(file_app_v1_agent_projects, 8);
 
 /**
  * @generated from message app.v1.UpdateAgentProjectRequest
@@ -268,7 +298,7 @@ export type UpdateAgentProjectRequest = Message<"app.v1.UpdateAgentProjectReques
  * Use `create(UpdateAgentProjectRequestSchema)` to create a new message.
  */
 export const UpdateAgentProjectRequestSchema: GenMessage<UpdateAgentProjectRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 8);
+  messageDesc(file_app_v1_agent_projects, 9);
 
 /**
  * @generated from message app.v1.UpdateAgentProjectResponse
@@ -285,7 +315,7 @@ export type UpdateAgentProjectResponse = Message<"app.v1.UpdateAgentProjectRespo
  * Use `create(UpdateAgentProjectResponseSchema)` to create a new message.
  */
 export const UpdateAgentProjectResponseSchema: GenMessage<UpdateAgentProjectResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 9);
+  messageDesc(file_app_v1_agent_projects, 10);
 
 /**
  * @generated from message app.v1.DeleteAgentProjectRequest
@@ -302,7 +332,7 @@ export type DeleteAgentProjectRequest = Message<"app.v1.DeleteAgentProjectReques
  * Use `create(DeleteAgentProjectRequestSchema)` to create a new message.
  */
 export const DeleteAgentProjectRequestSchema: GenMessage<DeleteAgentProjectRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 10);
+  messageDesc(file_app_v1_agent_projects, 11);
 
 /**
  * @generated from message app.v1.DeleteAgentProjectResponse
@@ -315,7 +345,7 @@ export type DeleteAgentProjectResponse = Message<"app.v1.DeleteAgentProjectRespo
  * Use `create(DeleteAgentProjectResponseSchema)` to create a new message.
  */
 export const DeleteAgentProjectResponseSchema: GenMessage<DeleteAgentProjectResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 11);
+  messageDesc(file_app_v1_agent_projects, 12);
 
 /**
  * @generated from message app.v1.ReorderAgentProjectsRequest
@@ -332,7 +362,7 @@ export type ReorderAgentProjectsRequest = Message<"app.v1.ReorderAgentProjectsRe
  * Use `create(ReorderAgentProjectsRequestSchema)` to create a new message.
  */
 export const ReorderAgentProjectsRequestSchema: GenMessage<ReorderAgentProjectsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 12);
+  messageDesc(file_app_v1_agent_projects, 13);
 
 /**
  * @generated from message app.v1.ReorderAgentProjectsResponse
@@ -345,7 +375,7 @@ export type ReorderAgentProjectsResponse = Message<"app.v1.ReorderAgentProjectsR
  * Use `create(ReorderAgentProjectsResponseSchema)` to create a new message.
  */
 export const ReorderAgentProjectsResponseSchema: GenMessage<ReorderAgentProjectsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 13);
+  messageDesc(file_app_v1_agent_projects, 14);
 
 /**
  * @generated from message app.v1.AttachAgentWorkspaceRequest
@@ -389,7 +419,7 @@ export type AttachAgentWorkspaceRequest = Message<"app.v1.AttachAgentWorkspaceRe
  * Use `create(AttachAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const AttachAgentWorkspaceRequestSchema: GenMessage<AttachAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 14);
+  messageDesc(file_app_v1_agent_projects, 15);
 
 /**
  * @generated from message app.v1.AttachAgentWorkspaceResponse
@@ -406,7 +436,7 @@ export type AttachAgentWorkspaceResponse = Message<"app.v1.AttachAgentWorkspaceR
  * Use `create(AttachAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const AttachAgentWorkspaceResponseSchema: GenMessage<AttachAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 15);
+  messageDesc(file_app_v1_agent_projects, 16);
 
 /**
  * @generated from message app.v1.DetachAgentWorkspaceRequest
@@ -423,7 +453,7 @@ export type DetachAgentWorkspaceRequest = Message<"app.v1.DetachAgentWorkspaceRe
  * Use `create(DetachAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const DetachAgentWorkspaceRequestSchema: GenMessage<DetachAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 16);
+  messageDesc(file_app_v1_agent_projects, 17);
 
 /**
  * @generated from message app.v1.DetachAgentWorkspaceResponse
@@ -436,7 +466,51 @@ export type DetachAgentWorkspaceResponse = Message<"app.v1.DetachAgentWorkspaceR
  * Use `create(DetachAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const DetachAgentWorkspaceResponseSchema: GenMessage<DetachAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 17);
+  messageDesc(file_app_v1_agent_projects, 18);
+
+/**
+ * @generated from message app.v1.SetAgentFolderDetachedRequest
+ */
+export type SetAgentFolderDetachedRequest = Message<"app.v1.SetAgentFolderDetachedRequest"> & {
+  /**
+   * Machine.id of one of the caller's machines.
+   *
+   * @generated from field: int64 machine_id = 1 [jstype = JS_NUMBER];
+   */
+  machineId: bigint;
+
+  /**
+   * As AttachAgentWorkspaceRequest.dir.
+   *
+   * @generated from field: string dir = 2;
+   */
+  dir: string;
+
+  /**
+   * @generated from field: bool detached = 3;
+   */
+  detached: boolean;
+};
+
+/**
+ * Describes the message app.v1.SetAgentFolderDetachedRequest.
+ * Use `create(SetAgentFolderDetachedRequestSchema)` to create a new message.
+ */
+export const SetAgentFolderDetachedRequestSchema: GenMessage<SetAgentFolderDetachedRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_agent_projects, 19);
+
+/**
+ * @generated from message app.v1.SetAgentFolderDetachedResponse
+ */
+export type SetAgentFolderDetachedResponse = Message<"app.v1.SetAgentFolderDetachedResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.SetAgentFolderDetachedResponse.
+ * Use `create(SetAgentFolderDetachedResponseSchema)` to create a new message.
+ */
+export const SetAgentFolderDetachedResponseSchema: GenMessage<SetAgentFolderDetachedResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_agent_projects, 20);
 
 /**
  * @generated from message app.v1.MoveAgentWorkspaceRequest
@@ -460,7 +534,7 @@ export type MoveAgentWorkspaceRequest = Message<"app.v1.MoveAgentWorkspaceReques
  * Use `create(MoveAgentWorkspaceRequestSchema)` to create a new message.
  */
 export const MoveAgentWorkspaceRequestSchema: GenMessage<MoveAgentWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 18);
+  messageDesc(file_app_v1_agent_projects, 21);
 
 /**
  * @generated from message app.v1.MoveAgentWorkspaceResponse
@@ -477,7 +551,7 @@ export type MoveAgentWorkspaceResponse = Message<"app.v1.MoveAgentWorkspaceRespo
  * Use `create(MoveAgentWorkspaceResponseSchema)` to create a new message.
  */
 export const MoveAgentWorkspaceResponseSchema: GenMessage<MoveAgentWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_agent_projects, 19);
+  messageDesc(file_app_v1_agent_projects, 22);
 
 /**
  * What a workspace's folder is.
@@ -652,6 +726,25 @@ export const AgentProjectsService: GenService<{
     methodKind: "unary";
     input: typeof MoveAgentWorkspaceRequestSchema;
     output: typeof MoveAgentWorkspaceResponseSchema;
+  },
+  /**
+   * Marks or unmarks a folder of one of the caller's machines as dropped by
+   * the user while the machine could not be told (it was offline to the
+   * device that deleted the project or workspace). Devices record no
+   * workspace for a marked folder when they sync the machine's folders, so a
+   * deleted project does not come back through another device; the machine
+   * drops the folder when it is back, and the device that finds it gone
+   * unmarks it. Recording the folder as a workspace unmarks it too.
+   * invalid_argument for a bad dir, not_found "machine_not_found" (another
+   * user's, or a removed machine), resource_exhausted
+   * "too_many_detached_folders" at 1000 marks.
+   *
+   * @generated from rpc app.v1.AgentProjectsService.SetAgentFolderDetached
+   */
+  setAgentFolderDetached: {
+    methodKind: "unary";
+    input: typeof SetAgentFolderDetachedRequestSchema;
+    output: typeof SetAgentFolderDetachedResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_app_v1_agent_projects, 0);
