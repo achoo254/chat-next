@@ -86,6 +86,21 @@ describe("deleting a thread", () => {
     expect(core.list()).toHaveLength(0);
   });
 
+  test("a thread whose AI runs in a terminal of the machine is refused until the user goes on, whatever the AI says about its files", async () => {
+    const { core, work, sessionId, claudeHome } = setup();
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: none, device: "phone" });
+    await until(core, thread.id, turnsDone(1));
+    await core.close(thread.id);
+    transcriptOf(claudeHome, sessionId, work);
+    core.terminalStarted(thread.id, 1, 4242);
+    await expect(core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" })).rejects.toMatchObject({ reason: ErrorReason.SESSION_OPEN_ELSEWHERE });
+    expect(core.list()).toHaveLength(1);
+    // Once the terminal has ended, the thread goes like any other.
+    core.terminalEnded(1, 4242);
+    await core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "phone" });
+    expect(core.list()).toHaveLength(0);
+  });
+
   test("a session changed elsewhere after the thread is refused until the user goes on", async () => {
     const { core, work, sessionId, claudeHome } = setup();
     const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: none, device: "phone" });

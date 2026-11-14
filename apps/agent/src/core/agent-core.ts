@@ -1385,6 +1385,8 @@ export class AgentCore {
     }
     const sessions = this.threadSessions(t);
     if (!req.openAnyway) {
+      // Its AI runs in a terminal of the machine right now: the files it holds open stay where they are.
+      if (t.meta.terminal) throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
       for (const { history, sessionId } of sessions) {
         await history.prime?.();
         const live = await history.liveness?.(sessionId);

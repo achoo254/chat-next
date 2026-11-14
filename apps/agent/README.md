@@ -164,6 +164,8 @@ Bộ test hợp đồng ([`test/provider-contract.test.ts`](test/provider-contra
   Claude. Ở chế độ `auto`/`accept-edits` agy có thể gọi công cụ MCP không hỏi, khi đó lệnh ghi bị dịch vụ từ chối vì chưa duyệt.
   Mật khẩu đã lưu trong lệnh shell của agy chưa có. Thông điệp commit chạy `agy --sandbox` với mọi công cụ bị chặn; hook toàn cục của công cụ khác trong
   `~/.gemini/config/hooks.json` vẫn chạy (agy không tắt được cho một lần chạy). tunelo không cài hook nào vào agy.
+  Xoá một phiên Antigravity đưa `brain/<id>` và `conversations/<id>.db` của hội thoại đó (trong `~/.gemini/antigravity-cli`) vào
+  Thùng rác của máy, như phiên Claude; thiếu hai đường dẫn này agy không còn liệt kê hội thoại.
 - **Tài khoản AI** (trang "Tài khoản AI" của máy): mỗi AI một danh sách và một lựa chọn riêng; đổi tài khoản của AI này không
   đụng phiên AI khác. Tất cả ghi trong `ai-accounts/ai-accounts.json` (không chứa credential).
   - Antigravity lưu đăng nhập trong Keychain chung của người dùng (`gemini`/`antigravity`), nên đổi tài khoản là ghi đăng nhập

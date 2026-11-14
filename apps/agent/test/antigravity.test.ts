@@ -3,7 +3,7 @@
 // transcripts, the commit message writer and plan usage, on fixtures
 // recorded from agy 1.5.8.
 import { EventEmitter } from "node:events";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { Decision, ErrorCode, Role, TurnState } from "@achoo254/chat-proto/remote/remote";
@@ -204,6 +204,28 @@ describe("agy's history", () => {
     expect(read?.entries).toHaveLength(1);
     expect(read?.end).toBe(Buffer.byteLength(line) + 1);
     expect(h.read("../x", 0)).toBeUndefined();
+  });
+
+  it("hands the trash the session's own folder and database, never a link or another session's", () => {
+    const home = tempDir("agy-trash-");
+    mkdirSync(join(home, "brain", "s1", ".system_generated"), { recursive: true });
+    mkdirSync(join(home, "brain", "s2"), { recursive: true });
+    mkdirSync(join(home, "conversations"), { recursive: true });
+    for (const name of ["s1.db", "s1.db-wal", "s2.db"]) writeFileSync(join(home, "conversations", name), "x");
+    const h = new AgyHistory({ home: () => home, listSessions: async () => [] });
+    // The databases first: a trash that stops at a held one has not moved the transcript yet.
+    expect(h.sessionFiles("s1")).toEqual([join(home, "conversations", "s1.db"), join(home, "conversations", "s1.db-wal"), join(home, "brain", "s1")]);
+    expect(h.sessionFiles("s3")).toEqual([]);
+    expect(h.sessionFiles("../s1")).toEqual([]);
+    // A link in the session's place is not the session's file.
+    mkdirSync(join(home, "elsewhere"));
+    try {
+      symlinkSync(join(home, "elsewhere"), join(home, "brain", "s4"), "dir");
+    } catch {
+      // No symlinks here (Windows without the privilege): this last check runs on the other platforms.
+      return;
+    }
+    expect(h.sessionFiles("s4")).toEqual([]);
   });
 });
 

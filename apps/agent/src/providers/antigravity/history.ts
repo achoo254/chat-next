@@ -3,8 +3,9 @@
 // most every LIST_TTL_MS; what each session said comes from agy's own
 // transcript file, brain/<id>/.system_generated/logs/transcript.jsonl. Nothing
 // else of agy's is read (no database, no log). A record tunelo does not know
-// is skipped.
-import { closeSync, openSync, readSync, statSync } from "node:fs";
+// is skipped. A deleted thread takes the session's brain/<id> folder and
+// conversations/<id>.db to the trash, which is all agy's `session/list` goes by.
+import { closeSync, lstatSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
 import { agyHome } from "./agy.ts";
@@ -164,6 +165,28 @@ export class AgyHistory implements SessionHistory {
     const whole = last < 0 ? "" : text.slice(0, last + 1);
     const end = start + Buffer.byteLength(whole, "utf8");
     return { entries: entriesOf(sessionId, whole), end };
+  }
+
+  /**
+   * The session's brain/<id> folder and conversations/<id>.db (with the
+   * SQLite -wal and -shm beside it), each only when it is there as a plain
+   * file or folder, never a link. Without them agy no longer lists the session.
+   * The databases come first: when the trash stops at one that is held open,
+   * the transcript in brain/<id> has not moved yet.
+   */
+  sessionFiles(sessionId: string): string[] {
+    if (!ID_RE.test(sessionId)) return [];
+    const home = (this.opts.home ?? agyHome)();
+    const plain = (path: string, dir: boolean) => {
+      try {
+        const st = lstatSync(path);
+        return !st.isSymbolicLink() && (dir ? st.isDirectory() : st.isFile());
+      } catch {
+        return false;
+      }
+    };
+    const db = join(home, "conversations", `${sessionId}.db`);
+    return [...[db, `${db}-wal`, `${db}-shm`].filter((file) => plain(file, false)), ...(plain(join(home, "brain", sessionId), true) ? [join(home, "brain", sessionId)] : [])];
   }
 
   async liveness(sessionId: string): Promise<Liveness> {
