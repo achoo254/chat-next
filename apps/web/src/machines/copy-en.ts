@@ -700,6 +700,7 @@ export const enMachines: MachinesCopy = {
 		typeHere: "Type into the terminal",
 		mode: { label: "Open the session in", chat: "Conversation", terminal: "Terminal" },
 		openInTerminal: "Open in terminal",
+		scrollLatest: "Back to the newest line",
 		held: (ai: string) => `${ai} is running this session in a terminal. View only here.`,
 		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal.`,
 		showTerminal: "Open terminal",

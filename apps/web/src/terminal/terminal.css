@@ -59,7 +59,17 @@
 /* The pane's hit area stays in its gutter: as tall as 44px, as wide as the gutter. */
 .tx-pane-x::before { content: ""; position: absolute; inset: -4px -1px -20px -1px; }
 .tx-panes:has(.tx-pane + .tx-pane) .tx-pane-in[data-focused] { border-color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
-.tx-term { width: 100%; height: 100%; }
+.tx-term { position: relative; width: 100%; height: 100%; }
+/* A touch screen's view of the history (terminal-touch-thumb.ts): a thumb along the edge, and the way back to the newest line. */
+.tx-thumb { position: absolute; z-index: 3; top: 0; right: 2px; width: 4px; border-radius: var(--radius-full); background: rgb(230 232 238 / 0.9); opacity: 0; pointer-events: none; transition: opacity 0.3s ease, width 0.15s ease; }
+.tx-thumb[data-on] { opacity: 0.22; }
+.tx-thumb[data-on][data-active] { opacity: 0.75; width: 6px; }
+.tx-latest { position: absolute; z-index: 3; right: var(--space-3); bottom: var(--space-3); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgb(255 255 255 / 0.14); border-radius: var(--radius-full); background: rgb(34 38 46 / 0.94); color: #e6e8ee; box-shadow: 0 2px 10px rgb(0 0 0 / 0.45); cursor: pointer; }
+.tx-latest[hidden] { display: none; }
+.tx-latest::before { content: ""; width: 10px; height: 10px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); }
+.tx-latest:active { background: rgb(52 58 70 / 0.96); }
+/* On a touch screen the thumb replaces xterm's own bar. */
+.tx-dock.touch .xterm-scrollable-element > .scrollbar { display: none !important; }
 .tx-term .xterm { height: 100%; }
 /* The leftover pixels under the last row show the viewport; xterm leaves it black, so it takes the terminal colour. */
 .tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
@@ -173,6 +183,8 @@
 .tx-live-field:focus-visible, .tx-live-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
 /* Tabs on a phone (after Orca's): pill tabs, round actions; the session header already says when it goes through the relay. */
 .tx-dock.touch .tx-head { gap: var(--space-2); min-height: 56px; padding: 0 var(--space-2); }
+/* In a session the header above already has the way back: the bar is just the tabs and "+". */
+.tx-dock.touch.embedded .tx-head { min-height: 52px; }
 .tx-dock.touch .tx-tabs { gap: var(--space-1); }
 .tx-dock.touch .tx-tab { margin: 6px 0; border-radius: var(--radius-full); }
 .tx-dock.touch .tx-tab[data-active] { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }

@@ -709,6 +709,7 @@ export const viMachines = {
 		typeHere: "Gõ vào terminal",
 		mode: { label: "Mở phiên bằng", chat: "Trò chuyện", terminal: "Terminal" },
 		openInTerminal: "Mở bằng terminal",
+		scrollLatest: "Về dòng mới nhất",
 		held: (ai: string) => `${ai} đang chạy phiên này trong terminal. Ở đây chỉ xem.`,
 		heldOpen: (ai: string) => `Phiên đang mở bằng ${ai} trong terminal.`,
 		showTerminal: "Mở terminal",

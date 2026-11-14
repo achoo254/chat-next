@@ -695,6 +695,7 @@ export const zhCNMachines: MachinesCopy = {
 		typeHere: "在终端中输入",
 		mode: { label: "打开会话方式", chat: "聊天", terminal: "终端" },
 		openInTerminal: "在终端中打开",
+		scrollLatest: "回到最新一行",
 		held: (ai: string) => `${ai} 正在终端中运行此会话。此处仅可查看。`,
 		heldOpen: (ai: string) => `此会话已在终端的 ${ai} 中打开。`,
 		showTerminal: "打开终端",

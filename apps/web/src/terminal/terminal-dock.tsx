@@ -40,7 +40,6 @@ import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.t
 import {
 	activeTab,
 	addTab,
-	aiOnly,
 	aiPane,
 	closePane,
 	closeSession,
@@ -485,15 +484,37 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const keyboard = useViewportFit(root, touch && thread === undefined);
 	const [imeOpen, setImeOpen] = useState(false);
 
-	// On a phone a session runs one terminal, its AI: no tab bar, no shells of its own (they stay for a computer).
-	const single = touch && thread !== undefined;
-	const view = single ? aiOnly(layout) : layout;
+	const view = layout;
 	const tab = activeTab(view);
 	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
 	const shown = sessionsOf(layout);
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
 	// A session's dock lists the shells and its own AI; the machine's lists the shells.
 	const hidden = listed.filter((s) => !shown.has(s.session) && (s.threadId === "" || s.threadId === threadId));
+	// On a phone a session shows just its AI, as long as that is all there is. Once there is more to reach (tabs
+	// opened here, or shells and sessions the machine runs, most often opened on a computer) the tab bar shows
+	// under the session header, its "+" listing what the machine runs; it steps aside while the keyboard is up.
+	const tabBar = !touch || thread === undefined || layout.tabs.length > 1 || hidden.length > 0;
+	/** The machine's sessions again (a phone that was away, or the "+" menu opening). */
+	const relist = () => {
+		link.request({ case: "termListRequest", value: {} }).then(
+			(frame) => {
+				if (frame.body.case === "termListResult") setListed(frame.body.value.sessions);
+			},
+			() => undefined,
+		);
+	};
+	// A phone coming back to the front learns what a computer opened meanwhile.
+	useEffect(() => {
+		if (!touch || thread === undefined || !ready) return;
+		const onVisible = () => {
+			if (document.visibilityState === "visible") relist();
+		};
+		document.addEventListener("visibilitychange", onVisible);
+		return () => document.removeEventListener("visibilitychange", onVisible);
+		// `relist` only reads the link, which this effect already depends on.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [touch, thread === undefined, ready, link]);
 
 	const send = (text: string) => {
 		if (focused === null || text === "") return;
@@ -602,6 +623,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					focused={isFocused}
 					touch={touch}
 					label={tt.screenLabel(titles.get(pane.session) ?? "")}
+					latestLabel={tt.scrollLatest}
 					probe={probe}
 					onFocus={() => setLayout((l) => focusPane(l, pane.id))}
 					onTitle={(text) => setTitles((m) => new Map(m).set(pane.session, text))}
@@ -683,7 +705,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						: tt.notOpened;
 	return (
 		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock" data-typing={touch && keyboardUp ? "" : undefined}>
-			{!single && (
+			{tabBar && (
 				<TerminalTabs
 					t={tt}
 					back={back}
@@ -711,14 +733,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					onAction={(action) => void run(action)}
 					onReopen={(session) => setLayout((l) => addTab(l, session, threadId !== undefined && listed.some((s) => s.session === session && s.threadId === threadId)))}
 					onStartAgent={(provider) => void startAgent(provider)}
-					onMenu={() => {
-						link.request({ case: "termListRequest", value: {} }).then(
-							(frame) => {
-								if (frame.body.case === "termListResult") setListed(frame.body.value.sessions);
-							},
-							() => undefined,
-						);
-					}}
+					onMenu={relist}
 				/>
 			)}
 			{(notice !== "" || relayNote) && (

@@ -19,6 +19,7 @@ import { TouchScroller } from "./touch-scroll.ts";
 import { noAutofill } from "./no-autofill.ts";
 import { openWebLink } from "./open-web-link.ts";
 import { keepScrollbarVisible } from "./terminal-scrollbar.ts";
+import { showTouchThumb } from "./terminal-touch-thumb.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 import { showCursorWithoutFocus } from "./terminal-cursor.ts";
@@ -58,6 +59,8 @@ export interface TerminalViewProps {
 	/** A touch screen: typing goes through the dock's own input (IME), not xterm's. */
 	touch: boolean;
 	label: string;
+	/** Names the touch screen's "back to the newest output" button. */
+	latestLabel?: string;
 	probe: LatencyProbe | null;
 	onFocus(): void;
 	onTitle(title: string): void;
@@ -155,7 +158,7 @@ class OutputWriter {
 
 const encoder = new TextEncoder();
 
-export function TerminalView({ link, session, focused, touch, label, probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
+export function TerminalView({ link, session, focused, touch, label, latestLabel = "", probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const scrollerRef = useRef<TouchScroller | null>(null);
 	const termRef = useRef<Terminal | null>(null);
@@ -165,6 +168,7 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 	const shortcut = useEffectEvent((event: KeyboardEvent) => onShortcut(event));
 	const registerHandle = useEffectEvent((handle: PaneHandle | null) => register(handle));
 	const labelNow = useEffectEvent(() => label);
+	const latestNow = useEffectEvent(() => latestLabel);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -273,6 +277,8 @@ export function TerminalView({ link, session, focused, touch, label, probe, onFo
 				term.onResize(({ cols, rows }) => link.resize(session, cols, rows)),
 				term.onTitleChange((text) => title(text)),
 				keepScrollbarVisible(host, term),
+				// A finger has no hover or drag on xterm's hairline bar: it gets a thumb and a way back to the newest line.
+				...(touch ? [showTouchThumb(host, term, latestNow())] : []),
 			];
 			term.attachCustomKeyEventHandler((event) => {
 				// Ctrl+Shift+C copies the selection (Ctrl+C alone stays the program's interrupt); with nothing selected it does nothing.
