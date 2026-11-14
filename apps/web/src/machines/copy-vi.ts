@@ -1062,7 +1062,7 @@ export const viMachines = {
 			linkSave: "Lưu liên kết",
 			unlinked: "Đã bỏ liên kết kho git.",
 			split: "Tách thành dự án riêng",
-			primary: "chính",
+			primary: "main",
 			showAttention: (n: number) => `Chỉ hiện ${n} mục cần bạn hoặc đang chạy`,
 			remoteExists: "Đã có dự án liên kết repo này.",
 			tooMany: "Đã tới giới hạn số dự án hoặc workspace.",

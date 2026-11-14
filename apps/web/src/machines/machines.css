@@ -71,7 +71,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-project-toggle { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .mx-project-toggle b, .mx-ws-title b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
 .mx-project-toggle > .icon { flex: none; color: var(--c-icon-muted); }
-.mx-project-toggle[aria-expanded="true"] > .icon { color: var(--c-text-muted); }
+.mx-project-toggle[aria-expanded="true"] > .icon { color: var(--c-primary); }
 .mx-project-toggle .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 /* Dragging a project (project-drag.ts): the header holds still for a long press, the dragged one fades, a line marks where it lands. */
 .mx-project-head { -webkit-touch-callout: none; user-select: none; }
@@ -90,9 +90,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-ws-title b { min-width: 0; font-weight: 500; }
 .mx-ws-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-ws-sub.mx-ws-missing { color: var(--c-error-text); }
-.mx-ws-primary { flex: none; padding: 0 5px; border-radius: var(--radius-sm); background: var(--c-surface-subtle); color: var(--c-text-muted); font-size: 0.6875rem; line-height: 1.5; }
+.mx-ws-primary { flex: none; padding: 0 5px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-primary) 16%, transparent); color: var(--c-primary); font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1.5; }
 /* The machine's chip: always there, at the end of the title line, cut before the title is. */
 .mx-ws-host { flex: 0 1 auto; min-width: 2.5rem; max-width: 7rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+/* The machine chip takes a violet tint so the host reads apart from the grey text around it. */
+.mx-ws-host { color: color-mix(in srgb, var(--c-primary) 78%, var(--c-text-muted)); border-color: color-mix(in srgb, var(--c-primary) 35%, var(--c-border-subtle)); }
 .mx-ws-host[data-offline] { border-style: dashed; opacity: 0.7; }
 /* The actions take no room until wanted: over the row's end on hover or focus, in it on touch. */
 .mx-ws-acts { position: absolute; top: 50%; right: var(--space-1); z-index: 1; display: flex; align-items: center; transform: translateY(-50%); border-radius: var(--radius-sm); background: var(--c-surface); opacity: 0; pointer-events: none; }

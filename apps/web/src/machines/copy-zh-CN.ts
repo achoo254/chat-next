@@ -1044,7 +1044,7 @@ export const zhCNMachines: MachinesCopy = {
 			linkSave: "保存关联",
 			unlinked: "已取消关联 Git 仓库。",
 			split: "拆分为独立项目",
-			primary: "主",
+			primary: "main",
 			showAttention: (n: number) => `只显示需要你或运行中的 ${n} 项`,
 			remoteExists: "已有项目关联此仓库。",
 			tooMany: "已达到项目或工作区的数量上限。",

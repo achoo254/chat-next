@@ -103,7 +103,7 @@
 .ws-branch { flex: 1; min-width: 0; }
 .ws-branch-btn { width: 100%; justify-content: flex-start; }
 .ws-branch-btn .ws-branch-name { flex: 1; text-align: left; }
-.ws-branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.8125rem; }
+.ws-branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-primary); }
 .ws-branch-menu { left: 0; right: auto; width: min(320px, 85vw); max-height: 360px; overflow-y: auto; }
 .ws-branch-menu button { min-height: 32px; }
 .ws-branch-menu button small { margin-left: auto; color: var(--c-text-muted); font-size: 0.6875rem; white-space: nowrap; }
@@ -137,7 +137,7 @@
 
 .ws-sec { display: grid; grid-template-columns: minmax(0, 1fr); }
 .ws-sec-head { margin: 0; }
-.ws-sec-head button { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0 var(--space-3) 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.ws-sec-head button { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0 var(--space-3) 0 var(--space-2); border: 0; background: none; color: color-mix(in srgb, var(--c-primary) 65%, var(--c-text-muted)); font: inherit; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
 .ws-sec-head button:hover { color: var(--c-text); }
 .ws-sec-sub { min-width: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; letter-spacing: 0; text-transform: none; }
 .ws-sec-body[hidden] { display: none; }
@@ -158,7 +158,7 @@
 .ws-commit-text { display: grid; min-width: 0; gap: 1px; }
 .ws-commit-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--c-text); }
 .ws-commit-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.6875rem; color: var(--c-text-muted); }
-.ws-commit-meta .mono { font-size: 0.6875rem; }
+.ws-commit-meta .mono { font-size: 0.6875rem; color: color-mix(in srgb, var(--c-primary) 75%, var(--c-text-muted)); }
 .ws-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 
 /* With a touch screen every control is at least 44px high (or wide) to hit. */
