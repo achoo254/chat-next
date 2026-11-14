@@ -159,8 +159,10 @@ Bộ test hợp đồng ([`test/provider-contract.test.ts`](test/provider-contra
   `agy acp` phục vụ mọi phiên; chế độ quyền và model lấy từ agy. Cài đặt `toolPermission: "always-proceed"` của agy
   (`~/.gemini/antigravity-cli/settings.json`) chạy mọi công cụ không hỏi, nên phiên của máy đó là toàn quyền (`full-access`) và
   thiết bị không chọn chế độ khác được; muốn được hỏi thì đổi cài đặt đó trong agy. tunelo chỉ đọc cài đặt của agy, không ghi.
-  "Luôn cho phép" chỉ nhớ trong phiên ở phía tunelo, agy không nhận "always". Bản này chưa có MCP `tunelo` và mật khẩu đã lưu
-  cho Antigravity. Thông điệp commit chạy `agy --sandbox` với mọi công cụ bị chặn; hook toàn cục của công cụ khác trong
+  "Luôn cho phép" chỉ nhớ trong phiên ở phía tunelo, agy không nhận "always". Phiên Antigravity có MCP `tunelo` (công cụ tên
+  `mcp_tunelo_<tool>`): lệnh ghi luôn hiện thẻ duyệt, không "cho phép cả phiên"; phiên toàn quyền chạy lệnh ghi như bypass của
+  Claude. Ở chế độ `auto`/`accept-edits` agy có thể gọi công cụ MCP không hỏi, khi đó lệnh ghi bị dịch vụ từ chối vì chưa duyệt.
+  Mật khẩu đã lưu trong lệnh shell của agy chưa có. Thông điệp commit chạy `agy --sandbox` với mọi công cụ bị chặn; hook toàn cục của công cụ khác trong
   `~/.gemini/config/hooks.json` vẫn chạy (agy không tắt được cho một lần chạy). tunelo không cài hook nào vào agy.
 - **Tài khoản AI** (trang "Tài khoản AI" của máy): mỗi AI một danh sách và một lựa chọn riêng; đổi tài khoản của AI này không
   đụng phiên AI khác. Tất cả ghi trong `ai-accounts/ai-accounts.json` (không chứa credential).
