@@ -312,6 +312,64 @@ describe("a session the machine opened in its terminal", () => {
     const processes = new ClaudeProcesses({ platform: "darwin", selfPid: 1, exec: async (cmd) => (cmd === "ps" ? `  42  77  09:00 claude claude --session-id ${sessionId}\n` : `p42\nfcwd\nn${work}\n`) });
     expect((await new LocalSessions({ homes: () => [claudeHome], processes }).liveness(sessionId)).state).toBe("busy");
   });
+
+  async function heldByTerminal() {
+    const claudeHome = tempDir("claude-home-");
+    const provider = createClaudeProvider({ query: fakeQuery().fn, findBinary: async () => "claude", homes: () => [claudeHome] });
+    provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
+    const { core, work } = makeCore([provider]);
+    cores.push(core);
+    const thread = await core.create({ provider: "claude", model: "", dir: work, text: "", consent: none, device: "phone" });
+    const spec = await core.terminalLaunch(thread.id);
+    const sessionId = spec.args[spec.args.indexOf("--session-id") + 1] ?? "";
+    core.terminalStarted(thread.id, 1, 4242);
+    const seen: ThreadSummary[] = [];
+    core.onStatus((s) => s.id === thread.id && seen.push(s));
+    return { core, claudeHome, thread, seen, t: new Transcript(sessionId, work, "cli").opening() };
+  }
+
+  test("takes the session's name and last message from what the CLI wrote, with no device following it", async () => {
+    const { core, claudeHome, thread, seen, t } = await heldByTerminal();
+    expect(summaryOf(core, thread.id)).toMatchObject({ title: "", preview: "" });
+    t.user("deploy it");
+    t.assistant([{ type: "text", text: "Deployed to staging." }]);
+    setTime(t.write(claudeHome), Date.now() - 90_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)).toMatchObject({ title: "deploy it", preview: "Deployed to staging.", terminalSession: 1 });
+    expect(seen.at(-1)).toMatchObject({ title: "deploy it", preview: "Deployed to staging." });
+
+    // The AI names the session later: the name follows.
+    const lines = t.lines.length;
+    t.aiTitle("Deploy to staging");
+    setTime(t.appendFrom(claudeHome, lines), Date.now() - 80_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)?.title).toBe("Deploy to staging");
+  });
+
+  test("keeps the name the user gave the session over the AI's later one", async () => {
+    const { core, claudeHome, thread, t } = await heldByTerminal();
+    t.user("deploy it");
+    t.customTitle("Release night");
+    t.assistant([{ type: "text", text: "On it." }]);
+    t.aiTitle("Deploy to staging");
+    setTime(t.write(claudeHome), Date.now() - 90_000);
+    await core.lookElsewhere();
+    expect(summaryOf(core, thread.id)).toMatchObject({ title: "Release night", preview: "On it." });
+  });
+
+  test("announces nothing while the transcript does not change", async () => {
+    const { core, claudeHome, thread, seen, t } = await heldByTerminal();
+    t.user("deploy it");
+    t.assistant([{ type: "text", text: "Done." }]);
+    setTime(t.write(claudeHome), Date.now() - 90_000);
+    await core.lookElsewhere();
+    const updatedAt = summaryOf(core, thread.id)?.updatedAt;
+    const count = seen.length;
+    await core.lookElsewhere();
+    await core.lookElsewhere();
+    expect(seen).toHaveLength(count);
+    expect(summaryOf(core, thread.id)?.updatedAt).toBe(updatedAt);
+  });
 });
 
 /** An AI whose events the test pushes by hand. */

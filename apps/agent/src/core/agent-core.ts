@@ -599,6 +599,11 @@ export class AgentCore {
         for (const t of [...this.threads.values()]) {
           const before = elsewhereKey(this.summary(t));
           try {
+            this.followElsewhere(t);
+          } catch {
+            // the next look reads from the last mark
+          }
+          try {
             await this.lookAt(t);
           } catch {
             delete t.elsewhere;
@@ -611,6 +616,25 @@ export class AgentCore {
       }
     })();
     return this.looking;
+  }
+
+  /**
+   * A thread whose AI a terminal of the machine holds, or that ran a turn
+   * elsewhere at the last look, is talked to there, not through the chat:
+   * what its transcript got since the last look comes into the journal, so
+   * the thread list shows the session's name and its last message (see
+   * syncHistory). Reads only when the transcript's end moved past the
+   * journal's mark, so a quiet session costs one look at its end; nothing is
+   * announced when nothing changed.
+   */
+  private followElsewhere(t: Thread): void {
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (t.deleted || (!t.meta.terminal && t.elsewhere === undefined) || !seg?.sessionId || !history) return;
+    const end = history.end(seg.sessionId);
+    if (end === undefined) return;
+    if (t.meta.history?.sessionId === seg.sessionId && t.meta.history.end === end) return;
+    this.syncHistory(t);
   }
 
   private async lookAt(t: Thread): Promise<void> {
