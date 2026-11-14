@@ -198,6 +198,23 @@ export function prune(layout: DockLayout, alive: ReadonlySet<number>): DockLayou
 	return next;
 }
 
+/**
+ * A stored layout as the machine has it now: a pane keeps its session only while the machine still has it for the
+ * same owner. The machine numbers its sessions from 1 again when its terminal process restarts (an update), so a
+ * stored number may now be another session's AI: an AI pane shows only `threadId`'s AI, a shell pane only a shell.
+ */
+export function pruneForScope(layout: DockLayout, sessions: readonly { readonly session: number; readonly threadId: string }[], threadId: string | undefined): DockLayout {
+	const owner = new Map(sessions.map((s) => [s.session, s.threadId]));
+	let next = layout;
+	for (const tab of layout.tabs)
+		for (const pane of panesOf(tab.root)) {
+			const has = owner.get(pane.session);
+			const expected = pane.ai === true ? threadId : "";
+			if (has === undefined || has !== expected) next = closePane(next, pane.id);
+		}
+	return next;
+}
+
 // --- reading back what was stored ------------------------------------------------------
 
 function isId(value: unknown): value is string {

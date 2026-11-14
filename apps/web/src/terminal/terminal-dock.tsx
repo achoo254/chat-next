@@ -50,7 +50,7 @@ import {
 	isSplitPane,
 	layoutStore,
 	panesOf,
-	prune,
+	pruneForScope,
 	selectTab,
 	sessionsOf,
 	setPaneSession,
@@ -248,13 +248,13 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			if (!live) return;
 			// Without the machine's list the stored layout stays as it is (a session that is gone says so when attached).
 			setListed(list ?? []);
-			setLayout(list === null ? (stored ?? EMPTY_LAYOUT) : prune(stored ?? EMPTY_LAYOUT, new Set(list.map((s) => s.session))));
+			setLayout(list === null ? (stored ?? EMPTY_LAYOUT) : pruneForScope(stored ?? EMPTY_LAYOUT, list, threadId));
 			setReady(true);
 		})();
 		return () => {
 			live = false;
 		};
-	}, [online, ready, scope, link, store, t]);
+	}, [online, ready, scope, threadId, link, store, t]);
 
 	useEffect(() => {
 		if (!ready) return;
