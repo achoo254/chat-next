@@ -96,6 +96,10 @@ mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
 
+Có gì ở 3.3.1: phiên Claude chạy trong terminal của máy vẫn báo "đang chạy" khi model nghĩ lâu mà chưa ghi gì (cột AI Agent
+hiện biểu tượng đang chạy riêng của từng AI). Terminal mở lại từ thiết bị (đổi tab, Trò chuyện ⟷ Terminal, tải lại trang) cuộn
+lên được: `tunelo-term-host` giữ 1.000 dòng lịch sử và gửi kèm những dòng mới nhất vừa một khung.
+
 Có gì ở 3.1.0: AI của phiên viết thông điệp commit từ phần đã stage (nút trong Source Control; chỉ AI nào khai báo được mới
 viết, không có AI mặc định; tệp bí mật chỉ gửi tên). Phiên chưa mở trên máy (chạy ở terminal, đang chờ tin đầu) vẫn có danh sách
 lệnh `/` và skill trong chat: tunelo hỏi AI danh sách của thư mục mà không gửi tin nào, theo đúng tài khoản và chế độ nạp cấu hình
@@ -176,7 +180,9 @@ Phiên AI Agent là phiên Claude Code bình thường của máy, không phải
   bật cấu hình dự án thì không hỏi, xem dưới).
 - **Lượt gõ trên máy sau đó** (`claude --resume` trong Terminal) hiện trong Chat khi mở lại phiên hoặc gửi tin tiếp; phiên đang
   mở trong tunelo được mở lại để Claude đọc cả phần đó.
-- **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây, khi một `claude` đang chạy ghi
+- **Mở hai nơi cùng lúc:** phiên "có vẻ đang mở ở nơi khác" khi bản ghi vừa đổi trong 60 giây (lâu hơn thế, khi một `claude`
+  đang giữ phiên mà tool chưa có kết quả, tối đa 10 phút, hoặc model chưa trả lời yêu cầu cuối cùng, tối đa 30 phút: lúc model
+  nghĩ lâu bản ghi không đổi; cột AI Agent hiện biểu tượng "đang chạy" theo từng AI), khi một `claude` đang chạy ghi
   nó trong `sessions/<pid>.json` của thư mục Claude mà tunelo biết, hoặc khi một tiến trình `claude` đang chạy (bất kể ai mở,
   kể cả với `CLAUDE_CONFIG_DIR` riêng) làm việc trong thư mục của phiên và phiên đổi sau lúc tiến trình bắt đầu (phiên mới
   nhất, mỗi tiến trình một phiên; `--resume <id>` trên dòng lệnh thì đúng phiên đó). macOS/Linux đọc bằng `ps` và `lsof`
