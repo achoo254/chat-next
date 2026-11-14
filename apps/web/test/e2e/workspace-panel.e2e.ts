@@ -109,9 +109,11 @@ test("on a phone the panel is a full-height sheet with its own close button", as
 	const errors: string[] = [];
 	page.on("pageerror", (err) => errors.push(String(err)));
 	await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
-	const toggle = page.locator("[data-id=session-panel-toggle]");
-	await toggle.waitFor({ timeout: 30_000 });
-	await toggle.tap();
+	// A phone's header has no room for the panel's button: it is an item of the "⋯" menu.
+	const menu = page.getByRole("button", { name: "Tuỳ chọn phiên" });
+	await menu.waitFor({ timeout: 30_000 });
+	await menu.tap();
+	await page.getByRole("menuitem", { name: "Tệp và git của workspace" }).tap();
 	const panel = page.locator("[data-id=workspace-panel]");
 	await page.getByRole("tree").getByRole("treeitem").first().waitFor();
 	const box = await panel.boundingBox();

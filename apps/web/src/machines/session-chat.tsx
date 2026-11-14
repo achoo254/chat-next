@@ -284,13 +284,14 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					machine={machine}
 					machineName={machineName}
 					dir={dir}
-					narrowItems={
+					narrowItems={(close) => (
 						<>
 							{offered &&
 								(["chat", "terminal"] as const)
 									.filter((m) => m !== mode)
 									.map((m) => (
 										<button key={m} type="button" role="menuitem" onClick={() => {
+											close();
 											rememberMode(machine, m);
 											navigate(modePath(machine, threadId, m));
 										}}>
@@ -299,19 +300,25 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 										</button>
 									))}
 							{thread !== null && mode === "chat" && (
-								<button type="button" role="menuitem" onClick={() => setChangesOpen((v) => !v)}>
+								<button type="button" role="menuitem" onClick={() => {
+									close();
+									setChangesOpen((v) => !v);
+								}}>
 									<MachineIcon name="pencil" small />
 									<span>{changeCount > 0 ? `${t.agent.header.changes} (${changeCount})` : t.agent.header.changes}</span>
 								</button>
 							)}
 							{thread !== null && panel.workspace !== undefined && (
-								<button type="button" role="menuitem" onClick={() => panel.toggle()}>
+								<button type="button" role="menuitem" onClick={() => {
+									close();
+									panel.toggle();
+								}}>
 									<MachineIcon name="folder" small />
 									<span>{t.agent.header.panel}</span>
 								</button>
 							)}
 						</>
-					}
+					)}
 					{...(thread !== null && online && threadActionsSupported(state.info) ? { manage: { link, thread, ai } } : {})}
 					{...(endTerminal !== undefined && online ? { endTerminal } : {})}
 				/>
@@ -494,8 +501,11 @@ function HeadMenu({
 	machine: string;
 	machineName: string;
 	dir: string;
-	/** On a phone the header shows only the title and this menu: the mode, the changes and the panel come here. */
-	narrowItems?: ReactNode;
+	/**
+	 * On a phone the header shows only the title and this menu: the mode, the changes and the panel come here.
+	 * Each item closes the menu itself (`close`) when tapped.
+	 */
+	narrowItems?: (close: () => void) => ReactNode;
 	manage?: { link: MachineLink; thread: ThreadSummary; ai: string };
 	/** The session's AI runs in the terminal: "Kết thúc" stops it there. */
 	endTerminal?: () => Promise<void>;
@@ -511,8 +521,9 @@ function HeadMenu({
 			{open && (
 				<div className="mx-menu" role="menu" aria-label={t.agent.header.menu}>
 					{narrowItems !== undefined && (
-						<div className="mx-menu-narrow" onClickCapture={() => setOpen(false)}>
-							{narrowItems}
+						// Not closed on the click's capture: that unmounts the menu before a real tap reaches the item.
+						<div className="mx-menu-narrow">
+							{narrowItems(() => setOpen(false))}
 							<hr />
 						</div>
 					)}
