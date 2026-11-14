@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } fro
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { describe, expect, test } from "vitest";
-import { LocalSessions, RECENT_BYTES, noteBackground } from "../src/providers/claude/local-sessions.ts";
+import { LocalSessions, RECENT_BYTES } from "../src/providers/claude/local-sessions.ts";
 import { cleanPrompt } from "../src/providers/claude/transcript.ts";
 import { tempDir } from "./harness.ts";
 import { Transcript } from "./support/claude-transcript.ts";
@@ -285,16 +285,18 @@ describe("reading a session back", () => {
 });
 
 describe("background shells and subagents", () => {
+  // The structured result claude writes with a launch (what it records, beside the text the model reads).
   const launchAgent = (t: Transcript, id: string) =>
-    t.user([{ tool_use_id: "toolu_a", type: "tool_result", content: [{ type: "text", text: `Async agent launched successfully.
-agentId: ${id} (internal ID)
-The agent is working in the background.` }] }]);
-  const launchShell = (t: Transcript, id: string) => t.toolResult("toolu_s", `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}). Output is being written to: /tmp/${id}.output`);
-  const finished = (t: Transcript, id: string, status = "completed") => t.user(`<task-notification>
-<task-id>${id}</task-id>
-<status>${status}</status>
-<summary>done</summary>
-</task-notification>`);
+    t.user([{ tool_use_id: "toolu_a", type: "tool_result", content: [{ type: "text", text: `Async agent launched successfully.\nagentId: ${id} (internal ID)` }] }], {
+      toolUseResult: { isAsync: true, status: "async_launched", agentId: id, description: "review", prompt: "a long prompt" },
+    });
+  const launchShell = (t: Transcript, id: string) =>
+    t.user([{ tool_use_id: "toolu_s", type: "tool_result", content: `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).` }], {
+      toolUseResult: { stdout: "", stderr: "", interrupted: false, backgroundTaskId: id },
+    });
+  const notice = (id: string, status = "completed") => `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>toolu_x</tool-use-id>\n<status>${status}</status>\n<summary>done</summary>\n</task-notification>`;
+  /** The notification as a message between turns. */
+  const finished = (t: Transcript, id: string, status = "completed") => t.user(notice(id, status), { origin: { kind: "task-notification" } });
 
   test("a launch counts until its task-notification, whatever the task's end (finished, failed, stopped)", () => {
     const home = tempDir("claude-home-");
@@ -316,6 +318,21 @@ The agent is working in the background.` }] }]);
     expect(s.backgroundTasks(id)).toBe(0);
   });
 
+  test("a notification that arrived during a turn is a queued command and an attachment, and ends the task as well", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    launchShell(t, "b1x9");
+    launchShell(t, "b2y8");
+    const file = t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(2);
+    appendFileSync(file, `${JSON.stringify({ type: "queue-operation", operation: "enqueue", sessionId: id, content: JSON.stringify(notice("b1x9")) })}\n`);
+    expect(s.backgroundTasks(id)).toBe(1);
+    appendFileSync(file, `${JSON.stringify({ parentUuid: null, isSidechain: false, attachment: { type: "queued_command", prompt: notice("b2y8", "failed") }, type: "attachment", uuid: randomUUID() })}\n`);
+    expect(s.backgroundTasks(id)).toBe(0);
+  });
+
   test("reads only what was appended, and starts over when the transcript was replaced by a shorter one", () => {
     const home = tempDir("claude-home-");
     const id = randomUUID();
@@ -332,24 +349,35 @@ The agent is working in the background.` }] }]);
     expect(s.backgroundTasks(id)).toBe(0);
   });
 
-  test("a subagent's own records, the AI's words about tasks and a notification without a task are not launches or ends", () => {
-    const running = new Set<string>();
-    noteBackground(running, JSON.stringify({ type: "user", isSidechain: true, message: { role: "user", content: [{ type: "tool_result", content: "moved to the background (ID: side1)" }] } }));
-    noteBackground(running, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Async agent launched successfully. agentId: said1" }] } }));
-    expect(running.size).toBe(0);
-    noteBackground(running, JSON.stringify({ type: "user", isSidechain: false, message: { role: "user", content: [{ type: "tool_result", content: "Command running in background with ID: b2" }] } }));
-    noteBackground(running, JSON.stringify({ type: "user", isSidechain: false, message: { role: "user", content: "<task-notification>\n<status>completed</status>\n</task-notification>" } }));
-    expect([...running]).toEqual(["b2"]);
-  });
-
-  test("a long tool output after the markers does not hide them", () => {
+  test("text that only looks like a launch is none: a tool printing it, the AI's words, a subagent's own records, a notification without a task", () => {
     const home = tempDir("claude-home-");
     const id = randomUUID();
     const t = new Transcript(id, "/w/x").opening();
-    t.toolResult("toolu_s", `Command running in background with ID: big1
-${"x".repeat(1024 * 1024)}`);
+    t.user("show me the diff");
+    // A diff or a grep of this very feature prints the words a launch result has.
+    t.toolResult("toolu_d", "+ Command did not complete within its 600s timeout and was moved to the background (ID: printed1)\n+ Async agent launched successfully.\n+ agentId: printed2");
+    t.assistant([{ type: "text", text: "A shell was moved to the background (ID: said1)" }]);
+    const file = t.write(home);
+    appendFileSync(file, `${JSON.stringify({ type: "user", isSidechain: true, message: { role: "user", content: [] }, toolUseResult: { backgroundTaskId: "side1" } })}\n`);
+    appendFileSync(file, `${JSON.stringify({ type: "user", isSidechain: false, message: { role: "user", content: "<task-notification>\n<status>completed</status>\n</task-notification>" } })}\n`);
+    expect(sessions([home]).backgroundTasks(id)).toBe(0);
+    // A real launch beside them still counts, and the notification without a task takes nothing off.
+    launchShell(t, "real1");
     t.write(home);
     expect(sessions([home]).backgroundTasks(id)).toBe(1);
+  });
+
+  test("a long tool output after the launch's markers does not hide it, and one too long to keep whole is not a launch", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    t.user([{ tool_use_id: "toolu_s", type: "tool_result", content: "started" }], { toolUseResult: { stdout: "y".repeat(100 * 1024), backgroundTaskId: "big1" } });
+    t.write(home);
+    expect(sessions([home]).backgroundTasks(id)).toBe(1);
+    const huge = new Transcript(randomUUID(), "/w/x").opening();
+    huge.user([{ tool_use_id: "toolu_s", type: "tool_result", content: "started" }], { toolUseResult: { stdout: "y".repeat(1024 * 1024), backgroundTaskId: "huge1" } });
+    huge.write(home);
+    expect(sessions([home]).backgroundTasks(huge.sessionId)).toBe(0);
   });
 });
 

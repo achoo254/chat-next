@@ -205,7 +205,7 @@ describe("a session running elsewhere", () => {
     await core.close(thread.id);
     // Nothing holds the session: a launch in its record says nothing about work still running.
     let lines = t.lines.length;
-    t.toolResult("toolu_b", "Command running in background with ID: bg01");
+    t.user([{ tool_use_id: "toolu_b", type: "tool_result", content: "Command running in background with ID: bg01" }], { toolUseResult: { backgroundTaskId: "bg01" } });
     setTime(t.appendFrom(claudeHome, lines), Date.now() - 120_000);
     await core.lookElsewhere();
     expect(summaryOf(core, thread.id)).toMatchObject({ backgroundTasks: 0, state: ThreadState.IDLE });

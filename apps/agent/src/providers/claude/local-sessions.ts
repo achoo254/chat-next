@@ -48,14 +48,10 @@ const MESSAGE_TYPE = /"type":"(?:user|assistant)"/;
 const TOOL_TAIL_BYTES = 256 * 1024;
 /** The end of a transcript read the first time for background work: older launches are not seen. */
 const BACKGROUND_TAIL_BYTES = 4 * 1024 * 1024;
-/** Bytes of a line read for background work: the markers sit at its start, a long tool output after them. */
-const BACKGROUND_KEEP = 8 * 1024;
+/** Bytes of a line read for background work: a launch's record is small, and a notification names its task at its start. */
+const BACKGROUND_KEEP = COUNT_KEEP;
 const TASK_ID = /<task-id>([A-Za-z0-9_-]+)<\/task-id>/;
 const TASK_STATUS = /<status>([a-z_]+)<\/status>/;
-/** What the result of a background subagent's launch says: its agentId. */
-const AGENT_LAUNCHED = /Async agent launched successfully[\s\S]{0,600}?agentId: ([A-Za-z0-9]+)/;
-/** What the result of a shell put in the background says (on purpose, or after its timeout): its id. */
-const SHELL_BACKGROUND = /(?:moved to the background \(ID: |running in background with ID: )([A-Za-z0-9_-]+)/;
 const TITLE_MAX = 120;
 const DIRS_MAX = 50;
 export const PAGE_DEFAULT = 30;
@@ -245,7 +241,7 @@ export class LocalSessions implements SessionHistory {
       bg ??= { pos: Math.max(0, k.size - BACKGROUND_TAIL_BYTES), running: new Set<string>() };
       if (bg.pos < k.size) {
         const running = bg.running;
-        bg.pos = withFile(k.file, (fd) => scanLines(fd, bg.pos, k.size, BACKGROUND_KEEP, (line) => noteBackground(running, line.toString("utf8")), first && bg.pos > 0));
+        bg.pos = withFile(k.file, (fd) => scanLines(fd, bg.pos, k.size, BACKGROUND_KEEP, (line, whole) => noteBackground(running, line.toString("utf8"), whole), first && bg.pos > 0));
       }
       k.background = bg;
       return bg.running.size;
@@ -570,21 +566,27 @@ export class LocalSessions implements SessionHistory {
 }
 
 /**
- * One transcript line's mark on the background work: a user record that
- * carries the result of a launch adds the task it names; a task-notification
- * (the CLI telling the model a task ended or was stopped) takes it off. A
- * subagent's own records are not the session's.
+ * One transcript line's mark on the background work. A launch is told by the
+ * structured result claude writes with it (a shell put in the background has
+ * `backgroundTaskId`, a background subagent `isAsync` and its `agentId`), never
+ * by what the result's text says: a tool that merely prints such text (a diff,
+ * a grep) launches nothing. An end is the task-notification claude hands the
+ * model when a task finished or was stopped, which it records as a user
+ * message, or, when it arrived during a turn, as a queued command and an
+ * attachment. A subagent's own records are not the session's.
  */
-export function noteBackground(running: Set<string>, line: string): void {
-  if (!line.includes('"type":"user"') || line.includes('"isSidechain":true')) return;
-  if (line.includes('"content":"<task-notification>')) {
+export function noteBackground(running: Set<string>, line: string, whole: boolean): void {
+  if (line.includes('"isSidechain":true')) return;
+  if (line.includes("<task-notification>")) {
     const id = TASK_ID.exec(line)?.[1];
     const status = TASK_STATUS.exec(line)?.[1];
     if (id !== undefined && status !== undefined && status !== "running") running.delete(id);
     return;
   }
-  const launched = AGENT_LAUNCHED.exec(line)?.[1] ?? SHELL_BACKGROUND.exec(line)?.[1];
-  if (launched !== undefined) running.add(launched);
+  if (!whole || !line.includes('"toolUseResult"') || !(line.includes('"backgroundTaskId"') || line.includes('"async_launched"'))) return;
+  const result = parseRecord(line)?.toolUseResult as { backgroundTaskId?: unknown; isAsync?: unknown; status?: unknown; agentId?: unknown } | undefined;
+  if (typeof result?.backgroundTaskId === "string") running.add(result.backgroundTaskId);
+  else if (result?.isAsync === true && result.status === "async_launched" && typeof result.agentId === "string") running.add(result.agentId);
 }
 
 function entries(dir: string): Dirent[] {

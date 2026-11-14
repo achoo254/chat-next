@@ -155,8 +155,8 @@ Bộ test hợp đồng ([`test/provider-contract.test.ts`](test/provider-contra
 
 - **Claude Code**: `claude` của máy qua Agent SDK. Nhiều tài khoản: mỗi tài khoản một thư mục `CLAUDE_CONFIG_DIR` ở
   `ai-accounts/claude/<id>/home`, đăng nhập từ thiết bị bằng cách dán mã.
-  Phiên Claude còn báo số shell và subagent chạy nền chưa xong (`ThreadSummary.background_tasks`): đếm từ transcript (kết quả lúc
-  chạy nền cộng với `<task-notification>` lúc xong), chỉ tính khi phiên còn được giữ (phiên của máy, terminal của máy, hoặc tiến
+  Phiên Claude còn báo số shell và subagent chạy nền chưa xong (`ThreadSummary.background_tasks`): đếm từ transcript (kết quả có cấu trúc
+  `backgroundTaskId` / `async_launched` lúc chạy nền, trừ đi `<task-notification>` lúc xong, dù nó ghi dạng tin nhắn hay lệnh xếp hàng), chỉ tính khi phiên còn được giữ (phiên của máy, terminal của máy, hoặc tiến
   trình `claude` đang chạy), nên thiết bị vẫn hiện phiên đang làm việc dù lượt đã xong.
 - **Antigravity**: `agy` của máy (1.5.2 trở lên) qua `agy acp` ([client ACP dùng chung](src/providers/acp/)). Một tiến trình
   `agy acp` phục vụ mọi phiên; chế độ quyền và model lấy từ agy. Cài đặt `toolPermission: "always-proceed"` của agy

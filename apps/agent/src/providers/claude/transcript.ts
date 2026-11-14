@@ -92,6 +92,8 @@ export type TranscriptRecord = {
   aiTitle?: unknown;
   customTitle?: unknown;
   summary?: unknown;
+  /** What the tool returned, in the shape of its own: a background launch names its task here. */
+  toolUseResult?: unknown;
 };
 
 export function parseRecord(line: Buffer | string): TranscriptRecord | undefined {
