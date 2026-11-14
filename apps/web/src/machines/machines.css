@@ -154,7 +154,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 @media (min-width: 761px) {
 	.modal.large .mx-add-project:has(> .mx-recent-folders) { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); column-gap: var(--space-5); }
 	.modal.large .mx-add-project:has(> .mx-recent-folders) > * { grid-column: 1; }
-	.modal.large .mx-add-project:has(> .mx-recent-folders) > .mx-recent-folders { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
+	.modal.large .mx-add-project:has(> .mx-recent-folders) > .mx-recent-folders { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; contain: size; overflow: hidden; }
+	/* The recent folders take the left column's height (contain: size keeps their own length out of the row's size) and scroll inside. */
+	.modal.large .mx-add-project:has(> .mx-recent-folders) > .mx-recent-folders ul { flex: 1 1 0; height: auto; min-height: 0; }
 	.modal.large .mx-add-project:has(> .mx-recent-folders) > .dlg-foot { grid-column: 1 / -1; }
 }
 /* A row's menu: shown on hover or focus (always on touch screens), over the row's right edge. */
