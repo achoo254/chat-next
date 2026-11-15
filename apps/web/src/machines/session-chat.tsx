@@ -637,7 +637,11 @@ const NOT_A_BLOCK = "[data-id=transcript-older], [data-id=transcript-earlier], [
 
 export function markReading(el: HTMLElement): ReadingMark {
 	const top = el.getBoundingClientRect().top;
-	const node = [...el.children].find((c) => !c.matches(NOT_A_BLOCK) && c.getBoundingClientRect().bottom > top) ?? null;
+	const blocks = [...el.children].filter((c) => !c.matches(NOT_A_BLOCK));
+	// The first block may fold together with what loads above it (a run of tools grows into an earlier one and is
+	// drawn anew): any later one keeps its element.
+	const later = blocks.slice(1);
+	const node = later.find((c) => c.getBoundingClientRect().bottom > top) ?? blocks[0] ?? null;
 	return { node, offset: node === null ? 0 : node.getBoundingClientRect().top - top, height: el.scrollHeight };
 }
 

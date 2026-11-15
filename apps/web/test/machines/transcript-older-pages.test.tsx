@@ -141,7 +141,7 @@ describe("older items of a long session", () => {
 		expect(drawn()).toBeGreaterThan(after);
 	});
 
-	it("keeps the block being read in place when older blocks come in above and new ones at the bottom at once", () => {
+	it("keeps the block being read in place when older blocks come in above, the first one is drawn anew and new ones come at the bottom", () => {
 		// A scroller laid out by hand: each block 100px tall, stacked from the scroller's top minus scrollTop.
 		const scroller = document.createElement("div");
 		let top = 0;
@@ -160,16 +160,20 @@ describe("older items of a long session", () => {
 		top = 30;
 		layout();
 		const mark = markReading(scroller);
-		expect(mark.node?.textContent).toBe("b10");
-		// Five older blocks above, two new ones at the bottom.
+		// Not the first block: a run of tools there folds into older tools that load above it.
+		expect(mark.node?.textContent).toBe("b11");
+		// The first block is drawn anew (folded with older tools), five older blocks above, two new ones at the bottom.
+		const first = scroller.children[1];
+		if (first === undefined) throw new Error("no first block");
+		scroller.replaceChild(block("b10'"), first);
 		scroller.insertBefore(block("b5"), scroller.children[1] ?? null);
 		for (const n of ["b6", "b7", "b8", "b9"]) scroller.insertBefore(block(n), scroller.children[scroller.children.length - 3] ?? null);
 		scroller.append(block("b13"), block("b14"));
 		layout();
 		keepReading(scroller, mark);
 		layout();
-		const reading = [...scroller.children].find((c) => c.textContent === "b10");
-		expect(reading?.getBoundingClientRect().top).toBe(70);
+		const reading = [...scroller.children].find((c) => c.textContent === "b11");
+		expect(reading?.getBoundingClientRect().top).toBe(170);
 	});
 
 	it("scrolling on while an older page loads keeps the latest place, not the one where loading began", async () => {
