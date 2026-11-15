@@ -1384,6 +1384,10 @@ enum ErrorReason {
   // runs on the machine (subject: what runs, e.g. a terminal or a session's
   // title). Nothing changed.
   ERROR_REASON_ACCOUNT_SWITCH_BLOCKED = 76;
+  // OfficeWatch{on} for an office more than the agent keeps at once: 4 per
+  // connection, 16 for the machine (docs/office-wire.md). Watching again an
+  // office already watched is never refused; stop another watch first.
+  ERROR_REASON_OFFICE_WATCH_LIMIT = 77;
 }
 
 enum ErrorCode {
@@ -3172,7 +3176,8 @@ message UsageDelete {}
 // connection. On: answered with OfficeSnapshot (asking again is how a device
 // asks for a fresh snapshot after a gap in seq or a reconnect). Off:
 // answered with Ack. Closing the connection stops every watch it had.
-// ERROR_REASON_THREAD_NOT_FOUND for an unknown thread.
+// ERROR_REASON_THREAD_NOT_FOUND for an unknown thread;
+// ERROR_REASON_OFFICE_WATCH_LIMIT past the offices watched at once.
 message OfficeWatch {
   string thread_id = 1;
   bool on = 2;

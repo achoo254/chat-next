@@ -443,6 +443,10 @@ const (
 	// runs on the machine (subject: what runs, e.g. a terminal or a session's
 	// title). Nothing changed.
 	ErrorReason_ERROR_REASON_ACCOUNT_SWITCH_BLOCKED ErrorReason = 76
+	// OfficeWatch{on} for an office more than the agent keeps at once: 4 per
+	// connection, 16 for the machine (docs/office-wire.md). Watching again an
+	// office already watched is never refused; stop another watch first.
+	ErrorReason_ERROR_REASON_OFFICE_WATCH_LIMIT ErrorReason = 77
 )
 
 // Enum value maps for ErrorReason.
@@ -524,6 +528,7 @@ var (
 		74: "ERROR_REASON_NOTHING_STAGED",
 		75: "ERROR_REASON_PROVIDER_REQUIRED",
 		76: "ERROR_REASON_ACCOUNT_SWITCH_BLOCKED",
+		77: "ERROR_REASON_OFFICE_WATCH_LIMIT",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                   0,
@@ -602,6 +607,7 @@ var (
 		"ERROR_REASON_NOTHING_STAGED":                74,
 		"ERROR_REASON_PROVIDER_REQUIRED":             75,
 		"ERROR_REASON_ACCOUNT_SWITCH_BLOCKED":        76,
+		"ERROR_REASON_OFFICE_WATCH_LIMIT":            77,
 	}
 )
 
@@ -20404,7 +20410,8 @@ func (*UsageDelete) Descriptor() ([]byte, []int) {
 // connection. On: answered with OfficeSnapshot (asking again is how a device
 // asks for a fresh snapshot after a gap in seq or a reconnect). Off:
 // answered with Ack. Closing the connection stops every watch it had.
-// ERROR_REASON_THREAD_NOT_FOUND for an unknown thread.
+// ERROR_REASON_THREAD_NOT_FOUND for an unknown thread;
+// ERROR_REASON_OFFICE_WATCH_LIMIT past the offices watched at once.
 type OfficeWatch struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
@@ -23101,7 +23108,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x1aACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ACCOUNT_STATUS_OK\x10\x01\x12 \n" +
 	"\x1cACCOUNT_STATUS_NEEDS_SIGN_IN\x10\x02\x12\x18\n" +
-	"\x14ACCOUNT_STATUS_ERROR\x10\x03*\xf1\x15\n" +
+	"\x14ACCOUNT_STATUS_ERROR\x10\x03*\x96\x16\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -23179,7 +23186,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"!ERROR_REASON_USAGE_LEDGER_BLOCKED\x10I\x12\x1f\n" +
 	"\x1bERROR_REASON_NOTHING_STAGED\x10J\x12\"\n" +
 	"\x1eERROR_REASON_PROVIDER_REQUIRED\x10K\x12'\n" +
-	"#ERROR_REASON_ACCOUNT_SWITCH_BLOCKED\x10L\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
+	"#ERROR_REASON_ACCOUNT_SWITCH_BLOCKED\x10L\x12#\n" +
+	"\x1fERROR_REASON_OFFICE_WATCH_LIMIT\x10M\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +

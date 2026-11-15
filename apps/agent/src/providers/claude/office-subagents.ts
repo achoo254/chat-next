@@ -11,164 +11,116 @@
 // input is looked into only for a shell's command (to pick a room on the
 // machine) and a subagent's kind. Neither format has official docs: a field
 // missing or of another type is skipped, a file that cannot be read is
-// passed over, and nothing here throws.
-import { type Dirent, lstatSync, readFileSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+// passed over (and logged, rate-limited), and nothing here throws.
+//
+// Reading is bounded (docs/office-wire.md, part 9): a byte budget for the
+// first read of a session and for each later one, only the newest agents'
+// logs followed, a finished agent left alone once its files stop changing,
+// and a folder listed again only when it changed.
+import type { Dirent, Stats } from "node:fs";
+import { lstat, readFile, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { readLinesUntil } from "../../office/office-bounded-lines.ts";
+import { type OfficeLog, OfficeProblems } from "../../office/office-problem-log.ts";
 import type { SessionUsageCall, SubagentActivity, SubagentReport, SubagentToolCall } from "../types.ts";
+import { type Line, clean, parseAgentLine } from "./office-subagent-lines.ts";
 import { toolKind } from "./tool-map.ts";
-import { JsonCursor } from "./usage-json.ts";
-import { LINE_CAP, parseUsageLine, readLines } from "./usage-scan.ts";
+import { LINE_CAP, parseUsageLine } from "./usage-scan.ts";
+
+export { parseAgentLine } from "./office-subagent-lines.ts";
 
 /** How deep the subagents' folder goes (workflows nest one level more), as usage-scan.ts. */
 const SUBAGENT_DEPTH = 4;
-/** The end of a subagent's transcript read the first time. */
+/** The end of a subagent's transcript read the first time; a log further behind than this skips to it. */
 const AGENT_TAIL_BYTES = 4 * 1024 * 1024;
 /** The end of the session's own transcript read the first time, for token counts. */
 const MAIN_TAIL_BYTES = 64 * 1024 * 1024;
+/** All subagents' logs together, on the first read of a session (newest agents first). */
+const FIRST_AGENTS_BUDGET = 32 * 1024 * 1024;
+/** Everything read on each later read of a session (its transcript and the subagents' logs). */
+const POLL_BUDGET = 2 * 1024 * 1024;
+/** Agents whose record (meta.json) is looked at, the newest first. */
+const AGENTS_CONSIDERED = 256;
+/** Agents whose log is followed, the newest first. */
+const AGENTS_FOLLOWED = 32;
+/** Every agent's files are looked at again at least this often (a finished subagent may be resumed). */
+const RESCAN_MS = 30_000;
+/** A finished agent whose files have not changed for this long is not read any more. */
+const STALE_FINISHED_MS = 10 * 60_000;
 const META_MAX_BYTES = 64 * 1024;
-/** Tool calls kept per subagent (the newest). */
+/** Ended tool calls kept per subagent (the newest); open ones are kept until they end, up to OPEN_TOOLS_MAX. */
 const TOOLS_KEPT = 8;
+const OPEN_TOOLS_MAX = 64;
 /** Tool call ids remembered per subagent, to find who started a nested one. */
 const IDS_KEPT = 2_000;
 /** Sessions whose reads are remembered at once. */
 const SESSIONS_KEPT = 16;
 const CALLS_KEPT = 200_000;
 const AGENT_FILE = /^agent-([A-Za-z0-9_-]+)\.(meta\.json|jsonl)$/;
-const NAME_MAX = 200;
 
-type FilePos = { pos: number; size: number };
+type FileInfo = { size: number; mtimeMs: number };
 
 type AgentState = {
   agentId: string;
   workflowId: string;
   metaPath?: string;
-  metaMtime: number;
+  metaFile?: FileInfo;
+  /** The meta.json change time last read (-1: never). */
+  metaReadAt: number;
   logPath?: string;
-  log?: FilePos;
+  logFile?: FileInfo;
+  /** Where the next read of the log starts; undefined before the first. */
+  logPos?: number;
   meta: { agentType: string; description: string; toolUseId: string; spawnDepth: number; background: boolean; finished: boolean };
-  /** The newest tool calls, oldest first, with when each ended (0 while open). */
+  /** Tool calls, oldest first, with when each ended (0 while open). */
   tools: (SubagentToolCall & { doneAt: number })[];
   ids: Set<string>;
   updatedAt: number;
 };
 
-type SessionState = { main?: FilePos; agents: Map<string, AgentState>; calls: Map<string, SessionUsageCall> };
+/** A folder of the subagents' tree as last listed. */
+type Listing = { mtimeMs: number; files: { name: string; path: string }[]; dirs: string[] };
 
-// eslint-disable-next-line no-control-regex
-const clean = (v: string): string => v.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, NAME_MAX);
+type SessionState = {
+  mainPos?: number;
+  agents: Map<string, AgentState>;
+  calls: Map<string, SessionUsageCall>;
+  listings: Map<string, Listing>;
+  /** When every agent's files were last looked at (0: never). */
+  rankedAt: number;
+};
+
 const str = (v: unknown): string => (typeof v === "string" ? clean(v) : "");
-
-/** A plain folder or file (never a link) and its size and change time. */
-function plain(path: string, dir: boolean): { size: number; mtimeMs: number } | undefined {
-  try {
-    const st = lstatSync(path);
-    if (st.isSymbolicLink() || (dir ? !st.isDirectory() : !st.isFile())) return undefined;
-    return { size: st.size, mtimeMs: st.mtimeMs };
-  } catch {
-    return undefined;
-  }
-}
-
-async function entries(dir: string): Promise<Dirent[]> {
-  try {
-    return await readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-}
-
-type Block = { type: string; id: string; name: string; command?: string; toolUseId: string; isError: boolean };
-type Line = { type: string; at: number; blocks: Block[] };
-
-/** Reads a tool_use's input for a shell's command only; every other field is stepped over. */
-function pickInput(c: JsonCursor, block: Block): void {
-  c.object((k) => {
-    if (k === "command" && c.peek() === '"') block.command = c.string();
-  });
-}
-
-function pickBlock(c: JsonCursor): Block | undefined {
-  if (c.peek() !== "{") return undefined;
-  const b: Block = { type: "", id: "", name: "", toolUseId: "", isError: false };
-  c.object((k) => {
-    if ((k === "type" || k === "id" || k === "name" || k === "tool_use_id") && c.peek() === '"') {
-      const v = c.string();
-      if (k === "tool_use_id") b.toolUseId = v;
-      else b[k] = v;
-    } else if (k === "is_error") b.isError = c.scalar() === true;
-    else if (k === "input" && c.peek() === "{") pickInput(c, b);
-  });
-  // The command is kept for a shell only (read on the machine to pick a room, never sent).
-  if (b.command !== undefined && (b.type !== "tool_use" || toolKind(b.name) !== "shell")) delete b.command;
-  return b;
-}
-
-/** The top-level type, time and content blocks (tool calls and results) of one record; undefined when it is not one. */
-export function parseAgentLine(line: Buffer): Line | undefined {
-  const out: Line = { type: "", at: Number.NaN, blocks: [] };
-  try {
-    const c = new JsonCursor(line);
-    c.object((key) => {
-      if ((key === "type" || key === "timestamp") && c.peek() === '"') {
-        const v = c.string();
-        if (key === "type") out.type = v;
-        else out.at = Date.parse(v);
-      } else if (key === "message" && c.peek() === "{") {
-        c.object((k) => {
-          if (k !== "content" || c.peek() !== "[") return;
-          c.array(() => {
-            const b = pickBlock(c);
-            if (b) out.blocks.push(b);
-          });
-        });
-      }
-    });
-  } catch {
-    return undefined;
-  }
-  return out.type === "assistant" || out.type === "user" ? out : undefined;
-}
-
-function parseMeta(path: string): AgentState["meta"] | undefined {
-  try {
-    const st = plain(path, false);
-    if (!st || st.size > META_MAX_BYTES) return undefined;
-    const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
-    if (typeof raw !== "object" || raw === null) return undefined;
-    const m = raw as Record<string, unknown>;
-    const depth = typeof m.spawnDepth === "number" && Number.isInteger(m.spawnDepth) && m.spawnDepth > 0 ? m.spawnDepth : 1;
-    return {
-      agentType: str(m.agentType).slice(0, 60),
-      description: str(m.description),
-      toolUseId: str(m.toolUseId),
-      spawnDepth: depth,
-      background: m.requestShape === "background",
-      finished: m.finished === true || m.stoppedByUser === true,
-    };
-  } catch {
-    return undefined;
-  }
-}
+const newest = (a: AgentState): number => Math.max(a.metaFile?.mtimeMs ?? 0, a.logFile?.mtimeMs ?? 0);
+const isMissing = (err: unknown): boolean => typeof err === "object" && err !== null && (err as { code?: unknown }).code === "ENOENT";
 
 /** Reads the subagents of Claude Code's sessions for the office view; one per machine's Claude folders. */
 export class ClaudeSubagentFeed {
   private readonly sessions = new Map<string, SessionState>();
+  private readonly problems: OfficeProblems;
 
   /** `transcriptOf`: the path of a session's transcript (<id>.jsonl); undefined when there is none. */
-  constructor(private readonly transcriptOf: (sessionId: string) => string | undefined) {}
+  constructor(
+    private readonly transcriptOf: (sessionId: string) => string | undefined,
+    log: OfficeLog = (line) => console.log(line),
+    private readonly now: () => number = Date.now,
+  ) {
+    this.problems = new OfficeProblems(log, now);
+  }
 
   async read(sessionId: string, since: number): Promise<SubagentReport> {
     try {
       const transcript = this.transcriptOf(sessionId);
       if (!transcript) return { subagents: [], usage: [] };
       const s = this.session(sessionId);
-      await this.readMain(s, transcript);
+      const first = s.mainPos === undefined;
+      const usedMain = await this.readMain(s, transcript, first);
       const folder = transcript.slice(0, -".jsonl".length);
-      await this.walk(s, join(folder, "subagents"), SUBAGENT_DEPTH, "");
-      for (const a of s.agents.values()) await this.readAgent(s, a);
+      const listed = await this.walk(s, join(folder, "subagents"), SUBAGENT_DEPTH, "");
+      await this.readAgents(s, listed, first ? FIRST_AGENTS_BUDGET : Math.max(0, POLL_BUDGET - usedMain));
       return { subagents: this.report(s, since), usage: [...s.calls.values()].filter((c) => c.at >= since) };
-    } catch {
+    } catch (err) {
+      this.problems.report("subagent records", err);
       return { subagents: [], usage: [] };
     }
   }
@@ -181,7 +133,7 @@ export class ClaudeSubagentFeed {
       this.sessions.set(sessionId, s);
       return s;
     }
-    s = { agents: new Map(), calls: new Map() };
+    s = { agents: new Map(), calls: new Map(), listings: new Map(), rankedAt: 0 };
     this.sessions.set(sessionId, s);
     if (this.sessions.size > SESSIONS_KEPT) {
       const oldest = this.sessions.keys().next().value;
@@ -190,85 +142,198 @@ export class ClaudeSubagentFeed {
     return s;
   }
 
-  /** Token counts of the session's own transcript, from where the last read ended. */
-  private async readMain(s: SessionState, path: string): Promise<void> {
-    const st = plain(path, false);
-    if (!st) return;
-    s.main = await this.readFrom(path, st.size, s.main, MAIN_TAIL_BYTES, (line) => this.addCall(s, line, false));
+  /** A plain folder or file (never a link) and its size and change time; undefined when there is none. */
+  private async plain(path: string, dir: boolean): Promise<FileInfo | undefined> {
+    let st: Stats;
+    try {
+      st = await lstat(path);
+    } catch (err) {
+      if (!isMissing(err)) this.problems.report("subagent file", err);
+      return undefined;
+    }
+    if (st.isSymbolicLink() || (dir ? !st.isDirectory() : !st.isFile())) return undefined;
+    return { size: st.size, mtimeMs: st.mtimeMs };
   }
 
-  private async walk(s: SessionState, dir: string, depth: number, workflowId: string): Promise<void> {
-    if (depth <= 0 || !plain(dir, true)) return;
-    for (const e of await entries(dir)) {
+  /** Lines of a file from `from`, none starting at or past `end`; where the next read starts. */
+  private async lines(path: string, from: number, end: number, onLine: (line: Buffer) => void): Promise<number> {
+    try {
+      return await readLinesUntil(path, from, end, LINE_CAP, onLine);
+    } catch (err) {
+      if (!isMissing(err)) this.problems.report("subagent log", err);
+      return from;
+    }
+  }
+
+  /** Token counts of the session's own transcript, from where the last read ended; the bytes read. */
+  private async readMain(s: SessionState, path: string, first: boolean): Promise<number> {
+    const st = await this.plain(path, false);
+    if (!st) {
+      s.mainPos ??= 0;
+      return 0;
+    }
+    // The first time (or rewritten shorter, or far behind): from its last MAIN_TAIL_BYTES.
+    let from = s.mainPos ?? 0;
+    if (first || from > st.size || st.size - from > MAIN_TAIL_BYTES) from = Math.max(0, st.size - MAIN_TAIL_BYTES);
+    const end = first ? st.size : Math.min(st.size, from + POLL_BUDGET);
+    const stats = { records: 0, withUsage: 0, parseErrors: 0, overCap: 0, unknownTypes: {} };
+    const pos = await this.lines(path, from, end, (line) => this.addCall(s, parseUsageLine(line, false, stats)));
+    s.mainPos = pos;
+    return pos - from;
+  }
+
+  /** Lists the subagents' tree, a folder again only when it changed; true when any listing changed. */
+  private async walk(s: SessionState, dir: string, depth: number, workflowId: string): Promise<boolean> {
+    if (depth <= 0) return false;
+    const st = await this.plain(dir, true);
+    if (!st) return false;
+    let listing = s.listings.get(dir);
+    let changed = false;
+    if (!listing || listing.mtimeMs !== st.mtimeMs) {
+      listing = await this.list(dir, st.mtimeMs);
+      s.listings.set(dir, listing);
+      changed = true;
+      for (const f of listing.files) this.agentFile(s, f.name, f.path, workflowId);
+    }
+    for (const sub of listing.dirs) {
+      // subagents/workflows/<workflow id>/agent-<id>.*
+      const wf = basename(dir) === "workflows" ? clean(basename(sub)) : workflowId;
+      if (await this.walk(s, sub, depth - 1, wf)) changed = true;
+    }
+    return changed;
+  }
+
+  private async list(dir: string, mtimeMs: number): Promise<Listing> {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      if (!isMissing(err)) this.problems.report("subagent folder", err);
+      entries = [];
+    }
+    const listing: Listing = { mtimeMs, files: [], dirs: [] };
+    for (const e of entries) {
       const path = join(dir, e.name);
-      if (e.isDirectory()) {
-        // subagents/workflows/<workflow id>/agent-<id>.*
-        const wf = basename(dir) === "workflows" ? clean(e.name) : workflowId;
-        await this.walk(s, path, depth - 1, wf);
-        continue;
+      if (e.isDirectory()) listing.dirs.push(path);
+      else if (e.isFile() && AGENT_FILE.test(e.name)) listing.files.push({ name: e.name, path });
+    }
+    return listing;
+  }
+
+  private agentFile(s: SessionState, name: string, path: string, workflowId: string): void {
+    const m = AGENT_FILE.exec(name);
+    if (!m?.[1]) return;
+    const key = `${workflowId}/${m[1]}`;
+    let a = s.agents.get(key);
+    if (!a) {
+      a = {
+        agentId: m[1],
+        workflowId,
+        metaReadAt: -1,
+        meta: { agentType: "", description: "", toolUseId: "", spawnDepth: 1, background: false, finished: false },
+        tools: [],
+        ids: new Set(),
+        updatedAt: 0,
+      };
+      s.agents.set(key, a);
+    }
+    if (m[2] === "jsonl") a.logPath = path;
+    else a.metaPath = path;
+  }
+
+  /**
+   * Looks at the agents' files and reads what changed, within `budget` bytes
+   * of logs: every agent's files when the tree changed or RESCAN_MS passed
+   * (the newest AGENTS_CONSIDERED), else only the followed ones.
+   */
+  private async readAgents(s: SessionState, listed: boolean, budget: number): Promise<void> {
+    const now = this.now();
+    const all = [...s.agents.values()];
+    const rescan = listed || now - s.rankedAt >= RESCAN_MS;
+    if (rescan) {
+      s.rankedAt = now;
+      await Promise.all(all.map((a) => this.statAgent(a)));
+      const considered = all.sort((x, y) => newest(y) - newest(x)).slice(0, AGENTS_CONSIDERED);
+      for (const a of considered) await this.readMeta(a);
+    }
+    const followed = [...s.agents.values()]
+      .filter((a) => a.logPath && !(a.meta.finished && now - newest(a) > STALE_FINISHED_MS))
+      .sort((x, y) => newest(y) - newest(x))
+      .slice(0, AGENTS_FOLLOWED);
+    let left = budget;
+    for (const a of followed) {
+      if (left <= 0) break;
+      if (!rescan) {
+        await this.statAgent(a);
+        await this.readMeta(a);
       }
-      const m = AGENT_FILE.exec(e.name);
-      if (!m?.[1] || !e.isFile()) continue;
-      const key = `${workflowId}/${m[1]}`;
-      let a = s.agents.get(key);
-      if (!a) {
-        a = {
-          agentId: m[1],
-          workflowId,
-          metaMtime: -1,
-          meta: { agentType: "", description: "", toolUseId: "", spawnDepth: 1, background: false, finished: false },
-          tools: [],
-          ids: new Set(),
-          updatedAt: 0,
-        };
-        s.agents.set(key, a);
-      }
-      if (m[2] === "jsonl") a.logPath = path;
-      else a.metaPath = path;
+      left -= await this.readLog(s, a, left);
     }
   }
 
-  private async readAgent(s: SessionState, a: AgentState): Promise<void> {
+  private async statAgent(a: AgentState): Promise<void> {
     if (a.metaPath) {
-      const st = plain(a.metaPath, false);
-      if (st && st.mtimeMs !== a.metaMtime) {
-        const meta = parseMeta(a.metaPath);
-        a.metaMtime = st.mtimeMs;
-        if (meta) {
-          a.meta = meta;
-          a.updatedAt = Math.max(a.updatedAt, st.mtimeMs);
-        }
-      }
+      const st = await this.plain(a.metaPath, false);
+      if (st) a.metaFile = st;
+      else delete a.metaFile;
     }
-    if (!a.logPath) return;
-    const st = plain(a.logPath, false);
-    if (!st) return;
-    a.log = await this.readFrom(a.logPath, st.size, a.log, AGENT_TAIL_BYTES, (line) => {
-      this.addCall(s, line, true);
+    if (a.logPath) {
+      const st = await this.plain(a.logPath, false);
+      if (st) a.logFile = st;
+      else delete a.logFile;
+    }
+  }
+
+  private async readMeta(a: AgentState): Promise<void> {
+    const st = a.metaFile;
+    if (!a.metaPath || !st || st.mtimeMs === a.metaReadAt) return;
+    a.metaReadAt = st.mtimeMs;
+    if (st.size > META_MAX_BYTES) return;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await readFile(a.metaPath, "utf8"));
+    } catch (err) {
+      if (!isMissing(err)) this.problems.report("subagent meta", err);
+      return;
+    }
+    if (typeof raw !== "object" || raw === null) return;
+    const m = raw as Record<string, unknown>;
+    const depth = typeof m.spawnDepth === "number" && Number.isInteger(m.spawnDepth) && m.spawnDepth > 0 ? m.spawnDepth : 1;
+    a.meta = {
+      agentType: str(m.agentType).slice(0, 60),
+      description: str(m.description),
+      toolUseId: str(m.toolUseId),
+      spawnDepth: depth,
+      background: m.requestShape === "background",
+      finished: m.finished === true || m.stoppedByUser === true,
+    };
+    a.updatedAt = Math.max(a.updatedAt, st.mtimeMs);
+  }
+
+  /** Reads the log's new whole lines, at most about `budget` bytes; the bytes read. */
+  private async readLog(s: SessionState, a: AgentState, budget: number): Promise<number> {
+    const st = a.logFile;
+    if (!a.logPath || !st) return 0;
+    // The first time, rewritten shorter, or too far behind: from its last AGENT_TAIL_BYTES (older calls are not counted).
+    let from = a.logPos ?? -1;
+    if (from < 0 || from > st.size || st.size - from > AGENT_TAIL_BYTES) from = Math.max(0, st.size - AGENT_TAIL_BYTES);
+    const pos = await this.lines(a.logPath, from, Math.min(st.size, from + budget), (line) => {
       const rec = parseAgentLine(line);
-      if (rec) this.addRecord(a, rec);
+      if (!rec) return;
+      this.addCall(s, rec.call);
+      this.addRecord(a, rec);
     });
+    a.logPos = pos;
+    return pos - from;
   }
 
-  /** Reads the whole lines of `path` after the last read (the first time, its last `tail` bytes). */
-  private async readFrom(path: string, size: number, last: FilePos | undefined, tail: number, onLine: (line: Buffer) => void): Promise<FilePos> {
-    // Rewritten shorter: start over from its end.
-    const from = last && size >= last.pos ? last.pos : Math.max(0, size - tail);
-    if (from >= size) return { pos: from, size };
-    const stats = { records: 0, withUsage: 0, parseErrors: 0, overCap: 0, unknownTypes: {} };
-    const pos = await readLines(path, from, LINE_CAP, stats, onLine);
-    return { pos, size };
-  }
-
-  private addCall(s: SessionState, line: Buffer, subagent: boolean): void {
-    const stats = { records: 0, withUsage: 0, parseErrors: 0, overCap: 0, unknownTypes: {} };
-    const turn = parseUsageLine(line, subagent, stats);
-    if (!turn || s.calls.has(turn.key)) return;
+  private addCall(s: SessionState, call: { key: string; at: number; inputTokens?: number; outputTokens?: number } | undefined): void {
+    if (!call || s.calls.has(call.key)) return;
     if (s.calls.size >= CALLS_KEPT) {
       const oldest = s.calls.keys().next().value;
       if (oldest !== undefined) s.calls.delete(oldest);
     }
-    s.calls.set(turn.key, { key: turn.key, at: turn.at, inputTokens: turn.inputTokens ?? 0, outputTokens: turn.outputTokens ?? 0 });
+    s.calls.set(call.key, { key: call.key, at: call.at, inputTokens: call.inputTokens ?? 0, outputTokens: call.outputTokens ?? 0 });
   }
 
   private addRecord(a: AgentState, rec: Line): void {
@@ -280,7 +345,7 @@ export class ClaudeSubagentFeed {
         if (a.tools.some((t) => t.toolId === b.id)) continue;
         const name = clean(b.name);
         a.tools.push({ toolId: b.id, name, kind: toolKind(name), at, done: false, ok: true, doneAt: 0, ...(b.command !== undefined ? { command: b.command } : {}) });
-        if (a.tools.length > TOOLS_KEPT) a.tools.shift();
+        this.trimTools(a);
         a.updatedAt = Math.max(a.updatedAt, at);
       } else if (rec.type === "user" && b.type === "tool_result" && b.toolUseId) {
         const t = a.tools.find((x) => x.toolId === b.toolUseId);
@@ -289,20 +354,37 @@ export class ClaudeSubagentFeed {
         t.ok = !b.isError;
         t.doneAt = at;
         a.updatedAt = Math.max(a.updatedAt, at);
+        this.trimTools(a);
       }
     }
   }
 
+  /** Keeps the newest TOOLS_KEPT ended calls and every open one (an open call dropped would never end), up to OPEN_TOOLS_MAX. */
+  private trimTools(a: AgentState): void {
+    let extraEnded = a.tools.filter((t) => t.done).length - TOOLS_KEPT;
+    while (extraEnded > 0) {
+      // The call that ended first goes (not the one started first: it may have just ended).
+      let oldest = -1;
+      for (const [i, t] of a.tools.entries()) if (t.done && (oldest < 0 || t.doneAt < (a.tools[oldest]?.doneAt ?? 0))) oldest = i;
+      a.tools.splice(oldest, 1);
+      extraEnded--;
+    }
+    while (a.tools.length > TOOLS_KEPT + OPEN_TOOLS_MAX) a.tools.shift();
+  }
+
   /** Every subagent read so far, with its tool calls that started, ended or still run at or after `since`. */
   private report(s: SessionState, since: number): SubagentActivity[] {
-    const ownerOf = (toolUseId: string): string => {
-      for (const a of s.agents.values()) if (a.meta.toolUseId !== toolUseId && a.ids.has(toolUseId)) return a.meta.toolUseId;
-      return "";
-    };
+    // Who made each tool call, once for all agents: a nested subagent's owner is the agent that called it.
+    const ownerOf = new Map<string, string>();
+    for (const a of s.agents.values()) {
+      const owner = a.meta.toolUseId;
+      if (!owner) continue;
+      for (const id of a.ids) if (id !== owner && !ownerOf.has(id)) ownerOf.set(id, owner);
+    }
     const out: SubagentActivity[] = [];
     for (const a of s.agents.values()) {
-      // An agent with neither record nor id cannot be told apart from another one: skip it.
-      if (!a.metaPath && !a.logPath) continue;
+      // Nothing read of it yet (over the limits of what is read): not known.
+      if (a.metaReadAt < 0 && a.logPos === undefined) continue;
       const toolUseId = a.meta.toolUseId;
       if (!toolUseId && !a.workflowId) continue;
       out.push({
@@ -311,7 +393,7 @@ export class ClaudeSubagentFeed {
         agentType: a.meta.agentType,
         description: a.meta.description,
         spawnDepth: a.meta.spawnDepth,
-        parentToolUseId: toolUseId ? ownerOf(toolUseId) : "",
+        parentToolUseId: toolUseId ? (ownerOf.get(toolUseId) ?? "") : "",
         workflowId: a.workflowId,
         background: a.meta.background,
         finished: a.meta.finished,

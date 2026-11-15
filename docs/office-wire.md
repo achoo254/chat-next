@@ -24,11 +24,15 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 
 | Số | Thân | Chiều | Trả lời |
 |---|---|---|---|
-| 168 | `OfficeWatch {thread_id=1, on=2}` | A → B | `on`: `OfficeSnapshot`; tắt: `Ack`. Luồng lạ: `Error` `THREAD_NOT_FOUND` |
+| 168 | `OfficeWatch {thread_id=1, on=2}` | A → B | `on`: `OfficeSnapshot`; tắt: `Ack`. Luồng lạ: `Error` `THREAD_NOT_FOUND`; quá trần: `Error` `OFFICE_WATCH_LIMIT` |
 | 169 | `OfficeSnapshot {thread_id=1, epoch=2, seq=3, state=4 (OfficeState)}` | B → A | |
 | 170 | `OfficeEvents {thread_id=1, epoch=2, events=3 (OfficeEvent)}` | B → A, không hỏi | |
 
 - Xem được nhiều luồng cùng lúc trên một kết nối; mỗi kết nối chỉ nhận `OfficeEvents` của luồng nó đang xem. Đóng kết nối là tắt mọi lượt xem của nó.
+- Trần: tối đa **4** văn phòng mỗi kết nối và **16** văn phòng cho cả máy (mọi kết nối cộng lại). `OfficeWatch{on}` cho văn phòng thứ 5 của một kết nối, hoặc
+  cho văn phòng mới khi máy đã giữ 16, bị từ chối bằng `Error` (`ERROR_CODE_INVALID`, `ERROR_REASON_OFFICE_WATCH_LIMIT`); không văn phòng nào bị đẩy ra. Xem lại
+  văn phòng đang xem, hay xem một văn phòng máy đang giữ cho kết nối khác, không bao giờ bị từ chối. Thiết bị tắt lượt xem cũ (`on = false`) rồi xem lại.
+- Luồng bị xoá (hoặc vào thùng rác): văn phòng của nó bị bỏ ngay, không còn khung sự kiện; thiết bị đã nhận `ThreadDeleted`.
 - `OfficeWatch{on}` lần nữa cho luồng đang xem là **xin ảnh chụp mới** (dùng khi hở `seq` hay nối lại). Không có khung xin ảnh chụp riêng.
 - `OfficeSnapshot.seq` là sự kiện cuối đã gộp vào ảnh chụp (0 khi chưa có sự kiện nào); `OfficeEvents` sau đó của cùng epoch bắt đầu từ `seq + 1`.
 - Sự kiện được gom tối đa 250 ms một khung. Không gửi khung rỗng.
@@ -99,8 +103,8 @@ Hoạt động song song của một actor (Claude gọi nhiều tool cùng lúc
   (`run_in_background`) xong khi AI báo tác vụ nền kết thúc, không phải khi lời gọi tool trả về (lời gọi đó trả về ngay lúc khởi chạy).
 - **Máy**: vào khi một lệnh shell có `run_in_background` hoặc một `Monitor` bắt đầu, hoạt động `MACHINE` ở phòng theo tiền tố lệnh (mục 4); rời khi AI báo
   tác vụ nền kết thúc, hoặc khi `background_tasks` về 0 (rời hết), hoặc giảm thấp hơn số máy đang có (máy cũ nhất rời trước).
-- **Phiên hết bận**: mọi hoạt động còn mở được đóng (`activity_end`, `ok = true`, không tính vào `checks`); nhân viên đang làm chuyển `DONE`, trừ subagent chạy nền
-  khi `background_tasks` > 0.
+- **Phiên hết bận**: Giám đốc nhận `actor_update` (`IDLE`, không có `activity`): mọi hoạt động còn mở của Giám đốc bỏ đi, không gửi `activity_end` riêng và không
+  tính vào `checks`; nhân viên đang làm chuyển `DONE` (`actor_update`, hoạt động `hand-in`), trừ subagent chạy nền khi `background_tasks` > 0.
 - **Duyệt quyền**: mục duyệt mới là `WAITING`, gắn vào actor có hoạt động mang đúng id tool cần duyệt (kể cả tool bên trong subagent), không khớp thì gắn Giám
   đốc; trả lời cho `ALLOWED` hoặc `DENIED`, huỷ hoặc hết hạn cho `CANCELLED`. Câu hỏi (`AskUserQuestion`) chỉ bật `waiting_for_user`, không phải duyệt.
 
@@ -116,7 +120,7 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
 | `web` | WebFetch, WebSearch; `fetch`, `search_web` | `PHONE` | `LIBRARY` |
 | `edit` | Write, Edit, MultiEdit, NotebookEdit | `TYPE` | `WORK` |
 | `todo` | TodoWrite | `TYPE` | `PLANNING` |
-| `mcp` | `mcp__<server>__<tool>`; tên có `__` | `TYPE` | `POST`; riêng tiền tố `mcp__tunelo__` (MCP của chính tunelo, gửi tin cho người dùng) là `LOBBY` |
+| `mcp` | `mcp__<server>__<tool>`; tên có `__` | `TYPE` | `POST`; riêng tiền tố `mcp__tunelo__` (MCP của chính tunelo, gửi tin cho người dùng) là `LOBBY`. `OfficeActivity.tool` luôn là `mcp`, không bao giờ tên server |
 | `shell` | Bash, PowerShell, BashOutput, KillShell, Monitor; `execute`, `run_command` | `MACHINE` | theo lệnh, bảng dưới |
 | `subagent` | Agent, Task (tạo nhân viên) | `ARRIVE` | `LOBBY` |
 | `other` và tool lạ | Skill, ExitPlanMode, … | `TYPE` | `WORK` |
@@ -125,16 +129,26 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
 
 **Lệnh shell** (`classifyCommand`): chỉ đọc trên máy, chuỗi lệnh không đi vào trường nào của khung.
 
-1. Lệnh ghép (`&&`, `||`, `;`, `|`, xuống dòng): lấy lệnh đầu.
-2. Bỏ các từ đứng trước: gán biến môi trường (`FOO=1`), `sudo`, `env`, `time`, `npx`, `bunx`, `pnpx`; với `pnpm`/`npm`/`yarn`/`bun` thì bỏ thêm `run`/`exec`/`x`
-   và các cờ (`--filter x`, `-C dir`, …). Từ đầu còn lại so theo tên tệp, chữ thường, bỏ `.exe`/`.cmd`.
-3. Theo thứ tự:
+1. Tách lệnh ghép (`&&`, `||`, `;`, `|`, `&`, xuống dòng), tôn trọng ngoặc `'…'`/`"…"`. Bỏ các lệnh **chuẩn bị** đứng trước và nối bằng `&&`, `;` hoặc xuống
+   dòng: `cd`/`pushd`/`chdir`/`Set-Location`, `export`, `set`, `source`/`.`, lệnh chỉ gồm gán biến, gán biến PowerShell (`$env:X = …`). Lấy lệnh đầu tiên còn lại
+   (`cd apps/agent && pnpm test` là `pnpm test`; `cd x | y` không bỏ `cd`).
+2. Bỏ các từ đứng trước: gán biến (`FOO=1`, kể cả giá trị có ngoặc và dấu cách), `env` (và cờ của nó), `sudo`/`doas` (và cờ: `-u bob`, …), `timeout` (cờ và thời
+   lượng: `timeout 60`, `timeout -s KILL 5m`), `nice` (`-n 10`, `-5`), `time`, `nohup`, `exec`, `command`, toán tử gọi `&` của PowerShell. Từ đầu còn lại so theo
+   tên tệp, chữ thường, bỏ `.exe`/`.cmd`/`.bat`/`.ps1`.
+3. Mở các trình chạy: `npx`/`bunx`/`pnpx` (bỏ cờ) → lệnh sau; `bash`/`sh`/`zsh`/`pwsh`/`cmd` với `-c`/`-Command`/`/c` → phân phòng chuỗi lệnh đó (tối đa 2 tầng),
+   không có `-c` thì là tên script (`bash ./deploy.sh`); `python -m X`, `uv`/`poetry`/`pipenv`/`hatch`/`pdm run X`, `node <tệp>` → X hoặc tên tệp.
+   Trình quản lý gói `pnpm`/`npm`/`yarn`/`bun`: bỏ cờ theo từng trình (cờ có giá trị: pnpm `--filter`/`-F`/`-C`/`--dir`; npm `-w`/`--workspace`/`--prefix`;
+   yarn `--cwd`, `workspace <tên>`; bun `--cwd`/`--filter`; mọi cờ khác đứng một mình, ví dụ `pnpm -w`, `pnpm -r`), rồi: `run`/`run-script` → **tên script**;
+   `exec`/`x`/`dlx` → lệnh sau; còn lại là **lệnh con hoặc script** (`pnpm deploy`, `pnpm lint`, `npm test`). `make`/`just`/`task`: **đích** đầu tiên.
+4. Theo thứ tự:
 
 | Điều kiện | Phòng |
 |---|---|
-| Từ đầu là `git`, `gh`, `rsync`, `scp`; hoặc một từ của lệnh có chữ `deploy` | `POST` |
-| Từ đầu là `vitest`, `jest`, `pytest`, `eslint`, `tsc`; hoặc `go test`, `cargo test`; hoặc tên script sau trình quản lý gói bắt đầu bằng `test`, `lint`, `typecheck`, `tsc`, `vitest`, `jest`, `eslint` (`pnpm test`, `pnpm run lint:fix`, `npm run typecheck`) | `QA` |
-| Còn lại (kể cả lệnh rỗng, lệnh lạ) | `SERVER` |
+| Lệnh là `git`, `gh`, `rsync`, `scp`; hoặc tên lệnh, tên script, lệnh con hay đích mang chữ `deploy` như một từ (`deploy`, `deploy.sh`, `deploy:web`, `infra-deploy`; `pnpm deploy`, `npm run deploy`, `make deploy`). `cat deploy.log`, `grep deploy` không tính | `POST` |
+| Lệnh là trình kiểm tra `vitest`, `jest`, `pytest`, `eslint`, `tsc`, `vue-tsc`, `mocha`, `playwright`; hoặc `go test`/`go vet`, `cargo test`/`clippy`/`check`; hoặc tên script hay đích bắt đầu bằng `test`, `lint`, `typecheck`, `type-check`, `tsc`, `vitest`, `jest`, `eslint` (kèm hậu tố sau `:`, `-`, `.`, `_`), hoặc `ci:…` (`pnpm ci:all`; không phải `npm ci`). Chữ `tsc` làm tham số (`echo tsc`, `which vitest`) không tính | `QA` |
+| Còn lại (kể cả lệnh rỗng, lệnh lạ, `cd x` đứng một mình) | `SERVER` |
+
+Bảng ví dụ đầy đủ: `apps/agent/test/office-activity-map.test.ts`.
 
 Tool bên trong subagent được phân phòng giống hệt (lệnh shell của subagent cũng chỉ đọc trên máy).
 
@@ -145,10 +159,10 @@ Chỉ cho tool của Giám đốc; tool bên trong subagent, máy, `think`, `arr
 | Loại | Chủ đề |
 |---|---|
 | `read`, `edit` | Tên tệp, không thư mục (`agent-core.ts`) |
-| `shell` | Từ đầu của lệnh sau khi bỏ biến môi trường và `sudo` (`pnpm`, `git`) |
+| `shell` | Tên lệnh (`pnpm`, `git`) sau khi bỏ phần chuẩn bị và các từ đứng trước như bước 1-2 của mục 4 (không mở `npx`, `bash -c`). Chỉ nhận khi từ đó, như đã gõ, không có `=`, `:` (trừ ổ đĩa `C:\`), `$`, ngoặc kép, ngoặc đơn, backtick, ngoặc các loại, `@`, `%`, `!`, `*`, `?`, `,`, `;`, và tên tệp của nó (bỏ thư mục, chữ thường) khớp `^[a-z0-9][a-z0-9._+-]{0,39}$`; không thì rỗng. Không bao giờ là giá trị biến hay đường dẫn |
 | `search` | Rỗng |
 | `web` | Tên miền của URL (`docs.example.com`); câu tìm kiếm thì rỗng |
-| `mcp` | Tên tool sau `mcp__<server>__` |
+| `mcp` | Tên tool sau `mcp__<server>__` (tên server không đi ra, kể cả trong `tool`) |
 | Khác | Rỗng |
 
 Lời gọi tool mà core đánh dấu nhạy cảm (`mentionsSensitive`, cờ `sensitive` của thẻ tool) thì chủ đề rỗng, bất kể loại.
@@ -194,14 +208,25 @@ Quan sát khi chạy thật (Claude Code 2.1.325, Agent SDK 0.3.319, 15/11/2026)
 ## 8. Cam kết dữ liệu không rời máy
 
 Không khung văn phòng nào chứa: input của tool (lệnh đầy đủ, nội dung tệp, câu tìm kiếm, câu hỏi, URL đầy đủ), output của tool, chữ của todo, nội dung tin
-nhắn hay suy nghĩ của AI, đường dẫn thư mục. Chỉ đi ra: tên tool, nhóm hoạt ảnh, mã phòng, chủ đề rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1
-(vốn đã hiện trong chat), các số đếm, token và chi phí. Test `apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output và
-quét mọi khung văn phòng đã mã hoá để khẳng định chuỗi đó không có mặt.
+nhắn hay suy nghĩ của AI, đường dẫn thư mục, giá trị biến môi trường, tên server MCP. Chỉ đi ra: tên tool (MCP chỉ là `mcp`), nhóm hoạt ảnh, mã phòng, chủ đề
+rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1 (vốn đã hiện trong chat), các số đếm, token và chi phí. Test
+`apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output, vào vị trí gán biến (có ngoặc và dấu cách, `$env:`, `set`), sau
+`cd x &&`, vào tên server MCP, rồi quét mọi khung văn phòng đã mã hoá (không phân biệt hoa thường) để khẳng định chuỗi đó không có mặt;
+`apps/agent/test/office-shell-words.test.ts` thử riêng chủ đề lệnh shell với từng dạng đó.
 
 ## 9. Giới hạn
 
 - 64 actor mỗi văn phòng (Giám đốc luôn có chỗ); dư thì đếm ở `hidden_actors`.
 - Gom sự kiện 250 ms; `session` chỉ gửi khi một số đổi.
-- Transcript của subagent chỉ đọc phần mới từ vị trí đã nhớ; lần đầu đọc tối đa 4 MiB cuối của mỗi tệp. Token của phiên chạy nơi khác lần đầu đọc tối đa
-  64 MiB cuối của transcript chính: phiên dài hơn thế thiếu phần đầu (số thấp hơn thật, không bao giờ cao hơn). Định dạng `subagents/` của Claude Code không có tài liệu
-  chính thức: agent đọc phòng thủ (thiếu trường thì bỏ qua hoặc loại "lạ"), lỗi đọc chỉ ảnh hưởng văn phòng.
+- 4 văn phòng mỗi kết nối, 16 cho cả máy (mục 2).
+- Bản ghi subagent (phiên chạy nơi khác) chỉ được đọc khi luồng không do máy chạy lượt hiện tại, và: lần đầu sau khi dựng văn phòng, hoặc phiên đang chạy nơi
+  khác, hoặc một lần nữa ngay khi lượt nơi khác vừa xong, hoặc tác vụ nền của lượt nơi khác còn chạy. Luồng do máy chạy, đang rảnh: chỉ đọc một lần (luồng SDK
+  của máy đã báo mọi thứ, kể cả subagent chạy nền; lần đọc đó lấy những gì các lượt nơi khác trước đây để lại).
+- Mỗi lần đọc có trần byte: lần đầu của một phiên tối đa 64 MiB cuối transcript chính (token) và tổng 32 MiB cho mọi log subagent (mỗi log tối đa 4 MiB cuối,
+  agent mới nhất trước); các lần sau tổng 2 MiB cho transcript chính và log subagent, phần chưa đọc để lần sau. Log tụt sau quá 4 MiB thì nhảy tới 4 MiB cuối.
+  Chỉ xét 256 agent mới nhất (theo thời gian sửa tệp) để đọc `meta.json`, chỉ theo dõi log của 32 agent mới nhất; agent đã `finished` mà tệp không đổi quá 10
+  phút thì không đọc nữa. Thư mục `subagents/` chỉ liệt kê lại khi thời gian sửa của nó đổi; mọi tệp được xem lại ít nhất mỗi 30 giây (subagent đã xong có thể
+  được gọi tiếp). Mỗi subagent giữ 8 lời gọi tool đã xong mới nhất và mọi lời gọi còn mở (tối đa 64). Phần bị bỏ qua làm số token thấp hơn thật, không bao giờ
+  cao hơn.
+- Định dạng `subagents/` của Claude Code không có tài liệu chính thức: agent đọc phòng thủ (thiếu trường thì bỏ qua hoặc loại "lạ"), lỗi đọc chỉ ảnh hưởng văn
+  phòng và được ghi vào log của máy (mỗi chỗ tối đa một dòng mỗi phút, chỉ tên chỗ và loại lỗi, không nội dung).

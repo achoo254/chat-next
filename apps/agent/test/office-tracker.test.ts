@@ -286,6 +286,41 @@ describe("office tracker", () => {
     expect(t.snapshot().session).toMatchObject({ hiddenActors: 5, tasksDone: 1 });
   });
 
+  it("a machine over the limit that ends is not counted as a subagent's work handed in", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus({ ...busy, backgroundTasks: 1 }, 1);
+    for (let i = 0; i < MAX_ACTORS - 1; i++) t.subagentStart({ toolId: `s${i}`, agentType: "scout", description: "", background: false }, 2);
+    t.toolStart(shell("m", "npm run dev", { background: true }), 3);
+    expect(t.snapshot().session).toMatchObject({ hiddenActors: 1, tasksDone: 0 });
+    t.backgroundEnded("m", true, 4);
+    expect(t.snapshot().session).toMatchObject({ hiddenActors: 0, tasksDone: 0 });
+  });
+
+  it("fewer background tasks also send hidden machines away", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus({ ...busy, backgroundTasks: 2 }, 1);
+    for (let i = 0; i < MAX_ACTORS - 1; i++) t.subagentStart({ toolId: `s${i}`, agentType: "scout", description: "", background: false }, 2);
+    t.toolStart(shell("m1", "npm run dev", { background: true }), 3);
+    t.toolStart(shell("m2", "npm run worker", { background: true }), 4);
+    expect(t.snapshot().session?.hiddenActors).toBe(2);
+    t.setStatus({ ...busy, backgroundTasks: 0 }, 5);
+    expect(t.snapshot().session).toMatchObject({ hiddenActors: 0, tasksDone: 0 });
+  });
+
+  it("an MCP call's tool is sent as \"mcp\", never with its server's name", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.toolStart({ toolId: "c1", name: "mcp__private-server__create_issue", kind: "mcp", summary: "", sensitive: false, background: false }, 2);
+    t.subagentStart({ toolId: "s", agentType: "scout", description: "", background: false }, 3);
+    t.toolStart({ toolId: "c2", actorId: "s", name: "mcp__private-server__list", kind: "mcp", summary: "", sensitive: false, background: false }, 4);
+    const activities = t.snapshot().actors.map((a) => [a.id, a.activity?.tool, a.activity?.subject, a.activity?.room]);
+    expect(activities).toEqual([
+      ["director", "mcp", "create_issue", OfficeRoom.POST],
+      ["s", "mcp", "", OfficeRoom.POST],
+    ]);
+    expect(JSON.stringify(t.drain().map((e) => e.kind.value), (_k, v: unknown) => (typeof v === "bigint" ? Number(v) : v))).not.toContain("private-server");
+  });
+
   it("never brings staff in for an AI that does not report them", () => {
     const t = new OfficeTracker(false, 0);
     t.subagentStart({ toolId: "s1", agentType: "scout", description: "", background: false }, 1);

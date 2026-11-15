@@ -17,7 +17,7 @@ import {
 import type { ToolKind } from "../providers/types.ts";
 import { ARRIVE, HAND_IN, THINK, classifyActivity } from "./office-activity-map.ts";
 import { type ActivityRecord, type ActorRecord, DIRECTOR_ID, activityWire, actorWire, isEmployee, isMachine, newActor, shownActivity } from "./office-actor.ts";
-import { officeSubject } from "./office-subject.ts";
+import { officeSubject, officeToolName } from "./office-subject.ts";
 import { type OfficeStatus, SessionNumbers, type TodoCounts } from "./office-session-numbers.ts";
 import type { OfficeUsageNumbers } from "./office-usage.ts";
 
@@ -71,8 +71,8 @@ type EventKind = NonNullable<MessageInitShape<typeof OfficeEventSchema>["kind"]>
 export class OfficeTracker {
   private seqNo = 0;
   private readonly actors = new Map<string, ActorRecord>();
-  /** Actors over MAX_ACTORS: tracked by id only, never sent. */
-  private readonly hidden = new Set<string>();
+  /** Actors over MAX_ACTORS: tracked by id and role only, never sent. */
+  private readonly hidden = new Map<string, OfficeRole>();
   /** Which actor each open tool call belongs to. */
   private readonly owners = new Map<string, string>();
   private readonly seen = new Set<string>();
@@ -148,16 +148,17 @@ export class OfficeTracker {
   toolStart(t: ToolStart, at: number): void {
     if (this.seenBefore(t.toolId)) return;
     const place = classifyActivity({ kind: t.kind, name: t.name, command: t.command ?? t.summary });
+    const tool = officeToolName(t.kind, t.name);
     if (t.background && !t.actorId) {
       // A shell in the background is a machine of its own, standing in its room until its work ends.
-      const work: ActivityRecord = { id: t.toolId, tool: t.name, place, subject: "", startedAt: at };
-      this.enter({ id: t.toolId, role: OfficeRole.MACHINE, agentType: t.name.slice(0, 60), background: true, enteredAt: at, open: [work] }, at);
+      const work: ActivityRecord = { id: t.toolId, tool, place, subject: "", startedAt: at };
+      this.enter({ id: t.toolId, role: OfficeRole.MACHINE, agentType: tool.slice(0, 60), background: true, enteredAt: at, open: [work] }, at);
       return;
     }
     const actor = this.actors.get(t.actorId ?? DIRECTOR_ID);
     if (!actor || actor.state === OfficeActorState.DONE) return;
     const subject = actor.id === DIRECTOR_ID ? officeSubject(t) : "";
-    actor.open.push({ id: t.toolId, tool: t.name, place, subject, startedAt: at });
+    actor.open.push({ id: t.toolId, tool, place, subject, startedAt: at });
     // A subagent's first tool call: it has arrived.
     if (actor.between?.id === "arrive") delete actor.between;
     this.owners.set(t.toolId, actor.id);
@@ -218,7 +219,9 @@ export class OfficeTracker {
    */
   subagentDone(toolId: string, at: number, fromBackground = false): void {
     const actor = this.actors.get(toolId);
-    if (this.hidden.delete(toolId)) {
+    // A subagent over the limit still hands in its work (counted); a hidden machine is not a subagent.
+    if (this.hidden.get(toolId) === OfficeRole.EMPLOYEE) {
+      this.hidden.delete(toolId);
       this.numbers.subagentsDone++;
       this.sessionChanged(at);
     }
@@ -230,6 +233,11 @@ export class OfficeTracker {
 
   /** Background work of the tool call `toolId` ended: its machine leaves, its subagent is done. */
   backgroundEnded(toolId: string, ok: boolean, at: number): void {
+    if (this.hidden.get(toolId) === OfficeRole.MACHINE) {
+      this.hidden.delete(toolId);
+      this.sessionChanged(at);
+      return;
+    }
     const actor = this.actors.get(toolId);
     if (actor && isMachine(actor)) {
       const work = actor.open[0];
@@ -342,10 +350,21 @@ export class OfficeTracker {
     }
   }
 
-  /** Fewer background tasks than machines: the oldest machines leave (all of them at 0). */
+  /** Fewer background tasks than machines: the oldest machines leave (all of them at 0), shown ones first, then those over the limit. */
   private backgroundShrank(count: number, at: number): void {
     const machines = [...this.actors.values()].filter(isMachine);
-    for (const m of machines.slice(0, Math.max(0, machines.length - count))) this.leave(m, at);
+    const hiddenMachines = [...this.hidden].filter(([, role]) => role === OfficeRole.MACHINE).map(([id]) => id);
+    let excess = machines.length + hiddenMachines.length - count;
+    for (const m of machines) {
+      if (excess <= 0) break;
+      this.leave(m, at);
+      excess--;
+    }
+    for (const id of hiddenMachines) {
+      if (excess <= 0) break;
+      this.hidden.delete(id);
+      excess--;
+    }
     if (count === 0 && !this.status.busy) {
       for (const a of [...this.actors.values()]) if (isEmployee(a) && a.state !== OfficeActorState.DONE) this.finishEmployee(a, at);
     }
@@ -370,7 +389,7 @@ export class OfficeTracker {
 
   private enter(fields: Parameters<typeof newActor>[0], at: number): ActorRecord | undefined {
     if (this.actors.size >= MAX_ACTORS) {
-      this.hidden.add(fields.id);
+      this.hidden.set(fields.id, fields.role);
       this.sessionChanged(at);
       return undefined;
     }

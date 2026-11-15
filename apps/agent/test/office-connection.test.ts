@@ -15,12 +15,13 @@ import {
   OfficeRole,
   OfficeRoom,
   OfficeSnapshotSchema,
+  ErrorReason,
   PromptState,
   TurnState,
 } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { ConfigStore } from "../src/config.ts";
-import { officeHubFor } from "../src/office/office-hub.ts";
+import { OFFICES_PER_MACHINE, OfficeHub, type OfficeSink, WATCHES_PER_CONNECTION, officeHubFor } from "../src/office/office-hub.ts";
 import type { AgentProvider, AskUser, ProviderEvent, ProviderSession, SessionHistory } from "../src/providers/types.ts";
 import { Channel } from "../src/util/channel.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
@@ -39,6 +40,19 @@ const history: SessionHistory = {
   subagentActivity: async () => ({ subagents: [], usage: [] }),
 };
 
+/** Director's calls (names the core does not take for secrets) with MARK in front of the command (or in the MCP server's name), and the subject each must show. */
+const SECRET_FRONTS: [string, string, string, string][] = [
+  ["h1", "Bash", `APP_MODE="live ${MARK}" node x.js`, "node"],
+  ["h2", "Bash", `PGPASSWORD='hunter2 ${MARK}' psql`, "psql"],
+  ["h3", "Bash", `$env:APP_MODE="${MARK}"; gh pr list`, "gh"],
+  ["h4", "Bash", `$env:APP_MODE = "${MARK} x"; gh pr list`, "gh"],
+  ["h5", "Bash", `cd ${MARK} && git status`, "git"],
+  ["h6", "Bash", `cd "/w/${MARK} dir" && MODE=${MARK} make`, "make"],
+  ["h7", "Bash", `set MODE=${MARK} && git push`, "git"],
+  ["h8", "Bash", `"${MARK}" --version`, ""],
+  ["h9", `mcp__${MARK}__create_issue`, "", "create_issue"],
+];
+
 /** One scripted turn touching every kind of signal, with MARK in every input, output and text. */
 async function script(events: Channel<ProviderEvent>, askUser: AskUser): Promise<void> {
   const push = (e: ProviderEvent) => events.push(e);
@@ -46,6 +60,12 @@ async function script(events: Channel<ProviderEvent>, askUser: AskUser): Promise
   push({ type: "tool-end", toolId: "q1", ok: true, output: `${MARK} 12 passed` });
   push({ type: "tool-start", toolId: "r1", kind: "read", name: "Read", summary: `src/${MARK}/notes.md`, input: JSON.stringify({ file_path: `/w/src/${MARK}/notes.md` }) });
   push({ type: "tool-end", toolId: "r1", ok: true, output: `${MARK} file body` });
+  // MARK where the command's first word is looked for: assignments, quoted values, PowerShell's $env:, a `cd` in front, an MCP server's name.
+  for (const [id, name, command] of SECRET_FRONTS) {
+    // The input is left out: the core reads it for sensitive paths, which would blank the subject before it is ever looked for.
+    push({ type: "tool-start", toolId: id, kind: name === "Bash" ? "shell" : "mcp", name, summary: command, input: "{}" });
+    push({ type: "tool-end", toolId: id, ok: true, output: "" });
+  }
   push({ type: "todo", entries: [{ text: `${MARK} first`, state: "done" }, { text: `${MARK} second`, state: "in-progress" }, { text: `${MARK} third`, state: "pending" }] });
   push({ type: "subagent", toolId: "a1", description: "Review the diff", done: false, agentType: "code-reviewer" });
   push({ type: "subagent-tool", parentToolId: "a1", toolId: "s1", name: "Bash", kind: "shell", done: false, command: `git status ${MARK}` });
@@ -154,6 +174,11 @@ describe("the office over the link", () => {
     expect(starts).toContainEqual(["director", "Bash", OfficeRoom.QA, "pnpm"]);
     expect(starts).toContainEqual(["director", "Read", OfficeRoom.LIBRARY, "notes.md"]);
     expect(starts).toContainEqual(["a1", "Bash", OfficeRoom.POST, ""]);
+    const shown = SECRET_FRONTS.map(([id]) => {
+      const start = events.flatMap((e) => (e.kind.case === "activityStart" && e.kind.value.activity?.id === id ? [e.kind.value.activity] : []))[0];
+      return [id, start?.tool, start?.subject];
+    });
+    expect(shown).toEqual(SECRET_FRONTS.map(([id, name, , subject]) => [id, name === "Bash" ? "Bash" : "mcp", subject]));
     expect(events.some((e) => e.kind.case === "actorLeave" && e.kind.value.actorId === "m1")).toBe(true);
     const approvals = events.flatMap((e) => (e.kind.case === "approval" ? [[e.kind.value.actorId, e.kind.value.state]] : []));
     expect(approvals).toEqual([
@@ -184,7 +209,8 @@ describe("the office over the link", () => {
       const bytes =
         f.body.case === "officeSnapshot" ? toBinary(OfficeSnapshotSchema, f.body.value) : f.body.case === "officeEvents" ? toBinary(OfficeEventsSchema, f.body.value) : new Uint8Array();
       const text = Buffer.from(bytes).toString("utf8");
-      expect(text).not.toContain(MARK);
+      // Case-blind: a subject is written in lower case.
+      expect(text.toLowerCase()).not.toContain(MARK.toLowerCase());
       expect(text).not.toContain("rm -rf");
       expect(text).not.toContain("npm run dev");
     }
@@ -204,7 +230,7 @@ describe("the office over the link", () => {
     ]);
     expect(state?.session).toMatchObject({ busy: false, tasksDone: 2, todo: { pending: 1, inProgress: 1, done: 1 }, checks: { passed: 1, failed: 0 } });
     expect(state?.session?.usage).toMatchObject({ inputTokens: 10n, outputTokens: 20n, hasCost: true, available: true });
-    expect(Buffer.from(toBinary(OfficeSnapshotSchema, rebuilt.body.value)).toString("utf8")).not.toContain(MARK);
+    expect(Buffer.from(toBinary(OfficeSnapshotSchema, rebuilt.body.value)).toString("utf8").toLowerCase()).not.toContain(MARK.toLowerCase());
 
     watcher.close();
     other.close();
@@ -278,7 +304,7 @@ describe("the office over the link", () => {
     // The machine's turn (10 in, 20 out) plus the call read from the records.
     expect(snap.body.value.state?.session?.usage).toMatchObject({ inputTokens: 17n, outputTokens: 29n, hasCost: true, available: true });
     const all = officeFrames(device.received).map((f) => (f.body.case === "officeEvents" ? Buffer.from(toBinary(OfficeEventsSchema, f.body.value)) : Buffer.alloc(0)));
-    for (const b of all) expect(b.toString("utf8")).not.toContain(MARK);
+    for (const b of all) expect(b.toString("utf8").toLowerCase()).not.toContain(MARK.toLowerCase());
     device.close();
     await core.stop();
   });
@@ -296,6 +322,90 @@ describe("the office over the link", () => {
     expect(officeHubFor(core, [provider]).watched).toEqual([thread.id]);
     device.close();
     expect(officeHubFor(core, [provider]).watched).toEqual([]);
+    await core.stop();
+  });
+
+  it("refuses an office past the limits, per connection and for the machine; watching again is never refused", async () => {
+    const provider = officeProvider();
+    const { core, work } = makeCore([provider]);
+    const hub = new OfficeHub(core, { providers: [provider] });
+    const threads: string[] = [];
+    for (let i = 0; i < OFFICES_PER_MACHINE + 1; i++) threads.push((await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" })).id);
+    const thread = (i: number): string => threads[i] ?? "";
+    const sinks: OfficeSink[] = Array.from({ length: OFFICES_PER_MACHINE / WATCHES_PER_CONNECTION + 1 }, () => () => undefined);
+    const [one, two, last] = [sinks[0], sinks[1], sinks.at(-1)];
+    if (!one || !two || !last) throw new Error("no sinks");
+    for (let i = 0; i < WATCHES_PER_CONNECTION; i++) hub.watch(thread(i), one);
+    expect(() => hub.watch(thread(WATCHES_PER_CONNECTION), one)).toThrow(expect.objectContaining({ reason: ErrorReason.OFFICE_WATCH_LIMIT }));
+    // Asking again for an office it watches (a fresh snapshot), and another connection watching the same office: fine.
+    expect(hub.watch(thread(0), one).threadId).toBe(thread(0));
+    expect(hub.watch(thread(0), two).threadId).toBe(thread(0));
+    // Fill the machine; then one more office is refused even on a connection with room.
+    let next = WATCHES_PER_CONNECTION;
+    for (const sink of sinks.slice(1, -1)) {
+      for (let i = sink === two ? 1 : 0; i < WATCHES_PER_CONNECTION; i++) hub.watch(thread(next++), sink);
+    }
+    hub.watch(thread(next), last);
+    expect(hub.watched).toHaveLength(OFFICES_PER_MACHINE);
+    expect(() => hub.watch(thread(OFFICES_PER_MACHINE), last)).toThrow(expect.objectContaining({ reason: ErrorReason.OFFICE_WATCH_LIMIT }));
+    // An office already kept may still be watched by it.
+    expect(hub.watch(thread(0), last).threadId).toBe(thread(0));
+    // A connection closing makes room.
+    hub.forget(one);
+    hub.forget(two);
+    expect(hub.watch(thread(OFFICES_PER_MACHINE), last).threadId).toBe(thread(OFFICES_PER_MACHINE));
+    await core.stop();
+  });
+
+  it("the link answers an office past the limit with OFFICE_WATCH_LIMIT", async () => {
+    const provider = officeProvider();
+    const { core, work, audit } = makeCore([provider]);
+    const config = new ConfigStore(join(tempDir(), "cfg"));
+    const device = await pairedDevice({ core, config, audit, providers: [provider] });
+    for (let i = 0; i <= WATCHES_PER_CONNECTION; i++) {
+      const thread = await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" });
+      const answer = await device.request(`w${i}`, { case: "officeWatch", value: { threadId: thread.id, on: true } });
+      if (i < WATCHES_PER_CONNECTION) expect(answer.body.case).toBe("officeSnapshot");
+      else expect(answer.body).toMatchObject({ case: "error", value: { reason: ErrorReason.OFFICE_WATCH_LIMIT } });
+    }
+    device.close();
+    await core.stop();
+  });
+
+  it("drops the office of a deleted thread", async () => {
+    const provider = officeProvider();
+    const { core, work } = makeCore([provider]);
+    const hub = new OfficeHub(core, { providers: [provider] });
+    const release = hub.attach();
+    const thread = await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" });
+    hub.watch(thread.id, () => undefined);
+    expect(hub.watched).toEqual([thread.id]);
+    await core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "test" });
+    expect(hub.watched).toEqual([]);
+    release();
+    await core.stop();
+  });
+
+  it("logs what goes wrong in the office, by place and kind only, and keeps the core going", async () => {
+    const provider = officeProvider();
+    const { core, work } = makeCore([provider]);
+    const lines: string[] = [];
+    const hub = new OfficeHub(core, { providers: [provider], flushMs: 5, log: (l) => lines.push(l) });
+    const release = hub.attach();
+    const thread = await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" });
+    hub.watch(thread.id, () => {
+      throw new Error(`device gone ${MARK}`);
+    });
+    await core.send(thread.id, "go", "c1");
+    const items = await until(core, thread.id, (all) => byCase(all, "approval").some((a) => a.body.value.state === PromptState.PENDING));
+    const ask = byCase(items, "approval")[0];
+    if (!ask) throw new Error("no approval");
+    core.respond(thread.id, ask.id, ask.revision, { decision: Decision.ALLOW }, "test");
+    await until(core, thread.id, (all) => byCase(all, "turn").some((t) => t.body.value.state === TurnState.COMPLETED));
+    await wait(50);
+    // One line for many failed sends (at most one a minute), without the error's message.
+    expect(lines).toEqual(["office: send events failed: Error"]);
+    release();
     await core.stop();
   });
 });

@@ -2,7 +2,7 @@
 // in docs/office-wire.md, part 4.
 import { OfficeAnimGroup, OfficeRoom } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { classifyActivity, classifyCommand, commandHead } from "../src/office/office-activity-map.ts";
+import { classifyActivity, classifyCommand } from "../src/office/office-activity-map.ts";
 import { toolKind } from "../src/providers/claude/tool-map.ts";
 
 const place = (name: string, command?: string) => classifyActivity({ kind: toolKind(name), name, ...(command !== undefined ? { command } : {}) });
@@ -95,7 +95,7 @@ describe("rooms by command", () => {
     expect(classifyCommand("pnpm test; git push")).toBe(OfficeRoom.QA);
     expect(classifyCommand("pnpm lint || true")).toBe(OfficeRoom.QA);
     expect(classifyCommand("ls | grep test")).toBe(OfficeRoom.SERVER);
-    expect(classifyCommand("cd app\ngit status")).toBe(OfficeRoom.SERVER);
+    expect(classifyCommand("ls\ngit status")).toBe(OfficeRoom.SERVER);
   });
 
   it("skips environment assignments and runners in front", () => {
@@ -106,11 +106,70 @@ describe("rooms by command", () => {
   });
 });
 
-describe("a command's first word", () => {
-  it("drops assignments, sudo and the program's folder", () => {
-    expect(commandHead("FOO=1 BAR=2 pnpm test")).toBe("pnpm");
-    expect(commandHead("sudo /usr/local/bin/git status")).toBe("git");
-    expect(commandHead("C:\\tools\\node.exe x.js")).toBe("node");
-    expect(commandHead("")).toBe("");
+describe("commands as the AI writes them", () => {
+  it.each([
+    // Setup in front is not the command: `cd dir &&`, `export`, assignments, PowerShell's $env:.
+    ["cd apps/agent && pnpm test", OfficeRoom.QA],
+    ["cd x && git push", OfficeRoom.POST],
+    ["cd 'my dir'; pnpm lint", OfficeRoom.QA],
+    ["cd x\npnpm test", OfficeRoom.QA],
+    ["pushd web && npm run typecheck", OfficeRoom.QA],
+    ["export CI=1 && pnpm test", OfficeRoom.QA],
+    ["set -e; pnpm test", OfficeRoom.QA],
+    ['$env:CI="1"; pnpm test', OfficeRoom.QA],
+    ['$env:GITHUB_TOKEN = "x"; gh pr list', OfficeRoom.POST],
+    ["cd x | grep y", OfficeRoom.SERVER],
+    ["cd x", OfficeRoom.SERVER],
+    // Wrappers and their options.
+    ["sudo -u bob git pull", OfficeRoom.POST],
+    ["sudo -- git pull", OfficeRoom.POST],
+    ["timeout 60 pnpm test", OfficeRoom.QA],
+    ["timeout -s KILL 5m pnpm test", OfficeRoom.QA],
+    ["nice -n 10 pnpm test", OfficeRoom.QA],
+    ["nice -5 cargo test", OfficeRoom.QA],
+    ["env -i PATH=/bin git status", OfficeRoom.POST],
+    ["time -p go test ./...", OfficeRoom.QA],
+    ['bash -c "pnpm test"', OfficeRoom.QA],
+    ["sh -c 'cd x && git push'", OfficeRoom.POST],
+    ["bash ./scripts/deploy.sh", OfficeRoom.POST],
+    ['& "C:\\tools\\git.exe" status', OfficeRoom.POST],
+    // Package managers' options: `-w` and `-r` stand alone in pnpm; npm's `-w` takes a workspace.
+    ["pnpm -w test", OfficeRoom.QA],
+    ["pnpm -r test", OfficeRoom.QA],
+    ["pnpm --filter @app/web --if-present lint", OfficeRoom.QA],
+    ["pnpm -F web run typecheck", OfficeRoom.QA],
+    ["npm run -w app lint", OfficeRoom.QA],
+    ["npm -w app test", OfficeRoom.QA],
+    ["yarn workspace app test", OfficeRoom.QA],
+    ["pnpm exec vitest run", OfficeRoom.QA],
+    ["pnpm ci:all", OfficeRoom.QA],
+    ["npm ci", OfficeRoom.SERVER],
+    ["pnpm install --frozen-lockfile", OfficeRoom.SERVER],
+    // Deploy only as a program, a script or a subcommand.
+    ["pnpm deploy", OfficeRoom.POST],
+    ["npm run deploy", OfficeRoom.POST],
+    ["./deploy.sh", OfficeRoom.POST],
+    ["make deploy", OfficeRoom.POST],
+    ["cat deploy.log", OfficeRoom.SERVER],
+    ["grep -rn deploy src", OfficeRoom.SERVER],
+    ["echo deploy", OfficeRoom.SERVER],
+    ["pnpm run build -- --mode deploy", OfficeRoom.SERVER],
+    // QA only when the program or script is a checker.
+    ["echo tsc", OfficeRoom.SERVER],
+    ["which vitest", OfficeRoom.SERVER],
+    ["ls node_modules/.bin/jest", OfficeRoom.SERVER],
+    ["make test", OfficeRoom.QA],
+    ["make -C server lint", OfficeRoom.QA],
+    ["make build", OfficeRoom.SERVER],
+    ["uv run pytest -q", OfficeRoom.QA],
+    ["poetry run pytest", OfficeRoom.QA],
+    ["python3 -m pytest", OfficeRoom.QA],
+    ["python3 script.py pytest", OfficeRoom.SERVER],
+    ["node node_modules/vitest/vitest.mjs run", OfficeRoom.QA],
+    ["go vet ./...", OfficeRoom.QA],
+    ["cargo clippy", OfficeRoom.QA],
+    ["go run . test", OfficeRoom.SERVER],
+  ])("%s", (command, room) => {
+    expect(classifyCommand(command)).toBe(room);
   });
 });

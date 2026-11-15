@@ -82,6 +82,14 @@ export class OfficeThread {
   private readonly openPrompts = new Set<string>();
   private summary: ThreadSummary | undefined;
   private readonly builtAt: number;
+  /**
+   * One read of the subagents' records is due: the first one (turns and
+   * subagents of runs elsewhere before the office was built), and one more
+   * after a run elsewhere ends (its last lines).
+   */
+  private recordsDue = true;
+  /** The last turn seen ran elsewhere (not on the machine): its background work is in the records only. */
+  private ranElsewhere = false;
 
   constructor(
     readonly threadId: string,
@@ -111,6 +119,9 @@ export class OfficeThread {
   }
 
   setSummary(s: ThreadSummary, at: number): void {
+    if (this.summary?.busyElsewhere && !s.busyElsewhere) this.recordsDue = true;
+    if (s.busyElsewhere) this.ranElsewhere = true;
+    else if (runsHere(s)) this.ranElsewhere = false;
     this.summary = s;
     const elsewhere = s.busyElsewhere;
     const status: OfficeStatus = {
@@ -120,6 +131,8 @@ export class OfficeThread {
     };
     this.tracker.setStatus(status, at);
     // Prompts the journal does not hold (a sign-in secret, a session run elsewhere): the director waits.
+    // The core writes a prompt's journal item before it counts the prompt in `pending` (and takes it out
+    // of `pending` before it marks the item answered), so a prompt of the journal is never taken for one outside.
     const outside = s.pending > this.openPrompts.size;
     this.tracker.prompt(OUTSIDE_PROMPT, "", outside ? "waiting" : "cancelled", at);
   }
@@ -227,13 +240,23 @@ export class OfficeThread {
     }
   }
 
-  /** Whether the subagents' records are worth reading now: the AI keeps them, and the machine does not run the turn (its own stream tells it all). */
+  /**
+   * Whether the subagents' records are worth reading now: the AI keeps them,
+   * the machine does not run the turn (its own stream tells it all, background
+   * subagents included), and the session runs elsewhere (or its background
+   * work from a run elsewhere goes on) or a read is due.
+   * An idle thread the machine ran is read once, for what earlier runs
+   * elsewhere left, and not again until it runs elsewhere.
+   */
   wantsSubagentRecords(): boolean {
-    return this.sessionId !== "" && !(this.summary && runsHere(this.summary));
+    if (this.sessionId === "" || (this.summary && runsHere(this.summary))) return false;
+    const s = this.summary;
+    return this.recordsDue || s?.busyElsewhere === true || (this.ranElsewhere && (s?.backgroundTasks ?? 0) > 0);
   }
 
   /** What the AI's records tell of the session's subagents and calls (a session run elsewhere). */
   subagentReport(r: SubagentReport, at: number): void {
+    this.recordsDue = false;
     for (const s of r.subagents) {
       if (s.finished && s.updatedAt > 0 && s.updatedAt < this.builtAt - STALE_SUBAGENT_MS) continue;
       this.tracker.subagentStart(

@@ -3,7 +3,7 @@
 // name. Never a whole command, a path, a query or anything the core holds
 // sensitive (docs/office-wire.md, part 5).
 import type { ToolKind } from "../providers/types.ts";
-import { commandHead } from "./office-activity-map.ts";
+import { shellSubject } from "./office-shell-words.ts";
 
 export const SUBJECT_MAX = 40;
 
@@ -37,6 +37,18 @@ function mcpTool(name: string): string {
   return parts.length >= 3 ? parts.slice(2).join("__") : "";
 }
 
+/** What an MCP call's tool is called on the wire: just "mcp", never which server it went to. */
+export const MCP_TOOL = "mcp";
+
+/**
+ * A tool's name as the office sends it (OfficeActivity.tool): the tool's own
+ * name ("Bash", "Read"), except an MCP call's, which would name the MCP
+ * server ("mcp__github__create_issue"): that is "mcp".
+ */
+export function officeToolName(kind: ToolKind, name: string): string {
+  return kind === "mcp" ? MCP_TOOL : name;
+}
+
 /**
  * The subject of one of the director's tool calls. `summary` is the one line
  * the chat's tool card shows (a shell's command, a path relative to the
@@ -50,7 +62,7 @@ export function officeSubject(tool: { kind: ToolKind; name: string; summary: str
     case "edit":
       return clip(fileName(tool.summary));
     case "shell":
-      return clip(commandHead(tool.summary));
+      return clip(shellSubject(tool.summary));
     case "web":
       return clip(host(tool.summary));
     case "mcp":
