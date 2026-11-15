@@ -8,7 +8,7 @@ import { ErrorCode, HandshakeErrorCode, ItemSchema, Role, ThreadInfoSchema, type
 import { encodeHandshakeError, generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DeviceRegistrationRefused } from "../../src/machines/link/device-registration.ts";
-import { MachineLink, mergeThreadInfo, RemoteError, UNKNOWN_DEVICE_WAITS_MS, UNSYNCED_RETRY_MS, WAKE_PROBE_MS, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
+import { HISTORY_PAGE, MachineLink, mergeThreadInfo, RemoteError, UNKNOWN_DEVICE_WAITS_MS, UNSYNCED_RETRY_MS, WAKE_PROBE_MS, type LinkDeps, type Timers } from "../../src/machines/link/machine-link.ts";
 import { orderedItems } from "../../src/machines/transcript/reducer.ts";
 import { defaultAnswer as defaultAnswerOf, FakeMachine, until, type FakeSocket } from "./fake-machine.ts";
 
@@ -185,6 +185,39 @@ describe("MachineLink", () => {
 		expect(machine.sent("threadSubscribe")[1]?.cursor).toMatchObject({ epoch: 7n, seq: 2n });
 		await until(() => l.journal("t1").cursor?.epoch === 8n, "reset applied");
 		expect(orderedItems(l.journal("t1")).map((i) => i.id)).toEqual(["c"]);
+		unwatch();
+		l.stop();
+	});
+
+	it("opens a thread on its newest items and pages older ones in on request, one request at a time", async () => {
+		machine.handler = (frame) => {
+			const b = frame.body;
+			if (b.case === "threadSubscribe") {
+				return [{ case: "threadItems", value: { threadId: "t1", items: [textItem("c", 3n, "three")], cursor: { epoch: 7n, seq: 3n }, earlier: "mark-c" } }];
+			}
+			if (b.case === "threadEarlier") {
+				return b.value.earlier === "mark-c"
+					? [{ case: "threadEarlierResult", value: { threadId: "t1", items: [textItem("b", 2n, "two")], earlier: "mark-b" } }]
+					: [{ case: "threadEarlierResult", value: { threadId: "t1", items: [textItem("a", 1n, "one")], earlier: "" } }];
+			}
+			return defaultAnswerOf(frame);
+		};
+		const l = link();
+		const unwatch = l.watch("t1");
+		l.start();
+		await until(() => l.journal("t1").items.size === 1, "newest items");
+		expect(machine.sent("threadSubscribe")[0]?.tail).toBe(HISTORY_PAGE);
+		expect(l.journal("t1").earlier).toBe("mark-c");
+
+		await Promise.all([l.loadEarlier("t1"), l.loadEarlier("t1")]);
+		expect(machine.sent("threadEarlier")).toEqual([expect.objectContaining({ threadId: "t1", earlier: "mark-c", limit: HISTORY_PAGE })]);
+		await l.loadEarlier("t1");
+		expect(orderedItems(l.journal("t1")).map((i) => i.id)).toEqual(["a", "b", "c"]);
+		expect(l.journal("t1").earlier).toBe("");
+		expect(l.journal("t1").cursor).toMatchObject({ epoch: 7n, seq: 3n });
+		// Everything is in: nothing more to ask.
+		await l.loadEarlier("t1");
+		expect(machine.sent("threadEarlier")).toHaveLength(2);
 		unwatch();
 		l.stop();
 	});

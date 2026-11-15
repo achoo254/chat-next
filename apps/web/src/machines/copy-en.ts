@@ -297,7 +297,10 @@ export const enMachines: MachinesCopy = {
 	},
 	transcript: {
 		earlier: (n: number) => (n === 1 ? "Show 1 earlier item" : `Show ${n} earlier items`),
+		older: "Load earlier messages",
+		loadingOlder: "Loading earlier messages…",
 		previous: (n: number) => (n === 1 ? "Previous conversation (1 message)" : `Previous conversation (${n} messages)`),
+		previousUncounted: "Previous conversation",
 		ranTools: (n) => (n === 1 ? "Ran 1 tool" : `Ran ${n} tools`),
 		runningTool: (name) => `Running ${name}`,
 		runningFor: (time) => `Running for ${time}`,

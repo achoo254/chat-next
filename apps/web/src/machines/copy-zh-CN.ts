@@ -294,7 +294,10 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	transcript: {
 		earlier: (n: number) => `查看之前的 ${n} 项`,
+		older: "加载更早的内容",
+		loadingOlder: "正在加载更早的内容…",
 		previous: (n: number) => `之前的对话（${n} 条消息）`,
+		previousUncounted: "之前的对话",
 		ranTools: (n) => `已运行 ${n} 个工具`,
 		runningTool: (name) => `正在运行 ${name}`,
 		runningFor: (time) => `已运行 ${time}`,

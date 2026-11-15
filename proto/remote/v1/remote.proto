@@ -295,6 +295,13 @@ message Frame {
 
     // A → B
     AccountCaptureCurrent account_capture_current = 165;
+
+    // Older items of a thread than the device holds (tunelo 3.4.0+); see
+    // ThreadEarlier.
+    // A → B
+    ThreadEarlier thread_earlier = 166;
+    // B → A
+    ThreadEarlierResult thread_earlier_result = 167;
   }
 }
 
@@ -354,6 +361,12 @@ message ThreadSubscribe {
   string thread_id = 1;
   // Zero cursor: from the start.
   Cursor cursor = 2;
+  // When B sends from the start (zero cursor, or a reset), only the last
+  // `tail` items in display order, plus the latest conversation break and
+  // every approval or question still pending; ThreadItems.earlier then tells
+  // how to ask for the rest (ThreadEarlier). 0: everything, as before.
+  // Machines before tunelo 3.4.0 ignore it and send everything.
+  uint32 tail = 3;
 }
 
 message ThreadRespond {
@@ -454,6 +467,26 @@ message ThreadSwitch {
 message ThreadFetchFull {
   string thread_id = 1;
   string item_id = 2;
+}
+
+// The items of a thread that come before the ones B sent (tunelo 3.4.0+):
+// a page of at most `limit` of them, the newest first left out, in display
+// order. Answered with ThreadEarlierResult. Does not move the cursor: items
+// changed later still come as ThreadItems.
+message ThreadEarlier {
+  string thread_id = 1;
+  // ThreadItems.earlier or ThreadEarlierResult.earlier, as B sent it.
+  string earlier = 2;
+  // At most this many; B caps it.
+  uint32 limit = 3;
+}
+
+message ThreadEarlierResult {
+  string thread_id = 1;
+  // In display order, oldest first.
+  repeated Item items = 2;
+  // Where the next page starts; empty when nothing is earlier.
+  string earlier = 3;
 }
 
 // What is not committed in the thread's folder, as git sees it (GitChanges).
@@ -1488,6 +1521,11 @@ message ThreadItems {
   repeated Item items = 2;
   // Where the device is after applying these items.
   Cursor cursor = 3;
+  // Set when B left older items out of what it sends from the start to a
+  // device that asked for a tail (ThreadSubscribe.tail; also the items that
+  // follow ThreadCreated once the device asked for one on this connection):
+  // an opaque mark for ThreadEarlier. Empty on every other ThreadItems.
+  string earlier = 4;
 }
 
 message ThreadReset {

@@ -302,8 +302,13 @@ export const viMachines = {
 	},
 	transcript: {
 		earlier: (n: number) => `Xem ${n} mục trước`,
+		/** The machine still holds older items of the session than this device loaded. */
+		older: "Tải nội dung cũ hơn",
+		loadingOlder: "Đang tải nội dung cũ hơn…",
 		/** The row folding the conversations before the AI's CLI went on in another one (/clear). */
 		previous: (n: number) => `Cuộc trò chuyện trước (${n} tin nhắn)`,
+		/** The same row while older items of the session are still on the machine (not counted yet). */
+		previousUncounted: "Cuộc trò chuyện trước",
 		ranTools: (n: number) => `Đã chạy ${n} tool`,
 		runningTool: (name: string) => `Đang chạy ${name}`,
 		runningFor: (time: string) => `Chạy được ${time}`,

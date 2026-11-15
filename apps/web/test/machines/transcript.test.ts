@@ -4,7 +4,7 @@
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { Decision, ItemSchema, PromptState, Role, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { applyItems, EMPTY_JOURNAL, orderedItems, resetJournal } from "../../src/machines/transcript/reducer.ts";
+import { applyEarlier, applyItems, EMPTY_JOURNAL, orderedItems, resetJournal } from "../../src/machines/transcript/reducer.ts";
 import { contextShare, currentModel, foldTranscript, turnRunning } from "../../src/machines/transcript/tool-fold.ts";
 
 type Body = NonNullable<MessageInitShape<typeof ItemSchema>["body"]>;
@@ -57,6 +57,22 @@ describe("journal reducer", () => {
 		expect(j.cursor).toEqual(cursor(5n));
 		j = applyItems(j, [], cursor(1n, 2n));
 		expect(j.cursor).toEqual(cursor(1n, 2n));
+	});
+
+	it("keeps the machine's mark for older items until a page says nothing is earlier; later items never clear it", () => {
+		const newest = item("n", 100, text(Role.USER, "newest"));
+		let j = applyItems(EMPTY_JOURNAL, [newest], cursor(9n), "mark-1");
+		expect(j.earlier).toBe("mark-1");
+		j = applyItems(j, [item("m", 200, text(Role.ASSISTANT, "more"))], cursor(10n));
+		expect(j.earlier).toBe("mark-1");
+		const older = item("o", 50, text(Role.USER, "older"));
+		j = applyEarlier(j, [older], "mark-0");
+		expect(orderedItems(j).map((i) => i.id)).toEqual(["o", "n", "m"]);
+		expect(j.cursor).toEqual(cursor(10n));
+		expect(j.earlier).toBe("mark-0");
+		j = applyEarlier(j, [], "");
+		expect(j.earlier).toBe("");
+		expect(resetJournal().earlier).toBe("");
 	});
 
 	it("reset forgets every item", () => {

@@ -180,6 +180,8 @@ export class Connection {
   private session: Session | undefined;
   private device = "";
   private subscribed = new Set<string>();
+  /** The tail this device last asked for (ThreadSubscribe.tail): it pages older items itself. 0: it takes everything. */
+  private tail = 0;
   /** Looks at the transcripts of the threads this device follows, for turns typed outside Chat. */
   private followTimer: ReturnType<typeof setInterval> | undefined;
   private unsubscribe: (() => void)[] = [];
@@ -404,9 +406,9 @@ export class Connection {
     this.send("", { case: "threadInfo", value: this.ctx.core.info(threadId) });
   }
 
-  private sendItems(threadId: string, items: Item[], id = ""): void {
+  private sendItems(threadId: string, items: Item[], id = "", earlier = ""): void {
     const cursor = { epoch: this.ctx.core.epoch, seq: this.ctx.core.lastSeq(threadId) };
-    this.send(id, { case: "threadItems", value: { threadId, items: items.map(wireItem), cursor } });
+    this.send(id, { case: "threadItems", value: { threadId, items: items.map(wireItem), cursor, earlier } });
   }
 
   /** Every AI's accounts: a sign-in code is handed to the AI's CLI and dropped, never kept or logged. */
@@ -568,6 +570,7 @@ export class Connection {
         }
         case "sessionOpen": {
           const v = b.value;
+          const known = new Set(core.list().map((x) => x.id));
           const thread = await core.openLocal({
             provider: v.provider,
             sessionId: v.sessionId,
@@ -579,17 +582,20 @@ export class Connection {
             openAnyway: v.openAnyway,
             device: this.device,
           });
-          return this.openedThread(id, thread);
+          // A session a thread holds already gives that thread: the device may hold part of it, so it gets everything.
+          return this.openedThread(id, thread, !known.has(thread.id));
         }
         case "threadSubscribe": {
-          const { threadId, cursor } = b.value;
-          const r = core.subscribe(threadId, cursor);
+          const { threadId, cursor, tail } = b.value;
+          if (tail > 0) this.tail = tail;
+          const r = core.subscribe(threadId, cursor, tail);
           this.subscribed.add(threadId);
           this.sendInfo(threadId);
           if (r.resume.kind === "reset") {
             this.send(id, { case: "threadReset", value: { threadId, reason: r.resume.reason } });
-            this.sendItems(threadId, core.snapshot(threadId), id);
-          } else this.sendItems(threadId, r.items, id);
+            const page = tail > 0 ? core.tailSnapshot(threadId, tail) : { items: core.snapshot(threadId), earlier: "" };
+            this.sendItems(threadId, page.items, id, page.earlier);
+          } else this.sendItems(threadId, r.items, id, r.earlier);
           // A turn already running: what it does now, without waiting for its next change.
           const activity = core.activity(threadId);
           if (activity) this.send("", { case: "threadActivity", value: activity });
@@ -665,6 +671,10 @@ export class Connection {
         case "threadSwitch":
           await core.switchProvider(b.value.threadId, b.value.provider, b.value.model);
           return ack();
+        case "threadEarlier": {
+          const page = core.earlier(b.value.threadId, b.value.earlier, b.value.limit);
+          return this.send(id, { case: "threadEarlierResult", value: { threadId: b.value.threadId, items: page.items.map(wireItem), earlier: page.earlier } });
+        }
         case "threadFetchFull":
           return this.send(id, { case: "fullItem", value: { threadId: b.value.threadId, item: core.fullItem(b.value.threadId, b.value.itemId) } });
         case "threadGitChanges":
@@ -815,12 +825,21 @@ export class Connection {
     this.browserLink.handle(id, b);
   }
 
-  /** A thread opened for this device: it is followed from now on and gets its statusline and every item. */
-  private openedThread(id: string, thread: ThreadSummary): void {
+  /**
+   * A thread opened for this device: it is followed from now on and gets its
+   * statusline and its items. `fresh`: the thread is new, so the device holds
+   * none of it and may get only the newest (an existing one may be held in
+   * part: newer revisions of older items would be skipped by the cursor).
+   */
+  private openedThread(id: string, thread: ThreadSummary, fresh = true): void {
     this.subscribed.add(thread.id);
     this.send(id, { case: "threadCreated", value: { thread } });
     this.sendInfo(thread.id);
-    this.sendItems(thread.id, this.ctx.core.snapshot(thread.id));
+    // A device that pages older items itself (it asked for a tail on this link) gets the newest ones only.
+    if (fresh && this.tail > 0) {
+      const page = this.ctx.core.tailSnapshot(thread.id, this.tail);
+      this.sendItems(thread.id, page.items, "", page.earlier);
+    } else this.sendItems(thread.id, this.ctx.core.snapshot(thread.id));
   }
 
   private sendError(id: string, err: unknown): void {

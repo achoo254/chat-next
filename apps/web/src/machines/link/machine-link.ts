@@ -35,7 +35,7 @@ import {
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
 import { HandshakeFailure, equal, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
-import { applyItems, EMPTY_JOURNAL, resetJournal, type Journal } from "../transcript/reducer.ts";
+import { applyEarlier, applyItems, EMPTY_JOURNAL, resetJournal, type Journal } from "../transcript/reducer.ts";
 import type { PendingSend, ShownAttachment } from "../transcript/tool-fold.ts";
 import { DeviceRegistrationRefused } from "./device-registration.ts";
 import { allowedTunnel, frameBytes, type SocketFactory, type SocketLike } from "./socket.ts";
@@ -44,6 +44,12 @@ export const PING_MS = 10_000;
 /** No frame for this long while pinging: the link is dead. */
 const SILENCE_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+/**
+ * Items a thread opens with: the machine sends the newest ones only and the
+ * rest a page at a time as the user scrolls up (tunelo 3.4.0+; older machines
+ * send everything).
+ */
+export const HISTORY_PAGE = 200;
 /** Back in the foreground: an open link that does not answer a ping this fast died meanwhile. */
 export const WAKE_PROBE_MS = 3_000;
 const BACKOFF = { baseMs: 1_000, maxMs: 30_000 };
@@ -234,6 +240,8 @@ export class MachineLink {
 	private queue: Promise<void> = Promise.resolve();
 	private readonly waiters = new Map<string, Waiter>();
 	private readonly watched = new Map<string, number>();
+	/** Threads whose older page is on its way: one request at a time each. */
+	private readonly loadingEarlier = new Set<string>();
 	/**
 	 * The latest activity of each running turn (ThreadActivity), kept out of
 	 * LinkState: it changes every second, and only the activity line reads it,
@@ -401,6 +409,31 @@ export class MachineLink {
 		} finally {
 			// Also when the answer is late or refused: following twice does no harm, not following leaves the view stale.
 			if (this.watched.has(threadId)) this.subscribeThread(threadId);
+		}
+	}
+
+	/**
+	 * Asks for the page of a thread's items before the ones this device holds;
+	 * does nothing when it holds them from the start or a page is on its way.
+	 * Resolves once the page is in (or the request failed: scrolling up asks again).
+	 */
+	async loadEarlier(threadId: string): Promise<void> {
+		const earlier = this.journal(threadId).earlier;
+		if (earlier === "" || this.loadingEarlier.has(threadId)) return;
+		this.loadingEarlier.add(threadId);
+		try {
+			const answer = await this.request({ case: "threadEarlier", value: { threadId, earlier, limit: HISTORY_PAGE } });
+			const b = answer.body;
+			// Only onto the journal it was asked for: a reset meanwhile brought a new tail and mark, which an old page would
+			// move back past, leaving a gap nothing fills.
+			if (b.case !== "threadEarlierResult" || this.journal(threadId).earlier !== earlier) return;
+			const journals = new Map(this.current.journals);
+			journals.set(threadId, applyEarlier(this.journal(threadId), b.value.items, b.value.earlier));
+			this.set({ journals });
+		} catch {
+			// Offline or refused: the next scroll to the top asks again.
+		} finally {
+			this.loadingEarlier.delete(threadId);
 		}
 	}
 
@@ -575,7 +608,7 @@ export class MachineLink {
 
 	private subscribeThread(threadId: string): void {
 		const cursor = this.current.journals.get(threadId)?.cursor ?? { epoch: 0n, seq: 0n };
-		this.request({ case: "threadSubscribe", value: { threadId, cursor } }).catch(() => undefined);
+		this.request({ case: "threadSubscribe", value: { threadId, cursor, tail: HISTORY_PAGE } }).catch(() => undefined);
 	}
 
 	private ping(): void {
@@ -704,7 +737,7 @@ export class MachineLink {
 		switch (b.case) {
 			case "threadItems": {
 				const journals = new Map(this.current.journals);
-				journals.set(b.value.threadId, applyItems(this.journal(b.value.threadId), b.value.items, b.value.cursor));
+				journals.set(b.value.threadId, applyItems(this.journal(b.value.threadId), b.value.items, b.value.cursor, b.value.earlier));
 				const echoed = new Set(b.value.items.flatMap((i) => (i.body.case === "text" && i.body.value.clientMsgId !== "" ? [i.body.value.clientMsgId] : [])));
 				const pending = this.current.pending.get(b.value.threadId);
 				if (pending !== undefined && echoed.size > 0) {

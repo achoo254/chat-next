@@ -30,6 +30,7 @@ import {
 import { type Resume, conversationBreakItem, isConversationBreak, resumeFrom } from "@achoo254/chat-remote-protocol";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { mentionsSensitive } from "../safety/sensitive-paths.ts";
+import { type Page, earlierPage, pageSize, tailPage } from "../threads/journal-pages.ts";
 import type {
   AgentProvider,
   ApprovalAnswer,
@@ -946,14 +947,28 @@ export class AgentCore {
     return this.maxSessions;
   }
 
-  subscribe(threadId: string, cursor: Cursor | undefined): { resume: Resume; items: Item[] } {
+  /**
+   * What a device that last applied `cursor` gets. One that starts from the
+   * beginning and asks for a `tail` gets only the newest items (tailPage) and
+   * a mark to page back from (`earlier`, "" when nothing was left out).
+   */
+  subscribe(threadId: string, cursor: Cursor | undefined, tail = 0): { resume: Resume; items: Item[]; earlier: string } {
     const t = this.thread(threadId);
     // Turns added elsewhere (a terminal, an IDE) show with the rest; an open
     // session opens again so the AI reads them too.
     if (this.syncHistory(t) > 0 && t.session) void this.park(t).then(() => this.touch(t));
     const resume = resumeFrom(t.journal.bounds(this.epoch), cursor ? { epoch: cursor.epoch, seq: cursor.seq } : undefined);
-    if (resume.kind === "reset") return { resume, items: [] };
-    return { resume, items: t.journal.since(resume.fromSeq - 1n) };
+    if (resume.kind === "reset") return { resume, items: [], earlier: "" };
+    const from = resume.fromSeq - 1n;
+    if (from === 0n && tail > 0) return { resume, ...tailPage(t.journal.all(), pageSize(tail)) };
+    return { resume, items: t.journal.since(from), earlier: "" };
+  }
+
+  /** Items older than the device holds: a page before `mark` (ThreadEarlier). */
+  earlier(threadId: string, mark: string, limit: number): Page {
+    const page = earlierPage(this.thread(threadId).journal.all(), mark, pageSize(limit));
+    if (!page) throw new AgentError(ErrorCode.INVALID, "unknown earlier mark");
+    return page;
   }
 
   /**
@@ -975,6 +990,11 @@ export class AgentCore {
   /** Every item of the thread, for a device that was told to reset. */
   snapshot(threadId: string): Item[] {
     return this.thread(threadId).journal.all();
+  }
+
+  /** What a device told to reset gets when it asked for a tail: the newest items only (see subscribe). */
+  tailSnapshot(threadId: string, tail: number): Page {
+    return tailPage(this.snapshot(threadId), pageSize(tail));
   }
 
   lastSeq(threadId: string): bigint {

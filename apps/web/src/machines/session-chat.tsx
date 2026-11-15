@@ -81,10 +81,14 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const all = foldTranscript(conversations.current, state.pending.get(threadId) ?? []);
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
+	// A long session opens on its newest items: until its oldest are in, the earlier conversations are counted in part.
+	const allLoaded = (state.journals.get(threadId)?.earlier ?? "") === "";
+	const previousBlocks = foldTranscript(conversations.previous).filter((b) => !isPending(b));
+	// A prompt still pending in an earlier conversation shows in the dock: alone it makes no earlier conversation to fold.
 	const previous: PreviousConversation | null =
-		conversations.previous.length === 0
+		previousBlocks.length === 0
 			? null
-			: { blocks: foldTranscript(conversations.previous).filter((b) => !isPending(b)), messages: messageCount(conversations.previous), breakId: conversations.breakId };
+			: { blocks: previousBlocks, messages: allLoaded ? messageCount(conversations.previous) : null, breakId: conversations.breakId };
 	/** The takeover whose live view shows over the session. */
 	const [viewing, setViewing] = useState<string | null>(null);
 	const viewed = viewing === null ? undefined : state.takeovers.get(viewing);
@@ -310,6 +314,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							threadId={threadId}
 							thread={thread}
 							live={versionAtLeast(state.info?.agentVersion ?? "", AGENT_LIVE_ACTIVITY)}
+							older={!allLoaded}
+							breakId={conversations.breakId}
+							loadOlder={() => link.loadEarlier(threadId)}
 						/>
 					)}
 					{suggestion !== undefined && (
@@ -580,8 +587,8 @@ function Dock({ prompts, ai, sessionAllow, decide, answer }: DockProps) {
 /** The conversations before the latest break (the AI's CLI went on in another one): folded away until asked for. */
 export interface PreviousConversation {
 	readonly blocks: readonly Block[];
-	/** Messages of the user and the AI in them. */
-	readonly messages: number;
+	/** Messages of the user and the AI in them; null while older items of the session are still on the machine. */
+	readonly messages: number | null;
 	/** The latest break: another one means the CLI went on in yet another conversation. */
 	readonly breakId: string;
 }
@@ -602,6 +609,15 @@ interface TranscriptProps {
 	thread: ThreadSummary | null;
 	/** The machine tells what a running turn does (ThreadActivity). */
 	live: boolean;
+	/** The machine holds older items of the session than this device loaded (it sent the newest first). */
+	older?: boolean;
+	/**
+	 * The session's latest conversation break ("" when none), known before any item of an earlier conversation is
+	 * loaded: paging those in must not count as the CLI going on in another conversation.
+	 */
+	breakId?: string;
+	/** Asks the machine for the page before the loaded items; resolves once it is in or failed. */
+	loadOlder?: () => Promise<void>;
 }
 
 /** Within this distance of the bottom, the transcript follows new content. */
@@ -612,7 +628,7 @@ export const TRANSCRIPT_PAGE = 40;
 const EARLIER_PX = 600;
 
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
-export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live }: TranscriptProps) {
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -623,7 +639,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 	// its first block stays put, so blocks arriving meanwhile never shift what is being read.
 	// The window and the opened earlier conversations belong to one conversation of the session: when the CLI goes
 	// on in another one (/clear), the current one starts over, shorter than the window kept for the one before.
-	const view = `${threadId}\u0000${previous?.breakId ?? ""}`;
+	const view = `${threadId}\u0000${breakId ?? previous?.breakId ?? ""}`;
 	const [from, setFrom] = useState<{ view: string; start: number | null }>({ view, start: null });
 	// The earlier conversations, once opened, come before the current one and page like it; the row that opens
 	// and closes them stays where the current one begins.
@@ -651,9 +667,38 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 		el.scrollTop += el.scrollHeight - heightBefore.current;
 		heightBefore.current = null;
 	}, [start]);
+	// Older items still on the machine: fetched when the user reaches the top of what is loaded. The first block and
+	// the scroll height before they came keep the reading position across the blocks they add above it.
+	const firstId = all[0]?.id;
+	const [fetching, setFetching] = useState(false);
+	const olderAnchor = useRef<{ height: number; firstId: string | undefined } | null>(null);
+	useLayoutEffect(() => {
+		const el = scroller.current;
+		const anchor = olderAnchor.current;
+		if (el === null || anchor === null || anchor.firstId === firstId) return;
+		el.scrollTop += el.scrollHeight - anchor.height;
+		olderAnchor.current = null;
+	}, [firstId]);
+	useLayoutEffect(() => {
+		// The page is in but added nothing above (it went to a folded earlier conversation): nothing to keep.
+		if (!fetching) olderAnchor.current = null;
+	}, [fetching]);
+	// Folded earlier conversations take what comes before them without being drawn: page them only once opened.
+	const canFetchOlder = older && loadOlder !== undefined && (previous === null || opened);
+	const fetchOlder = () => {
+		if (!canFetchOlder || fetching) return;
+		const el = scroller.current;
+		olderAnchor.current = el === null ? null : { height: el.scrollHeight, firstId };
+		setFetching(true);
+		void loadOlder().finally(() => setFetching(false));
+	};
 	const showEarlier = () => {
 		const el = scroller.current;
-		if (start === 0 || heightBefore.current !== null) return;
+		if (heightBefore.current !== null) return;
+		if (start === 0) {
+			fetchOlder();
+			return;
+		}
 		heightBefore.current = el?.scrollHeight ?? null;
 		setFrom({ view, start: Math.max(0, start - TRANSCRIPT_PAGE) });
 	};
@@ -716,10 +761,16 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 					if (up && el.scrollTop < EARLIER_PX) showEarlier();
 				}}
 			>
-				{start > 0 && (
+				{start > 0 ? (
 					<button type="button" className="btn btn-sm mx-earlier" onClick={showEarlier} data-id="transcript-earlier">
 						{t.transcript.earlier(Math.min(start, TRANSCRIPT_PAGE))}
 					</button>
+				) : (
+					canFetchOlder && (
+						<button type="button" className="btn btn-sm mx-earlier" onClick={fetchOlder} disabled={fetching} aria-busy={fetching} data-id="transcript-older">
+							{fetching ? t.transcript.loadingOlder : t.transcript.older}
+						</button>
+					)
 				)}
 				{withPreviousRow(
 					shown.map((block) => (
@@ -761,11 +812,11 @@ function withPreviousRow(views: ReactNode[], row: ReactNode, at: number): ReactN
 }
 
 /** One small row where the current conversation begins: "Cuộc trò chuyện trước (n tin nhắn)", opening the earlier ones above it. */
-function PreviousRow({ messages, opened, onToggle, t }: { messages: number; opened: boolean; onToggle: () => void; t: MachinesCopy }) {
+function PreviousRow({ messages, opened, onToggle, t }: { messages: number | null; opened: boolean; onToggle: () => void; t: MachinesCopy }) {
 	return (
 		<button type="button" className="mx-previous" aria-expanded={opened} onClick={onToggle} data-id="transcript-previous">
 			<MachineIcon name="chevron-right" small />
-			<span>{t.transcript.previous(messages)}</span>
+			<span>{messages === null ? t.transcript.previousUncounted : t.transcript.previous(messages)}</span>
 		</button>
 	);
 }
