@@ -3,7 +3,7 @@
 // leaves it. Git, deploys and copies to other hosts → POST; test, lint and
 // typecheck runners → QA; anything else → SERVER.
 import { OfficeRoom } from "@achoo254/chat-proto/remote/remote";
-import { commandName, commandWords } from "./office-shell-words.ts";
+import { commandName, commandWords, isListedCommand } from "./office-shell-words.ts";
 
 const POST_COMMANDS = new Set(["git", "gh", "rsync", "scp"]);
 const QA_COMMANDS = new Set(["vitest", "jest", "pytest", "eslint", "tsc", "vue-tsc", "mocha", "playwright"]);
@@ -130,8 +130,12 @@ function interpreterRoom(head: string, words: readonly string[], depth: number):
 }
 
 function classifyLine(line: string, depth: number): OfficeRoom {
-  const words = commandWords(line).map((w) => w.text);
-  return words.length > 0 ? programRoom(words, depth) : OfficeRoom.SERVER;
+  const { words, opaque } = commandWords(line);
+  const texts = words.map((w) => w.text);
+  if (texts.length === 0) return OfficeRoom.SERVER;
+  // Past a substitution, a backtick or an escape the parse may be off: trust only a command on the known list.
+  if (opaque && !isListedCommand(texts[0] ?? "")) return OfficeRoom.SERVER;
+  return programRoom(texts, depth);
 }
 
 /** The room of a shell command line. */

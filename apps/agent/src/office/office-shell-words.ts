@@ -1,12 +1,43 @@
 // The words of a shell command line as the office reads them, on the machine
-// only: split into simple commands (quotes respected), the setup in front of
-// the real command dropped (`cd dir &&`, environment assignments, `export`,
-// PowerShell's `$env:X = …;`) and the wrappers that only change how it runs
-// (`env`, `sudo -u x`, `timeout 60`, `nice -n 5`, `time`). What is left is
-// what the command does. docs/office-wire.md, parts 4 and 5.
+// only: split into simple commands (quotes and substitutions respected), the
+// setup in front of the real command dropped (`cd dir &&`, environment
+// assignments, `export`, PowerShell's `$env:X = …;`) and the wrappers that
+// only change how it runs (`env`, `sudo -u x`, `timeout 60`, `nice -n 5`,
+// `time`). What is left is what the command does. docs/office-wire.md,
+// parts 4 and 5.
+//
+// The parse only picks a room (an enum) and checks a word against a fixed
+// list of command names: a misparse may misroute, but the only text that
+// ever leaves the machine is a name from that list (SUBJECT_COMMANDS).
 
-/** One word: `raw` as typed (quotes kept), `text` as the shell passes it (quotes removed). */
+/** One word: `raw` as typed (quotes kept), `text` as the shell passes it (quotes removed, substitutions kept as typed). */
 export type ShellWord = { raw: string; text: string };
+
+/**
+ * The only shell subjects there are: common command names, lower case,
+ * without a Windows program suffix. Anything else shows no subject.
+ */
+export const SUBJECT_COMMANDS: ReadonlySet<string> = new Set([
+  // version control and hosting
+  "git", "gh", "glab",
+  // JavaScript and TypeScript
+  "node", "deno", "bun", "bunx", "npm", "npx", "pnpm", "pnpx", "yarn", "tsx", "tsc", "eslint", "prettier", "biome", "vitest", "jest", "mocha", "playwright",
+  // Python
+  "python", "python3", "py", "pip", "pip3", "pipx", "uv", "poetry", "pytest", "ruff", "mypy",
+  // other languages and builds
+  "go", "cargo", "rustc", "rustup", "make", "cmake", "just", "java", "javac", "gradle", "mvn", "dotnet", "swift", "xcodebuild", "flutter", "dart", "ruby", "bundle", "php", "composer",
+  // containers, cloud, infrastructure
+  "docker", "docker-compose", "podman", "kubectl", "helm", "terraform", "ansible", "aws", "gcloud", "az", "wrangler", "vercel", "firebase",
+  // data
+  "buf", "protoc", "psql", "mysql", "mongosh", "redis-cli", "sqlite3",
+  // files, text, network
+  "ls", "dir", "cat", "head", "tail", "less", "grep", "rg", "find", "fd", "sed", "awk", "sort", "wc", "diff", "cp", "mv", "rm", "mkdir", "touch", "chmod", "tar", "unzip", "zip",
+  "echo", "printf", "curl", "wget", "ssh", "scp", "rsync", "cd", "pushd", "which", "where", "sleep", "ps", "kill",
+  // shells
+  "bash", "sh", "zsh", "pwsh", "powershell", "cmd",
+  // PowerShell's common commands
+  "get-childitem", "get-content", "select-string", "set-location", "test-path", "remove-item", "copy-item", "new-item", "invoke-webrequest",
+]);
 
 /** Separators between simple commands, longest first. */
 const SEPARATORS = ["&&", "||", ";", "|", "&", "\n", "\r"];
@@ -17,6 +48,10 @@ const SETUP_COMMANDS = new Set(["cd", "pushd", "chdir", "set-location", "sl", "e
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 /** PowerShell's environment variables (`$env:NAME = …`). */
 const PS_ENV = /^\$env:/i;
+/** What makes a skipped word untrustworthy to parse past: a substitution, a backtick, an escape. */
+const OPAQUE = /\$\(|\$\{|`|\\/;
+/** Word separators: ASCII space and tab only, as the shell (a no-break space is part of a word). */
+const BLANK = /[ \t]/;
 
 /** Wrappers and the options of each that take a value (`sudo -u bob`). */
 const WRAPPERS: Record<string, { valueFlags: ReadonlySet<string>; takesArgument?: boolean }> = {
@@ -40,11 +75,77 @@ export function commandName(word: string): string {
   return base.toLowerCase().replace(/\.(exe|cmd|bat|ps1|com)$/, "");
 }
 
+/** Whether a word names a command on the subject list. */
+export function isListedCommand(word: string): boolean {
+  return SUBJECT_COMMANDS.has(commandName(word));
+}
+
+/** The index after a `$(…)`, `$((…))` or `${…}` starting at `i` (nesting, quotes and backticks inside respected); the line's end when unclosed. */
+function skipSubstitution(line: string, i: number): number {
+  const open = line[i + 1] === "{" ? "{" : "(";
+  const close = open === "{" ? "}" : ")";
+  let depth = 0;
+  let j = i + 1;
+  while (j < line.length) {
+    const ch = line[j] ?? "";
+    if (ch === "\\") j += 2;
+    else if (ch === "'") j = skipSingle(line, j);
+    else if (ch === '"') j = skipDouble(line, j);
+    else if (ch === "`") j = skipBacktick(line, j);
+    else if (ch === "$" && (line[j + 1] === "(" || line[j + 1] === "{")) j = skipSubstitution(line, j);
+    else {
+      if (ch === open) depth++;
+      else if (ch === close && --depth === 0) return j + 1;
+      j++;
+    }
+  }
+  return line.length;
+}
+
+/** The index after a `'…'` starting at `i`. */
+function skipSingle(line: string, i: number): number {
+  const close = line.indexOf("'", i + 1);
+  return close < 0 ? line.length : close + 1;
+}
+
+/** The index after a `` `…` `` starting at `i` (`\`` inside does not close it). */
+function skipBacktick(line: string, i: number): number {
+  let j = i + 1;
+  while (j < line.length) {
+    const ch = line[j];
+    if (ch === "\\") j += 2;
+    else if (ch === "`") return j + 1;
+    else j++;
+  }
+  return line.length;
+}
+
+/** The index after a `"…"` starting at `i`: `\"`, `\\`, `` \` ``, `\$` do not close it, nor do substitutions inside. */
+function skipDouble(line: string, i: number): number {
+  let j = i + 1;
+  while (j < line.length) {
+    const ch = line[j] ?? "";
+    if (ch === "\\") j += 2;
+    else if (ch === '"') return j + 1;
+    else if (ch === "`") j = skipBacktick(line, j);
+    else if (ch === "$" && (line[j + 1] === "(" || line[j + 1] === "{")) j = skipSubstitution(line, j);
+    else j++;
+  }
+  return line.length;
+}
+
+/** What the shell passes for a `"…"` block: its content, the escapes of `"`, `\`, `` ` ``, `$` undone. */
+function doubleText(block: string): string {
+  const inner = block.endsWith('"') && block.length > 1 ? block.slice(1, -1) : block.slice(1);
+  return inner.replace(/\\(["\\`$])/g, "$1");
+}
+
 /**
  * Splits a command line into simple commands of words, each with the
- * separator that ended it ("" for the last). Quotes ('…', "…") keep spaces
- * and separators inside a word; a backslash escapes only a quote, a space or
- * a separator (elsewhere it is a Windows path's).
+ * separator that ended it ("" for the last). Quotes, `$(…)`, `${…}` and
+ * backticks keep spaces and separators inside one word; a backslash outside
+ * quotes escapes only a quote, a blank, a separator, `$` or a backtick
+ * (elsewhere it is a Windows path's). Only ASCII space and tab part words.
  */
 export function simpleCommands(line: string): { words: ShellWord[]; end: string }[] {
   const out: { words: ShellWord[]; end: string }[] = [];
@@ -63,22 +164,40 @@ export function simpleCommands(line: string): { words: ShellWord[]; end: string 
     if (words.length > 0) out.push({ words, end: sep });
     words = [];
   };
+  const block = (from: number, to: number, shown: string): void => {
+    raw += line.slice(from, to);
+    text += shown;
+    inWord = true;
+  };
   let i = 0;
   while (i < line.length) {
     const ch = line[i] ?? "";
-    if (ch === "'" || ch === '"') {
-      const close = line.indexOf(ch, i + 1);
-      const stop = close < 0 ? line.length : close;
-      raw += line.slice(i, Math.min(stop + 1, line.length));
-      text += line.slice(i + 1, stop);
-      inWord = true;
-      i = stop + 1;
+    if (ch === "'") {
+      const to = skipSingle(line, i);
+      block(i, to, line.slice(i + 1, line[to - 1] === "'" && to - 1 > i ? to - 1 : to));
+      i = to;
       continue;
     }
-    if (ch === "\\" && i + 1 < line.length && /["'\s;&|]/.test(line[i + 1] ?? "")) {
-      raw += line.slice(i, i + 2);
-      text += line[i + 1] ?? "";
-      inWord = true;
+    if (ch === '"') {
+      const to = skipDouble(line, i);
+      block(i, to, doubleText(line.slice(i, to)));
+      i = to;
+      continue;
+    }
+    if (ch === "`") {
+      const to = skipBacktick(line, i);
+      block(i, to, line.slice(i, to));
+      i = to;
+      continue;
+    }
+    if (ch === "$" && (line[i + 1] === "(" || line[i + 1] === "{")) {
+      const to = skipSubstitution(line, i);
+      block(i, to, line.slice(i, to));
+      i = to;
+      continue;
+    }
+    if (ch === "\\" && i + 1 < line.length && /["' \t\n;&|$`]/.test(line[i + 1] ?? "")) {
+      block(i, i + 2, line[i + 1] ?? "");
       i += 2;
       continue;
     }
@@ -94,14 +213,12 @@ export function simpleCommands(line: string): { words: ShellWord[]; end: string 
       i += sep.length;
       continue;
     }
-    if (/\s/.test(ch)) {
+    if (BLANK.test(ch)) {
       endWord();
       i++;
       continue;
     }
-    raw += ch;
-    text += ch;
-    inWord = true;
+    block(i, i + 1, ch);
     i++;
   }
   endCommand("");
@@ -117,18 +234,20 @@ function isSetup(words: readonly ShellWord[]): boolean {
   return SETUP_COMMANDS.has(commandName(first.text));
 }
 
-/** Drops wrappers and assignments in front of the command (`sudo -u bob env A=1 timeout 60 x` → `x …`). */
-function unwrap(words: readonly ShellWord[]): ShellWord[] {
+/** Drops wrappers and assignments in front of the command (`sudo -u bob env A=1 timeout 60 x` → `x …`); `skipped` gets the words dropped. */
+function unwrap(words: readonly ShellWord[], skipped: ShellWord[]): ShellWord[] {
   let i = 0;
   for (;;) {
     const w = words[i];
     if (!w) return [];
     if (ENV_ASSIGNMENT.test(w.text)) {
+      skipped.push(w);
       i++;
       continue;
     }
     const wrapper = WRAPPERS[commandName(w.text)];
     if (!wrapper) return words.slice(i);
+    const from = i;
     i++;
     // The wrapper's own options: `--` ends them; `-n 5` takes a value, `-n5` and `--x=y` do not.
     while (i < words.length) {
@@ -142,43 +261,40 @@ function unwrap(words: readonly ShellWord[]): ShellWord[] {
     }
     // `timeout 60 x`: its duration; `nice -10 x` is an option above.
     if (wrapper.takesArgument && i < words.length) i++;
+    skipped.push(...words.slice(from, i));
   }
 }
 
 /**
  * The words of the command a line runs: the first simple command that is
  * not setup (`cd dir && …`, `export A=1; …`), wrappers dropped. A setup
- * command piped into another is the command itself. [] for none.
+ * command piped into another is the command itself. `opaque`: a word skipped
+ * on the way holds a substitution, a backtick or a backslash, so what
+ * follows it may not be what the shell runs.
  */
-export function commandWords(line: string): ShellWord[] {
+export function commandWords(line: string): { words: ShellWord[]; opaque: boolean } {
   const commands = simpleCommands(line);
+  const skipped: ShellWord[] = [];
   for (const [i, c] of commands.entries()) {
     const last = i === commands.length - 1;
-    if (!last && SETUP_ENDS.has(c.end) && isSetup(c.words)) continue;
-    return unwrap(c.words);
+    if (!last && SETUP_ENDS.has(c.end) && isSetup(c.words)) {
+      skipped.push(...c.words);
+      continue;
+    }
+    const words = unwrap(c.words, skipped);
+    return { words, opaque: skipped.some((w) => OPAQUE.test(w.raw)) };
   }
-  return [];
+  return { words: [], opaque: skipped.some((w) => OPAQUE.test(w.raw)) };
 }
 
-/** What a command name may look like to be shown: a plain name, nothing that could be a value. */
-const SAFE_NAME = /^[a-z0-9][a-z0-9._+-]{0,39}$/;
-/** Characters that make a word a value, an expression or a quoted thing, never a command's name. */
-const UNSAFE_RAW = /["'`$=()[\]{}<>@%!*?,;]/;
-/** A Windows drive in front of a program's path (`C:\tools\node.exe`). */
-const DRIVE = /^[A-Za-z]:[\\/]/;
-
 /**
- * The shell call's short subject: the command's name ("pnpm", "git") when the
- * word it starts with is plainly a program's name or path; "" otherwise, so
- * a value, a variable or anything quoted is never shown.
+ * The shell call's short subject: the command's name ("pnpm", "git") when it
+ * is on SUBJECT_COMMANDS; "" otherwise. Whatever the parse makes of a line,
+ * nothing but a name from that list comes out.
  */
 export function shellSubject(line: string): string {
-  const first = commandWords(line)[0];
-  if (!first || first.raw === "&") return "";
-  const raw = first.raw;
-  if (UNSAFE_RAW.test(raw)) return "";
-  const withoutDrive = DRIVE.test(raw) ? raw.slice(2) : raw;
-  if (withoutDrive.includes(":")) return "";
-  const name = commandName(withoutDrive);
-  return SAFE_NAME.test(name) ? name : "";
+  const first = commandWords(line).words[0];
+  if (!first) return "";
+  const name = commandName(first.text);
+  return SUBJECT_COMMANDS.has(name) ? name : "";
 }

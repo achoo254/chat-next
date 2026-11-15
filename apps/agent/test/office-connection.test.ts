@@ -51,6 +51,13 @@ const SECRET_FRONTS: [string, string, string, string][] = [
   ["h7", "Bash", `set MODE=${MARK} && git push`, "git"],
   ["h8", "Bash", `"${MARK}" --version`, ""],
   ["h9", `mcp__${MARK}__create_issue`, "", "create_issue"],
+  // Substitutions, backticks, an escaped quote and a no-break space in the value.
+  ["h10", "Bash", `MODE=$(echo ${MARK} | base64) gh pr list`, "gh"],
+  ["h11", "Bash", `MODE=\`echo ${MARK} | base64\` gh pr list`, "gh"],
+  ["h12", "Bash", `X=$(printf ${MARK} ) node x.js`, "node"],
+  ["h13", "Bash", `X="$(echo "a ${MARK} c")" node`, "node"],
+  ["h14", "Bash", `X="a\\" ${MARK} q" node`, "node"],
+  ["h15", "Bash", `A=x\u00a0${MARK} node`, "node"],
 ];
 
 /** One scripted turn touching every kind of signal, with MARK in every input, output and text. */
@@ -383,6 +390,26 @@ describe("the office over the link", () => {
     await core.deleteThread({ threadId: thread.id, stopRunning: false, openAnyway: false, device: "test" });
     expect(hub.watched).toEqual([]);
     release();
+    await core.stop();
+  });
+
+  it("a poll whose thread list fails logs it and keeps the offices", async () => {
+    const provider = officeProvider();
+    const { core, work } = makeCore([provider]);
+    const lines: string[] = [];
+    const hub = new OfficeHub(core, { providers: [provider], pollMs: 10, log: (l) => lines.push(l) });
+    const thread = await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" });
+    const sink: OfficeSink = () => undefined;
+    hub.watch(thread.id, sink);
+    const list = core.list.bind(core);
+    core.list = () => {
+      throw new TypeError(`broken ${MARK}`);
+    };
+    await wait(60);
+    core.list = list;
+    expect(lines).toEqual(["office: list threads failed: TypeError"]);
+    expect(hub.watched).toEqual([thread.id]);
+    hub.unwatch(thread.id, sink);
     await core.stop();
   });
 

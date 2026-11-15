@@ -9,11 +9,18 @@ const CHUNK = 256 * 1024;
 
 /**
  * Calls `onLine` with each whole line that starts at or after `from` and
- * before `end`; returns the byte after the last line passed (or skipped as
- * too long), which is where the next read starts.
+ * before `end`. `next`: the byte after the last line passed (or skipped as
+ * too long), where the next read starts; `bytesRead`: what was read from
+ * the file, a line not finished yet included (it counts against a budget).
  */
-export async function readLinesUntil(path: string, from: number, end: number, cap: number, onLine: (line: Buffer) => void): Promise<number> {
-  if (end <= from) return from;
+export async function readLinesUntil(
+  path: string,
+  from: number,
+  end: number,
+  cap: number,
+  onLine: (line: Buffer) => void,
+): Promise<{ next: number; bytesRead: number }> {
+  if (end <= from) return { next: from, bytesRead: 0 };
   const fh = await open(path, "r");
   try {
     const buf = Buffer.allocUnsafe(CHUNK);
@@ -25,7 +32,7 @@ export async function readLinesUntil(path: string, from: number, end: number, ca
     let skipping = false;
     for (;;) {
       const { bytesRead } = await fh.read(buf, 0, buf.length, pos);
-      if (bytesRead <= 0) return lineStart;
+      if (bytesRead <= 0) return { next: lineStart, bytesRead: pos - from };
       let start = 0;
       for (;;) {
         const nl = buf.indexOf(0x0a, start);
@@ -44,7 +51,7 @@ export async function readLinesUntil(path: string, from: number, end: number, ca
         skipping = false;
         lineStart = pos + nl + 1;
         start = nl + 1;
-        if (lineStart >= end) return lineStart;
+        if (lineStart >= end) return { next: lineStart, bytesRead: pos + bytesRead - from };
       }
       pos += bytesRead;
     }

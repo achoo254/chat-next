@@ -4,7 +4,7 @@
 // batches of up to FLUSH_MS. A thread nobody watches has no office (it is
 // built again, from the journal, when one does). docs/office-wire.md.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, type OfficeEvents, OfficeEventsSchema, type OfficeSnapshot, OfficeSnapshotSchema } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type OfficeEvents, OfficeEventsSchema, type OfficeSnapshot, OfficeSnapshotSchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import type { AgentProvider, HistoryEntry, ProviderEvent } from "../providers/types.ts";
 import { type OfficeLog, OfficeProblems } from "./office-problem-log.ts";
@@ -220,9 +220,21 @@ export class OfficeHub {
     }
   }
 
+  /** The core's threads by id; undefined (logged) when it cannot list them: this runs in a timer, where a throw would be uncaught. */
+  private threadsNow(): Map<string, ThreadSummary> | undefined {
+    try {
+      return new Map(this.core.list().map((t) => [t.id, t]));
+    } catch (err) {
+      this.problems.report("list threads", err);
+      return undefined;
+    }
+  }
+
   private poll(): void {
     const now = this.now();
-    const threads = new Map(this.core.list().map((s) => [s.id, s]));
+    const threads = this.threadsNow();
+    // The core could not list its threads: nothing is dropped or read this time.
+    if (!threads) return;
     for (const [threadId, office] of [...this.offices]) {
       const summary = threads.get(threadId);
       // Gone without a deletion heard (the core forgot it): nothing left to show.

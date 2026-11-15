@@ -129,7 +129,8 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
 
 **Lệnh shell** (`classifyCommand`): chỉ đọc trên máy, chuỗi lệnh không đi vào trường nào của khung.
 
-1. Tách lệnh ghép (`&&`, `||`, `;`, `|`, `&`, xuống dòng), tôn trọng ngoặc `'…'`/`"…"`. Bỏ các lệnh **chuẩn bị** đứng trước và nối bằng `&&`, `;` hoặc xuống
+1. Tách lệnh ghép (`&&`, `||`, `;`, `|`, `&`, xuống dòng), tôn trọng ngoặc `'…'`/`"…"` (trong `"…"` thì `\"`, `\\`, `` \` ``, `\$` không đóng ngoặc), và coi
+   `$(…)` (kể cả lồng, `$((…))`), `${…}`, `` `…` `` là một khối liền. Chỉ dấu cách và tab ASCII tách từ (khoảng trắng Unicode như NBSP là một phần của từ). Bỏ các lệnh **chuẩn bị** đứng trước và nối bằng `&&`, `;` hoặc xuống
    dòng: `cd`/`pushd`/`chdir`/`Set-Location`, `export`, `set`, `source`/`.`, lệnh chỉ gồm gán biến, gán biến PowerShell (`$env:X = …`). Lấy lệnh đầu tiên còn lại
    (`cd apps/agent && pnpm test` là `pnpm test`; `cd x | y` không bỏ `cd`).
 2. Bỏ các từ đứng trước: gán biến (`FOO=1`, kể cả giá trị có ngoặc và dấu cách), `env` (và cờ của nó), `sudo`/`doas` (và cờ: `-u bob`, …), `timeout` (cờ và thời
@@ -140,7 +141,9 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
    Trình quản lý gói `pnpm`/`npm`/`yarn`/`bun`: bỏ cờ theo từng trình (cờ có giá trị: pnpm `--filter`/`-F`/`-C`/`--dir`; npm `-w`/`--workspace`/`--prefix`;
    yarn `--cwd`, `workspace <tên>`; bun `--cwd`/`--filter`; mọi cờ khác đứng một mình, ví dụ `pnpm -w`, `pnpm -r`), rồi: `run`/`run-script` → **tên script**;
    `exec`/`x`/`dlx` → lệnh sau; còn lại là **lệnh con hoặc script** (`pnpm deploy`, `pnpm lint`, `npm test`). `make`/`just`/`task`: **đích** đầu tiên.
-4. Theo thứ tự:
+4. Đóng an toàn: nếu một từ bị bỏ qua ở bước 1-2 có `$(`, `${`, backtick hay `\` (phép tách có thể sai sau đó), chỉ phân phòng tiếp khi lệnh còn lại nằm trong
+   danh sách tên lệnh của mục 5; không thì `SERVER`.
+5. Theo thứ tự:
 
 | Điều kiện | Phòng |
 |---|---|
@@ -159,7 +162,7 @@ Chỉ cho tool của Giám đốc; tool bên trong subagent, máy, `think`, `arr
 | Loại | Chủ đề |
 |---|---|
 | `read`, `edit` | Tên tệp, không thư mục (`agent-core.ts`) |
-| `shell` | Tên lệnh (`pnpm`, `git`) sau khi bỏ phần chuẩn bị và các từ đứng trước như bước 1-2 của mục 4 (không mở `npx`, `bash -c`). Chỉ nhận khi từ đó, như đã gõ, không có `=`, `:` (trừ ổ đĩa `C:\`), `$`, ngoặc kép, ngoặc đơn, backtick, ngoặc các loại, `@`, `%`, `!`, `*`, `?`, `,`, `;`, và tên tệp của nó (bỏ thư mục, chữ thường) khớp `^[a-z0-9][a-z0-9._+-]{0,39}$`; không thì rỗng. Không bao giờ là giá trị biến hay đường dẫn |
+| `shell` | Tên lệnh (`pnpm`, `git`) sau khi bỏ phần chuẩn bị và các từ đứng trước như bước 1-2 của mục 4 (không mở `npx`, `bash -c`), **chỉ khi tên đó nằm trong danh sách cố định** `SUBJECT_COMMANDS` (`apps/agent/src/office/office-shell-words.ts`, 125 lệnh phát triển thông dụng: `git`, `gh`, `pnpm`, `npm`, `node`, `python`, `go`, `cargo`, `make`, `docker`, `kubectl`, `ls`, `grep`, `curl`, `ssh`, `psql`, …), so chữ thường, bỏ thư mục và đuôi `.exe`/`.cmd`/`.bat`/`.ps1`. Tên khác: rỗng. Vì chủ đề chỉ có thể là một chữ trong danh sách, phép tách lệnh có sai thế nào cũng không đưa giá trị biến, đường dẫn hay chữ người dùng gõ ra ngoài |
 | `search` | Rỗng |
 | `web` | Tên miền của URL (`docs.example.com`); câu tìm kiếm thì rỗng |
 | `mcp` | Tên tool sau `mcp__<server>__` (tên server không đi ra, kể cả trong `tool`) |
@@ -210,9 +213,10 @@ Quan sát khi chạy thật (Claude Code 2.1.325, Agent SDK 0.3.319, 15/11/2026)
 Không khung văn phòng nào chứa: input của tool (lệnh đầy đủ, nội dung tệp, câu tìm kiếm, câu hỏi, URL đầy đủ), output của tool, chữ của todo, nội dung tin
 nhắn hay suy nghĩ của AI, đường dẫn thư mục, giá trị biến môi trường, tên server MCP. Chỉ đi ra: tên tool (MCP chỉ là `mcp`), nhóm hoạt ảnh, mã phòng, chủ đề
 rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1 (vốn đã hiện trong chat), các số đếm, token và chi phí. Test
-`apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output, vào vị trí gán biến (có ngoặc và dấu cách, `$env:`, `set`), sau
-`cd x &&`, vào tên server MCP, rồi quét mọi khung văn phòng đã mã hoá (không phân biệt hoa thường) để khẳng định chuỗi đó không có mặt;
-`apps/agent/test/office-shell-words.test.ts` thử riêng chủ đề lệnh shell với từng dạng đó.
+`apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output, vào vị trí gán biến (có ngoặc và dấu cách, `$env:`, `set`,
+`$(…)`, backtick, `\"` trong ngoặc kép, NBSP), sau `cd x &&`, vào tên server MCP, rồi quét mọi khung văn phòng đã mã hoá (không phân biệt hoa thường) để khẳng
+định chuỗi đó không có mặt; `apps/agent/test/office-shell-words.test.ts` thử riêng chủ đề lệnh shell với từng dạng đó và với 2 000 dòng ghép ngẫu nhiên (chủ đề
+luôn rỗng hoặc là một tên trong danh sách).
 
 ## 9. Giới hạn
 
@@ -221,9 +225,13 @@ rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1
 - 4 văn phòng mỗi kết nối, 16 cho cả máy (mục 2).
 - Bản ghi subagent (phiên chạy nơi khác) chỉ được đọc khi luồng không do máy chạy lượt hiện tại, và: lần đầu sau khi dựng văn phòng, hoặc phiên đang chạy nơi
   khác, hoặc một lần nữa ngay khi lượt nơi khác vừa xong, hoặc tác vụ nền của lượt nơi khác còn chạy. Luồng do máy chạy, đang rảnh: chỉ đọc một lần (luồng SDK
-  của máy đã báo mọi thứ, kể cả subagent chạy nền; lần đọc đó lấy những gì các lượt nơi khác trước đây để lại).
-- Mỗi lần đọc có trần byte: lần đầu của một phiên tối đa 64 MiB cuối transcript chính (token) và tổng 32 MiB cho mọi log subagent (mỗi log tối đa 4 MiB cuối,
-  agent mới nhất trước); các lần sau tổng 2 MiB cho transcript chính và log subagent, phần chưa đọc để lần sau. Log tụt sau quá 4 MiB thì nhảy tới 4 MiB cuối.
+  của máy đã báo mọi thứ, kể cả subagent chạy nền; lần đọc đó lấy những gì các lượt nơi khác trước đây để lại). Mỗi lần "đến hạn" (sau khi dựng, sau khi lượt
+  nơi khác xong) là hai lần đọc cách nhau một nhịp, để một lỗi I/O ở lần đầu (lần đọc không bao giờ báo lỗi, chỉ trả rỗng) không làm mất các dòng cuối.
+- Mỗi lần đọc có trần byte. Lần đầu của một phiên: tối đa 64 MiB cuối transcript chính (token) **cộng** tổng 32 MiB cho mọi log subagent (mỗi log tối đa 4 MiB
+  cuối, agent mới nhất trước), tức tối đa khoảng 96 MiB, một lần, bất đồng bộ. Các lần sau: tổng 2 MiB cho transcript chính và log subagent, tính cả phần dòng
+  chưa xong đã đọc; phần chưa đọc để lần sau; một dòng bắt đầu trước trần được đọc hết (tối đa 8 MiB, dài hơn thì bỏ) nên một lần có thể vượt trần một dòng.
+  Tệp có kích thước không đổi kể từ lần đọc đã tới cuối tệp thì không mở lại (dòng cuối chưa xong không bị đọc lại mỗi nhịp). Log tụt sau quá 4 MiB thì nhảy
+  tới 4 MiB cuối.
   Chỉ xét 256 agent mới nhất (theo thời gian sửa tệp) để đọc `meta.json`, chỉ theo dõi log của 32 agent mới nhất; agent đã `finished` mà tệp không đổi quá 10
   phút thì không đọc nữa. Thư mục `subagents/` chỉ liệt kê lại khi thời gian sửa của nó đổi; mọi tệp được xem lại ít nhất mỗi 30 giây (subagent đã xong có thể
   được gọi tiếp). Mỗi subagent giữ 8 lời gọi tool đã xong mới nhất và mọi lời gọi còn mở (tối đa 64). Phần bị bỏ qua làm số token thấp hơn thật, không bao giờ

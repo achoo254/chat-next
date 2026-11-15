@@ -34,6 +34,8 @@ const KIND: Record<WireToolKind, ToolKind> = {
 const OUTSIDE_PROMPT = "outside";
 /** Subagents a record reports that finished this long before the office was built are not brought in. */
 const STALE_SUBAGENT_MS = 10 * 60_000;
+/** Reads of the subagents' records made each time one is due (see OfficeThread.recordsDue). */
+const RECORD_READS_DUE = 2;
 
 /** Whether the tool call runs in the background (a machine of the office): its input asks for it, or it is a Monitor. */
 function inBackground(name: string, input: string): boolean {
@@ -83,11 +85,13 @@ export class OfficeThread {
   private summary: ThreadSummary | undefined;
   private readonly builtAt: number;
   /**
-   * One read of the subagents' records is due: the first one (turns and
-   * subagents of runs elsewhere before the office was built), and one more
-   * after a run elsewhere ends (its last lines).
+   * Reads of the subagents' records due: after the office is built (turns
+   * and subagents of runs elsewhere before it), and after a run elsewhere
+   * ends (its last lines). Each is RECORD_READS_DUE reads: the provider's read
+   * never fails but may come back empty after an I/O error, and one more
+   * read (POLL_MS later) keeps such an error from losing the last lines.
    */
-  private recordsDue = true;
+  private recordsDue = RECORD_READS_DUE;
   /** The last turn seen ran elsewhere (not on the machine): its background work is in the records only. */
   private ranElsewhere = false;
 
@@ -119,7 +123,7 @@ export class OfficeThread {
   }
 
   setSummary(s: ThreadSummary, at: number): void {
-    if (this.summary?.busyElsewhere && !s.busyElsewhere) this.recordsDue = true;
+    if (this.summary?.busyElsewhere && !s.busyElsewhere) this.recordsDue = RECORD_READS_DUE;
     if (s.busyElsewhere) this.ranElsewhere = true;
     else if (runsHere(s)) this.ranElsewhere = false;
     this.summary = s;
@@ -251,12 +255,12 @@ export class OfficeThread {
   wantsSubagentRecords(): boolean {
     if (this.sessionId === "" || (this.summary && runsHere(this.summary))) return false;
     const s = this.summary;
-    return this.recordsDue || s?.busyElsewhere === true || (this.ranElsewhere && (s?.backgroundTasks ?? 0) > 0);
+    return this.recordsDue > 0 || s?.busyElsewhere === true || (this.ranElsewhere && (s?.backgroundTasks ?? 0) > 0);
   }
 
   /** What the AI's records tell of the session's subagents and calls (a session run elsewhere). */
   subagentReport(r: SubagentReport, at: number): void {
-    this.recordsDue = false;
+    this.recordsDue = Math.max(0, this.recordsDue - 1);
     for (const s of r.subagents) {
       if (s.finished && s.updatedAt > 0 && s.updatedAt < this.builtAt - STALE_SUBAGENT_MS) continue;
       this.tracker.subagentStart(

@@ -2,7 +2,7 @@
 // typed in front of the command (assignments, PowerShell's $env:, `cd dir`,
 // wrappers) or as a quoted value never comes out (docs/office-wire.md, part 5).
 import { describe, expect, it } from "vitest";
-import { commandWords, shellSubject, simpleCommands } from "../src/office/office-shell-words.ts";
+import { SUBJECT_COMMANDS, commandWords, shellSubject, simpleCommands } from "../src/office/office-shell-words.ts";
 
 const MARK = "ZZMARKER-91c4-private";
 
@@ -67,18 +67,63 @@ describe("shell subject", () => {
     `${MARK}=1`,
     `x:${MARK}`,
     `& "C:\\${MARK}\\tool.exe"`,
-  ])("is empty when the first word is not plainly a name: %s", (command) => {
+    // A plain name that is not on the list: not shown either (it could be anything typed first).
+    "ghp_SECRET123 --help",
+    "frobnicate --all",
+  ])("is empty when the first word is not a listed command: %s", (command) => {
     expect(shellSubject(command)).toBe("");
+  });
+
+  it.each([
+    // Substitutions, backticks and escaped quotes in an assigned value; a no-break space inside it.
+    [`TOKEN=$(echo ${MARK} | base64) gh pr list`, "gh"],
+    [`TOKEN=\`echo ${MARK} | base64\` gh pr list`, "gh"],
+    [`X=$(printf ${MARK} ) node x.js`, "node"],
+    [`X="$(echo "a ${MARK} c")" node`, "node"],
+    [`X="a\\" ${MARK} q" node`, "node"],
+    [`A=x\u00a0${MARK} node`, "node"],
+    [`A=\u00a0${MARK} node`, "node"],
+    [`X=$(echo a ${MARK}) gh`, "gh"],
+    [`X=\${HOME:-${MARK}} gh`, "gh"],
+    [`X=$((1 + $(echo ${MARK}))) gh`, "gh"],
+    [`X=\`echo \\\` ${MARK}\` gh`, "gh"],
+  ])("never shows a substituted or escaped value: %s", (command, subject) => {
+    const s = shellSubject(command);
+    expect(s.toLowerCase()).not.toContain(MARK.toLowerCase());
+    expect(s).toBe(subject);
+  });
+
+  it("only ever gives a name from the list, whatever it is fed", () => {
+    const pieces = ["A=", "$(", ")", "`", '"', "'", "\\", " ", "\u00a0", ";", "&&", "|", MARK, "git", "cd x", "$env:X=", "${", "}", "sudo -u", "\t"];
+    let seed = 7;
+    const next = (): number => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648);
+    for (let n = 0; n < 2_000; n++) {
+      const line = Array.from({ length: 1 + (next() % 10) }, () => pieces[next() % pieces.length] ?? "").join("");
+      const s = shellSubject(line);
+      if (s !== "") expect(SUBJECT_COMMANDS.has(s)).toBe(true);
+    }
   });
 });
 
 describe("shell words", () => {
-  it("keeps quoted separators inside a word", () => {
+  it("keeps quoted separators and substitutions inside a word", () => {
     expect(simpleCommands(`echo "a && b"; ls`).map((c) => c.words.map((w) => w.text))).toEqual([["echo", "a && b"], ["ls"]]);
+    expect(simpleCommands(`X=$(a && b | c) y; z`).map((c) => c.words.map((w) => w.raw))).toEqual([["X=$(a && b | c)", "y"], ["z"]]);
+    expect(simpleCommands("X=`a; b` y").map((c) => c.words.map((w) => w.raw))).toEqual([["X=`a; b`", "y"]]);
+    expect(simpleCommands(`X="a\\" b" y`).map((c) => c.words.map((w) => w.text))).toEqual([['X=a" b', "y"]]);
+    expect(simpleCommands("a\u00a0b c").map((c) => c.words.map((w) => w.text))).toEqual([["a\u00a0b", "c"]]);
   });
 
   it("skips setup and wrappers to the real command", () => {
-    expect(commandWords("cd x && sudo -u bob timeout 5 git pull").map((w) => w.text)).toEqual(["git", "pull"]);
-    expect(commandWords("cd x").map((w) => w.text)).toEqual(["cd", "x"]);
+    expect(commandWords("cd x && sudo -u bob timeout 5 git pull").words.map((w) => w.text)).toEqual(["git", "pull"]);
+    expect(commandWords("cd x").words.map((w) => w.text)).toEqual(["cd", "x"]);
+  });
+
+  it("says when a skipped word holds a substitution, a backtick or a backslash", () => {
+    expect(commandWords("A=1 cd x && pnpm test").opaque).toBe(false);
+    expect(commandWords("A=$(x) pnpm test").opaque).toBe(true);
+    expect(commandWords("A=`x` pnpm test").opaque).toBe(true);
+    expect(commandWords("cd C:\\work && pnpm test").opaque).toBe(true);
+    expect(commandWords("pnpm test $(x)").opaque).toBe(false);
   });
 });

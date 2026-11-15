@@ -71,6 +71,8 @@ type AgentState = {
   logFile?: FileInfo;
   /** Where the next read of the log starts; undefined before the first. */
   logPos?: number;
+  /** The log's size when a read last reached its end: while the size stays so, there is nothing new (a line not finished yet is not read again). */
+  logReadSize?: number;
   meta: { agentType: string; description: string; toolUseId: string; spawnDepth: number; background: boolean; finished: boolean };
   /** Tool calls, oldest first, with when each ended (0 while open). */
   tools: (SubagentToolCall & { doneAt: number })[];
@@ -83,6 +85,8 @@ type Listing = { mtimeMs: number; files: { name: string; path: string }[]; dirs:
 
 type SessionState = {
   mainPos?: number;
+  /** As AgentState.logReadSize, for the session's own transcript. */
+  mainReadSize?: number;
   agents: Map<string, AgentState>;
   calls: Map<string, SessionUsageCall>;
   listings: Map<string, Listing>;
@@ -155,13 +159,13 @@ export class ClaudeSubagentFeed {
     return { size: st.size, mtimeMs: st.mtimeMs };
   }
 
-  /** Lines of a file from `from`, none starting at or past `end`; where the next read starts. */
-  private async lines(path: string, from: number, end: number, onLine: (line: Buffer) => void): Promise<number> {
+  /** Lines of a file from `from`, none starting at or past `end`: where the next read starts, and the bytes read; undefined when it could not be read. */
+  private async lines(path: string, from: number, end: number, onLine: (line: Buffer) => void): Promise<{ next: number; bytesRead: number } | undefined> {
     try {
       return await readLinesUntil(path, from, end, LINE_CAP, onLine);
     } catch (err) {
       if (!isMissing(err)) this.problems.report("subagent log", err);
-      return from;
+      return undefined;
     }
   }
 
@@ -173,13 +177,22 @@ export class ClaudeSubagentFeed {
       return 0;
     }
     // The first time (or rewritten shorter, or far behind): from its last MAIN_TAIL_BYTES.
+    if (!first && s.mainReadSize === st.size) return 0;
     let from = s.mainPos ?? 0;
     if (first || from > st.size || st.size - from > MAIN_TAIL_BYTES) from = Math.max(0, st.size - MAIN_TAIL_BYTES);
     const end = first ? st.size : Math.min(st.size, from + POLL_BUDGET);
     const stats = { records: 0, withUsage: 0, parseErrors: 0, overCap: 0, unknownTypes: {} };
-    const pos = await this.lines(path, from, end, (line) => this.addCall(s, parseUsageLine(line, false, stats)));
-    s.mainPos = pos;
-    return pos - from;
+    const read = await this.lines(path, from, end, (line) => this.addCall(s, parseUsageLine(line, false, stats)));
+    // Not read: tried again next time, from the same place.
+    if (!read) {
+      s.mainPos ??= from;
+      return 0;
+    }
+    const { next, bytesRead } = read;
+    s.mainPos = next;
+    if (end >= st.size) s.mainReadSize = st.size;
+    else delete s.mainReadSize;
+    return bytesRead;
   }
 
   /** Lists the subagents' tree, a folder again only when it changed; true when any listing changed. */
@@ -313,18 +326,23 @@ export class ClaudeSubagentFeed {
   /** Reads the log's new whole lines, at most about `budget` bytes; the bytes read. */
   private async readLog(s: SessionState, a: AgentState, budget: number): Promise<number> {
     const st = a.logFile;
-    if (!a.logPath || !st) return 0;
+    if (!a.logPath || !st || a.logReadSize === st.size) return 0;
     // The first time, rewritten shorter, or too far behind: from its last AGENT_TAIL_BYTES (older calls are not counted).
     let from = a.logPos ?? -1;
     if (from < 0 || from > st.size || st.size - from > AGENT_TAIL_BYTES) from = Math.max(0, st.size - AGENT_TAIL_BYTES);
-    const pos = await this.lines(a.logPath, from, Math.min(st.size, from + budget), (line) => {
+    const end = Math.min(st.size, from + budget);
+    const read = await this.lines(a.logPath, from, end, (line) => {
       const rec = parseAgentLine(line);
       if (!rec) return;
       this.addCall(s, rec.call);
       this.addRecord(a, rec);
     });
-    a.logPos = pos;
-    return pos - from;
+    if (!read) return 0;
+    const { next, bytesRead } = read;
+    a.logPos = next;
+    if (end >= st.size) a.logReadSize = st.size;
+    else delete a.logReadSize;
+    return bytesRead;
   }
 
   private addCall(s: SessionState, call: { key: string; at: number; inputTokens?: number; outputTokens?: number } | undefined): void {

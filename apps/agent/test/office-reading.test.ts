@@ -22,26 +22,26 @@ describe("bounded lines", () => {
   it("passes whole lines starting before the end, and says where to go on", async () => {
     const path = file("aa\nbbbb\ncc\ndd");
     const seen: string[] = [];
-    const pos = await readLinesUntil(path, 0, 4, 100, (l) => seen.push(l.toString()));
+    const { next } = await readLinesUntil(path, 0, 4, 100, (l) => seen.push(l.toString()));
     // "bbbb" starts at 3, before the end (4): passed whole.
     expect(seen).toEqual(["aa", "bbbb"]);
-    expect(pos).toBe(8);
+    expect(next).toBe(8);
     const rest: string[] = [];
-    // "dd" has no newline yet: left for later.
-    expect(await readLinesUntil(path, pos, 100, 100, (l) => rest.push(l.toString()))).toBe(11);
+    // "dd" has no newline yet: left for later, but its bytes were read (they count against a budget).
+    expect(await readLinesUntil(path, next, 100, 100, (l) => rest.push(l.toString()))).toEqual({ next: 11, bytesRead: 5 });
     expect(rest).toEqual(["cc"]);
   });
 
   it("skips a line over the cap whole", async () => {
     const path = file(`${"x".repeat(50)}\nok\n`);
     const seen: string[] = [];
-    expect(await readLinesUntil(path, 0, 1_000, 10, (l) => seen.push(l.toString()))).toBe(54);
+    expect((await readLinesUntil(path, 0, 1_000, 10, (l) => seen.push(l.toString()))).next).toBe(54);
     expect(seen).toEqual(["ok"]);
   });
 
   it("reads nothing when the end is not past the start", async () => {
     const path = file("aa\n");
-    expect(await readLinesUntil(path, 3, 3, 100, () => undefined)).toBe(3);
+    expect(await readLinesUntil(path, 3, 3, 100, () => undefined)).toEqual({ next: 3, bytesRead: 0 });
   });
 });
 
@@ -81,6 +81,9 @@ describe("when the subagents' records are read", () => {
     t.setSummary(summary({}), 1);
     expect(t.wantsSubagentRecords()).toBe(true);
     t.subagentReport(report, 2);
+    // A second read, in case the first came back empty after an error.
+    expect(t.wantsSubagentRecords()).toBe(true);
+    t.subagentReport(report, 2);
     expect(t.wantsSubagentRecords()).toBe(false);
     t.setSummary(summary({ state: ThreadState.RUNNING }), 3);
     expect(t.wantsSubagentRecords()).toBe(false);
@@ -95,6 +98,7 @@ describe("when the subagents' records are read", () => {
     t.subagentReport(report, 2);
     expect(t.wantsSubagentRecords()).toBe(true);
     t.setSummary(summary({ backgroundTasks: 1 }), 3);
+    t.subagentReport(report, 4);
     t.subagentReport(report, 4);
     expect(t.wantsSubagentRecords()).toBe(true);
     t.setSummary(summary({}), 5);
