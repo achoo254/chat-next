@@ -78,6 +78,37 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     expect(live).toEqual({ state: "busy", since: NOW - 10_000, tool: "Bash", turnOpen: true, via: "transcript" });
   });
 
+  test("opened with claude --resume and nothing typed: bookkeeping written now is not a running turn", async () => {
+    // The last turn ended long ago (its records keep their times); opening the session appends bookkeeping only.
+    const { home, t } = session("done");
+    t.aiTitle("Lỗi scroll giao diện terminal").customTitle("Lỗi scroll giao diện terminal");
+    const file = t.write(home);
+    setTime(file, NOW - 5_000);
+    const sessions = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) });
+    const live = await sessions.liveness(t.sessionId);
+    expect(live.state).toBe("idle");
+    // `since` stays the file's time: it tells a session held elsewhere, and how long it was left alone.
+    expect(live.since).toBe(NOW - 5_000);
+    // Listed without a claude holding it (as after claude exits): not busy either.
+    expect(new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).find(t.sessionId)?.busy).toBe(false);
+    // A turn that starts after it is busy again at once.
+    t.user("next step");
+    setTime(t.write(home), NOW - 5_000);
+    const again = new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) });
+    expect((await again.liveness(t.sessionId)).state).toBe("busy");
+  });
+
+  test("the model thinking: the bookkeeping claude writes right after the request does not hide the turn", async () => {
+    const home = tempDir("claude-home-");
+    const t = new Transcript(randomUUID(), "/w/x", "cli", NOW - 20_000).opening();
+    t.user("explain the build");
+    t.apiRequest();
+    t.aiTitle("Build");
+    setTime(t.write(home), NOW - 5_000);
+    const live = await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).liveness(t.sessionId);
+    expect(live.state).toBe("busy");
+  });
+
   test("a finished tool is not reported; nothing on record is unknown", async () => {
     const { home, t, file } = session("done");
     setTime(file, NOW - 10_000);

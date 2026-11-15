@@ -216,7 +216,10 @@ export type LocalSession = {
   messages: number;
   /** What started it, as the transcript says; "" when unknown. */
   entrypoint: string;
-  /** Changed in the last minute, or a running process of the AI says it holds it. */
+  /**
+   * A turn wrote to it in the last minute (bookkeeping alone, as when a session merely opens, does not count), or a
+   * running process of the AI says it holds it.
+   */
   busy: boolean;
 };
 

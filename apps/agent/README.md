@@ -97,6 +97,10 @@ mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
 
+Có gì ở 3.5.1: mở lại một phiên bằng `claude --resume` (kể cả từ terminal của app) mà chưa gõ gì không còn hiện là đang chạy.
+Claude chỉ ghi thêm vài dòng sổ sách (tệp đính kèm, chi phí, chế độ) lúc mở và lúc thoát; tunelo chỉ coi là đang chạy khi một
+lượt thật ghi vào transcript trong phút vừa qua.
+
 Có gì ở 3.5.0: mở terminal của một phiên dài thấy ngay màn hình mới nhất, không còn cảnh lịch sử tua từ cũ tới mới. `tunelo-term-host`
 gửi trước bản dựng của phiên (khung `Preview`), terminal thật nhận đủ từng byte phía sau rồi mới hiện, nên không dòng nào bị cắt
 (`docs/terminal-wire.md`, mục 4). Kéo thả tệp vào terminal của phiên: tệp lưu vào thư mục của phiên và đường dẫn được gõ vào

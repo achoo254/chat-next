@@ -49,8 +49,9 @@ const texts = (items: Item[], role: Role) => byCase(items, "text").filter((i) =>
 const turnsDone = (n: number) => (items: Item[]) => byCase(items, "turn").filter((t) => t.body.value.state !== TurnState.RUNNING).length >= n;
 
 /** A terminal session in `dir`: a question, an answer with a command and its output. */
-function terminalSession(dir: string, claudeHome: string, ago = HOUR) {
-  const t = new Transcript(randomUUID(), dir, "cli").opening();
+/** `start`: when its first record was written (claude stamps every record); a fixed date in the past by default. */
+function terminalSession(dir: string, claudeHome: string, ago = HOUR, start?: number) {
+  const t = new Transcript(randomUUID(), dir, "cli", start).opening();
   t.user("Chạy test giúp mình");
   t.assistant([
     { type: "text", text: "Mình chạy npm test." },
@@ -124,7 +125,8 @@ describe("opening a session from the machine", () => {
 
   test("a session that seems open elsewhere is refused until the user goes on anyway", async () => {
     const { core, claudeHome, work } = setup();
-    const t = terminalSession(work, claudeHome, 5_000);
+    // Written seconds ago, records and file alike: a turn that just ran in a terminal.
+    const t = terminalSession(work, claudeHome, 5_000, Date.now() - 15_000);
     expect((await core.localSessions({ provider: "claude", dir: "", query: "", offset: 0, limit: 0 })).sessions[0]?.busyElsewhere).toBe(true);
     const err = await core.openLocal({ provider: "claude", sessionId: t.sessionId, consent: none, openAnyway: false, device: "phone" }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AgentError);

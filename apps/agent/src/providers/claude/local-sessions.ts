@@ -66,7 +66,38 @@ type Count = { scanned: number; messages: number };
  * no result yet ("" when none), and whether the model was asked after the
  * last message and has not answered (it writes nothing while it thinks).
  */
-type OpenTool = { size: number; mtimeMs: number; name: string; request: boolean };
+type OpenTool = {
+  size: number;
+  mtimeMs: number;
+  name: string;
+  request: boolean;
+  /**
+   * When the newest record of a turn was written (its own timestamp; null when it has none or the tail holds
+   * none), and whether only bookkeeping came after it. Claude appends bookkeeping when a session merely opens
+   * (`claude --resume`: attachments, cost and mode records): the file is fresh, yet nothing runs.
+   */
+  activeAt: number | null;
+  bookkeepingSince: boolean;
+};
+
+/** Records claude writes about a session rather than as part of a turn (opening one, its title, costs, settings). */
+const BOOKKEEPING = new Set([
+  "attachment",
+  "last-prompt",
+  "ai-title",
+  "custom-title",
+  "agent-name",
+  "mode",
+  "permission-mode",
+  "session-owner",
+  "atis-latch",
+  "tools-used",
+  "cost-state",
+  "file-history-snapshot",
+  "summary",
+  "tag",
+]);
+
 /**
  * The shells and subagents the session started in the background that its
  * transcript does not show finished, read from `pos` on (the part before it is
@@ -229,8 +260,10 @@ export class LocalSessions implements SessionHistory {
     }
     if (!k) return { state: "unknown", via: "transcript" };
     const since = Math.round(k.mtimeMs);
-    const quiet = this.now() - k.mtimeMs;
     const open = this.openWork(k);
+    // Quiet since the last write of a turn: bookkeeping alone (a session merely opened) does not make it busy.
+    // `since` stays the file's time: what tells a session held elsewhere and how long it was left alone.
+    const quiet = this.now() - this.lastTurnWrite(k, open);
     const turnOpen = open.name !== "" || open.request;
     const work = quiet < REQUEST_BUSY_MS ? open : { name: "", request: false };
     const tool = quiet < TOOL_BUSY_MS ? work.name : "";
@@ -242,6 +275,14 @@ export class LocalSessions implements SessionHistory {
     if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, turnOpen, via: "transcript" };
     if (!pending) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
     return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, turnOpen, via: "process" } : { state: "idle", since, turnOpen, via: "process" };
+  }
+
+  /**
+   * When the session last did something: the file's time, unless only bookkeeping was appended since the newest
+   * record of a turn (a session opened with `claude --resume` and nothing typed yet), then that record's time.
+   */
+  private lastTurnWrite(k: Known, open: OpenTool): number {
+    return open.bookkeepingSince && open.activeAt !== null ? Math.min(open.activeAt, k.mtimeMs) : k.mtimeMs;
   }
 
   /**
@@ -368,6 +409,13 @@ export class LocalSessions implements SessionHistory {
     const open = new Map<string, string>();
     const resultIds = /"tool_use_id":"([^"]+)"/g;
     let request = false;
+    let activeAt: number | null = null;
+    let bookkeepingSince = false;
+    const turnRecord = (timestamp: unknown) => {
+      const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
+      activeAt = Number.isNaN(at) ? null : at;
+      bookkeepingSince = false;
+    };
     try {
       withFile(k.file, (fd) =>
         scanLines(
@@ -381,10 +429,14 @@ export class LocalSessions implements SessionHistory {
               for (const m of head.matchAll(resultIds)) if (m[1]) open.delete(m[1]);
               // A message too long to keep whole (a huge answer or tool output) still ends a wait for the model.
               if (MESSAGE_TYPE.test(head)) request = false;
+              // Its time is not read from a cut line: the file's own time stands in.
+              turnRecord(undefined);
               return;
             }
             const rec = parseRecord(line);
             if (!rec || rec.isSidechain === true) return;
+            if (typeof rec.type === "string" && BOOKKEEPING.has(rec.type)) bookkeepingSince = true;
+            else turnRecord(rec.timestamp);
             if (rec.type === "api-request" || rec.type === "user" || rec.type === "assistant") request = rec.type === "api-request";
             if (!Array.isArray(rec.message?.content)) return;
             for (const block of rec.message.content as { type?: unknown; id?: unknown; name?: unknown; tool_use_id?: unknown }[]) {
@@ -400,9 +452,9 @@ export class LocalSessions implements SessionHistory {
         ),
       );
     } catch {
-      return { size: k.size, mtimeMs: k.mtimeMs, name: "", request: false };
+      return { size: k.size, mtimeMs: k.mtimeMs, name: "", request: false, activeAt: null, bookkeepingSince: false };
     }
-    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name: [...open.values()].at(-1) ?? "", request };
+    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name: [...open.values()].at(-1) ?? "", request, activeAt, bookkeepingSince };
     return k.tool;
   }
 
@@ -662,7 +714,8 @@ export class LocalSessions implements SessionHistory {
       updatedAt: Math.round(k.mtimeMs),
       messages: counted,
       entrypoint: head.entrypoint,
-      busy: this.now() - k.mtimeMs < BUSY_MS || running.has(k.sessionId),
+      // A file written in the last minute reads its tail only then: bookkeeping alone is not a running turn.
+      busy: (this.now() - k.mtimeMs < BUSY_MS && this.now() - this.lastTurnWrite(k, this.openWork(k)) < BUSY_MS) || running.has(k.sessionId),
     };
   }
 }
