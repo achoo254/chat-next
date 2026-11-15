@@ -111,4 +111,34 @@ describe("older items of a long session", () => {
 		expect(screen.getByRole("button", { name: "Cuộc trò chuyện trước" })).toBeTruthy();
 		expect(screen.queryByText("reply 100")).toBeTruthy();
 	});
+
+	it("a burst of scroll events before a render still draws earlier blocks, and later reaches of the top keep working", async () => {
+		const shown = render(view(replies(0, 130), false, () => Promise.resolve()));
+		const scroller = shown.container.querySelector<HTMLDivElement>(".mx-messages");
+		if (scroller === null) throw new Error("no scroller");
+		let top = 5000;
+		Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => top, set: (v: number) => (top = v) });
+		Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 6000 });
+		Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 500 });
+		const scrollTo = (v: number) => {
+			top = v;
+			scroller.dispatchEvent(new Event("scroll"));
+		};
+		const drawn = () => shown.container.querySelectorAll(".mx-messages > *").length;
+		await act(async () => scrollTo(4000));
+		const before = drawn();
+		// Two events in one batch: the second one's handler still sees the window as the first found it.
+		await act(async () => {
+			scrollTo(200);
+			scrollTo(0);
+		});
+		expect(drawn()).toBeGreaterThan(before);
+		const after = drawn();
+		await act(async () => {
+			scrollTo(300);
+			scrollTo(0);
+		});
+		expect(drawn()).toBeGreaterThan(after);
+	});
 });
+

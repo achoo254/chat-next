@@ -666,7 +666,9 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 		if (el === null || heightBefore.current === null) return;
 		el.scrollTop += el.scrollHeight - heightBefore.current;
 		heightBefore.current = null;
-	}, [start]);
+		// Every window change clears the mark, also one that ends where it began: a mark left behind would ignore
+		// every later reach of the top.
+	}, [start, from]);
 	// Older items still on the machine: fetched when the user reaches the top of what is loaded. The first block and
 	// the scroll height before they came keep the reading position across the blocks they add above it.
 	const firstId = all[0]?.id;
@@ -700,7 +702,12 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 			return;
 		}
 		heightBefore.current = el?.scrollHeight ?? null;
-		setFrom({ view, start: Math.max(0, start - TRANSCRIPT_PAGE) });
+		// From the window as it is by now: scroll events can come faster than renders, and this render's `start` may
+		// already be stale.
+		setFrom((f) => {
+			const current = f.view === view && f.start !== null && f.start < all.length ? f.start : start;
+			return { view, start: Math.max(0, current - TRANSCRIPT_PAGE) };
+		});
 	};
 	const last = blocks.at(-1);
 	const tail = last === undefined ? "" : `${blocks.length}:${last.kind === "text" ? last.text.length : last.id}`;
@@ -756,7 +763,8 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 						// Only the user scrolling up stops the following; content growing does not.
 						stick.current = false;
 						setSeenAt((seen) => seen ?? blocks.length);
-						if (fixed === null) setFrom({ view, start });
+						// Pins the window where it is unless an earlier event of this burst moved it already.
+						if (fixed === null) setFrom((f) => (f.view === view && f.start !== null ? f : { view, start }));
 					}
 					if (up && el.scrollTop < EARLIER_PX) showEarlier();
 				}}
