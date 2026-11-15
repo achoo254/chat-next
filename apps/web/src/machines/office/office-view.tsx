@@ -4,7 +4,7 @@
 // that to a renderer. View only: no input, the chat is untouched. A machine
 // whose tunelo predates the office gets a note to update and no frame.
 // Loaded on demand with the rest of machines/office/ (and its styles).
-import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
 import { ErrorReason, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { AGENT_OFFICE, versionAtLeast } from "../agent-version.ts";
 import type { MachinesCopy } from "../copy-vi.ts";
@@ -31,13 +31,25 @@ export const PHONE_WIDTH = 640;
 const FRAME_TICK_MS = 1_000;
 const SOUND_KEY = "ai:office:sound";
 
+/** The 3D scene, its own lazy chunk; it falls back to the 2D view itself where 3D cannot run. */
+const Office3D = lazy(() => import("../../office-3d/office-canvas.tsx"));
+
+function Office3DOr2D(props: OfficeRendererProps) {
+	return (
+		<Suspense fallback={<Office2D {...props} />}>
+			<Office3D {...props} />
+		</Suspense>
+	);
+}
+
 /**
- * The way to draw the office on this device. The 2D view for now; the 3D
- * scene adds itself here (WebGL2 or WebGPU present, and its lazy module from
- * apps/web/src/office-3d/office-canvas.tsx), with the 2D view kept as the fallback.
+ * The way to draw the office on this device: the 3D scene
+ * (apps/web/src/office-3d/office-canvas.tsx, which checks for hardware
+ * WebGL2 before loading Babylon), with the 2D view while it loads and as its
+ * fallback.
  */
 export function chooseRenderer(): ComponentType<OfficeRendererProps> {
-	return Office2D;
+	return Office3DOr2D;
 }
 
 /** What to say when the machine refused to watch: its reason when it gave one (too many offices open at once), else that the office could not open. */
@@ -206,7 +218,7 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 					{t.loading}
 				</p>
 			) : (
-				<Renderer state={state} placements={frame.placements} layout={layout} floor={frame.floor.floor} size={size} daypart={officeDaypart(frame.now, state.off)} assets={assets} now={frame.now} />
+				<Renderer state={state} placements={frame.placements} layout={layout} floor={frame.floor.floor} size={size} daypart={officeDaypart(frame.now, state.off)} assets={assets} now={frame.now} sound={sound} />
 			)}
 		</div>
 	);

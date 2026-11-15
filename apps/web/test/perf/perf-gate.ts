@@ -15,8 +15,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type Page } from "playwright";
 import { build, preview } from "vite";
-import { BUNDLE_BUDGET, PROFILES, SCENARIO, STARTUP_MODULES, type Profile } from "./budgets.ts";
-import { measure, parseManifest, startupFiles, totalGzip } from "./bundle.ts";
+import { BUNDLE_BUDGET, OFFICE_3D_BUDGET, OFFICE_3D_MODULES, OFFICE_VIEW_MODULE, office3dPart, PROFILES, SCENARIO, STARTUP_MODULES, type Profile } from "./budgets.ts";
+import { lazyFiles, measure, parseManifest, startupFiles, totalGzip } from "./bundle.ts";
 import { PERF_SEED, type OpenSample, type ScrollSample } from "./perf-api.ts";
 import { frameStats, longTaskStats, percentile } from "./stats.ts";
 
@@ -69,6 +69,12 @@ async function bundleCheck(): Promise<void> {
 		}
 		row("startup JS (gzip)", totalGzip(js) / KB, "KB", BUNDLE_BUDGET.startupJsGzip / KB, atMost);
 		row("startup CSS (gzip)", totalGzip(css) / KB, "KB", BUNDLE_BUDGET.startupCssGzip / KB, atMost);
+		const beforeOffice3d = [...files.js, ...lazyFiles(manifest, [OFFICE_VIEW_MODULE], [], () => false)];
+		for (const backend of ["webgpu", "webgl2"] as const) {
+			const office3d = await measure(outDir, lazyFiles(manifest, OFFICE_3D_MODULES, beforeOffice3d, office3dPart(backend)));
+			console.log(`3D office (${backend}): ${office3d.length} JS chunks, largest ${(Math.max(0, ...office3d.map((f) => f.gzipBytes)) / KB).toFixed(1)} KB gzip`);
+			row(`3D office JS, ${backend} (gzip)`, totalGzip(office3d) / KB, "KB", OFFICE_3D_BUDGET.jsGzip / KB, atMost);
+		}
 	} finally {
 		await rm(outDir, { recursive: true, force: true });
 	}

@@ -27,10 +27,38 @@ export const BUNDLE_BUDGET = {
 	 * having left the startup catalog for its own chunk. 150.4 KB with
 	 * @achoo254/app-switcher 0.6.0 (developer tools heading); 147.7 KB once the
 	 * switcher loaded in its own chunk behind a placeholder of its size.
+	 * 150.5 KB with the lazy 3D office: no app module entered startup, but
+	 * Babylon's on-demand chunks also use the bundler's runtime helpers, so
+	 * rolldown moved them out of the react vendor chunk into a startup chunk
+	 * of their own (149.74 → 150.05 KB, the split's overhead).
 	 */
-	startupJsGzip: 150 * 1024,
+	startupJsGzip: 150.5 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
+} as const;
+
+/**
+ * The 3D office (apps/web/src/office-3d): the lazy modules the Office tab
+ * loads for it (manifest keys), counted with their static imports and
+ * Babylon's on-demand parts (shaders), minus what a signed-in start and the
+ * Office tab itself (OFFICE_VIEW_MODULE) already loaded.
+ */
+export const OFFICE_3D_MODULES = ["src/office-3d/office-canvas.tsx", "src/office-3d/office-world.ts"] as const;
+export const OFFICE_VIEW_MODULE = "src/machines/office/office-view.tsx";
+
+/**
+ * On-demand parts that belong to the 3D office's count, for one backend: a
+ * device runs WebGPU (WGSL shaders) or WebGL2 (GLSL shaders), never both, so
+ * each backend's count leaves out the other's shader chunks.
+ */
+export function office3dPart(backend: "webgpu" | "webgl2"): (key: string) => boolean {
+	const other = backend === "webgpu" ? "/@babylonjs/core/Shaders/" : "/@babylonjs/core/ShadersWGSL/";
+	return (key) => (key.includes("@babylonjs/") && !key.includes(other)) || key.startsWith("src/office-3d/");
+}
+
+export const OFFICE_3D_BUDGET = {
+	/** Plan decision 7: the 3D chunk under 1 MB gzip, models and textures not counted (the spike page measured 807 KB). */
+	jsGzip: 1024 * 1024,
 } as const;
 
 /** GitHub Actions and most CI systems set CI=true. */

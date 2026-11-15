@@ -21,4 +21,6 @@ export interface OfficeRendererProps {
 	readonly assets: Parsed<OfficeAssets> | null;
 	/** Viewer time. */
 	readonly now: number;
+	/** The viewer turned the office's sound on (the 3D scene plays it; 2D is silent). */
+	readonly sound?: boolean;
 }

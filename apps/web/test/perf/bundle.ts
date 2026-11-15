@@ -74,6 +74,33 @@ export function startupFiles(manifest: Manifest, lazyModules: readonly string[])
 	return { js: [...js].sort(), css: [...css].sort() };
 }
 
+/**
+ * JS files `modules` (manifest keys) load that `exclude` does not already
+ * list (what a lazy feature adds on top of what is loaded before it): every
+ * static import, and the dynamic imports whose key `follow` accepts (a
+ * library's own on-demand parts, not the app's other lazy screens).
+ * Throws when a module is not in the manifest.
+ */
+export function lazyFiles(manifest: Manifest, modules: readonly string[], exclude: readonly string[], follow: (key: string) => boolean): string[] {
+	const skip = new Set(exclude);
+	const seen = new Set<string>();
+	const js = new Set<string>();
+	const visit = (key: string) => {
+		if (seen.has(key)) return;
+		seen.add(key);
+		const chunk = manifest[key];
+		if (chunk === undefined) throw new Error(`bundle: manifest misses chunk ${key}`);
+		if (chunk.file.endsWith(".js") && !skip.has(chunk.file)) js.add(chunk.file);
+		for (const imported of chunk.imports ?? []) visit(imported);
+		for (const imported of chunk.dynamicImports ?? []) if (follow(imported)) visit(imported);
+	};
+	for (const module of modules) {
+		if (manifest[module] === undefined) throw new Error(`bundle: lazy module ${module} is not a chunk in the manifest`);
+		visit(module);
+	}
+	return [...js].sort();
+}
+
 export interface SizedFile {
 	readonly file: string;
 	readonly bytes: number;

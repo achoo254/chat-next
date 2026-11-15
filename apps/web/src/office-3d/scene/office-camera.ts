@@ -1,0 +1,133 @@
+// The office's isometric camera at run time: orthographic, framed by
+// fit-office-camera.ts for the canvas shape each frame, with the viewer's
+// zoom (wheel, pinch), a small turn (right-drag, shift-drag, or two fingers
+// sideways) that glides back to the default after a few seconds untouched,
+// and drag to pan within the floor. View only: nothing is picked.
+import { Camera } from "@babylonjs/core/Cameras/camera";
+import { TargetCamera } from "@babylonjs/core/Cameras/targetCamera";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Scene } from "@babylonjs/core/scene";
+import type { LayoutCamera } from "../../machines/office/office-layout.ts";
+import { baseFraming, clampPan, clampUser, dragToPan, frameOffice, NO_USER, type CameraUser, type OfficeFrame } from "./fit-office-camera.ts";
+import type { Rect } from "./scene-layout.ts";
+
+export interface OfficeCamera {
+	readonly camera: TargetCamera;
+	/** Re-frames for the canvas (CSS pixels); `lift` raises the view for the floor-change glide. Returns the frame. */
+	update(width: number, height: number, timeMs: number, lift: number): OfficeFrame;
+	readonly frame: OfficeFrame | null;
+	dispose(): void;
+}
+
+/** The turn glides back to the default after this long untouched. */
+const RETURN_AFTER_MS = 5_000;
+const RETURN_GLIDE_MS = 900;
+/** Radians of turn per CSS pixel of sideways drag. */
+const TURN_PER_PIXEL = 0.006;
+
+export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, layout: LayoutCamera, footprint: Rect, focus: Rect | null, reducedMotion: boolean): OfficeCamera {
+	const camera = new TargetCamera("office-camera", new Vector3(0, 30, -30), scene);
+	camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
+	camera.minZ = 1;
+	camera.maxZ = 200;
+	let user: CameraUser = NO_USER;
+	let lastInput = -Infinity;
+	let lastTime: number | null = null;
+	let frame: OfficeFrame | null = null;
+	let size = { width: 1, height: 1 };
+	const pointers = new Map<number, { x: number; y: number }>();
+	const target = new Vector3();
+
+	const base = () => baseFraming(layout, size.width / Math.max(1, size.height), focus);
+	const touch = (): void => {
+		lastInput = performance.now();
+	};
+	const pan = (dx: number, dy: number): void => {
+		if (frame === null) return;
+		const d = dragToPan(frame, size.height, dx, dy);
+		user = clampPan(base(), { ...user, panX: user.panX + d.x, panZ: user.panZ + d.z }, footprint);
+	};
+	const turn = (dx: number): void => {
+		user = clampUser({ ...user, yaw: user.yaw - dx * TURN_PER_PIXEL });
+	};
+	const zoomBy = (factor: number): void => {
+		user = clampUser({ ...user, zoom: user.zoom * factor });
+	};
+
+	const onDown = (e: PointerEvent): void => {
+		touch();
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		canvas.setPointerCapture(e.pointerId);
+	};
+	const onMove = (e: PointerEvent): void => {
+		const was = pointers.get(e.pointerId);
+		if (was === undefined) return;
+		touch();
+		const dx = e.clientX - was.x;
+		const dy = e.clientY - was.y;
+		if (pointers.size >= 2) {
+			const others = [...pointers].filter(([id]) => id !== e.pointerId).map(([, p]) => p);
+			const other = others[0];
+			if (other !== undefined) {
+				const before = Math.hypot(was.x - other.x, was.y - other.y);
+				const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
+				if (before > 4) zoomBy(after / before);
+				turn(dx / 2);
+			}
+		} else if (e.button === 2 || (e.buttons & 2) !== 0 || e.shiftKey) turn(dx);
+		else pan(dx, dy);
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+	};
+	const onUp = (e: PointerEvent): void => {
+		pointers.delete(e.pointerId);
+	};
+	const onWheel = (e: WheelEvent): void => {
+		e.preventDefault();
+		touch();
+		zoomBy(Math.exp(-e.deltaY * 0.0015));
+	};
+	const onMenu = (e: Event): void => e.preventDefault();
+	canvas.addEventListener("pointerdown", onDown);
+	canvas.addEventListener("pointermove", onMove);
+	canvas.addEventListener("pointerup", onUp);
+	canvas.addEventListener("pointercancel", onUp);
+	canvas.addEventListener("wheel", onWheel, { passive: false });
+	canvas.addEventListener("contextmenu", onMenu);
+
+	return {
+		camera,
+		get frame() {
+			return frame;
+		},
+		update(width, height, timeMs, lift) {
+			size = { width: Math.max(1, width), height: Math.max(1, height) };
+			const delta = lastTime === null ? 0 : Math.max(0, timeMs - lastTime);
+			lastTime = timeMs;
+			if (pointers.size === 0 && timeMs - lastInput > RETURN_AFTER_MS && user.yaw !== 0) {
+				const yaw = reducedMotion ? 0 : user.yaw * Math.exp(-delta / RETURN_GLIDE_MS);
+				user = { ...user, yaw: Math.abs(yaw) < 1e-3 ? 0 : yaw };
+			}
+			const b = base();
+			user = clampPan(b, user, footprint);
+			const f = frameOffice(layout, size.width / size.height, b, user, lift);
+			frame = f;
+			camera.position.set(f.position.x, f.position.y, f.position.z);
+			target.set(f.target.x, f.target.y, f.target.z);
+			camera.setTarget(target);
+			camera.orthoLeft = -f.halfWidth;
+			camera.orthoRight = f.halfWidth;
+			camera.orthoTop = f.halfHeight;
+			camera.orthoBottom = -f.halfHeight;
+			return f;
+		},
+		dispose() {
+			canvas.removeEventListener("pointerdown", onDown);
+			canvas.removeEventListener("pointermove", onMove);
+			canvas.removeEventListener("pointerup", onUp);
+			canvas.removeEventListener("pointercancel", onUp);
+			canvas.removeEventListener("wheel", onWheel);
+			canvas.removeEventListener("contextmenu", onMenu);
+			camera.dispose();
+		},
+	};
+}
