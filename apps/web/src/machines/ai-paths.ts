@@ -10,6 +10,8 @@ export const aiPaths = {
 	manage: "/ai/machines",
 	/** A session in its AI's own CLI, in the machine's terminal. */
 	sessionTerminal: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}/terminal`,
+	/** A session's office: the building where its AI and subagents work (view only). */
+	sessionOffice: (machine: string, threadId: string) => `/ai/${machine}/s/${encodeURIComponent(threadId)}/office`,
 	/** The machine's terminal opening one more plain shell in `cwd` ("" for the home folder). */
 	newShell: (machine: string, cwd: string) => `/ai/${machine}/terminal?new=${encodeURIComponent(cwd)}`,
 	/** The machine's terminal showing one of its sessions (a plain shell no tab here shows). */

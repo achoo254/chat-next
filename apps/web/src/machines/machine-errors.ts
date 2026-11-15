@@ -180,6 +180,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.usageLedgerBlocked;
 		case ErrorReason.NOTHING_STAGED:
 			return r.nothingStaged;
+		case ErrorReason.OFFICE_WATCH_LIMIT:
+			return r.officeWatchLimit;
 		default:
 			return undefined;
 	}

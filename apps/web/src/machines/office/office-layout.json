@@ -1,0 +1,1957 @@
+{
+	"formatVersion": 1,
+	"units": "m",
+	"note": "Bố cục toà nhà Văn phòng, nguồn sự thật duy nhất của hình học (cảnh 3D, bước lắp và bake Blender, bản 2D). Trục: x sang phải, z vào sâu (tường sau ở z = 8), y lên; face là rotation.y của Babylon (0 nhìn về +z). Hình chữ nhật [x0, z0, x1, z1]. Kiểm bằng parseOfficeLayout (office-layout.ts).",
+	"footprint": [
+		-13,
+		-12,
+		13,
+		8
+	],
+	"wallHeight": 3.2,
+	"defaultCamera": {
+		"note": "Camera isometric trực giao dùng chung cho cảnh 3D và ảnh 2D dựng sẵn: yaw quay quanh trục y (độ, 0 = nhìn thẳng vào tường sau từ phía sảnh), pitch là góc ngẩng trên mặt sàn (độ), target là điểm giữa khung, orthoHeight là chiều cao khung nhìn (mét) theo cỡ ảnh, aspect là rộng chia cao.",
+		"yaw": 30,
+		"pitch": 35,
+		"target": [
+			0,
+			1.6,
+			-2
+		],
+		"views": {
+			"desktop": {
+				"aspect": 1.6,
+				"orthoHeight": 25
+			},
+			"phone": {
+				"aspect": 1,
+				"orthoHeight": 36
+			}
+		}
+	},
+	"floors": [
+		{
+			"level": 1,
+			"name": "Tầng 1",
+			"rooms": [
+				{
+					"room": "DIRECTOR",
+					"name": "Phòng Giám đốc",
+					"rect": [
+						-13,
+						0,
+						-6.5,
+						8
+					]
+				},
+				{
+					"room": "SERVER",
+					"name": "Phòng Máy chủ",
+					"rect": [
+						-13,
+						-8,
+						-6.5,
+						0
+					]
+				},
+				{
+					"room": "WORK",
+					"name": "Phòng Làm việc chung",
+					"rect": [
+						-6.5,
+						-8,
+						6.5,
+						8
+					]
+				},
+				{
+					"room": "PANTRY",
+					"name": "Pantry",
+					"rect": [
+						6.5,
+						0,
+						13,
+						8
+					]
+				},
+				{
+					"room": "MEETING",
+					"name": "Phòng họp",
+					"rect": [
+						6.5,
+						-8,
+						13,
+						0
+					]
+				},
+				{
+					"room": "LOBBY",
+					"name": "Sảnh",
+					"rect": [
+						-6.5,
+						-12,
+						13,
+						-8
+					]
+				}
+			],
+			"circulation": [
+				{
+					"name": "Thang máy và cầu thang",
+					"rect": [
+						-13,
+						-12,
+						-6.5,
+						-8
+					]
+				}
+			],
+			"glass": [
+				[
+					-6.5,
+					-8,
+					-6.5,
+					8
+				],
+				[
+					6.5,
+					-8,
+					6.5,
+					8
+				],
+				[
+					-13,
+					0,
+					-6.5,
+					0
+				],
+				[
+					6.5,
+					0,
+					13,
+					0
+				],
+				[
+					-6.5,
+					-8,
+					13,
+					-8
+				],
+				[
+					-6.5,
+					-12,
+					-6.5,
+					-8
+				]
+			],
+			"doors": [
+				{
+					"id": "door-director",
+					"between": [
+						"WORK",
+						"DIRECTOR"
+					],
+					"at": [
+						-6.5,
+						1.5
+					],
+					"width": 1.4,
+					"axis": "z"
+				},
+				{
+					"id": "door-server",
+					"between": [
+						"WORK",
+						"SERVER"
+					],
+					"at": [
+						-6.5,
+						-0.85
+					],
+					"width": 1.5,
+					"axis": "z"
+				},
+				{
+					"id": "door-pantry",
+					"between": [
+						"WORK",
+						"PANTRY"
+					],
+					"at": [
+						6.5,
+						1.5
+					],
+					"width": 1.4,
+					"axis": "z"
+				},
+				{
+					"id": "door-meeting",
+					"between": [
+						"WORK",
+						"MEETING"
+					],
+					"at": [
+						6.5,
+						-0.85
+					],
+					"width": 1.5,
+					"axis": "z"
+				},
+				{
+					"id": "door-lobby",
+					"between": [
+						"WORK",
+						"LOBBY"
+					],
+					"at": [
+						0,
+						-8
+					],
+					"width": 2.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-core",
+					"between": [
+						"LOBBY",
+						null
+					],
+					"at": [
+						-6.5,
+						-10
+					],
+					"width": 2,
+					"axis": "z"
+				},
+				{
+					"id": "entrance",
+					"between": [
+						"LOBBY",
+						null
+					],
+					"at": [
+						4,
+						-12
+					],
+					"width": 2.6,
+					"axis": "x"
+				}
+			],
+			"anchors": [
+				{
+					"id": "desk-0",
+					"kind": "desk",
+					"room": "WORK",
+					"x": -5.7,
+					"z": 2.6,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": -4.5,
+						"z": 2.6,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-west"
+				},
+				{
+					"id": "desk-1",
+					"kind": "desk",
+					"room": "WORK",
+					"x": -2.35,
+					"z": 2.6,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": -1.15,
+						"z": 2.6,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-west"
+				},
+				{
+					"id": "desk-2",
+					"kind": "desk",
+					"room": "WORK",
+					"x": 1,
+					"z": 2.6,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": 2.2,
+						"z": 2.6,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-east"
+				},
+				{
+					"id": "desk-3",
+					"kind": "desk",
+					"room": "WORK",
+					"x": 4.3,
+					"z": 2.6,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": 5.5,
+						"z": 2.6,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-east"
+				},
+				{
+					"id": "desk-4",
+					"kind": "desk",
+					"room": "WORK",
+					"x": -5.7,
+					"z": -1.9,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": -4.5,
+						"z": -1.9,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-west"
+				},
+				{
+					"id": "desk-5",
+					"kind": "desk",
+					"room": "WORK",
+					"x": -2.35,
+					"z": -1.9,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": -1.15,
+						"z": -1.9,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-west"
+				},
+				{
+					"id": "desk-6",
+					"kind": "desk",
+					"room": "WORK",
+					"x": 1,
+					"z": -1.9,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": 2.2,
+						"z": -1.9,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-east"
+				},
+				{
+					"id": "desk-7",
+					"kind": "desk",
+					"room": "WORK",
+					"x": 4.3,
+					"z": -1.9,
+					"face": 1.57,
+					"sit": true,
+					"desk": {
+						"x": 5.5,
+						"z": -1.9,
+						"rotY": 0
+					},
+					"node": "f1-work-aisle-east"
+				},
+				{
+					"id": "director",
+					"kind": "director",
+					"room": "DIRECTOR",
+					"x": -10.8,
+					"z": 5,
+					"face": 1.57,
+					"sit": true,
+					"node": "f1-director"
+				},
+				{
+					"id": "director-front",
+					"kind": "work",
+					"room": "DIRECTOR",
+					"x": -8.2,
+					"z": 4.6,
+					"face": -1.57,
+					"node": "f1-director"
+				},
+				{
+					"id": "server-0",
+					"kind": "server",
+					"room": "SERVER",
+					"x": -10.95,
+					"z": -2,
+					"face": -1.57,
+					"node": "f1-server"
+				},
+				{
+					"id": "server-1",
+					"kind": "server",
+					"room": "SERVER",
+					"x": -10.95,
+					"z": -4.3,
+					"face": -1.57,
+					"node": "f1-server"
+				},
+				{
+					"id": "server-2",
+					"kind": "server",
+					"room": "SERVER",
+					"x": -10.95,
+					"z": -6.6,
+					"face": -1.57,
+					"node": "f1-server"
+				},
+				{
+					"id": "pantry-coffee",
+					"kind": "pantry",
+					"room": "PANTRY",
+					"x": 8.6,
+					"z": 6.3,
+					"face": 0,
+					"node": "f1-pantry"
+				},
+				{
+					"id": "sofa-0",
+					"kind": "sofa",
+					"room": "PANTRY",
+					"x": 10.2,
+					"z": 4.2,
+					"face": 3.14,
+					"sit": true,
+					"node": "f1-pantry"
+				},
+				{
+					"id": "sofa-1",
+					"kind": "sofa",
+					"room": "PANTRY",
+					"x": 11.6,
+					"z": 4.2,
+					"face": 3.14,
+					"sit": true,
+					"node": "f1-pantry"
+				},
+				{
+					"id": "meeting-0",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 11.55,
+					"z": -4.3,
+					"face": -1.57,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "meeting-1",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 10.68,
+					"z": -2.78,
+					"face": -2.62,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "meeting-2",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 8.93,
+					"z": -2.78,
+					"face": 2.62,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "meeting-3",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 8.05,
+					"z": -4.3,
+					"face": 1.57,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "meeting-4",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 8.93,
+					"z": -5.82,
+					"face": 0.52,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "meeting-5",
+					"kind": "meeting",
+					"room": "MEETING",
+					"x": 10.68,
+					"z": -5.82,
+					"face": -0.52,
+					"sit": true,
+					"node": "f1-meeting"
+				},
+				{
+					"id": "lobby-entry",
+					"kind": "lobby",
+					"room": "LOBBY",
+					"x": 4,
+					"z": -11.2,
+					"face": 0,
+					"node": "f1-entrance"
+				},
+				{
+					"id": "chairman",
+					"kind": "chairman",
+					"room": "LOBBY",
+					"x": 2,
+					"z": -10.6,
+					"face": 0,
+					"node": "f1-lobby-mid"
+				},
+				{
+					"id": "chairman-meet",
+					"kind": "work",
+					"room": "LOBBY",
+					"x": 2,
+					"z": -9.2,
+					"face": 3.14,
+					"node": "f1-lobby-mid"
+				},
+				{
+					"id": "lobby-board",
+					"kind": "board",
+					"room": "LOBBY",
+					"x": 12.85,
+					"z": -10,
+					"y": 1.8,
+					"face": -1.57,
+					"node": "f1-lobby-east"
+				},
+				{
+					"id": "board-view",
+					"kind": "work",
+					"room": "LOBBY",
+					"x": 11.2,
+					"z": -10,
+					"face": 1.57,
+					"node": "f1-lobby-east"
+				},
+				{
+					"id": "f1-elevator",
+					"kind": "elevator",
+					"room": null,
+					"x": -9.2,
+					"z": -10,
+					"face": 1.57,
+					"node": "f1-elevator"
+				},
+				{
+					"id": "director-work-1",
+					"kind": "work",
+					"room": "DIRECTOR",
+					"x": -8.4,
+					"z": 6.8,
+					"face": -1.57,
+					"node": "f1-director"
+				},
+				{
+					"id": "director-work-2",
+					"kind": "work",
+					"room": "DIRECTOR",
+					"x": -10.6,
+					"z": 1.6,
+					"face": 0,
+					"node": "f1-director"
+				},
+				{
+					"id": "work-spot-0",
+					"kind": "work",
+					"room": "WORK",
+					"x": -3,
+					"z": -5.5,
+					"face": 0,
+					"node": "f1-work-front"
+				},
+				{
+					"id": "work-spot-1",
+					"kind": "work",
+					"room": "WORK",
+					"x": 0,
+					"z": -5.5,
+					"face": 0,
+					"node": "f1-work-front"
+				},
+				{
+					"id": "work-spot-2",
+					"kind": "work",
+					"room": "WORK",
+					"x": 3,
+					"z": -5.5,
+					"face": 0,
+					"node": "f1-work-front"
+				}
+			],
+			"phoneDeskOrder": [
+				"desk-1",
+				"desk-2",
+				"desk-5",
+				"desk-6",
+				"desk-0",
+				"desk-4"
+			],
+			"graph": {
+				"nodes": [
+					{
+						"id": "f1-work-aisle-west",
+						"x": -5,
+						"z": 0.35,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-aisle-mid",
+						"x": 0,
+						"z": 0.35,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-aisle-east",
+						"x": 5,
+						"z": 0.35,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-front",
+						"x": 0,
+						"z": -6.5,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-door-director",
+						"x": -6.5,
+						"z": 1.5,
+						"room": null
+					},
+					{
+						"id": "f1-door-server",
+						"x": -6.5,
+						"z": -0.85,
+						"room": null
+					},
+					{
+						"id": "f1-door-pantry",
+						"x": 6.5,
+						"z": 1.5,
+						"room": null
+					},
+					{
+						"id": "f1-door-meeting",
+						"x": 6.5,
+						"z": -0.85,
+						"room": null
+					},
+					{
+						"id": "f1-door-lobby",
+						"x": 0,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f1-door-core",
+						"x": -6.5,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f1-director",
+						"x": -8.6,
+						"z": 2.6,
+						"room": "DIRECTOR"
+					},
+					{
+						"id": "f1-server",
+						"x": -10.2,
+						"z": -1.2,
+						"room": "SERVER"
+					},
+					{
+						"id": "f1-pantry",
+						"x": 8.6,
+						"z": 2.2,
+						"room": "PANTRY"
+					},
+					{
+						"id": "f1-meeting",
+						"x": 8.2,
+						"z": -1.6,
+						"room": "MEETING"
+					},
+					{
+						"id": "f1-lobby-west",
+						"x": -4,
+						"z": -10,
+						"room": "LOBBY"
+					},
+					{
+						"id": "f1-lobby-mid",
+						"x": 2,
+						"z": -10,
+						"room": "LOBBY"
+					},
+					{
+						"id": "f1-lobby-east",
+						"x": 9,
+						"z": -10,
+						"room": "LOBBY"
+					},
+					{
+						"id": "f1-entrance",
+						"x": 4,
+						"z": -11.6,
+						"room": "LOBBY"
+					},
+					{
+						"id": "f1-elevator",
+						"x": -9.2,
+						"z": -10,
+						"room": null
+					}
+				],
+				"edges": [
+					[
+						"f1-work-aisle-west",
+						"f1-work-aisle-mid"
+					],
+					[
+						"f1-work-aisle-mid",
+						"f1-work-aisle-east"
+					],
+					[
+						"f1-work-aisle-mid",
+						"f1-work-front"
+					],
+					[
+						"f1-work-aisle-west",
+						"f1-door-director"
+					],
+					[
+						"f1-work-aisle-west",
+						"f1-door-server"
+					],
+					[
+						"f1-work-aisle-east",
+						"f1-door-pantry"
+					],
+					[
+						"f1-work-aisle-east",
+						"f1-door-meeting"
+					],
+					[
+						"f1-door-director",
+						"f1-director"
+					],
+					[
+						"f1-door-server",
+						"f1-server"
+					],
+					[
+						"f1-door-pantry",
+						"f1-pantry"
+					],
+					[
+						"f1-door-meeting",
+						"f1-meeting"
+					],
+					[
+						"f1-work-front",
+						"f1-door-lobby"
+					],
+					[
+						"f1-door-lobby",
+						"f1-lobby-mid"
+					],
+					[
+						"f1-lobby-west",
+						"f1-lobby-mid"
+					],
+					[
+						"f1-lobby-mid",
+						"f1-lobby-east"
+					],
+					[
+						"f1-lobby-mid",
+						"f1-entrance"
+					],
+					[
+						"f1-lobby-west",
+						"f1-door-core"
+					],
+					[
+						"f1-door-core",
+						"f1-elevator"
+					]
+				]
+			},
+			"elevatorNode": "f1-elevator",
+			"props": [
+				{
+					"name": "desk",
+					"x": -4.5,
+					"z": 2.6,
+					"rotY": 0,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "chair",
+					"x": -5.7,
+					"z": 2.6,
+					"rotY": 1.57,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "monitor",
+					"x": -4.05,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "keyboard",
+					"x": -4.8,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "desk-lamp",
+					"x": -4.05,
+					"z": 3.05,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "desk",
+					"x": -1.15,
+					"z": 2.6,
+					"rotY": 0,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "chair",
+					"x": -2.35,
+					"z": 2.6,
+					"rotY": 1.57,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "monitor",
+					"x": -0.7,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "keyboard",
+					"x": -1.45,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "desk-lamp",
+					"x": -0.7,
+					"z": 3.05,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "desk",
+					"x": 2.2,
+					"z": 2.6,
+					"rotY": 0,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "chair",
+					"x": 1,
+					"z": 2.6,
+					"rotY": 1.57,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "monitor",
+					"x": 2.65,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "keyboard",
+					"x": 1.9,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 2.65,
+					"z": 3.05,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "desk",
+					"x": 5.5,
+					"z": 2.6,
+					"rotY": 0,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "chair",
+					"x": 4.3,
+					"z": 2.6,
+					"rotY": 1.57,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "monitor",
+					"x": 5.95,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "keyboard",
+					"x": 5.2,
+					"z": 2.6,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 5.95,
+					"z": 3.05,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "desk",
+					"x": -4.5,
+					"z": -1.9,
+					"rotY": 0,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "chair",
+					"x": -5.7,
+					"z": -1.9,
+					"rotY": 1.57,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "monitor",
+					"x": -4.05,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "keyboard",
+					"x": -4.8,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "desk-lamp",
+					"x": -4.05,
+					"z": -1.45,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "desk",
+					"x": -1.15,
+					"z": -1.9,
+					"rotY": 0,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "chair",
+					"x": -2.35,
+					"z": -1.9,
+					"rotY": 1.57,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "monitor",
+					"x": -0.7,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "keyboard",
+					"x": -1.45,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "desk-lamp",
+					"x": -0.7,
+					"z": -1.45,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "desk",
+					"x": 2.2,
+					"z": -1.9,
+					"rotY": 0,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "chair",
+					"x": 1,
+					"z": -1.9,
+					"rotY": 1.57,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "monitor",
+					"x": 2.65,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "keyboard",
+					"x": 1.9,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 2.65,
+					"z": -1.45,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "desk",
+					"x": 5.5,
+					"z": -1.9,
+					"rotY": 0,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "chair",
+					"x": 4.3,
+					"z": -1.9,
+					"rotY": 1.57,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "monitor",
+					"x": 5.95,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "keyboard",
+					"x": 5.2,
+					"z": -1.9,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 5.95,
+					"z": -1.45,
+					"y": 0.75,
+					"rotY": -1.57,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "bookshelf",
+					"x": -3,
+					"z": 7.6,
+					"rotY": 3.14
+				},
+				{
+					"name": "bookshelf",
+					"x": 3,
+					"z": 7.6,
+					"rotY": 3.14
+				},
+				{
+					"name": "glass-partition",
+					"x": 0.52,
+					"z": 2.6,
+					"rotY": 1.57
+				},
+				{
+					"name": "glass-partition",
+					"x": 0.52,
+					"z": -1.9,
+					"rotY": 1.57
+				},
+				{
+					"name": "plant",
+					"x": -5.9,
+					"z": 7.3
+				},
+				{
+					"name": "plant",
+					"x": 5.9,
+					"z": 7.3
+				},
+				{
+					"name": "plant",
+					"x": -5.9,
+					"z": -7.3
+				},
+				{
+					"name": "plant",
+					"x": 5.9,
+					"z": -7.3
+				}
+			],
+			"smallProps": [
+				{
+					"name": "mug",
+					"x": -4.7,
+					"z": 2.2,
+					"y": 0.75,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "paper-stack",
+					"x": -4.4,
+					"z": 2.95,
+					"y": 0.75,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "sticky-notes",
+					"x": -4.95,
+					"z": 2.9,
+					"y": 0.75,
+					"anchor": "desk-0"
+				},
+				{
+					"name": "mug",
+					"x": -1.35,
+					"z": 2.2,
+					"y": 0.75,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "cable-bundle",
+					"x": -0.65,
+					"z": 2.2,
+					"y": 0,
+					"anchor": "desk-1"
+				},
+				{
+					"name": "mug",
+					"x": 2,
+					"z": 2.2,
+					"y": 0.75,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "paper-stack",
+					"x": 2.3,
+					"z": 2.95,
+					"y": 0.75,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "mug",
+					"x": 5.3,
+					"z": 2.2,
+					"y": 0.75,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "sticky-notes",
+					"x": 5.05,
+					"z": 2.9,
+					"y": 0.75,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "cable-bundle",
+					"x": 6,
+					"z": 2.2,
+					"y": 0,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "mug",
+					"x": -4.7,
+					"z": -2.3,
+					"y": 0.75,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "paper-stack",
+					"x": -4.4,
+					"z": -1.55,
+					"y": 0.75,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "mug",
+					"x": -1.35,
+					"z": -2.3,
+					"y": 0.75,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "cable-bundle",
+					"x": -0.65,
+					"z": -2.3,
+					"y": 0,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "mug",
+					"x": 2,
+					"z": -2.3,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "paper-stack",
+					"x": 2.3,
+					"z": -1.55,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "sticky-notes",
+					"x": 1.75,
+					"z": -1.6,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "mug",
+					"x": 5.3,
+					"z": -2.3,
+					"y": 0.75,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "cable-bundle",
+					"x": 6,
+					"z": -2.3,
+					"y": 0,
+					"anchor": "desk-7"
+				}
+			]
+		},
+		{
+			"level": 2,
+			"name": "Tầng 2",
+			"rooms": [
+				{
+					"room": "PLANNING",
+					"name": "Phòng Kế hoạch",
+					"rect": [
+						-13,
+						-8,
+						-4.33,
+						8
+					]
+				},
+				{
+					"room": "LIBRARY",
+					"name": "Thư viện",
+					"rect": [
+						-4.33,
+						-8,
+						4.33,
+						8
+					]
+				},
+				{
+					"room": "POST",
+					"name": "Bưu phòng",
+					"rect": [
+						4.33,
+						-8,
+						13,
+						8
+					]
+				}
+			],
+			"circulation": [
+				{
+					"name": "Thang máy và cầu thang",
+					"rect": [
+						-13,
+						-12,
+						-6.5,
+						-8
+					]
+				},
+				{
+					"name": "Hành lang",
+					"rect": [
+						-6.5,
+						-12,
+						13,
+						-8
+					]
+				}
+			],
+			"glass": [],
+			"doors": [
+				{
+					"id": "door-planning",
+					"between": [
+						"PLANNING",
+						null
+					],
+					"at": [
+						-8.66,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-library",
+					"between": [
+						"LIBRARY",
+						null
+					],
+					"at": [
+						0,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-post",
+					"between": [
+						"POST",
+						null
+					],
+					"at": [
+						8.66,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-core",
+					"between": [
+						null,
+						null
+					],
+					"at": [
+						-6.5,
+						-10
+					],
+					"width": 2,
+					"axis": "z"
+				}
+			],
+			"anchors": [
+				{
+					"id": "f2-elevator",
+					"kind": "elevator",
+					"room": null,
+					"x": -9.2,
+					"z": -10,
+					"face": 1.57,
+					"node": "f2-elevator"
+				},
+				{
+					"id": "planning-work-0",
+					"kind": "work",
+					"room": "PLANNING",
+					"x": -11.06,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-planning"
+				},
+				{
+					"id": "planning-work-1",
+					"kind": "work",
+					"room": "PLANNING",
+					"x": -8.66,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-planning"
+				},
+				{
+					"id": "planning-work-2",
+					"kind": "work",
+					"room": "PLANNING",
+					"x": -6.26,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-planning"
+				},
+				{
+					"id": "library-work-0",
+					"kind": "work",
+					"room": "LIBRARY",
+					"x": -2.4,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-library"
+				},
+				{
+					"id": "library-work-1",
+					"kind": "work",
+					"room": "LIBRARY",
+					"x": 0,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-library"
+				},
+				{
+					"id": "library-work-2",
+					"kind": "work",
+					"room": "LIBRARY",
+					"x": 2.4,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-library"
+				},
+				{
+					"id": "post-work-0",
+					"kind": "work",
+					"room": "POST",
+					"x": 6.26,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-post"
+				},
+				{
+					"id": "post-work-1",
+					"kind": "work",
+					"room": "POST",
+					"x": 8.66,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-post"
+				},
+				{
+					"id": "post-work-2",
+					"kind": "work",
+					"room": "POST",
+					"x": 11.06,
+					"z": 2.5,
+					"face": 0,
+					"node": "f2-post"
+				},
+				{
+					"id": "planning-board",
+					"kind": "board",
+					"room": "PLANNING",
+					"x": -8.66,
+					"z": 7.6,
+					"face": 0,
+					"node": "f2-planning"
+				}
+			],
+			"graph": {
+				"nodes": [
+					{
+						"id": "f2-elevator",
+						"x": -9.2,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f2-door-core",
+						"x": -6.5,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f2-hall-planning",
+						"x": -8.66,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f2-door-planning",
+						"x": -8.66,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f2-planning",
+						"x": -8.66,
+						"z": -5.5,
+						"room": "PLANNING"
+					},
+					{
+						"id": "f2-hall-library",
+						"x": 0,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f2-door-library",
+						"x": 0,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f2-library",
+						"x": 0,
+						"z": -5.5,
+						"room": "LIBRARY"
+					},
+					{
+						"id": "f2-hall-post",
+						"x": 8.66,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f2-door-post",
+						"x": 8.66,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f2-post",
+						"x": 8.66,
+						"z": -5.5,
+						"room": "POST"
+					}
+				],
+				"edges": [
+					[
+						"f2-elevator",
+						"f2-door-core"
+					],
+					[
+						"f2-door-core",
+						"f2-hall-planning"
+					],
+					[
+						"f2-hall-planning",
+						"f2-door-planning"
+					],
+					[
+						"f2-door-planning",
+						"f2-planning"
+					],
+					[
+						"f2-hall-planning",
+						"f2-hall-library"
+					],
+					[
+						"f2-hall-library",
+						"f2-door-library"
+					],
+					[
+						"f2-door-library",
+						"f2-library"
+					],
+					[
+						"f2-hall-library",
+						"f2-hall-post"
+					],
+					[
+						"f2-hall-post",
+						"f2-door-post"
+					],
+					[
+						"f2-door-post",
+						"f2-post"
+					]
+				]
+			},
+			"elevatorNode": "f2-elevator",
+			"props": [],
+			"smallProps": []
+		},
+		{
+			"level": 3,
+			"name": "Tầng 3",
+			"rooms": [
+				{
+					"room": "SECURITY",
+					"name": "Phòng Bảo vệ",
+					"rect": [
+						-13,
+						-8,
+						-4.33,
+						8
+					]
+				},
+				{
+					"room": "AUDIT",
+					"name": "Phòng Kiểm toán",
+					"rect": [
+						-4.33,
+						-8,
+						4.33,
+						8
+					]
+				},
+				{
+					"room": "QA",
+					"name": "Phòng QA/ISO",
+					"rect": [
+						4.33,
+						-8,
+						13,
+						8
+					]
+				}
+			],
+			"circulation": [
+				{
+					"name": "Thang máy và cầu thang",
+					"rect": [
+						-13,
+						-12,
+						-6.5,
+						-8
+					]
+				},
+				{
+					"name": "Hành lang",
+					"rect": [
+						-6.5,
+						-12,
+						13,
+						-8
+					]
+				}
+			],
+			"glass": [],
+			"doors": [
+				{
+					"id": "door-security",
+					"between": [
+						"SECURITY",
+						null
+					],
+					"at": [
+						-8.66,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-audit",
+					"between": [
+						"AUDIT",
+						null
+					],
+					"at": [
+						0,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-qa",
+					"between": [
+						"QA",
+						null
+					],
+					"at": [
+						8.66,
+						-8
+					],
+					"width": 1.6,
+					"axis": "x"
+				},
+				{
+					"id": "door-core",
+					"between": [
+						null,
+						null
+					],
+					"at": [
+						-6.5,
+						-10
+					],
+					"width": 2,
+					"axis": "z"
+				}
+			],
+			"anchors": [
+				{
+					"id": "f3-elevator",
+					"kind": "elevator",
+					"room": null,
+					"x": -9.2,
+					"z": -10,
+					"face": 1.57,
+					"node": "f3-elevator"
+				},
+				{
+					"id": "security-work-0",
+					"kind": "work",
+					"room": "SECURITY",
+					"x": -11.06,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-security"
+				},
+				{
+					"id": "security-work-1",
+					"kind": "work",
+					"room": "SECURITY",
+					"x": -8.66,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-security"
+				},
+				{
+					"id": "security-work-2",
+					"kind": "work",
+					"room": "SECURITY",
+					"x": -6.26,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-security"
+				},
+				{
+					"id": "audit-work-0",
+					"kind": "work",
+					"room": "AUDIT",
+					"x": -2.4,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-audit"
+				},
+				{
+					"id": "audit-work-1",
+					"kind": "work",
+					"room": "AUDIT",
+					"x": 0,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-audit"
+				},
+				{
+					"id": "audit-work-2",
+					"kind": "work",
+					"room": "AUDIT",
+					"x": 2.4,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-audit"
+				},
+				{
+					"id": "qa-work-0",
+					"kind": "work",
+					"room": "QA",
+					"x": 6.26,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-qa"
+				},
+				{
+					"id": "qa-work-1",
+					"kind": "work",
+					"room": "QA",
+					"x": 8.66,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-qa"
+				},
+				{
+					"id": "qa-work-2",
+					"kind": "work",
+					"room": "QA",
+					"x": 11.06,
+					"z": 2.5,
+					"face": 0,
+					"node": "f3-qa"
+				},
+				{
+					"id": "audit-board",
+					"kind": "board",
+					"room": "AUDIT",
+					"x": 0,
+					"z": 7.6,
+					"face": 0,
+					"node": "f3-audit"
+				},
+				{
+					"id": "qa-board",
+					"kind": "board",
+					"room": "QA",
+					"x": 8.66,
+					"z": 7.6,
+					"face": 0,
+					"node": "f3-qa"
+				}
+			],
+			"graph": {
+				"nodes": [
+					{
+						"id": "f3-elevator",
+						"x": -9.2,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f3-door-core",
+						"x": -6.5,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f3-hall-security",
+						"x": -8.66,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f3-door-security",
+						"x": -8.66,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f3-security",
+						"x": -8.66,
+						"z": -5.5,
+						"room": "SECURITY"
+					},
+					{
+						"id": "f3-hall-audit",
+						"x": 0,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f3-door-audit",
+						"x": 0,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f3-audit",
+						"x": 0,
+						"z": -5.5,
+						"room": "AUDIT"
+					},
+					{
+						"id": "f3-hall-qa",
+						"x": 8.66,
+						"z": -10,
+						"room": null
+					},
+					{
+						"id": "f3-door-qa",
+						"x": 8.66,
+						"z": -8,
+						"room": null
+					},
+					{
+						"id": "f3-qa",
+						"x": 8.66,
+						"z": -5.5,
+						"room": "QA"
+					}
+				],
+				"edges": [
+					[
+						"f3-elevator",
+						"f3-door-core"
+					],
+					[
+						"f3-door-core",
+						"f3-hall-security"
+					],
+					[
+						"f3-hall-security",
+						"f3-door-security"
+					],
+					[
+						"f3-door-security",
+						"f3-security"
+					],
+					[
+						"f3-hall-security",
+						"f3-hall-audit"
+					],
+					[
+						"f3-hall-audit",
+						"f3-door-audit"
+					],
+					[
+						"f3-door-audit",
+						"f3-audit"
+					],
+					[
+						"f3-hall-audit",
+						"f3-hall-qa"
+					],
+					[
+						"f3-hall-qa",
+						"f3-door-qa"
+					],
+					[
+						"f3-door-qa",
+						"f3-qa"
+					]
+				]
+			},
+			"elevatorNode": "f3-elevator",
+			"props": [],
+			"smallProps": []
+		}
+	],
+	"elevator": {
+		"travelSecondsPerFloor": 2.5,
+		"doorSeconds": 1,
+		"nodes": {
+			"1": "f1-elevator",
+			"2": "f2-elevator",
+			"3": "f3-elevator"
+		}
+	}
+}

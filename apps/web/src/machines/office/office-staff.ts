@@ -1,0 +1,90 @@
+// The office's employees, one per agent type at a time: the agent sends each
+// subagent as its own actor, the office folds them into people. A new
+// subagent of a type whose employee has finished is that same employee back
+// at work; only when every employee of the type is busy does someone new
+// come in, named with a number ("Tí Trinh Sát 2"). Each employee keeps one
+// home desk for the whole session; with no desk left they sit in the meeting
+// room and take the first desk that frees up. Employees of a nested subagent
+// or a workflow work from the meeting room and never take a desk. Pure: the
+// store calls these on every change.
+
+export interface StaffMember {
+	/** Stable while the employee stays: "<agent type>#<ordinal>" (nested ones carry a "~"). */
+	readonly key: string;
+	readonly agentType: string;
+	/** 1 for the first employee of the type, 2 for the next one busy at the same time, … */
+	readonly ordinal: number;
+	/** The actor (subagent) the employee works as now. */
+	readonly actorId: string;
+	/** Index into the floor's desk order; null in the meeting room. */
+	readonly desk: number | null;
+	/** A nested subagent or a workflow's agent: the meeting room, never a desk. */
+	readonly nested: boolean;
+	/** When this employee first came in (machine time). */
+	readonly firstEnteredAt: number;
+}
+
+export interface Hire {
+	readonly actorId: string;
+	readonly agentType: string;
+	readonly nested: boolean;
+	readonly enteredAt: number;
+}
+
+/** Whether the employee's current actor has finished by `at` (machine time): such an employee takes the next subagent of the type. */
+export type FreeAt = (actorId: string, at: number) => boolean;
+
+function keyOf(agentType: string, nested: boolean, ordinal: number): string {
+	return `${nested ? "~" : ""}${agentType}#${ordinal}`;
+}
+
+/** The desks `deskCount` offers: desks past it are given up, free ones go to the people waiting in the meeting room, longest waiting first. */
+export function fillDesks(staff: readonly StaffMember[], deskCount: number): StaffMember[] {
+	const kept = staff.map((m) => (m.desk !== null && m.desk >= deskCount ? { ...m, desk: null } : m));
+	const taken = new Set(kept.flatMap((m) => (m.desk === null ? [] : [m.desk])));
+	return kept.map((m) => {
+		if (m.nested || m.desk !== null) return m;
+		for (let desk = 0; desk < deskCount; desk++) {
+			if (!taken.has(desk)) {
+				taken.add(desk);
+				return { ...m, desk };
+			}
+		}
+		return m;
+	});
+}
+
+/** A subagent came in: the free employee of its type takes it, else a new employee does. */
+export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, deskCount: number): StaffMember[] {
+	if (staff.some((m) => m.actorId === next.actorId)) return [...staff];
+	const same = staff.filter((m) => m.agentType === next.agentType && m.nested === next.nested);
+	const free = same.filter((m) => freeAt(m.actorId, next.enteredAt)).sort((a, b) => a.ordinal - b.ordinal)[0];
+	if (free !== undefined) return staff.map((m) => (m === free ? { ...m, actorId: next.actorId } : m));
+	const used = new Set(same.map((m) => m.ordinal));
+	let ordinal = 1;
+	while (used.has(ordinal)) ordinal++;
+	const member: StaffMember = {
+		key: keyOf(next.agentType, next.nested, ordinal),
+		agentType: next.agentType,
+		ordinal,
+		actorId: next.actorId,
+		desk: null,
+		nested: next.nested,
+		firstEnteredAt: next.enteredAt,
+	};
+	return fillDesks([...staff, member], deskCount);
+}
+
+/** The actor left: its employee goes home (an employee who moved on to another subagent stays). */
+export function release(staff: readonly StaffMember[], actorId: string, deskCount: number): StaffMember[] {
+	if (!staff.some((m) => m.actorId === actorId)) return [...staff];
+	return fillDesks(
+		staff.filter((m) => m.actorId !== actorId),
+		deskCount,
+	);
+}
+
+/** People waiting for a desk in the meeting room ("+N"); nested employees are not waiting for one. */
+export function overflowOf(staff: readonly StaffMember[]): number {
+	return staff.filter((m) => !m.nested && m.desk === null).length;
+}

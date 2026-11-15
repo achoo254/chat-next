@@ -84,6 +84,9 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 		case "session-terminal":
 			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} mode="terminal" />;
 			break;
+		case "session-office":
+			main = <SessionChat key={`${view.machine}/${view.threadId}`} machine={view.machine} threadId={view.threadId} mode="office" />;
+			break;
 		case "terminal":
 			main = <TerminalPage key={view.machine} machine={view.machine} openShellIn={new URLSearchParams(search).get("new") ?? undefined} showSession={sessionParam(search)} />;
 			break;

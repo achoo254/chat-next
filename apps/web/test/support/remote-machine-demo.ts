@@ -13,7 +13,9 @@
 // message with an image and a file (the image fetched back over the link),
 // uploads acknowledged piece by piece (a file named "stall-…" stops at about
 // 40 %, to show the progress); and beside it a machine this browser has not
-// paired with and one that is offline.
+// paired with and one that is offline. A session's office (fake-office.ts)
+// answers on a page opened at an office path or with ?office, where the
+// machine reports tunelo 3.6.0 (elsewhere 2.0.11, as the other screens expect).
 // Test-only: never part of the production build.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { AccountStatus, Decision, GitFileState, ItemSchema, LoginState, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
@@ -23,6 +25,7 @@ import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
 import { FakeTerminalHost } from "../machines/fake-terminal.ts";
 import { FakeRfb } from "./fake-rfb.ts";
+import { FakeOffice } from "./fake-office.ts";
 import { FakeUsage } from "./fake-usage.ts";
 import { FakeWorkspace } from "./fake-workspace.ts";
 import type { FakeMachines } from "./fake-machines.ts";
@@ -357,6 +360,10 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	// "Hiệu quả" of the machine: the demo folder's usage in memory; the e2e reads it as window.__fakeUsage.
 	const usageSide = new FakeUsage("local:chat-next");
 	(window as unknown as { __fakeUsage?: FakeUsage }).__fakeUsage = usageSide;
+	// The office of a session (tunelo 3.6.0): the e2e reads it as window.__fakeOffice.
+	const office = new FakeOffice(machine);
+	(window as unknown as { __fakeOffice?: FakeOffice }).__fakeOffice = office;
+	const officeDemo = new URLSearchParams(window.location.search).has("office") || window.location.pathname.endsWith("/office");
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();
 	/** Folders whose .claude configuration is on (ProjectConfigSet); every other one is off. The e2e reads it as window.__fakeProjectConfig. */
@@ -470,7 +477,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 						value: {
 							name: "DIEUVY-LAPTOP",
 							os: "win32",
-							agentVersion: "2.0.11",
+							agentVersion: officeDemo ? "3.6.0" : "2.0.11",
 							secrets: true,
 							gitChanges: true,
 							browser: { available: true, running: true, clearable: true },
@@ -670,7 +677,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "attachmentFetch":
 				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
-				return workspace.handle(frame) ?? usageSide.handle(frame) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
+				return workspace.handle(frame) ?? usageSide.handle(frame) ?? office.handle(frame, socket) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
 		}
 	};
 	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.

@@ -9,7 +9,7 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 // "Chat | Terminal" in the header opens the same session in its AI's own CLI
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -47,7 +47,7 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeSwitch, TerminalHeldBar, openSessionIn, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { ModeIcon, ModeSwitch, TerminalHeldBar, officeOffered, openSessionIn, rememberSessionMode, sessionModes, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
 import { isPhone, useViewportFit } from "./viewport-fit.ts";
@@ -57,6 +57,9 @@ import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
 
 export { versionAtLeast };
+
+/** The session's office (machines/office): loaded, with its styles and the building's layout, the first time it opens. */
+const OfficeView = lazy(() => import("./office/office-view.tsx"));
 
 /** The first tunelo that takes a message with a denial and lists a session's files. */
 const AGENT_2_0_1 = [2, 0, 1] as const;
@@ -123,7 +126,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const limits = limitsOf(state.info?.attachments);
 	const attach = useAttachments(link, threadId, limits, caps?.images ?? false, ai);
 	// In the terminal the dock takes dropped files itself (into the session's folder, the path typed in the pane).
-	const drop = useFileDrop(online && !missing && mode !== "terminal", (files) => {
+	const drop = useFileDrop(online && !missing && mode === "chat", (files) => {
 		attach.add(files);
 		document.querySelector<HTMLElement>(".mx-chat [data-composer]")?.focus();
 	});
@@ -166,6 +169,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const chip = online ? null : "offline";
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
+	// The views of the session's header: the switch shows once there are two.
+	const modes = sessionModes(offered, officeOffered(state.info));
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
@@ -230,7 +235,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					</>
 				}
 			>
-				{offered && <ModeSwitch machine={machine} threadId={threadId} mode={mode} />}
+				<ModeSwitch machine={machine} threadId={threadId} mode={mode} modes={modes} />
 				{mode === "terminal" && offered && (
 					<Suspense fallback={null}>
 						<TerminalPill machine={machine} />
@@ -250,15 +255,15 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					dir={dir}
 					narrowItems={(close) => (
 						<>
-							{offered &&
-								(["chat", "terminal"] as const)
+							{modes.length > 1 &&
+								modes
 									.filter((m) => m !== mode)
 									.map((m) => (
 										<button key={m} type="button" role="menuitem" onClick={() => {
 											close();
 											openSessionIn(machine, threadId, m);
 										}}>
-											<MachineIcon name={m === "terminal" ? "terminal" : "chat"} small />
+											<ModeIcon mode={m} />
 											<span>{t.terminal.mode[m]}</span>
 										</button>
 									))}
@@ -279,7 +284,14 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} bar />
-			{mode === "terminal" ? (
+			{mode === "office" ? (
+				<div className="mx-chat-body">
+					<Suspense fallback={<p className="mx-group-note muted">{t.office.loading}</p>}>
+						<OfficeView link={link} threadId={threadId} info={state.info} online={online} />
+					</Suspense>
+					{workspacePanel}
+				</div>
+			) : mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (
 						<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>

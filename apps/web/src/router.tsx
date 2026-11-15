@@ -42,6 +42,8 @@ export type MachinesView =
 	| { readonly page: "session"; readonly machine: string; readonly threadId: string }
 	/** The session opened in its AI's own CLI, in the machine's terminal. */
 	| { readonly page: "session-terminal"; readonly machine: string; readonly threadId: string }
+	/** The session's office: its AI and subagents at work in a small building (view only). */
+	| { readonly page: "session-office"; readonly machine: string; readonly threadId: string }
 	/**
 	 * "Hiệu quả": the machine's AI usage of one repository, `key` its
 	 * canonical key ("host/path"), `local:<folder>` or `scratch`; "" for
@@ -244,6 +246,7 @@ function matchMachines(parts: readonly string[]): Route | null {
 	if (parts[1] !== "s" || !THREAD_ID.test(threadId)) return null;
 	if (parts.length === 3) return route({ page: "session", machine, threadId });
 	if (parts.length === 4 && parts[3] === "terminal") return route({ page: "session-terminal", machine, threadId });
+	if (parts.length === 4 && parts[3] === "office") return route({ page: "session-office", machine, threadId });
 	return null;
 }
 
