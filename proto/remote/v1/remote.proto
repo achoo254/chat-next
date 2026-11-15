@@ -302,6 +302,15 @@ message Frame {
     ThreadEarlier thread_earlier = 166;
     // B → A
     ThreadEarlierResult thread_earlier_result = 167;
+
+    // The office of a session (tunelo 3.6.0+); see "the office of a session"
+    // below.
+    // A → B
+    OfficeWatch office_watch = 168;
+    // B → A
+    OfficeSnapshot office_snapshot = 169;
+    // Unasked, to the connections watching the thread's office.
+    OfficeEvents office_events = 170;
   }
 }
 
@@ -3144,3 +3153,257 @@ message UsageRuleSwitch {
 // starts again from the transcripts still on the machine. Answered with Ack;
 // B writes it to the consent log.
 message UsageDelete {}
+
+// --- the office of a session --------------------------------------------------
+// A playful view of one thread's session as a small office building (tunelo
+// 3.6.0+): the AI's main agent is the director, each subagent an employee,
+// each background shell a machine, and every tool call an activity in one of
+// the building's rooms. B turns each AI's own events into these shapes on
+// the machine; a device only draws them. docs/office-wire.md is the full
+// contract (rooms for each tool and command, gaps in seq, which signals
+// each kind of session lacks).
+//
+// Nothing here carries a tool's input or output, a command's text, a todo's
+// text or a file's content: only tool names, the room and animation B picked
+// for them, short subjects (a file name without its folder, a command's
+// first word, a host name; empty for a sensitive path), and counts.
+
+// A → B: start (on) or stop watching the office of a thread for this
+// connection. On: answered with OfficeSnapshot (asking again is how a device
+// asks for a fresh snapshot after a gap in seq or a reconnect). Off:
+// answered with Ack. Closing the connection stops every watch it had.
+// ERROR_REASON_THREAD_NOT_FOUND for an unknown thread.
+message OfficeWatch {
+  string thread_id = 1;
+  bool on = 2;
+}
+
+// B → A: the whole office of a thread. Events with seq up to and including
+// `seq` are in it; the next OfficeEvents of the same epoch starts at seq + 1.
+message OfficeSnapshot {
+  string thread_id = 1;
+  // The agent's epoch (as in Cursor): a device drops what it holds for
+  // another epoch and applies this snapshot.
+  uint64 epoch = 2;
+  uint64 seq = 3;
+  OfficeState state = 4;
+}
+
+// B → A, unasked: what changed in the office, in order. Gathered for up to
+// 250 ms. Each event's seq is one more than the one before it, across
+// frames; a device that sees a gap (or another epoch) watches again.
+message OfficeEvents {
+  string thread_id = 1;
+  uint64 epoch = 2;
+  repeated OfficeEvent events = 3;
+}
+
+message OfficeState {
+  // The director first, then everyone else in the order they came in. At
+  // most 64; the rest are counted in OfficeSession.hidden_actors.
+  repeated OfficeActor actors = 1;
+  // The AI reports its subagents (false for an AI that cannot, Antigravity:
+  // a device says so instead of showing an empty office).
+  bool reports_staff = 2;
+  OfficeSession session = 3;
+}
+
+// The session's own numbers, sent whole in the snapshot and in an event
+// whenever one of them changes.
+message OfficeSession {
+  // A turn runs, on this machine or elsewhere (ThreadSummary.busy_elsewhere).
+  bool busy = 1;
+  // The AI waits for the user: an approval, a question, or a sign-in secret.
+  bool waiting_for_user = 2;
+  // Unix milliseconds the first turn B saw began; 0 before one.
+  int64 started_at = 3;
+  // Subagents that handed in their work plus todo entries done, this session.
+  uint32 tasks_done = 4;
+  // Shells and subagents still running in the background
+  // (ThreadSummary.background_tasks).
+  uint32 background_machines = 5;
+  OfficeTodoCounts todo = 6;
+  OfficeUsage usage = 7;
+  OfficeChecks checks = 8;
+  // Actors over the 64 B keeps.
+  uint32 hidden_actors = 9;
+}
+
+// The todo list as counts only, never the entries' text.
+message OfficeTodoCounts {
+  uint32 pending = 1;
+  uint32 in_progress = 2;
+  uint32 done = 3;
+}
+
+// Tokens and estimated cost of the turns B saw end in this session.
+message OfficeUsage {
+  uint64 input_tokens = 1;
+  uint64 output_tokens = 2;
+  // At the AI's API prices, in US dollars; only an estimate (a subscription
+  // plan is not charged by it).
+  double cost_usd_estimate = 3;
+  // The AI reports a cost (false: show tokens only).
+  bool has_cost = 4;
+  // B has numbers for this kind of session at all (false: a device shows
+  // that it has none, never zeros).
+  bool available = 5;
+}
+
+// Test, lint and typecheck commands (activities in OFFICE_ROOM_QA) that
+// ended this session.
+message OfficeChecks {
+  uint32 passed = 1;
+  uint32 failed = 2;
+  // The latest one passed; meaningless while passed + failed is 0.
+  bool last_ok = 3;
+}
+
+message OfficeActor {
+  // "director" for the main agent; an employee's or a machine's id is the
+  // tool call that started it.
+  string id = 1;
+  OfficeRole role = 2;
+  // An employee's agent type as the AI names it ("code-reviewer"); a
+  // machine's tool ("Bash"); "" for the director or when unknown.
+  string agent_type = 3;
+  // An employee's short task description, as its card in the chat shows it.
+  string description = 4;
+  // The actor that started this one ("" for the director's own staff).
+  string parent_id = 5;
+  // 1 for a subagent of the main agent, 2 and more for one a subagent
+  // started (a workflow); 0 for the director and machines.
+  uint32 spawn_depth = 6;
+  OfficeActorState state = 7;
+  // What the actor does now; unset when nothing.
+  OfficeActivity activity = 8;
+  // Unix milliseconds.
+  int64 entered_at = 9;
+  // Unix milliseconds the actor finished (OFFICE_ACTOR_STATE_DONE); 0 before.
+  int64 done_at = 10;
+}
+
+message OfficeActivity {
+  // The tool call's id, or a fixed id for what is not a tool call
+  // ("think", "arrive", "hand-in").
+  string id = 1;
+  // The tool's name as the AI calls it ("Read", "Bash", "mcp__github__x");
+  // "" for thinking, arriving and handing in.
+  string tool = 2;
+  OfficeAnimGroup group = 3;
+  OfficeRoom room = 4;
+  // At most 40 characters; the director's own tools only, "" otherwise.
+  string subject = 5;
+  // Unix milliseconds.
+  int64 started_at = 6;
+}
+
+message OfficeEvent {
+  uint64 seq = 1;
+  // Unix milliseconds on the machine.
+  int64 at = 2;
+  oneof kind {
+    OfficeActor actor_enter = 3;
+    // The actor's state and fields as they are now (activity included).
+    OfficeActor actor_update = 4;
+    OfficeActorLeave actor_leave = 5;
+    OfficeActivityStart activity_start = 6;
+    OfficeActivityEnd activity_end = 7;
+    // A new turn started (a message from the user, or a turn seen starting
+    // elsewhere).
+    OfficeTurnStart turn_start = 8;
+    OfficeApproval approval = 9;
+    OfficeSession session = 10;
+  }
+}
+
+message OfficeActorLeave {
+  string actor_id = 1;
+}
+
+// The actor's activity is this one now (it replaces the one shown).
+message OfficeActivityStart {
+  string actor_id = 1;
+  OfficeActivity activity = 2;
+}
+
+// The activity ended; the actor's activity clears only when it is the one
+// shown (activity.id == activity_id).
+message OfficeActivityEnd {
+  string actor_id = 1;
+  string activity_id = 2;
+  bool ok = 3;
+}
+
+message OfficeTurnStart {}
+
+// A permission prompt for the actor's tool: WAITING makes the actor
+// OFFICE_ACTOR_STATE_AWAITING_APPROVAL, any other state sets it back to
+// what it was.
+message OfficeApproval {
+  string actor_id = 1;
+  OfficeApprovalState state = 2;
+}
+
+enum OfficeRole {
+  OFFICE_ROLE_UNSPECIFIED = 0;
+  OFFICE_ROLE_DIRECTOR = 1;
+  OFFICE_ROLE_EMPLOYEE = 2;
+  OFFICE_ROLE_MACHINE = 3;
+}
+
+enum OfficeActorState {
+  OFFICE_ACTOR_STATE_UNSPECIFIED = 0;
+  OFFICE_ACTOR_STATE_IDLE = 1;
+  OFFICE_ACTOR_STATE_WORKING = 2;
+  // Finished; stays until the session has been idle for 10 minutes.
+  OFFICE_ACTOR_STATE_DONE = 3;
+  OFFICE_ACTOR_STATE_AWAITING_APPROVAL = 4;
+}
+
+// How an activity is acted out.
+enum OfficeAnimGroup {
+  OFFICE_ANIM_GROUP_UNSPECIFIED = 0;
+  // Leafing through files: reading and searching.
+  OFFICE_ANIM_GROUP_READ = 1;
+  // Typing: edits, todo lists, MCP tools and any tool B does not know.
+  OFFICE_ANIM_GROUP_TYPE = 2;
+  // Standing at a machine: shell commands.
+  OFFICE_ANIM_GROUP_MACHINE = 3;
+  // On the phone: the web.
+  OFFICE_ANIM_GROUP_PHONE = 4;
+  // Walking in: a subagent starting.
+  OFFICE_ANIM_GROUP_ARRIVE = 5;
+  // Handing in a file: a subagent finished.
+  OFFICE_ANIM_GROUP_HAND_IN = 6;
+  // Thinking or writing the answer.
+  OFFICE_ANIM_GROUP_THINK = 7;
+}
+
+// The building's rooms. A device reads an unknown or unset room as
+// OFFICE_ROOM_WORK. B never sends PANTRY (idle play a device picks) nor an
+// agent type's home room (a device applies those); both are here so devices
+// and the building's layout file share one code.
+enum OfficeRoom {
+  OFFICE_ROOM_UNSPECIFIED = 0;
+  OFFICE_ROOM_LOBBY = 1;
+  OFFICE_ROOM_DIRECTOR = 2;
+  OFFICE_ROOM_WORK = 3;
+  OFFICE_ROOM_SERVER = 4;
+  OFFICE_ROOM_MEETING = 5;
+  OFFICE_ROOM_PANTRY = 6;
+  OFFICE_ROOM_PLANNING = 7;
+  OFFICE_ROOM_LIBRARY = 8;
+  OFFICE_ROOM_POST = 9;
+  OFFICE_ROOM_SECURITY = 10;
+  OFFICE_ROOM_AUDIT = 11;
+  OFFICE_ROOM_QA = 12;
+}
+
+enum OfficeApprovalState {
+  OFFICE_APPROVAL_STATE_UNSPECIFIED = 0;
+  OFFICE_APPROVAL_STATE_WAITING = 1;
+  OFFICE_APPROVAL_STATE_ALLOWED = 2;
+  OFFICE_APPROVAL_STATE_DENIED = 3;
+  OFFICE_APPROVAL_STATE_CANCELLED = 4;
+}
