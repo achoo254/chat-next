@@ -30,6 +30,7 @@ pub mod client_type {
     pub const DETACH: u8 = 0x13;
     pub const ACK: u8 = 0x14;
     pub const PING: u8 = 0x15;
+    pub const PREVIEW: u8 = 0x16;
 }
 
 pub mod server_type {
@@ -37,6 +38,7 @@ pub mod server_type {
     pub const OUTPUT: u8 = 0x90;
     pub const SNAPSHOT: u8 = 0x91;
     pub const EXIT: u8 = 0x92;
+    pub const PREVIEW: u8 = 0x93;
     pub const PONG: u8 = 0x95;
     pub const ERROR: u8 = 0x9F;
 }
@@ -54,13 +56,38 @@ pub mod error_code {
 /// A frame sent by a client to the daemon.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClientFrame<'a> {
-    Hello { version: u8, caps: u8 },
-    Input { session: u32, data: &'a [u8] },
-    Resize { session: u32, cols: u16, rows: u16 },
-    Attach { session: u32, last_offset: u64 },
-    Detach { session: u32 },
-    Ack { session: u32, offset: u64 },
-    Ping { client_micros: u64 },
+    Hello {
+        version: u8,
+        caps: u8,
+    },
+    Input {
+        session: u32,
+        data: &'a [u8],
+    },
+    Resize {
+        session: u32,
+        cols: u16,
+        rows: u16,
+    },
+    Attach {
+        session: u32,
+        last_offset: u64,
+    },
+    Detach {
+        session: u32,
+    },
+    Ack {
+        session: u32,
+        offset: u64,
+    },
+    Ping {
+        client_micros: u64,
+    },
+    /// Asks for the session as the daemon's emulator renders it now (a
+    /// `Preview`), to show at once while `Attach` replays the whole stream.
+    Preview {
+        session: u32,
+    },
 }
 
 /// A frame sent by the daemon to a client.
@@ -76,6 +103,17 @@ pub enum ServerFrame<'a> {
         data: &'a [u8],
     },
     Snapshot {
+        session: u32,
+        offset: u64,
+        cols: u16,
+        rows: u16,
+        alt_screen: bool,
+        vt: &'a [u8],
+    },
+    /// Answers a client `Preview`: laid out like `Snapshot`, but only to be
+    /// shown, never applied to the client's stream; `offset` is the output
+    /// offset the rendering reflects.
+    Preview {
         session: u32,
         offset: u64,
         cols: u16,
@@ -247,6 +285,9 @@ pub fn decode_client(buf: &[u8]) -> Result<ClientFrame<'_>, DecodeError> {
                 client_micros: r.u64()?,
             }
         }
+        t::PREVIEW => ClientFrame::Preview {
+            session: session_level(session)?,
+        },
         other => return Err(DecodeError::UnknownType(other)),
     };
     r.end()?;
@@ -270,7 +311,7 @@ pub fn decode_server(buf: &[u8]) -> Result<ServerFrame<'_>, DecodeError> {
             offset: r.u64()?,
             data: r.rest(),
         },
-        t::SNAPSHOT => {
+        t::SNAPSHOT | t::PREVIEW => {
             let offset = r.u64()?;
             let cols = dim(r.u16()?)?;
             let rows = dim(r.u16()?)?;
@@ -279,13 +320,26 @@ pub fn decode_server(buf: &[u8]) -> Result<ServerFrame<'_>, DecodeError> {
                 1 => true,
                 _ => return Err(DecodeError::BadValue),
             };
-            ServerFrame::Snapshot {
-                session: session_level(session)?,
-                offset,
-                cols,
-                rows,
-                alt_screen,
-                vt: r.rest(),
+            let session = session_level(session)?;
+            let vt = r.rest();
+            if kind == t::SNAPSHOT {
+                ServerFrame::Snapshot {
+                    session,
+                    offset,
+                    cols,
+                    rows,
+                    alt_screen,
+                    vt,
+                }
+            } else {
+                ServerFrame::Preview {
+                    session,
+                    offset,
+                    cols,
+                    rows,
+                    alt_screen,
+                    vt,
+                }
             }
         }
         t::EXIT => ServerFrame::Exit {
@@ -325,7 +379,9 @@ pub fn server_frame_len(frame: &ServerFrame<'_>) -> usize {
         + match frame {
             ServerFrame::Hello { .. } => 1 + 4,
             ServerFrame::Output { data, .. } => 8 + data.len(),
-            ServerFrame::Snapshot { vt, .. } => SNAPSHOT_HEADER_LEN - HEADER_LEN + vt.len(),
+            ServerFrame::Snapshot { vt, .. } | ServerFrame::Preview { vt, .. } => {
+                SNAPSHOT_HEADER_LEN - HEADER_LEN + vt.len()
+            }
             ServerFrame::Exit { .. } => 4 + 1,
             ServerFrame::Pong { .. } => 8,
             ServerFrame::Error { message, .. } => 2 + message.len(),
@@ -359,8 +415,21 @@ pub fn encode_server(frame: &ServerFrame<'_>, out: &mut Vec<u8>) {
             rows,
             alt_screen,
             vt,
+        }
+        | ServerFrame::Preview {
+            session,
+            offset,
+            cols,
+            rows,
+            alt_screen,
+            vt,
         } => {
-            put_header(out, t::SNAPSHOT, *session);
+            let kind = if matches!(frame, ServerFrame::Snapshot { .. }) {
+                t::SNAPSHOT
+            } else {
+                t::PREVIEW
+            };
+            put_header(out, kind, *session);
             out.extend_from_slice(&offset.to_be_bytes());
             out.extend_from_slice(&cols.to_be_bytes());
             out.extend_from_slice(&rows.to_be_bytes());
@@ -430,6 +499,7 @@ pub fn encode_client(frame: &ClientFrame<'_>, out: &mut Vec<u8>) {
             put_header(out, t::PING, 0);
             out.extend_from_slice(&client_micros.to_be_bytes());
         }
+        ClientFrame::Preview { session } => put_header(out, t::PREVIEW, *session),
     }
 }
 
@@ -492,6 +562,7 @@ mod tests {
         client_round_trip(ClientFrame::Ping {
             client_micros: 123_456_789,
         });
+        client_round_trip(ClientFrame::Preview { session: 3 });
     }
 
     #[test]
@@ -512,6 +583,14 @@ mod tests {
             rows: 24,
             alt_screen: true,
             vt: b"\x1bc\x1b[Hhi",
+        });
+        server_round_trip(ServerFrame::Preview {
+            session: 2,
+            offset: 7,
+            cols: 100,
+            rows: 30,
+            alt_screen: false,
+            vt: b"c[Hlatest",
         });
         server_round_trip(ServerFrame::Exit {
             session: 2,

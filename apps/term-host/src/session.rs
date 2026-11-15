@@ -80,6 +80,19 @@ pub fn snapshot_frame(session: u32, snap: &Snapshot) -> ServerFrame<'_> {
     }
 }
 
+/// The answer to a client `Preview`: the rendered screen, laid out as a
+/// `Snapshot` but only for showing (section 4).
+pub fn preview_frame(session: u32, snap: &Snapshot) -> ServerFrame<'_> {
+    ServerFrame::Preview {
+        session,
+        offset: snap.offset,
+        cols: snap.cols,
+        rows: snap.rows,
+        alt_screen: snap.alt_screen,
+        vt: &snap.vt,
+    }
+}
+
 /// Output bytes from `from`, at most `max`, appended to `out`: from the ring
 /// when it still holds `from`, else from the log. Returns how many (0 when
 /// `from` is not held). Errors come from the log only.

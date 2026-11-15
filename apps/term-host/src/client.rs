@@ -46,6 +46,14 @@ pub enum Frame {
         alt_screen: bool,
         vt: Vec<u8>,
     },
+    Preview {
+        session: u32,
+        offset: u64,
+        cols: u16,
+        rows: u16,
+        alt_screen: bool,
+        vt: Vec<u8>,
+    },
     Exit {
         session: u32,
         code: i32,
@@ -82,6 +90,21 @@ impl Frame {
                 alt_screen,
                 vt,
             } => Frame::Snapshot {
+                session,
+                offset,
+                cols,
+                rows,
+                alt_screen,
+                vt: vt.to_vec(),
+            },
+            ServerFrame::Preview {
+                session,
+                offset,
+                cols,
+                rows,
+                alt_screen,
+                vt,
+            } => Frame::Preview {
                 session,
                 offset,
                 cols,
@@ -504,6 +527,11 @@ impl TermClient {
             session,
             last_offset,
         })
+    }
+
+    /// Ask for the session as the daemon renders it now (answered with `Preview`).
+    pub fn preview(&mut self, session: u32) -> io::Result<()> {
+        self.send(&ClientFrame::Preview { session })
     }
 
     /// Offer a direct path bound to `bind` and wait until it is open, but

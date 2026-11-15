@@ -6,7 +6,7 @@ use super::Hub;
 use crate::audit::AuditKind;
 use crate::conn::{Attachment, Conn};
 use crate::pty::WriteJob;
-use crate::session::{attach_plan, snapshot_frame, AttachPlan};
+use crate::session::{attach_plan, preview_frame, snapshot_frame, AttachPlan};
 use crate::wire::{self, error_code, ClientFrame, DecodeError, ServerFrame};
 
 fn send_error(conn: &mut Conn, session: u32, code: u16, message: &str) {
@@ -168,6 +168,23 @@ impl Hub {
                     self.record_audit(AuditKind::Open, Some(session), Some(conn_id), Some(key));
                 }
             }
+            Frame::Preview { session } => {
+                // The session as the emulator renders it now: shown by the client at once while the Attach that
+                // follows replays the whole stream out of sight. Nothing about the attachment changes.
+                let Some(s) = self.sessions.get(&session) else {
+                    send_error(
+                        conn,
+                        session,
+                        error_code::NO_SUCH_SESSION,
+                        "no such session",
+                    );
+                    return;
+                };
+                let snap = s.snapshot();
+                if let Some(sink) = conn.sink() {
+                    let _ = sink.send(&preview_frame(session, &snap));
+                }
+            }
             Frame::Detach { session } => {
                 if conn.attachments.remove(&session).is_some() {
                     let key = conn.device_key;
@@ -210,6 +227,7 @@ enum Frame {
     Detach { session: u32 },
     Ack { session: u32, offset: u64 },
     Ping { client_micros: u64 },
+    Preview { session: u32 },
 }
 
 fn owned(f: &ClientFrame<'_>) -> Frame {
@@ -234,6 +252,7 @@ fn owned(f: &ClientFrame<'_>) -> Frame {
         ClientFrame::Detach { session } => Frame::Detach { session },
         ClientFrame::Ack { session, offset } => Frame::Ack { session, offset },
         ClientFrame::Ping { client_micros } => Frame::Ping { client_micros },
+        ClientFrame::Preview { session } => Frame::Preview { session },
         ClientFrame::Input { session, .. } => Frame::Input { session },
     }
 }

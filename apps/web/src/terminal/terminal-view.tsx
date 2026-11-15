@@ -23,6 +23,7 @@ import { showTouchThumb } from "./terminal-touch-thumb.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 import { showCursorWithoutFocus } from "./terminal-cursor.ts";
+import { PreviewCover } from "./terminal-preview.ts";
 
 /** Output smaller than this is written at once. */
 const SMALL_WRITE = 4 * 1024;
@@ -245,6 +246,13 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				}
 			}
 			const writer = new OutputWriter(term, session, probe);
+			// A fresh attach of a long session: the machine's rendering shows at once, the replay out of sight.
+			const cover = new PreviewCover({
+				host,
+				real: () => term.element,
+				showReal: () => term.scrollToBottom(),
+				options: () => ({ ...textOptions(term.options.fontSize ?? fontSize(fallbackSize)), allowProposedApi: true }),
+			});
 			let frame = 0;
 			const fitNow = () => {
 				frame = 0;
@@ -265,7 +273,12 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					if (term.cols !== snap.cols || term.rows !== snap.rows) term.resize(snap.cols, snap.rows);
 					term.write(snap.vt, fitSoon);
 				},
-				output: (data, done) => writer.write(data, done),
+				output: (data, done) => {
+					cover.output();
+					writer.write(data, done);
+				},
+				preview: (preview) => cover.show(preview),
+				caughtUp: () => cover.caughtUp(),
 				exit: (code) => exited(code),
 				gone: () => gone(),
 			});
@@ -362,6 +375,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				fonts?.removeEventListener("loadingdone", redraw);
 				for (const s of subscriptions) s.dispose();
 				detach();
+				cover.dispose();
 				writer.dispose();
 				termRef.current = null;
 				term.dispose();

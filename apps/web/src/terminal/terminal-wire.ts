@@ -21,6 +21,7 @@ export const ClientType = {
 	detach: 0x13,
 	ack: 0x14,
 	ping: 0x15,
+	preview: 0x16,
 } as const;
 
 export const ServerType = {
@@ -28,6 +29,7 @@ export const ServerType = {
 	output: 0x90,
 	snapshot: 0x91,
 	exit: 0x92,
+	preview: 0x93,
 	pong: 0x95,
 	error: 0x9f,
 } as const;
@@ -49,6 +51,19 @@ export type ServerFrame =
 	/** `offset`: where the next Output starts; `vt` rebuilds the screen after a resize to cols × rows. */
 	| {
 			readonly type: "snapshot";
+			readonly session: number;
+			readonly offset: number;
+			readonly cols: number;
+			readonly rows: number;
+			readonly altScreen: boolean;
+			readonly vt: Uint8Array;
+	  }
+	/**
+	 * The session as the machine's emulator renders it now, laid out like a snapshot: shown at once while the whole
+	 * stream replays out of sight, never applied to it. `offset`: the output offset the rendering reflects.
+	 */
+	| {
+			readonly type: "preview";
 			readonly session: number;
 			readonly offset: number;
 			readonly cols: number;
@@ -128,6 +143,11 @@ export function encodeAttach(session: number, lastOffset: number): Uint8Array<Ar
 	return bytes;
 }
 
+/** Asks for the session as the machine renders it now (answered with a preview by tunelo 3.5.0+, ignored before). */
+export function encodePreview(session: number): Uint8Array<ArrayBuffer> {
+	return frame(ClientType.preview, session, 0).bytes;
+}
+
 export function encodeDetach(session: number): Uint8Array<ArrayBuffer> {
 	return frame(ClientType.detach, session, 0).bytes;
 }
@@ -170,14 +190,16 @@ export function decodeServerFrame(buf: Uint8Array): ServerFrame | null {
 			if (offset === null) return null;
 			return { type: "output", session, offset, data: buf.subarray(p + 8) };
 		}
-		case ServerType.snapshot: {
+		case ServerType.snapshot:
+		case ServerType.preview: {
 			if (session === 0 || size < 13) return null;
 			const offset = getU64(view, p);
 			const cols = view.getUint16(p + 8);
 			const rows = view.getUint16(p + 10);
 			const alt = view.getUint8(p + 12);
 			if (offset === null || !validDim(cols) || !validDim(rows) || alt > 1) return null;
-			return { type: "snapshot", session, offset, cols, rows, altScreen: alt === 1, vt: buf.subarray(p + 13) };
+			const kind = type === ServerType.snapshot ? "snapshot" : "preview";
+			return { type: kind, session, offset, cols, rows, altScreen: alt === 1, vt: buf.subarray(p + 13) };
 		}
 		case ServerType.exit: {
 			if (session === 0 || size !== 5) return null;

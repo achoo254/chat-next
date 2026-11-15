@@ -61,6 +61,8 @@ class ManualTimers implements Timers {
 class Screen implements TerminalSink {
 	text = "";
 	snapshots = 0;
+	previews: string[] = [];
+	caughtUps = 0;
 	exits: number[] = [];
 	isGone = false;
 	hold = false;
@@ -69,6 +71,12 @@ class Screen implements TerminalSink {
 	snapshot(s: { vt: Uint8Array }): void {
 		this.snapshots += 1;
 		this.text = dec.decode(s.vt).replace("\x1bc", "");
+	}
+	preview(p: { vt: Uint8Array }): void {
+		this.previews.push(dec.decode(p.vt).replace("c", ""));
+	}
+	caughtUp(): void {
+		this.caughtUps += 1;
 	}
 	output(data: Uint8Array, done: () => void): void {
 		this.text += dec.decode(data);
@@ -235,6 +243,44 @@ describe("the relay path", () => {
 		]);
 		expect(machine.sent("termData").at(-1)?.link).not.toBe(firstLink);
 		expect(path()).toBe("relay");
+	});
+
+	it("asks a machine that renders previews for one before a fresh replay, and says when the replay caught up", async () => {
+		host.previews = true;
+		const session = host.open();
+		host.print(session, "old lines, newest line");
+		link.start();
+		const screen = new Screen();
+		screen.hold = true;
+		link.attach(session, screen);
+		await until(() => screen.previews.length === 1, "preview");
+		expect(screen.previews[0]).toContain("newest line");
+		expect(host.frames.map((f) => f.frame.type).filter((t) => t === "preview" || t === "attach")).toEqual(["preview", "attach"]);
+		// The replay is in the screen's hands but not written yet: not caught up.
+		await until(() => screen.snapshots === 1, "replay");
+		expect(screen.caughtUps).toBe(0);
+		screen.finish();
+		host.print(session, "!");
+		await until(() => screen.caughtUps === 1, "caught up");
+		screen.finish();
+		// A link that comes back resumes from its offset: no preview then.
+		machine.socket.drop();
+		await until(() => host.frames.filter((f) => f.frame.type === "attach").length === 2, "attach again");
+		expect(host.frames.filter((f) => f.frame.type === "preview")).toHaveLength(1);
+		expect(screen.previews).toHaveLength(1);
+	});
+
+	it("shows the replay as before when the machine ignores Preview (tunelo before 3.5.0)", async () => {
+		const session = host.open();
+		host.print(session, "$ ");
+		link.start();
+		const screen = new Screen();
+		link.attach(session, screen);
+		await until(() => screen.snapshots === 1 && screen.text.endsWith("$ "), "snapshot");
+		expect(host.frames.some((f) => f.frame.type === "preview")).toBe(true);
+		expect(screen.previews).toEqual([]);
+		expect(screen.caughtUps).toBe(0);
+		expect(status().kind).toBe("open");
 	});
 
 	it("shows the session's end and a session that is gone", async () => {

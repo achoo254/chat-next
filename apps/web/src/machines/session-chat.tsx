@@ -122,7 +122,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const suggestion = pending ? undefined : threadInfo?.accountSuggestion;
 	const limits = limitsOf(state.info?.attachments);
 	const attach = useAttachments(link, threadId, limits, caps?.images ?? false, ai);
-	const drop = useFileDrop(online && !missing, (files) => {
+	// In the terminal the dock takes dropped files itself (into the session's folder, the path typed in the pane).
+	const drop = useFileDrop(online && !missing && mode !== "terminal", (files) => {
 		attach.add(files);
 		document.querySelector<HTMLElement>(".mx-chat [data-composer]")?.focus();
 	});

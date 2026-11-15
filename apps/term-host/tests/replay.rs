@@ -80,10 +80,31 @@ fn fresh_attach_replays_every_byte_since_the_session_opened() {
     let dir_mode = std::fs::metadata(output_dir(&d)).map(|m| m.permissions().mode() & 0o777);
     assert_eq!(dir_mode.ok(), Some(0o700));
 
-    // A second device opening the terminal later gets a reset at offset 0,
-    // then exactly the same bytes, ED3 included.
+    // A second device opening the terminal later first asks for the session
+    // as the daemon renders it (shown at once), then attaches: it gets a reset
+    // at offset 0, then exactly the same bytes, ED3 included.
     let mut late = agent.open_relay(2, &key(2)).expect("relay 2");
     late.hello().expect("hello 2");
+    late.preview(s).expect("preview 2");
+    match late.recv_acking(T) {
+        Some(Frame::Preview {
+            session,
+            offset,
+            vt,
+            ..
+        }) => {
+            assert_eq!(session, s);
+            assert!(
+                offset > 0 && offset <= stream.len() as u64,
+                "preview offset {offset}"
+            );
+            assert!(
+                contains(&vt, b"GEN_DONE"),
+                "the preview shows the newest rows"
+            );
+        }
+        other => panic!("expected preview, got {other:?}"),
+    }
     late.attach(s, 0).expect("attach 2");
     match late.recv_acking(T) {
         Some(Frame::Snapshot { offset, vt, .. }) => {

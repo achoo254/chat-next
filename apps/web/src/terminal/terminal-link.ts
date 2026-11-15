@@ -30,6 +30,7 @@ import {
 	decodeServerFrame,
 	encodeAck,
 	encodeAttach,
+	encodePreview,
 	encodeDetach,
 	encodeHello,
 	encodeInput,
@@ -114,9 +115,25 @@ export function browserPeers(): PeerFactory | null {
 	return (config) => new RTCPeerConnection({ iceServers: config.iceServers.map((s) => ({ urls: s.urls })) }) as unknown as PeerConnection;
 }
 
+/** A screen as the machine renders it: what a snapshot or a preview carries. */
+export interface RenderedScreen {
+	readonly cols: number;
+	readonly rows: number;
+	readonly altScreen: boolean;
+	readonly vt: Uint8Array;
+}
+
 /** What a session's screen does with the bytes; `done` runs once they are written. */
 export interface TerminalSink {
-	snapshot(snapshot: { readonly cols: number; readonly rows: number; readonly altScreen: boolean; readonly vt: Uint8Array }): void;
+	snapshot(snapshot: RenderedScreen): void;
+	/**
+	 * A session opened fresh replays every byte since it began (the owner's rule: no line is cut), which takes a
+	 * while for a long one. The machine first sends the session as it renders it now (tunelo 3.5.0+): the screen
+	 * shows that at once and keeps the replay out of sight until `caughtUp`.
+	 */
+	preview?(preview: RenderedScreen): void;
+	/** The replay reached the output the preview showed. */
+	caughtUp?(): void;
 	output(data: Uint8Array, done: () => void): void;
 	exit(code: number, signal: number): void;
 	/** The machine has no such session any more. */
@@ -172,6 +189,8 @@ interface SessionState {
 	resyncAt: number;
 	resyncTimer: unknown;
 	size: { cols: number; rows: number } | null;
+	/** The output offset the preview on screen reflects, until the replay gets there; null when none shows. */
+	previewEnd: number | null;
 }
 
 interface DirectAttempt {
@@ -329,6 +348,7 @@ export class TerminalLink {
 			resyncAt: 0,
 			resyncTimer: null,
 			size: null,
+			previewEnd: null,
 		};
 		this.sessions.set(session, s);
 		const gen = this.gen;
@@ -461,6 +481,9 @@ export class TerminalLink {
 	private sendAttach(gen: Generation, s: SessionState): void {
 		s.gap = false;
 		s.resyncAt = this.timers.now();
+		// Nothing applied yet: the machine replays from the start, so it is asked first for the screen as it is now.
+		// A machine before tunelo 3.5.0 ignores the frame and the replay shows as it comes.
+		if (s.applied === 0) this.send(gen, encodePreview(s.id));
 		this.send(gen, encodeAttach(s.id, s.applied));
 		if (s.size !== null) this.send(gen, encodeResize(s.id, s.size.cols, s.size.rows));
 	}
@@ -808,6 +831,16 @@ export class TerminalLink {
 				this.timers.clearTimeout(s.ackTimer);
 				s.ackTimer = null;
 				s.sink.snapshot({ cols: frame.cols, rows: frame.rows, altScreen: frame.altScreen, vt: frame.vt });
+				// A rendered snapshot (the machine lost its log) may start past the preview: nothing left to wait for.
+				this.reachedPreview(s);
+				return;
+			}
+			case "preview": {
+				const s = this.sessions.get(frame.session);
+				// Late (the replay already passed it) or for a session not shown here: nothing to show.
+				if (s === undefined || s.written >= frame.offset) return;
+				s.previewEnd = frame.offset;
+				s.sink.preview?.({ cols: frame.cols, rows: frame.rows, altScreen: frame.altScreen, vt: frame.vt });
 				return;
 			}
 			case "exit":
@@ -883,6 +916,7 @@ export class TerminalLink {
 	private written(s: SessionState, epoch: number, end: number): void {
 		if (s.epoch !== epoch || this.sessions.get(s.id) !== s) return;
 		if (end > s.written) s.written = end;
+		this.reachedPreview(s);
 		if (s.written - s.acked >= ACK_BYTES) return this.ack(s);
 		if (s.written > s.acked && s.ackTimer === null) {
 			s.ackTimer = this.timers.setTimeout(() => {
@@ -890,6 +924,13 @@ export class TerminalLink {
 				if (s.written > s.acked) this.ack(s);
 			}, ACK_MS);
 		}
+	}
+
+	/** The replay got to what the preview showed: the screen may show the replayed terminal now. */
+	private reachedPreview(s: SessionState): void {
+		if (s.previewEnd === null || s.written < s.previewEnd) return;
+		s.previewEnd = null;
+		s.sink.caughtUp?.();
 	}
 
 	private ack(s: SessionState): void {

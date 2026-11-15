@@ -31,6 +31,7 @@ import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
 import { limitsOf, type Limits } from "../machines/attachments.ts";
+import { DropZone, useFileDrop } from "../machines/attachment-tray.tsx";
 import { useDictation } from "./dictation.ts";
 import { ImageTooLarge, imageIntoMachine, pathInput } from "./terminal-image.ts";
 import { KeySheet } from "./key-sheet.tsx";
@@ -611,14 +612,15 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [imageError, setImageError] = useState("");
 	const imageAbort = useRef<AbortController | null>(null);
 	useEffect(() => () => imageAbort.current?.abort(), []);
-	const pickImage = (file: File) => {
-		if (thread === undefined || imageLimits === null || focused === null) return;
+	/** One file into the session's folder, its path typed into the focused pane; resolves when done or failed. */
+	const sendFile = (file: File): Promise<void> => {
+		if (thread === undefined || imageLimits === null || focused === null) return Promise.resolve();
 		const pane = focused;
 		const abort = new AbortController();
 		imageAbort.current = abort;
 		setImageError("");
 		setImageProgress(0);
-		imageIntoMachine(link, thread.id, file, imageLimits, setImageProgress, abort.signal).then(
+		return imageIntoMachine(link, thread.id, file, imageLimits, setImageProgress, abort.signal).then(
 			(path) => {
 				const bracketed = handles.current.get(pane.id)?.bracketedPaste() ?? false;
 				terminal.input(pane.session, encoder.encode(pathInput(path, bracketed)));
@@ -630,6 +632,13 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			},
 		);
 	};
+	const pickImage = (file: File) => void sendFile(file);
+	// Files dragged onto the terminal go the same way, one after another (the chat's composer is not on screen here).
+	const drop = useFileDrop(thread !== undefined && imageLimits !== null && online, (files) => {
+		void files.reduce((previous, file) => previous.then(() => sendFile(file)), Promise.resolve());
+	});
+	// A desktop has no key bar to show how a dropped file is going: the note line says it.
+	const fileNote = touch ? "" : imageProgress !== null ? tt.keys.imageSending(Math.round(imageProgress * 100)) : imageError;
 	const liveImage = thread !== undefined && imageLimits !== null ? { progress: imageProgress, error: imageError, pick: pickImage } : undefined;
 	const toggle = (mod: Modifier, sinceLastTapMs: number) => setMods((m) => ({ ...m, [mod]: tapLatch(m[mod], sinceLastTapMs) }));
 	/** Paste from the clipboard into the terminal (the browser may ask first; a refusal pastes nothing). */
@@ -771,7 +780,14 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 						? tt.busyRetry
 						: tt.notOpened;
 	return (
-		<div className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"} ref={root} data-id="terminal-dock" data-typing={touch && keyboardUp ? "" : undefined}>
+		<div
+			className={touch ? (thread === undefined ? "tx-dock touch" : "tx-dock touch embedded") : "tx-dock"}
+			ref={root}
+			data-id="terminal-dock"
+			data-typing={touch && keyboardUp ? "" : undefined}
+			{...drop.handlers}
+		>
+			{drop.dragging && thread !== undefined && <DropZone ai={thread.aiName ?? ""} maxBytes={imageLimits?.fileMaxBytes ?? 0} supported={imageLimits !== null} />}
 			{tabBar && (
 				<TerminalTabs
 					t={tt}
@@ -801,6 +817,11 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			{(notice !== "" || relayNote) && (
 				<p className={notice !== "" ? "tx-note" : "tx-note relay"} role="status">
 					{notice !== "" ? notice : tt.fellBack}
+				</p>
+			)}
+			{fileNote !== "" && (
+				<p className="tx-note" role="status" data-id="terminal-file-note">
+					{fileNote}
 				</p>
 			)}
 			<div className="tx-body">

@@ -97,6 +97,11 @@ mật đã lưu, trình duyệt của máy, tài khoản AI và số liệu sử
 
 `tunelo update` đọc các release `tunelo-v*` của repo.
 
+Có gì ở 3.5.0: mở terminal của một phiên dài thấy ngay màn hình mới nhất, không còn cảnh lịch sử tua từ cũ tới mới. `tunelo-term-host`
+gửi trước bản dựng của phiên (khung `Preview`), terminal thật nhận đủ từng byte phía sau rồi mới hiện, nên không dòng nào bị cắt
+(`docs/terminal-wire.md`, mục 4). Kéo thả tệp vào terminal của phiên: tệp lưu vào thư mục của phiên và đường dẫn được gõ vào
+terminal (trước đây tệp vào ô chat đang bị ẩn và biến mất).
+
 Có gì ở 3.4.0: mở một phiên dài ở AI Agent thấy ngay phần mới nhất. Máy gửi 200 mục cuối (kèm duyệt quyền, câu hỏi còn chờ và mốc
 `/clear` gần nhất), phần cũ hơn gửi từng trang khi cuộn lên tới đỉnh (`ThreadSubscribe.tail`, `ThreadEarlier`). Thiết bị hay máy
 bản cũ hơn vẫn gửi và nhận cả phiên như trước.

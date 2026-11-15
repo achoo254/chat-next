@@ -39,8 +39,8 @@ export const serverFrames = {
 		b.set(data, 13);
 		return b;
 	},
-	snapshot(session: number, offset: number, cols: number, rows: number, altScreen: boolean, vt: Uint8Array): Uint8Array<ArrayBuffer> {
-		const { b, v } = header(0x91, session, 13 + vt.length);
+	snapshot(session: number, offset: number, cols: number, rows: number, altScreen: boolean, vt: Uint8Array, kind = 0x91): Uint8Array<ArrayBuffer> {
+		const { b, v } = header(kind, session, 13 + vt.length);
 		u64(v, 5, offset);
 		v.setUint16(13, cols);
 		v.setUint16(15, rows);
@@ -75,7 +75,10 @@ export type ClientFrame =
 	| { type: "attach"; session: number; lastOffset: number }
 	| { type: "detach"; session: number }
 	| { type: "ack"; session: number; offset: number }
-	| { type: "ping"; micros: number };
+	| { type: "ping"; micros: number }
+	| { type: "preview"; session: number }
+	/** A type this process does not know: ignored, as the spec says. */
+	| { type: "unknown" };
 
 /** A client frame as the terminal process reads it; null when malformed. */
 export function decodeClientFrame(buf: Uint8Array): ClientFrame | null {
@@ -98,8 +101,10 @@ export function decodeClientFrame(buf: Uint8Array): ClientFrame | null {
 			return size === 8 && session !== 0 ? { type: "ack", session, offset: Number(v.getBigUint64(5)) } : null;
 		case 0x15:
 			return size === 8 && session === 0 ? { type: "ping", micros: Number(v.getBigUint64(5)) } : null;
+		case 0x16:
+			return size === 0 && session !== 0 ? { type: "preview", session } : null;
 		default:
-			return null;
+			return { type: "unknown" };
 	}
 }
 
@@ -241,6 +246,8 @@ export class FakeTerminalHost {
 	readonly keystrokes: KeystrokeRecord[] = [];
 	readonly acks: { session: number; offset: number; path: "direct" | "relay" }[] = [];
 	readonly resizes: { session: number; cols: number; rows: number }[] = [];
+	/** Answers Preview as tunelo 3.5.0+ does; off: an older machine that ignores it. */
+	previews = false;
 	readonly frames: { frame: ClientFrame; path: "direct" | "relay" }[] = [];
 	/** Typed bytes come back as output. */
 	echo = true;
@@ -477,11 +484,25 @@ export class FakeTerminalHost {
 		switch (frame.type) {
 			case "ping":
 				return this.sendFrame(conn, serverFrames.pong(frame.micros));
+			case "unknown":
+				return;
+			case "preview": {
+				// tunelo before 3.5.0 does not know the frame and ignores it.
+				if (!this.previews) return;
+				const s = this.sessions.get(frame.session);
+				if (s === undefined) return this.sendFrame(conn, serverFrames.error(frame.session, 1, "no such session"));
+				const vt = enc.encode(`cPREVIEW:${dec.decode(new Uint8Array(s.log))}`);
+				return this.sendFrame(conn, serverFrames.snapshot(s.id, s.log.length, s.cols, s.rows, false, vt, 0x93));
+			}
 			case "attach": {
 				const s = this.sessions.get(frame.session);
 				if (s === undefined) return this.sendFrame(conn, serverFrames.error(frame.session, 1, "no such session"));
 				if (frame.lastOffset > 0 && frame.lastOffset <= s.log.length) {
 					this.sendOutput(conn, s, frame.lastOffset);
+				} else if (this.previews) {
+					// As tunelo does: a reset at offset 0, then every byte since the session opened.
+					this.sendFrame(conn, serverFrames.snapshot(s.id, 0, s.cols, s.rows, false, enc.encode("c")));
+					this.sendOutput(conn, s, 0);
 				} else {
 					const vt = enc.encode(`\x1bc${dec.decode(new Uint8Array(s.log))}`);
 					this.sendFrame(conn, serverFrames.snapshot(s.id, s.log.length, s.cols, s.rows, false, vt));

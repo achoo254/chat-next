@@ -63,11 +63,11 @@ vi.mock("../../src/terminal/terminal-view.tsx", () => ({
 		session: number;
 		label: string;
 		onExit: (code: number) => void;
-		register?: (handle: { text(): string } | null) => void;
+		register?: (handle: { text(): string; bracketedPaste(): boolean; claimSize(): void } | null) => void;
 	}) => {
 		useEffect(() => {
 			// The dock reads a pane's text when its program exits; the stand-in's is what it received.
-			register?.({ text: () => screens.get(session) ?? "" });
+			register?.({ text: () => screens.get(session) ?? "", bracketedPaste: () => false, claimSize: () => undefined });
 			return () => register?.(null);
 		}, [register, session]);
 		useEffect(() => {
@@ -572,6 +572,36 @@ describe("the dock", () => {
 		await act(() => new Promise((r) => setTimeout(r, 50)));
 		expect(sent("termClose")).toEqual([]);
 		expect(sent("termOpen")).toHaveLength(2);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("a file dropped on a session's terminal goes into the session's folder and its path is typed into the pane", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		machine.handler = (frame: Frame, socket) => {
+			if (frame.body.case === "attachmentSave") return [{ case: "attachmentSaved", value: { path: "/w/app/.tunelo-attachments/notes.txt" } }];
+			return host.handle(frame, socket) ?? defaultAnswer(frame);
+		};
+		const limits = { fileMaxBytes: 1_000_000, messageMaxBytes: 1_000_000, messageMaxFiles: 10, imageMaxBytes: 1_000_000, pieceMaxBytes: 64_000 };
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", aiName: "Claude Code" }} store={refusing()} touch={false} imageLimits={limits} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(view.container.querySelectorAll(".tx-pane")).toHaveLength(1));
+		const dock = view.container.querySelector("[data-id=terminal-dock]");
+		if (dock === null) throw new Error("no dock");
+		const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+		const dataTransfer = { types: ["Files"], files: [file], dropEffect: "none" };
+		fireEvent.dragEnter(dock, { dataTransfer });
+		expect(await screen.findByText("Thả để đính kèm")).toBeTruthy();
+		fireEvent.drop(dock, { dataTransfer });
+		await until(() => sent("attachmentSave").length === 1, "saved on the machine");
+		expect(sent("attachmentUpload").length).toBeGreaterThan(0);
+		await until(() => host.keystrokes.some((k) => k.text.includes("/w/app/.tunelo-attachments/notes.txt")), "path typed");
+		expect(screen.queryByText("Thả để đính kèm")).toBeNull();
 		parts.terminal.stop();
 		parts.link.stop();
 	});

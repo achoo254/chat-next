@@ -38,6 +38,7 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 | `0x13` | Detach | không có. Ngừng nhận đầu ra của phiên; phiên vẫn chạy. |
 | `0x14` | Ack | `offset u64`: số byte đầu ra client đã áp dụng (không giảm). |
 | `0x15` | Ping | `clientMicros u64`; `session` = 0. |
+| `0x16` | Preview | không có. Xin phiên như emulator của daemon dựng lúc này (từ `tunelo` 3.5.0; daemon cũ bỏ qua như mọi khung lạ). Không cần `Attach` trước; không đổi gì của việc gắn (xem mục 4). |
 
 ### Daemon → client
 
@@ -46,6 +47,7 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 | `0x81` | Hello | `version u8` · `maxFrame u32` (=65536). Trả lời `Hello`; `session` = 0. |
 | `0x90` | Output | `offset u64` · byte đầu ra thô. |
 | `0x91` | Snapshot | `offset u64` · `cols u16` · `rows u16` · `altScreen u8` (0/1) · chuỗi VT: chỉ RIS khi bắt đầu phát lại từ offset 0, hoặc màn hình dựng lại trong chế độ dự phòng (mục 4). `offset` là offset mà `Output` kế tiếp sẽ bắt đầu. |
+| `0x93` | Preview | Cùng bố cục với `Snapshot` (`offset u64` · `cols u16` · `rows u16` · `altScreen u8` · chuỗi VT dựng bởi emulator), trả lời `Preview` của client. Chỉ để hiển thị, không bao giờ áp vào luồng của client; `offset` là offset đầu ra mà bản dựng phản ánh. |
 | `0x92` | Exit | `code i32` (-1 nếu bị tín hiệu giết) · `signal u8` (0 nếu không). Gửi ngay sau khung `Output` cuối cùng của phiên (đầu ra còn bị window giữ thì đi trước). |
 | `0x95` | Pong | `clientMicros u64` (nguyên giá trị của `Ping`); `session` = 0. |
 | `0x9F` | Error | `code u16` · thông điệp UTF-8. `session` là phiên liên quan, 0 nếu lỗi cấp kết nối. |
@@ -68,6 +70,8 @@ Client gửi `Attach{lastOffset}`. Mỗi phiên daemon giữ:
 1. Nếu `lastOffset` > 0 và daemon còn giữ byte từ `lastOffset` (với nhật ký nguyên vẹn là mọi `lastOffset` từ 1 tới offset hiện tại): gửi `Output` bắt đầu từ `lastOffset`, rồi tiếp tục luồng sống.
 2. Ngược lại (`lastOffset` = 0, hoặc lớn hơn offset hiện tại): gửi `Snapshot` **đầu luồng**: `offset` 0, `cols`×`rows` là cỡ hiện tại của phiên, `altScreen` 0, chuỗi VT chỉ là `ESC c` (RIS) để client xoá sạch terminal; rồi `Output` từ offset 0. Client nhận đúng từng byte chương trình đã ghi kể từ lúc mở phiên.
 3. Dự phòng, chỉ khi nhật ký không tạo được hoặc hỏng giữa chừng (lỗi đĩa; daemon ghi cảnh báo và phiên vẫn chạy): daemon chỉ còn giữ những gì vòng đệm có. Khi byte cần đã rời vòng đệm, daemon gửi `Snapshot` dựng bởi emulator (chi tiết bên dưới), rồi `Output` từ offset của nó.
+
+**Xem trước khi phát lại từ đầu** (từ `tunelo` 3.5.0): phát lại cả phiên dài qua relay mất vài giây, và nếu vẽ thẳng thì người dùng thấy cả lịch sử tua qua. Client chưa áp dụng byte nào (`lastOffset` = 0) gửi `Preview` ngay trước `Attach`. Daemon trả `Preview` (cùng nội dung với `Snapshot` dựng bởi emulator ở chế độ dự phòng bên dưới), rồi `Attach` chạy đúng quy tắc 2 ở trên. Client hiện bản dựng đó ngay, nhận luồng phát lại vào terminal thật nhưng chưa cho thấy, và chỉ cho thấy terminal thật (ở dòng mới nhất) khi đã ghi xong tới `offset` của `Preview` và đầu ra yên 150 ms (chương trình vẽ lại theo cỡ của client ngay sau khi gắn), chậm nhất 1,5 giây sau khi tới `offset`, và không bao giờ giữ bản xem trước quá 15 giây. Không dòng nào bị cắt: luồng phát lại vẫn đủ từng byte. Client không gửi `Preview` khi gắn lại với `lastOffset` > 0; bản `Preview` đến khi luồng đã qua `offset` của nó bị bỏ.
 
 Giới hạn đã biết: luồng phát lại được client vẽ ở cỡ hiện tại của nó, không theo từng cỡ cũ lúc byte được ghi (giao thức không mang mốc đổi cỡ trong luồng). Nhật ký lớn dần theo đầu ra thật của phiên (vd `yes` chạy khi không có client nào gắn thì đĩa lớn theo), tới khi phiên đóng.
 

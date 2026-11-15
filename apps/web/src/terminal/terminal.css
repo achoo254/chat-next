@@ -1,6 +1,6 @@
 /* The terminal dock (terminal-dock.tsx); loaded with it. The header follows
    the app's theme; the terminal surface is always dark, as xterm draws it. */
-.tx-dock { --tx-bg: #111318; display: flex; flex-direction: column; flex: 1 1 0; width: 100%; height: 100%; min-height: 0; min-width: 0; background: var(--c-surface); }
+.tx-dock { --tx-bg: #111318; position: relative; display: flex; flex-direction: column; flex: 1 1 0; width: 100%; height: 100%; min-height: 0; min-width: 0; background: var(--c-surface); }
 /* The machine's own terminal page on a phone: the visible box (viewport-fit.ts); a session's dock fills its view. */
 .tx-dock.touch:not(.embedded) { position: fixed; z-index: 30; left: 0; right: 0; top: var(--vf-t, 0px); height: var(--vf-h, 100dvh); padding-top: env(safe-area-inset-top); }
 .tx-dock.touch.embedded { flex: 1 1 0; }
@@ -81,6 +81,9 @@
 /* On a touch screen the thumb replaces xterm's own bar. */
 .tx-dock.touch .xterm-scrollable-element > .scrollbar { display: none !important; }
 .tx-term .xterm { height: 100%; }
+/* The machine's rendering of a session opened fresh (terminal-preview.ts), over the pane while the real terminal takes the replay out of sight. */
+.tx-preview { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: var(--tx-bg); pointer-events: none; }
+.tx-preview .xterm { height: 100%; }
 /* The leftover pixels under the last row show the viewport; xterm leaves it black, so it takes the terminal colour. */
 .tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
 /* xterm fades its overlay scrollbar out after a moment; with history to scroll (terminal-scrollbar.ts) it stays, with a faint track. */
