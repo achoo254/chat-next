@@ -7,7 +7,10 @@
 // Level of detail runs a clip only every n-th frame at n times the speed
 // (goToFrame on a paused group did not pose in this Babylon version).
 // Sitting lifts or lowers the root once per clip so the pelvis lands on the
-// seat (the CC0 clips are for an adult-sized rig).
+// seat (the CC0 clips are for an adult-sized rig). Each copy wears its skin
+// cell (character-skins.ts) and its accessory on a bone; the pantry mug shows
+// in the hand only while drinking. A model's own typing clip replaces the
+// coded typing swing.
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
@@ -18,6 +21,9 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF/2.0";
 import { clipFor, isSeatedPose, typesWith, type Pose } from "./anim-groups.ts";
+import type { CharacterAccessories, WornAccessory } from "./character-accessories.ts";
+import { COFFEE_ITEM, skinCellFor, type PersonLook } from "./character-look.ts";
+import type { CharacterSkins } from "./character-skins.ts";
 import type { CharacterVisual } from "./character-visual.ts";
 import { typingOffsets } from "./typing-motion.ts";
 
@@ -25,6 +31,14 @@ import { typingOffsets } from "./typing-motion.ts";
 const SEAT_PELVIS_HEIGHT = 0.5;
 /** Clip offset between characters, seconds, so they do not move in unison. */
 const PHASE_SECONDS = 0.83;
+/** A clip that animates the typing hands itself (no coded swing on top). */
+const TYPING_CLIP = "Typing";
+
+/** What dresses a copy of the model: the skins and accessories loaded with it (either may be missing). */
+export interface CharacterDress {
+	readonly skins: CharacterSkins | null;
+	readonly accessories: CharacterAccessories | null;
+}
 
 export async function loadCharacterContainer(scene: Scene, url: string): Promise<AssetContainer> {
 	const container = await LoadAssetContainerAsync(url, scene);
@@ -40,7 +54,7 @@ const clipFps = (group: AnimationGroup): number => group.targetedAnimations[0]?.
 /** Seat lift per sitting clip, shared by everyone (same rig): measured once. */
 const seatLift = new Map<string, number>();
 
-export function createSkinnedCharacter(scene: Scene, container: AssetContainer, key: string, index: number): CharacterVisual {
+export function createSkinnedCharacter(scene: Scene, container: AssetContainer, key: string, index: number, look: PersonLook, dress: CharacterDress): CharacterVisual {
 	const suffix = `-${key}`;
 	const entries = container.instantiateModelsToScene((name) => `${name}${suffix}`, false, { doNotInstantiate: false });
 	const holder = new TransformNode(`person-${key}`, scene);
@@ -61,6 +75,16 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 	);
 	const swing = new Quaternion();
 	const meshes: AbstractMesh[] = model.getChildMeshes(false);
+	if (dress.skins !== null) dress.skins.apply(meshes, skinCellFor(look, dress.skins.count));
+	const worn = (name: string | null): WornAccessory | null => (name === null || dress.accessories === null ? null : dress.accessories.attach(name, key, nodes));
+	const accessory = worn(look.accessory);
+	const mug = look.kind === "director" || look.kind === "employee" ? worn(COFFEE_ITEM) : null;
+	mug?.holder.setEnabled(false);
+	const showItems = (drinking: boolean): void => {
+		mug?.holder.setEnabled(drinking);
+		// The mug takes the hand: a hand-held accessory steps aside meanwhile.
+		accessory?.holder.setEnabled(!(drinking && mug !== null && accessory.bone === mug.bone));
+	};
 	let pose: Pose = "stand-idle";
 	let clip: string | null = null;
 	let every = 1;
@@ -89,6 +113,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			if (next === pose && clip !== null) return;
 			pose = next;
 			play(clipFor(next, clips));
+			showItems(next === "coffee");
 		},
 		setUpdateEvery(next) {
 			if (next === every) return;
@@ -117,7 +142,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 				}
 				measure = false;
 			}
-			if (!typesWith(pose) || every === 0) return;
+			if (!typesWith(pose) || every === 0 || clip === TYPING_CLIP) return;
 			const o = typingOffsets(seconds, index);
 			for (const entry of swung) {
 				const { side, bone, node } = entry;

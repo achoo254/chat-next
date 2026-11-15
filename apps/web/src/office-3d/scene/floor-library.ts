@@ -2,8 +2,9 @@
 // from the layout in blocks the first time it is needed (floor 1 at start,
 // the others when shown or when the scene is idle), its baked shell swapped
 // in when the asset file lists one, furniture placed through the prop
-// library. Only the floor shown is enabled (plan decision P): the others
-// cost no draw calls.
+// library (from the layout at first, then from the places the shell's extras
+// list, which are the ones its lightmap shadows were baked from). Only the
+// floor shown is enabled (plan decision P): the others cost no draw calls.
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { FloorLevel } from "../../machines/office/office-rooms.ts";
@@ -11,7 +12,7 @@ import { loadBakedShell, type BakedShell } from "./baked-shell.ts";
 import type { BlockKit } from "./block-kit.ts";
 import { buildPlaceholderShell } from "./placeholder-floor.ts";
 import type { PropLibrary } from "./prop-library.ts";
-import { assetUrl, lightmapPair, type SceneAssets } from "./scene-assets.ts";
+import { assetUrl, lightmapPair, type LightmapSize, type SceneAssets } from "./scene-assets.ts";
 import { sceneFloor, type SceneLayout } from "./scene-layout.ts";
 
 interface FloorEntry {
@@ -28,7 +29,7 @@ export interface FloorLibrary {
 	/** Builds a floor ahead of time (hidden). */
 	prepare(level: FloorLevel): void;
 	/** The asset file arrived: swap in baked shells (built floors now, others when built). */
-	setAssets(assets: SceneAssets, lightmapSize: 1024 | 2048): void;
+	setAssets(assets: SceneAssets, lightmapSize: LightmapSize): void;
 	setNightMix(nightMix: number, closed: boolean): void;
 	dispose(): void;
 }
@@ -37,7 +38,7 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 	const floors = new Map<FloorLevel, FloorEntry>();
 	let shown: FloorLevel = 1;
 	let assets: SceneAssets | null = null;
-	let size: 1024 | 2048 = 1024;
+	let size: LightmapSize = 1024;
 	let light = { nightMix: 0, closed: false };
 
 	const bake = (level: FloorLevel, entry: FloorEntry): void => {
@@ -51,6 +52,7 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 			entry.baked = baked;
 			baked.setNightMix(light.nightMix, light.closed);
 			entry.blocks.setEnabled(false);
+			if (baked.places !== null) props.placeFloor(level, entry.root, baked.places);
 		});
 	};
 
@@ -62,7 +64,7 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 		const root = new TransformNode(`floor-${level}`, scene);
 		root.setEnabled(false);
 		const blocks = buildPlaceholderShell(scene, kit, layout, floor, root);
-		props.placeFloor(root, [...floor.props, ...floor.smallProps]);
+		props.placeFloor(level, root, [...floor.props, ...floor.smallProps]);
 		const entry: FloorEntry = { root, blocks, baked: null, loading: false };
 		floors.set(level, entry);
 		bake(level, entry);

@@ -75,8 +75,8 @@ export function poseFor(input: PoseInput): Pose {
 export const POSE_CLIPS: Readonly<Record<Pose, readonly string[]>> = {
 	walk: ["Walk"],
 	"sit-idle": ["Sitting_Idle"],
-	"sit-type": ["Sitting_Typing", "Typing", "Sitting Writing", "Sitting_Idle"],
-	"sit-read": ["Sitting Writing", "Sitting_Idle"],
+	"sit-type": ["Sitting_Typing", "Typing", "Sitting_Writing", "Sitting Writing", "Sitting_Idle"],
+	"sit-read": ["Sitting_Writing", "Sitting Writing", "Sitting_Idle"],
 	"sit-think": ["Sitting_Idle"],
 	"sit-phone": ["Sitting_Talking", "Sitting_Idle"],
 	"stand-idle": ["Idle_A", "Idle", "Consume"],

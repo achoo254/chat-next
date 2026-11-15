@@ -12,7 +12,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { BOARD_ROOMS } from "../machines/office/office-boards.tsx";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
 import type { OfficeSfx } from "./audio/office-sfx.ts";
-import { createOfficeSfx } from "./audio/office-sfx.ts";
+import { createOfficeSfx, eventSoundFiles } from "./audio/office-sfx.ts";
 import { createCharacterPool } from "./character/character-pool.ts";
 import { createOfficePeople } from "./character/office-people.ts";
 import { createRouter } from "./character/office-routes.ts";
@@ -33,7 +33,7 @@ import { createOfficeLights } from "./scene/office-lights.ts";
 import { createPostProcessing } from "./scene/post-processing.ts";
 import { createPropLibrary } from "./scene/prop-library.ts";
 import { createRoomFx } from "./scene/room-fx.ts";
-import { assetUrl, loadSceneAssets } from "./scene/scene-assets.ts";
+import { assetUrl, loadSceneAssets, propSources } from "./scene/scene-assets.ts";
 import { SCENE_LAYOUT } from "./scene/scene-layout.ts";
 import { exposeTestApi, phoneDeskFocus } from "./world-support.ts";
 
@@ -148,20 +148,23 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		if (opts.signal.aborted) return;
 		floors.setAssets(assets, qualityLevelAt(startIndex).lightmapSize);
 		sfx.dispose();
-		sfx = createOfficeSfx(assets.sounds, assetUrl);
+		sfx = createOfficeSfx(eventSoundFiles(assets.sounds), assetUrl);
 		sfx.setEnabled(soundOn);
-		const models = new Map([...assets.props].map(([name, file]) => [name, assetUrl(file)]));
+		props.setSources(new Map([...propSources(assets)].map(([name, file]) => [name, assetUrl(file)])), opts.signal);
 		const character = assets.character;
-		await Promise.all([
-			props.loadModels(models, opts.signal),
-			character === null
-				? Promise.resolve()
-				: pool.load(assetUrl(character.model), opts.signal).then((ok) => {
-						if (!ok || opts.signal.aborted) return;
-						people.rebuild();
-						lights.refreshCasters(people.meshes());
-					}),
-		]);
+		if (character === null) return;
+		const accessories = assets.accessories;
+		const ok = await pool.load(
+			{
+				model: assetUrl(character.file),
+				skins: character.skins === null ? null : { url: assetUrl(character.skins.file), atlas: character.skins },
+				accessories: accessories === null ? null : { url: assetUrl(accessories.file), items: accessories.items },
+			},
+			opts.signal,
+		);
+		if (!ok || opts.signal.aborted) return;
+		people.rebuild();
+		lights.refreshCasters(people.meshes());
 	});
 	const prepareTimer = window.setTimeout(() => {
 		floors.prepare(2);

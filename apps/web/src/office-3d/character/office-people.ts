@@ -8,13 +8,14 @@
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import type { OfficeLayout } from "../../machines/office/office-layout.ts";
-import { markerStatus, personColor } from "../../machines/office/office-names.ts";
+import { markerStatus } from "../../machines/office/office-names.ts";
 import type { Placement } from "../../machines/office/office-placement.ts";
 import type { FloorLevel } from "../../machines/office/office-rooms.ts";
 import type { OfficeState } from "../../machines/office/office-store.ts";
 import { sampleRoute, type MotionSample } from "./actor-motion.ts";
 import { animationRates, type LodEntry } from "./animation-lod.ts";
 import { poseFor, type Pose } from "./anim-groups.ts";
+import { personLook } from "./character-look.ts";
 import type { CharacterPool } from "./character-pool.ts";
 import type { CharacterVisual } from "./character-visual.ts";
 import { idlePerformance, type IdleTarget } from "./idle-performer.ts";
@@ -123,7 +124,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 						key,
 						index,
 						placement: w.placement,
-						visual: pool.create(key, personColor(w.placement), index),
+						visual: pool.create(key, personLook(w.placement), index),
 						blob: pool.blob(key),
 						target: start,
 						route: { legs: [] },
@@ -222,7 +223,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 		rebuild() {
 			for (const p of people.values()) {
 				p.visual.dispose();
-				p.visual = pool.create(p.key, personColor(p.placement), p.index);
+				p.visual = pool.create(p.key, personLook(p.placement), p.index);
 				p.pose = "stand-idle";
 			}
 		},

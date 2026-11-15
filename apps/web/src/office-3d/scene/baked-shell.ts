@@ -3,8 +3,10 @@
 // in the second UV set) with its day and night lightmaps. Every mesh with
 // lightmap UVs gets an unlit StandardMaterial with the blend plugin; glass
 // gets a plain see-through material; the panes behind the windows glow,
-// tinted by the hour. Loaded into the floor's node; the caller hides the
-// placeholder shell once it is in.
+// tinted by the hour (the colours from the shell's extras when given). The
+// shell's asset.extras also say where the floor's props stand and how bright
+// the lightmap was stored (shell-extras.ts). Loaded into the floor's node;
+// the caller hides the placeholder shell once it is in.
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
@@ -17,11 +19,18 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF/2.0";
 import { LIGHTMAP_HALF_BAKE_SCALE, LightmapBlendPlugin } from "./lightmap-blend.ts";
+import type { Place } from "./scene-layout.ts";
+import { gammaScale, NO_SHELL_EXTRAS, parseShellExtras, type Rgb, type ShellExtras } from "./shell-extras.ts";
 
 export interface BakedShell {
+	/** Where the floor's props stand per the shell's extras, or null (use the layout's). */
+	readonly places: readonly Place[] | null;
 	setNightMix(nightMix: number, closed: boolean): void;
 	dispose(): void;
 }
+
+/** Window panes by day and at night when the shell does not say. */
+const WINDOW_DEFAULT: { readonly day: Rgb; readonly night: Rgb } = { day: [1, 1, 1], night: [0.35, 0.38, 0.65] };
 
 /** Things that shine by themselves: [day, night] glow by mesh name. */
 const GLOW: readonly (readonly [RegExp, number, number])[] = [
@@ -49,8 +58,17 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 		return t;
 	};
 	let container: AssetContainer;
+	let extras: ShellExtras = NO_SHELL_EXTRAS;
 	try {
-		container = await LoadAssetContainerAsync(urls.shell, scene);
+		container = await LoadAssetContainerAsync(urls.shell, scene, {
+			pluginOptions: {
+				gltf: {
+					onParsed: (data) => {
+						extras = parseShellExtras(data.json);
+					},
+				},
+			},
+		});
 	} catch (error) {
 		if (!signal.aborted) console.warn("office: floor shell not loaded, keeping blocks", error);
 		return null;
@@ -101,6 +119,10 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 		}
 		mesh.material = material;
 	}
+	const lightScale = extras.intensityScale === null ? LIGHTMAP_HALF_BAKE_SCALE : gammaScale(extras.intensityScale);
+	const windowColours = extras.windowColours ?? WINDOW_DEFAULT;
+	const windowDay = Color3.FromArray(windowColours.day);
+	const windowNight = Color3.FromArray(windowColours.night);
 	container.addAllToScene();
 	for (const node of container.rootNodes) node.parent = parent;
 	for (const mesh of container.meshes) {
@@ -109,14 +131,15 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 		mesh.freezeWorldMatrix();
 	}
 	return {
+		places: extras.places,
 		setNightMix(nightMix, closed) {
 			for (const { plugin, glow } of plugins) {
 				plugin.nightMix = nightMix;
-				plugin.scale = LIGHTMAP_HALF_BAKE_SCALE * (closed ? 0.45 : 1);
+				plugin.scale = lightScale * (closed ? 0.45 : 1);
 				plugin.glow = glow === null || closed ? 0 : glow[0] + (glow[1] - glow[0]) * nightMix;
 			}
 			// Daylight outside by day, the city's dusk blue at night.
-			for (const view of windows) view.emissiveColor = Color3.Lerp(Color3.White(), new Color3(0.35, 0.38, 0.65), nightMix);
+			for (const view of windows) view.emissiveColor = Color3.Lerp(windowDay, windowNight, nightMix);
 		},
 		dispose() {
 			container.dispose();

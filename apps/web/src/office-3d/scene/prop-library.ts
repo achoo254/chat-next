@@ -1,9 +1,13 @@
-// Furniture and small props: every name of the layout is one model loaded
-// once and drawn as GPU instances wherever the layout places it, on every
-// floor (one draw call per model part however many desks; plan decision M as
-// changed by the spike: only the shell is baked, repeated furniture is
-// instanced). Until a name's model arrives (or when it fails) its places show
+// Furniture and small props: every model name is loaded once and drawn as GPU
+// instances wherever a floor places it, on every floor (one draw call per
+// model part however many desks; plan decision M as changed by the spike:
+// only the shell is baked, repeated furniture is instanced). The asset file
+// ships one props GLB per floor holding the models first used there, one
+// named node per model (a node of several parts when the model has several
+// materials); a GLB is fetched the first time a placed name needs it. Until a
+// name's model arrives (or when it has none, or fails) its places show
 // placeholder blocks; a model replaces its blocks as soon as it loads.
+import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import "@babylonjs/core/Meshes/instancedMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
@@ -12,6 +16,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF/2.0";
 import type { BlockKit } from "./block-kit.ts";
+import { containerModels, modelParts } from "./gltf-models.ts";
 import { shapeOf } from "./placeholder-shapes.ts";
 import type { Place } from "./scene-layout.ts";
 
@@ -22,18 +27,23 @@ interface Placed {
 }
 
 export interface PropLibrary {
-	/** Places a floor's props under `parent`. */
-	placeFloor(parent: TransformNode, places: readonly Place[]): void;
-	/** Loads the models of `files` (name → URL) and swaps them in as they come. */
-	loadModels(files: ReadonlyMap<string, string>, signal: AbortSignal): Promise<void>;
+	/** Places (or re-places) the props of floor `key` under `parent`, dropping that floor's earlier ones. */
+	placeFloor(key: number, parent: TransformNode, places: readonly Place[]): void;
+	/** Where each model lives (name → GLB URL); placed names load their GLB on demand from now on. */
+	setSources(sources: ReadonlyMap<string, string>, signal: AbortSignal): void;
 	/** The meshes the live props light should reach. */
 	readonly litMeshes: () => readonly Mesh[];
 	dispose(): void;
 }
 
 export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
-	const placed = new Map<string, Placed[]>();
+	const floors = new Map<number, Placed[]>();
 	const models = new Map<string, Mesh[]>();
+	const containers: AssetContainer[] = [];
+	const loading = new Set<string>();
+	const failed = new Set<string>();
+	let sources: ReadonlyMap<string, string> = new Map();
+	let signal: AbortSignal | null = null;
 	let disposed = false;
 
 	const blockFor = (p: Placed, i: number): void => {
@@ -57,10 +67,63 @@ export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
 		});
 	};
 
+	const swapIn = (name: string): void => {
+		const parts = models.get(name);
+		if (parts === undefined) return;
+		for (const list of floors.values()) for (const p of list) if (p.place.name === name) modelFor(p, parts);
+	};
+
+	const loadFile = async (url: string, abort: AbortSignal): Promise<void> => {
+		loading.add(url);
+		try {
+			const container = await LoadAssetContainerAsync(url, scene);
+			if (abort.aborted || disposed) {
+				container.dispose();
+				return;
+			}
+			container.addAllToScene();
+			containers.push(container);
+			const found = containerModels(container);
+			for (const [name, top] of found) {
+				if (models.has(name)) continue;
+				const parts = modelParts(top);
+				if (parts.length === 0) continue;
+				for (const part of parts) {
+					// Bake the glTF root's handedness flip (and the model node's own transform) into each part so instances place in plain scene units.
+					part.setParent(null);
+					part.isVisible = false;
+					part.isPickable = false;
+				}
+				models.set(name, parts);
+			}
+			for (const node of container.transformNodes) if (node.getChildMeshes(false).length === 0) node.setEnabled(false);
+			for (const root of container.meshes) if (root.getTotalVertices() === 0) root.setEnabled(false);
+			for (const [name, file] of sources) if (file === url && !models.has(name)) console.warn(`office: prop model ${name} missing from ${url}, keeping its block`);
+			for (const name of found.keys()) swapIn(name);
+		} catch (error) {
+			failed.add(url);
+			if (!abort.aborted) console.warn(`office: props ${url} not loaded, keeping blocks`, error);
+		} finally {
+			loading.delete(url);
+		}
+	};
+
+	/** Starts the GLB fetch for any placed name whose model is listed but not in yet. */
+	const ensure = (names: Iterable<string>): void => {
+		if (signal === null || disposed) return;
+		for (const name of names) {
+			if (models.has(name)) continue;
+			const url = sources.get(name);
+			if (url === undefined || loading.has(url) || failed.has(url)) continue;
+			void loadFile(url, signal);
+		}
+	};
+
 	return {
-		placeFloor(parent, places) {
-			places.forEach((place, i) => {
-				const holder = new TransformNode(`prop-${place.name}-${i}`, scene);
+		placeFloor(key, parent, places) {
+			for (const old of floors.get(key) ?? []) old.holder.dispose(false, false);
+			const list = places.map((place, i): Placed => {
+				const holder = new TransformNode(`prop-${key}-${place.name}-${i}`, scene);
 				holder.parent = parent;
 				holder.position.set(place.x, place.y, place.z);
 				holder.rotation.y = place.rotY;
@@ -69,45 +132,25 @@ export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
 				const parts = models.get(place.name);
 				if (parts === undefined) blockFor(p, i);
 				else modelFor(p, parts);
-				const list = placed.get(place.name) ?? [];
-				list.push(p);
-				placed.set(place.name, list);
+				return p;
 			});
+			floors.set(key, list);
+			ensure(new Set(places.map((p) => p.name)));
 		},
-		async loadModels(files, signal) {
-			await Promise.all(
-				[...files].map(async ([name, url]) => {
-					if (models.has(name)) return;
-					try {
-						const container = await LoadAssetContainerAsync(url, scene);
-						if (signal.aborted || disposed) {
-							container.dispose();
-							return;
-						}
-						container.addAllToScene();
-						const parts = container.meshes.filter((m): m is Mesh => m.getTotalVertices() > 0 && "createInstance" in m);
-						if (parts.length === 0) throw new Error("no geometry");
-						for (const part of parts) {
-							// Bake the glTF root's handedness flip into each part so instances place in plain scene units.
-							part.setParent(null);
-							part.isVisible = false;
-							part.isPickable = false;
-						}
-						for (const root of container.meshes) if (root.getTotalVertices() === 0) root.setEnabled(false);
-						models.set(name, parts);
-						for (const p of placed.get(name) ?? []) modelFor(p, parts);
-					} catch (error) {
-						if (!signal.aborted) console.warn(`office: prop model ${name} not loaded, keeping its block`, error);
-					}
-				}),
-			);
+		setSources(next, abort) {
+			sources = next;
+			signal = abort;
+			ensure(new Set([...floors.values()].flatMap((list) => list.map((p) => p.place.name))));
 		},
 		litMeshes: () => [...kit.sources, ...[...models.values()].flat()],
 		dispose() {
 			disposed = true;
-			for (const parts of models.values()) for (const part of parts) part.dispose(false, true);
+			for (const list of floors.values()) for (const p of list) p.holder.dispose(false, false);
+			floors.clear();
 			models.clear();
-			placed.clear();
+			// The containers own the model parts, their materials and textures.
+			for (const container of containers) container.dispose();
+			containers.length = 0;
 		},
 	};
 }
