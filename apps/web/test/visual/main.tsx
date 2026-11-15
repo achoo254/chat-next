@@ -321,7 +321,8 @@ const SCREENS: Record<string, string> = {
 	"machine-sessions": paths.machine("1"),
 	// The machine's terminal: the dock with a shell on the relay (the fake machine has no direct path).
 	"machine-terminal": paths.machineTerminal("1"),
-	"machine-session-terminal": `/ai/1/s/${encodeURIComponent(DEMO_THREAD)}/terminal`,
+	// A session with no turn running in chat: the machine opens its AI in the terminal (the demo thread waits mid-turn, so its terminal waits for the turn).
+	"machine-session-terminal": "/ai/1/s/demo-hi/terminal",
 	"machine-info": paths.machineInfo("1"),
 	// "Tài khoản AI" of the demo machine: a Claude block and an Antigravity block.
 	"machine-ai-accounts": paths.machineAccounts("1"),

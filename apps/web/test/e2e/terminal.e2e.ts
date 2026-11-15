@@ -250,10 +250,13 @@ test("a phone, keyboard up: the session keeps to what is left (header on top, co
 	await until(p.page, "the session keeps to the visible box", () => document.querySelector(".mx-chat")?.hasAttribute("data-keyboard") === true);
 	const box = await p.page.evaluate(() => {
 		const r = (s: string) => document.querySelector(s)?.getBoundingClientRect();
-		return { head: r(".mx-chat .mx-head")?.top ?? -1, composer: r(".mx-chat .mx-composer")?.bottom ?? -1, font: getComputedStyle(document.querySelector(".mx-chat [data-composer]") ?? document.body).fontSize, locked: document.documentElement.classList.contains("keyboard-open") };
+		// The compose box (the field, then the model and mode row inside it) is the last thing, its own margin above the keyboard.
+		const compose = document.querySelector(".mx-chat .mx-compose-box");
+		const end = (r(".mx-chat .mx-compose-box")?.bottom ?? -1) + parseFloat(compose === null ? "0" : getComputedStyle(compose).marginBottom);
+		return { head: r(".mx-chat .mx-head")?.top ?? -1, composer: end, font: getComputedStyle(document.querySelector(".mx-chat [data-composer]") ?? document.body).fontSize, locked: document.documentElement.classList.contains("keyboard-open") };
 	});
 	assert.equal(Math.round(box.head), 0);
-	assert.ok(Math.abs(box.composer - (844 - 336)) <= 1, `composer ends at ${box.composer}`);
+	assert.ok(Math.abs(box.composer - (844 - 336)) <= 1, `compose box ends at ${box.composer}`);
 	assert.equal(box.font, "16px", "no zoom on focus");
 	assert.equal(box.locked, true);
 	await p.shot("phone-chat-keyboard-open");
@@ -288,7 +291,8 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	}));
 	// Typing: the header and the tabs step aside, the key row slims to one 44px strip.
 	assert.equal(box.head, 0, "the session header steps aside");
-	assert.equal(box.tabs, 0, "the tabs step aside");
+	// A phone's session has no tab bar at all (-1: none in the page); were there one, it steps aside.
+	assert.ok(box.tabs <= 0, "no tabs over the terminal");
 	assert.ok(box.keys <= 45, `key row ${box.keys} px tall`);
 	assert.ok(Math.abs(box.bar - (844 - 336)) <= 1, `key row ends at ${box.bar}`);
 	assert.ok(box.dock > 400, `terminal ${box.dock} px tall`);
@@ -298,7 +302,11 @@ test("a phone, the session in its terminal: the key row (44 px keys, the AI's fi
 	await p.close();
 });
 
-test("an iPhone (WebKit, touch): a tap on the terminal or on the live input leaves the focus in the dock's input, so the phone keyboard comes up", async () => {
+// Playwright's WebKit build for Windows has no X25519 in WebCrypto (Safari on iPhone and WebKit on macOS and Linux
+// do), so the page cannot make its device key there: the test runs where WebKit can sign in to a machine.
+const webkitCanPair = process.platform !== "win32";
+
+test("an iPhone (WebKit, touch): a tap on the terminal or on the live input leaves the focus in the dock's input, so the phone keyboard comes up", { skip: webkitCanPair ? false : "Playwright WebKit on Windows has no X25519" }, async () => {
 	const safari = await webkit.launch();
 	const context = await safari.newContext({ locale: "vi-VN", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 	const page = await context.newPage();
