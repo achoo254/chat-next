@@ -171,5 +171,40 @@ describe("older items of a long session", () => {
 		const reading = [...scroller.children].find((c) => c.textContent === "b10");
 		expect(reading?.getBoundingClientRect().top).toBe(70);
 	});
+
+	it("scrolling on while an older page loads keeps the latest place, not the one where loading began", async () => {
+		let finish: () => void = () => undefined;
+		const loadOlder = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+		const shown = render(view(replies(10, 3), true, loadOlder));
+		const scroller = shown.container.querySelector<HTMLDivElement>(".mx-messages");
+		if (scroller === null) throw new Error("no scroller");
+		let top = 900;
+		Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => top, set: (v: number) => (top = v) });
+		Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => scroller.children.length * 100 });
+		// Laid out at call time: each child of the transcript 100px tall, in its current order.
+		const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+			if (this === scroller) return { top: 0, bottom: 500 } as DOMRect;
+			const i = this.parentElement === scroller ? [...scroller.children].indexOf(this) : 0;
+			return { top: i * 100 - top, bottom: i * 100 + 100 - top } as DOMRect;
+		});
+		try {
+			const scrollTo = (v: number) => {
+				top = v;
+				scroller.dispatchEvent(new Event("scroll"));
+			};
+			await act(async () => scrollTo(900));
+			await act(async () => scrollTo(200));
+			expect(loadOlder).toHaveBeenCalledTimes(1);
+			// The fling goes on to the top before the page comes in.
+			await act(async () => scrollTo(0));
+			const reading = [...scroller.children].find((c) => c.textContent === "reply 10");
+			const before = reading?.getBoundingClientRect().top;
+			shown.rerender(view([...replies(7, 3), ...replies(10, 3)], false, loadOlder));
+			await act(async () => finish());
+			expect(reading?.getBoundingClientRect().top).toBe(before);
+		} finally {
+			rect.mockRestore();
+		}
+	});
 });
 

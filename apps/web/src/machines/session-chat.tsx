@@ -793,6 +793,8 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 						// Pins the window where it is unless an earlier event of this burst moved it already.
 						if (fixed === null) setFrom((f) => (f.view === view && f.start !== null ? f : { view, start }));
 					}
+					// The user keeps scrolling (a phone's fling) while an older page loads: it keeps their latest place.
+					if (olderAnchor.current !== null) olderAnchor.current = { ...olderAnchor.current, mark: markReading(el) };
 					if (up && el.scrollTop < EARLIER_PX) showEarlier();
 				}}
 			>
