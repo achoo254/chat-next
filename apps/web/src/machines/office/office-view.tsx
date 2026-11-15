@@ -14,15 +14,15 @@ import { useMachinesCopy } from "../use-machines-copy.ts";
 import { isPhone } from "../viewport-fit.ts";
 import { Office2D } from "./office-2d.tsx";
 import { loadOfficeAssets, type OfficeAssets } from "./office-assets.ts";
-import { connectOffice } from "./office-client.ts";
+import { connectOffice, documentVisibility, type OfficeConnection } from "./office-client.ts";
 import { officeDaypart } from "./office-daypart.ts";
 import { busyFloors, FIRST_FLOOR, followPreference, latestWork, nextFloor, OfficeFloorTabs, pickFloor, rememberFollow, type FollowState } from "./office-floor-tabs.tsx";
-import type { ScreenSize } from "./office-geometry.ts";
+import { deskOrder, type ScreenSize } from "./office-geometry.ts";
 import type { Parsed } from "./office-json.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "./office-layout.ts";
 import { EMPTY_MEMORY, officePlacement, type Placement, type PlacementMemory } from "./office-placement.ts";
 import type { OfficeRendererProps } from "./office-renderer.ts";
-import { createOfficeStore, DESKS_PHONE, DESKS_WIDE, type OfficeState } from "./office-store.ts";
+import { createOfficeStore, type OfficeState } from "./office-store.ts";
 import "./office.css";
 
 /** The office's frame below this width uses the phone framing and six desks. */
@@ -41,6 +41,10 @@ export function chooseRenderer(): ComponentType<OfficeRendererProps> {
 }
 
 /** What to say when the machine refused to watch: its reason when it gave one (too many offices open at once), else that the office could not open. */
+export function isWatchLimit(err: unknown): boolean {
+	return err instanceof RemoteError && err.reason === ErrorReason.OFFICE_WATCH_LIMIT;
+}
+
 export function refusalText(copy: MachinesCopy, err: unknown): string {
 	return err instanceof RemoteError && err.reason !== ErrorReason.UNSPECIFIED ? errorText(copy, err, "") : copy.office.failed;
 }
@@ -88,32 +92,44 @@ interface Frame {
 const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, floor: FIRST_FLOOR };
 
 /** The next frame: places from the store's state at `now`, then the floor following the newest work. */
-export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, size: ScreenSize, follow: boolean): Frame {
-	const placed = officePlacement(state, layout, now, prev.memory, size);
+export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, follow: boolean): Frame {
+	const placed = officePlacement(state, layout, now, prev.memory);
 	return { now, placements: placed.placements, memory: placed.memory, floor: nextFloor(prev.floor, { follow, now, latest: latestWork(placed.placements) }) };
 }
 
 function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: string; layout: OfficeLayout }) {
 	const copy = useMachinesCopy();
 	const t = copy.office;
-	const [store] = useState(() => createOfficeStore({ now: () => Date.now(), deskCount: isPhone() ? DESKS_PHONE : DESKS_WIDE }));
-	// Why the machine refused to watch (too many offices open, an unknown session, …); null while it did not.
+	const [store] = useState(() => createOfficeStore({ now: () => Date.now(), desks: deskOrder(layout, isPhone() ? "phone" : "desktop") }));
+	// Why the machine refused to watch (too many offices open, an unknown session, …); cleared when a snapshot comes.
 	const [refusal, setRefusal] = useState<{ err: unknown } | null>(null);
-	useEffect(() => connectOffice(link, threadId, store, { now: () => Date.now(), onError: (err) => setRefusal({ err }) }), [link, threadId, store]);
+	const connection = useRef<OfficeConnection | null>(null);
+	useEffect(() => {
+		const opened = connectOffice(link, threadId, store, { now: () => Date.now(), onRefusal: (err) => setRefusal(err === null ? null : { err }) });
+		connection.current = opened;
+		return () => {
+			connection.current = null;
+			opened.close();
+		};
+	}, [link, threadId, store]);
 	const failed = refusal !== null;
 	const state = useSyncExternalStore(store.subscribe, store.state);
 	const box = useRef<HTMLDivElement>(null);
 	const size = useScreenSize(box);
-	useEffect(() => store.setDeskCount(size === "phone" ? DESKS_PHONE : DESKS_WIDE), [store, size]);
+	// The phone uses six of the eight desks: people keep theirs when it stays offered.
+	useEffect(() => store.setDesks(deskOrder(layout, size)), [store, layout, size]);
 	const [follow, setFollow] = useState(followPreference);
-	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), size, follow));
-	// The frame moves on with every change of the store and every second (holds and following run on the clock).
-	const inputs = useRef({ size, follow });
+	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), follow));
+	// The frame moves on with every change of the store and every second while the page shows (holds and following run on the clock).
+	const following = useRef(follow);
 	useEffect(() => {
-		inputs.current = { size, follow };
-	}, [size, follow]);
+		following.current = follow;
+	}, [follow]);
 	useEffect(() => {
-		const step = (): void => setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), inputs.current.size, inputs.current.follow));
+		const step = (): void => {
+			if (documentVisibility.hidden()) return;
+			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), following.current));
+		};
 		const off = store.subscribe(step);
 		const timer = window.setInterval(step, FRAME_TICK_MS);
 		return () => {
@@ -133,15 +149,15 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 		};
 	}, [layout]);
 	const [sound, setSound] = useState(soundPreference);
-	const notes: { key: string; text: string; tone?: "warn" }[] = [];
-	if (refusal !== null) notes.push({ key: "failed", text: refusalText(copy, refusal.err), tone: "warn" });
+	const notes: { key: string; text: string; tone?: "warn"; retry?: boolean }[] = [];
+	if (refusal !== null) notes.push({ key: "failed", text: refusalText(copy, refusal.err), tone: "warn", retry: isWatchLimit(refusal.err) });
 	if (state.status === "live" && !state.reportsStaff) notes.push({ key: "staff", text: t.noStaff });
 	if (state.power === "out") notes.push({ key: "power", text: t.powerOut, tone: "warn" });
 	else if (state.off) notes.push({ key: "closed", text: t.closed });
 	else if (state.status === "live" && state.awaitingSnapshot) notes.push({ key: "sync", text: t.catchingUp });
 	if (state.session.hiddenActors > 0) notes.push({ key: "hidden", text: t.hidden(state.session.hiddenActors) });
 	return (
-		<div className="of" ref={box} data-id="office">
+		<div className="of" ref={box} data-id="office" data-size={size}>
 			<div className="of-bar">
 				<OfficeFloorTabs
 					floor={frame.floor.floor}
@@ -170,6 +186,19 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 			{notes.map((n) => (
 				<p key={n.key} className="of-note" data-tone={n.tone} role="status">
 					{n.text}
+					{n.retry === true && (
+						<button
+							type="button"
+							className="btn btn-sm mx-btn-ghost of-retry"
+							onClick={() => {
+								setRefusal(null);
+								connection.current?.retry();
+							}}
+							data-id="office-retry"
+						>
+							{copy.terminal.retry}
+						</button>
+					)}
 				</p>
 			))}
 			{state.status === "loading" && !failed ? (

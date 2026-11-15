@@ -170,7 +170,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The views of the session's header: the switch shows once there are two.
-	const modes = sessionModes(offered, officeOffered(state.info));
+	const modes = sessionModes(offered, officeOffered(state.info), mode);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;

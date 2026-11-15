@@ -34,9 +34,14 @@ export function officeOffered(info: Pick<MachineInfo, "agentVersion"> | null): b
 	return info !== null && versionAtLeast(info.agentVersion, AGENT_OFFICE);
 }
 
-/** The views a session offers, in the order the switch shows them. */
-export function sessionModes(terminal: boolean, office: boolean): SessionMode[] {
-	return ["chat", ...(terminal ? (["terminal"] as const) : []), ...(office ? (["office"] as const) : [])];
+/**
+ * The views a session offers, in the order the switch shows them. An office
+ * open now stays among them (remembered, on a machine that went offline or
+ * back to an older tunelo), so there is always a way back to chat; a terminal
+ * not offered says so on its own page.
+ */
+export function sessionModes(terminal: boolean, office: boolean, current: SessionMode = "chat"): SessionMode[] {
+	return (["chat", "terminal", "office"] as const).filter((m) => m === "chat" || (m === "terminal" ? terminal : office || current === "office"));
 }
 
 /** The mode new sessions on the machine open in, as last picked when starting one (chat when none, or when storage is refused). */

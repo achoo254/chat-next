@@ -1,56 +1,56 @@
 {
 	"formatVersion": 1,
 	"units": "m",
-	"note": "Bố cục toà nhà Văn phòng, nguồn sự thật duy nhất của hình học (cảnh 3D, bước lắp và bake Blender, bản 2D). Trục: x sang phải, z vào sâu (tường sau ở z = 8), y lên; face là rotation.y của Babylon (0 nhìn về +z). Hình chữ nhật [x0, z0, x1, z1]. Kiểm bằng parseOfficeLayout (office-layout.ts).",
+	"note": "Bố cục toà nhà Văn phòng, nguồn sự thật duy nhất của hình học (cảnh 3D, bước lắp và bake Blender, bản 2D). Trục: x sang phải, z vào sâu (tường sau ở z = 5), y lên; face và rotY là rotation.y của Babylon (0 nhìn về +z); mặt trước của mọi model đồ đạc nhìn về +z khi rotY = 0. Hình chữ nhật [x0, z0, x1, z1]; glass và walls là đoạn [x0, z0, x1, z1]. Tường ngoài cao ở sau (z = 5) và phải (x = 9); trước và trái để hở cho camera. props và smallProps là model dùng instancing; decor do bước lắp Blender tự dựng và bake vào vỏ tầng. Sinh bằng tools/office-art/write-office-layout.py (workspace); kiểm bằng parseOfficeLayout (office-layout.ts).",
 	"footprint": [
-		-13,
-		-12,
-		13,
-		8
+		-9.0,
+		-9.0,
+		9.0,
+		5.0
 	],
-	"wallHeight": 3.2,
+	"wallHeight": 3.0,
 	"defaultCamera": {
 		"note": "Camera isometric trực giao dùng chung cho cảnh 3D và ảnh 2D dựng sẵn: yaw quay quanh trục y (độ, 0 = nhìn thẳng vào tường sau từ phía sảnh), pitch là góc ngẩng trên mặt sàn (độ), target là điểm giữa khung, orthoHeight là chiều cao khung nhìn (mét) theo cỡ ảnh, aspect là rộng chia cao.",
 		"yaw": 30,
 		"pitch": 35,
 		"target": [
-			0,
-			1.6,
-			-2
+			0.357,
+			1.0,
+			-1.382
 		],
 		"views": {
 			"desktop": {
 				"aspect": 1.6,
-				"orthoHeight": 25
+				"orthoHeight": 15.45
 			},
 			"phone": {
 				"aspect": 1,
-				"orthoHeight": 36
+				"orthoHeight": 23.94
 			}
 		}
 	},
 	"floors": [
 		{
 			"level": 1,
-			"name": "Tầng 1",
+			"name": "Tầng 1: Sảnh, Giám đốc, Làm việc chung, Máy chủ, Họp, Pantry",
 			"rooms": [
 				{
 					"room": "DIRECTOR",
 					"name": "Phòng Giám đốc",
 					"rect": [
-						-13,
+						-9,
 						0,
-						-6.5,
-						8
+						-4.5,
+						5
 					]
 				},
 				{
 					"room": "SERVER",
 					"name": "Phòng Máy chủ",
 					"rect": [
-						-13,
-						-8,
-						-6.5,
+						-9,
+						-5,
+						-4.5,
 						0
 					]
 				},
@@ -58,29 +58,29 @@
 					"room": "WORK",
 					"name": "Phòng Làm việc chung",
 					"rect": [
-						-6.5,
-						-8,
-						6.5,
-						8
+						-4.5,
+						-5,
+						4.5,
+						5
 					]
 				},
 				{
 					"room": "PANTRY",
 					"name": "Pantry",
 					"rect": [
-						6.5,
+						4.5,
 						0,
-						13,
-						8
+						9,
+						5
 					]
 				},
 				{
 					"room": "MEETING",
 					"name": "Phòng họp",
 					"rect": [
-						6.5,
-						-8,
-						13,
+						4.5,
+						-5,
+						9,
 						0
 					]
 				},
@@ -88,10 +88,10 @@
 					"room": "LOBBY",
 					"name": "Sảnh",
 					"rect": [
-						-6.5,
-						-12,
-						13,
-						-8
+						-4.5,
+						-9,
+						9,
+						-5
 					]
 				}
 			],
@@ -99,50 +99,95 @@
 				{
 					"name": "Thang máy và cầu thang",
 					"rect": [
-						-13,
-						-12,
-						-6.5,
-						-8
+						-9,
+						-9,
+						-4.5,
+						-5
 					]
 				}
 			],
 			"glass": [
 				[
-					-6.5,
-					-8,
-					-6.5,
-					8
+					-4.5,
+					-5,
+					-4.5,
+					5
 				],
 				[
-					6.5,
-					-8,
-					6.5,
-					8
+					4.5,
+					-5,
+					4.5,
+					5
 				],
 				[
-					-13,
+					-9,
 					0,
-					-6.5,
+					-4.5,
 					0
 				],
 				[
-					6.5,
+					4.5,
 					0,
-					13,
+					9,
 					0
 				],
 				[
-					-6.5,
-					-8,
-					13,
-					-8
+					-4.5,
+					-5,
+					9,
+					-5
 				],
 				[
-					-6.5,
-					-12,
-					-6.5,
-					-8
+					-4.5,
+					-9,
+					-4.5,
+					-5
 				]
+			],
+			"walls": [
+				[
+					-9,
+					-5,
+					-4.5,
+					-5
+				]
+			],
+			"windows": [
+				{
+					"wall": "back",
+					"from": -3.3,
+					"to": -1.1,
+					"sill": 0.95,
+					"top": 2.45
+				},
+				{
+					"wall": "back",
+					"from": 1.1,
+					"to": 3.3,
+					"sill": 0.95,
+					"top": 2.45
+				},
+				{
+					"wall": "back",
+					"from": -6.4,
+					"to": -5.0,
+					"sill": 0.95,
+					"top": 2.45
+				},
+				{
+					"wall": "back",
+					"from": 5.6,
+					"to": 7.6,
+					"sill": 1.15,
+					"top": 2.45
+				},
+				{
+					"wall": "east",
+					"from": -3.6,
+					"to": -1.4,
+					"sill": 0.95,
+					"top": 2.45
+				}
 			],
 			"doors": [
 				{
@@ -152,10 +197,10 @@
 						"DIRECTOR"
 					],
 					"at": [
-						-6.5,
-						1.5
+						-4.5,
+						0.6
 					],
-					"width": 1.4,
+					"width": 1.0,
 					"axis": "z"
 				},
 				{
@@ -165,10 +210,10 @@
 						"SERVER"
 					],
 					"at": [
-						-6.5,
-						-0.85
+						-4.5,
+						-0.6
 					],
-					"width": 1.5,
+					"width": 1.0,
 					"axis": "z"
 				},
 				{
@@ -178,10 +223,10 @@
 						"PANTRY"
 					],
 					"at": [
-						6.5,
-						1.5
+						4.5,
+						0.6
 					],
-					"width": 1.4,
+					"width": 1.0,
 					"axis": "z"
 				},
 				{
@@ -191,10 +236,10 @@
 						"MEETING"
 					],
 					"at": [
-						6.5,
-						-0.85
+						4.5,
+						-0.6
 					],
-					"width": 1.5,
+					"width": 1.0,
 					"axis": "z"
 				},
 				{
@@ -205,9 +250,9 @@
 					],
 					"at": [
 						0,
-						-8
+						-5
 					],
-					"width": 2.6,
+					"width": 1.6,
 					"axis": "x"
 				},
 				{
@@ -217,10 +262,10 @@
 						null
 					],
 					"at": [
-						-6.5,
-						-10
+						-4.5,
+						-6.5
 					],
-					"width": 2,
+					"width": 1.4,
 					"axis": "z"
 				},
 				{
@@ -231,85 +276,94 @@
 					],
 					"at": [
 						4,
-						-12
+						-9
 					],
-					"width": 2.6,
+					"width": 1.8,
 					"axis": "x"
 				}
 			],
 			"anchors": [
 				{
+					"id": "f1-elevator",
+					"kind": "elevator",
+					"room": null,
+					"x": -6.6,
+					"z": -6.5,
+					"face": -1.5708,
+					"node": "f1-elevator"
+				},
+				{
 					"id": "desk-0",
 					"kind": "desk",
 					"room": "WORK",
-					"x": -5.7,
-					"z": 2.6,
-					"face": 1.57,
+					"x": -2.87,
+					"z": 3.36,
+					"face": 3.1416,
 					"sit": true,
 					"desk": {
-						"x": -4.5,
-						"z": 2.6,
-						"rotY": 0
+						"x": -2.87,
+						"z": 2.56,
+						"rotY": 0.0
 					},
-					"node": "f1-work-aisle-west"
+					"node": "f1-work-north-west"
 				},
 				{
 					"id": "desk-1",
 					"kind": "desk",
 					"room": "WORK",
-					"x": -2.35,
-					"z": 2.6,
-					"face": 1.57,
+					"x": -1.43,
+					"z": 3.36,
+					"face": 3.1416,
 					"sit": true,
 					"desk": {
-						"x": -1.15,
-						"z": 2.6,
-						"rotY": 0
+						"x": -1.43,
+						"z": 2.56,
+						"rotY": 0.0
 					},
-					"node": "f1-work-aisle-west"
+					"node": "f1-work-north-west"
 				},
 				{
 					"id": "desk-2",
 					"kind": "desk",
 					"room": "WORK",
-					"x": 1,
-					"z": 2.6,
-					"face": 1.57,
+					"x": 1.43,
+					"z": 3.36,
+					"face": 3.1416,
 					"sit": true,
 					"desk": {
-						"x": 2.2,
-						"z": 2.6,
-						"rotY": 0
+						"x": 1.43,
+						"z": 2.56,
+						"rotY": 0.0
 					},
-					"node": "f1-work-aisle-east"
+					"node": "f1-work-north-east"
 				},
 				{
 					"id": "desk-3",
 					"kind": "desk",
 					"room": "WORK",
-					"x": 4.3,
-					"z": 2.6,
-					"face": 1.57,
+					"x": 2.87,
+					"z": 3.36,
+					"face": 3.1416,
 					"sit": true,
 					"desk": {
-						"x": 5.5,
-						"z": 2.6,
-						"rotY": 0
+						"x": 2.87,
+						"z": 2.56,
+						"rotY": 0.0
 					},
-					"node": "f1-work-aisle-east"
+					"node": "f1-work-north-east"
 				},
 				{
 					"id": "desk-4",
 					"kind": "desk",
 					"room": "WORK",
-					"x": -5.7,
-					"z": -1.9,
-					"face": 1.57,
+					"x": -2.87,
+					"z": 1.04,
+					"face": 0.0,
 					"sit": true,
 					"desk": {
-						"x": -4.5,
-						"z": -1.9,
-						"rotY": 0
+						"x": -2.87,
+						"z": 1.84,
+						"rotY": 3.1416
 					},
 					"node": "f1-work-aisle-west"
 				},
@@ -317,14 +371,14 @@
 					"id": "desk-5",
 					"kind": "desk",
 					"room": "WORK",
-					"x": -2.35,
-					"z": -1.9,
-					"face": 1.57,
+					"x": -1.43,
+					"z": 1.04,
+					"face": 0.0,
 					"sit": true,
 					"desk": {
-						"x": -1.15,
-						"z": -1.9,
-						"rotY": 0
+						"x": -1.43,
+						"z": 1.84,
+						"rotY": 3.1416
 					},
 					"node": "f1-work-aisle-west"
 				},
@@ -332,14 +386,14 @@
 					"id": "desk-6",
 					"kind": "desk",
 					"room": "WORK",
-					"x": 1,
-					"z": -1.9,
-					"face": 1.57,
+					"x": 1.43,
+					"z": 1.04,
+					"face": 0.0,
 					"sit": true,
 					"desk": {
-						"x": 2.2,
-						"z": -1.9,
-						"rotY": 0
+						"x": 1.43,
+						"z": 1.84,
+						"rotY": 3.1416
 					},
 					"node": "f1-work-aisle-east"
 				},
@@ -347,24 +401,51 @@
 					"id": "desk-7",
 					"kind": "desk",
 					"room": "WORK",
-					"x": 4.3,
-					"z": -1.9,
-					"face": 1.57,
+					"x": 2.87,
+					"z": 1.04,
+					"face": 0.0,
 					"sit": true,
 					"desk": {
-						"x": 5.5,
-						"z": -1.9,
-						"rotY": 0
+						"x": 2.87,
+						"z": 1.84,
+						"rotY": 3.1416
 					},
 					"node": "f1-work-aisle-east"
+				},
+				{
+					"id": "work-spot-0",
+					"kind": "work",
+					"room": "WORK",
+					"x": -3.15,
+					"z": -2.8,
+					"face": 1.5708,
+					"node": "f1-work-front"
+				},
+				{
+					"id": "work-spot-1",
+					"kind": "work",
+					"room": "WORK",
+					"x": -1.25,
+					"z": -2.8,
+					"face": -1.5708,
+					"node": "f1-work-front"
+				},
+				{
+					"id": "work-spot-2",
+					"kind": "work",
+					"room": "WORK",
+					"x": -2.2,
+					"z": -3.75,
+					"face": 0.0,
+					"node": "f1-work-front"
 				},
 				{
 					"id": "director",
 					"kind": "director",
 					"room": "DIRECTOR",
-					"x": -10.8,
-					"z": 5,
-					"face": 1.57,
+					"x": -6.75,
+					"z": 3.75,
+					"face": 3.1416,
 					"sit": true,
 					"node": "f1-director"
 				},
@@ -372,74 +453,63 @@
 					"id": "director-front",
 					"kind": "work",
 					"room": "DIRECTOR",
-					"x": -8.2,
-					"z": 4.6,
-					"face": -1.57,
+					"x": -6.75,
+					"z": 1.95,
+					"face": 0.0,
+					"node": "f1-director"
+				},
+				{
+					"id": "director-work-1",
+					"kind": "work",
+					"room": "DIRECTOR",
+					"x": -7.6,
+					"z": 4.05,
+					"face": 0.0,
+					"node": "f1-director"
+				},
+				{
+					"id": "director-work-2",
+					"kind": "work",
+					"room": "DIRECTOR",
+					"x": -5.4,
+					"z": 1.0,
+					"face": -1.5708,
 					"node": "f1-director"
 				},
 				{
 					"id": "server-0",
 					"kind": "server",
 					"room": "SERVER",
-					"x": -10.95,
-					"z": -2,
-					"face": -1.57,
+					"x": -8.25,
+					"z": -1.55,
+					"face": 0.0,
 					"node": "f1-server"
 				},
 				{
 					"id": "server-1",
 					"kind": "server",
 					"room": "SERVER",
-					"x": -10.95,
-					"z": -4.3,
-					"face": -1.57,
+					"x": -7.45,
+					"z": -1.55,
+					"face": 0.0,
 					"node": "f1-server"
 				},
 				{
 					"id": "server-2",
 					"kind": "server",
 					"room": "SERVER",
-					"x": -10.95,
-					"z": -6.6,
-					"face": -1.57,
+					"x": -6.65,
+					"z": -1.55,
+					"face": 0.0,
 					"node": "f1-server"
-				},
-				{
-					"id": "pantry-coffee",
-					"kind": "pantry",
-					"room": "PANTRY",
-					"x": 8.6,
-					"z": 6.3,
-					"face": 0,
-					"node": "f1-pantry"
-				},
-				{
-					"id": "sofa-0",
-					"kind": "sofa",
-					"room": "PANTRY",
-					"x": 10.2,
-					"z": 4.2,
-					"face": 3.14,
-					"sit": true,
-					"node": "f1-pantry"
-				},
-				{
-					"id": "sofa-1",
-					"kind": "sofa",
-					"room": "PANTRY",
-					"x": 11.6,
-					"z": 4.2,
-					"face": 3.14,
-					"sit": true,
-					"node": "f1-pantry"
 				},
 				{
 					"id": "meeting-0",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 11.55,
-					"z": -4.3,
-					"face": -1.57,
+					"x": 5.3,
+					"z": -2.5,
+					"face": 1.5708,
 					"sit": true,
 					"node": "f1-meeting"
 				},
@@ -447,9 +517,9 @@
 					"id": "meeting-1",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 10.68,
-					"z": -2.78,
-					"face": -2.62,
+					"x": 6.25,
+					"z": -1.55,
+					"face": 3.1416,
 					"sit": true,
 					"node": "f1-meeting"
 				},
@@ -457,9 +527,9 @@
 					"id": "meeting-2",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 8.93,
-					"z": -2.78,
-					"face": 2.62,
+					"x": 7.3,
+					"z": -1.55,
+					"face": 3.1416,
 					"sit": true,
 					"node": "f1-meeting"
 				},
@@ -467,9 +537,9 @@
 					"id": "meeting-3",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 8.05,
-					"z": -4.3,
-					"face": 1.57,
+					"x": 8.2,
+					"z": -2.5,
+					"face": -1.5708,
 					"sit": true,
 					"node": "f1-meeting"
 				},
@@ -477,9 +547,9 @@
 					"id": "meeting-4",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 8.93,
-					"z": -5.82,
-					"face": 0.52,
+					"x": 7.3,
+					"z": -3.45,
+					"face": 0.0,
 					"sit": true,
 					"node": "f1-meeting"
 				},
@@ -487,111 +557,86 @@
 					"id": "meeting-5",
 					"kind": "meeting",
 					"room": "MEETING",
-					"x": 10.68,
-					"z": -5.82,
-					"face": -0.52,
+					"x": 6.25,
+					"z": -3.45,
+					"face": 0.0,
 					"sit": true,
 					"node": "f1-meeting"
+				},
+				{
+					"id": "pantry-coffee",
+					"kind": "pantry",
+					"room": "PANTRY",
+					"x": 6.3,
+					"z": 3.95,
+					"face": 0.0,
+					"node": "f1-pantry"
+				},
+				{
+					"id": "sofa-0",
+					"kind": "sofa",
+					"room": "PANTRY",
+					"x": 8.35,
+					"z": 1.95,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f1-pantry"
+				},
+				{
+					"id": "sofa-1",
+					"kind": "sofa",
+					"room": "PANTRY",
+					"x": 8.35,
+					"z": 2.85,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f1-pantry"
 				},
 				{
 					"id": "lobby-entry",
 					"kind": "lobby",
 					"room": "LOBBY",
-					"x": 4,
-					"z": -11.2,
-					"face": 0,
+					"x": 4.0,
+					"z": -8.6,
+					"face": 0.0,
 					"node": "f1-entrance"
 				},
 				{
 					"id": "chairman",
 					"kind": "chairman",
 					"room": "LOBBY",
-					"x": 2,
-					"z": -10.6,
-					"face": 0,
+					"x": 2.0,
+					"z": -7.7,
+					"face": 3.1416,
 					"node": "f1-lobby-mid"
 				},
 				{
 					"id": "chairman-meet",
 					"kind": "work",
 					"room": "LOBBY",
-					"x": 2,
-					"z": -9.2,
-					"face": 3.14,
+					"x": 2.0,
+					"z": -6.5,
+					"face": 3.1416,
 					"node": "f1-lobby-mid"
 				},
 				{
 					"id": "lobby-board",
 					"kind": "board",
 					"room": "LOBBY",
-					"x": 12.85,
-					"z": -10,
+					"x": 8.97,
+					"z": -7.4,
+					"face": -1.5708,
 					"y": 1.8,
-					"face": -1.57,
 					"node": "f1-lobby-east"
 				},
 				{
 					"id": "board-view",
 					"kind": "work",
 					"room": "LOBBY",
-					"x": 11.2,
-					"z": -10,
-					"face": 1.57,
+					"x": 7.6,
+					"z": -7.4,
+					"face": 1.5708,
 					"node": "f1-lobby-east"
-				},
-				{
-					"id": "f1-elevator",
-					"kind": "elevator",
-					"room": null,
-					"x": -9.2,
-					"z": -10,
-					"face": 1.57,
-					"node": "f1-elevator"
-				},
-				{
-					"id": "director-work-1",
-					"kind": "work",
-					"room": "DIRECTOR",
-					"x": -8.4,
-					"z": 6.8,
-					"face": -1.57,
-					"node": "f1-director"
-				},
-				{
-					"id": "director-work-2",
-					"kind": "work",
-					"room": "DIRECTOR",
-					"x": -10.6,
-					"z": 1.6,
-					"face": 0,
-					"node": "f1-director"
-				},
-				{
-					"id": "work-spot-0",
-					"kind": "work",
-					"room": "WORK",
-					"x": -3,
-					"z": -5.5,
-					"face": 0,
-					"node": "f1-work-front"
-				},
-				{
-					"id": "work-spot-1",
-					"kind": "work",
-					"room": "WORK",
-					"x": 0,
-					"z": -5.5,
-					"face": 0,
-					"node": "f1-work-front"
-				},
-				{
-					"id": "work-spot-2",
-					"kind": "work",
-					"room": "WORK",
-					"x": 3,
-					"z": -5.5,
-					"face": 0,
-					"node": "f1-work-front"
 				}
 			],
 			"phoneDeskOrder": [
@@ -602,124 +647,147 @@
 				"desk-0",
 				"desk-4"
 			],
+			"elevatorNode": "f1-elevator",
 			"graph": {
 				"nodes": [
 					{
+						"id": "f1-elevator",
+						"x": -6.6,
+						"z": -6.5,
+						"room": null
+					},
+					{
+						"id": "f1-door-core",
+						"x": -4.5,
+						"z": -6.5,
+						"room": null
+					},
+					{
 						"id": "f1-work-aisle-west",
-						"x": -5,
-						"z": 0.35,
+						"x": -3.6,
+						"z": 0.15,
 						"room": "WORK"
 					},
 					{
 						"id": "f1-work-aisle-mid",
 						"x": 0,
-						"z": 0.35,
+						"z": 0.15,
 						"room": "WORK"
 					},
 					{
 						"id": "f1-work-aisle-east",
-						"x": 5,
-						"z": 0.35,
+						"x": 3.6,
+						"z": 0.15,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-north",
+						"x": 0,
+						"z": 4.15,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-north-west",
+						"x": -2.15,
+						"z": 4.15,
+						"room": "WORK"
+					},
+					{
+						"id": "f1-work-north-east",
+						"x": 2.15,
+						"z": 4.15,
 						"room": "WORK"
 					},
 					{
 						"id": "f1-work-front",
 						"x": 0,
-						"z": -6.5,
+						"z": -3.0,
 						"room": "WORK"
 					},
 					{
 						"id": "f1-door-director",
-						"x": -6.5,
-						"z": 1.5,
-						"room": null
-					},
-					{
-						"id": "f1-door-server",
-						"x": -6.5,
-						"z": -0.85,
-						"room": null
-					},
-					{
-						"id": "f1-door-pantry",
-						"x": 6.5,
-						"z": 1.5,
-						"room": null
-					},
-					{
-						"id": "f1-door-meeting",
-						"x": 6.5,
-						"z": -0.85,
-						"room": null
-					},
-					{
-						"id": "f1-door-lobby",
-						"x": 0,
-						"z": -8,
-						"room": null
-					},
-					{
-						"id": "f1-door-core",
-						"x": -6.5,
-						"z": -10,
+						"x": -4.5,
+						"z": 0.6,
 						"room": null
 					},
 					{
 						"id": "f1-director",
-						"x": -8.6,
-						"z": 2.6,
+						"x": -5.6,
+						"z": 1.3,
 						"room": "DIRECTOR"
 					},
 					{
+						"id": "f1-door-server",
+						"x": -4.5,
+						"z": -0.6,
+						"room": null
+					},
+					{
 						"id": "f1-server",
-						"x": -10.2,
-						"z": -1.2,
+						"x": -5.6,
+						"z": -1.6,
 						"room": "SERVER"
 					},
 					{
-						"id": "f1-pantry",
-						"x": 8.6,
-						"z": 2.2,
-						"room": "PANTRY"
+						"id": "f1-door-meeting",
+						"x": 4.5,
+						"z": -0.6,
+						"room": null
 					},
 					{
 						"id": "f1-meeting",
-						"x": 8.2,
-						"z": -1.6,
+						"x": 5.25,
+						"z": -1.0,
 						"room": "MEETING"
 					},
 					{
+						"id": "f1-door-pantry",
+						"x": 4.5,
+						"z": 0.6,
+						"room": null
+					},
+					{
+						"id": "f1-pantry",
+						"x": 5.3,
+						"z": 0.9,
+						"room": "PANTRY"
+					},
+					{
+						"id": "f1-door-lobby",
+						"x": 0,
+						"z": -5,
+						"room": null
+					},
+					{
 						"id": "f1-lobby-west",
-						"x": -4,
-						"z": -10,
+						"x": -3.5,
+						"z": -7.4,
 						"room": "LOBBY"
 					},
 					{
 						"id": "f1-lobby-mid",
-						"x": 2,
-						"z": -10,
+						"x": 2.0,
+						"z": -7.1,
 						"room": "LOBBY"
 					},
 					{
 						"id": "f1-lobby-east",
-						"x": 9,
-						"z": -10,
+						"x": 7.0,
+						"z": -7.4,
 						"room": "LOBBY"
 					},
 					{
 						"id": "f1-entrance",
-						"x": 4,
-						"z": -11.6,
+						"x": 4.0,
+						"z": -8.6,
 						"room": "LOBBY"
-					},
-					{
-						"id": "f1-elevator",
-						"x": -9.2,
-						"z": -10,
-						"room": null
 					}
 				],
 				"edges": [
+					[
+						"f1-elevator",
+						"f1-door-core"
+					],
 					[
 						"f1-work-aisle-west",
 						"f1-work-aisle-mid"
@@ -729,44 +797,56 @@
 						"f1-work-aisle-east"
 					],
 					[
+						"f1-work-north-west",
+						"f1-work-north"
+					],
+					[
+						"f1-work-north",
+						"f1-work-north-east"
+					],
+					[
+						"f1-work-aisle-mid",
+						"f1-work-north"
+					],
+					[
 						"f1-work-aisle-mid",
 						"f1-work-front"
+					],
+					[
+						"f1-work-front",
+						"f1-door-lobby"
 					],
 					[
 						"f1-work-aisle-west",
 						"f1-door-director"
 					],
 					[
-						"f1-work-aisle-west",
-						"f1-door-server"
-					],
-					[
-						"f1-work-aisle-east",
-						"f1-door-pantry"
-					],
-					[
-						"f1-work-aisle-east",
-						"f1-door-meeting"
-					],
-					[
 						"f1-door-director",
 						"f1-director"
+					],
+					[
+						"f1-work-aisle-west",
+						"f1-door-server"
 					],
 					[
 						"f1-door-server",
 						"f1-server"
 					],
 					[
-						"f1-door-pantry",
-						"f1-pantry"
+						"f1-work-aisle-east",
+						"f1-door-meeting"
 					],
 					[
 						"f1-door-meeting",
 						"f1-meeting"
 					],
 					[
-						"f1-work-front",
-						"f1-door-lobby"
+						"f1-work-aisle-east",
+						"f1-door-pantry"
+					],
+					[
+						"f1-door-pantry",
+						"f1-pantry"
 					],
 					[
 						"f1-door-lobby",
@@ -787,532 +867,1207 @@
 					[
 						"f1-lobby-west",
 						"f1-door-core"
-					],
-					[
-						"f1-door-core",
-						"f1-elevator"
 					]
 				]
 			},
-			"elevatorNode": "f1-elevator",
 			"props": [
 				{
+					"name": "floor-plant",
+					"x": -5.0,
+					"z": -5.5,
+					"rotY": 0.0
+				},
+				{
 					"name": "desk",
-					"x": -4.5,
-					"z": 2.6,
-					"rotY": 0,
+					"x": -2.87,
+					"z": 2.56,
+					"rotY": 0.0,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "chair",
-					"x": -5.7,
-					"z": 2.6,
-					"rotY": 1.57,
+					"x": -2.87,
+					"z": 3.36,
+					"rotY": 3.1416,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "monitor",
-					"x": -4.05,
-					"z": 2.6,
+					"x": -2.87,
+					"z": 2.41,
+					"rotY": 0.0,
 					"y": 0.75,
-					"rotY": -1.57,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "keyboard",
-					"x": -4.8,
-					"z": 2.6,
+					"x": -2.87,
+					"z": 2.68,
+					"rotY": 0.0,
 					"y": 0.75,
-					"rotY": -1.57,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "desk-lamp",
-					"x": -4.05,
-					"z": 3.05,
+					"x": -2.32,
+					"z": 2.44,
+					"rotY": 0.0,
 					"y": 0.75,
-					"rotY": -1.57,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "desk",
-					"x": -1.15,
-					"z": 2.6,
-					"rotY": 0,
+					"x": -1.43,
+					"z": 2.56,
+					"rotY": 0.0,
 					"anchor": "desk-1"
 				},
 				{
 					"name": "chair",
-					"x": -2.35,
-					"z": 2.6,
-					"rotY": 1.57,
+					"x": -1.43,
+					"z": 3.36,
+					"rotY": 3.1416,
 					"anchor": "desk-1"
 				},
 				{
 					"name": "monitor",
-					"x": -0.7,
-					"z": 2.6,
+					"x": -1.43,
+					"z": 2.41,
+					"rotY": 0.0,
 					"y": 0.75,
-					"rotY": -1.57,
 					"anchor": "desk-1"
 				},
 				{
 					"name": "keyboard",
-					"x": -1.45,
-					"z": 2.6,
+					"x": -1.43,
+					"z": 2.68,
+					"rotY": 0.0,
 					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-1"
-				},
-				{
-					"name": "desk-lamp",
-					"x": -0.7,
-					"z": 3.05,
-					"y": 0.75,
-					"rotY": -1.57,
 					"anchor": "desk-1"
 				},
 				{
 					"name": "desk",
+					"x": 1.43,
+					"z": 2.56,
+					"rotY": 0.0,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "chair",
+					"x": 1.43,
+					"z": 3.36,
+					"rotY": 3.1416,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "monitor",
+					"x": 1.43,
+					"z": 2.41,
+					"rotY": 0.0,
+					"y": 0.75,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "keyboard",
+					"x": 1.43,
+					"z": 2.68,
+					"rotY": 0.0,
+					"y": 0.75,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "desk",
+					"x": 2.87,
+					"z": 2.56,
+					"rotY": 0.0,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "chair",
+					"x": 2.87,
+					"z": 3.36,
+					"rotY": 3.1416,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "monitor",
+					"x": 2.87,
+					"z": 2.41,
+					"rotY": 0.0,
+					"y": 0.75,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "keyboard",
+					"x": 2.87,
+					"z": 2.68,
+					"rotY": 0.0,
+					"y": 0.75,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 3.42,
+					"z": 2.44,
+					"rotY": 0.0,
+					"y": 0.75,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "desk",
+					"x": -2.87,
+					"z": 1.84,
+					"rotY": 3.1416,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "chair",
+					"x": -2.87,
+					"z": 1.04,
+					"rotY": 0.0,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "monitor",
+					"x": -2.87,
+					"z": 1.99,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "keyboard",
+					"x": -2.87,
+					"z": 1.72,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-4"
+				},
+				{
+					"name": "desk",
+					"x": -1.43,
+					"z": 1.84,
+					"rotY": 3.1416,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "chair",
+					"x": -1.43,
+					"z": 1.04,
+					"rotY": 0.0,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "monitor",
+					"x": -1.43,
+					"z": 1.99,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "keyboard",
+					"x": -1.43,
+					"z": 1.72,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "desk-lamp",
+					"x": -1.98,
+					"z": 1.96,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-5"
+				},
+				{
+					"name": "desk",
+					"x": 1.43,
+					"z": 1.84,
+					"rotY": 3.1416,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "chair",
+					"x": 1.43,
+					"z": 1.04,
+					"rotY": 0.0,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "monitor",
+					"x": 1.43,
+					"z": 1.99,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "keyboard",
+					"x": 1.43,
+					"z": 1.72,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "desk-lamp",
+					"x": 0.88,
+					"z": 1.96,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-6"
+				},
+				{
+					"name": "desk",
+					"x": 2.87,
+					"z": 1.84,
+					"rotY": 3.1416,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "chair",
+					"x": 2.87,
+					"z": 1.04,
+					"rotY": 0.0,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "monitor",
+					"x": 2.87,
+					"z": 1.99,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "keyboard",
+					"x": 2.87,
+					"z": 1.72,
+					"rotY": 3.1416,
+					"y": 0.75,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "low-cabinet",
+					"x": -2.2,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "low-cabinet",
 					"x": 2.2,
-					"z": 2.6,
-					"rotY": 0,
-					"anchor": "desk-2"
+					"z": 4.72,
+					"rotY": 3.1416
 				},
 				{
-					"name": "chair",
-					"x": 1,
-					"z": 2.6,
-					"rotY": 1.57,
-					"anchor": "desk-2"
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": 4.45,
+					"rotY": 0.0
 				},
 				{
-					"name": "monitor",
-					"x": 2.65,
-					"z": 2.6,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-2"
+					"name": "floor-plant",
+					"x": 4.0,
+					"z": 4.45,
+					"rotY": 0.0
 				},
 				{
-					"name": "keyboard",
-					"x": 1.9,
-					"z": 2.6,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-2"
+					"name": "trash-bin",
+					"x": -4.1,
+					"z": 1.2,
+					"rotY": 0.0
 				},
 				{
-					"name": "desk-lamp",
-					"x": 2.65,
-					"z": 3.05,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-2"
+					"name": "trash-bin",
+					"x": 4.1,
+					"z": 3.6,
+					"rotY": 0.0
 				},
 				{
-					"name": "desk",
-					"x": 5.5,
-					"z": 2.6,
-					"rotY": 0,
-					"anchor": "desk-3"
+					"name": "round-table",
+					"x": -2.2,
+					"z": -2.8,
+					"rotY": 0.0
 				},
 				{
-					"name": "chair",
-					"x": 4.3,
-					"z": 2.6,
-					"rotY": 1.57,
-					"anchor": "desk-3"
+					"name": "printer",
+					"x": 2.3,
+					"z": -4.55,
+					"rotY": 0.0
 				},
 				{
-					"name": "monitor",
-					"x": 5.95,
-					"z": 2.6,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-3"
+					"name": "filing-cabinet",
+					"x": 3.2,
+					"z": -4.6,
+					"rotY": 0.0
 				},
 				{
-					"name": "keyboard",
-					"x": 5.2,
-					"z": 2.6,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-3"
+					"name": "filing-cabinet",
+					"x": 3.75,
+					"z": -4.6,
+					"rotY": 0.0
 				},
 				{
-					"name": "desk-lamp",
-					"x": 5.95,
-					"z": 3.05,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-3"
+					"name": "water-cooler",
+					"x": 4.1,
+					"z": -3.4,
+					"rotY": -1.5708
 				},
 				{
-					"name": "desk",
-					"x": -4.5,
-					"z": -1.9,
-					"rotY": 0,
-					"anchor": "desk-4"
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -4.5,
+					"rotY": 0.0
 				},
 				{
-					"name": "chair",
-					"x": -5.7,
-					"z": -1.9,
-					"rotY": 1.57,
-					"anchor": "desk-4"
+					"name": "exec-desk",
+					"x": -6.75,
+					"z": 2.9,
+					"rotY": 0.0
+				},
+				{
+					"name": "exec-chair",
+					"x": -6.75,
+					"z": 3.75,
+					"rotY": 3.1416
 				},
 				{
 					"name": "monitor",
-					"x": -4.05,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-4"
+					"x": -6.45,
+					"z": 2.78,
+					"rotY": 0.0,
+					"y": 0.75
 				},
 				{
 					"name": "keyboard",
-					"x": -4.8,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-4"
+					"x": -6.75,
+					"z": 3.08,
+					"rotY": 0.0,
+					"y": 0.75
 				},
 				{
 					"name": "desk-lamp",
-					"x": -4.05,
-					"z": -1.45,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-4"
-				},
-				{
-					"name": "desk",
-					"x": -1.15,
-					"z": -1.9,
-					"rotY": 0,
-					"anchor": "desk-5"
-				},
-				{
-					"name": "chair",
-					"x": -2.35,
-					"z": -1.9,
-					"rotY": 1.57,
-					"anchor": "desk-5"
-				},
-				{
-					"name": "monitor",
-					"x": -0.7,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-5"
-				},
-				{
-					"name": "keyboard",
-					"x": -1.45,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-5"
-				},
-				{
-					"name": "desk-lamp",
-					"x": -0.7,
-					"z": -1.45,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-5"
-				},
-				{
-					"name": "desk",
-					"x": 2.2,
-					"z": -1.9,
-					"rotY": 0,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "chair",
-					"x": 1,
-					"z": -1.9,
-					"rotY": 1.57,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "monitor",
-					"x": 2.65,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "keyboard",
-					"x": 1.9,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "desk-lamp",
-					"x": 2.65,
-					"z": -1.45,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "desk",
-					"x": 5.5,
-					"z": -1.9,
-					"rotY": 0,
-					"anchor": "desk-7"
-				},
-				{
-					"name": "chair",
-					"x": 4.3,
-					"z": -1.9,
-					"rotY": 1.57,
-					"anchor": "desk-7"
-				},
-				{
-					"name": "monitor",
-					"x": 5.95,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-7"
-				},
-				{
-					"name": "keyboard",
-					"x": 5.2,
-					"z": -1.9,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-7"
-				},
-				{
-					"name": "desk-lamp",
-					"x": 5.95,
-					"z": -1.45,
-					"y": 0.75,
-					"rotY": -1.57,
-					"anchor": "desk-7"
+					"x": -7.45,
+					"z": 2.78,
+					"rotY": 0.0,
+					"y": 0.75
 				},
 				{
 					"name": "bookshelf",
-					"x": -3,
-					"z": 7.6,
-					"rotY": 3.14
+					"x": -7.6,
+					"z": 4.72,
+					"rotY": 3.1416
 				},
 				{
-					"name": "bookshelf",
-					"x": 3,
-					"z": 7.6,
-					"rotY": 3.14
+					"name": "floor-plant",
+					"x": -5.0,
+					"z": 4.45,
+					"rotY": 0.0
 				},
 				{
-					"name": "glass-partition",
-					"x": 0.52,
-					"z": 2.6,
-					"rotY": 1.57
+					"name": "floor-lamp",
+					"x": -8.6,
+					"z": 4.5,
+					"rotY": 0.0
 				},
 				{
-					"name": "glass-partition",
-					"x": 0.52,
-					"z": -1.9,
-					"rotY": 1.57
+					"name": "armchair",
+					"x": -8.4,
+					"z": 1.0,
+					"rotY": 1.5708
 				},
 				{
-					"name": "plant",
-					"x": -5.9,
-					"z": 7.3
+					"name": "side-table",
+					"x": -8.5,
+					"z": 1.85,
+					"rotY": 0.0
 				},
 				{
-					"name": "plant",
-					"x": 5.9,
-					"z": 7.3
+					"name": "server-rack",
+					"x": -8.25,
+					"z": -0.45,
+					"rotY": 3.1416
 				},
 				{
-					"name": "plant",
-					"x": -5.9,
-					"z": -7.3
+					"name": "server-rack",
+					"x": -7.45,
+					"z": -0.45,
+					"rotY": 3.1416
 				},
 				{
-					"name": "plant",
-					"x": 5.9,
-					"z": -7.3
+					"name": "server-rack",
+					"x": -6.65,
+					"z": -0.45,
+					"rotY": 3.1416
+				},
+				{
+					"name": "server-rack",
+					"x": -5.85,
+					"z": -0.45,
+					"rotY": 3.1416
+				},
+				{
+					"name": "desk",
+					"x": -6.4,
+					"z": -4.35,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": -6.4,
+					"z": -3.55,
+					"rotY": 3.1416
+				},
+				{
+					"name": "monitor",
+					"x": -6.68,
+					"z": -4.5,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "monitor",
+					"x": -6.12,
+					"z": -4.5,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": -6.4,
+					"z": -4.23,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "filing-cabinet",
+					"x": -8.55,
+					"z": -4.55,
+					"rotY": 0.0
+				},
+				{
+					"name": "trash-bin",
+					"x": -8.6,
+					"z": -3.8,
+					"rotY": 0.0
+				},
+				{
+					"name": "meeting-table",
+					"x": 6.75,
+					"z": -2.5,
+					"rotY": 1.5708
+				},
+				{
+					"name": "chair",
+					"x": 5.3,
+					"z": -2.5,
+					"rotY": 1.5708,
+					"anchor": "meeting-0"
+				},
+				{
+					"name": "chair",
+					"x": 6.25,
+					"z": -1.55,
+					"rotY": 3.1416,
+					"anchor": "meeting-1"
+				},
+				{
+					"name": "chair",
+					"x": 7.3,
+					"z": -1.55,
+					"rotY": 3.1416,
+					"anchor": "meeting-2"
+				},
+				{
+					"name": "chair",
+					"x": 8.2,
+					"z": -2.5,
+					"rotY": -1.5708,
+					"anchor": "meeting-3"
+				},
+				{
+					"name": "chair",
+					"x": 7.3,
+					"z": -3.45,
+					"rotY": 0.0,
+					"anchor": "meeting-4"
+				},
+				{
+					"name": "chair",
+					"x": 6.25,
+					"z": -3.45,
+					"rotY": 0.0,
+					"anchor": "meeting-5"
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -0.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -4.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "pantry-counter",
+					"x": 6.6,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "coffee-machine",
+					"x": 6.2,
+					"z": 4.75,
+					"rotY": 3.1416,
+					"y": 0.9
+				},
+				{
+					"name": "mini-fridge",
+					"x": 5.0,
+					"z": 4.62,
+					"rotY": 3.1416
+				},
+				{
+					"name": "sofa",
+					"x": 8.5,
+					"z": 2.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "coffee-table",
+					"x": 7.45,
+					"z": 2.4,
+					"rotY": 1.5708
+				},
+				{
+					"name": "round-table",
+					"x": 5.6,
+					"z": 2.2,
+					"rotY": 0.0
+				},
+				{
+					"name": "stool",
+					"x": 5.6,
+					"z": 1.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "stool",
+					"x": 5.6,
+					"z": 2.95,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": 0.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "reception-desk",
+					"x": -1.6,
+					"z": -6.2,
+					"rotY": 3.1416
+				},
+				{
+					"name": "sofa",
+					"x": 6.2,
+					"z": -5.55,
+					"rotY": 3.1416
+				},
+				{
+					"name": "armchair",
+					"x": 8.2,
+					"z": -6.5,
+					"rotY": -1.5708
+				},
+				{
+					"name": "coffee-table",
+					"x": 6.2,
+					"z": -6.55,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -5.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "water-cooler",
+					"x": 0.6,
+					"z": -5.45,
+					"rotY": 3.1416
 				}
 			],
 			"smallProps": [
 				{
 					"name": "mug",
-					"x": -4.7,
-					"z": 2.2,
+					"x": -3.37,
+					"z": 2.66,
 					"y": 0.75,
+					"rotY": 0.0,
 					"anchor": "desk-0"
 				},
 				{
 					"name": "paper-stack",
-					"x": -4.4,
-					"z": 2.95,
+					"x": -2.45,
+					"z": 2.66,
 					"y": 0.75,
+					"rotY": 0.3,
 					"anchor": "desk-0"
+				},
+				{
+					"name": "mug",
+					"x": -1.93,
+					"z": 2.66,
+					"y": 0.75,
+					"rotY": 0.0,
+					"anchor": "desk-1"
 				},
 				{
 					"name": "sticky-notes",
-					"x": -4.95,
-					"z": 2.9,
+					"x": -1.01,
+					"z": 2.66,
 					"y": 0.75,
-					"anchor": "desk-0"
-				},
-				{
-					"name": "mug",
-					"x": -1.35,
-					"z": 2.2,
-					"y": 0.75,
+					"rotY": 0.3,
 					"anchor": "desk-1"
 				},
 				{
-					"name": "cable-bundle",
-					"x": -0.65,
-					"z": 2.2,
-					"y": 0,
+					"name": "desk-plant",
+					"x": -1.93,
+					"z": 2.38,
+					"y": 0.75,
+					"rotY": 0.6,
 					"anchor": "desk-1"
 				},
 				{
 					"name": "mug",
-					"x": 2,
-					"z": 2.2,
+					"x": 0.93,
+					"z": 2.66,
 					"y": 0.75,
+					"rotY": 0.0,
 					"anchor": "desk-2"
 				},
 				{
 					"name": "paper-stack",
-					"x": 2.3,
-					"z": 2.95,
+					"x": 1.85,
+					"z": 2.66,
 					"y": 0.75,
+					"rotY": 0.3,
+					"anchor": "desk-2"
+				},
+				{
+					"name": "sticky-notes",
+					"x": 0.93,
+					"z": 2.38,
+					"y": 0.75,
+					"rotY": 0.6,
 					"anchor": "desk-2"
 				},
 				{
 					"name": "mug",
-					"x": 5.3,
-					"z": 2.2,
+					"x": 2.37,
+					"z": 2.66,
 					"y": 0.75,
+					"rotY": 0.0,
 					"anchor": "desk-3"
+				},
+				{
+					"name": "desk-plant",
+					"x": 3.29,
+					"z": 2.66,
+					"y": 0.75,
+					"rotY": 0.3,
+					"anchor": "desk-3"
+				},
+				{
+					"name": "mug",
+					"x": -2.37,
+					"z": 1.74,
+					"y": 0.75,
+					"rotY": 0.0,
+					"anchor": "desk-4"
 				},
 				{
 					"name": "sticky-notes",
-					"x": 5.05,
-					"z": 2.9,
+					"x": -3.29,
+					"z": 1.74,
 					"y": 0.75,
-					"anchor": "desk-3"
-				},
-				{
-					"name": "cable-bundle",
-					"x": 6,
-					"z": 2.2,
-					"y": 0,
-					"anchor": "desk-3"
+					"rotY": 0.3,
+					"anchor": "desk-4"
 				},
 				{
 					"name": "mug",
-					"x": -4.7,
-					"z": -2.3,
+					"x": -0.93,
+					"z": 1.74,
 					"y": 0.75,
-					"anchor": "desk-4"
+					"rotY": 0.0,
+					"anchor": "desk-5"
 				},
 				{
 					"name": "paper-stack",
-					"x": -4.4,
-					"z": -1.55,
+					"x": -1.85,
+					"z": 1.74,
 					"y": 0.75,
-					"anchor": "desk-4"
-				},
-				{
-					"name": "mug",
-					"x": -1.35,
-					"z": -2.3,
-					"y": 0.75,
+					"rotY": 0.3,
 					"anchor": "desk-5"
 				},
 				{
-					"name": "cable-bundle",
-					"x": -0.65,
-					"z": -2.3,
-					"y": 0,
+					"name": "desk-plant",
+					"x": -0.93,
+					"z": 2.02,
+					"y": 0.75,
+					"rotY": 0.6,
 					"anchor": "desk-5"
 				},
 				{
 					"name": "mug",
-					"x": 2,
-					"z": -2.3,
+					"x": 1.93,
+					"z": 1.74,
 					"y": 0.75,
+					"rotY": 0.0,
 					"anchor": "desk-6"
+				},
+				{
+					"name": "mug",
+					"x": 3.37,
+					"z": 1.74,
+					"y": 0.75,
+					"rotY": 0.0,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "paper-stack",
+					"x": 2.45,
+					"z": 1.74,
+					"y": 0.75,
+					"rotY": 0.3,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "sticky-notes",
+					"x": 3.37,
+					"z": 2.02,
+					"y": 0.75,
+					"rotY": 0.6,
+					"anchor": "desk-7"
+				},
+				{
+					"name": "desk-plant",
+					"x": -2.7,
+					"z": 4.72,
+					"y": 0.62,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": -1.75,
+					"z": 4.72,
+					"y": 0.62,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-plant",
+					"x": 1.7,
+					"z": 4.72,
+					"y": 0.62,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": 2.65,
+					"z": 4.72,
+					"y": 0.62,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": -2.35,
+					"z": -2.75,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": -2.0,
+					"z": -2.95,
+					"y": 0.74,
+					"rotY": 0.0
 				},
 				{
 					"name": "paper-stack",
 					"x": 2.3,
-					"z": -1.55,
-					"y": 0.75,
-					"anchor": "desk-6"
-				},
-				{
-					"name": "sticky-notes",
-					"x": 1.75,
-					"z": -1.6,
-					"y": 0.75,
-					"anchor": "desk-6"
+					"z": -4.55,
+					"y": 0.42,
+					"rotY": 0.0
 				},
 				{
 					"name": "mug",
-					"x": 5.3,
-					"z": -2.3,
+					"x": -6.05,
+					"z": 3.05,
 					"y": 0.75,
-					"anchor": "desk-7"
+					"rotY": 0.0
 				},
 				{
-					"name": "cable-bundle",
-					"x": 6,
-					"z": -2.3,
-					"y": 0,
-					"anchor": "desk-7"
+					"name": "paper-stack",
+					"x": -7.15,
+					"z": 3.1,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-plant",
+					"x": -5.85,
+					"z": 2.75,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": -6.9,
+					"z": -4.25,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "sticky-notes",
+					"x": -5.98,
+					"z": -4.25,
+					"y": 0.75,
+					"rotY": 0.3
+				},
+				{
+					"name": "mug",
+					"x": 6.3,
+					"z": -2.2,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": 7.1,
+					"z": -2.75,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-plant",
+					"x": 6.75,
+					"z": -2.5,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 6.85,
+					"z": 4.65,
+					"y": 0.9,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 7.1,
+					"z": 4.75,
+					"y": 0.9,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-plant",
+					"x": 7.5,
+					"z": 4.7,
+					"y": 0.9,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 7.35,
+					"z": 2.2,
+					"y": 0.42,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": 7.55,
+					"z": 2.65,
+					"y": 0.42,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 5.5,
+					"z": 2.1,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-plant",
+					"x": -1.2,
+					"z": -6.2,
+					"y": 1.0,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": -2.1,
+					"z": -6.15,
+					"y": 1.0,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": 6.0,
+					"z": -6.55,
+					"y": 0.42,
+					"rotY": 0.0
+				}
+			],
+			"decor": [
+				{
+					"kind": "elevator",
+					"x": -8.15,
+					"z": -6.5,
+					"width": 1.7,
+					"depth": 2.4,
+					"doorFace": 1.571
+				},
+				{
+					"kind": "stairs",
+					"rect": [
+						-7.2,
+						-9,
+						-4.9,
+						-8.0
+					],
+					"rise": "west"
+				},
+				{
+					"kind": "divider",
+					"x": -2.15,
+					"z": 2.2,
+					"y": 0.75,
+					"width": 2.9,
+					"height": 0.5,
+					"axis": "x"
+				},
+				{
+					"kind": "cable",
+					"x": -2.85,
+					"z": 1.95,
+					"length": 0.7
+				},
+				{
+					"kind": "cable",
+					"x": -1.45,
+					"z": 2.45,
+					"length": 0.7
+				},
+				{
+					"kind": "divider",
+					"x": 2.15,
+					"z": 2.2,
+					"y": 0.75,
+					"width": 2.9,
+					"height": 0.5,
+					"axis": "x"
+				},
+				{
+					"kind": "cable",
+					"x": 1.45,
+					"z": 1.95,
+					"length": 0.7
+				},
+				{
+					"kind": "cable",
+					"x": 2.85,
+					"z": 2.45,
+					"length": 0.7
+				},
+				{
+					"kind": "clock",
+					"wall": "back",
+					"x": 0.0,
+					"y": 2.45,
+					"size": 0.42
+				},
+				{
+					"kind": "art",
+					"wall": "back",
+					"x": 0.0,
+					"y": 1.55,
+					"width": 0.7,
+					"height": 0.55,
+					"picture": 1
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-3.6,
+						-4.0,
+						-0.8,
+						-1.6
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-8.3,
+						1.4,
+						-5.2,
+						4.1
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "art",
+					"wall": "back",
+					"x": -7.6,
+					"y": 2.3,
+					"width": 0.9,
+					"height": 0.6,
+					"picture": 2
+				},
+				{
+					"kind": "cable",
+					"x": -7.0,
+					"z": -1.0,
+					"length": 1.4
+				},
+				{
+					"kind": "cable",
+					"x": -5.5,
+					"z": -1.0,
+					"length": 0.8
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-8.6,
+						-2.2,
+						-5.2,
+						-1.0
+					],
+					"colour": "grey"
+				},
+				{
+					"kind": "board",
+					"wall": "east",
+					"z": -2.5,
+					"y": 1.55,
+					"width": 2.0,
+					"height": 1.1,
+					"picture": "whiteboard"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						5.0,
+						-4.2,
+						8.5,
+						-0.8
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						6.7,
+						1.3,
+						8.9,
+						3.5
+					],
+					"colour": "cream"
+				},
+				{
+					"kind": "art",
+					"wall": "east",
+					"z": 2.4,
+					"y": 1.75,
+					"width": 1.0,
+					"height": 0.65,
+					"picture": 3
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						3.1,
+						-8.95,
+						4.9,
+						-7.9
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						5.0,
+						-7.4,
+						7.5,
+						-5.2
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "board",
+					"wall": "east",
+					"z": -7.4,
+					"y": 1.8,
+					"width": 1.6,
+					"height": 1.0,
+					"picture": "lobby"
 				}
 			]
 		},
 		{
 			"level": 2,
-			"name": "Tầng 2",
+			"name": "Tầng 2: Kế hoạch, Thư viện, Bưu phòng",
 			"rooms": [
 				{
 					"room": "PLANNING",
 					"name": "Phòng Kế hoạch",
 					"rect": [
-						-13,
-						-8,
-						-4.33,
-						8
+						-9,
+						-5,
+						-3,
+						5
 					]
 				},
 				{
 					"room": "LIBRARY",
 					"name": "Thư viện",
 					"rect": [
-						-4.33,
-						-8,
-						4.33,
-						8
+						-3,
+						-5,
+						3,
+						5
 					]
 				},
 				{
 					"room": "POST",
 					"name": "Bưu phòng",
 					"rect": [
-						4.33,
-						-8,
-						13,
-						8
+						3,
+						-5,
+						9,
+						5
 					]
 				}
 			],
@@ -1320,23 +2075,57 @@
 				{
 					"name": "Thang máy và cầu thang",
 					"rect": [
-						-13,
-						-12,
-						-6.5,
-						-8
+						-9,
+						-9,
+						-4.5,
+						-5
 					]
 				},
 				{
 					"name": "Hành lang",
 					"rect": [
-						-6.5,
-						-12,
-						13,
-						-8
+						-4.5,
+						-9,
+						9,
+						-5
 					]
 				}
 			],
-			"glass": [],
+			"glass": [
+				[
+					-3,
+					-5,
+					-3,
+					5
+				],
+				[
+					3,
+					-5,
+					3,
+					5
+				],
+				[
+					-4.5,
+					-5,
+					9,
+					-5
+				],
+				[
+					-4.5,
+					-9,
+					-4.5,
+					-5
+				]
+			],
+			"walls": [
+				[
+					-9,
+					-5,
+					-4.5,
+					-5
+				]
+			],
+			"windows": [],
 			"doors": [
 				{
 					"id": "door-planning",
@@ -1345,10 +2134,10 @@
 						null
 					],
 					"at": [
-						-8.66,
-						-8
+						-3.75,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1358,10 +2147,10 @@
 						null
 					],
 					"at": [
-						0,
-						-8
+						0.0,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1371,10 +2160,10 @@
 						null
 					],
 					"at": [
-						8.66,
-						-8
+						6.0,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1384,10 +2173,10 @@
 						null
 					],
 					"at": [
-						-6.5,
-						-10
+						-4.5,
+						-6.5
 					],
-					"width": 2,
+					"width": 1.4,
 					"axis": "z"
 				}
 			],
@@ -1396,168 +2185,170 @@
 					"id": "f2-elevator",
 					"kind": "elevator",
 					"room": null,
-					"x": -9.2,
-					"z": -10,
-					"face": 1.57,
+					"x": -6.6,
+					"z": -6.5,
+					"face": -1.5708,
 					"node": "f2-elevator"
+				},
+				{
+					"id": "planning-board",
+					"kind": "board",
+					"room": "PLANNING",
+					"x": -6.0,
+					"z": 4.97,
+					"face": 3.1416,
+					"y": 1.6,
+					"node": "f2-planning"
 				},
 				{
 					"id": "planning-work-0",
 					"kind": "work",
 					"room": "PLANNING",
-					"x": -11.06,
-					"z": 2.5,
-					"face": 0,
+					"x": -6.8,
+					"z": 3.6,
+					"face": 0.0,
 					"node": "f2-planning"
 				},
 				{
 					"id": "planning-work-1",
 					"kind": "work",
 					"room": "PLANNING",
-					"x": -8.66,
-					"z": 2.5,
-					"face": 0,
+					"x": -5.2,
+					"z": 3.6,
+					"face": 0.0,
 					"node": "f2-planning"
 				},
 				{
 					"id": "planning-work-2",
 					"kind": "work",
 					"room": "PLANNING",
-					"x": -6.26,
-					"z": 2.5,
-					"face": 0,
+					"x": -7.6,
+					"z": 0.8,
+					"face": -1.5708,
 					"node": "f2-planning"
 				},
 				{
 					"id": "library-work-0",
 					"kind": "work",
 					"room": "LIBRARY",
-					"x": -2.4,
-					"z": 2.5,
-					"face": 0,
+					"x": -1.6,
+					"z": 3.7,
+					"face": 0.0,
 					"node": "f2-library"
 				},
 				{
 					"id": "library-work-1",
 					"kind": "work",
 					"room": "LIBRARY",
-					"x": 0,
-					"z": 2.5,
-					"face": 0,
+					"x": 0.6,
+					"z": 3.7,
+					"face": 0.0,
 					"node": "f2-library"
 				},
 				{
 					"id": "library-work-2",
 					"kind": "work",
 					"room": "LIBRARY",
-					"x": 2.4,
-					"z": 2.5,
-					"face": 0,
+					"x": -1.8,
+					"z": 1.4,
+					"face": -1.5708,
 					"node": "f2-library"
 				},
 				{
 					"id": "post-work-0",
 					"kind": "work",
 					"room": "POST",
-					"x": 6.26,
-					"z": 2.5,
-					"face": 0,
+					"x": 4.9,
+					"z": 3.7,
+					"face": 0.0,
 					"node": "f2-post"
 				},
 				{
 					"id": "post-work-1",
 					"kind": "work",
 					"room": "POST",
-					"x": 8.66,
-					"z": 2.5,
-					"face": 0,
+					"x": 6.9,
+					"z": 3.7,
+					"face": 0.0,
 					"node": "f2-post"
 				},
 				{
 					"id": "post-work-2",
 					"kind": "work",
 					"room": "POST",
-					"x": 11.06,
-					"z": 2.5,
-					"face": 0,
+					"x": 6.0,
+					"z": 1.75,
+					"face": 3.1416,
 					"node": "f2-post"
-				},
-				{
-					"id": "planning-board",
-					"kind": "board",
-					"room": "PLANNING",
-					"x": -8.66,
-					"z": 7.6,
-					"face": 0,
-					"node": "f2-planning"
 				}
 			],
+			"elevatorNode": "f2-elevator",
 			"graph": {
 				"nodes": [
 					{
 						"id": "f2-elevator",
-						"x": -9.2,
-						"z": -10,
+						"x": -6.6,
+						"z": -6.5,
 						"room": null
 					},
 					{
 						"id": "f2-door-core",
-						"x": -6.5,
-						"z": -10,
+						"x": -4.5,
+						"z": -6.5,
 						"room": null
 					},
 					{
 						"id": "f2-hall-planning",
-						"x": -8.66,
-						"z": -10,
+						"x": -3.75,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f2-door-planning",
-						"x": -8.66,
-						"z": -8,
+						"x": -3.75,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f2-planning",
-						"x": -8.66,
-						"z": -5.5,
+						"x": -3.75,
+						"z": -3.6,
 						"room": "PLANNING"
 					},
 					{
 						"id": "f2-hall-library",
-						"x": 0,
-						"z": -10,
+						"x": 0.0,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f2-door-library",
-						"x": 0,
-						"z": -8,
+						"x": 0.0,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f2-library",
-						"x": 0,
-						"z": -5.5,
+						"x": 0.0,
+						"z": -3.6,
 						"room": "LIBRARY"
 					},
 					{
 						"id": "f2-hall-post",
-						"x": 8.66,
-						"z": -10,
+						"x": 6.0,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f2-door-post",
-						"x": 8.66,
-						"z": -8,
+						"x": 6.0,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f2-post",
-						"x": 8.66,
-						"z": -5.5,
+						"x": 6.0,
+						"z": -3.6,
 						"room": "POST"
 					}
 				],
@@ -1604,42 +2395,463 @@
 					]
 				]
 			},
-			"elevatorNode": "f2-elevator",
-			"props": [],
-			"smallProps": []
+			"props": [
+				{
+					"name": "floor-plant",
+					"x": -5.0,
+					"z": -5.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "kanban-board",
+					"x": -8.45,
+					"z": 0.8,
+					"rotY": 1.5708
+				},
+				{
+					"name": "desk",
+					"x": -4.2,
+					"z": 0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": -4.2,
+					"z": 1.2,
+					"rotY": 3.1416
+				},
+				{
+					"name": "monitor",
+					"x": -4.2,
+					"z": 0.25,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": -4.2,
+					"z": 0.52,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "desk-lamp",
+					"x": -3.65,
+					"z": 0.28,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "round-table",
+					"x": -6.4,
+					"z": -1.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "stool",
+					"x": -7.15,
+					"z": -1.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "stool",
+					"x": -5.65,
+					"z": -1.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "filing-cabinet",
+					"x": -3.55,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "floor-plant",
+					"x": -8.5,
+					"z": 4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -3.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "low-cabinet",
+					"x": -8.65,
+					"z": -2.9,
+					"rotY": 1.5708
+				},
+				{
+					"name": "tall-bookcase",
+					"x": -1.9,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "tall-bookcase",
+					"x": 0.0,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "tall-bookcase",
+					"x": 1.9,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "tall-bookcase",
+					"x": -2.72,
+					"z": 2.4,
+					"rotY": 1.5708
+				},
+				{
+					"name": "tall-bookcase",
+					"x": -2.72,
+					"z": 0.5,
+					"rotY": 1.5708
+				},
+				{
+					"name": "reading-table",
+					"x": 0.6,
+					"z": 0.6,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": 0.6,
+					"z": 1.45,
+					"rotY": 3.1416
+				},
+				{
+					"name": "chair",
+					"x": 0.6,
+					"z": -0.25,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-lamp",
+					"x": 1.2,
+					"z": 0.5,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "globe",
+					"x": 0.05,
+					"z": 0.75,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "armchair",
+					"x": 2.3,
+					"z": -2.6,
+					"rotY": -1.5708
+				},
+				{
+					"name": "floor-lamp",
+					"x": 2.6,
+					"z": -3.6,
+					"rotY": 0.0
+				},
+				{
+					"name": "side-table",
+					"x": 2.55,
+					"z": -1.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "filing-cabinet",
+					"x": 2.6,
+					"z": 3.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "filing-cabinet",
+					"x": 2.6,
+					"z": 2.8,
+					"rotY": -1.5708
+				},
+				{
+					"name": "floor-plant",
+					"x": -2.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "mail-cubbies",
+					"x": 4.9,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "mail-cubbies",
+					"x": 6.9,
+					"z": 4.72,
+					"rotY": 3.1416
+				},
+				{
+					"name": "post-counter",
+					"x": 6.0,
+					"z": 0.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "parcel-boxes",
+					"x": 8.45,
+					"z": 4.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "parcel-boxes",
+					"x": 8.5,
+					"z": 3.2,
+					"rotY": 0.6
+				},
+				{
+					"name": "parcel-boxes",
+					"x": 8.45,
+					"z": -4.3,
+					"rotY": 2.2
+				},
+				{
+					"name": "parcel-cart",
+					"x": 3.8,
+					"z": -2.4,
+					"rotY": 1.5708
+				},
+				{
+					"name": "mailbox",
+					"x": 7.4,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 3.5,
+					"z": 4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "water-cooler",
+					"x": 8.55,
+					"z": -6.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "trash-bin",
+					"x": 2.0,
+					"z": -5.4,
+					"rotY": 0.0
+				}
+			],
+			"smallProps": [
+				{
+					"name": "mug",
+					"x": -4.7,
+					"z": 0.5,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "sticky-notes",
+					"x": -3.78,
+					"z": 0.5,
+					"y": 0.75,
+					"rotY": 0.3
+				},
+				{
+					"name": "paper-stack",
+					"x": -4.7,
+					"z": 0.22,
+					"y": 0.75,
+					"rotY": 0.6
+				},
+				{
+					"name": "sticky-notes",
+					"x": -6.5,
+					"z": -1.35,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": -6.2,
+					"z": -1.55,
+					"y": 0.74,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": -8.65,
+					"z": -3.2,
+					"y": 0.62,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": 0.6,
+					"z": 0.55,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 0.95,
+					"z": 0.8,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "book-stack",
+					"x": 2.55,
+					"z": -1.75,
+					"y": 0.55,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": 5.6,
+					"z": 0.95,
+					"y": 1.0,
+					"rotY": 0.0
+				}
+			],
+			"decor": [
+				{
+					"kind": "elevator",
+					"x": -8.15,
+					"z": -6.5,
+					"width": 1.7,
+					"depth": 2.4,
+					"doorFace": 1.571
+				},
+				{
+					"kind": "stairs",
+					"rect": [
+						-7.2,
+						-9,
+						-4.9,
+						-8.0
+					],
+					"rise": "west"
+				},
+				{
+					"kind": "board",
+					"wall": "back",
+					"x": -6.0,
+					"y": 1.6,
+					"width": 2.4,
+					"height": 1.3,
+					"picture": "pinboard"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-7.6,
+						2.4,
+						-4.6,
+						4.3
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "art",
+					"wall": "back",
+					"x": -3.9,
+					"y": 2.1,
+					"width": 0.6,
+					"height": 0.6,
+					"picture": 4
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-1.3,
+						-1.2,
+						2.5,
+						2.3
+					],
+					"colour": "cream"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						4.4,
+						1.6,
+						7.6,
+						3.4
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-3.5,
+						-7.3,
+						7.5,
+						-5.9
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "art",
+					"wall": "east",
+					"z": -7.6,
+					"y": 1.6,
+					"width": 0.8,
+					"height": 0.6,
+					"picture": 4
+				}
+			]
 		},
 		{
 			"level": 3,
-			"name": "Tầng 3",
+			"name": "Tầng 3: Bảo vệ, Kiểm toán, QA/ISO",
 			"rooms": [
 				{
 					"room": "SECURITY",
 					"name": "Phòng Bảo vệ",
 					"rect": [
-						-13,
-						-8,
-						-4.33,
-						8
+						-9,
+						-5,
+						-3,
+						5
 					]
 				},
 				{
 					"room": "AUDIT",
 					"name": "Phòng Kiểm toán",
 					"rect": [
-						-4.33,
-						-8,
-						4.33,
-						8
+						-3,
+						-5,
+						3,
+						5
 					]
 				},
 				{
 					"room": "QA",
 					"name": "Phòng QA/ISO",
 					"rect": [
-						4.33,
-						-8,
-						13,
-						8
+						3,
+						-5,
+						9,
+						5
 					]
 				}
 			],
@@ -1647,23 +2859,57 @@
 				{
 					"name": "Thang máy và cầu thang",
 					"rect": [
-						-13,
-						-12,
-						-6.5,
-						-8
+						-9,
+						-9,
+						-4.5,
+						-5
 					]
 				},
 				{
 					"name": "Hành lang",
 					"rect": [
-						-6.5,
-						-12,
-						13,
-						-8
+						-4.5,
+						-9,
+						9,
+						-5
 					]
 				}
 			],
-			"glass": [],
+			"glass": [
+				[
+					-3,
+					-5,
+					-3,
+					5
+				],
+				[
+					3,
+					-5,
+					3,
+					5
+				],
+				[
+					-4.5,
+					-5,
+					9,
+					-5
+				],
+				[
+					-4.5,
+					-9,
+					-4.5,
+					-5
+				]
+			],
+			"walls": [
+				[
+					-9,
+					-5,
+					-4.5,
+					-5
+				]
+			],
+			"windows": [],
 			"doors": [
 				{
 					"id": "door-security",
@@ -1672,10 +2918,10 @@
 						null
 					],
 					"at": [
-						-8.66,
-						-8
+						-3.75,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1685,10 +2931,10 @@
 						null
 					],
 					"at": [
-						0,
-						-8
+						0.0,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1698,10 +2944,10 @@
 						null
 					],
 					"at": [
-						8.66,
-						-8
+						6.0,
+						-5
 					],
-					"width": 1.6,
+					"width": 1.2,
 					"axis": "x"
 				},
 				{
@@ -1711,10 +2957,10 @@
 						null
 					],
 					"at": [
-						-6.5,
-						-10
+						-4.5,
+						-6.5
 					],
-					"width": 2,
+					"width": 1.4,
 					"axis": "z"
 				}
 			],
@@ -1723,177 +2969,185 @@
 					"id": "f3-elevator",
 					"kind": "elevator",
 					"room": null,
-					"x": -9.2,
-					"z": -10,
-					"face": 1.57,
+					"x": -6.6,
+					"z": -6.5,
+					"face": -1.5708,
 					"node": "f3-elevator"
 				},
 				{
 					"id": "security-work-0",
 					"kind": "work",
 					"room": "SECURITY",
-					"x": -11.06,
+					"x": -6.0,
 					"z": 2.5,
-					"face": 0,
+					"face": 0.0,
+					"sit": true,
 					"node": "f3-security"
 				},
 				{
 					"id": "security-work-1",
 					"kind": "work",
 					"room": "SECURITY",
-					"x": -8.66,
+					"x": -7.7,
 					"z": 2.5,
-					"face": 0,
+					"face": 0.0,
+					"sit": true,
 					"node": "f3-security"
 				},
 				{
 					"id": "security-work-2",
 					"kind": "work",
 					"room": "SECURITY",
-					"x": -6.26,
-					"z": 2.5,
-					"face": 0,
+					"x": -4.7,
+					"z": -3.4,
+					"face": 1.5708,
 					"node": "f3-security"
+				},
+				{
+					"id": "audit-board",
+					"kind": "board",
+					"room": "AUDIT",
+					"x": 0.0,
+					"z": 4.97,
+					"face": 3.1416,
+					"y": 1.6,
+					"node": "f3-audit"
 				},
 				{
 					"id": "audit-work-0",
 					"kind": "work",
 					"room": "AUDIT",
-					"x": -2.4,
-					"z": 2.5,
-					"face": 0,
+					"x": -1.2,
+					"z": 1.6,
+					"face": 3.1416,
+					"sit": true,
 					"node": "f3-audit"
 				},
 				{
 					"id": "audit-work-1",
 					"kind": "work",
 					"room": "AUDIT",
-					"x": 0,
-					"z": 2.5,
-					"face": 0,
+					"x": 1.2,
+					"z": 1.6,
+					"face": 3.1416,
+					"sit": true,
 					"node": "f3-audit"
 				},
 				{
 					"id": "audit-work-2",
 					"kind": "work",
 					"room": "AUDIT",
-					"x": 2.4,
-					"z": 2.5,
-					"face": 0,
-					"node": "f3-audit"
-				},
-				{
-					"id": "qa-work-0",
-					"kind": "work",
-					"room": "QA",
-					"x": 6.26,
-					"z": 2.5,
-					"face": 0,
-					"node": "f3-qa"
-				},
-				{
-					"id": "qa-work-1",
-					"kind": "work",
-					"room": "QA",
-					"x": 8.66,
-					"z": 2.5,
-					"face": 0,
-					"node": "f3-qa"
-				},
-				{
-					"id": "qa-work-2",
-					"kind": "work",
-					"room": "QA",
-					"x": 11.06,
-					"z": 2.5,
-					"face": 0,
-					"node": "f3-qa"
-				},
-				{
-					"id": "audit-board",
-					"kind": "board",
-					"room": "AUDIT",
-					"x": 0,
-					"z": 7.6,
-					"face": 0,
+					"x": 0.0,
+					"z": 3.8,
+					"face": 0.0,
 					"node": "f3-audit"
 				},
 				{
 					"id": "qa-board",
 					"kind": "board",
 					"room": "QA",
-					"x": 8.66,
-					"z": 7.6,
-					"face": 0,
+					"x": 6.6,
+					"z": 4.97,
+					"face": 3.1416,
+					"y": 1.6,
+					"node": "f3-qa"
+				},
+				{
+					"id": "qa-work-0",
+					"kind": "work",
+					"room": "QA",
+					"x": 4.6,
+					"z": 3.6,
+					"face": 0.0,
+					"node": "f3-qa"
+				},
+				{
+					"id": "qa-work-1",
+					"kind": "work",
+					"room": "QA",
+					"x": 7.0,
+					"z": 0.6,
+					"face": 3.1416,
+					"sit": true,
+					"node": "f3-qa"
+				},
+				{
+					"id": "qa-work-2",
+					"kind": "work",
+					"room": "QA",
+					"x": 7.8,
+					"z": 2.4,
+					"face": 1.5708,
 					"node": "f3-qa"
 				}
 			],
+			"elevatorNode": "f3-elevator",
 			"graph": {
 				"nodes": [
 					{
 						"id": "f3-elevator",
-						"x": -9.2,
-						"z": -10,
+						"x": -6.6,
+						"z": -6.5,
 						"room": null
 					},
 					{
 						"id": "f3-door-core",
-						"x": -6.5,
-						"z": -10,
+						"x": -4.5,
+						"z": -6.5,
 						"room": null
 					},
 					{
 						"id": "f3-hall-security",
-						"x": -8.66,
-						"z": -10,
+						"x": -3.75,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f3-door-security",
-						"x": -8.66,
-						"z": -8,
+						"x": -3.75,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f3-security",
-						"x": -8.66,
-						"z": -5.5,
+						"x": -3.75,
+						"z": -3.6,
 						"room": "SECURITY"
 					},
 					{
 						"id": "f3-hall-audit",
-						"x": 0,
-						"z": -10,
+						"x": 0.0,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f3-door-audit",
-						"x": 0,
-						"z": -8,
+						"x": 0.0,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f3-audit",
-						"x": 0,
-						"z": -5.5,
+						"x": 0.0,
+						"z": -3.6,
 						"room": "AUDIT"
 					},
 					{
 						"id": "f3-hall-qa",
-						"x": 8.66,
-						"z": -10,
+						"x": 6.0,
+						"z": -6.6,
 						"room": null
 					},
 					{
 						"id": "f3-door-qa",
-						"x": 8.66,
-						"z": -8,
+						"x": 6.0,
+						"z": -5,
 						"room": null
 					},
 					{
 						"id": "f3-qa",
-						"x": 8.66,
-						"z": -5.5,
+						"x": 6.0,
+						"z": -3.6,
 						"room": "QA"
 					}
 				],
@@ -1940,9 +3194,464 @@
 					]
 				]
 			},
-			"elevatorNode": "f3-elevator",
-			"props": [],
-			"smallProps": []
+			"props": [
+				{
+					"name": "floor-plant",
+					"x": -5.0,
+					"z": -5.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "cctv-wall",
+					"x": -6.0,
+					"z": 4.8,
+					"rotY": 3.1416,
+					"y": 0.9
+				},
+				{
+					"name": "desk",
+					"x": -6.0,
+					"z": 3.3,
+					"rotY": 3.1416
+				},
+				{
+					"name": "chair",
+					"x": -6.0,
+					"z": 2.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "monitor",
+					"x": -5.72,
+					"z": 3.45,
+					"rotY": 3.1416,
+					"y": 0.75
+				},
+				{
+					"name": "monitor",
+					"x": -6.28,
+					"z": 3.45,
+					"rotY": 3.1416,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": -6.0,
+					"z": 3.18,
+					"rotY": 3.1416,
+					"y": 0.75
+				},
+				{
+					"name": "desk",
+					"x": -7.7,
+					"z": 3.3,
+					"rotY": 3.1416
+				},
+				{
+					"name": "chair",
+					"x": -7.7,
+					"z": 2.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "monitor",
+					"x": -7.7,
+					"z": 3.45,
+					"rotY": 3.1416,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": -7.7,
+					"z": 3.18,
+					"rotY": 3.1416,
+					"y": 0.75
+				},
+				{
+					"name": "turnstile",
+					"x": -3.75,
+					"z": -3.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "locker",
+					"x": -8.6,
+					"z": 0.6,
+					"rotY": 1.5708
+				},
+				{
+					"name": "locker",
+					"x": -8.6,
+					"z": -0.2,
+					"rotY": 1.5708
+				},
+				{
+					"name": "filing-cabinet",
+					"x": -3.55,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "floor-plant",
+					"x": -8.5,
+					"z": 4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -8.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk",
+					"x": -1.2,
+					"z": 0.8,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": -1.2,
+					"z": 1.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "monitor",
+					"x": -1.2,
+					"z": 0.65,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": -1.2,
+					"z": 0.92,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "desk-lamp",
+					"x": -0.65,
+					"z": 0.68,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "desk",
+					"x": 1.2,
+					"z": 0.8,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": 1.2,
+					"z": 1.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "monitor",
+					"x": 1.2,
+					"z": 0.65,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": 1.2,
+					"z": 0.92,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "cash-register",
+					"x": -1.45,
+					"z": 0.75,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "coin-stacks",
+					"x": 1.55,
+					"z": 0.7,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "safe",
+					"x": 2.45,
+					"z": 4.45,
+					"rotY": 3.1416
+				},
+				{
+					"name": "filing-cabinet",
+					"x": -2.5,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "filing-cabinet",
+					"x": -1.95,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "floor-plant",
+					"x": -2.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "trash-bin",
+					"x": 2.6,
+					"z": -0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "test-bench",
+					"x": 4.6,
+					"z": 4.45,
+					"rotY": 3.1416
+				},
+				{
+					"name": "signal-tower",
+					"x": 3.55,
+					"z": 4.55,
+					"rotY": 0.0
+				},
+				{
+					"name": "device-shelf",
+					"x": 8.55,
+					"z": 2.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "desk",
+					"x": 7.0,
+					"z": -0.2,
+					"rotY": 0.0
+				},
+				{
+					"name": "chair",
+					"x": 7.0,
+					"z": 0.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "monitor",
+					"x": 6.72,
+					"z": -0.35,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "monitor",
+					"x": 7.28,
+					"z": -0.35,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "keyboard",
+					"x": 7.0,
+					"z": -0.08,
+					"rotY": 0.0,
+					"y": 0.75
+				},
+				{
+					"name": "filing-cabinet",
+					"x": 8.5,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "floor-plant",
+					"x": 3.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "water-cooler",
+					"x": 8.55,
+					"z": -6.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "trash-bin",
+					"x": 2.0,
+					"z": -5.4,
+					"rotY": 0.0
+				}
+			],
+			"smallProps": [
+				{
+					"name": "mug",
+					"x": -5.5,
+					"z": 3.2,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": -6.42,
+					"z": 3.2,
+					"y": 0.75,
+					"rotY": 0.3
+				},
+				{
+					"name": "mug",
+					"x": -7.2,
+					"z": 3.2,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "paper-stack",
+					"x": -1.7,
+					"z": 0.9,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": -0.78,
+					"z": 0.9,
+					"y": 0.75,
+					"rotY": 0.3
+				},
+				{
+					"name": "paper-stack",
+					"x": 0.7,
+					"z": 0.9,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "sticky-notes",
+					"x": 1.62,
+					"z": 0.9,
+					"y": 0.75,
+					"rotY": 0.3
+				},
+				{
+					"name": "mug",
+					"x": 6.5,
+					"z": -0.1,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "sticky-notes",
+					"x": 7.42,
+					"z": -0.1,
+					"y": 0.75,
+					"rotY": 0.3
+				}
+			],
+			"decor": [
+				{
+					"kind": "elevator",
+					"x": -8.15,
+					"z": -6.5,
+					"width": 1.7,
+					"depth": 2.4,
+					"doorFace": 1.571
+				},
+				{
+					"kind": "stairs",
+					"rect": [
+						-7.2,
+						-9,
+						-4.9,
+						-8.0
+					],
+					"rise": "west"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-8.3,
+						1.8,
+						-4.3,
+						3.0
+					],
+					"colour": "grey"
+				},
+				{
+					"kind": "board",
+					"wall": "back",
+					"x": 0.0,
+					"y": 1.6,
+					"width": 2.0,
+					"height": 1.2,
+					"picture": "chart"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-2.4,
+						-0.4,
+						2.4,
+						2.6
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "board",
+					"wall": "back",
+					"x": 6.6,
+					"y": 1.6,
+					"width": 1.8,
+					"height": 1.2,
+					"picture": "checklist"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						3.6,
+						2.6,
+						7.6,
+						4.0
+					],
+					"colour": "grey"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-3.5,
+						-7.3,
+						7.5,
+						-5.9
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "art",
+					"wall": "east",
+					"z": -7.6,
+					"y": 1.6,
+					"width": 0.8,
+					"height": 0.6,
+					"picture": 5
+				}
+			]
 		}
 	],
 	"elevator": {

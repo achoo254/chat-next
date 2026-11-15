@@ -15,7 +15,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { ModeIcon, openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
@@ -93,7 +93,7 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	return (
 		<span className="sub" data-live={live ? "" : undefined}>
 			<span className="mx-row-mode" role="img" aria-label={modeLabel} title={modeLabel} data-mode={mode}>
-				<MachineIcon name={mode === "terminal" ? "terminal" : "chat"} small />
+				<ModeIcon mode={mode} />
 			</span>
 			{text}
 		</span>

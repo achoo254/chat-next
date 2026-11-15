@@ -16,8 +16,8 @@ export interface StaffMember {
 	readonly ordinal: number;
 	/** The actor (subagent) the employee works as now. */
 	readonly actorId: string;
-	/** Index into the floor's desk order; null in the meeting room. */
-	readonly desk: number | null;
+	/** The home desk's anchor id ("desk-3"); null in the meeting room. */
+	readonly desk: string | null;
 	/** A nested subagent or a workflow's agent: the meeting room, never a desk. */
 	readonly nested: boolean;
 	/** When this employee first came in (machine time). */
@@ -38,24 +38,40 @@ function keyOf(agentType: string, nested: boolean, ordinal: number): string {
 	return `${nested ? "~" : ""}${agentType}#${ordinal}`;
 }
 
-/** The desks `deskCount` offers: desks past it are given up, free ones go to the people waiting in the meeting room, longest waiting first. */
-export function fillDesks(staff: readonly StaffMember[], deskCount: number): StaffMember[] {
-	const kept = staff.map((m) => (m.desk !== null && m.desk >= deskCount ? { ...m, desk: null } : m));
-	const taken = new Set(kept.flatMap((m) => (m.desk === null ? [] : [m.desk])));
+/**
+ * Seats people at `desks` (anchor ids, in the order they are taken): a desk
+ * not offered any more (a phone uses six of the eight) is given up, free ones
+ * go to the people waiting in the meeting room, longest waiting first. Nobody
+ * keeping a desk moves, so turning a phone keeps everyone where they sat.
+ */
+export function fillDesks(staff: readonly StaffMember[], desks: readonly string[]): StaffMember[] {
+	const taken = new Set<string>();
+	const kept = staff.map((m) => {
+		if (m.desk === null || !desks.includes(m.desk) || taken.has(m.desk)) return m.desk === null ? m : { ...m, desk: null };
+		taken.add(m.desk);
+		return m;
+	});
 	return kept.map((m) => {
 		if (m.nested || m.desk !== null) return m;
-		for (let desk = 0; desk < deskCount; desk++) {
-			if (!taken.has(desk)) {
-				taken.add(desk);
-				return { ...m, desk };
-			}
-		}
-		return m;
+		const desk = desks.find((d) => !taken.has(d));
+		if (desk === undefined) return m;
+		taken.add(desk);
+		return { ...m, desk };
 	});
 }
 
+/** The same people seen again (a fresh snapshot): each employee sits back at the desk they had, by key; the rest are seated as usual. */
+export function reseat(staff: readonly StaffMember[], before: readonly StaffMember[], desks: readonly string[]): StaffMember[] {
+	const had = new Map(before.map((m) => [m.key, m.desk]));
+	// Those who had a desk claim it first; fillDesks then seats the rest in order.
+	return fillDesks(
+		staff.map((m) => ({ ...m, desk: m.nested ? null : (had.get(m.key) ?? null) })),
+		desks,
+	);
+}
+
 /** A subagent came in: the free employee of its type takes it, else a new employee does. */
-export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, deskCount: number): StaffMember[] {
+export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, desks: readonly string[]): StaffMember[] {
 	if (staff.some((m) => m.actorId === next.actorId)) return [...staff];
 	const same = staff.filter((m) => m.agentType === next.agentType && m.nested === next.nested);
 	const free = same.filter((m) => freeAt(m.actorId, next.enteredAt)).sort((a, b) => a.ordinal - b.ordinal)[0];
@@ -72,15 +88,15 @@ export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, 
 		nested: next.nested,
 		firstEnteredAt: next.enteredAt,
 	};
-	return fillDesks([...staff, member], deskCount);
+	return fillDesks([...staff, member], desks);
 }
 
 /** The actor left: its employee goes home (an employee who moved on to another subagent stays). */
-export function release(staff: readonly StaffMember[], actorId: string, deskCount: number): StaffMember[] {
+export function release(staff: readonly StaffMember[], actorId: string, desks: readonly string[]): StaffMember[] {
 	if (!staff.some((m) => m.actorId === actorId)) return [...staff];
 	return fillDesks(
 		staff.filter((m) => m.actorId !== actorId),
-		deskCount,
+		desks,
 	);
 }
 

@@ -11,6 +11,7 @@
 .of-toggle:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
 .of-note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 .of-note[data-tone="warn"] { color: var(--c-warning-text); }
+.of-retry { min-height: 44px; margin-left: var(--space-2); }
 
 .of-stage { position: relative; flex: 1 0 auto; min-height: 240px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); overflow: hidden; transition: filter 0.4s ease-out; }
 /* Power cut: people freeze, the building goes grey. Closed for the day: dark. */

@@ -5,7 +5,11 @@
 import { create } from "@bufbuild/protobuf";
 import { OfficeActorState, OfficeApprovalState, OfficeChecksSchema, OfficeRoom, OfficeTodoCountsSchema, OfficeUsageSchema } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it, vi } from "vitest";
-import { CLOSING_MS, POWER_OUT_MS, SLOW_TOOL_MS } from "../../src/machines/office/office-store.ts";
+import { CLOSING_MS, DEFAULT_DESKS, POWER_OUT_MS, SLOW_TOOL_MS } from "../../src/machines/office/office-store.ts";
+
+const WIDE = [...DEFAULT_DESKS];
+/** The layout's phone order (a subset of the eight, in another order). */
+const PHONE = ["desk-1", "desk-2", "desk-5", "desk-6", "desk-0", "desk-4"];
 import { act, director, ev, machine, session, snapshot, staff, storeAt, T0 } from "./office-builders.ts";
 
 describe("the office store", () => {
@@ -46,10 +50,16 @@ describe("the office store", () => {
 		expect(store.state().lastTurnStart).toBe(T0 + 14_000);
 	});
 
-	it("drops a frame of another epoch and asks for a snapshot", () => {
+	it("drops a frame of an older epoch, and asks for a snapshot on a newer one (re-rendering once)", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director()], { epoch: 5n, seq: 2n }));
+		const listener = vi.fn();
+		store.subscribe(listener);
+		expect(store.applyEvents(4n, [ev(3, { case: "actorEnter", value: staff("a1", "scout") })])).toBe("ok");
+		expect(store.state().awaitingSnapshot).toBe(false);
 		expect(store.applyEvents(6n, [ev(3, { case: "actorEnter", value: staff("a1", "scout") })])).toBe("need-snapshot");
+		expect(store.applyEvents(6n, [ev(4, { case: "actorEnter", value: staff("a1", "scout") })])).toBe("need-snapshot");
+		expect(listener).toHaveBeenCalledTimes(1);
 		expect(store.state().actors).toHaveLength(1);
 		store.applySnapshot(snapshot([director()], { epoch: 6n, seq: 0n }));
 		expect(store.applyEvents(6n, [ev(1, { case: "actorEnter", value: staff("a1", "scout") })])).toBe("ok");
@@ -86,13 +96,25 @@ describe("the office store", () => {
 		// Nothing time decides changed: no emit.
 		store.tick(clock.now + 1000);
 		expect(listener).toHaveBeenCalledTimes(1);
+		// A tick right after a change (nothing cached) still sees the clock's own transitions.
+		store.applyEvents(1n, [ev(1, { case: "activityStart", value: { actorId: "director", activity: act("t2", OfficeRoom.QA, "Bash", T0 + SLOW_TOOL_MS) } }, T0 + SLOW_TOOL_MS)]);
+		expect(store.state().actors[0]?.activity?.slow).toBe(false);
+		listener.mockClear();
+		store.applyEvents(1n, [ev(2, { case: "turnStart", value: {} }, T0 + SLOW_TOOL_MS)]);
+		store.tick(T0 + 2 * SLOW_TOOL_MS);
+		expect(listener).toHaveBeenCalledTimes(2);
+		expect(store.state().actors[0]?.activity?.slow).toBe(true);
 	});
 
-	it("ends every open activity when the session goes idle, and closes the building ten idle minutes later", () => {
+	it("ends the director's work when the session goes idle (machines and background subagents work on), and closes the building ten idle minutes later", () => {
 		const { store, clock } = storeAt();
-		store.applySnapshot(snapshot([director({ activity: act("t1", OfficeRoom.LIBRARY) }), staff("a1", "scout", { activity: act("x", OfficeRoom.LIBRARY) })]));
-		store.applyEvents(1n, [ev(1, { case: "session", value: session({ busy: false }) }, T0)]);
-		expect(store.state().actors.every((a) => a.activity === null)).toBe(true);
+		store.applySnapshot(snapshot([director({ activity: act("t1", OfficeRoom.LIBRARY) }), staff("a1", "scout", { activity: act("x", OfficeRoom.LIBRARY) }), machine("m1")]));
+		store.applyEvents(1n, [ev(1, { case: "session", value: session({ busy: false, backgroundMachines: 2 }) }, T0)]);
+		expect(store.state().actors.map((a) => [a.id, a.activity?.id ?? null])).toEqual([
+			["director", null],
+			["a1", "x"],
+			["m1", "m1"],
+		]);
 		expect(store.state().idleSince).toBe(T0);
 		clock.now = T0 + CLOSING_MS;
 		store.tick(clock.now);
@@ -104,17 +126,64 @@ describe("the office store", () => {
 	it("seats nine employees on eight desks with one in the meeting room, and three on a phone's six", () => {
 		const types = ["scout", "tester", "planner", "researcher", "code-reviewer", "debugger", "docs", "a", "b"];
 		const actors = [director(), ...types.map((t, i) => staff(`s${i}`, t))];
-		const { store } = storeAt(T0, 8);
+		const { store } = storeAt(T0, WIDE);
 		store.applySnapshot(snapshot(actors));
 		expect(store.state().overflow).toBe(1);
-		expect(store.state().staff.filter((m) => m.desk !== null).map((m) => m.desk)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-		store.setDeskCount(6);
+		expect(store.state().staff.filter((m) => m.desk !== null).map((m) => m.desk)).toEqual(WIDE);
+		store.setDesks(PHONE);
 		expect(store.state().overflow).toBe(3);
 		// A desk frees up: the one who waited longest takes it.
-		store.setDeskCount(8);
+		store.setDesks(WIDE);
 		store.applyEvents(1n, [ev(1, { case: "actorLeave", value: { actorId: "s2" } })]);
 		expect(store.state().overflow).toBe(0);
-		expect(store.state().staff.find((m) => m.actorId === "s8")?.desk).toBe(2);
+		expect(store.state().staff.find((m) => m.actorId === "s8")?.desk).toBe("desk-2");
+	});
+
+	it("keeps everyone at their desk when the screen turns between the phone's six desks and the eight", () => {
+		const actors = [director(), ...["a", "b", "c", "d", "e"].map((t, i) => staff(`s${i}`, t))];
+		const { store } = storeAt(T0, PHONE);
+		store.applySnapshot(snapshot(actors));
+		const seats = () => Object.fromEntries(store.state().staff.map((m) => [m.key, m.desk]));
+		const onPhone = seats();
+		expect(Object.values(onPhone)).toEqual(PHONE.slice(0, 5));
+		store.setDesks(WIDE);
+		expect(seats()).toEqual(onPhone);
+		store.setDesks(PHONE);
+		expect(seats()).toEqual(onPhone);
+		// Seated on a desk the phone does not offer: the meeting room until one frees.
+		const wide = storeAt(T0, WIDE).store;
+		wide.applySnapshot(snapshot([director(), ...["a", "b", "c", "d", "e", "f", "g", "h"].map((t, i) => staff(`s${i}`, t))]));
+		const before = Object.fromEntries(wide.state().staff.map((m) => [m.key, m.desk]));
+		wide.setDesks(PHONE);
+		for (const m of wide.state().staff) expect(m.desk).toBe(PHONE.includes(before[m.key] ?? "") ? before[m.key] : null);
+	});
+
+	it("keeps desks and today's staff across a snapshot of the same run, and forgets them for a new run", () => {
+		const { store } = storeAt();
+		store.applySnapshot(snapshot([director(), staff("a1", "scout"), staff("a2", "tester")], { seq: 1n }));
+		store.applyEvents(1n, [ev(2, { case: "turnStart", value: {} }), ev(3, { case: "actorLeave", value: { actorId: "a1" } })]);
+		expect(store.state().staff.map((m) => [m.key, m.desk])).toEqual([["tester#1", "desk-1"]]);
+		// A gap: the snapshot lists the tester first now, and a new planner.
+		store.applySnapshot(snapshot([director(), staff("p1", "planner"), staff("a2", "tester")], { seq: 9n }));
+		expect(store.state().staff.map((m) => [m.key, m.desk])).toEqual([
+			["planner#1", "desk-0"],
+			["tester#1", "desk-1"],
+		]);
+		expect(store.state().visitors.map((v) => v.key)).toEqual(["scout#1", "tester#1", "planner#1"]);
+		expect(store.state().lastTurnStart).toBe(T0 + 2000);
+		store.applySnapshot(snapshot([director()], { epoch: 2n }));
+		expect(store.state().visitors).toEqual([]);
+		expect(store.state().lastTurnStart).toBe(0);
+	});
+
+	it("names an employee again when their agent type becomes known", () => {
+		const { store } = storeAt();
+		store.applySnapshot(snapshot([director(), staff("a1", "")]));
+		expect(store.state().staff[0]?.key).toBe("#1");
+		store.applyEvents(1n, [ev(1, { case: "actorUpdate", value: staff("a1", "researcher") })]);
+		expect(store.state().staff.map((m) => [m.key, m.actorId])).toEqual([["researcher#1", "a1"]]);
+		store.applyEvents(1n, [ev(2, { case: "actorUpdate", value: staff("a1", "researcher", { spawnDepth: 2, parentId: "x" }) })]);
+		expect(store.state().staff.map((m) => [m.key, m.desk])).toEqual([["~researcher#1", null]]);
 	});
 
 	it("keeps one employee per agent type: a new subagent of a type whose employee finished is that employee", () => {

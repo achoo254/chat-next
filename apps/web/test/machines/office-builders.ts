@@ -54,8 +54,8 @@ export function ev(seq: number, kind: NonNullable<MessageInitShape<typeof Office
 }
 
 /** A store on a hand-driven clock. */
-export function storeAt(start = T0, deskCount?: number): { store: OfficeStore; clock: { now: number } } {
+export function storeAt(start = T0, desks?: readonly string[]): { store: OfficeStore; clock: { now: number } } {
 	const clock = { now: start };
-	const store = createOfficeStore({ now: () => clock.now, ...(deskCount === undefined ? {} : { deskCount }) });
+	const store = createOfficeStore({ now: () => clock.now, ...(desks === undefined ? {} : { desks }) });
 	return { store, clock };
 }

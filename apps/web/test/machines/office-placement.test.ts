@@ -6,7 +6,7 @@ import { OfficeActorState, OfficeAnimGroup, OfficeRoom } from "@achoo254/chat-pr
 import { describe, expect, it } from "vitest";
 import { deskOrder } from "../../src/machines/office/office-geometry.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
-import { EMPTY_MEMORY, LINGER_MS, MIN_STAY_MS, officePlacement, type Placement, type PlacementMemory } from "../../src/machines/office/office-placement.ts";
+import { EMPTY_MEMORY, HAND_IN_MS, LINGER_MS, MIN_STAY_MS, officePlacement, type Placement, type PlacementMemory } from "../../src/machines/office/office-placement.ts";
 import type { OfficeStore } from "../../src/machines/office/office-store.ts";
 import { act, director, ev, machine, session, snapshot, staff, storeAt, T0 } from "./office-builders.ts";
 
@@ -18,8 +18,8 @@ function layout(): OfficeLayout {
 /** Places people at successive moments, keeping the memory like the views do. */
 function placer(store: OfficeStore) {
 	let memory: PlacementMemory = EMPTY_MEMORY;
-	return (now: number, size: "desktop" | "phone" = "desktop"): readonly Placement[] => {
-		const result = officePlacement(store.state(), layout(), now, memory, size);
+	return (now: number): readonly Placement[] => {
+		const result = officePlacement(store.state(), layout(), now, memory);
 		memory = result.memory;
 		return result.placements;
 	};
@@ -95,9 +95,10 @@ describe("office placement", () => {
 		expect(find(places, "a#1")).toMatchObject({ room: "WORK", anchorId: "desk-0", activityRoom: null });
 		expect(find(places, "i#1").room).toBe("MEETING");
 		expect(find(places, "~Explore#1").room).toBe("MEETING");
-		// A phone's desk order.
-		const phone = officePlacement(store.state(), layout(), T0, EMPTY_MEMORY, "phone").placements;
-		expect(find(phone, "a#1").anchorId).toBe(deskOrder(layout(), "phone")[0]);
+		// On a phone the first employee takes the phone's first desk.
+		const { store: small } = storeAt(T0, deskOrder(layout(), "phone"));
+		small.applySnapshot(snapshot([director(), staff("s0", "a", { state: OfficeActorState.DONE })]));
+		expect(find(officePlacement(small.state(), layout(), T0, EMPTY_MEMORY).placements, "a#1").anchorId).toBe(deskOrder(layout(), "phone")[0]);
 	});
 
 	it("moves at most once every four seconds through a burst of short tools", () => {
@@ -132,6 +133,14 @@ describe("office placement", () => {
 		expect(find(place(ended + 1), "scout#1")).toMatchObject({ room: "LIBRARY", activityRoom: "LIBRARY" });
 		expect(find(place(ended + LINGER_MS - 1), "scout#1").room).toBe("LIBRARY");
 		expect(find(place(ended + LINGER_MS), "scout#1")).toMatchObject({ room: "WORK", anchorId: "desk-0", activityRoom: null });
+	});
+
+	it("lets a finished employee hand in their file at the director's, then sends them home", () => {
+		const store = fresh([director(), staff("a1", "scout", { state: OfficeActorState.DONE, doneAt: BigInt(T0), activity: act("hand-in", OfficeRoom.DIRECTOR, "", T0, OfficeAnimGroup.HAND_IN) })]);
+		const place = placer(store);
+		expect(find(place(T0), "scout#1")).toMatchObject({ room: "DIRECTOR", activityRoom: "DIRECTOR" });
+		expect(find(place(T0 + HAND_IN_MS - 1), "scout#1").room).toBe("DIRECTOR");
+		expect(find(place(T0 + HAND_IN_MS + LINGER_MS), "scout#1")).toMatchObject({ room: "WORK", anchorId: "desk-0", activityRoom: null });
 	});
 
 	it("takes whoever waits for an approval to Security, and puts the chairman in the lobby", () => {

@@ -24,7 +24,8 @@ function waitingForDesks(placements: readonly Placement[]): number {
 function Marker({ p, t, placed }: { p: Placement; t: OfficeCopy; placed?: { x: number; y: number; stack: number } }) {
 	const status = markerStatus(p.kind, p.actor);
 	const name = personName(t, p);
-	const bubble = bubbleText(t, p.actor?.activity ?? null);
+	// A bubble only while at work (not for someone home after handing in their file).
+	const bubble = p.activityRoom === null ? "" : bubbleText(t, p.actor?.activity ?? null);
 	const label = status === "idle" || status === "working" ? name : `${name} · ${t.state[status === "waiting-you" ? "waitingYou" : status]}`;
 	const style: ColorStyle = { "--of-color": personColor(p) };
 	if (placed !== undefined) {
@@ -33,7 +34,7 @@ function Marker({ p, t, placed }: { p: Placement; t: OfficeCopy; placed?: { x: n
 		style["--of-stack"] = placed.stack;
 	}
 	return (
-		<div className="of-marker" data-status={status} data-kind={p.kind} style={style} title={label} data-id={`office-person-${p.key}`}>
+		<div className="of-marker" data-status={status} data-kind={p.kind} data-anchor={p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
 			<span className="of-dot" aria-hidden="true">
 				{status === "slow" ? "⌛" : ""}
 			</span>

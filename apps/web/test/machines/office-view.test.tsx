@@ -27,11 +27,12 @@ const wrap = (node: ReactNode) => render(<I18nProvider>{node}</I18nProvider>);
 /** A link that records requests and lets the test play the machine's frames. */
 function fakeLink() {
 	const sent: Body[] = [];
+	const rejects: ((err: unknown) => void)[] = [];
 	const frames = new Set<(body: Frame["body"]) => void>();
 	const link = {
 		request: (body: Body) => {
 			sent.push(body);
-			return new Promise<Frame>(() => undefined);
+			return new Promise<Frame>((_resolve, reject) => rejects.push(reject));
 		},
 		onFrame: (listener: (body: Frame["body"]) => void) => {
 			frames.add(listener);
@@ -44,6 +45,8 @@ function fakeLink() {
 		link: link as unknown as MachineLink,
 		sent,
 		deliver: (body: Frame["body"]) => reactAct(() => frames.forEach((listener) => listener(body))),
+		/** The oldest request fails. */
+		reject: (err: unknown) => reactAct(async () => rejects.shift()?.(err)),
 	};
 }
 
@@ -126,6 +129,9 @@ describe("the session's views", () => {
 		expect(sessionModes(true, true)).toEqual(["chat", "terminal", "office"]);
 		expect(sessionModes(false, true)).toEqual(["chat", "office"]);
 		expect(sessionModes(false, false)).toEqual(["chat"]);
+		// A remembered office on a machine offline or back on an older tunelo: still a way back to chat.
+		expect(sessionModes(false, false, "office")).toEqual(["chat", "office"]);
+		expect(sessionModes(false, false, "terminal")).toEqual(["chat"]);
 	});
 
 	it("shows the switch only with two views: chat, terminal and office; chat and office; nothing for chat alone", () => {
@@ -168,5 +174,19 @@ describe("a refused watch", () => {
 		const limit = new RemoteError(ErrorCode.INVALID, "too many", ErrorReason.OFFICE_WATCH_LIMIT, "");
 		expect(refusalText(viMachines, limit)).toBe(viMachines.errors.reasons.officeWatchLimit);
 		expect(refusalText(viMachines, new Error("x"))).toBe(viMachines.office.failed);
+	});
+
+	it("offers to try again after the limit of offices, and the warning goes once the office opens", async () => {
+		const fake = fakeLink();
+		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
+		await fake.reject(new RemoteError(ErrorCode.INVALID, "too many", ErrorReason.OFFICE_WATCH_LIMIT, ""));
+		expect(await screen.findByText(viMachines.errors.reasons.officeWatchLimit)).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Thử lại" }));
+		expect(fake.sent.filter((b) => b.case === "officeWatch")).toHaveLength(2);
+		expect(screen.queryByText(viMachines.errors.reasons.officeWatchLimit)).toBeNull();
+		await fake.reject(new RemoteError(ErrorCode.INVALID, "too many", ErrorReason.OFFICE_WATCH_LIMIT, ""));
+		expect(await screen.findByText(viMachines.errors.reasons.officeWatchLimit)).toBeTruthy();
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
+		await waitFor(() => expect(screen.queryByText(viMachines.errors.reasons.officeWatchLimit)).toBeNull());
 	});
 });

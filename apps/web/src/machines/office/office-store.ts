@@ -10,7 +10,7 @@
 // injected, so tests and a future replay drive it.
 import type { OfficeEvent, OfficeSnapshot } from "@achoo254/chat-proto/remote/remote";
 import { actorOf, activityOf, APPROVALS, EMPTY_SESSION, nestedActor, sessionOf, type ActorRecord, type OfficeState, type SessionView } from "./office-state.ts";
-import { fillDesks, hire, overflowOf, release, type StaffMember } from "./office-staff.ts";
+import { fillDesks, hire, overflowOf, release, reseat, type StaffMember } from "./office-staff.ts";
 
 export type { ActivityView, ActorRole, ActorState, ActorView, AnimGroup, ApprovalState, OfficeState, SessionView } from "./office-state.ts";
 export type { StaffMember } from "./office-staff.ts";
@@ -21,9 +21,12 @@ export const POWER_OUT_MS = 30_000;
 export const SLOW_TOOL_MS = 120_000;
 /** The session idle this long: the building closes for the day. */
 export const CLOSING_MS = 10 * 60_000;
-/** Home desks in the shared work room: 8 on a wide screen, 6 on a phone. */
-export const DESKS_WIDE = 8;
-export const DESKS_PHONE = 6;
+/**
+ * The home desks of the shared work room as anchor ids, in the order they are
+ * taken (the views pass the layout's: eight on a wide screen, six on a phone);
+ * this default names the layout's eight.
+ */
+export const DEFAULT_DESKS: readonly string[] = ["desk-0", "desk-1", "desk-2", "desk-3", "desk-4", "desk-5", "desk-6", "desk-7"];
 
 export type ApplyResult = "ok" | "need-snapshot";
 
@@ -33,14 +36,15 @@ export interface OfficeStore {
 	/** The link to the machine opened or closed; `at` is when it was last heard from (viewer time). */
 	linkStatus(open: boolean, at: number): void;
 	tick(now: number): void;
-	setDeskCount(count: number): void;
+	/** The desks the screen offers (anchor ids): people keep theirs when it is still offered. */
+	setDesks(desks: readonly string[]): void;
 	subscribe(listener: () => void): () => void;
 	state(): OfficeState;
 }
 
-export function createOfficeStore(options: { now: () => number; deskCount?: number }): OfficeStore {
+export function createOfficeStore(options: { now: () => number; desks?: readonly string[] }): OfficeStore {
 	const listeners = new Set<() => void>();
-	let deskCount = options.deskCount ?? DESKS_WIDE;
+	let desks: readonly string[] = options.desks ?? DEFAULT_DESKS;
 	let live = false;
 	let epoch: bigint | null = null;
 	let seq = 0n;
@@ -52,7 +56,10 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 	let session: SessionView = EMPTY_SESSION;
 	let lastTurnStart = 0;
 	let idleSince: number | null = null;
-	// Viewer time minus machine time, from the latest events; 0 until one.
+	// Viewer time minus machine time, from the latest events; 0 until one. A
+	// snapshot carries no time of its own, so until the first event the two
+	// clocks are taken as equal (an hourglass or closing may show a little early
+	// or late on a machine whose clock is off).
 	let clockOffset = 0;
 	let linkOpen = true;
 	let lastHeard = options.now();
@@ -75,7 +82,7 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 
 	const hireActor = (a: ActorRecord): void => {
 		if (a.role !== "employee") return;
-		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, freeAt, deskCount);
+		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, freeAt, desks);
 		remember(staff);
 	};
 
@@ -93,7 +100,7 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 			})),
 			staff,
 			overflow: overflowOf(staff),
-			deskCount,
+			deskCount: desks.length,
 			session,
 			chairman: live && session.waitingForUser,
 			lastTurnStart,
@@ -104,9 +111,13 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 		};
 	};
 
+	const notify = (): void => {
+		for (const listener of listeners) listener();
+	};
+
 	const emit = (): void => {
 		cached = null;
-		for (const listener of listeners) listener();
+		notify();
 	};
 
 	/** The clock-driven parts of the state: emit only when one of them changed. */
@@ -136,12 +147,19 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 				if (previous === undefined) {
 					actors = [...actors, next];
 					hireActor(next);
-				} else update(next.id, () => next);
+				} else {
+					update(next.id, () => next);
+					// Its agent type or nesting became known or changed: it is someone else (another name, a desk or the meeting room).
+					if (next.role === "employee" && (previous.agentType !== next.agentType || nestedActor(previous) !== nestedActor(next))) {
+						staff = release(staff, next.id, desks);
+						hireActor(next);
+					}
+				}
 				break;
 			}
 			case "actorLeave":
 				actors = actors.filter((a) => a.id !== k.value.actorId);
-				staff = release(staff, k.value.actorId, deskCount);
+				staff = release(staff, k.value.actorId, desks);
 				break;
 			case "activityStart": {
 				const activity = activityOf(k.value.activity);
@@ -171,8 +189,8 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 				const next = sessionOf(k.value);
 				if (session.busy && !next.busy) {
 					idleSince = at;
-					// The session went idle: whatever was still open ends with it.
-					actors = actors.map((a) => (a.activity === null ? a : { ...a, activity: null }));
+					// The director's turn is over; machines and background subagents work on (the agent ends theirs).
+					actors = actors.map((a) => (a.role === "director" && a.activity !== null ? { ...a, activity: null } : a));
 				} else if (next.busy) idleSince = null;
 				else idleSince ??= at;
 				session = next;
@@ -188,6 +206,9 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 		applySnapshot(snapshot) {
 			viewerNow = options.now();
 			const s = snapshot.state;
+			// The same agent run (a gap or a reconnect): the same people, at the same desks, and nobody forgotten from today.
+			const same = live && snapshot.epoch === epoch;
+			const before = { staff, visitors };
 			epoch = snapshot.epoch;
 			seq = snapshot.seq;
 			awaiting = false;
@@ -195,24 +216,30 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 			reportsStaff = s?.reportsStaff ?? false;
 			actors = [];
 			staff = [];
-			visitors = [];
+			visitors = same ? before.visitors : [];
 			for (const a of s?.actors ?? []) {
 				const record = actorOf(a, undefined);
 				actors = [...actors, record];
 				hireActor(record);
 			}
+			if (same) staff = reseat(staff, before.staff, desks);
 			session = sessionOf(s?.session);
 			idleSince = session.busy ? null : idleEdgeOf(actors, session);
-			lastTurnStart = 0;
+			if (!same) lastTurnStart = 0;
 			if (linkOpen) power = "on";
 			emit();
 		},
 
 		applyEvents(frameEpoch, events) {
 			viewerNow = options.now();
+			// An older epoch's frame (sent before the agent restarted) is just dropped.
+			if (live && epoch !== null && frameEpoch < epoch) return "ok";
 			if (!live || awaiting || frameEpoch !== epoch) {
-				awaiting = live;
-				if (live) emit();
+				// Shown as catching up once; nothing re-renders until the snapshot comes.
+				if (live && !awaiting) {
+					awaiting = true;
+					emit();
+				}
 				return "need-snapshot";
 			}
 			let changed = false;
@@ -237,7 +264,7 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 		linkStatus(open, at) {
 			viewerNow = options.now();
 			if (open === linkOpen) {
-				if (!open) lastHeard = Math.min(lastHeard, at);
+				if (!open) lastHeard = at;
 				return;
 			}
 			linkOpen = open;
@@ -248,17 +275,17 @@ export function createOfficeStore(options: { now: () => number; deskCount?: numb
 		},
 
 		tick(now) {
+			const before = timeKey(state());
 			viewerNow = now;
-			const before = cached ?? build();
 			if (!linkOpen && now - lastHeard >= POWER_OUT_MS) power = "out";
-			cached = null;
-			if (timeKey(build()) !== timeKey(before)) emit();
+			cached = build();
+			if (timeKey(cached) !== before) notify();
 		},
 
-		setDeskCount(count) {
-			if (count === deskCount) return;
-			deskCount = count;
-			staff = fillDesks(staff, deskCount);
+		setDesks(next) {
+			if (next.length === desks.length && next.every((d, i) => d === desks[i])) return;
+			desks = next;
+			staff = fillDesks(staff, desks);
 			emit();
 		},
 

@@ -303,8 +303,9 @@ export class FakeOffice {
 		const { threadId, on } = frame.body.value;
 		const was = this.offices.get(threadId);
 		if (!on) {
+			// Like the agent, which rebuilds the office from the thread's journal on the next watch: the script stays where it was.
 			if (was !== undefined && was.timer !== null) clearInterval(was.timer);
-			this.offices.delete(threadId);
+			if (was !== undefined) this.offices.set(threadId, { office: was.office, timer: null });
 			return [{ case: "ack", value: {} }];
 		}
 		const office = was?.office ?? new Office(threadId, threadId !== "demo-idle", (body) => this.machine.send(socket, body));
@@ -312,6 +313,15 @@ export class FakeOffice {
 		const timer = this.auto ? setInterval(() => office.next(), STEP_MS) : null;
 		this.offices.set(threadId, { office, timer });
 		return [office.snapshot()];
+	}
+
+	/** Stops the steps playing on their own (step() still plays them). */
+	pause(): void {
+		this.auto = false;
+		for (const entry of this.offices.values()) {
+			if (entry.timer !== null) clearInterval(entry.timer);
+			entry.timer = null;
+		}
 	}
 
 	/** Plays one step in every watched office. */

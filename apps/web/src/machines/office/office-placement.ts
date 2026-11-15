@@ -10,7 +10,7 @@
 // before going home. The speech bubble shows the real tool at once anyway.
 // Pure: the memory of the last call goes in, the new one comes out.
 import { homeRoomOf } from "./office-cast.ts";
-import { anchorById, anchorOfKind, deskOrder, floorOfRoom, spotsOf, type ScreenSize } from "./office-geometry.ts";
+import { anchorById, anchorOfKind, floorOfRoom, spotsOf } from "./office-geometry.ts";
 import type { OfficeLayout } from "./office-layout.ts";
 import type { FloorLevel, RoomCode } from "./office-rooms.ts";
 import type { ActorView, OfficeState, StaffMember } from "./office-store.ts";
@@ -19,6 +19,12 @@ import type { ActorView, OfficeState, StaffMember } from "./office-store.ts";
 export const MIN_STAY_MS = 4_000;
 /** After the work in a room ends, its person stays this long before going home. */
 export const LINGER_MS = 6_000;
+/**
+ * A finished employee's "hand-in" stays their activity on the wire (the agent
+ * keeps it until they leave): the visit to the director lasts this long from
+ * when it began, then they go home.
+ */
+export const HAND_IN_MS = 5_000;
 
 export type PersonKind = "director" | "employee" | "machine" | "chairman";
 
@@ -78,15 +84,22 @@ function people(state: OfficeState): Person[] {
 	return list;
 }
 
-function wish(person: Person, layout: OfficeLayout, desks: readonly string[]): Wish {
+/** What the person does now: a finished employee's hand-in only for its visit. */
+export function currentActivity(actor: ActorView, now: number, clockOffset: number): ActorView["activity"] {
+	const a = actor.activity;
+	if (a !== null && actor.state === "done" && a.group === "hand-in" && now - (a.startedAt + clockOffset) >= HAND_IN_MS) return null;
+	return a;
+}
+
+function wish(person: Person, layout: OfficeLayout, now: number, clockOffset: number): Wish {
 	const actor = person.actor;
 	if (person.kind === "chairman" || actor === null) return { room: "LOBBY", working: false, own: anchorOfKind(layout, "LOBBY", "chairman")?.id ?? null };
 	if (actor.state === "awaiting") return { room: "SECURITY", working: true, own: null };
-	const desk = person.member?.desk ?? null;
-	const deskId = desk === null ? null : (desks[desk] ?? null);
+	const deskId = person.member?.desk ?? null;
 	const directorChair = anchorOfKind(layout, "DIRECTOR", "director")?.id ?? null;
-	if (actor.activity !== null) {
-		let room = actor.activity.room;
+	const activity = currentActivity(actor, now, clockOffset);
+	if (activity !== null) {
+		let room = activity.room;
 		if (room === "WORK" && person.kind === "employee") room = homeRoomOf(actor.agentType);
 		if (person.kind === "director" && room === "DIRECTOR") return { room, working: true, own: directorChair };
 		return { room, working: true, own: room === "WORK" && person.kind === "employee" ? deskId : null };
@@ -103,13 +116,11 @@ export function officePlacement(
 	layout: OfficeLayout,
 	now: number,
 	memory: PlacementMemory,
-	size: ScreenSize = "desktop",
 ): { readonly placements: readonly Placement[]; readonly memory: PlacementMemory } {
-	const desks = deskOrder(layout, size);
 	const frozen = state.power === "out";
 	const decided: { person: Person; room: RoomCode; keep: string | null; own: string | null; since: number; workedAt: number | null; busy: boolean }[] = [];
 	for (const person of people(state)) {
-		const want = wish(person, layout, desks);
+		const want = wish(person, layout, now, state.clockOffset);
 		const was = memory.get(person.key);
 		if (was === undefined) {
 			decided.push({ person, room: want.room, keep: null, own: want.own, since: now, workedAt: want.working ? now : null, busy: want.working });
