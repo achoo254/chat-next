@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import type { LinkState } from "../../src/machines/link/machine-link.ts";
-import { Transcript } from "../../src/machines/session-chat.tsx";
+import { keepReading, markReading, Transcript } from "../../src/machines/session-chat.tsx";
 import type { Block } from "../../src/machines/transcript/tool-fold.ts";
 
 afterEach(cleanup);
@@ -139,6 +139,37 @@ describe("older items of a long session", () => {
 			scrollTo(0);
 		});
 		expect(drawn()).toBeGreaterThan(after);
+	});
+
+	it("keeps the block being read in place when older blocks come in above and new ones at the bottom at once", () => {
+		// A scroller laid out by hand: each block 100px tall, stacked from the scroller's top minus scrollTop.
+		const scroller = document.createElement("div");
+		let top = 0;
+		Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => top, set: (v: number) => (top = v) });
+		const layout = () => {
+			[...scroller.children].forEach((child, i) => {
+				child.getBoundingClientRect = () => ({ top: i * 100 - top, bottom: i * 100 + 100 - top }) as DOMRect;
+			});
+			Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: scroller.children.length * 100 });
+		};
+		scroller.getBoundingClientRect = () => ({ top: 0, bottom: 500 }) as DOMRect;
+		const block = (name: string) => Object.assign(document.createElement("div"), { textContent: name });
+		const button = Object.assign(document.createElement("button"), { textContent: "older" });
+		button.setAttribute("data-id", "transcript-older");
+		scroller.append(button, block("b10"), block("b11"), block("b12"));
+		top = 30;
+		layout();
+		const mark = markReading(scroller);
+		expect(mark.node?.textContent).toBe("b10");
+		// Five older blocks above, two new ones at the bottom.
+		scroller.insertBefore(block("b5"), scroller.children[1] ?? null);
+		for (const n of ["b6", "b7", "b8", "b9"]) scroller.insertBefore(block(n), scroller.children[scroller.children.length - 3] ?? null);
+		scroller.append(block("b13"), block("b14"));
+		layout();
+		keepReading(scroller, mark);
+		layout();
+		const reading = [...scroller.children].find((c) => c.textContent === "b10");
+		expect(reading?.getBoundingClientRect().top).toBe(70);
 	});
 });
 

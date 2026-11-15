@@ -620,6 +620,33 @@ interface TranscriptProps {
 	loadOlder?: () => Promise<void>;
 }
 
+/**
+ * Where the user is reading: the first block on screen and how far below the top of the transcript it shows. A
+ * running session adds blocks at the bottom while older ones load above, so the height that changed is not all
+ * above the reading position; the block itself is.
+ */
+interface ReadingMark {
+	readonly node: Element | null;
+	readonly offset: number;
+	/** The scroll height, for when the block is gone. */
+	readonly height: number;
+}
+
+/** The buttons above the blocks stay at the top whatever loads: never a reading position. */
+const NOT_A_BLOCK = "[data-id=transcript-older], [data-id=transcript-earlier], [data-id=transcript-previous]";
+
+export function markReading(el: HTMLElement): ReadingMark {
+	const top = el.getBoundingClientRect().top;
+	const node = [...el.children].find((c) => !c.matches(NOT_A_BLOCK) && c.getBoundingClientRect().bottom > top) ?? null;
+	return { node, offset: node === null ? 0 : node.getBoundingClientRect().top - top, height: el.scrollHeight };
+}
+
+export function keepReading(el: HTMLElement, mark: ReadingMark): void {
+	// The block still in this transcript (React kept its element): it goes back where it was on screen.
+	if (mark.node !== null && el.contains(mark.node)) el.scrollTop += mark.node.getBoundingClientRect().top - el.getBoundingClientRect().top - mark.offset;
+	else el.scrollTop += el.scrollHeight - mark.height;
+}
+
 /** Within this distance of the bottom, the transcript follows new content. */
 const STICK_PX = 80;
 /** Blocks drawn when a session opens; scrolling near the top draws this many more. */
@@ -659,26 +686,26 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 		else setFrom({ view, start: Math.max(0, n - TRANSCRIPT_PAGE) });
 		setOpenedFor(opened ? null : view);
 	};
-	/** The scroll height before earlier blocks came in: the reading position is kept across them. */
-	const heightBefore = useRef<number | null>(null);
+	/** Where the user was reading before earlier blocks came in: the reading position is kept across them. */
+	const heightBefore = useRef<ReadingMark | null>(null);
 	useLayoutEffect(() => {
 		const el = scroller.current;
 		if (el === null || heightBefore.current === null) return;
-		el.scrollTop += el.scrollHeight - heightBefore.current;
+		keepReading(el, heightBefore.current);
 		heightBefore.current = null;
 		// Every window change clears the mark, also one that ends where it began: a mark left behind would ignore
 		// every later reach of the top.
 	}, [start, from]);
-	// Older items still on the machine: fetched when the user reaches the top of what is loaded. The first block and
-	// the scroll height before they came keep the reading position across the blocks they add above it.
+	// Older items still on the machine: fetched when the user reaches the top of what is loaded. The first block tells
+	// when they came in; the block being read keeps its place on screen across the blocks they add above it.
 	const firstId = all[0]?.id;
 	const [fetching, setFetching] = useState(false);
-	const olderAnchor = useRef<{ height: number; firstId: string | undefined } | null>(null);
+	const olderAnchor = useRef<{ mark: ReadingMark; firstId: string | undefined } | null>(null);
 	useLayoutEffect(() => {
 		const el = scroller.current;
 		const anchor = olderAnchor.current;
 		if (el === null || anchor === null || anchor.firstId === firstId) return;
-		el.scrollTop += el.scrollHeight - anchor.height;
+		keepReading(el, anchor.mark);
 		olderAnchor.current = null;
 	}, [firstId]);
 	useLayoutEffect(() => {
@@ -690,7 +717,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 	const fetchOlder = () => {
 		if (!canFetchOlder || fetching) return;
 		const el = scroller.current;
-		olderAnchor.current = el === null ? null : { height: el.scrollHeight, firstId };
+		olderAnchor.current = el === null ? null : { mark: markReading(el), firstId };
 		setFetching(true);
 		void loadOlder().finally(() => setFetching(false));
 	};
@@ -701,7 +728,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 			fetchOlder();
 			return;
 		}
-		heightBefore.current = el?.scrollHeight ?? null;
+		heightBefore.current = el === null ? null : markReading(el);
 		// From the window as it is by now: scroll events can come faster than renders, and this render's `start` may
 		// already be stale.
 		setFrom((f) => {
