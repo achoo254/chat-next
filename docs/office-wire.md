@@ -15,8 +15,9 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 - **Hoạt động** (`OfficeActivity`): việc một actor đang làm, kèm **nhóm hoạt ảnh** (`OfficeAnimGroup`) và **phòng** (`OfficeRoom`) mà agent đã chọn trên máy.
   Mỗi actor hiện tối đa MỘT hoạt động; id hoạt động là id lời gọi tool, hoặc id cố định `think`, `arrive`, `hand-in`.
 - **`epoch`**: epoch của core agent (như `Cursor.epoch`), đổi mỗi lần agent khởi động lại.
-- **`seq`**: số thứ tự sự kiện của văn phòng một luồng trong một epoch, tăng đúng 1 mỗi sự kiện, bắt đầu từ 1. Agent giữ văn phòng của một luồng chỉ khi có ít nhất
-  một kết nối đang xem; không còn ai xem thì văn phòng bị huỷ, lần xem sau dựng lại từ đầu (seq lại từ 1) nên thiết bị luôn bắt đầu bằng ảnh chụp.
+- **`seq`**: số thứ tự sự kiện của văn phòng một luồng, tăng đúng 1 mỗi sự kiện. Agent giữ văn phòng của một luồng chỉ khi có ít nhất một kết nối đang xem;
+  không còn ai xem thì văn phòng bị huỷ, lần xem sau dựng lại từ nhật ký với dãy `seq` mới (không nối tiếp lần trước). Thiết bị luôn bắt đầu bằng ảnh chụp và
+  lấy `seq` của ảnh chụp làm mốc, không so với dãy cũ.
 - Thời gian là Unix mili giây theo đồng hồ của máy.
 
 ## 2. Khung (thân `Frame` số 168 đến 170)
@@ -67,7 +68,7 @@ văn phòng trống; agent suy ra từ việc adapter có `SessionHistory.subage
   không biết (web dùng loại "lạ").
 - `description`: mô tả ngắn của subagent cấp 1 (chính dòng thẻ subagent trong chat đã hiện), cắt 80 ký tự. Rỗng với subagent lồng (chat không hiện mô tả đó) và máy.
 - `parent_id`: id actor đã tạo actor này (subagent do subagent khác tạo); `workflow:<id>` cho agent thuộc một workflow (không phải actor nào); rỗng khi Giám
-  đốc tạo. `spawn_depth`: 1 cho subagent của Giám đốc, từ 2 cho subagent lồng; 0 cho Giám đốc và máy. Web đặt actor có `spawn_depth` > 1 hoặc `parent_id` khác
+  đốc tạo. Agent của workflow không có lời gọi tool riêng nên id của nó là `workflow:<id workflow>/<id agent>`. `spawn_depth`: 1 cho subagent của Giám đốc, từ 2 cho subagent lồng; 0 cho Giám đốc và máy. Web đặt actor có `spawn_depth` > 1 hoặc `parent_id` khác
   rỗng vào Phòng họp.
 - `state` (`OfficeActorState`): `IDLE` (Giám đốc lúc phiên rảnh), `WORKING`, `DONE` (nhân viên đã xong, ở lại tới khi phiên rảnh quá 10 phút thì `actor_leave`),
   `AWAITING_APPROVAL` (có tool đang chờ duyệt). Máy không bao giờ `DONE`: máy xong là `actor_leave` ngay.
@@ -175,7 +176,20 @@ Lời gọi tool mà core đánh dấu nhạy cảm (`mentionsSensitive`, cờ `
 | Qua/trượt kiểm thử | Có | Có (kết quả tool đọc lại từ transcript) | Có |
 
 Văn phòng dựng khi thiết bị bắt đầu xem, từ nhật ký của luồng (tool, kết quả, subagent, todo, duyệt, lượt): nhân viên đã xong trong 10 phút rảnh gần nhất vẫn có
-mặt. Phiên chạy nơi khác đang giữa chừng khi bắt đầu xem chỉ có những gì nhật ký đã đọc vào; phần còn lại tới theo nhịp đọc transcript.
+mặt; máy chỉ còn bằng số `background_tasks` hiện tại (nhật ký không ghi lúc tác vụ nền xong). Loại agent của nhân viên dựng từ nhật ký lấy từ những gì agent đã
+nghe khi subagent bắt đầu, trong lúc có ít nhất một thiết bị kết nối (nhật ký không giữ loại agent); không có thì rỗng, hoặc lấy từ `meta.json` với phiên chạy
+nơi khác. Phiên chạy nơi khác đang giữa chừng khi bắt đầu xem chỉ có những gì nhật ký đã đọc vào; phần còn lại tới theo nhịp đọc transcript (1,5 giây), và bản
+ghi subagent chỉ được đọc khi agent đã biết id phiên của luồng (từ một lượt máy chạy, hoặc một lần đọc transcript sau khi agent khởi động).
+
+Quan sát khi chạy thật (Claude Code 2.1.325, Agent SDK 0.3.319, 15/11/2026):
+
+- Subagent chạy nền (`run_in_background`) gửi tin của nó (có `parent_tool_use_id`) vào CÙNG luồng SDK, kể cả sau `result` của lượt; lời gọi `Agent` trả kết quả
+  ngay lúc khởi chạy; SDK báo kết thúc bằng tin hệ thống `task_notification` có `tool_use_id` (cả với subagent không chạy nền). Khi tác vụ nền xong sau lượt,
+  SDK tự chạy thêm một lượt ngắn: token của lượt đó nằm trong transcript, ngoài khoảng các lượt máy chạy, nên được tính như lần gọi "nơi khác".
+- Thứ tự không cố định: trong một lần chạy, tin của subagent tới sau kết quả lời gọi `Agent` của nó; văn phòng bỏ tool của nhân viên đã `DONE`, nên lần đó nhân
+  viên không có hoạt động bên trong.
+- `meta.json` ghi `requestShape: "background"` cho gần như mọi subagent (248/253 tệp trên máy dev; 5 tệp còn lại là agent của workflow, `foreground`), kể cả khi không xin chạy nền: agent coi đó là "xong khi
+  `finished`", không dùng để quyết định máy hay nhân viên.
 
 ## 8. Cam kết dữ liệu không rời máy
 
@@ -188,5 +202,6 @@ quét mọi khung văn phòng đã mã hoá để khẳng định chuỗi đó k
 
 - 64 actor mỗi văn phòng (Giám đốc luôn có chỗ); dư thì đếm ở `hidden_actors`.
 - Gom sự kiện 250 ms; `session` chỉ gửi khi một số đổi.
-- Transcript của subagent chỉ đọc phần mới từ vị trí đã nhớ; lần đầu đọc tối đa 4 MiB cuối của mỗi tệp. Định dạng `subagents/` của Claude Code không có tài liệu
+- Transcript của subagent chỉ đọc phần mới từ vị trí đã nhớ; lần đầu đọc tối đa 4 MiB cuối của mỗi tệp. Token của phiên chạy nơi khác lần đầu đọc tối đa
+  64 MiB cuối của transcript chính: phiên dài hơn thế thiếu phần đầu (số thấp hơn thật, không bao giờ cao hơn). Định dạng `subagents/` của Claude Code không có tài liệu
   chính thức: agent đọc phòng thủ (thiếu trường thì bỏ qua hoặc loại "lạ"), lỗi đọc chỉ ảnh hưởng văn phòng.

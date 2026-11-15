@@ -88,7 +88,9 @@ describe("a subagent's edits", () => {
         ],
       },
     } as unknown as SDKMessage);
-    expect(events).toEqual([{ type: "diff", toolId: "e1", path: "a.ts", unified: "--- a/a.ts\n+++ b/a.ts\n@@\n-x\n+y", added: 1, removed: 1, parentToolId: "task1" }]);
+    // Its tool calls also go out as subagent-tool events, which only the office view reads (never a card in the chat).
+    const forChat = events.filter((e) => e.type !== "subagent-tool");
+    expect(forChat).toEqual([{ type: "diff", toolId: "e1", path: "a.ts", unified: "--- a/a.ts\n+++ b/a.ts\n@@\n-x\n+y", added: 1, removed: 1, parentToolId: "task1" }]);
   });
 
   it("keep the model of the conversation's latest reply", () => {

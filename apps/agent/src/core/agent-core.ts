@@ -357,6 +357,7 @@ export class AgentCore {
   private infoListeners = new Set<(threadId: string) => void>();
   private turnEndListeners = new Set<(threadId: string) => void>();
   private activityListeners = new Set<(activity: ThreadActivity) => void>();
+  private providerEventListeners = new Set<(threadId: string, e: ProviderEvent | HistoryEntry) => void>();
   private elsewhereTimer: ReturnType<typeof setInterval> | undefined;
   /** The look for activity elsewhere under way; one at a time. */
   private looking: Promise<void> | undefined;
@@ -609,6 +610,17 @@ export class AgentCore {
   onActivity(fn: (activity: ThreadActivity) => void): () => void {
     this.activityListeners.add(fn);
     return () => this.activityListeners.delete(fn);
+  }
+
+  /**
+   * Called with each event of a thread's AI session before the core handles
+   * it, and with each entry read back from its transcript (turns run
+   * elsewhere): what the journal does not keep (a subagent's kind, its tool
+   * calls), for the office view. A listener must not throw.
+   */
+  onProviderEvent(fn: (threadId: string, e: ProviderEvent | HistoryEntry) => void): () => void {
+    this.providerEventListeners.add(fn);
+    return () => this.providerEventListeners.delete(fn);
   }
 
   /** What the thread's running turn is doing now; undefined when none runs (or the thread is unknown). */
@@ -1280,6 +1292,7 @@ export class AgentCore {
     }
     const items: Item[] = [];
     for (const e of entries) {
+      for (const fn of this.providerEventListeners) fn(t.meta.id, e);
       const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
       const found = t.journal.get(entry.id);
       const prev = found && found.seq > shownFrom ? found : undefined;
@@ -1850,6 +1863,7 @@ export class AgentCore {
   }
 
   private handle(t: Thread, e: ProviderEvent, accountId: string): void {
+    for (const fn of this.providerEventListeners) fn(t.meta.id, e);
     t.lastActive = this.now();
     switch (e.type) {
       case "session": {
