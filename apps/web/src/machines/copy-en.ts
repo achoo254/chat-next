@@ -942,6 +942,7 @@ export const enMachines: MachinesCopy = {
 		},
 		title: "AI Agent",
 		sessionsLabel: "AI sessions on every machine",
+		listResize: "Width of the session list",
 		machines: "Manage machines",
 		machinesTitle: "Manage machines",
 		machinesIntro: "Computers running tunelo and an AI coding agent. Sessions of every machine show in the AI Agent column.",

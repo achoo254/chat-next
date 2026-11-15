@@ -1,7 +1,12 @@
 /* "Máy của tôi" (plans …/mock-ui.html), on the app's tokens. Desktop: the
    list column beside the page, inside the folder-rail frame; phones: one
    column at a time (data-pane), the frame keeps the safe-area padding. */
-.mx { display: grid; grid-template-columns: var(--list-w, 340px) minmax(0, 1fr); min-height: 0; min-width: 0; height: 100%; }
+.mx { position: relative; display: grid; grid-template-columns: var(--list-w, 340px) minmax(0, 1fr); min-height: 0; min-width: 0; height: 100%; }
+/* The session column's right edge: drag it (or ←/→ on it) to widen or narrow the column, as the chat list's. */
+.mx-list-resize { position: absolute; top: 0; bottom: 0; left: calc(var(--list-w, 340px) - 4px); z-index: 4; width: 8px; cursor: ew-resize; touch-action: none; }
+.mx-list-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background var(--dur-fast) var(--ease-standard); }
+.mx-list-resize:hover::after, .mx-list-resize:focus-visible::after { background: var(--c-primary-solid); }
+.mx-list-resize:focus-visible { outline: none; }
 .mx-list { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--c-surface); border-right: 1px solid var(--c-border-subtle); container-type: inline-size; }
 .mx-list-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
 .mx-list-head h2 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
@@ -716,6 +721,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-menu-narrow { display: contents; }
 	.mx-compose-box { width: calc(100% - 2 * var(--space-3)); margin-bottom: calc(var(--space-2) + env(safe-area-inset-bottom)); }
 	.mx { grid-template-columns: minmax(0, 1fr); }
+	.mx-list-resize { display: none; }
 	.mx[data-pane="list"] > .mx-main, .mx[data-pane="main"] > .mx-list { display: none; }
 	/* An open session has its own bar with a back button: the app's top bar steps aside, as in an open chat. */
 	.app-frame:has(.mx-chat) > .rail { display: none; }

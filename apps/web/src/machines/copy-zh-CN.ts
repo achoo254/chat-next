@@ -936,6 +936,7 @@ export const zhCNMachines: MachinesCopy = {
 		},
 		title: "AI Agent",
 		sessionsLabel: "所有电脑上的 AI 会话",
+		listResize: "会话列表宽度",
 		machines: "管理设备",
 		machinesTitle: "管理设备",
 		machinesIntro: "运行 tunelo 和 AI 编程助手的电脑。所有电脑的会话都显示在 AI Agent 栏中。",

@@ -7,7 +7,8 @@
 // the same page under /ai. A machine's terminals (xterm and the dock) load
 // only when opened, and only on a machine that offers them. Loaded on demand
 // with its styles.
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { ListResizer } from "../messaging/ui/list-resizer.tsx";
 import { navigate, paths, usePathname, useSearch, type MachinesView } from "../router.tsx";
 import { AddMachine } from "./add-machine.tsx";
 import { terminalGate } from "./agent-version.ts";
@@ -28,7 +29,13 @@ import "./machines.css";
 const UsageScreen = lazy(() => import("./usage/usage-screen.tsx"));
 const AiAccountsScreen = lazy(() => import("./ai-accounts/ai-accounts-screen.tsx"));
 
+/** The column of sessions: wide enough for a session's name and its machine chip, never more than half a laptop screen; kept on this device. */
+const SESSIONS_WIDTH = { min: 260, max: 640 } as const;
+const SESSIONS_WIDTH_KEY = "ai:list-width";
+
 export default function MachinesScreen({ view }: { view: MachinesView }) {
+	const t = useMachinesCopy();
+	const grid = useRef<HTMLDivElement>(null);
 	const hub = useHub();
 	useHubPresence(hub);
 	const pathname = usePathname();
@@ -89,8 +96,9 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			break;
 	}
 	return (
-		<div className="mx" data-pane={pane}>
+		<div className="mx" data-pane={pane} ref={grid}>
 			<SessionSidebar view={view} />
+			<ListResizer app={grid} list=":scope > .mx-list" storageKey={SESSIONS_WIDTH_KEY} min={SESSIONS_WIDTH.min} max={SESSIONS_WIDTH.max} label={t.agent.listResize} className="mx-list-resize" />
 			<section className="mx-main">{main}</section>
 		</div>
 	);

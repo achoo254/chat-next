@@ -954,6 +954,7 @@ export const viMachines = {
 		},
 		title: "AI Agent",
 		sessionsLabel: "Phiên AI trên mọi máy",
+		listResize: "Độ rộng danh sách phiên",
 		machines: "Quản lý máy",
 		machinesTitle: "Quản lý máy",
 		machinesIntro: "Máy tính chạy tunelo và AI lập trình. Phiên của mọi máy hiện ở cột AI Agent.",
