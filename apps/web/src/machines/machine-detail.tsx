@@ -28,6 +28,7 @@ import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { sortForList } from "./link/machine-link.ts";
 import { aiName, folderName, mcpAiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
+import { sessionPath, terminalOffered } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
@@ -119,7 +120,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 					{!online && <p className="muted">{t.detail.needsLink}</p>}
 					{online && state.listed && state.threads.length === 0 && <p className="muted">{t.detail.noSessions}</p>}
 					{sortForList(state.threads).map((thread) => (
-						<Link key={thread.id} to={paths.machineSession(machine, thread.id)} className="mx-session-row">
+						<Link key={thread.id} to={sessionPath(machine, thread, terminalOffered(state.info, thread.provider))} className="mx-session-row">
 							<span>
 								<b>{thread.title || t.agent.newSession}</b>
 								<span className="mono muted" title={thread.dir}>

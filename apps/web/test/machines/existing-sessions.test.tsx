@@ -3,7 +3,7 @@
 // came from; searched; a session that may be open elsewhere asks first, as
 // do a sensitive folder and untrusted project settings.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, LocalSessionSchema, ProjectConfigLevel, ProjectSchema, type LocalSession, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LocalSessionSchema, ProjectConfigLevel, ProjectSchema, TerminalAvailability, type LocalSession, type Project } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
@@ -53,10 +53,10 @@ const fakeLink = (sessions: LocalSession[], refuse: (sent: Sent) => RemoteError 
 
 const state = { status: { kind: "open" }, info: { home: HOME, providers: [{ id: "claude", name: "Claude Code" }] }, threads: [], listed: true, openSessions: 0, maxSessions: 3 } as unknown as LinkState;
 
-async function openTab(link: MachineLink, project?: Project) {
+async function openTab(link: MachineLink, project?: Project, shown: LinkState = state) {
 	render(
 		<I18nProvider>
-			<NewSession machine="1" name="Mac mini" link={link} state={state} onClose={() => {}} {...(project !== undefined ? { project } : {})} />
+			<NewSession machine="1" name="Mac mini" link={link} state={shown} onClose={() => {}} {...(project !== undefined ? { project } : {})} />
 		</I18nProvider>,
 	);
 	fireEvent.click(screen.getByRole("tab", { name: "Phiên có sẵn trên máy" }));
@@ -65,7 +65,10 @@ async function openTab(link: MachineLink, project?: Project) {
 
 const sent = (list: Sent[], c: string) => list.filter((s) => s.case === c);
 
-afterEach(() => window.history.replaceState(null, "", "/"));
+afterEach(() => {
+	window.history.replaceState(null, "", "/");
+	window.localStorage.clear();
+});
 
 describe("sessions on the machine", () => {
 	it("lists them by folder, newest first, with when, how many messages and where each came from", async () => {
@@ -100,6 +103,25 @@ describe("sessions on the machine", () => {
 		expect(sent(requests, "sessionList").at(-1)?.value.query).toBe("bài");
 		fireEvent.change(search, { target: { value: "không có" } });
 		expect(await screen.findByText("Không có phiên nào khớp.")).toBeTruthy();
+	});
+
+	it("a thread of Chat reopens in the mode that session last had; another session's mode never applies", async () => {
+		const terminal = { ...state, info: { home: HOME, terminal: TerminalAvailability.AVAILABLE, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: true } }] } } as unknown as LinkState;
+		window.localStorage.setItem("ai:mode:1:t1", "terminal");
+		window.localStorage.setItem("ai:mode:1:t2", "terminal");
+		const { link } = fakeLink([session("b", `${HOME}/shop`, "Giỏ hàng", { threadId: "t1" }), session("c", `${HOME}/shop`, "Đơn hàng", { threadId: "t3" })]);
+		await openTab(link, undefined, terminal);
+		fireEvent.click(await screen.findByRole("button", { name: "Xem: Giỏ hàng" }));
+		expect(window.location.pathname).toBe("/ai/1/s/t1/terminal");
+	});
+
+	it("a thread never opened on this device reopens in chat, whatever the new-session pick", async () => {
+		const terminal = { ...state, info: { home: HOME, terminal: TerminalAvailability.AVAILABLE, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: true } }] } } as unknown as LinkState;
+		window.localStorage.setItem("ai:mode:1", "terminal");
+		const { link } = fakeLink([session("c", `${HOME}/shop`, "Đơn hàng", { threadId: "t3" })]);
+		await openTab(link, undefined, terminal);
+		fireEvent.click(await screen.findByRole("button", { name: "Xem: Đơn hàng" }));
+		expect(window.location.pathname).toBe("/ai/1/s/t3");
 	});
 
 	it("opens one as a thread and goes to it; a thread of Chat opens without asking the machine", async () => {

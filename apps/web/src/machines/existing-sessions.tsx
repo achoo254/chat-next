@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ErrorCode, type LocalSession, type SessionDir } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../brand.ts";
 import { navigate, paths } from "../router.tsx";
+import { modePath, sessionModeOf } from "./session-mode.tsx";
 import { RemoteError, type MachineLink } from "./link/machine-link.ts";
 import { machineErrorText, needsProjectTrust, openElsewhere } from "./machine-errors.ts";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -27,6 +28,8 @@ export interface ExistingSessionsProps {
 	provider: string;
 	/** The machine's home folder ("" when unknown). */
 	home: string;
+	/** The AI opens in the machine's terminal (terminalOffered): a session of this app reopens in the mode it last had. */
+	offered?: boolean;
 	/**
 	 * Opened from a workspace: its folder, picked at first (its sessions only);
 	 * "Mọi thư mục" and the other folders still widen the list, for this open only.
@@ -104,7 +107,7 @@ function useSettled<T>(value: T, ms: number): T {
 	return settled;
 }
 
-export default function ExistingSessions({ machine, name, link, ai, provider, home, folder, loadsByDefault = false, onClose }: ExistingSessionsProps) {
+export default function ExistingSessions({ machine, name, link, ai, provider, home, offered = false, folder, loadsByDefault = false, onClose }: ExistingSessionsProps) {
 	const t = useMachinesCopy();
 	const c = t.existing;
 	const now = useNow();
@@ -153,7 +156,7 @@ export default function ExistingSessions({ machine, name, link, ai, provider, ho
 		setOpenError("");
 		if (session.threadId !== "") {
 			onClose();
-			navigate(paths.machineSession(machine, session.threadId));
+			navigate(modePath(machine, session.threadId, offered ? sessionModeOf(machine, session.threadId) : "chat"));
 			return;
 		}
 		if (session.busyElsewhere && !agreed.anyway) return setAsk({ kind: "elsewhere", session, agreed });
