@@ -1,8 +1,9 @@
 // How a session opens: the chat view, or its AI's own CLI in the machine's
 // terminal (for those who prefer the CLI). The terminal is offered only when
 // the machine has its terminal and the session's AI opens there
-// (ProviderCapabilities.terminal). The last mode used on a machine is
-// remembered on this device and picks where its sessions open next. While
+// (ProviderCapabilities.terminal). Each session remembers, on this device,
+// the mode it was last opened in: switching one session never moves another.
+// The machine keeps only the pick of the new-session dialog. While
 // the CLI holds a session, the chat view shows it read-only and points to
 // the terminal: no two views write to one session.
 import { useState } from "react";
@@ -25,7 +26,7 @@ export function terminalOffered(info: MachineInfo | null, provider: string): boo
 	return terminalGate(info) === "available" && providerOf(info, provider)?.capabilities?.terminal === true;
 }
 
-/** The mode last used on the machine (chat when none, or when storage is refused). */
+/** The mode new sessions on the machine open in, as last picked when starting one (chat when none, or when storage is refused). */
 export function lastMode(machine: string): SessionMode {
 	try {
 		return window.localStorage.getItem(MODE_KEY(machine)) === "terminal" ? "terminal" : "chat";
@@ -44,13 +45,12 @@ export function rememberMode(machine: string, mode: SessionMode): void {
 
 const SESSION_MODE_KEY = (machine: string, threadId: string) => `ai:mode:${machine}:${threadId}`;
 
-/** The mode the session was last opened in on this device; the machine's last mode when never. */
+/** The mode the session was last opened in on this device; chat when never (another session's choice never applies). */
 export function sessionModeOf(machine: string, threadId: string): SessionMode {
 	try {
-		const kept = window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId));
-		return kept === "terminal" || kept === "chat" ? kept : lastMode(machine);
+		return window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId)) === "terminal" ? "terminal" : "chat";
 	} catch {
-		return lastMode(machine);
+		return "chat";
 	}
 }
 
@@ -59,7 +59,7 @@ export function rememberSessionMode(machine: string, threadId: string, mode: Ses
 	try {
 		window.localStorage.setItem(SESSION_MODE_KEY(machine, threadId), mode);
 	} catch {
-		// Storage refused: the row falls back to the machine's last mode.
+		// Storage refused: the session opens in chat next time.
 	}
 }
 
@@ -78,18 +78,21 @@ export function modePath(machine: string, threadId: string, mode: SessionMode): 
 	return mode === "terminal" ? aiPaths.sessionTerminal(machine, threadId) : paths.machineSession(machine, threadId);
 }
 
-/** Where a session opens from a list: in the mode last used on the machine, when that mode is offered. */
-export function sessionPath(machine: string, threadId: string, offered: boolean): string {
-	return modePath(machine, threadId, offered ? lastMode(machine) : "chat");
+/** Switch this one session to `mode`: it remembers the choice, no other session moves. */
+export function openSessionIn(machine: string, threadId: string, mode: SessionMode): void {
+	rememberSessionMode(machine, threadId, mode);
+	navigate(modePath(machine, threadId, mode));
+}
+
+/** Where a session opens from a list: the view its row names, when the terminal is offered. */
+export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean): string {
+	return modePath(machine, thread.id, offered ? rowMode(machine, thread) : "chat");
 }
 
 /** "Chat | Terminal" in the session header. */
 export function ModeSwitch({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
 	const t = useMachinesCopy();
-	const pick = (next: SessionMode) => {
-		rememberMode(machine, next);
-		navigate(modePath(machine, threadId, next));
-	};
+	const pick = (next: SessionMode) => openSessionIn(machine, threadId, next);
 	return (
 		<div className="mx-view-switch" role="group" aria-label={t.terminal.mode.label}>
 			{(["chat", "terminal"] as const).map((m) => (
@@ -131,10 +134,7 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 					<button
 						type="button"
 						className="btn btn-sm btn-primary"
-						onClick={() => {
-							rememberMode(machine, "terminal");
-							navigate(aiPaths.sessionTerminal(machine, thread.id));
-						}}
+						onClick={() => openSessionIn(machine, thread.id, "terminal")}
 					>
 						{t.terminal.showTerminal}
 					</button>

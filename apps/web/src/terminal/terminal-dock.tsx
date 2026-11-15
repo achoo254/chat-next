@@ -68,7 +68,7 @@ import { TerminalView, type PaneHandle } from "./terminal-view.tsx";
 import { FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontKeyOf, fontSize, setFontSize } from "./terminal-font.ts";
 import { endedOnPurpose, endOnPurpose, forgetEnded } from "./ended-sessions.ts";
 import { TerminalLoading } from "./terminal-loading.tsx";
-import { modePath, rememberMode } from "../machines/session-mode.tsx";
+import { modePath, openSessionIn } from "../machines/session-mode.tsx";
 import { useAgentProjects } from "../machines/agent-projects-store.ts";
 import { adoptStarted } from "../machines/project-actions.ts";
 import { machineErrorText, needsProjectTrust } from "../machines/machine-errors.ts";
@@ -723,10 +723,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 							<button
 								type="button"
 								className="btn btn-sm btn-primary"
-								onClick={() => {
-									rememberMode(machine, "chat");
-									navigate(thread.chat);
-								}}
+								onClick={() => openSessionIn(machine, thread.id, "chat")}
 							>
 								{tt.backToChat}
 							</button>

@@ -47,8 +47,7 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeSwitch, TerminalHeldBar, modePath, rememberMode, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
-import { aiPaths } from "./ai-paths.ts";
+import { ModeSwitch, TerminalHeldBar, openSessionIn, rememberSessionMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
 import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
 import { isPhone, useViewportFit } from "./viewport-fit.ts";
@@ -166,10 +165,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
 	const toTerminal = offered && mode === "chat" && thread !== null
-		? () => {
-				rememberMode(machine, "terminal");
-				navigate(aiPaths.sessionTerminal(machine, threadId));
-			}
+		? () => openSessionIn(machine, threadId, "terminal")
 		: undefined;
 	const workspacePanel = panelShown && panel.workspace !== undefined && (
 		<WorkspacePanelHost
@@ -255,8 +251,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 									.map((m) => (
 										<button key={m} type="button" role="menuitem" onClick={() => {
 											close();
-											rememberMode(machine, m);
-											navigate(modePath(machine, threadId, m));
+											openSessionIn(machine, threadId, m);
 										}}>
 											<MachineIcon name={m === "terminal" ? "terminal" : "chat"} small />
 											<span>{t.terminal.mode[m]}</span>

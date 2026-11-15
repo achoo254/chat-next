@@ -15,7 +15,7 @@ import type { Conn } from "../../src/machines/machine-status.ts";
 import type { LooseFolder } from "../../src/machines/project-tree.ts";
 import { LooseGroup, setFoldersArchived, UNDO_MS, type TreeContext } from "../../src/machines/project-tree-view.tsx";
 import type { MachineView } from "../../src/machines/use-machines.ts";
-import { rememberMode, rememberSessionMode, rowMode, sessionModeOf } from "../../src/machines/session-mode.tsx";
+import { rememberMode, rememberSessionMode, rowMode, sessionModeOf, sessionPath } from "../../src/machines/session-mode.tsx";
 import {
 	FONT_SAMPLE,
 	FONT_SIZE_DEFAULT,
@@ -176,20 +176,28 @@ describe("a session row's glyph", () => {
 });
 
 describe("a session row's mode icon", () => {
-	it("a live hold wins (terminal, or open as a chat here); else the mode the session was last opened in; else the machine's", () => {
+	it("a live hold wins (terminal, or open as a chat here); else the mode the session was last opened in; else chat", () => {
 		const base = { id: "s1", terminalSession: 0, open: false };
 		expect(rowMode("1", { ...base, terminalSession: 2 })).toBe("terminal");
 		expect(rowMode("1", { ...base, open: true })).toBe("chat");
-		// Never opened here: the machine's last mode.
+		// Never opened here: chat, whatever the new-session pick or another session's mode.
 		expect(rowMode("1", base)).toBe("chat");
 		rememberMode("1", "terminal");
+		rememberSessionMode("1", "s2", "terminal");
+		expect(rowMode("1", base)).toBe("chat");
+		// Opened in a mode: that one.
+		rememberSessionMode("1", "s1", "terminal");
+		expect(sessionModeOf("1", "s1")).toBe("terminal");
 		expect(rowMode("1", base)).toBe("terminal");
-		// Opened in a mode: that one, whatever the machine's last.
 		rememberSessionMode("1", "s1", "chat");
-		expect(sessionModeOf("1", "s1")).toBe("chat");
 		expect(rowMode("1", base)).toBe("chat");
 		// A live hold still wins over what was remembered.
 		expect(rowMode("1", { ...base, terminalSession: 5 })).toBe("terminal");
+		// A row opens where it says, and only in chat when the terminal is not offered.
+		rememberSessionMode("1", "s1", "terminal");
+		expect(sessionPath("1", base, true)).toBe("/ai/1/s/s1/terminal");
+		expect(sessionPath("1", { ...base, id: "s3" }, true)).toBe("/ai/1/s/s3");
+		expect(sessionPath("1", base, false)).toBe("/ai/1/s/s1");
 	});
 
 	it("every row shows its mode: a chat bubble 'Trò chuyện' or a terminal 'Terminal' (a terminal hold says how)", async () => {

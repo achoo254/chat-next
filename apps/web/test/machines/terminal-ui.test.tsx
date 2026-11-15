@@ -266,7 +266,9 @@ describe("a session in chat or in its terminal", () => {
 		await waitFor(() => expect(document.querySelector(".pg-head [data-id=terminal-path], header [data-id=terminal-path]")).toBeTruthy());
 		await userEvent.click(within(group).getByRole("button", { name: "Trò chuyện" }));
 		expect(window.location.pathname).toBe("/ai/1/s/t1");
-		expect(window.localStorage.getItem("ai:mode:1")).toBe("chat");
+		// Only this session moves: it remembers chat; the machine's new-session pick stays as it was.
+		await waitFor(() => expect(window.localStorage.getItem("ai:mode:1:t1")).toBe("chat"));
+		expect(window.localStorage.getItem("ai:mode:1")).toBeNull();
 	});
 
 	it("a turn running in the terminal: the bar above the composer says it runs there, and no header chip repeats it", async () => {
@@ -327,7 +329,7 @@ describe("a session in chat or in its terminal", () => {
 		expect(sent("termClose")[0]?.body.value).toMatchObject({ session: 7 });
 		await userEvent.click(within(section as HTMLElement).getByRole("button", { name: "Mở terminal" }));
 		expect(window.location.pathname).toBe("/ai/1/s/t1/terminal");
-		expect(window.localStorage.getItem("ai:mode:1")).toBe("terminal");
+		expect(window.localStorage.getItem("ai:mode:1")).toBeNull();
 	});
 });
 

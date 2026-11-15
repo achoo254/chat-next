@@ -7,7 +7,6 @@ import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import type { MachineInfo, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { followInApp, navigate, paths } from "../router.tsx";
-import { aiPaths } from "./ai-paths.ts";
 import type { MachinesCopy } from "./copy-vi.ts";
 import { phaseText, tokenCount } from "./activity-line.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
@@ -16,7 +15,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { rememberMode, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
@@ -112,7 +111,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const ref_ = machine.entry.ref;
 	const inTerminal = terminalOffered(machine.state.info, thread.provider);
 	const status = threadStatus(thread, done);
-	const path = sessionPath(ref_, thread.id, inTerminal);
+	const path = sessionPath(ref_, thread, inTerminal);
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>
@@ -172,8 +171,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 							role="menuitem"
 							onClick={() => {
 								setOpen(false);
-								rememberMode(ref_, "terminal");
-								navigate(aiPaths.sessionTerminal(ref_, thread.id));
+								openSessionIn(ref_, thread.id, "terminal");
 							}}
 						>
 							<MachineIcon name="terminal" small />
