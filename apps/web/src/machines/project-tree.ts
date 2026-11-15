@@ -80,6 +80,17 @@ export function worstStatus(list: readonly WorkStatus[]): WorkStatus {
 	return list.reduce<WorkStatus>((best, s) => (RANK[s] < RANK[best] ? s : best), "idle");
 }
 
+/**
+ * The AI doing the work of a set of sessions (a workspace, a project, a loose folder):
+ * the one AI of every session working now (threadStatus "running"), so the set
+ * shows that AI's mark as its session rows do; undefined when none works or
+ * several AIs do (the plain spinner then). Archived sessions never count.
+ */
+export function runningAi(threads: readonly ThreadSummary[]): string | undefined {
+	const working = new Set(threads.filter((x) => !x.archived && x.provider !== "" && threadStatus(x, false) === "running").map((x) => x.provider));
+	return working.size === 1 ? [...working][0] : undefined;
+}
+
 export interface WorkspaceNode {
 	readonly workspace: AgentWorkspace;
 	/** null: the machine was removed (machine_id 0) or is not in the directory. */
@@ -90,6 +101,8 @@ export interface WorkspaceNode {
 	/** Sessions shown under the filter, in the order the device holds them (never moved by state). */
 	readonly threads: ThreadSummary[];
 	readonly status: WorkStatus;
+	/** The AI working in it now (runningAi), for its running mark. */
+	readonly ai: string | undefined;
 	readonly offline: boolean;
 	/** Unix ms of its newest session; 0 without one. */
 	readonly activity: number;
@@ -99,6 +112,8 @@ export interface ProjectNode {
 	readonly project: AgentProject;
 	readonly workspaces: WorkspaceNode[];
 	readonly status: WorkStatus;
+	/** The AI working in its workspaces now (runningAi over all their sessions). */
+	readonly ai: string | undefined;
 	/** Sessions waiting for the user. */
 	readonly need: number;
 }
@@ -109,6 +124,7 @@ export interface LooseFolder {
 	readonly dir: string;
 	readonly threads: ThreadSummary[];
 	readonly status: WorkStatus;
+	readonly ai: string | undefined;
 }
 
 export interface Tree {
@@ -161,6 +177,7 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 					branch,
 					threads: sortForList(threads.filter((t) => matches(filter, t))),
 					status: statusOf(threads, seen),
+					ai: runningAi(threads),
 					offline: machine === null || machine.conn.kind !== "on",
 					activity: newest(threads),
 				};
@@ -172,13 +189,14 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 			project,
 			workspaces,
 			status: worstStatus(workspaces.map((w) => w.status)),
+			ai: runningAi(everyThread),
 			need: everyThread.filter((t) => !t.archived && t.state === ThreadState.WAITING).length,
 		};
 	});
 	// In the user's order (dragged, or "Lên trên"/"Xuống dưới"): a project never jumps on its own.
 	const shown = nodes.filter((n) => filter === "all" || n.workspaces.length > 0).sort((a, b) => a.project.order - b.project.order || a.project.id - b.project.id);
 	const folders = [...loose.values()]
-		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen) }))
+		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen), ai: runningAi(g.threads) }))
 		.filter((g) => g.threads.length > 0)
 		.sort((a, b) => a.dir.localeCompare(b.dir));
 	return { projects: shown, loose: folders };

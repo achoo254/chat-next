@@ -1,6 +1,7 @@
 // The AI Agent column as Project > Workspace > sessions, with no machine in
-// it: the folders a machine keeps become projects on first connect (one
-// project per repository across machines), a workspace shows its folder,
+// it: only folders the user added on a machine are projects (one project per
+// repository across machines; a folder the machine keeps that nobody added
+// never shows by itself), a workspace shows its folder,
 // branch and state dot, and the machine's name only when its project spans
 // two machines; sessions in no workspace wait, folded, in "Chưa phân loại",
 // each folder offering "Tạo dự án" and "Thêm vào dự án…" (another
@@ -83,11 +84,34 @@ afterEach(() => {
 	window.WebSocket = NativeWebSocket;
 });
 
-function column(hosts: { name: string; online: boolean }[], view: MachinesView = { page: "machines" }, before?: (server: FakeMachines["projects"]) => void) {
+/**
+ * The folders the machines keep (`projects`), recorded on the server as the
+ * user added them on each online machine: one project per repository across
+ * machines, a project of its own for a folder outside one.
+ */
+function recordAdded(server: FakeMachines["projects"], hosts: readonly { online: boolean }[]): void {
+	const byRemote = new Map<string, { name: string; workspaces: { machineId: number; dir: string; branch: string; kind: AgentWorkspaceKind }[] }>();
+	hosts.forEach((h, i) => {
+		if (!h.online) return;
+		for (const p of projects) {
+			const workspace = { machineId: i + 1, dir: p.dir, branch: p.git?.branch ?? "", kind: AgentWorkspaceKind.CLONE };
+			if (p.gitRemote === "") server.seed(p.name, "", [workspace]);
+			else {
+				const group = byRemote.get(p.gitRemote) ?? { name: p.name, workspaces: [] };
+				group.workspaces.push(workspace);
+				byRemote.set(p.gitRemote, group);
+			}
+		}
+	});
+	for (const [remote, group] of byRemote) server.seed(group.name, remote, group.workspaces);
+}
+
+function column(hosts: { name: string; online: boolean }[], view: MachinesView = { page: "machines" }, before?: (server: FakeMachines["projects"]) => void, added = true) {
 	const machines = new FakeMachines();
 	hosts.forEach((h, i) =>
 		machines.add({ name: h.name, tunnelUrl: h.online ? `wss://m-${i + 1}.tunnel.hoandat.com` : "", lastSeenAt: h.online ? BigInt(Math.floor(Date.now() / 1000)) : 0n, publicKey: machine.keys.publicKey }),
 	);
+	if (added) recordAdded(machines.projects, hosts);
 	before?.(machines.projects);
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	render(
@@ -112,7 +136,7 @@ const projectRow = (list: HTMLElement, name: string) => {
 };
 
 describe("the project column", () => {
-	it("first connect: the machine's folders become projects, sessions sit in their workspace, no machine anywhere", async () => {
+	it("the folders added on the machine are projects, sessions sit in their workspace, no machine anywhere", async () => {
 		const { list, server } = column([{ name: "Mac mini", online: true }]);
 		await waitFor(() => expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs"]), WAIT);
 		await within(list).findByText("t1", undefined, WAIT);
@@ -154,14 +178,35 @@ describe("the project column", () => {
 		expect(within(list).getByRole("link", { name: /Quản lý máy/ })).toBeTruthy();
 	});
 
-	it("one repository on two machines: one project, each workspace names its machine", async () => {
+	it("a folder the machine keeps that nobody added never shows as a project by itself: its sessions wait in 'Chưa phân loại'", async () => {
+		const { list, server } = column([{ name: "Mac mini", online: true }], { page: "machines" }, undefined, false);
+		await waitFor(() => expect(within(list).getAllByRole("button", { name: /Chưa phân loại/ }).length).toBeGreaterThan(0), WAIT);
+		// The column lists the machine's folders once, then the sync pass asks again (it reads the list fresh): wait for that pass.
+		await waitFor(() => expect(machine.received.filter((f) => f.body.case === "projectList").length).toBeGreaterThanOrEqual(2), WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(server.projects).toEqual([]);
+		expect(server.workspaces).toEqual([]);
+		expect(list.querySelector("[data-project-id]")).toBeNull();
+	});
+
+	it("a workspace and its project working with Claude show Claude's running mark, as the session row does", async () => {
+		threads = [thread("t1", "/w/app", 2), thread("t2", "/w/app/src", 1)];
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		await within(list).findByText("t1", undefined, WAIT);
+		const app = projectRow(list, "app");
+		for (const where of [".mx-project-head", ".mx-ws-head", ".mx-srow"]) {
+			await waitFor(() => expect(app.querySelector(`${where} .mx-glyph.running`)?.getAttribute("data-ai")).toBe("claude"), WAIT);
+		}
+	});
+
+	it("one repository added on two machines: one project, each workspace names its machine", async () => {
 		const { list, server } = column([
 			{ name: "Mac mini", online: true },
 			{ name: "Mac studio", online: true },
 		]);
 		await waitFor(() => expect(server.workspaces).toHaveLength(4), WAIT);
 		expect(server.projects.map((p) => p.name).sort()).toEqual(["app", "docs", "docs"]);
-		const app = projectRow(list, "app");
+		const app = await waitFor(() => projectRow(list, "app"), WAIT);
 		await waitFor(() => expect([...app.querySelectorAll(".mx-ws-host")].map((e) => e.textContent).sort()).toEqual(["Mac mini", "Mac studio"]), WAIT);
 		// Every workspace row shown has exactly one chip.
 		for (const row of list.querySelectorAll(".mx-ws")) expect(row.querySelectorAll(".mx-ws-host")).toHaveLength(1);

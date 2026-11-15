@@ -1,8 +1,10 @@
 // Folders of the machines into the server's projects (project-sync.ts,
-// project-actions.ts): idempotent, safe with several devices at once (the
-// server's unique keys decide, a race lost is success, a project made for
-// nothing in a race is deleted again), merged by git repository across
-// machines, and never a project for sessions found running outside the app.
+// project-actions.ts): only folders the user picked on a machine become
+// workspaces (never the folders other machines keep by themselves);
+// idempotent, safe with several devices at once (the server's unique keys
+// decide, a race lost is success, a project made for nothing in a race is
+// deleted again), merged by git repository across machines, and never a
+// project for sessions found running outside the app.
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ProjectSchema, ProjectSuggestionSchema, ThreadSummarySchema, type Frame, type Project, type ProjectSuggestion } from "@achoo254/chat-proto/remote/remote";
 import { RemoteError, type MachineLink } from "../../src/machines/link/machine-link.ts";
@@ -10,8 +12,9 @@ import { RemoteError, type MachineLink } from "../../src/machines/link/machine-l
 type FrameBody = Parameters<MachineLink["request"]>[0];
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentProjectsStore } from "../../src/machines/agent-projects-store.ts";
+import type { AgentProjectsApi } from "../../src/machines/agent-projects-client.ts";
 import { adoptStarted, deleteProject, detachWorkspace, linkRepository, placeByHand, RemoteMismatchError, splitWorkspace, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
-import { misplaced, placeFolder, syncFolders, type FolderInfo } from "../../src/machines/project-sync.ts";
+import { misplaced, placeFolder, type FolderInfo } from "../../src/machines/project-sync.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
 
 const folder = (machineId: number, dir: string, remote = "", name = ""): FolderInfo => ({ machineId, dir, remote, branch: remote === "" ? "" : "main", git: remote !== "", name });
@@ -44,16 +47,25 @@ function host(id: number, projects: Project[]): Omit<SyncHost, "link"> & { link:
 
 afterEach(() => window.localStorage.clear());
 
+/** Records `folders` one after another, as placing them by hand does. */
+async function placeAll(api: AgentProjectsApi, folders: readonly FolderInfo[]): Promise<void> {
+	const known = await api.list();
+	for (const f of folders) await placeFolder(api, known, f);
+}
+
+/** Folders of `machine` placed by hand, one after another (the machine keeps them already). */
+async function placeDirs(store: AgentProjectsStore, machine: SyncHost, ...dirs: string[]): Promise<void> {
+	for (const dir of dirs) await placeByHand(store, machine, dir, {});
+}
+
 describe("placing folders", () => {
 	it("is idempotent: a second pass over the same folders changes nothing", async () => {
 		const server = new FakeAgentProjects();
 		const api = server.api();
 		const folders = [folder(1, "/w/app", "git@github.com:a/app.git"), folder(1, "/w/notes")];
-		const first = await syncFolders(api, await api.list(), folders, () => false);
-		expect(first.placed).toBe(2);
+		await placeAll(api, folders);
 		const changes = server.log.length;
-		const second = await syncFolders(api, await api.list(), folders, () => false);
-		expect(second).toEqual({ placed: 0, failed: [] });
+		await placeAll(api, folders);
 		expect(server.log.length).toBe(changes);
 		const list = await api.list();
 		expect(list.map((p) => [p.name, p.gitRemote, p.workspaces.map((w) => w.dir)])).toEqual([
@@ -65,8 +77,8 @@ describe("placing folders", () => {
 	it("merges one repository's clones on two machines into one project", async () => {
 		const server = new FakeAgentProjects();
 		const api = server.api();
-		await syncFolders(api, await api.list(), [folder(1, "/Users/me/app", "git@github.com:a/app.git")], () => false);
-		await syncFolders(api, await api.list(), [folder(2, "C:\\code\\app", "https://github.com/A/App")], () => false);
+		await placeAll(api, [folder(1, "/Users/me/app", "git@github.com:a/app.git")]);
+		await placeAll(api, [folder(2, "C:\\code\\app", "https://github.com/A/App")]);
 		const list = await api.list();
 		expect(list).toHaveLength(1);
 		expect(list[0]?.workspaces.map((w) => [w.machineId, w.dir])).toEqual([
@@ -80,9 +92,7 @@ describe("placing folders", () => {
 		const a = server.api();
 		const b = server.api();
 		const f = [folder(1, "/w/notes")];
-		const [ra, rb] = await Promise.all([syncFolders(a, await a.list(), f, () => false), syncFolders(b, await b.list(), f, () => false)]);
-		expect(ra.failed).toEqual([]);
-		expect(rb.failed).toEqual([]);
+		await Promise.all([placeAll(a, f), placeAll(b, f)]);
 		const list = await a.list();
 		expect(list).toHaveLength(1);
 		expect(list[0]?.workspaces.map((w) => w.dir)).toEqual(["/w/notes"]);
@@ -95,11 +105,7 @@ describe("placing folders", () => {
 		const server = new FakeAgentProjects();
 		const a = server.api();
 		const b = server.api();
-		const [ra, rb] = await Promise.all([
-			syncFolders(a, await a.list(), [folder(1, "/w/app", "git@github.com:a/app.git")], () => false),
-			syncFolders(b, await b.list(), [folder(2, "/srv/app", "https://github.com/a/app.git")], () => false),
-		]);
-		expect([...ra.failed, ...rb.failed]).toEqual([]);
+		await Promise.all([placeAll(a, [folder(1, "/w/app", "git@github.com:a/app.git")]), placeAll(b, [folder(2, "/srv/app", "https://github.com/a/app.git")])]);
 		const list = await a.list();
 		expect(list).toHaveLength(1);
 		expect(list[0]?.workspaces.map((w) => w.machineId).sort()).toEqual([1, 2]);
@@ -111,7 +117,7 @@ describe("placing folders", () => {
 		const b = server.api();
 		// Same folder, same repository, from two devices: one creates, the other joins it; nothing is deleted.
 		const f = [folder(1, "/w/app", "git@github.com:a/app.git")];
-		await Promise.all([syncFolders(a, await a.list(), f, () => false), syncFolders(b, await b.list(), f, () => false)]);
+		await Promise.all([placeAll(a, f), placeAll(b, f)]);
 		const list = await a.list();
 		expect(list).toHaveLength(1);
 		expect(list[0]?.workspaces).toHaveLength(1);
@@ -133,16 +139,20 @@ describe("placing folders", () => {
 });
 
 describe("the sync and the app's own actions", () => {
-	it("first connect: the machine's folders become projects and workspaces, asking the machine only for its list", async () => {
+	it("the folders a machine keeps never become workspaces by themselves: only one picked on that machine does", async () => {
 		const server = new FakeAgentProjects();
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
 		const mac = host(1, [own("/w/app", "git@github.com:a/app.git"), own("/w/notes")]);
-		expect(await syncHosts(store, [mac])).toBe(2);
-		expect(store.snapshot().projects.map((p) => p.name)).toEqual(["app", "notes"]);
-		// Only its list was asked, once per pass.
-		expect(mac.sent.map((b) => b.case)).toEqual(["projectList"]);
-		expect(await syncHosts(store, [mac])).toBe(0);
+		const pc = host(2, [own("D:\\code\\app", "https://github.com/a/app")]);
+		expect(await syncHosts(store, [mac, pc])).toBe(0);
+		expect(store.snapshot().projects).toEqual([]);
+		// Only their lists were asked, once per pass.
+		expect([...mac.sent, ...pc.sent].map((b) => b.case)).toEqual(["projectList", "projectList"]);
+		// Added on the Mac: the project holds the Mac's folder only, though the PC keeps a clone of the same repository.
+		await placeDirs(store, mac, "/w/app");
+		expect(await syncHosts(store, [mac, pc])).toBe(0);
+		expect(store.snapshot().projects.map((p) => [p.name, p.workspaces.map((w) => `${w.machineId}:${w.dir}`)])).toEqual([["app", ["1:/w/app"]]]);
 	});
 
 	it("a list this device holds from before a folder was removed does not bring the folder back", async () => {
@@ -157,18 +167,7 @@ describe("the sync and the app's own actions", () => {
 		expect(server.workspaces).toEqual([]);
 	});
 
-	it("a machine that does not answer is left for the next pass, never recorded from the list held", async () => {
-		const server = new FakeAgentProjects();
-		const store = new AgentProjectsStore(server.api());
-		await store.refresh();
-		const mac = host(1, [own("/w/app")]);
-		const silent = { ...mac, link: { request: () => Promise.reject(new Error("link closed")) } } as SyncHost;
-		expect(await syncHosts(store, [silent])).toBe(0);
-		expect(store.snapshot().projects).toEqual([]);
-		expect(await syncHosts(store, [mac])).toBe(1);
-	});
-
-	it("sessions found running outside the app make no project: only folders the machine keeps are synced", async () => {
+	it("sessions found running outside the app make no project", async () => {
 		const server = new FakeAgentProjects();
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
@@ -250,7 +249,7 @@ describe("the sync and the app's own actions", () => {
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
 		const mac = host(1, [own("/w/app")]);
-		await syncHosts(store, [mac]);
+		await placeDirs(store, mac, "/w/app");
 		const workspace = store.snapshot().projects[0]?.workspaces[0];
 		if (workspace === undefined) throw new Error("no workspace");
 		// The machine answers projectRemove only when let go; meanwhile a sync pass runs.
@@ -272,7 +271,7 @@ describe("the sync and the app's own actions", () => {
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
 		const mac = host(1, [own("/w/app")]);
-		await syncHosts(store, [mac]);
+		await placeDirs(store, mac, "/w/app");
 		const workspace = store.snapshot().projects[0]?.workspaces[0];
 		if (workspace === undefined) throw new Error("no workspace");
 		const stale = { ...mac, state: { projects: undefined, info: {} } } as unknown as SyncHost;
@@ -287,7 +286,7 @@ describe("the sync and the app's own actions", () => {
 		const store = new AgentProjectsStore(server.api());
 		await store.refresh();
 		const mac = host(1, [own("/w/app")]);
-		await syncHosts(store, [mac]);
+		await placeDirs(store, mac, "/w/app");
 		const workspace = store.snapshot().projects[0]?.workspaces[0];
 		if (workspace === undefined) throw new Error("no workspace");
 		await detachWorkspace(store, workspace, null);
@@ -316,20 +315,23 @@ describe("only the same known repository shares a project", () => {
 	it("three folders without a known remote on two machines: three projects, each named after its folder", async () => {
 		const { store } = await freshStore();
 		// A machine too old to report remotes: every remote is empty.
-		await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/acme-records-portal")]), host(2, [own("/root")])]);
+		const mac = host(1, [own("/Users/me/hoandat-app"), own("/Users/me/acme-records-portal")]);
+		const cloud = host(2, [own("/root")]);
+		await placeDirs(store, mac, "/Users/me/hoandat-app", "/Users/me/acme-records-portal");
+		await placeDirs(store, cloud, "/root");
 		expect(shape(store)).toEqual([
 			["acme-records-portal", "", ["1:/Users/me/acme-records-portal"]],
 			["hoandat-app", "", ["1:/Users/me/hoandat-app"]],
 			["root", "", ["2:/root"]],
 		]);
-		expect(await syncHosts(store, [host(1, [own("/Users/me/hoandat-app"), own("/Users/me/acme-records-portal")]), host(2, [own("/root")])])).toBe(0);
+		expect(await syncHosts(store, [mac, cloud])).toBe(0);
 	});
 
 	it("a folder without a remote never joins an existing project linking none", async () => {
 		const server = new FakeAgentProjects();
 		server.seed("Notes", "", [{ machineId: 1, dir: "/w/notes", branch: "", kind: 3 }]);
 		const { store } = await freshStore(server);
-		await syncHosts(store, [host(1, [own("/w/notes"), own("/w/other")])]);
+		await placeDirs(store, host(1, [own("/w/notes"), own("/w/other")]), "/w/notes", "/w/other");
 		expect(shape(store)).toEqual([
 			["Notes", "", ["1:/w/notes"]],
 			["other", "", ["1:/w/other"]],
@@ -338,16 +340,17 @@ describe("only the same known repository shares a project", () => {
 
 	it("two folders of different repositories: two projects", async () => {
 		const { store } = await freshStore();
-		await syncHosts(store, [host(1, [own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git"), own("/w/acme-records", "https://gitlab.example.com/scm/team/acme-records.git")])]);
+		await placeDirs(store, host(1, [own("/w/hoandat-app", "git@github.com:achoo254/hoandat-app.git"), own("/w/acme-records", "https://gitlab.example.com/scm/team/acme-records.git")]), "/w/hoandat-app", "/w/acme-records");
 		expect(shape(store)).toEqual([
 			["acme-records", "gitlab.example.com/scm/team/acme-records", ["1:/w/acme-records"]],
 			["hoandat-app", "github.com/achoo254/hoandat-app", ["1:/w/hoandat-app"]],
 		]);
 	});
 
-	it("one repository on two machines: one project", async () => {
+	it("one repository added on two machines: one project", async () => {
 		const { store } = await freshStore();
-		await syncHosts(store, [host(1, [own("/Users/me/app", "git@github.com:a/app.git")]), host(2, [own("/srv/app", "https://github.com/a/app")])]);
+		await placeDirs(store, host(1, [own("/Users/me/app", "git@github.com:a/app.git")]), "/Users/me/app");
+		await placeDirs(store, host(2, [own("/srv/app", "https://github.com/a/app")]), "/srv/app");
 		expect(shape(store)).toEqual([["app", "github.com/a/app", ["1:/Users/me/app", "2:/srv/app"]]]);
 	});
 });
@@ -406,7 +409,7 @@ describe("repairing workspaces grouped with another repository", () => {
 		expect(server.log.filter((x) => x.startsWith("move:"))).toEqual([]);
 	});
 
-	it("after linking a project to a repository: new folders of it join, workspaces placed elsewhere stay, another repository's workspace in it moves out", async () => {
+	it("after linking a project to a repository: a folder of it added later joins, workspaces placed elsewhere stay, another repository's workspace in it moves out", async () => {
 		const server = new FakeAgentProjects();
 		const plan = server.seed("Kế hoạch", "", [{ machineId: 1, dir: "/w/other", branch: "", kind: 1 }]);
 		server.seed("Mine", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 1 }]);
@@ -418,9 +421,12 @@ describe("repairing workspaces grouped with another repository", () => {
 		if (target === undefined) throw new Error("no project");
 		await linkRepository(store, target, "https://user:tok@github.com/A/App.git");
 		expect(server.projects.find((p) => p.id === plan.id)?.gitRemote).toBe("github.com/a/app");
-		// A clone of the repository the machine adds later joins the linked project.
+		// Another repository's workspace moves out; a clone the machine keeps is not recorded by itself.
 		own3.push(own("/srv/app-2", "https://github.com/a/app"));
-		expect(await syncHosts(store, [mac])).toBe(2);
+		expect(await syncHosts(store, [mac])).toBe(1);
+		expect(server.workspaces.map((w) => w.dir)).not.toContain("/srv/app-2");
+		// Added by hand, it joins the linked project.
+		await placeDirs(store, mac, "/srv/app-2");
 		expect(shape(store)).toEqual([
 			["Kế hoạch", "github.com/a/app", ["1:/srv/app-2"]],
 			["Mine", "", ["1:/w/app"]],
@@ -467,7 +473,7 @@ describe("a folder dropped while its machine was offline to the device that drop
 		const pc = new AgentProjectsStore(server.api());
 		await Promise.all([phone.refresh(), pc.refresh()]);
 		const mac = host(1, [own("/w/app")]);
-		await syncHosts(phone, [mac]);
+		await placeDirs(phone, mac, "/w/app");
 		await pc.refresh();
 		const project = phone.snapshot().projects[0];
 		if (project === undefined) throw new Error("no project");

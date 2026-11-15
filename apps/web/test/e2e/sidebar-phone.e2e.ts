@@ -77,7 +77,7 @@ async function open(width: number, height: number, touch: boolean): Promise<{ pa
 	const page = await context.newPage();
 	await page.goto(`http://localhost:${PORT}/?at=machine-home`);
 	await page.locator(".mx-list .mx-srow").first().waitFor({ timeout: 30_000 });
-	// Let the project tree settle (first connect turns folders into projects).
+	// Let the project tree settle (the projects load, the machine lists its folders).
 	await page.waitForTimeout(600);
 	const dir = process.env.E2E_SHOTS;
 	if (dir !== undefined && dir !== "") await page.screenshot({ path: join(dir, `sidebar-${width}${touch ? "-touch" : ""}.png`) });

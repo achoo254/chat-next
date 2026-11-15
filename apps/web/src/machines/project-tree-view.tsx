@@ -23,7 +23,8 @@ import { NewSession } from "./new-session.tsx";
 import { folderName } from "./new-session-hints.ts";
 import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace, workspaceRemote } from "./project-actions.ts";
 import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, projectIcon, shortHost, unseenDone, workspaceIcon, workspaceLabels } from "./project-tree.ts";
-import { SessionRow, StatusGlyph } from "./session-row.tsx";
+import { SessionRow } from "./session-row.tsx";
+import { StatusGlyph } from "./status-glyph.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
 import { aiName, errorText, sessionProvider, type MachineView } from "./use-machines.ts";
@@ -212,7 +213,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 				<span className="mx-ws-name">
 					<span className="mx-ws-title">
 						{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
-						<StatusGlyph status={node.status} icon={workspaceIcon(node)} offline={node.offline} />
+						<StatusGlyph status={node.status} icon={workspaceIcon(node)} ai={node.ai} offline={node.offline} />
 						<b>{label.title}</b>
 						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
@@ -310,7 +311,7 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 				<button type="button" className="mx-project-toggle" data-row="" aria-expanded={open} onClick={onToggle}>
 					<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
 					{/* A repository or a plain project, or in that place the most urgent state of its workspaces. */}
-					<StatusGlyph status={node.status} icon={projectIcon(project)} offline={offline} />
+					<StatusGlyph status={node.status} icon={projectIcon(project)} ai={node.ai} offline={offline} />
 					<b>{project.name}</b>
 					{node.need > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(node.need)}>
@@ -376,7 +377,7 @@ function LooseItem({ folder, ctx, onArchive }: { folder: LooseFolder; ctx: TreeC
 			<div className="mx-ws-head">
 				<span className="mx-ws-name" title={`${machine.entry.name} · ${dir}`}>
 					<span className="mx-ws-title">
-						<StatusGlyph status={folder.status} icon="folder" offline={machine.conn.kind !== "on"} />
+						<StatusGlyph status={folder.status} icon="folder" ai={folder.ai} offline={machine.conn.kind !== "on"} />
 						<b>{name}</b>
 						<HostChip name={machine.entry.name} offline={machine.conn.kind !== "on"} />
 					</span>

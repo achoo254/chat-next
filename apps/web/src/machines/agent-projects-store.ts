@@ -2,11 +2,10 @@
 // screen: listed once, again when another device changes them (the
 // agent_projects_changed update), when the app comes back to the front and
 // after each change made here. One store per signed-in app, kept with the
-// link hub. It also remembers, on this device, the folders the user is
-// placing by hand right now (the sync leaves them alone). The folders dropped
-// while their machine was offline (the machine is told when it is back, so
-// the sync does not add them again) are marked on the server, so every
-// device of the user leaves them alone, not only the one that dropped them.
+// link hub. The folders dropped while their machine was offline are marked
+// on the server, so the first device of the user to reach the machine has it
+// drop them from its own list too (a device still on an older build, which
+// recorded every folder a machine keeps, would otherwise add them again).
 import { useEffect, useSyncExternalStore } from "react";
 import { EventKeys } from "@achoo254/chat-core";
 import { useServices, type Services } from "../messaging/data/services.tsx";
@@ -31,7 +30,6 @@ export class AgentProjectsStore {
 	private readonly listeners = new Set<() => void>();
 	private loading: Promise<void> | null = null;
 	private again = false;
-	private readonly claims: FolderKey[] = [];
 	/** The folders marked as dropped: as the server listed them, and what this device marked since. */
 	private marks: FolderKey[] = [];
 
@@ -85,20 +83,6 @@ export class AgentProjectsStore {
 		const projects = [...this.state.projects].sort((a, b) => (rank.get(a.id) ?? ids.length) - (rank.get(b.id) ?? ids.length) || a.order - b.order).map((p, i) => ({ ...p, order: i + 1 }));
 		this.set({ status: this.state.status, projects });
 		return this.change((api) => api.reorder(ids));
-	}
-
-	/** While `run` runs, the sync leaves `folder` alone (the user is placing it). */
-	async claim<T>(folder: FolderKey, run: () => Promise<T>): Promise<T> {
-		this.claims.push(folder);
-		try {
-			return await run();
-		} finally {
-			this.claims.splice(this.claims.indexOf(folder), 1);
-		}
-	}
-
-	claimed(folder: FolderKey): boolean {
-		return this.claims.some((c) => c.machineId === folder.machineId && samePath(c.dir, folder.dir));
 	}
 
 	/** Dropped by the user while its machine could not be told (marked on the server, so by any device). */

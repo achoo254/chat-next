@@ -1,10 +1,12 @@
 // Folders of the user's machines into the server's projects. The server
 // cannot see a machine's folders (they travel end to end to the machine), so
-// a signed-in device does it: the folders a machine keeps as projects become
-// workspaces the first time a device sees them (merged by git repository,
-// else a project of their own, named after the repository or the folder);
-// so does the folder of a session started from the app. Sessions found
-// running outside the app create nothing: they wait under "Chưa phân loại".
+// a signed-in device records them, and only those the user picked: a folder
+// added on a machine (Thêm workspace, Thêm dự án) or the folder of a session
+// started from the app becomes a workspace of that machine (merged by git
+// repository, else a project of its own, named after the repository or the
+// folder). Folders other machines keep are never recorded by themselves, and
+// sessions found running outside the app create nothing: they wait under
+// "Chưa phân loại".
 //
 // Every step is idempotent and safe with several devices at once: the
 // server's unique keys decide. A folder another device recorded first
@@ -182,31 +184,4 @@ async function relist(api: AgentProjectsApi, known: AgentProject[]): Promise<Age
 	const fresh = await api.list();
 	known.splice(0, known.length, ...fresh);
 	return known;
-}
-
-export interface SyncResult {
-	/** Folders recorded by this pass. */
-	readonly placed: number;
-	/** Folders that failed, with the error (tried again on the next pass). */
-	readonly failed: readonly { dir: string; error: unknown }[];
-}
-
-/**
- * One pass for one machine: every folder it keeps that no workspace records
- * yet becomes one (skipping those `skip` names: ones the user is placing by
- * hand right now, or detached on this device). `known` is updated in place.
- */
-export async function syncFolders(api: AgentProjectsApi, known: AgentProject[], folders: readonly FolderInfo[], skip: (folder: FolderInfo) => boolean): Promise<SyncResult> {
-	let placed = 0;
-	const failed: { dir: string; error: unknown }[] = [];
-	for (const folder of folders) {
-		if (skip(folder) || findWorkspace(known, folder.machineId, folder.dir) !== undefined) continue;
-		try {
-			await placeFolder(api, known, folder);
-			placed += 1;
-		} catch (error) {
-			failed.push({ dir: folder.dir, error });
-		}
-	}
-	return { placed, failed };
 }

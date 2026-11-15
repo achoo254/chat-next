@@ -10,6 +10,8 @@ import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
 import { MachineIcon } from "../machines/machine-icons.tsx";
+import type { WorkStatus } from "../machines/project-tree.ts";
+import { StatusGlyph } from "../machines/status-glyph.tsx";
 import { usePopover } from "../machines/use-popover.ts";
 import { Link } from "../router.tsx";
 import { buildNewTabActions, type AgentChoice } from "./new-tab-actions.ts";
@@ -72,6 +74,10 @@ export interface TabView {
 	readonly title: string;
 	/** The session's AI runs in it (its spark), not a shell. */
 	readonly ai?: boolean;
+	/** The AI's tab: the session's state (its mark in place of the spark, as in the AI Agent column), its AI's id and name. */
+	readonly status?: WorkStatus | undefined;
+	readonly provider?: string | undefined;
+	readonly who?: string | undefined;
 }
 
 interface TabsProps {
@@ -144,7 +150,11 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents,
 				{tabs.map((tab) => (
 					<div key={tab.id} className="tx-tab" data-active={tab.id === active ? "" : undefined}>
 						<button type="button" role="tab" aria-selected={tab.id === active} title={tab.title} onClick={() => onSelect(tab.id)}>
-							<MachineIcon name={tab.ai === true ? "ai-session" : "terminal"} small />
+							{tab.ai === true && tab.status !== undefined ? (
+								<StatusGlyph status={tab.status} icon="ai-session" ai={tab.provider} {...(tab.who !== undefined ? { who: tab.who } : {})} />
+							) : (
+								<MachineIcon name={tab.ai === true ? "ai-session" : "terminal"} small />
+							)}
 							<span>{tab.title}</span>
 						</button>
 						<button type="button" className="tx-tab-x" aria-label={t.closeTab(tab.title)} title={t.closeTab(tab.title)} onClick={() => onClose(tab.id)}>

@@ -148,7 +148,7 @@ function host(id: number, name: string) {
 }
 
 const session = (id: string, dir: string): ThreadSummary => create(ThreadSummarySchema, { id, dir, title: id, provider: "claude", updatedAt: 1n });
-const folder = (machine: MachineView, dir: string, ids: string[]): LooseFolder => ({ machine, dir, threads: ids.map((id) => session(id, dir)), status: "idle" });
+const folder = (machine: MachineView, dir: string, ids: string[]): LooseFolder => ({ machine, dir, threads: ids.map((id) => session(id, dir)), status: "idle", ai: undefined });
 const archivedIds = (sent: Req[], archived: boolean) => sent.flatMap((r) => (r.case === "threadSetArchived" && r.value.archived === archived ? [r.value.threadId] : []));
 
 async function looseCtx(machines: MachineView[]): Promise<TreeContext> {
@@ -162,7 +162,7 @@ describe("a session row's glyph", () => {
 		const mac = host(1, "Mac");
 		const held = create(ThreadSummarySchema, { id: "h1", dir: "/tmp/a", title: "Phiên mới", provider: "claude", updatedAt: 1n, terminalSession: 3 });
 		const working = create(ThreadSummarySchema, { id: "w1", dir: "/tmp/a", title: "Đang sửa", provider: "claude", updatedAt: 1n, terminalSession: 4, busyElsewhere: true });
-		const { container } = wrap(<LooseGroup folders={[{ machine: mac.view, dir: "/tmp/a", threads: [held, working], status: "running" }]} ctx={await looseCtx([mac.view])} open onToggle={() => undefined} />);
+		const { container } = wrap(<LooseGroup folders={[{ machine: mac.view, dir: "/tmp/a", threads: [held, working], status: "running", ai: "claude" }]} ctx={await looseCtx([mac.view])} open onToggle={() => undefined} />);
 		const rows = [...container.querySelectorAll(".mx-srow")];
 		const heldRow = rows.find((r) => r.textContent?.includes("Phiên mới"));
 		const workingRow = rows.find((r) => r.textContent?.includes("Đang sửa"));
@@ -199,8 +199,8 @@ describe("a session row's mode icon", () => {
 		const row = (id: string, extra: { open?: boolean; terminalSession?: number } = {}) => create(ThreadSummarySchema, { id, dir: "/tmp/a", title: id, provider: "claude", updatedAt: 1n, ...extra });
 		// A folder lists its three newest sessions: two folders hold the four cases.
 		const folders: LooseFolder[] = [
-			{ machine: mac.view, dir: "/tmp/a", threads: [row("c1"), row("t1"), row("hi", { open: true })], status: "idle" },
-			{ machine: mac.view, dir: "/tmp/b", threads: [row("held", { terminalSession: 3 })], status: "open" },
+			{ machine: mac.view, dir: "/tmp/a", threads: [row("c1"), row("t1"), row("hi", { open: true })], status: "idle", ai: undefined },
+			{ machine: mac.view, dir: "/tmp/b", threads: [row("held", { terminalSession: 3 })], status: "open", ai: undefined },
 		];
 		const { container } = wrap(<LooseGroup folders={folders} ctx={await looseCtx([mac.view])} open onToggle={() => undefined} />);
 		const modeOf = (title: string) => {

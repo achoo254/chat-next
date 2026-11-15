@@ -7,8 +7,8 @@
 // "Trò chuyện | Terminal" switch) asks the machine for its AI by the thread
 // alone, shows the path pill in the session header, and every split pane
 // closes on its own; the split icons keep their 14x12 glyph; the column has
-// no Terminal entry. The column speaks of projects only: the demo machine's
-// folders become projects, a workspace shows its branch and state, no
+// no Terminal entry. The column speaks of projects only: the folders added
+// on the demo machine are projects, a workspace shows its branch and state, no
 // machine's name shows. The real direct path is checked against the real
 // terminal process at acceptance. Starts its own Vite dev server of the
 // harness, so it needs no backend:
@@ -151,14 +151,14 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await context.close();
 });
 
-test("the column speaks of projects only: the machine's folders became projects, workspaces with branch and state, each naming its machine", async () => {
+test("the column speaks of projects only: the folders added on the machine are projects, workspaces with branch and state, each naming its machine", async () => {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
 	const page = await context.newPage();
 	const errors: string[] = [];
 	page.on("pageerror", (err) => errors.push(String(err)));
 	await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
 	const list = page.locator(".mx-list");
-	// The demo machine keeps three folders; the column records them as projects on first connect.
+	// Three folders were added on the demo machine: the column shows them as projects.
 	await until(page, "three projects", () => document.querySelectorAll(".mx-list .mx-project-toggle").length === 3, 30_000);
 	const names = await list.locator(".mx-project-toggle b").allTextContents();
 	assert.deepEqual([...names].sort(), ["auth-next", "chat-next", "localman-next"]);

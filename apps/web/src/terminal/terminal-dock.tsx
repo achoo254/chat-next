@@ -23,6 +23,8 @@ import { LOCAL_REF } from "../machines/link/link-hub.ts";
 import { RemoteError, type MachineLink } from "../machines/link/machine-link.ts";
 import { errorText, useHub, useLink } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
+import type { WorkStatus } from "../machines/project-tree.ts";
+import { aiTabTitle } from "../machines/status-glyph.tsx";
 import { Icon } from "../components/screen-icons.tsx";
 import { navigate, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
@@ -145,6 +147,11 @@ export interface DockThread {
 	readonly running?: boolean | undefined;
 	/** The AI already runs in a terminal of the machine (shown here or not). */
 	readonly inTerminal?: boolean | undefined;
+	/** The session's state as the AI Agent column shows it (threadStatus), for the mark of its AI's tab. */
+	readonly status?: WorkStatus | undefined;
+	/** The session's AI: its id (for its running mark) and its name (for the mark's label). */
+	readonly provider?: string | undefined;
+	readonly aiName?: string | undefined;
 }
 
 /**
@@ -520,6 +527,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
 	const shown = sessionsOf(layout);
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
+	// The AI's own tab: its title without the state mark the AI prints, its state from the session (StatusGlyph), as in the AI Agent column.
+	const aiTitleOf = (session: number, index: number) => aiTabTitle(titles.get(session) ?? "") || thread?.aiName || tt.tabTitle(index + 1);
 	// A session's dock lists the shells and its own AI; the machine's lists the shells.
 	const hidden = listed.filter((s) => !shown.has(s.session) && (s.threadId === "" || s.threadId === threadId));
 	// A phone's session has no tab bar (its header is the session's, and the keyboard takes the rest). Once there is
@@ -529,7 +538,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const moreTabs = touch && thread !== undefined && (layout.tabs.length > 1 || hidden.length > 0);
 	const tabViews = layout.tabs.map((x, i) => {
 		const pane = panesOf(x.root).find((p) => p.id === x.focus);
-		return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: pane?.ai === true };
+		if (pane?.ai === true) return { id: x.id, title: aiTitleOf(pane.session, i), ai: true, status: thread?.status, provider: thread?.provider, who: thread?.aiName };
+		return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: false };
 	});
 	const closeTabById = (id: string) => {
 		const closing = layout.tabs.find((x) => x.id === id);
@@ -682,7 +692,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					session={pane.session}
 					focused={isFocused}
 					touch={touch}
-					label={tt.screenLabel(titles.get(pane.session) ?? "")}
+					label={tt.screenLabel(pane.ai ? aiTabTitle(titles.get(pane.session) ?? "") : (titles.get(pane.session) ?? ""))}
 					latestLabel={tt.scrollLatest}
 					probe={probe}
 					onFocus={() => setLayout((l) => focusPane(l, pane.id))}

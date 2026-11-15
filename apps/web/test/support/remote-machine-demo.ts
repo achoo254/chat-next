@@ -18,6 +18,7 @@
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
 import { AccountStatus, Decision, GitFileState, ItemSchema, LoginState, ProjectConfigLevel, PromptState, Role, TerminalAvailability, ThreadState, ToolKind, TurnState, type Item } from "@achoo254/chat-proto/remote/remote";
 import { brand } from "../../src/brand.ts";
+import { AgentWorkspaceKind } from "../../src/machines/agent-projects-client.ts";
 import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
 import { FakeTerminalHost } from "../machines/fake-terminal.ts";
@@ -324,6 +325,10 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 		publicKey: machine.keys.publicKey,
 	});
 	const ref = String(entry.id);
+	// The folders the user added on the machine (Thêm dự án / Thêm workspace): the column shows them as projects.
+	for (const [name, branch] of [["chat-next", "main"], ["localman-next", "feat/forward"], ["auth-next", "main"]] as const) {
+		machines.projects.seed(name, "", [{ machineId: Number(entry.id), dir: `D:\\CONG VIEC\\hoandat-app\\${name}`, branch, kind: AgentWorkspaceKind.CLONE }]);
+	}
 	const image = await demoImage();
 	const browserPicture = await demoBrowserPicture();
 	const at = new URLSearchParams(window.location.search).get("at");

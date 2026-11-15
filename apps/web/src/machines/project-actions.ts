@@ -3,15 +3,15 @@
 // machine for its git remote first, so a repository merges into its
 // project), detaching a workspace or deleting a project (the machine drops
 // the folder from its list too; files and sessions stay), adopting the folder
-// of a session started from the app, and the background sync of the folders
-// every machine keeps (project-sync.ts).
+// of a session started from the app, and the background sync pass, which
+// never records a folder (syncHosts).
 import { useEffect, useRef } from "react";
 import { ErrorCode, ErrorReason, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import type { AgentProject, AgentWorkspace } from "./agent-projects-client.ts";
 import type { AgentProjectsStore, ProjectsSnapshot } from "./agent-projects-store.ts";
 import { canonicalRemote, remoteMismatch, remoteUrlFor } from "./git-remote.ts";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
-import { findWorkspace, placeFolder, projectForRemote, projectNameFor, remoteKey, repairWorkspaces, syncFolders, type FolderInfo, type KnownRemote, type Placement } from "./project-sync.ts";
+import { findWorkspace, placeFolder, projectForRemote, projectNameFor, remoteKey, repairWorkspaces, type FolderInfo, type KnownRemote, type Placement } from "./project-sync.ts";
 import { locate } from "./project-tree.ts";
 import { inFolder, projectsSupported, samePath } from "./projects-view.ts";
 
@@ -76,29 +76,28 @@ export function isNeedsConsent(err: unknown): boolean {
  * Places `dir` of `host` by hand: into `target` (refused with
  * RemoteMismatchError when the folder's repository is another one), else
  * into the project linking its repository or a new one named `name` (else
- * after the repository or folder). The sync leaves the folder alone meanwhile.
+ * after the repository or folder).
  */
-export function placeByHand(store: AgentProjectsStore, host: Host, dir: string, options: { target?: AgentProject; name?: string; sensitive?: boolean }): Promise<Placement> {
-	return store.claim({ machineId: host.id, dir }, async () => {
-		const known = store.snapshot().projects;
-		const remote = options.target?.gitRemote ?? "";
-		// What the machine reported already: a mismatch is refused before the machine is asked anything.
-		if (remoteMismatch(remote, knownFolder(host, dir).remote)) throw new RemoteMismatchError();
-		const { folder, added } = await machineFolder(host, dir, options.sensitive ?? false, options.name ?? "");
-		if (options.target !== undefined && remoteMismatch(remote, folder.remote)) {
-			if (added) await forget(host, folder.dir).catch(() => undefined);
-			throw new RemoteMismatchError();
-		}
-		await store.setDetached({ machineId: host.id, dir: folder.dir }, false);
-		return store.change((api) => placeFolder(api, [...known], folder, options.target?.id));
-	});
+export async function placeByHand(store: AgentProjectsStore, host: Host, dir: string, options: { target?: AgentProject; name?: string; sensitive?: boolean }): Promise<Placement> {
+	const known = store.snapshot().projects;
+	const remote = options.target?.gitRemote ?? "";
+	// What the machine reported already: a mismatch is refused before the machine is asked anything.
+	if (remoteMismatch(remote, knownFolder(host, dir).remote)) throw new RemoteMismatchError();
+	const { folder, added } = await machineFolder(host, dir, options.sensitive ?? false, options.name ?? "");
+	if (options.target !== undefined && remoteMismatch(remote, folder.remote)) {
+		if (added) await forget(host, folder.dir).catch(() => undefined);
+		throw new RemoteMismatchError();
+	}
+	await store.setDetached({ machineId: host.id, dir: folder.dir }, false);
+	return store.change((api) => placeFolder(api, [...known], folder, options.target?.id));
 }
 
 /**
  * The machine drops `dir` from its own list (the folder and its sessions
  * stay). The list is asked again, not read from this device's copy: a copy
  * that is old or not loaded yet would show no such folder, nothing would be
- * dropped, and the sync would record the workspace again right after it left.
+ * dropped, and a device still on an older build (which recorded every folder
+ * a machine keeps) would add the workspace again right after it left.
  * Throws when the machine does not answer, so the caller remembers to retry.
  */
 async function forget(host: Host, dir: string): Promise<void> {
@@ -110,10 +109,10 @@ async function forget(host: Host, dir: string): Promise<void> {
 
 /**
  * Before a workspace leaves the app: its machine drops the folder too, now
- * when it is online, else when it is back (remembered on this device), so
- * the sync does not record it again. `host` null: the machine is offline or
- * gone. The machine goes first: until its list no longer holds the folder,
- * a sync pass (here or on another device) would record it again.
+ * when it is online, else when it is back (marked on the server, see
+ * syncHosts). `host` null: the machine is offline or gone. The machine goes
+ * first: until its list no longer holds the folder, a device still on an
+ * older build (which recorded every folder a machine keeps) would add it again.
  */
 async function release(store: AgentProjectsStore, workspace: AgentWorkspace, host: Host | null): Promise<void> {
 	const key = { machineId: workspace.machineId, dir: workspace.dir };
@@ -196,19 +195,24 @@ function warnMark(err: unknown): void {
 	console.warn("ai: could not update the mark of a dropped folder", err);
 }
 
-/** One pass over `hosts`: folders they keep that no workspace records become workspaces. */
+/**
+ * One pass over `hosts`. It never records a folder: a workspace appears only
+ * for the machine the user picked (Thêm workspace, Thêm dự án) or where they
+ * started a session from the app, so another machine's clone of the same
+ * repository stays out of the project until it is added by hand. The pass
+ * only has a machine drop the folders detached while it was offline, and
+ * moves a workspace grouped with another repository to its own (repairWorkspaces).
+ */
 export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncHost[]): Promise<number> {
 	const snapshot = store.snapshot();
 	if (snapshot.status !== "ready") return 0;
 	const known = [...snapshot.projects];
-	let placed = 0;
 	// Every machine is asked at once: one that is slow to answer holds up only itself.
 	const lists = new Map(await Promise.all(hosts.filter((h) => h.ready && h.id > 0).map(async (h) => [h, await currentProjects(h)] as const)));
 	for (const host of hosts) {
 		const listed = lists.get(host);
 		if (listed === undefined) continue;
 		const own = listed.filter((p) => !p.missing);
-		const dropped = new Set<string>();
 		// Detached here while the machine was offline: it drops the folder now.
 		for (const p of own) {
 			const key = { machineId: host.id, dir: p.dir };
@@ -218,7 +222,6 @@ export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncH
 				await store.setDetached(key, false).catch(warnMark);
 				continue;
 			}
-			dropped.add(p.id);
 			await host.link.request({ case: "projectRemove", value: { id: p.id } }).then(
 				() => store.setDetached(key, false).catch(warnMark),
 				(err: unknown) => console.warn("ai: the machine did not drop a detached folder", err),
@@ -228,22 +231,14 @@ export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncH
 		for (const mark of store.detachedOf(host.id)) {
 			if (!own.some((p) => samePath(p.dir, mark.dir))) await store.setDetached(mark, false).catch(warnMark);
 		}
-		const result = await syncFolders(
-			store.api,
-			known,
-			own.filter((p) => !dropped.has(p.id)).map((p) => folderOf(host, p)),
-			(f) => store.claimed(f) || store.isDetached(f),
-		);
-		placed += result.placed;
-		for (const f of result.failed) console.warn(`ai: could not record ${f.dir} as a workspace`, f.error);
 	}
 	// A workspace in a project that links another repository goes to its own repository's project (projects linking none are left alone).
 	const moved = await repairWorkspaces(store.api, known, knownRemotes(known, hosts)).catch((err: unknown) => {
 		console.warn("ai: could not move a workspace to its repository's project", err);
 		return 0;
 	});
-	if (placed + moved > 0) await store.refresh();
-	return placed + moved;
+	if (moved > 0) await store.refresh();
+	return moved;
 }
 
 /** The repository each workspace's machine (online, keeping projects) reports for its folder now; unknown ones are left out. */
@@ -282,7 +277,7 @@ export async function splitWorkspace(store: AgentProjectsStore, workspace: Agent
 	});
 }
 
-/** Links `project` to the repository of `url` ("" unlinks); the next sync pass moves the workspaces of that repository into it. */
+/** Links `project` to the repository of `url` ("" unlinks); a folder of that repository added later joins it, and the next sync pass moves another repository's workspaces out of it. */
 export async function linkRepository(store: AgentProjectsStore, project: AgentProject, url: string): Promise<void> {
 	const key = url.trim() === "" ? "" : canonicalRemote(url);
 	if (key === null) throw new InvalidRemoteError();
@@ -314,8 +309,9 @@ function pass(store: AgentProjectsStore, hosts: () => readonly SyncHost[]): void
 }
 
 /**
- * Keeps the server's projects in step with the folders of the machines
- * online (see project-sync.ts): a pass after the lists settle, one at a time.
+ * Keeps the server's projects in step with the machines online (syncHosts:
+ * dropped folders, workspaces grouped with another repository): a pass after
+ * the lists settle, one at a time. It never adds a workspace.
  */
 export function useProjectSync(store: AgentProjectsStore, snapshot: ProjectsSnapshot, hosts: readonly SyncHost[]): void {
 	const latest = useRef(hosts);

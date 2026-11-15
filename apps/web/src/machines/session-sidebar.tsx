@@ -7,8 +7,8 @@
 // that keeps only what needs the user or runs and "+" for "Thêm dự án".
 // Folders whose sessions no workspace holds wait, folded, in "Chưa phân
 // loại" at the bottom; archived sessions show only behind their own link.
-// While it shows, the folders every machine keeps become workspaces
-// (project-actions.ts), and each session this device opens counts as seen.
+// While it shows, the sync tidies the workspaces the user added (never adds
+// one: project-actions.ts), and each session this device opens counts as seen.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, type MachinesView } from "../router.tsx";
@@ -160,7 +160,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	const current = view.page === "session" || view.page === "session-terminal" ? { machine: view.machine, thread: view.threadId } : null;
 	const seen = useSeen(machines.flatMap((m) => m.state.threads.map((x) => ({ id: x.id, at: Number(x.updatedAt), open: m.entry.ref === current?.machine && x.id === current.thread }))));
 
-	// Machines keeping projects list them (once per link until it answers); their folders become workspaces.
+	// Machines keeping projects list them (once per link until it answers): the workspace rows read branches and defaults from them.
 	const unlisted = machines.filter((m) => m.conn.kind === "on" && projectsSupported(m.state.info?.agentVersion) && m.state.projects === null);
 	const unlistedKey = unlisted.map((m) => m.entry.ref).join(",");
 	useEffect(() => {

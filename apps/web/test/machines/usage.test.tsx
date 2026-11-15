@@ -12,6 +12,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
+import { AgentWorkspaceKind } from "../../src/machines/agent-projects-client.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import { MachineLinksProvider } from "../../src/machines/link/connection-provider.tsx";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
@@ -206,6 +207,8 @@ afterEach(() => {
 function open(view: MachinesView, online = true) {
 	const machines = new FakeMachines();
 	machines.add({ name: "Mac mini", tunnelUrl: online ? "wss://m-1.tunnel.hoandat.com" : "", lastSeenAt: online ? BigInt(Math.floor(Date.now() / 1000)) : 0n, publicKey: machine.keys.publicKey });
+	// The repository's folder, added on the machine: the project "app".
+	machines.projects.seed("app", REMOTE, [{ machineId: 1, dir: "/w/app", branch: "main", kind: AgentWorkspaceKind.CLONE }]);
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	render(
 		<I18nProvider>

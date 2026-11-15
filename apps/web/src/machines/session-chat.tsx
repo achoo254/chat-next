@@ -55,7 +55,7 @@ import { isPhone, useViewportFit } from "./viewport-fit.ts";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
-import { locate } from "./project-tree.ts";
+import { locate, threadStatus } from "./project-tree.ts";
 
 export { versionAtLeast };
 
@@ -285,7 +285,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
 							<TerminalScreen
 								machine={machine}
-								thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId), running: turnHolds, inTerminal: thread.terminalSession !== 0 }}
+								thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId), running: turnHolds, inTerminal: thread.terminalSession !== 0, status: threadStatus(thread, false), provider: thread.provider, aiName: ai }}
 							/>
 						</Suspense>
 					) : (
