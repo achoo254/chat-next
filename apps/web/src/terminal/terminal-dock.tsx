@@ -611,14 +611,26 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [imageProgress, setImageProgress] = useState<number | null>(null);
 	const [imageError, setImageError] = useState("");
 	const imageAbort = useRef<AbortController | null>(null);
-	useEffect(() => () => imageAbort.current?.abort(), []);
+	/** Files go to the machine one after another; the dock leaving stops the ones not sent yet. */
+	const uploads = useRef<Promise<void>>(Promise.resolve());
+	const leaving = useRef(false);
+	useEffect(() => {
+		leaving.current = false;
+		return () => {
+			leaving.current = true;
+			imageAbort.current?.abort();
+		};
+	}, []);
 	/** One file into the session's folder, its path typed into the focused pane; resolves when done or failed. */
 	const sendFile = (file: File): Promise<void> => {
-		if (thread === undefined || imageLimits === null || focused === null) return Promise.resolve();
+		if (thread === undefined || imageLimits === null) return Promise.resolve();
+		if (focused === null) {
+			setImageError(tt.keys.imageFailed);
+			return Promise.resolve();
+		}
 		const pane = focused;
 		const abort = new AbortController();
 		imageAbort.current = abort;
-		setImageError("");
 		setImageProgress(0);
 		return imageIntoMachine(link, thread.id, file, imageLimits, setImageProgress, abort.signal).then(
 			(path) => {
@@ -632,10 +644,18 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			},
 		);
 	};
-	const pickImage = (file: File) => void sendFile(file);
-	// Files dragged onto the terminal go the same way, one after another (the chat's composer is not on screen here).
-	const drop = useFileDrop(thread !== undefined && imageLimits !== null && online, (files) => {
-		void files.reduce((previous, file) => previous.then(() => sendFile(file)), Promise.resolve());
+	/** Queues files behind any still going; a new batch clears the last batch's error, a failure in it stays shown. */
+	const sendFiles = (files: readonly File[]) => {
+		setImageError("");
+		for (const file of files) uploads.current = uploads.current.then(() => (leaving.current ? undefined : sendFile(file)));
+	};
+	const pickImage = (file: File) => sendFiles([file]);
+	// Files dragged onto a session's terminal go the same way (the chat's composer is not on screen here). The dock
+	// takes every drop over a session, even one it cannot send now, so the browser never opens the file instead.
+	const drop = useFileDrop(thread !== undefined, (files) => {
+		if (imageLimits === null) return setImageError(t.agent.attach.needsUpdate);
+		if (!online) return setImageError(tt.keys.imageFailed);
+		sendFiles(files);
 	});
 	// A desktop has no key bar to show how a dropped file is going: the note line says it.
 	const fileNote = touch ? "" : imageProgress !== null ? tt.keys.imageSending(Math.round(imageProgress * 100)) : imageError;

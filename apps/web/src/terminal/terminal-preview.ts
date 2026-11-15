@@ -6,6 +6,7 @@
 // sight. Once the replay reached the preview and the output went quiet (the
 // program redraws for this screen's size right after attaching), the real
 // terminal shows, at its newest line, and the cover goes.
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { Terminal } from "@xterm/xterm";
 import type { RenderedScreen } from "./terminal-link.ts";
 
@@ -27,6 +28,11 @@ export interface PreviewCoverDeps {
 	readonly showReal: () => void;
 	/** The cover takes the real terminal's look (font, colours). */
 	readonly options: () => ConstructorParameters<typeof Terminal>[0];
+	/**
+	 * The pane's size: the rendering is for the session's size on the machine (maybe another device's), and is fitted
+	 * to the pane once written, so its newest rows stay in sight (rows that no longer fit go to the cover's history).
+	 */
+	readonly size: () => { readonly cols: number; readonly rows: number };
 	readonly now?: () => number;
 }
 
@@ -52,10 +58,18 @@ export class PreviewCover {
 		box.setAttribute("aria-hidden", "true");
 		this.deps.host.appendChild(box);
 		const term = new Terminal({ ...this.deps.options(), cols: preview.cols, rows: preview.rows, scrollback: COVER_SCROLLBACK, disableStdin: true, cursorBlink: false });
+		// The real terminal's widths (emoji, wide characters), so the rows line up as the machine drew them.
+		term.loadAddon(new Unicode11Addon());
+		term.unicode.activeVersion = "11";
 		term.open(box);
-		term.write(preview.vt, () => term.scrollToBottom());
 		this.term = term;
 		this.box = box;
+		term.write(preview.vt, () => {
+			if (this.term !== term) return;
+			const { cols, rows } = this.deps.size();
+			if (cols > 0 && rows > 0 && (cols !== term.cols || rows !== term.rows)) term.resize(cols, rows);
+			term.scrollToBottom();
+		});
 		this.hideReal(true);
 		this.shownAt = this.now();
 		this.caughtUpAt = null;

@@ -5,8 +5,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const written: string[] = [];
+const resized: { cols: number; rows: number }[] = [];
+vi.mock("@xterm/addon-unicode11", () => ({ Unicode11Addon: function Unicode11Addon() {} }));
 vi.mock("@xterm/xterm", () => ({
 	Terminal: class {
+		cols: number;
+		rows: number;
+		unicode = { activeVersion: "6" };
+		constructor(options: { cols: number; rows: number }) {
+			this.cols = options.cols;
+			this.rows = options.rows;
+		}
+		loadAddon(): void {}
+		resize(cols: number, rows: number): void {
+			this.cols = cols;
+			this.rows = rows;
+			resized.push({ cols, rows });
+		}
 		open(box: HTMLElement): void {
 			box.appendChild(document.createElement("div")).className = "xterm";
 		}
@@ -24,9 +39,10 @@ const { COVER_MAX_MS, PreviewCover, QUIET_MS, SETTLE_MAX_MS } = await import("..
 let host: HTMLDivElement;
 let real: HTMLDivElement;
 let shownReal = 0;
+let pane = { cols: 80, rows: 24 };
 
 function cover() {
-	return new PreviewCover({ host, real: () => real, showReal: () => (shownReal += 1), options: () => ({}), now: () => Date.now() });
+	return new PreviewCover({ host, real: () => real, showReal: () => (shownReal += 1), options: () => ({}), size: () => pane, now: () => Date.now() });
 }
 
 const preview = { cols: 80, rows: 24, altScreen: false, vt: new TextEncoder().encode("\x1bcthe newest line") };
@@ -35,7 +51,9 @@ const covering = () => host.querySelector(".tx-preview") !== null;
 beforeEach(() => {
 	vi.useFakeTimers();
 	written.length = 0;
+	resized.length = 0;
 	shownReal = 0;
+	pane = { cols: 80, rows: 24 };
 	host = document.createElement("div");
 	real = host.appendChild(document.createElement("div"));
 	document.body.appendChild(host);
@@ -60,6 +78,20 @@ describe("the preview of a session opened fresh", () => {
 		}
 		expect(covering()).toBe(true);
 		c.dispose();
+	});
+
+	it("fits the rendering (for the session's size on another device) to this pane, so its newest rows stay in sight", () => {
+		pane = { cols: 45, rows: 20 };
+		const c = cover();
+		c.show({ ...preview, cols: 200, rows: 50 });
+		expect(resized).toEqual([{ cols: 45, rows: 20 }]);
+		c.dispose();
+		// Already the pane's size: nothing to fit.
+		pane = { cols: 80, rows: 24 };
+		const same = cover();
+		same.show(preview);
+		expect(resized).toHaveLength(1);
+		same.dispose();
 	});
 
 	it("shows the real terminal at its newest line once the replay caught up and the output went quiet", () => {

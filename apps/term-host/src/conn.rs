@@ -1,7 +1,7 @@
 //! Client connections: grants, device keys, the path a connection sends on,
 //! and per-session attachment state (offsets and flow window).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::time::Instant;
 
@@ -143,6 +143,9 @@ pub struct Conn {
     /// The client sent a valid Hello.
     pub hello: bool,
     pub attachments: BTreeMap<u32, Attachment>,
+    /// Sessions this connection read a `Preview` of without attaching yet: the
+    /// preview was audited as their opening, so the `Attach` after it is not.
+    pub previewed: BTreeSet<u32>,
 }
 
 impl Conn {
@@ -157,6 +160,7 @@ impl Conn {
             peer: None,
             hello: false,
             attachments: BTreeMap::new(),
+            previewed: BTreeSet::new(),
         }
     }
 

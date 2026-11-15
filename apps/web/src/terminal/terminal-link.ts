@@ -191,6 +191,8 @@ interface SessionState {
 	size: { cols: number; rows: number } | null;
 	/** The output offset the preview on screen reflects, until the replay gets there; null when none shows. */
 	previewEnd: number | null;
+	/** A preview was asked for this attach: a path change before any output was applied does not ask again. */
+	previewAsked: boolean;
 }
 
 interface DirectAttempt {
@@ -349,6 +351,7 @@ export class TerminalLink {
 			resyncTimer: null,
 			size: null,
 			previewEnd: null,
+			previewAsked: false,
 		};
 		this.sessions.set(session, s);
 		const gen = this.gen;
@@ -483,7 +486,10 @@ export class TerminalLink {
 		s.resyncAt = this.timers.now();
 		// Nothing applied yet: the machine replays from the start, so it is asked first for the screen as it is now.
 		// A machine before tunelo 3.5.0 ignores the frame and the replay shows as it comes.
-		if (s.applied === 0) this.send(gen, encodePreview(s.id));
+		if (s.applied === 0 && !s.previewAsked) {
+			s.previewAsked = true;
+			this.send(gen, encodePreview(s.id));
+		}
 		this.send(gen, encodeAttach(s.id, s.applied));
 		if (s.size !== null) this.send(gen, encodeResize(s.id, s.size.cols, s.size.rows));
 	}

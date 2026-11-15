@@ -170,6 +170,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 	const registerHandle = useEffectEvent((handle: PaneHandle | null) => register(handle));
 	const labelNow = useEffectEvent(() => label);
 	const latestNow = useEffectEvent(() => latestLabel);
+	const focusedNow = useEffectEvent(() => focused);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -250,8 +251,13 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 			const cover = new PreviewCover({
 				host,
 				real: () => term.element,
-				showReal: () => term.scrollToBottom(),
+				showReal: () => {
+					term.scrollToBottom();
+					// A click while covered could not reach the hidden terminal: the pane in use takes the keyboard now.
+					if (focusedNow() && !touch) term.focus();
+				},
 				options: () => ({ ...textOptions(term.options.fontSize ?? fontSize(fallbackSize)), allowProposedApi: true }),
+				size: () => ({ cols: term.cols, rows: term.rows }),
 			});
 			let frame = 0;
 			const fitNow = () => {
@@ -274,8 +280,11 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					term.write(snap.vt, fitSoon);
 				},
 				output: (data, done) => {
-					cover.output();
-					writer.write(data, done);
+					// Quiet is counted from when xterm wrote the output, not when it arrived: a backlog still redraws.
+					writer.write(data, () => {
+						cover.output();
+						done();
+					});
 				},
 				preview: (preview) => cover.show(preview),
 				caughtUp: () => cover.caughtUp(),
@@ -310,7 +319,8 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 			observer.observe(host);
 			// A finger scrolls the terminal itself (touch-scroll.ts): the history of the normal screen, or arrow
 			// keys for a full-screen program (its own screen has no history), as xterm does for a mouse wheel.
-			const stopTouch = touch ? touchScroll(host, term, (seq) => link.input(session, encoder.encode(seq)), scrollerRef) : () => undefined;
+			// While the preview covers the pane, a swipe moves nothing: the hidden terminal is not what the user sees.
+			const stopTouch = touch ? touchScroll(host, term, (seq) => link.input(session, encoder.encode(seq)), scrollerRef, () => cover.showing) : () => undefined;
 			// Ctrl/⌘ + − 0 here, or A−/A+ in the dock: every terminal of the page takes the new size.
 			const stopSize = onFontSize((size) => {
 				term.options.fontSize = size;
@@ -410,10 +420,11 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 }
 
 /** Wires a TouchScroller to the pane's fingers; returns the cleanup. */
-function touchScroll(host: HTMLElement, term: Terminal, input: (seq: string) => void, ref: { current: TouchScroller | null }): () => void {
+function touchScroll(host: HTMLElement, term: Terminal, input: (seq: string) => void, ref: { current: TouchScroller | null }, covered: () => boolean): () => void {
 	const scroller = new TouchScroller({
 		rowHeight: () => host.clientHeight / Math.max(1, term.rows),
 		scrollLines: (lines) => {
+			if (covered()) return;
 			if (term.buffer.active.type === "alternate") {
 				const older = lines < 0;
 				const code = older ? "A" : "B";

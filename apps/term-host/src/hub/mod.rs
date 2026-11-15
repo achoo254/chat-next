@@ -415,7 +415,13 @@ impl Hub {
                 });
             }
         }
-        let sessions: Vec<u32> = c.attachments.keys().copied().collect();
+        // Sessions it attached, and those it only read a preview of (audited as opened too).
+        let sessions: Vec<u32> = c
+            .attachments
+            .keys()
+            .chain(c.previewed.iter())
+            .copied()
+            .collect();
         for s in sessions {
             self.record_audit(AuditKind::Close, Some(s), Some(id), Some(c.device_key));
         }

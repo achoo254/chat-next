@@ -105,6 +105,12 @@ fn fresh_attach_replays_every_byte_since_the_session_opened() {
         }
         other => panic!("expected preview, got {other:?}"),
     }
+    // Reading the preview is audited as opening the session.
+    agent
+        .wait_event(T, |e| {
+            e["event"] == "audit" && e["kind"] == "open" && e["conn"] == 2 && e["session"] == s
+        })
+        .expect("preview audited");
     late.attach(s, 0).expect("attach 2");
     match late.recv_acking(T) {
         Some(Frame::Snapshot { offset, vt, .. }) => {

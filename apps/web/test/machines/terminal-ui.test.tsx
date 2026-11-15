@@ -606,6 +606,28 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a file dropped on a session's terminal on a machine that cannot take it is kept from the browser, and the dock says why", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", aiName: "Claude Code" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		const dock = view.container.querySelector("[data-id=terminal-dock]");
+		if (dock === null) throw new Error("no dock");
+		const dataTransfer = { types: ["Files"], files: [new File(["x"], "a.pdf")], dropEffect: "none" };
+		fireEvent.dragEnter(dock, { dataTransfer });
+		expect(await screen.findByText("Máy này chưa nhận tệp đính kèm. Cập nhật trên máy: tunelo update")).toBeTruthy();
+		// Handled here: the browser does not open the file in place of the app.
+		expect(fireEvent.drop(dock, { dataTransfer })).toBe(false);
+		expect(view.container.querySelector("[data-id=terminal-file-note]")?.textContent).toBe("Máy này chưa nhận tệp đính kèm. Cập nhật trên máy: tunelo update");
+		expect(sent("attachmentUpload")).toEqual([]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
 	it("Terminal mới in a folder: one more shell there, then the request is done", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");

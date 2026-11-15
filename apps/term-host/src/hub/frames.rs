@@ -163,7 +163,9 @@ impl Hub {
                 };
                 let att = Attachment::new(from);
                 let is_new = conn.attachments.insert(session, att).is_none();
-                if is_new {
+                // A preview just before it was audited as the opening already.
+                let previewed = conn.previewed.remove(&session);
+                if is_new && !previewed {
                     let key = conn.device_key;
                     self.record_audit(AuditKind::Open, Some(session), Some(conn_id), Some(key));
                 }
@@ -183,6 +185,11 @@ impl Hub {
                 let snap = s.snapshot();
                 if let Some(sink) = conn.sink() {
                     let _ = sink.send(&preview_frame(session, &snap));
+                }
+                // The preview shows the session's content: audited as its opening, once, unless already attached.
+                if !conn.attachments.contains_key(&session) && conn.previewed.insert(session) {
+                    let key = conn.device_key;
+                    self.record_audit(AuditKind::Open, Some(session), Some(conn_id), Some(key));
                 }
             }
             Frame::Detach { session } => {

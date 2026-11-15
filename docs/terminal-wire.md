@@ -38,7 +38,7 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 | `0x13` | Detach | không có. Ngừng nhận đầu ra của phiên; phiên vẫn chạy. |
 | `0x14` | Ack | `offset u64`: số byte đầu ra client đã áp dụng (không giảm). |
 | `0x15` | Ping | `clientMicros u64`; `session` = 0. |
-| `0x16` | Preview | không có. Xin phiên như emulator của daemon dựng lúc này (từ `tunelo` 3.5.0; daemon cũ bỏ qua như mọi khung lạ). Không cần `Attach` trước; không đổi gì của việc gắn (xem mục 4). |
+| `0x16` | Preview | không có. Xin phiên như emulator của daemon dựng lúc này (từ `tunelo` 3.5.0; daemon cũ bỏ qua như mọi khung lạ). Không cần `Attach` trước; không đổi gì của việc gắn (xem mục 4). Đọc bản dựng là xem nội dung phiên nên daemon ghi nhật ký `open` cho phiên (một lần; `Attach` ngay sau không ghi lại) và `close` khi kết nối đóng. |
 
 ### Daemon → client
 
