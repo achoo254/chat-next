@@ -77,8 +77,13 @@
 .tx-dock.touch .xterm-scrollable-element > .scrollbar { display: none !important; }
 .tx-term .xterm { height: 100%; }
 /* The machine's rendering of a session opened fresh (terminal-preview.ts), over the pane while the real terminal takes the replay out of sight. */
-.tx-preview { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: var(--tx-bg); pointer-events: none; }
-.tx-preview .xterm { height: 100%; }
+.tx-preview { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: var(--tx-bg); cursor: text; }
+.tx-preview-screen, .tx-preview .xterm { height: 100%; }
+/* The rows shown are the machine's rendering while the replay catches up; typing already works. */
+.tx-preview-chip { position: absolute; right: 12px; bottom: 10px; display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 10px; border-radius: 999px; background: rgb(17 19 24 / 0.86); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); color: #c9ced8; font-size: 0.75rem; line-height: 1.4; pointer-events: none; animation: tx-chip-in 200ms ease-out 400ms both; }
+.tx-preview-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #b9a8ff; animation: tx-pulse 1.2s ease-in-out infinite; }
+/* The pane's opening screen (terminal-view.tsx) sits over its terminal until it is drawn. */
+.tx-pane-in > .tx-loading { z-index: 2; background: var(--tx-bg); }
 /* The leftover pixels under the last row show the viewport; xterm leaves it black, so it takes the terminal colour. */
 .tx-term .xterm-viewport { background-color: var(--tx-bg) !important; }
 /* xterm fades its overlay scrollbar out after a moment; with history to scroll (terminal-scrollbar.ts) it stays, with a faint track. */
@@ -116,7 +121,9 @@
 @keyframes tx-breathe { 0% { opacity: 0.7; transform: scale(0.94); } 100% { opacity: 0; transform: scale(1.18); } }
 @keyframes tx-shimmer { to { background-position: -200% 0; } }
 @keyframes tx-blink { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { .tx-loading-mark::after, .tx-loading-line, .tx-loading-prompt i { animation: none; } }
+@keyframes tx-chip-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes tx-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tx-loading-mark::after, .tx-loading-line, .tx-loading-prompt i, .tx-preview-chip, .tx-preview-chip::before { animation: none; } }
 .tx-failed { z-index: 3; background: rgb(17 19 24 / 0.92); }
 .tx-failed p { margin: 0; max-width: 420px; }
 

@@ -7,7 +7,7 @@
 // counts as written (and is acknowledged to the machine) when xterm's write
 // callback runs, so a flood paces the machine instead of the page.
 // Loaded lazily with the dock; xterm never reaches the app's first chunk.
-import { useEffect, useEffectEvent, useRef, type PointerEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type PointerEvent } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -23,6 +23,8 @@ import { showTouchThumb } from "./terminal-touch-thumb.ts";
 import { FONT, FONT_SIZE_DEFAULT, FONT_SIZE_TOUCH, fontSize, onFontSize, textOptions, waitForFont } from "./terminal-font.ts";
 import type { TerminalLink } from "./terminal-link.ts";
 import { showCursorWithoutFocus } from "./terminal-cursor.ts";
+import { TerminalLoading } from "./terminal-loading.tsx";
+import { OpeningGate } from "./terminal-opening.ts";
 import { PreviewCover } from "./terminal-preview.ts";
 
 /** Output smaller than this is written at once. */
@@ -62,6 +64,10 @@ export interface TerminalViewProps {
 	label: string;
 	/** Names the touch screen's "back to the newest output" button. */
 	latestLabel?: string;
+	/** What the pane says until its terminal is drawn (the dock's own opening screen says the same). */
+	openingLabel?: string;
+	/** What the chip over the machine's preview says while the replay catches up. */
+	syncingLabel?: string;
 	probe: LatencyProbe | null;
 	onFocus(): void;
 	onTitle(title: string): void;
@@ -159,7 +165,7 @@ class OutputWriter {
 
 const encoder = new TextEncoder();
 
-export function TerminalView({ link, session, focused, touch, label, latestLabel = "", probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
+export function TerminalView({ link, session, focused, touch, label, latestLabel = "", openingLabel = "", syncingLabel = "", probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const scrollerRef = useRef<TouchScroller | null>(null);
 	const termRef = useRef<Terminal | null>(null);
@@ -171,6 +177,9 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 	const labelNow = useEffectEvent(() => label);
 	const latestNow = useEffectEvent(() => latestLabel);
 	const focusedNow = useEffectEvent(() => focused);
+	const syncingNow = useEffectEvent(() => syncingLabel);
+	// Until the terminal is drawn the pane keeps the opening screen: it then shows ready to type, never empty or mid-redraw.
+	const [opening, setOpening] = useState(true);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -247,17 +256,27 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				}
 			}
 			const writer = new OutputWriter(term, session, probe);
+			const gate = new OpeningGate(() => {
+				if (!alive) return;
+				setOpening(false);
+				term.scrollToBottom();
+				if (focusedNow() && !touch) term.focus();
+			});
 			// A fresh attach of a long session: the machine's rendering shows at once, the replay out of sight.
 			const cover = new PreviewCover({
 				host,
 				real: () => term.element,
 				showReal: () => {
 					term.scrollToBottom();
-					// A click while covered could not reach the hidden terminal: the pane in use takes the keyboard now.
+					// The pane in use keeps the keyboard as the cover goes.
 					if (focusedNow() && !touch) term.focus();
 				},
 				options: () => ({ ...textOptions(term.options.fontSize ?? fontSize(fallbackSize)), allowProposedApi: true }),
 				size: () => ({ cols: term.cols, rows: term.rows }),
+				focusReal: () => {
+					if (!touch) term.focus();
+				},
+				label: syncingNow(),
 			});
 			let frame = 0;
 			const fitNow = () => {
@@ -277,18 +296,29 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					writer.reset();
 					term.reset();
 					if (term.cols !== snap.cols || term.rows !== snap.rows) term.resize(snap.cols, snap.rows);
-					term.write(snap.vt, fitSoon);
+					term.write(snap.vt, () => {
+						fitSoon();
+						gate.content();
+					});
 				},
 				output: (data, done) => {
 					// Quiet is counted from when xterm wrote the output, not when it arrived: a backlog still redraws.
 					writer.write(data, () => {
 						cover.output();
+						gate.content();
 						done();
 					});
 				},
-				preview: (preview) => cover.show(preview),
+				preview: (preview) => {
+					cover.show(preview);
+					// The preview is the session drawn: the pane shows it, and takes the keyboard, at once.
+					gate.open();
+				},
 				caughtUp: () => cover.caughtUp(),
-				exit: (code) => exited(code),
+				exit: (code) => {
+					gate.open();
+					exited(code);
+				},
 				gone: () => gone(),
 			});
 			const subscriptions = [
@@ -385,6 +415,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				fonts?.removeEventListener("loadingdone", redraw);
 				for (const s of subscriptions) s.dispose();
 				detach();
+				gate.dispose();
 				cover.dispose();
 				writer.dispose();
 				termRef.current = null;
@@ -416,7 +447,12 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 	const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
 		if (scrollerRef.current?.moved === true) event.stopPropagation();
 	};
-	return <div className="tx-term" ref={hostRef} onPointerDown={onPointerDown} onPointerUp={onPointerUp} />;
+	return (
+		<>
+			<div className="tx-term" ref={hostRef} onPointerDown={onPointerDown} onPointerUp={onPointerUp} />
+			{opening && <TerminalLoading label={openingLabel} />}
+		</>
+	);
 }
 
 /** Wires a TouchScroller to the pane's fingers; returns the cleanup. */

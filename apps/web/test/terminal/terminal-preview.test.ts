@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const written: string[] = [];
 const resized: { cols: number; rows: number }[] = [];
 vi.mock("@xterm/addon-unicode11", () => ({ Unicode11Addon: function Unicode11Addon() {} }));
+vi.mock("@xterm/addon-webgl", () => ({ WebglAddon: function WebglAddon() {} }));
 vi.mock("@xterm/xterm", () => ({
 	Terminal: class {
 		cols: number;
@@ -70,7 +71,7 @@ describe("the preview of a session opened fresh", () => {
 		c.show(preview);
 		expect(covering()).toBe(true);
 		expect(written).toEqual(["\x1bcthe newest line"]);
-		expect(real.style.visibility).toBe("hidden");
+		expect(real.style.opacity).toBe("0");
 		// The replay goes on: nothing shows until it caught up.
 		for (let i = 0; i < 20; i++) {
 			c.output();
@@ -107,7 +108,7 @@ describe("the preview of a session opened fresh", () => {
 		expect(covering()).toBe(true);
 		vi.advanceTimersByTime(QUIET_MS + 60);
 		expect(covering()).toBe(false);
-		expect(real.style.visibility).toBe("");
+		expect(real.style.opacity).toBe("");
 		expect(shownReal).toBe(1);
 	});
 
@@ -132,6 +133,6 @@ describe("the preview of a session opened fresh", () => {
 		c.show(preview);
 		c.dispose();
 		expect(covering()).toBe(false);
-		expect(real.style.visibility).toBe("");
+		expect(real.style.opacity).toBe("");
 	});
 });

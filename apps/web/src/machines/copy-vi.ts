@@ -761,6 +761,7 @@ export const viMachines = {
 		mode: { label: "Mở phiên bằng", chat: "Trò chuyện", terminal: "Terminal", office: "Văn phòng" },
 		openInTerminal: "Mở bằng terminal",
 		scrollLatest: "Về dòng mới nhất",
+		syncing: "Đang đồng bộ phiên… gõ được ngay",
 		tabsOpen: (n: number) => `Các tab terminal (${n})`,
 		held: (ai: string) => `${ai} đang chạy phiên này trong terminal. Ở đây chỉ xem.`,
 		heldOpen: (ai: string) => `Phiên đang mở bằng ${ai} trong terminal.`,

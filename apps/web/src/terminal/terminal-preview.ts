@@ -6,7 +6,13 @@
 // sight. Once the replay reached the preview and the output went quiet (the
 // program redraws for this screen's size right after attaching), the real
 // terminal shows, at its newest line, and the cover goes.
+//
+// The cover looks like the real terminal (WebGL: xterm's DOM renderer styles its rows with a <style> the
+// site's CSP refuses, which drew them in the page font without colours), and the pane is usable under it:
+// the real terminal is only transparent, so it keeps the keyboard, and what is typed reaches the program
+// while the replay catches up. A small chip says the rows shown are still being brought up to date.
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import type { RenderedScreen } from "./terminal-link.ts";
 
@@ -33,6 +39,10 @@ export interface PreviewCoverDeps {
 	 * to the pane once written, so its newest rows stay in sight (rows that no longer fit go to the cover's history).
 	 */
 	readonly size: () => { readonly cols: number; readonly rows: number };
+	/** A click on the cover gives the keyboard to the real terminal under it. */
+	readonly focusReal?: () => void;
+	/** What the chip over the cover says while the replay catches up. */
+	readonly label?: string;
 	readonly now?: () => number;
 }
 
@@ -55,13 +65,31 @@ export class PreviewCover {
 		this.clear();
 		const box = document.createElement("div");
 		box.className = "tx-preview";
-		box.setAttribute("aria-hidden", "true");
+		// The cover's own terminal never takes the focus: a click goes to the real one under it.
+		box.addEventListener("pointerdown", (event) => {
+			if (event.pointerType === "mouse") event.preventDefault();
+			this.deps.focusReal?.();
+		});
+		const screen = box.appendChild(document.createElement("div"));
+		screen.className = "tx-preview-screen";
+		screen.setAttribute("aria-hidden", "true");
+		if (this.deps.label !== undefined && this.deps.label !== "") {
+			const chip = box.appendChild(document.createElement("p"));
+			chip.className = "tx-preview-chip";
+			chip.setAttribute("role", "status");
+			chip.textContent = this.deps.label;
+		}
 		this.deps.host.appendChild(box);
 		const term = new Terminal({ ...this.deps.options(), cols: preview.cols, rows: preview.rows, scrollback: COVER_SCROLLBACK, disableStdin: true, cursorBlink: false });
 		// The real terminal's widths (emoji, wide characters), so the rows line up as the machine drew them.
 		term.loadAddon(new Unicode11Addon());
 		term.unicode.activeVersion = "11";
-		term.open(box);
+		term.open(screen);
+		try {
+			term.loadAddon(new WebglAddon());
+		} catch {
+			// No WebGL2 here: the DOM renderer, as the real terminal falls back to.
+		}
 		this.term = term;
 		this.box = box;
 		term.write(preview.vt, () => {
@@ -115,8 +143,9 @@ export class PreviewCover {
 
 	private hideReal(hidden: boolean): void {
 		const real = this.deps.real();
-		// Hidden, not removed: the real terminal keeps its size and takes the replay while out of sight.
-		if (real !== undefined) real.style.visibility = hidden ? "hidden" : "";
+		// Transparent, not hidden or removed: the real terminal keeps its size, takes the replay out of sight and
+		// keeps the keyboard, so typing during the catch-up reaches the program.
+		if (real !== undefined) real.style.opacity = hidden ? "0" : "";
 	}
 
 	private clear(): void {

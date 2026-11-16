@@ -711,6 +711,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					touch={touch}
 					label={tt.screenLabel(pane.ai ? aiTabTitle(titles.get(pane.session) ?? "") : (titles.get(pane.session) ?? ""))}
 					latestLabel={tt.scrollLatest}
+					openingLabel={t.terminal.loading}
+					syncingLabel={tt.syncing}
 					probe={probe}
 					onFocus={() => setLayout((l) => focusPane(l, pane.id))}
 					onTitle={(text) => setTitles((m) => new Map(m).set(pane.session, text))}

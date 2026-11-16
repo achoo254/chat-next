@@ -749,6 +749,7 @@ export const enMachines: MachinesCopy = {
 		mode: { label: "Open the session in", chat: "Conversation", terminal: "Terminal", office: "Office" },
 		openInTerminal: "Open in terminal",
 		scrollLatest: "Back to the newest line",
+		syncing: "Syncing the session… you can type",
 		tabsOpen: (n: number) => `Terminal tabs (${n})`,
 		held: (ai: string) => `${ai} is running this session in a terminal. View only here.`,
 		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal.`,
