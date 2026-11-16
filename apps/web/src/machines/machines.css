@@ -229,6 +229,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-pc-hint:hover:not(:disabled) { background: var(--c-hover); }
 .mx-pc-hint:disabled { opacity: 0.6; cursor: default; }
 .mx-back { display: none; }
+.mx-back.always { display: inline-grid; }
 .mx-body { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-4) var(--space-5); }
 .mx-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); max-width: 760px; }
 .mx-card.narrow { max-width: 560px; }

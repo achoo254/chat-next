@@ -132,7 +132,7 @@ function MachineCard({ machine, now }: { machine: MachineView; now: number }) {
 						{t.terminal.newTab}
 					</button>
 				</span>
-				<Link to={paths.machineInfo(entry.ref)} className="btn btn-sm mx-btn-ghost">
+				<Link to={paths.machineInfo(entry.ref)} className="btn btn-sm">
 					<Icon name="settings" small />
 					{t.agent.info}
 				</Link>

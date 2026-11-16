@@ -480,8 +480,6 @@ export const enMachines: MachinesCopy = {
 	},
 	detail: {
 		more: "More",
-		sessions: "Sessions",
-		noSessions: "No sessions yet.",
 		audit: "Consent log",
 		auditNote: (machine) =>
 			`Kept on ${machine}. Written when a session opens in a sensitive folder, project settings load, a tool touching a sensitive folder is approved, the account adds or revokes a device, an AI account is added, picked or removed, forwarding to localhost is turned on or off, a sign-in secret is entered, used or removed (never its value), the machine's browser is controlled (never the keys typed) or its profile deleted.`,
@@ -559,8 +557,8 @@ export const enMachines: MachinesCopy = {
 		decline: "Decline",
 		expires: (time: string) => `Waits until ${time}`,
 		more: (n: number) => `${n} more ${n === 1 ? "request" : "requests"}`,
-		savedTitle: "Saved secrets",
-		savedNote: (ai) => `Sign-ins you let ${ai} use on this machine. Values are never shown here; ${ai} only fills them into their own website.`,
+		savedTitle: "Website sign-ins for the AI",
+		savedNote: (ai) => `Passwords and tokens of websites you let ${ai} use when it signs in through the machine's browser. These are not ${ai}'s own accounts (see AI accounts). Values are never shown here; ${ai} only fills them into their own website.`,
 		savedEmpty: "No secrets are saved on this machine.",
 		lastUsed: (when: string) => `Last used ${when}`,
 		neverUsed: "Not used yet",
@@ -823,7 +821,7 @@ export const enMachines: MachinesCopy = {
 		},
 	},
 	localForward: {
-		title: "Requests to localhost",
+		title: "Localman to localhost",
 		label: "Let Localman send requests to localhost on this machine",
 		onNote:
 			"Localman, signed in with your own account, can send requests to localhost:<port> on this machine. Risky ports (Docker, debuggers, databases, tunelo's and IDE ports) are always refused. Each request is written to tunelo's log on the machine (tunelo logs).",

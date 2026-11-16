@@ -492,8 +492,6 @@ export const viMachines = {
 	},
 	detail: {
 		more: "Thêm",
-		sessions: "Phiên",
-		noSessions: "Chưa có phiên nào.",
 		audit: "Nhật ký đồng ý",
 		auditNote: (machine: string) =>
 			`Lưu trên ${machine}. Ghi khi mở phiên ở thư mục nhạy cảm, nạp cấu hình dự án, duyệt việc chạm thư mục nhạy cảm, tài khoản thêm hay thu hồi thiết bị, thêm, chọn hay xoá tài khoản AI, bật hay tắt chuyển tiếp localhost, nhập, dùng hay xoá bí mật đăng nhập (không bao giờ ghi giá trị), điều khiển trình duyệt của máy (không ghi phím gõ) hay xoá hồ sơ của nó.`,
@@ -571,8 +569,8 @@ export const viMachines = {
 		decline: "Từ chối",
 		expires: (time: string) => `Chờ tới ${time}`,
 		more: (n: number) => `Còn ${n} yêu cầu nữa`,
-		savedTitle: "Bí mật đã lưu",
-		savedNote: (ai: string) => `Thông tin đăng nhập bạn đã cho ${ai} dùng trên máy này. Giá trị không bao giờ hiện ở đây; ${ai} chỉ điền vào đúng trang web của nó.`,
+		savedTitle: "Mật khẩu web cho AI",
+		savedNote: (ai: string) => `Mật khẩu, token của các trang web bạn đã cho ${ai} dùng khi tự đăng nhập trong trình duyệt của máy. Đây không phải tài khoản của ${ai} (xem Tài khoản AI). Giá trị không bao giờ hiện ở đây; ${ai} chỉ điền vào đúng trang web của nó.`,
 		savedEmpty: "Chưa lưu bí mật nào trên máy này.",
 		lastUsed: (when: string) => `Dùng lần cuối ${when}`,
 		neverUsed: "Chưa dùng",
@@ -835,7 +833,7 @@ export const viMachines = {
 		},
 	},
 	localForward: {
-		title: "Gửi tới localhost",
+		title: "Localman gọi localhost",
 		label: "Cho Localman gửi request tới localhost trên máy này",
 		onNote:
 			"Localman, đăng nhập bằng chính tài khoản của bạn, gửi được request tới localhost:<cổng> trên máy này. Cổng nguy hiểm (Docker, debug, cơ sở dữ liệu, cổng của tunelo và IDE) luôn bị chặn. Mỗi request được ghi vào nhật ký của tunelo trên máy (tunelo logs).",

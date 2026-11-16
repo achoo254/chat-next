@@ -56,7 +56,7 @@ export default function AiAccountsScreen({ machine }: { machine: string }) {
 	const name = entry?.name ?? state.info?.name ?? "";
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.aiAccounts.title} data-id="ai-accounts">
-			<PageHead back={paths.machineInfo(machine)} backLabel={t.agent.info} title={t.aiAccounts.title} subtitle={name === "" ? undefined : t.aiAccounts.subtitle(name)} />
+			<PageHead back={paths.machineInfo(machine)} backLabel={t.agent.info} backAlways title={t.aiAccounts.title} subtitle={name === "" ? undefined : t.aiAccounts.subtitle(name)} />
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<div className="mx-body">
 				{entry === null && hub.directory().status !== "loading" ? (

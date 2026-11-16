@@ -476,8 +476,6 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	detail: {
 		more: "更多",
-		sessions: "会话",
-		noSessions: "还没有会话。",
 		audit: "同意记录",
 		auditNote: (machine) => `保存在 ${machine} 上。在敏感文件夹中打开会话、加载项目配置、批准涉及敏感文件夹的操作、账号添加或撤销设备、添加、选择或移除 AI 账号、开启或关闭 localhost 转发、输入、使用或删除登录密钥（从不记录其值）、控制机器的浏览器（从不记录按键）或删除其配置文件时记录。`,
 		auditEmpty: "暂无记录。",
@@ -554,8 +552,8 @@ export const zhCNMachines: MachinesCopy = {
 		decline: "拒绝",
 		expires: (time: string) => `等待至 ${time}`,
 		more: (n: number) => `还有 ${n} 个请求`,
-		savedTitle: "已保存的密钥",
-		savedNote: (ai) => `你允许 ${ai} 在这台机器上使用的登录信息。这里从不显示值；${ai} 只会把它填入对应的网站。`,
+		savedTitle: "供 AI 使用的网站登录",
+		savedNote: (ai) => `你允许 ${ai} 在这台机器的浏览器中登录网站时使用的密码和令牌。这些不是 ${ai} 自己的账号（见 AI 账号）。这里从不显示值；${ai} 只会把它填入对应的网站。`,
 		savedEmpty: "这台机器上还没有保存密钥。",
 		lastUsed: (when: string) => `上次使用：${when}`,
 		neverUsed: "尚未使用",
@@ -818,7 +816,7 @@ export const zhCNMachines: MachinesCopy = {
 		},
 	},
 	localForward: {
-		title: "发送到 localhost",
+		title: "Localman 访问 localhost",
 		label: "允许 Localman 向这台机器的 localhost 发送请求",
 		onNote:
 			"用你自己的账号登录的 Localman 可以向这台机器的 localhost:<端口> 发送请求。危险端口（Docker、调试器、数据库、tunelo 和 IDE 的端口）始终被拒绝。每个请求都记录在机器上的 tunelo 日志中（tunelo logs）。",

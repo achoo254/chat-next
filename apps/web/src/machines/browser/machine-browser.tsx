@@ -26,6 +26,7 @@ export function MachineBrowser({ link, state, ai }: MachineBrowserProps) {
 	const [cleared, setCleared] = useState(false);
 	const online = state.status.kind === "open";
 	const running = state.info?.browser?.running === true;
+	const clearable = state.info?.browser?.clearable === true;
 	const takeover = viewing === null ? undefined : state.takeovers.get(viewing);
 
 	const open = () => {
@@ -66,21 +67,21 @@ export function MachineBrowser({ link, state, ai }: MachineBrowserProps) {
 		<section className="card pad mx-card" data-id="machine-browser">
 			<h3>{b.machineTitle}</h3>
 			<p className="note">{b.machineNote(ai)}</p>
-			{running ? (
-				<div>
-					<button type="button" className="btn btn-sm" disabled={!online || busy} onClick={open} data-id="machine-browser-open">
-						<MachineIcon name="monitor" small />
-						{b.machineOpen}
-					</button>
-				</div>
-			) : (
-				<p className="muted">{b.machineIdle(ai)}</p>
-			)}
-			{state.info?.browser?.clearable === true && (
-				<div>
-					<button type="button" className="btn btn-sm danger-outline" disabled={!online} onClick={() => setConfirming(true)} data-id="machine-browser-clear">
-						{b.clear}
-					</button>
+			{!running && <p className="muted">{b.machineIdle(ai)}</p>}
+			{/* Opening and clearing sit side by side, as every card's actions do. */}
+			{(running || clearable) && (
+				<div className="acts">
+					{running && (
+						<button type="button" className="btn btn-sm" disabled={!online || busy} onClick={open} data-id="machine-browser-open">
+							<MachineIcon name="monitor" small />
+							{b.machineOpen}
+						</button>
+					)}
+					{clearable && (
+						<button type="button" className="btn btn-sm danger-outline" disabled={!online} onClick={() => setConfirming(true)} data-id="machine-browser-clear">
+							{b.clear}
+						</button>
+					)}
 				</div>
 			)}
 			{cleared && (

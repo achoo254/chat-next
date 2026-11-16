@@ -1,4 +1,5 @@
-// A machine's page: its sessions, a way to its AI accounts (ai-accounts/),
+// A machine's settings (its sessions are the column's and the overview's): its terminals, a way to its AI accounts (ai-accounts/),
+// what the AI uses on it (browser, website sign-ins, screen),
 // whether Localman may send requests to localhost on it (local-forward-setting.tsx),
 // the consent log kept on the machine (opening sensitive folders, loading
 // project settings, approving sensitive tools, devices the account added or
@@ -26,9 +27,7 @@ import { MachineTerminalSessions } from "./machine-terminal-sessions.tsx";
 import { terminalGate } from "./agent-version.ts";
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
-import { sortForList } from "./link/machine-link.ts";
-import { aiName, folderName, mcpAiName, stateKey, useEntry, useHub, useLink } from "./use-machines.ts";
-import { sessionPath, terminalOffered } from "./session-mode.tsx";
+import { aiName, mcpAiName, useEntry, useHub, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
@@ -115,22 +114,6 @@ export function MachineDetail({ machine }: { machine: string }) {
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} />
-				<section className="card pad mx-card">
-					<h3>{t.detail.sessions}</h3>
-					{!online && <p className="muted">{t.detail.needsLink}</p>}
-					{online && state.listed && state.threads.length === 0 && <p className="muted">{t.detail.noSessions}</p>}
-					{sortForList(state.threads).map((thread) => (
-						<Link key={thread.id} to={sessionPath(machine, thread, terminalOffered(state.info, thread.provider))} className="mx-session-row">
-							<span>
-								<b>{thread.title || t.agent.newSession}</b>
-								<span className="mono muted" title={thread.dir}>
-									{folderName(thread.dir)}
-								</span>
-							</span>
-							<span className={`chip mx-chip ${stateKey(thread)}`}>{t.sessions.state[stateKey(thread)]}</span>
-						</Link>
-					))}
-				</section>
 				{terminalGate(state.info) === "available" && <MachineTerminalSessions machine={machine} link={link} online={online} threads={state.threads} />}
 				{hasAccounts && (
 					<section className="card pad mx-card" data-id="machine-ai-accounts">
@@ -144,10 +127,11 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</div>
 					</section>
 				)}
-				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
-				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={mcpAi} />}
+				{/* What the AI uses on the machine (its browser, the web sign-ins it fills there, the screen), then Localman's own setting. */}
 				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={mcpAi} />}
+				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={mcpAi} />}
 				{state.info?.screenShare === true && <MachineScreen link={link} state={state} ai={mcpAi} />}
+				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>

@@ -342,7 +342,7 @@ describe("the project column", () => {
 		expect(screen.queryByText(/chưa là dự án/)).toBeNull();
 	});
 
-	it("the machine's settings: the Full Disk Access card sits in the page's column; a session shows its folder's name, the whole path on hover", async () => {
+	it("the machine's settings: the Full Disk Access card sits in the page's column, and sessions are left to the column and the overview", async () => {
 		const base = machine.handler;
 		machine.handler = (frame, socket) =>
 			frame.body.case === "machineInfoRequest"
@@ -351,8 +351,7 @@ describe("the project column", () => {
 		column([{ name: "Mac mini", online: true }], { page: "info", machine: "1" });
 		const card = await screen.findByRole("alert");
 		expect(card.closest(".mx-body")).toBeTruthy();
-		const folder = await screen.findByText("scratch", { selector: ".mx-session-row span" });
-		expect(folder.getAttribute("title")).toBe("/tmp/scratch");
+		expect(card.closest(".mx-body")?.querySelector(".mx-session-row")).toBeNull();
 	});
 });
 
