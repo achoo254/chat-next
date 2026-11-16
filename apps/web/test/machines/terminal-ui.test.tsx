@@ -263,9 +263,12 @@ describe("a session in chat or in its terminal", () => {
 		const group = screen.getByRole("group", { name: "Mở phiên bằng" });
 		expect(within(group).getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe("true");
 		// The path pill sits in the session header.
-		await waitFor(() => expect(document.querySelector(".pg-head [data-id=terminal-path], header [data-id=terminal-path]")).toBeTruthy());
+		await waitFor(() => expect(document.querySelector(".mx-sub-pill [data-id=terminal-path]")).toBeTruthy());
 		await userEvent.click(within(group).getByRole("button", { name: "Trò chuyện" }));
 		expect(window.location.pathname).toBe("/ai/1/s/t1");
+		// The pill stays in the same place on the chat view: no terminal attached, so the machine's link through the relay.
+		await waitFor(() => expect(document.querySelector(".mx-sub-pill [data-id=terminal-path][data-tone=relay]")?.textContent).toBe("Qua relay"));
+		expect(document.querySelectorAll("[data-id=terminal-path]")).toHaveLength(1);
 		// Only this session moves: it remembers chat; the machine's new-session pick stays as it was.
 		await waitFor(() => expect(window.localStorage.getItem("ai:mode:1:t1")).toBe("chat"));
 		expect(window.localStorage.getItem("ai:mode:1")).toBeNull();

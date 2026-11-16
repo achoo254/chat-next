@@ -1,0 +1,8 @@
+/* The path pill: the terminal's own tab bar and every view of a session's header. */
+.tx-pill { display: inline-flex; align-items: center; gap: 6px; margin-left: var(--space-1); padding: 2px var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tx-pill .dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--c-border-strong); }
+.tx-pill[data-tone="direct"] .dot { background: var(--c-success); }
+.tx-pill[data-tone="relay"] .dot { background: var(--c-warning); }
+.tx-pill[data-tone="wait"] .dot { background: var(--c-warning); animation: tx-pill-blink 1.2s ease-in-out infinite; }
+@keyframes tx-pill-blink { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tx-pill[data-tone="wait"] .dot { animation: none; } }

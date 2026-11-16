@@ -15,10 +15,8 @@
 // terminal opens.
 import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ErrorCode, ErrorReason, type TermSessionInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
-import { brand } from "../brand.ts";
 import { useI18n } from "../i18n/i18n.tsx";
 import type { MachinesCopy } from "../machines/copy-vi.ts";
-import type { LinkHub } from "../machines/link/link-hub.ts";
 import { LOCAL_REF } from "../machines/link/link-hub.ts";
 import { RemoteError, type MachineLink } from "../machines/link/machine-link.ts";
 import { errorText, useHub, useLink } from "../machines/use-machines.ts";
@@ -39,7 +37,8 @@ import { loadPrefs, rowOf, savePrefs, type KeyPrefs } from "./key-prefs.ts";
 import { afterKey, keySequence, LiveInput, MobileKeyBar, NO_MODIFIERS, tapLatch, withModifiers, type BarKey, type Modifier, type Modifiers } from "./mobile-key-bar.tsx";
 import { useViewportFit } from "../machines/viewport-fit.ts";
 import { StatusPill } from "./status-pill.tsx";
-import { browserPeers, defaultIceServers, TerminalLink } from "./terminal-link.ts";
+import type { TerminalLink } from "./terminal-link.ts";
+import { terminalLinkFor } from "./terminal-links.ts";
 import {
 	activeTab,
 	addTab,
@@ -79,36 +78,6 @@ import "./terminal.css";
 
 const SAVE_DELAY_MS = 300;
 const encoder = new TextEncoder();
-
-// --- one terminal link per machine, for the hub's lifetime ------------------------------
-
-const linksOfHub = new WeakMap<LinkHub, Map<string, TerminalLink>>();
-
-/** STUN servers: VITE_TERMINAL_STUN ("host:port,host:port", "" for none) or the relay's own. */
-function iceServers(): { urls: string }[] {
-	const configured = import.meta.env.VITE_TERMINAL_STUN;
-	if (configured === undefined) return defaultIceServers(brand.domain);
-	return configured
-		.split(",")
-		.map((s) => s.trim())
-		.filter((s) => /^[A-Za-z0-9.-]+:[0-9]{1,5}$/.test(s))
-		.slice(0, 4)
-		.map((s) => ({ urls: `stun:${s}` }));
-}
-
-export function terminalLinkFor(hub: LinkHub, ref: string): TerminalLink {
-	let links = linksOfHub.get(hub);
-	if (links === undefined) {
-		links = new Map();
-		linksOfHub.set(hub, links);
-	}
-	let link = links.get(ref);
-	if (link === undefined) {
-		link = new TerminalLink({ carrier: hub.terminalCarrier(ref), peers: browserPeers(), iceServers: iceServers() });
-		links.set(ref, link);
-	}
-	return link;
-}
 
 let sharedStore: LayoutStore | null = null;
 
@@ -204,16 +173,6 @@ export default function TerminalScreen({ machine, thread, openShellIn, showSessi
 			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
 		/>
 	);
-}
-
-/** The path pill of the machine's terminal, for a session header in terminal mode. */
-export function DockPill({ machine }: { machine: string }) {
-	const t = useMachinesCopy();
-	const hub = useHub();
-	const [, state] = useLink(hub, machine);
-	const terminal = terminalLinkFor(hub, machine);
-	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
-	return <StatusPill t={t.terminal} status={status} online={state.status.kind === "open"} />;
 }
 
 export interface TerminalDockProps {

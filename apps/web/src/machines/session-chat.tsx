@@ -49,7 +49,7 @@ import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
 import { ModeIcon, ModeSwitch, TerminalHeldBar, officeOffered, openSessionIn, rememberSessionMode, sessionModes, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
-import { TerminalPill, TerminalScreen } from "./terminal-screen.ts";
+import { SessionPathPill, TerminalScreen } from "./terminal-screen.ts";
 import { isPhone, useViewportFit } from "./viewport-fit.ts";
 import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
@@ -216,11 +216,11 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				title={thread ? thread.title || t.agent.newSession : ""}
 				subtitle={
 					<>
-						{mode === "terminal" && offered && (
-							// On a phone the path pill sits under the title (the header has no room beside it).
+						{thread !== null && (
+							// The path pill sits under the title on every view, so switching views keeps it in place.
 							<span className="mx-sub-pill">
 								<Suspense fallback={null}>
-									<TerminalPill machine={machine} />
+									<SessionPathPill machine={machine} terminal={offered} />
 								</Suspense>
 							</span>
 						)}
@@ -236,11 +236,6 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 				}
 			>
 				<ModeSwitch machine={machine} threadId={threadId} mode={mode} modes={modes} />
-				{mode === "terminal" && offered && (
-					<Suspense fallback={null}>
-						<TerminalPill machine={machine} />
-					</Suspense>
-				)}
 				{chip !== null && (
 					<span className={`chip mx-chip ${chip}`} role="status" aria-label={t.chat.chip[chip]} title={t.chat.chip[chip]}>
 						<span className="hide-narrow" aria-hidden="true">

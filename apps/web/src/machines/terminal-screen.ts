@@ -3,5 +3,5 @@ import { lazy } from "react";
 
 export const TerminalScreen = lazy(() => import("../terminal/terminal-dock.tsx"));
 
-/** The terminal's path pill, from the same chunk. */
-export const TerminalPill = lazy(() => import("../terminal/terminal-dock.tsx").then((m) => ({ default: m.DockPill })));
+/** The session header's path pill: its own small chunk (no xterm), shown on every view. */
+export const SessionPathPill = lazy(() => import("../terminal/status-pill.tsx").then((m) => ({ default: m.SessionPathPill })));

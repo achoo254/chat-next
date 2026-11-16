@@ -61,7 +61,6 @@
 @media (prefers-reduced-motion: reduce) { .mx-view-switch button { transition: none; } }
 /* The session header: the title gives way first; the switch, the pill and the buttons keep their size and an even gap. */
 .mx-chat > .mx-head > :not(.title) { flex: none; }
-.mx-chat > .mx-head .tx-pill { margin-left: 0; }
 .mx-group-note { display: grid; gap: var(--space-2); justify-items: start; margin: 0 var(--space-2) var(--space-2); font-size: 0.8125rem; }
 .mx-group-note p { margin: 0; color: var(--c-text-muted); }
 p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 8px + var(--space-2)); }
@@ -222,8 +221,9 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-head .title strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title span { display: flex; align-items: center; gap: var(--space-1); min-width: 0; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-head .title .mono { overflow: hidden; text-overflow: ellipsis; }
-/* The terminal's connection pill under the title is the phone's (its header has no room beside the title); elsewhere it sits with the actions. */
-.mx-head .title .mx-sub-pill { display: none; }
+/* The session's path pill (direct or through the relay) leads the line under the title, the same on every view. */
+.mx-head .title .mx-sub-pill { flex: none; overflow: visible; }
+.mx-head .title .mx-sub-pill .tx-pill { margin: 0 var(--space-1) 0 0; padding: 0 var(--space-2); font-size: 0.75rem; }
 /* The session header's "Nạp kỹ năng dự án": a small outlined button beside the folder and branch, not a sentence. */
 .mx-pc-hint { display: inline-flex; align-items: center; gap: 4px; margin-left: var(--space-1); padding: 1px var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: none; color: var(--c-primary); font: inherit; font-size: 0.75rem; cursor: pointer; }
 .mx-pc-hint:hover:not(:disabled) { background: var(--c-hover); }
@@ -908,13 +908,12 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 	.mx-chat > .mx-head .title { flex: 1 1 auto; min-width: 72px; }
 	.mx-view-switch button { padding: 0 10px; }
 	.mx-view-switch .mx-view-word { display: none; }
-	.mx-chat > .mx-head .tx-pill { display: none; }
 	/* The session in its terminal (after Orca's phone app): the title centred over the path pill, round buttons, "Kết thúc" in the menu. */
 	.mx-chat[data-mode="terminal"] > .mx-head { gap: var(--space-2); padding: var(--space-2); }
 	.mx-chat[data-mode="terminal"] > .mx-head .title { text-align: center; }
 	.mx-chat[data-mode="terminal"] > .mx-head .title > span { justify-content: center; }
-	.mx-chat[data-mode="terminal"] .mx-sub-pill { display: inline-flex; min-width: 0; }
-	.mx-chat[data-mode="terminal"] .mx-sub-pill .tx-pill { display: inline-flex; margin: 0; padding: 0; border: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+	.mx-chat .mx-sub-pill { min-width: 0; }
+	.mx-chat > .mx-head .title .mx-sub-pill .tx-pill { display: inline-flex; margin: 0; padding: 0; border: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 	.mx-chat[data-mode="terminal"] .mx-sub-pill:has(.tx-pill) ~ * { display: none; }
 	.mx-chat[data-mode="terminal"] > .mx-head .icon-btn { width: 44px; height: 44px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
 }
