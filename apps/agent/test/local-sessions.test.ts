@@ -365,6 +365,32 @@ describe("background shells and subagents", () => {
     expect(s.backgroundTasks(id)).toBe(0);
   });
 
+  test("a task the AI stopped itself (TaskStop, or KillShell before it) ends with the stop's result: no notification comes", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    launchShell(t, "bkxz7s27b");
+    launchShell(t, "old1");
+    launchAgent(t, "a77e01");
+    t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(3);
+    const message = "Successfully stopped task: bkxz7s27b (npx vite)";
+    t.user([{ tool_use_id: "toolu_k", type: "tool_result", content: JSON.stringify({ message, task_id: "bkxz7s27b", task_type: "local_bash" }) }], {
+      toolUseResult: { message, task_id: "bkxz7s27b", task_type: "local_bash", command: "npx vite" },
+    });
+    t.user([{ tool_use_id: "toolu_o", type: "tool_result", content: "Successfully killed shell: old1 (sleep 99)" }], {
+      toolUseResult: { message: "Successfully killed shell: old1 (sleep 99)", shell_id: "old1" },
+    });
+    t.write(home);
+    expect(s.backgroundTasks(id)).toBe(1);
+    // Words alone stop nothing: a tool printing them, or a result naming no task.
+    t.toolResult("toolu_g", "grep: Successfully stopped task: a77e01");
+    t.user([{ tool_use_id: "toolu_n", type: "tool_result", content: "x" }], { toolUseResult: { message: "Successfully stopped task: a77e01" } });
+    t.write(home);
+    expect(s.backgroundTasks(id)).toBe(1);
+  });
+
   test("a notification that arrived during a turn is a queued command and an attachment, and ends the task as well", () => {
     const home = tempDir("claude-home-");
     const id = randomUUID();

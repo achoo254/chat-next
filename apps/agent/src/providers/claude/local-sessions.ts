@@ -753,7 +753,9 @@ export class LocalSessions implements SessionHistory {
  * a grep) launches nothing. An end is the task-notification claude hands the
  * model when a task finished or was stopped, which it records as a user
  * message, or, when it arrived during a turn, as a queued command and an
- * attachment. A subagent's own records are not the session's.
+ * attachment. A task the AI stopped itself (TaskStop, KillShell before it)
+ * gets no notification: the structured result of the stop ends it. A
+ * subagent's own records are not the session's.
  */
 export function noteBackground(running: Set<string>, line: string, whole: boolean): void {
   if (line.includes('"isSidechain":true')) return;
@@ -763,10 +765,25 @@ export function noteBackground(running: Set<string>, line: string, whole: boolea
     if (id !== undefined && status !== undefined && status !== "running") running.delete(id);
     return;
   }
+  if (whole && line.includes('"toolUseResult"') && (line.includes("Successfully stopped task") || line.includes("Successfully killed shell"))) {
+    const stopped = stoppedTask(parseRecord(line)?.toolUseResult);
+    if (stopped !== undefined) running.delete(stopped);
+    return;
+  }
   if (!whole || !line.includes('"toolUseResult"') || !(line.includes('"backgroundTaskId"') || line.includes('"async_launched"'))) return;
   const result = parseRecord(line)?.toolUseResult as { backgroundTaskId?: unknown; isAsync?: unknown; status?: unknown; agentId?: unknown } | undefined;
   if (typeof result?.backgroundTaskId === "string") running.add(result.backgroundTaskId);
   else if (result?.isAsync === true && result.status === "async_launched" && typeof result.agentId === "string") running.add(result.agentId);
+}
+
+/** The task a stop tool's structured result names: TaskStop's `task_id`, or the older KillShell's `shell_id`. */
+function stoppedTask(result: unknown): string | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const r = result as { message?: unknown; task_id?: unknown; shell_id?: unknown };
+  if (typeof r.message !== "string") return undefined;
+  if (r.message.startsWith("Successfully stopped task") && typeof r.task_id === "string") return r.task_id;
+  if (r.message.startsWith("Successfully killed shell") && typeof r.shell_id === "string") return r.shell_id;
+  return undefined;
 }
 
 function entries(dir: string): Dirent[] {
