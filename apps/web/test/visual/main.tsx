@@ -28,7 +28,7 @@ import { fixtureConnector } from "../support/fake-chat.ts";
 import { routerFetch } from "../support/router-fetch.ts";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { DEMO_THREAD, installRemoteMachineDemo } from "../support/remote-machine-demo.ts";
-import { paths } from "../../src/router.tsx";
+import { navigate, paths } from "../../src/router.tsx";
 import { aiPaths } from "../../src/machines/ai-paths.ts";
 
 const params = new URLSearchParams(window.location.search);
@@ -635,6 +635,12 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	// "Terminal đang chạy trên máy" on the machine's page: the fake machine runs a few sessions, then the list is asked again.
 	"terminal-sessions": async () => {
 		await seedTerminalSessions();
+	},
+	// The machine's shells under their workspace in the AI Agent column: seeded, then a page change makes the column ask again.
+	"sidebar-shells": async () => {
+		await seedTerminalSessions(false);
+		navigate(paths.machine("1"));
+		await find(() => document.querySelector(".mx-shell"));
 	},
 	// "Dừng N phiên chạy nền": the confirmation listing them.
 	"terminal-stop-idle": async () => {

@@ -1117,6 +1117,7 @@ export const enMachines: MachinesCopy = {
 			saveFailed: "Could not save; try again later.",
 			more: (n: number) => `Show more (${n})`,
 			less: "Show less",
+			shells: (folder: string) => `Shells running in ${folder}`,
 			status: { need: "Needs you", failed: "Failed", running: "Running", done: "Done, not seen", open: "Open in a terminal, waiting for input", idle: "Idle" },
 			machineOffline: "Machine offline",
 			offlineStatus: (status: string) => `Offline · ${status}`,

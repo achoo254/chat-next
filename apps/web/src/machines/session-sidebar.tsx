@@ -23,6 +23,7 @@ import { movedTo, useProjectDrag } from "./project-drag.ts";
 import { LooseGroup, ProjectItem, type ProjectPlace, type TreeContext } from "./project-tree-view.tsx";
 import { projectsSupported } from "./projects-view.ts";
 import { useSeen } from "./seen-sessions.ts";
+import { useSidebarShells } from "./sidebar-shells.tsx";
 import { useHub, useMachineViews, useNow, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -197,7 +198,8 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		setOpened(next);
 		writeSession(OPEN_KEY, next);
 	};
-	const ctx: TreeContext = { store, projects: snapshot.projects, machines, now, seen, current };
+	const shells = useSidebarShells(machines, snapshot.projects);
+	const ctx: TreeContext = { store, projects: snapshot.projects, machines, now, seen, current, shells };
 	// The user's order of the projects: dragged, or one place from a project's menu; only with every project shown.
 	const order = tree.projects.map((n) => n.project.id);
 	const reorderable = filter === "all" && snapshot.status === "ready";

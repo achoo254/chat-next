@@ -453,6 +453,27 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		void openShell(openShellIn);
 	}, [ready, openShellIn]);
 
+	// A shell picked while the dock already shows (a shell row of the AI Agent column): its pane, else a new tab for it.
+	// The one asked at start is the load's; the address then drops ?open, so picking the same shell again counts too.
+	const [picked, setPicked] = useState(showSession);
+	/** Counts the picks shown this way, so the request is done once per pick. */
+	const [picks, setPicks] = useState(0);
+	if (showSession !== picked) {
+		setPicked(showSession);
+		if (ready && showSession !== undefined) {
+			const session = showSession;
+			setLayout((l) => {
+				const pane = l.tabs.flatMap((x) => panesOf(x.root)).find((p) => p.session === session);
+				return pane !== undefined ? focusPane(l, pane.id) : addTab(l, session);
+			});
+			setPicks((n) => n + 1);
+		}
+	}
+	const shownPicked = useEffectEvent(() => onShellOpened?.());
+	useEffect(() => {
+		if (picks > 0) shownPicked();
+	}, [picks]);
+
 	// The text size of every terminal (this browser keeps it); the default follows the screen.
 	const fallbackSize = touch ? FONT_SIZE_TOUCH : FONT_SIZE_DEFAULT;
 	const [textSize, setTextSize] = useState(() => fontSize(fallbackSize));

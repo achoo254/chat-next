@@ -24,6 +24,7 @@ import { folderName } from "./new-session-hints.ts";
 import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace, workspaceRemote } from "./project-actions.ts";
 import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, projectIcon, shortHost, unseenDone, workspaceIcon, workspaceLabels } from "./project-tree.ts";
 import { SessionRow } from "./session-row.tsx";
+import { ShellRows, type ShellsByWorkspace } from "./sidebar-shells.tsx";
 import { StatusGlyph } from "./status-glyph.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
@@ -55,6 +56,8 @@ export interface TreeContext {
 	readonly seen: SeenMap;
 	/** The open session: its machine ref and thread id. */
 	readonly current: { readonly machine: string; readonly thread: string } | null;
+	/** Live shells of the machines, under the workspace that holds their folder. */
+	readonly shells: ShellsByWorkspace;
 }
 
 type MenuItem = { label: string; icon: Parameters<typeof Icon>[0]["name"]; run: () => void; danger?: boolean } | null;
@@ -244,6 +247,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 				</span>
 			</div>
 			{machine !== null && <Sessions machine={machine} threads={node.threads} ctx={ctx} />}
+			{machine !== null && <ShellRows machine={machine} dir={workspace.dir} shells={ctx.shells.get(workspace.id) ?? []} now={ctx.now} />}
 			{dialog === "custom" && machine !== null && (
 				<NewSession
 					machine={machine.entry.ref}

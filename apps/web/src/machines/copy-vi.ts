@@ -1132,6 +1132,7 @@ export const viMachines = {
 			saveFailed: "Không lưu được, thử lại sau.",
 			more: (n: number) => `Xem thêm (${n})`,
 			less: "Thu gọn",
+			shells: (folder: string) => `Shell đang chạy trong ${folder}`,
 			status: { need: "Cần bạn", failed: "Có lỗi", running: "Đang chạy", done: "Xong, chưa xem", open: "Mở trong terminal, đang chờ lệnh", idle: "Rảnh" },
 			machineOffline: "Máy ngoại tuyến",
 			offlineStatus: (status: string) => `Ngoại tuyến · ${status}`,

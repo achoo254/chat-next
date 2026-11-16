@@ -940,3 +940,7 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 .mx-ws .mx-srow .tx { padding-left: calc(var(--mx-indent) * 2); }
 .mx-ws .mx-more { margin-left: calc(var(--space-2) + var(--mx-indent) * 2); }
 .mx-ws-empty { padding-left: calc(var(--space-2) + var(--mx-indent)); }
+/* Shell rows under a workspace's sessions (sidebar-shells.tsx): the session row's shape, a terminal mark, the state in the second line. */
+.mx-ws .mx-shells { padding-top: 0; }
+/* Under the name, as a session row's second line sits after its 16px mode mark. */
+.mx-shell .mx-shell-sub { padding-left: calc(16px + var(--space-2)); overflow: hidden; color: var(--c-text-muted); font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }

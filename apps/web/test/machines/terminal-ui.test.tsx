@@ -672,6 +672,35 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a shell picked while the dock shows (a shell row of the AI Agent column): its own tab, focused, nothing new opened", async () => {
+		const first = host.open();
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		let done = 0;
+		const dock = (show: number | undefined) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} back="/ai/1" showSession={show} onShellOpened={() => (done += 1)} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		const view = render(dock(first));
+		await until(() => done === 1, "first shown");
+		// The address drops ?open once shown, then the column picks another shell, then the first again.
+		view.rerender(dock(undefined));
+		const second = host.open();
+		view.rerender(dock(second));
+		await until(() => done === 2, "second shown");
+		await waitFor(() => expect(document.querySelectorAll(".tx-tab")).toHaveLength(2));
+		expect(document.querySelectorAll(".tx-tab")[1]?.hasAttribute("data-active")).toBe(true);
+		view.rerender(dock(undefined));
+		view.rerender(dock(first));
+		await until(() => done === 3, "first again");
+		expect(document.querySelectorAll(".tx-tab")).toHaveLength(2);
+		expect(document.querySelectorAll(".tx-tab")[0]?.hasAttribute("data-active")).toBe(true);
+		expect(sent("termOpen")).toEqual([]);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
 	it("Mở of a session that ended meanwhile says so and starts no shell in its place", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");

@@ -122,6 +122,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-new-session": "?at=machine-sessions&open=new-session",
 	"machine-new-session-existing": "?at=machine-sessions&open=new-session-existing",
 	"machine-info": "?at=machine-info",
+	"machine-sidebar-shells": "?at=machine-home&open=sidebar-shells",
 	"machine-add": "?at=machine-add",
 };
 

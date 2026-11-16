@@ -1111,6 +1111,7 @@ export const zhCNMachines: MachinesCopy = {
 			saveFailed: "无法保存，请稍后再试。",
 			more: (n: number) => `显示更多（${n}）`,
 			less: "收起",
+			shells: (folder: string) => `在 ${folder} 中运行的 shell`,
 			status: { need: "需要你", failed: "出错", running: "运行中", done: "已完成，未查看", open: "在终端中打开，等待输入", idle: "空闲" },
 			machineOffline: "设备离线",
 			offlineStatus: (status: string) => `离线 · ${status}`,

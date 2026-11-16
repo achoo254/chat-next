@@ -10,7 +10,7 @@
 // needs the user or runs, with "+" on the same row.
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { create } from "@bufbuild/protobuf";
-import { ProjectSchema, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ProjectSchema, TerminalAvailability, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -352,6 +352,49 @@ describe("the project column", () => {
 		const card = await screen.findByRole("alert");
 		expect(card.closest(".mx-body")).toBeTruthy();
 		expect(card.closest(".mx-body")?.querySelector(".mx-session-row")).toBeNull();
+	});
+});
+
+describe("shells in the column", () => {
+	it("a machine's live shells sit under the workspace holding their folder, each opening in the machine's terminal", async () => {
+		const base = machine.handler;
+		machine.handler = (frame, socket) => {
+			if (frame.body.case === "machineInfoRequest")
+				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.6.0", maxSessions: 3, terminal: TerminalAvailability.AVAILABLE, providers: [{ id: "claude", name: "Claude Code" }] } }];
+			if (frame.body.case === "termListRequest")
+				return [
+					{
+						case: "termListResult",
+						value: {
+							sessions: [
+								{ session: 11, title: "pnpm dev", cwd: "/w/app/apps/web", createdAt: BigInt(Date.now() - 60_000), attached: false },
+								{ session: 12, title: "", cwd: "/w/app", createdAt: BigInt(Date.now()), attached: true },
+								// An AI's own CLI is its session's row; an ended shell and one outside every workspace stay out.
+								{ session: 13, title: "claude", cwd: "/w/app", threadId: "t1" },
+								{ session: 14, title: "old", cwd: "/w/app", exited: true },
+								{ session: 15, title: "tmp", cwd: "/tmp" },
+							],
+							maxSessions: 8,
+						},
+					},
+				];
+			return base(frame, socket);
+		};
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		const app = await waitFor(() => {
+			const row = projectRow(list, "app");
+			expect(row.querySelector("[data-id=sidebar-shell-11]")).toBeTruthy();
+			return row;
+		}, WAIT);
+		const shells = [...app.querySelectorAll<HTMLAnchorElement>(".mx-shell")];
+		expect(shells.map((a) => a.dataset.id)).toEqual(["sidebar-shell-12", "sidebar-shell-11"]);
+		// No title: "Shell"; a device shows it or it runs in the background; a subfolder is named.
+		expect(shells[0]?.textContent).toContain("Shell");
+		expect(shells[0]?.textContent).toContain("Đang mở ở thiết bị");
+		expect(shells[1]?.textContent).toContain("pnpm dev");
+		expect(shells[1]?.textContent).toContain("Chạy nền · apps/web");
+		expect(shells[1]?.getAttribute("href")).toBe("/ai/1/terminal?open=11");
+		expect(list.querySelector("[data-id=sidebar-shell-13], [data-id=sidebar-shell-14], [data-id=sidebar-shell-15]")).toBeNull();
 	});
 });
 
