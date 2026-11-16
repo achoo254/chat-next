@@ -125,15 +125,37 @@ async function release(store: AgentProjectsStore, workspace: AgentWorkspace, hos
 	}
 }
 
+/** Workspaces leaving the app on this device: their machine dropped the folder, the server still records them for a moment. */
+const leaving = new WeakMap<AgentProjectsStore, Set<number>>();
+
+/** Runs `remove` with `workspaces` marked as leaving, so a sync pass meanwhile does not have their machine keep the folder again. */
+async function whileLeaving(store: AgentProjectsStore, workspaces: readonly AgentWorkspace[], remove: () => Promise<void>): Promise<void> {
+	let ids = leaving.get(store);
+	if (ids === undefined) {
+		ids = new Set();
+		leaving.set(store, ids);
+	}
+	for (const w of workspaces) ids.add(w.id);
+	try {
+		await remove();
+	} finally {
+		for (const w of workspaces) ids.delete(w.id);
+	}
+}
+
 export async function detachWorkspace(store: AgentProjectsStore, workspace: AgentWorkspace, host: Host | null): Promise<void> {
-	await release(store, workspace, host);
-	await store.change((api) => api.detach(workspace.id));
+	await whileLeaving(store, [workspace], async () => {
+		await release(store, workspace, host);
+		await store.change((api) => api.detach(workspace.id));
+	});
 }
 
 /** Deletes the project's record and its workspaces' (never a file or a session). */
 export async function deleteProject(store: AgentProjectsStore, project: AgentProject, hostOf: (machineId: number) => Host | null): Promise<void> {
-	await Promise.all(project.workspaces.map((w) => release(store, w, hostOf(w.machineId))));
-	await store.change((api) => api.remove(project.id));
+	await whileLeaving(store, project.workspaces, async () => {
+		await Promise.all(project.workspaces.map((w) => release(store, w, hostOf(w.machineId))));
+		await store.change((api) => api.remove(project.id));
+	});
 }
 
 /**
@@ -191,6 +213,32 @@ async function currentProjects(host: Host): Promise<readonly Project[] | undefin
 	}
 }
 
+/**
+ * A workspace of `host` the machine does not keep (recorded by an older build
+ * from a list the machine has since lost, or dropped on the machine alone):
+ * the machine keeps its folder again, since its files and git open only
+ * through the machine's own project. Not a folder detached and waiting to be
+ * dropped, nor a workspace leaving right now, nor one the machine keeps as a
+ * folder that went missing.
+ * A sensitive folder waits for the user (Thêm workspace asks); a folder no
+ * longer on the disk stays as it is.
+ */
+async function keepWorkspaces(store: AgentProjectsStore, host: Host, known: readonly AgentProject[], listed: readonly Project[]): Promise<void> {
+	const workspaces = known.flatMap((p) => p.workspaces).filter((w) => w.machineId === host.id);
+	for (const workspace of workspaces) {
+		if (listed.some((p) => inFolder(workspace.dir, p.dir))) continue;
+		if (store.isDetached({ machineId: host.id, dir: workspace.dir }) || leaving.get(store)?.has(workspace.id) === true) continue;
+		// Gone from the server since the pass began (detached on this device meanwhile).
+		if (findWorkspace(store.snapshot().projects, host.id, workspace.dir) === undefined) continue;
+		try {
+			await host.link.request({ case: "projectAdd", value: { dir: workspace.dir, name: "", consent: { sensitive: false, projectSettings: false } } });
+		} catch (err) {
+			const waits = isNeedsConsent(err) || (err instanceof RemoteError && (err.reason === ErrorReason.FOLDER_NOT_FOUND || err.reason === ErrorReason.PROJECT_EXISTS));
+			if (!waits) console.warn("ai: the machine did not keep a workspace's folder", err);
+		}
+	}
+}
+
 function warnMark(err: unknown): void {
 	console.warn("ai: could not update the mark of a dropped folder", err);
 }
@@ -200,8 +248,9 @@ function warnMark(err: unknown): void {
  * for the machine the user picked (Thêm workspace, Thêm dự án) or where they
  * started a session from the app, so another machine's clone of the same
  * repository stays out of the project until it is added by hand. The pass
- * only has a machine drop the folders detached while it was offline, and
- * moves a workspace grouped with another repository to its own (repairWorkspaces).
+ * only has a machine drop the folders detached while it was offline, keep
+ * again the folder of a workspace it lost, and moves a workspace grouped
+ * with another repository to its own (repairWorkspaces).
  */
 export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncHost[]): Promise<number> {
 	const snapshot = store.snapshot();
@@ -231,6 +280,7 @@ export async function syncHosts(store: AgentProjectsStore, hosts: readonly SyncH
 		for (const mark of store.detachedOf(host.id)) {
 			if (!own.some((p) => samePath(p.dir, mark.dir))) await store.setDetached(mark, false).catch(warnMark);
 		}
+		await keepWorkspaces(store, host, known, listed);
 	}
 	// A workspace in a project that links another repository goes to its own repository's project (projects linking none are left alone).
 	const moved = await repairWorkspaces(store.api, known, knownRemotes(known, hosts)).catch((err: unknown) => {
@@ -310,8 +360,9 @@ function pass(store: AgentProjectsStore, hosts: () => readonly SyncHost[]): void
 
 /**
  * Keeps the server's projects in step with the machines online (syncHosts:
- * dropped folders, workspaces grouped with another repository): a pass after
- * the lists settle, one at a time. It never adds a workspace.
+ * dropped folders, workspace folders a machine lost, workspaces grouped with
+ * another repository): a pass after the lists settle, one at a time. It
+ * never adds a workspace.
  */
 export function useProjectSync(store: AgentProjectsStore, snapshot: ProjectsSnapshot, hosts: readonly SyncHost[]): void {
 	const latest = useRef(hosts);

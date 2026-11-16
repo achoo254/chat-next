@@ -12,7 +12,7 @@ import { RemoteError, type MachineLink } from "../../src/machines/link/machine-l
 type FrameBody = Parameters<MachineLink["request"]>[0];
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentProjectsStore } from "../../src/machines/agent-projects-store.ts";
-import type { AgentProjectsApi } from "../../src/machines/agent-projects-client.ts";
+import { AgentWorkspaceKind, type AgentProjectsApi } from "../../src/machines/agent-projects-client.ts";
 import { adoptStarted, deleteProject, detachWorkspace, linkRepository, placeByHand, RemoteMismatchError, splitWorkspace, syncHosts, type SyncHost } from "../../src/machines/project-actions.ts";
 import { misplaced, placeFolder, type FolderInfo } from "../../src/machines/project-sync.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
@@ -46,6 +46,11 @@ function host(id: number, projects: Project[]): Omit<SyncHost, "link"> & { link:
 }
 
 afterEach(() => window.localStorage.clear());
+
+async function until(done: () => boolean): Promise<void> {
+	for (let i = 0; i < 100 && !done(); i++) await new Promise((resolve) => setTimeout(resolve, 0));
+	if (!done()) throw new Error("never happened");
+}
 
 /** Records `folders` one after another, as placing them by hand does. */
 async function placeAll(api: AgentProjectsApi, folders: readonly FolderInfo[]): Promise<void> {
@@ -294,6 +299,57 @@ describe("the sync and the app's own actions", () => {
 		expect(mac.sent.map((b) => b.case).filter((c) => c !== "projectList")).toEqual(["projectRemove"]);
 		expect(store.isDetached({ machineId: 1, dir: "/w/app" })).toBe(false);
 		expect(store.snapshot().projects[0]?.workspaces).toEqual([]);
+	});
+
+	it("a workspace whose folder the machine no longer keeps: the pass has the machine keep it again", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("app", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: AgentWorkspaceKind.FOLDER }]);
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, []);
+		const pc = host(2, []);
+		expect(await syncHosts(store, [mac, pc])).toBe(0);
+		expect(mac.projects.map((p) => p.dir)).toEqual(["/w/app"]);
+		// Only the workspace's own machine is asked; a second pass changes nothing.
+		expect(pc.sent.map((b) => b.case)).toEqual(["projectList"]);
+		await syncHosts(store, [mac, pc]);
+		expect(mac.sent.filter((b) => b.case === "projectAdd")).toHaveLength(1);
+	});
+
+	it("a workspace inside a folder the machine keeps, or a sensitive one, is left as it is", async () => {
+		const server = new FakeAgentProjects();
+		server.seed("app", "", [{ machineId: 1, dir: "/w/app/sub", branch: "", kind: AgentWorkspaceKind.FOLDER }]);
+		server.seed("home", "", [{ machineId: 1, dir: "/home/me", branch: "", kind: AgentWorkspaceKind.FOLDER }]);
+		const store = new AgentProjectsStore(server.api());
+		await store.refresh();
+		const mac = host(1, [own("/w/app")]);
+		const request = mac.link.request;
+		const careful = { ...mac, link: { request: (body: FrameBody) => (body.case === "projectAdd" && body.value.dir === "/home/me" ? Promise.reject(new RemoteError(ErrorCode.NEEDS_CONSENT, "sensitive")) : request(body)) } } as SyncHost;
+		expect(await syncHosts(store, [careful])).toBe(0);
+		expect(mac.projects.map((p) => p.dir)).toEqual(["/w/app"]);
+		expect(mac.sent.filter((b) => b.case === "projectAdd").map((b) => (b.case === "projectAdd" ? b.value.dir : ""))).toEqual([]);
+	});
+
+	it("a pass while a workspace is being detached (machine done, server not yet) does not have the machine keep it again", async () => {
+		const server = new FakeAgentProjects();
+		const api = server.api();
+		let letGo = (): void => undefined;
+		const slowApi = { ...api, detach: (id: number) => new Promise<void>((resolve) => (letGo = () => void api.detach(id).then(() => resolve()))) } as typeof api;
+		const store = new AgentProjectsStore(slowApi);
+		await store.refresh();
+		const mac = host(1, [own("/w/app")]);
+		await placeDirs(store, mac, "/w/app");
+		const workspace = store.snapshot().projects[0]?.workspaces[0];
+		if (workspace === undefined) throw new Error("no workspace");
+		const detaching = detachWorkspace(store, workspace, mac);
+		await until(() => mac.projects.length === 0);
+		await syncHosts(store, [mac]);
+		expect(mac.projects).toEqual([]);
+		letGo();
+		await detaching;
+		await syncHosts(store, [mac]);
+		expect(mac.projects).toEqual([]);
+		expect(server.workspaces).toEqual([]);
 	});
 });
 
