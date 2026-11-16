@@ -18,8 +18,11 @@
 // terminal runs, which on a machine that keeps its AIs open is never. So the
 // running one is replaced as soon as every program in it is a thread's AI
 // sitting idle (its AI says no turn runs, quiet for REPLACE_QUIET_MS): each
-// opens again in the new process, resumed, the same conversation. A plain
-// shell, or an AI in a turn, keeps the old process until it ends.
+// opens again in the new process, resumed, the same conversation. An AI's
+// CLI no thread owns (its thread deleted while it kept running, say) ends in
+// the switch once nothing was written to that AI's sessions in its folder for
+// as long; its record stays, to resume. A plain shell, or an AI in a turn,
+// keeps the old process until it ends. Why it still waits goes to the log.
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, TerminalAvailability, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
@@ -27,6 +30,7 @@ import { type ConfigStore, deviceLabel } from "../config.ts";
 import { AgentError, type AgentCore, type TerminalSpec } from "../core/agent-core.ts";
 import type { ShellEnv } from "../providers/types.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
+import { type ChildProcess, childProcesses } from "./child-processes.ts";
 import { AGENT_VERSION } from "../version.ts";
 import { Grants, TerminalDenied } from "./grants.ts";
 import { ControlError, type DaemonAudit, type DaemonEvent, type HelloResult, sessionListSchema } from "./host-link.ts";
@@ -104,10 +108,16 @@ export interface AiTerminals {
   idle(threadId: string, quietMs: number): Promise<boolean>;
   /** The thread takes the session its CLI holds now (it may have gone on in another); true when it changed. */
   follow(threadId: string): boolean;
+  /**
+   * Whether the sessions of terminal process `pid` no thread owns may end in
+   * a switch (`sessions` live in all): "" when they may, else why not.
+   * Without it such a session keeps the old process.
+   */
+  orphansQuiet?(pid: number, sessions: number, quietMs: number): Promise<string>;
 }
 
 /** The core as the terminal sees it. */
-export function aiTerminalsOf(core: AgentCore): AiTerminals {
+export function aiTerminalsOf(core: AgentCore, programs: (pid: number) => Promise<ChildProcess[] | undefined> = childProcesses): AiTerminals {
   return {
     launch: (threadId) => core.terminalLaunch(threadId),
     sessionOf: (threadId, pid) => core.terminalSession(threadId, pid),
@@ -118,6 +128,7 @@ export function aiTerminalsOf(core: AgentCore): AiTerminals {
     alive: (pid, sessions) => core.terminalAlive(pid, sessions),
     idle: (threadId, quietMs) => core.terminalIdle(threadId, quietMs),
     follow: (threadId) => core.terminalFollow(threadId),
+    orphansQuiet: (pid, sessions, quietMs) => core.terminalOrphansQuiet(pid, sessions, quietMs, programs),
   };
 }
 
@@ -175,6 +186,8 @@ export class TerminalService {
   private stopped = false;
   /** A switch to the staged terminal process failed: no more tries this run (each would end the AIs again). */
   private replaceFailed = false;
+  /** The last reason logged for a newer terminal process still waiting. */
+  private waitingFor = "";
 
   constructor(private readonly opts: TerminalServiceOptions) {
     this.supervisor = new HostSupervisor({
@@ -534,6 +547,13 @@ export class TerminalService {
     return this.replacing;
   }
 
+  /** Logs why a newer terminal process still waits, once per reason. */
+  private waiting(why: string): void {
+    if (why === this.waitingFor) return;
+    this.waitingFor = why;
+    this.opts.log(`terminal: a newer terminal process waits (${why})`);
+  }
+
   private async replaceIfIdle(): Promise<void> {
     const ai = this.opts.ai;
     if (!ai || this.stopped || this.replaceFailed || !this.supervisor.hasStaged() || !this.supervisor.link.isReady) return;
@@ -541,14 +561,23 @@ export class TerminalService {
     const live = async () => sessionListSchema.parse(await this.call("list", {})).filter((s) => s.exited === undefined);
     const sessions = await live();
     const reopen: { session: number; threadId: string; cols: number; rows: number }[] = [];
+    let orphans = 0;
     for (const s of sessions) {
       const threadId = ai.threadOf(s.session, this.hostPid);
-      if (!threadId) return; // a plain shell: the old process stays until it ends
+      // No thread owns it: judged with the others below (an AI's CLI left alone may end; a shell keeps the old process).
+      if (!threadId) {
+        orphans += 1;
+        continue;
+      }
       // The CLI may have gone on in another conversation: that one is what is judged, and what opens again.
       ai.follow(threadId);
       // An AI in a turn: the old process stays until it ends.
-      if (!(await ai.idle(threadId, quietMs))) return;
+      if (!(await ai.idle(threadId, quietMs))) return this.waiting(`thread ${threadId}'s AI is not idle`);
       reopen.push({ session: s.session, threadId, cols: s.cols, rows: s.rows });
+    }
+    if (orphans > 0) {
+      const why = ai.orphansQuiet ? await ai.orphansQuiet(this.hostPid, sessions.length, quietMs) : "a session no thread owns";
+      if (why !== "") return this.waiting(why);
     }
     // Looked again right before: nothing opened or ended meanwhile, nothing being opened, still running, no CLI gone on in another session.
     const again = await live();
@@ -556,7 +585,8 @@ export class TerminalService {
     if (!same || this.aiOpening.size > 0 || this.stopped || !this.supervisor.link.isReady) return;
     if (reopen.some((r) => ai.follow(r.threadId))) return;
     const oldPid = this.hostPid;
-    this.opts.log(`terminal: switching to the newer terminal process (${reopen.length} idle AI session(s) open again resumed)`);
+    this.waitingFor = "";
+    this.opts.log(`terminal: switching to the newer terminal process (${reopen.length} idle AI session(s) open again resumed, ${orphans} left alone end)`);
     try {
       await this.supervisor.replace();
     } catch (err) {

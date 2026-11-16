@@ -15,6 +15,7 @@ import { TerminalService, aiTerminalsOf } from "../../src/terminal/terminal-serv
 import { fakeProvider } from "../fake-provider.ts";
 import { makeCore, tempDir } from "../harness.ts";
 import { trustDevice } from "./trusted-devices.ts";
+import type { ChildProcess } from "../../src/terminal/child-processes.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -46,6 +47,8 @@ export async function terminalMachine(opts: {
   orphanGraceMs?: number;
   /** How long a thread's AI must be quiet before a staged terminal process replaces the running one. */
   replaceQuietMs?: number;
+  /** The programs the terminal process runs, as the system lists them (the machine's own by default). */
+  programs?: (pid: number) => Promise<ChildProcess[] | undefined>;
 }) {
   const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()]);
   const config = new ConfigStore(opts.configDir ?? join(tempDir("term-"), "cfg"));
@@ -57,7 +60,7 @@ export async function terminalMachine(opts: {
     config,
     audit,
     unit: opts.unit,
-    ai: aiTerminalsOf(core),
+    ai: opts.programs ? aiTerminalsOf(core, opts.programs) : aiTerminalsOf(core),
     log: (l) => logs.push(l),
     ...(opts.env ? { env: opts.env } : {}),
     ...(opts.shellEnv ? { shellEnv: opts.shellEnv } : {}),

@@ -3,13 +3,16 @@
 // down, the staged binary becomes the current one, and each AI opens again in
 // the new process resumed at its size. A plain shell, an AI in a turn (even
 // one quiet for long: a tool still waiting) or a session its process no longer
-// holds keeps the old process. A staged one that does not start is dropped,
+// holds keeps the old process. An AI's CLI no thread owns ends in the switch
+// once its folder was quiet as long; a program no AI claims keeps the old
+// process, and the log says why it waits. A staged one that does not start is dropped,
 // the old one starts again and no switch is tried again.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ThreadState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentProvider, Liveness, SessionHistory } from "../src/providers/types.ts";
+import type { ChildProcess } from "../src/terminal/child-processes.ts";
 import { TERM_HOST_BINARY } from "../src/terminal/host-supervisor.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { tempDir } from "./harness.ts";
@@ -22,13 +25,15 @@ afterEach(async () => {
 });
 
 /** The fake AI with a CLI and a transcript whose liveness the test sets; `held` is the session its CLI in the thread's folder holds now, as the AI tells. */
-function cliProvider(live: { now: Liveness; held?: { dir: string; sessionId: string } }): AgentProvider {
+function cliProvider(live: Live): AgentProvider {
   const history: SessionHistory = {
     list: () => ({ sessions: [], total: 0, dirs: [] }),
     find: () => undefined,
     end: () => 1,
     read: () => undefined,
     liveness: async () => live.now,
+    // The fake AI's CLI is /opt/fake-ai; whether its folder was quiet is set by the test.
+    terminalCliQuiet: (cli) => (cli.command === "/opt/fake-ai" ? live.cliQuiet : undefined),
     terminalHeldSession: (cli) => (live.held && live.held.dir === cli.dir && Math.abs(Date.now() - cli.startedAt) < 60_000 ? live.held.sessionId : undefined),
   };
   return {
@@ -42,13 +47,15 @@ function cliProvider(live: { now: Liveness; held?: { dir: string; sessionId: str
   };
 }
 
+type Live = { now: Liveness; held?: { dir: string; sessionId: string }; cliQuiet: boolean; programs: ChildProcess[] | undefined };
+
 const QUIET_MS = 1_000;
 /** A session its running CLI holds, quiet for `ms`, outside any turn. */
 const idleFor = (ms: number): Liveness => ({ state: "idle", since: Date.now() - ms, held: true, turnOpen: false, via: "transcript" });
 const consent = { sensitive: false, projectSettings: false };
 
 async function setup() {
-  const live: { now: Liveness; held?: { dir: string; sessionId: string } } = { now: idleFor(5 * QUIET_MS) };
+  const live: Live = { now: idleFor(5 * QUIET_MS), cliQuiet: true, programs: undefined };
   const configDir = join(tempDir("term-replace-"), "cfg");
   const bin = join(configDir, "term-host", "bin");
   mkdirSync(join(bin, "current"), { recursive: true });
@@ -63,7 +70,7 @@ async function setup() {
       await fake.start();
     },
   };
-  const m = await terminalMachine({ unit, configDir, providers: [cliProvider(live)], replaceQuietMs: QUIET_MS });
+  const m = await terminalMachine({ unit, configDir, providers: [cliProvider(live)], replaceQuietMs: QUIET_MS, programs: async () => live.programs });
   cleanup.push(() => rmSync(dirname(configDir), { recursive: true, force: true }), () => m.terminal.stop(), () => host.stop());
   const c = await m.connect(await m.pair());
   const thread = await m.core.create({ provider: "fake", model: "", dir: m.work, text: "hi", consent, device: "test" });
@@ -156,5 +163,45 @@ describe("a staged terminal process", () => {
     stage();
     await m.terminal.replaceWhenIdle();
     expect(host.commands.some((x) => x.cmd === "shutdown")).toBe(false);
+  });
+
+  it("an AI's CLI no thread owns, its folder quiet: the switch goes ahead, it ends there and is not opened again", async () => {
+    const { m, c, host, live, stage } = await setup();
+    // A session the thread no longer owns: here a second session the fake AI's CLI runs in.
+    expect((await c.request("2", { case: "termOpen", value: { cols: 80, rows: 24, cwd: m.work } })).body).toMatchObject({ case: "termOpened" });
+    const ai = (pid: number): ChildProcess => ({ pid, command: "/opt/fake-ai", args: "/opt/fake-ai --resume x", cwd: m.work });
+    live.programs = [ai(10), ai(11)];
+    stage();
+    await m.terminal.replaceWhenIdle();
+    expect(host.commands.filter((x) => x.cmd === "shutdown")).toHaveLength(1);
+    // Only the thread's AI opens again.
+    expect(host.commands.filter((x) => x.cmd === "open")).toHaveLength(3);
+    expect(m.logs.some((l) => l.includes("(1 idle AI session(s) open again resumed, 1 left alone end)"))).toBe(true);
+  });
+
+  it("an AI's CLI no thread owns waits while its folder was written recently, a shell or unreadable programs always wait; each reason logged once", async () => {
+    const { m, c, host, live, stage } = await setup();
+    expect((await c.request("2", { case: "termOpen", value: { cols: 80, rows: 24, cwd: m.work } })).body).toMatchObject({ case: "termOpened" });
+    const ai: ChildProcess = { pid: 10, command: "/opt/fake-ai", args: "/opt/fake-ai", cwd: m.work };
+    stage();
+    live.cliQuiet = false;
+    live.programs = [ai, { ...ai, pid: 11 }];
+    await m.terminal.replaceWhenIdle();
+    await m.terminal.replaceWhenIdle();
+    live.cliQuiet = true;
+    live.programs = [ai, { pid: 11, command: "/bin/zsh", args: "-zsh", cwd: m.work }];
+    await m.terminal.replaceWhenIdle();
+    // One program for two sessions: it cannot tell which is which.
+    live.programs = [ai];
+    await m.terminal.replaceWhenIdle();
+    live.programs = undefined;
+    await m.terminal.replaceWhenIdle();
+    expect(host.commands.some((x) => x.cmd === "shutdown")).toBe(false);
+    const waits = m.logs.filter((l) => l.includes("a newer terminal process waits"));
+    expect(waits).toHaveLength(4);
+    expect(waits[0]).toContain("was active in");
+    expect(waits[1]).toContain("runs zsh, not an AI's CLI");
+    expect(waits[2]).toContain("1 program(s) for 2 session(s)");
+    expect(waits[3]).toContain("cannot be read");
   });
 });

@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
+import type { ChildProcess } from "../terminal/child-processes.ts";
 import { create } from "@bufbuild/protobuf";
 import {
   ActivityPhase,
@@ -2555,6 +2556,32 @@ export class AgentCore {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Whether the sessions of terminal process `pid` that no thread owns may
+   * end when a newer terminal process replaces it: every program it runs
+   * (one per live session, `sessions` of them) is an AI's CLI with nothing
+   * written to that AI's sessions in its folder for `quietMs`. "" when they
+   * may, else why not (for the agent's log). A shell, any program no AI
+   * claims, or programs that cannot be read keep them.
+   */
+  async terminalOrphansQuiet(pid: number, sessions: number, quietMs: number, list: (pid: number) => Promise<ChildProcess[] | undefined>): Promise<string> {
+    const programs = await list(pid);
+    if (programs === undefined) return "the terminal's programs cannot be read on this machine";
+    if (programs.length !== sessions) return `the terminal runs ${programs.length} program(s) for ${sessions} session(s)`;
+    const histories = this.opts.providers.flatMap((p) => (p.history?.terminalCliQuiet ? [p.history] : []));
+    for (const program of programs) {
+      let quiet: boolean | undefined;
+      for (const history of histories) {
+        await history.prime?.();
+        quiet = history.terminalCliQuiet?.(program, quietMs);
+        if (quiet !== undefined) break;
+      }
+      if (quiet === undefined) return `a session no thread owns runs ${program.command.split("/").pop() ?? "a program"}, not an AI's CLI`;
+      if (!quiet) return `an AI's CLI no thread owns was active in ${program.cwd || "an unknown folder"} within ${Math.round(quietMs / 60_000)} min`;
+    }
+    return "";
   }
 
   /** The thread whose AI runs in `session` of terminal process `pid`; "" when none. */

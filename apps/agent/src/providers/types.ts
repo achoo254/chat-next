@@ -355,6 +355,15 @@ export interface SessionHistory {
    */
   liveness?(sessionId: string): Promise<Liveness>;
   /**
+   * For a program a terminal of the machine runs that no thread owns
+   * (`command` and `args` as the system lists them, `cwd` its working
+   * folder): undefined when it is not this AI's CLI, else whether nothing was
+   * written to the AI's sessions in that folder (or one inside it) for
+   * `quietMs`, so it can end with nothing lost. False when it cannot tell.
+   * Never fails.
+   */
+  terminalCliQuiet?(cli: { command: string; args: string; cwd: string }, quietMs: number): boolean | undefined;
+  /**
    * The session that the AI's CLI a terminal of the machine started holds
    * now, as the AI's own record of its running processes tells: the CLI may
    * have gone on in another session than the one it started with (Claude:

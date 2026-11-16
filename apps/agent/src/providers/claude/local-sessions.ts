@@ -23,7 +23,7 @@ import { basename, dirname, join } from "node:path";
 import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery, SubagentReport } from "../types.ts";
 import { ClaudeSubagentFeed } from "./office-subagents.ts";
 import { type ProcessStartLookup, windowsProcessStart } from "./process-start.ts";
-import { ClaudeProcesses, heldSessions } from "./running-claude.ts";
+import { ClaudeProcesses, heldSessions, isClaudeCommand } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
 
 const SESSION_FILE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
@@ -584,6 +584,24 @@ export class LocalSessions implements SessionHistory {
       return fresh;
     }
     return this.scan().find((x) => x.sessionId === id);
+  }
+
+  terminalCliQuiet(cli: { command: string; args: string; cwd: string }, quietMs: number): boolean | undefined {
+    if (!isClaudeCommand(cli.command, cli.args)) return undefined;
+    if (cli.cwd === "") return false;
+    try {
+      const since = this.now() - quietMs;
+      const same = dirComparer();
+      for (const k of this.scan()) {
+        if (k.mtimeMs < since) continue;
+        const dir = this.head(k)?.dir ?? "";
+        // A recent session whose folder is unknown may be this CLI's.
+        if (dir === "" || same(dir, cli.cwd) || within(dir, cli.cwd)) return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /** Where the session began, what started it, and the first thing the user asked. */

@@ -435,3 +435,33 @@ test("what the user typed, as the terminal shows it", () => {
   expect(cleanPrompt("<system-reminder>x</system-reminder>")).toBeUndefined();
   expect(cleanPrompt("  plain  ")).toBe("plain");
 });
+
+describe("a Claude CLI in a terminal no thread owns", () => {
+  const MIN = 60_000;
+  const cli = (cwd: string) => ({ command: "/Users/me/.local/bin/claude", args: "/Users/me/.local/bin/claude --session-id x", cwd });
+
+  test("quiet once no session in its folder, or one inside it, was written for as long; another folder's sessions do not count", () => {
+    const home = tempDir("claude-home-");
+    const here = new Transcript(randomUUID(), "/Users/me/app").opening();
+    here.user("hello");
+    const inside = new Transcript(randomUUID(), "/Users/me/app/web").opening();
+    inside.user("hi");
+    const other = new Transcript(randomUUID(), "/Users/me/other").opening();
+    other.user("busy elsewhere");
+    age(here.write(home), 30 * MIN);
+    const insideFile = inside.write(home);
+    age(insideFile, 20 * MIN);
+    age(other.write(home), 0);
+    const s = sessions([home]);
+    expect(s.terminalCliQuiet(cli("/Users/me/app"), 10 * MIN)).toBe(true);
+    age(insideFile, 2 * MIN);
+    expect(s.terminalCliQuiet(cli("/Users/me/app"), 10 * MIN)).toBe(false);
+  });
+
+  test("not its business for another program; not quiet when its folder is unknown", () => {
+    const s = sessions([tempDir("claude-home-")]);
+    expect(s.terminalCliQuiet({ command: "/bin/zsh", args: "-zsh", cwd: "/Users/me/app" }, MIN)).toBeUndefined();
+    expect(s.terminalCliQuiet(cli(""), MIN)).toBe(false);
+    expect(s.terminalCliQuiet(cli("/Users/me/app"), MIN)).toBe(true);
+  });
+});

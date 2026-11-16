@@ -10,6 +10,7 @@
 // Nothing here reads any application's own files or settings.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { parseCwds } from "../../terminal/child-processes.ts";
 
 const run = promisify(execFile);
 
@@ -75,15 +76,7 @@ export function parsePs(out: string, now: number, exceptParent: number): Omit<Ru
 }
 
 /** `lsof -a -d cwd -Fn -p …` output → working folder by pid. */
-export function parseLsofCwd(out: string): Map<number, string> {
-  const cwd = new Map<number, string>();
-  let pid = 0;
-  for (const line of out.split("\n")) {
-    if (line.startsWith("p")) pid = Number(line.slice(1));
-    else if (line.startsWith("n") && pid) cwd.set(pid, line.slice(1));
-  }
-  return cwd;
-}
+export const parseLsofCwd = parseCwds;
 
 export type ProbeDeps = {
   platform?: NodeJS.Platform;
