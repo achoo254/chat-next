@@ -375,11 +375,19 @@ fn closing_the_session_while_history_is_rebuilt_removes_its_log() {
             .unwrap_or(true)),
         "log left behind"
     );
-    // No page of a closed session goes out.
+    // No page goes out once the session is closed (a fast rebuild may still
+    // answer before the close: frames of one connection keep their order, so
+    // only rows after the session's Exit are wrong).
     let deadline = Instant::now() + Duration::from_secs(2);
+    let mut exited = false;
     while Instant::now() < deadline {
-        if let Some(Frame::History { row_count, .. }) = t.recv_acking(Duration::from_millis(200)) {
-            assert_eq!(row_count, 0, "rows of a closed session");
+        match t.recv_acking(Duration::from_millis(200)) {
+            Some(Frame::Exit { session, .. }) if session == s => exited = true,
+            Some(Frame::History { row_count, .. }) if exited => {
+                assert_eq!(row_count, 0, "rows of a closed session");
+            }
+            _ => {}
         }
     }
+    assert!(exited, "the closed session's Exit");
 }
