@@ -13903,7 +13903,8 @@ type AuditEntry struct {
 	// open_sensitive, project_settings (detail "trust" when a device trusted
 	// the folder), approve_sensitive, revoke (the account revoked a connected device),
 	// permission_mode, profile_add, profile_select, profile_remove (detail:
-	// the AI id, then the account),
+	// the AI id, then the account), profile_accept (a saved account keeps the
+	// account its sign-in changed to; detail: the old and the new account),
 	// delete_session (path: the folder; detail: the session ids),
 	// project_add (a sensitive folder added as a project),
 	// secret_add (path: the site; detail: the name, "saved" or "once"),
