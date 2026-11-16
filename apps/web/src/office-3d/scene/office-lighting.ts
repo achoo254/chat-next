@@ -44,7 +44,7 @@ const NIGHT: OfficeLight = {
 	keyIntensity: 0.62,
 	keyColor: [1, 0.72, 0.48],
 	backdrop: [0.3, 0.27, 0.4],
-	exposure: 1.1,
+	exposure: 0.82,
 	bloomWeight: 0.65,
 	screenGlow: 0.9,
 	ambient: [0.62, 0.55, 0.62],

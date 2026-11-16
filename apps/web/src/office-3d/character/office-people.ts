@@ -43,6 +43,8 @@ export interface PersonView {
 	/** The anchor walked to (or stood at) and the pose now, for tests. */
 	readonly target: string;
 	readonly pose: Pose;
+	/** Height of the name label over the feet, metres (the drawn character's). */
+	readonly labelHeight: number;
 }
 
 interface Person {
@@ -218,6 +220,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				deskAnchor: p.sample.done && deskAnchors.has(p.target.anchorId) ? p.target.anchorId : null,
 				target: p.target.anchorId,
 				pose: p.pose,
+				labelHeight: p.visual.labelHeight,
 			}));
 		},
 		rebuild() {

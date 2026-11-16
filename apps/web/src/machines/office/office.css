@@ -55,7 +55,8 @@
 .of-picture .of-marker { position: absolute; max-width: 180px; padding: 2px 8px 2px 2px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); transform: translate(-8px, calc(-50% - var(--of-stack, 0) * 26px)); }
 .of-picture .of-bubble { position: absolute; left: 0; bottom: calc(100% + 4px); max-width: 200px; }
 .of-picture .of-overflow { position: absolute; transform: translate(-50%, -50%); }
-.of-board-pin { position: absolute; width: 150px; padding: var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 92%, transparent); box-shadow: var(--shadow-sm); transform: translate(-50%, -100%); }
+/* Kept inside the picture across: a board near a side edge slides in instead of widening the scroll area. */
+.of-board-pin { --of-board-half: 75px; position: absolute; width: calc(var(--of-board-half) * 2); padding: var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 92%, transparent); box-shadow: var(--shadow-sm); transform: translate(-50%, -100%); }
 .of-board-pin .of-board { padding-top: 0; border-top: 0; }
 @container (max-width: 640px) {
 	.of-picture { width: max(100%, 560px); }

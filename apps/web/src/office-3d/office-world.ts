@@ -181,6 +181,14 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		const now = performance.now();
 		const dtMs = Math.min(100, now - last);
 		last = now;
+		// The quality scaler may change the canvas resolution, so it too runs before this frame draws: the
+		// previous frame's duration decides (on WebGPU a resize after render() destroys textures the frame still submits).
+		if (frames > 0) {
+			if (warm < WARM_UP_FRAMES) {
+				warm += 1;
+				if (warm === WARM_UP_FRAMES) scaler.start();
+			} else scaler.onFrame(dtMs);
+		}
 		if (resizePending) {
 			resizePending = false;
 			engine.resize();
@@ -203,10 +211,6 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		scene.render();
 		frames += 1;
 		stats.push(dtMs);
-		if (warm < WARM_UP_FRAMES) {
-			warm += 1;
-			if (warm === WARM_UP_FRAMES) scaler.start();
-		} else scaler.onFrame(dtMs);
 	};
 	const gate = createRenderGate(host, (run) => {
 		if (run) {
@@ -265,6 +269,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				window.clearTimeout(prepareTimer);
 				gate.dispose();
 				resize.disconnect();
+				overlay.dispose();
 				engine.onContextLostObservable.remove(lost);
 				removeTestApi();
 				engine.stopRenderLoop();

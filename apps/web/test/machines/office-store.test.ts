@@ -83,6 +83,16 @@ describe("the office store", () => {
 		expect(store.state().power).toBe("on");
 	});
 
+	it("shows no hourglass on a subagent that is done, however long it stays at its hand-in spot", () => {
+		const { store, clock } = storeAt();
+		store.applySnapshot(snapshot([director(), staff("a1", "tester", { state: OfficeActorState.DONE, activity: act("hand-in", OfficeRoom.LOBBY, "", T0) })]));
+		clock.now = T0 + SLOW_TOOL_MS * 3;
+		store.tick(clock.now);
+		const done = store.state().actors.find((a) => a.id === "a1");
+		expect(done?.state).toBe("done");
+		expect(done?.activity?.slow).toBe(false);
+	});
+
 	it("shows an hourglass on a tool running over two minutes", () => {
 		const { store, clock } = storeAt();
 		store.applySnapshot(snapshot([director({ activity: act("t1", OfficeRoom.QA, "Bash", T0) })]));

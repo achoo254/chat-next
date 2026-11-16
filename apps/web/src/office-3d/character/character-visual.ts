@@ -10,6 +10,8 @@ import type { Pose } from "./anim-groups.ts";
 export interface CharacterVisual {
 	readonly root: TransformNode;
 	readonly meshes: () => readonly AbstractMesh[];
+	/** Where the name label sits over the feet, metres: just clear of the head. */
+	readonly labelHeight: number;
 	setPose(pose: Pose): void;
 	/** Animation level of detail (0 stops the clip). */
 	setUpdateEvery(every: UpdateEvery): void;

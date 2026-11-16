@@ -29,6 +29,14 @@ import { typingOffsets } from "./typing-motion.ts";
 
 /** Where the pelvis rests when sitting (seat of the chair model plus its cushion). */
 const SEAT_PELVIS_HEIGHT = 0.5;
+/**
+ * Size of the model in the room: the concept draws big-headed chibi staff
+ * about as tall as a desk and its monitor, so the rig (built near adult desk
+ * scale) is enlarged to stay readable in the whole-floor view.
+ */
+export const CHARACTER_SCALE = 1.35;
+/** Name label height over the feet for the rig at its own size, metres (clear of the hair). */
+const LABEL_HEIGHT_UNSCALED = 1.4;
 /** Clip offset between characters, seconds, so they do not move in unison. */
 const PHASE_SECONDS = 0.83;
 /** A clip that animates the typing hands itself (no coded swing on top). */
@@ -58,6 +66,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 	const suffix = `-${key}`;
 	const entries = container.instantiateModelsToScene((name) => `${name}${suffix}`, false, { doNotInstantiate: false });
 	const holder = new TransformNode(`person-${key}`, scene);
+	holder.scaling.setAll(CHARACTER_SCALE);
 	const model = entries.rootNodes[0] as TransformNode | undefined;
 	if (model === undefined) throw new Error("character has no root node");
 	model.parent = holder;
@@ -108,6 +117,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 
 	return {
 		root: holder,
+		labelHeight: LABEL_HEIGHT_UNSCALED * CHARACTER_SCALE,
 		meshes: () => meshes,
 		setPose(next) {
 			if (next === pose && clip !== null) return;
@@ -136,7 +146,9 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			if (measure && clip !== null) {
 				const pelvis = nodes.get("pelvis");
 				if (pelvis !== undefined) {
-					const lift = SEAT_PELVIS_HEIGHT - (pelvis.computeWorldMatrix(true).getTranslation().y - holder.position.y - model.position.y);
+					// In the model's own (unscaled) units: the pelvis height over the holder, without the current lift.
+					const pelvisInModel = (pelvis.computeWorldMatrix(true).getTranslation().y - holder.position.y) / CHARACTER_SCALE - model.position.y;
+					const lift = SEAT_PELVIS_HEIGHT / CHARACTER_SCALE - pelvisInModel;
 					seatLift.set(clip, lift);
 					model.position.y = lift;
 				}

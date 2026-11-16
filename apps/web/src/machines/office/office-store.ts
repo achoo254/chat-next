@@ -96,7 +96,8 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			reportsStaff,
 			actors: actors.map(({ beforeApproval: _before, activity, ...rest }) => ({
 				...rest,
-				activity: activity === null ? null : { ...activity, slow: activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS },
+				// Only work still going on runs long: a finished subagent keeps its hand-in spot as an activity.
+				activity: activity === null ? null : { ...activity, slow: rest.state === "working" && activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS },
 			})),
 			staff,
 			overflow: overflowOf(staff),

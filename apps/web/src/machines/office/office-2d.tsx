@@ -73,7 +73,7 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 						const at = view.anchors.get(a.id);
 						if (at === undefined || a.room === null) return null;
 						return (
-							<div key={a.id} className="of-board-pin" style={{ left: `${at[0]}%`, top: `${at[1]}%` }}>
+							<div key={a.id} className="of-board-pin" style={{ left: `clamp(var(--of-board-half), ${at[0]}%, calc(100% - var(--of-board-half)))`, top: `${at[1]}%` }}>
 								<OfficeBoard room={a.room} state={state} now={now} t={t} locale={locale} />
 							</div>
 						);

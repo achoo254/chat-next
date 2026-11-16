@@ -68,6 +68,7 @@ export function createBlockCharacter(scene: Scene, bodies: BlockBodies, key: str
 	return {
 		root,
 		meshes: () => [body, head],
+		labelHeight: 1.4,
 		setPose(next) {
 			pose = next;
 		},
