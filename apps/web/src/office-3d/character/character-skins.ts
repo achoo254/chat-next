@@ -27,18 +27,16 @@ interface Textured {
 /** Loads a texture and resolves once its picture is on the GPU. */
 export function loadTexture(scene: Scene, url: string): Promise<Texture> {
 	return new Promise((resolve, reject) => {
-		const texture: Texture = new Texture(
-			url,
-			scene,
-			{ invertY: false, noMipmap: false },
-			undefined,
-			undefined,
-			() => resolve(texture),
-			(message) => {
+		// With an options object the constructor reads the callbacks from it, not from its later arguments.
+		const texture: Texture = new Texture(url, scene, {
+			invertY: false,
+			noMipmap: false,
+			onLoad: () => resolve(texture),
+			onError: (message) => {
 				texture.dispose();
 				reject(new Error(message ?? `texture ${url} not loaded`));
 			},
-		);
+		});
 	});
 }
 
