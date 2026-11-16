@@ -15,6 +15,7 @@ import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, ty
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../router.tsx";
+import { AdvisorVerdictCard } from "./cards/advisor-verdict.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
 import { QuestionCard } from "./cards/question.tsx";
@@ -38,7 +39,7 @@ import { ProjectConfigHint } from "./project-config.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
 import { StatusBar } from "./status-bar.tsx";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
-import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block } from "./transcript/tool-fold.ts";
+import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block, type ShownAttachment } from "./transcript/tool-fold.ts";
 import { messageCount, splitConversations } from "./transcript/conversation-break.ts";
 import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
@@ -68,6 +69,14 @@ const AGENT_2_0_1 = [2, 0, 1] as const;
 
 type Pending = Extract<Block, { kind: "approval" | "question" }>;
 
+/**
+ * Advisor's chips may send in this session: one the machine listed and not Advisor's own (before the list came,
+ * an Advisor thread opened by its link is not known as one yet).
+ */
+export function verdictChipsSend(listed: boolean, advisorThread: boolean): boolean {
+	return listed && !advisorThread;
+}
+
 function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
@@ -90,7 +99,10 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const prompts = all.filter(isPending);
 	// A long session opens on its newest items: until its oldest are in, the earlier conversations are counted in part.
 	const allLoaded = (state.journals.get(threadId)?.earlier ?? "") === "";
-	const previousBlocks = foldTranscript(conversations.previous).filter((b) => !isPending(b));
+	// An earlier conversation is over: Advisor's next steps there are spent.
+	const previousBlocks = foldTranscript(conversations.previous)
+		.filter((b) => !isPending(b))
+		.map((b) => (b.kind === "advisor" ? { ...b, open: false } : b));
 	// A prompt still pending in an earlier conversation shows in the dock: alone it makes no earlier conversation to fold.
 	const previous: PreviousConversation | null =
 		previousBlocks.length === 0
@@ -200,6 +212,12 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useEffect(() => rememberSessionMode(machine, threadId, mode), [machine, threadId, mode]);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
 	const held = thread !== null && thread.terminalSession > 0;
+	const canSend = online && !missing && !held;
+	const send = async (text: string, files: readonly ShownAttachment[]): Promise<void> => {
+		// `/clear` opens a new, empty session in this folder: go to it.
+		const opened = await link.send(threadId, text, files);
+		if (opened !== undefined) navigate(paths.machineSession(machine, opened.id));
+	};
 	// "project · workspace · branch · machine" under the title: the project holding the session's folder, else the folder.
 	const placed = entry === null || dir === "" ? null : locate(projects.projects, entry.id, dir);
 	const own = state.projects?.projects.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
@@ -334,6 +352,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							older={!allLoaded}
 							breakId={conversations.breakId}
 							loadOlder={() => link.loadEarlier(threadId)}
+							onSend={verdictChipsSend(state.listed, advisorThread) ? (text) => send(text, []) : undefined}
+							sendLocked={!canSend}
 						/>
 					)}
 					{suggestion !== undefined && (
@@ -383,7 +403,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					<Composer
 						ai={ai}
 						machine={machineName}
-						online={online && !missing && !held}
+						online={canSend}
 						running={running}
 						prompting={prompts.length > 0 || outside > 0}
 						commands={threadInfo?.commands ?? []}
@@ -392,11 +412,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						focusKey={threadId}
 						fill={fill}
 						onFilled={(id) => advisorStore.takeFill(machine, threadId, id)}
-						onSend={async (text, files) => {
-							// `/clear` opens a new, empty session in this folder: go to it.
-							const opened = await link.send(threadId, text, files);
-							if (opened !== undefined) navigate(paths.machineSession(machine, opened.id));
-						}}
+						onSend={send}
 						onStop={async () => {
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}
@@ -639,6 +655,13 @@ interface TranscriptProps {
 	breakId?: string;
 	/** Asks the machine for the page before the loaded items; resolves once it is in or failed. */
 	loadOlder?: () => Promise<void>;
+	/**
+	 * Sends a message to the session (an Advisor verdict's chip); none where the user sends nothing (Advisor's own
+	 * session, or before the machine listed its threads and that is not known yet).
+	 */
+	onSend?: ((text: string) => Promise<void>) | undefined;
+	/** The session cannot take a message now (offline, held by its terminal): chips are dimmed like during a turn. */
+	sendLocked?: boolean;
 }
 
 /**
@@ -680,7 +703,7 @@ export const TRANSCRIPT_PAGE = 40;
 const EARLIER_PX = 600;
 
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
-export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId }: TranscriptProps) {
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -836,7 +859,19 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 				)}
 				{withPreviousRow(
 					shown.map((block) => (
-						<BlockView key={block.id} block={block} state={state} running={running || (block.kind === "tools" && block === last)} fetchFull={fetchFull} t={t} link={link} threadId={threadId} />
+						<BlockView
+							key={block.id}
+							block={block}
+							state={state}
+							running={running || (block.kind === "tools" && block === last)}
+							fetchFull={fetchFull}
+							t={t}
+							link={link}
+							threadId={threadId}
+							ai={aiName(state.info, thread?.provider ?? "")}
+							onSend={onSend}
+							sendLocked={sendLocked}
+						/>
 					)),
 					previous === null || before < start ? null : (
 						<PreviousRow key="previous-conversation" messages={previous.messages} opened={opened} onToggle={togglePrevious} t={t} />
@@ -891,9 +926,12 @@ interface BlockViewProps {
 	t: MachinesCopy;
 	link: UploadLink;
 	threadId: string;
+	ai: string;
+	onSend: ((text: string) => Promise<void>) | undefined;
+	sendLocked: boolean;
 }
 
-function BlockView({ block, state, running, fetchFull, t, link, threadId }: BlockViewProps) {
+function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked }: BlockViewProps) {
 	const { locale } = useI18n();
 	switch (block.kind) {
 		case "user":
@@ -925,6 +963,9 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId }: Bloc
 		}
 		case "todo":
 			return <TodoCard todo={block.todo} />;
+		case "advisor":
+			// Chips wait for the turn to end (one sent mid-turn would land in the wrong turn) and are spent once anything followed.
+			return <AdvisorVerdictCard verdict={block.verdict} onSend={onSend} past={!block.open} running={running} unavailable={sendLocked} ai={ai} />;
 		case "approval":
 			// Answered (pending ones wait in the dock): the outcome line.
 			return <ApprovalCard approval={block.approval} ai="" sessionAllow={false} onDecide={() => Promise.resolve()} />;

@@ -2,10 +2,12 @@
 // 3 file"); when the machine reported the turn's numbers, the line opens to
 // show them: model, tokens, cache, context, time waiting on the API, model
 // round trips and the cost at API prices (an estimate: a subscription plan
-// is not charged it).
+// is not charged it). A session with automatic Advisor whose AI ended a
+// turn without asking it for next steps gets a quiet line under it.
 import { TurnState, type TurnItem } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon } from "../machine-icons.tsx";
+import { AdvisorMissedLine } from "./advisor-verdict.tsx";
 
 /** 45,2 giây · 1 phút 17 giây · 1 giờ 3 phút. */
 export function durationText(ms: number, t: MachinesCopy, locale: string): string {
@@ -44,7 +46,16 @@ interface TurnLineProps {
 	locale: string;
 }
 
-export function TurnLine({ turn, tools, files, t, locale }: TurnLineProps) {
+export function TurnLine(props: TurnLineProps) {
+	return (
+		<>
+			<TurnSummary {...props} />
+			{props.turn.advisorMissed && props.turn.state === TurnState.COMPLETED && <AdvisorMissedLine />}
+		</>
+	);
+}
+
+function TurnSummary({ turn, tools, files, t, locale }: TurnLineProps) {
 	const text = turnText(turn, tools, files, t, locale);
 	const failed = turn.state === TurnState.FAILED;
 	if (!hasTurnDetails(turn)) return <div className={failed ? "mx-line error" : "mx-line"}>{text}</div>;

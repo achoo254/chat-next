@@ -5,7 +5,9 @@
 // and the question comes back answered; in a session, a failed push copied
 // from Source Control goes with its failure_id, and "Gửi sang phiên" fills the
 // session's composer; on a phone the mascot snaps to the edge it is dragged
-// to, keeps it after a reload, and the bubble is a bottom sheet. Starts its
+// to, keeps it after a reload, and the bubble is a bottom sheet; the
+// session's automatic verdict is a card with its options and its chips
+// spent once the user wrote on, on a computer and a phone. Starts its
 // own Vite dev server of the harness, so it needs no backend:
 //
 //   node --test test/e2e/advisor.e2e.ts
@@ -184,3 +186,35 @@ test("on a phone the mascot snaps to the edge it is dragged to, keeps it, and th
 	assert.deepEqual(errors, []);
 	await context.close();
 });
+
+for (const viewport of [
+	{ width: 1366, height: 768 },
+	{ width: 390, height: 844 },
+]) {
+	test(`the session's verdict card at ${viewport.width} px: what was sent, its shares, chips spent after the user's next message`, async () => {
+		const context = await browser.newContext({ locale: "vi-VN", viewport });
+		const page = await context.newPage();
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(String(err)));
+		await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
+		const card = page.locator("[data-id=advisor-verdict]");
+		await card.waitFor({ timeout: 30_000 });
+		await card.scrollIntoViewIfNeeded();
+		assert.equal(await card.getAttribute("aria-label"), "Cố vấn nhận định");
+		await card.getByText("Sau khi sửa CSS thẻ tool, làm gì tiếp?").waitFor();
+		assert.match((await card.locator("li.top").textContent()) ?? "", /Build lại rồi chụp ảnh 375 px\s*74%/);
+		// The user wrote their own message after it (the demo's second turn): the chips are spent, and a command is never one.
+		const chips = card.getByRole("group", { name: "Gửi vào phiên" }).getByRole("button");
+		assert.equal(await chips.count(), 2);
+		for (const chip of await chips.all()) assert.equal(await chip.isDisabled(), true);
+		await card.getByText("Đã có tin mới sau nhận định này.").waitFor();
+		// The advisor_weigh call is the card: no tool row of it, never its raw input.
+		const text = (await page.locator(".mx-messages").textContent()) ?? "";
+		assert.ok(!text.includes("raw-input-not-shown") && !text.includes("advisor_weigh"), "the call's raw input shows");
+		await noSideScroll(page);
+		const box = await card.boundingBox();
+		assert.ok(box !== null && box.x >= 0 && box.x + box.width <= viewport.width, `card ${box?.x}+${box?.width} outside ${viewport.width}`);
+		assert.deepEqual(errors, []);
+		await context.close();
+	});
+}

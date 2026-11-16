@@ -84,6 +84,17 @@ export const zhCNAdvisor: AdvisorCopy = {
 		},
 		otherError: "顾问出错了。",
 	},
+	card: {
+		title: (name) => `${name}的判断`,
+		kinds: { decision: "选择", next_steps: "下一步", answer: "回答" },
+		options: "各个选项",
+		next: "发送到会话",
+		locked: "当前这一轮结束后才能发送。",
+		unavailable: "会话现在无法接收消息（设备已断开，或会话正在终端中打开）。",
+		past: "这条判断之后已有新消息。",
+		chosen: "已发送",
+		missed: (name) => `这一轮 AI 没有询问${name}。`,
+	},
 	menu: {
 		label: "顾问选项",
 		auto: "自动关注此会话",

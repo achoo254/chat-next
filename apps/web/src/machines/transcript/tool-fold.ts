@@ -5,12 +5,16 @@
 // a card with buttons), a turn's outcome shows where the turn ends (before the next
 // message of the user), and a label names the AI/model when the answering
 // one changed. Only the generic item shapes are read, never a tool's own
-// name, so every AI adapter renders the same way.
+// name, so every AI adapter renders the same way: Advisor's verdict on a call
+// (AdvisorVerdictItem) names that call by its tool id, and the call with its
+// result folds into the verdict's card instead of a row of its own (the
+// call's raw input may hold what Advisor refused to send).
 import {
 	PromptState,
 	Role,
 	ToolKind,
 	TurnState,
+	type AdvisorVerdictItem,
 	type AgentHandoffItem,
 	type ApprovalItem,
 	type DiffItem,
@@ -45,6 +49,11 @@ export type Block =
 	| { readonly kind: "tools"; readonly id: string; readonly runs: readonly ToolRun[] }
 	| { readonly kind: "diff"; readonly id: string; readonly diff: DiffItem }
 	| { readonly kind: "todo"; readonly id: string; readonly todo: TodoItem }
+	/**
+	 * Advisor's verdict on one advisor_weigh call: its call and result fold into it. `open`: nothing of the user
+	 * (sent or on its way) came after it, so its next steps may still be sent.
+	 */
+	| { readonly kind: "advisor"; readonly id: string; readonly verdict: AdvisorVerdictItem; readonly open: boolean }
 	| { readonly kind: "approval"; readonly id: string; readonly revision: number; readonly approval: ApprovalItem }
 	| { readonly kind: "question"; readonly id: string; readonly revision: number; readonly question: QuestionItem }
 	/** `tools` and `files`: tool calls and files edited in the turn, counted from its items. */
@@ -86,6 +95,8 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	const answered = new Map<string, ApprovalItem>();
 	/** Paths each subagent edited, by its tool id. */
 	const subagentFiles = new Map<string, Set<string>>();
+	/** Calls Advisor gave a verdict on: drawn as that verdict's card, never as a row. */
+	const advised = new Set<string>();
 	for (const item of items) {
 		const b = item.body;
 		if (b.case === "diff" && b.value.parentToolId !== "") {
@@ -99,6 +110,9 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 			if (b.value.kind !== ToolKind.TODO) rows.add(b.value.toolId);
 		} else if (b.case === "text" && b.value.clientMsgId !== "") echoed.add(b.value.clientMsgId);
 		else if (b.case === "approval" && b.value.state !== PromptState.PENDING && b.value.toolId !== "") answered.set(b.value.toolId, b.value);
+		// A verdict naming no call (never sent by tunelo, which takes the id from the call's start) folds nothing: its card
+		// shows and so does any call row.
+		else if (b.case === "advisorVerdict" && b.value.toolId !== "") advised.add(b.value.toolId);
 	}
 
 	const blocks: Block[] = [];
@@ -109,6 +123,15 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	let turnTools = 0;
 	let turnFiles = new Set<string>();
 	const filesOf = (toolId: string): string[] => [...(subagentFiles.get(toolId) ?? [])];
+	/** Where in `blocks` the verdicts still open are: the user's next message (or one on its way) closes them. */
+	let openVerdicts: number[] = [];
+	const closeVerdicts = () => {
+		for (const at of openVerdicts) {
+			const block = blocks[at];
+			if (block?.kind === "advisor") blocks[at] = { ...block, open: false };
+		}
+		openVerdicts = [];
+	};
 
 	const flushRuns = () => {
 		if (runs.length === 0) return;
@@ -131,6 +154,8 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				// The todo card shows the list; its tool call adds nothing.
 				if (b.value.kind === ToolKind.TODO) break;
 				turnTools += 1;
+				// Advisor's card shows this call (at its verdict).
+				if (advised.has(b.value.toolId)) break;
 				const result = results.get(b.value.toolId);
 				runs.push({
 					id: item.id,
@@ -160,8 +185,8 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				blocks.push({ kind: "diff", id: item.id, diff: b.value });
 				break;
 			case "approval":
-				// Answered and its call is shown: the call's row carries the outcome.
-				if (b.value.state !== PromptState.PENDING && rows.has(b.value.toolId)) break;
+				// Answered and its call is shown: the call's row (or Advisor's card) carries the outcome.
+				if (b.value.state !== PromptState.PENDING && (rows.has(b.value.toolId) || advised.has(b.value.toolId))) break;
 				flushRuns();
 				blocks.push({ kind: "approval", id: item.id, revision: item.revision, approval: b.value });
 				break;
@@ -170,6 +195,7 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				flushRuns();
 				if (b.value.role === Role.USER) {
 					flushTurn();
+					closeVerdicts();
 					turnTools = 0;
 					turnFiles = new Set<string>();
 					const attachments = b.value.attachments.map((a) => ({ id: a.id, name: a.name, size: Number(a.size), image: a.image, path: a.path, preview: "" }));
@@ -183,6 +209,11 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 				blocks.push({ kind: "text", id: item.id, text: b.value.text, partial: b.value.partial });
 				break;
 			}
+			case "advisorVerdict":
+				flushRuns();
+				openVerdicts.push(blocks.length);
+				blocks.push({ kind: "advisor", id: item.id, verdict: b.value, open: true });
+				break;
 			case "turn":
 				// The outcome belongs at the end of the turn: held until the next user message.
 				flushTurn();
@@ -199,10 +230,10 @@ export function foldTranscript(items: readonly Item[], pending: readonly Pending
 	}
 	flushRuns();
 	flushTurn();
-	for (const send of pending) {
-		if (!echoed.has(send.clientMsgId)) {
-			blocks.push({ kind: "user", id: `pending:${send.clientMsgId}`, text: send.text, pending: true, attachments: send.attachments ?? [] });
-		}
+	const sending = pending.filter((send) => !echoed.has(send.clientMsgId));
+	if (sending.length > 0) closeVerdicts();
+	for (const send of sending) {
+		blocks.push({ kind: "user", id: `pending:${send.clientMsgId}`, text: send.text, pending: true, attachments: send.attachments ?? [] });
 	}
 	return blocks;
 }

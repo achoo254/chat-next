@@ -264,6 +264,26 @@ function transcript(now: number): Item[] {
 				removed: 1,
 			},
 		}),
+		// Automatic Advisor at the end of the turn: its call folds into the verdict's card (raw input never shown).
+		item("t10", { case: "toolCall", value: { toolId: "10", kind: ToolKind.OTHER, name: "mcp__tunelo__advisor_weigh", summary: "advisor_weigh", input: '{"kind":"next_steps","note":"raw-input-not-shown"}' } }),
+		item("r10", done("10", '{"advisor":"verdict"}')),
+		item("advisor:10", {
+			case: "advisorVerdict",
+			value: {
+				toolId: "10",
+				turnId: "turn1",
+				kind: "next_steps",
+				question: "Sau khi sửa CSS thẻ tool, làm gì tiếp?",
+				options: [
+					{ text: "Build lại rồi chụp ảnh 375 px", probability: 0.74 },
+					{ text: "Chạy lại toàn bộ test web", probability: 0.21 },
+					{ text: "/compact", probability: 0.05 },
+				],
+				context: "Đã sửa machines.css và tool-run.tsx; test 52/52 qua.",
+				confidence: 0.68,
+				verdict: "confident",
+			},
+		}),
 		item("u2", { case: "text", value: { role: Role.USER, text: "Ok, build lại luôn nhé" } }),
 		item("turn2", { case: "turn", value: { state: TurnState.RUNNING } }),
 		item("a2", { case: "text", value: { role: Role.ASSISTANT, text: "Mình xoá thư mục build cũ rồi chạy lại." } }),

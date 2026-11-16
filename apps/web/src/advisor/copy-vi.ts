@@ -83,6 +83,17 @@ export const viAdvisor = {
 		} as Record<string, string>,
 		otherError: "Cố vấn gặp lỗi.",
 	},
+	card: {
+		title: (name: string) => `${name} nhận định`,
+		kinds: { decision: "Lựa chọn", next_steps: "Bước tiếp theo", answer: "Câu trả lời" } as Record<string, string>,
+		options: "Các phương án",
+		next: "Gửi vào phiên",
+		locked: "Gửi được khi lượt đang chạy kết thúc.",
+		unavailable: "Phiên chưa nhận tin lúc này (máy mất kết nối hoặc phiên đang mở trong terminal).",
+		past: "Đã có tin mới sau nhận định này.",
+		chosen: "Đã gửi",
+		missed: (name: string) => `Lượt này AI chưa hỏi ${name}.`,
+	},
 	menu: {
 		label: "Tuỳ chọn Cố vấn",
 		auto: "Tự theo dõi phiên này",

@@ -508,6 +508,25 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-todo .done .box { background: var(--c-success); border-color: var(--c-success); color: var(--c-on-primary); }
 .mx-todo .now { font-weight: 600; }
 .mx-todo .now .box { border-color: var(--c-primary); }
+.mx-advisor { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--c-primary) 35%, var(--c-border-subtle)); background: var(--c-surface); font-size: 0.875rem; min-width: 0; }
+.mx-advisor-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.mx-advisor-head img { width: 28px; height: 28px; flex: none; object-fit: contain; }
+.mx-advisor-head .grow { min-width: 0; overflow-wrap: anywhere; }
+.mx-advisor-sent { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mx-advisor-note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
+.mx-advisor-note.mx-error { color: var(--c-error); }
+.mx-advisor-options { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.mx-advisor-options li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.mx-advisor-options li .grow { min-width: 0; overflow-wrap: anywhere; }
+.mx-advisor-options li.top .grow { font-weight: 600; }
+.mx-advisor-options .mx-bar { width: 56px; }
+.mx-advisor-options .pct { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--c-text-muted); font-size: 0.8125rem; }
+.mx-advisor-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.mx-advisor-chip { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+.mx-advisor-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.mx-advisor-hint { font-size: 0.75rem; }
+.mx-advisor-context summary { cursor: pointer; font-size: 0.8125rem; color: var(--c-text-muted); }
+.mx-advisor-context .mx-advisor-sent { margin-top: var(--space-1); font-size: 0.8125rem; }
 .mx-action { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--c-warning) 55%, var(--c-border)); background: var(--c-surface); }
 .mx-action.question { border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-border)); }
 .mx-action.sensitive { border-color: color-mix(in srgb, var(--c-error) 60%, var(--c-border)); }

@@ -11,13 +11,13 @@
 // sets the route's outer context for them.
 import "./advisor.css";
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
-import { useAdvisorProfile } from "../messaging/data/services.tsx";
 import type { Route } from "../router.tsx";
 import { listenForCopies, setRouteContext, IGNORE_ATTR, type ScopeContext } from "./advisor-context.tsx";
 import { useMascotDrag } from "./advisor-drag.ts";
 import { advisorStore, useAdvisorState, type AdvisorStore } from "./advisor-store.ts";
-import { lookOf, pictureOf } from "./looks.ts";
+import { pictureOf } from "./looks.ts";
 import { useAdvisorCopy } from "./use-advisor-copy.ts";
+import { useAdvisorIdentity } from "./use-advisor-identity.ts";
 
 const AdvisorLive = lazy(() => import("./advisor-bubble.tsx"));
 
@@ -38,10 +38,8 @@ export function routeContextOf(route: Route): ScopeContext {
 
 export default function AdvisorMascot({ route, store = advisorStore }: { route: Route; store?: AdvisorStore }) {
 	const t = useAdvisorCopy();
-	const profile = useAdvisorProfile();
+	const { name, look, tone } = useAdvisorIdentity();
 	const state = useAdvisorState(store);
-	const look = lookOf(profile.lookId);
-	const name = profile.name.trim() === "" ? t.defaultName : profile.name;
 
 	useEffect(() => listenForCopies(document, store), [store]);
 	// Nothing of the account's Advisor outlives the signed-in app (sign-out, another account).
@@ -88,7 +86,7 @@ export default function AdvisorMascot({ route, store = advisorStore }: { route: 
 			)}
 			{live && (
 				<Suspense fallback={null}>
-					<AdvisorLive name={name} look={look} tone={profile.tone} store={store} />
+					<AdvisorLive name={name} look={look} tone={tone} store={store} />
 				</Suspense>
 			)}
 		</>

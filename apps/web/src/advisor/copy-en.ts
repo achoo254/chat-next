@@ -84,6 +84,17 @@ export const enAdvisor: AdvisorCopy = {
 		},
 		otherError: "Advisor ran into an error.",
 	},
+	card: {
+		title: (name) => `${name}'s take`,
+		kinds: { decision: "Decision", next_steps: "Next steps", answer: "Answer" },
+		options: "Options",
+		next: "Send to the session",
+		locked: "You can send once the running turn ends.",
+		unavailable: "The session cannot take a message now (the machine is offline or the session is open in its terminal).",
+		past: "A newer message came after this take.",
+		chosen: "Sent",
+		missed: (name) => `The AI did not ask ${name} this turn.`,
+	},
 	menu: {
 		label: "Advisor options",
 		auto: "Watch this session",
