@@ -9,8 +9,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-1-day-desktop.1f24ba77.webp",
-					"night": "office-2d-floor-1-night-desktop.a8e02a7f.webp",
+					"day": "office-2d-floor-1-day-desktop.379f915d.webp",
+					"night": "office-2d-floor-1-night-desktop.cc195c3c.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.98,
@@ -149,8 +149,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-1-day-phone.d3daca74.webp",
-					"night": "office-2d-floor-1-night-phone.e88bb56d.webp",
+					"day": "office-2d-floor-1-day-phone.d9a8d6c8.webp",
+					"night": "office-2d-floor-1-night-phone.cb81ce0c.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.52,
@@ -288,23 +288,25 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-1.840e399c.glb",
+				"shell": "office-floor-1.caabb2a5.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-1-day-1024.426f0710.webp",
-						"2048": "lightmap-floor-1-day-2048.0480c13d.webp"
+						"1024": "lightmap-floor-1-day-1024.647e4d50.webp",
+						"2048": "lightmap-floor-1-day-2048.ce9392f8.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-1-night-1024.97efd27f.webp",
-						"2048": "lightmap-floor-1-night-2048.c720e4e2.webp"
+						"1024": "lightmap-floor-1-night-1024.64aa3f38.webp",
+						"2048": "lightmap-floor-1-night-2048.6bb6e213.webp"
 					}
 				},
-				"props": "office-props-floor-1.0ffcdbdb.glb",
+				"props": "office-props-floor-1.7bd750af.glb",
 				"models": [
 					"armchair",
+					"book-stack",
 					"bookshelf",
 					"chair",
 					"coffee-machine",
+					"coffee-table",
 					"desk",
 					"desk-lamp",
 					"desk-plant",
@@ -340,8 +342,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-2-day-desktop.a579b8d7.webp",
-					"night": "office-2d-floor-2-night-desktop.2b49c564.webp",
+					"day": "office-2d-floor-2-day-desktop.24f0dafe.webp",
+					"night": "office-2d-floor-2-night-desktop.becd5c8f.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.98,
@@ -392,8 +394,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-2-day-phone.6371cba8.webp",
-					"night": "office-2d-floor-2-night-phone.6c14022e.webp",
+					"day": "office-2d-floor-2-day-phone.e30f16db.webp",
+					"night": "office-2d-floor-2-night-phone.0b564ccf.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.52,
@@ -443,19 +445,29 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-2.1bbbf3d0.glb",
+				"shell": "office-floor-2.58ca737e.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-2-day-1024.19269783.webp",
-						"2048": "lightmap-floor-2-day-2048.9fec03c6.webp"
+						"1024": "lightmap-floor-2-day-1024.1f3952f8.webp",
+						"2048": "lightmap-floor-2-day-2048.a82daa69.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-2-night-1024.8cba8910.webp",
-						"2048": "lightmap-floor-2-night-2048.44e6a7d5.webp"
+						"1024": "lightmap-floor-2-night-1024.3f0df4ca.webp",
+						"2048": "lightmap-floor-2-night-2048.f91357cf.webp"
 					}
 				},
-				"props": "office-props-floor-2.7a878a33.glb",
-				"models": []
+				"props": "office-props-floor-2.71d34d04.glb",
+				"models": [
+					"globe",
+					"kanban-board",
+					"mail-cubbies",
+					"mailbox",
+					"parcel-boxes",
+					"parcel-cart",
+					"post-counter",
+					"reading-table",
+					"tall-bookcase"
+				]
 			}
 		},
 		{
@@ -464,8 +476,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-3-day-desktop.a0d2a613.webp",
-					"night": "office-2d-floor-3-night-desktop.88656e94.webp",
+					"day": "office-2d-floor-3-day-desktop.b3be2686.webp",
+					"night": "office-2d-floor-3-night-desktop.8cb87484.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.98,
@@ -520,8 +532,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-3-day-phone.aaad78d5.webp",
-					"night": "office-2d-floor-3-night-phone.76dcf064.webp",
+					"day": "office-2d-floor-3-day-phone.3089ba54.webp",
+					"night": "office-2d-floor-3-night-phone.b2000d94.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.52,
@@ -575,25 +587,35 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-3.db758629.glb",
+				"shell": "office-floor-3.72f83289.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-3-day-1024.6d4bb8a9.webp",
-						"2048": "lightmap-floor-3-day-2048.eb32c73a.webp"
+						"1024": "lightmap-floor-3-day-1024.739842ae.webp",
+						"2048": "lightmap-floor-3-day-2048.50b61fd3.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-3-night-1024.b811731f.webp",
-						"2048": "lightmap-floor-3-night-2048.02ecda08.webp"
+						"1024": "lightmap-floor-3-night-1024.12a8f570.webp",
+						"2048": "lightmap-floor-3-night-2048.e1ee0a53.webp"
 					}
 				},
-				"props": "office-props-floor-3.7a878a33.glb",
-				"models": []
+				"props": "office-props-floor-3.d699a02c.glb",
+				"models": [
+					"cash-register",
+					"cctv-wall",
+					"coin-stacks",
+					"device-shelf",
+					"locker",
+					"safe",
+					"signal-tower",
+					"test-bench",
+					"turnstile"
+				]
 			}
 		}
 	],
 	"propsNote": "floors[].scene.props holds one mesh per model first used on that floor (named like the model); the shell GLB lists every placed model of its floor in asset.extras.instances as [x, y, z, rotY] (layout coordinates). Shell lightmaps: TEXCOORD_1, colour times light, half intensity (multiply by 2).",
 	"character": {
-		"file": "character.97b412fb.glb",
+		"file": "character.33d43e11.glb",
 		"clips": [
 			"Consume",
 			"Idle_A",
@@ -608,7 +630,7 @@
 			"Typing"
 		],
 		"skins": {
-			"file": "character-skins.a220a2f9.webp",
+			"file": "character-skins.829c4902.webp",
 			"columns": 4,
 			"rows": 3,
 			"count": 10,
@@ -631,11 +653,35 @@
 		}
 	},
 	"accessories": {
-		"file": "accessories.b3055046.glb",
+		"file": "accessories.58a4b5f9.glb",
 		"items": {
+			"magnifier": {
+				"bone": "hand_r",
+				"scale": 1
+			},
+			"hard-hat": {
+				"bone": "head",
+				"scale": 1.6
+			},
 			"glasses": {
 				"bone": "head",
 				"scale": 1.8
+			},
+			"book-stack": {
+				"bone": "hand_r",
+				"scale": 1
+			},
+			"clipboard": {
+				"bone": "hand_r",
+				"scale": 1
+			},
+			"flashlight": {
+				"bone": "hand_r",
+				"scale": 1
+			},
+			"headphones": {
+				"bone": "head",
+				"scale": 2.2
 			},
 			"mug": {
 				"bone": "hand_r",
@@ -699,6 +745,12 @@
 				"loop": false,
 				"seconds": 0.6,
 				"kb": 4
+			},
+			"light-switch": {
+				"file": "sfx/light-switch.34b7741a.mp3",
+				"loop": false,
+				"seconds": 0.4,
+				"kb": 3
 			}
 		}
 	}
