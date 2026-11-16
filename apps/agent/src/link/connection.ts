@@ -13,6 +13,7 @@ import {
   type MachineInfo,
   type ProjectConfigLevel,
   type AdvisorAttachment,
+  AdvisorTone,
   TermPath,
   ThreadKind,
   type ThreadSummary,
@@ -22,7 +23,7 @@ import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { AdvisorKeyError, type AdvisorKeyStore, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
-import type { AdvisorAttachmentInput } from "../advisor/advisor-thread.ts";
+import type { AdvisorAttachmentInput, AdvisorToneInput } from "../advisor/advisor-thread.ts";
 import { redactSecrets } from "../mcp/redact.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import type { TrustVerdict } from "../device-trust.ts";
@@ -189,6 +190,20 @@ export function projectListBody(list: ProjectList, levelOf?: (dir: string) => Pr
 }
 
 const KEY_LENGTH = 32;
+
+/** The style a device picked for Advisor's answer; "" for none or a value this machine does not know (ignored). */
+export function advisorToneOf(tone: AdvisorTone): AdvisorToneInput {
+  switch (tone) {
+    case AdvisorTone.SHORT:
+      return "short";
+    case AdvisorTone.FUN:
+      return "fun";
+    case AdvisorTone.SERIOUS:
+      return "serious";
+    default:
+      return "";
+  }
+}
 
 /** An attachment of a question to Advisor as the core takes it. */
 function advisorAttachment(a: AdvisorAttachment): AdvisorAttachmentInput {
@@ -689,6 +704,7 @@ export class Connection {
           }
           await core.send(b.value.threadId, b.value.text, b.value.clientMsgId, b.value.attachmentIds, {
             attachments: b.value.advisorAttachments.map(advisorAttachment),
+            tone: advisorToneOf(b.value.advisorTone),
             device: this.device,
           });
           return ack();

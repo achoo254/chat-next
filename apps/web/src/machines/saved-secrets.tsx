@@ -56,7 +56,7 @@ export function SavedSecrets({ link, online, ai }: SavedSecretsProps) {
 	};
 
 	return (
-		<section className="card pad mx-card" data-id="saved-secrets">
+		<section className="card pad mx-card" data-id="saved-secrets" data-advisor-ignore="">
 			<h3>{s.savedTitle}</h3>
 			<p className="note">{s.savedNote(ai)}</p>
 			{secrets !== null && secrets.length === 0 && <p className="muted">{s.savedEmpty}</p>}

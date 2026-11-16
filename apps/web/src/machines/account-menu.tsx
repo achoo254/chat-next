@@ -6,6 +6,7 @@
 // announces it to every device). Adding an account opens the sign-in dialog
 // where the AI offers one; "Tài khoản AI" of the machine keeps the full
 // management.
+import { PercentBar } from "./percent-bar.tsx";
 import { useState } from "react";
 import type { AiAccount } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -183,9 +184,7 @@ export function Usage({ label, pct }: { label: string; pct: number }) {
 	return (
 		<span className={pct >= 80 ? "mx-st-item warn" : "mx-st-item"}>
 			<span>{label}</span>
-			<span className="mx-bar" aria-hidden="true">
-				<i style={{ width: `${pct}%` }} />
-			</span>
+			<PercentBar pct={pct} />
 			<span>{pct}%</span>
 		</span>
 	);

@@ -31,6 +31,7 @@ import {
 	type ProjectListResult,
 	type SecretPrompt,
 	type ThreadActivity,
+	ThreadKind,
 	type ThreadInfo,
 	type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
@@ -92,8 +93,13 @@ export type LinkStatus =
 export interface LinkState {
 	readonly status: LinkStatus;
 	readonly info: MachineInfo | null;
-	/** Newest first, as the machine lists them. */
+	/** Newest first, as the machine lists them; never an Advisor thread (ThreadKind.ADVISOR). */
 	readonly threads: readonly ThreadSummary[];
+	/**
+	 * Advisor's own threads (tunelo 3.13.0+), kept apart: no list, badge or
+	 * folder shows them. The mascot reads their state.
+	 */
+	readonly advisorThreads: readonly ThreadSummary[];
 	/** The thread list arrived at least once on this link. */
 	readonly listed: boolean;
 	readonly openSessions: number;
@@ -144,6 +150,8 @@ export class RemoteError extends Error {
 		message: string,
 		readonly reason: ErrorReason = ErrorReason.UNSPECIFIED,
 		readonly subject = "",
+		/** A failed git request of a workspace (tunelo 3.13.0+): the machine keeps git's whole output under this id for 10 minutes; "" otherwise. */
+		readonly failureId = "",
 	) {
 		super(message);
 	}
@@ -211,6 +219,7 @@ const INITIAL: LinkState = {
 	status: { kind: "idle" },
 	info: null,
 	threads: [],
+	advisorThreads: [],
 	listed: false,
 	openSessions: 0,
 	maxSessions: 0,
@@ -601,7 +610,8 @@ export class MachineLink {
 		this.pingTimer = this.timers.setInterval(() => this.tick(), PING_MS);
 		if (this.deps.purpose === "terminal") return;
 		this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
-		this.request({ case: "threadList", value: {} }).catch(() => undefined);
+		// Saying it knows ThreadSummary.kind, so Advisor's threads come too (kept apart in advisorThreads).
+		this.request({ case: "threadList", value: { advisor: true } }).catch(() => undefined);
 		for (const threadId of this.watched.keys()) this.subscribeThread(threadId);
 		if (this.active) this.ping();
 	}
@@ -761,9 +771,12 @@ export class MachineLink {
 			case "threadCreated":
 				if (b.value.thread !== undefined) this.putThread(b.value.thread);
 				break;
-			case "threadListResult":
-				this.set({ threads: keepOrder(this.current.threads, b.value.threads), listed: true, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
+			case "threadListResult": {
+				const listed = b.value.threads.filter((t) => !isAdvisorThread(t));
+				const advisorThreads = b.value.threads.filter(isAdvisorThread);
+				this.set({ threads: keepOrder(this.current.threads, listed), advisorThreads, listed: true, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
 				break;
+			}
 			case "machineInfo":
 				this.set({ info: b.value, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
 				break;
@@ -835,7 +848,7 @@ export class MachineLink {
 			if (b.value.reason === ErrorReason.FULL_DISK_ACCESS_NEEDED && this.current.info?.needsFullDiskAccess !== true) {
 				this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
 			}
-			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject));
+			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject, b.value.failureId));
 		}
 		else waiter.resolve(frame);
 	}
@@ -872,6 +885,7 @@ export class MachineLink {
 		this.setActivity(threadId, undefined);
 		this.set({
 			threads,
+			advisorThreads: this.current.advisorThreads.filter((t) => t.id !== threadId),
 			openSessions: threads.filter((t) => t.open).length,
 			journals: without(this.current.journals),
 			pending: without(this.current.pending),
@@ -880,12 +894,22 @@ export class MachineLink {
 	}
 
 	private putThread(thread: ThreadSummary): void {
+		if (isAdvisorThread(thread)) {
+			const others = this.current.advisorThreads.filter((t) => t.id !== thread.id);
+			this.set({ advisorThreads: [thread, ...others] });
+			return;
+		}
 		// A known session keeps its place however its state or time changed; a new one comes first.
 		const known = this.current.threads.some((t) => t.id === thread.id);
 		const threads = known ? this.current.threads.map((t) => (t.id === thread.id ? thread : t)) : [thread, ...this.current.threads];
 		const open = threads.filter((t) => t.open).length;
 		this.set({ threads, openSessions: Math.max(open, 0) });
 	}
+}
+
+/** Advisor's own thread: hidden from every list of sessions (proto ThreadKind.ADVISOR). */
+export function isAdvisorThread(thread: Pick<ThreadSummary, "kind">): boolean {
+	return thread.kind === ThreadKind.ADVISOR;
 }
 
 /**

@@ -9,7 +9,7 @@
 // Files (tunelo 2.0.5+) come by the attach button, by pasting or by dropping
 // them on the session; they upload at once and go with the next message,
 // which may then have no text.
-import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState, type PointerEvent } from "react";
 import type { SlashCommand } from "@achoo254/chat-proto/remote/remote";
 import { hasFinePointer } from "../components/fine-pointer.ts";
 import { Icon } from "../components/screen-icons.tsx";
@@ -45,6 +45,9 @@ interface ComposerProps {
 	attach?: Attachments | undefined;
 	/** Changes when another session opens in this box: the caret goes into it. */
 	focusKey?: string | undefined;
+	/** Text put in the box from outside (Advisor's "Gửi sang phiên"): a new id adds it after what is typed, then onFilled runs. */
+	fill?: { readonly text: string; readonly id: number } | undefined;
+	onFilled?: ((id: number) => void) | undefined;
 	onSend: (text: string, files: readonly ShownAttachment[]) => Promise<void>;
 	onStop: () => Promise<void>;
 }
@@ -68,9 +71,17 @@ interface Found {
 	readonly listing: FileListing;
 }
 
-export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, focusKey, onSend, onStop }: ComposerProps) {
+export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, focusKey, fill, onFilled, onSend, onStop }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
+	// Text from outside comes into the box once per id (state kept from render, as React allows); the caret follows.
+	const [filled, setFilled] = useState(0);
+	if (fill !== undefined && fill.id !== filled) {
+		setFilled(fill.id);
+		// What the user was typing stays: the text goes after it.
+		setText(text.trim() === "" ? fill.text : `${text.trimEnd()}\n\n${fill.text}`);
+	}
+
 	const [error, setError] = useState("");
 	const [stopping, setStopping] = useState(false);
 	const [active, setActive] = useState(0);
@@ -105,6 +116,14 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	useEffect(() => {
 		if (hasFinePointer()) field.current?.focus();
 	}, [focusKey]);
+
+	// Text put in from outside: the caret goes to it, and the sender hears it was taken.
+	const filledNow = useEffectEvent((id: number) => onFilled?.(id));
+	useEffect(() => {
+		if (filled === 0) return;
+		filledNow(filled);
+		field.current?.focus();
+	}, [filled]);
 
 	// "@…": ask the machine for matching files, a moment after the typing stops.
 	const mentionQuery = at?.query ?? null;

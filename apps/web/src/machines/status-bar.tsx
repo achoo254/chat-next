@@ -5,6 +5,7 @@
 // (folder, branch, effort, context used, account, both usage windows with
 // their reset, lines changed) sits in "Chi tiết", labelled. One line on
 // phones. Whatever is not known yet is left out.
+import { PercentBar } from "./percent-bar.tsx";
 import { useState, type ReactNode } from "react";
 import type { MachineInfo, ThreadInfo } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -53,13 +54,6 @@ function countdown(t: MachinesCopy, left: Countdown | null): string {
 	return left === null ? "" : t.statusBar.resetIn(left.days, left.hours, left.minutes);
 }
 
-function Bar({ pct }: { pct: number }) {
-	return (
-		<span className="mx-bar" aria-hidden="true">
-			<i style={{ width: `${pct}%` }} />
-		</span>
-	);
-}
 
 export function StatusBar({ ai, dir, machine, provider, model, answered, context, info, link, threadId, online, account, switchingTo = "" }: StatusBarProps) {
 	const t = useMachinesCopy();
@@ -87,7 +81,7 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 						title={t.agent.status.usageValue(five.pct, countdown(t, five.left))}
 					>
 						<span className="lbl">{t.agent.status.fiveHour}</span>
-						<Bar pct={five.pct} />
+						<PercentBar pct={five.pct} />
 						<span>{five.pct}%</span>
 						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.fiveHour}: ${t.agent.status.usageValue(five.pct, countdown(t, five.left))}`}</span>
 					</span>
@@ -95,7 +89,7 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 				{week !== null && week.pct >= USAGE_WARN && (
 					<span className="mx-st-item mx-usage warn" title={t.agent.status.usageValue(week.pct, countdown(t, week.left))}>
 						<span className="lbl">{t.agent.status.week}</span>
-						<Bar pct={week.pct} />
+						<PercentBar pct={week.pct} />
 						<span>{week.pct}%</span>
 						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.week}: ${t.agent.status.usageValue(week.pct, countdown(t, week.left))}`}</span>
 					</span>
@@ -134,7 +128,7 @@ function Details({ ai, dir, machine, provider, model, answered, context, info, n
 		<>
 			<dt>{label}</dt>
 			<dd className="mx-dd-usage" title={at(u.resetsAt, withDay)}>
-				<Bar pct={u.pct} />
+				<PercentBar pct={u.pct} />
 				<span>{t.agent.status.usageValue(u.pct, countdown(t, u.left))}</span>
 			</dd>
 		</>
@@ -173,7 +167,7 @@ function Details({ ai, dir, machine, provider, model, answered, context, info, n
 							<>
 								<dt>{t.agent.status.context}</dt>
 								<dd className="mx-dd-usage">
-									<Bar pct={pct} />
+									<PercentBar pct={pct} />
 									<span>{t.agent.status.contextValue(pct)}</span>
 								</dd>
 							</>

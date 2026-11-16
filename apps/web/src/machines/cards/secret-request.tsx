@@ -83,7 +83,7 @@ export function SecretCard({ prompt, ai, onProvide, onDecline }: SecretCardProps
 	};
 
 	return (
-		<form className="mx-action mx-secret" aria-labelledby={`${id}-title`} onSubmit={submit} data-id="secret-card">
+		<form className="mx-action mx-secret" aria-labelledby={`${id}-title`} onSubmit={submit} data-id="secret-card" data-advisor-ignore="">
 			<h4 id={`${id}-title`}>
 				<Icon name="key" />
 				<span>{s.title(ai)}</span>

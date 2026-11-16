@@ -31,3 +31,10 @@ dev, FLUX.2 dev, Kontext dev, klein 9B, RMBG-2.0) không được dùng. Không 
 GLB chỉ ghi `asset.generator = "hoandat office-art"`, `asset.extras` (mã băm bố cục, danh sách instance) và tên mesh; WebP và MP3 được ghi
 không kèm siêu dữ liệu (không đường dẫn máy, không tên máy, không workflow ComfyUI nhúng). Prompt, ảnh trung gian, mesh thô và script nằm
 ngoài repo này.
+
+## Mascot Cố vấn (`apps/web/src/advisor/assets/`)
+
+16 ảnh `<look>/<state>.webp` (`look` = owl, robot, suit, cat; `state` = idle, thinking, answering, sleeping), 256 px, nền trong suốt,
+mỗi tệp dưới 19 KB. Vẽ offline trên GPU cục bộ ngày 16/11/2026: ảnh `idle` bằng Qwen-Image-2512, ba trạng thái còn lại bằng FLUX.2 klein 4B
+(chỉnh sửa từ ảnh `idle`), tách nền bằng flood-fill từ bốn góc rồi xuất WebP. Cả hai model đều Apache-2.0. Không chứa chữ, không siêu dữ liệu.
+Quyền với tệp: sở hữu của hoandat, giữ mọi quyền (không phải CC0). Prompt và ảnh gốc nằm ngoài repo này.

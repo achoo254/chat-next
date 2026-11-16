@@ -737,7 +737,7 @@ function TokenTab({ bot, onIssued, confirmNow, onConfirmShown }: TabProps & { on
 							<Icon name="alert" small />
 							<span className="grow">{t.token.onceWarning}</span>
 						</div>
-						<div className="secret">
+						<div className="secret" data-advisor-ignore="">
 							<code data-testid="bot-token">{token}</code>
 							<button
 								type="button"

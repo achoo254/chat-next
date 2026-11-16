@@ -2,7 +2,7 @@
 // reason, then CHANGES, COMMITTED ON BRANCH and COMMITS, and the
 // confirmations. Outside a git repository (or in a folder inside a larger
 // one) it says so instead.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ErrorReason, WsGitArea, WsGitDiffSource, type WsGitEntry } from "@achoo254/chat-proto/remote/remote";
 import { RemoteError } from "../../link/machine-link.ts";
 import { PanelIcon } from "../panel-icons.tsx";
@@ -18,6 +18,29 @@ import { CommitsSection, CompareSection } from "./history-sections.tsx";
 import { areaOf, discardableEntries, stagedEntries, unstagedEntries } from "./status-model.ts";
 import { useHistory } from "./use-history.ts";
 import type { Scm } from "./use-scm.ts";
+import { useAdvisorScope } from "../../../advisor/advisor-context.tsx";
+
+/**
+ * The latest failed write, kept after its box is dismissed: a copy of its
+ * text tells Advisor which failure it was. The machine keeps git's output
+ * of a failure_id for 10 minutes and ignores an older one.
+ */
+interface LastFailure {
+	readonly action: string;
+	readonly errorCode: string;
+	readonly failureId: string;
+}
+
+function lastFailureOf(failure: Scm["failure"]): LastFailure | null {
+	if (failure === null) return null;
+	const err = failure.error;
+	const remote = err instanceof RemoteError ? err : null;
+	return {
+		action: failure.op,
+		errorCode: remote === null || remote.reason === ErrorReason.UNSPECIFIED ? "" : (ErrorReason[remote.reason] ?? ""),
+		failureId: remote?.failureId ?? "",
+	};
+}
 
 interface SourceControlProps {
 	link: WsLink;
@@ -52,6 +75,28 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 	const git = status?.git === true;
 	const history = useHistory(link, workspaceId, online, git, status?.branch ?? "", scm.history);
 	const [naming, setNaming] = useState(false);
+	// Copies in Source Control carry the panel, the branch and the latest failure (until the next write).
+	const [shownFailure, setShownFailure] = useState<Scm["failure"]>(null);
+	const [lastFailure, setLastFailure] = useState<LastFailure | null>(null);
+	if (scm.failure !== shownFailure) {
+		setShownFailure(scm.failure);
+		if (scm.failure !== null) setLastFailure(lastFailureOf(scm.failure));
+	}
+	// The next write starting ends it: once it succeeds, copies no longer name the old failure.
+	const [shownBusy, setShownBusy] = useState<Scm["busy"]>(null);
+	if (scm.busy !== shownBusy) {
+		setShownBusy(scm.busy);
+		if (scm.busy !== null && scm.failure === null) setLastFailure(null);
+	}
+	const section = useRef<HTMLElement>(null);
+	useAdvisorScope(section, {
+		screen: "scm",
+		panel: "scm",
+		branch: status?.branch ?? "",
+		action: lastFailure?.action ?? "",
+		errorCode: lastFailure?.errorCode ?? "",
+		failureId: lastFailure?.failureId ?? "",
+	});
 	const writeMessage =
 		writer === undefined
 			? undefined
@@ -75,7 +120,7 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 		const err = scm.statusError;
 		const text = status !== null ? p.scm.notRepo : err === null ? p.loading : errorText(err);
 		return (
-			<section className="ws-view" aria-label={p.tabs.scm}>
+			<section ref={section} className="ws-view" aria-label={p.tabs.scm}>
 				{head}
 				<p className={err !== null && !notGit(err) ? "ws-msg mx-error" : "ws-msg muted"} role="status" aria-busy={status === null && err === null}>
 					{text}
@@ -86,7 +131,7 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 	const entries = status.entries;
 	const disabled = !online || scm.busy !== null;
 	return (
-		<section className="ws-view" aria-label={p.tabs.scm}>
+		<section ref={section} className="ws-view" aria-label={p.tabs.scm}>
 			{head}
 			<div className="ws-scroll ws-scm">
 				<BranchBar

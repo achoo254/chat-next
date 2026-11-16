@@ -73,7 +73,7 @@ export function demoStatus(): FakeEntry[] {
 
 type Value<K> = Extract<Frame["body"], { case: K }> extends { value: infer V } ? V : never;
 
-const fail = (reason: ErrorReason, subject = "", code = ErrorCode.INVALID): Body[] => [{ case: "error", value: { code, message: `refused (${reason})`, reason, subject } }];
+const fail = (reason: ErrorReason, subject = "", code = ErrorCode.INVALID, failureId = ""): Body[] => [{ case: "error", value: { code, message: `refused (${reason})`, reason, subject, failureId } }];
 
 /** Natural order ("case-9" before "case-10"). */
 const natural = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
@@ -93,7 +93,8 @@ export class FakeWorkspace {
 		refs: i === 0 ? ["HEAD -> feat/workspace-panel", "origin/feat/workspace-panel"] : i === 5 ? ["origin/main", "main"] : [],
 	}));
 	/** Requests that fail with this reason (by request case), once each. */
-	readonly failures = new Map<string, { reason: ErrorReason; subject?: string }>();
+	/** The next request of a kind fails; a git write may name the failure the machine keeps (failureId, tunelo 3.13.0+). */
+	readonly failures = new Map<string, { reason: ErrorReason; subject?: string; failureId?: string }>();
 	/** Requests received, by case. */
 	readonly seen: Frame["body"][] = [];
 	watching = false;
@@ -212,7 +213,7 @@ export class FakeWorkspace {
 		const failure = this.failures.get(b.case);
 		if (failure !== undefined) {
 			this.failures.delete(b.case);
-			return fail(failure.reason, failure.subject ?? "", failure.reason === ErrorReason.DISCARD_NOT_CONFIRMED ? ErrorCode.NEEDS_CONSENT : ErrorCode.INVALID);
+			return fail(failure.reason, failure.subject ?? "", failure.reason === ErrorReason.DISCARD_NOT_CONFIRMED ? ErrorCode.NEEDS_CONSENT : ErrorCode.INVALID, failure.failureId ?? "");
 		}
 		const ws = this.id;
 		switch (b.case) {

@@ -7,9 +7,10 @@
 // machine's lists.
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ErrorCode, ErrorReason, type Item, Role, ThreadKind, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { AdvisorTone, ErrorCode, ErrorReason, type Item, Role, ThreadKind, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { ADVISOR_SESSION_INSTRUCTIONS, ADVISOR_SESSION_REMINDER, AdvisorQueue, advisorScratchDir, contextYaml } from "../src/advisor/advisor-thread.ts";
+import { ADVISOR_SESSION_INSTRUCTIONS, ADVISOR_SESSION_REMINDER, ADVISOR_TONE_LINES, AdvisorQueue, advisorScratchDir, contextYaml, toneLine } from "../src/advisor/advisor-thread.ts";
+import { advisorToneOf } from "../src/link/connection.ts";
 import type { GitFailure } from "../src/advisor/git-failure-memory.ts";
 import { AgentError, type CoreOptions } from "../src/core/agent-core.ts";
 import { NOTE_SEPARATOR } from "../src/advisor/advisor-instructions.ts";
@@ -381,6 +382,31 @@ describe("questions to an Advisor thread", () => {
     expect(text).not.toContain(made.work);
     // The journal keeps only the question.
     expect(byCase(made.core.snapshot(t.id), "text")[0]?.body.value.text).toBe("why did push fail?");
+  });
+
+  it("the answer style the user picked becomes a fixed line of the machine's; none or an unknown one adds nothing", async () => {
+    const made = setup();
+    const t = await made.core.createAdvisor({ provider: "adv", model: "", dir: made.work, consent: { sensitive: false }, device: "phone" });
+    await made.core.send(t.id, "why?", "q-1", [], { attachments: [], device: "phone", tone: "fun" });
+    await until(made.core, t.id, (i) => turns(i).length === 1 && settled(i));
+    await made.core.send(t.id, "and now?", "q-2", [], { attachments: [], device: "phone", tone: "" });
+    await until(made.core, t.id, (i) => turns(i).length === 2 && settled(i));
+    const [first, second] = made.ai.log.sent.map((m) => m.text);
+    expect(first).toContain(ADVISOR_TONE_LINES.fun);
+    for (const line of Object.values(ADVISOR_TONE_LINES)) expect(second).not.toContain(line);
+    // The journal keeps the question as asked, without the style.
+    expect(byCase(made.core.snapshot(t.id), "text").filter((i) => i.body.value.role === Role.USER).map((i) => i.body.value.text)).toEqual(["why?", "and now?"]);
+    expect(toneLine("short")).toBe(ADVISOR_TONE_LINES.short);
+    expect(toneLine("shouting")).toBe("");
+    expect(toneLine("")).toBe("");
+  });
+
+  it("reads the style from the device's enum; unspecified or unknown values are ignored", () => {
+    expect(advisorToneOf(AdvisorTone.SHORT)).toBe("short");
+    expect(advisorToneOf(AdvisorTone.FUN)).toBe("fun");
+    expect(advisorToneOf(AdvisorTone.SERIOUS)).toBe("serious");
+    expect(advisorToneOf(AdvisorTone.UNSPECIFIED)).toBe("");
+    expect(advisorToneOf(42 as AdvisorTone)).toBe("");
   });
 
   it("refuses files, an empty question and a question without its id; attachments on an ordinary thread", async () => {

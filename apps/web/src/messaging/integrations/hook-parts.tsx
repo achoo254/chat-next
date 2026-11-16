@@ -211,7 +211,8 @@ export function OneTimeUrlDialog({ title, url, format, hookName, chatTitle, onDo
 	return (
 		<Modal labelledBy={id} onClose={close} className="wide">
 			<DialogHead id={id} title={title} />
-			<div className="dlg-body stack">
+			{/* The URL holds the hook's secret: nothing copied here is kept for Advisor. */}
+			<div className="dlg-body stack" data-advisor-ignore="">
 				<div className="banner warn">
 					<Icon name="alert" small />
 					<span className="grow">{t.oneTime.warn(chatTitle)}</span>

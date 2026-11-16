@@ -405,6 +405,18 @@ message ThreadSend {
   // the question, at most 5. B hands them to the AI marked as untrusted, and
   // adds what it keeps of a failure_id it knows. Refused on other threads.
   repeated AdvisorAttachment advisor_attachments = 5;
+  // An Advisor thread only: the answer style the user picked (their Advisor
+  // profile's tone). B turns it into a fixed line of its own for the AI;
+  // UNSPECIFIED or a value B does not know adds nothing. Ignored elsewhere.
+  AdvisorTone advisor_tone = 6;
+}
+
+// How Advisor's answers read (the user's Advisor profile).
+enum AdvisorTone {
+  ADVISOR_TONE_UNSPECIFIED = 0;
+  ADVISOR_TONE_SHORT = 1;
+  ADVISOR_TONE_FUN = 2;
+  ADVISOR_TONE_SERIOUS = 3;
 }
 
 // A piece the user copied and attached to a question for Advisor, with

@@ -25,6 +25,7 @@ import { deviceKeyStore } from "../../src/machines/link/device-keys.ts";
 import { defaultAnswer, FakeMachine, type Body as FrameBody } from "../machines/fake-machine.ts";
 import { FakeTerminalHost } from "../machines/fake-terminal.ts";
 import { FakeRfb } from "./fake-rfb.ts";
+import { FakeAdvisor } from "./fake-advisor.ts";
 import { FakeOffice } from "./fake-office.ts";
 import { FakeUsage } from "./fake-usage.ts";
 import { FakeWorkspace } from "./fake-workspace.ts";
@@ -362,6 +363,9 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	(window as unknown as { __fakeUsage?: FakeUsage }).__fakeUsage = usageSide;
 	// The office of a session (tunelo 3.6.0): the e2e reads it as window.__fakeOffice.
 	const office = new FakeOffice(machine);
+	// Advisor (tunelo 3.13.0): its threads answer each question a moment later; the e2e reads it as window.__fakeAdvisor.
+	const advisor = new FakeAdvisor(machine);
+	(window as unknown as { __fakeAdvisor?: FakeAdvisor }).__fakeAdvisor = advisor;
 	(window as unknown as { __fakeOffice?: FakeOffice }).__fakeOffice = office;
 	// The machine itself, for the office e2e to drop its link and keep it down (sockets, unreachable).
 	(window as unknown as { __fakeMachine?: FakeMachine }).__fakeMachine = machine;
@@ -484,6 +488,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 							gitChanges: true,
 							browser: { available: true, running: true, clearable: true },
 							screenShare: true,
+							advisor: { available: true, keySet: true, keyFingerprint: "a1b2c3", setByDevice: "Chrome · Windows", setAt: BigInt(now - 86_400_000) },
 							terminal: TerminalAvailability.AVAILABLE,
 							maxSessions: 3,
 							openSessions: 1,
@@ -499,6 +504,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 										terminal: true,
 										accounts: true,
 										sessionMcp: true,
+										advisorSession: true,
 										permissionModes: ["default", "acceptEdits", "plan", "auto"],
 										bypassModeId: "bypassPermissions",
 										models: [{ id: "opus", name: "Opus 4.7" }, { id: "sonnet", name: "Sonnet 4.6" }],
@@ -679,7 +685,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 			case "attachmentFetch":
 				return [{ case: "attachmentData", value: { threadId: frame.body.value.threadId, attachmentId: frame.body.value.attachmentId, mimeType: "image/png", data: image } }];
 			default:
-				return workspace.handle(frame) ?? usageSide.handle(frame) ?? office.handle(frame, socket) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
+				return advisor.handle(frame, socket) ?? workspace.handle(frame) ?? usageSide.handle(frame) ?? office.handle(frame, socket) ?? terminalHost.handle(frame, socket) ?? defaultAnswer(frame);
 		}
 	};
 	// The link opens `new WebSocket(TUNNEL)`: that one address goes to the fake machine.

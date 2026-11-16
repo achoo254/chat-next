@@ -77,6 +77,7 @@ import {
   ADVISOR_TITLE,
   ADVISOR_TURN_MS,
   type AdvisorAttachmentInput,
+  type AdvisorToneInput,
   AdvisorQueue,
   type SavedQuestion,
   QUEUE_MAX,
@@ -1561,7 +1562,7 @@ export class AgentCore {
     text: string,
     clientMsgId: string,
     attachmentIds: readonly string[] = [],
-    advisor: { attachments: readonly AdvisorAttachmentInput[]; device: string } = { attachments: [], device: "" },
+    advisor: { attachments: readonly AdvisorAttachmentInput[]; device: string; tone?: AdvisorToneInput } = { attachments: [], device: "" },
   ): Promise<void> {
     const t = this.thread(threadId);
     if (t.meta.kind === "advisor") return this.askAdvisor(t, { text, clientMsgId, attachmentIds, ...advisor });
@@ -1608,7 +1609,7 @@ export class AgentCore {
    */
   private async askAdvisor(
     t: Thread,
-    q: { text: string; clientMsgId: string; attachmentIds: readonly string[]; attachments: readonly AdvisorAttachmentInput[]; device: string },
+    q: { text: string; clientMsgId: string; attachmentIds: readonly string[]; attachments: readonly AdvisorAttachmentInput[]; device: string; tone?: AdvisorToneInput },
   ): Promise<void> {
     if (q.clientMsgId.trim() === "") throw new AgentError(ErrorCode.INVALID, "a question to Advisor needs its client_msg_id", { reason: ErrorReason.UNSPECIFIED });
     if (q.attachmentIds.length > 0) throw new AgentError(ErrorCode.INVALID, "Advisor takes no files", { reason: ErrorReason.UNSPECIFIED });
@@ -1618,14 +1619,22 @@ export class AgentCore {
     const queue = (t.questions ??= new AdvisorQueue());
     if (queue.size >= QUEUE_MAX) throw new AgentError(ErrorCode.INVALID, `at most ${QUEUE_MAX} questions wait for Advisor at once`, { reason: ErrorReason.UNSPECIFIED });
     const attachments = q.attachments.map((a) => ({ ...a }));
-    queue.push({ clientMsgId: q.clientMsgId, device: q.device, question: q.text.trim(), attachments, prompt: this.questionPrompt(t.meta.dir, q.text, attachments) });
+    const tone = q.tone ?? "";
+    queue.push({
+      clientMsgId: q.clientMsgId,
+      device: q.device,
+      question: q.text.trim(),
+      attachments,
+      ...(tone ? { tone } : {}),
+      prompt: this.questionPrompt(t.meta.dir, q.text, attachments, tone),
+    });
     this.saveQueue(t);
     await this.advanceAdvisor(t);
   }
 
   /** What the AI reads for a question; never a command of the AI's: the question comes after a line of tunelo's. */
-  private questionPrompt(dir: string, question: string, attachments: readonly AdvisorAttachmentInput[]): string {
-    return `[tunelo] The user asks:\n${advisorPrompt(question, attachments, (id) => this.opts.gitFailure?.(id), dir)}`;
+  private questionPrompt(dir: string, question: string, attachments: readonly AdvisorAttachmentInput[], tone = ""): string {
+    return `[tunelo] The user asks:\n${advisorPrompt(question, attachments, (id) => this.opts.gitFailure?.(id), dir, tone)}`;
   }
 
   /** The Advisor thread's waiting questions, kept with it (a restart goes on with them), without the text built for the AI. */
@@ -2839,7 +2848,7 @@ export class AgentCore {
       info: (meta.info ??= {}),
       reasks: new Map(),
       ...(meta.kind === "advisor"
-        ? { questions: new AdvisorQueue((meta.advisorQueue ?? []).map((q) => ({ ...q, attachments: q.attachments ?? [], prompt: this.questionPrompt(meta.dir, q.question, q.attachments ?? []) }))) }
+        ? { questions: new AdvisorQueue((meta.advisorQueue ?? []).map((q) => ({ ...q, attachments: q.attachments ?? [], prompt: this.questionPrompt(meta.dir, q.question, q.attachments ?? [], q.tone ?? "") }))) }
         : {}),
     };
   }

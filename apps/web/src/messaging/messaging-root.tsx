@@ -3,7 +3,7 @@
 // core once per signed-in session and keeps it alive across the chat, settings
 // and moderation screens.
 import type { Transport } from "@connectrpc/connect";
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SelfUser } from "../api/adapters.ts";
 import { loadAccountClient, loadConnectWeb } from "../api/client.ts";
 import { PageLoader } from "../components/brand-loader.tsx";
@@ -55,6 +55,8 @@ const Moderation = moderationCode.Component;
 const DeveloperConsole = consoleCode.Component;
 const MachinesScreen = machinesCode.Component;
 const FeedbackPage = feedbackPageCode.Component;
+/** Advisor's mascot, shown on every screen once loaded: only its loader's chunk is named here (advisor/advisor-loader.tsx). */
+const AdvisorMascot = lazy(() => import("../advisor/advisor-loader.tsx"));
 
 /**
  * Secondary screens (and the rarer parts of messages) whose code is fetched
@@ -307,6 +309,10 @@ export default function MessagingRoot({ self, route, transport, onSelfChange, on
 					onSignOut={services.signOut}
 					moderator={self.isOperator}
 				/>
+				{/* Inside the links' provider: asking reaches the machines from any screen. */}
+				<Suspense fallback={null}>
+					<AdvisorMascot route={route} />
+				</Suspense>
 			</MachineLinksProvider>
 			<Toast />
 			<AppBadge />

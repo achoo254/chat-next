@@ -380,7 +380,7 @@ function DeliveryForm({
 	const maxShown = shownError("max", maxError, true);
 	const pending = delivery.status.pending;
 	return (
-		<form className="card form" aria-labelledby={formId} onSubmit={save} noValidate>
+		<form className="card form" aria-labelledby={formId} onSubmit={save} noValidate data-advisor-ignore="">
 			<h2 id={formId}>{t.console.tab.updates}</h2>
 			<div className="field">
 				<span className="label" id={modeId}>
@@ -552,7 +552,7 @@ function PollCommand() {
 	const { toasts } = useServices();
 	const command = pollCommand(serverOrigin());
 	return (
-		<div className="command">
+		<div className="command" data-advisor-ignore="">
 			<pre className="snippet" aria-label={t.delivery.command}>
 				{breakAfterSlashes(command)}
 			</pre>

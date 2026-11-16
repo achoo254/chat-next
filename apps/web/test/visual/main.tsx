@@ -313,6 +313,8 @@ const SCREENS: Record<string, string> = {
 	"machine-screen-signin": paths.machineInfo("1"),
 	"machine-screen-live": paths.machineInfo("1"),
 	"machine-home": paths.machines(),
+	// A chat opened cold with the demo machine paired: Advisor's mascot asks it from outside the AI Agent screens.
+	"machine-in-chat": `/c/${demo.ids.ops}`,
 	"machine-need": aiPaths.need,
 	"machine-unpaired": paths.machine("2"),
 	// An offline machine's board: what to do on it, step by step.

@@ -37,12 +37,27 @@ export type ContextField = (typeof CONTEXT_FIELDS)[number];
 export type AdvisorContextInput = Partial<Record<ContextField, string>>;
 export type AdvisorAttachmentInput = { text: string; context?: AdvisorContextInput };
 
+/** The answer styles of the user's Advisor profile; "" when the device named none (or one this machine does not know). */
+export type AdvisorToneInput = "short" | "fun" | "serious" | "";
+
+/** The fixed line each style adds after the question: the device sends only the style's name, never text. */
+export const ADVISOR_TONE_LINES: Readonly<Record<Exclude<AdvisorToneInput, "">, string>> = {
+  short: "[tunelo] Answer style: brief and plain.",
+  fun: "[tunelo] Answer style: light and friendly.",
+  serious: "[tunelo] Answer style: formal and serious.",
+};
+
+/** The line for a style; "" for none or an unknown one (nothing is added). */
+export function toneLine(tone: string): string {
+  return tone === "short" || tone === "fun" || tone === "serious" ? ADVISOR_TONE_LINES[tone] : "";
+}
+
 /**
  * One question of the queue: who asked (a device label), the user's words,
  * the attachments, and the text the AI gets (built when asked, with what the
  * machine adds of a git failure; kept in memory only).
  */
-export type AdvisorQuestion = { clientMsgId: string; device: string; question: string; attachments: AdvisorAttachmentInput[]; prompt: string };
+export type AdvisorQuestion = { clientMsgId: string; device: string; question: string; attachments: AdvisorAttachmentInput[]; tone?: AdvisorToneInput; prompt: string };
 
 /** A waiting question as the thread keeps it on disk: never the machine's additions (git's output stays in memory). */
 export type SavedQuestion = Omit<AdvisorQuestion, "prompt">;
@@ -135,6 +150,7 @@ export function advisorPrompt(
   attachments: readonly AdvisorAttachmentInput[],
   failureOf: (failureId: string) => GitFailure | undefined,
   threadDir: string,
+  tone = "",
 ): string {
   const tag = `UNTRUSTED-${randomBytes(6).toString("hex")}`;
   const block = (title: string, body: string, meta = "") =>
@@ -146,6 +162,8 @@ export function advisorPrompt(
     const extra = FAILURE_ID.test(id) ? failureSupplement(failureOf(id), threadDir) : undefined;
     if (extra) parts.push(block(`What the machine kept of the failure attachment ${i + 1} shows`, extra));
   });
+  const style = toneLine(tone);
+  if (style) parts.push(style);
   return parts.join("\n\n");
 }
 

@@ -13,7 +13,7 @@ import { useHubSlot } from "./link/connection-provider.tsx";
 import { deviceKeyStore } from "./link/device-keys.ts";
 import { deviceIdentity } from "./link/device-registration.ts";
 import { LinkHub, LOCAL_REF, localMachine, type DirectoryState } from "./link/link-hub.ts";
-import type { LinkState, MachineLink } from "./link/machine-link.ts";
+import { isAdvisorThread, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
 import { connOf, shouldConnect, type Conn } from "./machine-status.ts";
@@ -47,7 +47,8 @@ export function needsOf(hub: LinkHub): number {
 	if (localMachine() !== null) refs.push(LOCAL_REF);
 	let count = 0;
 	for (const ref of refs) {
-		for (const thread of hub.link(ref).snapshot().threads) if (thread.state === ThreadState.WAITING) count += 1;
+		// Advisor's threads never wait for the user; the link keeps them out of `threads` too.
+		for (const thread of hub.link(ref).snapshot().threads) if (thread.state === ThreadState.WAITING && !isAdvisorThread(thread)) count += 1;
 	}
 	return count;
 }

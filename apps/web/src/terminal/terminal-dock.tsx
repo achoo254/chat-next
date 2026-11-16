@@ -28,6 +28,7 @@ import { Link, navigate, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
+import { copyWithContext, useAdvisorScope } from "../advisor/advisor-context.tsx";
 import { limitsOf, type Limits } from "../machines/attachments.ts";
 import { DropZone, useFileDrop } from "../machines/attachment-tray.tsx";
 import { useDictation } from "./dictation.ts";
@@ -238,6 +239,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const ime = useRef<HTMLTextAreaElement>(null);
 	const root = useRef<HTMLDivElement>(null);
 	const autoOpened = useRef(false);
+	// A copy in the machine's terminal names the machine (a session's terminal adds its own context around it).
+	useAdvisorScope(root, { screen: "terminal", machine });
 	const shellOpening = useRef(false);
 	/** Each scope keeps its own tabs. */
 	const scope = thread === undefined ? machine : `${machine}/s/${thread.id}`;
@@ -661,7 +664,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	/** Copy the focused pane's selection to the clipboard (nothing selected: nothing happens). */
 	const copy = () => {
 		const selected = focused === null ? "" : (handles.current.get(focused.id)?.selection() ?? "");
-		if (selected !== "") void navigator.clipboard?.writeText(selected).catch(() => undefined);
+		if (selected !== "") void copyWithContext(selected, root.current);
 	};
 	const keyboardUp = imeOpen || keyboard > 0;
 	/** The keyboard key and the live input: up when it is down (at the caret), down when it is up. */

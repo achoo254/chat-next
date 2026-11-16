@@ -5,7 +5,7 @@ import type { NotificationSettings as CoreNotificationSettings, NotificationSoun
 import { requestNotificationPermission } from "@achoo254/chat-platform-web";
 import { LanguageSwitch, ThemeSwitch } from "@achoo254/app-shell";
 import "@achoo254/app-shell/app-shell.css";
-import { Fragment, useState } from "react";
+import { Fragment, lazy, useState } from "react";
 import { brand } from "../../brand.ts";
 import { FONT_MAX, FONT_MIN, LEGACY_THEME_KEY, setFontSize, storedFontSize } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
@@ -30,6 +30,9 @@ import ProfilePhotoField from "./profile-photo.tsx";
 import type { SelfUser } from "../../api/adapters.ts";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
+/** Advisor's settings load with the machines' link code (each machine's key), only when opened. */
+const AdvisorSettings = lazy(() => import("../../screens/settings/advisor-settings.tsx"));
+
 /** `self` and `onSelfChange`: the Profile tab's photo field, the only part of that tab drawn here. */
 export default function SettingsExtra({ tab, self, onSelfChange }: { tab: SettingsTab; self?: SelfUser; onSelfChange?: (self: SelfUser) => void }) {
 	switch (tab) {
@@ -51,6 +54,8 @@ export default function SettingsExtra({ tab, self, onSelfChange }: { tab: Settin
 			return <AccountSettings />;
 		case "mcp":
 			return <McpSettings />;
+		case "advisor":
+			return <AdvisorSettings />;
 		default:
 			return null;
 	}

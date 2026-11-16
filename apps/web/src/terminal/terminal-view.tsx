@@ -34,6 +34,7 @@ import { showCursorWithoutFocus } from "./terminal-cursor.ts";
 import { TerminalLoading } from "./terminal-loading.tsx";
 import { OpeningGate } from "./terminal-opening.ts";
 import { PreviewCover } from "./terminal-preview.ts";
+import { copyWithContext, rememberCopy } from "../advisor/advisor-context.tsx";
 
 /** Output smaller than this is written at once. */
 const SMALL_WRITE = 4 * 1024;
@@ -390,6 +391,8 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				// A program cleared its history: the rows from before it go too.
 				watchHistoryClears(term, () => history.cleared()),
 				keepScrollbarVisible(host, term),
+				// ⌘C / Ctrl+C through the browser: xterm's selection is not the page's, so Advisor is told here.
+				rememberCopies(host, () => term.getSelection()),
 				// A finger has no hover or drag on xterm's hairline bar: it gets a thumb and a way back to the newest line.
 				...(touch ? [showTouchThumb(host, term, latestNow())] : []),
 			];
@@ -399,7 +402,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				if (event.type === "keydown" && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === "KeyC") {
 					event.preventDefault();
 					const selected = term.getSelection() || history.selection();
-					if (selected !== "") void navigator.clipboard?.writeText(selected).catch(() => undefined);
+					if (selected !== "") void copyWithContext(selected, host);
 					return false;
 				}
 				// ⌘C copies this terminal's selection through the browser; one in the history is copied here.
@@ -407,7 +410,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					const selected = history.selection();
 					if (selected !== "") {
 						event.preventDefault();
-						void navigator.clipboard?.writeText(selected).catch(() => undefined);
+						void copyWithContext(selected, host);
 						return false;
 					}
 				}
@@ -578,4 +581,13 @@ function touchScroll({ host, term, input, ref, covered, scroll, rowHeight }: Tou
 		host.removeEventListener("pointerup", up);
 		host.removeEventListener("pointercancel", up);
 	};
+}
+
+/** A copy event inside the terminal (bubbling from xterm's own field): Advisor keeps the terminal's selection. */
+export function rememberCopies(host: HTMLElement, selection: () => string): { dispose(): void } {
+	const onCopy = () => {
+		rememberCopy(selection(), host);
+	};
+	host.addEventListener("copy", onCopy);
+	return { dispose: () => host.removeEventListener("copy", onCopy) };
 }

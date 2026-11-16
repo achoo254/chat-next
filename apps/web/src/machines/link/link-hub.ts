@@ -81,6 +81,8 @@ export class LinkHub {
 	/** Second connections that carry only a machine's terminal (MachineLink purpose "terminal"). */
 	private readonly carriers = new Map<string, MachineLink>();
 	private active = false;
+	/** Machines whose link pings whatever screen shows: Advisor waits for an answer there (hold). */
+	private readonly held = new Map<string, number>();
 	/** This device's key, registered with the account on first use. */
 	readonly device: () => Promise<KeyPair>;
 
@@ -137,7 +139,7 @@ export class LinkHub {
 		let link = this.links.get(ref);
 		if (link === undefined) {
 			const made = this.makeLink(ref, "chat");
-			made.setActive(this.active);
+			made.setActive(this.active || this.held.has(ref));
 			// Each new MachineInfo: kept for the machine's page while it is offline (provider-cache.ts).
 			let seen: unknown = null;
 			made.subscribe(() => {
@@ -222,7 +224,28 @@ export class LinkHub {
 	/** The user is on a machines screen and the app is visible: links ping. */
 	setActive(active: boolean): void {
 		this.active = active;
-		for (const link of this.links.values()) link.setActive(active);
+		for (const [ref, link] of this.links) link.setActive(active || this.held.has(ref));
+	}
+
+	/**
+	 * Keeps the link to `ref` pinging (so the machine holds back its push and a
+	 * dead socket is noticed) until the returned function runs, on any screen:
+	 * Advisor's question waits for its answer there.
+	 */
+	hold(ref: string): () => void {
+		this.held.set(ref, (this.held.get(ref) ?? 0) + 1);
+		this.links.get(ref)?.setActive(true);
+		let released = false;
+		return () => {
+			if (released) return;
+			released = true;
+			const left = (this.held.get(ref) ?? 1) - 1;
+			if (left > 0) this.held.set(ref, left);
+			else {
+				this.held.delete(ref);
+				this.links.get(ref)?.setActive(this.active);
+			}
+		};
 	}
 
 	/** Reconnect now (back in the foreground, network back). */

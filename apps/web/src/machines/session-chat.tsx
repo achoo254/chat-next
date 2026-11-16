@@ -55,6 +55,8 @@ import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
+import { useAdvisorScope, useAdvisorSession } from "../advisor/advisor-context.tsx";
+import { advisorStore, useSessionFill } from "../advisor/advisor-store.ts";
 
 export { versionAtLeast };
 
@@ -78,6 +80,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const [link, state] = useLink(hub, machine);
 	useWatch(link, threadId);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
+	// Advisor's own thread ("Xem phiên Cố vấn"): read only here; questions go through the mascot, which names them.
+	const advisorThread = state.advisorThreads.some((x) => x.id === threadId);
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
 	// After the AI's CLI went on in another conversation (/clear), the session shows that one; earlier ones fold away.
 	const conversations = splitConversations(items);
@@ -201,6 +205,11 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const own = state.projects?.projects.filter((x) => inFolder(dir, x.dir)).sort((a, b) => b.dir.length - a.dir.length)[0];
 	const branch = own?.git?.git === true ? own.git.branch : (placed?.workspace.branch ?? "");
 	const workspace = placed === null ? folderName(dir) : folderName(placed.workspace.dir);
+	// Copies made in the session (its transcript, terminal, Source Control) tell Advisor where; the mascot's menu follows it.
+	useAdvisorScope(chatRef, { screen: "session", machine, threadId, dir, branch });
+	useAdvisorSession(machine, threadId);
+	// "Gửi sang phiên": Advisor's pick waits in the composer for the user to send.
+	const fill = useSessionFill(machine, threadId);
 	const endTerminal = held
 		? () => {
 				endOnPurpose(machine, thread.terminalSession);
@@ -343,7 +352,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					)}
 					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} />}
 					<div className="mx-compose-box">
-					{!missing && (
+					{!missing && !advisorThread && (
 						<StatusBar
 							ai={ai}
 							dir={dir}
@@ -370,6 +379,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							}
 						/>
 					)}
+					{!advisorThread && (
 					<Composer
 						ai={ai}
 						machine={machineName}
@@ -380,6 +390,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 						listFiles={modern ? listFiles : undefined}
 						attach={attach}
 						focusKey={threadId}
+						fill={fill}
+						onFilled={(id) => advisorStore.takeFill(machine, threadId, id)}
 						onSend={async (text, files) => {
 							// `/clear` opens a new, empty session in this folder: go to it.
 							const opened = await link.send(threadId, text, files);
@@ -389,6 +401,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}
 					/>
+					)}
 					</div>
 				</div>
 				{screenOpen && <ScreenViewHost link={link} ai={ai} online={online} inSession onClose={() => setScreenOpen(false)} />}

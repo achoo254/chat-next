@@ -10,7 +10,7 @@
 // machine is offline or removed) lies over the last state known, it does not
 // replace it. Projects: in the user's order (a new one last), never moved by
 // what their sessions do.
-import { ThreadState, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ThreadKind, ThreadState, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "./agent-projects-client.ts";
 import { sortForList } from "./link/machine-link.ts";
 import { inFolder, samePath } from "./projects-view.ts";
@@ -149,6 +149,8 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 	const loose = new Map<string, { machine: MachineView; dir: string; threads: ThreadSummary[] }>();
 	for (const machine of machines) {
 		for (const thread of machine.state.threads) {
+			// Advisor's threads are no work of a folder (the link keeps them apart already).
+			if (thread.kind === ThreadKind.ADVISOR) continue;
 			const w = machine.entry.id > 0 ? holder(all, machine.entry.id, thread.dir) : undefined;
 			if (w !== undefined) {
 				const list = held.get(w.id);
