@@ -60,6 +60,38 @@ Cột "Kết quả" để người nghiệm thu ghi Đạt / Không đạt kèm 
 | D1 | Tài khoản vận hành: Kiểm duyệt › Hàng đợi báo cáo, Góp ý | Thấy báo cáo và góp ý, xử lý được | |
 | D2 | Nhóm "Vận hành chat" | Nhận cảnh báo vận hành (watchdog) và góp ý, báo cáo mới | |
 
+### Văn phòng AI
+
+Cần một máy chạy `tunelo` 3.6.0 trở lên và một phiên Claude do app mở (trừ E18, E19). Mở AI Agent › một phiên › tab "Văn phòng". Nhân vật, phòng và
+tín hiệu: [ADR 0018](adr/0018-office-view-babylon-normalized-agent-stream.md); bảng phân phòng: [`office-wire.md`](office-wire.md) mục 4.
+
+| # | Thao tác | Kết quả đúng | Kết quả |
+|---|---|---|---|
+| E1 | Mở tab Văn phòng của một phiên | Đầu phiên có "Trò chuyện \| Terminal \| Văn phòng" (Terminal khi AI hỗ trợ); văn phòng 3D hiện tầng 1 với Giám đốc; lần sau mở phiên vẫn ở tab Văn phòng | Chưa chạy |
+| E2 | Bấm T2, T3 trên thanh tầng; để bật "Tự theo" và cho AI chạy việc ở tầng khác | Chuyển tầng có hiệu ứng thang máy; tầng có người làm việc có chấm; Tự theo chuyển tới tầng vừa có việc, không nhảy liên tục, và ngừng tự theo một lúc sau khi tự bấm tầng; tắt Tự theo thì nhớ trên thiết bị | Chưa chạy |
+| E3 | Sảnh (T1): gửi một tin cho AI; cho AI gửi tin qua MCP `tunelo` | Thư bay vào sảnh khi lượt mới bắt đầu; lúc AI gửi tin qua MCP `tunelo` thì người gửi đứng ở sảnh; nhân viên mới bước vào từ cửa sảnh; bảng tin có Nhân viên hôm nay, Việc xong, Thời gian phiên | Chưa chạy |
+| E4 | Phòng Giám đốc (T1): hỏi một câu AI trả lời không cần tool | Giám đốc ở phòng mình, tư thế suy nghĩ; phiên rảnh thì "Rảnh" | Chưa chạy |
+| E5 | Phòng làm việc chung (T1): nhờ AI sửa một tệp | Người làm đi tới bàn gõ phím, màn hình bàn sáng, bong bóng hiện tên tệp (không thư mục) | Chưa chạy |
+| E6 | Phòng máy chủ (T1): nhờ AI chạy `ls`; rồi một lệnh chạy nền | `ls` ở phòng máy chủ, bong bóng chỉ hiện tên lệnh; lệnh nền thành một "Máy" ở phòng máy chủ, đèn rack nháy, máy rời khi lệnh nền xong | Chưa chạy |
+| E7 | Phòng họp (T1): nhờ AI chạy subagent lồng (subagent gọi subagent) hoặc workflow; hoặc hơn 8 subagent (điện thoại: 6) | Subagent lồng ngồi phòng họp; người không còn bàn ngồi phòng họp kèm nhãn "+N" | Chưa chạy |
+| E8 | Pantry (T1): để phiên rảnh | Sau một lúc rảnh, người không có việc uống cà phê ở pantry, tán gẫu ở sofa hoặc ngáp ở bàn; Giám đốc đi tuần; không ai đang làm việc bị kéo vào pantry | Chưa chạy |
+| E9 | Phòng Kế hoạch (T2): nhờ AI lập danh sách việc (todo) | Người đi tới phòng Kế hoạch; bảng "Việc cần làm" chỉ có số Chờ / Đang làm / Xong, không có chữ của mục | Chưa chạy |
+| E10 | Thư viện (T2): nhờ AI đọc tệp, tìm trong mã, đọc một trang web | Người đi thang máy lên Thư viện; bong bóng hiện tên tệp hoặc tên miền, tìm kiếm thì không hiện câu tìm | Chưa chạy |
+| E11 | Bưu phòng (T2): nhờ AI chạy `git status`; gọi một tool MCP ngoài | Người tới Bưu phòng; bong bóng MCP chỉ hiện tên tool, không có tên server | Chưa chạy |
+| E12 | Phòng Bảo vệ (T3): ở chế độ quyền hỏi duyệt, nhờ AI chạy lệnh cần duyệt | Người có tool cần duyệt đứng ở Bảo vệ, trạng thái "Chờ duyệt"; Chủ tịch (bạn) đứng ở sảnh | Chưa chạy |
+| E13 | Phòng Kiểm toán (T3): xong một lượt | Bảng Chi phí có Token vào, Token ra và Chi phí ước tính; phiên chưa có lượt nào kết thúc hiện "Chưa có số liệu", không hiện số 0 | Chưa chạy |
+| E14 | Phòng QA/ISO (T3): nhờ AI chạy `pnpm test` (một lần qua, một lần trượt) | Người tới QA; bảng Kiểm thử đếm Qua / Trượt; qua thì ăn mừng, trượt thì bốc khói | Chưa chạy |
+| E15 | Nhờ AI chạy một subagent (ví dụ scout) tới khi xong, rồi để phiên rảnh hơn 10 phút | Nhân viên có tên và phụ kiện theo loại agent, vào từ cửa sảnh, đi qua cửa và thang máy tới phòng của việc; xong thì tới phòng Giám đốc nộp hồ sơ rồi về bàn; rảnh hơn 10 phút thì về, toà nhà "Tan ca" tối đèn | Chưa chạy |
+| E16 | Ở E12: lần đầu Cho phép, lần sau Từ chối | Cho phép: người quay lại việc; Từ chối: "Bị chặn ở cửa", lắc đầu rồi quay về | Chưa chạy |
+| E17 | Tắt mạng của máy hơn 30 giây, rồi bật lại | Báo "Mất điện", người đứng hình, phủ xám; nối lại thì "Đang cập nhật văn phòng…" rồi sáng đèn, trạng thái đúng với phiên | Chưa chạy |
+| E18 | Mở phiên trên máy chạy `tunelo` cũ hơn 3.6.0; mở thẳng đường dẫn `…/office` của phiên đó | Không có tab Văn phòng; đường dẫn thẳng hiện "Cập nhật tunelo trên máy (3.6.0 trở lên)…", không lỗi | Chưa chạy |
+| E19 | Mở tab Văn phòng của một phiên Antigravity | Chỉ có Giám đốc (vẫn đi tới phòng theo tool) và dòng "AI này chưa báo cáo nhân viên: chỉ có Giám đốc."; bảng Chi phí chỉ có token | Chưa chạy |
+| E20 | Mở văn phòng với `?office3d=off` trên địa chỉ (hoặc trình duyệt tắt tăng tốc phần cứng) | Bản 2D: ảnh dựng sẵn của từng tầng, đủ 3 tầng qua thanh tầng, chấm trạng thái và nhãn tên đặt đúng bàn | Chưa chạy |
+| E21 | Điện thoại dọc (trình duyệt và app): mở văn phòng, kéo, chuyển tầng | Mở vào khu 6 bàn của tầng 1, kéo dời khung trong tầng; đủ 3 tầng; người thứ 7 trở đi vào phòng họp kèm "+N" | Chưa chạy |
+| E22 | Xem lúc ban ngày, chiều tối, ban đêm (đổi giờ máy xem), và lúc tan ca | Ngày sáng; chiều chuyển dần sang đêm; đêm có đèn bàn và màn hình sáng, ánh sáng ấm; tan ca tối đèn dù giờ nào | Chưa chạy |
+| E23 | Lăn chuột hoặc chụm hai ngón; chuột phải kéo, Shift kéo hoặc hai ngón kéo ngang | Zoom trong giới hạn; xoay nhẹ trong giới hạn góc rồi tự về góc mặc định sau vài giây không chạm | Chưa chạy |
+| E24 | Bấm nút "Âm thanh" | Mặc định tắt; bật thì nghe chuông thang máy, gõ phím, ăn mừng, chuông khi chờ duyệt; lựa chọn nhớ trên thiết bị | Chưa chạy |
+
 ## Giới hạn đã biết
 
 - App iOS/Android chưa lên store (iOS mới có TestFlight nội bộ, xem [`mobile-app.md`](mobile-app.md)); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt. Không có app desktop riêng (huỷ R8 ngày 20/10/2026: desktop = PWA).

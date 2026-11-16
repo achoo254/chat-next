@@ -65,6 +65,8 @@ Token do tiến trình nền gắn, claude không bao giờ thấy, và mọi ch
 
 Cài hoặc cập nhật bằng một dòng không tham số (trang thêm máy hiện đúng lệnh theo hệ điều hành): `curl -fsSL https://chat.hoandat.com/agent/install.sh | sh` (macOS; Linux x64/arm64 dùng glibc và có systemd), `irm https://chat.hoandat.com/agent/install.ps1 | iex` (Windows PowerShell) hoặc `powershell -NoProfile -c "irm https://chat.hoandat.com/agent/install.ps1 | iex"` (Windows cmd); chi tiết ở [`apps/agent/README.md`](apps/agent/README.md). Script nhắc gỡ gói npm `tunelo` 1.x nếu còn.
 
+Tab "Văn phòng" của mỗi phiên (cạnh Trò chuyện và Terminal, khi máy chạy `tunelo` 3.6.0 trở lên) vẽ phiên thành một toà nhà 3D nhỏ 3 tầng, 12 phòng: agent chính là Giám đốc, subagent là nhân viên, mỗi tool là một việc ở đúng phòng của nó, người dùng là Chủ tịch đứng ở sảnh khi AI chờ duyệt. Tab chỉ để xem. `tunelo` chuẩn hoá hoạt động trên máy và chỉ gửi tên tool, phòng, số đếm qua kênh mã hoá đầu cuối, không gửi lệnh hay nội dung; web vẽ bằng Babylon.js (`apps/web/src/office-3d/`), không có WebGL thì dùng bản 2D (`apps/web/src/machines/office/`). Giao thức: [`docs/office-wire.md`](docs/office-wire.md); quyết định: [ADR 0018](docs/adr/0018-office-view-babylon-normalized-agent-stream.md).
+
 ## Production
 
 Deploy và vận hành: [`docs/deployment-guide.md`](docs/deployment-guide.md); hạ tầng đã triển khai: [`docs/infrastructure-inventory.md`](docs/infrastructure-inventory.md); skill vận hành cho agent: [`.claude/skills/chat-ops-prod/`](.claude/skills/chat-ops-prod/).
