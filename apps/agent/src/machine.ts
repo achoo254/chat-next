@@ -227,8 +227,9 @@ export class Machine {
       config: this.config,
       audit: this.audit,
       unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),
-      // A shell runs each AI's CLI on the account picked on the machine, as Chat's sessions do; the default one needs nothing.
-      shellEnv: () => Object.assign({}, ...this.providers.map((p) => p.shellEnv?.(this.selectedScope(p.id)) ?? {})),
+      // A shell runs each AI's CLI on the account picked on the machine, made ready as for Chat's sessions
+      // (Claude: the machine's settings copied in); the default one needs nothing.
+      shellEnv: () => Object.assign({}, ...this.providers.map((p) => p.shellEnv?.(this.shellScope(p.id)) ?? {})),
       ai: aiTerminalsOf(this.core),
       log: this.log,
       onAvailability: () => void this.announceInfo(),
@@ -329,6 +330,7 @@ export class Machine {
     // Saved values are hidden from every output from the start, not only once used.
     void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
     for (const p of this.providers) void p.accounts?.cleanLeftovers?.();
+    for (const p of this.providers) p.accounts?.watch?.();
     this.browser.start();
     const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
     this.wss = wss;
@@ -554,6 +556,21 @@ export class Machine {
       return this.accountsOf(providerId)?.selectedScope();
     } catch {
       return undefined; // the accounts cannot be read: sessions say so when they open
+    }
+  }
+
+  /**
+   * The account a new terminal runs an AI's CLI on, prepared like a session's.
+   * Preparing it may fail (a settings copy the system refused): the picked
+   * account still applies, never the AI's own sign-in in its place; only
+   * accounts that cannot be read at all leave the shell on its own sign-in.
+   */
+  private shellScope(providerId: string): AccountScopeRef | undefined {
+    try {
+      return this.accountsOf(providerId)?.sessionAccount().scope;
+    } catch (err) {
+      this.log(`terminal: ${providerId} account not prepared (${(err as Error).message})`);
+      return this.selectedScope(providerId);
     }
   }
 

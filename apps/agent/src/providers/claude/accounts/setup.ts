@@ -2,7 +2,8 @@
 // folders of projects, plans, skills, hooks… link back to the machine's
 // Claude folder (junctions on Windows, symlinks elsewhere), the prompt
 // history is shared (history-link.ts), settings and key bindings are copied
-// (again at every session start: syncMachineSettings),
+// (again at every session start and whenever they change on the machine:
+// syncMachineSettings, settings-watch.ts),
 // CLAUDE.md imports the shared one, and the profile's .claude.json gets the
 // projects and MCP servers of the machine's own. The machine's .claude.json
 // is only read, and only those two keys: never its account or user id.
@@ -49,12 +50,15 @@ export const SHARED_DIRS = [
 
 /**
  * The machine's settings (permission rules, hooks, default mode) and key
- * bindings, copied over the profile's at every session start so a change
- * on the machine reaches every profile. Not linked: claude saves them by
+ * bindings, copied over the profile's at every session start, every terminal
+ * opened on the profile, and whenever they change on the machine, so a change
+ * on the machine reaches every profile. A setting a profile's session saves
+ * itself lands in the profile's copy only and is replaced by the next copy:
+ * change settings on the machine's own account. Not linked: claude saves them by
  * writing a new file and renaming it, which cuts a link, and a file link on
  * Windows needs administrator rights; a copy behaves the same everywhere.
  */
-const COPIED_FILES = ["settings.json", "keybindings.json"] as const;
+export const MACHINE_SETTINGS_FILES = ["settings.json", "keybindings.json"] as const;
 
 /** Keys of the machine's .claude.json a profile takes over. */
 const MERGED_KEYS = ["projects", "mcpServers"] as const;
@@ -195,7 +199,7 @@ function sharedMemoryRef(claudeHome: string): string {
  * rules or a mode the machine dropped.
  */
 export function syncMachineSettings(home: string, claudeHome: string): void {
-  for (const name of COPIED_FILES) {
+  for (const name of MACHINE_SETTINGS_FILES) {
     const from = join(claudeHome, name);
     const to = join(home, name);
     if (!existsSync(from)) {
@@ -203,8 +207,13 @@ export function syncMachineSettings(home: string, claudeHome: string): void {
       continue;
     }
     const tmp = `${to}.${process.pid}.tmp`;
-    copyFileSync(from, tmp);
-    renameSync(tmp, to);
+    try {
+      copyFileSync(from, tmp);
+      renameSync(tmp, to);
+    } catch (err) {
+      rmSync(tmp, { force: true }); // a refused rename leaves no copy behind in the profile
+      throw err;
+    }
   }
 }
 

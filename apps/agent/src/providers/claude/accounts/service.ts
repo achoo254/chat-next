@@ -29,6 +29,7 @@ import type {
 import { type ClaudeAccount, readAccount, sameAccount, signOut } from "./account.ts";
 import { ensureHistoryLink } from "./history-link.ts";
 import { PROFILE_ID_RE, assertSafeHome, defaultClaudeHome, makeProfileHome, profileDir, profileHome, profilesRoot } from "./paths.ts";
+import { watchMachineSettings } from "./settings-watch.ts";
 import { ensureSharedDirs, setupProfileHome, syncMachineSettings } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
 import { ProfileStore, type ProfileUsage } from "./store.ts";
@@ -86,6 +87,8 @@ export class ClaudeProfiles implements AccountsFacet {
   private readonly now: () => number;
   private readonly log: (line: string) => void;
   private listener: AccountsListener = {};
+  /** Stops following the machine's settings; set while the service runs. */
+  private stopSettingsWatch: (() => void) | undefined;
   /** A new account signs in from a device: claude's link, then the code its page shows. */
   readonly signIn = {
     begin: (): Promise<SignInStart> => this.beginRemote(),
@@ -591,8 +594,31 @@ export class ClaudeProfiles implements AccountsFacet {
     });
   }
 
-  /** Stops a sign-in in progress (the service is stopping). */
+  /**
+   * Follows the machine's settings while the service runs: a change there
+   * is copied to every profile at once, so sessions already open on a
+   * profile get it too. Once; stop() ends it.
+   */
+  watch(): void {
+    this.stopSettingsWatch ??= watchMachineSettings(this.claudeHome, () => this.syncEveryProfile(), this.log);
+  }
+
+  /** The machine's settings copied into every kept profile; one that fails is logged and the rest still get theirs. */
+  private syncEveryProfile(): void {
+    if (this.store.damaged) return;
+    for (const p of this.store.get().profiles) {
+      try {
+        syncMachineSettings(this.home(p.id), this.claudeHome);
+      } catch (err) {
+        this.log(`claude profiles: the machine's settings did not reach a profile (${(err as Error).message})`);
+      }
+    }
+  }
+
+  /** Stops a sign-in in progress and following the machine's settings (the service is stopping). */
   async stop(): Promise<void> {
+    this.stopSettingsWatch?.();
+    this.stopSettingsWatch = undefined;
     await this.cancel(this.attempt?.id ?? "");
   }
 }

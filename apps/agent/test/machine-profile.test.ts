@@ -1,15 +1,16 @@
 // The machine's Claude account seen from devices: picking one (from a device
 // or from the machine's own terminal) reaches every connected device as
 // MachineAccounts, then again when each session has moved and when the new
-// account's usage is read. And the account offered when a session runs out:
-// the signed-in one with the most usage left.
-import { mkdirSync, rmSync } from "node:fs";
+// account's usage is read. The machine's settings reach every account while
+// the service runs. And the account offered when a session runs out: the
+// signed-in one with the most usage left.
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type MachineAccounts, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { Machine } from "../src/machine.ts";
-import { makeProfileHome } from "../src/providers/claude/accounts/paths.ts";
+import { makeProfileHome, profileHome } from "../src/providers/claude/accounts/paths.ts";
 import { usageLeft } from "../src/providers/claude/accounts/service.ts";
 import { setupProfileHome } from "../src/providers/claude/accounts/setup.ts";
 import { fakeProvider } from "./fake-provider.ts";
@@ -87,6 +88,29 @@ describe("the machine's Claude account on every device", () => {
         () => announced(d).at(-1)?.accounts?.selectedByProvider["claude"] === "" && announced(d).at(-1)?.sessions.every((s) => s.accountId === "") === true,
       );
     }
+  });
+});
+
+describe("the machine's settings on every account", () => {
+  it("reach an account as soon as they change on the machine, while the service runs", async () => {
+    const f = profilesFixture({ defaultEmail: "team@example.com" });
+    addProfile(f, "p2", "max@example.com");
+    const claude = { ...fakeProvider("claude"), accounts: f.profiles };
+    const machine = new Machine({ config: new ConfigStore(f.configDir), providers: [claude], log: () => undefined });
+    await machine.start(0);
+    cleanup.push(() => machine.stop());
+    await new Promise((r) => setTimeout(r, 100));
+
+    const statusLine = { statusLine: { type: "command", command: "my-status-line" } };
+    writeFileSync(join(f.claudeHome, "settings.json"), JSON.stringify(statusLine));
+    const copy = join(profileHome(f.configDir, "p2"), "settings.json");
+    await waitFor(() => {
+      try {
+        return readFileSync(copy, "utf8") === JSON.stringify(statusLine);
+      } catch {
+        return false;
+      }
+    });
   });
 });
 

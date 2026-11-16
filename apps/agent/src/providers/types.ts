@@ -607,6 +607,8 @@ export interface AccountsFacet {
   listen(listener: AccountsListener): void;
   /** Leftovers of an unfinished sign-in a crash left: cleaned at start. */
   cleanLeftovers?(): Promise<void>;
+  /** Keeps the accounts in step with the machine while the service runs (Claude: its settings); started once at start. */
+  watch?(): void;
   /** The service is stopping: a sign-in in progress ends. */
   stop?(): Promise<void>;
 }

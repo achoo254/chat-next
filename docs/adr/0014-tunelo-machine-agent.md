@@ -79,7 +79,11 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 - Phiên hết hạn mức (claude báo `rate_limit`) mà máy có profile khác đã đăng nhập và còn hạn mức: `ThreadInfo.profile_suggestion`
   gợi ý profile còn nhiều nhất (phần trăm còn lại theo cửa sổ chặt hơn). Chỉ là gợi ý; máy không tự đổi.
 - Profile dùng chung dữ liệu với `~/.claude` (`projects`, `todos`, `plans`, … liên kết bằng symlink hoặc junction). Chỉ đăng nhập
-  là riêng. `settings.json` và `keybindings.json` được chép lại mỗi lần mở phiên, vì claude ghi file bằng cách đổi tên nên link bị cắt.
+  là riêng. `settings.json` và `keybindings.json` được chép (không link, vì claude ghi file bằng cách đổi tên nên link bị cắt): lại
+  mỗi lần mở phiên, mỗi lần mở terminal trên profile, và ngay khi hai file đó đổi trên máy lúc tunelo đang chạy (từ `tunelo` 3.6.1),
+  nên phiên đang mở trên profile cũng nhận cài đặt mới. Một chiều: cài đặt mà phiên của profile tự lưu chỉ nằm trong bản chép và bị bản
+  chép sau ghi đè, nên đổi cài đặt ở tài khoản của máy. `settings.json` của máy là symlink (dotfiles) thì sửa file đích không báo
+  thay đổi trong thư mục Claude: profile nhận bản mới lúc mở phiên hoặc terminal tiếp theo.
 - Tài khoản lấy từ `claude auth status --json`. tunelo không đọc token Claude. Trùng email + tổ chức với profile có sẵn thì bị từ chối.
 - Hạn mức 5 giờ và tuần lấy từ claude, kèm giờ cập nhật. Profile hết đăng nhập hiện "Cần đăng nhập lại" và không chọn được.
 - Xoá profile: đăng xuất trước, xoá link như link, không bao giờ đụng file trong `~/.claude`. Đăng xuất lỗi thì từ chối xoá. Lệnh
