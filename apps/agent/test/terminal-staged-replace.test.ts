@@ -9,7 +9,7 @@
 // the old one starts again and no switch is tried again.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { ThreadState } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, TerminalUpdateHoldReason, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentProvider, Liveness, SessionHistory } from "../src/providers/types.ts";
 import type { ChildProcess } from "../src/terminal/child-processes.ts";
@@ -203,5 +203,47 @@ describe("a staged terminal process", () => {
     expect(waits[1]).toContain("runs zsh, not an AI's CLI");
     expect(waits[2]).toContain("1 program(s) for 2 session(s)");
     expect(waits[3]).toContain("cannot be read");
+  });
+
+  it("the machine's list says a newer terminal process waits, since when, and which sessions hold it and why", async () => {
+    const { m, c, live, stage } = await setup();
+    let asked = 0;
+    const list = async () => {
+      asked += 1;
+      const r = await c.request(`list-${asked}`, { case: "termListRequest", value: {} });
+      if (r.body.case !== "termListResult") throw new Error("no list");
+      return r.body.value;
+    };
+    expect((await list()).update).toBeUndefined();
+    expect((await c.request("2", { case: "termOpen", value: { cols: 80, rows: 24, cwd: m.work } })).body).toMatchObject({ case: "termOpened" });
+    stage();
+    live.now = { ...idleFor(5 * QUIET_MS), state: "busy" };
+    live.programs = [
+      { pid: 10, command: "/opt/fake-ai", args: "/opt/fake-ai", cwd: m.work },
+      { pid: 11, command: "/bin/zsh", args: "-zsh", cwd: m.work },
+    ];
+    const update = (await list()).update;
+    expect(Number(update?.stagedAt)).toBeGreaterThan(Date.now() - 60_000);
+    expect(update?.holds).toEqual([
+      expect.objectContaining({ session: 1, reason: TerminalUpdateHoldReason.AI_ACTIVE }),
+      expect.objectContaining({ session: 2, reason: TerminalUpdateHoldReason.SHELL }),
+    ]);
+  });
+
+  it("a device replaces it now: the thread's AI opens again resumed even mid-turn, the shell ends, the list comes back", async () => {
+    const { m, c, host, live, bin, stage } = await setup();
+    expect((await c.request("2", { case: "termOpen", value: { cols: 80, rows: 24, cwd: m.work } })).body).toMatchObject({ case: "termOpened" });
+    // Nothing waits: refused.
+    expect((await c.request("3", { case: "termUpdateNow", value: {} })).body).toMatchObject({ case: "error", value: { reason: ErrorReason.TERMINAL_UNAVAILABLE } });
+    stage();
+    live.now = { ...idleFor(5 * QUIET_MS), state: "busy" };
+    const r = await c.request("4", { case: "termUpdateNow", value: {} });
+    expect(r.body.case).toBe("termListResult");
+    if (r.body.case !== "termListResult") return;
+    expect(r.body.value.update).toBeUndefined();
+    expect(r.body.value.sessions.map((s) => s.threadId !== "")).toEqual([true]);
+    expect(host.commands.filter((x) => x.cmd === "shutdown")).toHaveLength(1);
+    expect(readFileSync(join(bin, "current", TERM_HOST_BINARY), "utf8")).toBe("new");
+    expect(m.logs.some((l) => l.includes("as a device asked (1 AI session(s) open again resumed, 1 other session(s) end)"))).toBe(true);
   });
 });

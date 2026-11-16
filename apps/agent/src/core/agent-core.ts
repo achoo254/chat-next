@@ -5,6 +5,9 @@ import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { ChildProcess } from "../terminal/child-processes.ts";
+
+/** Whether sessions no thread owns may end in a terminal switch (terminalOrphansQuiet). */
+export type OrphanVerdict = { hold: "" | "shell" | "cli" | "unknown"; why: string };
 import { create } from "@bufbuild/protobuf";
 import {
   ActivityPhase,
@@ -2562,14 +2565,15 @@ export class AgentCore {
    * Whether the sessions of terminal process `pid` that no thread owns may
    * end when a newer terminal process replaces it: every program it runs
    * (one per live session, `sessions` of them) is an AI's CLI with nothing
-   * written to that AI's sessions in its folder for `quietMs`. "" when they
-   * may, else why not (for the agent's log). A shell, any program no AI
-   * claims, or programs that cannot be read keep them.
+   * written to that AI's sessions in its folder for `quietMs`. `hold` ""
+   * when they may, else what keeps them, with `why` for the agent's log. A
+   * shell or any program no AI claims ("shell"), an AI's CLI active lately
+   * ("cli"), or programs that cannot be read ("unknown") keep them.
    */
-  async terminalOrphansQuiet(pid: number, sessions: number, quietMs: number, list: (pid: number) => Promise<ChildProcess[] | undefined>): Promise<string> {
+  async terminalOrphansQuiet(pid: number, sessions: number, quietMs: number, list: (pid: number) => Promise<ChildProcess[] | undefined>): Promise<OrphanVerdict> {
     const programs = await list(pid);
-    if (programs === undefined) return "the terminal's programs cannot be read on this machine";
-    if (programs.length !== sessions) return `the terminal runs ${programs.length} program(s) for ${sessions} session(s)`;
+    if (programs === undefined) return { hold: "unknown", why: "the terminal's programs cannot be read on this machine" };
+    if (programs.length !== sessions) return { hold: "unknown", why: `the terminal runs ${programs.length} program(s) for ${sessions} session(s)` };
     const histories = this.opts.providers.flatMap((p) => (p.history?.terminalCliQuiet ? [p.history] : []));
     for (const program of programs) {
       let quiet: boolean | undefined;
@@ -2578,10 +2582,10 @@ export class AgentCore {
         quiet = history.terminalCliQuiet?.(program, quietMs);
         if (quiet !== undefined) break;
       }
-      if (quiet === undefined) return `a session no thread owns runs ${program.command.split("/").pop() ?? "a program"}, not an AI's CLI`;
-      if (!quiet) return `an AI's CLI no thread owns was active in ${program.cwd || "an unknown folder"} within ${Math.round(quietMs / 60_000)} min`;
+      if (quiet === undefined) return { hold: "shell", why: `a session no thread owns runs ${program.command.split("/").pop() ?? "a program"}, not an AI's CLI` };
+      if (!quiet) return { hold: "cli", why: `an AI's CLI no thread owns was active in ${program.cwd || "an unknown folder"} within ${Math.round(quietMs / 60_000)} min` };
     }
-    return "";
+    return { hold: "", why: "" };
   }
 
   /** The thread whose AI runs in `session` of terminal process `pid`; "" when none. */

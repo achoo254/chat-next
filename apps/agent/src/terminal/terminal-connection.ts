@@ -16,7 +16,7 @@ import type { TerminalService } from "./terminal-service.ts";
 import { TerminalError } from "./terminal-error.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
-export type TermRequest = Extract<Frame["body"], { case: "termListRequest" | "termOpen" | "termClose" | "termResize" | "termSignal" }>;
+export type TermRequest = Extract<Frame["body"], { case: "termListRequest" | "termOpen" | "termClose" | "termResize" | "termSignal" | "termUpdateNow" }>;
 type TermDataBody = Extract<Frame["body"], { case: "termData" }>["value"];
 
 /** Header of a terminal frame (type u8, session u32) and the largest frame (docs/terminal-wire.md). */
@@ -77,6 +77,8 @@ export class TerminalConnection {
       switch (b.case) {
         case "termListRequest":
           return this.peer.send(id, { case: "termListResult", value: await this.service.list() });
+        case "termUpdateNow":
+          return this.peer.send(id, { case: "termListResult", value: await this.service.updateNow() });
         case "termOpen": {
           const { cols, rows } = b.value;
           if (!validDim(cols) || !validDim(rows)) throw new TerminalError(ErrorCode.INVALID, ErrorReason.UNSPECIFIED, "cols and rows must be 1 to 1000");

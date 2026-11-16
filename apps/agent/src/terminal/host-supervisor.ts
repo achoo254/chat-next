@@ -11,7 +11,7 @@
 // terminal process runs, so an update never cuts open shells. The terminal
 // service replaces a running one sooner when every session it keeps is a
 // thread's idle AI, which opens again resumed (`replace`).
-import { existsSync, renameSync, rmSync } from "node:fs";
+import { existsSync, renameSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ControlError, type HelloResult, HostLink, type HostLinkOptions, readControlInfo, termHostDir } from "./host-link.ts";
 
@@ -138,6 +138,16 @@ export class HostSupervisor {
   hasStaged(): boolean {
     if ((this.opts.env ?? process.env).TUNELO_TERM_HOST_BIN) return false;
     return existsSync(join(binDir(this.opts.configDir), "next", TERM_HOST_BINARY));
+  }
+
+  /** When the update brought the newer terminal process waiting (Unix ms); undefined when none waits. */
+  stagedAt(): number | undefined {
+    if (!this.hasStaged()) return undefined;
+    try {
+      return Math.round(statSync(join(binDir(this.opts.configDir), "next", TERM_HOST_BINARY)).mtimeMs);
+    } catch {
+      return undefined;
+    }
   }
 
   /**

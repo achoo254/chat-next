@@ -768,6 +768,7 @@ export class Connection {
         case "termClose":
         case "termResize":
         case "termSignal":
+        case "termUpdateNow":
           // Answered later, by id: starting the terminal process may take a moment.
           if (!this.terminal) return this.send(id, { case: "error", value: refusal("this machine has no terminal", ErrorReason.UNSUPPORTED_REQUEST) });
           return this.terminal.handle(id, b);

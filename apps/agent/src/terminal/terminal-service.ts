@@ -24,16 +24,16 @@
 // as long; its record stays, to resume. A plain shell, or an AI in a turn,
 // keeps the old process until it ends. Why it still waits goes to the log.
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, TerminalAvailability, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, TerminalAvailability, TerminalUpdateHoldReason, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type ConfigStore, deviceLabel } from "../config.ts";
-import { AgentError, type AgentCore, type TerminalSpec } from "../core/agent-core.ts";
+import { AgentError, type AgentCore, type OrphanVerdict, type TerminalSpec } from "../core/agent-core.ts";
 import type { ShellEnv } from "../providers/types.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { type ChildProcess, childProcesses } from "./child-processes.ts";
 import { AGENT_VERSION } from "../version.ts";
 import { Grants, TerminalDenied } from "./grants.ts";
-import { ControlError, type DaemonAudit, type DaemonEvent, type HelloResult, sessionListSchema } from "./host-link.ts";
+import { ControlError, type DaemonAudit, type DaemonEvent, type DaemonSession, type HelloResult, sessionListSchema } from "./host-link.ts";
 import { HostSupervisor, type TermHostUnit, type TerminalAvailabilityState, TerminalUnavailable } from "./host-supervisor.ts";
 import { type TerminalPeer, TerminalConnection } from "./terminal-connection.ts";
 import { TerminalError } from "./terminal-error.ts";
@@ -49,6 +49,16 @@ export const MAX_TERMINAL_SESSIONS = 20;
 export const ORPHAN_GRACE_MS = 30_000;
 /** How often a staged terminal process looks for its moment to replace the running one. */
 export const REPLACE_CHECK_MS = 60_000;
+
+type Reopen = { session: number; threadId: string; cols: number; rows: number };
+type Hold = { session: number; reason: TerminalUpdateHoldReason; why: string };
+type SwitchPlan = { sessions: DaemonSession[]; reopen: Reopen[]; orphans: number[]; holds: Hold[] };
+
+const ORPHAN_HOLD: Record<Exclude<OrphanVerdict["hold"], "">, TerminalUpdateHoldReason> = {
+  shell: TerminalUpdateHoldReason.SHELL,
+  cli: TerminalUpdateHoldReason.CLI_ACTIVE,
+  unknown: TerminalUpdateHoldReason.UNKNOWN,
+};
 /** How long a thread's AI must have been quiet before it is closed and opened again in a newer terminal process. */
 export const REPLACE_QUIET_MS = 10 * 60_000;
 
@@ -110,10 +120,10 @@ export interface AiTerminals {
   follow(threadId: string): boolean;
   /**
    * Whether the sessions of terminal process `pid` no thread owns may end in
-   * a switch (`sessions` live in all): "" when they may, else why not.
-   * Without it such a session keeps the old process.
+   * a switch (`sessions` live in all). Without it such a session keeps the
+   * old process.
    */
-  orphansQuiet?(pid: number, sessions: number, quietMs: number): Promise<string>;
+  orphansQuiet?(pid: number, sessions: number, quietMs: number): Promise<OrphanVerdict>;
 }
 
 /** The core as the terminal sees it. */
@@ -308,6 +318,7 @@ export class TerminalService {
         threadId: this.opts.ai?.threadOf(s.session, this.hostPid) ?? "",
         cwd: this.cwds.get(s.session) ?? "",
       })),
+      update: await this.updateInfo().catch(() => undefined),
     };
   }
 
@@ -554,46 +565,93 @@ export class TerminalService {
     this.opts.log(`terminal: a newer terminal process waits (${why})`);
   }
 
-  private async replaceIfIdle(): Promise<void> {
-    const ai = this.opts.ai;
-    if (!ai || this.stopped || this.replaceFailed || !this.supervisor.hasStaged() || !this.supervisor.link.isReady) return;
+  /**
+   * The running terminal process's live sessions as a switch would treat
+   * them: the threads' AIs to open again, and what holds an automatic switch
+   * (none when it may happen now).
+   */
+  private async assess(ai: AiTerminals): Promise<SwitchPlan> {
     const quietMs = this.opts.replaceQuietMs ?? REPLACE_QUIET_MS;
-    const live = async () => sessionListSchema.parse(await this.call("list", {})).filter((s) => s.exited === undefined);
-    const sessions = await live();
-    const reopen: { session: number; threadId: string; cols: number; rows: number }[] = [];
-    let orphans = 0;
+    const sessions = await this.liveSessions();
+    const reopen: Reopen[] = [];
+    const holds: Hold[] = [];
+    const orphans: number[] = [];
     for (const s of sessions) {
       const threadId = ai.threadOf(s.session, this.hostPid);
       // No thread owns it: judged with the others below (an AI's CLI left alone may end; a shell keeps the old process).
       if (!threadId) {
-        orphans += 1;
+        orphans.push(s.session);
         continue;
       }
       // The CLI may have gone on in another conversation: that one is what is judged, and what opens again.
       ai.follow(threadId);
-      // An AI in a turn: the old process stays until it ends.
-      if (!(await ai.idle(threadId, quietMs))) return this.waiting(`thread ${threadId}'s AI is not idle`);
       reopen.push({ session: s.session, threadId, cols: s.cols, rows: s.rows });
+      // An AI in a turn: the old process stays until it ends.
+      if (!(await ai.idle(threadId, quietMs))) holds.push({ session: s.session, reason: TerminalUpdateHoldReason.AI_ACTIVE, why: `thread ${threadId}'s AI is not idle` });
     }
-    if (orphans > 0) {
-      const why = ai.orphansQuiet ? await ai.orphansQuiet(this.hostPid, sessions.length, quietMs) : "a session no thread owns";
-      if (why !== "") return this.waiting(why);
+    if (orphans.length > 0) {
+      const verdict: OrphanVerdict = ai.orphansQuiet ? await ai.orphansQuiet(this.hostPid, sessions.length, quietMs) : { hold: "shell", why: "a session no thread owns" };
+      if (verdict.hold !== "") for (const session of orphans) holds.push({ session, reason: ORPHAN_HOLD[verdict.hold], why: verdict.why });
     }
+    return { sessions, reopen, orphans, holds };
+  }
+
+  private async liveSessions(): Promise<DaemonSession[]> {
+    return sessionListSchema.parse(await this.call("list", {})).filter((s) => s.exited === undefined);
+  }
+
+  private async replaceIfIdle(): Promise<void> {
+    const ai = this.opts.ai;
+    if (!ai || this.stopped || this.replaceFailed || !this.supervisor.hasStaged() || !this.supervisor.link.isReady) return;
+    const plan = await this.assess(ai);
+    const held = plan.holds[0];
+    if (held) return this.waiting(held.why);
     // Looked again right before: nothing opened or ended meanwhile, nothing being opened, still running, no CLI gone on in another session.
-    const again = await live();
-    const same = again.length === sessions.length && again.every((s) => sessions.some((x) => x.session === s.session));
+    const again = await this.liveSessions();
+    const same = again.length === plan.sessions.length && again.every((s) => plan.sessions.some((x) => x.session === s.session));
     if (!same || this.aiOpening.size > 0 || this.stopped || !this.supervisor.link.isReady) return;
-    if (reopen.some((r) => ai.follow(r.threadId))) return;
+    if (plan.reopen.some((r) => ai.follow(r.threadId))) return;
+    await this.switchTo(ai, plan, "idle");
+  }
+
+  /**
+   * Replaces the running terminal process with the waiting one now, whatever
+   * runs in it (a device asked, knowing): the threads' AIs open again
+   * resumed, every other session ends. Answers with the machine's sessions.
+   */
+  async updateNow(): Promise<MessageInitShape<typeof TermListResultSchema>> {
+    const ai = this.opts.ai;
+    await this.ensure();
+    if (!ai || !this.supervisor.hasStaged()) throw new TerminalError(ErrorCode.INVALID, ErrorReason.TERMINAL_UNAVAILABLE, "no newer terminal process waits");
+    if (this.replacing) await this.replacing.catch(() => undefined);
+    // A switch that failed before is tried again when the user asks.
+    this.replaceFailed = false;
+    const plan = await this.assess(ai);
+    try {
+      await this.switchTo(ai, plan, "asked");
+    } catch (err) {
+      throw new TerminalError(ErrorCode.INTERNAL, ErrorReason.TERMINAL_UNAVAILABLE, `the newer terminal process did not start: ${(err as Error).message}`);
+    }
+    if (this.supervisor.hasStaged()) throw new TerminalError(ErrorCode.INTERNAL, ErrorReason.TERMINAL_UNAVAILABLE, "the newer terminal process could not be put in place");
+    return this.list();
+  }
+
+  /** The switch itself: the old process shuts down, the staged one starts, the threads' AIs open again in it. */
+  private async switchTo(ai: AiTerminals, plan: SwitchPlan, why: "idle" | "asked"): Promise<void> {
     const oldPid = this.hostPid;
     this.waitingFor = "";
-    this.opts.log(`terminal: switching to the newer terminal process (${reopen.length} idle AI session(s) open again resumed, ${orphans} left alone end)`);
+    this.opts.log(
+      why === "idle"
+        ? `terminal: switching to the newer terminal process (${plan.reopen.length} idle AI session(s) open again resumed, ${plan.orphans.length} left alone end)`
+        : `terminal: switching to the newer terminal process as a device asked (${plan.reopen.length} AI session(s) open again resumed, ${plan.orphans.length} other session(s) end)`,
+    );
     try {
       await this.supervisor.replace();
     } catch (err) {
       this.replaceFailed = true;
       throw err;
     } finally {
-      for (const r of reopen) {
+      for (const r of plan.reopen) {
         try {
           await this.openAi(r.threadId, r.cols, r.rows);
         } catch (err) {
@@ -608,6 +666,15 @@ export class TerminalService {
       this.replaceFailed = true;
       this.opts.log("terminal: the newer terminal process is still not in use; trying again after the agent restarts");
     }
+  }
+
+  /** What a device is told about a newer terminal process waiting; undefined when none waits or nothing can be said. */
+  private async updateInfo(): Promise<MessageInitShape<typeof TermListResultSchema>["update"]> {
+    const ai = this.opts.ai;
+    const stagedAt = this.supervisor.stagedAt();
+    if (!ai || stagedAt === undefined) return undefined;
+    const plan = await this.assess(ai);
+    return { stagedAt: BigInt(stagedAt), holds: plan.holds.map((h) => ({ session: h.session, reason: h.reason })) };
   }
 
   private onEvent(e: DaemonEvent): void {
