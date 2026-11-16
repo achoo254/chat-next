@@ -47,6 +47,9 @@ vi.mock("../src/identity/session.ts", async (importOriginal) => ({
     info: () => ({ issuer: "https://auth.example", sub: "acc_1", clientId: "tunelo-agent" }),
     covers: () => true,
     getAppToken: async () => "token",
+    // Renewed just now, so the daily renewal is not due while a test runs.
+    lastRenewedAt: () => Date.now(),
+    renew: async () => ({ renewed: false, renewedAt: Date.now() }),
   }),
 }));
 
