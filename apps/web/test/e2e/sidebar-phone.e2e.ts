@@ -1,6 +1,7 @@
 // The AI Agent column on a phone (touch, 390×844) and wider screens: rows as
-// compact as their content (project about 44 px, workspace about 40 px, a
-// two-line session about 56 px; the 44 px touch target comes from an
+// compact as their content (on touch a project about 44 px, a workspace about
+// 40 px; with a mouse both about 32 px; a two-line session about 50 px; the
+// 44 px touch target comes from an
 // invisible hit area, not from height), no empty status column (a row's
 // state takes its icon's place), a chevron leading each project, the icon and
 // text stepping in per level (project, workspace, session), and nothing wider
@@ -89,11 +90,13 @@ const near = (values: number[], what: string) => {
 	assert.ok(spread <= 1, `${what} differ by ${spread} px: ${values.join(", ")}`);
 };
 
-function check(g: Geometry, label: string): void {
+function check(g: Geometry, label: string, touch: boolean): void {
 	if (process.env.E2E_DEBUG === "1") console.log(label, JSON.stringify(g, null, 1));
 	assert.ok(g.projects.length > 0 && g.workspaces.length > 0 && g.sessions.length > 1, `${label}: rows shown`);
-	for (const p of g.projects) assert.ok(p.height >= 40 && p.height <= 48, `${label}: project row ${p.height} px`);
-	for (const w of g.workspaces) assert.ok(w.height >= 36 && w.height <= 44, `${label}: workspace row ${w.height} px`);
+	// A one-line row: 44/40 px on touch, 32 px with a mouse (a workspace with its folder line grows past it).
+	const [projectMin, projectMax, wsMin, wsMax] = touch ? [40, 48, 36, 44] : [30, 34, 30, 44];
+	for (const p of g.projects) assert.ok(p.height >= projectMin && p.height <= projectMax, `${label}: project row ${p.height} px`);
+	for (const w of g.workspaces) assert.ok(w.height >= wsMin && w.height <= wsMax, `${label}: workspace row ${w.height} px`);
 	for (const s of g.sessions) assert.ok(s.height >= 48 && s.height <= 62, `${label}: session row "${s.title}" ${s.height} px`);
 	// One grid: the same columns in every session row.
 	near(g.sessions.map((s) => s.ai), `${label}: provider icons`);
@@ -120,7 +123,25 @@ for (const [width, height, touch] of [
 ] as const) {
 	test(`the column at ${width} px${touch ? " (touch)" : ""}: compact rows, stepped levels, nothing too wide`, async () => {
 		const { page, close } = await open(width, height, touch);
-		check(await geometry(page), `${width}${touch ? " touch" : ""}`);
+		check(await geometry(page), `${width}${touch ? " touch" : ""}`, touch);
+		if (!touch) {
+			// With a mouse, a hovered row's buttons fit inside its 32 px.
+			for (const [head, buttons] of [
+				[".mx-list .mx-ws-head", ".mx-ws-acts .icon-btn"],
+				[".mx-list .mx-project-head", ".mx-row-menu .icon-btn"],
+			] as const) {
+				const row = page.locator(head).first();
+				await row.hover();
+				const spill = await row.evaluate((el, sel) => {
+					const box = el.getBoundingClientRect();
+					return [...el.querySelectorAll(sel)].map((b) => {
+						const r = b.getBoundingClientRect();
+						return Math.max(box.top - r.top, r.bottom - box.bottom);
+					});
+				}, buttons);
+				assert.ok(spill.length > 0 && spill.every((x) => x <= 0), `${width}: ${buttons} spill out of ${head} by ${spill.join(", ")} px`);
+			}
+		}
 		await close();
 	});
 }

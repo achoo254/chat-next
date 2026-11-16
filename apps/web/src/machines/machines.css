@@ -106,8 +106,16 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 /* They sit where the machine's chip is (line 2), which hides meanwhile: nothing is cut, nothing moves. */
 @media (hover: hover) {
 	.mx-ws-acts { top: auto; bottom: 0; transform: none; }
-	.mx-ws-acts .icon-btn { height: 28px; }
 	.mx-ws-head:hover .mx-ws-host, .mx-ws-head:focus-within .mx-ws-host, .mx-ws-head:has([aria-expanded="true"]) .mx-ws-host { visibility: hidden; }
+}
+/* With a mouse, a one-line project or workspace row is as tall as its text needs (32 px), so the two-line session rows
+   set the rhythm; touch keeps 44 px. The project's "⋮" shrinks to fit and keeps its target through an invisible margin. */
+@media (hover: hover) and (pointer: fine) {
+	.mx-project-toggle { min-height: 32px; }
+	.mx-ws-head { min-height: 32px; }
+	.mx-ws-head .mx-ws-acts .icon-btn { height: 28px; }
+	.mx-project-head > .mx-row-menu .icon-btn { position: relative; width: 32px; height: 28px; }
+	.mx-project-head > .mx-row-menu .icon-btn::before { content: ""; position: absolute; inset: -4px; }
 }
 .mx-ws-acts .icon-btn { position: relative; width: 36px; height: 36px; }
 .mx-ws-acts .icon-btn::before { content: ""; position: absolute; inset: -4px; }
