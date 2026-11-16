@@ -33,7 +33,7 @@ export function termState(s: Pick<TermSessionInfo, "attached" | "exited">): Term
 
 const ORDER: Record<TermState, number> = { viewed: 0, idle: 1, exited: 2 };
 
-/** Open ones first, then the ones nobody watches, the ended last; newest first in each. */
+/** Open ones first, then the ones running in the background, the ended last; newest first in each. */
 export function sortTermSessions(list: readonly TermSessionInfo[]): TermSessionInfo[] {
 	return [...list].sort((a, b) => ORDER[termState(a)] - ORDER[termState(b)] || Number(b.createdAt - a.createdAt));
 }
@@ -203,7 +203,7 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 											</small>
 										)}
 									</span>
-									<span className={`chip mx-chip mx-term-chip ${state}`}>{state === "exited" ? tt.exitedShort(s.exitCode) : state === "viewed" ? m.viewed : m.idle}</span>
+									<span className={`chip mx-chip mx-term-chip ${state}`} title={state === "viewed" ? m.viewedHint : state === "idle" ? m.idleHint : undefined}>{state === "exited" ? tt.exitedShort(s.exitCode) : state === "viewed" ? m.viewed : m.idle}</span>
 									<span className="mx-term-acts">
 										{state !== "exited" && (
 											<Link to={open} className="btn btn-sm" aria-label={`${m.open} ${title}`} data-id={`machine-terminal-open-${s.session}`}>

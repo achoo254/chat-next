@@ -636,7 +636,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	"terminal-sessions": async () => {
 		await seedTerminalSessions();
 	},
-	// "Dừng N phiên không ai xem": the confirmation listing them.
+	// "Dừng N phiên chạy nền": the confirmation listing them.
 	"terminal-stop-idle": async () => {
 		await seedTerminalSessions();
 		(await find(() => document.querySelector<HTMLButtonElement>("[data-id=machine-terminals-stop-idle]"))).click();
