@@ -5,11 +5,12 @@
 // workspace stays on the machine's page ("Terminal đang chạy trên máy"); an AI's
 // own CLI is its session's row already. The lists are asked of every online
 // machine with a terminal: when the column shows, on every page change (a
-// shell opened or closed in the dock) and every 30 seconds while visible.
+// shell opened or closed in the dock; once more a moment later, when the dock
+// has attached to it) and every 30 seconds while visible.
 // A row opens the shell in the machine's terminal page (?open=<session>).
 import { useEffect, useState } from "react";
 import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
-import { followInApp, usePathname } from "../router.tsx";
+import { followInApp, usePathname, useSearch } from "../router.tsx";
 import { terminalGate } from "./agent-version.ts";
 import type { AgentProject } from "./agent-projects-client.ts";
 import { aiPaths } from "./ai-paths.ts";
@@ -19,6 +20,8 @@ import { timeAgo, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const RELIST_MS = 30_000;
+/** After a page change, asked once more when the dock has attached to the shell it opened. */
+const SETTLE_MS = 3_000;
 
 /** Live shells by workspace id. */
 export type ShellsByWorkspace = ReadonlyMap<number, readonly TermSessionInfo[]>;
@@ -54,7 +57,7 @@ function listable(machines: readonly MachineView[]): MachineView[] {
 
 /** Every listable machine's shells, placed under the projects' workspaces on it. */
 export function useSidebarShells(machines: readonly MachineView[], projects: readonly AgentProject[]): ShellsByWorkspace {
-	const pathname = usePathname();
+	const page = `${usePathname()}?${useSearch()}`;
 	const [lists, setLists] = useState<ReadonlyMap<string, readonly TermSessionInfo[]>>(new Map());
 	const hosts = listable(machines);
 	const hostsKey = hosts.map((m) => m.entry.ref).join(",");
@@ -75,16 +78,18 @@ export function useSidebarShells(machines: readonly MachineView[], projects: rea
 			}
 		};
 		ask();
+		const settle = window.setTimeout(ask, SETTLE_MS);
 		const timer = window.setInterval(() => {
 			if (document.visibilityState === "visible") ask();
 		}, RELIST_MS);
 		return () => {
 			live = false;
+			window.clearTimeout(settle);
 			window.clearInterval(timer);
 		};
 		// `hostsKey` stands for `hosts`; a page change asks again (the dock opened or closed a shell).
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [hostsKey, pathname]);
+	}, [hostsKey, page]);
 
 	const placed = new Map<number, TermSessionInfo[]>();
 	for (const m of hosts) {
