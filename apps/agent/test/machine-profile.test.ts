@@ -112,6 +112,28 @@ describe("the machine's settings on every account", () => {
       }
     });
   });
+
+  it("reach the machine when an account's session changes them, while the service runs", async () => {
+    const f = profilesFixture({ defaultEmail: "team@example.com" });
+    addProfile(f, "p2", "max@example.com");
+    const claude = { ...fakeProvider("claude"), accounts: f.profiles };
+    const machine = new Machine({ config: new ConfigStore(f.configDir), providers: [claude], log: () => undefined });
+    await machine.start(0);
+    cleanup.push(() => machine.stop());
+    await new Promise((r) => setTimeout(r, 100));
+
+    const own = join(profileHome(f.configDir, "p2"), ".claude.json");
+    // The machine had no .claude.json yet: the account's session writes the first one.
+    writeFileSync(own, JSON.stringify({ oauthAccount: { emailAddress: "max@example.com" }, claudeInChromeDefaultEnabled: true }));
+    await waitFor(() => {
+      try {
+        const shared = JSON.parse(readFileSync(join(f.claudeHome, ".claude.json"), "utf8")) as Record<string, unknown>;
+        return shared.claudeInChromeDefaultEnabled === true && shared.oauthAccount === undefined;
+      } catch {
+        return false;
+      }
+    });
+  });
 });
 
 describe("the account offered when a session runs out", () => {

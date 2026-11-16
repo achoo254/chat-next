@@ -62,7 +62,7 @@ describe("following the machine's settings", () => {
     const logs: string[] = [];
     const stop = watchMachineSettings(join(tempDir("settings-watch-"), "missing"), () => undefined, (l) => logs.push(l));
     stops.push(stop);
-    expect(logs.join("\n")).toMatch(/cannot follow the machine's settings/);
+    expect(logs.join("\n")).toMatch(/cannot follow the settings in/);
     expect(() => stop()).not.toThrow();
   });
 });

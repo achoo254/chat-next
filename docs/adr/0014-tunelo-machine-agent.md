@@ -78,12 +78,17 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
   nhau. Hạn mức profile mới được đọc lại ngay (tối đa 1 lần/30 giây mỗi profile).
 - Phiên hết hạn mức (claude báo `rate_limit`) mà máy có profile khác đã đăng nhập và còn hạn mức: `ThreadInfo.profile_suggestion`
   gợi ý profile còn nhiều nhất (phần trăm còn lại theo cửa sổ chặt hơn). Chỉ là gợi ý; máy không tự đổi.
-- Profile dùng chung dữ liệu với `~/.claude` (`projects`, `todos`, `plans`, … liên kết bằng symlink hoặc junction). Chỉ đăng nhập
-  là riêng. `settings.json` và `keybindings.json` được chép (không link, vì claude ghi file bằng cách đổi tên nên link bị cắt): lại
-  mỗi lần mở phiên, mỗi lần mở terminal trên profile, và ngay khi hai file đó đổi trên máy lúc tunelo đang chạy (từ `tunelo` 3.6.1),
-  nên phiên đang mở trên profile cũng nhận cài đặt mới. Một chiều: cài đặt mà phiên của profile tự lưu chỉ nằm trong bản chép và bị bản
-  chép sau ghi đè, nên đổi cài đặt ở tài khoản của máy. `settings.json` của máy là symlink (dotfiles) thì sửa file đích không báo
-  thay đổi trong thư mục Claude: profile nhận bản mới lúc mở phiên hoặc terminal tiếp theo.
+- Profile chỉ quản lý đăng nhập; mọi cấu hình khác giống hệt mở `claude` gốc trên máy (đổi 16/11/2026, trước đó chỉ chép một chiều
+  `settings.json` và gộp `projects`/`mcpServers` một lần lúc tạo profile, nên tuỳ chọn như `claudeInChromeDefaultEnabled` bị lệch):
+  - Mọi thư mục con của `~/.claude` liên kết về máy (symlink hoặc junction), trừ `sessions`, `backups`, `cache`, `telemetry`,
+    `statsig`, `debug` là của riêng một tiến trình hoặc một tài khoản. Thư mục máy có thêm sau này cũng được liên kết.
+  - `settings.json`, `keybindings.json` và `.claude.json` đồng bộ hai chiều (chép, không link, vì claude ghi file bằng cách đổi tên nên
+    link bị cắt): lúc mở phiên, lúc mở terminal trên profile, và ngay khi file đổi ở máy hoặc ở profile lúc tunelo đang chạy. Bên nào
+    đổi kể từ lần đồng bộ trước thì thắng; profile đổi thì ghi về máy rồi lan ra profile khác. `.claude.json` gộp theo khoá (`projects`
+    theo từng thư mục), giữ riêng các khoá của tài khoản (`oauthAccount`, `userID`, các cache gói/tổ chức/model/cờ tính năng). Dấu
+    lần đồng bộ trước nằm ở `config-sync.json` cạnh `home` (chỉ băm). Profile tạo từ bản cũ: lần đồng bộ đầu lấy cấu hình của máy.
+  - `settings.json` của máy là symlink (dotfiles) thì sửa file đích không báo thay đổi trong thư mục Claude: profile nhận bản mới lúc
+    mở phiên hoặc terminal tiếp theo.
 - Tài khoản lấy từ `claude auth status --json`. tunelo không đọc token Claude. Trùng email + tổ chức với profile có sẵn thì bị từ chối.
 - Hạn mức 5 giờ và tuần lấy từ claude, kèm giờ cập nhật. Profile hết đăng nhập hiện "Cần đăng nhập lại" và không chọn được.
 - Xoá profile: đăng xuất trước, xoá link như link, không bao giờ đụng file trong `~/.claude`. Đăng xuất lỗi thì từ chối xoá. Lệnh

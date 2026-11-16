@@ -1,14 +1,12 @@
-// Fills a new profile's home so that only the sign-in is its own: the
-// folders of projects, plans, skills, hooks… link back to the machine's
-// Claude folder (junctions on Windows, symlinks elsewhere), the prompt
-// history is shared (history-link.ts), settings and key bindings are copied
-// (again at every session start and whenever they change on the machine:
-// syncMachineSettings, settings-watch.ts),
-// CLAUDE.md imports the shared one, and the profile's .claude.json gets the
-// projects and MCP servers of the machine's own. The machine's .claude.json
-// is only read, and only those two keys: never its account or user id.
+// Fills a new profile's home so that only the sign-in is its own: every
+// folder of the machine's Claude folder (projects, plans, skills, hooks,
+// chrome…) links back to it (junctions on Windows, symlinks elsewhere), except
+// the few that are one claude process's own (PROFILE_OWN_DIRS); the prompt
+// history is shared (history-link.ts); settings, key bindings and the
+// preferences of .claude.json are kept equal to the machine's both ways
+// (config-sync.ts, at every session start and whenever either side changes);
+// CLAUDE.md imports the shared one.
 import {
-  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -16,7 +14,6 @@ import {
   readdirSync,
   realpathSync,
   renameSync,
-  rmSync,
   rmdirSync,
   symlinkSync,
   unlinkSync,
@@ -25,7 +22,8 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensureHistoryLink } from "./history-link.ts";
-import { claudeJsonOf, samePath } from "./paths.ts";
+import { syncProfileConfig } from "./config-sync.ts";
+import { samePath } from "./paths.ts";
 import { sameVolume } from "./volume.ts";
 
 /** Folders every profile shares with the machine's Claude folder. */
@@ -49,19 +47,29 @@ export const SHARED_DIRS = [
 ] as const;
 
 /**
- * The machine's settings (permission rules, hooks, default mode) and key
- * bindings, copied over the profile's at every session start, every terminal
- * opened on the profile, and whenever they change on the machine, so a change
- * on the machine reaches every profile. A setting a profile's session saves
- * itself lands in the profile's copy only and is replaced by the next copy:
- * change settings on the machine's own account. Not linked: claude saves them by
- * writing a new file and renaming it, which cuts a link, and a file link on
- * Windows needs administrator rights; a copy behaves the same everywhere.
+ * Folders that belong to one claude process or one sign-in, never shared:
+ * running sessions, backups of the profile's own .claude.json, caches and
+ * telemetry of the account.
  */
-export const MACHINE_SETTINGS_FILES = ["settings.json", "keybindings.json"] as const;
+export const PROFILE_OWN_DIRS = ["sessions", "backups", "cache", "telemetry", "statsig", "debug"] as const;
 
-/** Keys of the machine's .claude.json a profile takes over. */
-const MERGED_KEYS = ["projects", "mcpServers"] as const;
+/**
+ * Every folder a profile links to the machine's: the known ones (made on the
+ * machine when missing) and any other folder the machine's Claude has, so a
+ * folder a new claude version or a plugin adds is shared too.
+ */
+export function sharedDirNames(claudeHome: string): string[] {
+  const names = new Set<string>(SHARED_DIRS);
+  const own = new Set<string>(PROFILE_OWN_DIRS);
+  try {
+    for (const entry of readdirSync(claudeHome, { withFileTypes: true })) {
+      if (entry.isDirectory() && !entry.name.startsWith(".") && !own.has(entry.name)) names.add(entry.name);
+    }
+  } catch {
+    // a machine folder not made yet has only the known ones
+  }
+  return [...names];
+}
 
 export type SetupResult = { warnings: string[] };
 
@@ -141,7 +149,7 @@ function moveMissing(from: string, to: string): void {
 export function ensureSharedDirs(home: string, claudeHome: string, warnings: string[]): string[] {
   if (!sameVolume(home, claudeHome)) return []; // no link is possible: the profile keeps its own, as at setup
   const repaired: string[] = [];
-  for (const name of SHARED_DIRS) {
+  for (const name of sharedDirNames(claudeHome)) {
     const link = join(home, name);
     const target = join(claudeHome, name);
     let st;
@@ -161,74 +169,22 @@ export function ensureSharedDirs(home: string, claudeHome: string, warnings: str
   return repaired;
 }
 
-function readJson(file: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
-
-/** The profile's .claude.json with the machine's projects and MCP servers added. */
-function mergeClaudeJson(home: string, claudeHome: string): void {
-  const machine = readJson(claudeJsonOf(claudeHome));
-  const file = join(home, ".claude.json");
-  const own = readJson(file);
-  for (const key of MERGED_KEYS) {
-    const shared = machine[key];
-    if (!isRecord(shared)) continue;
-    const mine = own[key];
-    own[key] = { ...shared, ...(isRecord(mine) ? mine : {}) };
-  }
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(own, null, 2), { mode: 0o600 });
-  renameSync(tmp, file);
-}
-
 /** How the profile's CLAUDE.md names the shared one. */
 function sharedMemoryRef(claudeHome: string): string {
   return samePath(claudeHome, join(homedir(), ".claude")) ? "~/.claude/CLAUDE.md" : join(claudeHome, "CLAUDE.md");
-}
-
-/**
- * Makes the profile's settings those of the machine: copied (temp file and
- * rename), or removed when the machine has none, so a profile never keeps
- * rules or a mode the machine dropped.
- */
-export function syncMachineSettings(home: string, claudeHome: string): void {
-  for (const name of MACHINE_SETTINGS_FILES) {
-    const from = join(claudeHome, name);
-    const to = join(home, name);
-    if (!existsSync(from)) {
-      rmSync(to, { force: true });
-      continue;
-    }
-    const tmp = `${to}.${process.pid}.tmp`;
-    try {
-      copyFileSync(from, tmp);
-      renameSync(tmp, to);
-    } catch (err) {
-      rmSync(tmp, { force: true }); // a refused rename leaves no copy behind in the profile
-      throw err;
-    }
-  }
 }
 
 /** Prepares `home` (already created, 0700) as a profile of `claudeHome`. */
 export function setupProfileHome(home: string, claudeHome: string): SetupResult {
   const warnings: string[] = [];
   mkdirSync(claudeHome, { recursive: true, mode: 0o700 });
-  for (const name of SHARED_DIRS) shareDir(home, claudeHome, name, warnings);
+  for (const name of sharedDirNames(claudeHome)) shareDir(home, claudeHome, name, warnings);
   mkdirSync(join(home, "sessions"), { recursive: true, mode: 0o700 });
   ensureHistoryLink(home, claudeHome, (w) => warnings.push(w));
-  syncMachineSettings(home, claudeHome);
   const memory = join(home, "CLAUDE.md");
   if (existsSync(join(claudeHome, "CLAUDE.md")) && !existsSync(memory)) {
     writeFileSync(memory, `@${sharedMemoryRef(claudeHome)}\n`, { mode: 0o600 });
   }
-  mergeClaudeJson(home, claudeHome);
+  syncProfileConfig(home, claudeHome);
   return { warnings };
 }

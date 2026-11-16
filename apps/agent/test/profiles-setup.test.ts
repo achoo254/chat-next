@@ -1,6 +1,6 @@
 // A profile's home on a fake machine: shared folders link back to the
-// machine's Claude folder, settings are copied, .claude.json takes only the
-// projects and MCP servers, earlier data is kept aside, unsafe paths are
+// machine's Claude folder, settings are copied, .claude.json takes every
+// preference of the machine's but none of its account, earlier data is kept aside, unsafe paths are
 // refused, deleting a profile never reaches through a link, and a cut
 // prompt-history link is noticed and made again without losing a line.
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
@@ -32,6 +32,7 @@ function machine() {
     cachedGrowthBookFeatures: { x: 1 },
     projects: { "/work/app": { allowedTools: ["Bash(ls)"] } },
     mcpServers: { files: { command: "files-mcp" } },
+    claudeInChromeDefaultEnabled: true,
   };
   writeFileSync(join(claudeHome, ".claude.json"), JSON.stringify(machineJson));
   const home = makeProfileHome(configDir, "p1", claudeHome);
@@ -56,10 +57,11 @@ describe("profile setup", () => {
     expect(readFileSync(join(home, "CLAUDE.md"), "utf8")).toBe(`@${join(claudeHome, "CLAUDE.md")}\n`);
 
     const own = JSON.parse(readFileSync(join(home, ".claude.json"), "utf8")) as Record<string, unknown>;
-    expect(own).toEqual({ projects: machineJson.projects, mcpServers: machineJson.mcpServers });
+    expect(own).toEqual({ projects: machineJson.projects, mcpServers: machineJson.mcpServers, claudeInChromeDefaultEnabled: true });
     expect(own.oauthAccount).toBeUndefined();
     expect(own.userID).toBeUndefined();
-    // The machine's own .claude.json is only read.
+    expect(own.cachedGrowthBookFeatures).toBeUndefined();
+    // A new profile changed nothing, so the machine's own .claude.json is left as it was.
     expect(JSON.parse(readFileSync(join(claudeHome, ".claude.json"), "utf8"))).toEqual(machineJson);
   });
 

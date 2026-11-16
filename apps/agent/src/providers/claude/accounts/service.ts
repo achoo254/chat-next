@@ -29,8 +29,9 @@ import type {
 import { type ClaudeAccount, readAccount, sameAccount, signOut } from "./account.ts";
 import { ensureHistoryLink } from "./history-link.ts";
 import { PROFILE_ID_RE, assertSafeHome, defaultClaudeHome, makeProfileHome, profileDir, profileHome, profilesRoot } from "./paths.ts";
-import { watchMachineSettings } from "./settings-watch.ts";
-import { ensureSharedDirs, setupProfileHome, syncMachineSettings } from "./setup.ts";
+import { syncProfileConfig } from "./config-sync.ts";
+import { SYNCED_FILES, watchFiles, watchMachineSettings } from "./settings-watch.ts";
+import { ensureSharedDirs, setupProfileHome } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
 import { ProfileStore, type ProfileUsage } from "./store.ts";
 
@@ -89,6 +90,8 @@ export class ClaudeProfiles implements AccountsFacet {
   private listener: AccountsListener = {};
   /** Stops following the machine's settings; set while the service runs. */
   private stopSettingsWatch: (() => void) | undefined;
+  /** Stops following each kept profile's own settings, by profile id; filled while the service runs. */
+  private profileWatches = new Map<string, () => void>();
   /** A new account signs in from a device: claude's link, then the code its page shows. */
   readonly signIn = {
     begin: (): Promise<SignInStart> => this.beginRemote(),
@@ -200,8 +203,8 @@ export class ClaudeProfiles implements AccountsFacet {
   }
 
   /**
-   * What a session opening now uses: the selected profile, with the
-   * machine's settings copied in and its history and shared-folder links checked. Throws when
+   * What a session opening now uses: the selected profile, with its
+   * configuration synced with the machine's and its history and shared-folder links checked. Throws when
    * the profiles cannot be read, rather than run on another account.
    */
   sessionAccount(): { id: string; scope?: AccountScopeRef } {
@@ -209,7 +212,7 @@ export class ClaudeProfiles implements AccountsFacet {
     const p = this.store.selected();
     if (!p) return { id: "" };
     const home = this.home(p.id);
-    syncMachineSettings(home, this.claudeHome);
+    syncProfileConfig(home, this.claudeHome);
     try {
       const state = ensureHistoryLink(home, this.claudeHome, (w) => this.log(`claude profiles: ${w}`));
       if (state === "repaired") this.log("claude profiles: the shared prompt history link was made again");
@@ -541,6 +544,7 @@ export class ClaudeProfiles implements AccountsFacet {
       });
     });
     this.opts.audit.write({ device, action: "profile_add", path: "", detail: account.email });
+    this.followProfiles();
     this.listener.onChange?.();
     this.log(`claude profiles: added a profile (${id.slice(0, 8)})`);
     return { ok: true, id, email: account.email, organization: account.orgName };
@@ -587,6 +591,7 @@ export class ClaudeProfiles implements AccountsFacet {
       this.store.update((d) => {
         d.profiles = d.profiles.filter((x) => x.id !== id);
       });
+      this.followProfiles();
       removeTreeSafely(profileDir(this.opts.configDir, id));
       this.opts.audit.write({ device, action: "profile_remove", path: "", detail: options.force && !signedOut ? `${p.email} (forced)` : p.email });
       if (wasSelected) this.listener.onSelect?.("");
@@ -595,30 +600,58 @@ export class ClaudeProfiles implements AccountsFacet {
   }
 
   /**
-   * Follows the machine's settings while the service runs: a change there
-   * is copied to every profile at once, so sessions already open on a
-   * profile get it too. Once; stop() ends it.
+   * Follows Claude's configuration while the service runs, both ways: a
+   * change on the machine reaches every profile at once, and a change a
+   * profile's session makes reaches the machine (and so every other profile),
+   * so sessions already open get it too. Once; stop() ends it.
    */
   watch(): void {
     this.stopSettingsWatch ??= watchMachineSettings(this.claudeHome, () => this.syncEveryProfile(), this.log);
+    this.followProfiles();
   }
 
-  /** The machine's settings copied into every kept profile; one that fails is logged and the rest still get theirs. */
-  private syncEveryProfile(): void {
-    if (this.store.damaged) return;
-    for (const p of this.store.get().profiles) {
+  /** One watch per kept profile while the service follows the machine; a removed profile's ends. */
+  private followProfiles(): void {
+    if (!this.stopSettingsWatch || this.store.damaged) return;
+    const kept = new Set(this.store.get().profiles.map((p) => p.id));
+    for (const [id, stop] of this.profileWatches) {
+      if (kept.has(id)) continue;
+      stop();
+      this.profileWatches.delete(id);
+    }
+    for (const id of kept) {
+      if (this.profileWatches.has(id)) continue;
       try {
-        syncMachineSettings(this.home(p.id), this.claudeHome);
+        const home = this.home(id);
+        this.profileWatches.set(id, watchFiles(home, SYNCED_FILES, () => this.syncOne(id), this.log));
       } catch (err) {
-        this.log(`claude profiles: the machine's settings did not reach a profile (${(err as Error).message})`);
+        this.log(`claude profiles: a profile's settings are not followed (${(err as Error).message})`);
       }
     }
+  }
+
+  /** One profile's configuration synced with the machine's; a failure is logged and the next change tries again. */
+  private syncOne(id: string): void {
+    if (this.store.damaged || !this.store.find(id)) return;
+    try {
+      syncProfileConfig(this.home(id), this.claudeHome);
+    } catch (err) {
+      this.log(`claude profiles: a profile's settings did not sync with the machine (${(err as Error).message})`);
+    }
+  }
+
+  /** Every kept profile synced with the machine's configuration; one that fails is logged and the rest still sync. */
+  private syncEveryProfile(): void {
+    if (this.store.damaged) return;
+    for (const p of this.store.get().profiles) this.syncOne(p.id);
   }
 
   /** Stops a sign-in in progress and following the machine's settings (the service is stopping). */
   async stop(): Promise<void> {
     this.stopSettingsWatch?.();
     this.stopSettingsWatch = undefined;
+    for (const stop of this.profileWatches.values()) stop();
+    this.profileWatches.clear();
     await this.cancel(this.attempt?.id ?? "");
   }
 }
