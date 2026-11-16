@@ -25,6 +25,9 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0015 Thông báo bảo mật từ IdP](./adr/0015-account-notices-from-idp.md) | `POST /api/account-notices`: IdP gửi thông báo bảo mật bằng token tự ký (`client_id` `auth-account-notices`, scope `account-notices`), Chat chuyển qua bot trợ lý; `204` cả khi không có người dùng để IdP không dò được tài khoản. |
 | [0016 Xoá tài khoản chỉ ở IdP](./adr/0016-account-deletion-at-idp.md) | Chat không còn luồng xoá, giữ 30 ngày hay tự xoá; IdP gửi SET `account.deleted` tới `POST /api/idp/account-deleted` (kiểm JWKS, `typ: secevent+jwt`, `aud` = URL endpoint), Chat xoá ngay, nhóm và kênh chuyển cho người vai trò cao nhất rồi vào sớm nhất, bot bị xoá; `202` cả khi `sub` không có. |
 | [0017 AI Agent không gắn với một AI](./adr/0017-provider-neutral-ai-agent.md) | Không AI mặc định, capability thay rẽ nhánh theo id, tài khoản theo từng AI, Antigravity qua `agy acp`. |
+| [0018 Văn phòng của phiên AI](./adr/0018-office-view-babylon-normalized-agent-stream.md) | Toà nhà 3D Babylon.js (bản 2D khi không có WebGL) vẽ từ luồng hoạt động agent chuẩn hoá trên máy; chỉ tên tool, phòng, số đếm rời máy. |
+| [0019 Tầng sinh hoạt và trò chuyện](./adr/0019-office-living-floor-and-resident-talks.md) | Nhân vật sống 24/7 theo lịch giờ người xem, bỏ tan ca, trò chuyện viết sẵn điền bằng dữ kiện chuẩn hoá, ngủ gật khi kẹt. |
+| [0020 Cố vấn (Jev)](./adr/0020-advisor-mascot-jev.md) | Mascot trên mọi màn, ngữ cảnh copy chỉ gửi khi người dùng đính, phiên Cố vấn chỉ đọc do tunelo ép theo (máy, thư mục, AI), Jev bằng khoá TypeSafe BYOK trên máy, chế độ tự động theo phiên. |
 
 Đổi một quyết định: viết ADR mới mang số kế tiếp, ghi ADR cũ là "Bị thay thế bởi ADR NNNN" trong dòng trạng thái, và làm theo mục "Cách thay đổi" của ADR cũ.
 

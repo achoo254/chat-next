@@ -99,11 +99,37 @@ tín hiệu: [ADR 0018](adr/0018-office-view-babylon-normalized-agent-stream.md)
 | E30 | Cho AI chạy subagent nền (`run_in_background`), để agent chính hết lượt | Nhân viên đó vẫn làm việc tới khi AI báo xong, không đi xem tivi; mọi người không rời văn phòng khi còn subagent nền | Đạt 16/11/2026 cho logic (test `office-tracker.test.ts` "subagents in the background", `office-reading.test.ts`). Chưa xem trên máy thật |
 | E31 | Đang ở tab Văn phòng (hoặc Terminal) của một phiên, chọn phiên khác ở danh sách; rồi rời tab Văn phòng và quay lại | Phiên kia mở cùng chế độ đã chọn (máy chạy tunelo cũ không có Văn phòng thì mở như trước); quay lại văn phòng thì mọi người hiện ngay ở chỗ, không ai đi từ cửa vào | Đạt 16/11/2026 (test `office-view.test.tsx`; e2e `office.e2e.ts` "opening the office again") |
 
+### Cố vấn
+
+Cần một máy chạy `tunelo` có Cố vấn (3.13.0 trở lên), một phiên Claude do app mở, và khoá TypeSafe thật dán ở Cài đặt › Cố vấn. Quyết định và
+giới hạn: [ADR 0020](adr/0020-advisor-mascot-jev.md); dữ liệu gửi đi: [`privacy/data-inventory.md`](privacy/data-inventory.md) mục "Cố vấn". Kịch bản
+F1 làm sau khi nút gộp bằng rebase ở khung Quản lý mã nguồn đã phát hành. Ghi độ trễ mỗi lần gọi Jev và từ lúc hỏi tới lúc có bong bóng vào báo
+cáo nghiệm thu.
+
+| # | Thao tác | Kết quả đúng | Kết quả |
+|---|---|---|---|
+| F1 | Khung Quản lý mã nguồn: gây một lỗi git mà nút rebase không xử lý (push lên nhánh được bảo vệ, hoặc thiếu quyền); copy dòng lỗi, mở mascot, bấm "Đính kèm đoạn vừa copy", hỏi | Chip ghi khung, thư mục, nhánh; Cố vấn chạy trong đúng thư mục, đọc lỗi đầy đủ (đã làm sạch), trả lời bằng bong bóng có nguyên nhân, phương án cao nhất kèm %; "Gửi sang phiên" điền cách sửa vào ô nhập của phiên làm việc, không tự gửi | Chưa chạy |
+| F2 | Như F1 với lỗi push khi nhánh lệch với remote | Cố vấn giải thích đúng và chỉ tới nút gộp bằng rebase của khung Quản lý mã nguồn | Chưa chạy |
+| F3 | Hai thiết bị hỏi cùng thư mục cùng lúc; bấm Dừng ở một bên | Mỗi bên nhận đúng câu trả lời của mình; Dừng chỉ huỷ câu của bên bấm; thiết bị kia chỉ thấy chấm trên mascot | Chưa chạy |
+| F4 | Khoá điện thoại khi Cố vấn đang nghĩ, chờ, mở lại app | Có Web Push "Cố vấn đã trả lời" chỉ ghi tên máy; mở lại thấy câu trả lời | Chưa chạy |
+| F5 | Mở thẳng `/chat` (tải lạnh) rồi hỏi Cố vấn | Mascot có mặt; "đang kết nối" rồi trả lời | Chưa chạy |
+| F6 | Copy bot token ở Developer Console, URL webhook một lần, hoặc bí mật đăng nhập; rồi mở mascot | Không gợi ý đính kèm, không có trong "Các lần copy gần đây" | Chưa chạy |
+| F7 | Hỏi Cố vấn điều khiến AI muốn chạy Bash, sửa tệp, đọc `.env` hay tìm nội dung tệp bằng Grep | AI bị từ chối ngay (tìm nội dung đi qua `advisor_grep`); không thẻ duyệt, không huy hiệu "cần bạn"; phiên Cố vấn không hiện trong danh sách phiên, thư mục gần đây, văn phòng hay thống kê | Chưa chạy |
+| F8 | Hỏi không đính kèm từ màn chat thường | Hỏi máy chọn lần cuối, chạy trong thư mục nháp (ngoài thư mục cấu hình tunelo); copy trong chat thường không rời thiết bị khi chưa đính (xem frame gửi đi), khi đính chỉ ghi "một tin nhắn chat" | Chưa chạy |
+| F9 | Menu ⋯ của mascot › "Tự theo dõi phiên này" trên một phiên Claude, ba lượt | Mỗi lượt xong có thẻ "Cố vấn nhận định" và một dòng ngắn cạnh mascot; AI làm theo khi chắc chắn, hỏi lại khi phân vân; chip mờ khi lượt chạy; không thẻ duyệt cho `advisor_weigh`; `/compact` không bị chèn chỉ dẫn; tắt giữa phiên thì lượt sau AI không gọi | Chưa chạy |
+| F10 | Ở F9, mở tab Văn phòng | Cố vấn ngồi ghế đầu bàn Phòng họp, tên và ngoại hình theo Cài đặt › Cố vấn; khi AI hỏi thì người hỏi đứng cạnh, bong bóng "Đang cân nhắc" rồi câu trả lời; tải lại vẫn đúng | Chưa chạy |
+| F11 | Dừng lượt khi Cố vấn đang được hỏi; xoá khoá từ thiết bị khác; để Jev quá 8 giây | Thẻ hoặc bong bóng ghi lý do, không chip, không dòng "Lượt này AI chưa hỏi Cố vấn"; xoá khoá thì mọi thiết bị thấy "Máy chưa có khoá Cố vấn" ngay | Chưa chạy |
+| F12 | Tìm khoá: log của tunelo, transcript, frame lỗi, env của CLI (`ps -E`); nhờ AI của phiên làm việc chạy `tunelo advisor set-key` qua pipe hoặc đọc Keychain của tunelo bằng `security … -w` | Không thấy khoá ở đâu; các lệnh đó bị coi là nhạy cảm (thẻ duyệt) hoặc bị từ chối; thiết bị chỉ thấy dấu vân tay | Chưa chạy |
+| F13 | Kéo mascot quanh màn, thả gần mép; mở khung Quản lý mã nguồn, terminal, ô nhập; mở bàn phím điện thoại | Hít vào mép gần nhất, nhớ vị trí trên thiết bị; không che header, nút chính hay ô nhập; trên điện thoại bong bóng là sheet đáy | Chưa chạy |
+| F14 | Mở web mới với máy chạy tunelo cũ; mở web cũ với máy chạy tunelo mới đang bật chế độ tự động | Web mới: mascot ngủ, "Máy cần cập nhật tunelo để dùng Cố vấn."; web cũ: `advisor_weigh` là thẻ tool thường, không nhân viên lạ trong văn phòng, không phiên Cố vấn lạ trong danh sách | Chưa chạy |
+| F15 | Cài đặt › Cố vấn: đổi tên, ngoại hình, giọng văn trên một thiết bị | Mascot, bong bóng, thẻ và văn phòng trên mọi thiết bị đổi theo; câu trả lời sau đổi giọng | Chưa chạy |
+
 ## Giới hạn đã biết
 
 - App iOS/Android chưa lên store (iOS mới có TestFlight nội bộ, xem [`mobile-app.md`](mobile-app.md)); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt. Không có app desktop riêng (huỷ R8 ngày 20/10/2026: desktop = PWA).
 - Server chưa có ffmpeg: video, audio do bot gửi chưa có ảnh xem trước, sóng âm và thời lượng.
 - Ở bề rộng 761–1100 px, cột thông tin và Mini App phủ lên phần phải khung chat thay vì xếp thành cột riêng.
+- Phiên Cố vấn chưa chạy với Antigravity (chờ thử tay xác nhận agy xin quyền từng tool); chế độ tự động của phiên Antigravity vẫn dùng được. Ô skin và phụ kiện riêng của 4 ngoại hình Cố vấn trong văn phòng 3D chưa có: Cố vấn dùng ô skin tạm, chỉ ngoại hình cú có kính.
 - Mỗi process phục vụ tối đa 1000 người online cùng lúc (giới hạn đã đo trên máy hiện tại); vượt thì người sau chờ "Đang kết nối…".
 
 ## Gửi phản hồi

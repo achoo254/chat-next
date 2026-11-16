@@ -339,21 +339,23 @@ func (w *exportWriter) write() error {
 		CreatedAt    string          `json:"created_at"`
 		Privacy      json.RawMessage `json:"privacy_settings"`
 		Notification json.RawMessage `json:"notification_settings"`
+		Advisor      json.RawMessage `json:"advisor_profile"`
 		ExportedAt   string          `json:"exported_at"`
 	}
 	var created time.Time
-	var privacy, notification []byte
+	var privacy, notification, advisor []byte
 	if err := q.QueryRow(ctx, `
 		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), coalesce(u.idp_picture, ''), u.locale, u.created_at,
 			coalesce((SELECT to_jsonb(p) - 'user_id' FROM privacy_settings p WHERE p.user_id = u.id), 'null'),
-			coalesce((SELECT to_jsonb(n) - 'user_id' FROM notification_settings n WHERE n.user_id = u.id), 'null')
+			coalesce((SELECT to_jsonb(n) - 'user_id' FROM notification_settings n WHERE n.user_id = u.id), 'null'),
+			coalesce((SELECT to_jsonb(a) - 'user_id' FROM advisor_profiles a WHERE a.user_id = u.id), 'null')
 		FROM users u WHERE u.id = $1 AND u.tenant_id = $2`, me, w.s.cfg.TenantID).Scan(
 		&profile.ID, &profile.Username, &profile.Name, &profile.Bio, &profile.Email, &profile.IdPPicture, &profile.Locale, &created,
-		&privacy, &notification); err != nil {
+		&privacy, &notification, &advisor); err != nil {
 		return fmt.Errorf("privacy: export profile: %w", err)
 	}
 	profile.CreatedAt, profile.ExportedAt = exportTime(created), exportTime(w.s.now())
-	profile.Privacy, profile.Notification = privacy, notification
+	profile.Privacy, profile.Notification, profile.Advisor = privacy, notification, advisor
 
 	chats, err := w.loadChats()
 	if err != nil {
@@ -435,7 +437,7 @@ func (w *exportWriter) writeReadme() error {
 		"Dữ liệu cá nhân của bạn trong ứng dụng chat",
 		"",
 		"Mở index.html để xem offline. Các file .json đọc được bằng máy:",
-		"profile.json: tài khoản, cài đặt quyền riêng tư và thông báo, ngôn ngữ app, tự xoá.",
+		"profile.json: tài khoản, cài đặt quyền riêng tư và thông báo, hồ sơ Cố vấn, ngôn ngữ app, tự xoá.",
 		"contacts.json, blocked.json: danh bạ và người bạn đã chặn.",
 		"sessions.json: các thiết bị đã đăng nhập.",
 		"bots.json: bot của bạn (không có token).",

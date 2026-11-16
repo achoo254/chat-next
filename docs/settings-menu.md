@@ -18,3 +18,11 @@
 - Thêm một `SettingsTab` (hoặc một trang con của mục có sẵn) và nội dung của nó; không thêm route có layout riêng.
 - Nhãn và biểu tượng nằm trong nhóm phù hợp của menu; chữ có đủ vi, en, zh-CN.
 - Kiểm cả hai cỡ màn: máy tính (menu trái + nội dung phải) và điện thoại (danh sách → trang có nút quay lại).
+
+## Mục Cố vấn
+
+Cài đặt › Cố vấn (`/settings/advisor`, [`advisor-settings.tsx`](../apps/web/src/screens/settings/advisor-settings.tsx)) theo quy tắc 1–2 như mọi mục, với ba điểm riêng ([ADR 0020](./adr/0020-advisor-mascot-jev.md)):
+
+- **Hồ sơ theo tài khoản, ẩn/hiện theo thiết bị.** Tên, ngoại hình và giọng văn lưu trên server và áp cho mascot, bong bóng, thẻ "Cố vấn nhận định" và văn phòng trên mọi thiết bị; công tắc "Hiện mascot trên thiết bị này" chỉ nhớ trên thiết bị đang dùng (cùng việc với "Ẩn mascot" ở menu của mascot).
+- **Khoá theo từng máy, không theo tài khoản.** Khoá TypeSafe nằm trên máy và đi tới máy qua kênh mã hoá đầu cuối; mục chỉ hiện trạng thái, dấu vân tay, thiết bị đặt và thời điểm, không bao giờ hiện lại khoá. Xoá khoá xác nhận ngay tại chỗ, không mở hộp thoại thay cho trang (quy tắc 4).
+- **Chỗ duy nhất nhắc "Jev"/"TypeSafe"**, và cả mục nằm ngoài vùng bắt copy của Cố vấn (`data-advisor-ignore`), để khoá vừa dán không bao giờ thành gợi ý đính kèm.

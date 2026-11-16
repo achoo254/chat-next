@@ -113,6 +113,13 @@ func TestDataExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// So is the Advisor profile they set.
+	advisor := appv1connect.NewAdvisorServiceClient(an.http, e.srv.URL+"/rpc", withOrigin(e.srv.URL))
+	advisorName := "Thầy Cú"
+	if _, err := advisor.SetAdvisorProfile(ctx, connect.NewRequest(&appv1.SetAdvisorProfileRequest{Name: &advisorName})); err != nil {
+		t.Fatal(err)
+	}
+
 	p := an.privacy(e.env)
 	state, err := p.GetDataExport(ctx, connect.NewRequest(&appv1.GetDataExportRequest{}))
 	if err != nil || !state.Msg.GetAvailable() || state.Msg.GetExport() != nil || state.Msg.GetNextRequestAt() != 0 {
@@ -161,8 +168,14 @@ func TestDataExport(t *testing.T) {
 	var profile struct {
 		Username string `json:"username"`
 		Locale   string `json:"locale"`
+		Advisor  struct {
+			Name   string `json:"name"`
+			LookID string `json:"look_id"`
+			UserID *int64 `json:"user_id"`
+		} `json:"advisor_profile"`
 	}
-	if err := json.Unmarshal(files["profile.json"], &profile); err != nil || profile.Username != "annguyen" || profile.Locale != "zh-CN" {
+	if err := json.Unmarshal(files["profile.json"], &profile); err != nil || profile.Username != "annguyen" || profile.Locale != "zh-CN" ||
+		profile.Advisor.Name != advisorName || profile.Advisor.LookID != "owl" || profile.Advisor.UserID != nil {
 		t.Fatalf("profile.json: %s %v", files["profile.json"], err)
 	}
 	messages := string(files["messages/"+strconv.FormatInt(chatID, 10)+".json"])
