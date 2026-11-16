@@ -204,7 +204,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		};
 		people.frame(frozen ? 0 : dtMs / 1000, t.floor, fullRate, inView, { x: frame.target.x, z: frame.target.z });
 		const views = people.views();
-		fx.frame(now / 1000, t.floor, views, frozen ? 0 : light.screenGlow);
+		fx.frame(now / 1000, t.floor, views, frozen ? 0 : light.screenGlow, frozen ? 0 : light.deskLamp);
 		overlay.update(scene, width, height, t.floor, views, boards);
 		fade.style.opacity = t.fade > 0 ? t.fade.toFixed(2) : "";
 		if (now < flickerUntil) post.applyLight(Math.sin(now / 37) > 0.2 ? 0.25 : light.exposure, light.bloomWeight);

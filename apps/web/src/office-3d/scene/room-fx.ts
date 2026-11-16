@@ -1,5 +1,5 @@
 // Effects tied to the rooms: a glowing screen at each desk where someone
-// works, blinking lights on the server racks while background machines run,
+// works (and, after dark, a warm desk lamp beside it), blinking lights on the server racks while background machines run,
 // a puff of smoke over someone whose last tool failed, and a letter flying
 // from the lobby door to the reception desk when a new turn starts. All
 // blocks from the shared kit (instances: a draw call or two in all).
@@ -18,16 +18,31 @@ import { sceneFloor, type SceneLayout } from "./scene-layout.ts";
 
 export interface RoomFx {
 	update(state: OfficeState): void;
-	frame(seconds: number, shown: FloorLevel, people: readonly PersonView[], screenGlow: number): void;
+	/** `lampGlow`: how bright the desk lamps burn (0 by day, office-lighting.ts). */
+	frame(seconds: number, shown: FloorLevel, people: readonly PersonView[], screenGlow: number, lampGlow: number): void;
 	dispose(): void;
 }
 
 const PUFFS = 3;
+/** The warm light of a desk lamp at night (the concept's yellow pools of light). */
+const LAMP_COLOR = new Color3(1, 0.72, 0.38);
+/** Beside the monitor along the desk, and up at a lamp head's height, metres. */
+const LAMP_SIDE = 0.38;
+const LAMP_UP = 0.3;
 const MAIL_SECONDS = 1.6;
 
 export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): RoomFx {
 	const roots = new Map<FloorLevel, TransformNode>();
 	const screens = new Map<string, InstancedMesh>();
+	const lamps = new Map<string, InstancedMesh>();
+	const lampMaterial = new StandardMaterial("desk-lamp", scene);
+	lampMaterial.diffuseColor = Color3.Black();
+	lampMaterial.specularColor = Color3.Black();
+	lampMaterial.disableLighting = true;
+	const lamp = CreateSphere("desk-lamp", { diameter: 0.18, segments: 8 }, scene);
+	lamp.material = lampMaterial;
+	lamp.isVisible = false;
+	lamp.isPickable = false;
 	const leds: { floor: FloorLevel; mesh: InstancedMesh; phase: number }[] = [];
 	for (const floor of layout.floors) {
 		const root = new TransformNode(`fx-${floor.level}`, scene);
@@ -37,6 +52,12 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 				const screen = kit.block(root, `screen-${p.anchor}`, { x: p.x + Math.sin(p.rotY) * 0.05, y: p.y + 0.08, z: p.z + Math.cos(p.rotY) * 0.05, w: 0.48, h: 0.3, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
 				screen.setEnabled(false);
 				screens.set(p.anchor, screen);
+				const bulb = lamp.createInstance(`lamp-${p.anchor}`);
+				bulb.parent = root;
+				bulb.position.set(p.x + Math.cos(p.rotY) * LAMP_SIDE, p.y + LAMP_UP, p.z - Math.sin(p.rotY) * LAMP_SIDE);
+				bulb.isPickable = false;
+				bulb.setEnabled(false);
+				lamps.set(p.anchor, bulb);
 			}
 			if (p.name === "server-rack") {
 				for (let k = 0; k < 3; k += 1) {
@@ -70,11 +91,13 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 			if (lastTurn >= 0 && state.lastTurnStart > lastTurn) mailStart = now;
 			lastTurn = state.lastTurnStart;
 		},
-		frame(seconds, shown, people, screenGlow) {
+		frame(seconds, shown, people, screenGlow, lampGlow) {
 			now = seconds;
 			for (const [level, root] of roots) root.setEnabled(level === shown);
 			const working = new Set(people.filter((p) => p.working && p.deskAnchor !== null).map((p) => p.deskAnchor));
 			for (const [anchor, screen] of screens) screen.setEnabled(screenGlow > 0 && working.has(anchor));
+			for (const [anchor, bulb] of lamps) bulb.setEnabled(lampGlow > 0.05 && working.has(anchor));
+			lampMaterial.emissiveColor.copyFrom(LAMP_COLOR).scaleInPlace(Math.min(1, lampGlow) * 1.6);
 			kit.screenMaterial.emissiveColor.set(0.55 * (0.4 + screenGlow), 0.78 * (0.4 + screenGlow), 1 * (0.4 + screenGlow));
 			const rate = machines > 0 ? 2 + Math.min(6, machines) : 0.4;
 			for (const led of leds) led.mesh.setEnabled(led.floor === shown && Math.sin(seconds * rate * Math.PI + led.phase) > -0.2);
@@ -112,6 +135,7 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 		dispose() {
 			for (const list of puffs.values()) for (const m of list) m.dispose();
 			puff.dispose(false, true);
+			lamp.dispose(false, true);
 			for (const root of roots.values()) root.dispose(false, false);
 		},
 	};

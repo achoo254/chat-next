@@ -19,6 +19,11 @@ describe("office lighting", () => {
 		expect(night.skyIntensity).toBeLessThan(day.skyIntensity);
 		expect(night.screenGlow).toBeGreaterThan(day.screenGlow);
 		expect(night.bloomWeight).toBeGreaterThan(day.bloomWeight);
+		// Desk lamps burn only after dark, and less at dusk.
+		expect(day.deskLamp).toBe(0);
+		expect(night.deskLamp).toBe(1);
+		expect(dusk.deskLamp).toBeCloseTo(0.5);
+		expect(night.exposure).toBeLessThan(day.exposure);
 		expect(dusk.skyIntensity).toBeCloseTo((day.skyIntensity + night.skyIntensity) / 2);
 		expect(officeLighting(-3, false)).toEqual(day);
 		expect(officeLighting(7, false)).toEqual(night);
@@ -29,6 +34,7 @@ describe("office lighting", () => {
 		const closed = officeLighting(0, true);
 		expect(closed).toEqual(officeLighting(1, true));
 		expect(closed.screenGlow).toBe(0);
+		expect(closed.deskLamp).toBe(0);
 		expect(closed.keyIntensity).toBeLessThan(officeLighting(1, false).keyIntensity);
 	});
 });

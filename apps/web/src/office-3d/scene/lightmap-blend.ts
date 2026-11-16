@@ -7,6 +7,10 @@
 // The baked meshes take no live light (disableLighting, white emissive): the
 // lightmaps supply all of it, furniture shadows included. Both maps are
 // sRGB-encoded like the albedo; `scale` undoes the half-intensity bake.
+// `woodTone` calms the baked atlas's orange wood toward the concept's light
+// brown: where the lit colour is warm orange (red over green over blue; the
+// bake's warm light makes much of it) it loses some saturation, so lavender
+// walls, rugs, plants and red art keep theirs.
 // Shader code exists for GLSL (WebGL2) and WGSL (WebGPU).
 import type { Material } from "@babylonjs/core/Materials/material";
 import { MaterialPluginBase } from "@babylonjs/core/Materials/materialPluginBase";
@@ -42,6 +46,8 @@ vec3 lightmapBlendDay = texture2D(lightmapDaySampler, vLightmapBlendUV).rgb;
 vec3 lightmapBlendNight = texture2D(lightmapNightSampler, vLightmapBlendUV).rgb;
 color.rgb *= mix(lightmapBlendDay, lightmapBlendNight, lightmapBlend.x) * lightmapBlend.y;
 color.rgb += baseColor.rgb * lightmapBlend.z;
+float lightmapWood = smoothstep(0.1, 0.35, color.r - color.b) * smoothstep(0.04, 0.16, color.g - color.b) * lightmapBlend.w;
+color.rgb = mix(color.rgb, vec3(dot(color.rgb, vec3(0.299, 0.587, 0.114))), lightmapWood * 0.45);
 #endif`,
 };
 
@@ -69,6 +75,8 @@ var lightmapNightSampler: texture_2d<f32>;
 let lightmapBlendDay = textureSample(lightmapDaySampler, lightmapDaySamplerSampler, fragmentInputs.vLightmapBlendUV).rgb;
 let lightmapBlendNight = textureSample(lightmapNightSampler, lightmapNightSamplerSampler, fragmentInputs.vLightmapBlendUV).rgb;
 color = vec4f(color.rgb * mix(lightmapBlendDay, lightmapBlendNight, uniforms.lightmapBlend.x) * uniforms.lightmapBlend.y + baseColor.rgb * uniforms.lightmapBlend.z, color.a);
+let lightmapWood = smoothstep(0.1, 0.35, color.r - color.b) * smoothstep(0.04, 0.16, color.g - color.b) * uniforms.lightmapBlend.w;
+color = vec4f(mix(color.rgb, vec3f(dot(color.rgb, vec3f(0.299, 0.587, 0.114))), lightmapWood * 0.45), color.a);
 #endif`,
 };
 
@@ -78,6 +86,8 @@ export class LightmapBlendPlugin extends MaterialPluginBase {
 	scale = LIGHTMAP_HALF_BAKE_SCALE;
 	/** Self-glow added after the lightmap (screens, lamp shades): albedo times this. */
 	glow = 0;
+	/** How far orange wood is calmed toward light brown (0 = the atlas as baked, 1 = full). */
+	woodTone = 0;
 	private readonly day: BaseTexture;
 	private readonly night: BaseTexture;
 
@@ -121,13 +131,13 @@ export class LightmapBlendPlugin extends MaterialPluginBase {
 
 	override getUniforms(shaderLanguage: ShaderLanguage = ShaderLanguage.GLSL): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
 		return {
-			ubo: [{ name: "lightmapBlend", size: 3, type: "vec3" }],
-			fragment: shaderLanguage === ShaderLanguage.GLSL ? "#ifdef LIGHTMAP_BLEND\nuniform vec3 lightmapBlend;\n#endif" : "",
+			ubo: [{ name: "lightmapBlend", size: 4, type: "vec4" }],
+			fragment: shaderLanguage === ShaderLanguage.GLSL ? "#ifdef LIGHTMAP_BLEND\nuniform vec4 lightmapBlend;\n#endif" : "",
 		};
 	}
 
 	override bindForSubMesh(uniformBuffer: UniformBuffer): void {
-		uniformBuffer.updateFloat3("lightmapBlend", this.nightMix, this.scale, this.glow);
+		uniformBuffer.updateFloat4("lightmapBlend", this.nightMix, this.scale, this.glow, this.woodTone);
 		uniformBuffer.setTexture("lightmapDaySampler", this.day);
 		uniformBuffer.setTexture("lightmapNightSampler", this.night);
 	}

@@ -20,6 +20,8 @@ export interface OfficeLight {
 	readonly bloomWeight: number;
 	/** Emissive strength of the monitors at desks where someone works. */
 	readonly screenGlow: number;
+	/** Brightness of the warm desk lamps where someone works (0 by day). */
+	readonly deskLamp: number;
 	/** Multiplier on the placeholder floor colours (no lightmap): night is dimmer and warmer. */
 	readonly ambient: Rgb;
 }
@@ -34,6 +36,7 @@ const DAY: OfficeLight = {
 	exposure: 1,
 	bloomWeight: 0.3,
 	screenGlow: 0.35,
+	deskLamp: 0,
 	ambient: [1, 1, 1],
 };
 
@@ -47,6 +50,7 @@ const NIGHT: OfficeLight = {
 	exposure: 0.82,
 	bloomWeight: 0.65,
 	screenGlow: 0.9,
+	deskLamp: 1,
 	ambient: [0.62, 0.55, 0.62],
 };
 
@@ -61,6 +65,7 @@ const CLOSED: OfficeLight = {
 	exposure: 1,
 	bloomWeight: 0.2,
 	screenGlow: 0,
+	deskLamp: 0,
 	ambient: [0.32, 0.32, 0.42],
 };
 
@@ -81,6 +86,7 @@ export function officeLighting(nightMix: number, closed: boolean): OfficeLight {
 		exposure: mix(DAY.exposure, NIGHT.exposure, t),
 		bloomWeight: mix(DAY.bloomWeight, NIGHT.bloomWeight, t),
 		screenGlow: mix(DAY.screenGlow, NIGHT.screenGlow, t),
+		deskLamp: mix(DAY.deskLamp, NIGHT.deskLamp, t),
 		ambient: mixRgb(DAY.ambient, NIGHT.ambient, t),
 	};
 }

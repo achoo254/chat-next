@@ -15,10 +15,12 @@ import type { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF/2.0";
 import { LIGHTMAP_HALF_BAKE_SCALE, LightmapBlendPlugin } from "./lightmap-blend.ts";
+import { createNightCityTexture } from "./night-city.ts";
 import type { Place } from "./scene-layout.ts";
 import { gammaScale, NO_SHELL_EXTRAS, parseShellExtras, type Rgb, type ShellExtras } from "./shell-extras.ts";
 
@@ -31,6 +33,9 @@ export interface BakedShell {
 
 /** Window panes by day and at night when the shell does not say. */
 const WINDOW_DEFAULT: { readonly day: Rgb; readonly night: Rgb } = { day: [1, 1, 1], night: [0.35, 0.38, 0.65] };
+
+/** The baked wood reads orange next to the concept's light brown: calmed this far (lightmap-blend.ts). */
+const WOOD_TONE = 1;
 
 /** Things that shine by themselves: [day, night] glow by mesh name. */
 const GLOW: readonly (readonly [RegExp, number, number])[] = [
@@ -82,6 +87,7 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 	const plugins: { plugin: LightmapBlendPlugin; glow: readonly [number, number] | null }[] = [];
 	const made = new Map<number, StandardMaterial>();
 	const windows: StandardMaterial[] = [];
+	const panes: AbstractMesh[] = [];
 	for (const mesh of container.meshes) {
 		const source = mesh.material;
 		if (source === null) continue;
@@ -100,6 +106,7 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 			view.emissiveColor = Color3.White();
 			mesh.material = view;
 			windows.push(view);
+			panes.push(mesh);
 			continue;
 		}
 		if (!mesh.isVerticesDataPresent(VertexBuffer.UV2Kind)) continue;
@@ -114,7 +121,9 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 				material.emissiveColor = Color3.White();
 			} else material.emissiveColor = albedoColor(source);
 			const glow = GLOW.find(([re]) => re.test(mesh.name) || re.test(source.name));
-			plugins.push({ plugin: new LightmapBlendPlugin(material, day, night), glow: glow === undefined ? null : [glow[1], glow[2]] });
+			const plugin = new LightmapBlendPlugin(material, day, night);
+			plugin.woodTone = WOOD_TONE;
+			plugins.push({ plugin, glow: glow === undefined ? null : [glow[1], glow[2]] });
 			made.set(source.uniqueId, material);
 		}
 		mesh.material = material;
@@ -125,6 +134,21 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 	const windowNight = Color3.FromArray(windowColours.night);
 	container.addAllToScene();
 	for (const node of container.rootNodes) node.parent = parent;
+	// The lit city over the panes, faded in with the night (drawn just in front of them: no depth fight).
+	const city = panes.length === 0 ? null : createNightCityTexture(scene);
+	const cityMaterial = new StandardMaterial("window-city", scene);
+	// Unlit like the baked materials: a white emissive shows the diffuse texture as drawn.
+	cityMaterial.disableLighting = true;
+	cityMaterial.diffuseTexture = city;
+	cityMaterial.specularColor = Color3.Black();
+	cityMaterial.emissiveColor = Color3.White();
+	cityMaterial.zOffset = -2;
+	cityMaterial.alpha = 0;
+	const cityPanes = panes.map((pane) => {
+		const copy = pane.clone(`${pane.name}-city`, pane.parent);
+		if (copy !== null) copy.material = cityMaterial;
+		return copy;
+	});
 	for (const mesh of container.meshes) {
 		mesh.isPickable = false;
 		mesh.computeWorldMatrix(true);
@@ -140,8 +164,13 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 			}
 			// Daylight outside by day, the city's dusk blue at night.
 			for (const view of windows) view.emissiveColor = Color3.Lerp(windowDay, windowNight, nightMix);
+			cityMaterial.alpha = nightMix;
+			for (const pane of cityPanes) pane?.setEnabled(nightMix > 0.02);
 		},
 		dispose() {
+			for (const pane of cityPanes) pane?.dispose();
+			cityMaterial.dispose();
+			city?.dispose();
 			container.dispose();
 			day.dispose();
 			night.dispose();
