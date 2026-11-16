@@ -129,7 +129,7 @@ function TerminalPage({ machine, openShellIn, showSession }: { machine: string; 
 	const text = gate === "unknown" ? (state.status.kind === "open" ? t.terminal.loading : t.terminal.offline) : t.terminal.hint[gate];
 	return (
 		<div className="mx-scroll">
-			<PageHead back={paths.machine(machine)} backLabel={t.back} title={t.terminal.title} />
+			<PageHead back={paths.machine(machine)} backLabel={t.back} backToOrigin title={t.terminal.title} />
 			<div className="mx-body">
 				<p className="note" role="status">
 					{text}

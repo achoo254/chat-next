@@ -13,7 +13,7 @@ import { MachineIcon } from "../machines/machine-icons.tsx";
 import type { WorkStatus } from "../machines/project-tree.ts";
 import { StatusGlyph } from "../machines/status-glyph.tsx";
 import { usePopover } from "../machines/use-popover.ts";
-import { Link } from "../router.tsx";
+import { BackLink } from "../router.tsx";
 import { buildNewTabActions, type AgentChoice } from "./new-tab-actions.ts";
 import { NewTabMenu } from "./new-tab-menu.tsx";
 import type { SplitDir } from "./terminal-layout.ts";
@@ -82,7 +82,7 @@ export interface TabView {
 
 interface TabsProps {
 	t: MachinesCopy["terminal"];
-	/** None in a session on a wide screen: its header has the way back. */
+	/** None in a session on a wide screen: its header has the way back. The page it was opened from comes first; this when opened directly. */
 	back: string | undefined;
 	backLabel: string;
 	tabs: readonly TabView[];
@@ -141,9 +141,9 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents,
 	return (
 		<div className="tx-head">
 			{back !== undefined && (
-				<Link to={back} className="icon-btn tx-back" aria-label={backLabel} title={backLabel}>
+				<BackLink fallback={back} className="icon-btn tx-back" label={backLabel}>
 					<Icon name="back" />
-				</Link>
+				</BackLink>
 			)}
 			{/* Many tabs scroll sideways, on purpose. */}
 			<div className="tx-tabs" role="tablist" aria-label={t.tabs} data-scroll-x="">

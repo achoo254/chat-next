@@ -155,6 +155,9 @@ export const enMachines: MachinesCopy = {
 		open: "Open session",
 		stop: "Stop",
 		loading: "Loading the request…",
+		terminal: "Terminal",
+		shells: (n) => `Terminals running (${n})`,
+		manageShells: "Manage terminals",
 	},
 	newSession: {
 		noProject: "No project AI settings from the home folder or a sensitive one: the AI itself never trusts settings there either.",
@@ -1044,7 +1047,7 @@ export const enMachines: MachinesCopy = {
 			recent: "Recent sessions",
 			resume: "Open",
 		},
-		capacity: (open, max) => `${open}/${max} sessions open · idle sessions pause after 5 minutes`,
+		capacity: (open, max) => `${open}/${max} AI sessions open · idle sessions pause after 5 minutes`,
 		header: {
 			menu: "Session options",
 			e2ee: "End-to-end encrypted between this device and the machine",

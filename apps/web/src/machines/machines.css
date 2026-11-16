@@ -335,6 +335,10 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-term-acts { grid-area: acts; display: flex; justify-content: flex-end; gap: var(--space-2); }
 .mx-term-acts .btn { gap: var(--space-1); }
 .mx-terms-foot { justify-content: flex-end; }
+/* Under the board's running shells: where they are stopped (the machine's settings). */
+.mx-board-more { justify-self: end; font-size: 0.8125rem; color: var(--c-primary); text-decoration: none; }
+.mx-board-more:hover { text-decoration: underline; }
+.mx-board-more:focus-visible { outline: 2px solid var(--c-focus, var(--c-primary)); outline-offset: 2px; border-radius: var(--radius-sm); }
 .mx-terms-confirm { list-style: none; margin: 0; padding: var(--space-2); display: grid; gap: var(--space-1); max-height: 220px; overflow-y: auto; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); background: var(--c-surface-subtle); font-size: 0.875rem; }
 .mx-terms-confirm li { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: var(--space-2); }
 .mx-terms-confirm span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

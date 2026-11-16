@@ -9,7 +9,9 @@ import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, PromptState, ThreadState, type Decision, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths, useSearch } from "../router.tsx";
+import { terminalGate } from "./agent-version.ts";
 import { aiPaths } from "./ai-paths.ts";
+import { BoardShells, useBoardShells } from "./board-shells.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
@@ -93,6 +95,8 @@ export function MachineBoard({ machine }: { machine: string }) {
 	const view = useMachineViews(hub, now).find((m) => m.entry.ref === machine);
 	const [creating, setCreating] = useState(false);
 	const [projects] = useAgentProjects();
+	const hasTerminal = view !== undefined && terminalGate(view.state.info) === "available";
+	const shells = useBoardShells(view?.link ?? null, hasTerminal && view?.conn.kind === "on");
 	// A push opens /ai/<id>?session=<thread>: go straight to that thread.
 	useEffect(() => {
 		const session = new URLSearchParams(search).get("session");
@@ -111,6 +115,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 	const { entry, link, state, conn } = view;
 	const { need, running, idle } = collect([view]);
 	const max = state.maxSessions;
+	const shellCount = conn.kind === "on" ? (shells?.length ?? 0) : 0;
 	return (
 		<div className="mx-scroll" role="region" aria-label={t.agent.machineBoardOf(entry.name)}>
 			{/* Opened from the machines list (Quản lý máy), adding a machine or this machine: back goes to that list. */}
@@ -120,6 +125,20 @@ export function MachineBoard({ machine }: { machine: string }) {
 					<Icon name="settings" small />
 					<span className="hide-narrow">{t.agent.info}</span>
 				</Link>
+				{/* The machine's terminal: the tabs this device keeps for it, or one new shell. */}
+				{!isBlocked(conn) &&
+					hasTerminal &&
+					(conn.kind === "on" ? (
+						<Link to={paths.machineTerminal(machine)} className="btn btn-sm" aria-label={t.board.terminal} title={t.board.terminal} data-id="machine-terminal-btn">
+							<MachineIcon name="terminal" small />
+							<span className="hide-narrow">{t.board.terminal}</span>
+						</Link>
+					) : (
+						<button type="button" className="btn btn-sm" disabled title={t.machinesPage.needsOnline} aria-label={`${t.board.terminal}: ${t.machinesPage.needsOnline}`}>
+							<MachineIcon name="terminal" small />
+							<span className="hide-narrow">{t.board.terminal}</span>
+						</button>
+					))}
 				{!isBlocked(conn) && (
 					<button
 						type="button"
@@ -137,7 +156,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 			<div className="mx-body">
 				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
 				{conn.kind === "offline" && <OfflineGuide />}
-				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && (
+				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && shellCount === 0 && (
 					// The same calm card as the board of every machine.
 					<div className="mx-calm">
 						<Icon name="check" />
@@ -145,6 +164,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 					</div>
 				)}
 				<Tiles need={need} running={running} showMachine={false} />
+				{conn.kind === "on" && shells !== null && <BoardShells machine={machine} shells={shells} now={now} />}
 				<Recent list={idle.slice(0, RECENT)} showMachine={false} now={now} />
 				{max > 0 && <p className="note">{t.agent.capacity(state.openSessions, max)}</p>}
 			</div>

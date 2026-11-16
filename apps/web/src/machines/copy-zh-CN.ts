@@ -155,6 +155,9 @@ export const zhCNMachines: MachinesCopy = {
 		open: "打开会话",
 		stop: "停止",
 		loading: "正在加载请求…",
+		terminal: "终端",
+		shells: (n) => `正在运行的终端（${n}）`,
+		manageShells: "管理终端",
 	},
 	newSession: {
 		noProject: "不加载主目录或敏感目录中的项目 AI 配置：AI 本身也从不信任那里的配置。",
@@ -1038,7 +1041,7 @@ export const zhCNMachines: MachinesCopy = {
 			recent: "最近的会话",
 			resume: "打开",
 		},
-		capacity: (open, max) => `已打开 ${open}/${max} 个会话 · 空闲超过 5 分钟自动暂停`,
+		capacity: (open, max) => `已打开 ${open}/${max} 个 AI 会话 · 空闲超过 5 分钟自动暂停`,
 		header: {
 			menu: "会话选项",
 			e2ee: "此设备与电脑之间端到端加密",

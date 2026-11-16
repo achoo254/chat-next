@@ -159,6 +159,9 @@ export const viMachines = {
 		open: "Mở phiên",
 		stop: "Dừng",
 		loading: "Đang tải yêu cầu…",
+		terminal: "Terminal",
+		shells: (n: number) => `Terminal đang chạy (${n})`,
+		manageShells: "Quản lý terminal",
 	},
 	newSession: {
 		noProject: "Không nạp cấu hình AI của dự án ở thư mục home hay thư mục nhạy cảm: chính AI cũng không bao giờ tin cấu hình ở đó.",
@@ -1059,7 +1062,7 @@ export const viMachines = {
 			recent: "Phiên gần đây",
 			resume: "Mở",
 		},
-		capacity: (open: number, max: number) => `${open}/${max} phiên đang mở · phiên rảnh quá 5 phút tự tạm tắt`,
+		capacity: (open: number, max: number) => `${open}/${max} phiên AI đang mở · phiên rảnh quá 5 phút tự tạm tắt`,
 		header: {
 			menu: "Tuỳ chọn phiên",
 			e2ee: "Mã hoá đầu cuối giữa thiết bị này và máy",

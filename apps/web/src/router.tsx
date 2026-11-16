@@ -295,12 +295,30 @@ function subscribe(listener: () => void): () => void {
 	};
 }
 
-/** `path` may carry a query ("/b/x?start=1"); the same path and query is a no-op. */
+/** Marks a history entry the app pushed itself: the entry before it is one of the app's pages. */
+const IN_APP = { inApp: true } as const;
+
+/** Whether the current entry was pushed by the app, so going back stays in the app. */
+function cameFromApp(): boolean {
+	const state: unknown = window.history.state;
+	return typeof state === "object" && state !== null && "inApp" in state && state.inApp === true;
+}
+
+/** `path` may carry a query ("/b/x?start=1"); the same path and query is a no-op. A replace keeps the entry's mark. */
 export function navigate(path: string, options: { replace?: boolean } = {}): void {
 	if (path === window.location.pathname + window.location.search) return;
-	if (options.replace) window.history.replaceState(null, "", path);
-	else window.history.pushState(null, "", path);
+	if (options.replace) window.history.replaceState(cameFromApp() ? IN_APP : null, "", path);
+	else window.history.pushState(IN_APP, "", path);
 	for (const listener of listeners) listener();
+}
+
+/**
+ * Back to the page this one was opened from, as the browser's Back does, when that page is the app's own;
+ * `fallback` when the page was opened directly (a link, a bookmark, a push, a new tab).
+ */
+export function goBack(fallback: string): void {
+	if (cameFromApp()) window.history.back();
+	else navigate(fallback);
 }
 
 export function usePathname(): string {
@@ -328,6 +346,24 @@ export function followInApp(event: MouseEvent<HTMLAnchorElement>, to: string): v
 	if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 	event.preventDefault();
 	navigate(to);
+}
+
+/**
+ * A back link: a plain click goes back to the page this one was opened from (`goBack`), `fallback` when
+ * opened directly; modified clicks keep browser behaviour on `fallback` (a new tab).
+ */
+export function BackLink({ fallback, className, label, children }: { fallback: string; className: string; label: string; children: ReactNode }) {
+	"use no memo";
+	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		event.preventDefault();
+		goBack(fallback);
+	};
+	return (
+		<a href={fallback} className={className} aria-label={label} title={label} onClick={onClick}>
+			{children}
+		</a>
+	);
 }
 
 /** In-app link: plain clicks navigate without a reload, modified clicks keep browser behaviour. */

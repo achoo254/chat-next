@@ -41,7 +41,7 @@ import {
 } from "../../src/terminal/terminal-layout.ts";
 import { TerminalLink, type TerminalSink } from "../../src/terminal/terminal-link.ts";
 import { shortcutOf } from "../../src/terminal/terminal-tabs.tsx";
-import { matchRoute, paths, type MachinesView } from "../../src/router.tsx";
+import { matchRoute, navigate, paths, type MachinesView } from "../../src/router.tsx";
 import { aiPaths } from "../../src/machines/ai-paths.ts";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { routerFetch } from "../support/router-fetch.ts";
@@ -185,6 +185,48 @@ describe("where the terminal shows", () => {
 		screenAt({ page: "machine", machine: "1" });
 		const head = await screen.findByRole("region", { name: /Mac mini/ });
 		expect(within(head).getByRole("link", { name: "Quản lý máy" }).getAttribute("href")).toBe("/ai/machines");
+	});
+
+	it("the machine's overview shows the shells still running, a way back to them and the terminal button", async () => {
+		const shell = host.open(80, 24, "");
+		screenAt({ page: "machine", machine: "1" });
+		await waitFor(() => expect(document.querySelector("[data-id=board-shells]")).not.toBeNull());
+		const list = document.querySelector<HTMLElement>("[data-id=board-shells]") ?? document.body;
+		expect(screen.getByRole("heading", { name: "Terminal đang chạy (1)" })).toBeTruthy();
+		expect(within(list).getByRole("link", { name: "Mở Shell" }).getAttribute("href")).toBe(aiPaths.showSession("1", shell));
+		expect(screen.getByRole("link", { name: "Quản lý terminal" }).getAttribute("href")).toBe("/ai/1/info");
+		// A shell runs: the board no longer says nothing does; the count below is of AI sessions.
+		expect(screen.queryByText("Không có phiên nào cần bạn hay đang chạy.")).toBeNull();
+		expect(screen.getByText(/phiên AI đang mở/)).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Terminal" }).getAttribute("href")).toBe("/ai/1/terminal");
+	});
+
+	it("the machine's overview with no shell running says nothing runs", async () => {
+		screenAt({ page: "machine", machine: "1" });
+		expect(await screen.findByText("Không có phiên nào cần bạn hay đang chạy.")).toBeTruthy();
+		await until(() => sent("termListRequest").length > 0, "the board asked for the shells");
+		expect(document.querySelector("[data-id=board-shells]")).toBeNull();
+	});
+
+	it("the terminal's back button returns to the page it was opened from, else to the machine's overview", async () => {
+		// Opened from the machines list: Back goes to that list, as the browser's Back does.
+		window.history.replaceState(null, "", "/ai/machines");
+		navigate(aiPaths.newShell("1", ""));
+		navigate(paths.machineTerminal("1"), { replace: true });
+		const back = vi.spyOn(window.history, "back").mockImplementation(() => undefined);
+		screenAt({ page: "terminal", machine: "1" });
+		// The dock's own arrow, once the machine's terminal is known (a waiting page before it has one that does the same).
+		await waitFor(() => expect(document.querySelector(".tx-back")).not.toBeNull());
+		const arrow = document.querySelector<HTMLElement>(".tx-back") ?? document.body;
+		expect(arrow.getAttribute("href")).toBe("/ai/1");
+		await userEvent.click(arrow);
+		expect(back).toHaveBeenCalledTimes(1);
+		expect(window.location.pathname).toBe("/ai/1/terminal");
+		back.mockRestore();
+		// Opened directly (a link, a bookmark): no page of the app before it, so the machine's overview.
+		window.history.replaceState(null, "", "/ai/1/terminal");
+		await userEvent.click(arrow);
+		expect(window.location.pathname).toBe("/ai/1");
 	});
 
 	it("the machine's terminal page opens a shell, on the relay, on its own connection", async () => {
