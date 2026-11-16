@@ -217,6 +217,8 @@ message Frame {
     TermOpened term_opened = 115;
     TermClosed term_closed = 116;
     TermStatus term_status = 117;
+    // A → B (tunelo 3.7.0+).
+    TermUpdateNow term_update_now = 171;
 
     // What a running turn is doing (tunelo 2.5.0+). B → A, unasked, to
     // devices following the thread.
@@ -2422,7 +2424,50 @@ message TermListResult {
   repeated TermSessionInfo sessions = 1;
   // Sessions the machine keeps at most (exited ones count until closed).
   uint32 max_sessions = 2;
+  // A newer terminal process an update brought waits to replace the running
+  // one (tunelo 3.7.0+); absent when none waits.
+  TerminalUpdate update = 3;
 }
+
+// The newer terminal process waiting. B replaces the running one by itself
+// as soon as nothing holds it (every thread's AI idle, every other session
+// an AI's CLI left alone): those AIs open again resumed, the others end.
+// Until then a device may replace it now (TermUpdateNow).
+message TerminalUpdate {
+  // Unix milliseconds the update brought it.
+  int64 staged_at = 1;
+  // The sessions that keep it waiting, each with why; empty when nothing
+  // does (it replaces the running one at B's next look, within a minute).
+  repeated TerminalUpdateHold holds = 2;
+}
+
+message TerminalUpdateHold {
+  uint32 session = 1;
+  TerminalUpdateHoldReason reason = 2;
+}
+
+enum TerminalUpdateHoldReason {
+  TERMINAL_UPDATE_HOLD_REASON_UNSPECIFIED = 0;
+  // A thread's AI runs a turn, waits on a tool or a prompt, or was active
+  // within the last minutes.
+  TERMINAL_UPDATE_HOLD_REASON_AI_ACTIVE = 1;
+  // No thread owns it and it runs a shell or another program no AI claims.
+  TERMINAL_UPDATE_HOLD_REASON_SHELL = 2;
+  // No thread owns it and it runs an AI's CLI that wrote to its sessions
+  // within the last minutes.
+  TERMINAL_UPDATE_HOLD_REASON_CLI_ACTIVE = 3;
+  // No thread owns it and B cannot tell what it runs (the machine's programs
+  // cannot be read).
+  TERMINAL_UPDATE_HOLD_REASON_UNKNOWN = 4;
+}
+
+// A → B: replace the running terminal process with the waiting one now.
+// Every thread's AI opens again in the new one, resumed (a turn it ran is
+// cut); every other session ends (its program is stopped; an AI's record
+// stays, to resume). Answered with TermListResult, or
+// ERROR_REASON_TERMINAL_UNAVAILABLE when none waits or the switch failed
+// (the running one starts again).
+message TermUpdateNow {}
 
 // A → B: start a login shell in a new session. Answered with TermOpened, or
 // ERROR_REASON_TERMINAL_SESSION_LIMIT / ERROR_REASON_TERMINAL_UNAVAILABLE /
