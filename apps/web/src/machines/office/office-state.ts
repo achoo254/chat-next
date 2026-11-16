@@ -6,9 +6,11 @@ import {
 	OfficeAnimGroup,
 	OfficeApprovalState,
 	OfficeRole,
+	OfficeServiceKind,
 	type OfficeActivity,
 	type OfficeActor,
 	type OfficeEvent,
+	type OfficeService,
 	type OfficeSession,
 } from "@achoo254/chat-proto/remote/remote";
 import { roomOf, type RoomCode } from "./office-rooms.ts";
@@ -19,6 +21,8 @@ export type ActorRole = "director" | "employee" | "machine";
 export type ActorState = "idle" | "working" | "done" | "awaiting";
 export type AnimGroup = "read" | "type" | "machine" | "phone" | "arrive" | "hand-in" | "think";
 export type ApprovalState = "waiting" | "allowed" | "denied" | "cancelled";
+/** What a machine runs, as the agent classified its command on the machine (never the command itself). */
+export type ServiceKind = "dev-server" | "test-watch" | "build" | "ci-watch" | "git" | "database" | "script";
 
 export interface ActivityView {
 	readonly id: string;
@@ -38,6 +42,16 @@ export interface ActivityView {
 	readonly stuckMs: number | null;
 }
 
+export interface ServiceView {
+	readonly kind: ServiceKind;
+	/** The port its command named; null when the agent does not know one. */
+	readonly port: number | null;
+	/** Machine time it started. */
+	readonly startedAt: number;
+	/** How long it has run at the view's time (ms). */
+	readonly uptimeMs: number;
+}
+
 export interface ActorView {
 	readonly id: string;
 	readonly role: ActorRole;
@@ -55,6 +69,8 @@ export interface ActorView {
 	readonly approval: { readonly state: ApprovalState; readonly at: number } | null;
 	/** How the actor's latest activity ended (pass or fail, a cheer or smoke). */
 	readonly lastResult: { readonly ok: boolean; readonly at: number } | null;
+	/** A machine's label from an agent that sends one; null otherwise (a person, or an older agent). */
+	readonly service: ServiceView | null;
 }
 
 export interface SessionView {
@@ -128,6 +144,19 @@ const STATES: Readonly<Partial<Record<OfficeActorState, ActorState>>> = {
 	[OfficeActorState.AWAITING_APPROVAL]: "awaiting",
 };
 
+const SERVICE_KINDS: Readonly<Partial<Record<OfficeServiceKind, ServiceKind>>> = {
+	[OfficeServiceKind.DEV_SERVER]: "dev-server",
+	[OfficeServiceKind.TEST_WATCH]: "test-watch",
+	[OfficeServiceKind.BUILD]: "build",
+	[OfficeServiceKind.CI_WATCH]: "ci-watch",
+	[OfficeServiceKind.GIT]: "git",
+	[OfficeServiceKind.DATABASE]: "database",
+	[OfficeServiceKind.SCRIPT]: "script",
+};
+
+/** Services that run until stopped: their long silence is how they work, not being stuck (no hourglass, no dozing). */
+const LONG_LIVED: ReadonlySet<ServiceKind> = new Set(["dev-server", "test-watch", "database"]);
+
 export const APPROVALS: Readonly<Partial<Record<OfficeApprovalState, ApprovalState>>> = {
 	[OfficeApprovalState.WAITING]: "waiting",
 	[OfficeApprovalState.ALLOWED]: "allowed",
@@ -136,7 +165,11 @@ export const APPROVALS: Readonly<Partial<Record<OfficeApprovalState, ApprovalSta
 };
 
 /** An actor as the store keeps it: the view without what the clock decides, plus the state an approval interrupted. */
-export type ActorRecord = Omit<ActorView, "activity"> & { readonly activity: Omit<ActivityView, "slow" | "stuckMs"> | null; readonly beforeApproval: ActorState | null };
+export type ActorRecord = Omit<ActorView, "activity" | "service"> & {
+	readonly activity: Omit<ActivityView, "slow" | "stuckMs"> | null;
+	readonly service: Omit<ServiceView, "uptimeMs"> | null;
+	readonly beforeApproval: ActorState | null;
+};
 
 /** A tool running this long shows an hourglass. */
 export const SLOW_TOOL_MS = 120_000;
@@ -145,12 +178,15 @@ export const STUCK_MS = 5 * 60_000;
 
 /** An actor as the views see it at machine time `now`: whether its work runs long, and whether they doze off over it. */
 export function actorViewOf(record: ActorRecord, now: number): ActorView {
-	const { beforeApproval: _before, activity, ...rest } = record;
-	if (activity === null) return { ...rest, activity: null };
-	// Only work still going on runs long: a finished subagent keeps its hand-in spot as an activity.
-	const slow = rest.state === "working" && activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS;
+	const { beforeApproval: _before, activity, service: label, ...rest } = record;
+	const service = label === null ? null : { ...label, uptimeMs: Math.max(0, now - label.startedAt) };
+	if (activity === null) return { ...rest, activity: null, service };
+	// Only work still going on runs long: a finished subagent keeps its hand-in spot as an activity. A dev server,
+	// a test watcher or a database runs on by design.
+	const runsOn = service !== null && LONG_LIVED.has(service.kind);
+	const slow = !runsOn && rest.state === "working" && activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS;
 	const silent = now - Math.max(rest.heardAt, activity.startedAt);
-	return { ...rest, activity: { ...activity, slow, stuckMs: slow && silent >= STUCK_MS ? silent : null } };
+	return { ...rest, activity: { ...activity, slow, stuckMs: slow && silent >= STUCK_MS ? silent : null }, service };
 }
 
 /** The actor an event is about, or null (a turn, the session). */
@@ -175,6 +211,13 @@ export function activityOf(a: OfficeActivity | undefined): ActorRecord["activity
 	return { id: a.id, tool: a.tool, group: GROUPS[a.group] ?? "type", room: roomOf(a.room), subject: a.subject, startedAt: Number(a.startedAt) };
 }
 
+/** A machine's label; an unset or unknown kind (a newer agent's) reads as a script. */
+export function serviceOf(s: OfficeService | undefined): ActorRecord["service"] {
+	if (s === undefined) return null;
+	const port = s.port >= 1 && s.port <= 65_535 ? s.port : null;
+	return { kind: SERVICE_KINDS[s.kind] ?? "script", port, startedAt: Number(s.startedAt) };
+}
+
 function roleOf(role: OfficeRole): ActorRole {
 	if (role === OfficeRole.DIRECTOR) return "director";
 	return role === OfficeRole.MACHINE ? "machine" : "employee";
@@ -195,6 +238,7 @@ export function actorOf(a: OfficeActor, previous: ActorRecord | undefined): Acto
 		heardAt: previous?.heardAt ?? Math.max(Number(a.enteredAt), Number(a.activity?.startedAt ?? 0n)),
 		approval: previous?.approval ?? null,
 		lastResult: previous?.lastResult ?? null,
+		service: a.id !== "director" && roleOf(a.role) === "machine" ? serviceOf(a.service) : null,
 		beforeApproval: previous?.beforeApproval ?? null,
 	};
 }

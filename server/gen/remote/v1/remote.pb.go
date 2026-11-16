@@ -2231,6 +2231,78 @@ func (OfficeRoom) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{30}
 }
 
+// The kind of a machine's background command (docs/office-wire.md, part 4).
+type OfficeServiceKind int32
+
+const (
+	OfficeServiceKind_OFFICE_SERVICE_KIND_UNSPECIFIED OfficeServiceKind = 0
+	// A dev or app server: `pnpm dev`, `vite`, `next dev`, `uvicorn`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_DEV_SERVER OfficeServiceKind = 1
+	// Tests, lint or typecheck running on: `vitest`, `pnpm test`, `go test`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_TEST_WATCH OfficeServiceKind = 2
+	// A build or a watching compiler: `pnpm build`, `tsc -w`, `cargo build`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_BUILD OfficeServiceKind = 3
+	// Watching a CI run: `gh run watch`, `gh pr checks --watch`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_CI_WATCH OfficeServiceKind = 4
+	// Any other git or hosting command: `git fetch`, `gh pr view`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_GIT OfficeServiceKind = 5
+	// A database server or client: `postgres`, `redis-server`, `psql`.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_DATABASE OfficeServiceKind = 6
+	// Anything else.
+	OfficeServiceKind_OFFICE_SERVICE_KIND_SCRIPT OfficeServiceKind = 7
+)
+
+// Enum value maps for OfficeServiceKind.
+var (
+	OfficeServiceKind_name = map[int32]string{
+		0: "OFFICE_SERVICE_KIND_UNSPECIFIED",
+		1: "OFFICE_SERVICE_KIND_DEV_SERVER",
+		2: "OFFICE_SERVICE_KIND_TEST_WATCH",
+		3: "OFFICE_SERVICE_KIND_BUILD",
+		4: "OFFICE_SERVICE_KIND_CI_WATCH",
+		5: "OFFICE_SERVICE_KIND_GIT",
+		6: "OFFICE_SERVICE_KIND_DATABASE",
+		7: "OFFICE_SERVICE_KIND_SCRIPT",
+	}
+	OfficeServiceKind_value = map[string]int32{
+		"OFFICE_SERVICE_KIND_UNSPECIFIED": 0,
+		"OFFICE_SERVICE_KIND_DEV_SERVER":  1,
+		"OFFICE_SERVICE_KIND_TEST_WATCH":  2,
+		"OFFICE_SERVICE_KIND_BUILD":       3,
+		"OFFICE_SERVICE_KIND_CI_WATCH":    4,
+		"OFFICE_SERVICE_KIND_GIT":         5,
+		"OFFICE_SERVICE_KIND_DATABASE":    6,
+		"OFFICE_SERVICE_KIND_SCRIPT":      7,
+	}
+)
+
+func (x OfficeServiceKind) Enum() *OfficeServiceKind {
+	p := new(OfficeServiceKind)
+	*p = x
+	return p
+}
+
+func (x OfficeServiceKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OfficeServiceKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[31].Descriptor()
+}
+
+func (OfficeServiceKind) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[31]
+}
+
+func (x OfficeServiceKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OfficeServiceKind.Descriptor instead.
+func (OfficeServiceKind) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{31}
+}
+
 type OfficeApprovalState int32
 
 const (
@@ -2270,11 +2342,11 @@ func (x OfficeApprovalState) String() string {
 }
 
 func (OfficeApprovalState) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[31].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[32].Descriptor()
 }
 
 func (OfficeApprovalState) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[31]
+	return &file_remote_v1_remote_proto_enumTypes[32]
 }
 
 func (x OfficeApprovalState) Number() protoreflect.EnumNumber {
@@ -2283,7 +2355,7 @@ func (x OfficeApprovalState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeApprovalState.Descriptor instead.
 func (OfficeApprovalState) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{31}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{32}
 }
 
 type Plain struct {
@@ -21047,8 +21119,14 @@ type OfficeState struct {
 	Actors []*OfficeActor `protobuf:"bytes,1,rep,name=actors,proto3" json:"actors,omitempty"`
 	// The AI reports its subagents (false for an AI that cannot, Antigravity:
 	// a device says so instead of showing an empty office).
-	ReportsStaff  bool           `protobuf:"varint,2,opt,name=reports_staff,json=reportsStaff,proto3" json:"reports_staff,omitempty"`
-	Session       *OfficeSession `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	ReportsStaff bool           `protobuf:"varint,2,opt,name=reports_staff,json=reportsStaff,proto3" json:"reports_staff,omitempty"`
+	Session      *OfficeSession `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	// Employees that left the office this session (OfficeActorLeave), so a
+	// device that opens the office later still knows everyone who worked in
+	// it: the last 32 to leave, in the order they came in (entered_at). Only
+	// in the snapshot; a device watching live sees them leave. Empty from an
+	// older agent (a device then knows only the actors).
+	Residents     []*OfficeResident `protobuf:"bytes,4,rep,name=residents,proto3" json:"residents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -21104,6 +21182,111 @@ func (x *OfficeState) GetSession() *OfficeSession {
 	return nil
 }
 
+func (x *OfficeState) GetResidents() []*OfficeResident {
+	if x != nil {
+		return x.Residents
+	}
+	return nil
+}
+
+// An employee no longer in the office: the fields of its OfficeActor a
+// device needs to name it again, as they were when it left.
+type OfficeResident struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The tool call that started it (its OfficeActor.id).
+	Id         string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AgentType  string `protobuf:"bytes,2,opt,name=agent_type,json=agentType,proto3" json:"agent_type,omitempty"`
+	ParentId   string `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	SpawnDepth uint32 `protobuf:"varint,4,opt,name=spawn_depth,json=spawnDepth,proto3" json:"spawn_depth,omitempty"`
+	// Unix milliseconds.
+	EnteredAt int64 `protobuf:"varint,5,opt,name=entered_at,json=enteredAt,proto3" json:"entered_at,omitempty"`
+	// Unix milliseconds it finished; 0 when it left unfinished.
+	DoneAt int64 `protobuf:"varint,6,opt,name=done_at,json=doneAt,proto3" json:"done_at,omitempty"`
+	// Unix milliseconds it left.
+	LeftAt        int64 `protobuf:"varint,7,opt,name=left_at,json=leftAt,proto3" json:"left_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfficeResident) Reset() {
+	*x = OfficeResident{}
+	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfficeResident) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfficeResident) ProtoMessage() {}
+
+func (x *OfficeResident) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfficeResident.ProtoReflect.Descriptor instead.
+func (*OfficeResident) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{236}
+}
+
+func (x *OfficeResident) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *OfficeResident) GetAgentType() string {
+	if x != nil {
+		return x.AgentType
+	}
+	return ""
+}
+
+func (x *OfficeResident) GetParentId() string {
+	if x != nil {
+		return x.ParentId
+	}
+	return ""
+}
+
+func (x *OfficeResident) GetSpawnDepth() uint32 {
+	if x != nil {
+		return x.SpawnDepth
+	}
+	return 0
+}
+
+func (x *OfficeResident) GetEnteredAt() int64 {
+	if x != nil {
+		return x.EnteredAt
+	}
+	return 0
+}
+
+func (x *OfficeResident) GetDoneAt() int64 {
+	if x != nil {
+		return x.DoneAt
+	}
+	return 0
+}
+
+func (x *OfficeResident) GetLeftAt() int64 {
+	if x != nil {
+		return x.LeftAt
+	}
+	return 0
+}
+
 // The session's own numbers, sent whole in the snapshot and in an event
 // whenever one of them changes.
 type OfficeSession struct {
@@ -21130,7 +21313,7 @@ type OfficeSession struct {
 
 func (x *OfficeSession) Reset() {
 	*x = OfficeSession{}
-	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	mi := &file_remote_v1_remote_proto_msgTypes[237]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21142,7 +21325,7 @@ func (x *OfficeSession) String() string {
 func (*OfficeSession) ProtoMessage() {}
 
 func (x *OfficeSession) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	mi := &file_remote_v1_remote_proto_msgTypes[237]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21155,7 +21338,7 @@ func (x *OfficeSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeSession.ProtoReflect.Descriptor instead.
 func (*OfficeSession) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{236}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{237}
 }
 
 func (x *OfficeSession) GetBusy() bool {
@@ -21233,7 +21416,7 @@ type OfficeTodoCounts struct {
 
 func (x *OfficeTodoCounts) Reset() {
 	*x = OfficeTodoCounts{}
-	mi := &file_remote_v1_remote_proto_msgTypes[237]
+	mi := &file_remote_v1_remote_proto_msgTypes[238]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21245,7 +21428,7 @@ func (x *OfficeTodoCounts) String() string {
 func (*OfficeTodoCounts) ProtoMessage() {}
 
 func (x *OfficeTodoCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[237]
+	mi := &file_remote_v1_remote_proto_msgTypes[238]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21258,7 +21441,7 @@ func (x *OfficeTodoCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeTodoCounts.ProtoReflect.Descriptor instead.
 func (*OfficeTodoCounts) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{237}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{238}
 }
 
 func (x *OfficeTodoCounts) GetPending() uint32 {
@@ -21301,7 +21484,7 @@ type OfficeUsage struct {
 
 func (x *OfficeUsage) Reset() {
 	*x = OfficeUsage{}
-	mi := &file_remote_v1_remote_proto_msgTypes[238]
+	mi := &file_remote_v1_remote_proto_msgTypes[239]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21313,7 +21496,7 @@ func (x *OfficeUsage) String() string {
 func (*OfficeUsage) ProtoMessage() {}
 
 func (x *OfficeUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[238]
+	mi := &file_remote_v1_remote_proto_msgTypes[239]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21326,7 +21509,7 @@ func (x *OfficeUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeUsage.ProtoReflect.Descriptor instead.
 func (*OfficeUsage) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{238}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{239}
 }
 
 func (x *OfficeUsage) GetInputTokens() uint64 {
@@ -21378,7 +21561,7 @@ type OfficeChecks struct {
 
 func (x *OfficeChecks) Reset() {
 	*x = OfficeChecks{}
-	mi := &file_remote_v1_remote_proto_msgTypes[239]
+	mi := &file_remote_v1_remote_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21390,7 +21573,7 @@ func (x *OfficeChecks) String() string {
 func (*OfficeChecks) ProtoMessage() {}
 
 func (x *OfficeChecks) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[239]
+	mi := &file_remote_v1_remote_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21403,7 +21586,7 @@ func (x *OfficeChecks) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeChecks.ProtoReflect.Descriptor instead.
 func (*OfficeChecks) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{239}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *OfficeChecks) GetPassed() uint32 {
@@ -21449,14 +21632,18 @@ type OfficeActor struct {
 	// Unix milliseconds.
 	EnteredAt int64 `protobuf:"varint,9,opt,name=entered_at,json=enteredAt,proto3" json:"entered_at,omitempty"`
 	// Unix milliseconds the actor finished (OFFICE_ACTOR_STATE_DONE); 0 before.
-	DoneAt        int64 `protobuf:"varint,10,opt,name=done_at,json=doneAt,proto3" json:"done_at,omitempty"`
+	DoneAt int64 `protobuf:"varint,10,opt,name=done_at,json=doneAt,proto3" json:"done_at,omitempty"`
+	// A machine's background work, as B classified its command on the
+	// machine; unset for the director and employees, and from an older
+	// agent.
+	Service       *OfficeService `protobuf:"bytes,11,opt,name=service,proto3" json:"service,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OfficeActor) Reset() {
 	*x = OfficeActor{}
-	mi := &file_remote_v1_remote_proto_msgTypes[240]
+	mi := &file_remote_v1_remote_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21468,7 +21655,7 @@ func (x *OfficeActor) String() string {
 func (*OfficeActor) ProtoMessage() {}
 
 func (x *OfficeActor) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[240]
+	mi := &file_remote_v1_remote_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21481,7 +21668,7 @@ func (x *OfficeActor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActor.ProtoReflect.Descriptor instead.
 func (*OfficeActor) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{240}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *OfficeActor) GetId() string {
@@ -21554,6 +21741,80 @@ func (x *OfficeActor) GetDoneAt() int64 {
 	return 0
 }
 
+func (x *OfficeActor) GetService() *OfficeService {
+	if x != nil {
+		return x.Service
+	}
+	return nil
+}
+
+// What a machine runs, in normalized words only: the kind of command, the
+// TCP port it listens on when its own words say so, and when it started.
+// Never the command's text.
+type OfficeService struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Kind  OfficeServiceKind      `protobuf:"varint,1,opt,name=kind,proto3,enum=remote.v1.OfficeServiceKind" json:"kind,omitempty"`
+	// A port given on the command line (`--port 5173`, `-p 3000`,
+	// `PORT=8080`) of a dev server or database, 1 to 65535; 0 when not known.
+	// B never scans the system for it.
+	Port uint32 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// Unix milliseconds the background work started.
+	StartedAt     int64 `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfficeService) Reset() {
+	*x = OfficeService{}
+	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfficeService) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfficeService) ProtoMessage() {}
+
+func (x *OfficeService) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfficeService.ProtoReflect.Descriptor instead.
+func (*OfficeService) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{242}
+}
+
+func (x *OfficeService) GetKind() OfficeServiceKind {
+	if x != nil {
+		return x.Kind
+	}
+	return OfficeServiceKind_OFFICE_SERVICE_KIND_UNSPECIFIED
+}
+
+func (x *OfficeService) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *OfficeService) GetStartedAt() int64 {
+	if x != nil {
+		return x.StartedAt
+	}
+	return 0
+}
+
 type OfficeActivity struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The tool call's id, or a fixed id for what is not a tool call
@@ -21574,7 +21835,7 @@ type OfficeActivity struct {
 
 func (x *OfficeActivity) Reset() {
 	*x = OfficeActivity{}
-	mi := &file_remote_v1_remote_proto_msgTypes[241]
+	mi := &file_remote_v1_remote_proto_msgTypes[243]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21586,7 +21847,7 @@ func (x *OfficeActivity) String() string {
 func (*OfficeActivity) ProtoMessage() {}
 
 func (x *OfficeActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[241]
+	mi := &file_remote_v1_remote_proto_msgTypes[243]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21599,7 +21860,7 @@ func (x *OfficeActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivity.ProtoReflect.Descriptor instead.
 func (*OfficeActivity) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{241}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{243}
 }
 
 func (x *OfficeActivity) GetId() string {
@@ -21666,7 +21927,7 @@ type OfficeEvent struct {
 
 func (x *OfficeEvent) Reset() {
 	*x = OfficeEvent{}
-	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	mi := &file_remote_v1_remote_proto_msgTypes[244]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21678,7 +21939,7 @@ func (x *OfficeEvent) String() string {
 func (*OfficeEvent) ProtoMessage() {}
 
 func (x *OfficeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	mi := &file_remote_v1_remote_proto_msgTypes[244]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21691,7 +21952,7 @@ func (x *OfficeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeEvent.ProtoReflect.Descriptor instead.
 func (*OfficeEvent) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{242}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{244}
 }
 
 func (x *OfficeEvent) GetSeq() uint64 {
@@ -21851,7 +22112,7 @@ type OfficeActorLeave struct {
 
 func (x *OfficeActorLeave) Reset() {
 	*x = OfficeActorLeave{}
-	mi := &file_remote_v1_remote_proto_msgTypes[243]
+	mi := &file_remote_v1_remote_proto_msgTypes[245]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21863,7 +22124,7 @@ func (x *OfficeActorLeave) String() string {
 func (*OfficeActorLeave) ProtoMessage() {}
 
 func (x *OfficeActorLeave) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[243]
+	mi := &file_remote_v1_remote_proto_msgTypes[245]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21876,7 +22137,7 @@ func (x *OfficeActorLeave) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActorLeave.ProtoReflect.Descriptor instead.
 func (*OfficeActorLeave) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{243}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{245}
 }
 
 func (x *OfficeActorLeave) GetActorId() string {
@@ -21897,7 +22158,7 @@ type OfficeActivityStart struct {
 
 func (x *OfficeActivityStart) Reset() {
 	*x = OfficeActivityStart{}
-	mi := &file_remote_v1_remote_proto_msgTypes[244]
+	mi := &file_remote_v1_remote_proto_msgTypes[246]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21909,7 +22170,7 @@ func (x *OfficeActivityStart) String() string {
 func (*OfficeActivityStart) ProtoMessage() {}
 
 func (x *OfficeActivityStart) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[244]
+	mi := &file_remote_v1_remote_proto_msgTypes[246]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21922,7 +22183,7 @@ func (x *OfficeActivityStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivityStart.ProtoReflect.Descriptor instead.
 func (*OfficeActivityStart) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{244}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{246}
 }
 
 func (x *OfficeActivityStart) GetActorId() string {
@@ -21952,7 +22213,7 @@ type OfficeActivityEnd struct {
 
 func (x *OfficeActivityEnd) Reset() {
 	*x = OfficeActivityEnd{}
-	mi := &file_remote_v1_remote_proto_msgTypes[245]
+	mi := &file_remote_v1_remote_proto_msgTypes[247]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21964,7 +22225,7 @@ func (x *OfficeActivityEnd) String() string {
 func (*OfficeActivityEnd) ProtoMessage() {}
 
 func (x *OfficeActivityEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[245]
+	mi := &file_remote_v1_remote_proto_msgTypes[247]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21977,7 +22238,7 @@ func (x *OfficeActivityEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivityEnd.ProtoReflect.Descriptor instead.
 func (*OfficeActivityEnd) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{245}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{247}
 }
 
 func (x *OfficeActivityEnd) GetActorId() string {
@@ -22009,7 +22270,7 @@ type OfficeTurnStart struct {
 
 func (x *OfficeTurnStart) Reset() {
 	*x = OfficeTurnStart{}
-	mi := &file_remote_v1_remote_proto_msgTypes[246]
+	mi := &file_remote_v1_remote_proto_msgTypes[248]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22021,7 +22282,7 @@ func (x *OfficeTurnStart) String() string {
 func (*OfficeTurnStart) ProtoMessage() {}
 
 func (x *OfficeTurnStart) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[246]
+	mi := &file_remote_v1_remote_proto_msgTypes[248]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22034,7 +22295,7 @@ func (x *OfficeTurnStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeTurnStart.ProtoReflect.Descriptor instead.
 func (*OfficeTurnStart) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{246}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{248}
 }
 
 // A permission prompt for the actor's tool: WAITING makes the actor
@@ -22050,7 +22311,7 @@ type OfficeApproval struct {
 
 func (x *OfficeApproval) Reset() {
 	*x = OfficeApproval{}
-	mi := &file_remote_v1_remote_proto_msgTypes[247]
+	mi := &file_remote_v1_remote_proto_msgTypes[249]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22062,7 +22323,7 @@ func (x *OfficeApproval) String() string {
 func (*OfficeApproval) ProtoMessage() {}
 
 func (x *OfficeApproval) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[247]
+	mi := &file_remote_v1_remote_proto_msgTypes[249]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22075,7 +22336,7 @@ func (x *OfficeApproval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeApproval.ProtoReflect.Descriptor instead.
 func (*OfficeApproval) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{247}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{249}
 }
 
 func (x *OfficeApproval) GetActorId() string {
@@ -23459,11 +23720,23 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\fOfficeEvents\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
 	"\x05epoch\x18\x02 \x01(\x04R\x05epoch\x12.\n" +
-	"\x06events\x18\x03 \x03(\v2\x16.remote.v1.OfficeEventR\x06events\"\x96\x01\n" +
+	"\x06events\x18\x03 \x03(\v2\x16.remote.v1.OfficeEventR\x06events\"\xcf\x01\n" +
 	"\vOfficeState\x12.\n" +
 	"\x06actors\x18\x01 \x03(\v2\x16.remote.v1.OfficeActorR\x06actors\x12#\n" +
 	"\rreports_staff\x18\x02 \x01(\bR\freportsStaff\x122\n" +
-	"\asession\x18\x03 \x01(\v2\x18.remote.v1.OfficeSessionR\asession\"\xf1\x02\n" +
+	"\asession\x18\x03 \x01(\v2\x18.remote.v1.OfficeSessionR\asession\x127\n" +
+	"\tresidents\x18\x04 \x03(\v2\x19.remote.v1.OfficeResidentR\tresidents\"\xce\x01\n" +
+	"\x0eOfficeResident\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"agent_type\x18\x02 \x01(\tR\tagentType\x12\x1b\n" +
+	"\tparent_id\x18\x03 \x01(\tR\bparentId\x12\x1f\n" +
+	"\vspawn_depth\x18\x04 \x01(\rR\n" +
+	"spawnDepth\x12\x1d\n" +
+	"\n" +
+	"entered_at\x18\x05 \x01(\x03R\tenteredAt\x12\x17\n" +
+	"\adone_at\x18\x06 \x01(\x03R\x06doneAt\x12\x17\n" +
+	"\aleft_at\x18\a \x01(\x03R\x06leftAt\"\xf1\x02\n" +
 	"\rOfficeSession\x12\x12\n" +
 	"\x04busy\x18\x01 \x01(\bR\x04busy\x12(\n" +
 	"\x10waiting_for_user\x18\x02 \x01(\bR\x0ewaitingForUser\x12\x1d\n" +
@@ -23490,7 +23763,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\fOfficeChecks\x12\x16\n" +
 	"\x06passed\x18\x01 \x01(\rR\x06passed\x12\x16\n" +
 	"\x06failed\x18\x02 \x01(\rR\x06failed\x12\x17\n" +
-	"\alast_ok\x18\x03 \x01(\bR\x06lastOk\"\xe9\x02\n" +
+	"\alast_ok\x18\x03 \x01(\bR\x06lastOk\"\x9d\x03\n" +
 	"\vOfficeActor\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x15.remote.v1.OfficeRoleR\x04role\x12\x1d\n" +
@@ -23505,7 +23778,13 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\n" +
 	"entered_at\x18\t \x01(\x03R\tenteredAt\x12\x17\n" +
 	"\adone_at\x18\n" +
-	" \x01(\x03R\x06doneAt\"\xca\x01\n" +
+	" \x01(\x03R\x06doneAt\x122\n" +
+	"\aservice\x18\v \x01(\v2\x18.remote.v1.OfficeServiceR\aservice\"t\n" +
+	"\rOfficeService\x120\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x1c.remote.v1.OfficeServiceKindR\x04kind\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x03 \x01(\x03R\tstartedAt\"\xca\x01\n" +
 	"\x0eOfficeActivity\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04tool\x18\x02 \x01(\tR\x04tool\x120\n" +
@@ -23835,7 +24114,16 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x14OFFICE_ROOM_SECURITY\x10\n" +
 	"\x12\x15\n" +
 	"\x11OFFICE_ROOM_AUDIT\x10\v\x12\x12\n" +
-	"\x0eOFFICE_ROOM_QA\x10\f*\xc9\x01\n" +
+	"\x0eOFFICE_ROOM_QA\x10\f*\xa0\x02\n" +
+	"\x11OfficeServiceKind\x12#\n" +
+	"\x1fOFFICE_SERVICE_KIND_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eOFFICE_SERVICE_KIND_DEV_SERVER\x10\x01\x12\"\n" +
+	"\x1eOFFICE_SERVICE_KIND_TEST_WATCH\x10\x02\x12\x1d\n" +
+	"\x19OFFICE_SERVICE_KIND_BUILD\x10\x03\x12 \n" +
+	"\x1cOFFICE_SERVICE_KIND_CI_WATCH\x10\x04\x12\x1b\n" +
+	"\x17OFFICE_SERVICE_KIND_GIT\x10\x05\x12 \n" +
+	"\x1cOFFICE_SERVICE_KIND_DATABASE\x10\x06\x12\x1e\n" +
+	"\x1aOFFICE_SERVICE_KIND_SCRIPT\x10\a*\xc9\x01\n" +
 	"\x13OfficeApprovalState\x12%\n" +
 	"!OFFICE_APPROVAL_STATE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dOFFICE_APPROVAL_STATE_WAITING\x10\x01\x12!\n" +
@@ -23855,8 +24143,8 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 	return file_remote_v1_remote_proto_rawDescData
 }
 
-var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 32)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 250)
+var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 33)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 252)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(Decision)(0),                    // 1: remote.v1.Decision
@@ -23889,579 +24177,585 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(OfficeActorState)(0),            // 28: remote.v1.OfficeActorState
 	(OfficeAnimGroup)(0),             // 29: remote.v1.OfficeAnimGroup
 	(OfficeRoom)(0),                  // 30: remote.v1.OfficeRoom
-	(OfficeApprovalState)(0),         // 31: remote.v1.OfficeApprovalState
-	(*Plain)(nil),                    // 32: remote.v1.Plain
-	(*Hello)(nil),                    // 33: remote.v1.Hello
-	(*Ready)(nil),                    // 34: remote.v1.Ready
-	(*HandshakeError)(nil),           // 35: remote.v1.HandshakeError
-	(*Frame)(nil),                    // 36: remote.v1.Frame
-	(*ThreadList)(nil),               // 37: remote.v1.ThreadList
-	(*ThreadCreate)(nil),             // 38: remote.v1.ThreadCreate
-	(*Consent)(nil),                  // 39: remote.v1.Consent
-	(*ThreadSend)(nil),               // 40: remote.v1.ThreadSend
-	(*ThreadSubscribe)(nil),          // 41: remote.v1.ThreadSubscribe
-	(*ThreadRespond)(nil),            // 42: remote.v1.ThreadRespond
-	(*Answers)(nil),                  // 43: remote.v1.Answers
-	(*Answer)(nil),                   // 44: remote.v1.Answer
-	(*ThreadInterrupt)(nil),          // 45: remote.v1.ThreadInterrupt
-	(*ThreadClose)(nil),              // 46: remote.v1.ThreadClose
-	(*ThreadDelete)(nil),             // 47: remote.v1.ThreadDelete
-	(*ThreadSetArchived)(nil),        // 48: remote.v1.ThreadSetArchived
-	(*ThreadSetModel)(nil),           // 49: remote.v1.ThreadSetModel
-	(*ThreadSetPermissionMode)(nil),  // 50: remote.v1.ThreadSetPermissionMode
-	(*ThreadSetEffort)(nil),          // 51: remote.v1.ThreadSetEffort
-	(*ThreadSwitch)(nil),             // 52: remote.v1.ThreadSwitch
-	(*ThreadFetchFull)(nil),          // 53: remote.v1.ThreadFetchFull
-	(*ThreadEarlier)(nil),            // 54: remote.v1.ThreadEarlier
-	(*ThreadEarlierResult)(nil),      // 55: remote.v1.ThreadEarlierResult
-	(*ThreadGitChanges)(nil),         // 56: remote.v1.ThreadGitChanges
-	(*GitFileDiff)(nil),              // 57: remote.v1.GitFileDiff
-	(*MachineInfoRequest)(nil),       // 58: remote.v1.MachineInfoRequest
-	(*Ping)(nil),                     // 59: remote.v1.Ping
-	(*DirList)(nil),                  // 60: remote.v1.DirList
-	(*AuditList)(nil),                // 61: remote.v1.AuditList
-	(*FileList)(nil),                 // 62: remote.v1.FileList
-	(*SessionList)(nil),              // 63: remote.v1.SessionList
-	(*LocalSession)(nil),             // 64: remote.v1.LocalSession
-	(*SessionDir)(nil),               // 65: remote.v1.SessionDir
-	(*SessionListResult)(nil),        // 66: remote.v1.SessionListResult
-	(*SessionOpen)(nil),              // 67: remote.v1.SessionOpen
-	(*AttachmentUpload)(nil),         // 68: remote.v1.AttachmentUpload
-	(*AttachmentCancel)(nil),         // 69: remote.v1.AttachmentCancel
-	(*AttachmentFetch)(nil),          // 70: remote.v1.AttachmentFetch
-	(*AttachmentData)(nil),           // 71: remote.v1.AttachmentData
-	(*AttachmentSave)(nil),           // 72: remote.v1.AttachmentSave
-	(*AttachmentSaved)(nil),          // 73: remote.v1.AttachmentSaved
-	(*Attachment)(nil),               // 74: remote.v1.Attachment
-	(*AttachmentLimits)(nil),         // 75: remote.v1.AttachmentLimits
-	(*ProjectList)(nil),              // 76: remote.v1.ProjectList
-	(*ProjectAdd)(nil),               // 77: remote.v1.ProjectAdd
-	(*ProjectCreate)(nil),            // 78: remote.v1.ProjectCreate
-	(*ProjectClone)(nil),             // 79: remote.v1.ProjectClone
-	(*ProjectCloneCancel)(nil),       // 80: remote.v1.ProjectCloneCancel
-	(*ProjectCloneProgress)(nil),     // 81: remote.v1.ProjectCloneProgress
-	(*ProjectUpdate)(nil),            // 82: remote.v1.ProjectUpdate
-	(*ProjectReorder)(nil),           // 83: remote.v1.ProjectReorder
-	(*ProjectRemove)(nil),            // 84: remote.v1.ProjectRemove
-	(*ProjectDefaults)(nil),          // 85: remote.v1.ProjectDefaults
-	(*GitStatus)(nil),                // 86: remote.v1.GitStatus
-	(*Project)(nil),                  // 87: remote.v1.Project
-	(*ProjectConfigGet)(nil),         // 88: remote.v1.ProjectConfigGet
-	(*ProjectConfigSet)(nil),         // 89: remote.v1.ProjectConfigSet
-	(*ProjectConfig)(nil),            // 90: remote.v1.ProjectConfig
-	(*ProjectSuggestion)(nil),        // 91: remote.v1.ProjectSuggestion
-	(*ProjectListResult)(nil),        // 92: remote.v1.ProjectListResult
-	(*AccountList)(nil),              // 93: remote.v1.AccountList
-	(*AccountSelect)(nil),            // 94: remote.v1.AccountSelect
-	(*AccountSignInBegin)(nil),       // 95: remote.v1.AccountSignInBegin
-	(*AccountSignInCode)(nil),        // 96: remote.v1.AccountSignInCode
-	(*AccountSignInCancel)(nil),      // 97: remote.v1.AccountSignInCancel
-	(*AccountRemove)(nil),            // 98: remote.v1.AccountRemove
-	(*UsageRefresh)(nil),             // 99: remote.v1.UsageRefresh
-	(*AccountCaptureCurrent)(nil),    // 100: remote.v1.AccountCaptureCurrent
-	(*AccountAcceptCurrent)(nil),     // 101: remote.v1.AccountAcceptCurrent
-	(*MachineSettingsSet)(nil),       // 102: remote.v1.MachineSettingsSet
-	(*OpenDiskAccessSettings)(nil),   // 103: remote.v1.OpenDiskAccessSettings
-	(*Ack)(nil),                      // 104: remote.v1.Ack
-	(*ThreadInfo)(nil),               // 105: remote.v1.ThreadInfo
-	(*AccountSuggestion)(nil),        // 106: remote.v1.AccountSuggestion
-	(*AccountInfo)(nil),              // 107: remote.v1.AccountInfo
-	(*SlashCommand)(nil),             // 108: remote.v1.SlashCommand
-	(*RateLimits)(nil),               // 109: remote.v1.RateLimits
-	(*RateWindow)(nil),               // 110: remote.v1.RateWindow
-	(*AiAccount)(nil),                // 111: remote.v1.AiAccount
-	(*AccountActions)(nil),           // 112: remote.v1.AccountActions
-	(*AccountListResult)(nil),        // 113: remote.v1.AccountListResult
-	(*MachineAccounts)(nil),          // 114: remote.v1.MachineAccounts
-	(*SessionAccount)(nil),           // 115: remote.v1.SessionAccount
-	(*AccountSignInPrompt)(nil),      // 116: remote.v1.AccountSignInPrompt
-	(*AccountSignInResult)(nil),      // 117: remote.v1.AccountSignInResult
-	(*Pong)(nil),                     // 118: remote.v1.Pong
-	(*Error)(nil),                    // 119: remote.v1.Error
-	(*Cursor)(nil),                   // 120: remote.v1.Cursor
-	(*ThreadSummary)(nil),            // 121: remote.v1.ThreadSummary
-	(*ThreadActivity)(nil),           // 122: remote.v1.ThreadActivity
-	(*ThreadListResult)(nil),         // 123: remote.v1.ThreadListResult
-	(*ThreadCreated)(nil),            // 124: remote.v1.ThreadCreated
-	(*ThreadDeleted)(nil),            // 125: remote.v1.ThreadDeleted
-	(*ThreadStatus)(nil),             // 126: remote.v1.ThreadStatus
-	(*ThreadItems)(nil),              // 127: remote.v1.ThreadItems
-	(*ThreadReset)(nil),              // 128: remote.v1.ThreadReset
-	(*FullItem)(nil),                 // 129: remote.v1.FullItem
-	(*Item)(nil),                     // 130: remote.v1.Item
-	(*TextItem)(nil),                 // 131: remote.v1.TextItem
-	(*ToolCallItem)(nil),             // 132: remote.v1.ToolCallItem
-	(*ToolResultItem)(nil),           // 133: remote.v1.ToolResultItem
-	(*DiffItem)(nil),                 // 134: remote.v1.DiffItem
-	(*TodoItem)(nil),                 // 135: remote.v1.TodoItem
-	(*TodoEntry)(nil),                // 136: remote.v1.TodoEntry
-	(*ApprovalItem)(nil),             // 137: remote.v1.ApprovalItem
-	(*ApprovalSecret)(nil),           // 138: remote.v1.ApprovalSecret
-	(*QuestionItem)(nil),             // 139: remote.v1.QuestionItem
-	(*Question)(nil),                 // 140: remote.v1.Question
-	(*QuestionOption)(nil),           // 141: remote.v1.QuestionOption
-	(*StatusItem)(nil),               // 142: remote.v1.StatusItem
-	(*TurnItem)(nil),                 // 143: remote.v1.TurnItem
-	(*SubagentItem)(nil),             // 144: remote.v1.SubagentItem
-	(*CompactionItem)(nil),           // 145: remote.v1.CompactionItem
-	(*ErrorItem)(nil),                // 146: remote.v1.ErrorItem
-	(*ModelChangeItem)(nil),          // 147: remote.v1.ModelChangeItem
-	(*AgentHandoffItem)(nil),         // 148: remote.v1.AgentHandoffItem
-	(*ProviderCapabilities)(nil),     // 149: remote.v1.ProviderCapabilities
-	(*ModelOption)(nil),              // 150: remote.v1.ModelOption
-	(*ProviderInfo)(nil),             // 151: remote.v1.ProviderInfo
-	(*MachineInfo)(nil),              // 152: remote.v1.MachineInfo
-	(*RemoteBrowserInfo)(nil),        // 153: remote.v1.RemoteBrowserInfo
-	(*MachineSettings)(nil),          // 154: remote.v1.MachineSettings
-	(*DirListResult)(nil),            // 155: remote.v1.DirListResult
-	(*DirEntry)(nil),                 // 156: remote.v1.DirEntry
-	(*FileListResult)(nil),           // 157: remote.v1.FileListResult
-	(*FileEntry)(nil),                // 158: remote.v1.FileEntry
-	(*AuditListResult)(nil),          // 159: remote.v1.AuditListResult
-	(*AuditEntry)(nil),               // 160: remote.v1.AuditEntry
-	(*SecretProvide)(nil),            // 161: remote.v1.SecretProvide
-	(*SecretDecline)(nil),            // 162: remote.v1.SecretDecline
-	(*SecretList)(nil),               // 163: remote.v1.SecretList
-	(*SecretRemove)(nil),             // 164: remote.v1.SecretRemove
-	(*SecretPrompt)(nil),             // 165: remote.v1.SecretPrompt
-	(*SecretPromptEnded)(nil),        // 166: remote.v1.SecretPromptEnded
-	(*SecretListResult)(nil),         // 167: remote.v1.SecretListResult
-	(*SavedSecret)(nil),              // 168: remote.v1.SavedSecret
-	(*GitChanges)(nil),               // 169: remote.v1.GitChanges
-	(*GitFileChange)(nil),            // 170: remote.v1.GitFileChange
-	(*GitFileDiffResult)(nil),        // 171: remote.v1.GitFileDiffResult
-	(*BrowserControl)(nil),           // 172: remote.v1.BrowserControl
-	(*BrowserView)(nil),              // 173: remote.v1.BrowserView
-	(*BrowserInput)(nil),             // 174: remote.v1.BrowserInput
-	(*BrowserMouse)(nil),             // 175: remote.v1.BrowserMouse
-	(*BrowserKey)(nil),               // 176: remote.v1.BrowserKey
-	(*BrowserTakeoverEnd)(nil),       // 177: remote.v1.BrowserTakeoverEnd
-	(*BrowserTakeover)(nil),          // 178: remote.v1.BrowserTakeover
-	(*BrowserTakeoverEnded)(nil),     // 179: remote.v1.BrowserTakeoverEnded
-	(*BrowserFrame)(nil),             // 180: remote.v1.BrowserFrame
-	(*BrowserState)(nil),             // 181: remote.v1.BrowserState
-	(*BrowserTab)(nil),               // 182: remote.v1.BrowserTab
-	(*PasskeyNotice)(nil),            // 183: remote.v1.PasskeyNotice
-	(*ScreenShareStatusRequest)(nil), // 184: remote.v1.ScreenShareStatusRequest
-	(*ScreenShareStatus)(nil),        // 185: remote.v1.ScreenShareStatus
-	(*ScreenShareOpen)(nil),          // 186: remote.v1.ScreenShareOpen
-	(*ScreenShareOpened)(nil),        // 187: remote.v1.ScreenShareOpened
-	(*ScreenShareData)(nil),          // 188: remote.v1.ScreenShareData
-	(*ScreenShareClose)(nil),         // 189: remote.v1.ScreenShareClose
-	(*ScreenShareClosed)(nil),        // 190: remote.v1.ScreenShareClosed
-	(*BrowserClear)(nil),             // 191: remote.v1.BrowserClear
-	(*AgentUpdateInfo)(nil),          // 192: remote.v1.AgentUpdateInfo
-	(*AgentUpdateCheck)(nil),         // 193: remote.v1.AgentUpdateCheck
-	(*AgentUpdateStart)(nil),         // 194: remote.v1.AgentUpdateStart
-	(*AgentUpdateProgress)(nil),      // 195: remote.v1.AgentUpdateProgress
-	(*TermListRequest)(nil),          // 196: remote.v1.TermListRequest
-	(*TermSessionInfo)(nil),          // 197: remote.v1.TermSessionInfo
-	(*TermListResult)(nil),           // 198: remote.v1.TermListResult
-	(*TerminalUpdate)(nil),           // 199: remote.v1.TerminalUpdate
-	(*TerminalUpdateHold)(nil),       // 200: remote.v1.TerminalUpdateHold
-	(*TermUpdateNow)(nil),            // 201: remote.v1.TermUpdateNow
-	(*TermOpen)(nil),                 // 202: remote.v1.TermOpen
-	(*TermAiSession)(nil),            // 203: remote.v1.TermAiSession
-	(*TermOpened)(nil),               // 204: remote.v1.TermOpened
-	(*TermClose)(nil),                // 205: remote.v1.TermClose
-	(*TermClosed)(nil),               // 206: remote.v1.TermClosed
-	(*TermResize)(nil),               // 207: remote.v1.TermResize
-	(*TermSignal)(nil),               // 208: remote.v1.TermSignal
-	(*TermData)(nil),                 // 209: remote.v1.TermData
-	(*TermStatus)(nil),               // 210: remote.v1.TermStatus
-	(*WsDirList)(nil),                // 211: remote.v1.WsDirList
-	(*WsEntry)(nil),                  // 212: remote.v1.WsEntry
-	(*WsDirListResult)(nil),          // 213: remote.v1.WsDirListResult
-	(*WsFileRead)(nil),               // 214: remote.v1.WsFileRead
-	(*WsFileReadResult)(nil),         // 215: remote.v1.WsFileReadResult
-	(*WsFindNames)(nil),              // 216: remote.v1.WsFindNames
-	(*WsFindNamesResult)(nil),        // 217: remote.v1.WsFindNamesResult
-	(*WsFindContents)(nil),           // 218: remote.v1.WsFindContents
-	(*WsContentMatch)(nil),           // 219: remote.v1.WsContentMatch
-	(*WsContentFile)(nil),            // 220: remote.v1.WsContentFile
-	(*WsFindContentsResult)(nil),     // 221: remote.v1.WsFindContentsResult
-	(*WsWatch)(nil),                  // 222: remote.v1.WsWatch
-	(*WsChanged)(nil),                // 223: remote.v1.WsChanged
-	(*WsGitStatus)(nil),              // 224: remote.v1.WsGitStatus
-	(*WsGitEntry)(nil),               // 225: remote.v1.WsGitEntry
-	(*WsGitUpstream)(nil),            // 226: remote.v1.WsGitUpstream
-	(*WsGitStatusResult)(nil),        // 227: remote.v1.WsGitStatusResult
-	(*WsGitDiff)(nil),                // 228: remote.v1.WsGitDiff
-	(*WsGitDiffResult)(nil),          // 229: remote.v1.WsGitDiffResult
-	(*WsGitStage)(nil),               // 230: remote.v1.WsGitStage
-	(*WsGitUnstage)(nil),             // 231: remote.v1.WsGitUnstage
-	(*WsGitDiscard)(nil),             // 232: remote.v1.WsGitDiscard
-	(*WsGitCommit)(nil),              // 233: remote.v1.WsGitCommit
-	(*WsGitCommitMessage)(nil),       // 234: remote.v1.WsGitCommitMessage
-	(*WsGitCommitMessageResult)(nil), // 235: remote.v1.WsGitCommitMessageResult
-	(*WsGitLogEntry)(nil),            // 236: remote.v1.WsGitLogEntry
-	(*WsGitCommitResult)(nil),        // 237: remote.v1.WsGitCommitResult
-	(*WsGitBranches)(nil),            // 238: remote.v1.WsGitBranches
-	(*WsGitBranch)(nil),              // 239: remote.v1.WsGitBranch
-	(*WsGitBranchesResult)(nil),      // 240: remote.v1.WsGitBranchesResult
-	(*WsGitCheckout)(nil),            // 241: remote.v1.WsGitCheckout
-	(*WsGitBranchCreate)(nil),        // 242: remote.v1.WsGitBranchCreate
-	(*WsGitFetch)(nil),               // 243: remote.v1.WsGitFetch
-	(*WsGitPull)(nil),                // 244: remote.v1.WsGitPull
-	(*WsGitRebase)(nil),              // 245: remote.v1.WsGitRebase
-	(*WsGitPush)(nil),                // 246: remote.v1.WsGitPush
-	(*WsGitLog)(nil),                 // 247: remote.v1.WsGitLog
-	(*WsGitLogResult)(nil),           // 248: remote.v1.WsGitLogResult
-	(*WsGitBranchCompare)(nil),       // 249: remote.v1.WsGitBranchCompare
-	(*WsGitBranchCompareResult)(nil), // 250: remote.v1.WsGitBranchCompareResult
-	(*WsGitPrUrl)(nil),               // 251: remote.v1.WsGitPrUrl
-	(*WsGitPrUrlResult)(nil),         // 252: remote.v1.WsGitPrUrlResult
-	(*UsageReportRequest)(nil),       // 253: remote.v1.UsageReportRequest
-	(*UsageReport)(nil),              // 254: remote.v1.UsageReport
-	(*UsageDay)(nil),                 // 255: remote.v1.UsageDay
-	(*UsageShape)(nil),               // 256: remote.v1.UsageShape
-	(*UsageSuggestion)(nil),          // 257: remote.v1.UsageSuggestion
-	(*UsageQuotaPoint)(nil),          // 258: remote.v1.UsageQuotaPoint
-	(*UsageSettingsGet)(nil),         // 259: remote.v1.UsageSettingsGet
-	(*UsageSettingsSet)(nil),         // 260: remote.v1.UsageSettingsSet
-	(*UsageSettings)(nil),            // 261: remote.v1.UsageSettings
-	(*UsageRuleSwitch)(nil),          // 262: remote.v1.UsageRuleSwitch
-	(*UsageDelete)(nil),              // 263: remote.v1.UsageDelete
-	(*OfficeWatch)(nil),              // 264: remote.v1.OfficeWatch
-	(*OfficeSnapshot)(nil),           // 265: remote.v1.OfficeSnapshot
-	(*OfficeEvents)(nil),             // 266: remote.v1.OfficeEvents
-	(*OfficeState)(nil),              // 267: remote.v1.OfficeState
-	(*OfficeSession)(nil),            // 268: remote.v1.OfficeSession
-	(*OfficeTodoCounts)(nil),         // 269: remote.v1.OfficeTodoCounts
-	(*OfficeUsage)(nil),              // 270: remote.v1.OfficeUsage
-	(*OfficeChecks)(nil),             // 271: remote.v1.OfficeChecks
-	(*OfficeActor)(nil),              // 272: remote.v1.OfficeActor
-	(*OfficeActivity)(nil),           // 273: remote.v1.OfficeActivity
-	(*OfficeEvent)(nil),              // 274: remote.v1.OfficeEvent
-	(*OfficeActorLeave)(nil),         // 275: remote.v1.OfficeActorLeave
-	(*OfficeActivityStart)(nil),      // 276: remote.v1.OfficeActivityStart
-	(*OfficeActivityEnd)(nil),        // 277: remote.v1.OfficeActivityEnd
-	(*OfficeTurnStart)(nil),          // 278: remote.v1.OfficeTurnStart
-	(*OfficeApproval)(nil),           // 279: remote.v1.OfficeApproval
-	nil,                              // 280: remote.v1.AccountListResult.SelectedByProviderEntry
-	nil,                              // 281: remote.v1.AccountListResult.DamagedEntry
+	(OfficeServiceKind)(0),           // 31: remote.v1.OfficeServiceKind
+	(OfficeApprovalState)(0),         // 32: remote.v1.OfficeApprovalState
+	(*Plain)(nil),                    // 33: remote.v1.Plain
+	(*Hello)(nil),                    // 34: remote.v1.Hello
+	(*Ready)(nil),                    // 35: remote.v1.Ready
+	(*HandshakeError)(nil),           // 36: remote.v1.HandshakeError
+	(*Frame)(nil),                    // 37: remote.v1.Frame
+	(*ThreadList)(nil),               // 38: remote.v1.ThreadList
+	(*ThreadCreate)(nil),             // 39: remote.v1.ThreadCreate
+	(*Consent)(nil),                  // 40: remote.v1.Consent
+	(*ThreadSend)(nil),               // 41: remote.v1.ThreadSend
+	(*ThreadSubscribe)(nil),          // 42: remote.v1.ThreadSubscribe
+	(*ThreadRespond)(nil),            // 43: remote.v1.ThreadRespond
+	(*Answers)(nil),                  // 44: remote.v1.Answers
+	(*Answer)(nil),                   // 45: remote.v1.Answer
+	(*ThreadInterrupt)(nil),          // 46: remote.v1.ThreadInterrupt
+	(*ThreadClose)(nil),              // 47: remote.v1.ThreadClose
+	(*ThreadDelete)(nil),             // 48: remote.v1.ThreadDelete
+	(*ThreadSetArchived)(nil),        // 49: remote.v1.ThreadSetArchived
+	(*ThreadSetModel)(nil),           // 50: remote.v1.ThreadSetModel
+	(*ThreadSetPermissionMode)(nil),  // 51: remote.v1.ThreadSetPermissionMode
+	(*ThreadSetEffort)(nil),          // 52: remote.v1.ThreadSetEffort
+	(*ThreadSwitch)(nil),             // 53: remote.v1.ThreadSwitch
+	(*ThreadFetchFull)(nil),          // 54: remote.v1.ThreadFetchFull
+	(*ThreadEarlier)(nil),            // 55: remote.v1.ThreadEarlier
+	(*ThreadEarlierResult)(nil),      // 56: remote.v1.ThreadEarlierResult
+	(*ThreadGitChanges)(nil),         // 57: remote.v1.ThreadGitChanges
+	(*GitFileDiff)(nil),              // 58: remote.v1.GitFileDiff
+	(*MachineInfoRequest)(nil),       // 59: remote.v1.MachineInfoRequest
+	(*Ping)(nil),                     // 60: remote.v1.Ping
+	(*DirList)(nil),                  // 61: remote.v1.DirList
+	(*AuditList)(nil),                // 62: remote.v1.AuditList
+	(*FileList)(nil),                 // 63: remote.v1.FileList
+	(*SessionList)(nil),              // 64: remote.v1.SessionList
+	(*LocalSession)(nil),             // 65: remote.v1.LocalSession
+	(*SessionDir)(nil),               // 66: remote.v1.SessionDir
+	(*SessionListResult)(nil),        // 67: remote.v1.SessionListResult
+	(*SessionOpen)(nil),              // 68: remote.v1.SessionOpen
+	(*AttachmentUpload)(nil),         // 69: remote.v1.AttachmentUpload
+	(*AttachmentCancel)(nil),         // 70: remote.v1.AttachmentCancel
+	(*AttachmentFetch)(nil),          // 71: remote.v1.AttachmentFetch
+	(*AttachmentData)(nil),           // 72: remote.v1.AttachmentData
+	(*AttachmentSave)(nil),           // 73: remote.v1.AttachmentSave
+	(*AttachmentSaved)(nil),          // 74: remote.v1.AttachmentSaved
+	(*Attachment)(nil),               // 75: remote.v1.Attachment
+	(*AttachmentLimits)(nil),         // 76: remote.v1.AttachmentLimits
+	(*ProjectList)(nil),              // 77: remote.v1.ProjectList
+	(*ProjectAdd)(nil),               // 78: remote.v1.ProjectAdd
+	(*ProjectCreate)(nil),            // 79: remote.v1.ProjectCreate
+	(*ProjectClone)(nil),             // 80: remote.v1.ProjectClone
+	(*ProjectCloneCancel)(nil),       // 81: remote.v1.ProjectCloneCancel
+	(*ProjectCloneProgress)(nil),     // 82: remote.v1.ProjectCloneProgress
+	(*ProjectUpdate)(nil),            // 83: remote.v1.ProjectUpdate
+	(*ProjectReorder)(nil),           // 84: remote.v1.ProjectReorder
+	(*ProjectRemove)(nil),            // 85: remote.v1.ProjectRemove
+	(*ProjectDefaults)(nil),          // 86: remote.v1.ProjectDefaults
+	(*GitStatus)(nil),                // 87: remote.v1.GitStatus
+	(*Project)(nil),                  // 88: remote.v1.Project
+	(*ProjectConfigGet)(nil),         // 89: remote.v1.ProjectConfigGet
+	(*ProjectConfigSet)(nil),         // 90: remote.v1.ProjectConfigSet
+	(*ProjectConfig)(nil),            // 91: remote.v1.ProjectConfig
+	(*ProjectSuggestion)(nil),        // 92: remote.v1.ProjectSuggestion
+	(*ProjectListResult)(nil),        // 93: remote.v1.ProjectListResult
+	(*AccountList)(nil),              // 94: remote.v1.AccountList
+	(*AccountSelect)(nil),            // 95: remote.v1.AccountSelect
+	(*AccountSignInBegin)(nil),       // 96: remote.v1.AccountSignInBegin
+	(*AccountSignInCode)(nil),        // 97: remote.v1.AccountSignInCode
+	(*AccountSignInCancel)(nil),      // 98: remote.v1.AccountSignInCancel
+	(*AccountRemove)(nil),            // 99: remote.v1.AccountRemove
+	(*UsageRefresh)(nil),             // 100: remote.v1.UsageRefresh
+	(*AccountCaptureCurrent)(nil),    // 101: remote.v1.AccountCaptureCurrent
+	(*AccountAcceptCurrent)(nil),     // 102: remote.v1.AccountAcceptCurrent
+	(*MachineSettingsSet)(nil),       // 103: remote.v1.MachineSettingsSet
+	(*OpenDiskAccessSettings)(nil),   // 104: remote.v1.OpenDiskAccessSettings
+	(*Ack)(nil),                      // 105: remote.v1.Ack
+	(*ThreadInfo)(nil),               // 106: remote.v1.ThreadInfo
+	(*AccountSuggestion)(nil),        // 107: remote.v1.AccountSuggestion
+	(*AccountInfo)(nil),              // 108: remote.v1.AccountInfo
+	(*SlashCommand)(nil),             // 109: remote.v1.SlashCommand
+	(*RateLimits)(nil),               // 110: remote.v1.RateLimits
+	(*RateWindow)(nil),               // 111: remote.v1.RateWindow
+	(*AiAccount)(nil),                // 112: remote.v1.AiAccount
+	(*AccountActions)(nil),           // 113: remote.v1.AccountActions
+	(*AccountListResult)(nil),        // 114: remote.v1.AccountListResult
+	(*MachineAccounts)(nil),          // 115: remote.v1.MachineAccounts
+	(*SessionAccount)(nil),           // 116: remote.v1.SessionAccount
+	(*AccountSignInPrompt)(nil),      // 117: remote.v1.AccountSignInPrompt
+	(*AccountSignInResult)(nil),      // 118: remote.v1.AccountSignInResult
+	(*Pong)(nil),                     // 119: remote.v1.Pong
+	(*Error)(nil),                    // 120: remote.v1.Error
+	(*Cursor)(nil),                   // 121: remote.v1.Cursor
+	(*ThreadSummary)(nil),            // 122: remote.v1.ThreadSummary
+	(*ThreadActivity)(nil),           // 123: remote.v1.ThreadActivity
+	(*ThreadListResult)(nil),         // 124: remote.v1.ThreadListResult
+	(*ThreadCreated)(nil),            // 125: remote.v1.ThreadCreated
+	(*ThreadDeleted)(nil),            // 126: remote.v1.ThreadDeleted
+	(*ThreadStatus)(nil),             // 127: remote.v1.ThreadStatus
+	(*ThreadItems)(nil),              // 128: remote.v1.ThreadItems
+	(*ThreadReset)(nil),              // 129: remote.v1.ThreadReset
+	(*FullItem)(nil),                 // 130: remote.v1.FullItem
+	(*Item)(nil),                     // 131: remote.v1.Item
+	(*TextItem)(nil),                 // 132: remote.v1.TextItem
+	(*ToolCallItem)(nil),             // 133: remote.v1.ToolCallItem
+	(*ToolResultItem)(nil),           // 134: remote.v1.ToolResultItem
+	(*DiffItem)(nil),                 // 135: remote.v1.DiffItem
+	(*TodoItem)(nil),                 // 136: remote.v1.TodoItem
+	(*TodoEntry)(nil),                // 137: remote.v1.TodoEntry
+	(*ApprovalItem)(nil),             // 138: remote.v1.ApprovalItem
+	(*ApprovalSecret)(nil),           // 139: remote.v1.ApprovalSecret
+	(*QuestionItem)(nil),             // 140: remote.v1.QuestionItem
+	(*Question)(nil),                 // 141: remote.v1.Question
+	(*QuestionOption)(nil),           // 142: remote.v1.QuestionOption
+	(*StatusItem)(nil),               // 143: remote.v1.StatusItem
+	(*TurnItem)(nil),                 // 144: remote.v1.TurnItem
+	(*SubagentItem)(nil),             // 145: remote.v1.SubagentItem
+	(*CompactionItem)(nil),           // 146: remote.v1.CompactionItem
+	(*ErrorItem)(nil),                // 147: remote.v1.ErrorItem
+	(*ModelChangeItem)(nil),          // 148: remote.v1.ModelChangeItem
+	(*AgentHandoffItem)(nil),         // 149: remote.v1.AgentHandoffItem
+	(*ProviderCapabilities)(nil),     // 150: remote.v1.ProviderCapabilities
+	(*ModelOption)(nil),              // 151: remote.v1.ModelOption
+	(*ProviderInfo)(nil),             // 152: remote.v1.ProviderInfo
+	(*MachineInfo)(nil),              // 153: remote.v1.MachineInfo
+	(*RemoteBrowserInfo)(nil),        // 154: remote.v1.RemoteBrowserInfo
+	(*MachineSettings)(nil),          // 155: remote.v1.MachineSettings
+	(*DirListResult)(nil),            // 156: remote.v1.DirListResult
+	(*DirEntry)(nil),                 // 157: remote.v1.DirEntry
+	(*FileListResult)(nil),           // 158: remote.v1.FileListResult
+	(*FileEntry)(nil),                // 159: remote.v1.FileEntry
+	(*AuditListResult)(nil),          // 160: remote.v1.AuditListResult
+	(*AuditEntry)(nil),               // 161: remote.v1.AuditEntry
+	(*SecretProvide)(nil),            // 162: remote.v1.SecretProvide
+	(*SecretDecline)(nil),            // 163: remote.v1.SecretDecline
+	(*SecretList)(nil),               // 164: remote.v1.SecretList
+	(*SecretRemove)(nil),             // 165: remote.v1.SecretRemove
+	(*SecretPrompt)(nil),             // 166: remote.v1.SecretPrompt
+	(*SecretPromptEnded)(nil),        // 167: remote.v1.SecretPromptEnded
+	(*SecretListResult)(nil),         // 168: remote.v1.SecretListResult
+	(*SavedSecret)(nil),              // 169: remote.v1.SavedSecret
+	(*GitChanges)(nil),               // 170: remote.v1.GitChanges
+	(*GitFileChange)(nil),            // 171: remote.v1.GitFileChange
+	(*GitFileDiffResult)(nil),        // 172: remote.v1.GitFileDiffResult
+	(*BrowserControl)(nil),           // 173: remote.v1.BrowserControl
+	(*BrowserView)(nil),              // 174: remote.v1.BrowserView
+	(*BrowserInput)(nil),             // 175: remote.v1.BrowserInput
+	(*BrowserMouse)(nil),             // 176: remote.v1.BrowserMouse
+	(*BrowserKey)(nil),               // 177: remote.v1.BrowserKey
+	(*BrowserTakeoverEnd)(nil),       // 178: remote.v1.BrowserTakeoverEnd
+	(*BrowserTakeover)(nil),          // 179: remote.v1.BrowserTakeover
+	(*BrowserTakeoverEnded)(nil),     // 180: remote.v1.BrowserTakeoverEnded
+	(*BrowserFrame)(nil),             // 181: remote.v1.BrowserFrame
+	(*BrowserState)(nil),             // 182: remote.v1.BrowserState
+	(*BrowserTab)(nil),               // 183: remote.v1.BrowserTab
+	(*PasskeyNotice)(nil),            // 184: remote.v1.PasskeyNotice
+	(*ScreenShareStatusRequest)(nil), // 185: remote.v1.ScreenShareStatusRequest
+	(*ScreenShareStatus)(nil),        // 186: remote.v1.ScreenShareStatus
+	(*ScreenShareOpen)(nil),          // 187: remote.v1.ScreenShareOpen
+	(*ScreenShareOpened)(nil),        // 188: remote.v1.ScreenShareOpened
+	(*ScreenShareData)(nil),          // 189: remote.v1.ScreenShareData
+	(*ScreenShareClose)(nil),         // 190: remote.v1.ScreenShareClose
+	(*ScreenShareClosed)(nil),        // 191: remote.v1.ScreenShareClosed
+	(*BrowserClear)(nil),             // 192: remote.v1.BrowserClear
+	(*AgentUpdateInfo)(nil),          // 193: remote.v1.AgentUpdateInfo
+	(*AgentUpdateCheck)(nil),         // 194: remote.v1.AgentUpdateCheck
+	(*AgentUpdateStart)(nil),         // 195: remote.v1.AgentUpdateStart
+	(*AgentUpdateProgress)(nil),      // 196: remote.v1.AgentUpdateProgress
+	(*TermListRequest)(nil),          // 197: remote.v1.TermListRequest
+	(*TermSessionInfo)(nil),          // 198: remote.v1.TermSessionInfo
+	(*TermListResult)(nil),           // 199: remote.v1.TermListResult
+	(*TerminalUpdate)(nil),           // 200: remote.v1.TerminalUpdate
+	(*TerminalUpdateHold)(nil),       // 201: remote.v1.TerminalUpdateHold
+	(*TermUpdateNow)(nil),            // 202: remote.v1.TermUpdateNow
+	(*TermOpen)(nil),                 // 203: remote.v1.TermOpen
+	(*TermAiSession)(nil),            // 204: remote.v1.TermAiSession
+	(*TermOpened)(nil),               // 205: remote.v1.TermOpened
+	(*TermClose)(nil),                // 206: remote.v1.TermClose
+	(*TermClosed)(nil),               // 207: remote.v1.TermClosed
+	(*TermResize)(nil),               // 208: remote.v1.TermResize
+	(*TermSignal)(nil),               // 209: remote.v1.TermSignal
+	(*TermData)(nil),                 // 210: remote.v1.TermData
+	(*TermStatus)(nil),               // 211: remote.v1.TermStatus
+	(*WsDirList)(nil),                // 212: remote.v1.WsDirList
+	(*WsEntry)(nil),                  // 213: remote.v1.WsEntry
+	(*WsDirListResult)(nil),          // 214: remote.v1.WsDirListResult
+	(*WsFileRead)(nil),               // 215: remote.v1.WsFileRead
+	(*WsFileReadResult)(nil),         // 216: remote.v1.WsFileReadResult
+	(*WsFindNames)(nil),              // 217: remote.v1.WsFindNames
+	(*WsFindNamesResult)(nil),        // 218: remote.v1.WsFindNamesResult
+	(*WsFindContents)(nil),           // 219: remote.v1.WsFindContents
+	(*WsContentMatch)(nil),           // 220: remote.v1.WsContentMatch
+	(*WsContentFile)(nil),            // 221: remote.v1.WsContentFile
+	(*WsFindContentsResult)(nil),     // 222: remote.v1.WsFindContentsResult
+	(*WsWatch)(nil),                  // 223: remote.v1.WsWatch
+	(*WsChanged)(nil),                // 224: remote.v1.WsChanged
+	(*WsGitStatus)(nil),              // 225: remote.v1.WsGitStatus
+	(*WsGitEntry)(nil),               // 226: remote.v1.WsGitEntry
+	(*WsGitUpstream)(nil),            // 227: remote.v1.WsGitUpstream
+	(*WsGitStatusResult)(nil),        // 228: remote.v1.WsGitStatusResult
+	(*WsGitDiff)(nil),                // 229: remote.v1.WsGitDiff
+	(*WsGitDiffResult)(nil),          // 230: remote.v1.WsGitDiffResult
+	(*WsGitStage)(nil),               // 231: remote.v1.WsGitStage
+	(*WsGitUnstage)(nil),             // 232: remote.v1.WsGitUnstage
+	(*WsGitDiscard)(nil),             // 233: remote.v1.WsGitDiscard
+	(*WsGitCommit)(nil),              // 234: remote.v1.WsGitCommit
+	(*WsGitCommitMessage)(nil),       // 235: remote.v1.WsGitCommitMessage
+	(*WsGitCommitMessageResult)(nil), // 236: remote.v1.WsGitCommitMessageResult
+	(*WsGitLogEntry)(nil),            // 237: remote.v1.WsGitLogEntry
+	(*WsGitCommitResult)(nil),        // 238: remote.v1.WsGitCommitResult
+	(*WsGitBranches)(nil),            // 239: remote.v1.WsGitBranches
+	(*WsGitBranch)(nil),              // 240: remote.v1.WsGitBranch
+	(*WsGitBranchesResult)(nil),      // 241: remote.v1.WsGitBranchesResult
+	(*WsGitCheckout)(nil),            // 242: remote.v1.WsGitCheckout
+	(*WsGitBranchCreate)(nil),        // 243: remote.v1.WsGitBranchCreate
+	(*WsGitFetch)(nil),               // 244: remote.v1.WsGitFetch
+	(*WsGitPull)(nil),                // 245: remote.v1.WsGitPull
+	(*WsGitRebase)(nil),              // 246: remote.v1.WsGitRebase
+	(*WsGitPush)(nil),                // 247: remote.v1.WsGitPush
+	(*WsGitLog)(nil),                 // 248: remote.v1.WsGitLog
+	(*WsGitLogResult)(nil),           // 249: remote.v1.WsGitLogResult
+	(*WsGitBranchCompare)(nil),       // 250: remote.v1.WsGitBranchCompare
+	(*WsGitBranchCompareResult)(nil), // 251: remote.v1.WsGitBranchCompareResult
+	(*WsGitPrUrl)(nil),               // 252: remote.v1.WsGitPrUrl
+	(*WsGitPrUrlResult)(nil),         // 253: remote.v1.WsGitPrUrlResult
+	(*UsageReportRequest)(nil),       // 254: remote.v1.UsageReportRequest
+	(*UsageReport)(nil),              // 255: remote.v1.UsageReport
+	(*UsageDay)(nil),                 // 256: remote.v1.UsageDay
+	(*UsageShape)(nil),               // 257: remote.v1.UsageShape
+	(*UsageSuggestion)(nil),          // 258: remote.v1.UsageSuggestion
+	(*UsageQuotaPoint)(nil),          // 259: remote.v1.UsageQuotaPoint
+	(*UsageSettingsGet)(nil),         // 260: remote.v1.UsageSettingsGet
+	(*UsageSettingsSet)(nil),         // 261: remote.v1.UsageSettingsSet
+	(*UsageSettings)(nil),            // 262: remote.v1.UsageSettings
+	(*UsageRuleSwitch)(nil),          // 263: remote.v1.UsageRuleSwitch
+	(*UsageDelete)(nil),              // 264: remote.v1.UsageDelete
+	(*OfficeWatch)(nil),              // 265: remote.v1.OfficeWatch
+	(*OfficeSnapshot)(nil),           // 266: remote.v1.OfficeSnapshot
+	(*OfficeEvents)(nil),             // 267: remote.v1.OfficeEvents
+	(*OfficeState)(nil),              // 268: remote.v1.OfficeState
+	(*OfficeResident)(nil),           // 269: remote.v1.OfficeResident
+	(*OfficeSession)(nil),            // 270: remote.v1.OfficeSession
+	(*OfficeTodoCounts)(nil),         // 271: remote.v1.OfficeTodoCounts
+	(*OfficeUsage)(nil),              // 272: remote.v1.OfficeUsage
+	(*OfficeChecks)(nil),             // 273: remote.v1.OfficeChecks
+	(*OfficeActor)(nil),              // 274: remote.v1.OfficeActor
+	(*OfficeService)(nil),            // 275: remote.v1.OfficeService
+	(*OfficeActivity)(nil),           // 276: remote.v1.OfficeActivity
+	(*OfficeEvent)(nil),              // 277: remote.v1.OfficeEvent
+	(*OfficeActorLeave)(nil),         // 278: remote.v1.OfficeActorLeave
+	(*OfficeActivityStart)(nil),      // 279: remote.v1.OfficeActivityStart
+	(*OfficeActivityEnd)(nil),        // 280: remote.v1.OfficeActivityEnd
+	(*OfficeTurnStart)(nil),          // 281: remote.v1.OfficeTurnStart
+	(*OfficeApproval)(nil),           // 282: remote.v1.OfficeApproval
+	nil,                              // 283: remote.v1.AccountListResult.SelectedByProviderEntry
+	nil,                              // 284: remote.v1.AccountListResult.DamagedEntry
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
-	33,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
-	34,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
-	35,  // 2: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
+	34,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
+	35,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
+	36,  // 2: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
 	0,   // 3: remote.v1.HandshakeError.code:type_name -> remote.v1.HandshakeErrorCode
-	37,  // 4: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
-	38,  // 5: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
-	40,  // 6: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
-	41,  // 7: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
-	42,  // 8: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
-	45,  // 9: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
-	49,  // 10: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
-	52,  // 11: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
-	53,  // 12: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
-	58,  // 13: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
-	59,  // 14: remote.v1.Frame.ping:type_name -> remote.v1.Ping
-	60,  // 15: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
-	61,  // 16: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
-	46,  // 17: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
-	50,  // 18: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
-	51,  // 19: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
-	93,  // 20: remote.v1.Frame.account_list:type_name -> remote.v1.AccountList
-	94,  // 21: remote.v1.Frame.account_select:type_name -> remote.v1.AccountSelect
-	95,  // 22: remote.v1.Frame.account_sign_in_begin:type_name -> remote.v1.AccountSignInBegin
-	96,  // 23: remote.v1.Frame.account_sign_in_code:type_name -> remote.v1.AccountSignInCode
-	97,  // 24: remote.v1.Frame.account_sign_in_cancel:type_name -> remote.v1.AccountSignInCancel
-	98,  // 25: remote.v1.Frame.account_remove:type_name -> remote.v1.AccountRemove
-	99,  // 26: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
-	102, // 27: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
-	62,  // 28: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
-	103, // 29: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
-	63,  // 30: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
-	67,  // 31: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
-	68,  // 32: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
-	69,  // 33: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
-	123, // 34: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
-	124, // 35: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
-	127, // 36: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
-	126, // 37: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
-	128, // 38: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
-	129, // 39: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
-	152, // 40: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
-	118, // 41: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	155, // 42: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	159, // 43: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
-	104, // 44: remote.v1.Frame.ack:type_name -> remote.v1.Ack
-	119, // 45: remote.v1.Frame.error:type_name -> remote.v1.Error
-	105, // 46: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
-	113, // 47: remote.v1.Frame.account_list_result:type_name -> remote.v1.AccountListResult
-	116, // 48: remote.v1.Frame.account_sign_in_prompt:type_name -> remote.v1.AccountSignInPrompt
-	117, // 49: remote.v1.Frame.account_sign_in_result:type_name -> remote.v1.AccountSignInResult
-	157, // 50: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
-	114, // 51: remote.v1.Frame.machine_accounts:type_name -> remote.v1.MachineAccounts
-	66,  // 52: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
-	71,  // 53: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
-	125, // 54: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
-	92,  // 55: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
-	81,  // 56: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
-	70,  // 57: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
-	47,  // 58: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
-	48,  // 59: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
-	76,  // 60: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
-	77,  // 61: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
-	78,  // 62: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
-	79,  // 63: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
-	80,  // 64: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
-	82,  // 65: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
-	83,  // 66: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
-	84,  // 67: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
-	161, // 68: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
-	162, // 69: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
-	163, // 70: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
-	164, // 71: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
-	56,  // 72: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
-	57,  // 73: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
-	172, // 74: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
-	173, // 75: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
-	174, // 76: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
-	177, // 77: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
-	184, // 78: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
-	186, // 79: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
-	188, // 80: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
-	189, // 81: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
-	191, // 82: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
-	193, // 83: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
-	194, // 84: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
-	165, // 85: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
-	166, // 86: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
-	167, // 87: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
-	169, // 88: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
-	171, // 89: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
-	178, // 90: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
-	179, // 91: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
-	180, // 92: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
-	181, // 93: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
-	183, // 94: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
-	185, // 95: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
-	187, // 96: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
-	190, // 97: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
-	195, // 98: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
-	196, // 99: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
-	202, // 100: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
-	205, // 101: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
-	207, // 102: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
-	208, // 103: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
-	209, // 104: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
-	198, // 105: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
-	204, // 106: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
-	206, // 107: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
-	210, // 108: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
-	201, // 109: remote.v1.Frame.term_update_now:type_name -> remote.v1.TermUpdateNow
-	122, // 110: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
-	211, // 111: remote.v1.Frame.ws_dir_list:type_name -> remote.v1.WsDirList
-	214, // 112: remote.v1.Frame.ws_file_read:type_name -> remote.v1.WsFileRead
-	216, // 113: remote.v1.Frame.ws_find_names:type_name -> remote.v1.WsFindNames
-	218, // 114: remote.v1.Frame.ws_find_contents:type_name -> remote.v1.WsFindContents
-	222, // 115: remote.v1.Frame.ws_watch:type_name -> remote.v1.WsWatch
-	224, // 116: remote.v1.Frame.ws_git_status:type_name -> remote.v1.WsGitStatus
-	228, // 117: remote.v1.Frame.ws_git_diff:type_name -> remote.v1.WsGitDiff
-	230, // 118: remote.v1.Frame.ws_git_stage:type_name -> remote.v1.WsGitStage
-	231, // 119: remote.v1.Frame.ws_git_unstage:type_name -> remote.v1.WsGitUnstage
-	232, // 120: remote.v1.Frame.ws_git_discard:type_name -> remote.v1.WsGitDiscard
-	233, // 121: remote.v1.Frame.ws_git_commit:type_name -> remote.v1.WsGitCommit
-	238, // 122: remote.v1.Frame.ws_git_branches:type_name -> remote.v1.WsGitBranches
-	241, // 123: remote.v1.Frame.ws_git_checkout:type_name -> remote.v1.WsGitCheckout
-	242, // 124: remote.v1.Frame.ws_git_branch_create:type_name -> remote.v1.WsGitBranchCreate
-	243, // 125: remote.v1.Frame.ws_git_fetch:type_name -> remote.v1.WsGitFetch
-	244, // 126: remote.v1.Frame.ws_git_pull:type_name -> remote.v1.WsGitPull
-	246, // 127: remote.v1.Frame.ws_git_push:type_name -> remote.v1.WsGitPush
-	247, // 128: remote.v1.Frame.ws_git_log:type_name -> remote.v1.WsGitLog
-	249, // 129: remote.v1.Frame.ws_git_branch_compare:type_name -> remote.v1.WsGitBranchCompare
-	251, // 130: remote.v1.Frame.ws_git_pr_url:type_name -> remote.v1.WsGitPrUrl
-	213, // 131: remote.v1.Frame.ws_dir_list_result:type_name -> remote.v1.WsDirListResult
-	215, // 132: remote.v1.Frame.ws_file_read_result:type_name -> remote.v1.WsFileReadResult
-	217, // 133: remote.v1.Frame.ws_find_names_result:type_name -> remote.v1.WsFindNamesResult
-	221, // 134: remote.v1.Frame.ws_find_contents_result:type_name -> remote.v1.WsFindContentsResult
-	223, // 135: remote.v1.Frame.ws_changed:type_name -> remote.v1.WsChanged
-	227, // 136: remote.v1.Frame.ws_git_status_result:type_name -> remote.v1.WsGitStatusResult
-	229, // 137: remote.v1.Frame.ws_git_diff_result:type_name -> remote.v1.WsGitDiffResult
-	237, // 138: remote.v1.Frame.ws_git_commit_result:type_name -> remote.v1.WsGitCommitResult
-	240, // 139: remote.v1.Frame.ws_git_branches_result:type_name -> remote.v1.WsGitBranchesResult
-	248, // 140: remote.v1.Frame.ws_git_log_result:type_name -> remote.v1.WsGitLogResult
-	250, // 141: remote.v1.Frame.ws_git_branch_compare_result:type_name -> remote.v1.WsGitBranchCompareResult
-	252, // 142: remote.v1.Frame.ws_git_pr_url_result:type_name -> remote.v1.WsGitPrUrlResult
-	253, // 143: remote.v1.Frame.usage_report_request:type_name -> remote.v1.UsageReportRequest
-	259, // 144: remote.v1.Frame.usage_settings_get:type_name -> remote.v1.UsageSettingsGet
-	260, // 145: remote.v1.Frame.usage_settings_set:type_name -> remote.v1.UsageSettingsSet
-	263, // 146: remote.v1.Frame.usage_delete:type_name -> remote.v1.UsageDelete
-	254, // 147: remote.v1.Frame.usage_report:type_name -> remote.v1.UsageReport
-	261, // 148: remote.v1.Frame.usage_settings:type_name -> remote.v1.UsageSettings
-	257, // 149: remote.v1.Frame.usage_suggestion:type_name -> remote.v1.UsageSuggestion
-	88,  // 150: remote.v1.Frame.project_config_get:type_name -> remote.v1.ProjectConfigGet
-	89,  // 151: remote.v1.Frame.project_config_set:type_name -> remote.v1.ProjectConfigSet
-	90,  // 152: remote.v1.Frame.project_config:type_name -> remote.v1.ProjectConfig
-	72,  // 153: remote.v1.Frame.attachment_save:type_name -> remote.v1.AttachmentSave
-	73,  // 154: remote.v1.Frame.attachment_saved:type_name -> remote.v1.AttachmentSaved
-	234, // 155: remote.v1.Frame.ws_git_commit_message:type_name -> remote.v1.WsGitCommitMessage
-	235, // 156: remote.v1.Frame.ws_git_commit_message_result:type_name -> remote.v1.WsGitCommitMessageResult
-	100, // 157: remote.v1.Frame.account_capture_current:type_name -> remote.v1.AccountCaptureCurrent
-	54,  // 158: remote.v1.Frame.thread_earlier:type_name -> remote.v1.ThreadEarlier
-	55,  // 159: remote.v1.Frame.thread_earlier_result:type_name -> remote.v1.ThreadEarlierResult
-	264, // 160: remote.v1.Frame.office_watch:type_name -> remote.v1.OfficeWatch
-	265, // 161: remote.v1.Frame.office_snapshot:type_name -> remote.v1.OfficeSnapshot
-	266, // 162: remote.v1.Frame.office_events:type_name -> remote.v1.OfficeEvents
-	101, // 163: remote.v1.Frame.account_accept_current:type_name -> remote.v1.AccountAcceptCurrent
-	245, // 164: remote.v1.Frame.ws_git_rebase:type_name -> remote.v1.WsGitRebase
-	39,  // 165: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
-	120, // 166: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
+	38,  // 4: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
+	39,  // 5: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
+	41,  // 6: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
+	42,  // 7: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
+	43,  // 8: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
+	46,  // 9: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
+	50,  // 10: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
+	53,  // 11: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
+	54,  // 12: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
+	59,  // 13: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
+	60,  // 14: remote.v1.Frame.ping:type_name -> remote.v1.Ping
+	61,  // 15: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
+	62,  // 16: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
+	47,  // 17: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
+	51,  // 18: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
+	52,  // 19: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
+	94,  // 20: remote.v1.Frame.account_list:type_name -> remote.v1.AccountList
+	95,  // 21: remote.v1.Frame.account_select:type_name -> remote.v1.AccountSelect
+	96,  // 22: remote.v1.Frame.account_sign_in_begin:type_name -> remote.v1.AccountSignInBegin
+	97,  // 23: remote.v1.Frame.account_sign_in_code:type_name -> remote.v1.AccountSignInCode
+	98,  // 24: remote.v1.Frame.account_sign_in_cancel:type_name -> remote.v1.AccountSignInCancel
+	99,  // 25: remote.v1.Frame.account_remove:type_name -> remote.v1.AccountRemove
+	100, // 26: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
+	103, // 27: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
+	63,  // 28: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
+	104, // 29: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
+	64,  // 30: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
+	68,  // 31: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
+	69,  // 32: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
+	70,  // 33: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
+	124, // 34: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
+	125, // 35: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
+	128, // 36: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
+	127, // 37: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
+	129, // 38: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
+	130, // 39: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
+	153, // 40: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
+	119, // 41: remote.v1.Frame.pong:type_name -> remote.v1.Pong
+	156, // 42: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	160, // 43: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	105, // 44: remote.v1.Frame.ack:type_name -> remote.v1.Ack
+	120, // 45: remote.v1.Frame.error:type_name -> remote.v1.Error
+	106, // 46: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
+	114, // 47: remote.v1.Frame.account_list_result:type_name -> remote.v1.AccountListResult
+	117, // 48: remote.v1.Frame.account_sign_in_prompt:type_name -> remote.v1.AccountSignInPrompt
+	118, // 49: remote.v1.Frame.account_sign_in_result:type_name -> remote.v1.AccountSignInResult
+	158, // 50: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
+	115, // 51: remote.v1.Frame.machine_accounts:type_name -> remote.v1.MachineAccounts
+	67,  // 52: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
+	72,  // 53: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
+	126, // 54: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
+	93,  // 55: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
+	82,  // 56: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
+	71,  // 57: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
+	48,  // 58: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
+	49,  // 59: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
+	77,  // 60: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
+	78,  // 61: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
+	79,  // 62: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
+	80,  // 63: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
+	81,  // 64: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
+	83,  // 65: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
+	84,  // 66: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
+	85,  // 67: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
+	162, // 68: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
+	163, // 69: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
+	164, // 70: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
+	165, // 71: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
+	57,  // 72: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
+	58,  // 73: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
+	173, // 74: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
+	174, // 75: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
+	175, // 76: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
+	178, // 77: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
+	185, // 78: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
+	187, // 79: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
+	189, // 80: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
+	190, // 81: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
+	192, // 82: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
+	194, // 83: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
+	195, // 84: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
+	166, // 85: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
+	167, // 86: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
+	168, // 87: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
+	170, // 88: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
+	172, // 89: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
+	179, // 90: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
+	180, // 91: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
+	181, // 92: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
+	182, // 93: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
+	184, // 94: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
+	186, // 95: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
+	188, // 96: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
+	191, // 97: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
+	196, // 98: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
+	197, // 99: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
+	203, // 100: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
+	206, // 101: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
+	208, // 102: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
+	209, // 103: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
+	210, // 104: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
+	199, // 105: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
+	205, // 106: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
+	207, // 107: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
+	211, // 108: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
+	202, // 109: remote.v1.Frame.term_update_now:type_name -> remote.v1.TermUpdateNow
+	123, // 110: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
+	212, // 111: remote.v1.Frame.ws_dir_list:type_name -> remote.v1.WsDirList
+	215, // 112: remote.v1.Frame.ws_file_read:type_name -> remote.v1.WsFileRead
+	217, // 113: remote.v1.Frame.ws_find_names:type_name -> remote.v1.WsFindNames
+	219, // 114: remote.v1.Frame.ws_find_contents:type_name -> remote.v1.WsFindContents
+	223, // 115: remote.v1.Frame.ws_watch:type_name -> remote.v1.WsWatch
+	225, // 116: remote.v1.Frame.ws_git_status:type_name -> remote.v1.WsGitStatus
+	229, // 117: remote.v1.Frame.ws_git_diff:type_name -> remote.v1.WsGitDiff
+	231, // 118: remote.v1.Frame.ws_git_stage:type_name -> remote.v1.WsGitStage
+	232, // 119: remote.v1.Frame.ws_git_unstage:type_name -> remote.v1.WsGitUnstage
+	233, // 120: remote.v1.Frame.ws_git_discard:type_name -> remote.v1.WsGitDiscard
+	234, // 121: remote.v1.Frame.ws_git_commit:type_name -> remote.v1.WsGitCommit
+	239, // 122: remote.v1.Frame.ws_git_branches:type_name -> remote.v1.WsGitBranches
+	242, // 123: remote.v1.Frame.ws_git_checkout:type_name -> remote.v1.WsGitCheckout
+	243, // 124: remote.v1.Frame.ws_git_branch_create:type_name -> remote.v1.WsGitBranchCreate
+	244, // 125: remote.v1.Frame.ws_git_fetch:type_name -> remote.v1.WsGitFetch
+	245, // 126: remote.v1.Frame.ws_git_pull:type_name -> remote.v1.WsGitPull
+	247, // 127: remote.v1.Frame.ws_git_push:type_name -> remote.v1.WsGitPush
+	248, // 128: remote.v1.Frame.ws_git_log:type_name -> remote.v1.WsGitLog
+	250, // 129: remote.v1.Frame.ws_git_branch_compare:type_name -> remote.v1.WsGitBranchCompare
+	252, // 130: remote.v1.Frame.ws_git_pr_url:type_name -> remote.v1.WsGitPrUrl
+	214, // 131: remote.v1.Frame.ws_dir_list_result:type_name -> remote.v1.WsDirListResult
+	216, // 132: remote.v1.Frame.ws_file_read_result:type_name -> remote.v1.WsFileReadResult
+	218, // 133: remote.v1.Frame.ws_find_names_result:type_name -> remote.v1.WsFindNamesResult
+	222, // 134: remote.v1.Frame.ws_find_contents_result:type_name -> remote.v1.WsFindContentsResult
+	224, // 135: remote.v1.Frame.ws_changed:type_name -> remote.v1.WsChanged
+	228, // 136: remote.v1.Frame.ws_git_status_result:type_name -> remote.v1.WsGitStatusResult
+	230, // 137: remote.v1.Frame.ws_git_diff_result:type_name -> remote.v1.WsGitDiffResult
+	238, // 138: remote.v1.Frame.ws_git_commit_result:type_name -> remote.v1.WsGitCommitResult
+	241, // 139: remote.v1.Frame.ws_git_branches_result:type_name -> remote.v1.WsGitBranchesResult
+	249, // 140: remote.v1.Frame.ws_git_log_result:type_name -> remote.v1.WsGitLogResult
+	251, // 141: remote.v1.Frame.ws_git_branch_compare_result:type_name -> remote.v1.WsGitBranchCompareResult
+	253, // 142: remote.v1.Frame.ws_git_pr_url_result:type_name -> remote.v1.WsGitPrUrlResult
+	254, // 143: remote.v1.Frame.usage_report_request:type_name -> remote.v1.UsageReportRequest
+	260, // 144: remote.v1.Frame.usage_settings_get:type_name -> remote.v1.UsageSettingsGet
+	261, // 145: remote.v1.Frame.usage_settings_set:type_name -> remote.v1.UsageSettingsSet
+	264, // 146: remote.v1.Frame.usage_delete:type_name -> remote.v1.UsageDelete
+	255, // 147: remote.v1.Frame.usage_report:type_name -> remote.v1.UsageReport
+	262, // 148: remote.v1.Frame.usage_settings:type_name -> remote.v1.UsageSettings
+	258, // 149: remote.v1.Frame.usage_suggestion:type_name -> remote.v1.UsageSuggestion
+	89,  // 150: remote.v1.Frame.project_config_get:type_name -> remote.v1.ProjectConfigGet
+	90,  // 151: remote.v1.Frame.project_config_set:type_name -> remote.v1.ProjectConfigSet
+	91,  // 152: remote.v1.Frame.project_config:type_name -> remote.v1.ProjectConfig
+	73,  // 153: remote.v1.Frame.attachment_save:type_name -> remote.v1.AttachmentSave
+	74,  // 154: remote.v1.Frame.attachment_saved:type_name -> remote.v1.AttachmentSaved
+	235, // 155: remote.v1.Frame.ws_git_commit_message:type_name -> remote.v1.WsGitCommitMessage
+	236, // 156: remote.v1.Frame.ws_git_commit_message_result:type_name -> remote.v1.WsGitCommitMessageResult
+	101, // 157: remote.v1.Frame.account_capture_current:type_name -> remote.v1.AccountCaptureCurrent
+	55,  // 158: remote.v1.Frame.thread_earlier:type_name -> remote.v1.ThreadEarlier
+	56,  // 159: remote.v1.Frame.thread_earlier_result:type_name -> remote.v1.ThreadEarlierResult
+	265, // 160: remote.v1.Frame.office_watch:type_name -> remote.v1.OfficeWatch
+	266, // 161: remote.v1.Frame.office_snapshot:type_name -> remote.v1.OfficeSnapshot
+	267, // 162: remote.v1.Frame.office_events:type_name -> remote.v1.OfficeEvents
+	102, // 163: remote.v1.Frame.account_accept_current:type_name -> remote.v1.AccountAcceptCurrent
+	246, // 164: remote.v1.Frame.ws_git_rebase:type_name -> remote.v1.WsGitRebase
+	40,  // 165: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
+	121, // 166: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
 	1,   // 167: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
-	43,  // 168: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
-	44,  // 169: remote.v1.Answers.answers:type_name -> remote.v1.Answer
-	130, // 170: remote.v1.ThreadEarlierResult.items:type_name -> remote.v1.Item
-	64,  // 171: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
-	65,  // 172: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
-	39,  // 173: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
-	39,  // 174: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
+	44,  // 168: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
+	45,  // 169: remote.v1.Answers.answers:type_name -> remote.v1.Answer
+	131, // 170: remote.v1.ThreadEarlierResult.items:type_name -> remote.v1.Item
+	65,  // 171: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
+	66,  // 172: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
+	40,  // 173: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
+	40,  // 174: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
 	4,   // 175: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
-	85,  // 176: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
-	85,  // 177: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
-	86,  // 178: remote.v1.Project.git:type_name -> remote.v1.GitStatus
+	86,  // 176: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
+	86,  // 177: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
+	87,  // 178: remote.v1.Project.git:type_name -> remote.v1.GitStatus
 	2,   // 179: remote.v1.Project.project_config:type_name -> remote.v1.ProjectConfigLevel
 	2,   // 180: remote.v1.ProjectConfigSet.level:type_name -> remote.v1.ProjectConfigLevel
 	2,   // 181: remote.v1.ProjectConfig.level:type_name -> remote.v1.ProjectConfigLevel
-	87,  // 182: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
-	91,  // 183: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
-	108, // 184: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
-	109, // 185: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
-	107, // 186: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
-	107, // 187: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
-	106, // 188: remote.v1.ThreadInfo.account_suggestion:type_name -> remote.v1.AccountSuggestion
-	110, // 189: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
-	110, // 190: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
+	88,  // 182: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
+	92,  // 183: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
+	109, // 184: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
+	110, // 185: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
+	108, // 186: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
+	108, // 187: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
+	107, // 188: remote.v1.ThreadInfo.account_suggestion:type_name -> remote.v1.AccountSuggestion
+	111, // 189: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
+	111, // 190: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
 	3,   // 191: remote.v1.AiAccount.status:type_name -> remote.v1.AccountStatus
-	109, // 192: remote.v1.AiAccount.usage:type_name -> remote.v1.RateLimits
-	111, // 193: remote.v1.AccountListResult.accounts:type_name -> remote.v1.AiAccount
-	280, // 194: remote.v1.AccountListResult.selected_by_provider:type_name -> remote.v1.AccountListResult.SelectedByProviderEntry
-	112, // 195: remote.v1.AccountListResult.actions:type_name -> remote.v1.AccountActions
-	281, // 196: remote.v1.AccountListResult.damaged:type_name -> remote.v1.AccountListResult.DamagedEntry
-	113, // 197: remote.v1.MachineAccounts.accounts:type_name -> remote.v1.AccountListResult
-	115, // 198: remote.v1.MachineAccounts.sessions:type_name -> remote.v1.SessionAccount
+	110, // 192: remote.v1.AiAccount.usage:type_name -> remote.v1.RateLimits
+	112, // 193: remote.v1.AccountListResult.accounts:type_name -> remote.v1.AiAccount
+	283, // 194: remote.v1.AccountListResult.selected_by_provider:type_name -> remote.v1.AccountListResult.SelectedByProviderEntry
+	113, // 195: remote.v1.AccountListResult.actions:type_name -> remote.v1.AccountActions
+	284, // 196: remote.v1.AccountListResult.damaged:type_name -> remote.v1.AccountListResult.DamagedEntry
+	114, // 197: remote.v1.MachineAccounts.accounts:type_name -> remote.v1.AccountListResult
+	116, // 198: remote.v1.MachineAccounts.sessions:type_name -> remote.v1.SessionAccount
 	5,   // 199: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
 	4,   // 200: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
 	7,   // 201: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
 	2,   // 202: remote.v1.ThreadSummary.project_config:type_name -> remote.v1.ProjectConfigLevel
 	6,   // 203: remote.v1.ThreadActivity.phase:type_name -> remote.v1.ActivityPhase
-	121, // 204: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
-	121, // 205: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
-	121, // 206: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
-	130, // 207: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
-	120, // 208: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
+	122, // 204: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
+	122, // 205: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
+	122, // 206: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
+	131, // 207: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
+	121, // 208: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
 	8,   // 209: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
-	130, // 210: remote.v1.FullItem.item:type_name -> remote.v1.Item
-	131, // 211: remote.v1.Item.text:type_name -> remote.v1.TextItem
-	132, // 212: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
-	133, // 213: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
-	134, // 214: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
-	135, // 215: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
-	139, // 216: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
-	137, // 217: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
-	142, // 218: remote.v1.Item.status:type_name -> remote.v1.StatusItem
-	143, // 219: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
-	144, // 220: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
-	145, // 221: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
-	146, // 222: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
-	147, // 223: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
-	148, // 224: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
+	131, // 210: remote.v1.FullItem.item:type_name -> remote.v1.Item
+	132, // 211: remote.v1.Item.text:type_name -> remote.v1.TextItem
+	133, // 212: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
+	134, // 213: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
+	135, // 214: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
+	136, // 215: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
+	140, // 216: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
+	138, // 217: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
+	143, // 218: remote.v1.Item.status:type_name -> remote.v1.StatusItem
+	144, // 219: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
+	145, // 220: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
+	146, // 221: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
+	147, // 222: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
+	148, // 223: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
+	149, // 224: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
 	9,   // 225: remote.v1.TextItem.role:type_name -> remote.v1.Role
-	74,  // 226: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
+	75,  // 226: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
 	10,  // 227: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
-	136, // 228: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
+	137, // 228: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
 	11,  // 229: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
 	10,  // 230: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
 	12,  // 231: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
 	1,   // 232: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
-	138, // 233: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
-	140, // 234: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
+	139, // 233: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
+	141, // 234: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
 	12,  // 235: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
-	43,  // 236: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
-	141, // 237: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
+	44,  // 236: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
+	142, // 237: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
 	13,  // 238: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
-	150, // 239: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
+	151, // 239: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
 	14,  // 240: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
-	149, // 241: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
-	151, // 242: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	154, // 243: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
-	75,  // 244: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
-	153, // 245: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
-	192, // 246: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
+	150, // 241: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
+	152, // 242: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
+	155, // 243: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
+	76,  // 244: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
+	154, // 245: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
+	193, // 246: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
 	15,  // 247: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
-	156, // 248: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	158, // 249: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
-	160, // 250: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	168, // 251: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
-	170, // 252: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
+	157, // 248: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	159, // 249: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
+	161, // 250: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	169, // 251: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
+	171, // 252: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
 	16,  // 253: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
-	170, // 254: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
-	175, // 255: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
-	176, // 256: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
+	171, // 254: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
+	176, // 255: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
+	177, // 256: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
 	17,  // 257: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
-	182, // 258: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
+	183, // 258: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
 	18,  // 259: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
 	19,  // 260: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
-	197, // 261: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
-	199, // 262: remote.v1.TermListResult.update:type_name -> remote.v1.TerminalUpdate
-	200, // 263: remote.v1.TerminalUpdate.holds:type_name -> remote.v1.TerminalUpdateHold
+	198, // 261: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
+	200, // 262: remote.v1.TermListResult.update:type_name -> remote.v1.TerminalUpdate
+	201, // 263: remote.v1.TerminalUpdate.holds:type_name -> remote.v1.TerminalUpdateHold
 	20,  // 264: remote.v1.TerminalUpdateHold.reason:type_name -> remote.v1.TerminalUpdateHoldReason
-	203, // 265: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
+	204, // 265: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
 	21,  // 266: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
 	22,  // 267: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
 	16,  // 268: remote.v1.WsEntry.git:type_name -> remote.v1.GitFileState
-	212, // 269: remote.v1.WsDirListResult.entries:type_name -> remote.v1.WsEntry
+	213, // 269: remote.v1.WsDirListResult.entries:type_name -> remote.v1.WsEntry
 	23,  // 270: remote.v1.WsFileReadResult.kind:type_name -> remote.v1.WsFileKind
-	219, // 271: remote.v1.WsContentFile.matches:type_name -> remote.v1.WsContentMatch
-	220, // 272: remote.v1.WsFindContentsResult.files:type_name -> remote.v1.WsContentFile
+	220, // 271: remote.v1.WsContentFile.matches:type_name -> remote.v1.WsContentMatch
+	221, // 272: remote.v1.WsFindContentsResult.files:type_name -> remote.v1.WsContentFile
 	24,  // 273: remote.v1.WsGitEntry.area:type_name -> remote.v1.WsGitArea
 	16,  // 274: remote.v1.WsGitEntry.state:type_name -> remote.v1.GitFileState
-	226, // 275: remote.v1.WsGitStatusResult.upstream:type_name -> remote.v1.WsGitUpstream
-	225, // 276: remote.v1.WsGitStatusResult.entries:type_name -> remote.v1.WsGitEntry
+	227, // 275: remote.v1.WsGitStatusResult.upstream:type_name -> remote.v1.WsGitUpstream
+	226, // 276: remote.v1.WsGitStatusResult.entries:type_name -> remote.v1.WsGitEntry
 	25,  // 277: remote.v1.WsGitDiff.source:type_name -> remote.v1.WsGitDiffSource
-	170, // 278: remote.v1.WsGitDiffResult.file:type_name -> remote.v1.GitFileChange
-	236, // 279: remote.v1.WsGitCommitResult.commit:type_name -> remote.v1.WsGitLogEntry
-	239, // 280: remote.v1.WsGitBranchesResult.local:type_name -> remote.v1.WsGitBranch
-	236, // 281: remote.v1.WsGitLogResult.commits:type_name -> remote.v1.WsGitLogEntry
-	225, // 282: remote.v1.WsGitBranchCompareResult.files:type_name -> remote.v1.WsGitEntry
-	256, // 283: remote.v1.UsageReport.shape:type_name -> remote.v1.UsageShape
-	255, // 284: remote.v1.UsageReport.days:type_name -> remote.v1.UsageDay
-	257, // 285: remote.v1.UsageReport.suggestions:type_name -> remote.v1.UsageSuggestion
-	258, // 286: remote.v1.UsageReport.quota:type_name -> remote.v1.UsageQuotaPoint
+	171, // 278: remote.v1.WsGitDiffResult.file:type_name -> remote.v1.GitFileChange
+	237, // 279: remote.v1.WsGitCommitResult.commit:type_name -> remote.v1.WsGitLogEntry
+	240, // 280: remote.v1.WsGitBranchesResult.local:type_name -> remote.v1.WsGitBranch
+	237, // 281: remote.v1.WsGitLogResult.commits:type_name -> remote.v1.WsGitLogEntry
+	226, // 282: remote.v1.WsGitBranchCompareResult.files:type_name -> remote.v1.WsGitEntry
+	257, // 283: remote.v1.UsageReport.shape:type_name -> remote.v1.UsageShape
+	256, // 284: remote.v1.UsageReport.days:type_name -> remote.v1.UsageDay
+	258, // 285: remote.v1.UsageReport.suggestions:type_name -> remote.v1.UsageSuggestion
+	259, // 286: remote.v1.UsageReport.quota:type_name -> remote.v1.UsageQuotaPoint
 	26,  // 287: remote.v1.UsageSuggestion.rule:type_name -> remote.v1.UsageRule
-	110, // 288: remote.v1.UsageQuotaPoint.five_hour:type_name -> remote.v1.RateWindow
-	110, // 289: remote.v1.UsageQuotaPoint.seven_day:type_name -> remote.v1.RateWindow
-	262, // 290: remote.v1.UsageSettingsSet.rules:type_name -> remote.v1.UsageRuleSwitch
-	262, // 291: remote.v1.UsageSettings.rules:type_name -> remote.v1.UsageRuleSwitch
+	111, // 288: remote.v1.UsageQuotaPoint.five_hour:type_name -> remote.v1.RateWindow
+	111, // 289: remote.v1.UsageQuotaPoint.seven_day:type_name -> remote.v1.RateWindow
+	263, // 290: remote.v1.UsageSettingsSet.rules:type_name -> remote.v1.UsageRuleSwitch
+	263, // 291: remote.v1.UsageSettings.rules:type_name -> remote.v1.UsageRuleSwitch
 	26,  // 292: remote.v1.UsageRuleSwitch.rule:type_name -> remote.v1.UsageRule
-	267, // 293: remote.v1.OfficeSnapshot.state:type_name -> remote.v1.OfficeState
-	274, // 294: remote.v1.OfficeEvents.events:type_name -> remote.v1.OfficeEvent
-	272, // 295: remote.v1.OfficeState.actors:type_name -> remote.v1.OfficeActor
-	268, // 296: remote.v1.OfficeState.session:type_name -> remote.v1.OfficeSession
-	269, // 297: remote.v1.OfficeSession.todo:type_name -> remote.v1.OfficeTodoCounts
-	270, // 298: remote.v1.OfficeSession.usage:type_name -> remote.v1.OfficeUsage
-	271, // 299: remote.v1.OfficeSession.checks:type_name -> remote.v1.OfficeChecks
-	27,  // 300: remote.v1.OfficeActor.role:type_name -> remote.v1.OfficeRole
-	28,  // 301: remote.v1.OfficeActor.state:type_name -> remote.v1.OfficeActorState
-	273, // 302: remote.v1.OfficeActor.activity:type_name -> remote.v1.OfficeActivity
-	29,  // 303: remote.v1.OfficeActivity.group:type_name -> remote.v1.OfficeAnimGroup
-	30,  // 304: remote.v1.OfficeActivity.room:type_name -> remote.v1.OfficeRoom
-	272, // 305: remote.v1.OfficeEvent.actor_enter:type_name -> remote.v1.OfficeActor
-	272, // 306: remote.v1.OfficeEvent.actor_update:type_name -> remote.v1.OfficeActor
-	275, // 307: remote.v1.OfficeEvent.actor_leave:type_name -> remote.v1.OfficeActorLeave
-	276, // 308: remote.v1.OfficeEvent.activity_start:type_name -> remote.v1.OfficeActivityStart
-	277, // 309: remote.v1.OfficeEvent.activity_end:type_name -> remote.v1.OfficeActivityEnd
-	278, // 310: remote.v1.OfficeEvent.turn_start:type_name -> remote.v1.OfficeTurnStart
-	279, // 311: remote.v1.OfficeEvent.approval:type_name -> remote.v1.OfficeApproval
-	268, // 312: remote.v1.OfficeEvent.session:type_name -> remote.v1.OfficeSession
-	273, // 313: remote.v1.OfficeActivityStart.activity:type_name -> remote.v1.OfficeActivity
-	31,  // 314: remote.v1.OfficeApproval.state:type_name -> remote.v1.OfficeApprovalState
-	315, // [315:315] is the sub-list for method output_type
-	315, // [315:315] is the sub-list for method input_type
-	315, // [315:315] is the sub-list for extension type_name
-	315, // [315:315] is the sub-list for extension extendee
-	0,   // [0:315] is the sub-list for field type_name
+	268, // 293: remote.v1.OfficeSnapshot.state:type_name -> remote.v1.OfficeState
+	277, // 294: remote.v1.OfficeEvents.events:type_name -> remote.v1.OfficeEvent
+	274, // 295: remote.v1.OfficeState.actors:type_name -> remote.v1.OfficeActor
+	270, // 296: remote.v1.OfficeState.session:type_name -> remote.v1.OfficeSession
+	269, // 297: remote.v1.OfficeState.residents:type_name -> remote.v1.OfficeResident
+	271, // 298: remote.v1.OfficeSession.todo:type_name -> remote.v1.OfficeTodoCounts
+	272, // 299: remote.v1.OfficeSession.usage:type_name -> remote.v1.OfficeUsage
+	273, // 300: remote.v1.OfficeSession.checks:type_name -> remote.v1.OfficeChecks
+	27,  // 301: remote.v1.OfficeActor.role:type_name -> remote.v1.OfficeRole
+	28,  // 302: remote.v1.OfficeActor.state:type_name -> remote.v1.OfficeActorState
+	276, // 303: remote.v1.OfficeActor.activity:type_name -> remote.v1.OfficeActivity
+	275, // 304: remote.v1.OfficeActor.service:type_name -> remote.v1.OfficeService
+	31,  // 305: remote.v1.OfficeService.kind:type_name -> remote.v1.OfficeServiceKind
+	29,  // 306: remote.v1.OfficeActivity.group:type_name -> remote.v1.OfficeAnimGroup
+	30,  // 307: remote.v1.OfficeActivity.room:type_name -> remote.v1.OfficeRoom
+	274, // 308: remote.v1.OfficeEvent.actor_enter:type_name -> remote.v1.OfficeActor
+	274, // 309: remote.v1.OfficeEvent.actor_update:type_name -> remote.v1.OfficeActor
+	278, // 310: remote.v1.OfficeEvent.actor_leave:type_name -> remote.v1.OfficeActorLeave
+	279, // 311: remote.v1.OfficeEvent.activity_start:type_name -> remote.v1.OfficeActivityStart
+	280, // 312: remote.v1.OfficeEvent.activity_end:type_name -> remote.v1.OfficeActivityEnd
+	281, // 313: remote.v1.OfficeEvent.turn_start:type_name -> remote.v1.OfficeTurnStart
+	282, // 314: remote.v1.OfficeEvent.approval:type_name -> remote.v1.OfficeApproval
+	270, // 315: remote.v1.OfficeEvent.session:type_name -> remote.v1.OfficeSession
+	276, // 316: remote.v1.OfficeActivityStart.activity:type_name -> remote.v1.OfficeActivity
+	32,  // 317: remote.v1.OfficeApproval.state:type_name -> remote.v1.OfficeApprovalState
+	318, // [318:318] is the sub-list for method output_type
+	318, // [318:318] is the sub-list for method input_type
+	318, // [318:318] is the sub-list for extension type_name
+	318, // [318:318] is the sub-list for extension extendee
+	0,   // [0:318] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -24665,7 +24959,7 @@ func file_remote_v1_remote_proto_init() {
 		(*BrowserInput_Key)(nil),
 		(*BrowserInput_Text)(nil),
 	}
-	file_remote_v1_remote_proto_msgTypes[242].OneofWrappers = []any{
+	file_remote_v1_remote_proto_msgTypes[244].OneofWrappers = []any{
 		(*OfficeEvent_ActorEnter)(nil),
 		(*OfficeEvent_ActorUpdate)(nil),
 		(*OfficeEvent_ActorLeave)(nil),
@@ -24680,8 +24974,8 @@ func file_remote_v1_remote_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
-			NumEnums:      32,
-			NumMessages:   250,
+			NumEnums:      33,
+			NumMessages:   252,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

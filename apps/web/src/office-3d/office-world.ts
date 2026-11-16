@@ -157,6 +157,15 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		lifeSounds = createLifeSounds(assets.sounds, assetUrl);
 		lifeSounds.setEnabled(soundOn);
 		props.setSources(new Map([...propSources(assets)].map(([name, file]) => [name, assetUrl(file)])), opts.signal);
+		const robot = assets.serviceRobot;
+		// The services' robot loads beside the character (neither waits for the other); each rebuilds everyone when in.
+		if (robot !== null) {
+			void pool.loadRobot(assetUrl(robot.file), robot, opts.signal).then((ok) => {
+				if (!ok || opts.signal.aborted) return;
+				people.rebuild();
+				lights.refreshCasters(people.meshes());
+			});
+		}
 		const character = assets.character;
 		if (character === null) return;
 		const accessories = assets.accessories;
@@ -238,18 +247,34 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		opts.onLost();
 	});
 	const removeTestApi = opts.testApi
-		? exposeTestApi(() => ({
-				backend,
-				quality: scaler.level.id,
-				floor: transition.frame(performance.now()).floor,
-				drawCalls: instrumentation.drawCallsCounter.current,
-				frames,
-				fps: engine.getFps(),
-				stats: stats.summary(),
-				camera: { zoom: camera.user.zoom, yaw: camera.user.yaw },
-				people: people.views().map((p) => ({ key: p.key, floor: p.floor, x: p.x, z: p.z, visible: p.visible, target: p.target, pose: p.pose, screen: overlay.screen.get(p.key) ?? null })),
-				resetStats: () => stats.reset(),
-			}))
+		? exposeTestApi(() => {
+				const heads = people.headOffsets();
+				return {
+					backend,
+					quality: scaler.level.id,
+					floor: transition.frame(performance.now()).floor,
+					drawCalls: instrumentation.drawCallsCounter.current,
+					frames,
+					fps: engine.getFps(),
+					stats: stats.summary(),
+					camera: { zoom: camera.user.zoom, yaw: camera.user.yaw },
+					people: people.views().map((p) => ({
+						key: p.key,
+						floor: p.floor,
+						x: p.x,
+						z: p.z,
+						visible: p.visible,
+						target: p.target,
+						pose: p.pose,
+						model: p.model,
+						dozing: p.dozing,
+						heading: p.heading,
+						head: heads.get(p.key) ?? null,
+						screen: overlay.screen.get(p.key) ?? null,
+					})),
+					resetStats: () => stats.reset(),
+				};
+			})
 		: () => undefined;
 
 	let disposed = false;

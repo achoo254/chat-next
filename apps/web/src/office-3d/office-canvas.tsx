@@ -34,6 +34,7 @@ function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: strin
 			className="of-marker of3d-pin"
 			data-status={status}
 			data-kind={p.kind}
+			data-service={p.actor?.service?.kind}
 			data-anchor={p.anchorId}
 			style={style}
 			title={label}

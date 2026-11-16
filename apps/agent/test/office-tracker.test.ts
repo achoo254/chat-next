@@ -1,20 +1,25 @@
 // The office of one session (docs/office-wire.md): consecutive seq, rooms,
 // subjects, staff coming and going, prompts on the right person, counts only,
 // and a snapshot plus the events after it giving the tracker's own state.
-import { clone, create } from "@bufbuild/protobuf";
+import { clone, create, toBinary } from "@bufbuild/protobuf";
 import {
   OfficeActorSchema,
   OfficeActorState,
   OfficeAnimGroup,
   OfficeApprovalState,
   type OfficeEvent,
+  OfficeEventSchema,
   OfficeRole,
+  OfficeResidentSchema,
   OfficeRoom,
+  OfficeServiceKind,
+  OfficeServiceSchema,
   type OfficeState,
   OfficeStateSchema,
 } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { LEAVE_AFTER_IDLE_MS, MAX_ACTORS, OfficeTracker, type ToolStart } from "../src/office/office-tracker.ts";
+import { MAX_RESIDENTS } from "../src/office/office-residents.ts";
+import { BACKGROUND_SILENT_MS, LEAVE_AFTER_IDLE_MS, MAX_ACTORS, OfficeTracker, type ToolStart } from "../src/office/office-tracker.ts";
 
 const busy = { busy: true, waitingForUser: false, backgroundTasks: 0 };
 const idle = { busy: false, waitingForUser: false, backgroundTasks: 0 };
@@ -41,9 +46,16 @@ function apply(state: OfficeState, ev: OfficeEvent, before: Map<string, OfficeAc
       if (i >= 0) state.actors[i] = clone(OfficeActorSchema, k.value);
       return;
     }
-    case "actorLeave":
+    case "actorLeave": {
+      // An employee leaving stays known as a resident (the snapshot's list: the last MAX_RESIDENTS, by entry).
+      const gone = actor(k.value.actorId);
       state.actors = state.actors.filter((a) => a.id !== k.value.actorId);
+      if (gone?.role !== OfficeRole.EMPLOYEE) return;
+      const { id, agentType, parentId, spawnDepth, enteredAt, doneAt } = gone;
+      const kept = [...state.residents.filter((r) => r.id !== id), create(OfficeResidentSchema, { id, agentType, parentId, spawnDepth, enteredAt, doneAt, leftAt: ev.at })];
+      state.residents = kept.slice(-MAX_RESIDENTS).sort((a, b) => Number(a.enteredAt - b.enteredAt) || (a.id < b.id ? -1 : 1));
       return;
+    }
     case "activityStart": {
       const a = actor(k.value.actorId);
       if (a && k.value.activity) a.activity = k.value.activity;
@@ -367,6 +379,198 @@ describe("office tracker", () => {
 
 it("an actor's wire shape has no field for input, output or command text", () => {
   const fields = OfficeActorSchema.fields.map((f) => f.name).sort();
-  expect(fields).toEqual(["activity", "agent_type", "description", "done_at", "entered_at", "id", "parent_id", "role", "spawn_depth", "state"].sort());
+  expect(fields).toEqual(["activity", "agent_type", "description", "done_at", "entered_at", "id", "parent_id", "role", "service", "spawn_depth", "state"].sort());
   expect(create(OfficeActorSchema).activity).toBeUndefined();
+  // A machine's label is an enum, a number and a time: nothing to put a command in.
+  expect(OfficeServiceSchema.fields.map((f) => [f.name, f.fieldKind, f.fieldKind === "scalar" ? f.scalar : f.fieldKind === "enum" ? f.enum.typeName : ""])).toEqual([
+    ["kind", "enum", "remote.v1.OfficeServiceKind"],
+    ["port", "scalar", 13],
+    ["started_at", "scalar", 3],
+  ]);
+  expect(OfficeResidentSchema.fields.map((f) => f.name).sort()).toEqual(["agent_type", "done_at", "entered_at", "id", "left_at", "parent_id", "spawn_depth"].sort());
+});
+
+describe("residents and machine labels", () => {
+  it("keeps employees that left in the snapshot, in the order they came in, at most MAX_RESIDENTS", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "s2", agentType: "tester", description: "Test", background: false }, 3);
+    t.subagentStart({ toolId: "s1", parentId: "s2", agentType: "scout", description: "Look", background: false }, 2);
+    t.subagentDone("s2", 4);
+    t.setStatus(idle, 5);
+    expect(t.snapshot().residents).toEqual([]);
+    t.tick(5 + LEAVE_AFTER_IDLE_MS);
+    const residents = t.snapshot().residents.map((r) => [r.id, r.agentType, r.parentId, r.spawnDepth, r.enteredAt, r.doneAt, r.leftAt]);
+    expect(residents).toEqual([
+      ["s1", "scout", "s2", 2, 2n, 5n, BigInt(5 + LEAVE_AFTER_IDLE_MS)],
+      ["s2", "tester", "", 1, 3n, 4n, BigInt(5 + LEAVE_AFTER_IDLE_MS)],
+    ]);
+    // Machines are not residents.
+    t.setStatus(busy, 10 + LEAVE_AFTER_IDLE_MS);
+    t.toolStart(shell("m", "pnpm dev", { background: true }), 11 + LEAVE_AFTER_IDLE_MS);
+    t.backgroundEnded("m", true, 12 + LEAVE_AFTER_IDLE_MS);
+    expect(t.snapshot().residents.map((r) => r.id)).toEqual(["s1", "s2"]);
+  });
+
+  it("forgets the first to leave past MAX_RESIDENTS", () => {
+    const t = new OfficeTracker(true, 0);
+    for (let i = 0; i < MAX_RESIDENTS + 3; i++) {
+      const at = i * 2 * LEAVE_AFTER_IDLE_MS + 1;
+      t.setStatus(busy, at);
+      t.subagentStart({ toolId: `s${i}`, agentType: "scout", description: "", background: false }, at + 1);
+      t.setStatus(idle, at + 2);
+      t.tick(at + 2 + LEAVE_AFTER_IDLE_MS);
+    }
+    const ids = t.snapshot().residents.map((r) => r.id);
+    expect(ids).toHaveLength(MAX_RESIDENTS);
+    expect(ids[0]).toBe("s3");
+    expect(ids.at(-1)).toBe(`s${MAX_RESIDENTS + 2}`);
+  });
+
+  it("labels a machine with the kind of its command, a port it was given and its start, and never sends the command", () => {
+    const MARK = "ZZMARKER-5f1d-private";
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    const from = t.snapshot();
+    t.drain();
+    t.toolStart(shell("m1", `cd /work/${MARK} && API_KEY=${MARK} pnpm --filter web dev --port 5173`, { background: true }), 2);
+    t.toolStart(shell("m2", `gh run watch 12345 --repo ${MARK}/x`, { background: true }), 3);
+    t.toolStart({ ...shell("m3", "", { background: true }), summary: `node ./${MARK}.js` }, 4);
+    const events = t.drain();
+    const machines = t.snapshot().actors.filter((a) => a.role === OfficeRole.MACHINE);
+    expect(machines.map((a) => [a.id, a.service?.kind, a.service?.port, a.service?.startedAt])).toEqual([
+      ["m1", OfficeServiceKind.DEV_SERVER, 5173, 2n],
+      ["m2", OfficeServiceKind.CI_WATCH, 0, 3n],
+      ["m3", OfficeServiceKind.SCRIPT, 0, 4n],
+    ]);
+    // The director and employees carry no label.
+    expect(t.snapshot().actors[0]?.service).toBeUndefined();
+    const wire = JSON.stringify([toBinary(OfficeStateSchema, t.snapshot()), ...events.map((e) => toBinary(OfficeEventSchema, e))].map((b) => Buffer.from(b).toString("latin1")));
+    expect(wire).not.toContain(MARK);
+    expectReplay(t, from, events);
+  });
+});
+
+describe("subagents in the background", () => {
+  const stateOf = (t: OfficeTracker, id: string): OfficeActorState | undefined => t.snapshot().actors.find((a) => a.id === id)?.state;
+
+  it("are not done when no background work is counted while they still run", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "fullstack-developer", description: "Build", background: true }, 2);
+    t.subagentDone("bg", 3);
+    // The count of background work reaches 0 (it may miss subagents) once the turn is over.
+    t.setStatus({ ...idle, backgroundTasks: 1 }, 4);
+    t.setStatus(idle, 5);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.WORKING);
+    t.backgroundEnded("bg", true, 6);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.DONE);
+  });
+
+  it("keep everyone in while one still runs, however long the session is idle", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "fullstack-developer", description: "Build", background: true }, 2);
+    t.subagentStart({ toolId: "fg", agentType: "scout", description: "Look", background: false }, 2);
+    t.setStatus(idle, 3);
+    // It keeps working (a tool call of its own every few minutes).
+    for (let at = 3; at < 3 * LEAVE_AFTER_IDLE_MS; at += 5 * 60_000) {
+      t.toolStart({ ...shell(`bg-${at}`, "ls"), actorId: "bg" }, at);
+      t.toolEnd(`bg-${at}`, true, at + 1);
+      t.tick(at + 2);
+    }
+    expect(t.snapshot().actors.map((a) => a.id)).toEqual(["director", "bg", "fg"]);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.WORKING);
+  });
+
+  it("works again when its tool call answered before it was known to run in the background", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "", description: "Build", background: false }, 2);
+    // "Async agent launched": the answer comes first, then the AI's record says it runs in the background.
+    t.subagentDone("bg", 3);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.DONE);
+    expect(t.snapshot().session?.tasksDone).toBe(1);
+    t.subagentStart({ toolId: "bg", agentType: "fullstack-developer", description: "", background: true }, 4);
+    expect(t.snapshot().actors.find((a) => a.id === "bg")).toMatchObject({ state: OfficeActorState.WORKING, doneAt: 0n, agentType: "fullstack-developer" });
+    expect(t.snapshot().session?.tasksDone).toBe(0);
+    t.setStatus(idle, 5);
+    t.tick(5 + LEAVE_AFTER_IDLE_MS);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.WORKING);
+    // Done for good once its background work ends: a later record does not bring it back.
+    t.backgroundEnded("bg", true, 6);
+    t.subagentStart({ toolId: "bg", agentType: "fullstack-developer", description: "", background: true }, 7);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.DONE);
+  });
+
+  it("is done after BACKGROUND_SILENT_MS silent with no background work counted, and goes home later", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "researcher", description: "Read", background: true }, 2);
+    t.setStatus(idle, 3);
+    t.tick(2 + BACKGROUND_SILENT_MS - 1);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.WORKING);
+    t.tick(2 + BACKGROUND_SILENT_MS);
+    expect(stateOf(t, "bg")).toBe(OfficeActorState.DONE);
+    expect(t.snapshot().actors.map((a) => a.id)).toContain("bg");
+    t.tick(2 + BACKGROUND_SILENT_MS + LEAVE_AFTER_IDLE_MS);
+    expect(t.snapshot().actors.map((a) => a.id)).toEqual(["director"]);
+  });
+});
+
+describe("subagents in the background: presumed and final ends", () => {
+  const actorOf = (t: OfficeTracker, id: string) => t.snapshot().actors.find((a) => a.id === id);
+
+  it("a tool of its own still open keeps it at work past BACKGROUND_SILENT_MS", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "tester", description: "", background: true }, 2);
+    t.toolStart({ ...shell("bg-long", "pnpm test"), actorId: "bg" }, 3);
+    t.setStatus(idle, 4);
+    t.tick(4 + 2 * BACKGROUND_SILENT_MS);
+    expect(actorOf(t, "bg")?.state).toBe(OfficeActorState.WORKING);
+  });
+
+  it("presumed done for its silence, a tool call of its own brings it back to work", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "tester", description: "", background: true }, 2);
+    t.setStatus(idle, 3);
+    t.tick(2 + BACKGROUND_SILENT_MS);
+    expect(actorOf(t, "bg")?.state).toBe(OfficeActorState.DONE);
+    const from = t.snapshot();
+    t.drain();
+    t.toolStart({ ...shell("bg-next", "ls"), actorId: "bg" }, 3 + BACKGROUND_SILENT_MS);
+    expect(actorOf(t, "bg")).toMatchObject({ state: OfficeActorState.WORKING, doneAt: 0n });
+    expect(actorOf(t, "bg")?.activity?.id).toBe("bg-next");
+    const events = t.drain();
+    // Devices never hear of an activity ending that they were not told it showed.
+    expect(events.filter((e) => e.kind.case === "activityEnd")).toEqual([]);
+    expectReplay(t, from, events);
+  });
+
+  it("finished by its record when already done: keeps its time and hand-in, no work again, and stays done", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "", description: "", background: false }, 2);
+    t.setStatus(idle, 5);
+    expect(actorOf(t, "bg")).toMatchObject({ state: OfficeActorState.DONE, doneAt: 5n });
+    t.drain();
+    // Its record, read later: it ran in the background and finished.
+    t.subagentStart({ toolId: "bg", agentType: "tester", description: "", background: false }, 100);
+    t.subagentDone("bg", 100, true, { doneAt: 4 });
+    expect(actorOf(t, "bg")).toMatchObject({ state: OfficeActorState.DONE, doneAt: 5n, agentType: "tester" });
+    expect(t.drain().filter((e) => e.kind.case === "actorUpdate" && e.kind.value.state === OfficeActorState.WORKING)).toEqual([]);
+    // Final now: a later word that it runs in the background does not bring it back.
+    t.subagentStart({ toolId: "bg", agentType: "tester", description: "", background: true }, 101);
+    expect(actorOf(t, "bg")?.state).toBe(OfficeActorState.DONE);
+  });
+
+  it("finished by its record while still at work: done at its record's last write", () => {
+    const t = new OfficeTracker(true, 0);
+    t.setStatus(busy, 1);
+    t.subagentStart({ toolId: "bg", agentType: "tester", description: "", background: true }, 2);
+    t.subagentDone("bg", 100, true, { doneAt: 40 });
+    expect(actorOf(t, "bg")).toMatchObject({ state: OfficeActorState.DONE, doneAt: 40n });
+  });
 });

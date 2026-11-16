@@ -66,6 +66,7 @@ export function createBlockCharacter(scene: Scene, bodies: BlockBodies, key: str
 	let frame = 0;
 	const phase = (key.length * 0.37) % 1;
 	return {
+		model: "block",
 		root,
 		meshes: () => [body, head],
 		labelHeight: 1.4,

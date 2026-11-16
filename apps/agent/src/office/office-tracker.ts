@@ -17,6 +17,8 @@ import {
 import type { ToolKind } from "../providers/types.ts";
 import { ARRIVE, HAND_IN, THINK, classifyActivity } from "./office-activity-map.ts";
 import { type ActivityRecord, type ActorRecord, DIRECTOR_ID, activityWire, actorWire, isEmployee, isMachine, newActor, shownActivity } from "./office-actor.ts";
+import { ResidentLog } from "./office-residents.ts";
+import { classifyService } from "./office-service-kind.ts";
 import { officeSubject, officeToolName } from "./office-subject.ts";
 import { type OfficeStatus, SessionNumbers, type TodoCounts } from "./office-session-numbers.ts";
 import type { OfficeUsageNumbers } from "./office-usage.ts";
@@ -27,6 +29,14 @@ export type { OfficeStatus, TodoCounts } from "./office-session-numbers.ts";
 export const MAX_ACTORS = 64;
 /** How long the session stays idle before finished staff go home. */
 export const LEAVE_AFTER_IDLE_MS = 10 * 60_000;
+/**
+ * A subagent in the background the AI never said ended, with nothing heard
+ * of it for this long while the session is idle and counts no background
+ * work: taken as finished (the AI that ran it quit, or its end was missed).
+ * Its record going quiet ends it sooner where the records are read
+ * (office-thread.ts, STALE_SUBAGENT_MS).
+ */
+export const BACKGROUND_SILENT_MS = 30 * 60_000;
 const DESCRIPTION_MAX = 80;
 /** Tool calls remembered as seen, so one read twice (live, then from a record) starts once. */
 const SEEN_MAX = 10_000;
@@ -80,6 +90,8 @@ export class OfficeTracker {
   private readonly prompts = new Map<string, string>();
   private events: OfficeEvent[] = [];
   private readonly numbers = new SessionNumbers();
+  /** Employees that left, for the snapshot (a device opening the office later still knows them). */
+  private readonly residents = new ResidentLog();
   private idleSince: number;
 
   constructor(
@@ -111,6 +123,7 @@ export class OfficeTracker {
       actors: [...this.actors.values()].map(actorWire),
       reportsStaff: this.reportsStaff,
       session: this.numbers.wire(this.hidden.size),
+      residents: this.residents.wire(),
     });
   }
 
@@ -152,13 +165,18 @@ export class OfficeTracker {
     if (t.background && !t.actorId) {
       // A shell in the background is a machine of its own, standing in its room until its work ends.
       const work: ActivityRecord = { id: t.toolId, tool, place, subject: "", startedAt: at };
-      this.enter({ id: t.toolId, role: OfficeRole.MACHINE, agentType: tool.slice(0, 60), background: true, enteredAt: at, open: [work] }, at);
+      // Its label is read from the command here; only the kind and a port leave the machine.
+      const service = t.kind === "shell" ? { ...classifyService(t.command ?? t.summary), startedAt: at } : undefined;
+      this.enter({ id: t.toolId, role: OfficeRole.MACHINE, agentType: tool.slice(0, 60), background: true, enteredAt: at, open: [work], ...(service ? { service } : {}) }, at);
       return;
     }
     const actor = this.actors.get(t.actorId ?? DIRECTOR_ID);
+    // Taken as done only for its silence: a tool call of its own says it still works.
+    if (actor?.state === OfficeActorState.DONE && actor.donePresumed) this.resumeInBackground(actor, at);
     if (!actor || actor.state === OfficeActorState.DONE) return;
     const subject = actor.id === DIRECTOR_ID ? officeSubject(t) : "";
     actor.open.push({ id: t.toolId, tool, place, subject, startedAt: at });
+    actor.heardAt = Math.max(actor.heardAt, at);
     // A subagent's first tool call: it has arrived.
     if (actor.between?.id === "arrive") delete actor.between;
     this.owners.set(t.toolId, actor.id);
@@ -172,6 +190,7 @@ export class OfficeTracker {
     const i = actor.open.findIndex((r) => r.id === toolId);
     if (i < 0) return;
     const [ended] = actor.open.splice(i, 1);
+    actor.heardAt = Math.max(actor.heardAt, at);
     if (ended) this.numbers.countCheck(ended.place.room, ok);
     this.refreshActivity(actor, at, { id: toolId, ok });
     this.sessionChanged(at);
@@ -181,6 +200,14 @@ export class OfficeTracker {
     if (!this.reportsStaff) return;
     const known = this.actors.get(s.toolId);
     if (known) {
+      known.heardAt = Math.max(known.heardAt, at);
+      // Its tool call answered ("launched") before the AI's record said it runs in the background, or its turn
+      // ended first: it was taken as done, but it works on until the AI says its background work ended.
+      if (s.background && known.state === OfficeActorState.DONE && !known.doneInBackground && !known.donePresumed) {
+        known.agentType ||= s.agentType.slice(0, 60);
+        this.resumeInBackground(known, at);
+        return;
+      }
       // Learnt more about it later (its kind, from the AI's record).
       const agentType = known.agentType || s.agentType.slice(0, 60);
       // Whether it runs in the background matters only until it is done.
@@ -214,10 +241,14 @@ export class OfficeTracker {
 
   /**
    * The subagent's tool call answered (`fromBackground` false) or the AI
-   * reported its background work ended (true). A subagent in the background
-   * is done only by the latter.
+   * reported its background work ended, or its record said finished (true).
+   * A subagent in the background is done only by the latter. `end.doneAt`:
+   * when it finished, if known earlier than `at` (its record's last write);
+   * `end.presumed`: only taken as done for its silence (its next tool call
+   * brings it back). One already done keeps its time and hand-in; a sure end
+   * only makes it final.
    */
-  subagentDone(toolId: string, at: number, fromBackground = false): void {
+  subagentDone(toolId: string, at: number, fromBackground = false, end: { doneAt?: number; presumed?: boolean } = {}): void {
     const actor = this.actors.get(toolId);
     // A subagent over the limit still hands in its work (counted); a hidden machine is not a subagent.
     if (this.hidden.get(toolId) === OfficeRole.EMPLOYEE) {
@@ -225,9 +256,16 @@ export class OfficeTracker {
       this.numbers.subagentsDone++;
       this.sessionChanged(at);
     }
-    if (!actor || !isEmployee(actor) || actor.state === OfficeActorState.DONE) return;
+    if (!actor || !isEmployee(actor)) return;
+    if (actor.state === OfficeActorState.DONE) {
+      if (fromBackground && end.presumed !== true) {
+        actor.doneInBackground = true;
+        actor.donePresumed = false;
+      }
+      return;
+    }
     if (actor.background && !fromBackground) return;
-    this.finishEmployee(actor, at);
+    this.finishEmployee(actor, at, { final: fromBackground && end.presumed !== true, presumed: end.presumed === true, doneAt: end.doneAt ?? at });
     this.sessionChanged(at);
   }
 
@@ -286,9 +324,28 @@ export class OfficeTracker {
     }
   }
 
-  /** Time passes: after LEAVE_AFTER_IDLE_MS idle with no background work, everyone but the director goes home. */
+  /**
+   * Time passes: a subagent in the background silent for BACKGROUND_SILENT_MS
+   * with no background work counted is done; after LEAVE_AFTER_IDLE_MS idle
+   * with no background work (a subagent in the background still working is
+   * some), everyone but the director goes home.
+   */
   tick(now: number): void {
-    if (this.status.busy || this.status.backgroundTasks > 0 || now - this.idleSince < LEAVE_AFTER_IDLE_MS) return;
+    if (!this.status.busy && this.status.backgroundTasks === 0) {
+      let quiet = false;
+      for (const a of this.backgroundStaff()) {
+        // A tool of its own still open is work going on, however long it runs.
+        if (a.open.length > 0 || now - a.heardAt < BACKGROUND_SILENT_MS) continue;
+        this.finishEmployee(a, now, { final: false, presumed: true, doneAt: now });
+        quiet = true;
+      }
+      if (quiet) {
+        // Handing in their work is the last thing done: the idle time to go home runs from it.
+        this.idleSince = Math.max(this.idleSince, now);
+        this.sessionChanged(now);
+      }
+    }
+    if (this.status.busy || this.status.backgroundTasks > 0 || this.backgroundStaff().length > 0 || now - this.idleSince < LEAVE_AFTER_IDLE_MS) return;
     let left = false;
     for (const a of [...this.actors.values()]) {
       if (a.id === DIRECTOR_ID) continue;
@@ -365,16 +422,43 @@ export class OfficeTracker {
       this.hidden.delete(id);
       excess--;
     }
+    // No background work left: staff still at work are done, but not subagents in the background (the count may
+    // miss them; they end when the AI says so, when their record goes quiet, or after BACKGROUND_SILENT_MS).
     if (count === 0 && !this.status.busy) {
-      for (const a of [...this.actors.values()]) if (isEmployee(a) && a.state !== OfficeActorState.DONE) this.finishEmployee(a, at);
+      for (const a of [...this.actors.values()]) if (isEmployee(a) && a.state !== OfficeActorState.DONE && !a.background) this.finishEmployee(a, at);
     }
   }
 
-  private finishEmployee(a: ActorRecord, at: number): void {
+  /** Subagents in the background still working. */
+  private backgroundStaff(): ActorRecord[] {
+    return [...this.actors.values()].filter((a) => isEmployee(a) && a.background && a.state !== OfficeActorState.DONE);
+  }
+
+  /** A subagent taken as done before it was known to run in the background works again until its background work ends. */
+  private resumeInBackground(a: ActorRecord, at: number): void {
+    a.background = true;
+    a.doneAt = 0;
+    a.donePresumed = false;
+    delete a.between;
+    a.state = OfficeActorState.WORKING;
+    a.stateBeforePrompt = OfficeActorState.WORKING;
+    this.numbers.subagentsDone = Math.max(0, this.numbers.subagentsDone - 1);
+    // The update shows no activity, and emit records that (shownId ""): its next tool starts fresh, no end of the hand-in.
+    this.emit({ case: "actorUpdate", value: actorWire(a) }, at, a);
+    this.sessionChanged(at);
+  }
+
+  /**
+   * `end.final`: the AI said its background work ended or its record said finished, so it is done for good;
+   * `end.presumed`: taken as done for its silence; `end.doneAt`: when it finished (`at` unless known earlier).
+   */
+  private finishEmployee(a: ActorRecord, at: number, end: { final: boolean; presumed: boolean; doneAt: number } = { final: false, presumed: false, doneAt: at }): void {
+    a.doneInBackground = end.final;
+    a.donePresumed = end.presumed;
     for (const r of a.open) this.owners.delete(r.id);
     a.open = [];
     a.between = { id: "hand-in", tool: "", place: HAND_IN, subject: "", startedAt: at };
-    a.doneAt = at;
+    a.doneAt = Math.min(at, end.doneAt);
     a.prompts = 0;
     a.state = OfficeActorState.DONE;
     this.numbers.subagentsDone++;
@@ -404,6 +488,7 @@ export class OfficeTracker {
     for (const r of a.open) this.owners.delete(r.id);
     for (const [prompt, owner] of this.prompts) if (owner === a.id) this.prompts.delete(prompt);
     this.actors.delete(a.id);
+    if (isEmployee(a)) this.residents.record(a, at);
     this.emit({ case: "actorLeave", value: { actorId: a.id } }, at);
   }
 

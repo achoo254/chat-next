@@ -3,9 +3,12 @@
 // subagents at work in a small building, view only). The terminal is offered
 // only when the machine has its terminal and the session's AI opens there
 // (ProviderCapabilities.terminal); the office when the machine's tunelo keeps
-// one (AGENT_OFFICE). Each session remembers, on this device,
-// the mode it was last opened in: switching one session never moves another.
-// The machine keeps only the pick of the new-session dialog. While
+// one (AGENT_OFFICE). The view last picked on the switch is kept on this
+// device and the next session opened from a list opens in it too (one that
+// does not offer it opens as before). Each session also remembers the mode it
+// was last opened in: its row's icon says that one (or a live hold), never
+// the device's pick. The machine keeps only the pick of the new-session
+// dialog. While
 // the CLI holds a session, the chat view shows it read-only and points to
 // the terminal: no two views write to one session.
 import { useState, type ReactElement } from "react";
@@ -61,6 +64,44 @@ export function rememberMode(machine: string, mode: SessionMode): void {
 	}
 }
 
+/** The view last picked on a session's switch, on this device, for every session and machine. */
+const PICKED_MODE_KEY = "ai:mode:picked";
+
+/** The pick as last read or written (undefined: not read yet, or another tab changed it); storage is read once, not per render. */
+let pickedCache: { readonly mode: SessionMode | null } | undefined;
+let pickedWatched = false;
+
+function readPicked(): SessionMode | null {
+	try {
+		const kept = window.localStorage.getItem(PICKED_MODE_KEY);
+		return kept === "chat" || kept === "terminal" || kept === "office" ? kept : null;
+	} catch {
+		return null;
+	}
+}
+
+/** The view last picked on a session's switch; null when none, or when storage is refused. */
+export function pickedMode(): SessionMode | null {
+	if (!pickedWatched && typeof window !== "undefined") {
+		pickedWatched = true;
+		// Another tab picked (or storage was cleared): read again next time.
+		window.addEventListener("storage", (e) => {
+			if (e.key === null || e.key === PICKED_MODE_KEY) pickedCache = undefined;
+		});
+	}
+	pickedCache ??= { mode: readPicked() };
+	return pickedCache.mode;
+}
+
+export function rememberPickedMode(mode: SessionMode): void {
+	pickedCache = { mode };
+	try {
+		window.localStorage.setItem(PICKED_MODE_KEY, mode);
+	} catch {
+		// Storage refused: the pick holds for this page only.
+	}
+}
+
 const SESSION_MODE_KEY = (machine: string, threadId: string) => `ai:mode:${machine}:${threadId}`;
 
 /** The mode the session was last opened in on this device; chat when never, or for a value this app does not know (another session's choice never applies). */
@@ -98,19 +139,25 @@ export function modePath(machine: string, threadId: string, mode: SessionMode): 
 	return mode === "office" ? aiPaths.sessionOffice(machine, threadId) : paths.machineSession(machine, threadId);
 }
 
-/** Switch this one session to `mode`: it remembers the choice, no other session moves. */
+/** Switch this session to `mode`: it and the device remember the choice (the next session opened from a list opens in it too). */
 export function openSessionIn(machine: string, threadId: string, mode: SessionMode): void {
 	rememberSessionMode(machine, threadId, mode);
+	rememberPickedMode(mode);
 	navigate(modePath(machine, threadId, mode));
 }
 
 /**
- * Where a session opens from a list: the view its row names; the terminal
- * only when offered (`offered`). An office it was left in opens there (only
- * a machine that keeps offices let it be picked; an older one says to update).
+ * Where a session opens from a list: a session held in a terminal opens
+ * there; else the view last picked on a switch when the session offers it
+ * (the terminal when `offered`, the office when the machine keeps one,
+ * `office`); else the view its row names, the terminal only when offered. An
+ * office it was left in opens there (only a machine that keeps offices let it
+ * be picked; an older one says to update).
  */
-export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean): string {
-	const mode = rowMode(machine, thread);
+export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, office = true): string {
+	const picked = thread.terminalSession > 0 ? null : pickedMode();
+	const usable = picked === "chat" || (picked === "terminal" && offered) || (picked === "office" && office);
+	const mode = usable && picked !== null ? picked : rowMode(machine, thread);
 	return modePath(machine, thread.id, mode === "terminal" && !offered ? "chat" : mode);
 }
 

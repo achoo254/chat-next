@@ -31,6 +31,9 @@
 .of-marker[data-status="done"] .of-dot { --of-ring: var(--c-success); }
 .of-marker[data-status="awaiting"] .of-dot, .of-marker[data-status="slow"] .of-dot, .of-marker[data-status="waiting-you"] .of-dot { --of-ring: var(--c-warning); }
 .of-marker[data-status="denied"] .of-dot { --of-ring: var(--c-error); }
+/* A background service is a little robot: a square screen-head with an antenna, in its kind's colour. */
+.of-marker[data-kind="machine"] .of-dot { position: relative; border-radius: var(--radius-xs); }
+.of-marker[data-kind="machine"] .of-dot::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 2px; height: 5px; margin-left: -1px; border-radius: var(--radius-full); background: var(--of-color); }
 .of-name { min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-bubble { min-width: 0; max-width: 60%; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-text-muted); font-family: var(--font-mono); font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-overflow { display: inline-grid; place-items: center; min-width: 24px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--c-warning) 55%, transparent); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }

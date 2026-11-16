@@ -1311,6 +1311,20 @@ export const viMachines = {
 		director: "Giám đốc",
 		chairman: "Chủ tịch (bạn)",
 		machine: (tool: string) => (tool === "" ? "Máy chạy nền" : `Máy ${tool}`),
+		/** A background service as the agent labelled it on the machine (never its command): its name and bubble. */
+		service: {
+			names: {
+				"dev-server": "Máy chủ dev",
+				"test-watch": "Theo dõi test",
+				build: "Build",
+				"ci-watch": "Theo dõi CI",
+				git: "Git",
+				database: "Cơ sở dữ liệu",
+				script: "Script",
+			},
+			port: (port: number) => `cổng ${port}`,
+			uptime: (minutes: number) => (minutes < 1 ? "vừa chạy" : minutes < 60 ? `${minutes} phút` : `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`),
+		},
 		cast: {
 			scout: "Tí Trinh Sát",
 			explore: "Cậu Dò Đường",

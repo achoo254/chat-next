@@ -38,6 +38,7 @@ import {
 	type OfficeActor,
 	type OfficeEvent,
 	type OfficeSession,
+	OfficeServiceKind,
 } from "@achoo254/chat-proto/remote/remote";
 import type { Body, FakeMachine, FakeSocket } from "../machines/fake-machine.ts";
 
@@ -199,7 +200,18 @@ class Office {
 			case 4:
 				return this.emit(
 					end("s-tester", "s2-test", false),
-					enter(create(OfficeActorSchema, { id: "m-dev", role: MACHINE, agentType: "Bash", state: WORKING, enteredAt: BigInt(Date.now()), activity: activity("m-dev", "Bash", G.MACHINE, R.SERVER) })),
+					// A dev server on port 5173, as the agent labels it on the machine (never the command).
+					enter(
+						create(OfficeActorSchema, {
+							id: "m-dev",
+							role: MACHINE,
+							agentType: "Bash",
+							state: WORKING,
+							enteredAt: BigInt(Date.now()),
+							activity: activity("m-dev", "Bash", G.MACHINE, R.SERVER),
+							service: { kind: OfficeServiceKind.DEV_SERVER, port: 5173, startedAt: BigInt(Date.now()) },
+						}),
+					),
 					this.sessionWith({ checks: checks(3, 2, false), backgroundMachines: 1 }),
 				);
 			case 5:

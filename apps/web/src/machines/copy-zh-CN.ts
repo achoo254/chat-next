@@ -1287,6 +1287,19 @@ export const zhCNMachines: MachinesCopy = {
 		director: "总经理",
 		chairman: "董事长（你）",
 		machine: (tool: string) => (tool === "" ? "后台机器" : `${tool} 机器`),
+		service: {
+			names: {
+				"dev-server": "开发服务器",
+				"test-watch": "测试监视",
+				build: "构建",
+				"ci-watch": "CI 监视",
+				git: "Git",
+				database: "数据库",
+				script: "脚本",
+			},
+			port: (port: number) => `端口 ${port}`,
+			uptime: (minutes: number) => (minutes < 1 ? "刚启动" : minutes < 60 ? `${minutes} 分钟` : `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`),
+		},
 		cast: {
 			scout: "侦察员小提",
 			explore: "探路员",

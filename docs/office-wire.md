@@ -48,9 +48,16 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 
 ## 3. Trạng thái (`OfficeState`) và sự kiện (`OfficeEvent`)
 
-`OfficeState {actors=1, reports_staff=2, session=3 (OfficeSession)}`. `actors`: Giám đốc trước, rồi theo thứ tự vào. Tối đa 64 actor; actor vượt quá không được
+`OfficeState {actors=1, reports_staff=2, session=3 (OfficeSession), residents=4}`. `actors`: Giám đốc trước, rồi theo thứ tự vào. Tối đa 64 actor; actor vượt quá không được
 gửi, chỉ đếm ở `OfficeSession.hidden_actors`. `reports_staff`: AI có báo subagent (Claude: có; Antigravity: không, web hiện "AI này chưa báo cáo nhân viên" thay vì
 văn phòng trống; agent suy ra từ việc adapter có `SessionHistory.subagentActivity`).
+
+`residents` (`repeated OfficeResident {id=1, agent_type=2, parent_id=3, spawn_depth=4, entered_at=5, done_at=6, left_at=7}`): nhân viên đã rời văn phòng trong
+phiên (đã có `actor_leave`), tối đa 32 người rời gần nhất, xếp theo `entered_at`. Chỉ có trong ảnh chụp (thiết bị đang xem thì thấy họ rời qua sự kiện), chỉ gồm
+các trường `OfficeActor` vốn đã gửi; máy không bao giờ là cư dân. Thiết bị mở văn phòng sau đó (tải lại trang) tuyển lại họ cùng các actor theo thứ tự vào, mỗi
+người rảnh từ `done_at` (hoặc `left_at` khi rời lúc chưa xong), rồi cho người đã rời thành cư dân ngoài giờ: ai cũng giữ đúng tên và số thứ tự như thiết bị
+xem từ đầu (`apps/web/src/machines/office/office-former-staff.ts`). Agent cũ không gửi trường này: web chỉ biết các actor như trước. Ảnh chụp cùng epoch thiết
+bị đang xem thì bỏ qua trường này (thiết bị đã thấy họ rời).
 
 `OfficeSession {busy=1, waiting_for_user=2, started_at=3, tasks_done=4, background_machines=5, todo=6, usage=7, checks=8, hidden_actors=9}`:
 
@@ -66,7 +73,7 @@ văn phòng trống; agent suy ra từ việc adapter có `SessionHistory.subage
 | `checks` | `OfficeChecks {passed=1, failed=2, last_ok=3}`: hoạt động ở phòng `QA` đã kết thúc (qua/trượt theo `ok` của tool) |
 | `hidden_actors` | Actor vượt giới hạn 64 |
 
-`OfficeActor {id=1, role=2, agent_type=3, description=4, parent_id=5, spawn_depth=6, state=7, activity=8, entered_at=9, done_at=10}`:
+`OfficeActor {id=1, role=2, agent_type=3, description=4, parent_id=5, spawn_depth=6, state=7, activity=8, entered_at=9, done_at=10, service=11}`:
 
 - `agent_type`: loại agent như AI gọi (`code-reviewer`, `general-purpose`), cắt 60 ký tự; với máy là tên tool (`Bash`, `Monitor`); rỗng với Giám đốc hoặc khi
   không biết (web dùng loại "lạ").
@@ -76,6 +83,10 @@ văn phòng trống; agent suy ra từ việc adapter có `SessionHistory.subage
   rỗng vào Phòng họp.
 - `state` (`OfficeActorState`): `IDLE` (Giám đốc lúc phiên rảnh), `WORKING`, `DONE` (nhân viên đã xong, ở lại tới khi phiên rảnh quá 10 phút thì `actor_leave`),
   `AWAITING_APPROVAL` (có tool đang chờ duyệt). Máy không bao giờ `DONE`: máy xong là `actor_leave` ngay.
+- `service` (`OfficeService {kind=1, port=2, started_at=3}`, chỉ máy là lệnh shell nền): nhãn agent phân loại lệnh nền ngay trên máy (mục 4, "Nhãn dịch vụ").
+  `kind` (`OfficeServiceKind`): `DEV_SERVER`, `TEST_WATCH`, `BUILD`, `CI_WATCH`, `GIT`, `DATABASE`, `SCRIPT`; `port`: cổng ghi trên chính dòng lệnh của máy chủ dev
+  hoặc cơ sở dữ liệu, 0 khi không biết; `started_at`: lúc chạy (web tính "N phút"). Không đặt với Giám đốc, nhân viên, và với agent cũ (web giữ "Máy Bash"). Web
+  đọc `kind` lạ hoặc `UNSPECIFIED` là `SCRIPT`. `DEV_SERVER`, `TEST_WATCH`, `DATABASE` chạy tới khi bị dừng nên web không coi im lặng lâu là kẹt.
 
 `OfficeActivity {id=1, tool=2, group=3, room=4, subject=5, started_at=6}`; `subject` theo mục 5, chỉ cho tool của Giám đốc.
 
@@ -100,7 +111,13 @@ Hoạt động song song của một actor (Claude gọi nhiều tool cùng lúc
 - **Giám đốc**: `WORKING` khi phiên bận, `IDLE` khi rảnh. Bận mà không có tool nào mở thì hoạt động là `think` (`THINK`, `DIRECTOR`).
 - **Nhân viên**: vào với hoạt động `arrive` (`ARRIVE`, `LOBBY`); mỗi tool bên trong subagent là một hoạt động (chỉ tên tool, nhóm và phòng; không chủ đề). Xong thì
   `actor_update` với `state` `DONE`, `done_at`, hoạt động `hand-in` (`HAND_IN`, `DIRECTOR`): web cho người đi nộp hồ sơ rồi về bàn. Subagent chạy nền
-  (`run_in_background`) xong khi AI báo tác vụ nền kết thúc, không phải khi lời gọi tool trả về (lời gọi đó trả về ngay lúc khởi chạy).
+  (`run_in_background`) xong hẳn khi AI báo tác vụ nền kết thúc, hoặc bản ghi subagent (đọc với phiên chạy nơi khác) báo `finished` (`done_at` là lần ghi
+  cuối của bản ghi; người đã `DONE` giữ nguyên `done_at` và không nộp hồ sơ lại); không phải khi lời gọi tool trả về (lời gọi đó trả về ngay lúc khởi chạy).
+  Chỉ **coi như xong** (một tool của chính nó sau đó đưa nó về làm việc) khi: bản ghi đứng yên quá 10 phút (`STALE_SUBAGENT_MS`) mà không còn tool nào mở
+  và `background_tasks` là 0; hoặc, khi không đọc bản ghi, không nghe gì về nó 30 phút (`BACKGROUND_SILENT_MS`), không có tool nào mở, lúc phiên rảnh và
+  `background_tasks` là 0. `background_tasks` về 0 không kết thúc subagent nền (số đó có thể bỏ sót subagent), và còn subagent nền đang làm thì không ai rời
+  văn phòng. Lời gọi tool trả về ("Async agent launched") hoặc lượt kết thúc trước khi agent biết subagent chạy nền: nhân viên đã `DONE` được làm lại
+  (`actor_update` `WORKING`, `done_at` 0, không hoạt động, `tasks_done` trừ lại) khi tin chạy nền tới, trừ khi nó đã xong hẳn.
 - **Máy**: vào khi một lệnh shell có `run_in_background` hoặc một `Monitor` bắt đầu, hoạt động `MACHINE` ở phòng theo tiền tố lệnh (mục 4); rời khi AI báo
   tác vụ nền kết thúc, hoặc khi `background_tasks` về 0 (rời hết), hoặc giảm thấp hơn số máy đang có (máy cũ nhất rời trước).
 - **Phiên hết bận**: Giám đốc nhận `actor_update` (`IDLE`, không có `activity`): mọi hoạt động còn mở của Giám đốc bỏ đi, không gửi `activity_end` riêng và không
@@ -154,6 +171,25 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
 Bảng ví dụ đầy đủ: `apps/agent/test/office-activity-map.test.ts`.
 
 Tool bên trong subagent được phân phòng giống hệt (lệnh shell của subagent cũng chỉ đọc trên máy).
+
+**Nhãn dịch vụ** (`classifyService`, `apps/agent/src/office/office-service-kind.ts`): lệnh nền của một máy được đọc qua cùng bước 1-4 ở trên
+(`office-command-walk.ts`, dùng chung với phân phòng), rồi theo chương trình hoặc tên script cuối cùng:
+
+| Nhãn | Ví dụ |
+|---|---|
+| `DEV_SERVER` | script `dev`, `start`, `serve`, `preview`, `storybook` (kèm hậu tố); `vite`, `next dev`, `nuxt`, `astro`, `uvicorn`, `flask`, `rails`, `http-server`, `nodemon`, `wrangler`, `python -m http.server`, `go run`, `cargo run`, `docker compose up`, `docker run`; tệp tên `dev`/`serve`/`server` (`node server.js`) |
+| `TEST_WATCH` | trình kiểm tra của bảng phòng `QA` (trừ `tsc`/`vue-tsc`), `go test`, `cargo test`, script `test`/`lint`/`typecheck`/`ci:…`; tệp tên `test`/`e2e`/`spec` |
+| `BUILD` | script `build`, `compile`, `bundle`, `watch`; `tsc`, `webpack`, `rollup`, `esbuild`, `tsup`, `vite build`, `cargo build`, `go build`, `gradle`, `mvn`, `docker build`; tệp tên `build` |
+| `CI_WATCH` | `gh … watch` hoặc `--watch` (`gh run watch`, `gh pr checks --watch`), `glab ci …` |
+| `GIT` | `git`, `gh`, `glab` còn lại |
+| `DATABASE` | `postgres`, `psql`, `mysql`, `mongod`, `redis-server`, `sqlite3`, `prisma`, script `db`/`migrate`/`seed` |
+| `SCRIPT` | còn lại, kể cả dòng không tin được (bước 4) |
+
+Cổng chỉ đọc với `DEV_SERVER` và `DATABASE`, từ chính các từ của dòng lệnh: `--port N`, `--port=N`, `--http-port N` với mọi chương trình; `-p N` chỉ với
+chương trình mà `-p` là cổng (`next`, `vite`, `http-server`, `json-server`, `flask`, `rails`, `hugo`, `docker`/`podman` với `-p 8080:80` lấy 8080, `postgres`,
+`psql`, `pg_ctl`, `streamlit`; không bao giờ `mysql -p`, đó là mật khẩu); `-P N` với `mysql`/`mysqld`/`mariadb`; `PORT=N` hay `X_PORT=N` đứng trước lệnh;
+kể cả trong chuỗi `bash -c "…"`; N từ 1 tới 65535, không thì 0. Không quét hệ thống, không đoán cổng mặc định. Ví dụ đầy đủ:
+`apps/agent/test/office-service-kind.test.ts`.
 
 ## 5. Chủ đề rút gọn (`OfficeActivity.subject`)
 
@@ -212,7 +248,9 @@ Quan sát khi chạy thật (Claude Code 2.1.325, Agent SDK 0.3.319, 15/11/2026)
 
 Không khung văn phòng nào chứa: input của tool (lệnh đầy đủ, nội dung tệp, câu tìm kiếm, câu hỏi, URL đầy đủ), output của tool, chữ của todo, nội dung tin
 nhắn hay suy nghĩ của AI, đường dẫn thư mục, giá trị biến môi trường, tên server MCP. Chỉ đi ra: tên tool (MCP chỉ là `mcp`), nhóm hoạt ảnh, mã phòng, chủ đề
-rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1 (vốn đã hiện trong chat), các số đếm, token và chi phí. Test
+rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1 (vốn đã hiện trong chat), các số đếm, token và chi phí, nhãn dịch vụ của máy (một giá trị
+enum, một số cổng, một thời điểm; không chữ nào của lệnh). `apps/agent/test/office-tracker.test.ts` bơm chuỗi đánh dấu vào lệnh nền và quét ảnh chụp cùng sự
+kiện đã mã hoá; test hình dạng khung khẳng định `OfficeService` chỉ có `kind` (enum), `port` (uint32), `started_at` (int64). Test
 `apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output, vào vị trí gán biến (có ngoặc và dấu cách, `$env:`, `set`,
 `$(…)`, backtick, `\"` trong ngoặc kép, NBSP), sau `cd x &&`, vào tên server MCP, rồi quét mọi khung văn phòng đã mã hoá (không phân biệt hoa thường) để khẳng
 định chuỗi đó không có mặt; `apps/agent/test/office-shell-words.test.ts` thử riêng chủ đề lệnh shell với từng dạng đó và với 2 000 dòng ghép ngẫu nhiên (chủ đề
@@ -220,7 +258,7 @@ luôn rỗng hoặc là một tên trong danh sách).
 
 ## 9. Giới hạn
 
-- 64 actor mỗi văn phòng (Giám đốc luôn có chỗ); dư thì đếm ở `hidden_actors`.
+- 64 actor mỗi văn phòng (Giám đốc luôn có chỗ); dư thì đếm ở `hidden_actors`. 32 cư dân trong `OfficeState.residents`.
 - Gom sự kiện 250 ms; `session` chỉ gửi khi một số đổi.
 - 4 văn phòng mỗi kết nối, 16 cho cả máy (mục 2).
 - Bản ghi subagent (phiên chạy nơi khác) chỉ được đọc khi luồng không do máy chạy lượt hiện tại, và: lần đầu sau khi dựng văn phòng, hoặc phiên đang chạy nơi

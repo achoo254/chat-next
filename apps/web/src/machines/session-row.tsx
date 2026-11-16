@@ -15,7 +15,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { ModeIcon, openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { ModeIcon, officeOffered, openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
@@ -111,7 +111,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const ref_ = machine.entry.ref;
 	const inTerminal = terminalOffered(machine.state.info, thread.provider);
 	const status = threadStatus(thread, done);
-	const path = sessionPath(ref_, thread, inTerminal);
+	const path = sessionPath(ref_, thread, inTerminal, officeOffered(machine.state.info));
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>

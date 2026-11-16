@@ -9,7 +9,10 @@
 //                   (columns × rows cells, `count` of them used, named);
 //   accessories     one GLB with a named node per accessory and, per name,
 //                   the bone it hangs from and a scale;
-//   sfx.sounds      sound files by name, with loop flag and length.
+//   sfx.sounds      sound files by name, with loop flag and length;
+//   serviceRobot    the toy robot background services are drawn as: its GLB,
+//                   its height and the node names of its body, screen, eyes
+//                   and antenna light.
 // Everything is optional and checked piece by piece: whatever is missing or
 // odd stays a placeholder (or a WebAudio tone); the whole file is ignored when
 // it was made for another layout (layoutSha256) or another format version.
@@ -63,15 +66,25 @@ export interface SoundFile {
 	readonly seconds: number;
 }
 
+export interface RobotAssets {
+	readonly file: string;
+	/** The model's height without the antenna, metres. */
+	readonly heightM: number;
+	/** Node names in the GLB. */
+	readonly parts: { readonly body: string; readonly screen: string; readonly eyes: string; readonly light: string };
+}
+
 export interface SceneAssets {
 	readonly floors: ReadonlyMap<FloorLevel, FloorAssets>;
 	readonly character: CharacterAssets | null;
 	readonly accessories: AccessoryAssets | null;
 	/** Sound files by the asset file's names (office-sfx.ts maps them to scene events). */
 	readonly sounds: ReadonlyMap<string, SoundFile>;
+	/** The robot of background services, or null (they stay people). */
+	readonly serviceRobot: RobotAssets | null;
 }
 
-export const NO_SCENE_ASSETS: SceneAssets = { floors: new Map(), character: null, accessories: null, sounds: new Map() };
+export const NO_SCENE_ASSETS: SceneAssets = { floors: new Map(), character: null, accessories: null, sounds: new Map(), serviceRobot: null };
 
 /** A file under ASSETS_BASE: a name, or one folder and a name; nothing that climbs out. */
 const SAFE_PATH = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)?$/;
@@ -153,6 +166,22 @@ function accessoriesOf(value: unknown): AccessoryAssets | null {
 	return items.size === 0 ? null : { file: glb, items };
 }
 
+/** Robots taller than this are not the toy robot. */
+const MAX_ROBOT_HEIGHT_M = 3;
+
+function robotOf(value: unknown): RobotAssets | null {
+	if (!isRecord(value) || !isRecord(value.parts)) return null;
+	const glb = file(value.file);
+	const heightM = numberOf(value.heightM);
+	const body = safeName(value.parts.body);
+	const screen = safeName(value.parts.screen);
+	const eyes = safeName(value.parts.eyes);
+	const light = safeName(value.parts.light);
+	if (glb === null || heightM === null || heightM <= 0 || heightM > MAX_ROBOT_HEIGHT_M) return null;
+	if (body === null || screen === null || eyes === null || light === null) return null;
+	return { file: glb, heightM, parts: { body, screen, eyes, light } };
+}
+
 function soundsOf(value: unknown): Map<string, SoundFile> {
 	const out = new Map<string, SoundFile>();
 	const sounds = isRecord(value) && isRecord(value.sounds) ? value.sounds : {};
@@ -176,7 +205,13 @@ export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 		if (!isFloorLevel(level)) continue;
 		if (isRecord(entry.scene)) floors.set(level, floorScene(entry.scene));
 	}
-	return { floors, character: characterOf(json.character), accessories: accessoriesOf(json.accessories), sounds: soundsOf(json.sfx) };
+	return {
+		floors,
+		character: characterOf(json.character),
+		accessories: accessoriesOf(json.accessories),
+		sounds: soundsOf(json.sfx),
+		serviceRobot: robotOf(json.serviceRobot),
+	};
 }
 
 /** The lightmap pair for a floor at a size (falling back to the other size), or null without both. */

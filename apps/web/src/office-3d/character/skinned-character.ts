@@ -125,7 +125,15 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		measure = next !== null && isSeatedPose(pose) && !pelvisOf.has(next);
 	};
 
+	const head = nodes.get("head");
 	return {
+		model: "skinned",
+		headOffset() {
+			if (head === undefined) return null;
+			const at = head.computeWorldMatrix(true).getTranslation();
+			const root = holder.computeWorldMatrix(true).getTranslation();
+			return { x: at.x - root.x, z: at.z - root.z };
+		},
 		root: holder,
 		labelHeight: LABEL_HEIGHT_UNSCALED * CHARACTER_SCALE,
 		meshes: () => meshes,

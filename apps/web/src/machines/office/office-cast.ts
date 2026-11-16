@@ -5,6 +5,7 @@
 // built from the type itself. This palette is the only place the office
 // hard-codes colours: characters must look the same in 2D and in 3D.
 import type { RoomCode } from "./office-rooms.ts";
+import type { ServiceKind } from "./office-state.ts";
 
 /** The friendly names the copy carries (office.cast in copy-*.ts). */
 export type CastKey = "scout" | "explore" | "generalPurpose" | "tester" | "codeReviewer" | "researcher" | "planner" | "debugger";
@@ -45,6 +46,17 @@ export const UNKNOWN_PALETTE: readonly string[] = ["#c0607a", "#4f9da6", "#a07b3
 
 /** The director, the user (chairman) and the machines. */
 export const ROLE_COLORS = { director: "#2c3e66", chairman: "#8a6d1f", machine: "#5f6b7a" } as const;
+
+/** A background service's robot by what it runs (a script keeps the machines' grey). */
+export const SERVICE_COLORS: Readonly<Record<ServiceKind, string>> = {
+	"dev-server": "#3d9970",
+	"test-watch": "#9b59b6",
+	build: "#d4813a",
+	"ci-watch": "#2f7fa3",
+	git: "#c0503f",
+	database: "#6a7fdb",
+	script: ROLE_COLORS.machine,
+};
 
 /** A stable 32-bit hash of the type's name (FNV-1a), so a colour never changes between sessions. */
 export function nameHash(name: string): number {

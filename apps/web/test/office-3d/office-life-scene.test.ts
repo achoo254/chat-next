@@ -141,6 +141,10 @@ describe("places of the living floor", () => {
 		expect(personIntent(placement("b#1", "tv-0"), [talk], 1_000, ctx).talk).toBeNull();
 		// After it, back to their own place.
 		expect(personIntent(placement("b#1", "tv-0"), [talk], 21_000, ctx).anchorId).toBe("tv-0");
+		// Gone to bed meanwhile (the talk was picked while they were awake): they lie at their bed as it faces.
+		const asleep = (key: string): Placement => ({ ...placement(key, "bed-0"), room: "DORM", life: { slot: "sleep", act: "sleep" } });
+		expect(personIntent(asleep("a#1"), [talk], 7_000, ctx)).toMatchObject({ anchorId: "bed-0", beside: false, turn: 0, talk: null });
+		expect(personIntent(asleep("b#1"), [talk], 1_000, ctx)).toMatchObject({ anchorId: "bed-0", beside: false, turn: 0, talk: null });
 	});
 });
 

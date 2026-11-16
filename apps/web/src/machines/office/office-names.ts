@@ -1,10 +1,14 @@
 // What the office calls people and what their speech bubbles say, shared by
 // the 2D and 3D views. Bubbles show the real tool at once (the agent already
 // cut the subject down to a file name, a command's first word or a domain).
+// A background service from an agent that labels it is named by what it runs
+// ("Máy chủ dev") and says its port and how long it has run; an older agent's
+// machine stays "Máy Bash".
 import type { MachinesCopy } from "../copy-vi.ts";
-import { castOf, nameFromType, ROLE_COLORS } from "./office-cast.ts";
+import { castOf, nameFromType, ROLE_COLORS, SERVICE_COLORS } from "./office-cast.ts";
 import type { Placement } from "./office-placement.ts";
 import type { ActivityView, ActorView } from "./office-store.ts";
+import type { ServiceView } from "./office-state.ts";
 
 export type OfficeCopy = MachinesCopy["office"];
 
@@ -14,8 +18,10 @@ export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | 
 			return t.director;
 		case "chairman":
 			return t.chairman;
-		case "machine":
-			return t.machine(p.actor?.agentType ?? "");
+		case "machine": {
+			const service = p.actor?.service ?? null;
+			return service === null ? t.machine(p.actor?.agentType ?? "") : t.service.names[service.kind];
+		}
 		case "employee": {
 			const type = p.member?.agentType ?? p.actor?.agentType ?? "";
 			const key = castOf(type).key;
@@ -29,7 +35,7 @@ export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | 
 export function personColor(p: Pick<Placement, "kind" | "actor" | "member">): string {
 	if (p.kind === "director") return ROLE_COLORS.director;
 	if (p.kind === "chairman") return ROLE_COLORS.chairman;
-	if (p.kind === "machine") return ROLE_COLORS.machine;
+	if (p.kind === "machine") return SERVICE_COLORS[p.actor?.service?.kind ?? "script"];
 	return castOf(p.member?.agentType ?? p.actor?.agentType ?? "").color;
 }
 
@@ -44,6 +50,22 @@ export function bubbleText(t: OfficeCopy, activity: ActivityView | null): string
 	}
 	// An MCP tool comes as "mcp" with the tool's own name as its subject: "mcp · create_issue".
 	return activity.subject === "" ? activity.tool : `${activity.tool} · ${activity.subject}`;
+}
+
+/** A service's bubble: "Máy chủ dev · cổng 5173 · 12 phút" (the port only when known). */
+export function serviceBubble(t: OfficeCopy, service: ServiceView): string {
+	const parts = [t.service.names[service.kind]];
+	if (service.port !== null) parts.push(t.service.port(service.port));
+	parts.push(t.service.uptime(Math.floor(service.uptimeMs / 60_000)));
+	return parts.join(" · ");
+}
+
+/** The bubble of a person at work: a labelled service says what it is (unless it dozes), anyone else their tool. */
+function workBubble(t: OfficeCopy, actor: ActorView | null): string {
+	const activity = actor?.activity ?? null;
+	const service = actor?.service ?? null;
+	if (service !== null && activity !== null && activity.stuckMs === null) return serviceBubble(t, service);
+	return bubbleText(t, activity);
 }
 
 export type MarkerStatus = "idle" | "working" | "done" | "awaiting" | "slow" | "stuck" | "denied" | "waiting-you";
@@ -87,7 +109,7 @@ export function markerView(t: OfficeCopy, p: Placement, line: string | null): Ma
 	else if (status !== "idle" && status !== "working") state = t.state[status];
 	const label = state === null ? name : `${name} · ${state}`;
 	// A work bubble only while at work (not for someone home after handing in their file).
-	const work = p.activityRoom === null ? "" : bubbleText(t, activity);
+	const work = p.activityRoom === null ? "" : workBubble(t, p.actor);
 	if (line !== null && work === "") return { status, name, label, bubble: line, talking: true };
 	return { status, name, label, bubble: work, talking: false };
 }

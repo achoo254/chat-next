@@ -57,7 +57,7 @@ let browser: Browser;
 
 // --- The layout: which floor and room every anchor belongs to. ------------------------------------------------------
 
-type Spot = { readonly floor: number; readonly room: string | null; readonly kind: string };
+type Spot = { readonly floor: number; readonly room: string | null; readonly kind: string; readonly x: number; readonly z: number; readonly face: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -76,7 +76,8 @@ function layoutSpots(): ReadonlyMap<string, Spot> {
 		if (!isRecord(floor) || typeof floor.level !== "number" || !Array.isArray(floor.anchors)) continue;
 		for (const a of floor.anchors) {
 			if (!isRecord(a) || typeof a.id !== "string" || typeof a.kind !== "string") continue;
-			spots.set(a.id, { floor: floor.level, room: typeof a.room === "string" ? a.room : null, kind: a.kind });
+			const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+			spots.set(a.id, { floor: floor.level, room: typeof a.room === "string" ? a.room : null, kind: a.kind, x: num(a.x), z: num(a.z), face: num(a.face) });
 		}
 	}
 	assert.ok(spots.size > 0, "the layout has anchors");
@@ -320,6 +321,12 @@ test("the office tab in 3D: every room of the table reached, seq gap, following 
 	await reaches(page, "the planner (todo)", typeIs("planner"), "PLANNING");
 	await step(page); // 4: the test fails; a background shell
 	await reaches(page, "the background machine", (k) => k === "machine:m-dev", "SERVER");
+	// Named by what it runs, its port and minutes in the bubble; drawn as the toy robot in 3D.
+	const machinePin = page.locator("[data-id='office-person-machine:m-dev']");
+	assert.equal(await machinePin.locator(".of-name").textContent(), "Máy chủ dev");
+	assert.match((await machinePin.locator(".of-bubble").textContent()) ?? "", /^Máy chủ dev · cổng 5173 · (vừa chạy|\d+ phút)$/);
+	assert.equal(await machinePin.getAttribute("data-service"), "dev-server");
+	if (three) await poll("the dev server drawn as a robot", async () => (await readout(page))?.people.find((p) => p.key === "machine:m-dev")?.model ?? "", (m) => m === "robot", 30_000);
 	await step(page); // 5: the director edits; a code reviewer and a researcher come in
 	await step(page); // 6: the reviewer edits (their home room replaces WORK)
 	await reaches(page, "the code reviewer (edit, home room)", typeIs("code-reviewer"), "AUDIT");
@@ -424,6 +431,35 @@ test("the office tab in 3D: every room of the table reached, seq gap, following 
 		assert.ok(lastGrowth - clickedAt < 1_000, `frames grew ${Math.round(lastGrowth - clickedAt)} ms after the chat tab was picked`);
 		assert.equal(await has3D(page), false, "the scene and its read-out are gone");
 		assert.equal(await page.locator("canvas.of3d-canvas").count(), 0, "no canvas left");
+	}
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("opening the office again shows everyone already there at their place: nobody walks in from the door", async () => {
+	const { context, page, errors } = await openOffice(browser, "machine-chat", FLAGS_3D);
+	const webgl = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
+	if (!webgl) {
+		console.log("office e2e: no WebGL2, the walk-in check is 3D only (2D draws no walking)");
+		await context.close();
+		return;
+	}
+	await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
+	for (let i = 0; i <= 6; i++) await step(page);
+	await poll("the staff in", async () => (await seen(page)).filter((s) => s.kind === "employee").length, (n) => n >= 5);
+	// Away to the chat and back: a new scene, a fresh snapshot of people who came in before it opened.
+	await page.locator("[data-id=session-mode-chat]").click();
+	await page.locator("[data-id=office]").waitFor({ state: "detached" });
+	await page.locator("[data-id=session-mode-office]").click();
+	await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
+	await until(page, "window.__office", () => (window as TestWindow).__office !== undefined);
+	await poll("the people drawn", async () => (await readout(page))?.people.length ?? 0, (n) => n >= 6);
+	// The first second: everyone stands or sits where they are; nobody walks in from the lobby door.
+	for (let i = 0; i < 5; i++) {
+		const people = (await readout(page))?.people ?? [];
+		const walking = people.filter((p) => p.pose === "walk").map((p) => p.key);
+		assert.deepEqual(walking, [], "everyone is already at their place (nobody walking in)");
+		await page.waitForTimeout(200);
 	}
 	assert.deepEqual(errors, []);
 	await context.close();
@@ -575,6 +611,24 @@ test("the residents' day: after the session nobody goes home, at 23:30 everyone 
 			(pose) => pose === "sleep",
 			60_000,
 		);
+		// Everyone asleep lies along their bed, head on the pillow: the bed anchor's facing, at its centre.
+		const sleepers = ((await readout(page))?.people ?? []).filter((p) => p.pose === "sleep");
+		assert.ok(sleepers.length > 0, "someone sleeps");
+		for (const p of sleepers) {
+			const bed = SPOTS.get(p.target);
+			assert.equal(bed?.kind, "bed", `${p.key} sleeps at a bed: ${p.target}`);
+			if (bed === undefined) continue;
+			const turn = Math.abs(Math.atan2(Math.sin(p.heading - bed.face), Math.cos(p.heading - bed.face)));
+			assert.ok(turn < 0.01, `${p.key} lies along ${p.target}: heading ${p.heading}, bed ${bed.face}`);
+			assert.ok(Math.hypot(p.x - bed.x, p.z - bed.z) < 0.01, `${p.key} lies at the centre of ${p.target}: ${p.x}, ${p.z}`);
+			// The body itself (the rigged model's head bone): along the bed, not across it.
+			if (p.head !== null) {
+				const along = Math.abs(p.head.x * Math.sin(bed.face) + p.head.z * Math.cos(bed.face));
+				const across = Math.abs(p.head.x * Math.cos(bed.face) - p.head.z * Math.sin(bed.face));
+				console.log(`office e2e: ${p.key} at ${p.target}: head ${p.head.x.toFixed(2)}, ${p.head.z.toFixed(2)} (along ${along.toFixed(2)}, across ${across.toFixed(2)})`);
+				assert.ok(across < along, `${p.key} lies along ${p.target}, not across it: along ${along.toFixed(2)}, across ${across.toFixed(2)}`);
+			}
+		}
 	}
 	await context.clock.setSystemTime(new Date(NEXT_MORNING));
 	// Placed in the office (a talk may walk the 3D figure over to a neighbour meanwhile: the placement stays).

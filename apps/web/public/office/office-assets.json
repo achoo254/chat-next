@@ -1,6 +1,6 @@
 {
 	"formatVersion": 1,
-	"layoutSha256": "a7eeb30163fa49f8eb62ce6f139c61672d541c70860f07db5b2e9bde8996f4b5",
+	"layoutSha256": "817f08e3cc628872f326f50cd7b2dac102bcbcaedef1652228bf0f395f21f6cf",
 	"note": "Office assets for the 2D view (floors[].views, checked by parseOfficeAssets) and the 3D scene (floors[].scene, character, accessories, sfx). Made by tools/office-art in the workspace; file names carry a content hash.",
 	"floors": [
 		{
@@ -9,8 +9,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-1-day-desktop.b242c647.webp",
-					"night": "office-2d-floor-1-night-desktop.d018170d.webp",
+					"day": "office-2d-floor-1-day-desktop.f0890371.webp",
+					"night": "office-2d-floor-1-night-desktop.c52ca923.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.98,
@@ -149,8 +149,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-1-day-phone.d2f5d0de.webp",
-					"night": "office-2d-floor-1-night-phone.2ba6cc0d.webp",
+					"day": "office-2d-floor-1-day-phone.ce536219.webp",
+					"night": "office-2d-floor-1-night-phone.320794d2.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.52,
@@ -288,18 +288,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-1.2adcf407.glb",
+				"shell": "office-floor-1.5f2a8edb.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-1-day-1024.a799eafe.webp",
-						"2048": "lightmap-floor-1-day-2048.49c7f99b.webp"
+						"1024": "lightmap-floor-1-day-1024.76b39f5d.webp",
+						"2048": "lightmap-floor-1-day-2048.b5c158b0.webp"
 					},
 					"night": {
 						"1024": "lightmap-floor-1-night-1024.dd2745b3.webp",
-						"2048": "lightmap-floor-1-night-2048.5309bb61.webp"
+						"2048": "lightmap-floor-1-night-2048.70b0348a.webp"
 					}
 				},
-				"props": "office-props-floor-1.b10a5d00.glb",
+				"props": "office-props-floor-1.d9f37cde.glb",
 				"models": [
 					"armchair",
 					"book-stack",
@@ -342,8 +342,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-2-day-desktop.363b20d4.webp",
-					"night": "office-2d-floor-2-night-desktop.a7e5e7a6.webp",
+					"day": "office-2d-floor-2-day-desktop.25ae0aec.webp",
+					"night": "office-2d-floor-2-night-desktop.64884364.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.98,
@@ -394,8 +394,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-2-day-phone.8ddb34a7.webp",
-					"night": "office-2d-floor-2-night-phone.4302c969.webp",
+					"day": "office-2d-floor-2-day-phone.2f448c7c.webp",
+					"night": "office-2d-floor-2-night-phone.25d4569d.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.52,
@@ -445,18 +445,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-2.7481c489.glb",
+				"shell": "office-floor-2.39b507d8.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-2-day-1024.a547144d.webp",
-						"2048": "lightmap-floor-2-day-2048.2daea84f.webp"
+						"1024": "lightmap-floor-2-day-1024.572b4f04.webp",
+						"2048": "lightmap-floor-2-day-2048.ab9b3b10.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-2-night-1024.d7c2379f.webp",
-						"2048": "lightmap-floor-2-night-2048.e4d7646b.webp"
+						"1024": "lightmap-floor-2-night-1024.d1a7d8fd.webp",
+						"2048": "lightmap-floor-2-night-2048.b9adddb7.webp"
 					}
 				},
-				"props": "office-props-floor-2.8840b7ca.glb",
+				"props": "office-props-floor-2.ec592789.glb",
 				"models": [
 					"globe",
 					"kanban-board",
@@ -476,8 +476,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-3-day-desktop.cb4312f9.webp",
-					"night": "office-2d-floor-3-night-desktop.42b5ffb9.webp",
+					"day": "office-2d-floor-3-day-desktop.a776b0f1.webp",
+					"night": "office-2d-floor-3-night-desktop.223c885c.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.98,
@@ -532,8 +532,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-3-day-phone.3ee5be4e.webp",
-					"night": "office-2d-floor-3-night-phone.11a6c367.webp",
+					"day": "office-2d-floor-3-day-phone.ed3a9a28.webp",
+					"night": "office-2d-floor-3-night-phone.5e43693c.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.52,
@@ -587,15 +587,15 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-3.607c30c2.glb",
+				"shell": "office-floor-3.e968552a.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-3-day-1024.f61afb15.webp",
-						"2048": "lightmap-floor-3-day-2048.b8e33690.webp"
+						"1024": "lightmap-floor-3-day-1024.f70fc7e3.webp",
+						"2048": "lightmap-floor-3-day-2048.07fc9f79.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-3-night-1024.3ddfa373.webp",
-						"2048": "lightmap-floor-3-night-2048.4170ed96.webp"
+						"1024": "lightmap-floor-3-night-1024.3407fe11.webp",
+						"2048": "lightmap-floor-3-night-2048.25d8fbf2.webp"
 					}
 				},
 				"props": "office-props-floor-3.d699a02c.glb",
@@ -618,8 +618,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-4-day-desktop.faf0a61a.webp",
-					"night": "office-2d-floor-4-night-desktop.1f4d041c.webp",
+					"day": "office-2d-floor-4-day-desktop.09f67051.webp",
+					"night": "office-2d-floor-4-night-desktop.8672e239.webp",
 					"anchors": {
 						"f4-elevator": [
 							35.98,
@@ -682,24 +682,24 @@
 							56.74
 						],
 						"tv-0": [
-							62.11,
-							36.74
+							61.65,
+							36
 						],
 						"tv-1": [
-							64.04,
-							35.72
+							63.58,
+							34.98
 						],
 						"tv-2": [
-							65.97,
-							34.7
+							65.5,
+							33.96
 						],
 						"tv-3": [
-							54.16,
-							35.6
+							54.51,
+							35.42
 						],
 						"tv-4": [
-							68.87,
-							27.81
+							68.52,
+							27.99
 						],
 						"tv-5": [
 							57.85,
@@ -742,8 +742,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-4-day-phone.76b68cd7.webp",
-					"night": "office-2d-floor-4-night-phone.52412ab1.webp",
+					"day": "office-2d-floor-4-day-phone.cba29d03.webp",
+					"night": "office-2d-floor-4-night-phone.503731b6.webp",
 					"anchors": {
 						"f4-elevator": [
 							35.52,
@@ -806,24 +806,24 @@
 							54.35
 						],
 						"tv-0": [
-							62.51,
-							41.44
+							62.03,
+							40.97
 						],
 						"tv-1": [
-							64.5,
-							40.79
+							64.02,
+							40.31
 						],
 						"tv-2": [
-							66.49,
-							40.13
+							66.01,
+							39.65
 						],
 						"tv-3": [
-							54.29,
-							40.71
+							54.65,
+							40.59
 						],
 						"tv-4": [
-							69.48,
-							35.68
+							69.12,
+							35.8
 						],
 						"tv-5": [
 							58.1,
@@ -865,18 +865,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-4.c43d5bad.glb",
+				"shell": "office-floor-4.22305c64.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-4-day-1024.438d6ff9.webp",
-						"2048": "lightmap-floor-4-day-2048.852bc513.webp"
+						"1024": "lightmap-floor-4-day-1024.986f7fdb.webp",
+						"2048": "lightmap-floor-4-day-2048.8682bd65.webp"
 					},
 					"night": {
 						"1024": "lightmap-floor-4-night-1024.83c5d2bb.webp",
-						"2048": "lightmap-floor-4-night-2048.e15aaebd.webp"
+						"2048": "lightmap-floor-4-night-2048.55e497d5.webp"
 					}
 				},
-				"props": "office-props-floor-4.1bcdde2c.glb",
+				"props": "office-props-floor-4.23277be5.glb",
 				"models": [
 					"beanbag",
 					"bed",
@@ -1083,6 +1083,16 @@
 				"seconds": 1.5,
 				"kb": 9
 			}
+		}
+	},
+	"serviceRobot": {
+		"file": "service-robot.00350b2e.glb",
+		"heightM": 0.62,
+		"parts": {
+			"body": "robot-body",
+			"screen": "robot-screen",
+			"eyes": "robot-eyes",
+			"light": "robot-light"
 		}
 	}
 }

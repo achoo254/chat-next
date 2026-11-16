@@ -29,7 +29,7 @@ import { useAgentProjects } from "./agent-projects-store.ts";
 import { adoptStarted } from "./project-actions.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { aiName, errorText, folderName, providerOf, timeAgo, useHub, useMachineViews, useNow, useWatch, type MachineView } from "./use-machines.ts";
-import { sessionPath, terminalOffered } from "./session-mode.tsx";
+import { officeOffered, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const SESSION_PARAM = /^[A-Za-z0-9_-]{1,64}$/;
@@ -337,7 +337,7 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 					return (
 						<li key={`${machine.entry.ref}/${thread.id}`}>
 							{online ? (
-								<Link to={sessionPath(machine.entry.ref, thread, terminalOffered(machine.state.info, thread.provider))} className="mx-recent-row">
+								<Link to={sessionPath(machine.entry.ref, thread, terminalOffered(machine.state.info, thread.provider), officeOffered(machine.state.info))} className="mx-recent-row">
 									{body}
 								</Link>
 							) : (

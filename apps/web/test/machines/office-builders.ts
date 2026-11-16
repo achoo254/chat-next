@@ -6,13 +6,16 @@ import {
 	OfficeActorState,
 	OfficeAnimGroup,
 	OfficeEventSchema,
+	OfficeResidentSchema,
 	OfficeRole,
 	OfficeRoom,
+	OfficeServiceSchema,
 	OfficeSessionSchema,
 	OfficeSnapshotSchema,
 	type OfficeActivity,
 	type OfficeActor,
 	type OfficeEvent,
+	type OfficeResident,
 	type OfficeSession,
 	type OfficeSnapshot,
 } from "@achoo254/chat-proto/remote/remote";
@@ -38,20 +41,41 @@ export function staff(id: string, agentType: string, extra: Partial<Pick<OfficeA
 	return create(OfficeActorSchema, { id, role: OfficeRole.EMPLOYEE, agentType, spawnDepth: 1, state: OfficeActorState.WORKING, enteredAt: BigInt(T0), ...extra });
 }
 
-export function machine(id: string, room = OfficeRoom.SERVER): OfficeActor {
-	return create(OfficeActorSchema, { id, role: OfficeRole.MACHINE, agentType: "Bash", state: OfficeActorState.WORKING, enteredAt: BigInt(T0), activity: act(id, room, "Bash", T0, OfficeAnimGroup.MACHINE) });
+export function machine(id: string, room = OfficeRoom.SERVER, service?: MessageInitShape<typeof OfficeServiceSchema>): OfficeActor {
+	return create(OfficeActorSchema, {
+		id,
+		role: OfficeRole.MACHINE,
+		agentType: "Bash",
+		state: OfficeActorState.WORKING,
+		enteredAt: BigInt(T0),
+		activity: act(id, room, "Bash", T0, OfficeAnimGroup.MACHINE),
+		...(service === undefined ? {} : { service: create(OfficeServiceSchema, service) }),
+	});
+}
+
+/** An employee that left before the snapshot (OfficeState.residents). */
+export function resident(id: string, agentType: string, times: { enteredAt: number; doneAt?: number; leftAt: number }, nesting: { parentId?: string; spawnDepth?: number } = {}): OfficeResident {
+	return create(OfficeResidentSchema, {
+		id,
+		agentType,
+		parentId: nesting.parentId ?? "",
+		spawnDepth: nesting.spawnDepth ?? 1,
+		enteredAt: BigInt(times.enteredAt),
+		doneAt: BigInt(times.doneAt ?? 0),
+		leftAt: BigInt(times.leftAt),
+	});
 }
 
 export function session(extra: Partial<Omit<OfficeSession, "$typeName" | "$unknown">> = {}): OfficeSession {
 	return create(OfficeSessionSchema, { busy: true, startedAt: BigInt(T0), ...extra });
 }
 
-export function snapshot(actors: OfficeActor[], options: { epoch?: bigint; seq?: bigint; reportsStaff?: boolean; session?: OfficeSession } = {}): OfficeSnapshot {
+export function snapshot(actors: OfficeActor[], options: { epoch?: bigint; seq?: bigint; reportsStaff?: boolean; session?: OfficeSession; residents?: OfficeResident[] } = {}): OfficeSnapshot {
 	return create(OfficeSnapshotSchema, {
 		threadId: "t1",
 		epoch: options.epoch ?? 1n,
 		seq: options.seq ?? 0n,
-		state: { actors, reportsStaff: options.reportsStaff ?? true, session: options.session ?? session() },
+		state: { actors, reportsStaff: options.reportsStaff ?? true, session: options.session ?? session(), residents: options.residents ?? [] },
 	});
 }
 

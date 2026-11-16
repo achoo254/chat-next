@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { ItemSchema, ThreadState, ThreadSummarySchema } from "@achoo254/chat-proto/remote/remote";
+import { ItemSchema, OfficeActorState, ThreadState, ThreadSummarySchema } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { readLinesUntil } from "../src/office/office-bounded-lines.ts";
 import { OfficeProblems, errorKind } from "../src/office/office-problem-log.ts";
@@ -118,6 +118,84 @@ describe("when the subagents' records are read", () => {
     // One the journal never brought in is still left out.
     built.subagentReport({ subagents: [{ ...record, toolUseId: "gone" }], usage: [] }, hour + 2);
     expect(built.tracker.snapshot().actors.some((a) => a.id === "gone")).toBe(false);
+  });
+
+  it("a subagent in the background is done only when its record says finished or has been quiet over ten minutes", () => {
+    const t = thread();
+    t.setSummary(summary({ busyElsewhere: true }), 1);
+    const minute = 60_000;
+    const record = { toolUseId: "bg", parentToolUseId: "", workflowId: "", agentType: "fullstack-developer", description: "Build", background: true, spawnDepth: 1, finished: false, updatedAt: 0, tools: [] };
+    const state = (): unknown => t.tracker.snapshot().actors.find((a) => a.id === "bg")?.state;
+    // Its record still being written (a minute ago): it works on, whatever the count of background work says.
+    t.subagentReport({ subagents: [{ ...record, updatedAt: 9 * minute }], usage: [] }, 10 * minute);
+    t.setSummary(summary({}), 10 * minute + 1);
+    expect(state()).toBe(OfficeActorState.WORKING);
+    // Quiet for over ten minutes: the AI that ran it is gone.
+    t.subagentReport({ subagents: [{ ...record, updatedAt: 9 * minute }], usage: [] }, 20 * minute);
+    expect(state()).toBe(OfficeActorState.DONE);
+  });
+
+  it("a quiet record is no end while a tool of its own is open or background work is counted, and only a presumed one", () => {
+    const minute = 60_000;
+    const t = thread();
+    t.setSummary(summary({ busyElsewhere: true }), 1);
+    const open = { toolId: "bg-t", name: "Bash", kind: "shell" as const, at: minute, done: false, ok: true, command: "pnpm test" };
+    const record = { toolUseId: "bg", parentToolUseId: "", workflowId: "", agentType: "tester", description: "Test", background: true, spawnDepth: 1, finished: false, updatedAt: minute, tools: [open] };
+    const state = (): unknown => t.tracker.snapshot().actors.find((a) => a.id === "bg")?.state;
+    // A long test run: its record is quiet for 15 minutes, its tool open, background work counted.
+    t.setSummary(summary({ backgroundTasks: 1 }), 2);
+    t.subagentReport({ subagents: [record], usage: [] }, 16 * minute);
+    expect(state()).toBe(OfficeActorState.WORKING);
+    // The count of background work at 0 (it may miss subagents): the open tool still keeps it at work.
+    t.setSummary(summary({ busyElsewhere: true }), 16 * minute + 1);
+    t.subagentReport({ subagents: [record], usage: [] }, 17 * minute);
+    expect(state()).toBe(OfficeActorState.WORKING);
+    // Its tool done, nothing counted, quiet: presumed gone...
+    const quiet = { ...record, tools: [{ ...open, done: true }] };
+    t.subagentReport({ subagents: [quiet], usage: [] }, 18 * minute);
+    expect(state()).toBe(OfficeActorState.DONE);
+    // ...until a tool call of its own shows up: back to work.
+    t.subagentReport({ subagents: [{ ...quiet, updatedAt: 19 * minute, tools: [{ ...open, toolId: "bg-t2", at: 19 * minute }] }], usage: [] }, 19 * minute);
+    expect(state()).toBe(OfficeActorState.WORKING);
+  });
+
+  it("a quiet record with no tool open is no end while background work is counted", () => {
+    const minute = 60_000;
+    const t = thread();
+    t.setSummary(summary({ backgroundTasks: 1 }), 1);
+    const record = { toolUseId: "bg", parentToolUseId: "", workflowId: "", agentType: "tester", description: "", background: true, spawnDepth: 1, finished: false, updatedAt: minute, tools: [] };
+    t.subagentReport({ subagents: [record], usage: [] }, 20 * minute);
+    expect(t.tracker.snapshot().actors.find((a) => a.id === "bg")?.state).toBe(OfficeActorState.WORKING);
+  });
+
+  it("a recent record saying finished does not bring one already done back to work", () => {
+    const t = thread();
+    t.setSummary(summary({ busyElsewhere: true }), 1);
+    const record = { toolUseId: "bg", parentToolUseId: "", workflowId: "", agentType: "tester", description: "", background: false, spawnDepth: 1, finished: false, updatedAt: 1, tools: [] };
+    t.subagentReport({ subagents: [record], usage: [] }, 2);
+    // Its turn ended first: taken as done (not yet known to run in the background).
+    t.setSummary(summary({}), 3);
+    expect(t.tracker.snapshot().actors.find((a) => a.id === "bg")).toMatchObject({ state: OfficeActorState.DONE, doneAt: 3n });
+    t.tracker.drain();
+    t.subagentReport({ subagents: [{ ...record, background: true, finished: true, updatedAt: 4 }], usage: [] }, 5);
+    expect(t.tracker.snapshot().actors.find((a) => a.id === "bg")).toMatchObject({ state: OfficeActorState.DONE, doneAt: 3n });
+    expect(t.tracker.drain().filter((e) => e.kind.case === "actorUpdate" && e.kind.value.state === OfficeActorState.WORKING)).toEqual([]);
+  });
+
+  it("a subagent its record says finished is never brought back to hand in again, and keeps when it was done", () => {
+    const hour = 3_600_000;
+    const built = new OfficeThread("t1", true, Object.assign(new OfficeMemory(), { sessionIds: new Map([["t1", "session-1"]]) }), hour);
+    const item = create(ItemSchema, { id: "sub:a1", at: 1_000n, body: { case: "subagent", value: { toolId: "a1", description: "Review", done: true } } });
+    built.seed([item], summary({ busyElsewhere: true }), hour);
+    const before = built.tracker.snapshot().actors.find((a) => a.id === "a1");
+    expect(before?.state).toBe(OfficeActorState.DONE);
+    built.tracker.drain();
+    const record = { toolUseId: "a1", parentToolUseId: "", workflowId: "", agentType: "code-reviewer", description: "Review", background: true, spawnDepth: 1, finished: true, updatedAt: 2_000, tools: [] };
+    // Read again and again (each read after a restart of the agent too): no work again, no second hand-in.
+    for (const at of [hour + 1, hour + 2]) built.subagentReport({ subagents: [record], usage: [] }, at);
+    const after = built.tracker.snapshot().actors.find((a) => a.id === "a1");
+    expect(after).toMatchObject({ state: OfficeActorState.DONE, doneAt: before?.doneAt, agentType: "code-reviewer" });
+    expect(built.tracker.drain().filter((e) => e.kind.case === "actorUpdate" && e.kind.value.state === OfficeActorState.WORKING)).toEqual([]);
   });
 
   it("never without the AI's session id", () => {

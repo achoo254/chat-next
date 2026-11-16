@@ -1294,6 +1294,19 @@ export const enMachines: MachinesCopy = {
 		director: "Director",
 		chairman: "Chairman (you)",
 		machine: (tool: string) => (tool === "" ? "Background machine" : `${tool} machine`),
+		service: {
+			names: {
+				"dev-server": "Dev server",
+				"test-watch": "Test watch",
+				build: "Build",
+				"ci-watch": "CI watch",
+				git: "Git",
+				database: "Database",
+				script: "Script",
+			},
+			port: (port: number) => `port ${port}`,
+			uptime: (minutes: number) => (minutes < 1 ? "just started" : minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`),
+		},
 		cast: {
 			scout: "Scout",
 			explore: "Pathfinder",

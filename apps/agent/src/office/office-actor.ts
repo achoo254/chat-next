@@ -9,8 +9,10 @@ import {
   OfficeActorSchema,
   OfficeActorState,
   OfficeRole,
+  OfficeServiceSchema,
 } from "@achoo254/chat-proto/remote/remote";
 import type { OfficePlace } from "./office-activity-map.ts";
+import type { ServiceLabel } from "./office-service-kind.ts";
 
 export const DIRECTOR_ID = "director";
 
@@ -29,6 +31,12 @@ export type ActorRecord = {
   doneAt: number;
   /** Runs in the background: its tool call answering is not its end. */
   background: boolean;
+  /** Its DONE came from the AI saying its background work ended, or its record saying finished: nothing brings it back. */
+  doneInBackground: boolean;
+  /** Its DONE was only presumed (silent for long with no tool open): a tool call of its own brings it back to work. */
+  donePresumed: boolean;
+  /** When the tracker last heard of it (entering, a tool call of its own starting or ending). */
+  heardAt: number;
   /** Open tool calls, oldest first. */
   open: ActivityRecord[];
   /** What it does when no tool call is open. */
@@ -38,6 +46,8 @@ export type ActorRecord = {
   /** Permission prompts waiting on its tools, and its state before the first of them. */
   prompts: number;
   stateBeforePrompt: OfficeActorState;
+  /** A machine's background command as a label (kind, port), and when it started; never the command. */
+  service?: ServiceLabel & { startedAt: number };
 };
 
 export function newActor(fields: Pick<ActorRecord, "id" | "role" | "enteredAt"> & Partial<ActorRecord>): ActorRecord {
@@ -49,6 +59,9 @@ export function newActor(fields: Pick<ActorRecord, "id" | "role" | "enteredAt"> 
     state: OfficeActorState.WORKING,
     doneAt: 0,
     background: false,
+    doneInBackground: false,
+    donePresumed: false,
+    heardAt: fields.enteredAt,
     open: [],
     shownId: "",
     prompts: 0,
@@ -86,6 +99,7 @@ export function actorWire(a: ActorRecord): OfficeActor {
     ...(shown ? { activity: activityWire(shown) } : {}),
     enteredAt: BigInt(a.enteredAt),
     doneAt: BigInt(a.doneAt),
+    ...(a.service ? { service: create(OfficeServiceSchema, { kind: a.service.kind, port: a.service.port, startedAt: BigInt(a.service.startedAt) }) } : {}),
   });
 }
 

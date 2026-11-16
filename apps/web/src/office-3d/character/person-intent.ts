@@ -3,8 +3,12 @@
 // free person may join the idle show (office hours only, never while living
 // by the schedule or talking); a conversation's visitor stands beside the
 // host facing them, and a standing host turns to the visitor; whoever dozes
-// off over a stuck tool stays put. Pure, no engine.
+// off over a stuck tool stays put. Someone asleep (in bed, or dozing on a
+// sofa) takes no part in a talk picked while they were awake: they lie or sit
+// at their own place exactly as the anchor faces, never turned or beside it.
+// Pure, no engine.
 import { lineOf, talkOf, type Talk } from "../../machines/office/office-conversations.ts";
+import { awakeAct } from "../../machines/office/office-life-schedule.ts";
 import type { Placement } from "../../machines/office/office-placement.ts";
 import type { TalkRole } from "./anim-groups.ts";
 import { idlePerformance, type IdleContext, type IdleTarget } from "./idle-performer.ts";
@@ -32,7 +36,8 @@ function roleIn(talk: Talk, key: string, now: number): TalkRole {
 }
 
 export function personIntent(placement: Placement, talks: readonly Talk[], now: number, ctx: IdleContext): PersonIntent {
-	const talk = talkOf(talks, placement.key);
+	const asleep = placement.life !== null && !awakeAct(placement.life.act);
+	const talk = asleep ? null : talkOf(talks, placement.key);
 	if (talk !== null && now < talk.end) {
 		const visitor = talk.visitor === placement.key;
 		return {

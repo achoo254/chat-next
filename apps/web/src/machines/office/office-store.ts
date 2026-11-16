@@ -11,7 +11,8 @@
 // and a future replay drive it.
 import type { OfficeEvent, OfficeSnapshot } from "@achoo254/chat-proto/remote/remote";
 import { actorOf, actorViewOf, activityOf, APPROVALS, EMPTY_SESSION, eventActor, nestedActor, sessionOf, type ActorRecord, type OfficeState, type SessionView } from "./office-state.ts";
-import { fillDesks, hire, overflowOf, release, reseat, retire, type StaffMember } from "./office-staff.ts";
+import { formerStaffOf, hireOrder } from "./office-former-staff.ts";
+import { fillDesks, hire, overflowOf, release, reseat, retire, type FreeAt, type StaffMember } from "./office-staff.ts";
 import { approvalDecided, workEnded, type WorkLog } from "./office-work-log.ts";
 
 export type { ActivityView, ActorRole, ActorState, ActorView, AnimGroup, ApprovalState, OfficeState, SessionView } from "./office-state.ts";
@@ -82,9 +83,9 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 		}
 	};
 
-	const hireActor = (a: ActorRecord): void => {
+	const hireActor = (a: Pick<ActorRecord, "id" | "role" | "agentType" | "spawnDepth" | "parentId" | "enteredAt">, free: FreeAt = freeAt): void => {
 		if (a.role !== "employee") return;
-		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, freeAt, desks, residents);
+		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, free, desks, residents);
 		// A resident back at work is on duty again.
 		residents = residents.filter((r) => !staff.some((m) => m.key === r.key));
 		remember(staff);
@@ -122,9 +123,10 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 	};
 
 	/** The clock-driven parts of the state: emit only when one of them changed. */
-	// A dozing person's "stuck N minutes" changes once a minute.
+	// A dozing person's "stuck N minutes" and a service's "N minutes" running change once a minute.
+	const minutes = (ms: number | null | undefined): string => (ms == null ? "" : String(Math.floor(ms / 60_000)));
 	const timeKey = (s: OfficeState): string =>
-		`${s.power}|${s.actors.map((a) => `${a.activity?.slow === true ? "1" : "0"}${a.activity?.stuckMs == null ? "" : Math.floor(a.activity.stuckMs / 60_000)}`).join(",")}`;
+		`${s.power}|${s.actors.map((a) => `${a.activity?.slow === true ? "1" : "0"}${minutes(a.activity?.stuckMs)}/${minutes(a.service?.uptimeMs)}`).join(",")}`;
 
 	const state = (): OfficeState => {
 		cached ??= build();
@@ -240,10 +242,21 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			visitors = same ? before.visitors : [];
 			residents = same ? before.residents : [];
 			work = same ? before.work : {};
-			for (const a of s?.actors ?? []) {
-				const record = actorOf(a, undefined);
-				actors = [...actors, record];
-				hireActor(record);
+			actors = (s?.actors ?? []).map((a) => actorOf(a, undefined));
+			// Opened afresh: those who had left are hired back first in the order everyone came in (a free one makes
+			// room for the next of the type from when they finished or left), then go off duty, so everyone keeps the
+			// name and number they had. Ignored for the same run: this device saw them leave.
+			const former = same ? [] : formerStaffOf(s?.residents ?? []);
+			const freeFrom = new Map(former.map((f) => [f.id, f.freeFrom]));
+			const replayFree: FreeAt = (actorId, at) => {
+				const from = freeFrom.get(actorId);
+				return from === undefined ? freeAt(actorId, at) : from <= at;
+			};
+			for (const a of hireOrder(former, actors)) hireActor(a, replayFree);
+			for (const f of [...former].sort((x, y) => x.leftAt - y.leftAt)) {
+				const after = retire(staff, residents, f.id, desks);
+				staff = after.staff;
+				residents = after.offDuty;
 			}
 			if (same) {
 				staff = reseat(staff, before.staff, desks);

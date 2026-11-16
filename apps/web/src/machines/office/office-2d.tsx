@@ -32,7 +32,7 @@ function Marker({ p, t, line, placed }: { p: Placement; t: OfficeCopy; line: str
 		style["--of-stack"] = placed.stack;
 	}
 	return (
-		<div className="of-marker" data-status={status} data-kind={p.kind} data-anchor={placed?.anchor ?? p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
+		<div className="of-marker" data-status={status} data-kind={p.kind} data-service={p.actor?.service?.kind} data-anchor={placed?.anchor ?? p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
 			<span className="of-dot" aria-hidden="true">
 				{status === "slow" ? "⌛" : ""}
 			</span>

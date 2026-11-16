@@ -3316,6 +3316,28 @@ message OfficeState {
   // a device says so instead of showing an empty office).
   bool reports_staff = 2;
   OfficeSession session = 3;
+  // Employees that left the office this session (OfficeActorLeave), so a
+  // device that opens the office later still knows everyone who worked in
+  // it: the last 32 to leave, in the order they came in (entered_at). Only
+  // in the snapshot; a device watching live sees them leave. Empty from an
+  // older agent (a device then knows only the actors).
+  repeated OfficeResident residents = 4;
+}
+
+// An employee no longer in the office: the fields of its OfficeActor a
+// device needs to name it again, as they were when it left.
+message OfficeResident {
+  // The tool call that started it (its OfficeActor.id).
+  string id = 1;
+  string agent_type = 2;
+  string parent_id = 3;
+  uint32 spawn_depth = 4;
+  // Unix milliseconds.
+  int64 entered_at = 5;
+  // Unix milliseconds it finished; 0 when it left unfinished.
+  int64 done_at = 6;
+  // Unix milliseconds it left.
+  int64 left_at = 7;
 }
 
 // The session's own numbers, sent whole in the snapshot and in an event
@@ -3391,6 +3413,23 @@ message OfficeActor {
   int64 entered_at = 9;
   // Unix milliseconds the actor finished (OFFICE_ACTOR_STATE_DONE); 0 before.
   int64 done_at = 10;
+  // A machine's background work, as B classified its command on the
+  // machine; unset for the director and employees, and from an older
+  // agent.
+  OfficeService service = 11;
+}
+
+// What a machine runs, in normalized words only: the kind of command, the
+// TCP port it listens on when its own words say so, and when it started.
+// Never the command's text.
+message OfficeService {
+  OfficeServiceKind kind = 1;
+  // A port given on the command line (`--port 5173`, `-p 3000`,
+  // `PORT=8080`) of a dev server or database, 1 to 65535; 0 when not known.
+  // B never scans the system for it.
+  uint32 port = 2;
+  // Unix milliseconds the background work started.
+  int64 started_at = 3;
 }
 
 message OfficeActivity {
@@ -3508,6 +3547,25 @@ enum OfficeRoom {
   OFFICE_ROOM_SECURITY = 10;
   OFFICE_ROOM_AUDIT = 11;
   OFFICE_ROOM_QA = 12;
+}
+
+// The kind of a machine's background command (docs/office-wire.md, part 4).
+enum OfficeServiceKind {
+  OFFICE_SERVICE_KIND_UNSPECIFIED = 0;
+  // A dev or app server: `pnpm dev`, `vite`, `next dev`, `uvicorn`.
+  OFFICE_SERVICE_KIND_DEV_SERVER = 1;
+  // Tests, lint or typecheck running on: `vitest`, `pnpm test`, `go test`.
+  OFFICE_SERVICE_KIND_TEST_WATCH = 2;
+  // A build or a watching compiler: `pnpm build`, `tsc -w`, `cargo build`.
+  OFFICE_SERVICE_KIND_BUILD = 3;
+  // Watching a CI run: `gh run watch`, `gh pr checks --watch`.
+  OFFICE_SERVICE_KIND_CI_WATCH = 4;
+  // Any other git or hosting command: `git fetch`, `gh pr view`.
+  OFFICE_SERVICE_KIND_GIT = 5;
+  // A database server or client: `postgres`, `redis-server`, `psql`.
+  OFFICE_SERVICE_KIND_DATABASE = 6;
+  // Anything else.
+  OFFICE_SERVICE_KIND_SCRIPT = 7;
 }
 
 enum OfficeApprovalState {

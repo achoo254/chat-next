@@ -168,6 +168,23 @@ describe("who talks", () => {
 		expect(after.some((t) => t.visitor === found?.visitor || t.host === found?.visitor)).toBe(false);
 	});
 
+	it("ends a talk for both when one of them falls asleep in the middle of it", () => {
+		const { state, at } = resting(["scout", "tester", "planner", "researcher"]);
+		for (let w = 0; w < 60; w += 1) {
+			const now = localAt(20) + w * TALK_WINDOW_MS + 9_000;
+			const talk = officeTalks(at(now), state, layout(), now)[0];
+			if (talk === undefined) continue;
+			// Mid-talk, the host's schedule sends them to sleep: neither of the two talks on.
+			const dozing = at(now).map((p) => (p.key === talk.host && p.life !== null ? { ...p, life: { ...p.life, act: "sleep" as const } } : p));
+			const after = officeTalks(dozing, state, layout(), now);
+			// The sleeper is in no talk, and the other is no longer talking to them (the talks are worked out afresh each frame).
+			expect(after.some((t) => t.host === talk.host || t.visitor === talk.host)).toBe(false);
+			expect(after.some((t) => t.visitor === talk.visitor && t.hostAnchor === talk.hostAnchor)).toBe(false);
+			return;
+		}
+		throw new Error("no talk in sixty windows");
+	});
+
 	it("says each line only while it is its time", () => {
 		const { state, at } = resting(["scout", "tester", "planner", "researcher", "debugger", "explore"]);
 		for (let w = 0; w < 30; w += 1) {

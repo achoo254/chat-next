@@ -2,9 +2,11 @@
 // shared with 2D) and the idle show into a target spot, walks people there
 // along the walkways and through the elevator, keeps everyone moving on in
 // logic even on floors not shown, picks each one's pose and animation rate,
-// and reports positions for the HTML labels and speech bubbles. A newcomer
-// after the first frame walks in from the lobby door; someone who left walks
-// out before vanishing. Residents talk (person-intent.ts: the visitor walks
+// and reports positions for the HTML labels and speech bubbles. Whoever is
+// there when the office is first seen live (opening the tab, a reload, coming
+// back to it) is already at their place; only someone who came in after the
+// tab opened (by their entry time) walks in from the lobby door, as does the
+// chairman showing up later. Someone who left walks out before vanishing. Residents talk (person-intent.ts: the visitor walks
 // over and both face each other), sleep in the dorm's beds at the mattress's
 // height and get up before walking off, run on the treadmill's belt. During a
 // power cut everyone freezes.
@@ -33,6 +35,8 @@ export const SMOKE_MS = 4_000;
 /** Getting out of bed (LayToIdle) before walking off, scene seconds. */
 export const WAKE_SECONDS = 1.6;
 const ENTRANCE = "lobby-entry";
+/** Entry times this close before the tab opened still count as before it (clocks and frames lag a little), viewer ms. */
+const ENTERED_BEFORE_SLACK_MS = 2_000;
 
 export type PeopleEvent = "arrive-lift" | "start-work" | "cheer" | "smoke" | "approval";
 
@@ -54,6 +58,10 @@ export interface PersonView {
 	readonly dozing: boolean;
 	/** Height of the name label over the feet, metres (the drawn character's). */
 	readonly labelHeight: number;
+	/** What draws them (a service's robot once its model is in). */
+	readonly model: CharacterVisual["model"];
+	/** Babylon rotation.y drawn now (the target's facing once there). */
+	readonly heading: number;
 }
 
 interface Person {
@@ -84,6 +92,8 @@ export interface OfficePeople {
 	/** Per frame: `dt` seconds of scene clock (0 while frozen). */
 	frame(dt: number, shown: FloorLevel, fullRate: number, inView: (x: number, z: number) => boolean, focus: { x: number; z: number }): void;
 	views(): readonly PersonView[];
+	/** Each drawn person's head from their root on the floor plane (tests only: computed on call). */
+	headOffsets(): ReadonlyMap<string, { readonly x: number; readonly z: number }>;
 	/** Rebuilds every visual (the character model arrived). */
 	rebuild(): void;
 	meshes(): readonly AbstractMesh[];
@@ -91,10 +101,27 @@ export interface OfficePeople {
 	dispose(): void;
 }
 
+/**
+ * Whether a person newly drawn came in after the office was first seen live
+ * at `liveSince` (viewer time): an employee by when they entered (machine time
+ * plus the clock offset), the chairman once the office was live. Nobody walks
+ * in on the first live frame: they were there before the tab opened.
+ */
+export function cameInAfterOpening(
+	p: { readonly kind: Placement["kind"]; readonly actor: { readonly enteredAt: number } | null; readonly member: { readonly firstEnteredAt: number } | null },
+	state: Pick<OfficeState, "clockOffset">, liveSince: number | null): boolean {
+	if (liveSince === null) return false;
+	if (p.kind === "chairman") return true;
+	if (p.kind !== "employee") return false;
+	const entered = p.actor?.enteredAt ?? p.member?.firstEnteredAt ?? 0;
+	return entered > 0 && entered + state.clockOffset >= liveSince - ENTERED_BEFORE_SLACK_MS;
+}
+
 export function createOfficePeople(layout: OfficeLayout, router: Router, pool: CharacterPool, onEvent: (e: PeopleEvent, floor: FloorLevel) => void): OfficePeople {
 	const people = new Map<string, Person>();
 	let clock = 0;
-	let first = true;
+	/** Viewer time the office was first seen live (the snapshot came); null before. */
+	let liveSince: number | null = null;
 	let nextIndex = 0;
 	const deskAnchors = new Set(layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "desk").map((a) => a.id)));
 	const pantry = layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "pantry").map((a) => a.id));
@@ -128,12 +155,13 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				seen.add(key);
 				const found = personTarget(layout, w.anchorId, shares[i] ?? 0, w.beside) ?? personTarget(layout, w.placement.anchorId, 0, false);
 				if (found === null) return;
-				// A standing host turns to the visitor.
-				const target = w.turn !== 0 && !found.seated ? { ...found, face: found.face + w.turn } : found;
+				// A standing host turns to the visitor; someone lying down keeps the bed's own facing (head on the pillow).
+				const lying = w.placement.life?.act === "sleep";
+				const target = w.turn !== 0 && !found.seated && !lying ? { ...found, face: found.face + w.turn } : found;
 				let p = people.get(key);
 				if (p === undefined) {
 					const index = nextIndex++;
-					const walksIn = !first && entrance !== null && (w.placement.kind === "employee" || w.placement.kind === "chairman");
+					const walksIn = entrance !== null && cameInAfterOpening(w.placement, state, liveSince);
 					const start = walksIn && entrance !== null ? entrance : target;
 					p = {
 						key,
@@ -192,7 +220,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				if (entrance !== null && !p.sample.inLift && p.placement.kind !== "director") startRoute(p, entrance);
 				else p.route = { legs: [] };
 			}
-			first = false;
+			if (liveSince === null && state.status === "live") liveSince = now;
 		},
 		frame(dt, shown, fullRate, inView, focus) {
 			clock += dt;
@@ -245,6 +273,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					p.pose = pose;
 				}
 				p.visual.setPose(pose, p.target.seat);
+				p.visual.setDozing?.(arrived && busy && activity?.stuckMs != null);
 				lod.push({ key: p.key, onFloor: visible, onScreen: visible && inView(s.x, s.z), active: s.moving || busy, distance: Math.hypot(s.x - focus.x, s.z - focus.z) });
 			}
 			const rates = animationRates(lod, fullRate);
@@ -267,7 +296,17 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				pose: p.pose,
 				dozing: p.sample.done && p.placement.activityRoom !== null && p.placement.actor?.activity?.stuckMs != null,
 				labelHeight: p.visual.labelHeight,
+				model: p.visual.model,
+				heading: p.visual.root.rotation.y,
 			}));
+		},
+		headOffsets() {
+			const out = new Map<string, { readonly x: number; readonly z: number }>();
+			for (const p of people.values()) {
+				const offset = p.visual.headOffset?.() ?? null;
+				if (offset !== null) out.set(p.key, offset);
+			}
+			return out;
 		},
 		rebuild() {
 			for (const p of people.values()) {

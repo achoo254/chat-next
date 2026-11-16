@@ -265,7 +265,11 @@ export class OfficeThread {
       if (s.finished && s.updatedAt > 0 && s.updatedAt < this.builtAt - STALE_SUBAGENT_MS) {
         // Not brought in, but one the journal already put in learns its kind: the journal does not keep it, and
         // the agent's memory of it is gone after a restart (else it would be a nameless "new employee").
-        if (this.tracker.has(s.toolUseId)) this.tracker.subagentStart({ toolId: s.toolUseId, agentType: s.agentType, description: s.description, background: s.background }, at);
+        if (this.tracker.has(s.toolUseId)) {
+          // Finished: it only learns its kind (never back to work to hand in again), and its end is final, at its record's last write.
+          this.tracker.subagentStart({ toolId: s.toolUseId, agentType: s.agentType, description: s.description, background: false }, at);
+          this.tracker.subagentDone(s.toolUseId, at, true, { doneAt: s.updatedAt });
+        }
         continue;
       }
       this.tracker.subagentStart(
@@ -275,7 +279,8 @@ export class OfficeThread {
           ...(s.workflowId ? { workflowId: s.workflowId } : {}),
           agentType: s.agentType,
           description: s.description,
-          background: s.background,
+          // A finished one is not brought back to work to hand in again.
+          background: s.background && !s.finished,
           spawnDepth: s.spawnDepth,
         },
         at,
@@ -288,7 +293,15 @@ export class OfficeThread {
         );
         if (t.done) this.tracker.toolEnd(t.toolId, t.ok, at);
       }
-      if (s.finished) this.tracker.subagentDone(s.toolUseId, at, true);
+      if (s.finished) {
+        this.tracker.subagentDone(s.toolUseId, at, true, s.updatedAt > 0 ? { doneAt: s.updatedAt } : {});
+        continue;
+      }
+      // In the background with its record quiet for STALE_SUBAGENT_MS, no tool of its own open and no background work
+      // counted: presumed gone (the AI that ran it quit). Only presumed: its next tool call brings it back.
+      const quiet =
+        s.background && s.updatedAt > 0 && at - s.updatedAt > STALE_SUBAGENT_MS && !s.tools.some((t) => !t.done) && (this.summary?.backgroundTasks ?? 0) === 0;
+      if (quiet) this.tracker.subagentDone(s.toolUseId, at, true, { presumed: true });
     }
     if (r.usage.length > 0) {
       this.usage.addCalls(r.usage);

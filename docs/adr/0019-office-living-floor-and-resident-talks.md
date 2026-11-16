@@ -32,8 +32,26 @@ chỉ dùng dữ kiện agent đã chuẩn hoá, không gọi model khi chạy.
 
 ## Hệ quả
 
-- Danh sách cư dân chỉ sống trong bộ nhớ của trang: tải lại trang sau khi agent đã cho nhân viên rời đi (agent vẫn cho mọi người trừ Giám đốc
-  rời sau 10 phút rảnh, `LEAVE_AFTER_IDLE_MS` trong `apps/agent/src/office/office-tracker.ts`) thì chỉ còn Giám đốc. Giữ cư dân qua lần tải lại
-  cần thêm trường vào ảnh chụp văn phòng (proto chỉ thêm, agent bản phụ): việc riêng, chưa làm.
+- Danh sách cư dân sống trong bộ nhớ của trang; từ bổ sung dưới đây, ảnh chụp mang thêm người đã rời nên tải lại trang vẫn giữ cư dân (agent cũ: chỉ còn
+  người đang có mặt như trước).
 - Người xem ở múi giờ khác thấy lịch khác: chủ ý, giống ánh sáng.
 - Tầng 4 thêm vào thanh tầng (T4); "Tự theo" khi không ai làm việc thì tới tầng đông người nhất.
+
+## Bổ sung (16/11/2026): cư dân qua lần tải lại, nhãn và robot cho dịch vụ nền
+
+- **Cư dân qua lần tải lại**: `OfficeState.residents` (proto chỉ thêm) mang tối đa 32 nhân viên đã rời trong phiên, chỉ các trường `OfficeActor` vốn đã
+  gửi. Web mở văn phòng mới thì tuyển lại họ theo thứ tự vào rồi cho thành cư dân ngoài giờ, nên tên và số thứ tự như thiết bị xem từ đầu
+  ([`office-wire.md`](../office-wire.md) mục 3).
+- **Nhãn dịch vụ**: agent phân loại lệnh nền ngay trên máy (cùng phép đọc lệnh với phân phòng) thành 7 nhóm, kèm cổng ghi trên dòng lệnh và lúc chạy
+  (`OfficeActor.service`); chỉ enum, số cổng và thời điểm rời máy. Web gọi máy theo nhóm ("Máy chủ dev") với bong bóng "Máy chủ dev · cổng 5173 · 12 phút".
+  Máy chủ dev, theo dõi test và cơ sở dữ liệu chạy tới khi bị dừng nên không bao giờ "Chạy lâu" hay ngủ gật; build, CI, git, script vẫn theo luật kẹt 5 phút.
+- **Robot**: máy được vẽ bằng robot đồ chơi (`serviceRobot` của tệp tài sản), thân theo màu nhóm (`SERVICE_COLORS`), đèn ăng-ten nhấp nháy khi chạy, màn hình
+  mờ và mắt tắt khi ngủ gật; thiếu tệp thì vẫn là người. Bản 2D: chấm vuông có ăng-ten theo màu nhóm.
+- **Subagent chạy nền**: xong hẳn khi AI báo tác vụ nền kết thúc hoặc bản ghi báo `finished`; chỉ "coi như xong" khi im lâu mà không còn tool mở và bộ
+  đếm việc nền là 0 (bản ghi im 10 phút, hoặc không nghe gì 30 phút), và một tool mới của nó đưa nó về làm; còn subagent nền đang làm thì không ai rời văn
+  phòng (trước đây `background_tasks` về 0 hay lượt kết thúc sớm làm họ "hết việc" và đi xem tivi).
+- **Mở lại văn phòng**: người đã có mặt hiện ngay ở chỗ của mình; chỉ ai vào sau lúc mở tab (theo `entered_at`) mới đi vào từ cửa sảnh.
+- **Người nằm theo giường**: người ngủ không nhận vai trong cuộc trò chuyện và không bị xoay (cuộc trò chuyện vốn tính lại mỗi khung từ chỗ đứng hiện tại, nên
+  một người ngủ thì cuộc của cả hai kết thúc); e2e đo xương đầu của mô hình: người nằm dọc giường, đầu về phía gối, ở tâm neo.
+- **Chế độ phiên**: mở một phiên từ danh sách theo chế độ chọn gần nhất trên thiết bị (nếu phiên đó có); biểu tượng trên hàng phiên vẫn theo trạng thái thật và
+  trí nhớ của chính phiên đó.
