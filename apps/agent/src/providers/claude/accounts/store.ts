@@ -14,8 +14,16 @@ const usageSchema = z.object({
   updatedAt: z.number(),
 });
 
-/** The last `claude auth status` of a profile. */
-const signInSchema = z.object({ loggedIn: z.boolean(), loginExpiresAt: z.number(), checkedAt: z.number() });
+/** The last `claude auth status` of a profile, with the account it reported (absent in checks before tunelo 3.9.0). */
+const signInSchema = z.object({
+  loggedIn: z.boolean(),
+  loginExpiresAt: z.number(),
+  checkedAt: z.number(),
+  email: z.string().optional(),
+  orgId: z.string().optional(),
+  orgName: z.string().optional(),
+  plan: z.string().optional(),
+});
 
 const savedDataSchema = z.object({ orgId: z.string().default(""), lastUsage: usageSchema.optional(), signIn: signInSchema.optional() });
 const ownDataSchema = z.object({ orgId: z.string().optional(), lastUsage: usageSchema.optional() });

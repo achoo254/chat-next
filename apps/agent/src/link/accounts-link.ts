@@ -16,12 +16,14 @@ export const ACCOUNT_REASONS: Record<AccountErrorKind, ErrorReason> = {
   "sign-out-failed": ErrorReason.ACCOUNT_SIGN_OUT_FAILED,
   "cli-missing": ErrorReason.AI_CLI_MISSING,
   "switch-blocked": ErrorReason.ACCOUNT_SWITCH_BLOCKED,
+  duplicate: ErrorReason.ACCOUNT_DUPLICATE,
 };
 
 const STATUS: Record<AiAccountInfo["status"], AccountStatus> = {
   ok: AccountStatus.OK,
   "needs-sign-in": AccountStatus.NEEDS_SIGN_IN,
   error: AccountStatus.ERROR,
+  "account-changed": AccountStatus.ACCOUNT_CHANGED,
 };
 
 const window = (w?: { utilization: number; resetsAt: number }) => (w ? { utilization: w.utilization, resetsAt: BigInt(w.resetsAt) } : undefined);
@@ -40,6 +42,7 @@ function accountBody(provider: string, selectedId: string, a: AiAccountInfo) {
     status: STATUS[a.status],
     current: a.id === selectedId,
     loginExpiresAt: BigInt(a.loginExpiresAt),
+    signedInAs: a.signedInAs ?? "",
     createdAt: BigInt(a.createdAt),
     usageUpdatedAt: BigInt(u?.updatedAt ?? 0),
     ...(u ? { usage: { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } } : {}),

@@ -414,6 +414,7 @@ export const enMachines: MachinesCopy = {
 			profileNotFound: (ai) => `This ${ai} account was not found on the machine.`,
 			defaultProfilePermanent: "The machine's default account cannot be removed.",
 			profileInUse: "A session is using this account. Close it first.",
+			profileDuplicate: (ai, email) => `${email} is already in the machine's ${ai} accounts. Remove this entry, then add the account you want again.`,
 			profileSignOutFailed: (ai) => `${ai} could not sign this account out, so nothing was deleted. Try again later.`,
 			profilesDamaged: (ai) => `The list of ${ai} accounts on the machine is damaged. Repair or remove it on the machine, then restart tunelo.`,
 			accountSwitchBlocked: {
@@ -496,6 +497,7 @@ export const enMachines: MachinesCopy = {
 			profile_add: "added an AI account",
 			profile_select: "picked an AI account",
 			profile_remove: "removed an AI account",
+			profile_accept: "kept the new account of a saved AI account",
 			local_forward: "changed forwarding to localhost",
 			secret_add: "entered a secret for",
 			secret_use: "used a secret on",
@@ -844,6 +846,10 @@ export const enMachines: MachinesCopy = {
 		needsSignInHint: (ai) => `${ai} reports this account as signed out or its sign-in as expired. Remove it and add it again to keep using it.`,
 		statusError: "Status unknown",
 		statusErrorHint: (ai) => `${ai} on the machine could not tell whether this account is still signed in.`,
+		accountChanged: "Account changed",
+		accountChangedHint: (ai, saved, now) =>
+			`${ai} reports this entry is signed in as ${now}, not ${saved} (perhaps signed in again from a session). It is skipped when switching accounts automatically. Keep ${now} for this entry, or remove it and add ${saved} again.`,
+		acceptCurrent: (email) => `Keep ${email}`,
 		loginEnds: (at) => `signed in until ${at}`,
 		loginEnded: (at) => `sign-in expired ${at}`,
 		selected: "In use",

@@ -313,6 +313,9 @@ message Frame {
     OfficeSnapshot office_snapshot = 169;
     // Unasked, to the connections watching the thread's office.
     OfficeEvents office_events = 170;
+
+    // A → B (tunelo 3.9.0+).
+    AccountAcceptCurrent account_accept_current = 172;
   }
 }
 
@@ -989,6 +992,16 @@ message AccountCaptureCurrent {
   string provider = 1;
 }
 
+// Keeps a saved account as the account its AI now reports it is signed in as
+// (AiAccount.signed_in_as), for an account whose status is
+// ACCOUNT_STATUS_ACCOUNT_CHANGED. Refused with ERROR_REASON_ACCOUNT_DUPLICATE
+// when that account is already kept (subject: its email). Answered with
+// AccountListResult.
+message AccountAcceptCurrent {
+  string id = 1;
+  string provider = 2;
+}
+
 // --- machine settings -------------------------------------------------------
 
 // Changes a setting of the machine; fields left unset stay as they are.
@@ -1098,6 +1111,10 @@ enum AccountStatus {
   ACCOUNT_STATUS_NEEDS_SIGN_IN = 2;
   // The AI could not tell (its CLI failed or is missing).
   ACCOUNT_STATUS_ERROR = 3;
+  // Signed in, but as another account than the one saved (tunelo 3.9.0+):
+  // the email it is signed in as now is in AiAccount.signed_in_as. Not used
+  // for an automatic switch; AccountAcceptCurrent keeps the new account.
+  ACCOUNT_STATUS_ACCOUNT_CHANGED = 4;
 }
 
 message AiAccount {
@@ -1124,6 +1141,9 @@ message AiAccount {
   int64 created_at = 11;
   // Unix milliseconds when the sign-in ends, as the AI reports it; 0 when unknown.
   int64 login_expires_at = 12;
+  // With ACCOUNT_STATUS_ACCOUNT_CHANGED: the email the AI reports the saved
+  // account is signed in as now; empty otherwise.
+  string signed_in_as = 13;
 }
 
 // What one AI offers on its accounts.
@@ -1390,6 +1410,9 @@ enum ErrorReason {
   // connection, 16 for the machine (docs/office-wire.md). Watching again an
   // office already watched is never refused; stop another watch first.
   ERROR_REASON_OFFICE_WATCH_LIMIT = 77;
+  // AccountAcceptCurrent for an account the AI already keeps under another
+  // entry (subject: its email).
+  ERROR_REASON_ACCOUNT_DUPLICATE = 78;
 }
 
 enum ErrorCode {
@@ -1966,7 +1989,8 @@ message AuditEntry {
   // open_sensitive, project_settings (detail "trust" when a device trusted
   // the folder), approve_sensitive, revoke (the account revoked a connected device),
   // permission_mode, profile_add, profile_select, profile_remove (detail:
-  // the AI id, then the account),
+  // the AI id, then the account), profile_accept (a saved account keeps the
+  // account its sign-in changed to; detail: the old and the new account),
   // delete_session (path: the folder; detail: the session ids),
   // project_add (a sensitive folder added as a project),
   // secret_add (path: the site; detail: the name, "saved" or "once"),

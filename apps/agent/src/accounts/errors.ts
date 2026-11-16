@@ -1,6 +1,6 @@
 // Why an account request was refused; devices word it in the user's language
 // (link/connection.ts maps each kind to an ErrorReason).
-export type AccountErrorKind = "damaged" | "not-found" | "default-permanent" | "in-use" | "sign-out-failed" | "cli-missing" | "switch-blocked";
+export type AccountErrorKind = "damaged" | "not-found" | "default-permanent" | "in-use" | "sign-out-failed" | "cli-missing" | "switch-blocked" | "duplicate";
 
 export class AccountError extends Error {
   constructor(

@@ -538,7 +538,8 @@ export interface TextWriter {
 
 // --- accounts ------------------------------------------------------------------
 
-export type AccountStatus = "ok" | "needs-sign-in" | "error";
+/** "account-changed": signed in, but as another account than the one saved (`signedInAs`). */
+export type AccountStatus = "ok" | "needs-sign-in" | "error" | "account-changed";
 
 /** Plan usage last read for an account; `updatedAt` in Unix milliseconds. */
 export type AccountUsage = { fiveHour?: RateWindow | undefined; sevenDay?: RateWindow | undefined; updatedAt: number };
@@ -558,6 +559,8 @@ export type AiAccountInfo = {
   /** Unix milliseconds the sign-in ends; 0 when unknown. */
   loginExpiresAt: number;
   usage?: AccountUsage;
+  /** With "account-changed": the email the AI reports it is signed in as now. */
+  signedInAs?: string;
 };
 
 /** Every account of one AI, its own sign-in first, and the one picked ("" for its own). */
@@ -612,6 +615,8 @@ export interface AccountsFacet {
   };
   /** Keeps the account the AI is signed in as now as a saved one. */
   captureCurrent?(device: string): Promise<void>;
+  /** A saved account whose sign-in changed to another account keeps that account (refused when it is already kept). */
+  acceptCurrent?(id: string, device: string): Promise<void>;
   /** Who hears about changes (the machine); one listener, the last set. */
   listen(listener: AccountsListener): void;
   /** Leftovers of an unfinished sign-in a crash left: cleaned at start. */

@@ -423,6 +423,8 @@ export const viMachines = {
 			profileNotFound: (ai: string) => `Không thấy tài khoản ${ai} này trên máy.`,
 			defaultProfilePermanent: "Không gỡ được tài khoản mặc định của máy.",
 			profileInUse: "Đang có phiên dùng tài khoản này. Đóng phiên đó trước.",
+			/** ACCOUNT_DUPLICATE: the subject is the account already kept. */
+			profileDuplicate: (ai: string, email: string) => `${email} đã có trong danh sách tài khoản ${ai} của máy. Xoá mục này rồi thêm lại tài khoản bạn muốn.`,
 			profileSignOutFailed: (ai: string) => `${ai} không đăng xuất được tài khoản này nên chưa xoá gì. Thử lại sau.`,
 			profilesDamaged: (ai: string) => `Danh sách tài khoản ${ai} trên máy bị hỏng. Sửa hoặc xoá nó trên máy rồi khởi động lại tunelo.`,
 			/** ACCOUNT_SWITCH_BLOCKED, by what holds the AI on the machine (machine-errors.ts). */
@@ -508,6 +510,7 @@ export const viMachines = {
 			profile_add: "thêm tài khoản AI",
 			profile_select: "chọn tài khoản AI",
 			profile_remove: "xoá tài khoản AI",
+			profile_accept: "nhận tài khoản AI mới cho một mục đã lưu",
 			local_forward: "đổi chuyển tiếp localhost",
 			secret_add: "nhập bí mật cho",
 			secret_use: "dùng bí mật ở",
@@ -857,6 +860,10 @@ export const viMachines = {
 		needsSignInHint: (ai: string) => `${ai} báo tài khoản này đã đăng xuất hoặc hết hạn đăng nhập. Xoá rồi thêm lại tài khoản để dùng tiếp.`,
 		statusError: "Không rõ trạng thái",
 		statusErrorHint: (ai: string) => `${ai} trên máy không cho biết tài khoản này còn đăng nhập hay không.`,
+		accountChanged: "Đã đổi tài khoản",
+		accountChangedHint: (ai: string, saved: string, now: string) =>
+			`${ai} báo mục này đang đăng nhập bằng ${now}, không phải ${saved} (có thể do đăng nhập lại trong một phiên). Mục này không được dùng khi tự chuyển tài khoản. Nhận ${now} cho mục này, hoặc xoá rồi thêm lại ${saved}.`,
+		acceptCurrent: (email: string) => `Nhận ${email}`,
 		loginEnds: (at: string) => `đăng nhập tới ${at}`,
 		loginEnded: (at: string) => `đăng nhập đã hết hạn lúc ${at}`,
 		selected: "Đang dùng",

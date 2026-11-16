@@ -460,6 +460,12 @@ export class Connection {
         await accounts.captureCurrent(this.device);
         return sendList();
       }
+      case "accountAcceptCurrent": {
+        const accounts = accountsOf(providers, b.value.provider);
+        if (!accounts.acceptCurrent) return this.send(id, { case: "error", value: refusal("this AI does not keep a changed sign-in", ErrorReason.UNSUPPORTED_REQUEST) });
+        await accounts.acceptCurrent(b.value.id, this.device);
+        return sendList();
+      }
       case "usageRefresh": {
         const accounts = accountsOf(providers, b.value.provider);
         if (!accounts.refreshUsage) return this.send(id, { case: "error", value: refusal("this AI cannot read its usage outside a session", ErrorReason.UNSUPPORTED_REQUEST) });
@@ -729,6 +735,7 @@ export class Connection {
         case "accountSignInCancel":
         case "accountRemove":
         case "accountCaptureCurrent":
+        case "accountAcceptCurrent":
         case "usageRefresh":
           // These may wait on an AI's CLI for seconds: they answer later, by id, and the
           // frames after them (pings, threads) go on meanwhile.
@@ -880,7 +887,7 @@ type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecli
 type AccountFrame = Extract<
   Frame["body"],
   {
-    case: "accountList" | "accountSelect" | "accountSignInBegin" | "accountSignInCode" | "accountSignInCancel" | "accountRemove" | "accountCaptureCurrent" | "usageRefresh";
+    case: "accountList" | "accountSelect" | "accountSignInBegin" | "accountSignInCode" | "accountSignInCancel" | "accountRemove" | "accountCaptureCurrent" | "accountAcceptCurrent" | "usageRefresh";
   }
 >;
 

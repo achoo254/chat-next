@@ -35,7 +35,7 @@ export function ProviderAccountsSection({ link, online, ai, profiles }: Provider
 	const a = t.aiAccounts;
 	const { locale } = useI18n();
 	const { provider, list } = profiles;
-	/** What is running: "select:<id>", "usage:<id>", "remove:<id>", "capture"; "" when idle. */
+	/** What is running: "select:<id>", "usage:<id>", "remove:<id>", "accept:<id>", "capture"; "" when idle. */
 	const [busy, setBusy] = useState("");
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
@@ -85,6 +85,7 @@ export function ProviderAccountsSection({ link, online, ai, profiles }: Provider
 						const selected = account.id === list.selectedId;
 						const signedOut = account.status === AccountStatus.NEEDS_SIGN_IN;
 						const unknown = account.status === AccountStatus.ERROR;
+						const changed = account.status === AccountStatus.ACCOUNT_CHANGED && account.signedInAs !== "";
 						// A saved account keeps its e-mail when it needs to sign in again; the AI's own sign-in shows what the AI says now.
 						const name = account.email !== "" && (!signedOut || !own) ? account.email : account.label !== "" ? account.label : own ? ownName : a.notSignedIn;
 						const five = usageOf(account.usage?.fiveHour, now);
@@ -100,6 +101,7 @@ export function ProviderAccountsSection({ link, online, ai, profiles }: Provider
 										{selected && <span className="mx-tag">{a.selected}</span>}
 										{signedOut && <span className="chip mx-chip warn">{a.needsSignIn}</span>}
 										{unknown && <span className="chip mx-chip warn">{a.statusError}</span>}
+										{changed && <span className="chip mx-chip warn">{a.accountChanged}</span>}
 										{sub.join(" · ")}
 									</small>
 									{five === null && week === null ? (
@@ -120,6 +122,7 @@ export function ProviderAccountsSection({ link, online, ai, profiles }: Provider
 									)}
 									{signedOut && !own && <small role="note">{a.needsSignInHint(ai)}</small>}
 									{unknown && <small role="note">{a.statusErrorHint(ai)}</small>}
+									{changed && <small role="note">{a.accountChangedHint(ai, account.email, account.signedInAs)}</small>}
 								</span>
 								<span className="acts">
 									{!selected && (
@@ -132,6 +135,17 @@ export function ProviderAccountsSection({ link, online, ai, profiles }: Provider
 										>
 											{busy === `select:${account.id}` ? <span className="spin" aria-hidden="true" /> : null}
 											{a.select}
+										</button>
+									)}
+									{changed && (
+										<button
+											type="button"
+											className="btn btn-sm"
+											disabled={!online || busy !== ""}
+											onClick={() => void run(`accept:${account.id}`, { case: "accountAcceptCurrent", value: { id: account.id, provider } })}
+										>
+											{busy === `accept:${account.id}` ? <span className="spin" aria-hidden="true" /> : null}
+											{a.acceptCurrent(account.signedInAs)}
 										</button>
 									)}
 									{actions?.usage === true && (

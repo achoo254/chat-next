@@ -23,6 +23,7 @@ export type AuditAction =
   | "profile_add"
   | "profile_select"
   | "profile_remove"
+  | "profile_accept"
   | "local_forward"
   | "mcp_local_writes"
   | "secret_add"

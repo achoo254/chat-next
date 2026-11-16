@@ -118,6 +118,45 @@ describe("an AI's block on Tài khoản AI", () => {
 		expect(screen.getByText("Mặc định hệ thống")).toBeTruthy();
 	});
 
+	it("marks a saved account signed in as another account, keeps it out of picking, and keeps the new account on request", async () => {
+		const list: Body = {
+			case: "accountListResult",
+			value: {
+				selectedByProvider: {},
+				actions: [{ provider: "claude", signIn: true, usage: true }],
+				accounts: [
+					{ provider: "claude", id: "", email: "owner@example.com", status: AccountStatus.OK },
+					{ provider: "claude", id: "p2", email: "second@example.com", status: AccountStatus.ACCOUNT_CHANGED, signedInAs: "owner@example.com" },
+				],
+			},
+		};
+		const { link, sent } = fakeLink(() => list);
+		wrap(<ProviderAccountsSection link={link} online ai="Claude Code" profiles={profilesFor(link, "claude", list)} />);
+		const second = screen.getByText("second@example.com").closest("li") as HTMLElement;
+		expect(within(second).getByText("Đã đổi tài khoản")).toBeTruthy();
+		expect(within(second).getByRole("note").textContent).toMatch(/đang đăng nhập bằng owner@example.com, không phải second@example.com/);
+		expect((within(second).getByRole("button", { name: "Chọn" }) as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.click(within(second).getByRole("button", { name: "Nhận owner@example.com" }));
+		await waitFor(() => expect(sent.at(-1)).toEqual(expect.objectContaining({ case: "accountAcceptCurrent", value: expect.objectContaining({ provider: "claude", id: "p2" }) })));
+	});
+
+	it("says which account is already kept when keeping a changed sign-in is refused", async () => {
+		const list: Body = {
+			case: "accountListResult",
+			value: {
+				selectedByProvider: {},
+				actions: [{ provider: "claude", signIn: true, usage: true }],
+				accounts: [{ provider: "claude", id: "p2", email: "second@example.com", status: AccountStatus.ACCOUNT_CHANGED, signedInAs: "owner@example.com" }],
+			},
+		};
+		const link = {
+			request: () => Promise.reject(new RemoteError(ErrorCode.INVALID, "duplicate", ErrorReason.ACCOUNT_DUPLICATE, "owner@example.com")),
+		} as unknown as MachineLink;
+		wrap(<ProviderAccountsSection link={link} online ai="Claude Code" profiles={profilesFor(link, "claude", list)} />);
+		await userEvent.click(screen.getByRole("button", { name: "Nhận owner@example.com" }));
+		expect((await screen.findByRole("alert")).textContent).toMatch(/owner@example.com đã có trong danh sách tài khoản Claude Code/);
+	});
+
 	it("removes a saved account after confirming, never the AI's own sign-in", async () => {
 		const { link, sent } = fakeLink(() => LIST);
 		wrap(<ProviderAccountsSection link={link} online ai="Claude Code" profiles={profilesFor(link, "claude")} />);

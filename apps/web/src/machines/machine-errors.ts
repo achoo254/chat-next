@@ -72,6 +72,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.defaultProfilePermanent;
 		case ErrorReason.ACCOUNT_IN_USE:
 			return r.profileInUse;
+		case ErrorReason.ACCOUNT_DUPLICATE:
+			return r.profileDuplicate(ai, s);
 		case ErrorReason.ACCOUNT_SIGN_OUT_FAILED:
 			return r.profileSignOutFailed(ai);
 		case ErrorReason.ACCOUNTS_DAMAGED:

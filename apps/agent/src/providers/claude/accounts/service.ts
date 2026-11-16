@@ -33,7 +33,7 @@ import { syncProfileConfig } from "./config-sync.ts";
 import { SYNCED_FILES, watchFiles, watchMachineSettings } from "./settings-watch.ts";
 import { ensureSharedDirs, setupProfileHome } from "./setup.ts";
 import { type LoginProcess, startLogin, validCode } from "./sign-in.ts";
-import { ProfileStore, type ProfileUsage } from "./store.ts";
+import { type ProfileSignIn, ProfileStore, type ProfileUsage, type StoredProfile } from "./store.ts";
 
 export type RateLimits = { fiveHour?: RateWindow; sevenDay?: RateWindow };
 
@@ -170,12 +170,23 @@ export class ClaudeProfiles implements AccountsFacet {
     return this.store.selected()?.id ?? "";
   }
 
-  /** Who a profile is signed in as, from the last report kept; undefined when unknown. */
+  /**
+   * Who a profile is signed in as, from the last report kept; undefined when
+   * unknown. A profile whose sign-in changed to another account answers with
+   * that account, so a session shows the account it really uses.
+   */
   account(id: string): { email: string; organization: string; plan: string } | undefined {
     if (this.store.damaged) return undefined;
-    const p = id === "" ? this.store.get().defaultProfile : this.store.find(id);
-    if (!p?.email) return undefined;
-    return { email: p.email, organization: p.orgName ?? "", plan: p.plan ?? "" };
+    if (id !== "") {
+      const p = this.store.find(id);
+      if (!p) return undefined;
+      const now = changedTo(p);
+      if (now) return { email: now.email, organization: now.orgName ?? "", plan: now.plan ?? "" };
+      return p.email ? { email: p.email, organization: p.orgName, plan: p.plan } : undefined;
+    }
+    const d = this.store.get().defaultProfile;
+    if (!d.email) return undefined;
+    return { email: d.email, organization: d.orgName ?? "", plan: d.plan ?? "" };
   }
 
   /**
@@ -234,11 +245,18 @@ export class ClaudeProfiles implements AccountsFacet {
   private async checkSignIn(bin: string, id: string): Promise<void> {
     const account = await readAccount(bin, this.home(id));
     if (!account || this.store.damaged || !this.store.find(id)) return;
-    const signIn = { loggedIn: account.loggedIn, loginExpiresAt: account.loginExpiresAt, checkedAt: this.now() };
+    const signIn: ProfileSignIn = { loggedIn: account.loggedIn, loginExpiresAt: account.loginExpiresAt, checkedAt: this.now() };
+    // The account it reports is kept beside the saved one: a sign-in made again in the profile's folder
+    // (claude's /login in one of its sessions) can be another account.
+    if (account.loggedIn && account.email !== "") Object.assign(signIn, { email: account.email, orgId: account.orgId, orgName: account.orgName, plan: account.plan });
+    const before = this.store.find(id);
     this.store.update((d) => {
       const p = d.profiles.find((x) => x.id === id);
       if (p) p.signIn = signIn;
     });
+    const after = this.store.find(id);
+    const now = after ? changedTo(after) : undefined;
+    if (now && !(before && changedTo(before))) this.log(`claude profiles: a profile (${id.slice(0, 8)}) is now signed in as another account`);
   }
 
   /** Checks every added profile whose last check is older than the interval; one round at a time. */
@@ -304,10 +322,11 @@ export class ClaudeProfiles implements AccountsFacet {
         email: p.email,
         organization: p.orgName,
         plan: p.plan,
-        status: this.signedIn(p.signIn) ? "ok" : "needs-sign-in",
+        status: profileStatus(p, this.signedIn(p.signIn)),
         loginExpiresAt: p.signIn?.loginExpiresAt ?? 0,
         createdAt: p.createdAt,
         ...(p.lastUsage ? { usage: p.lastUsage } : {}),
+        ...(this.signedIn(p.signIn) && changedTo(p) ? { signedInAs: changedTo(p)?.email ?? "" } : {}),
       }),
     );
     return { accounts: [def, ...rest], selectedId: this.store.selected()?.id ?? "" };
@@ -359,15 +378,65 @@ export class ClaudeProfiles implements AccountsFacet {
    */
   async suggestion(exhaustedId: string): Promise<AccountSuggestion | undefined> {
     if (this.store.damaged) return undefined;
-    const others = this.view().accounts.filter((p) => p.id !== exhaustedId && p.status === "ok" && p.email !== "");
+    // Another entry of the very account that ran out has no room either (the machine's own sign-in can be a saved account too).
+    const spent = this.identity(exhaustedId);
+    const candidate = (p: AiAccountInfo) => p.id !== exhaustedId && p.status === "ok" && p.email !== "" && !(spent && sameAccount(spent, this.identity(p.id) ?? { email: "", orgId: "" }));
+    const others = this.view().accounts.filter(candidate);
     await Promise.allSettled(others.map((p) => this.refreshUsage(p.id)));
     let best: AccountSuggestion | undefined;
     for (const p of this.view().accounts) {
-      if (p.id === exhaustedId || p.status !== "ok" || p.email === "" || !p.usage) continue;
+      if (!candidate(p) || !p.usage) continue;
       const remaining = usageLeft(p.usage, this.now());
       if (remaining > 0 && (!best || remaining > best.remaining)) best = { id: p.id, email: p.email, remaining };
     }
     return best;
+  }
+
+  /** The account a profile is signed in as by what is kept: the one it changed to, else the saved one. */
+  private identity(id: string): { email: string; orgId: string } | undefined {
+    if (id === "") {
+      const d = this.store.get().defaultProfile;
+      return d.email ? { email: d.email, orgId: d.orgId ?? "" } : undefined;
+    }
+    const p = this.store.find(id);
+    if (!p) return undefined;
+    const now = changedTo(p);
+    return now ? { email: now.email, orgId: now.orgId ?? "" } : { email: p.email, orgId: p.orgId };
+  }
+
+  /**
+   * A profile whose sign-in changed to another account keeps that account
+   * from now on: claude is asked again first, and the account must not be
+   * kept already (the machine's own sign-in or another profile).
+   */
+  acceptCurrent(id: string, device: string): Promise<void> {
+    return this.serial(async () => {
+      this.readable();
+      if (id === "") throw new AccountError("the machine's own sign-in always follows claude", "default-permanent");
+      if (!this.store.find(id)) throw new AccountError("no such profile", "not-found");
+      const bin = await this.bin();
+      await this.checkSignIn(bin, id);
+      const p = this.store.find(id);
+      const now = p ? changedTo(p) : undefined;
+      if (!p || !now || !p.signIn?.loggedIn) {
+        this.listener.onChange?.();
+        return;
+      }
+      const account = { email: now.email, orgId: now.orgId ?? "" };
+      const def = await readAccount(bin, undefined);
+      const taken = this.store.get().profiles.some((x) => x.id !== id && sameAccount(x, account)) || Boolean(def?.loggedIn && sameAccount(def, account));
+      if (taken) throw new AccountError("this account is already kept on the machine", "duplicate", account.email);
+      this.store.update((d) => {
+        const x = d.profiles.find((y) => y.id === id);
+        if (!x) return;
+        x.email = now.email;
+        x.orgId = now.orgId ?? "";
+        x.orgName = now.orgName ?? "";
+        x.plan = now.plan ?? "";
+      });
+      this.opts.audit.write({ device, action: "profile_accept", path: "", detail: `${p.email} → ${now.email}` });
+      this.listener.onChange?.();
+    });
   }
 
   private lastUsage(id: string): ProfileUsage | undefined {
@@ -654,6 +723,19 @@ export class ClaudeProfiles implements AccountsFacet {
     this.profileWatches.clear();
     await this.cancel(this.attempt?.id ?? "");
   }
+}
+
+/** The account a profile's last check reported when it is not the saved one; undefined otherwise (or never reported). */
+function changedTo(p: StoredProfile): (ProfileSignIn & { email: string }) | undefined {
+  const s = p.signIn;
+  if (!s?.loggedIn || !s.email) return undefined;
+  if (sameAccount(p, { email: s.email, orgId: s.orgId ?? "" })) return undefined;
+  return { ...s, email: s.email };
+}
+
+function profileStatus(p: StoredProfile, signedIn: boolean): AiAccountInfo["status"] {
+  if (!signedIn) return "needs-sign-in";
+  return changedTo(p) ? "account-changed" : "ok";
 }
 
 /** Percent of usage left by the tighter window; a window past its reset counts as unused. */

@@ -361,6 +361,43 @@ describe.skipIf(!posix)("accounts on the machine", () => {
     expect((await fresh.list()).accounts.find((a) => a.id === added.id)?.status).toBe("ok");
   });
 
+  it("flags an added account signed in again as another account, keeps it out of switching, and keeps the new one only when it is not kept already", async () => {
+    const f = profilesFixture({ defaultEmail: "owner@example.com" });
+    const added = await addProfile(f.profiles);
+    if (!added.ok) throw new Error(added.error);
+    const view = async () => (await f.profiles.list()).accounts.find((a) => a.id === added.id);
+    const auth = join(profileHome(f.configDir, added.id), "fake-auth.json");
+    const signInAs = (email: string) => writeFileSync(auth, JSON.stringify({ email, orgId: "org-1", orgName: "Org One", subscriptionType: "team", loginExpiresAt: LOGIN_EXPIRES }));
+    // Signed in again in the account's folder as the machine's own account (a /login in one of its sessions).
+    signInAs("owner@example.com");
+    await f.profiles.refreshUsage(added.id);
+    expect(await view()).toMatchObject({ status: "account-changed", email: "second@example.com", signedInAs: "owner@example.com" });
+    expect(f.profiles.account(added.id)?.email).toBe("owner@example.com");
+    expect(f.logs.some((l) => l.includes("another account"))).toBe(true);
+    expect(await f.profiles.suggestion("")).toBeUndefined();
+    await expect(f.profiles.acceptCurrent(added.id, "phone")).rejects.toMatchObject({ kind: "duplicate", subject: "owner@example.com" });
+    expect((await view())?.email).toBe("second@example.com");
+    // An account kept nowhere else can be kept for the entry.
+    signInAs("third@example.com");
+    await f.profiles.acceptCurrent(added.id, "phone");
+    const kept = await view();
+    expect(kept).toMatchObject({ status: "ok", email: "third@example.com", plan: "team" });
+    expect(kept?.signedInAs).toBeUndefined();
+    expect(f.audit.list()[0]).toMatchObject({ action: "profile_accept", detail: "second@example.com → third@example.com" });
+    await expect(f.profiles.acceptCurrent("", "phone")).rejects.toMatchObject({ kind: "default-permanent" });
+  });
+
+  it("never suggests another entry of the very account that ran out", async () => {
+    const f = profilesFixture({ defaultEmail: "owner@example.com" });
+    const added = await addProfile(f.profiles);
+    if (!added.ok) throw new Error(added.error);
+    expect((await f.profiles.suggestion(""))?.id).toBe(added.id);
+    // The machine's own sign-in became the added account (signed in again outside tunelo).
+    signInDefault(f.claudeHome, "second@example.com");
+    await f.profiles.list();
+    expect(await f.profiles.suggestion("")).toBeUndefined();
+  });
+
   it("reads claude's sign-in expiry as text, seconds or milliseconds", () => {
     expect(expiryMs("2026-11-09T00:00:00Z")).toBe(Date.UTC(2026, 10, 9));
     expect(expiryMs(1_800_000_000)).toBe(1_800_000_000_000);

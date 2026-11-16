@@ -411,6 +411,7 @@ export const zhCNMachines: MachinesCopy = {
 			profileNotFound: (ai) => `电脑上找不到此 ${ai} 账号。`,
 			defaultProfilePermanent: "无法移除电脑的默认账号。",
 			profileInUse: "有会话正在使用此账号。请先关闭该会话。",
+			profileDuplicate: (ai, email) => `${email} 已在这台电脑的 ${ai} 账号列表中。请移除此项，再重新添加你要的账号。`,
 			profileSignOutFailed: (ai) => `${ai} 无法退出此账号，因此未删除任何内容。请稍后重试。`,
 			profilesDamaged: (ai) => `电脑上的 ${ai} 账号列表已损坏。请在电脑上修复或删除它，然后重启 tunelo。`,
 			accountSwitchBlocked: {
@@ -491,6 +492,7 @@ export const zhCNMachines: MachinesCopy = {
 			profile_add: "添加了 AI 账号",
 			profile_select: "选择了 AI 账号",
 			profile_remove: "移除了 AI 账号",
+			profile_accept: "为已保存的 AI 账号采用了新账号",
 			local_forward: "更改了 localhost 转发",
 			secret_add: "输入了密钥，用于",
 			secret_use: "使用了密钥，在",
@@ -839,6 +841,10 @@ export const zhCNMachines: MachinesCopy = {
 		needsSignInHint: (ai) => `${ai} 报告此账号已登出或登录已过期。移除后重新添加即可继续使用。`,
 		statusError: "状态未知",
 		statusErrorHint: (ai) => `电脑上的 ${ai} 无法确认此账号是否仍已登录。`,
+		accountChanged: "账号已变更",
+		accountChangedHint: (ai, saved, now) =>
+			`${ai} 报告此项当前登录的是 ${now}，而不是 ${saved}（可能是在某个会话中重新登录）。自动切换账号时会跳过此项。可为此项采用 ${now}，或移除后重新添加 ${saved}。`,
+		acceptCurrent: (email) => `采用 ${email}`,
 		loginEnds: (at) => `登录有效至 ${at}`,
 		loginEnded: (at) => `登录已于 ${at} 过期`,
 		selected: "使用中",
