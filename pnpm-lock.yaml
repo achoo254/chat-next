@@ -75,8 +75,8 @@ importers:
         specifier: 2.4.0
         version: 2.4.0
       '@tunelo/client':
-        specifier: github:achoo254/localman-next#tunelo-client-v0.3.2&path:/packages/tunelo-client
-        version: https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client
+        specifier: github:achoo254/localman-next#tunelo-client-v0.3.3&path:/packages/tunelo-client
+        version: https://codeload.github.com/achoo254/localman-next/tar.gz/0ec53f4e45b51efdbde06c5ed18a393de25e458c#path:/packages/tunelo-client
       '@tunelo/shared':
         specifier: github:achoo254/localman-next#tunelo-shared-v0.2.1&path:/packages/tunelo-shared
         version: https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared
@@ -1223,9 +1223,9 @@ packages:
       '@tiptap/core': 3.32.0
       '@tiptap/pm': 3.32.0
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client':
-    resolution: {gitHosted: true, integrity: sha512-d+8fhh/eY72/synM9MqBRx9nrDrDlW8LO9kxXU0apZusvmlTY20BmVantYemg4xFoha5WZZ4ODNMbWa7j1Dkew==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03}
-    version: 0.3.2
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/0ec53f4e45b51efdbde06c5ed18a393de25e458c#path:/packages/tunelo-client':
+    resolution: {gitHosted: true, integrity: sha512-mHNAtB0IlEA58krrHiik4MIb/9RTc2s/OSPobp4GxdK9L08CfyDZLYlhXqs1R9BnP3rV//mkANkfFIWZJukQlQ==, path: /packages/tunelo-client, tarball: https://codeload.github.com/achoo254/localman-next/tar.gz/0ec53f4e45b51efdbde06c5ed18a393de25e458c}
+    version: 0.3.3
     engines: {node: '>=20'}
 
   '@tunelo/shared@https://codeload.github.com/achoo254/localman-next/tar.gz/b7348f3c0347d369af85b83e80749280435cad77#path:/packages/tunelo-shared':
@@ -3931,7 +3931,7 @@ snapshots:
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
       '@tiptap/pm': 3.32.0
 
-  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/26f234bc4e0cad6c8c61be852905198b19802c03#path:/packages/tunelo-client':
+  '@tunelo/client@https://codeload.github.com/achoo254/localman-next/tar.gz/0ec53f4e45b51efdbde06c5ed18a393de25e458c#path:/packages/tunelo-client':
     dependencies:
       '@types/ws': 8.18.1
       ws: 8.21.0
