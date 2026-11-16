@@ -1314,6 +1314,7 @@ export const viMachines = {
 		},
 		director: "Giám đốc",
 		chairman: "Chủ tịch (bạn)",
+		advisor: "Cố vấn",
 		machine: (tool: string) => (tool === "" ? "Máy chạy nền" : `Máy ${tool}`),
 		/** A background service as the agent labelled it on the machine (never its command): its name and bubble. */
 		service: {
@@ -1345,7 +1346,7 @@ export const viMachines = {
 		stuck: (minutes: number) => `Kẹt ${minutes} phút`,
 		snore: "Zzz",
 		life: { sleep: "Đang ngủ", doze: "Ngủ gật", run: "Chạy bộ", pushup: "Tập thể dục", jacks: "Nhảy bật", punch: "Đấm bao cát", eat: "Đang ăn", watch: "Xem tivi", chat: "Tán gẫu", dance: "Nhảy múa" },
-		doing: { think: "Suy nghĩ", arrive: "Vào làm", handIn: "Nộp hồ sơ" },
+		doing: { think: "Suy nghĩ", arrive: "Vào làm", handIn: "Nộp hồ sơ", consult: "Hỏi Cố vấn", weigh: "Đang cân nhắc" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} người chờ bàn trong phòng họp`,
 		empty: "Trống",

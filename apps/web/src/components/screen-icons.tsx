@@ -69,6 +69,16 @@ export const SCREEN_PATHS = {
 			<path d="M15 8h.01M3 16l5-5c.9-.9 2.1-.9 3 0l5 5M14 14l1-1c.9-.9 2.1-.9 3 0l3 3" />
 		</>
 	),
+	send: <path d="M10 14L21 3M21 3l-6.5 18a.55.55 0 0 1-1 0L10 14l-7-3.5a.55.55 0 0 1 0-1L21 3" />,
+	command: <path d="M7 9a2 2 0 1 1 2-2v10a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2V7a2 2 0 1 1 2 2H7" />,
+	apps: <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6" />,
+	clip: <path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13" />,
+	mic: (
+		<>
+			<rect x="9" y="2" width="6" height="11" rx="3" />
+			<path d="M5 10a7 7 0 0 0 14 0M8 21h8M12 17v4" />
+		</>
+	),
 } satisfies Record<string, ReactElement>;
 
 const PATHS = { ...STARTUP_PATHS, ...SCREEN_PATHS };

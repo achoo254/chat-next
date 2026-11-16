@@ -15,6 +15,8 @@ import type { OfficePlace } from "./office-activity-map.ts";
 import type { ServiceLabel } from "./office-service-kind.ts";
 
 export const DIRECTOR_ID = "director";
+/** Advisor's actor, there while the session's automatic Advisor is on. */
+export const ADVISOR_ID = "advisor";
 
 /** One activity: a tool call (its id), or "think", "arrive", "hand-in". */
 export type ActivityRecord = { id: string; tool: string; place: OfficePlace; subject: string; startedAt: number };
@@ -105,3 +107,4 @@ export function actorWire(a: ActorRecord): OfficeActor {
 
 export const isEmployee = (a: ActorRecord): boolean => a.role === OfficeRole.EMPLOYEE;
 export const isMachine = (a: ActorRecord): boolean => a.role === OfficeRole.MACHINE;
+export const isAdvisor = (a: ActorRecord): boolean => a.role === OfficeRole.ADVISOR;

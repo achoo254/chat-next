@@ -87,9 +87,10 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 	);
 	const swing = new Quaternion();
 	const meshes: AbstractMesh[] = model.getChildMeshes(false);
-	if (dress.skins !== null) dress.skins.apply(meshes, skinCellFor(look, dress.skins.count));
-	const worn = (name: string | null): WornAccessory | null => (name === null || dress.accessories === null ? null : dress.accessories.attach(name, key, nodes));
-	const accessory = worn(look.accessory);
+	if (dress.skins !== null) dress.skins.apply(meshes, skinCellFor(look, dress.skins.count, dress.skins.names));
+	const worn = (name: string | null, scale = 1): WornAccessory | null =>
+		name === null || dress.accessories === null ? null : dress.accessories.attach(name, key, nodes, scale);
+	const accessory = worn(look.accessory, look.accessoryScale);
 	const mug = look.kind === "director" || look.kind === "employee" ? worn(COFFEE_ITEM) : null;
 	mug?.holder.setEnabled(false);
 	const showItems = (drinking: boolean): void => {

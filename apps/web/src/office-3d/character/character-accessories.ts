@@ -35,8 +35,8 @@ export interface WornAccessory {
 
 export interface CharacterAccessories {
 	readonly names: ReadonlySet<string>;
-	/** Hangs accessory `name` on the matching bone node of one person, or null when the item or bone is missing. */
-	attach(name: string, key: string, bones: ReadonlyMap<string, TransformNode>): WornAccessory | null;
+	/** Hangs accessory `name` on the matching bone node of one person (`scale` times its own size), or null when the item or bone is missing. */
+	attach(name: string, key: string, bones: ReadonlyMap<string, TransformNode>, scale?: number): WornAccessory | null;
 	dispose(): void;
 }
 
@@ -83,13 +83,14 @@ export function createCharacterAccessories(scene: Scene, container: AssetContain
 
 	return {
 		names: new Set(models.keys()),
-		attach(name, key, bones) {
+		attach(name, key, bones, scale = 1) {
 			const model = models.get(name);
 			const bone = model === undefined ? undefined : bones.get(model.bone);
 			if (model === undefined || bone === undefined) return null;
 			const holder = new TransformNode(`accessory-${name}-${key}`, scene);
 			holder.parent = bone;
 			apply(holder, model.offset);
+			holder.scaling.scaleInPlace(scale);
 			for (const { mesh, local } of model.parts) {
 				const instance = mesh.createInstance(`${mesh.name}-${key}`);
 				instance.parent = holder;

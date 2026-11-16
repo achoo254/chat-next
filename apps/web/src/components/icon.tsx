@@ -44,7 +44,6 @@ export const PATHS = {
 			<path d="M8 11V7a4 4 0 1 1 8 0v4" />
 		</>
 	),
-	send: <path d="M10 14L21 3M21 3l-6.5 18a.55.55 0 0 1-1 0L10 14l-7-3.5a.55.55 0 0 1 0-1L21 3" />,
 	smile: (
 		<>
 			<circle cx="12" cy="12" r="9" />
@@ -101,17 +100,10 @@ export const PATHS = {
 	),
 	code: <path d="M7 8l-4 4 4 4M17 8l4 4-4 4M14 4l-4 16" />,
 	"wifi-off": <path d="M12 18h.01M9.2 15.2a4 4 0 0 1 5.6 0M6.3 12.3a8 8 0 0 1 3.9-2.1M14.4 10.4a8 8 0 0 1 3.3 2M3.5 9.5a12 12 0 0 1 3.5-2.4M10.2 6.1a12 12 0 0 1 10.3 3.4M3 3l18 18" />,
-	flag: <path d="M5 5a5 5 0 0 1 7 0 5 5 0 0 0 7 0v9a5 5 0 0 1-7 0 5 5 0 0 0-7 0V5zM5 21v-7" />,
 	ban: (
 		<>
 			<circle cx="12" cy="12" r="9" />
 			<path d="M5.7 5.7l12.6 12.6" />
-		</>
-	),
-	inbox: (
-		<>
-			<rect x="4" y="4" width="16" height="16" rx="2" />
-			<path d="M4 13h3l3 3h4l3-3h3" />
 		</>
 	),
 	cloud: <path d="M7 18a4.6 4.4 0 0 1 0-8.8 5 4.5 0 0 1 9.8 1H18a3.5 3.5 0 0 1 0 7.8H7z" />,
@@ -121,25 +113,10 @@ export const PATHS = {
 			<circle cx="19" cy="5" r="2.5" />
 		</>
 	),
-	command: <path d="M7 9a2 2 0 1 1 2-2v10a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2V7a2 2 0 1 1 2 2H7" />,
-	apps: <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6" />,
 	megaphone: <path d="M18 8a3 3 0 0 1 0 6M10 8v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5M12 8l4.5-3.8a.9.9 0 0 1 1.5.7v12.2a.9.9 0 0 1-1.5.7L12 14H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h8" />,
 	hash: <path d="M5 9h14M5 15h14M11 4L7 20M17 4l-4 16" />,
 	"arrow-up": <path d="M12 19V5M18 11l-6-6M6 11l6-6" />,
 	"arrow-down": <path d="M12 5v14M18 13l-6 6M6 13l6 6" />,
-	database: (
-		<>
-			<ellipse cx="12" cy="6" rx="8" ry="3" />
-			<path d="M4 6v6a8 3 0 0 0 16 0V6M4 12v6a8 3 0 0 0 16 0v-6" />
-		</>
-	),
-	clip: <path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3L18 10a3 3 0 0 0-6-6l-6.5 6.5a4.5 4.5 0 0 0 9 9L21 13" />,
-	mic: (
-		<>
-			<rect x="9" y="2" width="6" height="11" rx="3" />
-			<path d="M5 10a7 7 0 0 0 14 0M8 21h8M12 17v4" />
-		</>
-	),
 	upload: <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 9l5-5 5 5M12 4v12" />,
 	keyboard: (
 		<>
@@ -151,6 +128,19 @@ export const PATHS = {
 		<>
 			<path d="M11 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4" />
 			<rect x="14" y="14" width="7" height="5" rx="1" />
+		</>
+	),
+	flag: <path d="M5 5a5 5 0 0 1 7 0 5 5 0 0 0 7 0v9a5 5 0 0 1-7 0 5 5 0 0 0-7 0V5zM5 21v-7" />,
+	inbox: (
+		<>
+			<rect x="4" y="4" width="16" height="16" rx="2" />
+			<path d="M4 13h3l3 3h4l3-3h3" />
+		</>
+	),
+	database: (
+		<>
+			<ellipse cx="12" cy="6" rx="8" ry="3" />
+			<path d="M4 6v6a8 3 0 0 0 16 0V6M4 12v6a8 3 0 0 0 16 0v-6" />
 		</>
 	),
 } satisfies Record<string, ReactElement>;

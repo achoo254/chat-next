@@ -2,7 +2,7 @@
 // videos, or any file up to the server's limit. Loaded when first opened.
 import type { RefObject } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { PopupMenu } from "./popup-menu.tsx";
 
 interface AttachMenuProps {
@@ -15,7 +15,7 @@ interface AttachMenuProps {
 }
 
 export default function AttachMenu({ boundary, limit, onMedia, onFiles, onClose }: AttachMenuProps) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	return (
 		<PopupMenu className="attach-menu" label={copy.composer.attachMenu} boundary={boundary} onClose={onClose}>
 			<button type="button" role="menuitem" onClick={onMedia}>

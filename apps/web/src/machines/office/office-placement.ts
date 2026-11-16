@@ -12,7 +12,10 @@
 // session rests, a finished employee, a resident whose subagent left) lives
 // by the daily schedule (office-life-schedule.ts) on the living floor, and
 // spends office hours on the work floors as before (a resident in their
-// agent type's home room). Real work always wins over the schedule.
+// agent type's home room). Real work always wins over the schedule. Advisor,
+// while the session's automatic Advisor is on, keeps its own seat at the head
+// of the meeting table day and night (no schedule, no talks); whoever asks it
+// walks over to its seat.
 // Pure: the memory of the last call goes in, the new one comes out.
 import { homeRoomOf } from "./office-cast.ts";
 import { anchorById, anchorOfKind, floorOfRoom, spotsOf } from "./office-geometry.ts";
@@ -35,7 +38,16 @@ export const HAND_IN_MS = 5_000;
 /** At most this many residents (the director and employees, on duty or not) are shown; off-duty ones beyond it stay out of sight. */
 export const MAX_RESIDENTS = 12;
 
-export type PersonKind = "director" | "employee" | "machine" | "chairman";
+export type PersonKind = "director" | "employee" | "machine" | "chairman" | "advisor";
+
+/** Who Advisor is to the viewer (their Advisor profile): its name and look. */
+export interface OfficeAdvisor {
+	readonly name: string;
+	readonly lookId: string;
+}
+
+/** Advisor's room: it sits at the room's first meeting seat (the head of the table). */
+export const ADVISOR_ROOM: RoomCode = "MEETING";
 
 export interface Placement {
 	/** "director", "chairman", an employee's staff key, or "machine:<actor id>". */
@@ -54,6 +66,8 @@ export interface Placement {
 	readonly activityRoom: RoomCode | null;
 	/** Off duty at a place of the living floor: the part of the day and what they do there; null otherwise. */
 	readonly life: { readonly slot: LifeSlot; readonly act: LifeAct } | null;
+	/** Advisor's name and look, from the viewer's Advisor profile; null for everyone else. */
+	readonly advisor: OfficeAdvisor | null;
 }
 
 interface Remembered {
@@ -107,6 +121,8 @@ function people(state: OfficeState): Person[] {
 	const room = Math.max(0, MAX_RESIDENTS - list.length);
 	for (const member of state.residents.slice(0, room)) list.push({ key: member.key, kind: "employee", actor: null, member });
 	for (const actor of state.actors) if (actor.role === "machine") list.push({ key: `machine:${actor.id}`, kind: "machine", actor, member: null });
+	const advisor = state.actors.find((a) => a.role === "advisor");
+	if (advisor !== undefined) list.push({ key: "advisor", kind: "advisor", actor: advisor, member: null });
 	if (state.chairman) list.push({ key: "chairman", kind: "chairman", actor: null, member: null });
 	return list;
 }
@@ -131,10 +147,17 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 		// An off-duty resident: the living floor, or their agent type's home room in office hours.
 		return { room: homeRoomOf(person.member?.agentType ?? ""), working: false, own: null, life: livingPlan(person.key, now) };
 	}
+	const advisorSeat = anchorOfKind(layout, ADVISOR_ROOM, "meeting")?.id ?? null;
+	// Advisor never leaves its seat: listening there is its work.
+	if (person.kind === "advisor") return { room: ADVISOR_ROOM, working: actor.activity !== null, own: advisorSeat, life: null };
 	if (actor.state === "awaiting") return { room: "SECURITY", working: true, own: null, life: null };
 	const deskId = person.member?.desk ?? null;
 	const directorChair = anchorOfKind(layout, "DIRECTOR", "director")?.id ?? null;
 	const activity = currentActivity(actor, now, state.clockOffset);
+	// Asking Advisor: at its seat (the views stand them beside it), when Advisor is in.
+	if (activity !== null && activity.group === "consult" && state.actors.some((a) => a.role === "advisor")) {
+		return { room: ADVISOR_ROOM, working: true, own: advisorSeat, life: null };
+	}
 	if (activity !== null) {
 		let room = activity.room;
 		if (room === "WORK" && person.kind === "employee") room = homeRoomOf(actor.agentType);
@@ -174,6 +197,7 @@ export function officePlacement(
 	layout: OfficeLayout,
 	now: number,
 	memory: PlacementMemory,
+	advisor: OfficeAdvisor | null = null,
 ): { readonly placements: readonly Placement[]; readonly memory: PlacementMemory } {
 	const frozen = state.power === "out";
 	const decided: Decision[] = [];
@@ -250,6 +274,8 @@ export function officePlacement(
 			since: d.since,
 			activityRoom: d.busy ? d.room : null,
 			life: d.life === null || place === undefined ? null : { slot: d.life.slot, act: lifeActAt(place, d.life.slot, d.person.key, now) },
+			// Advisor is who the viewer's profile says (the machine belongs to the viewer's account): no profile, the defaults.
+			advisor: d.person.kind === "advisor" ? (advisor ?? { name: "", lookId: "" }) : null,
 		};
 	});
 	return { placements, memory: next };

@@ -907,7 +907,7 @@ export class Connection {
             office.unwatch(b.value.threadId, this.officeSink);
             return ack();
           }
-          return this.send(id, { case: "officeSnapshot", value: office.watch(b.value.threadId, this.officeSink) });
+          return this.send(id, { case: "officeSnapshot", value: office.watch(b.value.threadId, this.officeSink, b.value.advisorRole) });
         }
         case "projectConfigGet": {
           const dir = b.value.dir;

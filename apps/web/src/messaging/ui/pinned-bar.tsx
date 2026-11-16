@@ -4,7 +4,7 @@
 import { useState, useSyncExternalStore } from "react";
 import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { messagePreview, namedUserIds } from "../data/format.ts";
 import { pinnedLists, usePinned } from "../data/pinned.ts";
 import { useDialog, useMessage, useServices } from "../data/services.tsx";
@@ -49,7 +49,7 @@ export function usePinHidden(chatId: number): number {
  * this device until a newer pin. Forum groups show the pins of the topic.
  */
 export default function PinnedBar({ chat, topicId }: { chat: Chat; topicId: number }) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { store, toasts } = useServices();
 	const ui = useUi();
 	const view = useDialog(chat.id);

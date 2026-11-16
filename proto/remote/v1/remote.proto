@@ -3513,6 +3513,11 @@ message UsageDelete {}
 message OfficeWatch {
   string thread_id = 1;
   bool on = 2;
+  // The device draws Advisor (OFFICE_ROLE_ADVISOR, tunelo 3.13.0+). B sends
+  // Advisor's actor only to a watch that says so: to any other, every event
+  // about Advisor goes out without a kind (its seq kept) and the snapshot
+  // leaves Advisor out.
+  bool advisor_role = 3;
 }
 
 // B → A: the whole office of a thread. Events with seq up to and including
@@ -3726,6 +3731,11 @@ enum OfficeRole {
   OFFICE_ROLE_DIRECTOR = 1;
   OFFICE_ROLE_EMPLOYEE = 2;
   OFFICE_ROLE_MACHINE = 3;
+  // Advisor (Cố vấn), present while the session's automatic Advisor is on;
+  // id "advisor". Its description is Advisor's latest answer in the session
+  // ("<option> · 72%"). Only to a watch with OfficeWatch.advisor_role; a
+  // device drops an actor of a role it does not know.
+  OFFICE_ROLE_ADVISOR = 4;
 }
 
 enum OfficeActorState {
@@ -3754,6 +3764,10 @@ enum OfficeAnimGroup {
   OFFICE_ANIM_GROUP_HAND_IN = 6;
   // Thinking or writing the answer.
   OFFICE_ANIM_GROUP_THINK = 7;
+  // Asking Advisor (advisor_weigh): the asker goes to Advisor's seat and
+  // talks; Advisor listens while the call runs. A device that does not know
+  // it acts it out as TYPE.
+  OFFICE_ANIM_GROUP_CONSULT = 8;
 }
 
 // The building's rooms. A device reads an unknown or unset room as

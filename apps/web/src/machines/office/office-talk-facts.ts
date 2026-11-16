@@ -24,6 +24,7 @@ const DOING: Readonly<Record<AnimGroup, string>> = {
 	arrive: "nhận việc",
 	"hand-in": "nộp hồ sơ",
 	think: "ngồi nghĩ cách làm",
+	consult: "hỏi ý Cố vấn",
 };
 
 const WHERE: Readonly<Record<RoomCode, string>> = {

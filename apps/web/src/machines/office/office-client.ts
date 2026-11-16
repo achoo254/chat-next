@@ -64,7 +64,8 @@ export function connectOffice(link: OfficeLink, threadId: string, store: OfficeS
 	const watch = (): void => {
 		if (stopped || hidden || watching || !isOpen()) return;
 		watching = true;
-		link.request({ case: "officeWatch", value: { threadId, on: true } }).then(
+		// This app draws Advisor: the machine sends its actor (an older app is never sent one).
+		link.request({ case: "officeWatch", value: { threadId, on: true, advisorRole: true } }).then(
 			() => {
 				watching = false;
 			},

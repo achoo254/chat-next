@@ -186,8 +186,7 @@ export function exposedToolName(group: GroupName, tool: string): string {
 	return group === "tunnel" ? tool : `${group}_${tool}`;
 }
 
-/** The server name of tunelo's MCP in an AI session. */
-export const SESSION_MCP_SERVER = "tunelo";
+export { SESSION_MCP_SERVER } from "./session-mcp-server.js";
 
 /**
  * The group and tool behind a tool name as tunelo's MCP serves it, such as

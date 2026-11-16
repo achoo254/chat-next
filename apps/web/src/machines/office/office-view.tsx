@@ -21,7 +21,7 @@ import { busyFloors, FIRST_FLOOR, followPreference, followTarget, nextFloor, Off
 import { deskOrder, type ScreenSize } from "./office-geometry.ts";
 import type { Parsed } from "./office-json.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "./office-layout.ts";
-import { EMPTY_MEMORY, officePlacement, type Placement, type PlacementMemory } from "./office-placement.ts";
+import { EMPTY_MEMORY, officePlacement, type OfficeAdvisor, type Placement, type PlacementMemory } from "./office-placement.ts";
 import type { OfficeRendererProps } from "./office-renderer.ts";
 import { createOfficeStore, type OfficeState } from "./office-store.ts";
 import "./office.css";
@@ -105,9 +105,9 @@ interface Frame {
 
 const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, floor: FIRST_FLOOR, talks: [] };
 
-/** The next frame: places from the store's state at `now`, the talks among them, then the floor following the newest work (or the crowd). */
-export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, follow: boolean): Frame {
-	const placed = officePlacement(state, layout, now, prev.memory);
+/** The next frame: places from the store's state at `now`, the talks among them, then the floor following the newest work (or the crowd). `advisor`: who Advisor is to the viewer. */
+export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, follow: boolean, advisor: OfficeAdvisor | null = null): Frame {
+	const placed = officePlacement(state, layout, now, prev.memory, advisor);
 	return {
 		now,
 		placements: placed.placements,
@@ -117,7 +117,7 @@ export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayo
 	};
 }
 
-function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: string; layout: OfficeLayout }) {
+function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; threadId: string; layout: OfficeLayout; advisor: OfficeAdvisor | null }) {
 	const copy = useMachinesCopy();
 	const t = copy.office;
 	const [store] = useState(() => createOfficeStore({ now: () => Date.now(), desks: deskOrder(layout, isPhone() ? "phone" : "desktop") }));
@@ -139,16 +139,21 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 	// The phone uses six of the eight desks: people keep theirs when it stays offered.
 	useEffect(() => store.setDesks(deskOrder(layout, size)), [store, layout, size]);
 	const [follow, setFollow] = useState(followPreference);
-	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), follow));
+	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), follow, advisor));
 	// The frame moves on with every change of the store and every second while the page shows (holds and following run on the clock).
 	const following = useRef(follow);
 	useEffect(() => {
 		following.current = follow;
 	}, [follow]);
+	// Advisor's name or look changed in the profile: the next frame (at most a second later) shows it.
+	const advisorNow = useRef(advisor);
+	useEffect(() => {
+		advisorNow.current = advisor;
+	}, [advisor]);
 	useEffect(() => {
 		const step = (): void => {
 			if (documentVisibility.hidden()) return;
-			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), following.current));
+			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), following.current, advisorNow.current));
 		};
 		const off = store.subscribe(step);
 		const timer = window.setInterval(step, FRAME_TICK_MS);
@@ -231,7 +236,20 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 	);
 }
 
-export default function OfficeView({ link, threadId, info, online }: { link: MachineLink; threadId: string; info: MachineInfo | null; online: boolean }) {
+/** `advisor`: who Advisor is to the viewer (their Advisor profile); null shows Advisor under its default name and first look. */
+export default function OfficeView({
+	link,
+	threadId,
+	info,
+	online,
+	advisor = null,
+}: {
+	link: MachineLink;
+	threadId: string;
+	info: MachineInfo | null;
+	online: boolean;
+	advisor?: OfficeAdvisor | null;
+}) {
 	const t = useMachinesCopy().office;
 	let note: string | null = null;
 	if (!OFFICE_LAYOUT.ok) note = t.layoutBroken;
@@ -246,5 +264,5 @@ export default function OfficeView({ link, threadId, info, online }: { link: Mac
 			</div>
 		);
 	}
-	return <LiveOffice link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} />;
+	return <LiveOffice link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} advisor={advisor} />;
 }

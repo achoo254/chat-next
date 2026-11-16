@@ -11,7 +11,7 @@ import { useMachinesCopy } from "../use-machines-copy.ts";
 import { ASSETS_BASE, type AssetView } from "./office-assets.ts";
 import { BOARD_ROOMS, OfficeBoard } from "./office-boards.tsx";
 import { lineOf, talkOf } from "./office-conversations.ts";
-import { markerView, personColor, type OfficeCopy } from "./office-names.ts";
+import { markerView, personColor, workGroup, type OfficeCopy } from "./office-names.ts";
 import type { Placement } from "./office-placement.ts";
 import type { OfficeRendererProps } from "./office-renderer.ts";
 import type { RoomCode } from "./office-rooms.ts";
@@ -32,7 +32,17 @@ function Marker({ p, t, line, placed }: { p: Placement; t: OfficeCopy; line: str
 		style["--of-stack"] = placed.stack;
 	}
 	return (
-		<div className="of-marker" data-status={status} data-kind={p.kind} data-service={p.actor?.service?.kind} data-anchor={placed?.anchor ?? p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
+		<div
+			className="of-marker"
+			data-status={status}
+			data-kind={p.kind}
+			data-service={p.actor?.service?.kind}
+			data-group={workGroup(p)}
+			data-anchor={placed?.anchor ?? p.anchorId}
+			style={style}
+			title={label}
+			data-id={`office-person-${p.key}`}
+		>
 			<span className="of-dot" aria-hidden="true">
 				{status === "slow" ? "⌛" : ""}
 			</span>

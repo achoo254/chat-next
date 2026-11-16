@@ -8,9 +8,12 @@ import { viScreens, type ScreensCopy } from "./vi-screens.ts";
 // needed.
 export type FullCopy = MessagingCopy & ScreensCopy;
 
-/** `info` is split: presence words ship with the first chunk, the rest with the screens. */
+/**
+ * `info` and `composer` are split: presence words and the composer's
+ * placeholder ship with the first chunk, the rest with the screens.
+ */
 function merge(base: MessagingCopy, screens: ScreensCopy): FullCopy {
-	return { ...base, ...screens, info: { ...base.info, ...screens.info } };
+	return { ...base, ...screens, info: { ...base.info, ...screens.info }, composer: { ...base.composer, ...screens.composer } };
 }
 
 export const useScreensCopy = lazyCopy(merge(vi, viScreens), {

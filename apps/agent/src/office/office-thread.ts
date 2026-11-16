@@ -37,6 +37,34 @@ const STALE_SUBAGENT_MS = 10 * 60_000;
 /** Reads of the subagents' records made each time one is due (see OfficeThread.recordsDue). */
 const RECORD_READS_DUE = 2;
 
+/** One option Advisor weighed (AdvisorOption). */
+type AdvisorChoice = { readonly text: string; readonly probability: number };
+
+/** What Advisor's bubble says at most (OfficeActor.description). */
+const ADVISOR_SAYS_MAX = 80;
+
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]+/g;
+
+/**
+ * Advisor's bubble for one answer: its likeliest option and how likely,
+ * "<option> · 72%", cut to ADVISOR_SAYS_MAX characters; "" when Advisor did
+ * not answer (an error, nothing weighed). From an AdvisorVerdictItem; the options are what the session's
+ * Advisor card already shows (sent to Advisor after secrets were hidden).
+ */
+export function advisorSays(v: { readonly error: string; readonly options: readonly AdvisorChoice[] }): string {
+  if (v.error !== "") return "";
+  let top: AdvisorChoice | undefined;
+  for (const o of v.options) if (top === undefined || o.probability > top.probability) top = o;
+  if (top === undefined) return "";
+  const text = top.text.replace(CONTROL, " ").replace(/\s+/g, " ").trim();
+  if (text === "") return "";
+  const suffix = ` · ${Math.round(Math.min(1, Math.max(0, top.probability)) * 100)}%`;
+  const room = ADVISOR_SAYS_MAX - suffix.length;
+  const chars = [...text];
+  return `${chars.length <= room ? text : `${chars.slice(0, room - 1).join("")}…`}${suffix}`;
+}
+
 /** Whether the tool call runs in the background (a machine of the office): its input asks for it, or it is a Monitor. */
 function inBackground(name: string, input: string): boolean {
   if (name === "Monitor") return true;
@@ -187,6 +215,9 @@ export class OfficeThread {
         this.tracker.prompt(item.id, v.toolId, state, at);
         return;
       }
+      case "advisorVerdict":
+        this.tracker.advisorAnswered(advisorSays(b.value), at);
+        return;
       case "question":
         if (b.value.state === PromptState.PENDING) this.openPrompts.add(item.id);
         else this.openPrompts.delete(item.id);

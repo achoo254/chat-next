@@ -6,7 +6,7 @@
 // first item, arrows, Esc.
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { copyText } from "./parts.tsx";

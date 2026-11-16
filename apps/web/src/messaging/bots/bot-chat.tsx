@@ -10,7 +10,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
 import { cryptoRandomId } from "@achoo254/chat-platform";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { AiMark } from "../../machines/ai-mark.tsx";
 import type { OpenToken, PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { Link, paths } from "../../router.tsx";

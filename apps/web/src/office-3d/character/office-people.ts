@@ -21,7 +21,7 @@ import type { OfficeState } from "../../machines/office/office-store.ts";
 import { sampleRoute, type MotionSample } from "./actor-motion.ts";
 import { animationRates, type LodEntry } from "./animation-lod.ts";
 import { isLyingPose, poseFor, type Pose, type TalkRole } from "./anim-groups.ts";
-import { personLook } from "./character-look.ts";
+import { dressKey, personLook } from "./character-look.ts";
 import type { CharacterPool } from "./character-pool.ts";
 import type { CharacterVisual } from "./character-visual.ts";
 import type { IdleTarget } from "./idle-performer.ts";
@@ -69,6 +69,8 @@ interface Person {
 	index: number;
 	placement: Placement;
 	visual: CharacterVisual;
+	/** What the visual was dressed as (dressKey): drawn again when it changes. */
+	dress: string;
 	blob: InstancedMesh;
 	target: PersonTarget;
 	route: Route;
@@ -159,6 +161,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				const lying = w.placement.life?.act === "sleep";
 				const target = w.turn !== 0 && !found.seated && !lying ? { ...found, face: found.face + w.turn } : found;
 				let p = people.get(key);
+				const look = personLook(w.placement);
 				if (p === undefined) {
 					const index = nextIndex++;
 					const walksIn = entrance !== null && cameInAfterOpening(w.placement, state, liveSince);
@@ -167,7 +170,8 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 						key,
 						index,
 						placement: w.placement,
-						visual: pool.create(key, personLook(w.placement), index),
+						visual: pool.create(key, look, index),
+						dress: dressKey(look),
 						blob: pool.blob(key),
 						target: start,
 						route: { legs: [] },
@@ -186,6 +190,13 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					};
 					people.set(key, p);
 					if (walksIn) startRoute(p, target);
+				}
+				if (dressKey(look) !== p.dress) {
+					// Dressed otherwise now (Advisor's look from a profile read late, or changed): drawn again where they are.
+					p.visual.dispose();
+					p.visual = pool.create(key, look, p.index);
+					p.dress = dressKey(look);
+					p.pose = "stand-idle";
 				}
 				const wasAwaiting = p.placement.actor?.state === "awaiting";
 				p.placement = w.placement;
@@ -311,7 +322,9 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 		rebuild() {
 			for (const p of people.values()) {
 				p.visual.dispose();
-				p.visual = pool.create(p.key, personLook(p.placement), p.index);
+				const look = personLook(p.placement);
+				p.visual = pool.create(p.key, look, p.index);
+				p.dress = dressKey(look);
 				p.pose = "stand-idle";
 			}
 		},

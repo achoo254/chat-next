@@ -46,7 +46,8 @@ export function followTarget(placements: readonly Placement[]): { readonly floor
 	if (work !== null) return work;
 	const crowd = new Map<FloorLevel, { count: number; since: number }>();
 	for (const p of placements) {
-		if (p.kind === "chairman") continue;
+		// Advisor sits at its seat day and night: it never draws following to its floor.
+		if (p.kind === "chairman" || p.kind === "advisor") continue;
 		const c = crowd.get(p.floor) ?? { count: 0, since: 0 };
 		crowd.set(p.floor, { count: c.count + 1, since: Math.max(c.since, p.since) });
 	}

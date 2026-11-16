@@ -78,7 +78,7 @@ describe("the office tab", () => {
 	it("shows the floor's rooms with their people, the meeting room's +N and the boards", async () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
-		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true } }]);
+		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
 		const types = ["scout", "tester", "planner", "debugger", "docs-manager", "general-purpose", "a", "b", "c"];
 		const staffList = types.map((t, i) => staff(`s${i}`, t, { state: OfficeActorState.DONE }));
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ activity: act("t1", OfficeRoom.POST, "Bash") }), ...staffList], { session: session({ tasksDone: 7 }) }) });

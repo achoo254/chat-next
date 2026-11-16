@@ -34,11 +34,16 @@
 /* A background service is a little robot: a square screen-head with an antenna, in its kind's colour. */
 .of-marker[data-kind="machine"] .of-dot { position: relative; border-radius: var(--radius-xs); }
 .of-marker[data-kind="machine"] .of-dot::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 2px; height: 5px; margin-left: -1px; border-radius: var(--radius-full); background: var(--of-color); }
+/* Advisor: a rounded square ringed in its look's colour; its bubble is its latest answer, in plain text. Whoever asks it bobs as they talk. */
+.of-marker[data-kind="advisor"] .of-dot { border-radius: var(--radius-xs); --of-ring: var(--of-color); }
+.of-marker[data-kind="advisor"] .of-bubble, .of-marker[data-group="consult"] .of-bubble { font-family: inherit; color: var(--c-text); }
+.of-marker[data-group="consult"] .of-dot { animation: of-consult 1.2s ease-in-out infinite; }
+@keyframes of-consult { 50% { transform: translateY(-3px); } }
 .of-name { min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-bubble { min-width: 0; max-width: 60%; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-text-muted); font-family: var(--font-mono); font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-overflow { display: inline-grid; place-items: center; min-width: 24px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--c-warning) 55%, transparent); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 @keyframes of-pulse { 50% { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 6px color-mix(in srgb, var(--of-ring) 40%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .of-marker .of-dot { animation: none; } .of-stage { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .of-marker .of-dot, .of-marker[data-group="consult"] .of-dot { animation: none; } .of-stage { transition: none; } }
 
 .of-board { display: grid; gap: var(--space-1); padding-top: var(--space-2); border-top: 1px dashed var(--c-border-subtle); }
 .of-board h4 { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); }

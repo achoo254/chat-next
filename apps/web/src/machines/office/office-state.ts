@@ -17,9 +17,10 @@ import { roomOf, type RoomCode } from "./office-rooms.ts";
 import type { StaffMember } from "./office-staff.ts";
 import type { WorkLog } from "./office-work-log.ts";
 
-export type ActorRole = "director" | "employee" | "machine";
+/** Advisor sits in while the session's automatic Advisor is on (from tunelo 3.13.0, to a watch that says it draws Advisor). */
+export type ActorRole = "director" | "employee" | "machine" | "advisor";
 export type ActorState = "idle" | "working" | "done" | "awaiting";
-export type AnimGroup = "read" | "type" | "machine" | "phone" | "arrive" | "hand-in" | "think";
+export type AnimGroup = "read" | "type" | "machine" | "phone" | "arrive" | "hand-in" | "think" | "consult";
 export type ApprovalState = "waiting" | "allowed" | "denied" | "cancelled";
 /** What a machine runs, as the agent classified its command on the machine (never the command itself). */
 export type ServiceKind = "dev-server" | "test-watch" | "build" | "ci-watch" | "git" | "database" | "script";
@@ -135,6 +136,7 @@ const GROUPS: Readonly<Partial<Record<OfficeAnimGroup, AnimGroup>>> = {
 	[OfficeAnimGroup.ARRIVE]: "arrive",
 	[OfficeAnimGroup.HAND_IN]: "hand-in",
 	[OfficeAnimGroup.THINK]: "think",
+	[OfficeAnimGroup.CONSULT]: "consult",
 };
 
 const STATES: Readonly<Partial<Record<OfficeActorState, ActorState>>> = {
@@ -218,15 +220,25 @@ export function serviceOf(s: OfficeService | undefined): ActorRecord["service"] 
 	return { kind: SERVICE_KINDS[s.kind] ?? "script", port, startedAt: Number(s.startedAt) };
 }
 
-function roleOf(role: OfficeRole): ActorRole {
-	if (role === OfficeRole.DIRECTOR) return "director";
-	return role === OfficeRole.MACHINE ? "machine" : "employee";
+const ROLES: Readonly<Partial<Record<OfficeRole, ActorRole>>> = {
+	[OfficeRole.DIRECTOR]: "director",
+	[OfficeRole.EMPLOYEE]: "employee",
+	[OfficeRole.MACHINE]: "machine",
+	[OfficeRole.ADVISOR]: "advisor",
+};
+
+/** The role of a wire value; null for UNSPECIFIED or a role a newer agent added (such an actor is not shown, never hired as an employee). */
+export function roleOf(role: OfficeRole): ActorRole | null {
+	return ROLES[role] ?? null;
 }
 
-export function actorOf(a: OfficeActor, previous: ActorRecord | undefined): ActorRecord {
+/** The actor as the store keeps it; null for one of a role this app does not know (left out with every event about it). */
+export function actorOf(a: OfficeActor, previous: ActorRecord | undefined): ActorRecord | null {
+	const role = a.id === "director" ? "director" : roleOf(a.role);
+	if (role === null) return null;
 	return {
 		id: a.id,
-		role: a.id === "director" ? "director" : roleOf(a.role),
+		role,
 		agentType: a.agentType,
 		description: a.description,
 		parentId: a.parentId,
@@ -238,7 +250,7 @@ export function actorOf(a: OfficeActor, previous: ActorRecord | undefined): Acto
 		heardAt: previous?.heardAt ?? Math.max(Number(a.enteredAt), Number(a.activity?.startedAt ?? 0n)),
 		approval: previous?.approval ?? null,
 		lastResult: previous?.lastResult ?? null,
-		service: a.id !== "director" && roleOf(a.role) === "machine" ? serviceOf(a.service) : null,
+		service: role === "machine" ? serviceOf(a.service) : null,
 		beforeApproval: previous?.beforeApproval ?? null,
 	};
 }

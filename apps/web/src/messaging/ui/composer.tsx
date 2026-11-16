@@ -17,13 +17,13 @@
 // a list attached to the box (bots/inline-results.tsx).
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
-import { Icon } from "../../components/icon.tsx";
+import { Icon } from "../../components/screen-icons.tsx";
 import { AiMark } from "../../machines/ai-mark.tsx";
 import { hasFinePointer } from "../../components/fine-pointer.ts";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineToken } from "../bots/inline-token.ts";
-import { useCopy } from "../copy/use-copy.ts";
+import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
@@ -95,7 +95,7 @@ interface ComposerProps {
 }
 
 export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false, botId = 0, group = false }: ComposerProps) {
-	const copy = useCopy();
+	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const limits = useMediaLimits();
 	const files = useCell(attachments(chatId, topicId));

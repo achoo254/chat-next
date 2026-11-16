@@ -1,6 +1,7 @@
 // What a character does with its body: from walking or standing still, sitting
 // or not, the animation group of its activity (plan decision 3: read, type,
-// machine, phone, arrive, hand-in, think; an unknown tool types), a recent
+// machine, phone, arrive, hand-in, think; asking Advisor talks: the asker
+// standing beside Advisor's seat, Advisor seated; an unknown tool types), a recent
 // pass (a cheer) or a refusal at Security (a head shake), a conversation
 // (talking, listening, clapping), life on the living floor (sleeping in a
 // bed and getting up, the gym, meals, the TV, dancing) and the idle show.
@@ -77,6 +78,7 @@ const SEATED: Readonly<Record<AnimGroup, Pose>> = {
 	arrive: "sit-idle",
 	"hand-in": "sit-read",
 	think: "sit-think",
+	consult: "sit-talk",
 };
 
 const STANDING: Readonly<Record<AnimGroup, Pose>> = {
@@ -87,6 +89,7 @@ const STANDING: Readonly<Record<AnimGroup, Pose>> = {
 	arrive: "stand-idle",
 	"hand-in": "hand-in",
 	think: "stand-think",
+	consult: "talk",
 };
 
 function lifePose(act: LifeAct, seated: boolean, low: boolean): Pose {

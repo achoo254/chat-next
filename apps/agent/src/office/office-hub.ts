@@ -2,11 +2,29 @@
 // OfficeThread per watched thread, shared by every connection watching it,
 // fed from the core as things happen; events go out to the watchers in
 // batches of up to FLUSH_MS. A thread nobody watches has no office (it is
-// built again, from the journal, when one does). docs/office-wire.md.
+// built again, from the journal, when one does). Advisor's actor goes only
+// to watches that said they draw it (OfficeWatch.advisor_role): any other
+// gets each event about it without a kind, so its seq still runs on, and a
+// snapshot without it. docs/office-wire.md.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, type OfficeEvents, OfficeEventsSchema, type OfficeSnapshot, OfficeSnapshotSchema, ThreadKind, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import {
+  ErrorCode,
+  ErrorReason,
+  type OfficeEvent,
+  OfficeEventSchema,
+  type OfficeEvents,
+  OfficeEventsSchema,
+  OfficeRole,
+  type OfficeSnapshot,
+  OfficeSnapshotSchema,
+  type OfficeState,
+  OfficeStateSchema,
+  ThreadKind,
+  type ThreadSummary,
+} from "@achoo254/chat-proto/remote/remote";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import type { AgentProvider, HistoryEntry, ProviderEvent } from "../providers/types.ts";
+import { ADVISOR_ID } from "./office-actor.ts";
 import { type OfficeLog, OfficeProblems } from "./office-problem-log.ts";
 import { OfficeMemory, OfficeThread } from "./office-thread.ts";
 
@@ -33,7 +51,36 @@ export type OfficeHubOptions = {
   log?: OfficeLog;
 };
 
-type Office = { thread: OfficeThread; sinks: Set<OfficeSink>; reading: boolean; lastRead: number };
+/** Each watching sink, and whether it draws Advisor (OfficeWatch.advisor_role). */
+type Office = { thread: OfficeThread; sinks: Map<OfficeSink, boolean>; reading: boolean; lastRead: number };
+
+/** The actor an event is about; "" for one about no actor (a turn, the session). */
+function eventActorId(e: OfficeEvent): string {
+  const k = e.kind;
+  switch (k.case) {
+    case "actorEnter":
+    case "actorUpdate":
+      return k.value.id;
+    case "actorLeave":
+    case "activityStart":
+    case "activityEnd":
+    case "approval":
+      return k.value.actorId;
+    default:
+      return "";
+  }
+}
+
+/** The office as a device that does not draw Advisor gets it: Advisor left out. */
+function withoutAdvisor(state: OfficeState): OfficeState {
+  if (!state.actors.some((a) => a.role === OfficeRole.ADVISOR)) return state;
+  return create(OfficeStateSchema, { ...state, actors: state.actors.filter((a) => a.role !== OfficeRole.ADVISOR) });
+}
+
+/** Events for a device that does not draw Advisor: those about Advisor keep their seq and time but lose their kind. */
+function eventsWithoutAdvisor(events: readonly OfficeEvent[]): OfficeEvent[] {
+  return events.map((e) => (eventActorId(e) === ADVISOR_ID ? create(OfficeEventSchema, { seq: e.seq, at: e.at }) : e));
+}
 
 export class OfficeHub {
   private readonly memory = new OfficeMemory();
@@ -71,9 +118,10 @@ export class OfficeHub {
    * Starts (or restarts) watching a thread's office for `sink`; the snapshot
    * it starts from. Refused (OFFICE_WATCH_LIMIT) past WATCHES_PER_CONNECTION
    * offices for one sink or OFFICES_PER_MACHINE for the machine; watching
-   * again an office already watched is never refused.
+   * again an office already watched is never refused. `advisorRole`: the
+   * device draws Advisor (OfficeWatch.advisor_role).
    */
-  watch(threadId: string, sink: OfficeSink): OfficeSnapshot {
+  watch(threadId: string, sink: OfficeSink, advisorRole = false): OfficeSnapshot {
     let office = this.offices.get(threadId);
     if (!office?.sinks.has(sink)) this.checkLimits(sink, office === undefined);
     if (office) {
@@ -86,9 +134,10 @@ export class OfficeHub {
       this.pollTimer ??= setInterval(() => this.poll(), this.opts.pollMs ?? POLL_MS);
       this.pollTimer.unref?.();
     }
-    office.sinks.add(sink);
+    office.sinks.set(sink, advisorRole);
     const t = office.thread.tracker;
-    return create(OfficeSnapshotSchema, { threadId, epoch: this.core.epoch, seq: BigInt(t.seq), state: t.snapshot() });
+    const state = t.snapshot();
+    return create(OfficeSnapshotSchema, { threadId, epoch: this.core.epoch, seq: BigInt(t.seq), state: advisorRole ? state : withoutAdvisor(state) });
   }
 
   unwatch(threadId: string, sink: OfficeSink): void {
@@ -143,10 +192,12 @@ export class OfficeHub {
       if (sessionId !== "") this.memory.sessionIds.set(threadId, sessionId);
     }
     const thread = new OfficeThread(threadId, reportsStaff, this.memory, now);
+    // Advisor sits in before the journal is read: it hears the calls still open, and its last answer.
+    thread.tracker.setAdvisor(this.core.advisorAllowed(threadId), now);
     thread.seed(this.core.snapshot(threadId), summary, now);
     // Nobody has seen these events: the snapshot holds what they did.
     thread.tracker.drain();
-    return { thread, sinks: new Set(), reading: false, lastRead: 0 };
+    return { thread, sinks: new Map(), reading: false, lastRead: 0 };
   }
 
   private listen(): void {
@@ -162,6 +213,8 @@ export class OfficeHub {
         }),
       ),
       this.core.onDeleted((threadId) => this.guard("thread deleted", () => this.dropOffice(threadId))),
+      // The session's automatic Advisor turned on or off (among other changes of the thread's info).
+      this.core.onInfo((threadId) => this.guard("thread info", () => this.advisorNow(threadId))),
       this.core.onStatus((summary) =>
         this.guard("thread status", () => {
           const office = this.offices.get(summary.id);
@@ -178,6 +231,14 @@ export class OfficeHub {
     const office = this.offices.get(threadId);
     if (!office) return;
     office.thread.providerEvent(e, this.now());
+    this.changed();
+  }
+
+  /** Advisor is in the thread's office exactly while the session's automatic Advisor runs (on, and its AI can reach it). */
+  private advisorNow(threadId: string): void {
+    const office = this.offices.get(threadId);
+    if (!office) return;
+    office.thread.tracker.setAdvisor(this.core.advisorAllowed(threadId), this.now());
     this.changed();
   }
 
@@ -223,7 +284,15 @@ export class OfficeHub {
       const events = office.thread.tracker.drain();
       if (events.length === 0) continue;
       const frame = create(OfficeEventsSchema, { threadId, epoch: this.core.epoch, events });
-      for (const sink of office.sinks) this.guard("send events", () => sink(frame));
+      let plain: OfficeEvents | undefined;
+      for (const [sink, advisorRole] of office.sinks) {
+        if (advisorRole) {
+          this.guard("send events", () => sink(frame));
+          continue;
+        }
+        const out = (plain ??= create(OfficeEventsSchema, { threadId, epoch: this.core.epoch, events: eventsWithoutAdvisor(events) }));
+        this.guard("send events", () => sink(out));
+      }
     }
   }
 
@@ -252,6 +321,8 @@ export class OfficeHub {
       this.guard("poll", () => {
         // Turns typed elsewhere come in through the journal (onItems).
         this.core.followHistory(threadId);
+        // Advisor's key or the AI's reach to it changed without a word about the thread itself.
+        office.thread.tracker.setAdvisor(this.core.advisorAllowed(threadId), now);
         office.thread.tracker.tick(now);
         this.readSubagents(threadId, summary.provider, office, now);
       });

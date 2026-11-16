@@ -12,6 +12,9 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 - **Văn phòng**: trạng thái của MỘT luồng (thread) trên máy. Agent chính là **Giám đốc** (`OFFICE_ROLE_DIRECTOR`, id `director`, luôn có); mỗi subagent là một
   **nhân viên** (`OFFICE_ROLE_EMPLOYEE`, id là id của lời gọi tool đã tạo nó); mỗi lệnh shell hay Monitor chạy nền là một **máy** (`OFFICE_ROLE_MACHINE`, id là
   id của lời gọi tool). Người dùng (Chủ tịch) không phải actor: web vẽ Chủ tịch khi `OfficeSession.waiting_for_user` bật.
+- **Cố vấn** (`OFFICE_ROLE_ADVISOR`, id `advisor`, từ tunelo 3.13.0): có mặt khi chế độ tự động của Cố vấn bật cho phiên (`ThreadInfo.advisor`, và AI của
+  phiên tới được MCP của tunelo); chỉ gửi cho kết nối xem có `OfficeWatch.advisor_role` (mục 2). Luồng Cố vấn riêng (`THREAD_KIND_ADVISOR`) không có văn phòng.
+  Khung không mang tên hay ngoại hình của Cố vấn: máy thuộc tài khoản của người xem, nên web lấy cả hai từ hồ sơ Cố vấn của người xem.
 - **Hoạt động** (`OfficeActivity`): việc một actor đang làm, kèm **nhóm hoạt ảnh** (`OfficeAnimGroup`) và **phòng** (`OfficeRoom`) mà agent đã chọn trên máy.
   Mỗi actor hiện tối đa MỘT hoạt động; id hoạt động là id lời gọi tool, hoặc id cố định `think`, `arrive`, `hand-in`.
 - **`epoch`**: epoch của core agent (như `Cursor.epoch`), đổi mỗi lần agent khởi động lại.
@@ -24,7 +27,7 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 
 | Số | Thân | Chiều | Trả lời |
 |---|---|---|---|
-| 168 | `OfficeWatch {thread_id=1, on=2}` | A → B | `on`: `OfficeSnapshot`; tắt: `Ack`. Luồng lạ: `Error` `THREAD_NOT_FOUND`; quá trần: `Error` `OFFICE_WATCH_LIMIT` |
+| 168 | `OfficeWatch {thread_id=1, on=2, advisor_role=3}` | A → B | `on`: `OfficeSnapshot`; tắt: `Ack`. Luồng lạ: `Error` `THREAD_NOT_FOUND`; quá trần: `Error` `OFFICE_WATCH_LIMIT` |
 | 169 | `OfficeSnapshot {thread_id=1, epoch=2, seq=3, state=4 (OfficeState)}` | B → A | |
 | 170 | `OfficeEvents {thread_id=1, epoch=2, events=3 (OfficeEvent)}` | B → A, không hỏi | |
 
@@ -37,6 +40,9 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 - `OfficeSnapshot.seq` là sự kiện cuối đã gộp vào ảnh chụp (0 khi chưa có sự kiện nào); `OfficeEvents` sau đó của cùng epoch bắt đầu từ `seq + 1`.
 - Sự kiện được gom tối đa 250 ms một khung. Không gửi khung rỗng.
 - Kết nối đang nghẽn (socket còn trên 1 MiB chưa gửi) thì khung sự kiện của nó bị bỏ, không giữ lại: thiết bị sẽ thấy hở `seq` và xin ảnh chụp mới.
+- `advisor_role`: thiết bị vẽ được Cố vấn. Agent chỉ gửi actor Cố vấn cho lượt xem có cờ này; lượt xem không có cờ (web cũ) nhận ảnh chụp không có Cố vấn,
+  và mỗi sự kiện về Cố vấn tới dưới dạng sự kiện **không có `kind`** (giữ `seq`, `at`), nên dãy `seq` của mọi lượt xem vẫn liền nhau. Văn phòng một luồng vẫn
+  là một, dùng chung mọi lượt xem; cờ chỉ quyết định phần gửi đi.
 
 ### Quy tắc phía thiết bị
 
@@ -44,7 +50,9 @@ cổng tab Văn phòng theo phiên bản agent và không gửi khung cho máy c
 2. Sự kiện có `seq` ≤ seq đã áp: bỏ (trùng hoặc cũ).
 3. Sự kiện có `seq` > seq đã áp + 1: **hở** → xem lại để lấy ảnh chụp mới, bỏ các sự kiện tới trước khi ảnh chụp về.
 4. Ảnh chụp thay toàn bộ trạng thái. Ảnh chụp cộng các sự kiện sau nó cho ra đúng một trạng thái, không phụ thuộc giờ máy xem (phát lại được).
-5. Mất kết nối với máy quá 30 giây là "mất điện" (web tự quyết theo nhịp `Ping` sẵn có; không có khung nhịp tim riêng). Nối lại thì xem lại.
+5. Sự kiện không có `kind` hoặc có `kind` lạ: chỉ tăng `seq` đã áp, không đổi gì. Actor có `role` lạ (`UNSPECIFIED` hoặc vai trò của agent mới hơn) bị bỏ qua
+   (không thuê vào bàn, không vẽ), cùng mọi sự kiện về nó. Web trước bản này coi vai trò lạ là nhân viên: vì vậy agent không gửi Cố vấn cho nó (mục 2).
+6. Mất kết nối với máy quá 30 giây là "mất điện" (web tự quyết theo nhịp `Ping` sẵn có; không có khung nhịp tim riêng). Nối lại thì xem lại.
 
 ## 3. Trạng thái (`OfficeState`) và sự kiện (`OfficeEvent`)
 
@@ -78,6 +86,8 @@ bị đang xem thì bỏ qua trường này (thiết bị đã thấy họ rời
 - `agent_type`: loại agent như AI gọi (`code-reviewer`, `general-purpose`), cắt 60 ký tự; với máy là tên tool (`Bash`, `Monitor`); rỗng với Giám đốc hoặc khi
   không biết (web dùng loại "lạ").
 - `description`: mô tả ngắn của subagent cấp 1 (chính dòng thẻ subagent trong chat đã hiện), cắt 80 ký tự. Rỗng với subagent lồng (chat không hiện mô tả đó) và máy.
+  Với Cố vấn: câu trả lời gần nhất của Cố vấn trong phiên, `"<phương án cao nhất> · 72%"` (một dòng, tối đa 80 ký tự, phần trăm luôn giữ), lấy từ
+  `AdvisorVerdictItem` cuối có trả lời trong nhật ký; rỗng khi chưa có. Câu trả lời lỗi (`error` khác rỗng) không thay câu cũ.
 - `parent_id`: id actor đã tạo actor này (subagent do subagent khác tạo); `workflow:<id>` cho agent thuộc một workflow (không phải actor nào); rỗng khi Giám
   đốc tạo. Agent của workflow không có lời gọi tool riêng nên id của nó là `workflow:<id workflow>/<id agent>`. `spawn_depth`: 1 cho subagent của Giám đốc, từ 2 cho subagent lồng; 0 cho Giám đốc và máy. Web đặt actor có `spawn_depth` > 1 hoặc `parent_id` khác
   rỗng vào Phòng họp.
@@ -118,6 +128,12 @@ Hoạt động song song của một actor (Claude gọi nhiều tool cùng lúc
   `background_tasks` là 0. `background_tasks` về 0 không kết thúc subagent nền (số đó có thể bỏ sót subagent), và còn subagent nền đang làm thì không ai rời
   văn phòng. Lời gọi tool trả về ("Async agent launched") hoặc lượt kết thúc trước khi agent biết subagent chạy nền: nhân viên đã `DONE` được làm lại
   (`actor_update` `WORKING`, `done_at` 0, không hoạt động, `tasks_done` trừ lại) khi tin chạy nền tới, trừ khi nó đã xong hẳn.
+- **Cố vấn**: vào (`IDLE`, không hoạt động) khi chế độ tự động bật, kể cả khi dựng văn phòng từ nhật ký (vào trước khi đọc nhật ký, nên nghe được lời gọi
+  còn mở và câu trả lời cuối); rời (`actor_leave`, không thành cư dân) khi tắt. Không rời theo giờ rảnh như nhân viên. Mỗi lời gọi `advisor_weigh` của bất
+  kỳ ai: người gọi có hoạt động `CONSULT` (`MEETING`) như mọi tool, Cố vấn có hoạt động `CONSULT` cùng id lời gọi (tool rỗng) tới khi lời gọi kết thúc
+  (`activity_end`) hoặc lượt kết thúc. Câu trả lời mới tới qua `actor_update` (đổi `description`). Lời gọi Cố vấn khi Cố vấn không có mặt (tắt giữa lượt)
+  vẫn là `CONSULT` của người gọi. Agent không phát sự kiện văn phòng từ MCP của tunelo: mọi thứ suy từ nhật ký (lời gọi tool, `AdvisorVerdictItem`), nên dựng
+  lại được. Người gọi là Giám đốc khi dựng từ nhật ký; là subagent chỉ khi agent nghe trực tiếp luồng của subagent đó.
 - **Máy**: vào khi một lệnh shell có `run_in_background` hoặc một `Monitor` bắt đầu, hoạt động `MACHINE` ở phòng theo tiền tố lệnh (mục 4); rời khi AI báo
   tác vụ nền kết thúc, hoặc khi `background_tasks` về 0 (rời hết), hoặc giảm thấp hơn số máy đang có (máy cũ nhất rời trước).
 - **Phiên hết bận**: Giám đốc nhận `actor_update` (`IDLE`, không có `activity`): mọi hoạt động còn mở của Giám đốc bỏ đi, không gửi `activity_end` riêng và không
@@ -140,6 +156,7 @@ theo loại agent (web áp, chỉ thay `WORK`). Web đọc phòng lạ hoặc `U
 | `mcp` | `mcp__<server>__<tool>`; tên có `__` | `TYPE` | `POST`; riêng tiền tố `mcp__tunelo__` (MCP của chính tunelo, gửi tin cho người dùng) là `LOBBY`. `OfficeActivity.tool` luôn là `mcp`, không bao giờ tên server |
 | `shell` | Bash, PowerShell, BashOutput, KillShell, Monitor; `execute`, `run_command` | `MACHINE` | theo lệnh, bảng dưới |
 | `subagent` | Agent, Task (tạo nhân viên) | `ARRIVE` | `LOBBY` |
+| `advisor_weigh` của MCP tunelo, theo tên, mọi loại (`mcp__tunelo__advisor_weigh`; agy `mcp_tunelo_advisor_weigh`) | | `CONSULT` | `MEETING` (Cố vấn ngồi ghế đầu bàn Phòng họp) |
 | `other` và tool lạ | Skill, ExitPlanMode, … | `TYPE` | `WORK` |
 | (subagent xong) | | `HAND_IN` | `DIRECTOR` |
 | (suy nghĩ, viết trả lời) | | `THINK` | `DIRECTOR` |
@@ -249,7 +266,8 @@ Quan sát khi chạy thật (Claude Code 2.1.325, Agent SDK 0.3.319, 15/11/2026)
 Không khung văn phòng nào chứa: input của tool (lệnh đầy đủ, nội dung tệp, câu tìm kiếm, câu hỏi, URL đầy đủ), output của tool, chữ của todo, nội dung tin
 nhắn hay suy nghĩ của AI, đường dẫn thư mục, giá trị biến môi trường, tên server MCP. Chỉ đi ra: tên tool (MCP chỉ là `mcp`), nhóm hoạt ảnh, mã phòng, chủ đề
 rút gọn theo mục 5, loại agent và mô tả ngắn của subagent cấp 1 (vốn đã hiện trong chat), các số đếm, token và chi phí, nhãn dịch vụ của máy (một giá trị
-enum, một số cổng, một thời điểm; không chữ nào của lệnh). `apps/agent/test/office-tracker.test.ts` bơm chuỗi đánh dấu vào lệnh nền và quét ảnh chụp cùng sự
+enum, một số cổng, một thời điểm; không chữ nào của lệnh), và phương án cao nhất kèm phần trăm của câu trả lời Cố vấn gần nhất (chính phương án thẻ "Cố vấn
+nhận định" trong chat đã hiện, là phần đã gửi Cố vấn sau khi che bí mật; chỉ tới lượt xem có `advisor_role`). `apps/agent/test/office-tracker.test.ts` bơm chuỗi đánh dấu vào lệnh nền và quét ảnh chụp cùng sự
 kiện đã mã hoá; test hình dạng khung khẳng định `OfficeService` chỉ có `kind` (enum), `port` (uint32), `started_at` (int64). Test
 `apps/agent/test/office-connection.test.ts` bơm chuỗi đánh dấu vào lệnh, todo, input, output, vào vị trí gán biến (có ngoặc và dấu cách, `$env:`, `set`,
 `$(…)`, backtick, `\"` trong ngoặc kép, NBSP), sau `cd x &&`, vào tên server MCP, rồi quét mọi khung văn phòng đã mã hoá (không phân biệt hoa thường) để khẳng

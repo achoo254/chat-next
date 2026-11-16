@@ -9,7 +9,7 @@
 // Files dragged anywhere over the session go to the composer when dropped.
 // "Chat | Terminal" in the header opens the same session in its AI's own CLI
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -57,6 +57,7 @@ import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
 import { useAdvisorScope, useAdvisorSession } from "../advisor/advisor-context.tsx";
+import { useAdvisorIdentity } from "../advisor/use-advisor-identity.ts";
 import { advisorStore, useSessionFill } from "../advisor/advisor-store.ts";
 
 export { versionAtLeast };
@@ -79,6 +80,13 @@ export function verdictChipsSend(listed: boolean, advisorThread: boolean): boole
 
 function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
+}
+
+/** The office tab, with Advisor as the user's profile names and dresses it (the office draws Advisor while the session's automatic Advisor is on). */
+function OfficeTab(props: { link: MachineLink; threadId: string; info: MachineInfo | null; online: boolean }) {
+	const identity = useAdvisorIdentity();
+	const advisor = useMemo(() => ({ name: identity.name, lookId: identity.look.id }), [identity.name, identity.look.id]);
+	return <OfficeView {...props} advisor={advisor} />;
 }
 
 export function SessionChat({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
@@ -309,7 +317,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			{mode === "office" ? (
 				<div className="mx-chat-body">
 					<Suspense fallback={<p className="mx-group-note muted">{t.office.loading}</p>}>
-						<OfficeView link={link} threadId={threadId} info={state.info} online={online} />
+						<OfficeTab link={link} threadId={threadId} info={state.info} online={online} />
 					</Suspense>
 					{workspacePanel}
 				</div>

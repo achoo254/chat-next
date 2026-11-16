@@ -2100,6 +2100,11 @@ const (
 	OfficeRole_OFFICE_ROLE_DIRECTOR    OfficeRole = 1
 	OfficeRole_OFFICE_ROLE_EMPLOYEE    OfficeRole = 2
 	OfficeRole_OFFICE_ROLE_MACHINE     OfficeRole = 3
+	// Advisor (Cố vấn), present while the session's automatic Advisor is on;
+	// id "advisor". Its description is Advisor's latest answer in the session
+	// ("<option> · 72%"). Only to a watch with OfficeWatch.advisor_role; a
+	// device drops an actor of a role it does not know.
+	OfficeRole_OFFICE_ROLE_ADVISOR OfficeRole = 4
 )
 
 // Enum value maps for OfficeRole.
@@ -2109,12 +2114,14 @@ var (
 		1: "OFFICE_ROLE_DIRECTOR",
 		2: "OFFICE_ROLE_EMPLOYEE",
 		3: "OFFICE_ROLE_MACHINE",
+		4: "OFFICE_ROLE_ADVISOR",
 	}
 	OfficeRole_value = map[string]int32{
 		"OFFICE_ROLE_UNSPECIFIED": 0,
 		"OFFICE_ROLE_DIRECTOR":    1,
 		"OFFICE_ROLE_EMPLOYEE":    2,
 		"OFFICE_ROLE_MACHINE":     3,
+		"OFFICE_ROLE_ADVISOR":     4,
 	}
 )
 
@@ -2220,6 +2227,10 @@ const (
 	OfficeAnimGroup_OFFICE_ANIM_GROUP_HAND_IN OfficeAnimGroup = 6
 	// Thinking or writing the answer.
 	OfficeAnimGroup_OFFICE_ANIM_GROUP_THINK OfficeAnimGroup = 7
+	// Asking Advisor (advisor_weigh): the asker goes to Advisor's seat and
+	// talks; Advisor listens while the call runs. A device that does not know
+	// it acts it out as TYPE.
+	OfficeAnimGroup_OFFICE_ANIM_GROUP_CONSULT OfficeAnimGroup = 8
 )
 
 // Enum value maps for OfficeAnimGroup.
@@ -2233,6 +2244,7 @@ var (
 		5: "OFFICE_ANIM_GROUP_ARRIVE",
 		6: "OFFICE_ANIM_GROUP_HAND_IN",
 		7: "OFFICE_ANIM_GROUP_THINK",
+		8: "OFFICE_ANIM_GROUP_CONSULT",
 	}
 	OfficeAnimGroup_value = map[string]int32{
 		"OFFICE_ANIM_GROUP_UNSPECIFIED": 0,
@@ -2243,6 +2255,7 @@ var (
 		"OFFICE_ANIM_GROUP_ARRIVE":      5,
 		"OFFICE_ANIM_GROUP_HAND_IN":     6,
 		"OFFICE_ANIM_GROUP_THINK":       7,
+		"OFFICE_ANIM_GROUP_CONSULT":     8,
 	}
 )
 
@@ -21827,9 +21840,14 @@ func (*UsageDelete) Descriptor() ([]byte, []int) {
 // ERROR_REASON_THREAD_NOT_FOUND for an unknown thread;
 // ERROR_REASON_OFFICE_WATCH_LIMIT past the offices watched at once.
 type OfficeWatch struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	On            bool                   `protobuf:"varint,2,opt,name=on,proto3" json:"on,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	On       bool                   `protobuf:"varint,2,opt,name=on,proto3" json:"on,omitempty"`
+	// The device draws Advisor (OFFICE_ROLE_ADVISOR, tunelo 3.13.0+). B sends
+	// Advisor's actor only to a watch that says so: to any other, every event
+	// about Advisor goes out without a kind (its seq kept) and the snapshot
+	// leaves Advisor out.
+	AdvisorRole   bool `protobuf:"varint,3,opt,name=advisor_role,json=advisorRole,proto3" json:"advisor_role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -21874,6 +21892,13 @@ func (x *OfficeWatch) GetThreadId() string {
 func (x *OfficeWatch) GetOn() bool {
 	if x != nil {
 		return x.On
+	}
+	return false
+}
+
+func (x *OfficeWatch) GetAdvisorRole() bool {
+	if x != nil {
+		return x.AdvisorRole
 	}
 	return false
 }
@@ -24667,10 +24692,11 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04rule\x18\x01 \x01(\x0e2\x14.remote.v1.UsageRuleR\x04rule\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\"\n" +
 	"\fexperimental\x18\x03 \x01(\bR\fexperimental\"\r\n" +
-	"\vUsageDelete\":\n" +
+	"\vUsageDelete\"]\n" +
 	"\vOfficeWatch\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x0e\n" +
-	"\x02on\x18\x02 \x01(\bR\x02on\"\x83\x01\n" +
+	"\x02on\x18\x02 \x01(\bR\x02on\x12!\n" +
+	"\fadvisor_role\x18\x03 \x01(\bR\vadvisorRole\"\x83\x01\n" +
 	"\x0eOfficeSnapshot\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
 	"\x05epoch\x18\x02 \x01(\x04R\x05epoch\x12\x10\n" +
@@ -25049,19 +25075,20 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x12USAGE_RULE_CONTEXT\x10\x01\x12\x14\n" +
 	"\x10USAGE_RULE_TURNS\x10\x02\x12\x19\n" +
 	"\x15USAGE_RULE_MECHANICAL\x10\x03\x12\x18\n" +
-	"\x14USAGE_RULE_SUBAGENTS\x10\x04*v\n" +
+	"\x14USAGE_RULE_SUBAGENTS\x10\x04*\x8f\x01\n" +
 	"\n" +
 	"OfficeRole\x12\x1b\n" +
 	"\x17OFFICE_ROLE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14OFFICE_ROLE_DIRECTOR\x10\x01\x12\x18\n" +
 	"\x14OFFICE_ROLE_EMPLOYEE\x10\x02\x12\x17\n" +
-	"\x13OFFICE_ROLE_MACHINE\x10\x03*\xba\x01\n" +
+	"\x13OFFICE_ROLE_MACHINE\x10\x03\x12\x17\n" +
+	"\x13OFFICE_ROLE_ADVISOR\x10\x04*\xba\x01\n" +
 	"\x10OfficeActorState\x12\"\n" +
 	"\x1eOFFICE_ACTOR_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17OFFICE_ACTOR_STATE_IDLE\x10\x01\x12\x1e\n" +
 	"\x1aOFFICE_ACTOR_STATE_WORKING\x10\x02\x12\x1b\n" +
 	"\x17OFFICE_ACTOR_STATE_DONE\x10\x03\x12(\n" +
-	"$OFFICE_ACTOR_STATE_AWAITING_APPROVAL\x10\x04*\x82\x02\n" +
+	"$OFFICE_ACTOR_STATE_AWAITING_APPROVAL\x10\x04*\xa1\x02\n" +
 	"\x0fOfficeAnimGroup\x12!\n" +
 	"\x1dOFFICE_ANIM_GROUP_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16OFFICE_ANIM_GROUP_READ\x10\x01\x12\x1a\n" +
@@ -25070,7 +25097,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x17OFFICE_ANIM_GROUP_PHONE\x10\x04\x12\x1c\n" +
 	"\x18OFFICE_ANIM_GROUP_ARRIVE\x10\x05\x12\x1d\n" +
 	"\x19OFFICE_ANIM_GROUP_HAND_IN\x10\x06\x12\x1b\n" +
-	"\x17OFFICE_ANIM_GROUP_THINK\x10\a*\xc7\x02\n" +
+	"\x17OFFICE_ANIM_GROUP_THINK\x10\a\x12\x1d\n" +
+	"\x19OFFICE_ANIM_GROUP_CONSULT\x10\b*\xc7\x02\n" +
 	"\n" +
 	"OfficeRoom\x12\x1b\n" +
 	"\x17OFFICE_ROOM_UNSPECIFIED\x10\x00\x12\x15\n" +

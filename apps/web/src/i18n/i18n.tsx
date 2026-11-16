@@ -118,23 +118,46 @@ export function useI18n(): I18n {
 	return i18n;
 }
 
+/** A screen's copy hook, and a way to fetch a language's copy ahead of the first screen that reads it. */
+export type LazyCopyHook<T> = (() => T) & { readonly preload: (locale: Locale) => Promise<void> };
+
 /**
  * A hook giving `vietnamese` copy, or the copy of the current language,
  * fetched the first time it is needed (the screen suspends meanwhile). For
  * copy that ships with a screen's own chunk rather than with the app.
+ * `preload` fetches a language ahead; once it is in, the hook returns it at
+ * once (no suspending render), as with the app's own messages.
  */
-export function lazyCopy<T>(vietnamese: T, loaders: Readonly<Record<LazyLocale, () => Promise<T>>>): () => T {
-	const pending = new Map<LazyLocale, Promise<T>>();
-	const load = (locale: LazyLocale): Promise<T> => {
+export function lazyCopy<T>(vietnamese: T, loaders: Readonly<Record<LazyLocale, () => Promise<T>>>): LazyCopyHook<T> {
+	type CopyFetch = Promise<T> & ({ status?: undefined } | { status: "fulfilled"; value: T });
+	const pending = new Map<LazyLocale, CopyFetch>();
+	const load = (locale: LazyLocale): CopyFetch => {
 		let copy = pending.get(locale);
 		if (copy === undefined) {
-			copy = loaders[locale]();
+			const fetching: CopyFetch = loaders[locale]().then(
+				(value) => {
+					Object.assign(fetching, { status: "fulfilled", value });
+					return value;
+				},
+				(err: unknown) => {
+					
+					// A failed fetch (offline, a new deployment) is tried again next time.
+					pending.delete(locale);
+					throw err;
+				},
+			);
+			copy = fetching;
 			pending.set(locale, copy);
 		}
 		return copy;
 	};
-	return function useLocaleCopy(): T {
+	const useLocaleCopy = (): T => {
 		const { locale } = useI18n();
 		return locale === "vi" ? vietnamese : use(load(locale));
 	};
+	return Object.assign(useLocaleCopy, {
+		preload: async (locale: Locale): Promise<void> => {
+			if (locale !== "vi") await load(locale);
+		},
+	});
 }

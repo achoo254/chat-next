@@ -13,6 +13,8 @@ import { skinCell, type SkinAtlas } from "../scene/scene-assets.ts";
 export interface CharacterSkins {
 	/** Skins available (0 or 1 means only the model's own texture). */
 	readonly count: number;
+	/** The atlas's skin names, in cell order (may be fewer than `count`). */
+	readonly names: readonly string[];
 	/** Dresses one person's meshes in skin `cell` (the model's own look when there is no atlas). */
 	apply(meshes: readonly AbstractMesh[], cell: number): void;
 	dispose(): void;
@@ -71,6 +73,7 @@ export function createCharacterSkins(container: AssetContainer, atlas: SkinAtlas
 
 	return {
 		count: usable ? atlas.count : 0,
+		names: usable ? atlas.names : [],
 		apply(meshes, cell) {
 			const material = materialFor(cell);
 			if (material === null || source === undefined) return;

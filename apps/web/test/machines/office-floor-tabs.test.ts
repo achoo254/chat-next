@@ -9,7 +9,7 @@ import type { FloorLevel, RoomCode } from "../../src/machines/office/office-room
 const T = 1_000_000;
 
 function placed(key: string, floor: FloorLevel, room: RoomCode, since: number, working = true): Placement {
-	return { key, kind: key === "chairman" ? "chairman" : "employee", actor: null, member: null, floor, room, anchorId: "", since, activityRoom: working ? room : null, life: null };
+	return { key, kind: key === "chairman" ? "chairman" : "employee", actor: null, member: null, floor, room, anchorId: "", since, activityRoom: working ? room : null, life: null, advisor: null };
 }
 
 describe("following the work between floors", () => {

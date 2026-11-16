@@ -5,6 +5,7 @@ import type { Chat } from "@achoo254/chat-core";
 import { compactWindow, isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
+import { readStoredLocale } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
@@ -28,8 +29,10 @@ import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
 // The composer and its editor load apart from the startup code (fetched when
 // the browser is idle, or with the first chat opened), as Telegram Web loads
-// its message input; until then the chat shows the box waiting. No Suspense:
-// once fetched, the composer renders at once in every chat.
+// its message input; until then the chat shows the box waiting. Its words
+// beyond the placeholder are screen copy (use-screens-copy.ts): the preload
+// fetches them in the current language too, and should a chat open before
+// they are in, the box waits in place (Suspense) instead of the whole app.
 type ComposerCode = typeof import("./composer.tsx");
 let composerCode: ComposerCode | null = null;
 let composerFetch: Promise<ComposerCode> | null = null;
@@ -49,9 +52,11 @@ function loadComposer(): Promise<ComposerCode> {
 	return composerFetch;
 }
 
-/** Fetches the composer and its editor ahead of the first chat opened. */
+/** Fetches the composer, its words in the current language and its editor ahead of the first chat opened. */
 export async function preloadComposer(): Promise<void> {
-	await loadComposer();
+	// The screen copy module ships with the screens (never with the startup code): fetched here, then its language.
+	const screensCopy = import("../copy/use-screens-copy.ts").then(({ useScreensCopy }) => useScreensCopy.preload(readStoredLocale()));
+	await Promise.all([loadComposer(), screensCopy]);
 	const { preloadPlainTextEditor } = await import("../../components/plain-text-box.tsx");
 	await preloadPlainTextEditor();
 }
@@ -75,16 +80,26 @@ function useComposerCode(): ComposerCode | null {
 	return code;
 }
 
-/** The composer, or while its code loads its text box, busy, with its placeholder. */
-function ChatComposer(props: Parameters<ComposerCode["Composer"]>[0]) {
-	const code = useComposerCode();
-	if (code !== null) return <code.Composer {...props} />;
+/** The composer's text box, busy, with its placeholder: while its code or its words load. */
+function ComposerWaiting({ label, placeholder }: { label: string; placeholder: string }) {
 	return (
 		<div className="composer-wrap">
 			<div className="composer">
-				<div className="plain-text-box composer-field" role="textbox" aria-label={props.label} aria-placeholder={props.placeholder} aria-multiline="true" aria-busy="true" aria-disabled="true" />
+				<div className="plain-text-box composer-field" role="textbox" aria-label={label} aria-placeholder={placeholder} aria-multiline="true" aria-busy="true" aria-disabled="true" />
 			</div>
 		</div>
+	);
+}
+
+/** The composer, or while its code (or, in another language, its words) loads its text box waiting. */
+function ChatComposer(props: Parameters<ComposerCode["Composer"]>[0]) {
+	const code = useComposerCode();
+	const waiting = <ComposerWaiting label={props.label} placeholder={props.placeholder} />;
+	if (code === null) return waiting;
+	return (
+		<Suspense fallback={waiting}>
+			<code.Composer {...props} />
+		</Suspense>
 	);
 }
 const MediaViewer = lazy(() => import("../media/viewer.tsx"));

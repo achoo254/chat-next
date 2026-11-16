@@ -3,19 +3,26 @@
 // cut the subject down to a file name, a command's first word or a domain).
 // A background service from an agent that labels it is named by what it runs
 // ("Máy chủ dev") and says its port and how long it has run; an older agent's
-// machine stays "Máy Bash".
+// machine stays "Máy Bash". Advisor goes by the name of the viewer's Advisor
+// profile, in its look's colour, and says its latest answer ("Rebase · 72%");
+// whoever asks it says so.
+import { lookOf } from "../../advisor/looks.ts";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { castOf, nameFromType, ROLE_COLORS, SERVICE_COLORS } from "./office-cast.ts";
 import type { Placement } from "./office-placement.ts";
 import type { ActivityView, ActorView } from "./office-store.ts";
-import type { ServiceView } from "./office-state.ts";
+import type { AnimGroup, ServiceView } from "./office-state.ts";
 
 export type OfficeCopy = MachinesCopy["office"];
 
-export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | "member">): string {
+export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | "member"> & Partial<Pick<Placement, "advisor">>): string {
 	switch (p.kind) {
 		case "director":
 			return t.director;
+		case "advisor": {
+			const name = p.advisor?.name ?? "";
+			return name === "" ? t.advisor : name;
+		}
 		case "chairman":
 			return t.chairman;
 		case "machine": {
@@ -32,8 +39,9 @@ export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | 
 	}
 }
 
-export function personColor(p: Pick<Placement, "kind" | "actor" | "member">): string {
+export function personColor(p: Pick<Placement, "kind" | "actor" | "member"> & Partial<Pick<Placement, "advisor">>): string {
 	if (p.kind === "director") return ROLE_COLORS.director;
+	if (p.kind === "advisor") return lookOf(p.advisor?.lookId ?? "").colors.body;
 	if (p.kind === "chairman") return ROLE_COLORS.chairman;
 	if (p.kind === "machine") return SERVICE_COLORS[p.actor?.service?.kind ?? "script"];
 	return castOf(p.member?.agentType ?? p.actor?.agentType ?? "").color;
@@ -48,6 +56,8 @@ export function bubbleText(t: OfficeCopy, activity: ActivityView | null): string
 		if (activity.group === "hand-in") return t.doing.handIn;
 		return activity.group === "think" ? t.doing.think : "";
 	}
+	// Whatever the AI called it (an MCP tool): the visit to Advisor.
+	if (activity.group === "consult") return t.doing.consult;
 	// An MCP tool comes as "mcp" with the tool's own name as its subject: "mcp · create_issue".
 	return activity.subject === "" ? activity.tool : `${activity.tool} · ${activity.subject}`;
 }
@@ -66,6 +76,11 @@ function workBubble(t: OfficeCopy, actor: ActorView | null): string {
 	const service = actor?.service ?? null;
 	if (service !== null && activity !== null && activity.stuckMs === null) return serviceBubble(t, service);
 	return bubbleText(t, activity);
+}
+
+/** The animation group of what the person works at now (a marker's `data-group`); undefined when free. */
+export function workGroup(p: Pick<Placement, "activityRoom" | "actor">): AnimGroup | undefined {
+	return p.activityRoom === null ? undefined : p.actor?.activity?.group;
 }
 
 export type MarkerStatus = "idle" | "working" | "done" | "awaiting" | "slow" | "stuck" | "denied" | "waiting-you";
@@ -108,6 +123,8 @@ export function markerView(t: OfficeCopy, p: Placement, line: string | null): Ma
 	else if (p.life !== null && p.activityRoom === null && (status === "idle" || status === "done")) state = t.life[p.life.act];
 	else if (status !== "idle" && status !== "working") state = t.state[status];
 	const label = state === null ? name : `${name} · ${state}`;
+	// Advisor weighs while asked, then keeps saying its latest answer (the agent's "<option> · 72%").
+	if (p.kind === "advisor") return { status, name, label, bubble: activity !== null ? t.doing.weigh : (p.actor?.description ?? ""), talking: false };
 	// A work bubble only while at work (not for someone home after handing in their file).
 	const work = p.activityRoom === null ? "" : workBubble(t, p.actor);
 	if (line !== null && work === "") return { status, name, label, bubble: line, talking: true };

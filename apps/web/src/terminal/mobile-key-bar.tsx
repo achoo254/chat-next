@@ -10,8 +10,7 @@
 // cancelled, not its pointerdown, since WebKit drops the click of a tap whose
 // pointerdown was cancelled.
 import { useEffect, useRef, type MouseEvent } from "react";
-import { Icon } from "../components/icon.tsx";
-import { Icon as ScreenIcon } from "../components/screen-icons.tsx";
+import { Icon } from "../components/screen-icons.tsx";
 import { MachineIcon } from "../machines/machine-icons.tsx";
 import type { Dictation } from "./dictation.ts";
 import type { CustomKey } from "./key-prefs.ts";
@@ -437,7 +436,7 @@ export function LiveInput({ labels, dictation, image, onKeyboard }: { labels: Ba
 						onClick={() => picker.current?.click()}
 						data-id="terminal-image"
 					>
-						<ScreenIcon name="photo" />
+						<Icon name="photo" />
 					</button>
 					<input
 						ref={picker}

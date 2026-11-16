@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Office2D } from "../machines/office/office-2d.tsx";
 import { BOARD_ROOMS, OfficeBoard } from "../machines/office/office-boards.tsx";
 import { lineOf } from "../machines/office/office-conversations.ts";
-import { markerView, personColor, type OfficeCopy } from "../machines/office/office-names.ts";
+import { markerView, personColor, workGroup, type OfficeCopy } from "../machines/office/office-names.ts";
 import type { Placement } from "../machines/office/office-placement.ts";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
@@ -35,6 +35,7 @@ function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: strin
 			data-status={status}
 			data-kind={p.kind}
 			data-service={p.actor?.service?.kind}
+			data-group={workGroup(p)}
 			data-anchor={p.anchorId}
 			style={style}
 			title={label}

@@ -15,8 +15,20 @@ import {
   OfficeStateSchema,
 } from "@achoo254/chat-proto/remote/remote";
 import type { ToolKind } from "../providers/types.ts";
-import { ARRIVE, HAND_IN, THINK, classifyActivity } from "./office-activity-map.ts";
-import { type ActivityRecord, type ActorRecord, DIRECTOR_ID, activityWire, actorWire, isEmployee, isMachine, newActor, shownActivity } from "./office-actor.ts";
+import { ARRIVE, CONSULT, HAND_IN, THINK, classifyActivity } from "./office-activity-map.ts";
+import {
+  ADVISOR_ID,
+  type ActivityRecord,
+  type ActorRecord,
+  DIRECTOR_ID,
+  activityWire,
+  actorWire,
+  isAdvisor,
+  isEmployee,
+  isMachine,
+  newActor,
+  shownActivity,
+} from "./office-actor.ts";
 import { ResidentLog } from "./office-residents.ts";
 import { classifyService } from "./office-service-kind.ts";
 import { officeSubject, officeToolName } from "./office-subject.ts";
@@ -93,6 +105,8 @@ export class OfficeTracker {
   /** Employees that left, for the snapshot (a device opening the office later still knows them). */
   private readonly residents = new ResidentLog();
   private idleSince: number;
+  /** Advisor's latest answer in the session ("<option> · 72%"), kept while Advisor is away so it says it again when back. */
+  private advisorSays = "";
 
   constructor(
     private readonly reportsStaff: boolean,
@@ -148,6 +162,36 @@ export class OfficeTracker {
 
   // --- signals -----------------------------------------------------------------
 
+  /**
+   * The session's automatic Advisor is on (Advisor sits in the office) or off
+   * (Advisor leaves). An office already holding MAX_ACTORS has no seat for it:
+   * Advisor is then neither shown nor counted in hidden_actors (an older device
+   * would count someone it never draws), and comes in on a later call (the
+   * hub asks every poll) once there is room.
+   */
+  setAdvisor(on: boolean, at: number): void {
+    const advisor = this.actors.get(ADVISOR_ID);
+    if (!on) {
+      if (advisor) this.leave(advisor, at);
+      return;
+    }
+    if (advisor || this.actors.size >= MAX_ACTORS) return;
+    this.enter(
+      { id: ADVISOR_ID, role: OfficeRole.ADVISOR, description: this.advisorSays, state: OfficeActorState.IDLE, stateBeforePrompt: OfficeActorState.IDLE, enteredAt: at },
+      at,
+    );
+  }
+
+  /** Advisor answered in the session (an AdvisorVerdictItem): what it says now; "" when it could not answer. */
+  advisorAnswered(says: string, at: number): void {
+    if (says === "" || says === this.advisorSays) return;
+    this.advisorSays = says;
+    const advisor = this.actors.get(ADVISOR_ID);
+    if (!advisor) return;
+    advisor.description = says;
+    this.emit({ case: "actorUpdate", value: actorWire(advisor) }, at, advisor);
+  }
+
   /** Where the session stands (ThreadSummary): busy, waiting for the user, background work. */
   setStatus(next: OfficeStatus, at: number): void {
     const prev = this.status;
@@ -181,9 +225,17 @@ export class OfficeTracker {
     if (actor.between?.id === "arrive") delete actor.between;
     this.owners.set(t.toolId, actor.id);
     this.refreshActivity(actor, at);
+    if (place.group === CONSULT.group) this.advisorListens(t.toolId, at);
   }
 
   toolEnd(toolId: string, ok: boolean, at: number): void {
+    const advisor = this.actors.get(ADVISOR_ID);
+    const asked = advisor?.open.findIndex((r) => r.id === toolId) ?? -1;
+    if (advisor && asked >= 0) {
+      // Asked twice at once: it listens on while another call is open.
+      advisor.open.splice(asked, 1);
+      this.refreshActivity(advisor, at, { id: toolId, ok });
+    }
     const actor = this.actors.get(this.owners.get(toolId) ?? "");
     if (!actor || isMachine(actor)) return;
     this.owners.delete(toolId);
@@ -348,7 +400,8 @@ export class OfficeTracker {
     if (this.status.busy || this.status.backgroundTasks > 0 || this.backgroundStaff().length > 0 || now - this.idleSince < LEAVE_AFTER_IDLE_MS) return;
     let left = false;
     for (const a of [...this.actors.values()]) {
-      if (a.id === DIRECTOR_ID) continue;
+      // Advisor stays while the session's automatic Advisor is on.
+      if (a.id === DIRECTOR_ID || isAdvisor(a)) continue;
       this.leave(a, now);
       left = true;
     }
@@ -365,6 +418,19 @@ export class OfficeTracker {
     const d = this.actors.get(DIRECTOR_ID);
     if (!d) throw new Error("the office has no director");
     return d;
+  }
+
+  /**
+   * Someone asks Advisor (the tool call `toolId`): Advisor listens at its seat
+   * until every call open to it ends. Its open calls are the askers' (owners
+   * keeps those), never its own.
+   */
+  private advisorListens(toolId: string, at: number): void {
+    const advisor = this.actors.get(ADVISOR_ID);
+    if (!advisor) return;
+    advisor.open.push({ id: toolId, tool: "", place: CONSULT, subject: "", startedAt: at });
+    advisor.heardAt = Math.max(advisor.heardAt, at);
+    this.refreshActivity(advisor, at);
   }
 
   private seenBefore(id: string): boolean {
@@ -394,12 +460,14 @@ export class OfficeTracker {
   private turnEnded(at: number): void {
     this.idleSince = at;
     for (const a of [...this.actors.values()]) {
-      if (isMachine(a)) continue;
+      // Advisor is told only when someone was still asking it.
+      if (isMachine(a) || (isAdvisor(a) && a.open.length === 0)) continue;
       if (isEmployee(a)) {
         if (a.state !== OfficeActorState.DONE && !a.background) this.finishEmployee(a, at);
         continue;
       }
-      for (const r of a.open) this.owners.delete(r.id);
+      // Advisor's open calls belong to whoever asked.
+      if (!isAdvisor(a)) for (const r of a.open) this.owners.delete(r.id);
       a.open = [];
       delete a.between;
       this.setActorState(a, OfficeActorState.IDLE);
@@ -485,7 +553,8 @@ export class OfficeTracker {
   }
 
   private leave(a: ActorRecord, at: number): void {
-    for (const r of a.open) this.owners.delete(r.id);
+    // Advisor's open calls belong to whoever asked: they go on without it.
+    if (!isAdvisor(a)) for (const r of a.open) this.owners.delete(r.id);
     for (const [prompt, owner] of this.prompts) if (owner === a.id) this.prompts.delete(prompt);
     this.actors.delete(a.id);
     if (isEmployee(a)) this.residents.record(a, at);

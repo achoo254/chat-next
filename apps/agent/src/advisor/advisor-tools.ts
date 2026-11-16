@@ -8,7 +8,7 @@
 // it into the transcript's AdvisorVerdictItem (advisorResultOf).
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { SESSION_MCP_SERVER, type ToolRegistrar } from "../mcp/groups.js";
+import type { ToolRegistrar } from "../mcp/groups.js";
 import { outboundBody } from "./advisor-outbound.ts";
 import { type Verdict, verdictOf } from "./advisor-verdict.ts";
 import { type JevClientOptions, JevError, type JevFailure, type WeighBody, type WeighKind, weigh } from "./jev-client.ts";
@@ -162,16 +162,7 @@ function registerWeigh(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; thr
   );
 }
 
-/**
- * The names the AIs tunelo knows give advisor_weigh of tunelo's MCP: Claude
- * `mcp__tunelo__advisor_weigh`, agy `mcp_tunelo_advisor_weigh`.
- */
-const WEIGH_NAMES = new Set([`mcp__${SESSION_MCP_SERVER}__advisor_weigh`, `mcp_${SESSION_MCP_SERVER}_advisor_weigh`]);
-
-/** A tool call of an AI is advisor_weigh of tunelo's MCP. */
-export function isAdvisorWeigh(aiToolName: string): boolean {
-  return WEIGH_NAMES.has(aiToolName);
-}
+export { isAdvisorWeigh } from "./advisor-names.ts";
 
 const KINDS: readonly string[] = ["decision", "next_steps", "answer"];
 

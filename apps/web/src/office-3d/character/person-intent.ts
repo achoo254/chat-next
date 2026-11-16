@@ -6,6 +6,8 @@
 // off over a stuck tool stays put. Someone asleep (in bed, or dozing on a
 // sofa) takes no part in a talk picked while they were awake: they lie or sit
 // at their own place exactly as the anchor faces, never turned or beside it.
+// Whoever asks Advisor stands beside Advisor's seat (the placement sends them
+// there) facing it while the call runs.
 // Pure, no engine.
 import { lineOf, talkOf, type Talk } from "../../machines/office/office-conversations.ts";
 import { awakeAct } from "../../machines/office/office-life-schedule.ts";
@@ -53,5 +55,6 @@ export function personIntent(placement: Placement, talks: readonly Talk[], now: 
 		placement.life === null
 			? idlePerformance({ key: placement.key, kind: placement.kind, activityRoom: placement.activityRoom, since: placement.since }, now, ctx)
 			: null;
-	return { placement, idle, anchorId: idle?.anchorId ?? placement.anchorId, beside: idle?.act === "patrol", turn: 0, talk: null };
+	const consulting = placement.kind !== "advisor" && placement.activityRoom !== null && placement.actor?.activity?.group === "consult";
+	return { placement, idle, anchorId: idle?.anchorId ?? placement.anchorId, beside: idle?.act === "patrol" || consulting, turn: 0, talk: null };
 }

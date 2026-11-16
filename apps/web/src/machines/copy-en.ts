@@ -1297,6 +1297,7 @@ export const enMachines: MachinesCopy = {
 		},
 		director: "Director",
 		chairman: "Chairman (you)",
+		advisor: "Advisor",
 		machine: (tool: string) => (tool === "" ? "Background machine" : `${tool} machine`),
 		service: {
 			names: {
@@ -1327,7 +1328,7 @@ export const enMachines: MachinesCopy = {
 		stuck: (minutes: number) => `Stuck ${minutes} min`,
 		snore: "Zzz",
 		life: { sleep: "Sleeping", doze: "Dozing", run: "Running", pushup: "Working out", jacks: "Jumping jacks", punch: "Boxing", eat: "Eating", watch: "Watching TV", chat: "Chatting", dance: "Dancing" },
-		doing: { think: "Thinking", arrive: "Arriving", handIn: "Handing in" },
+		doing: { think: "Thinking", arrive: "Arriving", handIn: "Handing in", consult: "Asking Advisor", weigh: "Weighing" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} waiting for a desk in the meeting room`,
 		empty: "Empty",

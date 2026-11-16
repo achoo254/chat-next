@@ -155,6 +155,8 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			case "actorUpdate": {
 				const previous = actors.find((a) => a.id === k.value.id);
 				const next = actorOf(k.value, previous);
+				// A role this app does not know: nobody to show (and never an employee to hire).
+				if (next === null) break;
 				if (previous === undefined) {
 					actors = [...actors, next];
 					hireActor(next);
@@ -242,7 +244,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			visitors = same ? before.visitors : [];
 			residents = same ? before.residents : [];
 			work = same ? before.work : {};
-			actors = (s?.actors ?? []).map((a) => actorOf(a, undefined));
+			actors = (s?.actors ?? []).flatMap((a) => actorOf(a, undefined) ?? []);
 			// Opened afresh: those who had left are hired back first in the order everyone came in (a free one makes
 			// room for the next of the type from when they finished or left), then go off duty, so everyone keeps the
 			// name and number they had. Ignored for the same run: this device saw them leave.

@@ -104,6 +104,14 @@ describe("the office's link", () => {
 		expect(fake.watches()).toEqual([true, false]);
 	});
 
+	it("says it draws Advisor when it watches (the machine sends Advisor only then)", () => {
+		const fake = new FakeLink();
+		const store = createOfficeStore({ now: () => now });
+		connectOffice(fake.link, "t1", store, { now: () => now, visibility: page });
+		const watch = fake.sent.find((b) => b.case === "officeWatch");
+		expect(watch?.case === "officeWatch" ? watch.value.advisorRole : undefined).toBe(true);
+	});
+
 	it("asks for a snapshot once when events show a gap, however many frames follow", async () => {
 		const fake = new FakeLink();
 		const store = createOfficeStore({ now: () => now });

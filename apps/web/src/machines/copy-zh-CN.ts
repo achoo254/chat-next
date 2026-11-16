@@ -1290,6 +1290,7 @@ export const zhCNMachines: MachinesCopy = {
 		},
 		director: "总经理",
 		chairman: "董事长（你）",
+		advisor: "顾问",
 		machine: (tool: string) => (tool === "" ? "后台机器" : `${tool} 机器`),
 		service: {
 			names: {
@@ -1320,7 +1321,7 @@ export const zhCNMachines: MachinesCopy = {
 		stuck: (minutes: number) => `卡住 ${minutes} 分钟`,
 		snore: "Zzz",
 		life: { sleep: "睡觉中", doze: "打盹", run: "跑步", pushup: "健身", jacks: "开合跳", punch: "打沙袋", eat: "吃饭", watch: "看电视", chat: "聊天", dance: "跳舞" },
-		doing: { think: "思考", arrive: "到岗", handIn: "交文件" },
+		doing: { think: "思考", arrive: "到岗", handIn: "交文件", consult: "请教顾问", weigh: "权衡中" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} 人在会议室等工位`,
 		empty: "空",
