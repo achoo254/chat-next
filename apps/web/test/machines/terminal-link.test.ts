@@ -8,7 +8,8 @@ import { generateKeyPair } from "@achoo254/chat-remote-protocol";
 import { TermSignalKind } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MachineLink, type Timers } from "../../src/machines/link/machine-link.ts";
-import { ACK_MS, DIRECT_WAIT_MS, TerminalLink, type TerminalSink, type TerminalStatus } from "../../src/terminal/terminal-link.ts";
+import { BUSY_RETRY_MS, HISTORY_TIMEOUT_MS, type HistoryReply } from "../../src/terminal/terminal-history-requests.ts";
+import { ACK_MS, DIRECT_WAIT_MS, TerminalLink, type LiveScreen, type TerminalSink, type TerminalStatus } from "../../src/terminal/terminal-link.ts";
 import { defaultAnswer, FakeMachine, until } from "./fake-machine.ts";
 import { FakePeers, FakeTerminalHost, serverFrames } from "./fake-terminal.ts";
 
@@ -61,6 +62,7 @@ class ManualTimers implements Timers {
 class Screen implements TerminalSink {
 	text = "";
 	snapshots = 0;
+	lives: LiveScreen[] = [];
 	previews: string[] = [];
 	caughtUps = 0;
 	exits: number[] = [];
@@ -71,6 +73,10 @@ class Screen implements TerminalSink {
 	snapshot(s: { vt: Uint8Array }): void {
 		this.snapshots += 1;
 		this.text = dec.decode(s.vt).replace("\x1bc", "");
+	}
+	liveSnapshot(live: LiveScreen): void {
+		this.lives.push(live);
+		this.text = dec.decode(live.vt).replace("\x1bc", "");
 	}
 	preview(p: { vt: Uint8Array }): void {
 		this.previews.push(dec.decode(p.vt).replace("c", ""));
@@ -484,5 +490,298 @@ describe("the direct path", () => {
 		link.attach(host.open(), new Screen());
 		await until(() => status().kind === "failed", "refused");
 		expect(status()).toEqual({ kind: "failed", reason: "refused" });
+	});
+});
+
+describe("a machine that opens a session at its screen as it is now (CAP_LIVE_HISTORY)", () => {
+	beforeEach(async () => {
+		await setup({ direct: false });
+		host.liveHistory = true;
+	});
+
+	const linkId = () => machine.sent("termData").at(-1)?.link ?? 0;
+	const raw = (frame: Uint8Array) => machine.send(machine.socket, { case: "termData", value: { link: linkId(), data: frame } });
+	const rowsOf = (reply: HistoryReply) => (reply.kind === "rows" ? dec.decode(reply.vt).split("\x1b[m\r\n").slice(0, -1) : []);
+	const historyAsked = () => host.frames.filter((f) => f.frame.type === "historyRequest").map((f) => f.frame);
+
+	/** The screen of the pane that asks for history. */
+	let shown = new Screen();
+	/** Asks for history as the pane does: for the screen it shows. */
+	const ask = (session: number, beforeRow: number, maxRows: number) => {
+		const life = shown.lives.at(-1);
+		return link.history(session, { epoch: life?.epoch ?? 0, historyEnd: life?.historyEnd ?? 0 }, beforeRow, maxRows);
+	};
+
+	async function open(rows = 1_200): Promise<{ session: number; screen: Screen }> {
+		const session = host.open();
+		host.withHistory(session, rows);
+		host.print(session, "$ ");
+		link.start();
+		const screen = new Screen();
+		shown = screen;
+		link.attach(session, screen);
+		await until(() => screen.lives.length === 1, "live snapshot");
+		return { session, screen };
+	}
+
+	it("says it takes live snapshots, gets one instead of a replay and a preview, and keys go at once", async () => {
+		const { session, screen } = await open();
+		expect(host.frames[0]?.frame).toEqual({ type: "hello", version: 1, caps: 1 });
+		expect(screen.lives[0]).toMatchObject({ cols: 80, rows: 24, epoch: 1, historyEnd: 1_200 });
+		expect(screen.text).toBe("$ ");
+		expect(screen.previews).toEqual([]);
+		expect(screen.snapshots).toBe(0);
+		type(session, "ls\r");
+		await until(() => screen.text === "$ ls\r", "echo");
+		expect(host.keystrokes).toEqual([{ session, text: "ls\r", path: "relay" }]);
+		// Output written is acknowledged by offset, as before.
+		timers.advance(ACK_MS);
+		await until(() => host.acks.length === 1, "ack");
+		expect(host.acks[0]?.offset).toBe(host.text(session).length);
+	});
+
+	it("sends the pane's size only after the screen came, and only when it differs from the session's", async () => {
+		const session = host.open(80, 24);
+		link.start();
+		const screen = new Screen();
+		link.attach(session, screen);
+		// The pane fits before the machine answered: the same size as the session's.
+		link.resize(session, 80, 24);
+		link.resize(session, 80, 24, true);
+		await until(() => screen.lives.length === 1, "live snapshot");
+		await new Promise((r) => setTimeout(r, 20));
+		expect(host.resizes).toEqual([]);
+		// Another pane, another size: it goes once the screen came.
+		const other = host.open(80, 24);
+		const second = new Screen();
+		link.attach(other, second);
+		link.resize(other, 120, 40);
+		await until(() => host.resizes.length === 1, "the pane's size");
+		expect(host.resizes).toEqual([{ session: other, cols: 120, rows: 40 }]);
+		expect(host.frames.findIndex((f) => f.frame.type === "resize")).toBeGreaterThan(host.frames.findIndex((f) => f.frame.type === "attach" && f.frame.session === other));
+	});
+
+	it("takes a live snapshot in parts, and one that comes before the machine's Hello", async () => {
+		const session = host.open();
+		link.start();
+		const screen = new Screen();
+		// The machine reads nothing yet: its frames below come before its Hello.
+		host.holdRelay = true;
+		link.attach(session, screen);
+		await until(() => linkId() !== 0, "link");
+		const vt = new TextEncoder().encode("\x1bcthe screen now");
+		const at = { offset: 100, cols: 90, rows: 30, epoch: 4, historyEnd: 77, tailRows: 0, parts: 3 };
+		raw(serverFrames.liveSnapshot(session, { ...at, part: 0 }, vt.subarray(0, 5)));
+		raw(serverFrames.liveSnapshot(session, { ...at, part: 1 }, vt.subarray(5, 10)));
+		await new Promise((r) => setTimeout(r, 20));
+		expect(screen.lives).toEqual([]);
+		raw(serverFrames.liveSnapshot(session, { ...at, part: 2 }, vt.subarray(10)));
+		raw(serverFrames.output(session, 100, new TextEncoder().encode("!")));
+		await until(() => screen.text === "the screen now!", "screen then output");
+		expect(screen.lives[0]).toMatchObject({ cols: 90, rows: 30, epoch: 4, historyEnd: 77 });
+		// A part missing: the screen does not start from a piece of it.
+		raw(serverFrames.liveSnapshot(session, { ...at, offset: 200, part: 0 }, vt.subarray(0, 5)));
+		raw(serverFrames.liveSnapshot(session, { ...at, offset: 200, part: 2 }, vt.subarray(10)));
+		await new Promise((r) => setTimeout(r, 20));
+		expect(screen.lives).toHaveLength(1);
+		host.holdRelay = false;
+		host.releaseRelay();
+		await until(() => status().kind === "open", "open");
+	});
+
+	it("still replays a session whose full-screen program shows, after its preview", async () => {
+		host.previews = true;
+		const session = host.open();
+		const s = host.sessions.get(session);
+		if (s !== undefined) s.altScreen = true;
+		host.print(session, "vim");
+		link.start();
+		const screen = new Screen();
+		shown = screen;
+		link.attach(session, screen);
+		await until(() => screen.previews.length === 1 && screen.snapshots === 1 && screen.text === "vim", "preview and replay");
+		expect(screen.lives).toEqual([]);
+		// Its history is all in the screen: none to ask for.
+		expect(await ask(session, 10, 10)).toEqual({ kind: "failed", reason: "unavailable" });
+	});
+
+	it("brings pages of history older and older, in parts, down to the first row", async () => {
+		host.historyParts = 3;
+		const { session } = await open(1_200);
+		const first = await ask(session, 1_200, 500);
+		expect(first).toMatchObject({ kind: "rows", epoch: 1, firstRow: 700, rowCount: 500, atStart: false });
+		expect(rowsOf(first)[0]).toBe("row 700");
+		expect(rowsOf(first).at(-1)).toBe("row 1199");
+		const second = await ask(session, 700, 500);
+		expect(second).toMatchObject({ firstRow: 200, rowCount: 500, atStart: false });
+		const last = await ask(session, 200, 500);
+		expect(last).toMatchObject({ firstRow: 0, rowCount: 200, atStart: true });
+		expect(historyAsked().map((f) => (f.type === "historyRequest" ? f.reqId : 0))).toEqual([1, 2, 3]);
+	});
+
+	it("says when the program cleared the history since, and when the machine has none to give", async () => {
+		const { session } = await open(50);
+		const s = host.sessions.get(session);
+		if (s !== undefined) s.epoch = 2;
+		expect(await ask(session, 50, 50)).toMatchObject({ kind: "rows", epoch: 2, rowCount: 0, atStart: true });
+		host.historyFailWith = 1;
+		expect(await ask(session, 50, 50)).toEqual({ kind: "failed", reason: "unavailable" });
+		// Still busy after every wait: then it fails.
+		host.historyFailWith = 2;
+		const busy = ask(session, 50, 50);
+		for (const wait of BUSY_RETRY_MS) {
+			await new Promise((r) => setTimeout(r, 20));
+			timers.advance(wait);
+		}
+		expect(await busy).toEqual({ kind: "failed", reason: "busy" });
+		expect(historyAsked().length).toBe(3 + BUSY_RETRY_MS.length);
+	});
+
+	it("gives up on a page after 10 s and drops its late answer; the next one is answered", async () => {
+		const { session } = await open(100);
+		host.historyHold = true;
+		const late = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		timers.advance(HISTORY_TIMEOUT_MS - 1);
+		let settled = false;
+		void late.then(() => (settled = true));
+		await new Promise((r) => setTimeout(r, 10));
+		expect(settled).toBe(false);
+		timers.advance(1);
+		expect(await late).toEqual({ kind: "failed", reason: "timeout" });
+		// The machine answers the old one at last: nobody waits for it any more.
+		host.historyHold = false;
+		host.answerHistory();
+		await new Promise((r) => setTimeout(r, 20));
+		expect(await ask(session, 90, 10)).toMatchObject({ kind: "rows", firstRow: 80, rowCount: 10 });
+	});
+
+	it("drops the answer to a page asked before the screen started over", async () => {
+		const { session, screen } = await open(100);
+		host.historyHold = true;
+		const asked = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		// The machine lost its ring: the screen starts over, the history life with it.
+		const at = { offset: host.text(session).length, cols: 80, rows: 24, epoch: 1, historyEnd: 100, tailRows: 0, part: 0, parts: 1 };
+		raw(serverFrames.liveSnapshot(session, at, new TextEncoder().encode("\x1bcagain")));
+		expect(await asked).toEqual({ kind: "dropped" });
+		expect(screen.lives).toHaveLength(2);
+		host.historyHold = false;
+		host.answerHistory();
+		await new Promise((r) => setTimeout(r, 20));
+		// Asked again, the page comes.
+		expect(await ask(session, 100, 10)).toMatchObject({ kind: "rows", firstRow: 90 });
+	});
+
+	it("asks for the page in flight again after a change of path, with the same id, and takes it whole", async () => {
+		const { session, screen } = await open(100);
+		host.historyHold = true;
+		const asked = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		const reqId = historyAsked()[0]?.type === "historyRequest" ? (historyAsked()[0] as { reqId: number }).reqId : -1;
+		// Half a page came, then the connection dropped.
+		const page = { reqId, epoch: 1, firstRow: 90, rowCount: 10, parts: 2, atStart: false };
+		raw(serverFrames.history(session, { ...page, part: 0 }, new TextEncoder().encode("A")));
+		machine.socket.drop();
+		await until(() => historyAsked().length === 2, "asked again on the new link");
+		expect(historyAsked()[1]).toMatchObject({ type: "historyRequest", reqId, beforeRow: 100, maxRows: 10 });
+		// Asked after its Attach, which resumes from the offset applied.
+		const types = host.frames.map((f) => f.frame.type);
+		expect(types.lastIndexOf("historyRequest")).toBeGreaterThan(types.lastIndexOf("attach"));
+		expect(host.frames.filter((f) => f.frame.type === "attach").at(-1)?.frame).toMatchObject({ lastOffset: host.text(session).length });
+		raw(serverFrames.history(session, { ...page, part: 0 }, new TextEncoder().encode("A")));
+		raw(serverFrames.history(session, { ...page, part: 1 }, new TextEncoder().encode("B")));
+		const reply = await asked;
+		expect(reply.kind === "rows" && dec.decode(reply.vt)).toBe("AB");
+		expect(screen.lives).toHaveLength(1);
+	});
+
+	it("takes a page that the machine replaced halfway, because the history life changed, as an empty page of the new life", async () => {
+		const { session } = await open(100);
+		host.historyHold = true;
+		const asked = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		const reqId = (historyAsked()[0] as { reqId: number }).reqId;
+		raw(serverFrames.history(session, { reqId, epoch: 1, firstRow: 90, rowCount: 10, part: 0, parts: 3, atStart: false }, new TextEncoder().encode("A")));
+		// The program cleared the history while the page was on its way: the rest is one empty frame of the new life.
+		raw(serverFrames.history(session, { reqId, epoch: 2, firstRow: 0, rowCount: 0, part: 0, parts: 1, atStart: true }, new Uint8Array()));
+		const reply = await asked;
+		expect(reply).toMatchObject({ kind: "rows", epoch: 2, rowCount: 0, atStart: true });
+		expect(reply.kind === "rows" && reply.vt.length).toBe(0);
+	});
+
+	it("takes a page whose parts come twice and out of order across a change of path", async () => {
+		const { session } = await open(100);
+		host.historyHold = true;
+		const asked = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		const reqId = (historyAsked()[0] as { reqId: number }).reqId;
+		const page = { reqId, epoch: 1, firstRow: 90, rowCount: 10, parts: 4, atStart: false };
+		const part = (n: number) => raw(serverFrames.history(session, { ...page, part: n }, new TextEncoder().encode(String(n))));
+		// The page again from its first part on the new path, a late part of the old one in between.
+		part(0);
+		part(2);
+		part(1);
+		part(0);
+		part(2);
+		part(3);
+		const reply = await asked;
+		expect(reply.kind === "rows" && dec.decode(reply.vt)).toBe("0123");
+	});
+
+	it("takes a live snapshot whose parts come twice across a change of path", async () => {
+		const session = host.open();
+		link.start();
+		const screen = new Screen();
+		host.holdRelay = true;
+		link.attach(session, screen);
+		await until(() => linkId() !== 0, "link");
+		const at = { offset: 10, cols: 80, rows: 24, epoch: 1, historyEnd: 5, tailRows: 0, parts: 3 };
+		const part = (n: number) => raw(serverFrames.liveSnapshot(session, { ...at, part: n }, new TextEncoder().encode(String(n))));
+		part(0);
+		part(2);
+		part(1);
+		part(0);
+		part(1);
+		part(2);
+		await until(() => screen.lives.length === 1, "live snapshot");
+		expect(screen.text).toBe("012");
+	});
+
+	it("asks a busy machine again a little later instead of failing", async () => {
+		const { session } = await open(100);
+		host.historyHold = true;
+		const first = ask(session, 100, 10);
+		await until(() => historyAsked().length === 1, "asked");
+		timers.advance(HISTORY_TIMEOUT_MS);
+		expect(await first).toEqual({ kind: "failed", reason: "timeout" });
+		// The machine still builds the page given up on: the next one is refused as busy, and asked again.
+		const next = ask(session, 100, 10);
+		await until(() => historyAsked().length === 2, "asked");
+		await new Promise((r) => setTimeout(r, 20));
+		timers.advance(BUSY_RETRY_MS[0]);
+		await until(() => historyAsked().length === 3, "asked again");
+		host.historyHold = false;
+		host.answerHistory();
+		await new Promise((r) => setTimeout(r, 20));
+		timers.advance(BUSY_RETRY_MS[1]);
+		expect(await next).toMatchObject({ kind: "rows", firstRow: 90, rowCount: 10 });
+	});
+
+	it("does not answer a pane asking for rows of a screen no longer shown", async () => {
+		const { session } = await open(100);
+		expect(await link.history(session, { epoch: 1, historyEnd: 99 }, 99, 10)).toEqual({ kind: "dropped" });
+		expect(await link.history(session, { epoch: 7, historyEnd: 100 }, 100, 10)).toEqual({ kind: "dropped" });
+		expect(historyAsked()).toEqual([]);
+	});
+
+	it("drops what a pane asked once it leaves", async () => {
+		const { session } = await open(100);
+		host.historyHold = true;
+		// A session not shown here: nothing to answer.
+		expect(await ask(99, 100, 10)).toEqual({ kind: "dropped" });
+		const mine = ask(session, 100, 10);
+		link.attach(session, new Screen());
+		expect(await mine).toEqual({ kind: "dropped" });
 	});
 });

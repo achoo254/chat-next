@@ -755,6 +755,12 @@ export const enMachines: MachinesCopy = {
 		openInTerminal: "Open in terminal",
 		scrollLatest: "Back to the newest line",
 		syncing: "Syncing the session… you can type",
+		history: {
+			loading: "Loading the history…",
+			start: "Start of the history",
+			cleared: "A program cleared what came before",
+			failed: "Could not load the history. Scroll up to try again.",
+		},
 		tabsOpen: (n: number) => `Terminal tabs (${n})`,
 		held: (ai: string) => `${ai} is running this session in a terminal. View only here.`,
 		heldOpen: (ai: string) => `This session is open in ${ai} in a terminal.`,

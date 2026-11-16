@@ -1,6 +1,6 @@
 /* The terminal dock (terminal-dock.tsx); loaded with it. The header follows
    the app's theme; the terminal surface is always dark, as xterm draws it. */
-.tx-dock { --tx-bg: #111318; position: relative; display: flex; flex-direction: column; flex: 1 1 0; width: 100%; height: 100%; min-height: 0; min-width: 0; background: var(--c-surface); }
+.tx-dock { --tx-bg: #111318; --tx-rule: #2a2f3a; position: relative; display: flex; flex-direction: column; flex: 1 1 0; width: 100%; height: 100%; min-height: 0; min-width: 0; background: var(--c-surface); }
 /* The machine's own terminal page on a phone: the visible box (viewport-fit.ts); a session's dock fills its view. */
 .tx-dock.touch:not(.embedded) { position: fixed; z-index: 30; left: 0; right: 0; top: var(--vf-t, 0px); height: var(--vf-h, 100dvh); padding-top: env(safe-area-inset-top); }
 .tx-dock.touch.embedded { flex: 1 1 0; }
@@ -63,7 +63,13 @@
 /* The pane's hit area stays in its gutter: as tall as 44px, as wide as the gutter. */
 .tx-pane-x::before { content: ""; position: absolute; inset: -4px -1px -20px -1px; }
 .tx-panes:has(.tx-pane + .tx-pane) .tx-pane-in[data-focused] { border-color: color-mix(in srgb, var(--c-primary) 70%, transparent); }
-.tx-term { position: relative; width: 100%; height: 100%; }
+.tx-term { position: relative; width: 100%; height: 100%; overflow: hidden; }
+/* The history from before the pane opened (history-pane.ts): moved in from the top with the live terminal under it
+   (history-scroll.ts sets its height and both offsets), a thin rule between them, its status at the top of what shows. */
+.tx-history { position: absolute; z-index: 1; top: 0; left: 0; right: 0; overflow: hidden; background: var(--tx-bg); border-bottom: 1px solid var(--tx-rule); }
+.tx-history-screen { height: 100%; }
+.tx-history-status { position: absolute; right: 12px; margin: 6px 0 0; padding: 4px 10px; border-radius: 999px; background: rgb(17 19 24 / 0.86); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); color: #c9ced8; font-size: 0.75rem; line-height: 1.4; pointer-events: none; }
+.tx-history-status[hidden] { display: none; }
 /* A touch screen's view of the history (terminal-touch-thumb.ts): a thumb along the edge, and the way back to the newest line. */
 .tx-thumb { position: absolute; z-index: 3; top: 0; right: 2px; width: 4px; border-radius: var(--radius-full); background: rgb(230 232 238 / 0.9); opacity: 0; pointer-events: none; transition: opacity 0.3s ease, width 0.15s ease; }
 .tx-thumb[data-on] { opacity: 0.22; }
@@ -96,7 +102,7 @@
 .tx-divider { position: absolute; z-index: 2; touch-action: none; }
 .tx-divider.row { width: 8px; margin-left: -4px; cursor: col-resize; }
 .tx-divider.column { height: 8px; margin-top: -4px; cursor: row-resize; }
-.tx-divider::after { content: ""; position: absolute; background: #2a2f3a; }
+.tx-divider::after { content: ""; position: absolute; background: var(--tx-rule); }
 .tx-divider.row::after { left: 3.5px; top: 0; bottom: 0; width: 1px; }
 .tx-divider.column::after { top: 3.5px; left: 0; right: 0; height: 1px; }
 .tx-divider:hover::after, .tx-divider:focus-visible::after { background: var(--c-primary); }

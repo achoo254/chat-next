@@ -12,6 +12,13 @@ export const WIRE_VERSION = 1;
 export const HEADER_LEN = 5;
 /** Columns and rows of a terminal: 1 to 1000 each. */
 export const MAX_DIM = 1_000;
+/** Most rows one HistoryRequest may ask for. */
+export const MAX_HISTORY_ROWS = 500;
+/**
+ * Hello capability: this client takes a LiveSnapshot for a fresh attach on the normal screen and asks for older rows
+ * with HistoryRequest (docs/terminal-wire.md section 4).
+ */
+export const CAP_LIVE_HISTORY = 0x01;
 
 export const ClientType = {
 	hello: 0x01,
@@ -22,6 +29,7 @@ export const ClientType = {
 	ack: 0x14,
 	ping: 0x15,
 	preview: 0x16,
+	historyRequest: 0x17,
 } as const;
 
 export const ServerType = {
@@ -30,7 +38,10 @@ export const ServerType = {
 	snapshot: 0x91,
 	exit: 0x92,
 	preview: 0x93,
+	liveSnapshot: 0x94,
 	pong: 0x95,
+	history: 0x96,
+	historyError: 0x97,
 	error: 0x9f,
 } as const;
 
@@ -44,8 +55,16 @@ export const TermErrorCode = {
 	revoked: 6,
 } as const;
 
+/** Codes of a HistoryError frame. */
+export const HistoryErrorCode = {
+	unavailable: 1,
+	busy: 2,
+	cancelled: 3,
+} as const;
+
 export type ServerFrame =
-	| { readonly type: "hello"; readonly version: number; readonly maxFrame: number }
+	/** `caps`: the machine's capability bits, null when its Hello carried none (an older machine, or caps 0 sent). */
+	| { readonly type: "hello"; readonly version: number; readonly maxFrame: number; readonly caps: number | null }
 	/** `offset`: the session's output offset of the first byte of `data`. */
 	| { readonly type: "output"; readonly session: number; readonly offset: number; readonly data: Uint8Array }
 	/** `offset`: where the next Output starts; `vt` rebuilds the screen after a resize to cols × rows. */
@@ -71,6 +90,38 @@ export type ServerFrame =
 			readonly altScreen: boolean;
 			readonly vt: Uint8Array;
 	  }
+	/**
+	 * The screen as it is now, where a fresh attach on the normal screen starts (CAP_LIVE_HISTORY): the parts' `vt`
+	 * joined in `part` order is written to the terminal, then Output follows from `offset`. History rows before
+	 * `historyEnd` of `epoch` are asked for with HistoryRequest; `tailRows` rows from it are already in `vt`.
+	 */
+	| {
+			readonly type: "liveSnapshot";
+			readonly session: number;
+			readonly offset: number;
+			readonly cols: number;
+			readonly rows: number;
+			readonly epoch: number;
+			readonly historyEnd: number;
+			readonly tailRows: number;
+			readonly part: number;
+			readonly parts: number;
+			readonly vt: Uint8Array;
+	  }
+	/** `rowCount` rows from `firstRow` of `epoch`, oldest first, each ending in CR LF, split over `parts` frames. */
+	| {
+			readonly type: "history";
+			readonly session: number;
+			readonly reqId: number;
+			readonly epoch: number;
+			readonly firstRow: number;
+			readonly rowCount: number;
+			readonly part: number;
+			readonly parts: number;
+			readonly atStart: boolean;
+			readonly vt: Uint8Array;
+	  }
+	| { readonly type: "historyError"; readonly session: number; readonly reqId: number; readonly code: number }
 	| { readonly type: "exit"; readonly session: number; readonly code: number; readonly signal: number }
 	| { readonly type: "pong"; readonly micros: number }
 	| { readonly type: "error"; readonly session: number; readonly code: number; readonly message: string }
@@ -113,10 +164,11 @@ function getU64(view: DataView, at: number): number | null {
 	return high * TWO_32 + view.getUint32(at + 4);
 }
 
-export function encodeHello(): Uint8Array<ArrayBuffer> {
+/** `caps`: capability bits this client takes (CAP_LIVE_HISTORY); a machine that knows none of them ignores them. */
+export function encodeHello(caps = 0): Uint8Array<ArrayBuffer> {
 	const { bytes, view } = frame(ClientType.hello, 0, 2);
 	view.setUint8(HEADER_LEN, WIRE_VERSION);
-	view.setUint8(HEADER_LEN + 1, 0);
+	view.setUint8(HEADER_LEN + 1, caps);
 	return bytes;
 }
 
@@ -146,6 +198,27 @@ export function encodeAttach(session: number, lastOffset: number): Uint8Array<Ar
 /** Asks for the session as the machine renders it now (answered with a preview by tunelo 3.5.0+, ignored before). */
 export function encodePreview(session: number): Uint8Array<ArrayBuffer> {
 	return frame(ClientType.preview, session, 0).bytes;
+}
+
+/** Up to `maxRows` (1-500) history rows of `epoch` just before row `beforeRow`, on an attached session. */
+export function encodeHistoryRequest(
+	session: number,
+	reqId: number,
+	epoch: number,
+	beforeRow: number,
+	maxRows: number,
+): Uint8Array<ArrayBuffer> {
+	if (!Number.isInteger(reqId) || reqId < 0 || reqId > 0xffff) throw new RangeError(`request id ${reqId} is not a u16`);
+	if (!isU32(epoch)) throw new RangeError(`epoch ${epoch} is not a u32`);
+	if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > MAX_HISTORY_ROWS) {
+		throw new RangeError(`${maxRows} history rows is outside 1-${MAX_HISTORY_ROWS}`);
+	}
+	const { bytes, view } = frame(ClientType.historyRequest, session, 16);
+	view.setUint16(HEADER_LEN, reqId);
+	view.setUint32(HEADER_LEN + 2, epoch);
+	setU64(view, HEADER_LEN + 6, beforeRow);
+	view.setUint16(HEADER_LEN + 14, maxRows);
+	return bytes;
 }
 
 export function encodeDetach(session: number): Uint8Array<ArrayBuffer> {
@@ -181,8 +254,10 @@ export function decodeServerFrame(buf: Uint8Array): ServerFrame | null {
 	const p = HEADER_LEN;
 	switch (type) {
 		case ServerType.hello: {
-			if (session !== 0 || size !== 5) return null;
-			return { type: "hello", version: view.getUint8(p), maxFrame: view.getUint32(p + 1) };
+			// A sixth byte (caps) only comes back when this client sent caps.
+			if (session !== 0 || (size !== 5 && size !== 6)) return null;
+			const caps = size === 6 ? view.getUint8(p + 5) : null;
+			return { type: "hello", version: view.getUint8(p), maxFrame: view.getUint32(p + 1), caps };
 		}
 		case ServerType.output: {
 			if (session === 0 || size < 8) return null;
@@ -200,6 +275,53 @@ export function decodeServerFrame(buf: Uint8Array): ServerFrame | null {
 			if (offset === null || !validDim(cols) || !validDim(rows) || alt > 1) return null;
 			const kind = type === ServerType.snapshot ? "snapshot" : "preview";
 			return { type: kind, session, offset, cols, rows, altScreen: alt === 1, vt: buf.subarray(p + 13) };
+		}
+		case ServerType.liveSnapshot: {
+			if (session === 0 || size < 28) return null;
+			const offset = getU64(view, p);
+			const cols = view.getUint16(p + 8);
+			const rows = view.getUint16(p + 10);
+			const historyEnd = getU64(view, p + 16);
+			const part = view.getUint8(p + 26);
+			const parts = view.getUint8(p + 27);
+			if (offset === null || historyEnd === null || !validDim(cols) || !validDim(rows) || part >= parts) return null;
+			return {
+				type: "liveSnapshot",
+				session,
+				offset,
+				cols,
+				rows,
+				epoch: view.getUint32(p + 12),
+				historyEnd,
+				tailRows: view.getUint16(p + 24),
+				part,
+				parts,
+				vt: buf.subarray(p + 28),
+			};
+		}
+		case ServerType.history: {
+			if (session === 0 || size < 19) return null;
+			const firstRow = getU64(view, p + 6);
+			const part = view.getUint8(p + 16);
+			const parts = view.getUint8(p + 17);
+			const atStart = view.getUint8(p + 18);
+			if (firstRow === null || part >= parts || atStart > 1) return null;
+			return {
+				type: "history",
+				session,
+				reqId: view.getUint16(p),
+				epoch: view.getUint32(p + 2),
+				firstRow,
+				rowCount: view.getUint16(p + 14),
+				part,
+				parts,
+				atStart: atStart === 1,
+				vt: buf.subarray(p + 19),
+			};
+		}
+		case ServerType.historyError: {
+			if (session === 0 || size !== 3) return null;
+			return { type: "historyError", session, reqId: view.getUint16(p), code: view.getUint8(p + 2) };
 		}
 		case ServerType.exit: {
 			if (session === 0 || size !== 5) return null;

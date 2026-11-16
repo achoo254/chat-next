@@ -750,6 +750,12 @@ export const zhCNMachines: MachinesCopy = {
 		openInTerminal: "在终端中打开",
 		scrollLatest: "回到最新一行",
 		syncing: "正在同步会话…可以直接输入",
+		history: {
+			loading: "正在加载历史…",
+			start: "历史开头",
+			cleared: "之前的内容已被程序清除",
+			failed: "无法加载历史。向上滚动重试。",
+		},
 		tabsOpen: (n: number) => `终端标签页（${n}）`,
 		held: (ai: string) => `${ai} 正在终端中运行此会话。此处仅可查看。`,
 		heldOpen: (ai: string) => `此会话已在终端的 ${ai} 中打开。`,

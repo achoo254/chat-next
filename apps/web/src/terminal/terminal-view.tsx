@@ -6,6 +6,9 @@
 // large bursts are gathered and written once per animation frame. A frame
 // counts as written (and is acknowledged to the machine) when xterm's write
 // callback runs, so a flood paces the machine instead of the page.
+// On a machine that opens a session at its screen as it is now (a LiveSnapshot), the history from before
+// loads as the user scrolls up past the top, into a read-only terminal above the live one (history-pane.ts,
+// history-scroll.ts); a key always brings the view back to the live terminal's newest line.
 // Loaded lazily with the dock; xterm never reaches the app's first chunk.
 import { useEffect, useEffectEvent, useRef, useState, type PointerEvent } from "react";
 import { FitAddon } from "@xterm/addon-fit";
@@ -14,8 +17,13 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { useMachinesCopy } from "../machines/use-machines-copy.ts";
+import { watchHistoryClears } from "./history-clears.ts";
+import { HistoryPane } from "./history-pane.ts";
+import { HistoryScroll } from "./history-scroll.ts";
 import type { LatencyProbe } from "./latency-probe.ts";
 import { TouchScroller } from "./touch-scroll.ts";
+import { isTerminalReport } from "./terminal-reports.ts";
 import { noAutofill } from "./no-autofill.ts";
 import { openWebLink } from "./open-web-link.ts";
 import { keepScrollbarVisible } from "./terminal-scrollbar.ts";
@@ -178,6 +186,8 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 	const latestNow = useEffectEvent(() => latestLabel);
 	const focusedNow = useEffectEvent(() => focused);
 	const syncingNow = useEffectEvent(() => syncingLabel);
+	const historyCopy = useMachinesCopy().terminal.history;
+	const historyLabels = useEffectEvent(() => historyCopy);
 	// Until the terminal is drawn the pane keeps the opening screen: it then shows ready to type, never empty or mid-redraw.
 	const [opening, setOpening] = useState(true);
 
@@ -278,6 +288,28 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				},
 				label: syncingNow(),
 			});
+			// One row's height as drawn (the screen element's height over its rows), the box's share before the first draw.
+			const rowHeight = () => {
+				const drawn = term.element?.querySelector<HTMLElement>(".xterm-screen")?.offsetHeight ?? 0;
+				return (drawn > 0 ? drawn : host.clientHeight) / Math.max(1, term.rows);
+			};
+			// The history from before the screen this pane opened at, above the live terminal.
+			const history = new HistoryPane({
+				host,
+				options: () => ({ ...textOptions(term.options.fontSize ?? fontSize(fallbackSize)), allowProposedApi: true }),
+				cols: () => term.cols,
+				rows: () => term.rows,
+				load: (life, beforeRow, maxRows) => link.history(session, life, beforeRow, maxRows),
+				labels: () => historyLabels(),
+				changed: () => scroll.layout(),
+				focusLive: () => {
+					if (!touch) term.focus();
+				},
+			});
+			const scroll = new HistoryScroll({ live: term, pane: history, rowHeight });
+			const onWheel = (event: WheelEvent) => scroll.wheel(event);
+			// Before xterm sees it: past the top of the live terminal's history, the wheel scrolls the history pane.
+			host.addEventListener("wheel", onWheel, { capture: true, passive: false });
 			let frame = 0;
 			const fitNow = () => {
 				frame = 0;
@@ -287,6 +319,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				} catch {
 					// Not measurable yet (hidden): the next resize fits it.
 				}
+				scroll.layout();
 			};
 			const fitSoon = () => {
 				if (frame === 0) frame = requestAnimationFrame(fitNow);
@@ -297,8 +330,23 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					term.reset();
 					if (term.cols !== snap.cols || term.rows !== snap.rows) term.resize(snap.cols, snap.rows);
 					term.write(snap.vt, () => {
+						// A replayed screen (or one rebuilt mid-stream) holds its own history: none to load above it.
+						history.off();
 						fitSoon();
 						gate.content();
+					});
+				},
+				liveSnapshot: (live) => {
+					// The screen as it is now: no replay to wait for, no cover; the pane shows it and takes keys once written.
+					writer.reset();
+					cover.dispose();
+					scroll.toLive();
+					term.reset();
+					if (term.cols !== live.cols || term.rows !== live.rows) term.resize(live.cols, live.rows);
+					term.write(live.vt, () => {
+						history.start(live.epoch, live.historyEnd);
+						fitSoon();
+						gate.open();
 					});
 				},
 				output: (data, done) => {
@@ -323,25 +371,45 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 			});
 			const subscriptions = [
 				term.onData((data) => {
-					claimSize();
-					probe?.key(session);
+					// What the user typed, pasted or composed brings the newest line into view; xterm's own reports
+					// (focus, mouse, answers to the program) go to the program and leave the view where it is.
+					if (!isTerminalReport(data)) {
+						scroll.toLive();
+						claimSize();
+						probe?.key(session);
+					}
 					link.input(session, encoder.encode(data));
 				}),
 				// Mouse reports in X10 mode: one byte per character.
 				term.onBinary((data) => link.input(session, Uint8Array.from(data, (c) => c.charCodeAt(0) & 0xff))),
-				term.onResize(({ cols, rows }) => link.resize(session, cols, rows)),
+				term.onResize(({ cols, rows }) => {
+					link.resize(session, cols, rows);
+					history.refit();
+				}),
 				term.onTitleChange((text) => title(text)),
+				// A program cleared its history: the rows from before it go too.
+				watchHistoryClears(term, () => history.cleared()),
 				keepScrollbarVisible(host, term),
 				// A finger has no hover or drag on xterm's hairline bar: it gets a thumb and a way back to the newest line.
 				...(touch ? [showTouchThumb(host, term, latestNow())] : []),
 			];
 			term.attachCustomKeyEventHandler((event) => {
 				// Ctrl+Shift+C copies the selection (Ctrl+C alone stays the program's interrupt); with nothing selected it does nothing.
+				// The selection in this terminal, else one in the history above it (the keyboard stays here).
 				if (event.type === "keydown" && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === "KeyC") {
 					event.preventDefault();
-					const selected = term.getSelection();
+					const selected = term.getSelection() || history.selection();
 					if (selected !== "") void navigator.clipboard?.writeText(selected).catch(() => undefined);
 					return false;
+				}
+				// ⌘C copies this terminal's selection through the browser; one in the history is copied here.
+				if (event.type === "keydown" && event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.code === "KeyC" && !term.hasSelection()) {
+					const selected = history.selection();
+					if (selected !== "") {
+						event.preventDefault();
+						void navigator.clipboard?.writeText(selected).catch(() => undefined);
+						return false;
+					}
 				}
 				return !(event.type === "keydown" && shortcut(event));
 			});
@@ -350,11 +418,12 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 			// A finger scrolls the terminal itself (touch-scroll.ts): the history of the normal screen, or arrow
 			// keys for a full-screen program (its own screen has no history), as xterm does for a mouse wheel.
 			// While the preview covers the pane, a swipe moves nothing: the hidden terminal is not what the user sees.
-			const stopTouch = touch ? touchScroll(host, term, (seq) => link.input(session, encoder.encode(seq)), scrollerRef, () => cover.showing) : () => undefined;
+			const stopTouch = touch ? touchScroll({ host, term, input: (seq) => link.input(session, encoder.encode(seq)), ref: scrollerRef, covered: () => cover.showing, scroll, rowHeight }) : () => undefined;
 			// Ctrl/⌘ + − 0 here, or A−/A+ in the dock: every terminal of the page takes the new size.
 			const stopSize = onFontSize((size) => {
 				term.options.fontSize = size;
 				webgl?.clearTextureAtlas();
+				history.refit();
 				fitSoon();
 			});
 			fitNow();
@@ -392,7 +461,11 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				focus: () => term.focus(),
 				appCursor: () => term.modes.applicationCursorKeysMode,
 				bracketedPaste: () => term.modes.bracketedPasteMode,
-				claimSize: () => claimSize(),
+				// Called before the dock types into the pane: the view goes back to the newest line, as for a key here.
+				claimSize: () => {
+					scroll.toLive();
+					claimSize();
+				},
 				caret: () => {
 					if (term.cols === 0 || term.rows === 0) return null;
 					const height = host.clientHeight / term.rows;
@@ -401,7 +474,8 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 					return { x: buffer.cursorX * width, y: buffer.cursorY * height, height };
 				},
 				text: screenText,
-				selection: () => term.getSelection(),
+				// The dock's copy key: this terminal's selection, else one in the history above it.
+				selection: () => term.getSelection() || history.selection(),
 			});
 			probe?.screen(session, screenText);
 			cleanup = () => {
@@ -410,6 +484,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				if (frame !== 0) cancelAnimationFrame(frame);
 				observer.disconnect();
 				stopTouch();
+				host.removeEventListener("wheel", onWheel, { capture: true });
 				stopClaims();
 				stopSize();
 				fonts?.removeEventListener("loadingdone", redraw);
@@ -417,6 +492,7 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				detach();
 				gate.dispose();
 				cover.dispose();
+				history.dispose();
 				writer.dispose();
 				termRef.current = null;
 				term.dispose();
@@ -455,17 +531,28 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 	);
 }
 
+interface TouchScrollDeps {
+	readonly host: HTMLElement;
+	readonly term: Terminal;
+	readonly input: (seq: string) => void;
+	readonly ref: { current: TouchScroller | null };
+	readonly covered: () => boolean;
+	readonly scroll: HistoryScroll;
+	readonly rowHeight: () => number;
+}
+
 /** Wires a TouchScroller to the pane's fingers; returns the cleanup. */
-function touchScroll(host: HTMLElement, term: Terminal, input: (seq: string) => void, ref: { current: TouchScroller | null }, covered: () => boolean): () => void {
+function touchScroll({ host, term, input, ref, covered, scroll, rowHeight }: TouchScrollDeps): () => void {
 	const scroller = new TouchScroller({
-		rowHeight: () => host.clientHeight / Math.max(1, term.rows),
+		rowHeight,
 		scrollLines: (lines) => {
 			if (covered()) return;
-			if (term.buffer.active.type === "alternate") {
+			if (term.buffer.active.type === "alternate" && !scroll.inHistory) {
 				const older = lines < 0;
 				const code = older ? "A" : "B";
 				input((term.modes.applicationCursorKeysMode ? `\x1bO${code}` : `\x1b[${code}`).repeat(Math.abs(lines)));
-			} else term.scrollLines(lines);
+				// The live terminal's history, then past its top the history pane, as a wheel does.
+			} else scroll.scroll(lines * rowHeight());
 		},
 	});
 	ref.current = scroller;

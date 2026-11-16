@@ -26,11 +26,60 @@ function u64(v: DataView, at: number, n: number): void {
 	v.setBigUint64(at, BigInt(n));
 }
 
+/** `parts` slices of `bytes`, as even as can be (an empty one when there are no bytes). */
+export function split(bytes: Uint8Array, parts: number): Uint8Array[] {
+	const size = Math.max(1, Math.ceil(bytes.length / parts));
+	const out: Uint8Array[] = [];
+	for (let i = 0; i < parts; i++) out.push(bytes.slice(i * size, Math.min(bytes.length, (i + 1) * size)));
+	return out;
+}
+
 export const serverFrames = {
-	hello(version = 1, maxFrame = 65_536): Uint8Array<ArrayBuffer> {
-		const { b, v } = header(0x81, 0, 5);
+	/** `caps`: a sixth byte, as a machine that takes CAP_LIVE_HISTORY answers a client that sent it. */
+	hello(version = 1, maxFrame = 65_536, caps?: number): Uint8Array<ArrayBuffer> {
+		const { b, v } = header(0x81, 0, caps === undefined ? 5 : 6);
 		v.setUint8(5, version);
 		v.setUint32(6, maxFrame);
+		if (caps !== undefined) v.setUint8(10, caps);
+		return b;
+	},
+	liveSnapshot(
+		session: number,
+		at: { offset: number; cols: number; rows: number; epoch: number; historyEnd: number; tailRows: number; part: number; parts: number },
+		vt: Uint8Array,
+	): Uint8Array<ArrayBuffer> {
+		const { b, v } = header(0x94, session, 28 + vt.length);
+		u64(v, 5, at.offset);
+		v.setUint16(13, at.cols);
+		v.setUint16(15, at.rows);
+		v.setUint32(17, at.epoch);
+		u64(v, 21, at.historyEnd);
+		v.setUint16(29, at.tailRows);
+		v.setUint8(31, at.part);
+		v.setUint8(32, at.parts);
+		b.set(vt, 33);
+		return b;
+	},
+	history(
+		session: number,
+		at: { reqId: number; epoch: number; firstRow: number; rowCount: number; part: number; parts: number; atStart: boolean },
+		vt: Uint8Array,
+	): Uint8Array<ArrayBuffer> {
+		const { b, v } = header(0x96, session, 19 + vt.length);
+		v.setUint16(5, at.reqId);
+		v.setUint32(7, at.epoch);
+		u64(v, 11, at.firstRow);
+		v.setUint16(19, at.rowCount);
+		v.setUint8(21, at.part);
+		v.setUint8(22, at.parts);
+		v.setUint8(23, at.atStart ? 1 : 0);
+		b.set(vt, 24);
+		return b;
+	},
+	historyError(session: number, reqId: number, code: number): Uint8Array<ArrayBuffer> {
+		const { b, v } = header(0x97, session, 3);
+		v.setUint16(5, reqId);
+		v.setUint8(7, code);
 		return b;
 	},
 	output(session: number, offset: number, data: Uint8Array): Uint8Array<ArrayBuffer> {
@@ -77,6 +126,7 @@ export type ClientFrame =
 	| { type: "ack"; session: number; offset: number }
 	| { type: "ping"; micros: number }
 	| { type: "preview"; session: number }
+	| { type: "historyRequest"; session: number; reqId: number; epoch: number; beforeRow: number; maxRows: number }
 	/** A type this process does not know: ignored, as the spec says. */
 	| { type: "unknown" };
 
@@ -103,6 +153,10 @@ export function decodeClientFrame(buf: Uint8Array): ClientFrame | null {
 			return size === 8 && session === 0 ? { type: "ping", micros: Number(v.getBigUint64(5)) } : null;
 		case 0x16:
 			return size === 0 && session !== 0 ? { type: "preview", session } : null;
+		case 0x17:
+			return size === 16 && session !== 0
+				? { type: "historyRequest", session, reqId: v.getUint16(5), epoch: v.getUint32(7), beforeRow: Number(v.getBigUint64(11)), maxRows: v.getUint16(19) }
+				: null;
 		default:
 			return { type: "unknown" };
 	}
@@ -220,6 +274,11 @@ interface Session {
 	/** When it opened (Unix ms) and in which folder, as TermSessionInfo reports them. */
 	createdAt: number;
 	cwd: string;
+	/** History rows before the screen (row n at index n), and their life: what a LiveSnapshot points before. */
+	history: string[];
+	epoch: number;
+	/** A full-screen program (vim, less) shows: a fresh attach replays as before, even for a client that takes LiveSnapshot. */
+	altScreen: boolean;
 }
 
 interface Conn {
@@ -230,6 +289,10 @@ interface Conn {
 	direct: FakePeer | null;
 	readonly attached: Map<number, { sent: number }>;
 	closed: boolean;
+	/** The capability bits of the client's Hello. */
+	caps: number;
+	/** The HistoryRequest held unanswered (historyHold), as the machine serves one page at a time per connection. */
+	heldHistory: { session: number; reqId: number; epoch: number; beforeRow: number; maxRows: number } | null;
 }
 
 export type KeystrokeRecord = { readonly session: number; readonly text: string; readonly path: "direct" | "relay" };
@@ -248,6 +311,18 @@ export class FakeTerminalHost {
 	readonly resizes: { session: number; cols: number; rows: number }[] = [];
 	/** Answers Preview as tunelo 3.5.0+ does; off: an older machine that ignores it. */
 	previews = false;
+	/**
+	 * Takes CAP_LIVE_HISTORY as the new terminal process does: a client that sets it gets a Hello with caps, a LiveSnapshot
+	 * for a fresh attach on the normal screen (no Preview), and pages of history on request.
+	 */
+	liveHistory = false;
+	/** LiveSnapshot and History frames come in this many parts. */
+	liveParts = 1;
+	historyParts = 1;
+	/** HistoryRequests wait unanswered until answerHistory(). */
+	historyHold = false;
+	/** Every HistoryRequest is answered with this HistoryError code instead (0: answered). */
+	historyFailWith = 0;
 	readonly frames: { frame: ClientFrame; path: "direct" | "relay" }[] = [];
 	/** Typed bytes come back as output. */
 	echo = true;
@@ -331,8 +406,23 @@ export class FakeTerminalHost {
 	/** A new session with an empty screen; returns its id. */
 	open(cols = 80, rows = 24, cwd = ""): number {
 		const id = this.nextSession++;
-		this.sessions.set(id, { id, log: [...enc.encode(this.greeting)], cols, rows, title: "", exited: null, createdAt: Date.now(), cwd });
+		this.sessions.set(id, { id, log: [...enc.encode(this.greeting)], cols, rows, title: "", exited: null, createdAt: Date.now(), cwd, history: [], epoch: 1, altScreen: false });
 		return id;
+	}
+
+	/** `session` with `rows` of history before its screen (row n reads `row n`), as a program left it. */
+	withHistory(session: number, rows: number): void {
+		const s = this.sessions.get(session);
+		if (s !== undefined) s.history = Array.from({ length: rows }, (_, n) => `row ${n}`);
+	}
+
+	/** Answers the held HistoryRequests (historyHold), as the machine would have then. */
+	answerHistory(): void {
+		for (const conn of this.conns.values()) {
+			const held = conn.heldHistory;
+			conn.heldHistory = null;
+			if (held !== null && !conn.closed) this.historyPage(conn, held);
+		}
 	}
 
 	/** Everything `session` printed so far, as text. */
@@ -420,7 +510,7 @@ export class FakeTerminalHost {
 		const key = `${this.machine.sockets.indexOf(socket)}:${link}`;
 		let conn = this.conns.get(key);
 		if (conn === undefined) {
-			conn = { socket, link, hello: false, relay: false, direct: null, attached: new Map(), closed: false };
+			conn = { socket, link, hello: false, relay: false, direct: null, attached: new Map(), closed: false, caps: 0, heldHistory: null };
 			this.conns.set(key, conn);
 		}
 		return conn;
@@ -481,7 +571,8 @@ export class FakeTerminalHost {
 		this.frames.push({ frame, path });
 		if (frame.type === "hello") {
 			conn.hello = true;
-			return this.sendFrame(conn, serverFrames.hello());
+			conn.caps = frame.caps;
+			return this.sendFrame(conn, this.live(conn) ? serverFrames.hello(1, 65_536, 1) : serverFrames.hello());
 		}
 		if (!conn.hello) return this.sendFrame(conn, serverFrames.error(0, 3, "hello first"));
 		switch (frame.type) {
@@ -490,10 +581,11 @@ export class FakeTerminalHost {
 			case "unknown":
 				return;
 			case "preview": {
-				// tunelo before 3.5.0 does not know the frame and ignores it.
+				// tunelo before 3.5.0 does not know the frame and ignores it; a client that takes LiveSnapshot gets one only for a full-screen program.
 				if (!this.previews) return;
 				const s = this.sessions.get(frame.session);
 				if (s === undefined) return this.sendFrame(conn, serverFrames.error(frame.session, 1, "no such session"));
+				if (this.live(conn) && !s.altScreen) return;
 				const vt = enc.encode(`cPREVIEW:${dec.decode(new Uint8Array(s.log))}`);
 				return this.sendFrame(conn, serverFrames.snapshot(s.id, s.log.length, s.cols, s.rows, false, vt, 0x93));
 			}
@@ -502,6 +594,12 @@ export class FakeTerminalHost {
 				if (s === undefined) return this.sendFrame(conn, serverFrames.error(frame.session, 1, "no such session"));
 				if (frame.lastOffset > 0 && frame.lastOffset <= s.log.length) {
 					this.sendOutput(conn, s, frame.lastOffset);
+				} else if (this.live(conn) && !s.altScreen) {
+					// The screen as it is now, then live output from its offset.
+					const vt = enc.encode(`\x1bc${dec.decode(new Uint8Array(s.log))}`);
+					const parts = split(vt, this.liveParts);
+					const at = { offset: s.log.length, cols: s.cols, rows: s.rows, epoch: s.epoch, historyEnd: s.history.length, tailRows: 0, parts: parts.length };
+					parts.forEach((part, i) => this.sendFrame(conn, serverFrames.liveSnapshot(s.id, { ...at, part: i }, part)));
 				} else if (this.previews) {
 					// As tunelo does: a reset at offset 0, then every byte since the session opened.
 					this.sendFrame(conn, serverFrames.snapshot(s.id, 0, s.cols, s.rows, false, enc.encode("c")));
@@ -516,6 +614,20 @@ export class FakeTerminalHost {
 			case "detach":
 				conn.attached.delete(frame.session);
 				return;
+			case "historyRequest": {
+				if (!conn.attached.has(frame.session)) return this.sendFrame(conn, serverFrames.error(frame.session, 5, "not attached"));
+				const held = conn.heldHistory;
+				if (held !== null) {
+					// The same request again after a path change is not answered twice; another one waits its turn.
+					if (held.reqId !== frame.reqId) this.sendFrame(conn, serverFrames.historyError(frame.session, frame.reqId, 2));
+					return;
+				}
+				if (this.historyHold) {
+					conn.heldHistory = frame;
+					return;
+				}
+				return this.historyPage(conn, frame);
+			}
 			case "input": {
 				if (!conn.attached.has(frame.session)) return this.sendFrame(conn, serverFrames.error(frame.session, 5, "not attached"));
 				const text = dec.decode(frame.data);
@@ -540,6 +652,28 @@ export class FakeTerminalHost {
 				return;
 			}
 		}
+	}
+
+	private live(conn: Conn): boolean {
+		return this.liveHistory && (conn.caps & 1) !== 0;
+	}
+
+	/** A page of history: up to `maxRows` rows before `beforeRow`, each ending as the machine ends them. */
+	private historyPage(conn: Conn, ask: { session: number; reqId: number; epoch: number; beforeRow: number; maxRows: number }): void {
+		const s = this.sessions.get(ask.session);
+		if (s === undefined) return this.sendFrame(conn, serverFrames.historyError(ask.session, ask.reqId, 1));
+		if (this.historyFailWith !== 0) return this.sendFrame(conn, serverFrames.historyError(ask.session, ask.reqId, this.historyFailWith));
+		if (ask.epoch !== s.epoch) {
+			// The program cleared the history since: nothing of the life asked for.
+			const at = { reqId: ask.reqId, epoch: s.epoch, firstRow: 0, rowCount: 0, part: 0, parts: 1, atStart: true };
+			return this.sendFrame(conn, serverFrames.history(s.id, at, new Uint8Array()));
+		}
+		const end = Math.min(ask.beforeRow, s.history.length);
+		const first = Math.max(0, end - ask.maxRows);
+		const rows = s.history.slice(first, end);
+		const parts = split(enc.encode(rows.map((r) => `${r}\x1b[m\r\n`).join("")), this.historyParts);
+		const at = { reqId: ask.reqId, epoch: s.epoch, firstRow: first, rowCount: rows.length, parts: parts.length, atStart: first === 0 };
+		parts.forEach((part, i) => this.sendFrame(conn, serverFrames.history(s.id, { ...at, part: i }, part)));
 	}
 
 	private sendOutput(conn: Conn, s: Session, from: number): void {

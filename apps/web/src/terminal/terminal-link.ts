@@ -23,7 +23,9 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ErrorReason, TermPath, TermSignalKind, type Frame, type FrameSchema } from "@achoo254/chat-proto/remote/remote";
 import { RemoteError, type LinkStatus, type Timers } from "../machines/link/machine-link.ts";
 import { frameBytes } from "../machines/link/socket.ts";
+import { HistoryRequests, joined, type HistoryReply } from "./terminal-history-requests.ts";
 import {
+	CAP_LIVE_HISTORY,
 	MAX_INPUT,
 	TermErrorCode,
 	WIRE_VERSION,
@@ -37,6 +39,7 @@ import {
 	encodePing,
 	encodeResize,
 	validDim,
+	type ServerFrame,
 } from "./terminal-wire.ts";
 
 type FrameBody = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
@@ -123,9 +126,32 @@ export interface RenderedScreen {
 	readonly vt: Uint8Array;
 }
 
+/**
+ * Where a fresh attach on the normal screen starts on a machine that takes CAP_LIVE_HISTORY: the screen as it is now
+ * (with about a screen of the newest history above it), then live output. History before `historyEnd` of `epoch`
+ * comes page by page on request (TerminalLink.history).
+ */
+export interface LiveScreen {
+	readonly cols: number;
+	readonly rows: number;
+	readonly vt: Uint8Array;
+	/** The session's history life: bumped on the machine when a program cleared the history. */
+	readonly epoch: number;
+	/** The first history row this screen holds: older rows are asked for with `beforeRow` at most this. */
+	readonly historyEnd: number;
+}
+
+/** Which history rows a screen joins: its life and the first row it holds (from its LiveScreen). */
+export interface HistoryLife {
+	readonly epoch: number;
+	readonly historyEnd: number;
+}
+
 /** What a session's screen does with the bytes; `done` runs once they are written. */
 export interface TerminalSink {
 	snapshot(snapshot: RenderedScreen): void;
+	/** The screen as it is now, written as it comes; without it the screen takes it as a snapshot of the normal screen. */
+	liveSnapshot?(screen: LiveScreen): void;
 	/**
 	 * A session opened fresh replays every byte since it began (the owner's rule: no line is cut), which takes a
 	 * while for a long one. The machine first sends the session as it renders it now (tunelo 3.5.0+): the screen
@@ -188,7 +214,19 @@ interface SessionState {
 	gap: boolean;
 	resyncAt: number;
 	resyncTimer: unknown;
+	/** The size the machine has (as far as this page knows): from the last screen it sent, or the last Resize. */
 	size: { cols: number; rows: number } | null;
+	/** The size the pane wants; null until it said. */
+	want: { cols: number; rows: number } | null;
+	/**
+	 * A fresh attach waits for its first screen, which says the session's size: the pane's size goes only then, and
+	 * only when it differs (a Resize to the size in use makes some programs draw everything again).
+	 */
+	awaitingScreen: boolean;
+	/** The parts of a LiveSnapshot received so far. */
+	live: { readonly offset: number; readonly vts: Uint8Array[] } | null;
+	/** The history life the screen started from (a LiveSnapshot); null when its history is all in the screen. */
+	life: HistoryLife | null;
 	/** The output offset the preview on screen reflects, until the replay gets there; null when none shows. */
 	previewEnd: number | null;
 	/** A preview was asked for this attach: a path change before any output was applied does not ask again. */
@@ -264,11 +302,21 @@ export class TerminalLink {
 	private rttShown: number | null = null;
 	private rttShownAt = 0;
 	private offCarrier: (() => void)[] = [];
+	private readonly pages: HistoryRequests;
 
 	constructor(private readonly deps: TerminalLinkDeps) {
 		this.timers = deps.timers ?? systemTimers;
 		this.clock = deps.clock ?? (() => performance.now());
 		this.random = deps.random ?? Math.random;
+		this.pages = new HistoryRequests({
+			timers: this.timers,
+			send: (frame) => {
+				const gen = this.gen;
+				if (gen?.sendPath == null) return false;
+				this.send(gen, frame);
+				return true;
+			},
+		});
 	}
 
 	// --- state for React ---------------------------------------------------------
@@ -317,6 +365,7 @@ export class TerminalLink {
 		for (const off of this.offCarrier) off();
 		this.offCarrier = [];
 		this.deps.carrier.stop();
+		this.pages.dropAll();
 		this.pendingInput = [];
 		this.pendingBytes = 0;
 		this.update();
@@ -350,6 +399,10 @@ export class TerminalLink {
 			resyncAt: 0,
 			resyncTimer: null,
 			size: null,
+			want: null,
+			awaitingScreen: true,
+			live: null,
+			life: null,
 			previewEnd: null,
 			previewAsked: false,
 		};
@@ -384,10 +437,32 @@ export class TerminalLink {
 	resize(session: number, cols: number, rows: number, claim = false): void {
 		const s = this.sessions.get(session);
 		if (s === undefined || !validDim(cols) || !validDim(rows)) return;
+		s.want = { cols, rows };
+		// The first screen says the session's size; the pane's goes after it, when it differs.
+		if (s.awaitingScreen) return;
 		if (!claim && s.size?.cols === cols && s.size.rows === rows) return;
+		this.sendSize(s, cols, rows);
+	}
+
+	/**
+	 * Up to `maxRows` (1-500) history rows of `session` before row `beforeRow`, for the screen that started `from` (the
+	 * LiveScreen the asking pane shows): asked about another screen than the session's now, the answer is "dropped".
+	 * Never rejects: a failure, a timeout (10 s) or an answer that no longer applies is a reply too.
+	 */
+	history(session: number, from: HistoryLife, beforeRow: number, maxRows: number): Promise<HistoryReply> {
+		const s = this.sessions.get(session);
+		if (s === undefined) return Promise.resolve({ kind: "dropped" });
+		const life = s.life;
+		if (life === null) return Promise.resolve({ kind: "failed", reason: "unavailable" });
+		// Rows numbered for another screen than the one shown now (a new one is being written): they would not join it.
+		if (life.epoch !== from.epoch || life.historyEnd !== from.historyEnd) return Promise.resolve({ kind: "dropped" });
+		return this.pages.request(session, life.epoch, beforeRow, maxRows);
+	}
+
+	private sendSize(s: SessionState, cols: number, rows: number): void {
 		s.size = { cols, rows };
 		const gen = this.gen;
-		if (gen?.sendPath != null) this.send(gen, encodeResize(session, cols, rows));
+		if (gen?.sendPath != null) this.send(gen, encodeResize(s.id, cols, rows));
 	}
 
 	private dropSession(session: number, detach: boolean): void {
@@ -396,6 +471,7 @@ export class TerminalLink {
 		this.timers.clearTimeout(s.ackTimer);
 		this.timers.clearTimeout(s.resyncTimer);
 		this.sessions.delete(session);
+		this.pages.drop(session);
 		const gen = this.gen;
 		if (detach && gen?.sendPath != null) this.send(gen, encodeDetach(session));
 	}
@@ -468,7 +544,7 @@ export class TerminalLink {
 	private startPath(gen: Generation, path: Path): void {
 		gen.sendPath = path;
 		this.relinks = 0;
-		this.transmit(gen, path, encodeHello());
+		this.transmit(gen, path, encodeHello(CAP_LIVE_HISTORY));
 		for (const s of this.sessions.values()) {
 			this.sendAttach(gen, s);
 		}
@@ -491,7 +567,9 @@ export class TerminalLink {
 			this.send(gen, encodePreview(s.id));
 		}
 		this.send(gen, encodeAttach(s.id, s.applied));
-		if (s.size !== null) this.send(gen, encodeResize(s.id, s.size.cols, s.size.rows));
+		if (s.size !== null && !s.awaitingScreen) this.send(gen, encodeResize(s.id, s.size.cols, s.size.rows));
+		// A page of history in flight goes again (a LiveSnapshot cut short comes again by itself).
+		this.pages.resend(s.id);
 	}
 
 	private endGeneration(tellMachine: boolean): void {
@@ -828,19 +906,24 @@ export class TerminalLink {
 			case "snapshot": {
 				const s = this.sessions.get(frame.session);
 				if (s === undefined) return;
-				s.epoch += 1;
-				s.applied = s.written = s.acked = frame.offset;
-				s.gap = false;
-				// The session's size on the machine now (another device may have set it): the pane fitting itself
-				// after the snapshot sends its own size when it differs, instead of taking it for already sent.
-				s.size = { cols: frame.cols, rows: frame.rows };
-				this.timers.clearTimeout(s.ackTimer);
-				s.ackTimer = null;
+				this.screenStarts(s, frame.offset, frame.cols, frame.rows);
+				// The whole history replays into the screen (or the program cleared it): none to ask for.
+				s.life = null;
 				s.sink.snapshot({ cols: frame.cols, rows: frame.rows, altScreen: frame.altScreen, vt: frame.vt });
 				// A rendered snapshot (the machine lost its log) may start past the preview: nothing left to wait for.
 				this.reachedPreview(s);
+				this.sendWantedSize(s);
 				return;
 			}
+			case "liveSnapshot": {
+				const s = this.sessions.get(frame.session);
+				if (s !== undefined) this.livePart(s, frame);
+				return;
+			}
+			case "history":
+				return this.pages.part(frame);
+			case "historyError":
+				return this.pages.error(frame.session, frame.reqId, frame.code);
 			case "preview": {
 				const s = this.sessions.get(frame.session);
 				// Late (the replay already passed it) or for a session not shown here: nothing to show.
@@ -862,6 +945,47 @@ export class TerminalLink {
 			case "unknown":
 				return;
 		}
+	}
+
+	/** One part of a LiveSnapshot; the screen starts once every part is in, in order, for the same offset. */
+	private livePart(s: SessionState, frame: Extract<ServerFrame, { type: "liveSnapshot" }>): void {
+		// Another screen (another offset) starts over at its first part; the same one sent again after an Attach keeps
+		// what came, skips parts seen twice, and waits past a missing part for it to come again.
+		if (frame.part === 0 && s.live?.offset !== frame.offset) s.live = { offset: frame.offset, vts: [] };
+		const live = s.live;
+		if (live === null || live.offset !== frame.offset || live.vts.length !== frame.part) return;
+		live.vts.push(frame.vt.slice());
+		if (live.vts.length < frame.parts) return;
+		this.screenStarts(s, frame.offset, frame.cols, frame.rows);
+		s.life = { epoch: frame.epoch, historyEnd: frame.historyEnd };
+		// No preview on this path: the screen shown is the live one.
+		s.previewEnd = null;
+		const vt = joined(live.vts);
+		if (s.sink.liveSnapshot !== undefined) {
+			s.sink.liveSnapshot({ cols: frame.cols, rows: frame.rows, vt, epoch: frame.epoch, historyEnd: frame.historyEnd });
+		} else s.sink.snapshot({ cols: frame.cols, rows: frame.rows, altScreen: false, vt });
+		this.sendWantedSize(s);
+	}
+
+	/** A snapshot of either kind: the screen starts over at `offset`, at the session's size on the machine now. */
+	private screenStarts(s: SessionState, offset: number, cols: number, rows: number): void {
+		s.epoch += 1;
+		s.applied = s.written = s.acked = offset;
+		s.gap = false;
+		s.live = null;
+		s.awaitingScreen = false;
+		// The session's size on the machine now (another device may have set it).
+		s.size = { cols, rows };
+		this.timers.clearTimeout(s.ackTimer);
+		s.ackTimer = null;
+		// Pages asked for before belong to the screen that was.
+		this.pages.drop(s.id);
+	}
+
+	/** The pane's size, when it differs from the one the machine just reported. */
+	private sendWantedSize(s: SessionState): void {
+		const want = s.want;
+		if (want !== null && (want.cols !== s.size?.cols || want.rows !== s.size.rows)) this.sendSize(s, want.cols, want.rows);
 	}
 
 	private machineError(gen: Generation, session: number, code: number): void {

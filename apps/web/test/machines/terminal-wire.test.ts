@@ -3,13 +3,16 @@
 // decodes here, and malformed frames decode to null without throwing.
 import { describe, expect, it } from "vitest";
 import {
+	CAP_LIVE_HISTORY,
 	MAX_FRAME,
+	MAX_HISTORY_ROWS,
 	MAX_INPUT,
 	decodeServerFrame,
 	encodeAck,
 	encodeAttach,
 	encodeDetach,
 	encodeHello,
+	encodeHistoryRequest,
 	encodeInput,
 	encodePing,
 	encodeResize,
@@ -17,6 +20,7 @@ import {
 import { decodeClientFrame, serverFrames } from "./fake-terminal.ts";
 
 const text = (s: string) => new TextEncoder().encode(s);
+const dec = (b: Uint8Array) => new TextDecoder().decode(b);
 const BIG = 2 ** 40 + 7;
 
 describe("client frames", () => {
@@ -32,6 +36,16 @@ describe("client frames", () => {
 		expect(decodeClientFrame(encodeAck(9, 16_384))).toEqual({ type: "ack", session: 9, offset: 16_384 });
 		expect(decodeClientFrame(encodePing(BIG))).toEqual({ type: "ping", micros: BIG });
 		expect(decodeClientFrame(encodeResize(1, 1000, 1))).toEqual({ type: "resize", session: 1, cols: 1000, rows: 1 });
+		expect(decodeClientFrame(encodeHello(CAP_LIVE_HISTORY))).toEqual({ type: "hello", version: 1, caps: 1 });
+		expect([...encodeHistoryRequest(9, 0x0102, 7, 300, 500)]).toEqual([0x17, 0, 0, 0, 9, 1, 2, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 1, 0x2c, 1, 0xf4]);
+		expect(decodeClientFrame(encodeHistoryRequest(9, 65_535, 2 ** 32 - 1, BIG, 1))).toEqual({
+			type: "historyRequest",
+			session: 9,
+			reqId: 65_535,
+			epoch: 2 ** 32 - 1,
+			beforeRow: BIG,
+			maxRows: 1,
+		});
 	});
 
 	it("refuse what the terminal process would call malformed", () => {
@@ -42,12 +56,20 @@ describe("client frames", () => {
 		expect(() => encodeAttach(1, -1)).toThrow(RangeError);
 		expect(() => encodeAttach(1, 2 ** 53)).toThrow(RangeError);
 		expect(() => encodeDetach(2 ** 32)).toThrow(RangeError);
+		// A page of history: 1 to 500 rows, a u16 id, a u32 life.
+		expect(() => encodeHistoryRequest(1, 1, 1, 10, 0)).toThrow(RangeError);
+		expect(() => encodeHistoryRequest(1, 1, 1, 10, MAX_HISTORY_ROWS + 1)).toThrow(RangeError);
+		expect(() => encodeHistoryRequest(1, 0x10000, 1, 10, 1)).toThrow(RangeError);
+		expect(() => encodeHistoryRequest(1, 1, 2 ** 32, 10, 1)).toThrow(RangeError);
+		expect(() => encodeHistoryRequest(1, 1, 1, -1, 1)).toThrow(RangeError);
 	});
 });
 
 describe("frames from the terminal process", () => {
 	it("decode every type", () => {
-		expect(decodeServerFrame(serverFrames.hello(1, 65_536))).toEqual({ type: "hello", version: 1, maxFrame: 65_536 });
+		// A machine before CAP_LIVE_HISTORY, or a client that sent no caps: 5 bytes, no caps.
+		expect(decodeServerFrame(serverFrames.hello(1, 65_536))).toEqual({ type: "hello", version: 1, maxFrame: 65_536, caps: null });
+		expect(decodeServerFrame(serverFrames.hello(1, 65_536, CAP_LIVE_HISTORY))).toEqual({ type: "hello", version: 1, maxFrame: 65_536, caps: 1 });
 		const out = decodeServerFrame(serverFrames.output(3, BIG, text("ok")));
 		expect(out).toMatchObject({ type: "output", session: 3, offset: BIG });
 		expect(out?.type === "output" && [...out.data]).toEqual([...text("ok")]);
@@ -59,6 +81,48 @@ describe("frames from the terminal process", () => {
 		expect(decodeServerFrame(serverFrames.error(0, 6, "đã thu hồi"))).toEqual({ type: "error", session: 0, code: 6, message: "đã thu hồi" });
 		// Output with no bytes is still a frame.
 		expect(decodeServerFrame(serverFrames.output(3, 5, new Uint8Array()))).toMatchObject({ type: "output", offset: 5 });
+	});
+
+	it("decode a live snapshot, a page of history and a history error, round trip", () => {
+		const at = { offset: BIG, cols: 120, rows: 40, epoch: 2 ** 32 - 1, historyEnd: BIG + 1, tailRows: 30, part: 1, parts: 3 };
+		const live = decodeServerFrame(serverFrames.liveSnapshot(4, at, text("\x1b[Hscreen")));
+		expect(live).toMatchObject({ type: "liveSnapshot", session: 4, ...at });
+		expect(live?.type === "liveSnapshot" && dec(live.vt)).toBe("\x1b[Hscreen");
+		const page = { reqId: 65_535, epoch: 3, firstRow: BIG, rowCount: 500, part: 0, parts: 2, atStart: true };
+		const history = decodeServerFrame(serverFrames.history(4, page, text("row\x1b[m\r\n")));
+		expect(history).toMatchObject({ type: "history", session: 4, ...page });
+		expect(history?.type === "history" && dec(history.vt)).toBe("row\x1b[m\r\n");
+		// No rows: the life changed, or nothing before.
+		expect(decodeServerFrame(serverFrames.history(4, { ...page, rowCount: 0, parts: 1 }, new Uint8Array()))).toMatchObject({ type: "history", rowCount: 0, atStart: true });
+		expect(decodeServerFrame(serverFrames.historyError(4, 12, 2))).toEqual({ type: "historyError", session: 4, reqId: 12, code: 2 });
+	});
+
+	it("refuse a live snapshot or a page with a part out of range, the wrong length, or no session", () => {
+		const at = { offset: 1, cols: 80, rows: 24, epoch: 1, historyEnd: 0, tailRows: 0, part: 0, parts: 1 };
+		const page = { reqId: 1, epoch: 1, firstRow: 0, rowCount: 0, part: 0, parts: 1, atStart: false };
+		const bad: Uint8Array[] = [
+			serverFrames.liveSnapshot(1, { ...at, part: 1, parts: 1 }, new Uint8Array()),
+			serverFrames.liveSnapshot(1, { ...at, part: 0, parts: 0 }, new Uint8Array()),
+			serverFrames.liveSnapshot(1, { ...at, cols: 0 }, new Uint8Array()),
+			serverFrames.liveSnapshot(1, { ...at, rows: 1001 }, new Uint8Array()),
+			serverFrames.liveSnapshot(0, at, new Uint8Array()),
+			serverFrames.liveSnapshot(1, at, new Uint8Array()).subarray(0, 32),
+			serverFrames.history(1, { ...page, part: 2, parts: 2 }, new Uint8Array()),
+			serverFrames.history(0, page, new Uint8Array()),
+			serverFrames.history(1, page, new Uint8Array()).subarray(0, 23),
+			(() => {
+				const f = serverFrames.history(1, page, new Uint8Array());
+				f[23] = 2;
+				return f;
+			})(),
+			serverFrames.historyError(0, 1, 1),
+			serverFrames.historyError(1, 1, 1).subarray(0, 7),
+			new Uint8Array([...serverFrames.historyError(1, 1, 1), 0]),
+			// Hello: 4 or 7 bytes of data.
+			serverFrames.hello().subarray(0, 9),
+			new Uint8Array([...serverFrames.hello(1, 65_536, 1), 0]),
+		];
+		for (const frame of bad) expect(decodeServerFrame(frame)).toBeNull();
 	});
 
 	it("decode a frame inside a larger buffer (a data channel message view)", () => {
