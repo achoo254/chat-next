@@ -316,6 +316,9 @@ message Frame {
 
     // A → B (tunelo 3.9.0+).
     AccountAcceptCurrent account_accept_current = 172;
+
+    // A → B (tunelo 3.11.0+). Answered with WsGitStatusResult.
+    WsGitRebase ws_git_rebase = 173;
   }
 }
 
@@ -1377,10 +1380,11 @@ enum ErrorReason {
   // A git request in a workspace that is a folder inside a larger
   // repository, not the repository's top folder.
   ERROR_REASON_WORKSPACE_NOT_REPOSITORY_ROOT = 67;
-  // WsGitCommit where git would sign the commit (commit.gpgSign, or
-  // gpg.format ssh or x509): signing may prompt, so it is left to a terminal.
+  // WsGitCommit or WsGitRebase where git would sign the commit
+  // (commit.gpgSign, or gpg.format ssh or x509): signing may prompt, so it is
+  // left to a terminal.
   ERROR_REASON_GIT_COMMIT_SIGNING = 68;
-  // WsGitCommit, WsGitCheckout or WsGitPull while a merge, rebase,
+  // WsGitCommit, WsGitCheckout, WsGitPull or WsGitRebase while a merge, rebase,
   // cherry-pick, revert or bisect is in progress (subject: which); the user
   // finishes it in a terminal.
   ERROR_REASON_GIT_OPERATION_IN_PROGRESS = 69;
@@ -1413,6 +1417,19 @@ enum ErrorReason {
   // AccountAcceptCurrent for an account the AI already keeps under another
   // entry (subject: its email).
   ERROR_REASON_ACCOUNT_DUPLICATE = 78;
+  // WsGitPull or WsGitPush could not be done because the branches diverged
+  // (tunelo 3.11.0+): for a push, the upstream has commits the branch does
+  // not; for a pull, both sides have commits the other does not. B fetched
+  // first, so the counts are current. Subject: "<ahead> <behind>".
+  // WsGitRebase joins them.
+  ERROR_REASON_GIT_DIVERGED = 79;
+  // WsGitRebase with uncommitted changes to tracked files: nothing changed.
+  ERROR_REASON_GIT_UNCOMMITTED_CHANGES = 80;
+  // WsGitRebase stopped on a conflict; B aborted it, so the branch is back
+  // where it was. Subject: how many files conflicted, then at most 50 of
+  // them, one a line. A rebase stopped for another reason is aborted too and
+  // answered with git's own reason.
+  ERROR_REASON_GIT_REBASE_CONFLICT = 81;
 }
 
 enum ErrorCode {
@@ -2002,7 +2019,8 @@ message AuditEntry {
   // screen_share (a device opened the machine's Screen Sharing; never what it showed or what was typed),
   // agent_update (a device started an update of tunelo; detail: the version),
   // git_stage, git_unstage, git_discard, git_commit, git_checkout,
-  // git_branch_create, git_pull, git_push (a device changed a workspace's git;
+  // git_branch_create, git_pull, git_push, git_rebase (a device changed a
+  // workspace's git; a rebase that pushes logs git_rebase, then git_push;
   // path: the workspace folder; detail: "workspace <id>" and, for stage,
   // unstage and discard, how many files ("restored N, trashed M" for
   // discard); never a file's content, a file's path, a branch or a commit
@@ -3010,18 +3028,36 @@ message WsGitFetch {
 }
 
 // A → B: git pull --ff-only of the current branch's upstream (never a merge
-// commit or a rebase); refused while an operation is in progress. As
+// commit or a rebase); refused while an operation is in progress. When the
+// branch and its upstream have diverged, refused with
+// ERROR_REASON_GIT_DIVERGED (tunelo 3.11.0+; older: GIT_FAILED). As
 // WsGitFetch. Logged (git_pull).
 message WsGitPull {
   string workspace_id = 1;
+}
+
+// A → B (tunelo 3.11.0+): put the branch's own commits on top of its
+// upstream's new ones (git pull --rebase=merges --no-autostash), then push
+// when push is set. Never forced, never a reset. Refused on a detached HEAD
+// (GIT_DETACHED_HEAD), without an upstream (GIT_FAILED), with uncommitted
+// changes to tracked files (GIT_UNCOMMITTED_CHANGES), where git would sign
+// (GIT_COMMIT_SIGNING), or while an operation is in progress. A conflict is
+// aborted (GIT_REBASE_CONFLICT). An older agent answers
+// ERROR_REASON_UNSUPPORTED_REQUEST. Answered with WsGitStatusResult. Logged
+// (git_rebase once the branch moved, then git_push when it pushed).
+message WsGitRebase {
+  string workspace_id = 1;
+  bool push = 2;
 }
 
 // A → B: push the current branch to its upstream, never forced. A branch
 // without one is pushed to the same name on origin (or the only remote) and
 // that becomes its upstream. In a repository that uses Git LFS, B runs
 // `git lfs pre-push` first (its objects go up before the commits), and
-// refuses with ERROR_REASON_GIT_LFS_MISSING without git-lfs. As WsGitFetch.
-// Logged (git_push).
+// refuses with ERROR_REASON_GIT_LFS_MISSING without git-lfs. Rejected
+// because the upstream has commits the branch does not: refused with
+// ERROR_REASON_GIT_DIVERGED (tunelo 3.11.0+; older: GIT_FAILED). As
+// WsGitFetch. Logged (git_push).
 message WsGitPush {
   string workspace_id = 1;
 }

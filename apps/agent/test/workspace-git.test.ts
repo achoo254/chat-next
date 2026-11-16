@@ -1,7 +1,8 @@
 // Source Control on a workspace, against real repositories: status read
 // from porcelain v2 (renames, conflicts, untracked, the 1000 cap), stage,
 // unstage, discard (untracked files to the trash), commit with no hook ever
-// run, branches, fetch, pull and push against a local bare repository, log,
+// run, branches, fetch, pull and push against a local bare repository, a
+// branch that diverged from its remote joined by a rebase (never forced), log,
 // what a branch committed since its base, diffs and the pull request page.
 // A repository whose own config names a program is refused before any
 // write or network command, and reads run with those programs off. Nothing
@@ -12,8 +13,8 @@ import { type Server, createServer } from "node:http";
 import { join } from "node:path";
 import { ErrorCode, ErrorReason } from "@achoo254/chat-proto/remote/remote";
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { parseRiskyConfig } from "../src/workspace/git-run.ts";
-import { parseBranches, parseLog, parseNameStatus, prLink, remoteRepo } from "../src/workspace/git-ops.ts";
+import { type GitRunner, gitRunner, parseRiskyConfig } from "../src/workspace/git-run.ts";
+import { parseBranches, parseLog, parseNameStatus, prLink, push, rebase, remoteRepo } from "../src/workspace/git-ops.ts";
 import { parseNumstatZ, parseStatusV2 } from "../src/workspace/git-status.ts";
 import { tempDir } from "./harness.ts";
 import { TEST_GIT_CONFIG, commitAll, git, reasonOf, repo, workspaces } from "./support/workspace-fixture.ts";
@@ -439,17 +440,16 @@ describe("remotes", () => {
     expect((await ws.fetch("w")).upstream).toEqual({ name: "origin/main", ahead: 0, behind: 1 });
     expect((await ws.pull("w", "dev")).upstream).toEqual({ name: "origin/main", ahead: 0, behind: 0 });
     expect(existsSync(join(dir, "c.txt"))).toBe(true);
-    // Diverged: no merge commit, no rebase; git says why.
+    // Diverged: no merge commit, no rebase; the counts say why.
     writeFileSync(join(other, "c.txt"), "theirs again\n");
     commitAll(other, "theirs 2");
     git(other, "push", "-q");
     writeFileSync(join(dir, "d.txt"), "ours\n");
     commitAll(dir, "ours");
-    const diverged = await reasonOf(ws.pull("w", "dev"));
-    expect(diverged.reason).toBe(ErrorReason.GIT_FAILED);
+    expect(await reasonOf(ws.pull("w", "dev"))).toMatchObject({ reason: ErrorReason.GIT_DIVERGED, subject: "1 1" });
     expect(git(dir, "log", "-1", "--format=%s").trim()).toBe("ours");
     // Never forced either.
-    expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
+    expect(await reasonOf(ws.push("w", "dev"))).toMatchObject({ reason: ErrorReason.GIT_DIVERGED, subject: "1 1" });
     expect(git(bare, "log", "-1", "--format=%s", "main").trim()).toBe("theirs 2");
     expect(existsSync(marker)).toBe(false);
     const actions = readFileSync(auditFile, "utf8").trim().split("\n").map((l) => (JSON.parse(l) as { action: string }).action);
@@ -505,6 +505,125 @@ describe("remotes", () => {
     git(dir, "remote", "add", "origin", bare);
     expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
     expect(git(bare, "branch", "--list").trim()).toBe("");
+  });
+});
+
+describe("a branch that diverged from its remote", () => {
+  /** `dir` one commit ahead with ours.txt, the remote one commit ahead with theirs.txt (or the same file, for a conflict). */
+  function diverged(opts: { conflict?: boolean } = {}) {
+    const s = setup();
+    const bare = withRemote(s.base, s.dir);
+    const other = join(s.base, "other");
+    execFileSync("git", ["clone", "-q", bare, other]);
+    writeFileSync(join(other, opts.conflict ? "a.txt" : "theirs.txt"), "theirs\n");
+    commitAll(other, "theirs");
+    git(other, "push", "-q");
+    writeFileSync(join(s.dir, opts.conflict ? "a.txt" : "ours.txt"), "ours\n");
+    commitAll(s.dir, "ours");
+    return { ...s, bare };
+  }
+
+  it("refuses a push with the counts, fetched, so the device can offer a rebase", async () => {
+    const { ws, dir } = diverged();
+    expect(await reasonOf(ws.push("w", "dev"))).toMatchObject({ reason: ErrorReason.GIT_DIVERGED, subject: "1 1" });
+    expect(git(dir, "log", "-1", "--format=%s", "origin/main").trim()).toBe("theirs");
+    expect((await ws.status("w")).upstream).toEqual({ name: "origin/main", ahead: 1, behind: 1 });
+  });
+
+  it("keeps a pull that could fast-forward but failed for another reason as it was", async () => {
+    const { ws, dir, base } = setup();
+    const bare = withRemote(base, dir);
+    const other = join(base, "other");
+    execFileSync("git", ["clone", "-q", bare, other]);
+    writeFileSync(join(other, "a.txt"), "theirs\n");
+    commitAll(other, "theirs");
+    git(other, "push", "-q");
+    writeFileSync(join(dir, "a.txt"), "not committed\n");
+    expect((await reasonOf(ws.pull("w", "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
+    expect(readFileSync(join(dir, "a.txt"), "utf8")).toBe("not committed\n");
+  });
+
+  it("keeps the rebase in the log when the push after it fails", async () => {
+    const { ws, dir, bare, auditFile } = diverged();
+    const hooks = join(bare, "hooks");
+    mkdirSync(hooks, { recursive: true });
+    writeFileSync(join(hooks, "pre-receive"), "#!/bin/sh\necho protected branch >&2\nexit 1\n");
+    chmodSync(join(hooks, "pre-receive"), 0o755);
+    expect((await reasonOf(ws.rebase("w", true, "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
+    expect(git(dir, "log", "--format=%s").trim().split("\n")).toEqual(["ours", "theirs", "first"]);
+    const actions = readFileSync(auditFile, "utf8").trim().split("\n").map((l) => (JSON.parse(l) as { action: string }).action);
+    expect(actions.at(-1)).toBe("git_rebase");
+  });
+
+  it("keeps a push the remote refuses for another reason as it was", async () => {
+    const { ws, dir, base } = setup();
+    const bare = withRemote(base, dir);
+    writeFileSync(join(dir, "a.txt"), "refused\n");
+    commitAll(dir, "refused");
+    const hooks = join(bare, "hooks");
+    mkdirSync(hooks, { recursive: true });
+    writeFileSync(join(hooks, "pre-receive"), "#!/bin/sh\necho protected branch >&2\nexit 1\n");
+    chmodSync(join(hooks, "pre-receive"), 0o755);
+    expect((await reasonOf(ws.push("w", "dev"))).reason).toBe(ErrorReason.GIT_FAILED);
+  });
+
+  it("puts the branch's commits on top of the remote's and pushes, never forced", async () => {
+    const { ws, dir, bare, auditFile } = diverged();
+    const status = await ws.rebase("w", true, "dev");
+    expect(status.upstream).toEqual({ name: "origin/main", ahead: 0, behind: 0 });
+    expect(git(bare, "log", "--format=%s", "main").trim().split("\n")).toEqual(["ours", "theirs", "first"]);
+    expect(git(dir, "rev-list", "--merges", "--count", "HEAD").trim()).toBe("0");
+    const entries = readFileSync(auditFile, "utf8").trim().split("\n").map((l) => JSON.parse(l) as { action: string; detail: string });
+    expect(entries.slice(-2)).toMatchObject([
+      { action: "git_rebase", detail: "workspace w" },
+      { action: "git_push", detail: "workspace w" },
+    ]);
+  });
+
+  it("rebases without pushing when asked", async () => {
+    const { ws, bare } = diverged();
+    expect((await ws.rebase("w", false, "dev")).upstream).toEqual({ name: "origin/main", ahead: 1, behind: 0 });
+    expect(git(bare, "log", "-1", "--format=%s", "main").trim()).toBe("theirs");
+  });
+
+  it("aborts a conflict, names the files and leaves the branch where it was", async () => {
+    const { ws, dir } = diverged({ conflict: true });
+    const before = git(dir, "rev-parse", "HEAD").trim();
+    expect(await reasonOf(ws.rebase("w", true, "dev"))).toMatchObject({ reason: ErrorReason.GIT_REBASE_CONFLICT, subject: "1\na.txt" });
+    expect(git(dir, "rev-parse", "HEAD").trim()).toBe(before);
+    expect(existsSync(join(dir, ".git", "rebase-merge"))).toBe(false);
+    expect(existsSync(join(dir, ".git", "rebase-apply"))).toBe(false);
+    expect(readFileSync(join(dir, "a.txt"), "utf8")).toBe("ours\n");
+  });
+
+  it("refuses with uncommitted changes, and where git would sign", async () => {
+    const { ws, dir } = diverged();
+    const before = git(dir, "rev-parse", "HEAD").trim();
+    writeFileSync(join(dir, "b.txt"), "not committed\n");
+    expect((await reasonOf(ws.rebase("w", true, "dev"))).reason).toBe(ErrorReason.GIT_UNCOMMITTED_CHANGES);
+    expect(readFileSync(join(dir, "b.txt"), "utf8")).toBe("not committed\n");
+    git(dir, "checkout", "--", "b.txt");
+    git(dir, "config", "commit.gpgSign", "true");
+    expect((await reasonOf(ws.rebase("w", true, "dev"))).reason).toBe(ErrorReason.GIT_COMMIT_SIGNING);
+    expect(git(dir, "rev-parse", "HEAD").trim()).toBe(before);
+  });
+
+  it("never runs a forcing or resetting git command", async () => {
+    const { dir, base } = diverged();
+    const calls: (readonly string[])[] = [];
+    mkdirSync(join(base, "no-hooks"));
+    const real = gitRunner({ hooksDir: join(base, "no-hooks"), extraConfig: TEST_GIT_CONFIG });
+    const recording: GitRunner = (root, call) => {
+      calls.push(call.args);
+      return real(root, call);
+    };
+    await rebase(recording, dir);
+    await push(recording, dir);
+    expect(calls.some((a) => a.includes("--rebase=merges"))).toBe(true);
+    expect(calls.some((a) => a[0] === "push")).toBe(true);
+    for (const args of calls) {
+      expect(args.some((a) => a.startsWith("--force") || a === "-f" || a === "reset" || a.startsWith("+")), args.join(" ")).toBe(false);
+    }
   });
 });
 

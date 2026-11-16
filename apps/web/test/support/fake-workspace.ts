@@ -276,6 +276,9 @@ export class FakeWorkspace {
 			case "wsGitPush":
 				this.upstream = { name: `origin/${this.branch}`, ahead: 0, behind: this.upstream?.behind ?? 0 };
 				return this.status();
+			case "wsGitRebase":
+				this.upstream = { name: `origin/${this.branch}`, ahead: b.value.push ? 0 : (this.upstream?.ahead ?? 0), behind: 0 };
+				return this.status();
 			case "wsGitLog": {
 				const limit = b.value.limit === 0 ? 50 : Math.min(50, b.value.limit);
 				const page = this.commits.slice(b.value.skip, b.value.skip + limit);

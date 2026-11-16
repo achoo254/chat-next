@@ -39,8 +39,14 @@ export type WorkspacesOptions = {
 
 type Watching = { watcher: WorkspaceWatcher; listeners: Set<(change: WorkspaceChange) => void> };
 
-/** Longest a git write may hold its workspace, whatever git does: its own timeouts plus room to stop. */
-const WRITE_DEADLINE_MS = () => ops.OPS_LIMITS.networkTimeoutMs * 2 + 30_000;
+/**
+ * When a git write answers the device at the latest: its network commands'
+ * timeouts (two by default; a push also fetches when refused, a rebase
+ * pulls, pushes and may fetch), one write's, and room to stop. The
+ * workspace stays locked until git really ends, which git's own timeouts
+ * bound.
+ */
+const writeDeadlineMs = (networkCommands = 2): number => ops.OPS_LIMITS.networkTimeoutMs * networkCommands + ops.OPS_LIMITS.writeTimeoutMs + 30_000;
 
 export class Workspaces {
   private readonly run: GitRunner;
@@ -223,12 +229,35 @@ export class Workspaces {
     return this.write(id, "", undefined, (root) => ops.fetch(this.run, root).then(() => ""));
   }
 
+  /** A pull or push stopped because the branches diverged is refused with GIT_DIVERGED (after a fetch), so the device can offer a rebase. */
   pull(id: string, device: string): Promise<WorkspaceStatus> {
-    return this.write(id, device, "git_pull", (root) => ops.pull(this.run, root).then(() => ""));
+    return this.write(id, device, "git_pull", (root) => ops.divergedOr(this.run, root, "pull", () => ops.pull(this.run, root)).then(() => ""));
   }
 
   push(id: string, device: string): Promise<WorkspaceStatus> {
-    return this.write(id, device, "git_push", (root) => ops.push(this.run, root).then(() => ""));
+    return this.write(id, device, "git_push", (root) => ops.divergedOr(this.run, root, "push", () => ops.push(this.run, root)).then(() => ""), 4);
+  }
+
+  /** The rebase is logged as soon as the branch moved, then the push as its own entry: a failing push still leaves the rebase in the log. */
+  rebase(id: string, push: boolean, device: string): Promise<WorkspaceStatus> {
+    return this.write(
+      id,
+      device,
+      undefined,
+      async (root) => {
+        await ops.rebase(this.run, root);
+        this.audit(device, "git_rebase", root, id, "");
+        if (!push) return "";
+        await ops.divergedOr(this.run, root, "push", () => ops.push(this.run, root));
+        this.audit(device, "git_push", root, id, "");
+        return "";
+      },
+      5,
+    );
+  }
+
+  private audit(device: string, action: AuditAction, root: string, id: string, count: string): void {
+    this.opts.audit.write({ device, action, path: root, detail: count === "" ? `workspace ${id}` : `workspace ${id}: ${count}` });
   }
 
   private place(root: string): Promise<"top" | "inside" | "none"> {
@@ -246,26 +275,39 @@ export class Workspaces {
 
   /**
    * One git write of the workspace at a time, logged once git did it (with
-   * what `fn` says of it), then the status after it. The lock goes however
-   * git ends, at the latest at the write deadline.
+   * what `fn` says of it), then the status after it. The device hears back
+   * at the latest at the write deadline, but the lock goes only when git
+   * ends (its own timeouts bound that): no second write runs beside a slow
+   * one.
    */
-  private async write(id: string, device: string, action: AuditAction | undefined, fn: (root: string) => Promise<string>): Promise<WorkspaceStatus> {
+  private async write(id: string, device: string, action: AuditAction | undefined, fn: (root: string) => Promise<string>, networkCommands = 2): Promise<WorkspaceStatus> {
     // Taken before anything is awaited: the first request in is the one that runs.
     if (this.writing.has(id)) throw new AgentError(ErrorCode.INVALID, "another git command of this workspace is running", { reason: ErrorReason.GIT_BUSY });
     this.writing.add(id);
-    let deadline: ReturnType<typeof setTimeout> | undefined;
     let root: string;
     try {
       root = await this.gitRoot(id);
-      const expired = new Promise<never>((_, fail) => {
-        deadline = setTimeout(() => fail(gitError(ErrorReason.GIT_FAILED, "git took too long", "timeout")), WRITE_DEADLINE_MS());
-        deadline.unref?.();
-      });
-      const count = await Promise.race([fn(root), expired]);
-      if (action) this.opts.audit.write({ device, action, path: root, detail: count === "" ? `workspace ${id}` : `workspace ${id}: ${count}` });
+    } catch (err) {
+      this.writing.delete(id);
+      throw err;
+    }
+    const at = root;
+    // Logged when git is done, even after the device was answered; the workspace is free only then.
+    const work = fn(at)
+      .then((count) => {
+        if (action) this.audit(device, action, at, id, count);
+      })
+      .finally(() => this.writing.delete(id));
+    work.catch(() => undefined);
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_, fail) => {
+      deadline = setTimeout(() => fail(gitError(ErrorReason.GIT_FAILED, "git took too long", "timeout")), writeDeadlineMs(networkCommands));
+      deadline.unref?.();
+    });
+    try {
+      await Promise.race([work, expired]);
     } finally {
       clearTimeout(deadline);
-      this.writing.delete(id);
     }
     return this.statusOf(root);
   }

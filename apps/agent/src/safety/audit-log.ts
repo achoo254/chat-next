@@ -41,6 +41,7 @@ export type AuditAction =
   | "git_branch_create"
   | "git_pull"
   | "git_push"
+  | "git_rebase"
   | "usage_rules"
   | "usage_delete";
 

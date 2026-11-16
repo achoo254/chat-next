@@ -476,6 +476,10 @@ export const enMachines: MachinesCopy = {
 			gitCommitSigning: "The repository signs commits (GPG/SSH), which may ask for a passphrase. Commit in a terminal instead.",
 			gitOperationInProgress: (what) => `A ${what === "" ? "git operation" : what} is in progress. Finish or abort it in a terminal first.`,
 			gitDetachedHead: "HEAD is detached.",
+			gitDiverged: (ahead, behind) =>
+				`The remote has ${behind} new ${behind === 1 ? "commit" : "commits"} this machine does not, and the machine has ${ahead} ${ahead === 1 ? "commit" : "commits"} not pushed.`,
+			gitUncommittedChanges: "Commit or stash the uncommitted changes before joining the branches.",
+			gitRebaseConflict: "The branches could not be joined automatically because of a conflict. The repository is back as it was.",
 			sensitiveFileNotConfirmed: "Secret files need a confirmation before they go into git.",
 			usageRangeInvalid: "The time range is not valid (at most 92 days).",
 			usageLedgerBlocked: "The machine's usage ledger is locked because it cannot be read or has an unknown version; deleting the ledger starts it over.",

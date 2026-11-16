@@ -174,6 +174,14 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.gitOperationInProgress(s);
 		case ErrorReason.GIT_DETACHED_HEAD:
 			return r.gitDetachedHead;
+		case ErrorReason.GIT_DIVERGED: {
+			const [ahead = "0", behind = "0"] = s.split(" ");
+			return r.gitDiverged(Number(ahead), Number(behind));
+		}
+		case ErrorReason.GIT_UNCOMMITTED_CHANGES:
+			return r.gitUncommittedChanges;
+		case ErrorReason.GIT_REBASE_CONFLICT:
+			return r.gitRebaseConflict;
 		case ErrorReason.SENSITIVE_FILE_NOT_CONFIRMED:
 			return r.sensitiveFileNotConfirmed;
 		case ErrorReason.USAGE_RANGE_INVALID:

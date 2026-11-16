@@ -488,6 +488,9 @@ export const viMachines = {
 			gitCommitSigning: "Repo bật ký commit (GPG/SSH), việc ký có thể cần nhập mật khẩu. Hãy commit trong terminal.",
 			gitOperationInProgress: (what: string) => `Đang dở ${what === "" ? "một thao tác git" : what}. Hoàn tất hoặc huỷ nó trong terminal trước.`,
 			gitDetachedHead: "HEAD đang tách rời.",
+			gitDiverged: (ahead: number, behind: number) => `Remote có ${behind} commit mới mà máy chưa có, máy có ${ahead} commit chưa push.`,
+			gitUncommittedChanges: "Commit hoặc cất các thay đổi chưa commit trước khi gộp.",
+			gitRebaseConflict: "Không gộp tự động được vì xung đột. Repo đã về như trước khi gộp.",
 			sensitiveFileNotConfirmed: "Cần xác nhận trước khi đưa tệp bí mật vào git.",
 			// Usage statistics of the machine.
 			usageRangeInvalid: "Khoảng thời gian không hợp lệ (tối đa 92 ngày).",

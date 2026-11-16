@@ -9,6 +9,7 @@ import { PanelIcon } from "../panel-icons.tsx";
 import { usePanelCopy } from "../use-panel-copy.ts";
 import type { DiffTarget } from "../viewer/diff-view.tsx";
 import { ask, type WsLink } from "../ws-client.ts";
+import { divergedCounts, rebaseConflictFiles } from "../ws-errors.ts";
 import { BranchBar } from "./branch-bar.tsx";
 import { ChangesSection } from "./changes-section.tsx";
 import { CommitBox } from "./commit-box.tsx";
@@ -36,6 +37,9 @@ interface SourceControlProps {
 
 /** The machine gives its AI up to 120 s to write a commit message; a little longer for the answer to arrive. */
 const AI_WRITE_TIMEOUT_MS = 130_000;
+
+/** Conflicted files listed in the failure box; the rest are counted. */
+const CONFLICT_LINES = 10;
 
 /** Errors that mean "no git here" rather than "try again". */
 function notGit(err: unknown): boolean {
@@ -113,17 +117,10 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 				/>
 				{scm.busy !== null && (
 					<p className="ws-msg muted" role="status">
-						{p.scm.busy}
+						{scm.busy === "rebase" || scm.busy === "rebase-push" ? p.scm.rebasing : p.scm.busy}
 					</p>
 				)}
-				{scm.failure !== null && !naming && (
-					<div className="ws-failure" role="alert">
-						<p>{errorText(scm.failure.error)}</p>
-						<button type="button" className="icon-btn ws-act" aria-label={p.preview.close} onClick={scm.dismissFailure}>
-							<PanelIcon name="x" small />
-						</button>
-					</div>
-				)}
+				{scm.failure !== null && !naming && <FailureBox failure={scm.failure} disabled={disabled} onRebase={scm.rebase} onDismiss={scm.dismissFailure} errorText={errorText} />}
 				<ChangesSection
 					entries={entries}
 					truncated={status.truncated}
@@ -155,5 +152,56 @@ export function SourceControl({ link, workspaceId, name, online, scm, selected, 
 				/>
 			)}
 		</section>
+	);
+}
+
+interface FailureBoxProps {
+	failure: NonNullable<Scm["failure"]>;
+	disabled: boolean;
+	onRebase: (push: boolean) => void;
+	onDismiss: () => void;
+	errorText: (err: unknown) => string;
+}
+
+/**
+ * A failed write's reason. Branches that diverged offer a rebase (then a
+ * push when the push failed); a rebase stopped on a conflict lists the files.
+ */
+function FailureBox({ failure, disabled, onRebase, onDismiss, errorText }: FailureBoxProps) {
+	const p = usePanelCopy();
+	const diverged = divergedCounts(failure.error);
+	const conflicts = rebaseConflictFiles(failure.error);
+	// A push, or a rebase that was to push (someone pushed again meanwhile), offers the rebase then push.
+	const push = failure.op === "push" || failure.op === "rebase-push";
+	return (
+		<div className="ws-failure" role="alert">
+			<div className="ws-failure-body">
+				<p>{conflicts !== null ? p.scm.rebaseConflict : errorText(failure.error)}</p>
+				{conflicts !== null && (
+					<>
+						<ul className="ws-failure-files">
+							{conflicts.files.slice(0, CONFLICT_LINES).map((file) => (
+								<li key={file} title={file}>
+									{file}
+								</li>
+							))}
+							{conflicts.total > CONFLICT_LINES && <li>{p.scm.rebaseConflictMore(conflicts.total - Math.min(CONFLICT_LINES, conflicts.files.length))}</li>}
+						</ul>
+						<p className="muted">{p.scm.rebaseConflictHint}</p>
+					</>
+				)}
+				{diverged !== null && (
+					<>
+						<button type="button" className="btn btn-sm btn-primary ws-rebase-btn" disabled={disabled} onClick={() => onRebase(push)} data-id="workspace-rebase">
+							{push ? p.scm.rebasePush : p.scm.rebase}
+						</button>
+						<p className="muted">{p.scm.rebaseNote}</p>
+					</>
+				)}
+			</div>
+			<button type="button" className="icon-btn ws-act" aria-label={p.preview.close} onClick={onDismiss}>
+				<PanelIcon name="x" small />
+			</button>
+		</div>
 	);
 }

@@ -42,6 +42,22 @@ export function isDetachedRefusal(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.GIT_DETACHED_HEAD;
 }
 
+/** A pull or push the upstream's new commits stopped: how many commits each side has the other does not. */
+export function divergedCounts(err: unknown): { ahead: number; behind: number } | null {
+	if (!(err instanceof RemoteError) || err.reason !== ErrorReason.GIT_DIVERGED) return null;
+	const m = /^(\d+) (\d+)$/.exec(err.subject);
+	return m ? { ahead: Number(m[1]), behind: Number(m[2]) } : { ahead: 0, behind: 0 };
+}
+
+/** A rebase the machine aborted on a conflict: how many files conflicted, and the ones it names (at most 50). */
+export function rebaseConflictFiles(err: unknown): { total: number; files: string[] } | null {
+	if (!(err instanceof RemoteError) || err.reason !== ErrorReason.GIT_REBASE_CONFLICT) return null;
+	const [first = "", ...rest] = err.subject.split("\n").filter((line) => line !== "");
+	const files = rest.filter((line) => line !== "");
+	const total = Number(first);
+	return { total: Number.isInteger(total) && total >= files.length ? total : files.length, files };
+}
+
 /** The machine is too old for the panel (it does not know Ws* requests). */
 export function needsAgentUpdate(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.UNSUPPORTED_REQUEST;

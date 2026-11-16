@@ -345,6 +345,58 @@ describe("Source Control", () => {
 		expect(sent("wsGitDiff").length).toBe(before);
 	});
 
+	it("offers a rebase then push when the remote has commits the machine does not, and reads the counts again", async () => {
+		ws.failures.set("wsGitPush", { reason: ErrorReason.GIT_DIVERGED, subject: "1 1" });
+		open("scm");
+		await waitFor(() => expect(within(changes()).getByText("package.json")).toBeTruthy());
+		const statusReads = sent("wsGitStatus").length;
+		await userEvent.click(screen.getByRole("button", { name: /^Push/ }));
+		const alert = await screen.findByRole("alert");
+		expect(alert.textContent).toContain(viMachines.errors.reasons.gitDiverged(1, 1));
+		expect(alert.textContent).toContain(p.scm.rebaseNote);
+		await waitFor(() => expect(sent("wsGitStatus").length).toBeGreaterThan(statusReads));
+		await userEvent.click(within(alert).getByRole("button", { name: p.scm.rebasePush }));
+		await waitFor(() => expect(sent("wsGitRebase").length).toBe(1));
+		const rebase = sent("wsGitRebase")[0];
+		expect(rebase?.case === "wsGitRebase" ? rebase.value.push : null).toBe(true);
+		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+	});
+
+	it("offers a rebase without a push after a pull, and lists the files a conflict stopped", async () => {
+		ws.failures.set("wsGitPull", { reason: ErrorReason.GIT_DIVERGED, subject: "2 3" });
+		const files = Array.from({ length: 12 }, (_, i) => `src/file-${i}.ts`);
+		ws.failures.set("wsGitRebase", { reason: ErrorReason.GIT_REBASE_CONFLICT, subject: ["12", ...files].join("\n") });
+		open("scm");
+		await waitFor(() => expect(within(changes()).getByText("package.json")).toBeTruthy());
+		await userEvent.click(screen.getByRole("button", { name: /^Pull/ }));
+		const alert = await screen.findByRole("alert");
+		expect(alert.textContent).toContain(viMachines.errors.reasons.gitDiverged(2, 3));
+		await userEvent.click(within(alert).getByRole("button", { name: p.scm.rebase }));
+		const rebase = await waitFor(() => {
+			const r = sent("wsGitRebase")[0];
+			expect(r).toBeTruthy();
+			return r;
+		});
+		expect(rebase?.case === "wsGitRebase" ? rebase.value.push : null).toBe(false);
+		const conflict = await screen.findByText(p.scm.rebaseConflict);
+		const box = within(conflict.closest(".ws-failure") as HTMLElement);
+		expect(box.getByText("src/file-0.ts")).toBeTruthy();
+		expect(box.queryByText("src/file-10.ts")).toBeNull();
+		expect(box.getByText(p.scm.rebaseConflictMore(2))).toBeTruthy();
+		expect(box.getByText(p.scm.rebaseConflictHint)).toBeTruthy();
+		expect(box.queryByRole("button", { name: p.scm.rebase })).toBeNull();
+	});
+
+	it("says an older machine needs updating when it does not know the rebase", async () => {
+		ws.failures.set("wsGitPush", { reason: ErrorReason.GIT_DIVERGED, subject: "1 1" });
+		ws.failures.set("wsGitRebase", { reason: ErrorReason.UNSUPPORTED_REQUEST });
+		open("scm");
+		await waitFor(() => expect(within(changes()).getByText("package.json")).toBeTruthy());
+		await userEvent.click(screen.getByRole("button", { name: /^Push/ }));
+		await userEvent.click(within(await screen.findByRole("alert")).getByRole("button", { name: p.scm.rebasePush }));
+		expect((await screen.findByText(p.errors.needsUpdate)).closest(".ws-failure")).toBeTruthy();
+	});
+
 	it("shows the branch with its upstream, a Create PR link, committed-on-branch files and commits", async () => {
 		open("scm");
 		const pr = await screen.findByRole("link", { name: p.scm.createPr });

@@ -1,6 +1,7 @@
 // Source Control's git commands on a workspace: stage, unstage, discard
 // (untracked files to the operating system's trash), commit (hooks never
-// run), branches, fetch, pull (fast-forward only), push (never forced), log,
+// run), branches, fetch, pull (fast-forward only), push (never forced),
+// rebase onto a diverged upstream (never forced, a conflict aborted), log,
 // what the branch committed since its base, one file's diff, and the web
 // page that opens a pull request. Paths go to git through stdin
 // (--pathspec-from-file, NUL-separated, literal), refs are checked by git
@@ -215,6 +216,19 @@ async function noOperationInProgress(run: GitRunner, root: string): Promise<void
   }
 }
 
+/**
+ * Refuses where git would sign a commit: signing may ask for a passphrase or
+ * a key touch nobody at the machine answers, so it is left to a terminal.
+ * A rebase writes commits again, so it is refused there too.
+ */
+async function noSigning(run: GitRunner, root: string): Promise<void> {
+  const config = await effectiveConfig(run, root);
+  const format = (config.get("gpg.format") ?? "").toLowerCase();
+  if (TRUE.test(config.get("commit.gpgsign") ?? "") || format === "ssh" || format === "x509") {
+    throw new AgentError(ErrorCode.INVALID, "git would sign this commit: commit in a terminal", { reason: ErrorReason.GIT_COMMIT_SIGNING });
+  }
+}
+
 /** What an AI reads to write a commit message: the staged files and their patch. */
 export type StagedChanges = { files: string; patch: string };
 
@@ -289,12 +303,7 @@ export async function commit(run: GitRunner, root: string, message: string, sens
     () => false,
   );
   if (!onBranch && !opts.allowDetached) throw new AgentError(ErrorCode.INVALID, "HEAD is detached", { reason: ErrorReason.GIT_DETACHED_HEAD });
-  // Signing may ask for a passphrase or a key touch nobody at the machine answers: left to a terminal.
-  const config = await effectiveConfig(run, root);
-  const format = (config.get("gpg.format") ?? "").toLowerCase();
-  if (TRUE.test(config.get("commit.gpgsign") ?? "") || format === "ssh" || format === "x509") {
-    throw new AgentError(ErrorCode.INVALID, "git would sign this commit: commit in a terminal", { reason: ErrorReason.GIT_COMMIT_SIGNING });
-  }
+  await noSigning(run, root);
   const staged = (await text(run, root, read(["diff", "--cached", "--name-only", "-z", "--no-renames", "--relative"]))).split("\0").filter(Boolean);
   confirmSensitive(staged, sensitive, opts.confirmSensitive ?? []);
   // --no-verify on top of the hooks switched off for every call; the message comes on stdin.
@@ -382,6 +391,101 @@ export async function fetch(run: GitRunner, root: string): Promise<void> {
 export async function pull(run: GitRunner, root: string): Promise<void> {
   await noOperationInProgress(run, root);
   await run(root, network(["pull", "--ff-only", "--no-rebase", "--recurse-submodules=no", "--quiet"]));
+}
+
+/** Failures that say nothing about the branch's history: never turned into GIT_DIVERGED. */
+const NOT_HISTORY = new Set<ErrorReason>([ErrorReason.GIT_LFS_MISSING, ErrorReason.GIT_NEEDS_CREDENTIALS, ErrorReason.GIT_OPERATION_IN_PROGRESS]);
+
+/** How far HEAD and its upstream are apart, from what git knows now; undefined without an upstream. */
+async function upstreamCounts(run: GitRunner, root: string): Promise<{ ahead: number; behind: number } | undefined> {
+  const out = await text(run, root, read(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"])).catch(() => "");
+  const m = /^(\d+)\s+(\d+)$/.exec(out.trim());
+  return m ? { behind: Number(m[1]), ahead: Number(m[2]) } : undefined;
+}
+
+/** Which of a pull's or a push's failures the counts explain: a push needs the upstream's new commits; a pull, commits on both sides (a pull that could fast-forward failed for another reason). */
+export type DivergedWhen = "pull" | "push";
+
+const explains = (when: DivergedWhen, c: { ahead: number; behind: number }): boolean => c.behind > 0 && (when === "push" || c.ahead > 0);
+
+/**
+ * Runs a pull or a push; when it fails, fetches and counts the commits on
+ * each side, and refuses with GIT_DIVERGED when the branches diverged.
+ * Decided from the counts, never from git's or the host's words. Anything
+ * else, a failing fetch included, is the original error.
+ */
+export async function divergedOr(run: GitRunner, root: string, when: DivergedWhen, op: () => Promise<void>): Promise<void> {
+  try {
+    await op();
+  } catch (err) {
+    if (!(err instanceof AgentError) || NOT_HISTORY.has(err.reason)) throw err;
+    const counts = await fetch(run, root).then(
+      () => upstreamCounts(run, root),
+      () => undefined,
+    );
+    if (!counts || !explains(when, counts)) throw err;
+    throw new AgentError(ErrorCode.INVALID, `the upstream has ${counts.behind} commits the branch does not`, {
+      reason: ErrorReason.GIT_DIVERGED,
+      subject: `${counts.ahead} ${counts.behind}`,
+    });
+  }
+}
+
+/** Conflicted files reported, at most. */
+const CONFLICT_FILES = 50;
+
+/**
+ * Puts the branch's own commits on top of its upstream's new ones (merges
+ * kept, nothing stashed, no other branch moved). Never forced, never a
+ * reset: a stopped rebase is aborted, so the branch is back where it was; a
+ * conflict names its files, any other failure is git's own. The caller
+ * pushes afterwards when asked.
+ */
+export async function rebase(run: GitRunner, root: string): Promise<void> {
+  await noOperationInProgress(run, root);
+  const onBranch = await run(root, read(["symbolic-ref", "-q", "HEAD"])).then(
+    () => true,
+    () => false,
+  );
+  if (!onBranch) throw new AgentError(ErrorCode.INVALID, "HEAD is detached", { reason: ErrorReason.GIT_DETACHED_HEAD });
+  const hasUpstream = await run(root, read(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])).then(
+    () => true,
+    () => false,
+  );
+  if (!hasUpstream) throw gitError(ErrorReason.GIT_FAILED, "the branch has no upstream", "no upstream");
+  const changed = await text(run, root, read(["status", "--porcelain", "--untracked-files=no", "--ignore-submodules=all"]));
+  if (changed.trim() !== "") throw new AgentError(ErrorCode.INVALID, "commit or stash the changes first", { reason: ErrorReason.GIT_UNCOMMITTED_CHANGES });
+  await noSigning(run, root);
+  try {
+    // A user's rebase.updateRefs would move other local branches too: only this one moves.
+    await run(root, network(["-c", "rebase.updateRefs=false", "pull", "--rebase=merges", "--no-autostash", "--recurse-submodules=no", "--quiet"]));
+  } catch (err) {
+    // Whether a rebase was left stopped; when the folder cannot be read, an abort is tried anyway.
+    const stopped = await text(run, root, read(["rev-parse", "--absolute-git-dir"])).then(
+      (out) => {
+        const gitDir = out.replace(/\n$/, "");
+        return existsSync(join(gitDir, "rebase-merge")) || existsSync(join(gitDir, "rebase-apply"));
+      },
+      () => undefined,
+    );
+    if (stopped === false) throw err;
+    const conflicted = await text(run, root, read(["diff", "--name-only", "--diff-filter=U", "-z"])).catch(() => "");
+    const files = conflicted.split("\0").filter(Boolean);
+    const aborted = await run(root, write(["rebase", "--abort"])).then(
+      () => true,
+      () => false,
+    );
+    if (!aborted) {
+      if (stopped === undefined) throw err;
+      throw new AgentError(ErrorCode.INVALID, "a rebase is in progress: finish it in a terminal", { reason: ErrorReason.GIT_OPERATION_IN_PROGRESS, subject: "rebase" });
+    }
+    if (files.length === 0) throw err;
+    // Subject: the total, then at most CONFLICT_FILES files, one a line.
+    throw new AgentError(ErrorCode.INVALID, "the rebase stopped on a conflict and was aborted", {
+      reason: ErrorReason.GIT_REBASE_CONFLICT,
+      subject: [String(files.length), ...files.slice(0, CONFLICT_FILES)].join("\n"),
+    });
+  }
 }
 
 async function configValue(run: GitRunner, root: string, key: string): Promise<string> {

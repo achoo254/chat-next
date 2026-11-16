@@ -799,6 +799,7 @@ export class Connection {
         case "wsGitFetch":
         case "wsGitPull":
         case "wsGitPush":
+        case "wsGitRebase":
         case "wsGitLog":
         case "wsGitBranchCompare":
         case "wsGitPrUrl":

@@ -1,7 +1,8 @@
 // Source Control against the machine: git's status (read on open, after a
 // change the machine reports, and from the answer of every write), and the
-// writes: stage, unstage, discard, commit, checkout, new branch, fetch, pull
-// and push, one at a time. A write that needs the user's consent stops at a
+// writes: stage, unstage, discard, commit, checkout, new branch, fetch, pull,
+// push and a rebase onto a diverged upstream, one at a time. A failed pull or
+// push reads the status again, so ahead and behind are current. A write that needs the user's consent stops at a
 // confirmation first: discarding (always), taking in a secret file (named),
 // committing on a detached HEAD. The machine refuses without that consent,
 // and such a refusal opens the same confirmation. A confirmation holds what
@@ -12,7 +13,14 @@ import { ask, type WsLink } from "../ws-client.ts";
 import { isDetachedRefusal, unconfirmedSensitive } from "../ws-errors.ts";
 import { discardKinds, sensitivePaths, stagedEntries, unstagedEntries } from "./status-model.ts";
 
-export type ScmOp = "status" | "stage" | "unstage" | "discard" | "commit" | "checkout" | "branch" | "fetch" | "pull" | "push";
+export type ScmOp = "status" | "stage" | "unstage" | "discard" | "commit" | "checkout" | "branch" | "fetch" | "pull" | "push" | "rebase" | "rebase-push";
+
+/**
+ * How long the device waits for a pull, a push or a rebase: the machine may
+ * run several network commands of up to 120 s each (a refused push also
+ * fetches; a rebase pulls, pushes and may fetch) before it answers.
+ */
+const REMOTE_TIMEOUT_MS = 720_000;
 
 type Targets = readonly string[] | "all";
 
@@ -47,6 +55,8 @@ export interface Scm {
 	readonly checkout: (branch: string) => void;
 	readonly createBranch: (name: string) => Promise<boolean>;
 	readonly remote: (op: "fetch" | "pull" | "push") => void;
+	/** Puts the branch's commits on top of its upstream's new ones, then pushes when `push`. */
+	readonly rebase: (push: boolean) => void;
 	/** The user agreed to the confirmation shown. */
 	readonly accept: () => void;
 	readonly cancelConfirm: () => void;
@@ -94,13 +104,15 @@ export function useScm(link: WsLink, workspaceId: string, online: boolean): Scm 
 				return true;
 			} catch (error) {
 				if (unconfirmedSensitive(error) === null && !isDetachedRefusal(error)) setFailure({ op, error });
+				// The machine may have fetched (a newer one does when the branches diverged): show its counts now.
+				if (op === "pull" || op === "push" || op === "rebase-push") refresh();
 				return false;
 			} finally {
 				busyRef.current = null;
 				setBusy(null);
 			}
 		},
-		[take],
+		[take, refresh],
 	);
 
 	/** Stages with consent for `consented`; a refusal naming more secret files asks about those. */
@@ -203,8 +215,14 @@ export function useScm(link: WsLink, workspaceId: string, online: boolean): Scm 
 		(op: "fetch" | "pull" | "push") => {
 			const value = { workspaceId: ws };
 			const body = op === "fetch" ? ({ case: "wsGitFetch", value } as const) : op === "pull" ? ({ case: "wsGitPull", value } as const) : ({ case: "wsGitPush", value } as const);
-			void write(op, () => ask(link, body, "wsGitStatusResult"), true);
+			void write(op, () => ask(link, body, "wsGitStatusResult", op === "fetch" ? undefined : REMOTE_TIMEOUT_MS), true);
 		},
+		[link, ws, write],
+	);
+
+	const rebase = useCallback(
+		(push: boolean) =>
+			void write(push ? "rebase-push" : "rebase", () => ask(link, { case: "wsGitRebase", value: { workspaceId: ws, push } }, "wsGitStatusResult", REMOTE_TIMEOUT_MS), true),
 		[link, ws, write],
 	);
 
@@ -217,5 +235,5 @@ export function useScm(link: WsLink, workspaceId: string, online: boolean): Scm 
 
 	const cancelConfirm = useCallback(() => setConfirm(null), []);
 	const dismissFailure = useCallback(() => setFailure(null), []);
-	return { status, statusError, busy, failure, confirm, history, refresh, stage, unstage, discard, commit, checkout, createBranch, remote, accept, cancelConfirm, dismissFailure, onChange };
+	return { status, statusError, busy, failure, confirm, history, refresh, stage, unstage, discard, commit, checkout, createBranch, remote, rebase, accept, cancelConfirm, dismissFailure, onChange };
 }

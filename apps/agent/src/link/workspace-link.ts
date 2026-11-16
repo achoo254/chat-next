@@ -37,6 +37,7 @@ export type WorkspaceFrame = Extract<
       | "wsGitFetch"
       | "wsGitPull"
       | "wsGitPush"
+      | "wsGitRebase"
       | "wsGitLog"
       | "wsGitBranchCompare"
       | "wsGitPrUrl"
@@ -206,6 +207,8 @@ export class WorkspaceLink {
         return status(b.value.workspaceId, await w.pull(b.value.workspaceId, device));
       case "wsGitPush":
         return status(b.value.workspaceId, await w.push(b.value.workspaceId, device));
+      case "wsGitRebase":
+        return status(b.value.workspaceId, await w.rebase(b.value.workspaceId, b.value.push, device));
       case "wsGitLog": {
         const v = b.value;
         const r = await w.log(v.workspaceId, v.ref, v.skip, v.limit);

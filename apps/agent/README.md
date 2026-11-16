@@ -338,7 +338,19 @@ Thiết bị xem tệp và git của một workspace (một dự án của máy)
   `allow_detached`), nhánh (danh sách, đổi, tạo), fetch, pull chỉ fast-forward, push không bao giờ force (nhánh chưa có upstream
   thì đẩy lên cùng tên ở origin và đặt upstream; repo dùng Git LFS thì chạy `git lfs pre-push` trước, máy thiếu git-lfs thì từ
   chối `ERROR_REASON_GIT_LFS_MISSING`). Commit, checkout và pull bị từ chối khi đang dở merge, rebase, cherry-pick, revert hay
-  bisect (`ERROR_REASON_GIT_OPERATION_IN_PROGRESS`). Log phân trang, "committed on
+  bisect (`ERROR_REASON_GIT_OPERATION_IN_PROGRESS`).
+- **Nhánh lệch remote (3.11.0)**: pull mặc định vẫn chỉ fast-forward. Pull hoặc push thất bại thì tunelo fetch rồi đếm
+  `rev-list --left-right --count @{upstream}...HEAD`, rồi trả `ERROR_REASON_GIT_DIVERGED` (subject `"<ahead> <behind>"`) khi
+  nhánh lệch thật: với push là remote có commit máy chưa có, với pull là hai bên đều có commit bên kia chưa có. Quyết bằng số
+  đếm chứ không đọc chữ của git hay của host. Lỗi khác (nhánh được bảo vệ, thiếu quyền, thay đổi chưa commit bị đè, fetch hỏng)
+  giữ nguyên lỗi gốc. `WsGitRebase{push}` chạy `pull --rebase=merges --no-autostash` với `rebase.updateRefs=false` (giữ commit
+  merge, không cất thay đổi, không dời nhánh nào khác), rồi push nếu `push`; không bao giờ force hay reset. Từ chối trước khi chạy khi HEAD tách rời, nhánh chưa có upstream,
+  có thay đổi tracked chưa commit (`ERROR_REASON_GIT_UNCOMMITTED_CHANGES`), repo ký commit (`ERROR_REASON_GIT_COMMIT_SIGNING`,
+  vì rebase tạo lại commit) hoặc đang dở thao tác. Rebase dừng giữa chừng thì luôn chạy `rebase --abort` để nhánh về đúng như
+  trước: có tệp xung đột thì trả `ERROR_REASON_GIT_REBASE_CONFLICT` (subject: tổng số tệp, rồi tối đa 50 tệp, mỗi tệp một dòng),
+  dừng vì lý do khác thì trả lỗi gốc của git. Agent cũ trả `ERROR_REASON_UNSUPPORTED_REQUEST`. Mỗi lệnh ghi git trả lời thiết bị
+  chậm nhất ở hạn của nó (rebase rồi push dài nhất, khoảng 11 phút), nhưng workspace chỉ được nhả khi git thật sự xong.
+- Log phân trang, "committed on
   branch" so với `origin/HEAD` (rồi `origin/main`, `origin/master`, `main`, `master`), và URL trang tạo PR/MR của GitHub hoặc
   GitLab (chỉ https, không kèm thông tin đăng nhập).
 - **AI viết thông điệp commit (3.1.0)**: thiết bị gửi `WsGitCommitMessage` kèm id của AI (`provider`), lấy từ AI của phiên.
@@ -359,7 +371,9 @@ Thiết bị xem tệp và git của một workspace (một dự án của máy)
   workspace luôn được trả, và nếu dừng cứng để lại `.git/index.lock` thì lỗi nói rõ. Lỗi gửi về thiết bị không bao giờ chứa
   đường dẫn tuyệt đối của máy.
 - **Nhật ký đồng ý**: `git_stage`, `git_unstage`, `git_discard` (số tệp khôi phục và số tệp vào Thùng rác), `git_commit`,
-  `git_checkout`, `git_branch_create`, `git_pull`, `git_push` ghi thư mục workspace, mã workspace và số tệp; không bao giờ ghi
+  `git_checkout`, `git_branch_create`, `git_pull`, `git_push`, `git_rebase` (ghi ngay khi nhánh đã dời, push sau đó ghi thêm
+  `git_push`) ghi thư mục workspace,
+  mã workspace và số tệp; không bao giờ ghi
   đường dẫn tệp, nội dung, tên nhánh hay thông điệp commit. Mỗi workspace chỉ một lệnh git ghi tại một thời điểm
   (`ERROR_REASON_GIT_BUSY`).
 
