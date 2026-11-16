@@ -339,4 +339,119 @@ describe("identity session", () => {
 		expect(session.covers("chat")).toBe(true);
 		expect(session.covers("localman")).toBe(true);
 	});
+
+	describe("renewal", () => {
+		const HOUR = 60 * 60_000;
+		const RECENT = 20 * HOUR;
+
+		function storedRenewedAt(): unknown {
+			return (JSON.parse(sessionText()) as Record<string, unknown>).renewedAt;
+		}
+
+		test("refreshes a grant whose access token is still good, and saves the rotated refresh token and the time", async () => {
+			const fake = rotatingRefresh();
+			let clock = NOW;
+			const session = new IdentitySession(dir, deps(fake.refresh, { now: () => clock }));
+			await signedIn(session, NOW + 10 * 60_000);
+			expect(session.lastRenewedAt()).toBeUndefined();
+			expect(await session.renew(RECENT)).toEqual({ renewed: true, renewedAt: NOW });
+			expect(fake.used).toEqual([{ refreshToken: "rt-1", resource: TUNNEL, clientId: "tunelo-cli" }]);
+			expect(storedRenewedAt()).toBe(NOW);
+			expect(session.lastRenewedAt()).toBe(NOW);
+			// The new access token is stored too: no refresh to get it.
+			expect(await session.getAccessToken(TUNNEL)).not.toBe("at-old");
+			expect(fake.used).toHaveLength(1);
+			// The next renewal uses the rotated refresh token.
+			clock = NOW + 21 * HOUR;
+			await session.renew(RECENT);
+			expect(fake.used.map((u) => u.refreshToken)).toEqual(["rt-1", "rt-2"]);
+			expect(storedRenewedAt()).toBe(clock);
+		});
+
+		test("is skipped when the grant was renewed within the window, by any process", async () => {
+			const fake = rotatingRefresh();
+			let clock = NOW;
+			const session = new IdentitySession(dir, deps(fake.refresh, { now: () => clock }));
+			await signedIn(session, NOW - 1);
+			await session.renew(RECENT);
+			clock = NOW + 19 * HOUR;
+			const other = new IdentitySession(dir, deps(fake.refresh, { now: () => clock }));
+			expect(await other.renew(RECENT)).toEqual({ renewed: false, renewedAt: NOW });
+			expect(fake.used).toHaveLength(1);
+		});
+
+		test("a sign-in counts as a renewal", async () => {
+			const fake = rotatingRefresh();
+			const session = new IdentitySession(dir, deps(fake.refresh));
+			await signedInAgent(session, NOW + 10 * 60_000);
+			expect(session.lastRenewedAt()).toBe(NOW);
+			expect((await session.renew(RECENT)).renewed).toBe(false);
+			expect(fake.used).toEqual([]);
+		});
+
+		test("an ordinary refresh records the time too", async () => {
+			const fake = rotatingRefresh();
+			const session = new IdentitySession(dir, deps(fake.refresh));
+			await signedIn(session, NOW - 1);
+			await session.getAccessToken(TUNNEL);
+			expect(storedRenewedAt()).toBe(NOW);
+		});
+
+		test("two processes renewing at once rotate the refresh token only once", async () => {
+			const fake = rotatingRefresh();
+			const session = new IdentitySession(dir, deps(fake.refresh));
+			await signedIn(session, NOW + 10 * 60_000);
+			const other = new IdentitySession(dir, deps(fake.refresh));
+			const results = await Promise.all([session.renew(RECENT), other.renew(RECENT)]);
+			expect(fake.used.map((u) => u.refreshToken)).toEqual(["rt-1"]);
+			expect(results.map((r) => r.renewed).sort()).toEqual([false, true]);
+		});
+
+		test("refreshes the tunnel of a tunelo-agent grant", async () => {
+			const fake = rotatingRefresh();
+			const session = new IdentitySession(dir, deps(fake.refresh));
+			const resources = appResources("https://auth.example");
+			await session.replace(
+				"https://auth.example",
+				{ accessToken: "at-old", refreshToken: "rt-1", idToken: fakeJwt("acc_alice"), expiresIn: 600 },
+				resources.chat,
+				AGENT_CLIENT_ID,
+				[resources.chat, resources.tunnel],
+			);
+			await session.renew(0);
+			expect(fake.used).toEqual([{ refreshToken: "rt-1", resource: resources.tunnel, clientId: AGENT_CLIENT_ID }]);
+		});
+
+		test("a dead grant ends the session", async () => {
+			const session = new IdentitySession(
+				dir,
+				deps(async () => {
+					throw new OAuthResponseError("invalid_grant", 400);
+				}),
+			);
+			await signedIn(session, NOW + 10 * 60_000);
+			await expect(session.renew(RECENT)).rejects.toBeInstanceOf(SessionExpiredError);
+			expect(session.info()).toBeUndefined();
+		});
+
+		test("a network failure is thrown once, without retrying inside, and keeps the session", async () => {
+			let calls = 0;
+			const session = new IdentitySession(
+				dir,
+				deps(async () => {
+					calls++;
+					throw new TypeError("fetch failed");
+				}),
+			);
+			await signedIn(session, NOW + 10 * 60_000);
+			await expect(session.renew(RECENT)).rejects.toThrow("fetch failed");
+			expect(calls).toBe(1);
+			expect(session.info()?.sub).toBe("acc_alice");
+			expect(session.lastRenewedAt()).toBeUndefined();
+		});
+
+		test("no session means sign in first", async () => {
+			await expect(new IdentitySession(dir).renew(RECENT)).rejects.toBeInstanceOf(SessionExpiredError);
+		});
+	});
 });

@@ -47,6 +47,8 @@ export interface RegistrationDeps {
   onRegistered: () => void;
   /** The machine's link to Localman: its state, and linking again after `tunelo login`. */
   localman?: { state(): AppState; retryNow(): void };
+  /** The daily renewal of the sign-in: starts over after `tunelo login`. */
+  renewal?: { retryNow(): void };
   log: (line: string) => void;
   now?: () => number;
   /** Runs `fn` after `ms`; returns a cancel. */
@@ -137,6 +139,7 @@ export class Registration {
     // Until this try settles, `tunelo login` must not read the state from before it.
     if (!c.machineRemoved && !(c.machineId && c.machineSecret)) this.chat = { status: "waiting", detail: "adding this machine to AI Agent" };
     this.deps.localman?.retryNow();
+    this.deps.renewal?.retryNow();
     this.failures = 0;
     this.cancelRetry?.();
     this.cancelRetry = undefined;

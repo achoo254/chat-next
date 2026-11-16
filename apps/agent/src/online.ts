@@ -9,6 +9,11 @@
 // Localman link that fails only changes that app's state, and the tunnel
 // keeps running. The tunnel tells the machine whether its server gates
 // Localman's requests for localhost (tunnels/forward.ts).
+//
+// The service also renews the sign-in about once a day
+// (identity/session-renewal.ts): a tunnel that stays connected asks for no
+// token, and the IdP ends a grant unused for 30 days.
+import { SessionRenewal } from "./identity/session-renewal.ts";
 import { identitySession } from "./identity/session.ts";
 import { LocalmanLink, deviceIdOf } from "./localman/self-link.ts";
 import { MachineApiError, heartbeat, notifyNeedsInput, notifyUsageHint, registerMachine } from "./machine-api.ts";
@@ -34,6 +39,12 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
     forward: () => m.localForward.state(),
     log,
   });
+  const renewal = new SessionRenewal({
+    session,
+    log,
+    // The tunnel is the app that needs the sign-in; Chat runs on the machine secret.
+    onSignedOut: (detail) => registration.setTunnel({ status: "sign-in", detail }),
+  });
   const online = () => {
     stopMachine ??= machineOnline(m, localPort, registration, log, () => (stopMachine = undefined));
   };
@@ -48,6 +59,7 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
       localman.start();
     },
     localman,
+    renewal,
     log,
   });
   const c = m.config.get();
@@ -55,11 +67,13 @@ export function goOnline(m: Machine, localPort: number, log: (l: string) => void
   if (c.machineId && c.machineSecret) online();
   registration.start();
   localman.start();
+  renewal.start();
   return {
     registration,
     stop: () => {
       registration.stop();
       localman.stop();
+      renewal.stop();
       stopMachine?.();
     },
   };

@@ -17,6 +17,12 @@
  * the refreshing; a command refreshes only when the service is not running
  * (it routes everything else through the control socket). Nothing here hands
  * a refresh token to a caller.
+ *
+ * The IdP ends a grant that goes unused for 30 days, and a tunnel that stays
+ * connected asks for no token, so the service renews the grant about once a
+ * day (session-renewal.ts) through `renew`, under the same lock. Every
+ * successful refresh records when it happened (`renewedAt`), so a process
+ * that renewed recently spares the others another rotation.
  */
 import { randomUUID } from "node:crypto";
 import { readFileSync, rmSync } from "node:fs";
@@ -107,6 +113,15 @@ interface SessionFile extends SessionInfo {
 	/** The resources the grant holds; a refresh asks for one of them only. */
 	resources: string[];
 	access: Record<string, SealedToken>;
+	/** Epoch ms of the last successful refresh or sign-in; absent in older files. */
+	renewedAt?: number;
+}
+
+/** What `renew` did: refreshed the grant now, or found it renewed within the window. */
+export interface RenewResult {
+	renewed: boolean;
+	/** Epoch ms of the last renewal. */
+	renewedAt: number;
 }
 
 /** A session of an older tunelo or of the Tunelo CLI 1.x, stored in plain text. */
@@ -173,7 +188,7 @@ function readSession(dir: string): SessionFile | undefined {
 	if (!issuer || !sub || !clientId || !generation || !refreshToken) {
 		return undefined;
 	}
-	return {
+	const session: SessionFile = {
 		version: 1,
 		issuer,
 		sub,
@@ -183,6 +198,10 @@ function readSession(dir: string): SessionFile | undefined {
 		resources: parseResources(raw.resources, issuer, clientId),
 		access: parseAccess(raw.access),
 	};
+	if (typeof raw.renewedAt === "number" && Number.isFinite(raw.renewedAt)) {
+		session.renewedAt = raw.renewedAt;
+	}
+	return session;
 }
 
 /** The stored resources; a file written before they were recorded holds what its client always gets. */
@@ -212,6 +231,19 @@ const DEAD_GRANT_ERRORS = new Set([
 
 function isDeadGrant(err: unknown): boolean {
 	return err instanceof OAuthResponseError && DEAD_GRANT_ERRORS.has(err.error);
+}
+
+/**
+ * The resource a renewal refreshes: the tunnel, which every grant of this
+ * machine holds, or else the first one the grant records (a refresh must
+ * name a resource the grant holds).
+ */
+function renewalResource(session: SessionFile): string {
+	const tunnel = appResources(session.issuer).tunnel;
+	if (session.resources.includes(tunnel)) return tunnel;
+	const first = session.resources[0];
+	if (first === undefined) throw new SessionExpiredError(EXPIRED_MESSAGE);
+	return first;
 }
 
 type Attempt = { token: string } | { retry: unknown };
@@ -245,6 +277,11 @@ export class IdentitySession {
 		if (!session) return undefined;
 		const { issuer, sub, clientId } = session;
 		return { issuer, sub, clientId };
+	}
+
+	/** When the grant was last renewed (epoch ms), or undefined. Reads no secret. */
+	lastRenewedAt(): number | undefined {
+		return readSession(this.dir)?.renewedAt;
 	}
 
 	/** Whether the stored session's grant holds `app` (no network, no secret). */
@@ -361,17 +398,46 @@ export class IdentitySession {
 	}
 
 	/**
+	 * Refreshes the grant even when its access tokens are still good, so the
+	 * IdP sees it used, unless it was renewed less than `recentMs` ago (by
+	 * this or another process). One attempt: the caller schedules the next.
+	 * Throws `SessionExpiredError` when there is no session or the grant is
+	 * gone, and the refresh error otherwise.
+	 */
+	async renew(recentMs: number): Promise<RenewResult> {
+		return withFileLock(this.lockPath, async () => {
+			// Read inside the lock: another process may have just renewed.
+			const session = readSession(this.dir);
+			if (!session) throw new SessionExpiredError(EXPIRED_MESSAGE);
+			if (session.renewedAt !== undefined) {
+				const age = this.deps.now() - session.renewedAt;
+				// A mark in the future (the clock went back) says nothing: renew.
+				if (age >= 0 && age < recentMs) {
+					return { renewed: false, renewedAt: session.renewedAt };
+				}
+			}
+			const outcome = await this.refreshLocked(renewalResource(session), true);
+			if ("retry" in outcome) throw outcome.retry;
+			return {
+				renewed: true,
+				renewedAt: readSession(this.dir)?.renewedAt ?? this.deps.now(),
+			};
+		});
+	}
+
+	/**
 	 * Holds the lock. Re-reads the file: another process may have refreshed
 	 * while this one waited. On `invalid_grant` the file is read once more and
 	 * a refresh token another writer saved meanwhile is tried once; otherwise
-	 * the grant is gone and the session is removed.
+	 * the grant is gone and the session is removed. `force` refreshes even
+	 * when a good access token is stored (a renewal).
 	 */
-	private async refreshLocked(resource: string): Promise<Attempt> {
+	private async refreshLocked(resource: string, force = false): Promise<Attempt> {
 		let session = readSession(this.dir);
 		if (!session) throw new SessionExpiredError(EXPIRED_MESSAGE);
 		// Another process may have replaced the session meanwhile.
 		if (!session.resources.includes(resource)) throw new ResourceNotGrantedError(resource);
-		const ready = await this.validToken(session, resource);
+		const ready = force ? null : await this.validToken(session, resource);
 		if (ready) return { token: ready };
 		for (let retried = false; ; retried = true) {
 			try {
@@ -425,6 +491,7 @@ export class IdentitySession {
 				? await seal(this.dir, tokens.refreshToken)
 				: session.refreshToken,
 			access,
+			renewedAt: now,
 		});
 		this.cache.set(`${session.generation} ${resource}`, {
 			token: tokens.accessToken,
@@ -453,6 +520,7 @@ export class IdentitySession {
 		const refreshToken = tokens.refreshToken;
 		const previous = await withFileLock(this.lockPath, async () => {
 			const old = readSession(this.dir);
+			const now = this.deps.now();
 			const fresh: SessionFile = {
 				version: 1,
 				issuer,
@@ -464,9 +532,11 @@ export class IdentitySession {
 				access: {
 					[resource]: {
 						token: await seal(this.dir, tokens.accessToken),
-						expiresAt: this.deps.now() + tokens.expiresIn * 1000,
+						expiresAt: now + tokens.expiresIn * 1000,
 					},
 				},
+				// A new grant counts as used now.
+				renewedAt: now,
 			};
 			writeSession(this.dir, fresh);
 			return old;

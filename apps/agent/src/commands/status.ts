@@ -1,4 +1,5 @@
-// `tunelo status`: the version, the account, where the machine stands with
+// `tunelo status`: the version, the account and when its sign-in was last
+// renewed (never a token), where the machine stands with
 // Chat, the tunnel and Localman, the background service, when Chat last
 // listed the account's devices, and the tunnels running here. Exits 1 when
 // the background service does not answer (the Windows restart loop and the
@@ -27,6 +28,11 @@ export function ago(at: number, now = Date.now()): string {
   return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
 }
 
+/** When the sign-in was last renewed: the IdP ends a grant unused for 30 days. */
+export function renewedLine(renewedAt: number | undefined, now = Date.now()): string {
+  return `Sign-in last renewed: ${renewedAt === undefined ? "never" : ago(renewedAt, now)}`;
+}
+
 /** The lines about the machine itself, from the running service's status. */
 export function machineLines(service: ServiceStatus | undefined, pid: string): string[] {
   if (!service) return ["Background service: not running (`tunelo login` starts it)"];
@@ -52,7 +58,8 @@ export async function status(options: { json?: boolean }): Promise<number> {
   } catch {
     apps = storedReport(new ConfigStore(dir), session);
   }
-  const account = info ? { issuer: info.issuer, sub: info.sub } : null;
+  const renewedAt = session.lastRenewedAt();
+  const account = info ? { issuer: info.issuer, sub: info.sub, renewedAt: renewedAt ?? null } : null;
 
   if (options.json || process.stdout.isTTY !== true) {
     // Scripts wait for this to succeed: no service, nothing on stdout.
@@ -70,6 +77,7 @@ export async function status(options: { json?: boolean }): Promise<number> {
   } catch (err) {
     console.log(`Account: ${info?.sub ?? "not signed in"} (could not reach the tunnel server: ${(err as Error).message})`);
   }
+  if (info) console.log(renewedLine(renewedAt));
   if (info && info.clientId !== AGENT_CLIENT_ID) console.log("This sign-in covers the tunnel only: run `tunelo login` once for Chat and Localman too.");
   for (const line of describeApps(apps)) console.log(line);
   const servicePid = service ? controlPid(dir) : undefined;

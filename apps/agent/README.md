@@ -68,7 +68,7 @@ nằm ngoài phạm vi hiện tại.
 |---|---|
 | `tunelo login` | Đăng nhập một lần cho tunnel, Chat và Localman, cài dịch vụ nền, đợi máy vào AI Agent rồi báo đã kết nối. Chạy lại khi đã kết nối thì chỉ kiểm |
 | `tunelo logout` [`--force`] | Gỡ máy khỏi tài khoản (Chat, liên kết Localman), dừng dịch vụ nền, xoá đăng nhập; giữ binary và khoá máy, nên `login` lại giữ mục máy cũ. Mất mạng thì không đổi gì, trừ khi có `--force` |
-| `tunelo status` [`--json`] | Phiên bản, tài khoản, trạng thái tunnel/Chat/Localman, dịch vụ nền, máy trong AI Agent, số thiết bị tin cậy, tunnel đang chạy; thoát 1 khi dịch vụ không chạy |
+| `tunelo status` [`--json`] | Phiên bản, tài khoản, lần gia hạn đăng nhập gần nhất (`account.renewedAt` trong `--json`, không bao giờ in token), trạng thái tunnel/Chat/Localman, dịch vụ nền, máy trong AI Agent, số thiết bị tin cậy, tunnel đang chạy; thoát 1 khi dịch vụ không chạy |
 | `tunelo update` (`--check`, `--rollback`) | Cài bản ký mới nhất rồi khởi động lại (cũng làm được từ trang máy trong Chat). Tải file nén, kiểm SHA-256 và chữ ký minisign của file nén và của từng file trong đó rồi mới thay. `--rollback` đưa về bản mà lần `update` trước đã thay (kiểm lại chữ ký), terminal đang mở giữ nguyên |
 | `tunelo uninstall` | `logout` (mất mạng thì cảnh báo và đi tiếp), rồi gỡ dịch vụ nền, thư mục cấu hình, mục Keychain, dòng PATH và binary (mục "Gỡ") |
 | `tunelo logs` [`-n <số dòng>`] [`-f`] | Log của dịch vụ (`agent.log` trong thư mục cấu hình) |
@@ -76,6 +76,12 @@ nằm ngoài phạm vi hiện tại.
 | `tunelo kill <pid\|subdomain\|all>` | Đóng tunnel |
 | `tunelo watch [đích]` | Xem request của tunnel |
 | `tunelo config` (`--show`, `-s`, `-k`) | Cấu hình mặc định của tunnel |
+
+Đăng nhập của máy (grant ở IdP) chết nếu 30 ngày không được làm mới, mà tunnel nối liền thì không xin token. Vì vậy dịch vụ nền
+tự gia hạn khoảng mỗi 24 giờ (±2 giờ ngẫu nhiên; lúc khởi động, grant chưa gia hạn trong ngày được gia hạn sau vài phút), dưới
+cùng khoá `session.lock` với mọi lần làm mới khác và bỏ qua khi tiến trình khác vừa gia hạn trong 20 giờ
+([`src/identity/session-renewal.ts`](src/identity/session-renewal.ts)). Lỗi mạng thử lại sau 1 phút, nhân đôi tới 1 giờ. Grant đã
+chết hoặc bị thu hồi thì ngừng, ghi log và tunnel hiện `sign-in`: chạy `tunelo login` (không tự đăng nhập lại).
 
 Lệnh ẩn khỏi help nhưng vẫn chạy:
 
