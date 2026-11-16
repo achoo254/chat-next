@@ -262,7 +262,12 @@ export class OfficeThread {
   subagentReport(r: SubagentReport, at: number): void {
     this.recordsDue = Math.max(0, this.recordsDue - 1);
     for (const s of r.subagents) {
-      if (s.finished && s.updatedAt > 0 && s.updatedAt < this.builtAt - STALE_SUBAGENT_MS) continue;
+      if (s.finished && s.updatedAt > 0 && s.updatedAt < this.builtAt - STALE_SUBAGENT_MS) {
+        // Not brought in, but one the journal already put in learns its kind: the journal does not keep it, and
+        // the agent's memory of it is gone after a restart (else it would be a nameless "new employee").
+        if (this.tracker.has(s.toolUseId)) this.tracker.subagentStart({ toolId: s.toolUseId, agentType: s.agentType, description: s.description, background: s.background }, at);
+        continue;
+      }
       this.tracker.subagentStart(
         {
           toolId: s.toolUseId,

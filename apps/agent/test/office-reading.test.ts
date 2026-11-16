@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { ThreadState, ThreadSummarySchema } from "@achoo254/chat-proto/remote/remote";
+import { ItemSchema, ThreadState, ThreadSummarySchema } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { readLinesUntil } from "../src/office/office-bounded-lines.ts";
 import { OfficeProblems, errorKind } from "../src/office/office-problem-log.ts";
@@ -103,6 +103,21 @@ describe("when the subagents' records are read", () => {
     expect(t.wantsSubagentRecords()).toBe(true);
     t.setSummary(summary({}), 5);
     expect(t.wantsSubagentRecords()).toBe(false);
+  });
+
+  it("a subagent the journal brought in learns its kind from an old finished record (the agent's memory was lost on a restart)", () => {
+    // Built an hour after the subagent finished, while the session still runs elsewhere, from a journal item that keeps no kind.
+    const hour = 3_600_000;
+    const built = new OfficeThread("t1", true, Object.assign(new OfficeMemory(), { sessionIds: new Map([["t1", "session-1"]]) }), hour);
+    const item = create(ItemSchema, { id: "sub:a1", at: 1_000n, body: { case: "subagent", value: { toolId: "a1", description: "Review", done: true } } });
+    built.seed([item], summary({ busyElsewhere: true }), hour);
+    expect(built.tracker.snapshot().actors.find((a) => a.id === "a1")?.agentType).toBe("");
+    const record = { toolUseId: "a1", parentToolUseId: "", workflowId: "", agentType: "code-reviewer", description: "Review", background: true, spawnDepth: 1, finished: true, updatedAt: 2_000, tools: [] };
+    built.subagentReport({ subagents: [record], usage: [] }, hour + 1);
+    expect(built.tracker.snapshot().actors.find((a) => a.id === "a1")?.agentType).toBe("code-reviewer");
+    // One the journal never brought in is still left out.
+    built.subagentReport({ subagents: [{ ...record, toolUseId: "gone" }], usage: [] }, hour + 2);
+    expect(built.tracker.snapshot().actors.some((a) => a.id === "gone")).toBe(false);
   });
 
   it("never without the AI's session id", () => {
