@@ -363,6 +363,8 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 	// The office of a session (tunelo 3.6.0): the e2e reads it as window.__fakeOffice.
 	const office = new FakeOffice(machine);
 	(window as unknown as { __fakeOffice?: FakeOffice }).__fakeOffice = office;
+	// The machine itself, for the office e2e to drop its link and keep it down (sockets, unreachable).
+	(window as unknown as { __fakeMachine?: FakeMachine }).__fakeMachine = machine;
 	const officeDemo = new URLSearchParams(window.location.search).has("office") || window.location.pathname.endsWith("/office");
 	/** Uploads named "stall-…": pieces past this many bytes are never acknowledged. */
 	const stalled = new Map<string, number>();

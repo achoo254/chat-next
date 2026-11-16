@@ -242,12 +242,16 @@ class Office {
 					start("director", activity("t4", "Bash", G.MACHINE, R.SERVER, "rm")),
 					approval("director", OfficeApprovalState.WAITING),
 					this.sessionWith({ waitingForUser: true }),
+					// The nested subagent's first tool ends its arrival (as on the machine).
+					start("s-nested", activity("n1-grep", "Grep", G.READ, R.LIBRARY)),
 				);
 			case 11:
 				return this.emit(
 					approval("director", OfficeApprovalState.DENIED),
 					this.sessionWith({ waitingForUser: false }),
 					end("director", "t4", false),
+					// Between its tools the nested subagent sits in the meeting room.
+					end("s-nested", "n1-grep"),
 				);
 			case 12:
 				// The tunelo MCP (a message to the user): the lobby.
