@@ -1,6 +1,7 @@
 // RPC surface the core uses, typed by the generated Connect services so the
 // production client and the test fake implement the same contract.
 import { Code, ConnectError, createClient, type Client, type Transport } from "@connectrpc/connect";
+import { AdvisorService } from "@achoo254/chat-proto/advisor";
 import { ChatsService } from "@achoo254/chat-proto/chats";
 import { ConfigService } from "@achoo254/chat-proto/config";
 import { MediaService } from "@achoo254/chat-proto/media";
@@ -55,6 +56,8 @@ export interface RemoteApi {
 	readonly config?: Pick<Client<typeof ConfigService>, "getAppConfig">;
 	/** Message search on the server (R4). */
 	readonly search?: Pick<Client<typeof SearchService>, "searchMessages" | "searchChatMessages">;
+	/** The user's Advisor profile. */
+	readonly advisor?: Pick<Client<typeof AdvisorService>, "getAdvisorProfile" | "setAdvisorProfile">;
 }
 
 export function createRemoteApi(transport: Transport): RemoteApi {
@@ -67,6 +70,7 @@ export function createRemoteApi(transport: Transport): RemoteApi {
 		media: createClient(MediaService, transport),
 		config: createClient(ConfigService, transport),
 		search: createClient(SearchService, transport),
+		advisor: createClient(AdvisorService, transport),
 	};
 }
 

@@ -335,6 +335,16 @@ export const MIGRATIONS: readonly Migration[] = [
 			"ALTER TABLE uploads ADD COLUMN paused INTEGER NOT NULL DEFAULT 0",
 		],
 	},
+	{
+		version: 15,
+		statements: [
+			// The user's Advisor profile (JSON of AdvisorProfile); no row until fetched.
+			`CREATE TABLE advisor_profile (
+				id INTEGER PRIMARY KEY CHECK (id = 1),
+				profile TEXT NOT NULL
+			)`,
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

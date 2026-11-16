@@ -127,6 +127,8 @@ type ThreadMeta = {
   history?: { sessionId: string; end: number };
   /** Hidden from the list on every device (ThreadSetArchived). */
   archived?: boolean;
+  /** The session's automatic Advisor is on (ThreadSetAdvisor); unset when off. */
+  advisor?: boolean;
   /**
    * The running totals the AI last reported for the session `sessionId`
    * (API time, cost at API prices): a turn's share is what they grew by.
@@ -327,6 +329,11 @@ export type CoreOptions = {
   onSessionAccount?: (threadId: string) => void;
   /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
+  /**
+   * Whether the machine runs its sessions with tunelo's MCP now (it may turn
+   * it off); whether `sessionMcp` is given when unset.
+   */
+  sessionMcpEnabled?: () => boolean;
   /** A session reported plan usage for its account ("" for the AI's own sign-in). */
   onAccountUsage?: (provider: string, id: string, rateLimits: NonNullable<ProviderInfo["rateLimits"]>) => void;
   /** A session this machine opened (chat, resume, terminal) has this id of its AI; may come more than once. */
@@ -594,6 +601,8 @@ export class AgentCore {
       linesRemoved: t.info.linesRemoved ?? 0,
       commands: t.info.commands?.length ? t.info.commands : this.commandsFor(t),
       effort: t.info.effort ?? "",
+      // On only where the session can reach Advisor now (its AI, the machine's MCP); the wish is kept either way.
+      advisor: t.meta.advisor === true && this.advisorAvailable(t.meta.provider),
       permissionModes: this.permissionModes(t),
       accountId,
       machineAccountId: machineAccountId ?? "",
@@ -1078,8 +1087,8 @@ export class AgentCore {
   /**
    * `/clear`: the AI forgets the conversation, so the thread must not keep
    * showing it as if it were still in context. Another thread opens in the
-   * same folder on the same AI, model, effort, permission mode and project
-   * settings, with an empty journal; the old thread stays as history. Nothing
+   * same folder on the same AI, model, effort, permission mode, automatic
+   * Advisor and project settings, with an empty journal; the old thread stays as history. Nothing
    * is typed into the old session, and an idle one is parked.
    */
   async clear(threadId: string): Promise<ThreadSummary> {
@@ -1093,6 +1102,7 @@ export class AgentCore {
     });
     if (old.meta.effort) next.meta.effort = old.meta.effort;
     if (old.meta.permissionMode) next.meta.permissionMode = old.meta.permissionMode;
+    if (old.meta.advisor) next.meta.advisor = true;
     this.saveMeta(next);
     if (!old.running) await this.park(old);
     this.touch(old);
@@ -1635,6 +1645,43 @@ export class AgentCore {
     t.info.effort = effort;
     this.saveMeta(t);
     for (const fn of this.infoListeners) fn(t.meta.id);
+  }
+
+  /**
+   * Turns the session's automatic Advisor on or off; kept with the thread.
+   * Turning it on needs an AI whose sessions take tunelo's MCP and a machine
+   * that runs them with it; turning it off always works.
+   */
+  setAdvisor(threadId: string, on: boolean, device: string): void {
+    const t = this.thread(threadId);
+    if (on && !this.advisorAvailable(t.meta.provider)) {
+      throw new AgentError(ErrorCode.INVALID, "Advisor needs tunelo's MCP in this AI's sessions on this machine", {
+        reason: ErrorReason.ADVISOR_UNAVAILABLE,
+        subject: t.meta.provider,
+      });
+    }
+    if ((t.meta.advisor === true) === on) return;
+    if (on) t.meta.advisor = true;
+    else delete t.meta.advisor;
+    this.saveMeta(t);
+    this.opts.audit.write({ device, action: on ? "advisor_on" : "advisor_off", path: t.meta.dir, detail: t.meta.id });
+    for (const fn of this.infoListeners) fn(t.meta.id);
+  }
+
+  /** The thread's automatic Advisor is on; false for an unknown thread. */
+  advisorOn(threadId: string): boolean {
+    return this.threads.get(threadId)?.meta.advisor === true;
+  }
+
+  /** Sessions of this AI can ask Advisor: the AI takes tunelo's MCP and the machine runs its sessions with it. */
+  advisorAvailable(providerId: string): boolean {
+    const ai = this.opts.providers.find((p) => p.id === providerId);
+    return ai?.capabilities.sessionMcp === true && this.sessionMcpEnabled();
+  }
+
+  /** The machine runs its sessions with tunelo's MCP now. */
+  sessionMcpEnabled(): boolean {
+    return this.opts.sessionMcpEnabled?.() ?? this.opts.sessionMcp !== undefined;
   }
 
   /** Modes a device may pick: the AI's safe ones, plus bypass only when the machine itself starts there. */

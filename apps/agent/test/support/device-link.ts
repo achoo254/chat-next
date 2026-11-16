@@ -17,6 +17,7 @@ import type { RemoteBrowser } from "../../src/remote-browser/remote-browser.ts";
 import type { ScreenShare } from "../../src/screen-share/screen-share.ts";
 import type { Workspaces } from "../../src/workspace/workspaces.ts";
 import type { UsageApi } from "../../src/link/usage-link.ts";
+import type { AdvisorKeyStore } from "../../src/advisor/advisor-key-store.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -41,6 +42,8 @@ export async function pairedDevice(ctx: {
   screenShare?: ScreenShare;
   workspaces?: Workspaces;
   usage?: UsageApi;
+  advisorKeys?: AdvisorKeyStore;
+  onAdvisorKey?: () => void;
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -67,6 +70,8 @@ export async function pairedDevice(ctx: {
       ...(ctx.screenShare ? { screenShare: ctx.screenShare } : {}),
       ...(ctx.workspaces ? { workspaces: ctx.workspaces } : {}),
       ...(ctx.usage ? { usage: ctx.usage } : {}),
+      ...(ctx.advisorKeys ? { advisorKeys: ctx.advisorKeys } : {}),
+      ...(ctx.onAdvisorKey ? { onAdvisorKey: ctx.onAdvisorKey } : {}),
       machineKey: () => machineKey,
       trust: new DeviceTrust({ config: ctx.config }),
       machineInfo:

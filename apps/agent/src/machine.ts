@@ -41,6 +41,8 @@ import { Projects } from "./projects/projects.ts";
 import { writeCommitMessage } from "./workspace/commit-message.ts";
 import { Workspaces } from "./workspace/workspaces.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
+import { AdvisorKeyStore } from "./advisor/advisor-key-store.ts";
+import { redact } from "./mcp/redact.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
 import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 import { ScreenShare } from "./screen-share/screen-share.ts";
@@ -94,6 +96,8 @@ export class Machine {
   readonly isSensitive: (p: string) => boolean;
   readonly projects: Projects;
   readonly secrets: SecretService;
+  /** Advisor's TypeSafe key, apart from the sign-in secrets (no session reaches it). */
+  readonly advisorKeys: AdvisorKeyStore;
   readonly browser: RemoteBrowser;
   readonly screenShare: ScreenShare;
   readonly terminal: TerminalService;
@@ -129,6 +133,7 @@ export class Machine {
     this.isSensitive = createSensitiveCheck({ configDir: dir });
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
     this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
+    this.advisorKeys = new AdvisorKeyStore({ configDir: dir, audit: this.audit, log: this.log });
     this.browser = opts.browser ?? new RemoteBrowser({ configDir: dir, audit: this.audit, log: this.log });
     this.screenShare = opts.screenShare ?? new ScreenShare({ audit: this.audit, log: this.log });
     this.updater = new AgentUpdater({
@@ -218,6 +223,7 @@ export class Machine {
       },
       onSessionId: (provider, sessionId) => this.usage.launched.add(provider, sessionId),
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
+      sessionMcpEnabled: () => this.sessionMcpEnabled(),
     });
     for (const p of withAccounts(this.providers)) {
       p.accounts?.listen({ onSelect: () => this.core.followMachineAccount(p.id), onChange: () => this.announceAccounts() });
@@ -329,6 +335,7 @@ export class Machine {
     this.core.start();
     // Saved values are hidden from every output from the start, not only once used.
     void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
+    void this.advisorKeys.loadForRedaction().catch((err: unknown) => this.log(`advisor: ${redact((err as Error).message)}`));
     for (const p of this.providers) void p.accounts?.cleanLeftovers?.();
     for (const p of this.providers) p.accounts?.watch?.();
     this.browser.start();
@@ -525,6 +532,8 @@ export class Machine {
             req,
           ),
         usage: this.usageApi,
+        advisorKeys: this.advisorKeys,
+        onAdvisorKey: () => this.advisorKeyChanged(),
         openDiskAccessSettings: () => this.openDiskAccessSettings(),
         onPing: () => (this.lastPing = Date.now()),
       },
@@ -628,7 +637,28 @@ export class Machine {
       screenShare: this.screenShare.supported,
       agentUpdate: this.updater.info(),
       terminal: this.terminal.availability(),
+      advisor: { available: this.sessionMcpEnabled(), ...this.advisorStatus() },
     });
+  }
+
+  /** Sessions run with tunelo's MCP: the service has one and the machine did not turn it off. */
+  private sessionMcpEnabled(): boolean {
+    return this.opts.mcp !== undefined && this.config.get().sessionMcp !== false;
+  }
+
+  private advisorStatus(): { keySet: boolean; keyFingerprint: string; setByDevice: string; setAt: bigint } {
+    const s = this.advisorKeys.status();
+    return { keySet: s.keySet, keyFingerprint: s.fingerprint, setByDevice: s.setByDevice, setAt: BigInt(s.setAt) };
+  }
+
+  /**
+   * Advisor's key was set or removed (from a device, or `tunelo advisor` on
+   * the machine): the key is hidden from this process's output from now on
+   * and every connected device hears the machine's info again.
+   */
+  advisorKeyChanged(): void {
+    void this.advisorKeys.loadForRedaction().catch((err: unknown) => this.log(`advisor: ${redact((err as Error).message)}`));
+    void this.announceInfo();
   }
 
   /** Watches for the owner granting Full Disk Access while it is missing. */

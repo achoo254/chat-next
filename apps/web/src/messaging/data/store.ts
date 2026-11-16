@@ -3,6 +3,7 @@
 // Components subscribe to narrow keys with useSyncExternalStore, so a new
 // message re-renders its own item and its dialog row, not the whole screen.
 import {
+	DEFAULT_ADVISOR_PROFILE,
 	DEFAULT_NOTIFICATION_SETTINGS,
 	EventKeys,
 	isMuted,
@@ -16,6 +17,7 @@ import {
 	type HistoryRequest,
 	type MediaLimits,
 	type NotificationSettings,
+	type AdvisorProfile,
 	type PendingMessage,
 	type ScreenSnapshot,
 	type StoredMessage,
@@ -194,6 +196,8 @@ export class ChatStore {
 	private settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 	private totals: UnreadTotals = { messages: 0, chats: 0 };
 	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
+	private advisor: AdvisorProfile = DEFAULT_ADVISOR_PROFILE;
+	private readonly advisorRefresh = new Coalescer(() => this.loadAdvisor());
 	private muteTimer: ReturnType<typeof setTimeout> | undefined;
 	private listStatus: ListStatus = "loading";
 	private readonly users = new Map<number, User>();
@@ -251,6 +255,7 @@ export class ChatStore {
 		this.unsubscribe = source.events.subscribeBatches((keys) => this.onKeys(keys));
 		this.dialogRefresh.run();
 		this.settingsRefresh.run();
+		this.advisorRefresh.run();
 		this.limitsRefresh.run();
 		this.refreshConnection();
 	}
@@ -310,6 +315,7 @@ export class ChatStore {
 			else if (key === "connection") this.refreshConnection();
 			else if (key === EventKeys.typing) this.loadTyping();
 			else if (key === EventKeys.notificationSettings) this.settingsRefresh.run();
+			else if (key === EventKeys.advisorProfile) this.advisorRefresh.run();
 		}
 		if (dialogs) this.dialogRefresh.run();
 		for (const chatId of histories) {
@@ -534,6 +540,36 @@ export class ChatStore {
 		this.settings = settings;
 		this.emit("settings");
 		if (badgeChanged) this.refreshEntries();
+	}
+
+	// ------------------------------------------------------------- Advisor profile
+
+	/** The user's Advisor profile (the defaults until it loads). */
+	advisorProfile(): AdvisorProfile {
+		return this.advisor;
+	}
+
+	/** Changes the Advisor profile on the server; the store follows the saved result. */
+	async setAdvisorProfile(change: Partial<AdvisorProfile>): Promise<AdvisorProfile> {
+		const saved = await this.source.setAdvisorProfile(change);
+		if (!this.disposed) this.applyAdvisor(saved);
+		return saved;
+	}
+
+	private async loadAdvisor(): Promise<void> {
+		try {
+			const profile = await this.source.advisorProfile();
+			if (!this.disposed) this.applyAdvisor(profile);
+		} catch (err) {
+			this.reportError(err, "advisor profile");
+		}
+	}
+
+	private applyAdvisor(profile: AdvisorProfile): void {
+		const a = this.advisor;
+		if (profile.name === a.name && profile.lookId === a.lookId && profile.tone === a.tone) return;
+		this.advisor = profile;
+		this.emit("advisor");
 	}
 
 	/** Rebuilds the list entries and folder counts; listeners hear only of real changes. */

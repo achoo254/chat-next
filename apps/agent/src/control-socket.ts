@@ -165,6 +165,15 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     const call = mcpCall.parse(input);
     return t.mcp.call(call.session, call.group, call.tool, call.args ?? {});
   },
+  /**
+   * `tunelo advisor set-key|remove-key` changed Advisor's key in its own
+   * store: the service hides it from its output and tells every device. The
+   * key itself never goes through this channel.
+   */
+  "POST /advisor/changed": (t) => {
+    machineOf(t).advisorKeyChanged();
+    return { announced: true };
+  },
   /** A stream's holder is still there (see streamControl). */
   "POST /streams/alive": (t, input) => {
     const { id } = streamAlive.parse(input);

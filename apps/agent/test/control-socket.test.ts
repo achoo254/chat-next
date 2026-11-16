@@ -32,6 +32,7 @@ let local: http.Server;
 let localPort = 0;
 const answers: string[] = [];
 
+let advisorChanges = 0;
 let forwardOn = true;
 let forwardBlocked: number[] = [];
 
@@ -44,6 +45,9 @@ function fakeMachine(): Machine {
       setTrusted: (d: string) => d,
     },
     audit: { write: () => undefined, list: () => [] },
+    advisorKeyChanged: () => {
+      advisorChanges++;
+    },
     localForward: {
       state: () => ({ enabled: forwardOn, available: false, blockedPorts: forwardBlocked }),
       setEnabled: (on: boolean) => {
@@ -114,6 +118,7 @@ describe("control socket", () => {
       [
         "GET /apps",
         "GET /local-forward",
+        "POST /advisor/changed",
         "GET /status",
         "GET /trust",
         "GET /tunnels",
@@ -129,6 +134,12 @@ describe("control socket", () => {
       ].sort(),
     );
     expect(Object.keys(CONTROL_STREAMS).sort()).toEqual(["POST /mcp/session", "POST /tunnels/open"]);
+  });
+
+  test("advisor/changed tells the service Advisor's key changed; it takes and returns no key", async () => {
+    const before = advisorChanges;
+    expect(await call("POST", "/advisor/changed")).toEqual({ announced: true });
+    expect(advisorChanges).toBe(before + 1);
   });
 
   test("refuses a caller without the token of control.json", async () => {

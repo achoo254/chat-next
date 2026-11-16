@@ -45,9 +45,12 @@ import type {
 	Update as WireUpdate,
 } from "@achoo254/chat-proto/updates";
 import type { User as WireUser } from "@achoo254/chat-proto/users";
+import { AdvisorTone as WireAdvisorTone, type AdvisorProfile as WireAdvisorProfile } from "@achoo254/chat-proto/advisor";
 import { assertSafeId } from "../ids/index.ts";
 import { toBase64 } from "../media/codec.ts";
 import type {
+	AdvisorProfile,
+	AdvisorTone,
 	Chat,
 	ChatDifference,
 	ChatSyncState,
@@ -377,6 +380,33 @@ export function toWireSound(sound: NotificationSound): WireSound {
 	return WIRE_SOUNDS[sound];
 }
 
+const ADVISOR_TONES: Record<number, AdvisorTone> = {
+	[WireAdvisorTone.SHORT]: "short",
+	[WireAdvisorTone.FUN]: "fun",
+	[WireAdvisorTone.SERIOUS]: "serious",
+};
+
+const WIRE_ADVISOR_TONES: Record<AdvisorTone, WireAdvisorTone> = {
+	short: WireAdvisorTone.SHORT,
+	fun: WireAdvisorTone.FUN,
+	serious: WireAdvisorTone.SERIOUS,
+};
+
+export function toAdvisorProfile(profile: WireAdvisorProfile): AdvisorProfile {
+	return {
+		name: profile.name,
+		// An empty look (not from this server) shows the default one; the UI maps unknown ids itself.
+		lookId: profile.lookId || "owl",
+		// A tone this client does not know words answers the default way.
+		tone: ADVISOR_TONES[profile.tone] ?? "short",
+	};
+}
+
+/** Protocol tone from a client tone. */
+export function toWireAdvisorTone(tone: AdvisorTone): WireAdvisorTone {
+	return WIRE_ADVISOR_TONES[tone];
+}
+
 /** Client entity from a protocol entity; unknown types become "unknown". */
 export function fromWireEntity(entity: WireEntity): MessageEntity {
 	const type = ENTITY_TYPES[entity.type] ?? "unknown";
@@ -623,6 +653,10 @@ function toBody(update: WireUpdate): UpdateBody {
 		case "agentProjectsChanged":
 			// A content-free hint to list the AI Agent projects again; nothing for the chat store.
 			return { kind: "agent_projects_changed" };
+		case "advisorProfile": {
+			const profile = kind.value.profile;
+			return profile === undefined ? { kind: "unknown" } : { kind: "advisor_profile", profile: toAdvisorProfile(profile) };
+		}
 		case "userChanged":
 		case undefined:
 			// userChanged: the changed user comes with the frame's users, which every frame stores.

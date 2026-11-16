@@ -82,8 +82,17 @@ export function mentionsSensitive(
   // out), uninstalling, starting, stopping or running the service, trusting
   // a folder's settings, and every `tunelo config` (the default server and
   // token with -s/-k, local forwarding, MCP writes from outside tunelo's
-  // sessions).
-  if (/\btunelo(\.exe)?\s+(login|logout|uninstall|trust|untrust|config|start|stop|run)\b/i.test(text)) return true;
+  // sessions), and `tunelo advisor` (Advisor's key).
+  if (/\btunelo(\.exe)?\s+(login|logout|uninstall|trust|untrust|config|start|stop|run|advisor)\b/i.test(text)) return true;
+  // macOS's `security` reading or exporting tunelo's Keychain items (the
+  // sealing key behind its saved secrets and Advisor's key), or dumping the
+  // whole keychain.
+  if (/\bsecurity\s+[a-z-]+\b[^\n]*\bcom\.hoandat\.tunelo\b/i.test(text)) return true;
+  if (/\bsecurity\s+(dump-keychain|export)\b/i.test(text)) return true;
+  // Printing any password item (-w: the password, -g: the item with it), or
+  // naming tunelo's items by account alone (session-key, machine-key).
+  if (/\bsecurity\s+find-(generic|internet)-password\b[^\n]*\s-[a-zA-Z]*[wg]\b/.test(text)) return true;
+  if (/\bsecurity\s+[a-z-]+\b[^\n]*\b(session-key|machine-key)\b/i.test(text)) return true;
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")

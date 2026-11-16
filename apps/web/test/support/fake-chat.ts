@@ -1567,6 +1567,8 @@ export function toSource(core: ChatCore): ChatSource {
 		botKeyboard: (chatId, botId) => core.botKeyboard(chatId, botId),
 		notificationSettings: () => core.notificationSettings(),
 		setNotificationSettings: (change) => core.setNotificationSettings(change),
+		advisorProfile: () => core.advisorProfile(),
+		setAdvisorProfile: (change) => core.setAdvisorProfile(change),
 		pinnedMessages: (chatId, request) => core.pinnedMessages(chatId, request),
 		unpinAllMessages: (chatId, topicId) => core.unpinAllMessages(chatId, topicId),
 		onlineCount: (chatId) => core.onlineCount(chatId),

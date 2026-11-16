@@ -3,6 +3,7 @@
 // is asynchronous); tests wrap an in-process ChatCore. Fast-changing data is
 // never passed through React context: components subscribe to ChatStore.
 import type {
+	AdvisorProfile,
 	AlbumItemInput,
 	Chat,
 	ChatTyping,
@@ -53,6 +54,10 @@ export interface ChatSource {
 	botKeyboard(chatId: number, botId: number): Promise<StoredMessage | null>;
 	notificationSettings(): Promise<NotificationSettings>;
 	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
+	/** The user's Advisor profile, synced from the server (the defaults when it cannot be read yet). */
+	advisorProfile(): Promise<AdvisorProfile>;
+	/** Changes some fields of the Advisor profile (online only); returns all of them. */
+	setAdvisorProfile(change: Partial<AdvisorProfile>): Promise<AdvisorProfile>;
 	/** Pinned messages of a chat or forum topic, newest first (online only). */
 	pinnedMessages(chatId: number, request?: PinnedMessagesRequest): Promise<PinnedMessagesPage>;
 	unpinAllMessages(chatId: number, topicId?: number): Promise<void>;

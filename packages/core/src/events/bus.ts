@@ -21,6 +21,8 @@ export const EventKeys = {
 	notificationSettings: "notification_settings",
 	/** The user's AI Agent projects changed on the server (list them again). */
 	agentProjects: "agent_projects",
+	/** The user's Advisor profile changed. */
+	advisorProfile: "advisor_profile",
 	outbox: "outbox",
 	connection: "connection",
 	/** Who is typing changed (ChatCore.typing). */

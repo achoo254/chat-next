@@ -6,7 +6,7 @@ import { ClientPlatform } from "@achoo254/chat-proto/auth";
 import { databaseName, type SessionEndReason } from "../auth/web.ts";
 import { EventBus, EventKeys } from "../events/bus.ts";
 import { assertSafeId } from "../ids/index.ts";
-import type { Chat, ChatTyping, Message, MessageEntity, NotificationSettings, PinnedMessagesPage, TypingAction, User } from "../model/types.ts";
+import type { AdvisorProfile, Chat, ChatTyping, Message, MessageEntity, NotificationSettings, PinnedMessagesPage, TypingAction, User } from "../model/types.ts";
 import {
 	Outbox,
 	OutboxError,
@@ -124,6 +124,10 @@ export interface ChatCore {
 	notificationSettings(): Promise<NotificationSettings>;
 	/** Changes some notification settings (online only); returns all of them. */
 	setNotificationSettings(change: Partial<NotificationSettings>): Promise<NotificationSettings>;
+	/** The user's Advisor profile, synced from the server. */
+	advisorProfile(): Promise<AdvisorProfile>;
+	/** Changes some fields of the Advisor profile (online only); returns all of them. */
+	setAdvisorProfile(change: Partial<AdvisorProfile>): Promise<AdvisorProfile>;
 	/** A page of the chat's (or a topic's) pinned messages, newest first (online only). */
 	pinnedMessages(chatId: number, request?: PinnedMessagesRequest): Promise<PinnedMessagesPage>;
 	/** Unpins every pinned message of the chat, or of one forum topic (online only). */
@@ -676,6 +680,14 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		setNotificationSettings: async (change) => {
 			active();
 			return actions.setNotificationSettings(change);
+		},
+		advisorProfile: async () => {
+			active();
+			return actions.advisorProfile();
+		},
+		setAdvisorProfile: async (change) => {
+			active();
+			return actions.setAdvisorProfile(change);
 		},
 		pinnedMessages: async (chatId, request) => {
 			active();

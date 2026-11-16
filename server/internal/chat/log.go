@@ -36,6 +36,8 @@ const (
 	kindUserChanged       = "user_changed"
 	// kindAgentProjectsChanged: the user's AI Agent projects changed.
 	kindAgentProjectsChanged = "agent_projects_changed"
+	// kindAdvisorProfile: the user's Advisor profile changed.
+	kindAdvisorProfile = "advisor_profile"
 	// kindInlineButton: a user pressed a bot's callback button; the row
 	// carries no log entries, the press is in bot_callbacks.
 	kindInlineButton = "inline_button"

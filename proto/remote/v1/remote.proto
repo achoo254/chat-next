@@ -319,6 +319,12 @@ message Frame {
 
     // A → B (tunelo 3.11.0+). Answered with WsGitStatusResult.
     WsGitRebase ws_git_rebase = 173;
+
+    // Advisor (Cố vấn); only to a machine whose MachineInfo.advisor is set.
+    // See "advisor" below. A → B
+    ThreadSetAdvisor thread_set_advisor = 174;
+    AdvisorSetKey advisor_set_key = 175;
+    AdvisorRemoveKey advisor_remove_key = 176;
   }
 }
 
@@ -473,6 +479,17 @@ message ThreadSetPermissionMode {
 message ThreadSetEffort {
   string thread_id = 1;
   string effort = 2;
+}
+
+// Turns the session's automatic Advisor on or off: the AI asks Advisor when
+// it is unsure and before it ends each turn. Kept with the thread across
+// restarts, shown as ThreadInfo.advisor. Refused with
+// ERROR_REASON_ADVISOR_UNAVAILABLE when the thread's AI takes no session
+// MCP (ProviderCapabilities.session_mcp) or MachineInfo.advisor.available is
+// false. Answered with Ack; devices following the thread get ThreadInfo.
+message ThreadSetAdvisor {
+  string thread_id = 1;
+  bool on = 2;
 }
 
 message ThreadSwitch {
@@ -1063,6 +1080,8 @@ message ThreadInfo {
   // same AI has room: offer to move that AI there. Only a hint; B never
   // switches by itself. Unset otherwise.
   AccountSuggestion account_suggestion = 15;
+  // The session's automatic Advisor is on (ThreadSetAdvisor).
+  bool advisor = 16;
 }
 
 // Another account of the same AI to move to when a session's account is out
@@ -1430,6 +1449,15 @@ enum ErrorReason {
   // them, one a line. A rebase stopped for another reason is aborted too and
   // answered with git's own reason.
   ERROR_REASON_GIT_REBASE_CONFLICT = 81;
+  // ThreadSetAdvisor{on} for a thread whose AI takes no session MCP, or on a
+  // machine whose sessions run without tunelo's MCP. Nothing changed.
+  ERROR_REASON_ADVISOR_UNAVAILABLE = 82;
+  // AdvisorSetKey with an empty key, one too long, or one with spaces or
+  // control characters. The message never quotes the key.
+  ERROR_REASON_ADVISOR_KEY_INVALID = 83;
+  // AdvisorSetKey: the machine's key store could not seal the key (locked,
+  // refused). Nothing was saved.
+  ERROR_REASON_ADVISOR_KEY_NOT_SAVED = 84;
 }
 
 enum ErrorCode {
@@ -1933,6 +1961,9 @@ message MachineInfo {
   // hidden folder, so it is picked by path); empty when B does not run as its
   // installed program.
   string agent_binary = 24;
+  // Advisor on this machine; unset on machines that have none, which get no
+  // Advisor request.
+  AdvisorStatus advisor = 25;
 }
 
 enum TerminalAvailability {
@@ -2024,11 +2055,52 @@ message AuditEntry {
   // path: the workspace folder; detail: "workspace <id>" and, for stage,
   // unstage and discard, how many files ("restored N, trashed M" for
   // discard); never a file's content, a file's path, a branch or a commit
-  // message)
+  // message),
+  // advisor_key_set, advisor_key_remove (detail: the key's fingerprint, never
+  // the key), advisor_on, advisor_off (path: the thread's folder; detail: the
+  // thread id)
   string action = 3;
   string path = 4;
   string detail = 5;
 }
+
+// --- advisor ------------------------------------------------------------------
+//
+// Advisor (Cố vấn) weighs a session's options with the user's own TypeSafe
+// key, which B keeps sealed with the OS key store in a store of its own,
+// apart from the sign-in secrets: no session, command or tool of an AI ever
+// gets it. The key reaches B only in AdvisorSetKey, end-to-end encrypted,
+// never through the server; no frame from B ever carries it, only its
+// fingerprint. Every change of the key goes to every connected device as
+// MachineInfo, unasked.
+
+// What a machine offers for Advisor (MachineInfo.advisor).
+message AdvisorStatus {
+  // Sessions on this machine run with tunelo's MCP (the machine has not
+  // turned it off), so their AI can ask Advisor.
+  bool available = 1;
+  // A TypeSafe key is kept on the machine.
+  bool key_set = 2;
+  // The first 6 hex characters of the key's SHA-256; empty without a key.
+  string key_fingerprint = 3;
+  // The device that set the key ("local" for the machine's own terminal);
+  // empty without a key.
+  string set_by_device = 4;
+  // Unix milliseconds when the key was set; 0 without a key.
+  int64 set_at = 5;
+}
+
+// A → B: keep this TypeSafe key for Advisor, replacing the one kept. Answered
+// with Ack; every connected device then gets MachineInfo. Refused with
+// ERROR_REASON_ADVISOR_KEY_INVALID or ERROR_REASON_ADVISOR_KEY_NOT_SAVED.
+message AdvisorSetKey {
+  // At most 4096 characters, no spaces or control characters.
+  string key = 1;
+}
+
+// A → B: forget the TypeSafe key. Answered with Ack; every connected device
+// then gets MachineInfo. Forgetting a key that is not kept is no error.
+message AdvisorRemoveKey {}
 
 // --- sign-in secrets ----------------------------------------------------------
 //

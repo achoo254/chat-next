@@ -6,6 +6,7 @@ import type { Chat, Message, SessionRevokeReason, UpdateBody } from "../model/ty
 import { purgeChat, purgeMessages, recallMessages } from "../purge/index.ts";
 import {
 	ensureDialog,
+	putAdvisorProfile,
 	putChat,
 	putChatPts,
 	putMessage,
@@ -223,6 +224,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			return;
 		case "agent_projects_changed":
 			w.emit(EventKeys.agentProjects);
+			return;
+		case "advisor_profile":
+			putAdvisorProfile(w, body.profile);
 			return;
 		case "unknown":
 			// A kind newer than this build; the next release knows how to apply it.

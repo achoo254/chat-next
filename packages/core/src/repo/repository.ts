@@ -1,10 +1,10 @@
 // Reads of the local database and the single commit path for writes.
 import type { SqlDriver, SqlRow } from "@achoo254/chat-platform";
 import type { EventBus } from "../events/bus.ts";
-import type { Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
+import type { AdvisorProfile, Chat, Dialog, Message, NotificationSettings, SearchFilters, SyncState, User } from "../model/types.ts";
 import type { TextMatch } from "../search/index.ts";
 import { mentionsUser } from "../entities/index.ts";
-import { num, parseEntities, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
+import { num, parseAdvisorProfile, parseEntities, parseNotificationSettings, rowToChat, rowToDialog, rowToMessage, rowToUser, str } from "./rows.ts";
 import { CHAT_TOPIC, placeholders, type WriteBatch } from "./writes.ts";
 
 /** What Repository.search looks for. */
@@ -272,6 +272,12 @@ export class Repository {
 		const rows = await this.driver.query("SELECT settings FROM notification_settings WHERE id = 1");
 		const row = rows[0];
 		return row === undefined ? null : parseNotificationSettings(str(row, "settings"));
+	}
+
+	async advisorProfile(): Promise<AdvisorProfile | null> {
+		const rows = await this.driver.query("SELECT profile FROM advisor_profile WHERE id = 1");
+		const row = rows[0];
+		return row === undefined ? null : parseAdvisorProfile(str(row, "profile"));
 	}
 
 	async outbox(chatId?: number): Promise<OutboxRow[]> {

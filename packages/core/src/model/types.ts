@@ -201,6 +201,21 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 	badgeMuted: false,
 };
 
+/** How Advisor words its answers. */
+export type AdvisorTone = "short" | "fun" | "serious";
+
+/** The user's Advisor profile (AdvisorService), kept on the server and synced to every session. */
+export interface AdvisorProfile {
+	/** What the user calls their Advisor; empty for the default name in the user's language. */
+	readonly name: string;
+	/** One of the looks the client offers; an unknown one shows the first look. */
+	readonly lookId: string;
+	readonly tone: AdvisorTone;
+}
+
+/** The profile of a user who never changed it (the server's defaults). */
+export const DEFAULT_ADVISOR_PROFILE: AdvisorProfile = { name: "", lookId: "owl", tone: "short" };
+
 export type EntityType =
 	| "bold"
 	| "italic"
@@ -483,6 +498,8 @@ export type UpdateBody =
 	| { readonly kind: "notification_settings"; readonly settings: NotificationSettings }
 	/** The user's AI Agent projects changed (content-free: list them again). */
 	| { readonly kind: "agent_projects_changed" }
+	/** The user's Advisor profile after a change. */
+	| { readonly kind: "advisor_profile"; readonly profile: AdvisorProfile }
 	/** A kind added to the protocol after this client was built. */
 	| { readonly kind: "unknown" };
 

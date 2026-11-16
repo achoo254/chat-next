@@ -5,6 +5,7 @@
 import type { SqlParams, SqlStatement } from "@achoo254/chat-platform";
 import { EventKeys } from "../events/bus.ts";
 import type {
+	AdvisorProfile,
 	Chat,
 	Dialog,
 	Message,
@@ -220,6 +221,15 @@ export function putNotificationSettings(w: WriteBatch, settings: NotificationSet
 		[JSON.stringify(settings)],
 	);
 	w.emit(EventKeys.notificationSettings, EventKeys.dialogs);
+}
+
+export function putAdvisorProfile(w: WriteBatch, profile: AdvisorProfile): void {
+	w.add(
+		`INSERT INTO advisor_profile (id, profile) VALUES (1, ?)
+		ON CONFLICT (id) DO UPDATE SET profile = excluded.profile`,
+		[JSON.stringify(profile)],
+	);
+	w.emit(EventKeys.advisorProfile);
 }
 
 export function putMute(w: WriteBatch, chatId: number, muteUntil: number): void {

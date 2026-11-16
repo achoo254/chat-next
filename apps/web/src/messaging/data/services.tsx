@@ -3,7 +3,7 @@
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import type { Transport } from "@connectrpc/connect";
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@achoo254/chat-core";
+import type { AdvisorProfile, Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@achoo254/chat-core";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useCopy } from "../copy/use-copy.ts";
 import type { Bots } from "../bots/api.ts";
@@ -108,6 +108,12 @@ export function useListEntry(chatId: number): ListEntry | undefined {
 export function useNotificationSettings(): NotificationSettings {
 	const { store } = useServices();
 	return useStoreKey("settings", () => store.notificationSettings());
+}
+
+/** The user's Advisor profile, synced from the server (defaults until loaded). */
+export function useAdvisorProfile(): AdvisorProfile {
+	const { store } = useServices();
+	return useStoreKey("advisor", () => store.advisorProfile());
 }
 
 /** Unread messages and chats of the app badge. */

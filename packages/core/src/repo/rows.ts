@@ -3,6 +3,7 @@
 // an empty value instead of crashing the history view.
 import type { SqlRow, SqlValue } from "@achoo254/chat-platform";
 import type {
+	AdvisorProfile,
 	Chat,
 	ChatType,
 	Dialog,
@@ -22,7 +23,7 @@ import type {
 	ReplyKeyboard,
 	User,
 } from "../model/types.ts";
-import { DEFAULT_NOTIFICATION_SETTINGS } from "../model/types.ts";
+import { DEFAULT_ADVISOR_PROFILE, DEFAULT_NOTIFICATION_SETTINGS } from "../model/types.ts";
 import { decodeMediaRef } from "../media/codec.ts";
 
 export function num(row: SqlRow, column: string): number {
@@ -358,6 +359,19 @@ export function parseNotificationSettings(json: string | null): NotificationSett
 		channelsPreview: flagOr("channelsPreview", d.channelsPreview),
 		sound: sound === "default" || sound === "soft" || sound === "off" ? sound : d.sound,
 		badgeMuted: flagOr("badgeMuted", d.badgeMuted),
+	};
+}
+
+/** Decodes a stored Advisor profile; missing or corrupt fields take the defaults. */
+export function parseAdvisorProfile(json: string | null): AdvisorProfile {
+	const value = parseJson(json);
+	if (!isRecord(value)) return DEFAULT_ADVISOR_PROFILE;
+	const d = DEFAULT_ADVISOR_PROFILE;
+	const tone = value.tone;
+	return {
+		name: typeof value.name === "string" ? value.name : d.name,
+		lookId: typeof value.lookId === "string" && value.lookId !== "" ? value.lookId : d.lookId,
+		tone: tone === "short" || tone === "fun" || tone === "serious" ? tone : d.tone,
 	};
 }
 

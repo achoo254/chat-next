@@ -65,6 +65,13 @@ import { matchesSubstrings } from "../../src/search/index.ts";
 import { searchText } from "../../src/vifold/index.ts";
 import type { RemoteApi } from "../../src/protocol/api.ts";
 import type { MediaRef as WireMediaRef } from "@achoo254/chat-proto/media";
+import {
+	AdvisorProfileSchema,
+	AdvisorTone,
+	GetAdvisorProfileResponseSchema,
+	SetAdvisorProfileResponseSchema,
+	type AdvisorProfile as WireAdvisorProfile,
+} from "@achoo254/chat-proto/advisor";
 import type { FakeMedia } from "./fake-media.ts";
 import { toMessage } from "../../src/protocol/map.ts";
 import type { Message } from "../../src/model/types.ts";
@@ -121,9 +128,11 @@ interface UserRecord {
 	/** Chats the user marked as unread. */
 	readonly unreadMarks: Set<number>;
 	notify: WireNotificationSettings;
+	advisor: WireAdvisorProfile;
 }
 
 type NotifyChange = Partial<Omit<WireNotificationSettings, "$typeName" | "$unknown">>;
+type AdvisorChange = Partial<Omit<WireAdvisorProfile, "$typeName" | "$unknown">>;
 
 function defaultNotify(): WireNotificationSettings {
 	return create(NotificationSettingsSchema, {
@@ -235,6 +244,7 @@ export class FakeServer {
 			pins: [],
 			unreadMarks: new Set(),
 			notify: defaultNotify(),
+			advisor: create(AdvisorProfileSchema, { lookId: "owl", tone: AdvisorTone.SHORT }),
 		});
 		return id;
 	}
@@ -789,6 +799,18 @@ export class FakeServer {
 		return user.notify;
 	}
 
+	/** The user changed their Advisor profile on some session. */
+	setAdvisor(userId: number, change: AdvisorChange): WireAdvisorProfile {
+		const user = this.user(userId);
+		user.advisor = create(AdvisorProfileSchema, { ...user.advisor, ...change });
+		this.pushUser(userId, { case: "advisorProfile", value: { profile: user.advisor } }, 0);
+		return user.advisor;
+	}
+
+	advisorProfile(userId: number): WireAdvisorProfile {
+		return this.user(userId).advisor;
+	}
+
 	notifySettings(userId: number): WireNotificationSettings {
 		return this.user(userId).notify;
 	}
@@ -1276,6 +1298,22 @@ export class FakeServer {
 								});
 							}),
 					},
+			advisor: {
+				getAdvisorProfile: () =>
+					this.rpc(userId, "getAdvisorProfile", () => create(GetAdvisorProfileResponseSchema, { profile: this.user(userId).advisor })),
+				setAdvisorProfile: (request) =>
+					this.rpc(userId, "setAdvisorProfile", () => {
+						const change: AdvisorChange = {};
+						if (request.name !== undefined) change.name = request.name;
+						if (request.lookId !== undefined) change.lookId = request.lookId;
+						if (request.tone !== undefined) change.tone = request.tone;
+						const profile = this.setAdvisor(userId, change);
+						return create(SetAdvisorProfileResponseSchema, {
+							profile,
+							ack: { pts: big(this.user(userId).pts), ptsCount: 1, serverEpoch: big(this.epoch) },
+						});
+					}),
+			},
 			...(this.media === null ? {} : { media: this.media.apiFor(userId) }),
 			messages: {
 				sendMedia: (request) =>

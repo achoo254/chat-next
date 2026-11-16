@@ -19,6 +19,8 @@ export const CORE_METHODS = [
 	"botKeyboard",
 	"notificationSettings",
 	"setNotificationSettings",
+	"advisorProfile",
+	"setAdvisorProfile",
 	"pinnedMessages",
 	"unpinAllMessages",
 	"onlineCount",

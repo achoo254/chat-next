@@ -3,13 +3,13 @@
 // result is written locally right away where the UI shows it, and the
 // update the server writes for it reaches every session through sync
 // (expectAck makes a lost realtime echo come back through GetDifference).
-import { DEFAULT_NOTIFICATION_SETTINGS, unreadTotals } from "../model/types.ts";
-import type { NotificationSettings, PinnedMessagesPage } from "../model/types.ts";
+import { DEFAULT_ADVISOR_PROFILE, DEFAULT_NOTIFICATION_SETTINGS, unreadTotals } from "../model/types.ts";
+import type { AdvisorProfile, NotificationSettings, PinnedMessagesPage } from "../model/types.ts";
 import { assertSafeId } from "../ids/index.ts";
 import type { RemoteApi } from "../protocol/api.ts";
-import { toNotificationSettings, toPinnedMessagesPage, toSyncAck, toWireId, toWireSound } from "../protocol/map.ts";
+import { toAdvisorProfile, toNotificationSettings, toPinnedMessagesPage, toSyncAck, toWireAdvisorTone, toWireId, toWireSound } from "../protocol/map.ts";
 import type { Repository } from "../repo/repository.ts";
-import { putNotificationSettings, putUnreadMark, putUser } from "../repo/writes.ts";
+import { putAdvisorProfile, putNotificationSettings, putUnreadMark, putUser } from "../repo/writes.ts";
 import type { SyncEngine } from "../sync/engine.ts";
 
 export interface PinnedMessagesRequest {
@@ -89,6 +89,39 @@ export class DirectActions {
 		await engine.commitLocal((w) => putNotificationSettings(w, settings));
 		engine.expectAck(toSyncAck(response.ack), 0);
 		return settings;
+	}
+
+	/**
+	 * The user's Advisor profile: the synced copy, fetched from the server
+	 * when there is none yet; the defaults when it cannot be asked.
+	 */
+	async advisorProfile(): Promise<AdvisorProfile> {
+		const { repo, engine } = this.options;
+		const stored = await repo.advisorProfile();
+		if (stored !== null) return stored;
+		const fetched = await engine.fetchAdvisorProfile();
+		if (fetched === null) return DEFAULT_ADVISOR_PROFILE;
+		await engine.commitLocal(async (w) => {
+			// A change synced meanwhile is newer than this read.
+			if ((await repo.advisorProfile()) === null) putAdvisorProfile(w, fetched);
+		});
+		return (await repo.advisorProfile()) ?? fetched;
+	}
+
+	/** Changes the given fields of the Advisor profile; returns the whole profile after the change. */
+	async setAdvisorProfile(change: Partial<AdvisorProfile>): Promise<AdvisorProfile> {
+		const { api, engine } = this.options;
+		const call = required(api.advisor?.setAdvisorProfile, "SetAdvisorProfile");
+		const response = await call({
+			...(change.name === undefined ? {} : { name: change.name }),
+			...(change.lookId === undefined ? {} : { lookId: change.lookId }),
+			...(change.tone === undefined ? {} : { tone: toWireAdvisorTone(change.tone) }),
+		});
+		if (response.profile === undefined) throw new Error("SetAdvisorProfile returned no profile");
+		const profile = toAdvisorProfile(response.profile);
+		await engine.commitLocal((w) => putAdvisorProfile(w, profile));
+		engine.expectAck(toSyncAck(response.ack), 0);
+		return profile;
 	}
 
 	/** A page of the chat's pinned messages the user can see, newest first. */

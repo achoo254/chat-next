@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package app.v1;
 
+import "app/v1/advisor.proto";
 import "app/v1/auth.proto";
 import "app/v1/chats.proto";
 import "app/v1/messages.proto";
@@ -78,6 +79,7 @@ message Update {
     UpdateNotificationSettings notification_settings = 29;
     UpdateUserChanged user_changed = 30;
     UpdateAgentProjectsChanged agent_projects_changed = 31;
+    UpdateAdvisorProfile advisor_profile = 32;
   }
 }
 
@@ -243,6 +245,11 @@ message UpdateUserChanged {
 // sessions (AgentProjectsService): call ListAgentProjects again. Carries
 // nothing else.
 message UpdateAgentProjectsChanged {}
+
+// The user's Advisor profile after a change (AdvisorService), complete.
+message UpdateAdvisorProfile {
+  AdvisorProfile profile = 1;
+}
 
 // The user's notification settings after a change, complete.
 message UpdateNotificationSettings {

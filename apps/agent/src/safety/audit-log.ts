@@ -7,7 +7,8 @@
 // closed or refused to a device: never a typed byte or its output; a git
 // write to a workspace: what and how many files, never a path, a file's
 // content or a commit message; the usage rules switched, the usage ledger
-// deleted).
+// deleted; Advisor's key set or removed (its fingerprint, never the key), and
+// a session's automatic Advisor turned on or off).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -43,7 +44,11 @@ export type AuditAction =
   | "git_push"
   | "git_rebase"
   | "usage_rules"
-  | "usage_delete";
+  | "usage_delete"
+  | "advisor_key_set"
+  | "advisor_key_remove"
+  | "advisor_on"
+  | "advisor_off";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

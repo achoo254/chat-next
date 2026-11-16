@@ -5,6 +5,7 @@
 // localhost (http, tcp, kill, watch). `tunelo login` connects the machine,
 // `tunelo logout` takes it out of the account, `tunelo uninstall` removes it.
 import { Command } from "commander";
+import { registerAdvisorCommand } from "./advisor/cli-advisor-command.ts";
 import { configureGroupedHelp } from "./cli-help.ts";
 import { ConfigStore, configDir } from "./config.ts";
 import { callControl, controlPid, serveControl } from "./control-socket.ts";
@@ -260,6 +261,7 @@ export function buildProgram(): Command {
     .description("print whether this process has Full Disk Access (granted, needed, not-applicable)")
     .action(() => console.log(diskAccess()));
   registerMcpCommand(program);
+  registerAdvisorCommand(program, exits);
 
   // Tunnels.
   registerHttpCommand(program, display);

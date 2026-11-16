@@ -19,6 +19,8 @@ import { type KeyPair, type Session, acceptHello, decodePlain, encodeHandshakeEr
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
+import { AdvisorKeyError, type AdvisorKeyStore, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
+import { redactSecrets } from "../mcp/redact.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import type { TrustVerdict } from "../device-trust.ts";
 import { AccountError } from "../accounts/errors.ts";
@@ -95,11 +97,21 @@ export type LinkContext = {
   commitMessage?: (req: CommitMessageRequest) => Promise<string>;
   /** The AIs' token usage on the machine; absent where the machine keeps none (tests). */
   usage?: UsageApi;
+  /** Advisor's TypeSafe key on the machine; absent where the machine has no Advisor (tests). */
+  advisorKeys?: AdvisorKeyStore;
+  /** Advisor's key was set or removed: every device hears the machine's info again. */
+  onAdvisorKey?: () => void;
 };
 
 /** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
 export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string } {
-  const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
+  // No secret this process holds (a sign-in secret, Advisor's key) ever leaves in an error, whatever it echoes.
+  const message = redactSecrets(err instanceof Error ? err.message : String(err)).slice(0, 300);
+  if (err instanceof AdvisorKeyError) {
+    return err.kind === "invalid"
+      ? { code: ErrorCode.INVALID, message, reason: ErrorReason.ADVISOR_KEY_INVALID, subject: "" }
+      : { code: ErrorCode.INTERNAL, message, reason: ErrorReason.ADVISOR_KEY_NOT_SAVED, subject: "" };
+  }
   if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
   if (err instanceof AccountError) return { code: ErrorCode.INVALID, message, reason: ACCOUNT_REASONS[err.kind], subject: err.subject };
   if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
@@ -234,6 +246,8 @@ export class Connection {
         return this.close(1008, "protocol error");
       }
       if (f.body.case === "termData") return this.termData(f.body.value);
+      // Advisor's key is hidden from every output from the moment it arrives, before it waits in the queue.
+      if (f.body.case === "advisorSetKey") rememberAdvisorKey(f.body.value.key);
       this.queue = this.queue.then(() => (this.state === "closed" ? undefined : this.frame(f))).catch(() => this.close(1008, "protocol error"));
       return;
     }
@@ -403,6 +417,16 @@ export class Connection {
       case "secretRemove":
         return this.send(id, { case: "secretListResult", value: secretListBody(secrets.remove(b.value.id, this.device)) });
     }
+  }
+
+  /** Advisor's key: it arrives only here, sealed end to end, and goes straight to its own store; it is never logged or echoed. */
+  private async advisorFrame(id: string, b: AdvisorFrame): Promise<void> {
+    const keys = this.ctx.advisorKeys;
+    if (!keys) return this.send(id, { case: "error", value: refusal("this machine has no Advisor", ErrorReason.UNSUPPORTED_REQUEST) });
+    if (b.case === "advisorSetKey") await keys.set(b.value.key, this.device);
+    else await keys.remove(this.device);
+    this.send(id, { case: "ack", value: {} });
+    this.ctx.onAdvisorKey?.();
   }
 
   /** An event every device gets unasked (the machine's profile and where each session stands). */
@@ -687,6 +711,9 @@ export class Connection {
         case "threadSetPermissionMode":
           await core.setPermissionMode(b.value.threadId, b.value.mode, this.device);
           return ack();
+        case "threadSetAdvisor":
+          core.setAdvisor(b.value.threadId, b.value.on, this.device);
+          return ack();
         case "threadSwitch":
           await core.switchProvider(b.value.threadId, b.value.provider, b.value.model);
           return ack();
@@ -747,6 +774,12 @@ export class Connection {
         case "secretRemove":
           // Sealing waits on the key store: answered later, by id.
           void this.secretFrame(id, b).catch((err: unknown) => this.sendError(id, err));
+          return;
+        case "advisorSetKey":
+        case "advisorRemoveKey":
+          if (b.case === "advisorSetKey") rememberAdvisorKey(b.value.key);
+          // Sealing waits on the key store: answered later, by id.
+          void this.advisorFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
         case "browserControl":
         case "browserView":
@@ -884,6 +917,8 @@ type ProjectFrame = Extract<
 >;
 
 type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
+
+type AdvisorFrame = Extract<Frame["body"], { case: "advisorSetKey" | "advisorRemoveKey" }>;
 
 type AccountFrame = Extract<
   Frame["body"],

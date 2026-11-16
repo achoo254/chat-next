@@ -491,6 +491,9 @@ export const viMachines = {
 			gitDiverged: (ahead: number, behind: number) => `Remote có ${behind} commit mới mà máy chưa có, máy có ${ahead} commit chưa push.`,
 			gitUncommittedChanges: "Commit hoặc cất các thay đổi chưa commit trước khi gộp.",
 			gitRebaseConflict: "Không gộp tự động được vì xung đột. Repo đã về như trước khi gộp.",
+			advisorUnavailable: "Cố vấn chưa dùng được cho phiên này: AI của phiên hoặc máy đang chạy phiên không có MCP của tunelo.",
+			advisorKeyInvalid: "Khoá không hợp lệ: khoá trống, quá dài, hoặc có dấu cách hay ký tự điều khiển.",
+			advisorKeyNotSaved: "Máy không lưu được khoá (kho khoá của máy đang khoá hoặc từ chối). Chưa có gì thay đổi.",
 			sensitiveFileNotConfirmed: "Cần xác nhận trước khi đưa tệp bí mật vào git.",
 			// Usage statistics of the machine.
 			usageRangeInvalid: "Khoảng thời gian không hợp lệ (tối đa 92 ngày).",

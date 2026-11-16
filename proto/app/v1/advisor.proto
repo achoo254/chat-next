@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package app.v1;
+
+import "app/v1/messages.proto";
+
+option go_package = "app.local/server/gen/app/v1;appv1";
+
+// ID convention (ADR 0001): every int64 field marked [jstype = JS_NUMBER]
+// always holds a value < 2^53; the server asserts the bound when serializing.
+
+// The Advisor profile (Cố vấn) of the AI Agent: how the user's Advisor mascot
+// is called, looks and words its answers, kept per user by the server and
+// synced to every session like the notification settings. It holds no
+// secret and no machine or AI: the TypeSafe key stays on each machine, and
+// the device remembers which machine and AI it asked last. `name` is shown
+// to the user only, never put into an AI's prompt; machines map `tone` to a
+// fixed wording of their own. Every change reaches the user's sessions as
+// UpdateAdvisorProfile with the complete profile. Served under /rpc with the
+// user's session like every user service.
+service AdvisorService {
+  // The caller's profile; the defaults (empty name, look "owl", tone short)
+  // for a user who never changed it.
+  rpc GetAdvisorProfile(GetAdvisorProfileRequest) returns (GetAdvisorProfileResponse);
+  // Changes the given fields; returns the whole profile after the change.
+  // invalid_argument for a bad name, look_id or tone (nothing changes then).
+  rpc SetAdvisorProfile(SetAdvisorProfileRequest) returns (SetAdvisorProfileResponse);
+}
+
+// How Advisor words its answers.
+enum AdvisorTone {
+  ADVISOR_TONE_UNSPECIFIED = 0;
+  // Short and plain (the default).
+  ADVISOR_TONE_SHORT = 1;
+  // Light-hearted.
+  ADVISOR_TONE_FUN = 2;
+  // Formal.
+  ADVISOR_TONE_SERIOUS = 3;
+}
+
+message AdvisorProfile {
+  // What the user calls their Advisor; empty for the default name in the
+  // user's language ("Cố vấn", "Advisor").
+  string name = 1;
+  // One of the looks the client offers ("owl", "robot", "suit", "cat"); a
+  // client that does not know it shows its first look.
+  string look_id = 2;
+  AdvisorTone tone = 3;
+}
+
+message GetAdvisorProfileRequest {}
+
+message GetAdvisorProfileResponse {
+  AdvisorProfile profile = 1;
+}
+
+message SetAdvisorProfileRequest {
+  // Unset fields are left unchanged.
+  // Trimmed; at most 32 characters, no control characters; empty goes back
+  // to the default name.
+  optional string name = 1;
+  // 1 to 32 characters: a lowercase letter, then lowercase letters, digits
+  // or "-".
+  optional string look_id = 2;
+  // Not ADVISOR_TONE_UNSPECIFIED.
+  optional AdvisorTone tone = 3;
+}
+
+message SetAdvisorProfileResponse {
+  AdvisorProfile profile = 1;
+  SyncAck ack = 2;
+}

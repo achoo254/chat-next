@@ -192,6 +192,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.nothingStaged;
 		case ErrorReason.OFFICE_WATCH_LIMIT:
 			return r.officeWatchLimit;
+		case ErrorReason.ADVISOR_UNAVAILABLE:
+			return r.advisorUnavailable;
+		case ErrorReason.ADVISOR_KEY_INVALID:
+			return r.advisorKeyInvalid;
+		case ErrorReason.ADVISOR_KEY_NOT_SAVED:
+			return r.advisorKeyNotSaved;
 		default:
 			return undefined;
 	}

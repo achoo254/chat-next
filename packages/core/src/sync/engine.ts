@@ -22,6 +22,7 @@ import type {
 	HistoryPage,
 	Hello,
 	Message,
+	AdvisorProfile,
 	NotificationSettings,
 	SessionRevokeReason,
 	SyncAck,
@@ -38,6 +39,7 @@ import {
 	toDialogsPage,
 	toDifference,
 	toHistoryPage,
+	toAdvisorProfile,
 	toNotificationSettings,
 	toPeerDialogs,
 	toState,
@@ -53,6 +55,7 @@ import {
 	putChat,
 	putChatPts,
 	putDialog,
+	putAdvisorProfile,
 	putNotificationSettings,
 	putPinnedOrder,
 	putMessage,
@@ -797,11 +800,13 @@ export class SyncEngine {
 	private async resetFromServer(state: SyncState): Promise<void> {
 		const snapshot = await this.fetchDialogs();
 		const settings = await this.fetchNotificationSettings();
+		const advisor = await this.fetchAdvisorProfile();
 		await this.queue.run(async () => {
 			const w = new WriteBatch();
 			const effects = newEffects();
 			markAllStale(w);
 			if (settings !== null) putNotificationSettings(w, settings);
+			if (advisor !== null) putAdvisorProfile(w, advisor);
 			if (snapshot.complete) {
 				const present = new Set(snapshot.dialogs.map((d) => d.chatId));
 				for (const chatId of await this.options.repo.dialogChatIds()) {
@@ -867,6 +872,24 @@ export class SyncEngine {
 		} catch (err) {
 			if (classifyFailure(err) === "unauthenticated") throw err;
 			this.report(err, "GetNotificationSettings");
+			return null;
+		}
+	}
+
+	/**
+	 * The user's Advisor profile, part of a fresh snapshot. Null when the API
+	 * lacks it or the call failed (reported); the stored profile then stays
+	 * until the next change or snapshot.
+	 */
+	async fetchAdvisorProfile(): Promise<AdvisorProfile | null> {
+		const get = this.options.api.advisor?.getAdvisorProfile;
+		if (get === undefined) return null;
+		try {
+			const response = await get({});
+			return response.profile === undefined ? null : toAdvisorProfile(response.profile);
+		} catch (err) {
+			if (classifyFailure(err) === "unauthenticated") throw err;
+			this.report(err, "GetAdvisorProfile");
 			return null;
 		}
 	}
