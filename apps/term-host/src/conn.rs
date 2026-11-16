@@ -1,7 +1,7 @@
 //! Client connections: grants, device keys, the path a connection sends on,
 //! and per-session attachment state (offsets and flow window).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 use std::time::Instant;
 
@@ -146,6 +146,13 @@ pub struct Conn {
     /// Sessions this connection read a `Preview` of without attaching yet: the
     /// preview was audited as their opening, so the `Attach` after it is not.
     pub previewed: BTreeSet<u32>,
+    /// Capability bits of its `Hello` that this daemon understands.
+    pub caps: u8,
+    /// The history rebuild it waits for.
+    pub history: Option<crate::history::InFlight>,
+    /// History pages queued behind its output.
+    pub pages: VecDeque<crate::history::Page>,
+    pub history_rate: crate::history::Rate,
 }
 
 impl Conn {
@@ -161,6 +168,10 @@ impl Conn {
             hello: false,
             attachments: BTreeMap::new(),
             previewed: BTreeSet::new(),
+            caps: 0,
+            history: None,
+            pages: VecDeque::new(),
+            history_rate: crate::history::Rate::new(Instant::now()),
         }
     }
 
@@ -184,6 +195,27 @@ impl Conn {
             return d.buffered();
         }
         self.relay.as_ref().map_or(0, |r| r.buffered())
+    }
+
+    /// Whether it takes `LiveSnapshot` and history pages.
+    pub fn live_history(&self) -> bool {
+        self.caps & crate::wire::CAP_LIVE_HISTORY != 0
+    }
+
+    /// Stop the rebuild it waits for and drop its queued pages, for one
+    /// session or all of them.
+    pub fn cancel_history(&mut self, session: Option<u32>) {
+        if self
+            .history
+            .as_ref()
+            .is_some_and(|h| session.is_none_or(|s| s == h.session))
+        {
+            if let Some(h) = self.history.take() {
+                h.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        self.pages
+            .retain(|p| session.is_some_and(|s| s != p.session));
     }
 
     pub fn is_open(&self) -> bool {

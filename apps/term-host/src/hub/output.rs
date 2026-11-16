@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 use super::Hub;
 use crate::conn::{Attachment, FrameSink, SinkClosed};
 use crate::flow::{effective_window, flush_decision, Flush, PathKind, RelayBudget, ECHO_WINDOW};
-use crate::session::{snapshot_frame, Session};
+use crate::history::Page;
+use crate::session::{live_snapshot_frames, snapshot_frame, Session};
 use crate::wire::{ServerFrame, MAX_OUTPUT_DATA};
 use crate::Logger;
 
@@ -14,6 +15,12 @@ use crate::Logger;
 const SINK_HIGH_WATER: usize = 1024 * 1024;
 /// Retry delay for a connection above the high-water mark.
 const SINK_RETRY: Duration = Duration::from_millis(5);
+/// History parts sent to one connection per pass.
+const PAGE_PARTS_PER_PASS: usize = 2;
+/// A history part waits while the transport holds more than this.
+const PAGE_HIGH_WATER: usize = 128 * 1024;
+/// When to try the next history parts.
+const PAGE_RETRY: Duration = Duration::from_millis(10);
 
 impl Hub {
     /// Send whatever is due on every attachment, then pause or resume each
@@ -35,6 +42,7 @@ impl Hub {
                 continue;
             };
             let crowded = conn.buffered() > SINK_HIGH_WATER;
+            let live = conn.live_history();
             let Some(sink) = conn
                 .direct
                 .as_deref_mut()
@@ -50,12 +58,69 @@ impl Hub {
                     merge(flush_deadline, Some(now + SINK_RETRY));
                     continue;
                 }
-                match flush_attachment(s, att, sink, path, budget, scratch, now, &cfg.log) {
+                match flush_attachment(s, att, sink, path, budget, scratch, now, &cfg.log, live) {
                     Ok(next) => merge(flush_deadline, next),
                     Err(SinkClosed) => {
                         dead.push(conn.id);
                         break;
                     }
+                }
+            }
+        }
+        // History pages only after every connection's output of this pass,
+        // a few parts at a time, and only while the transport is nearly empty
+        // and the relay budget is not low: output and echo always go first.
+        for conn in conns.values_mut() {
+            if conn.pages.is_empty() || dead.contains(&conn.id) {
+                continue;
+            }
+            let Some(path) = conn.path() else {
+                continue;
+            };
+            let mut sent = 0;
+            while !conn.pages.is_empty() {
+                if sent >= PAGE_PARTS_PER_PASS || conn.buffered() > PAGE_HIGH_WATER {
+                    merge(flush_deadline, Some(now + PAGE_RETRY));
+                    break;
+                }
+                // While the budget is low a page takes at most one token per pass.
+                if path == PathKind::Relay
+                    && ((budget.low(now) && sent > 0) || !budget.try_take(now))
+                {
+                    merge(
+                        flush_deadline,
+                        Some(budget.next_token_at(now).max(now + PAGE_RETRY)),
+                    );
+                    break;
+                }
+                let Some(sink) = conn
+                    .direct
+                    .as_deref_mut()
+                    .or_else(|| conn.relay.as_mut().map(|r| r as &mut dyn FrameSink))
+                else {
+                    break;
+                };
+                let Some(page) = conn.pages.front_mut() else {
+                    break;
+                };
+                match sessions.get(&page.session).map(|s| s.screen.epoch()) {
+                    None => {
+                        conn.pages.pop_front();
+                        continue;
+                    }
+                    Some(epoch) if epoch != page.epoch => {
+                        *page = Page::empty(page.session, page.req_id, epoch);
+                    }
+                    Some(_) => {}
+                }
+                if sink.send(&page.frame(page.next)).is_err() {
+                    dead.push(conn.id);
+                    break;
+                }
+                sent += 1;
+                page.next += 1;
+                if page.next >= page.parts.len() {
+                    conn.pages.pop_front();
                 }
             }
         }
@@ -108,16 +173,34 @@ fn flush_attachment(
     scratch: &mut Vec<u8>,
     now: Instant,
     log: &Logger,
+    live: bool,
 ) -> Result<Option<Instant>, SinkClosed> {
     let end = s.end();
     if att.sent < s.held_start() {
         // Only without an output log: the bytes this client still needs left
-        // the ring, so resync with a rendered snapshot.
-        let snap = s.snapshot();
-        sink.send(&snapshot_frame(s.id, &snap))?;
-        att.sent = snap.offset;
-        att.acked = snap.offset;
-        att.clock.reset(snap.offset);
+        // the ring, so resync with a rendered snapshot (the live one for a
+        // client that takes it).
+        let mut offset = None;
+        if live && s.screen.live_ready() {
+            let snap = s.screen.live_snapshot();
+            if let Some(frames) = live_snapshot_frames(s.id, &snap) {
+                for f in &frames {
+                    sink.send(f)?;
+                }
+                offset = Some(snap.offset);
+            }
+        }
+        let offset = match offset {
+            Some(o) => o,
+            None => {
+                let snap = s.snapshot();
+                sink.send(&snapshot_frame(s.id, &snap))?;
+                snap.offset
+            }
+        };
+        att.sent = offset;
+        att.acked = offset;
+        att.clock.reset(offset);
         att.urgent = true;
     }
     let window = effective_window(att.window.size(), s.ring.capacity());

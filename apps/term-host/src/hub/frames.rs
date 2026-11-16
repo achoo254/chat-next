@@ -6,10 +6,12 @@ use super::Hub;
 use crate::audit::AuditKind;
 use crate::conn::{Attachment, Conn};
 use crate::pty::WriteJob;
-use crate::session::{attach_plan, preview_frame, snapshot_frame, AttachPlan};
+use crate::session::{
+    attach_plan, live_snapshot_frames, preview_frame, snapshot_frame, AttachPlan,
+};
 use crate::wire::{self, error_code, ClientFrame, DecodeError, ServerFrame};
 
-fn send_error(conn: &mut Conn, session: u32, code: u16, message: &str) {
+pub(super) fn send_error(conn: &mut Conn, session: u32, code: u16, message: &str) {
     if let Some(sink) = conn.sink() {
         let _ = sink.send(&ServerFrame::Error {
             session,
@@ -92,16 +94,20 @@ impl Hub {
             return;
         };
         match frame {
-            Frame::Hello { version } => {
+            Frame::Hello { version, caps } => {
                 if version != wire::VERSION {
                     send_error(conn, 0, error_code::BAD_VERSION, "unsupported version");
                     return;
                 }
                 conn.hello = true;
+                conn.caps = caps & wire::SUPPORTED_CAPS;
+                // Only a client that set a bit takes a Hello longer than 5 bytes.
+                let caps = (caps != 0).then_some(conn.caps);
                 if let Some(sink) = conn.sink() {
                     let _ = sink.send(&ServerFrame::Hello {
                         version: wire::VERSION,
                         max_frame: wire::MAX_FRAME as u32,
+                        caps,
                     });
                 }
             }
@@ -138,7 +144,7 @@ impl Hub {
                 session,
                 last_offset,
             } => {
-                let Some(s) = self.sessions.get(&session) else {
+                let Some(s) = self.sessions.get_mut(&session) else {
                     send_error(
                         conn,
                         session,
@@ -147,8 +153,10 @@ impl Hub {
                     );
                     return;
                 };
+                let live = conn.live_history() && s.screen.live_ready();
                 let from = match attach_plan(last_offset, s.held_start(), s.end()) {
                     AttachPlan::Replay { from } => from,
+                    _ if live && send_live_snapshot(conn, session, s) => s.screen.fed_offset(),
                     plan => {
                         let snap = if plan == AttachPlan::FromStart {
                             s.start_snapshot()
@@ -163,6 +171,11 @@ impl Hub {
                 };
                 let att = Attachment::new(from);
                 let is_new = conn.attachments.insert(session, att).is_none();
+                // A path change re-attaches: pages being sent start over on
+                // the new path (parts on the old one may be lost).
+                for page in conn.pages.iter_mut().filter(|p| p.session == session) {
+                    page.next = 0;
+                }
                 // A preview just before it was audited as the opening already.
                 let previewed = conn.previewed.remove(&session);
                 if is_new && !previewed {
@@ -170,6 +183,16 @@ impl Hub {
                     self.record_audit(AuditKind::Open, Some(session), Some(conn_id), Some(key));
                 }
             }
+            // A client that starts from LiveSnapshot sends Preview for older
+            // daemons: nothing to answer, nothing opened, when its Attach will
+            // get one. A session on the alternate screen (or whose numbering
+            // is unreliable) still replays, so it still gets its preview.
+            Frame::Preview { session }
+                if conn.live_history()
+                    && self
+                        .sessions
+                        .get(&session)
+                        .is_some_and(|s| s.screen.live_ready()) => {}
             Frame::Preview { session } => {
                 // The session as the emulator renders it now: shown by the client at once while the Attach that
                 // follows replays the whole stream out of sight. Nothing about the attachment changes.
@@ -193,12 +216,22 @@ impl Hub {
                 }
             }
             Frame::Detach { session } => {
+                conn.cancel_history(Some(session));
                 if conn.attachments.remove(&session).is_some() {
                     let key = conn.device_key;
                     self.record_audit(AuditKind::Close, Some(session), Some(conn_id), Some(key));
                 } else {
                     send_error(conn, session, error_code::NOT_ATTACHED, "not attached");
                 }
+            }
+            Frame::HistoryRequest {
+                session,
+                req_id,
+                epoch,
+                before_row,
+                max_rows,
+            } => {
+                self.on_history_request(conn_id, session, req_id, epoch, before_row, max_rows, now)
             }
             Frame::Ack { session, offset } => {
                 let Some(att) = conn.attachments.get_mut(&session) else {
@@ -225,21 +258,79 @@ impl Hub {
     }
 }
 
+/// Send the frames of the session's `LiveSnapshot`; false (nothing sent)
+/// when it does not fit 255 frames.
+fn send_live_snapshot(conn: &mut Conn, session: u32, s: &mut crate::session::Session) -> bool {
+    let snap = s.screen.live_snapshot();
+    let Some(frames) = live_snapshot_frames(session, &snap) else {
+        return false;
+    };
+    if let Some(sink) = conn.sink() {
+        for f in &frames {
+            if sink.send(f).is_err() {
+                break;
+            }
+        }
+    }
+    true
+}
+
 /// A client frame without borrowed data; Input data stays in its buffer.
 enum Frame {
-    Input { session: u32 },
-    Hello { version: u8 },
-    Resize { session: u32, cols: u16, rows: u16 },
-    Attach { session: u32, last_offset: u64 },
-    Detach { session: u32 },
-    Ack { session: u32, offset: u64 },
-    Ping { client_micros: u64 },
-    Preview { session: u32 },
+    Input {
+        session: u32,
+    },
+    Hello {
+        version: u8,
+        caps: u8,
+    },
+    HistoryRequest {
+        session: u32,
+        req_id: u16,
+        epoch: u32,
+        before_row: u64,
+        max_rows: u16,
+    },
+    Resize {
+        session: u32,
+        cols: u16,
+        rows: u16,
+    },
+    Attach {
+        session: u32,
+        last_offset: u64,
+    },
+    Detach {
+        session: u32,
+    },
+    Ack {
+        session: u32,
+        offset: u64,
+    },
+    Ping {
+        client_micros: u64,
+    },
+    Preview {
+        session: u32,
+    },
 }
 
 fn owned(f: &ClientFrame<'_>) -> Frame {
     match *f {
-        ClientFrame::Hello { version, .. } => Frame::Hello { version },
+        ClientFrame::Hello { version, caps } => Frame::Hello { version, caps },
+        ClientFrame::HistoryRequest {
+            session,
+            req_id,
+            epoch,
+            before_row,
+            max_rows,
+        } => Frame::HistoryRequest {
+            session,
+            req_id,
+            epoch,
+            before_row,
+            max_rows,
+        },
         ClientFrame::Resize {
             session,
             cols,

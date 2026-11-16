@@ -98,6 +98,13 @@ impl OutputLog {
         Ok(())
     }
 
+    /// Write buffered bytes to the file, so another handle reading it by
+    /// path (a history rebuild) sees every byte appended so far. After an
+    /// error the log must be dropped by the caller.
+    pub fn flush(&mut self) -> io::Result<()> {
+        self.file.as_mut().ok_or_else(closed)?.flush()
+    }
+
     /// Append to `out` the bytes from `from` on, at most `max`; returns how
     /// many (0 when `from` is at or past the end). Buffered bytes are written
     /// out first so the read sees all of them. After an error the log must

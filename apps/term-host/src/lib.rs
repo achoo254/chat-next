@@ -16,6 +16,7 @@ pub mod commands;
 pub mod conn;
 pub mod control;
 pub mod flow;
+pub mod history;
 mod home;
 mod hub;
 pub mod nic;

@@ -64,6 +64,11 @@ pub enum ControlMsg {
         peer: u64,
         event: crate::rtc::PeerEvent,
     },
+    /// A history rebuild finished (`history.rs`), for the job `token`.
+    HistoryBuilt {
+        token: u64,
+        built: crate::history::Built,
+    },
     /// Stop requested (signal or embedding code).
     Stop,
 }

@@ -4,6 +4,7 @@
 
 mod commands;
 mod frames;
+mod history;
 mod output;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -17,6 +18,7 @@ use crate::audit::{AuditKind, AuditLog};
 use crate::conn::{Conn, DeviceKey};
 use crate::control::{error_reply, ok_reply, AgentLink, AgentTx, ControlMsg};
 use crate::flow::RelayBudget;
+use crate::history::Rebuilds;
 use crate::pty::PtyEvent;
 use crate::rtc::{EndReason, PeerEvent, RtcSettings};
 use crate::session::{Session, KILL_GRACE};
@@ -64,6 +66,8 @@ pub struct Hub {
     exit: Option<ExitReason>,
     shutdown_reply: Option<Value>,
     scratch: Vec<u8>,
+    /// History rebuilds and their caches.
+    rebuilds: Rebuilds,
 }
 
 impl Hub {
@@ -91,6 +95,7 @@ impl Hub {
             exit: None,
             shutdown_reply: None,
             scratch: Vec::with_capacity(wire::MAX_FRAME),
+            rebuilds: Rebuilds::default(),
         }
     }
 
@@ -176,6 +181,7 @@ impl Hub {
                     self.on_peer(conn, event);
                 }
             }
+            ControlMsg::HistoryBuilt { token, built } => self.on_history_built(token, built),
             ControlMsg::Stop => {
                 self.exit.get_or_insert(ExitReason::Stopped);
             }
@@ -307,6 +313,7 @@ impl Hub {
         for id in finalize {
             self.finalize(id);
         }
+        self.rebuilds.expire(now);
         if self.sessions.is_empty() && self.conns.is_empty() {
             let since = *self.idle_since.get_or_insert(now);
             if now.saturating_duration_since(since) >= self.cfg.idle_timeout {
@@ -380,7 +387,9 @@ impl Hub {
             signal: 0,
         });
         let mut detached = Vec::new();
+        self.rebuilds.forget(id);
         for conn in self.conns.values_mut() {
+            conn.cancel_history(Some(id));
             if let Some(att) = conn.attachments.remove(&id) {
                 if !att.exit_sent {
                     if let Some(sink) = conn.sink() {
@@ -406,6 +415,7 @@ impl Hub {
         let Some(mut c) = self.conns.remove(&id) else {
             return;
         };
+        c.cancel_history(None);
         if let Some((code, message)) = error {
             if let Some(sink) = c.sink() {
                 let _ = sink.send(&ServerFrame::Error {

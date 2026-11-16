@@ -31,7 +31,7 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 
 | Loại | Tên | Dữ liệu |
 |---|---|---|
-| `0x01` | Hello | `version u8` (=1) · `caps u8` (=0). Khung đầu tiên client gửi; `session` = 0. |
+| `0x01` | Hello | `version u8` (=1) · `caps u8`. Khung đầu tiên client gửi; `session` = 0. Bit của `caps`: `0x01` `LIVE_HISTORY` (client nhận `LiveSnapshot` và xin lịch sử bằng `HistoryRequest`, mục 4). Daemon bỏ qua bit nó không biết. |
 | `0x10` | Input | byte bàn phím thô cho phiên. |
 | `0x11` | Resize | `cols u16` · `rows u16` (mỗi số từ 1 đến 1000). |
 | `0x12` | Attach | `lastOffset u64` (0 nếu chưa có gì). Đăng ký nhận đầu ra của phiên (xem mục 4). |
@@ -39,15 +39,19 @@ Header chung: `type u8` · `session u32` (0 với khung cấp kết nối). Ph�
 | `0x14` | Ack | `offset u64`: số byte đầu ra client đã áp dụng (không giảm). |
 | `0x15` | Ping | `clientMicros u64`; `session` = 0. |
 | `0x16` | Preview | không có. Xin phiên như emulator của daemon dựng lúc này (từ `tunelo` 3.5.0; daemon cũ bỏ qua như mọi khung lạ). Không cần `Attach` trước; không đổi gì của việc gắn (xem mục 4). Đọc bản dựng là xem nội dung phiên nên daemon ghi nhật ký `open` cho phiên (một lần; `Attach` ngay sau không ghi lại) và `close` khi kết nối đóng. |
+| `0x17` | HistoryRequest | `reqId u16` · `epoch u32` · `beforeRow u64` · `maxRows u16` (1 đến 500). Xin các dòng lịch sử của `epoch` ngay trước dòng `beforeRow` (mục 4, "Lịch sử theo yêu cầu"). Chỉ cho phiên kết nối này đang gắn; ngược lại `Error 5`. `maxRows` ngoài 1–500 trả `Error 3`. |
 
 ### Daemon → client
 
 | Loại | Tên | Dữ liệu |
 |---|---|---|
-| `0x81` | Hello | `version u8` · `maxFrame u32` (=65536). Trả lời `Hello`; `session` = 0. |
+| `0x81` | Hello | `version u8` · `maxFrame u32` (=65536) · `caps u8` chỉ khi `Hello` của client có bit khác 0 (bộ giải mã cũ từ chối `Hello` dài hơn 5 byte). `caps` là các bit client gửi mà daemon hiểu. Trả lời `Hello`; `session` = 0. |
 | `0x90` | Output | `offset u64` · byte đầu ra thô. |
 | `0x91` | Snapshot | `offset u64` · `cols u16` · `rows u16` · `altScreen u8` (0/1) · chuỗi VT: chỉ RIS khi bắt đầu phát lại từ offset 0, hoặc màn hình dựng lại trong chế độ dự phòng (mục 4). `offset` là offset mà `Output` kế tiếp sẽ bắt đầu. |
 | `0x93` | Preview | Cùng bố cục với `Snapshot` (`offset u64` · `cols u16` · `rows u16` · `altScreen u8` · chuỗi VT dựng bởi emulator), trả lời `Preview` của client. Chỉ để hiển thị, không bao giờ áp vào luồng của client; `offset` là offset đầu ra mà bản dựng phản ánh. |
+| `0x94` | LiveSnapshot | `offset u64` · `cols u16` · `rows u16` · `epoch u32` · `historyEnd u64` · `tailRows u16` · `part u8` · `parts u8` (`part` < `parts`) · chuỗi VT. Màn hình lúc này, điểm bắt đầu của một lần gắn mới trên màn hình thường cho client có `LIVE_HISTORY` (mục 4). Chuỗi VT chia thành `parts` khung liên tiếp cùng phần đầu; client ghép theo `part` rồi ghi. `Output` theo sau bắt đầu ở `offset`. |
+| `0x96` | History | `reqId u16` · `epoch u32` · `firstRow u64` · `rowCount u16` · `part u8` · `parts u8` · `atStart u8` (0/1) · chuỗi VT. Trả lời `HistoryRequest`: `rowCount` dòng từ dòng `firstRow`, cũ trước mới sau, mỗi dòng có thuộc tính và kết thúc bằng `ESC[m` CR LF; chia trên các dòng thành `parts` khung. `atStart` = 1 khi `firstRow` là dòng đầu của đời. |
+| `0x97` | HistoryError | `reqId u16` · `code u8`: `1` không phục vụ được (không có nhật ký, nhật ký hỏng, đời không dựng lại được), `2` bận (đã có một trang đang chờ, quá tần suất, hay máy đã dựng tối đa), `3` đã huỷ. |
 | `0x92` | Exit | `code i32` (-1 nếu bị tín hiệu giết) · `signal u8` (0 nếu không). Gửi ngay sau khung `Output` cuối cùng của phiên (đầu ra còn bị window giữ thì đi trước). |
 | `0x95` | Pong | `clientMicros u64` (nguyên giá trị của `Ping`); `session` = 0. |
 | `0x9F` | Error | `code u16` · thông điệp UTF-8. `session` là phiên liên quan, 0 nếu lỗi cấp kết nối. |
@@ -60,18 +64,26 @@ Sau `Error 6` daemon đóng kết nối; khung đến sau đó của kết nối
 
 ## 4. Mở lại phiên (reattach)
 
-Quy tắc của chủ sở hữu: daemon không tự cắt dòng nào. Việc của nó chỉ là nhận nguyên luồng byte chương trình (vd Claude Code) ghi ra PTY và chuyển tới client; không dựng lại màn hình, không giới hạn lịch sử, không xử lý riêng `ESC[3J` hay chuỗi nào khác.
+Quy tắc của chủ sở hữu: daemon không tự cắt dòng nào. Việc của nó là nhận nguyên luồng byte chương trình (vd Claude Code) ghi ra PTY và chuyển tới client, và mọi dòng của phiên đều xem lại được.
+
+Từ `tunelo` 3.10.0 quy tắc được viết lại cho **màn hình thường** với client mới (`LIVE_HISTORY`): người dùng mở lại phiên phải thấy ngay trạng thái hiện tại và gõ được ngay, lịch sử chỉ tải khi họ cuộn lên. Daemon gửi bản dựng màn hình (`LiveSnapshot`) làm điểm bắt đầu thay cho việc phát lại từ offset 0. Bản dựng mất những gì `state_formatted` không mang: scroll region (DECSTBM), origin mode, con trỏ đã lưu; chương trình đặt lại chúng khi vẽ lại (Claude Code và `clear` của shell không dùng). Vẫn không mất dòng nào: mọi dòng trước bản dựng xin được bằng `HistoryRequest`, tới dòng đầu của đời hiện tại. Phần trước một lần xoá lịch sử (`ED 3`) chương trình đã tự xoá nên không trả lại, đúng như terminal thật. Client cũ và phiên đang ở màn hình phụ vẫn đi theo phát lại nguyên luồng bên dưới; gắn lại với `lastOffset` > 0 mà daemon còn giữ byte từ đó vẫn nhận `Output` từ `lastOffset` như cũ (`lastOffset` không còn giữ được thì đi như gắn mới).
 
 Client gửi `Attach{lastOffset}`. Mỗi phiên daemon giữ:
 - **Nhật ký đầu ra trên đĩa**: mọi byte từ offset 0 (lúc mở phiên) tới hiện tại, chỉ ghi nối, không bao giờ cắt khi phiên còn sống. Nằm ở `<config dir>/term-host/output/session-<id>.log` (thư mục trạng thái riêng của daemon: thư mục 0700 và file 0600 trên Unix; trên Windows thừa hưởng DACL chỉ chủ sở hữu của `term-host/`). Xoá khi phiên đóng/dọn hoặc daemon tắt; khi daemon khởi động, thư mục `output/` còn sót (daemon trước chết đột ngột) bị xoá sạch.
 - Vòng đệm byte thô **1 MiB** (mặc định, cấu hình được, tối thiểu 256 KiB): phần đuôi trong bộ nhớ, đọc nhanh; byte đã rời vòng đệm đọc từ nhật ký.
-- Một emulator không đầu: chỉ để lấy tiêu đề cửa sổ cho `list`, và dựng `Snapshot` trong chế độ dự phòng bên dưới.
+- Một emulator không đầu: lấy tiêu đề cửa sổ cho `list`, dựng `LiveSnapshot` (mục "Mở trực tiếp" bên dưới), đánh số dòng lịch sử, và dựng `Snapshot` trong chế độ dự phòng bên dưới.
 
 1. Nếu `lastOffset` > 0 và daemon còn giữ byte từ `lastOffset` (với nhật ký nguyên vẹn là mọi `lastOffset` từ 1 tới offset hiện tại): gửi `Output` bắt đầu từ `lastOffset`, rồi tiếp tục luồng sống.
 2. Ngược lại (`lastOffset` = 0, hoặc lớn hơn offset hiện tại): gửi `Snapshot` **đầu luồng**: `offset` 0, `cols`×`rows` là cỡ hiện tại của phiên, `altScreen` 0, chuỗi VT chỉ là `ESC c` (RIS) để client xoá sạch terminal; rồi `Output` từ offset 0. Client nhận đúng từng byte chương trình đã ghi kể từ lúc mở phiên.
 3. Dự phòng, chỉ khi nhật ký không tạo được hoặc hỏng giữa chừng (lỗi đĩa; daemon ghi cảnh báo và phiên vẫn chạy): daemon chỉ còn giữ những gì vòng đệm có. Khi byte cần đã rời vòng đệm, daemon gửi `Snapshot` dựng bởi emulator (chi tiết bên dưới), rồi `Output` từ offset của nó.
 
 **Xem trước khi phát lại từ đầu** (từ `tunelo` 3.5.0): phát lại cả phiên dài qua relay mất vài giây, và nếu vẽ thẳng thì người dùng thấy cả lịch sử tua qua. Client chưa áp dụng byte nào (`lastOffset` = 0) gửi `Preview` ngay trước `Attach`. Daemon trả `Preview` (cùng nội dung với `Snapshot` dựng bởi emulator ở chế độ dự phòng bên dưới), rồi `Attach` chạy đúng quy tắc 2 ở trên. Client hiện bản dựng đó ngay, nhận luồng phát lại vào terminal thật nhưng chưa cho thấy, và chỉ cho thấy terminal thật (ở dòng mới nhất) khi đã ghi xong tới `offset` của `Preview` và đầu ra yên 150 ms (chương trình vẽ lại theo cỡ của client ngay sau khi gắn), chậm nhất 1,5 giây sau khi tới `offset`, và không bao giờ giữ bản xem trước quá 15 giây. Không dòng nào bị cắt: luồng phát lại vẫn đủ từng byte. Client không gửi `Preview` khi gắn lại với `lastOffset` > 0; bản `Preview` đến khi luồng đã qua `offset` của nó bị bỏ.
+
+**Mở trực tiếp** (từ `tunelo` 3.10.0, client có `LIVE_HISTORY`): khi `Attach{0}` tới một phiên đang ở màn hình thường, daemon gửi `LiveSnapshot` rồi `Output` từ `offset` của nó; không gửi byte nào trước `offset`, không trả `Preview` (client vẫn gửi `Preview` cho daemon cũ). `LiveSnapshot` gồm RIS, tiêu đề, tối đa một màn các dòng lịch sử mới nhất (`tailRows` dòng, từ dòng `historyEnd`) cuộn vào scrollback của client, rồi màn hình có thuộc tính, con trỏ và các chế độ nhập. Dùng cùng `offset` an toàn như `Snapshot`. Màn hình không vừa một khung thì chia thành nhiều phần, không rơi về chữ trơn; quá 255 phần thì daemon phát lại như cũ. Phiên đang ở màn hình phụ (vim, less…) hoặc có đời không đánh số chắc chắn được: daemon trả `Preview` và phát lại như cũ, nên client phải nhận được cả hai câu trả lời cho cùng một `Attach{0}`, kể cả khi `Hello` của daemon đến sau. Khi byte cần đã rời vòng đệm mà không có nhật ký (dự phòng ở trên), client `LIVE_HISTORY` nhận `LiveSnapshot` giữa luồng thay cho `Snapshot`: client đặt lại màn hình và bỏ phần lịch sử đã tải.
+
+**Đánh số dòng và đời**: mỗi dòng cuộn khỏi đỉnh màn hình thường (không tính dòng cuộn trong scroll region) nhận số kế tiếp của *đời* hiện tại, bắt đầu từ 0. Đời kết thúc khi chương trình xoá lịch sử lúc đang có dòng: `ED 3` mọi dạng (`ESC[3J`, `ESC[03J`, `ESC[3;J`, `ESC[?3J`, cả khi bị cắt giữa hai lần đọc) nhận từ bộ phân tích CSI ở màn hình thường, hoặc RIS; đời mới bắt đầu từ màn hình lúc đó với số 0. Daemon dùng cùng một bộ nạp cho emulator sống và cho việc dựng lại từ nhật ký, nên hai bên đánh số giống nhau bất kể kích thước các lần đọc; các lần đổi cỡ được ghi lại theo offset đã nạp (tối đa 4096 lần mỗi đời, trong bộ nhớ) để việc dựng lại áp đúng chỗ.
+
+**Lịch sử theo yêu cầu**: client xin `HistoryRequest{reqId, epoch, beforeRow, maxRows}`; trang đầu tiên xin `beforeRow = historyEnd`, trang sau xin `beforeRow = firstRow` của trang trước. Daemon trả các dòng mới nhất từ scrollback của emulator sống (500 dòng) hoặc từ bộ nhớ đệm, nếu không thì dựng lại đời đó từ nhật ký trên một luồng riêng và giữ một cửa sổ khoảng 2.000 dòng trước dòng xin (tối đa 8 MiB) cho các trang kế tiếp. `epoch` khác đời hiện tại: trả `History` với đời mới, `rowCount` 0, `atStart` 1 (client bỏ phần lịch sử đã tải). Giới hạn: mỗi kết nối tối đa một trang chưa xong (đang chờ dựng hoặc đang gửi) và 10 yêu cầu/giây (dồn 20); phần của trang đi sau đầu ra của mọi kết nối trong cùng lượt, tối đa 2 phần mỗi lượt và chỉ khi bộ đệm của đường còn dưới 128 KiB. Trang đã xếp mà đời đổi thì được thay bằng trang rỗng của đời mới. Dòng có số không chắc chắn (đời bị đánh dấu không chính xác) không bao giờ được trả: daemon trả `HistoryError 1`; toàn máy tối đa 2 việc dựng chạy cùng lúc, 8 việc chờ, bộ nhớ đệm 32 MiB, bộ nhớ đệm không ai đọc 60 giây thì bỏ. Việc dựng bị huỷ khi kết nối đóng, `Detach`, thu hồi thiết bị hay phiên đóng, và kết quả chỉ tới kết nối còn chờ đúng việc đó. Đọc lịch sử nằm trong lần gắn đã ghi `open` vào nhật ký đồng ý, không ghi thêm. Client gửi lại yêu cầu đang chờ sau mỗi lần đổi đường (cùng `reqId`: daemon không trả trùng; trang đang gửi dở được gửi lại từ phần đầu) và tự hết hạn sau 10 giây.
 
 Giới hạn đã biết: luồng phát lại được client vẽ ở cỡ hiện tại của nó, không theo từng cỡ cũ lúc byte được ghi (giao thức không mang mốc đổi cỡ trong luồng). Nhật ký lớn dần theo đầu ra thật của phiên (vd `yes` chạy khi không có client nào gắn thì đĩa lớn theo), tới khi phiên đóng.
 
@@ -107,7 +119,7 @@ Chi tiết `Snapshot` dựng bởi emulator (chỉ trong chế độ dự phòng
 - Client ack mỗi khi đã áp dụng thêm ≥ 16 KiB, và ít nhất mỗi 50 ms khi còn byte chưa ack. Offset ack luôn là cuối một khung đã áp dụng.
 - **Gom đầu ra**: daemon đọc PTY vào bộ đệm 16 KiB, gửi ngay nếu (a) phiên vừa nhận `Input` trong 25 ms gần nhất (đường echo), (b) đầu ra còn lại sau `Attach`, (c) phiên đã kết thúc, hoặc (d) đã gom đủ 16 KiB; ngược lại chờ tối đa 4 ms để gom.
   Trên **đường relay**: gom tới 16 ms (50 ms khi ngân sách còn dưới một nửa) hoặc tới đủ một khung (65523 byte dữ liệu); đường echo (a)–(c) vẫn gửi ngay. Mọi khung `Output` trên relay của cả máy dùng chung một ngân sách
-  200 khung/giây (thùng token, dồn tối đa 20); khung nào không có token thì chờ token kế tiếp. `Snapshot`, `Exit`, `Error`, `Pong`, `Hello` không tính vào ngân sách. Giới hạn của relay là 1000 tin/giây dùng chung với chat.
+  200 khung/giây (thùng token, dồn tối đa 20); khung nào không có token thì chờ token kế tiếp. `Snapshot`, `LiveSnapshot`, `HistoryError`, `Exit`, `Error`, `Pong`, `Hello` không tính vào ngân sách. Mỗi phần của `History` lấy một token và chỉ đi sau đầu ra đến hạn của kết nối trong cùng lượt, nên tải lịch sử không làm chậm tiếng vọng phím. Giới hạn của relay là 1000 tin/giây dùng chung với chat.
 - **Ưu tiên phím**: mỗi vòng lặp xử lý hết `Input` đang chờ trước khi đọc đầu ra PTY. Phím được ghi vào PTY trên một luồng riêng nên một chương trình không đọc stdin không làm nghẽn phiên khác.
   Trên đường thẳng, luồng WebRTC của mỗi peer cũng xử lý datagram đến (phím) trước khung đầu ra đang chờ gửi.
 - Window, ack và gom ở trên giống hệt nhau cho cả hai đường (cùng mã). Trên đường thẳng, bộ đệm gửi SCTP là 2 MiB (lớn hơn window tối đa) để window, không phải SCTP, quyết định lượng byte đang bay; không có ngân sách khung.
@@ -282,7 +294,7 @@ Người dùng mở một phiên AI bằng giao diện terminal thay vì chat: A
 - B → A: mỗi khung `kind 1` của `conn` thành một `TermData{link, data}` trên kết nối đã sở hữu liên kết.
 - `TermData` **không đi qua hàng đợi tuần tự** của kết nối: agent mở khung ngay khi nhận và chuyển thẳng cho daemon, nên một yêu cầu chat chậm (`ThreadCreate`) không làm trễ phím (có test: echo dưới 100 ms khi một `ThreadCreate` đang treo trên cùng kết nối).
 - Khung sai độ dài hay `link` = 0 chỉ đóng liên kết đó (`TermStatus{CLOSED, "bad_frame"}`, agent gửi `conn_close`); kết nối E2E và chat vẫn sống. Byte không mở được thành khung E2E thì đóng đúng kết nối E2E đó (như mọi kết nối).
-- Ngân sách relay của **cả máy**: mọi `TermData` B → A dùng chung thùng token 200 khung/giây, dồn tối đa 40 (cộng với ngân sách 200 khung `Output`/giây của daemon ở mục 5). Khi hết token, hoặc socket của thiết bị còn trên 512 KiB chưa gửi, khung được giữ theo thứ tự rồi gửi sau; giữ quá 64 MiB thì liên kết đóng với `"overflow"`. Tín hiệu (`TermSignal`, `TermStatus`) không tính vào ngân sách.
+- Ngân sách relay của **cả máy**: mọi `TermData` B → A dùng chung thùng token 200 khung/giây, dồn tối đa 40 (cộng với ngân sách 200 khung `Output` và `History`/giây của daemon ở mục 5). Khi hết token, hoặc socket của thiết bị còn trên 512 KiB chưa gửi, khung được giữ theo thứ tự rồi gửi sau; giữ quá 64 MiB thì liên kết đóng với `"overflow"`. Tín hiệu (`TermSignal`, `TermStatus`) không tính vào ngân sách.
 
 ### `TermStatus` từ `conn_state` của daemon
 

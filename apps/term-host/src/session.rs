@@ -14,8 +14,8 @@ use crate::audit::now_ms;
 use crate::output_log::OutputLog;
 use crate::pty::{self, ExitInfo, Gate, OpenSpec, ProcessControl, PtyEvent, WriteJob};
 use crate::ring::Ring;
-use crate::screen::{Screen, Snapshot};
-use crate::wire::{ServerFrame, MAX_DIM, MIN_DIM};
+use crate::screen::{EpochPin, LiveSnapshot, Screen, Snapshot};
+use crate::wire::{ServerFrame, MAX_DIM, MAX_LIVE_SNAPSHOT_VT, MIN_DIM};
 
 /// Default and smallest raw output ring per session.
 pub const DEFAULT_RING_BYTES: usize = 1024 * 1024;
@@ -91,6 +91,36 @@ pub fn preview_frame(session: u32, snap: &Snapshot) -> ServerFrame<'_> {
         alt_screen: snap.alt_screen,
         vt: &snap.vt,
     }
+}
+
+/// The frames of a `LiveSnapshot`: its VT split into parts that fit a frame.
+/// None when it would need more than 255 parts (a screen that large starts
+/// from the replay instead).
+pub fn live_snapshot_frames(session: u32, snap: &LiveSnapshot) -> Option<Vec<ServerFrame<'_>>> {
+    let chunks: Vec<&[u8]> = if snap.vt.is_empty() {
+        vec![&[][..]]
+    } else {
+        snap.vt.chunks(MAX_LIVE_SNAPSHOT_VT).collect()
+    };
+    let parts = u8::try_from(chunks.len()).ok()?;
+    Some(
+        chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, vt)| ServerFrame::LiveSnapshot {
+                session,
+                offset: snap.offset,
+                cols: snap.cols,
+                rows: snap.rows,
+                epoch: snap.epoch,
+                history_end: snap.history_end,
+                tail_rows: snap.tail_rows,
+                part: i as u8,
+                parts,
+                vt,
+            })
+            .collect(),
+    )
 }
 
 /// Output bytes from `from`, at most `max`, appended to `out`: from the ring
@@ -238,7 +268,12 @@ impl Session {
         }
     }
 
+    /// Resize the PTY and the emulator. The size it already has changes
+    /// nothing: no resize reaches the program, so it does not redraw.
     pub fn resize(&mut self, cols: u16, rows: u16) -> Result<(), String> {
+        if (cols, rows) == (self.cols, self.rows) {
+            return Ok(());
+        }
         self.master
             .resize(PtySize {
                 rows,
@@ -255,6 +290,19 @@ impl Session {
 
     pub fn snapshot(&self) -> Snapshot {
         self.screen.snapshot()
+    }
+
+    /// The log and the pinned epoch a history rebuild replays: None without
+    /// an intact log or when the epoch cannot be rebuilt. The log is flushed
+    /// first so a reader by path sees every byte up to the pin.
+    pub fn history_source(&mut self) -> Option<(std::path::PathBuf, EpochPin)> {
+        let pin = self.screen.pin()?;
+        let log = self.log.as_mut()?;
+        if log.flush().is_err() {
+            self.log = None;
+            return None;
+        }
+        Some((log.path().to_path_buf(), pin))
     }
 
     pub fn set_paused(&self, paused: bool) {

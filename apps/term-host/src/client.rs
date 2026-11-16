@@ -32,11 +32,40 @@ pub enum Frame {
     Hello {
         version: u8,
         max_frame: u32,
+        caps: Option<u8>,
     },
     Output {
         session: u32,
         offset: u64,
         data: Vec<u8>,
+    },
+    LiveSnapshot {
+        session: u32,
+        offset: u64,
+        cols: u16,
+        rows: u16,
+        epoch: u32,
+        history_end: u64,
+        tail_rows: u16,
+        part: u8,
+        parts: u8,
+        vt: Vec<u8>,
+    },
+    History {
+        session: u32,
+        req_id: u16,
+        epoch: u32,
+        first_row: u64,
+        row_count: u16,
+        part: u8,
+        parts: u8,
+        at_start: bool,
+        vt: Vec<u8>,
+    },
+    HistoryError {
+        session: u32,
+        req_id: u16,
+        code: u8,
     },
     Snapshot {
         session: u32,
@@ -72,7 +101,68 @@ pub enum Frame {
 impl Frame {
     fn from_wire(f: &ServerFrame<'_>) -> Frame {
         match *f {
-            ServerFrame::Hello { version, max_frame } => Frame::Hello { version, max_frame },
+            ServerFrame::Hello {
+                version,
+                max_frame,
+                caps,
+            } => Frame::Hello {
+                version,
+                max_frame,
+                caps,
+            },
+            ServerFrame::LiveSnapshot {
+                session,
+                offset,
+                cols,
+                rows,
+                epoch,
+                history_end,
+                tail_rows,
+                part,
+                parts,
+                vt,
+            } => Frame::LiveSnapshot {
+                session,
+                offset,
+                cols,
+                rows,
+                epoch,
+                history_end,
+                tail_rows,
+                part,
+                parts,
+                vt: vt.to_vec(),
+            },
+            ServerFrame::History {
+                session,
+                req_id,
+                epoch,
+                first_row,
+                row_count,
+                part,
+                parts,
+                at_start,
+                vt,
+            } => Frame::History {
+                session,
+                req_id,
+                epoch,
+                first_row,
+                row_count,
+                part,
+                parts,
+                at_start,
+                vt: vt.to_vec(),
+            },
+            ServerFrame::HistoryError {
+                session,
+                req_id,
+                code,
+            } => Frame::HistoryError {
+                session,
+                req_id,
+                code,
+            },
             ServerFrame::Output {
                 session,
                 offset,
@@ -498,16 +588,39 @@ impl TermClient {
 
     /// Hello handshake.
     pub fn hello(&mut self) -> io::Result<()> {
-        self.send(&ClientFrame::Hello {
-            version: 1,
-            caps: 0,
-        })?;
+        self.hello_with(0).map(|_| ())
+    }
+
+    /// Hello handshake announcing `caps`; returns the daemon's `caps` (None
+    /// when its `Hello` carried none).
+    pub fn hello_with(&mut self, caps: u8) -> io::Result<Option<u8>> {
+        self.send(&ClientFrame::Hello { version: 1, caps })?;
         match self.recv(Duration::from_secs(5)) {
-            Some(Frame::Hello { version: 1, .. }) => Ok(()),
+            Some(Frame::Hello {
+                version: 1, caps, ..
+            }) => Ok(caps),
             other => Err(io::Error::other(format!(
                 "unexpected hello reply: {other:?}"
             ))),
         }
+    }
+
+    /// Ask for history rows of `epoch` before `before_row`.
+    pub fn history(
+        &self,
+        session: u32,
+        req_id: u16,
+        epoch: u32,
+        before_row: u64,
+        max_rows: u16,
+    ) -> io::Result<()> {
+        self.send(&ClientFrame::HistoryRequest {
+            session,
+            req_id,
+            epoch,
+            before_row,
+            max_rows,
+        })
     }
 
     pub fn input(&self, session: u32, data: &[u8]) -> io::Result<()> {
@@ -682,6 +795,19 @@ impl TermClient {
                         offset,
                         data,
                     }
+                }
+                Frame::LiveSnapshot {
+                    session, offset, ..
+                } => {
+                    self.acks.insert(
+                        session,
+                        AckState {
+                            applied: offset,
+                            acked: offset,
+                            since: None,
+                        },
+                    );
+                    frame
                 }
                 Frame::Snapshot {
                     session,
