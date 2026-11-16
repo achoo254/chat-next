@@ -16,7 +16,7 @@
 import { SessionRenewal } from "./identity/session-renewal.ts";
 import { identitySession } from "./identity/session.ts";
 import { LocalmanLink, deviceIdOf } from "./localman/self-link.ts";
-import { MachineApiError, heartbeat, notifyNeedsInput, notifyUsageHint, registerMachine } from "./machine-api.ts";
+import { MachineApiError, heartbeat, notifyAdvisorAnswer, notifyNeedsInput, notifyUsageHint, registerMachine } from "./machine-api.ts";
 import type { Machine } from "./machine.ts";
 import { Registration } from "./registration-status.ts";
 import { TUNNEL_SERVER, isSignedIn, openTunnel } from "./tunnel.ts";
@@ -111,6 +111,18 @@ function machineOnline(m: Machine, localPort: number, registration: Registration
       await notifyUsageHint(secret());
     } catch (err) {
       if (err instanceof MachineApiError && err.code === "invalid_argument") usagePushRefused = true;
+      throw err;
+    }
+  });
+
+  // A chat server without Advisor's push refuses the kind: not asked again until tunelo restarts.
+  let advisorPushRefused = false;
+  m.setNotifyAdvisor(async () => {
+    if (advisorPushRefused) throw new Error("the chat server does not send Advisor pushes");
+    try {
+      await notifyAdvisorAnswer(secret());
+    } catch (err) {
+      if (err instanceof MachineApiError && err.code === "invalid_argument") advisorPushRefused = true;
       throw err;
     }
   });

@@ -68,6 +68,7 @@ vi.mock("../src/machine-api.ts", async (importOriginal) => {
     },
     notifyNeedsInput: async () => ({}),
     notifyUsageHint: async () => ({}),
+    notifyAdvisorAnswer: async () => ({}),
   };
 });
 
@@ -96,6 +97,7 @@ function fakeMachine(config: ConfigStore): FakeMachine {
     trust: new DeviceTrust({ config }),
     setNotify: () => undefined,
     setNotifyUsage: () => undefined,
+    setNotifyAdvisor: () => undefined,
 
     connectedDeviceKeys: () => [new Uint8Array(32).fill(9)],
     applyTrustedDevices(list: TrustedDevice[]) {

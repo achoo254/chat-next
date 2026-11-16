@@ -478,6 +478,7 @@ export const zhCNMachines: MachinesCopy = {
 			advisorUnavailable: "此会话无法使用顾问：该会话的 AI 或这台机器运行会话时未启用 tunelo 的 MCP。",
 			advisorKeyInvalid: "密钥无效：为空、过长，或包含空格或控制字符。",
 			advisorKeyNotSaved: "机器无法保存密钥（密钥库已锁定或拒绝）。未做任何更改。",
+			sessionLimit: (n: string) => `机器已运行 ${n} 个会话且都在忙。顾问不会关闭你的任何会话：请稍后再试。`,
 			sensitiveFileNotConfirmed: "机密文件加入 git 前需要先确认。",
 			usageRangeInvalid: "时间范围无效（最多 92 天）。",
 			usageLedgerBlocked: "机器的用量统计账本已锁定，因为无法读取或版本未知；删除账本即可重新开始。",

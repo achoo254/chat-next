@@ -71,6 +71,8 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   let secrets: () => SecretService | undefined = () => undefined;
   let browser: () => RemoteBrowser | undefined = () => undefined;
   let advisor: () => AdvisorHooks | undefined = () => undefined;
+  // Until the machine exists no session runs; fail closed meanwhile all the same.
+  let isAdvisorThread: (threadId: string) => boolean = () => true;
   const mcp = new McpHost(dir, {
     log,
     enabledGroups: () => config.get().mcpGroups,
@@ -78,6 +80,7 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     secrets: () => secrets(),
     browser: () => browser(),
     advisor: () => advisor(),
+    isAdvisorThread: (threadId) => isAdvisorThread(threadId),
   });
   const machine = new Machine({ config, mcp });
   secrets = () => machine.secrets;
@@ -88,8 +91,11 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     key: () => machine.advisorKeys.key(),
     call: (threadId, run) => machine.core.advisorCall(threadId, run),
     isSensitive: (path) => machine.isSensitive(path),
+    sessionDir: (threadId) => machine.core.advisorSessionDir(threadId),
+    git: machine.workspaces.runner,
   };
   advisor = () => advisorHooks;
+  isAdvisorThread = (threadId) => machine.core.isAdvisorThread(threadId);
   sessionBypassed = (threadId) => machine.core.bypassed(threadId);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;

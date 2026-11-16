@@ -198,8 +198,33 @@ export function gitDirOf(root: string): string {
   return dotgit;
 }
 
+/**
+ * git's whole stderr of a failed call, kept beside its error and never
+ * serialized: a device gets only its last line (lastLine), while Advisor may
+ * read all of it once cleaned (advisor/scrub-git-output.ts).
+ */
+const rawStderr = new WeakMap<AgentError, string>();
+
+/** The whole stderr git printed for this failure; undefined when the error did not come from git's output. */
+export function rawGitStderr(err: unknown): string | undefined {
+  return err instanceof AgentError ? rawStderr.get(err) : undefined;
+}
+
+/** `to` takes the whole stderr `from` kept (an error that replaces git's own keeps what git said). */
+export function keepGitStderr(to: AgentError, from: unknown): AgentError {
+  const raw = rawGitStderr(from);
+  if (raw !== undefined) rawStderr.set(to, raw);
+  return to;
+}
+
 /** A failed git call as a device gets it. */
 export function failure(out: GitOutput, root = "", kind: GitKind = "read"): AgentError {
+  const err = failureOf(out, root, kind);
+  if (out.stderr.trim() !== "") rawStderr.set(err, out.stderr);
+  return err;
+}
+
+function failureOf(out: GitOutput, root: string, kind: GitKind): AgentError {
   if (out.timedOut) {
     // A write stopped hard may leave git's lock behind: the user removes it once nothing else runs git there.
     const locked = kind !== "read" && root !== "" && existsSync(join(gitDirOf(root), "index.lock"));

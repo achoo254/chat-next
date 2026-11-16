@@ -4,7 +4,7 @@
 // batches of up to FLUSH_MS. A thread nobody watches has no office (it is
 // built again, from the journal, when one does). docs/office-wire.md.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, type OfficeEvents, OfficeEventsSchema, type OfficeSnapshot, OfficeSnapshotSchema, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, type OfficeEvents, OfficeEventsSchema, type OfficeSnapshot, OfficeSnapshotSchema, ThreadKind, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import type { AgentProvider, HistoryEntry, ProviderEvent } from "../providers/types.ts";
 import { type OfficeLog, OfficeProblems } from "./office-problem-log.ts";
@@ -131,7 +131,8 @@ export class OfficeHub {
 
   private build(threadId: string): Office {
     const summary = this.core.list().find((s) => s.id === threadId);
-    if (!summary) throw new AgentError(ErrorCode.NOT_FOUND, "no such thread", { reason: ErrorReason.THREAD_NOT_FOUND });
+    // Advisor's own threads have no office: they are hidden everywhere.
+    if (!summary || summary.kind === ThreadKind.ADVISOR) throw new AgentError(ErrorCode.NOT_FOUND, "no such thread", { reason: ErrorReason.THREAD_NOT_FOUND });
     const provider = this.opts.providers.find((p) => p.id === summary.provider);
     const reportsStaff = provider?.history?.subagentActivity !== undefined;
     const now = this.now();

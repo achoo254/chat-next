@@ -483,6 +483,7 @@ export const enMachines: MachinesCopy = {
 			advisorUnavailable: "Advisor is not available for this session: its AI or the machine runs sessions without tunelo's MCP.",
 			advisorKeyInvalid: "That key is not valid: it is empty, too long, or has spaces or control characters.",
 			advisorKeyNotSaved: "The machine could not save the key (its key store is locked or refused). Nothing changed.",
+			sessionLimit: (n: string) => `The machine already runs its ${n} sessions and they are busy. Advisor closes none of yours: try again later.`,
 			sensitiveFileNotConfirmed: "Secret files need a confirmation before they go into git.",
 			usageRangeInvalid: "The time range is not valid (at most 92 days).",
 			usageLedgerBlocked: "The machine's usage ledger is locked because it cannot be read or has an unknown version; deleting the ledger starts it over.",

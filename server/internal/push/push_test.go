@@ -745,6 +745,25 @@ func TestNotifyUserMachine(t *testing.T) {
 		}
 	}
 
+	// Advisor answered: the machine's name only, opening the machine.
+	for _, c := range []struct{ locale, body string }{
+		{LocaleVI, "Cố vấn đã trả lời trên Mac mini"},
+		{LocaleEN, "Advisor answered on Mac mini"},
+		{LocaleZhCN, "Mac mini 上的顾问已回答"},
+	} {
+		answer := e.svc.machineNotification(MachineNotice{MachineID: 42, MachineName: "Mac mini", Kind: MachineAdvisorAnswer,
+			Pending: 1, At: time.UnixMilli(1000)}, c.locale)
+		var ap Payload
+		if err := json.Unmarshal(answer.Payload, &ap); err != nil {
+			t.Fatal(err)
+		}
+		wantAnswer := Payload{Kind: KindMachine, MachineID: 42, Title: appName, Body: c.body,
+			Tag: "machine-advisor:42", URL: "/machines/42", Timestamp: 1000}
+		if ap != wantAnswer || answer.Topic != "machineadvisor42" || answer.TTL != advisorAnswerTTL || answer.Urgency != webpush.UrgencyNormal {
+			t.Fatalf("advisor answer push %s %+v %+v", c.locale, ap, answer)
+		}
+	}
+
 	off, err := New(e.Store.Pool(), e.Chat, e.presence, Config{TenantID: bottest.TenantID, AppName: appName,
 		SessionIdleTimeout: time.Hour, SessionMaxAge: time.Hour}, bottest.Quiet)
 	if err != nil {

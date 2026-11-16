@@ -24,10 +24,18 @@ export type UsageApi = {
  * in the config (each change written to the consent log), and deleting the
  * ledger through `deleteLedger` (which stops a scan under way).
  */
-export function usageApiOf(o: { ledger: Ledger; config: ConfigStore; audit: AuditLog; deleteLedger: () => Promise<void>; now?: () => number }): UsageApi {
+export function usageApiOf(o: {
+  ledger: Ledger;
+  config: ConfigStore;
+  audit: AuditLog;
+  deleteLedger: () => Promise<void>;
+  now?: () => number;
+  /** Sessions the report leaves out (lowercased ids): Advisor's own, hidden from the user's statistics. */
+  hiddenSessions?: () => ReadonlySet<string>;
+}): UsageApi {
   const rules = () => ruleSwitches(o.config.get().usageRules);
   return {
-    report: (q) => usageReport(o.ledger, q, rules(), (o.now ?? Date.now)()),
+    report: (q) => usageReport(o.ledger, q, rules(), (o.now ?? Date.now)(), o.hiddenSessions?.()),
     rules,
     setRules: (changes, device) => {
       const detail = Object.entries(changes)

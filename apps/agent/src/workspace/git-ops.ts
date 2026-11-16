@@ -15,7 +15,7 @@ import { hasControl } from "../projects/git.ts";
 import { OutsideFolderError } from "../safety/session-files.ts";
 import type { Trash } from "../safety/trash.ts";
 import { GIT_LIMITS, type GitFileChange, clipDiff, newFileDiff, splitDiff } from "../threads/git-changes.ts";
-import { type GitCall, type GitRunner, gitError, parseConfigList } from "./git-run.ts";
+import { type GitCall, type GitRunner, gitError, keepGitStderr, parseConfigList } from "./git-run.ts";
 import { type FileState, type StatusEntry, parseNumstatZ, parseStatusV2 } from "./git-status.ts";
 import { type IsSensitive, gitPath, relParts, resolveInside, within } from "./paths.ts";
 
@@ -424,10 +424,14 @@ export async function divergedOr(run: GitRunner, root: string, when: DivergedWhe
       () => undefined,
     );
     if (!counts || !explains(when, counts)) throw err;
-    throw new AgentError(ErrorCode.INVALID, `the upstream has ${counts.behind} commits the branch does not`, {
-      reason: ErrorReason.GIT_DIVERGED,
-      subject: `${counts.ahead} ${counts.behind}`,
-    });
+    // What git said of the refused push or pull stays with it, for Advisor.
+    throw keepGitStderr(
+      new AgentError(ErrorCode.INVALID, `the upstream has ${counts.behind} commits the branch does not`, {
+        reason: ErrorReason.GIT_DIVERGED,
+        subject: `${counts.ahead} ${counts.behind}`,
+      }),
+      err,
+    );
   }
 }
 

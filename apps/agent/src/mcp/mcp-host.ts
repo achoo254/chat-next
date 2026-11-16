@@ -70,6 +70,7 @@ const NO_SESSION =
 	"This MCP session ended (tunelo restarted); reconnect the MCP client.";
 const TICKET_ENDED =
 	"This claude session's access to tunelo ended; start a new session.";
+const ADVISOR_ONLY = "Advisor's session only has advisor_weigh, advisor_git and advisor_grep.";
 const NOT_APPROVED =
 	"This was not approved on the device: tunelo runs it only after the user approves this exact call.";
 /** How long a card waits for the name of the chat a message goes to. */
@@ -92,6 +93,8 @@ export interface McpHostOptions {
 	browser?: () => RemoteBrowser | undefined;
 	/** Advisor (its threads' state, the key, calls the core can stop); without it a session has no Advisor tools. */
 	advisor?: () => AdvisorHooks | undefined;
+	/** The thread is one of Advisor's own (the core's word): its session gets Advisor's tools only. */
+	isAdvisorThread?: (threadId: string) => boolean;
 	log?: (line: string) => void;
 }
 
@@ -153,6 +156,16 @@ export class McpHost {
 		const threadId = this.tickets.owner(ticket);
 		if (!threadId) return tables;
 		const session = { key: ticket, threadId };
+		const advisor = this.options.advisor?.();
+		// An Advisor thread's session has Advisor's tools and nothing else (none at all without them).
+		if (this.advisorThread(threadId)) {
+			if (advisor) {
+				const table = new ToolTable();
+				registerAdvisorTools(table, { hooks: advisor, threadId });
+				tables.set(ADVISOR_GROUP, table);
+			}
+			return tables;
+		}
 		const service = this.options.secrets?.();
 		if (service) {
 			const table = new ToolTable();
@@ -165,7 +178,6 @@ export class McpHost {
 			registerBrowserTools(table, { browser, session });
 			tables.set(BROWSER_GROUP, table);
 		}
-		const advisor = this.options.advisor?.();
 		if (advisor) {
 			const table = new ToolTable();
 			registerAdvisorTools(table, { hooks: advisor, threadId });
@@ -184,6 +196,11 @@ export class McpHost {
 		if (!entry) return failure(new Error(NO_SESSION));
 		const who = entry.ticket ? this.tickets.owner(entry.ticket) : "local";
 		if (!who) return failure(new Error(TICKET_ENDED));
+		// Advisor's own session reads only: none of Chat's, Localman's, the tunnels', the secrets' or the browser's tools.
+		if (entry.ticket && groupName !== ADVISOR_GROUP && this.advisorThread(who)) {
+			this.log(`mcp ${who}: ${groupName} ${tool} refused (Advisor's session)`);
+			return failure(new Error(ADVISOR_ONLY));
+		}
 		if (Object.hasOwn(TICKET_GROUPS, groupName)) return this.callTicketTool(entry, who, groupName, tool, args);
 		const group = toolGroup(groupName);
 		if (!group || !this.enabled(group.name)) {
@@ -211,6 +228,14 @@ export class McpHost {
 		const result = await table.call(tool, args);
 		this.log(redactMessage(`mcp ${who}: ${group} ${tool} ${result.isError ? "failed" : "ok"}`));
 		return { ...result, content: result.content.map((item) => (item.type === "text" ? { ...item, text: redact(item.text) } : item)) };
+	}
+
+	/** The thread is an Advisor thread (its session gets Advisor's tools only). */
+	private advisorThread(threadId: string): boolean {
+		// Asked of the core itself; Advisor's hooks only where the core is not wired (tests).
+		const isAdvisor = this.options.isAdvisorThread;
+		if (isAdvisor) return isAdvisor(threadId);
+		return this.options.advisor?.()?.sessionDir?.(threadId) !== undefined;
 	}
 
 	/** Why a write may not run now; undefined when it may (or is no write). */

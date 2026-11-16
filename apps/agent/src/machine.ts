@@ -9,7 +9,7 @@ import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { LoginState, type MachineInfo, MachineInfoSchema, ThreadState, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { LoginState, type MachineInfo, MachineInfoSchema, ThreadKind, ThreadState, type ThreadSummary, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { type KeyPair, PROTOCOL_VERSION, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
@@ -71,6 +71,8 @@ export type MachineOptions = {
   notify?: (thread: ThreadSummary, pending: number, providerId: string) => void;
   /** Asks the chat server for a content-free "usage hint" push to the account's devices; rejects when it was not sent. */
   notifyUsage?: () => Promise<void>;
+  /** Asks the chat server for a content-free "Advisor answered" push; rejects when it was not sent. */
+  notifyAdvisor?: () => Promise<void>;
   log?: (line: string) => void;
   /** tunelo's MCP for the sessions this machine opens (its tickets); absent in tests. */
   mcp?: McpHost;
@@ -180,7 +182,14 @@ export class Machine {
       deliver: (hints, sentAt) => this.deliverUsageHints(hints, sentAt),
       log: this.log,
     });
-    this.usageApi = usageApiOf({ ledger: this.usage.ledger, config: this.config, audit: this.audit, deleteLedger: () => this.usage.deleteLedger() });
+    this.usageApi = usageApiOf({
+      ledger: this.usage.ledger,
+      config: this.config,
+      audit: this.audit,
+      deleteLedger: () => this.usage.deleteLedger(),
+      // Advisor's sessions stay out of the user's statistics, as out of every list.
+      hiddenSessions: () => this.core.advisorSessionIds(),
+    });
     const c = this.config.get();
     this.trust = new DeviceTrust({ config: this.config });
     const forwardSettings = new ForwardSettings(dir);
@@ -225,6 +234,13 @@ export class Machine {
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
       sessionMcpEnabled: () => this.sessionMcpEnabled(),
       advisorKeySet: () => this.advisorKeys.status().keySet,
+      // Read when an Advisor thread opens or is asked, long after both are built.
+      isKnownFolder: (dir) => this.projects.projectOf(dir) !== undefined,
+      gitFailure: (failureId) => this.workspaces.failures.get(failureId),
+    });
+    // Only an answer: a question that failed, ran out of time or was stopped is not worth a push.
+    this.core.onAdvisorAnswer((threadId, _clientMsgId, state) => {
+      if (state === TurnState.COMPLETED) void this.advisorAnswered(threadId);
     });
     for (const p of withAccounts(this.providers)) {
       p.accounts?.listen({ onSelect: () => this.core.followMachineAccount(p.id), onChange: () => this.announceAccounts() });
@@ -249,7 +265,7 @@ export class Machine {
       home: homedir(),
       sessionDirs: async () => {
         const count = new Map<string, number>();
-        for (const t of this.core.list()) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
+        for (const t of this.core.list()) if (t.kind !== ThreadKind.ADVISOR) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
         for (const p of withHistory(this.providers)) {
           for (const d of (await this.core.localSessions({ provider: p.id, dir: "", query: "", offset: 0, limit: 1 })).dirs) {
             count.set(d.dir, Math.max(count.get(d.dir) ?? 0, d.sessions));
@@ -409,6 +425,29 @@ export class Machine {
     this.opts.notifyUsage = fn;
   }
 
+  /** Wired once the machine is registered with the chat server. */
+  setNotifyAdvisor(fn: () => Promise<void>): void {
+    this.opts.notifyAdvisor = fn;
+  }
+
+  /**
+   * A question to Advisor ended: devices following its thread read the
+   * answer from the journal; when none follows it now, or none looked at the
+   * machine lately (a phone locked meanwhile), one content-free push says
+   * Advisor answered.
+   */
+  private async advisorAnswered(threadId: string): Promise<void> {
+    const watched = Date.now() - this.lastPing < PING_FRESH_MS && [...this.connections].some((c) => c.follows(threadId));
+    if (watched) return;
+    const push = this.opts.notifyAdvisor;
+    if (!push) return;
+    try {
+      await push();
+    } catch (err) {
+      this.log(`advisor: answer push not sent (${(err as Error).message})`);
+    }
+  }
+
   /** The usage rules switched on now (the user's switches over the defaults). */
   private usageRules(): RuleSwitches {
     return ruleSwitches(this.config.get().usageRules);
@@ -419,7 +458,11 @@ export class Machine {
    * over the sealed link, and one content-free push through the chat server
    * for the devices not looking. Delivered when either got through.
    */
-  private async deliverUsageHints(hints: UsageHint[], sentAt: number): Promise<boolean> {
+  private async deliverUsageHints(all: UsageHint[], sentAt: number): Promise<boolean> {
+    // Advisor's sessions are hidden from the user: no hint, no push for them (recorded as handled).
+    const advisor = this.core.advisorSessionIds();
+    const hints = all.filter((h) => !advisor.has(h.sessionId.toLowerCase()));
+    if (hints.length === 0) return true;
     let reached = false;
     for (const c of this.connections) {
       if (!c.isOpen) continue;
@@ -718,11 +761,13 @@ export class Machine {
   }
 
   private maybePush(thread: ThreadSummary): void {
+    // Advisor's threads never wait for the user (nothing asks there); never a "needs you" push for one.
+    if (thread.kind === ThreadKind.ADVISOR) return;
     setTimeout(() => {
       const now = this.core.list().find((t) => t.id === thread.id);
       if (!now || now.state !== ThreadState.WAITING) return;
       if (Date.now() - this.lastPing < PING_FRESH_MS) return;
-      const waiting = this.core.list().filter((t) => t.pending > 0);
+      const waiting = this.core.list().filter((t) => t.pending > 0 && t.kind !== ThreadKind.ADVISOR);
       const pending = waiting.reduce((n, t) => n + t.pending, 0);
       const ais = new Set([now.provider, ...waiting.map((t) => t.provider)]);
       if (this.opts.notify) this.opts.notify(now, pending, ais.size === 1 ? now.provider : "");

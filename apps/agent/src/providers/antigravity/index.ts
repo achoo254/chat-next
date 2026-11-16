@@ -113,6 +113,12 @@ export function createAntigravityProvider(
     permissionModes: [...AGY_MODES],
     bypassModeId: FULL_ACCESS,
     sessionMcp: true,
+    // Off until it is seen on a real agy that it asks (session/request_permission)
+    // before every tool that is not a read, its MCP tools included: agy runs some
+    // tools without asking (and every tool under "always-proceed"), and a call
+    // it never asks about cannot be refused. The read-only guard below is
+    // ready for that day (permissions.ts).
+    advisorSession: false,
   };
   const listSessions = async (): Promise<ListedSession[]> => {
     const live = await acp.get();
@@ -169,7 +175,9 @@ export function createAntigravityProvider(
       const version = await versionOf(bin);
       if (version && !supported(version)) throw new Error(`agy ${version} is too old: update agy (1.5.2 or later)`);
       const alwaysProceed = permission() === "always-proceed";
-      const refused = modeRefusal(alwaysProceed, policy.permissionMode);
+      // agy that runs every tool without asking cannot keep an Advisor session to reading.
+      if (policy.advisorSession && (!capabilities.advisorSession || alwaysProceed)) throw new Error("Advisor cannot keep an agy session to reading on this machine");
+      const refused = policy.advisorSession ? undefined : modeRefusal(alwaysProceed, policy.permissionMode);
       if (refused) throw new Error(refused);
       const live = await acp.get();
       const params = { cwd: policy.dir, mcpServers: policy.sessionMcp ? [acpSessionMcpServer(policy.sessionMcp)] : [] };
@@ -199,6 +207,7 @@ export function createAntigravityProvider(
               rules,
               onRule: () => ref.session?.emit({ type: "session-rules", rules: [...rules] }),
               ...(policy.sessionMcp ? { sessionMcp: policy.sessionMcp } : {}),
+              ...(policy.advisorSession ? { advisorSession: true } : {}),
             },
             signal,
           ),
@@ -214,7 +223,7 @@ export function createAntigravityProvider(
           await s.setModel(policy.model);
           model = policy.model;
         }
-        if (!alwaysProceed && policy.permissionMode && policy.permissionMode !== mode) await s.setPermissionMode(policy.permissionMode);
+        if (!alwaysProceed && !policy.advisorSession && policy.permissionMode && policy.permissionMode !== mode) await s.setPermissionMode(policy.permissionMode);
       } catch (err) {
         await s.close();
         live.sessions.delete(s);
@@ -233,6 +242,7 @@ export function createAntigravityProvider(
           model = m;
         },
         setPermissionMode: async (m) => {
+          if (policy.advisorSession) return;
           const why = modeRefusal(permission() === "always-proceed", m);
           if (why) throw new Error(why);
           if (m !== FULL_ACCESS) await s.setPermissionMode(m);

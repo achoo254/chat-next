@@ -330,7 +330,13 @@ message Frame {
 
 // --- requests (A → B) ------------------------------------------------------
 
-message ThreadList {}
+message ThreadList {
+  // The device knows ThreadSummary.kind (tunelo 3.13.0+): Advisor's threads
+  // are listed too, and their ThreadStatus reaches it from now on. A device
+  // that never says so (nor opens or follows one of them) never hears of
+  // them.
+  bool advisor = 1;
+}
 
 message ThreadCreate {
   // Required: an adapter id from MachineInfo.providers (empty is refused
@@ -349,6 +355,23 @@ message ThreadCreate {
   // empty follows the machine's own AI settings. Machines before tunelo 2.0.7
   // ignore it.
   string permission_mode = 6;
+  // ADVISOR (tunelo 3.13.0+; see "advisor" below): the machine's Advisor
+  // thread of this folder and AI, opened when it has none. text and
+  // permission_mode are ignored; dir "" is a scratch folder of the machine.
+  // Only for an AI whose ProviderCapabilities.advisor_session is set (refused
+  // with ERROR_REASON_ADVISOR_UNAVAILABLE otherwise); machines before that
+  // know no such field and would open an ordinary thread.
+  ThreadKind kind = 7;
+}
+
+// What a thread is for.
+enum ThreadKind {
+  // An ordinary session.
+  THREAD_KIND_UNSPECIFIED = 0;
+  // Advisor's own session of one folder and one AI (see "advisor" below):
+  // read only, hidden from every list, push and recent folder. The AI's
+  // own records still keep it (e.g. `claude --resume` on the machine).
+  THREAD_KIND_ADVISOR = 1;
 }
 
 // What the user confirmed on A before opening the session.
@@ -378,6 +401,39 @@ message ThreadSend {
   // spent id refuses the message with ERROR_REASON_ATTACHMENT_NOT_FOUND.
   // Machines before tunelo 2.0.5 ignore the field: send none to them.
   repeated string attachment_ids = 4;
+  // An Advisor thread only (THREAD_KIND_ADVISOR): what the user attached to
+  // the question, at most 5. B hands them to the AI marked as untrusted, and
+  // adds what it keeps of a failure_id it knows. Refused on other threads.
+  repeated AdvisorAttachment advisor_attachments = 5;
+}
+
+// A piece the user copied and attached to a question for Advisor, with
+// where it was copied. Never a secret: devices drop copies that look like
+// one before offering them.
+message AdvisorAttachment {
+  // At most 8000 characters.
+  string text = 1;
+  AdvisorContext context = 2;
+}
+
+// Where a copy was made, as the screen declared it. Every field at most 200
+// characters on one line; empty when the screen did not say.
+message AdvisorContext {
+  // "chat", "session", "scm", "terminal", "files", …
+  string screen = 1;
+  // The folder on B and its branch, when the screen shows one.
+  string dir = 2;
+  string branch = 3;
+  // The session the copy came from.
+  string thread_id = 4;
+  // The panel and the action that failed there ("push", "pull", …).
+  string panel = 5;
+  string action = 6;
+  // The ErrorReason's name of the failure the copy shows.
+  string error_code = 7;
+  // Error.failure_id of the failure the copy shows: B adds git's whole
+  // output of it, cleaned, when it still keeps it (10 minutes).
+  string failure_id = 8;
 }
 
 message ThreadSubscribe {
@@ -427,6 +483,11 @@ message Answer {
 
 message ThreadInterrupt {
   string thread_id = 1;
+  // Required on an Advisor thread: the ThreadSend.client_msg_id of the
+  // question to stop. Waiting, it leaves the queue; running, its turn is
+  // stopped; another question goes on. Only the device that asked it may
+  // stop it. Ignored on other threads.
+  string client_msg_id = 2;
 }
 
 message ThreadClose {
@@ -1247,6 +1308,10 @@ message Error {
   // The one variable part the reason names, when it has one: a folder, an
   // AI's name, a mode, an effort level, a profile id, or the AI's own error.
   string subject = 4;
+  // A failed git request of a workspace (tunelo 3.13.0+): what B keeps of
+  // git's whole output for 10 minutes, for AdvisorContext.failure_id. An
+  // opaque id; empty for anything else.
+  string failure_id = 5;
 }
 
 enum ErrorReason {
@@ -1458,6 +1523,10 @@ enum ErrorReason {
   // AdvisorSetKey: the machine's key store could not seal the key (locked,
   // refused). Nothing was saved.
   ERROR_REASON_ADVISOR_KEY_NOT_SAVED = 84;
+  // An Advisor question while every session slot of the machine holds an
+  // ordinary session that is busy (subject: the limit). No session is
+  // closed for Advisor; ask again later.
+  ERROR_REASON_SESSION_LIMIT = 85;
 }
 
 enum ErrorCode {
@@ -1537,6 +1606,9 @@ message ThreadSummary {
   // The thread may be IDLE meanwhile: a device shows it as still working.
   // 0 when none, and from tunelo before 3.3.7.
   uint32 background_tasks = 18;
+  // THREAD_KIND_ADVISOR: Advisor's own thread; only devices that said so
+  // (ThreadList.advisor) get it. Such a thread is archived too.
+  ThreadKind kind = 19;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a
@@ -1833,6 +1905,9 @@ message TurnItem {
   // that failed counts as asked). Never set for an interrupted or failed
   // turn.
   bool advisor_missed = 13;
+  // The ThreadSend.client_msg_id of the message that started the turn
+  // (tunelo 3.13.0+); on an Advisor thread, the question it answers.
+  string client_msg_id = 14;
 }
 
 message SubagentItem {
@@ -1927,6 +2002,11 @@ message ProviderCapabilities {
   // The machine keeps several accounts of the AI and picks one
   // (AccountList, AccountSelect).
   bool accounts = 17;
+  // The machine can open an Advisor thread on this AI (ThreadCreate kind
+  // ADVISOR): tunelo itself keeps its session to reading, whatever the AI's
+  // own settings say. Unset for an AI where tunelo cannot (yet) make sure of
+  // that; ThreadCreate is then refused with ERROR_REASON_ADVISOR_UNAVAILABLE.
+  bool advisor_session = 18;
 }
 
 message ModelOption {
@@ -2116,6 +2196,26 @@ message AuditEntry {
 // never through the server; no frame from B ever carries it, only its
 // fingerprint. Every change of the key goes to every connected device as
 // MachineInfo, unasked.
+//
+// Asking Advisor from a device (tunelo 3.13.0+) uses the thread requests:
+// ThreadCreate{kind: ADVISOR, dir, provider} gives the one Advisor thread of
+// that folder and AI (dir "" for a scratch folder; a sensitive folder needs
+// Consent.sensitive each time, NEEDS_CONSENT otherwise; any other folder must
+// be a project of the machine or the folder of one of its sessions), then
+// ThreadSend{client_msg_id: a new id for the question, text: the question,
+// advisor_attachments}. Questions wait in order, one turn each (at most 120 s,
+// then the turn fails with an error item); each TurnItem carries the
+// client_msg_id it answers, and the answer is the turn's text with its
+// AdvisorVerdictItem (kind "answer"). The journal keeps them: a device that
+// comes back reads them by ThreadSubscribe. ThreadInterrupt{client_msg_id}
+// stops only that question. When no device follows the thread as the turn
+// ends, B asks for a content-free "Advisor answered" push.
+//
+// The thread's AI may only read inside its folder (no secret files, nothing
+// sensitive), search, and call advisor_git and advisor_weigh of tunelo's MCP;
+// tunelo refuses every other tool itself, without an approval card, and the
+// session never loads the folder's or the user's own AI settings. Its
+// permission mode, automatic Advisor and AI cannot be changed.
 
 // What a machine offers for Advisor (MachineInfo.advisor).
 message AdvisorStatus {

@@ -20,6 +20,7 @@ import {
   ProjectConfigLevel,
   PromptState,
   Role,
+  ThreadKind,
   ThreadState,
   type ThreadActivity,
   ThreadActivitySchema,
@@ -71,6 +72,20 @@ import { keptImage, prepareAttachments, textForAi, userWords } from "../attachme
 import { type NoteState, advisorNote, noteStateAfterToggle, withNote } from "../advisor/advisor-instructions.ts";
 import { advisorResultOf, isAdvisorWeigh } from "../advisor/advisor-tools.ts";
 import { type AdvisorCall, verdictItem } from "../advisor/advisor-verdict.ts";
+import {
+  ADVISOR_STOP_GRACE_MS,
+  ADVISOR_TITLE,
+  ADVISOR_TURN_MS,
+  type AdvisorAttachmentInput,
+  AdvisorQueue,
+  type SavedQuestion,
+  QUEUE_MAX,
+  advisorPrompt,
+  advisorScratchDir,
+  advisorSessionNote,
+  questionRefusal,
+} from "../advisor/advisor-thread.ts";
+import type { GitFailure } from "../advisor/git-failure-memory.ts";
 import { imageType } from "../attachments/image-type.ts";
 import { ATTACHMENTS_FOLDER, saveInFolder } from "../attachments/project-files.ts";
 import { type Trash, systemTrash } from "../safety/trash.ts";
@@ -80,6 +95,8 @@ import { ProjectConfigStore } from "./project-config.ts";
 export class AgentError extends Error {
   readonly reason: ErrorReason;
   readonly subject: string;
+  /** A failed git write of a workspace the machine keeps for Advisor (Error.failure_id); unset for anything else. */
+  failureId?: string;
 
   constructor(
     readonly code: ErrorCode,
@@ -133,6 +150,10 @@ type ThreadMeta = {
   archived?: boolean;
   /** The session's automatic Advisor is on (ThreadSetAdvisor); unset when off. */
   advisor?: boolean;
+  /** "advisor": Advisor's own thread of its folder and AI (ThreadKind ADVISOR); unset for an ordinary session. */
+  kind?: "advisor";
+  /** An Advisor thread's questions not started yet, oldest first: they go on after a restart (without what the machine added). */
+  advisorQueue?: SavedQuestion[];
   /**
    * The running totals the AI last reported for the session `sessionId`
    * (API time, cost at API prices): a turn's share is what they grew by.
@@ -270,6 +291,20 @@ type Thread = {
   advisorTurn?: { turnId: string; onAllAlong: boolean; askedNext: boolean; mixed: boolean };
   /** The turn (TurnItem id) the user stopped: an Advisor answer of it that comes late reads as interrupted. */
   advisorStopped?: string;
+  /** An Advisor thread's questions waiting for the running one to end. */
+  questions?: AdvisorQueue;
+  /** The question an Advisor thread runs now: who asked, its turn, and the timers that end it in time. */
+  asking?: { clientMsgId: string; device: string; turnItem: string; prompt: string; timer: ReturnType<typeof setTimeout>; grace?: ReturnType<typeof setTimeout> };
+  /**
+   * An Advisor thread's session resumed and not heard from yet: a resume
+   * that fails before the AI says anything starts a new session instead
+   * (`failed`: it reported an error already).
+   */
+  resuming?: { heard: boolean; failed: boolean };
+  /** The turn (TurnItem id) of an Advisor thread stopped for running too long: it ends as failed. */
+  timedOut?: string;
+  /** An Advisor thread is starting its next question (between taking it from the queue and its turn running). */
+  advancing?: boolean;
 };
 
 /** A note about Advisor waiting with a message: its text, where the session stands once the AI got it, and the generation it holds for. */
@@ -359,6 +394,14 @@ export type CoreOptions = {
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
   /** The machine keeps a key for Advisor (a turn that never asked it is flagged only then). */
   advisorKeySet?: () => boolean;
+  /** A folder the machine knows (one of its projects): an Advisor thread opens only in such a folder or one of a session. */
+  isKnownFolder?: (dir: string) => boolean;
+  /** A git failure of a workspace the machine keeps, for Advisor (workspace/workspaces.ts). */
+  gitFailure?: (failureId: string) => GitFailure | undefined;
+  /** Where an Advisor thread opened without a folder works; advisorScratchDir when unset (tests). */
+  advisorScratch?: () => string;
+  /** How long an Advisor turn may run, and how long its AI may take to end it once stopped; ADVISOR_TURN_MS and ADVISOR_STOP_GRACE_MS when unset (tests). */
+  advisorTimes?: { turnMs: number; graceMs: number };
   /**
    * Whether the machine runs its sessions with tunelo's MCP now (it may turn
    * it off); whether `sessionMcp` is given when unset.
@@ -399,6 +442,7 @@ export class AgentCore {
   private turnEndListeners = new Set<(threadId: string) => void>();
   private activityListeners = new Set<(activity: ThreadActivity) => void>();
   private providerEventListeners = new Set<(threadId: string, e: ProviderEvent | HistoryEntry) => void>();
+  private advisorAnswerListeners = new Set<(threadId: string, clientMsgId: string, state: TurnState) => void>();
   private elsewhereTimer: ReturnType<typeof setInterval> | undefined;
   /** The look for activity elsewhere under way; one at a time. */
   private looking: Promise<void> | undefined;
@@ -516,13 +560,18 @@ export class AgentCore {
     this.elsewhereTimer = setInterval(() => void this.lookElsewhere(), ELSEWHERE_POLL_MS);
     this.elsewhereTimer.unref?.();
     void this.lookElsewhere();
+    // Questions to Advisor that waited through a restart go on.
+    for (const t of this.threads.values()) if (t.questions?.size) void this.advanceAdvisor(t).catch(() => undefined);
   }
 
   async stop(): Promise<void> {
     if (this.idleTimer) clearInterval(this.idleTimer);
     if (this.elsewhereTimer) clearInterval(this.elsewhereTimer);
     await this.looking;
-    for (const t of this.threads.values()) this.endActivity(t);
+    for (const t of this.threads.values()) {
+      this.endActivity(t);
+      this.clearAsking(t);
+    }
     // Prompts waiting for the user expire with the service; its next start asks the questions again.
     for (const t of this.threads.values()) this.expirePending(t);
     // A session moving to another account opens first, then closes with the rest.
@@ -545,6 +594,12 @@ export class AgentCore {
   onInfo(fn: (threadId: string) => void): () => void {
     this.infoListeners.add(fn);
     return () => this.infoListeners.delete(fn);
+  }
+
+  /** Called when a question of an Advisor thread got its answer, failed or was stopped (its turn ended). */
+  onAdvisorAnswer(fn: (threadId: string, clientMsgId: string, state: TurnState) => void): () => void {
+    this.advisorAnswerListeners.add(fn);
+    return () => this.advisorAnswerListeners.delete(fn);
   }
 
   /** Called with a thread id whenever one of its turns ended (its folder may have changed). */
@@ -875,7 +930,8 @@ export class AgentCore {
   openSessionsOf(provider: string): { threadId: string; title: string; busy: boolean }[] {
     return [...this.threads.values()]
       .filter((t) => this.isOpen(t) && t.meta.provider === provider)
-      .map((t) => ({ threadId: t.meta.id, title: t.meta.title, busy: t.running || t.pending.size > 0 || Boolean(t.starting) || Boolean(t.switching) }));
+      // An Advisor thread still holds the AI (it blocks a switch while it runs) but is never named.
+      .map((t) => ({ threadId: t.meta.id, title: t.meta.kind === "advisor" ? "a background session" : t.meta.title, busy: t.running || t.pending.size > 0 || Boolean(t.starting) || Boolean(t.switching) }));
   }
 
   // --- the machine's account of each AI ------------------------------------------
@@ -910,7 +966,7 @@ export class AgentCore {
 
   /** Every thread and the account it runs with, for devices. */
   accountStates(): SessionAccountState[] {
-    return [...this.threads.values()].map((t) => ({
+    return [...this.threads.values()].filter((t) => t.meta.kind !== "advisor").map((t) => ({
       threadId: t.meta.id,
       provider: t.meta.provider,
       accountId: this.accountOf(t),
@@ -1072,10 +1128,32 @@ export class AgentCore {
     return item;
   }
 
+  /** The folders of the latest sessions, newest first; Advisor's threads are not sessions of the user's. */
   recentDirs(limit = 10): string[] {
     const seen: string[] = [];
-    for (const s of this.list()) if (!seen.includes(s.dir)) seen.push(s.dir);
+    for (const s of this.list()) if (s.kind !== ThreadKind.ADVISOR && !seen.includes(s.dir)) seen.push(s.dir);
     return seen.slice(0, limit);
+  }
+
+  /** The thread is one of Advisor's own (ThreadKind ADVISOR). */
+  isAdvisorThread(threadId: string): boolean {
+    return this.threads.get(threadId)?.meta.kind === "advisor";
+  }
+
+  /** The folder of an Advisor thread; undefined for any other thread (advisor_git runs only there). */
+  advisorSessionDir(threadId: string): string | undefined {
+    const t = this.threads.get(threadId);
+    return t?.meta.kind === "advisor" && !t.deleted ? t.meta.dir : undefined;
+  }
+
+  /** The AI session ids of Advisor's threads (lowercased), which the lists of the machine's sessions leave out. */
+  advisorSessionIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const t of this.threads.values()) {
+      if (t.meta.kind !== "advisor") continue;
+      for (const seg of t.meta.segments) if (seg.sessionId) ids.add(seg.sessionId.toLowerCase());
+    }
+    return ids;
   }
 
   // --- commands ------------------------------------------------------------
@@ -1115,6 +1193,60 @@ export class AgentCore {
   }
 
   /**
+   * The Advisor thread of a folder and an AI (ThreadCreate kind ADVISOR):
+   * the one there is, else a new one, archived, read only (advisor-guard.ts),
+   * on no settings of the folder. `dir` "" is a scratch folder of the
+   * machine; any other folder must be one of its projects or the folder of
+   * one of its sessions, and a sensitive one needs the user's consent each
+   * time (NEEDS_CONSENT): the machine never gives it itself.
+   */
+  async createAdvisor(req: { provider: string; model: string; dir: string; consent: { sensitive: boolean }; device: string }): Promise<ThreadSummary> {
+    const provider = this.namedProvider(req.provider);
+    if (provider.capabilities.advisorSession !== true || !this.advisorAvailable(provider.id)) {
+      throw new AgentError(ErrorCode.INVALID, `Advisor cannot run a read-only session of ${provider.name} on this machine`, {
+        reason: ErrorReason.ADVISOR_UNAVAILABLE,
+        subject: provider.id,
+      });
+    }
+    const dir = req.dir.trim() === "" ? (this.opts.advisorScratch ?? (() => advisorScratchDir(this.opts.isSensitive)))() : resolve(req.dir);
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
+    if (req.dir.trim() !== "" && !this.knownFolder(dir)) {
+      throw new AgentError(ErrorCode.INVALID, "Advisor opens only in a project of the machine or the folder of one of its sessions", {
+        reason: ErrorReason.PROJECT_NOT_FOUND,
+        subject: dir,
+      });
+    }
+    if (this.opts.isSensitive(dir) && !req.consent.sensitive) {
+      throw new AgentError(ErrorCode.NEEDS_CONSENT, "sensitive folder", { reason: ErrorReason.SENSITIVE_FOLDER, subject: dir });
+    }
+    const held = [...this.threads.values()].find((t) => t.meta.kind === "advisor" && !t.deleted && t.meta.dir === dir && t.meta.provider === provider.id);
+    if (held) return this.summary(held);
+    await this.admit(provider, dir, { sensitive: req.consent.sensitive, projectSettings: false }, req.device);
+    const t = this.addThread({ title: ADVISOR_TITLE, dir, provider: provider.id, model: req.model, projectSettings: false });
+    t.meta.kind = "advisor";
+    t.meta.archived = true;
+    t.questions = new AdvisorQueue();
+    this.saveMeta(t);
+    return this.summary(t);
+  }
+
+  /** A folder an Advisor thread may open in: a project of the machine, or the folder (or work tree) of one of its sessions. */
+  private knownFolder(dir: string): boolean {
+    if (this.opts.isKnownFolder?.(dir)) return true;
+    for (const t of this.threads.values()) {
+      if (t.meta.kind === "advisor" || t.deleted) continue;
+      if (t.meta.dir === dir || gitRoot(t.meta.dir) === dir) return true;
+    }
+    return false;
+  }
+
+  /** Refuses what an Advisor thread never does (its mode, its AI, a terminal, a fresh thread, automatic Advisor). */
+  private notOnAdvisor(t: Thread, what: string): void {
+    if (t.meta.kind !== "advisor") return;
+    throw new AgentError(ErrorCode.INVALID, `an Advisor thread cannot ${what}`, { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: what });
+  }
+
+  /**
    * `/clear`: the AI forgets the conversation, so the thread must not keep
    * showing it as if it were still in context. Another thread opens in the
    * same folder on the same AI, model, effort, permission mode, automatic
@@ -1123,6 +1255,7 @@ export class AgentCore {
    */
   async clear(threadId: string): Promise<ThreadSummary> {
     const old = this.thread(threadId);
+    this.notOnAdvisor(old, "be cleared");
     const next = this.addThread({
       title: "",
       dir: old.meta.dir,
@@ -1201,7 +1334,7 @@ export class AgentCore {
     const history = this.namedProvider(req.provider).history;
     if (!history) return { sessions: [], total: 0, dirs: [] };
     await history.prime?.();
-    const page = history.list({ dir: req.dir, query: req.query, offset: req.offset, limit: req.limit });
+    const page = history.list({ dir: req.dir, query: req.query, offset: req.offset, limit: req.limit, exclude: this.advisorSessionIds() });
     return { ...page, sessions: page.sessions.map((s) => this.localView(s)) };
   }
 
@@ -1243,6 +1376,10 @@ export class AgentCore {
       throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: found.dir });
     }
     const held = this.holder(found.sessionId);
+    // Advisor's sessions are not the user's to open.
+    if (held?.meta.kind === "advisor") {
+      throw new AgentError(ErrorCode.NOT_FOUND, "no such session on this machine", { reason: ErrorReason.SESSION_NOT_FOUND, subject: req.sessionId });
+    }
     if (held) {
       this.syncHistory(held);
       return this.summary(held);
@@ -1419,8 +1556,16 @@ export class AgentCore {
     return join(this.opts.dataDir, "threads", threadId, "attachments");
   }
 
-  async send(threadId: string, text: string, clientMsgId: string, attachmentIds: readonly string[] = []): Promise<void> {
+  async send(
+    threadId: string,
+    text: string,
+    clientMsgId: string,
+    attachmentIds: readonly string[] = [],
+    advisor: { attachments: readonly AdvisorAttachmentInput[]; device: string } = { attachments: [], device: "" },
+  ): Promise<void> {
     const t = this.thread(threadId);
+    if (t.meta.kind === "advisor") return this.askAdvisor(t, { text, clientMsgId, attachmentIds, ...advisor });
+    if (advisor.attachments.length > 0) throw new AgentError(ErrorCode.INVALID, "attachments for Advisor go to an Advisor thread only", { reason: ErrorReason.UNSPECIFIED });
     if (!text.trim() && attachmentIds.length === 0) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
     // No two views write to one session: while its AI runs in a terminal, that is where to type.
     if (t.meta.terminal || t.launching) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
@@ -1452,18 +1597,147 @@ export class AgentCore {
     const attachments = (prepared?.attachments ?? []).map((a) => ({ ...a, size: BigInt(a.size) }));
     this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text, clientMsgId, attachments } });
     const images = prepared?.images ?? [];
-    await this.startTurn(t, { text: textForAi(text, prepared?.files ?? []), ...(images.length ? { images } : {}) });
+    await this.startTurn(t, { text: textForAi(text, prepared?.files ?? []), ...(images.length ? { images } : {}) }, clientMsgId);
   }
 
-  /** A turn starts with this message for the AI. */
-  private async startTurn(t: Thread, message: { text: string; images?: ImageInput[] }): Promise<void> {
+  /**
+   * A question to an Advisor thread: its client_msg_id names it (required,
+   * asked once), it waits behind the questions before it, and its text for
+   * the AI is built now (advisor-thread.ts), with what the machine keeps of
+   * a git failure an attachment names.
+   */
+  private async askAdvisor(
+    t: Thread,
+    q: { text: string; clientMsgId: string; attachmentIds: readonly string[]; attachments: readonly AdvisorAttachmentInput[]; device: string },
+  ): Promise<void> {
+    if (q.clientMsgId.trim() === "") throw new AgentError(ErrorCode.INVALID, "a question to Advisor needs its client_msg_id", { reason: ErrorReason.UNSPECIFIED });
+    if (q.attachmentIds.length > 0) throw new AgentError(ErrorCode.INVALID, "Advisor takes no files", { reason: ErrorReason.UNSPECIFIED });
+    if (t.clientMsgIds.has(q.clientMsgId) || t.questions?.has(q.clientMsgId) || t.asking?.clientMsgId === q.clientMsgId) return;
+    const refused = questionRefusal(q.text, q.attachments);
+    if (refused) throw new AgentError(ErrorCode.INVALID, `Advisor cannot take ${refused}`, { reason: q.text.trim() === "" && q.attachments.length === 0 ? ErrorReason.EMPTY_MESSAGE : ErrorReason.UNSPECIFIED });
+    const queue = (t.questions ??= new AdvisorQueue());
+    if (queue.size >= QUEUE_MAX) throw new AgentError(ErrorCode.INVALID, `at most ${QUEUE_MAX} questions wait for Advisor at once`, { reason: ErrorReason.UNSPECIFIED });
+    const attachments = q.attachments.map((a) => ({ ...a }));
+    queue.push({ clientMsgId: q.clientMsgId, device: q.device, question: q.text.trim(), attachments, prompt: this.questionPrompt(t.meta.dir, q.text, attachments) });
+    this.saveQueue(t);
+    await this.advanceAdvisor(t);
+  }
+
+  /** What the AI reads for a question; never a command of the AI's: the question comes after a line of tunelo's. */
+  private questionPrompt(dir: string, question: string, attachments: readonly AdvisorAttachmentInput[]): string {
+    return `[tunelo] The user asks:\n${advisorPrompt(question, attachments, (id) => this.opts.gitFailure?.(id), dir)}`;
+  }
+
+  /** The Advisor thread's waiting questions, kept with it (a restart goes on with them), without the text built for the AI. */
+  private saveQueue(t: Thread): void {
+    const list: SavedQuestion[] = (t.questions?.list() ?? []).map(({ prompt: _prompt, ...saved }) => saved);
+    if (list.length) t.meta.advisorQueue = list;
+    else delete t.meta.advisorQueue;
+    this.saveMeta(t);
+  }
+
+  /**
+   * Starts the next question of an Advisor thread when none runs: its words
+   * go into the journal, its turn (which names it) starts, and it is ended
+   * after ADVISOR_TURN_MS. A question that cannot start fails its own turn
+   * with an error item; the next one is tried after it.
+   */
+  private async advanceAdvisor(t: Thread): Promise<void> {
+    if (t.deleted || t.running || t.asking || t.starting || t.switching || t.advancing) return;
+    if (!t.questions?.size) return;
+    // Held from before the first await until the turn runs (or failed): a question arriving meanwhile waits its turn.
+    t.advancing = true;
+    try {
+      await this.startNextQuestion(t);
+    } finally {
+      delete t.advancing;
+    }
+  }
+
+  private async startNextQuestion(t: Thread): Promise<void> {
+    const next = t.questions?.shift();
+    if (!next) return;
+    this.saveQueue(t);
+    // One question, one prompt: nothing of an earlier question waits to go with this one.
+    t.outbox = [];
+    t.clientMsgIds.add(next.clientMsgId);
+    t.limitSeen = false;
+    // Turns typed elsewhere (`claude --resume` on the machine) come first; an open session opens again so the AI reads them.
+    if (this.syncHistory(t) > 0 && t.session) await this.park(t);
+    this.put(t, `user:${randomUUID()}`, { case: "text", value: { role: Role.USER, text: next.question, clientMsgId: next.clientMsgId, attachments: [] } });
+    try {
+      await this.startTurn(t, { text: next.prompt }, next.clientMsgId, next.device);
+    } catch (err) {
+      // The turn failed already (the error item says why); a question asked by this very request hears it too.
+      if (t.running && this.askingNow(t) === next.clientMsgId) {
+        this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: (err as Error).message.slice(0, 500) } });
+        this.endTurn(t, TurnState.FAILED, 0);
+      }
+      throw err;
+    }
+  }
+
+  /** An Advisor thread's question ended (answered, failed or stopped): who listens hears of it, and the next one starts. */
+  private questionEnded(t: Thread, state: TurnState): void {
+    const asked = t.asking?.clientMsgId ?? "";
+    this.clearAsking(t);
+    delete t.timedOut;
+    delete t.resuming;
+    // Whatever ended it (an answer, a failure, a stop, no slot, a session that did not open), its prompt never goes later.
+    t.outbox = [];
+    if (asked !== "") for (const fn of this.advisorAnswerListeners) fn(t.meta.id, asked, state);
+    // After the session that ended it settles (a failed start unwinds first).
+    setTimeout(() => void this.advanceAdvisor(t).catch(() => undefined), 0);
+  }
+
+  /** The Advisor thread's turn ran past ADVISOR_TURN_MS: stopped, failed, and ended by the core if its AI does not end it. */
+  private advisorOvertime(t: Thread, turnItem: string): void {
+    if (!t.running || t.turnItem !== turnItem) return;
+    t.timedOut = turnItem;
+    const limit = Math.round((this.opts.advisorTimes?.turnMs ?? ADVISOR_TURN_MS) / 1000);
+    this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: `Advisor took longer than ${limit} s: the question was stopped` } });
+    this.stopAdvisor(t);
+    t.outbox = [];
+    const asking = t.asking;
+    if (asking) {
+      asking.grace = setTimeout(() => {
+        if (!t.running || t.turnItem !== turnItem) return;
+        this.endTurn(t, TurnState.FAILED, 0);
+        void this.park(t).then(() => this.touch(t));
+      }, this.opts.advisorTimes?.graceMs ?? ADVISOR_STOP_GRACE_MS);
+      asking.grace.unref?.();
+    }
+    if (t.session) void t.session.interrupt().catch(() => undefined);
+    else this.endTurn(t, TurnState.FAILED, 0);
+  }
+
+  /** The question an Advisor thread runs now ("" when none); read fresh after an await. */
+  private askingNow(t: Thread): string {
+    return t.asking?.clientMsgId ?? "";
+  }
+
+  private clearAsking(t: Thread): void {
+    if (!t.asking) return;
+    clearTimeout(t.asking.timer);
+    if (t.asking.grace) clearTimeout(t.asking.grace);
+    delete t.asking;
+  }
+
+  /** A turn starts with this message for the AI; `clientMsgId` names the message (and the question, on an Advisor thread). */
+  private async startTurn(t: Thread, message: { text: string; images?: ImageInput[] }, clientMsgId = "", device = ""): Promise<void> {
     const busy = t.running;
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
-    this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING } });
+    this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING, clientMsgId } });
     t.running = true;
     t.lastActive = this.now();
-    const on = this.advisorAllowed(t.meta.id);
+    if (t.meta.kind === "advisor") {
+      const turnItem = t.turnItem;
+      const timer = setTimeout(() => this.advisorOvertime(t, turnItem), this.opts.advisorTimes?.turnMs ?? ADVISOR_TURN_MS);
+      timer.unref?.();
+      t.asking = { clientMsgId, device, turnItem, prompt: message.text, timer };
+    }
+    const on = this.autoAdvisor(t);
     if (busy) {
       // Queued while a turn runs: the running turn's state stays, now mixed; Advisor's cards go with the newest turn.
       const turn = (t.advisorTurn ??= { turnId: t.turnItem, onAllAlong: false, askedNext: false, mixed: true });
@@ -1530,8 +1804,15 @@ export class AgentCore {
     this.touch(t);
   }
 
-  async interrupt(threadId: string): Promise<void> {
+  /**
+   * Stops the thread's turn. On an Advisor thread only the question
+   * `clientMsgId` stops, and only for the device that asked it: waiting, it
+   * leaves the queue; running, its turn stops; one already answered is left
+   * as it is.
+   */
+  async interrupt(threadId: string, clientMsgId = "", device = ""): Promise<void> {
     const t = this.thread(threadId);
+    if (t.meta.kind === "advisor") return this.stopQuestion(t, clientMsgId, device);
     this.cancelPending(t);
     this.cancelReasks(t);
     if (t.turnItem) t.advisorStopped = t.turnItem;
@@ -1539,6 +1820,26 @@ export class AgentCore {
     t.outbox = [];
     if (t.session) await t.session.interrupt();
     else if (t.running) this.endTurn(t, TurnState.INTERRUPTED, 0);
+  }
+
+  private async stopQuestion(t: Thread, clientMsgId: string, device: string): Promise<void> {
+    if (clientMsgId === "") throw new AgentError(ErrorCode.INVALID, "name the question to stop (client_msg_id)", { reason: ErrorReason.UNSPECIFIED });
+    const notYours = () => new AgentError(ErrorCode.INVALID, "only the device that asked may stop this question", { reason: ErrorReason.UNSPECIFIED });
+    const waiting = t.questions?.get(clientMsgId);
+    if (waiting) {
+      if (waiting.device !== device) throw notYours();
+      t.questions?.remove(clientMsgId);
+      this.saveQueue(t);
+      return;
+    }
+    const asking = t.asking;
+    if (!asking || asking.clientMsgId !== clientMsgId || !t.running) return;
+    if (asking.device !== device) throw notYours();
+    t.advisorStopped = asking.turnItem;
+    this.stopAdvisor(t);
+    t.outbox = [];
+    if (t.session) await t.session.interrupt();
+    else this.endTurn(t, TurnState.INTERRUPTED, 0);
   }
 
   /**
@@ -1564,7 +1865,8 @@ export class AgentCore {
   /** Hides a thread from the list on every device, or shows it again; nothing on disk changes. */
   setArchived(threadId: string, archived: boolean): void {
     const t = this.thread(threadId);
-    if (Boolean(t.meta.archived) === archived) return;
+    // An Advisor thread stays hidden from devices that do not know it.
+    if (t.meta.kind === "advisor" || Boolean(t.meta.archived) === archived) return;
     if (archived) t.meta.archived = true;
     else delete t.meta.archived;
     this.saveMeta(t);
@@ -1612,6 +1914,7 @@ export class AgentCore {
     }
     t.deleted = true;
     clearTimeout(t.flushTimer);
+    this.clearAsking(t);
     this.endActivity(t);
     this.cancelPending(t);
     this.threads.delete(t.meta.id);
@@ -1696,6 +1999,7 @@ export class AgentCore {
    */
   setAdvisor(threadId: string, on: boolean, device: string): void {
     const t = this.thread(threadId);
+    this.notOnAdvisor(t, "turn automatic Advisor on or off");
     if (on && !this.advisorAvailable(t.meta.provider)) {
       throw new AgentError(ErrorCode.INVALID, "Advisor needs tunelo's MCP in this AI's sessions on this machine", {
         reason: ErrorReason.ADVISOR_UNAVAILABLE,
@@ -1719,10 +2023,18 @@ export class AgentCore {
     return this.threads.get(threadId)?.meta.advisor === true;
   }
 
-  /** Advisor may be asked in the thread now: its automatic Advisor is on and its AI can reach tunelo's MCP. */
+  /**
+   * Advisor may be asked in the thread now: it is an Advisor thread, or its
+   * automatic Advisor is on; and its AI can reach tunelo's MCP.
+   */
   advisorAllowed(threadId: string): boolean {
     const t = this.threads.get(threadId);
-    return t !== undefined && t.meta.advisor === true && this.advisorAvailable(t.meta.provider);
+    return t !== undefined && (t.meta.kind === "advisor" || t.meta.advisor === true) && this.advisorAvailable(t.meta.provider);
+  }
+
+  /** The thread's automatic Advisor runs now (never on an Advisor thread, which is asked directly). */
+  private autoAdvisor(t: Thread): boolean {
+    return t.meta.kind !== "advisor" && t.meta.advisor === true && this.advisorAvailable(t.meta.provider);
   }
 
   /**
@@ -1754,7 +2066,7 @@ export class AgentCore {
    * the note due for the next one.
    */
   private noted(t: Thread, message: { text: string; images?: ImageInput[] }, on: boolean): { text: string; images?: ImageInput[]; advisor?: PendingNote } {
-    const { note, state } = advisorNote(message.text, on, t.advisorNote ?? "none");
+    const { note, state } = t.meta.kind === "advisor" ? advisorSessionNote(t.advisorNote ?? "none") : advisorNote(message.text, on, t.advisorNote ?? "none");
     return note ? { ...message, advisor: { note, state, gen: t.advisorGen ?? 0 } } : message;
   }
 
@@ -1810,7 +2122,7 @@ export class AgentCore {
   private advisorMissed(t: Thread, state: TurnState): boolean {
     const turn = t.advisorTurn;
     if (state !== TurnState.COMPLETED || !turn?.onAllAlong || turn.mixed || turn.askedNext) return false;
-    return this.advisorAllowed(t.meta.id) && t.sessionMcpOpen === true && (this.opts.advisorKeySet?.() ?? false);
+    return this.autoAdvisor(t) && t.sessionMcpOpen === true && (this.opts.advisorKeySet?.() ?? false);
   }
 
   /** Sessions of this AI can ask Advisor: the AI takes tunelo's MCP and the machine runs its sessions with it. */
@@ -1853,7 +2165,8 @@ export class AgentCore {
 
   async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
     const t = this.thread(threadId);
-    if (!this.permissionModes(t).includes(mode)) {
+    // An Advisor thread's session reads only, whatever mode its AI would offer.
+    if (t.meta.kind === "advisor" || !this.permissionModes(t).includes(mode)) {
       throw new AgentError(ErrorCode.INVALID, `permission mode "${mode}" is not allowed from a device`, {
         reason: ErrorReason.PERMISSION_MODE_NOT_ALLOWED,
         subject: mode,
@@ -1870,6 +2183,7 @@ export class AgentCore {
   /** Hands the thread to another AI: summary + changed files as its first message. */
   async switchProvider(threadId: string, providerId: string, model: string): Promise<void> {
     const t = this.thread(threadId);
+    this.notOnAdvisor(t, "move to another AI");
     const target = this.namedProvider(providerId);
     if (target.id === t.meta.provider) throw new AgentError(ErrorCode.INVALID, "already on this AI", { reason: ErrorReason.SAME_AI });
     this.assertReady(target, await target.detect(this.detectOptions(target)));
@@ -1931,7 +2245,14 @@ export class AgentCore {
     if (t.session) return this.flushOutbox(t);
     if (t.starting) return;
     if (this.openSessions() >= this.maxSessions) {
-      const victim = this.idleVictim(t);
+      // Advisor never closes an ordinary session for itself: only another Advisor thread's idle one.
+      const victim = t.meta.kind === "advisor" ? this.idleVictim(t, true) : this.idleVictim(t);
+      if (!victim && t.meta.kind === "advisor") {
+        throw new AgentError(ErrorCode.INVALID, `the machine runs its ${this.maxSessions} sessions already`, {
+          reason: ErrorReason.SESSION_LIMIT,
+          subject: String(this.maxSessions),
+        });
+      }
       if (!victim) {
         // Starts when a session frees up; the device sees the QUEUED state.
         t.queued = true;
@@ -1964,26 +2285,65 @@ export class AgentCore {
     }
     if (account.id) t.meta.accountId = account.id;
     else delete t.meta.accountId;
-    const policy = {
-      dir: t.meta.dir,
-      mcpServers: this.opts.mcpServers ?? {},
-      projectSettings: this.loadsProject(t),
-      isSensitive: this.opts.isSensitive,
-      ...(t.meta.model ? { model: t.meta.model } : {}),
-      ...(t.meta.effort ? { effort: t.meta.effort } : {}),
-      ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
-      ...(this.machineBypasses(t) ? { allowBypass: true } : {}),
-      ...(account.scope ? { account: account.scope } : {}),
-      ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
-    };
+    const advisorSession = t.meta.kind === "advisor";
+    // An Advisor thread's session: read only, on none of the folder's settings, no mode or rule of the user's (advisor-guard.ts).
+    const policy = advisorSession
+      ? {
+          dir: t.meta.dir,
+          mcpServers: {},
+          projectSettings: false,
+          isSensitive: this.opts.isSensitive,
+          advisorSession: true,
+          ...(t.meta.model ? { model: t.meta.model } : {}),
+          ...(t.meta.effort ? { effort: t.meta.effort } : {}),
+          ...(account.scope ? { account: account.scope } : {}),
+        }
+      : {
+          dir: t.meta.dir,
+          mcpServers: this.opts.mcpServers ?? {},
+          projectSettings: this.loadsProject(t),
+          isSensitive: this.opts.isSensitive,
+          ...(t.meta.model ? { model: t.meta.model } : {}),
+          ...(t.meta.effort ? { effort: t.meta.effort } : {}),
+          ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
+          ...(this.machineBypasses(t) ? { allowBypass: true } : {}),
+          ...(account.scope ? { account: account.scope } : {}),
+          ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
+        };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
     const advisorAllowed = () => this.advisorAllowed(t.meta.id);
-    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, advisorAllowed, ...(lease.secrets ? { secrets: lease.secrets } : {}), ...(lease.browserNotices ? { browserNotices: lease.browserNotices } : {}) } } : policy;
+    const withMcp = lease
+      ? {
+          ...policy,
+          sessionMcp: {
+            ticket: lease.ticket,
+            configDir: lease.configDir,
+            approveWrite: lease.approveWrite,
+            describeWrite: lease.describeWrite,
+            advisorAllowed,
+            ...(advisorSession ? { advisorSession: true } : {}),
+            ...(lease.secrets && !advisorSession ? { secrets: lease.secrets } : {}),
+            ...(lease.browserNotices && !advisorSession ? { browserNotices: lease.browserNotices } : {}),
+          },
+        }
+      : policy;
     t.modeUnseen = true;
     t.sessionMcpOpen = lease !== undefined;
     t.projectLoaded = policy.projectSettings;
-    t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
+    if (advisorSession && seg?.sessionId) t.resuming = { heard: false, failed: false };
+    else delete t.resuming;
+    const start = (resumeId: string | undefined) => provider.start({ policy: withMcp, askUser, ...(resumeId ? { resumeId } : {}) });
+    t.starting = start(seg?.sessionId).catch((err: unknown) => {
+      // An Advisor thread whose session cannot be resumed starts a new one (its questions stand on their own): never a failed thread.
+      if (!advisorSession || !seg?.sessionId) throw err;
+      this.opts.log?.(`advisor ${t.meta.id.slice(0, 8)}: resume failed, new session (${(err as Error).message.slice(0, 200)})`);
+      delete seg.sessionId;
+      delete t.meta.history;
+      delete t.advisorNote;
+      this.saveMeta(t);
+      return start(undefined);
+    });
     try {
       t.session = await t.starting;
     } catch (err) {
@@ -2017,11 +2377,37 @@ export class AgentCore {
     }
   }
 
-  /** The open, idle session used longest ago, to make room. */
-  private idleVictim(except: Thread): Thread | undefined {
+  /**
+   * An Advisor thread's resumed session ended before it said anything: its
+   * old conversation is dropped and the running question goes to a new
+   * session, so the thread never fails for it.
+   */
+  private async freshAdvisorSession(t: Thread): Promise<void> {
+    const s = t.session;
+    delete t.session;
+    void s?.close().catch(() => undefined);
+    const seg = t.meta.segments.at(-1);
+    this.opts.log?.(`advisor ${t.meta.id.slice(0, 8)}: resume failed, new session`);
+    if (seg) delete seg.sessionId;
+    delete t.meta.history;
+    delete t.advisorNote;
+    this.saveMeta(t);
+    const prompt = t.asking?.prompt;
+    if (!t.running || prompt === undefined) return;
+    t.outbox = [this.noted(t, { text: prompt }, false)];
+    try {
+      await this.openSession(t);
+    } catch {
+      // openSession ended the turn with an error item
+    }
+  }
+
+  /** The open, idle session to close to make room: Advisor's threads' first, then the one used longest ago. `advisorOnly`: Advisor's threads' only. */
+  private idleVictim(except: Thread, advisorOnly = false): Thread | undefined {
+    const advisor = (x: Thread) => (x.meta.kind === "advisor" ? 0 : 1);
     return [...this.threads.values()]
-      .filter((x) => x !== except && x.session && !x.running && x.pending.size === 0)
-      .sort((a, b) => a.lastActive - b.lastActive)[0];
+      .filter((x) => x !== except && x.session && !x.running && x.pending.size === 0 && (!advisorOnly || x.meta.kind === "advisor"))
+      .sort((a, b) => advisor(a) - advisor(b) || a.lastActive - b.lastActive)[0];
   }
 
   private async park(t: Thread): Promise<void> {
@@ -2073,6 +2459,20 @@ export class AgentCore {
   }
 
   private handle(t: Thread, e: ProviderEvent, accountId: string): void {
+    if (t.resuming && !t.resuming.heard) {
+      // An Advisor thread's resume that fails before anything else comes is not the question's failure.
+      if (e.type === "error") {
+        t.resuming.failed = true;
+        return;
+      }
+      if (e.type === "turn-end" && e.state !== "completed") {
+        delete t.resuming;
+        void this.freshAdvisorSession(t);
+        return;
+      }
+      t.resuming.heard = true;
+      if (t.resuming.failed) this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: "the AI reported an error" } });
+    }
     for (const fn of this.providerEventListeners) fn(t.meta.id, e);
     t.lastActive = this.now();
     switch (e.type) {
@@ -2226,7 +2626,9 @@ export class AgentCore {
     t.dirtyText.clear();
   }
 
-  private endTurn(t: Thread, state: TurnState, durationMs: number, stats?: TurnStats): void {
+  private endTurn(t: Thread, ended: TurnState, durationMs: number, stats?: TurnStats): void {
+    // An Advisor thread's turn stopped for running too long failed, whatever its AI says.
+    const state = t.timedOut !== undefined && t.timedOut === t.turnItem ? TurnState.FAILED : ended;
     this.stopAdvisor(t);
     this.closeAdvisorCalls(t);
     const missed = this.advisorMissed(t, state);
@@ -2271,6 +2673,7 @@ export class AgentCore {
     this.touch(t);
     this.gitReads.delete(t.meta.id);
     for (const fn of this.turnEndListeners) fn(t.meta.id);
+    if (t.meta.kind === "advisor") this.questionEnded(t, state);
     void this.dequeue();
     // The machine switched account during the turn: move now.
     void this.follow(t);
@@ -2435,6 +2838,9 @@ export class AgentCore {
       preview: "",
       info: (meta.info ??= {}),
       reasks: new Map(),
+      ...(meta.kind === "advisor"
+        ? { questions: new AdvisorQueue((meta.advisorQueue ?? []).map((q) => ({ ...q, attachments: q.attachments ?? [], prompt: this.questionPrompt(meta.dir, q.question, q.attachments ?? []) }))) }
+        : {}),
     };
   }
 
@@ -2544,6 +2950,7 @@ export class AgentCore {
       backgroundTasks: t.background ?? 0,
       projectConfig: this.threadProjectConfig(t),
       gitRoot: gitRoot(t.meta.dir),
+      kind: t.meta.kind === "advisor" ? ThreadKind.ADVISOR : ThreadKind.UNSPECIFIED,
     });
   }
 
@@ -2635,6 +3042,7 @@ export class AgentCore {
    */
   async terminalLaunch(threadId: string): Promise<TerminalSpec> {
     const t = this.thread(threadId);
+    this.notOnAdvisor(t, "open in a terminal");
     const provider = this.provider(t.meta.provider);
     if (!provider.terminal) {
       throw new AgentError(ErrorCode.INVALID, `${provider.name} does not open in a terminal`, { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: provider.name });

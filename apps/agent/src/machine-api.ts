@@ -164,6 +164,15 @@ export function notifyNeedsInput(secret: string, body: { kind: "approval" | "que
 }
 
 /**
+ * A content-free "Advisor answered" push to the account's devices
+ * (NEEDS_INPUT_KIND_ADVISOR_ANSWER). A server without the kind answers
+ * invalid_argument.
+ */
+export function notifyAdvisorAnswer(secret: string) {
+  return call<Record<string, never>>("NotifyNeedsInput", { kind: "NEEDS_INPUT_KIND_ADVISOR_ANSWER", pendingCount: 1, sessionId: "" }, secret);
+}
+
+/**
  * Asks for a "usage hint" push to the account's devices: a running session
  * went past a usage rule. Content-free like the others: the call names no
  * session, rule or number (the details reach devices over the sealed link).

@@ -15,7 +15,8 @@ import type { AuditAction, AuditLog } from "../safety/audit-log.ts";
 import { type Trash, systemTrash } from "../safety/trash.ts";
 import type { GitFileChange } from "../threads/git-changes.ts";
 import { type ContentQuery, type ContentResult, type DirPage, type DirPageRequest, type FilePreview, findContents, findNames, gitPlace, listDirPage, readFilePreview } from "./files.ts";
-import { type GitRunner, gitError, gitRunner } from "./git-run.ts";
+import { type GitRunner, gitError, gitRunner, rawGitStderr } from "./git-run.ts";
+import { GitFailureMemory } from "../advisor/git-failure-memory.ts";
 import * as ops from "./git-ops.ts";
 import { type WorkspaceStatus, readStatus, statusFingerprint } from "./git-status.ts";
 import { type IsSensitive, isSecretPath } from "./paths.ts";
@@ -35,6 +36,8 @@ export type WorkspacesOptions = {
   beforeTrash?: () => Promise<void>;
   watchTimings?: WatchTimings;
   fileWatch?: FileWatch;
+  /** Tests only: the clock of the failures kept for Advisor. */
+  now?: () => number;
 };
 
 type Watching = { watcher: WorkspaceWatcher; listeners: Set<(change: WorkspaceChange) => void> };
@@ -49,6 +52,8 @@ type Watching = { watcher: WorkspaceWatcher; listeners: Set<(change: WorkspaceCh
 const writeDeadlineMs = (networkCommands = 2): number => ops.OPS_LIMITS.networkTimeoutMs * networkCommands + ops.OPS_LIMITS.writeTimeoutMs + 30_000;
 
 export class Workspaces {
+  /** What git printed of the failed writes, kept a while for Advisor (git-failure-memory.ts). */
+  readonly failures: GitFailureMemory;
   private readonly run: GitRunner;
   private readonly trash: Trash;
   private readonly writing = new Set<string>();
@@ -58,6 +63,12 @@ export class Workspaces {
     mkdirSync(opts.hooksDir, { recursive: true, mode: 0o700 });
     this.run = gitRunner({ hooksDir: opts.hooksDir, ...(opts.extraGitConfig ? { extraConfig: opts.extraGitConfig } : {}) });
     this.trash = opts.trash ?? systemTrash();
+    this.failures = new GitFailureMemory(opts.now ? { now: opts.now } : {});
+  }
+
+  /** The workspaces' git runner (safe arguments, no hooks, no repository program): advisor_git reads with it. */
+  get runner(): GitRunner {
+    return this.run;
   }
 
   /** The real folder of workspace `id`. */
@@ -226,7 +237,7 @@ export class Workspaces {
 
   /** A fetch changes no file of the workspace, only what git knows of the remote: not logged. */
   fetch(id: string): Promise<WorkspaceStatus> {
-    return this.write(id, "", undefined, (root) => ops.fetch(this.run, root).then(() => ""));
+    return this.write(id, "", undefined, (root) => ops.fetch(this.run, root).then(() => ""), 2, "git_fetch");
   }
 
   /** A pull or push stopped because the branches diverged is refused with GIT_DIVERGED (after a fetch), so the device can offer a rebase. */
@@ -253,6 +264,7 @@ export class Workspaces {
         return "";
       },
       5,
+      "git_rebase",
     );
   }
 
@@ -280,7 +292,15 @@ export class Workspaces {
    * ends (its own timeouts bound that): no second write runs beside a slow
    * one.
    */
-  private async write(id: string, device: string, action: AuditAction | undefined, fn: (root: string) => Promise<string>, networkCommands = 2): Promise<WorkspaceStatus> {
+  private async write(
+    id: string,
+    device: string,
+    action: AuditAction | undefined,
+    fn: (root: string) => Promise<string>,
+    networkCommands = 2,
+    /** What a failure is kept as, for a write not logged as one action. */
+    failedAs: string = action ?? "git",
+  ): Promise<WorkspaceStatus> {
     // Taken before anything is awaited: the first request in is the one that runs.
     if (this.writing.has(id)) throw new AgentError(ErrorCode.INVALID, "another git command of this workspace is running", { reason: ErrorReason.GIT_BUSY });
     this.writing.add(id);
@@ -306,9 +326,24 @@ export class Workspaces {
     });
     try {
       await Promise.race([work, expired]);
+    } catch (err) {
+      throw this.remember(err, id, at, failedAs);
     } finally {
       clearTimeout(deadline);
     }
     return this.statusOf(root);
+  }
+
+  /**
+   * A failed write: what git printed of it (or, when it printed nothing, the
+   * refusal's own words) is kept for Advisor, and the error the device gets
+   * names it by a failure id.
+   */
+  private remember(err: unknown, id: string, root: string, action: string): unknown {
+    if (!(err instanceof AgentError)) return err;
+    const raw = rawGitStderr(err);
+    const output = raw ?? [err.message, err.subject].filter((s) => s !== "").join(": ");
+    err.failureId = this.failures.record({ workspaceId: id, root, action, output });
+    return err;
   }
 }

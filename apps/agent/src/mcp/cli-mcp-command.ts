@@ -20,7 +20,7 @@ import type { OfferedTool } from "./mcp-host.ts";
 import { failure } from "./mcp-result.js";
 import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { redactMessage } from "./redact.js";
-import { TICKET_ENV } from "./session-tickets.js";
+import { ADVISOR_MCP_ENV, TICKET_ENV } from "./session-tickets.js";
 import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
 import { ADVISOR_GROUP, registerAdvisorTools } from "../advisor/advisor-tools.ts";
@@ -183,13 +183,15 @@ export function registerMcpCommand(program: Command): void {
 				}
 			};
 
+			// Advisor's own session lists Advisor's tools and nothing else (the service refuses the rest anyway).
+			const advisorOnly = ticket !== undefined && process.env[ADVISOR_MCP_ENV] === "1";
 			// A client that may not write does not see write tools (the service refuses them anyway).
-			const offered = await offeredTools(dir, context, ticket);
-			if (!offered.writes) context.log(LOCAL_WRITES_OFF);
+			const offered = advisorOnly ? { tools: [], writes: false } : await offeredTools(dir, context, ticket);
+			if (!offered.writes && !advisorOnly) context.log(LOCAL_WRITES_OFF);
 
 			// The tunnel tools come from the same table the service runs.
 			for (const group of TOOL_GROUPS) {
-				if (!group.register) continue;
+				if (!group.register || advisorOnly) continue;
 				const table = new ToolTable();
 				group.register(table, { context, tunnels: new LocalTunnels(context) });
 				for (const [name, config] of table.entries()) {
@@ -213,11 +215,12 @@ export function registerMcpCommand(program: Command): void {
 
 			// Sign-in secrets, the tunelo browser and Advisor: only a session tunelo opened has a device to ask and a thread.
 			if (ticket) {
-				const groups: [string, (t: ToolTable) => void][] = [
+				const all: [string, (t: ToolTable) => void][] = [
 					[SECRETS_GROUP, (t) => registerSecretTools(t)],
 					[BROWSER_GROUP, (t) => registerBrowserTools(t)],
 					[ADVISOR_GROUP, (t) => registerAdvisorTools(t)],
 				];
+				const groups = advisorOnly ? all.filter(([group]) => group === ADVISOR_GROUP) : all;
 				for (const [group, register] of groups) {
 					const table = new ToolTable();
 					register(table);

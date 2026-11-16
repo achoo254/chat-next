@@ -13,7 +13,20 @@ export function tempDir(prefix = "agent-test-"): string {
 
 export function makeCore(
   providers: AgentProvider[],
-  opts: { dataDir?: string; home?: string; maxSessions?: number; trusted?: (dir: string) => boolean; trust?: CoreOptions["trust"]; sessionMcp?: CoreOptions["sessionMcp"]; advisorKeySet?: CoreOptions["advisorKeySet"]; trash?: CoreOptions["trash"]; onNeedsInput?: CoreOptions["onNeedsInput"]; now?: CoreOptions["now"] } = {},
+  opts: {
+    dataDir?: string;
+    home?: string;
+    maxSessions?: number;
+    trusted?: (dir: string) => boolean;
+    trust?: CoreOptions["trust"];
+    sessionMcp?: CoreOptions["sessionMcp"];
+    advisorKeySet?: CoreOptions["advisorKeySet"];
+    trash?: CoreOptions["trash"];
+    onNeedsInput?: CoreOptions["onNeedsInput"];
+    now?: CoreOptions["now"];
+    /** Any other option of the core, as given. */
+    more?: Partial<CoreOptions>;
+  } = {},
 ) {
   const root = tempDir();
   const home = opts.home ?? join(root, "home");
@@ -36,6 +49,7 @@ export function makeCore(
     ...(opts.now ? { now: opts.now } : {}),
     // Tests never touch the real trash.
     trash: opts.trash ?? (async () => undefined),
+    ...opts.more,
   });
   return { core, audit, home, work, dataDir };
 }

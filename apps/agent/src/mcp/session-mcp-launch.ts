@@ -5,11 +5,13 @@
  * shape (Claude's SDK record, ACP's `mcpServers` list).
  */
 import { selfCommand } from "../service.ts";
-import { type SessionMcp, TICKET_ENV } from "./session-tickets.ts";
+import { ADVISOR_MCP_ENV, type SessionMcp, TICKET_ENV } from "./session-tickets.ts";
 
 export type SessionMcpLaunch = { command: string; args: string[]; env: Record<string, string> };
 
-export function sessionMcpLaunch(mcp: Pick<SessionMcp, "ticket" | "configDir">): SessionMcpLaunch {
+export function sessionMcpLaunch(mcp: Pick<SessionMcp, "ticket" | "configDir" | "advisorSession">): SessionMcpLaunch {
 	const [command = process.execPath, ...args] = selfCommand("mcp");
-	return { command, args, env: { [TICKET_ENV]: mcp.ticket, TUNELO_HOME: mcp.configDir } };
+	const env: Record<string, string> = { [TICKET_ENV]: mcp.ticket, TUNELO_HOME: mcp.configDir };
+	if (mcp.advisorSession) env[ADVISOR_MCP_ENV] = "1";
+	return { command, args, env };
 }

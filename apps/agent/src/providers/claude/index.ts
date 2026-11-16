@@ -27,6 +27,8 @@ import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import { redactDeep } from "../../mcp/redact.ts";
 import { ADVISOR_OFF_REFUSAL } from "../../advisor/advisor-tools.ts";
+import { ADVISOR_GIT_ONLY, ADVISOR_ONLY_TOOLS, CLAUDE_ADVISOR_DISALLOWED, CLAUDE_ADVISOR_TOOLS, advisorGuard, claudeOwnTool } from "../../advisor/advisor-guard.ts";
+import { hideSecretShapes } from "../../advisor/scrub-git-output.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
 import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
 import type { AccountsStore } from "../../accounts/store.ts";
@@ -95,6 +97,8 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   bypassModeId: BYPASS_MODE,
   sessionMcp: true,
   sessionNotes: true,
+  // Every tool call reaches tunelo's PreToolUse hook and canUseTool, in any mode.
+  advisorSession: true,
 };
 
 /**
@@ -343,6 +347,69 @@ export function advisorWeighHook(allowed: () => boolean): HookCallback {
   };
 }
 
+/** advisor_git and advisor_grep outside an Advisor thread's session: refused at once, no card (tunelo would refuse them anyway). */
+export const advisorGitHook: HookCallback = async (input) => {
+  if (input.hook_event_name !== "PreToolUse" || !ADVISOR_ONLY_TOOLS.includes(tuneloTool(input.tool_name))) return {};
+  return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ADVISOR_GIT_ONLY } };
+};
+
+/** The paths a Claude tool call names, for Advisor's guard: a Glob pattern that leaves the folder counts as one. */
+export function guardPaths(toolName: string, input: Record<string, unknown>): string[] {
+  const paths = toolPaths(input);
+  const pattern = typeof input.pattern === "string" ? input.pattern : "";
+  if (toolName === "Glob" && (pattern.startsWith("/") || pattern.startsWith("~") || /(^|[\\/])\.\.([\\/]|$)/.test(pattern))) paths.push(pattern.startsWith("~") ? "/" : pattern);
+  return paths;
+}
+
+/** Whether Advisor's guard lets this call of an Advisor session go on; the refusal Claude reads otherwise. */
+export function advisorRefusal(toolName: string, input: Record<string, unknown>, policy: Pick<SessionPolicy, "dir" | "isSensitive">): string | undefined {
+  // Grep prints lines only in "content" mode (its default lists file names); its file filter reads as a path.
+  const grep = toolName === "Grep";
+  const glob = grep && typeof input.glob === "string" ? [input.glob] : [];
+  return advisorGuard(
+    { kind: toolKind(toolName), own: claudeOwnTool(toolName), paths: guardPaths(toolName, input), globs: glob, contentSearch: grep && input.output_mode === "content" },
+    policy,
+  );
+}
+
+/**
+ * PreToolUse of every tool in an Advisor thread's session: tunelo's own
+ * read-only list decides, in any permission mode (a hook's deny holds even
+ * where Claude would not ask), and an allowed call never reaches a card.
+ */
+export function advisorSessionHook(policy: Pick<SessionPolicy, "dir" | "isSensitive">): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse") return {};
+    const toolInput = typeof input.tool_input === "object" && input.tool_input !== null ? (input.tool_input as Record<string, unknown>) : {};
+    const why = advisorRefusal(input.tool_name, toolInput, policy);
+    if (why) return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: why } };
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+  };
+}
+
+/** After every tool of an Advisor thread's session: nothing shaped like a secret reaches Claude in what it read or found. */
+export const advisorOutputHook: HookCallback = async (input) => {
+  if (input.hook_event_name !== "PostToolUse") return {};
+  const output = scrubDeep(input.tool_response);
+  if (output === input.tool_response) return {};
+  return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: output } };
+};
+
+/** `value` with hideSecretShapes applied to every string (plain objects and arrays walked); the same value when nothing changed. */
+function scrubDeep(value: unknown): unknown {
+  if (typeof value === "string") return hideSecretShapes(value);
+  if (Array.isArray(value)) {
+    const next = value.map(scrubDeep);
+    return next.some((v, i) => v !== value[i]) ? next : value;
+  }
+  if (typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype) {
+    const entries = Object.entries(value);
+    const next = entries.map(([k, v]) => [k, scrubDeep(v)] as const);
+    return next.some(([, v], i) => v !== entries[i]?.[1]) ? Object.fromEntries(next) : value;
+  }
+  return value;
+}
+
 /**
  * What tunelo tells Claude beside each message (Advisor's instructions), as
  * context of that prompt: never the user's words, so the journal, Claude's
@@ -487,7 +554,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   const browserNotices = policy.sessionMcp?.browserNotices;
   const notices = browserNotices ? [browserNoticeHook(browserNotices)] : [];
   const advisorAllowed = policy.sessionMcp?.advisorAllowed;
-  const advisorHooks = advisorAllowed ? [advisorWeighHook(advisorAllowed)] : [];
+  const advisorHooks = [...(advisorAllowed ? [advisorWeighHook(advisorAllowed)] : []), advisorGitHook];
+  const advisorSession = policy.advisorSession === true;
   const promptNotes = new PromptNotes();
   let interrupted = false;
   let turnStart = 0;
@@ -495,6 +563,11 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   let closed = false;
 
   const canUseTool: CanUseTool = async (toolName, input, opts): Promise<PermissionResult> => {
+    // An Advisor session never asks the user: tunelo's read-only list answers.
+    if (advisorSession) {
+      const why = advisorRefusal(toolName, input, policy);
+      return why ? { behavior: "deny", message: why } : { behavior: "allow", updatedInput: input };
+    }
     if (toolName === "AskUserQuestion") {
       const questions = ((input.questions as Question[] | undefined) ?? []).map((q) => ({
         question: q.question,
@@ -555,40 +628,60 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     return { behavior: "allow", updatedInput: input };
   };
 
-  const options: Options = {
-    pathToClaudeCodeExecutable: bin,
-    cwd: policy.dir,
-    settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
-    strictMcpConfig: true,
-    mcpServers: policy.sessionMcp
-      ? { ...withoutTuneloMcp(policy.mcpServers), [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) }
-      : (policy.mcpServers as NonNullable<Options["mcpServers"]>),
-    // Also guards a `tunelo` MCP the machine's own config adds.
-    hooks: {
-      PreToolUse: [
-        { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
-        ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
-      ],
-      UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
-      PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
-      PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
-    },
-    // Without a mode picked on a device, the session follows the machine's own
-    // Claude settings (permissions.defaultMode and allow/deny rules).
-    includePartialMessages: true,
-    canUseTool,
-  };
+  const options: Options = advisorSession
+    ? {
+        pathToClaudeCodeExecutable: bin,
+        cwd: policy.dir,
+        // None of the user's or the folder's settings, hooks, rules or MCP servers: tunelo's own only.
+        settingSources: [],
+        strictMcpConfig: true,
+        mcpServers: policy.sessionMcp ? { [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) } : {},
+        tools: [...CLAUDE_ADVISOR_TOOLS],
+        disallowedTools: [...CLAUDE_ADVISOR_DISALLOWED],
+        hooks: {
+          PreToolUse: [{ hooks: [advisorSessionHook(policy)] }],
+          UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
+          PostToolUse: [{ hooks: [advisorOutputHook] }],
+        },
+        permissionMode: "default",
+        includePartialMessages: true,
+        canUseTool,
+      }
+    : {
+        pathToClaudeCodeExecutable: bin,
+        cwd: policy.dir,
+        settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
+        strictMcpConfig: true,
+        mcpServers: policy.sessionMcp
+          ? { ...withoutTuneloMcp(policy.mcpServers), [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) }
+          : (policy.mcpServers as NonNullable<Options["mcpServers"]>),
+        // Also guards a `tunelo` MCP the machine's own config adds.
+        hooks: {
+          PreToolUse: [
+            { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
+            ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
+          ],
+          UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
+          PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
+          PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
+        },
+        // Without a mode picked on a device, the session follows the machine's own
+        // Claude settings (permissions.defaultMode and allow/deny rules).
+        includePartialMessages: true,
+        canUseTool,
+      };
   // A profile picked on the machine: its own sign-in, the shared projects.
   if (policy.account) options.env = claudeEnv(policy.account.dir);
   // Claude Code runs this before every Bash command: the secrets a running command may read (secret-env.ts).
   if (secrets) options.env = { ...(options.env ?? claudeEnv(undefined)), CLAUDE_ENV_FILE: secrets.loader };
   if (policy.model) options.model = policy.model;
   if (policy.effort) options.effort = policy.effort as EffortLevel;
-  if (policy.permissionMode) options.permissionMode = policy.permissionMode as PermissionMode;
-  if (policy.allowBypass) options.allowDangerouslySkipPermissions = true;
+  // An Advisor session stays in Claude's default mode: no mode, bypass or rule from anywhere else.
+  if (policy.permissionMode && !advisorSession) options.permissionMode = policy.permissionMode as PermissionMode;
+  if (policy.allowBypass && !advisorSession) options.allowDangerouslySkipPermissions = true;
   if (resumeId) options.resume = resumeId;
   // "Allow for the session" given before this process: the same allow rules, from tunelo's own record.
-  const sessionRules = (policy.sessionRules ?? []).filter(replayableRule);
+  const sessionRules = advisorSession ? [] : (policy.sessionRules ?? []).filter(replayableRule);
   if (sessionRules.length) options.allowedTools = sessionRules;
 
   const q = queryFn({ prompt: inbox, options });
@@ -669,7 +762,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       emit({ type: "info", effort });
     },
     async setPermissionMode(mode) {
-      if (closed) return;
+      if (closed || advisorSession) return;
       await q.setPermissionMode(mode as PermissionMode);
       emit({ type: "info", permissionMode: mode });
     },

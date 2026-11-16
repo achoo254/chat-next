@@ -830,7 +830,7 @@ func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
 		"count":          notify(2, ""),
 		"session":        notify(1, "t_1"),
 		"retired kind 3": notifyKind(e, secret, appv1.NeedsInputKind(3)),
-		"bad kind 5":     notifyKind(e, secret, appv1.NeedsInputKind(5)),
+		"bad kind 6":     notifyKind(e, secret, appv1.NeedsInputKind(6)),
 	} {
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -862,6 +862,39 @@ func TestNotifyUsageHintNamesTheMachineOnly(t *testing.T) {
 	}
 	if timers := e.pending(); len(timers) != 1 {
 		t.Fatalf("merged push lost: %d timers", len(timers))
+	}
+}
+
+func TestNotifyAdvisorAnswerNamesTheMachineOnly(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	id, secret := e.register()
+	notify := func(pending int32, session string) error {
+		_, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+			Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_ADVISOR_ANSWER, PendingCount: pending, SessionId: session}, secret))
+		return err
+	}
+	for name, err := range map[string]error{"no count": notify(0, ""), "count": notify(2, ""), "session": notify(1, "t_1")} {
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if sent := e.notifier.take(); len(sent) != 0 {
+		t.Fatalf("pushed on invalid calls: %+v", sent)
+	}
+	// Sent at once, even inside a "needs you" window, which it leaves alone.
+	if _, err := e.client.NotifyNeedsInput(ctx, withSecret(&appv1.NotifyNeedsInputRequest{
+		Kind: appv1.NeedsInputKind_NEEDS_INPUT_KIND_APPROVAL, PendingCount: 1, SessionId: "t_1"}, secret)); err != nil {
+		t.Fatal(err)
+	}
+	e.notifier.take()
+	if err := notify(1, ""); err != nil {
+		t.Fatal(err)
+	}
+	sent := e.notifier.take()
+	want := push.MachineNotice{MachineID: id, MachineName: "Mac mini", Kind: push.MachineAdvisorAnswer, Pending: 1, At: e.now()}
+	if len(sent) != 1 || sent[0] != want {
+		t.Fatalf("advisor answer push %+v", sent)
 	}
 }
 

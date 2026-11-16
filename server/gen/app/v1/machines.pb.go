@@ -37,6 +37,12 @@ const (
 	// once, apart from the "needs you" notices, one per machine replacing the
 	// previous one.
 	NeedsInputKind_NEEDS_INPUT_KIND_USAGE_HINT NeedsInputKind = 4
+	// Advisor answered a question while no device was looking (tunelo
+	// 3.13.0+). Like USAGE_HINT: the notice names the machine only (never the
+	// question or the answer, which reach the devices over the end-to-end
+	// link), pending_count 1 and no session_id, sent at once, one per machine
+	// replacing the previous one.
+	NeedsInputKind_NEEDS_INPUT_KIND_ADVISOR_ANSWER NeedsInputKind = 5
 )
 
 // Enum value maps for NeedsInputKind.
@@ -46,12 +52,14 @@ var (
 		1: "NEEDS_INPUT_KIND_APPROVAL",
 		2: "NEEDS_INPUT_KIND_QUESTION",
 		4: "NEEDS_INPUT_KIND_USAGE_HINT",
+		5: "NEEDS_INPUT_KIND_ADVISOR_ANSWER",
 	}
 	NeedsInputKind_value = map[string]int32{
-		"NEEDS_INPUT_KIND_UNSPECIFIED": 0,
-		"NEEDS_INPUT_KIND_APPROVAL":    1,
-		"NEEDS_INPUT_KIND_QUESTION":    2,
-		"NEEDS_INPUT_KIND_USAGE_HINT":  4,
+		"NEEDS_INPUT_KIND_UNSPECIFIED":    0,
+		"NEEDS_INPUT_KIND_APPROVAL":       1,
+		"NEEDS_INPUT_KIND_QUESTION":       2,
+		"NEEDS_INPUT_KIND_USAGE_HINT":     4,
+		"NEEDS_INPUT_KIND_ADVISOR_ANSWER": 5,
 	}
 )
 
@@ -1480,11 +1488,11 @@ type NotifyNeedsInputRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  NeedsInputKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=app.v1.NeedsInputKind" json:"kind,omitempty"`
 	// How many approvals and questions wait on the machine in total (at least
-	// 1, at most 1000). 1 for USAGE_HINT.
+	// 1, at most 1000). 1 for USAGE_HINT and ADVISOR_ANSWER.
 	PendingCount int32 `protobuf:"varint,2,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
 	// The waiting thread, so the notification opens it: up to 64 characters of
 	// [A-Za-z0-9_-]; empty when unknown. An opaque id, never content. Empty
-	// for USAGE_HINT.
+	// for USAGE_HINT and ADVISOR_ANSWER.
 	SessionId string `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// The AI of the waiting thread (the agent's provider id, e.g. "claude"):
 	// up to 32 characters of [a-z0-9-]; anything else is dropped. The
@@ -1774,12 +1782,13 @@ const file_app_v1_machines_proto_rawDesc = "" +
 	"providerId\"\x1a\n" +
 	"\x18NotifyNeedsInputResponse\"\x1a\n" +
 	"\x18UnregisterMachineRequest\"\x1b\n" +
-	"\x19UnregisterMachineResponse*\xb7\x01\n" +
+	"\x19UnregisterMachineResponse*\xdc\x01\n" +
 	"\x0eNeedsInputKind\x12 \n" +
 	"\x1cNEEDS_INPUT_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19NEEDS_INPUT_KIND_APPROVAL\x10\x01\x12\x1d\n" +
 	"\x19NEEDS_INPUT_KIND_QUESTION\x10\x02\x12\x1f\n" +
-	"\x1bNEEDS_INPUT_KIND_USAGE_HINT\x10\x04\"\x04\b\x03\x10\x03*\x1eNEEDS_INPUT_KIND_DEVICE_PAIRED2\xc2\x04\n" +
+	"\x1bNEEDS_INPUT_KIND_USAGE_HINT\x10\x04\x12#\n" +
+	"\x1fNEEDS_INPUT_KIND_ADVISOR_ANSWER\x10\x05\"\x04\b\x03\x10\x03*\x1eNEEDS_INPUT_KIND_DEVICE_PAIRED2\xc2\x04\n" +
 	"\x0fMachinesService\x12I\n" +
 	"\fListMachines\x12\x1b.app.v1.ListMachinesRequest\x1a\x1c.app.v1.ListMachinesResponse\x12L\n" +
 	"\rRenameMachine\x12\x1c.app.v1.RenameMachineRequest\x1a\x1d.app.v1.RenameMachineResponse\x12L\n" +

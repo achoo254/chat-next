@@ -42,6 +42,14 @@ export type ProviderCapabilities = {
    * (advisor/advisor-instructions.ts).
    */
   sessionNotes?: boolean;
+  /**
+   * The adapter keeps an Advisor session to reading itself (SessionPolicy
+   * .advisorSession): every tool call it hears of goes through
+   * advisor/advisor-guard.ts, refused without a card when not allowed,
+   * whatever the AI's own mode or settings. Unset for an AI where tunelo
+   * cannot be sure to hear of every call: no Advisor thread opens on it.
+   */
+  advisorSession?: boolean;
 };
 
 export type LoginState = "ok" | "needs-login" | "unknown";
@@ -221,6 +229,13 @@ export type SessionPolicy = {
    * a restart) does not ask again. Allow rules only: never a mode or a folder.
    */
   sessionRules?: string[];
+  /**
+   * An Advisor thread's session: only the tools advisor/advisor-guard.ts
+   * allows, refused at once otherwise (never a card); none of the AI's own or
+   * the folder's settings; the AI's default mode whatever permissionMode and
+   * allowBypass say; no session rules.
+   */
+  advisorSession?: boolean;
 };
 
 export type DetectOptions = {
@@ -271,6 +286,8 @@ export type SessionQuery = {
   query: string;
   offset: number;
   limit: number;
+  /** Session ids (lowercased) left out, as if they did not exist: Advisor's own sessions. */
+  exclude?: ReadonlySet<string>;
 };
 
 /**

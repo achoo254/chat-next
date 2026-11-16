@@ -12,7 +12,9 @@ import {
   type Item,
   type MachineInfo,
   type ProjectConfigLevel,
+  type AdvisorAttachment,
   TermPath,
+  ThreadKind,
   type ThreadSummary,
 } from "@achoo254/chat-proto/remote/remote";
 import { type KeyPair, type Session, acceptHello, decodePlain, encodeHandshakeError } from "@achoo254/chat-remote-protocol";
@@ -20,6 +22,7 @@ import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { AdvisorKeyError, type AdvisorKeyStore, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
+import type { AdvisorAttachmentInput } from "../advisor/advisor-thread.ts";
 import { redactSecrets } from "../mcp/redact.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
 import type { TrustVerdict } from "../device-trust.ts";
@@ -104,7 +107,7 @@ export type LinkContext = {
 };
 
 /** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
-export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string } {
+export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string; failureId?: string } {
   // No secret this process holds (a sign-in secret, Advisor's key) ever leaves in an error, whatever it echoes.
   const message = redactSecrets(err instanceof Error ? err.message : String(err)).slice(0, 300);
   if (err instanceof AdvisorKeyError) {
@@ -112,7 +115,7 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
       ? { code: ErrorCode.INVALID, message, reason: ErrorReason.ADVISOR_KEY_INVALID, subject: "" }
       : { code: ErrorCode.INTERNAL, message, reason: ErrorReason.ADVISOR_KEY_NOT_SAVED, subject: "" };
   }
-  if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject };
+  if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject, ...(err.failureId ? { failureId: err.failureId } : {}) };
   if (err instanceof AccountError) return { code: ErrorCode.INVALID, message, reason: ACCOUNT_REASONS[err.kind], subject: err.subject };
   if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
   if (err instanceof OutsideFolderError) return { code: ErrorCode.INVALID, message, reason: ErrorReason.PATH_OUTSIDE_FOLDER, subject: "" };
@@ -187,6 +190,17 @@ export function projectListBody(list: ProjectList, levelOf?: (dir: string) => Pr
 
 const KEY_LENGTH = 32;
 
+/** An attachment of a question to Advisor as the core takes it. */
+function advisorAttachment(a: AdvisorAttachment): AdvisorAttachmentInput {
+  const c = a.context;
+  return {
+    text: a.text,
+    ...(c
+      ? { context: { screen: c.screen, dir: c.dir, branch: c.branch, threadId: c.threadId, panel: c.panel, action: c.action, errorCode: c.errorCode, failureId: c.failureId } }
+      : {}),
+  };
+}
+
 export class Connection {
   // "confirming": the handshake answered, but the device has not yet proven
   // its key with a first valid frame; it holds no session until then.
@@ -196,6 +210,12 @@ export class Connection {
   private session: Session | undefined;
   private device = "";
   private subscribed = new Set<string>();
+  /**
+   * The device knows Advisor's threads (ThreadList.advisor, or it opened or
+   * followed one): they are listed for it and their status reaches it. A
+   * device that never says so never hears of them.
+   */
+  private advisorAware = false;
   /** The tail this device last asked for (ThreadSubscribe.tail): it pages older items itself. 0: it takes everything. */
   private tail = 0;
   /** Looks at the transcripts of the threads this device follows, for turns typed outside Chat. */
@@ -328,7 +348,10 @@ export class Connection {
       this.ctx.core.onItems((threadId, items) => {
         if (this.subscribed.has(threadId)) this.sendItems(threadId, items);
       }),
-      this.ctx.core.onStatus((thread) => this.send("", { case: "threadStatus", value: { thread } })),
+      this.ctx.core.onStatus((thread) => {
+        if (thread.kind === ThreadKind.ADVISOR && !this.advisorAware) return;
+        this.send("", { case: "threadStatus", value: { thread } });
+      }),
       this.ctx.core.onActivity((activity) => {
         if (this.subscribed.has(activity.threadId)) this.send("", { case: "threadActivity", value: activity });
       }),
@@ -427,6 +450,11 @@ export class Connection {
     else await keys.remove(this.device);
     this.send(id, { case: "ack", value: {} });
     this.ctx.onAdvisorKey?.();
+  }
+
+  /** This device follows the thread now (it subscribed on this link). */
+  follows(threadId: string): boolean {
+    return this.state === "open" && this.subscribed.has(threadId);
   }
 
   /** An event every device gets unasked (the machine's profile and where each session stands). */
@@ -573,13 +601,22 @@ export class Connection {
           }
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
         }
-        case "threadList":
+        case "threadList": {
+          if (b.value.advisor) this.advisorAware = true;
+          const threads = this.advisorAware ? core.list() : core.list().filter((t) => t.kind !== ThreadKind.ADVISOR);
           return this.send(id, {
             case: "threadListResult",
-            value: { threads: core.list(), openSessions: core.openSessions(), maxSessions: core.limit },
+            value: { threads, openSessions: core.openSessions(), maxSessions: core.limit },
           });
+        }
         case "threadCreate": {
           const v = b.value;
+          if (v.kind === ThreadKind.ADVISOR) {
+            this.advisorAware = true;
+            const thread = await core.createAdvisor({ provider: v.provider, model: v.model, dir: v.dir, consent: { sensitive: Boolean(v.consent?.sensitive) }, device: this.device });
+            // The thread may hold earlier questions: the device gets all of it.
+            return this.openedThread(id, thread, false);
+          }
           const thread: ThreadSummary = await core.create({
             provider: v.provider,
             model: v.model,
@@ -631,6 +668,7 @@ export class Connection {
         case "threadSubscribe": {
           const { threadId, cursor, tail } = b.value;
           if (tail > 0) this.tail = tail;
+          if (core.isAdvisorThread(threadId)) this.advisorAware = true;
           const r = core.subscribe(threadId, cursor, tail);
           this.subscribed.add(threadId);
           this.sendInfo(threadId);
@@ -646,10 +684,13 @@ export class Connection {
         }
         case "threadSend":
           // `/clear` alone starts a fresh thread, answered like ThreadCreate: the device moves to it.
-          if (b.value.text.trim() === "/clear" && b.value.attachmentIds.length === 0) {
+          if (b.value.text.trim() === "/clear" && b.value.attachmentIds.length === 0 && !core.isAdvisorThread(b.value.threadId)) {
             return this.openedThread(id, await core.clear(b.value.threadId));
           }
-          await core.send(b.value.threadId, b.value.text, b.value.clientMsgId, b.value.attachmentIds);
+          await core.send(b.value.threadId, b.value.text, b.value.clientMsgId, b.value.attachmentIds, {
+            attachments: b.value.advisorAttachments.map(advisorAttachment),
+            device: this.device,
+          });
           return ack();
         case "attachmentUpload": {
           const v = b.value;
@@ -688,7 +729,7 @@ export class Connection {
           return ack();
         }
         case "threadInterrupt":
-          await core.interrupt(b.value.threadId);
+          await core.interrupt(b.value.threadId, b.value.clientMsgId, this.device);
           return ack();
         case "threadClose":
           await core.close(b.value.threadId);

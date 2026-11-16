@@ -494,6 +494,7 @@ export const viMachines = {
 			advisorUnavailable: "Cố vấn chưa dùng được cho phiên này: AI của phiên hoặc máy đang chạy phiên không có MCP của tunelo.",
 			advisorKeyInvalid: "Khoá không hợp lệ: khoá trống, quá dài, hoặc có dấu cách hay ký tự điều khiển.",
 			advisorKeyNotSaved: "Máy không lưu được khoá (kho khoá của máy đang khoá hoặc từ chối). Chưa có gì thay đổi.",
+			sessionLimit: (n: string) => `Máy đã chạy đủ ${n} phiên và các phiên đều đang bận. Cố vấn không đóng phiên nào của bạn: thử lại sau.`,
 			sensitiveFileNotConfirmed: "Cần xác nhận trước khi đưa tệp bí mật vào git.",
 			// Usage statistics of the machine.
 			usageRangeInvalid: "Khoảng thời gian không hợp lệ (tối đa 92 ngày).",

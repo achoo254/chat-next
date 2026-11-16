@@ -12,10 +12,12 @@ import { SESSION_MCP_SERVER, type ToolRegistrar } from "../mcp/groups.js";
 import { outboundBody } from "./advisor-outbound.ts";
 import { type Verdict, verdictOf } from "./advisor-verdict.ts";
 import { type JevClientOptions, JevError, type JevFailure, type WeighBody, type WeighKind, weigh } from "./jev-client.ts";
+import { registerAdvisorGitTool, registerAdvisorGrepTool } from "./advisor-git-tool.ts";
+import type { GitRunner } from "../workspace/git-run.ts";
 
 /** Not a group of groups.ts: it cannot be turned off, and only sessions with a ticket have it. */
 export const ADVISOR_GROUP = "advisor";
-export const ADVISOR_TOOLS = ["advisor_weigh"] as const;
+export const ADVISOR_TOOLS = ["advisor_weigh", "advisor_git", "advisor_grep"] as const;
 
 export const MAX_QUESTION_CHARS = 300;
 export const MAX_OPTION_CHARS = 80;
@@ -41,6 +43,10 @@ export type AdvisorHooks = {
   isSensitive(path: string): boolean;
   /** Where and how Jev is reached (tests). */
   jev?: JevClientOptions;
+  /** The folder of an Advisor thread (ThreadKind ADVISOR); undefined for any other thread. Without it advisor_git refuses. */
+  sessionDir?: (threadId: string) => string | undefined;
+  /** git for advisor_git (the workspaces' runner). */
+  git?: GitRunner;
 };
 
 /** Why a call gave no verdict (AdvisorVerdictItem.error). */
@@ -100,6 +106,14 @@ function refusal(error: AdvisorErrorCode, message: string, sent?: WeighBody): Ca
  * runs for; absent where the tool is only listed (`tunelo mcp`).
  */
 export function registerAdvisorTools(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; threadId: string }): void {
+  registerWeigh(server, bound);
+  const { sessionDir, git } = bound?.hooks ?? {};
+  const gitBound = bound && sessionDir && git ? { hooks: { sessionDir, git, isSensitive: (p: string) => bound.hooks.isSensitive(p) }, threadId: bound.threadId } : undefined;
+  registerAdvisorGitTool(server, gitBound);
+  registerAdvisorGrepTool(server, gitBound);
+}
+
+function registerWeigh(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; threadId: string }): void {
   server.registerTool(
     "advisor_weigh",
     {

@@ -29,6 +29,10 @@ const (
 	// hint is for a session still running, which the agent counts as one
 	// with a call in the last 30 minutes.
 	usageHintTTL = 30 * time.Minute
+	// advisorAnswerTTL is how long a push service keeps an "Advisor
+	// answered" push: the answer waits in the machine's journal, but the
+	// question was asked minutes ago.
+	advisorAnswerTTL = time.Hour
 )
 
 // copyText is the server-written text of notifications, per locale.
@@ -41,6 +45,8 @@ type copyText struct {
 	anyAI string
 	// usageHint names the machine only (fmt format).
 	usageHint string
+	// advisorAnswer names the machine only (fmt format).
+	advisorAnswer string
 	// accountDevice: a device key was added to the account (fmt format: the
 	// device's name and platform).
 	accountDevice string
@@ -51,16 +57,19 @@ var copies = map[string]copyText{
 		machineApproval: "%s trên %s cần bạn duyệt", machineQuestion: "%s trên %s cần bạn trả lời",
 		machinePending: "%s trên %s có %d việc cần bạn", anyAI: "AI",
 		usageHint:     "Có gợi ý dùng AI tiết kiệm hơn cho một phiên trên %s",
+		advisorAnswer: "Cố vấn đã trả lời trên %s",
 		accountDevice: "Thiết bị mới được thêm vào tài khoản: %s (%s). Không phải bạn? Thu hồi ngay trong AI Agent"},
 	LocaleEN: {hidden: "You have a new message", photo: "Photo", video: "Video", audio: "Audio", voice: "Voice message", file: "File",
 		machineApproval: "%s on %s needs your approval", machineQuestion: "%s on %s needs your answer",
 		machinePending: "%s on %s has %d requests waiting for you", anyAI: "AI",
 		usageHint:     "A tip to use the AI more efficiently in a session on %s",
+		advisorAnswer: "Advisor answered on %s",
 		accountDevice: "A new device was added to your account: %s (%s). Not you? Revoke it in AI Agent"},
 	LocaleZhCN: {hidden: "你有一条新消息", photo: "照片", video: "视频", audio: "音频", voice: "语音消息", file: "文件",
 		machineApproval: "%[2]s 上的 %[1]s 需要你批准", machineQuestion: "%[2]s 上的 %[1]s 需要你回答",
 		machinePending: "%[2]s 上的 %[1]s 有 %[3]d 个请求等你处理", anyAI: "AI",
 		usageHint:     "%s 上的一个会话有更省用量的建议",
+		advisorAnswer: "%s 上的顾问已回答",
 		accountDevice: "你的账号添加了新设备：%s（%s）。不是你？请在 AI Agent 中撤销"},
 }
 
@@ -168,6 +177,9 @@ const (
 	// MachineUsageHint: a running session went past a usage rule. The notice
 	// names the machine only, never the session, rule or numbers.
 	MachineUsageHint = "usage_hint"
+	// MachineAdvisorAnswer: Advisor answered a question while no device was
+	// looking. The notice names the machine only, never the question.
+	MachineAdvisorAnswer = "advisor_answer"
 )
 
 // MachineNotice is what a machine's push says (ADR 0013): the machine's name
@@ -175,7 +187,8 @@ const (
 type MachineNotice struct {
 	MachineID   int64
 	MachineName string
-	// Kind is MachineApproval, MachineQuestion or MachineUsageHint.
+	// Kind is MachineApproval, MachineQuestion, MachineUsageHint or
+	// MachineAdvisorAnswer.
 	Kind string
 	// Pending is how many requests wait on the machine; above 1 the push
 	// gives the count instead of the kind.
@@ -207,6 +220,13 @@ func (s *Service) machineNotification(n MachineNotice, locale string) webpush.Me
 			Timestamp: n.At.UnixMilli()}
 		payload, _ := json.Marshal(p)
 		return webpush.Message{Payload: payload, TTL: usageHintTTL, Urgency: webpush.UrgencyNormal, Topic: "machineusage" + id}
+	}
+	if n.Kind == MachineAdvisorAnswer {
+		p := Payload{Kind: KindMachine, MachineID: n.MachineID, Title: s.cfg.AppName,
+			Body: fmt.Sprintf(text.advisorAnswer, n.MachineName), Tag: "machine-advisor:" + id, URL: "/machines/" + id,
+			Timestamp: n.At.UnixMilli()}
+		payload, _ := json.Marshal(p)
+		return webpush.Message{Payload: payload, TTL: advisorAnswerTTL, Urgency: webpush.UrgencyNormal, Topic: "machineadvisor" + id}
 	}
 	ai, known := aiNames[n.Provider]
 	if !known {

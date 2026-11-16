@@ -183,10 +183,15 @@ export function buildReport(input: { index: LedgerIndex; turns: readonly Turn[];
   };
 }
 
-/** The report of `query` from the ledger, reading only the months it needs. Throws ReportRangeError, or LedgerUnreadable while blocked. */
-export async function usageReport(ledger: Ledger, query: ReportQuery, rules: RuleSwitches, now: number): Promise<UsageReportData> {
+/**
+ * The report of `query` from the ledger, reading only the months it needs;
+ * sessions in `hidden` (lowercased ids: Advisor's own) are left out of it.
+ * Throws ReportRangeError, or LedgerUnreadable while blocked.
+ */
+export async function usageReport(ledger: Ledger, query: ReportQuery, rules: RuleSwitches, now: number, hidden: ReadonlySet<string> = new Set()): Promise<UsageReportData> {
   const { from, to } = rangeOf(query);
   await ledger.open();
-  const turns = await ledger.turns({ from: from - SESSION_LOOKBACK_MS, to });
+  const all = await ledger.turns({ from: from - SESSION_LOOKBACK_MS, to });
+  const turns = hidden.size === 0 ? all : all.filter((t) => !hidden.has(t.sessionId.toLowerCase()));
   return buildReport({ index: ledger.snapshot(), turns, query, rules, now });
 }

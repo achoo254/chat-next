@@ -207,6 +207,7 @@ export class LocalSessions implements SessionHistory {
       const head = this.head(k);
       if (!head?.dir) continue;
       all.push(k);
+      if (q.exclude?.has(k.sessionId.toLowerCase())) continue;
       const title = this.title(k, head);
       if (!title) continue;
       if (words.length) {

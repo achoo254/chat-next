@@ -123,6 +123,7 @@ export class AgyHistory implements SessionHistory {
   list(q: SessionQuery): SessionPage {
     const words = q.query.toLowerCase().split(/\s+/).filter(Boolean);
     const all = this.listed
+      .filter((s) => !q.exclude?.has(s.sessionId.toLowerCase()))
       .filter((s) => s.cwd !== "" && (q.dir === "" || s.cwd === q.dir || s.cwd.startsWith(`${q.dir.replace(/\/$/, "")}/`)))
       .filter((s) => words.every((w) => `${s.title}\n${s.cwd}`.toLowerCase().includes(w)))
       .map((s) => this.view(s))

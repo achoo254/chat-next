@@ -17,7 +17,22 @@ import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import type { AskUser } from "../types.ts";
-import { describe, toolPaths } from "./tool-map.ts";
+import { describe, toolKind, toolPaths } from "./tool-map.ts";
+import { ADVISOR_ONLY_TOOLS, advisorGuard } from "../../advisor/advisor-guard.ts";
+
+/**
+ * What a search of agy shows, for Advisor's guard: only grep_search with
+ * MatchPerLine false (file names) and find_by_name show no content; any
+ * other search counts as printing lines (fail closed). Its Includes filters
+ * read as globs.
+ */
+export function searchOf(call: NonNullable<AcpPermissionParams["toolCall"]>): { contentSearch: boolean; globs: string[] } {
+  const input = typeof call.rawInput === "object" && call.rawInput !== null ? (call.rawInput as Record<string, unknown>) : {};
+  const includes = Array.isArray(input.Includes) ? input.Includes.filter((g): g is string => typeof g === "string") : [];
+  if (toolKind(call) !== "search") return { contentSearch: false, globs: includes };
+  const namesOnly = call.name === "find_by_name" || (call.name === "grep_search" && input.MatchPerLine === false);
+  return { contentSearch: !namesOnly, globs: includes };
+}
 
 /** Longest input shown on a card. */
 const CARD_INPUT_CHARS = 4_000;
@@ -68,6 +83,8 @@ export type PermissionContext = {
   onRule: (rule: string) => void;
   /** tunelo's own MCP of the session: its writes are described and approved here. */
   sessionMcp?: Pick<SessionMcp, "approveWrite" | "describeWrite" | "advisorAllowed">;
+  /** An Advisor thread's session: Advisor's read-only list answers every request, never the user (advisor-guard.ts). */
+  advisorSession?: boolean;
 };
 
 export async function answerPermission(p: AcpPermissionParams, ctx: PermissionContext, signal: AbortSignal): Promise<AcpPermissionOutcome> {
@@ -79,6 +96,12 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
   const command = typeof input.CommandLine === "string" ? input.CommandLine : "";
   const sensitive = toolPaths(call, ctx.dir).some(ctx.isSensitive) || (command !== "" && mentionsSensitive(command, ctx.isSensitive, { cwd: ctx.dir }));
   const own = tuneloTool(call.name ?? "");
+  if (ctx.advisorSession) {
+    const why = advisorGuard({ kind: toolKind(call), own, paths: toolPaths(call, ctx.dir), ...searchOf(call) }, ctx);
+    return { outcome: { outcome: "selected", optionId: why ? reject : allow } };
+  }
+  // advisor_git and advisor_grep are only for an Advisor thread's session: refused at once elsewhere.
+  if (ADVISOR_ONLY_TOOLS.includes(own)) return { outcome: { outcome: "selected", optionId: reject } };
   if (own !== "" && ASKS_ON_DEVICE.has(own)) return { outcome: { outcome: "selected", optionId: allow } };
   // advisor_weigh: allowed while Advisor may be asked in the session, refused at once otherwise (tunelo would refuse it anyway).
   const advisorAllowed = ctx.sessionMcp?.advisorAllowed;

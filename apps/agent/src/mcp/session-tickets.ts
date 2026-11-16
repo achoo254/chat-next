@@ -22,6 +22,8 @@ export interface SessionMcp {
 	browserNotices?: () => string[];
 	/** Advisor may be asked in this session now: its advisor_weigh calls go on without an approval card. */
 	advisorAllowed?: () => boolean;
+	/** The session is an Advisor thread's: its `tunelo mcp` offers Advisor's tools only (TUNELO_MCP_ADVISOR). */
+	advisorSession?: boolean;
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */
@@ -30,6 +32,8 @@ export interface SessionMcpLease extends SessionMcp {
 }
 
 export const TICKET_ENV = "TUNELO_MCP_TICKET";
+/** Set ("1") for an Advisor thread's `tunelo mcp`: it lists Advisor's tools and nothing else. */
+export const ADVISOR_MCP_ENV = "TUNELO_MCP_ADVISOR";
 
 export class SessionTickets {
 	private readonly owners = new Map<string, string>();
