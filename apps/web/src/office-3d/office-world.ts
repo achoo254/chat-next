@@ -235,6 +235,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				frames,
 				fps: engine.getFps(),
 				stats: stats.summary(),
+				camera: { zoom: camera.user.zoom, yaw: camera.user.yaw },
 				people: people.views().map((p) => ({ key: p.key, floor: p.floor, x: p.x, z: p.z, visible: p.visible, target: p.target, pose: p.pose, screen: overlay.screen.get(p.key) ?? null })),
 				resetStats: () => stats.reset(),
 			}))

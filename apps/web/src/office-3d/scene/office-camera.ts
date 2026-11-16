@@ -16,6 +16,8 @@ export interface OfficeCamera {
 	/** Re-frames for the canvas (CSS pixels); `lift` raises the view for the floor-change glide. Returns the frame. */
 	update(width: number, height: number, timeMs: number, lift: number): OfficeFrame;
 	readonly frame: OfficeFrame | null;
+	/** What the viewer did to the framing (zoom, turn, pan), for tests. */
+	readonly user: CameraUser;
 	dispose(): void;
 }
 
@@ -119,6 +121,9 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, layo
 			camera.orthoTop = f.halfHeight;
 			camera.orthoBottom = -f.halfHeight;
 			return f;
+		},
+		get user() {
+			return user;
 		},
 		dispose() {
 			canvas.removeEventListener("pointerdown", onDown);

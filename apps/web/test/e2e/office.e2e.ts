@@ -510,3 +510,34 @@ test("an AI that does not report its staff (Antigravity): the director alone wal
 	assert.deepEqual(errors, []);
 	await context.close();
 });
+
+test("the viewer's camera: wheel zoom stops at 0.8 and 3.2, a right-drag or shift-drag turns at most 0.45 rad", async () => {
+	const { context, page, errors } = await openOffice(browser, "machine-chat", FLAGS_3D);
+	await page.locator("canvas.of3d-canvas").waitFor({ timeout: 30_000 });
+	await poll("the 3D scene", () => has3D(page), (v) => v);
+	const box = await page.locator("canvas.of3d-canvas").boundingBox();
+	assert.ok(box !== null, "the canvas has a box");
+	const cx = box.x + box.width / 2;
+	const cy = box.y + box.height / 2;
+	const camera = async () => (await readout(page))?.camera ?? { zoom: Number.NaN, yaw: Number.NaN };
+	await page.mouse.move(cx, cy);
+	for (let i = 0; i < 30; i += 1) await page.mouse.wheel(0, -400);
+	await poll("zoomed in to the limit", async () => (await camera()).zoom, (z) => Math.abs(z - 3.2) < 0.01);
+	for (let i = 0; i < 40; i += 1) await page.mouse.wheel(0, 400);
+	await poll("zoomed out to the limit", async () => (await camera()).zoom, (z) => Math.abs(z - 0.8) < 0.01);
+	await page.mouse.down({ button: "right" });
+	await page.mouse.move(cx + 600, cy, { steps: 20 });
+	await page.mouse.up({ button: "right" });
+	const turned = (await camera()).yaw;
+	assert.ok(Math.abs(turned) > 0.1 && Math.abs(turned) <= 0.45 + 1e-6, `a long right-drag turns, capped at 0.45 rad: ${turned}`);
+	await page.keyboard.down("Shift");
+	await page.mouse.move(cx, cy);
+	await page.mouse.down();
+	await page.mouse.move(cx - 30, cy, { steps: 5 });
+	await page.mouse.up();
+	await page.keyboard.up("Shift");
+	const shifted = (await camera()).yaw;
+	assert.ok(Math.abs(shifted - turned) > 0.05, `shift-drag turns too: ${turned} → ${shifted}`);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
