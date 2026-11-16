@@ -216,7 +216,12 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		if (run) {
 			last = performance.now();
 			engine.runRenderLoop(onFrame);
-		} else engine.stopRenderLoop();
+		} else {
+			engine.stopRenderLoop();
+			// A floor change cut off mid-fade must not leave the scene veiled while no frame runs; the next frame sets the
+			// fade again from the transition's own clock.
+			fade.style.opacity = "";
+		}
 	});
 	const resize = new ResizeObserver(() => {
 		resizePending = true;
