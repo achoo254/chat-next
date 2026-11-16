@@ -135,6 +135,12 @@ export class OfficeHub {
     const provider = this.opts.providers.find((p) => p.id === summary.provider);
     const reportsStaff = provider?.history?.subagentActivity !== undefined;
     const now = this.now();
+    // Nothing the AI said since the agent started names its session (a restart, a session run elsewhere): the
+    // thread's own record does, and the subagents' records cannot be read without it.
+    if (!this.memory.sessionIds.has(threadId)) {
+      const sessionId = this.core.sessionIdOf(threadId);
+      if (sessionId !== "") this.memory.sessionIds.set(threadId, sessionId);
+    }
     const thread = new OfficeThread(threadId, reportsStaff, this.memory, now);
     thread.seed(this.core.snapshot(threadId), summary, now);
     // Nobody has seen these events: the snapshot holds what they did.

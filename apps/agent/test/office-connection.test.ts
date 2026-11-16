@@ -266,6 +266,37 @@ describe("the office over the link", () => {
     await core.stop();
   });
 
+  it("after a restart (nothing said the AI's session since) an office still reads the subagents' records, by the thread's session", async () => {
+    const asked: string[] = [];
+    const base = officeProvider();
+    const provider: AgentProvider = {
+      ...base,
+      history: {
+        ...history,
+        subagentActivity: async (sessionId) => {
+          asked.push(sessionId);
+          return { subagents: [], usage: [] };
+        },
+      },
+    };
+    const { core, work } = makeCore([provider]);
+    const thread = await core.create({ provider: "office-ai", model: "", dir: work, text: "", consent, device: "test" });
+    await core.send(thread.id, "go", "c1");
+    const items = await until(core, thread.id, (all) => byCase(all, "approval").some((a) => a.body.value.state === PromptState.PENDING));
+    const ask = byCase(items, "approval")[0];
+    if (!ask) throw new Error("no approval");
+    core.respond(thread.id, ask.id, ask.revision, { decision: Decision.ALLOW }, "test");
+    await until(core, thread.id, (all) => byCase(all, "turn").some((t) => t.body.value.state === TurnState.COMPLETED));
+    // A hub of its own: its memory heard nothing, as after the agent restarted.
+    const hub = new OfficeHub(core, { providers: [provider], pollMs: 10 });
+    const release = hub.attach();
+    hub.watch(thread.id, () => undefined);
+    await wait(200);
+    expect(asked).toContain("office-session-1");
+    release();
+    await core.stop();
+  });
+
   it("brings in what the subagents' records tell while the machine does not run the turn", async () => {
     const base = officeProvider();
     const at = Date.now() + 60_000;

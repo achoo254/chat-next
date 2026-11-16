@@ -815,6 +815,11 @@ export class AgentCore {
     return [...this.threads.values()].map((t) => this.summary(t)).sort((a, b) => Number(b.updatedAt - a.updatedAt));
   }
 
+  /** The AI session id of the thread's latest session ("" when it has none yet). */
+  sessionIdOf(threadId: string): string {
+    return this.threads.get(threadId)?.meta.segments.at(-1)?.sessionId ?? "";
+  }
+
   /** The AI session ids of every thread's sessions, by provider. */
   sessionIds(): { provider: string; sessionId: string }[] {
     const out: { provider: string; sessionId: string }[] = [];
