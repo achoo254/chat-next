@@ -9,8 +9,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-1-day-desktop.379f915d.webp",
-					"night": "office-2d-floor-1-night-desktop.cc195c3c.webp",
+					"day": "office-2d-floor-1-day-desktop.3debc69b.webp",
+					"night": "office-2d-floor-1-night-desktop.693bafc6.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.98,
@@ -149,8 +149,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-1-day-phone.d9a8d6c8.webp",
-					"night": "office-2d-floor-1-night-phone.cb81ce0c.webp",
+					"day": "office-2d-floor-1-day-phone.155ee401.webp",
+					"night": "office-2d-floor-1-night-phone.d6dc0f64.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.52,
@@ -288,18 +288,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-1.caabb2a5.glb",
+				"shell": "office-floor-1.840e399c.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-1-day-1024.647e4d50.webp",
-						"2048": "lightmap-floor-1-day-2048.ce9392f8.webp"
+						"1024": "lightmap-floor-1-day-1024.4173d8b9.webp",
+						"2048": "lightmap-floor-1-day-2048.d266afc8.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-1-night-1024.64aa3f38.webp",
-						"2048": "lightmap-floor-1-night-2048.6bb6e213.webp"
+						"1024": "lightmap-floor-1-night-1024.671e62d2.webp",
+						"2048": "lightmap-floor-1-night-2048.4d514abd.webp"
 					}
 				},
-				"props": "office-props-floor-1.7bd750af.glb",
+				"props": "office-props-floor-1.025a8dbd.glb",
 				"models": [
 					"armchair",
 					"book-stack",
@@ -342,8 +342,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-2-day-desktop.24f0dafe.webp",
-					"night": "office-2d-floor-2-night-desktop.becd5c8f.webp",
+					"day": "office-2d-floor-2-day-desktop.6c53dcf5.webp",
+					"night": "office-2d-floor-2-night-desktop.ebaa6a24.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.98,
@@ -394,8 +394,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-2-day-phone.e30f16db.webp",
-					"night": "office-2d-floor-2-night-phone.0b564ccf.webp",
+					"day": "office-2d-floor-2-day-phone.d55a30bb.webp",
+					"night": "office-2d-floor-2-night-phone.f6bf2668.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.52,
@@ -445,18 +445,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-2.58ca737e.glb",
+				"shell": "office-floor-2.1bbbf3d0.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-2-day-1024.1f3952f8.webp",
-						"2048": "lightmap-floor-2-day-2048.a82daa69.webp"
+						"1024": "lightmap-floor-2-day-1024.81b1c135.webp",
+						"2048": "lightmap-floor-2-day-2048.a877fbaf.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-2-night-1024.3f0df4ca.webp",
-						"2048": "lightmap-floor-2-night-2048.f91357cf.webp"
+						"1024": "lightmap-floor-2-night-1024.3d5a7a0a.webp",
+						"2048": "lightmap-floor-2-night-2048.a56c5576.webp"
 					}
 				},
-				"props": "office-props-floor-2.71d34d04.glb",
+				"props": "office-props-floor-2.489b46a8.glb",
 				"models": [
 					"globe",
 					"kanban-board",
@@ -476,8 +476,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-3-day-desktop.b3be2686.webp",
-					"night": "office-2d-floor-3-night-desktop.8cb87484.webp",
+					"day": "office-2d-floor-3-day-desktop.d958d274.webp",
+					"night": "office-2d-floor-3-night-desktop.b54e2d4c.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.98,
@@ -532,8 +532,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-3-day-phone.3089ba54.webp",
-					"night": "office-2d-floor-3-night-phone.b2000d94.webp",
+					"day": "office-2d-floor-3-day-phone.eedc7e87.webp",
+					"night": "office-2d-floor-3-night-phone.968cbe68.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.52,
@@ -587,15 +587,15 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-3.72f83289.glb",
+				"shell": "office-floor-3.db758629.glb",
 				"lightmaps": {
 					"day": {
 						"1024": "lightmap-floor-3-day-1024.739842ae.webp",
-						"2048": "lightmap-floor-3-day-2048.50b61fd3.webp"
+						"2048": "lightmap-floor-3-day-2048.582cb136.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-3-night-1024.12a8f570.webp",
-						"2048": "lightmap-floor-3-night-2048.e1ee0a53.webp"
+						"1024": "lightmap-floor-3-night-1024.3407fe11.webp",
+						"2048": "lightmap-floor-3-night-2048.727cde2a.webp"
 					}
 				},
 				"props": "office-props-floor-3.d699a02c.glb",
