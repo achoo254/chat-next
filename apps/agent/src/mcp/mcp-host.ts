@@ -16,9 +16,10 @@
  * outcome; never its arguments). Nothing leaves without redact().
  *
  * A session with a ticket also has the sign-in secret tools (request_secret,
- * fill_secret; sign-in-secrets/secret-tools.ts) and the tunelo browser tools
+ * fill_secret; sign-in-secrets/secret-tools.ts), the tunelo browser tools
  * (open_browser, request_takeover, virtual_authenticator;
- * remote-browser/browser-tools.ts), bound to that ticket and its thread.
+ * remote-browser/browser-tools.ts) and Advisor (advisor_weigh;
+ * advisor/advisor-tools.ts), bound to that ticket and its thread.
  */
 import { randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/server";
@@ -47,6 +48,7 @@ import { SECRETS_GROUP, SECRET_TOOLS, registerSecretTools } from "../sign-in-sec
 import type { SecretService } from "../sign-in-secrets/secret-service.ts";
 import { BROWSER_GROUP, BROWSER_TOOLS, registerBrowserTools } from "../remote-browser/browser-tools.ts";
 import type { RemoteBrowser } from "../remote-browser/remote-browser.ts";
+import { ADVISOR_GROUP, ADVISOR_TOOLS, type AdvisorHooks, registerAdvisorTools } from "../advisor/advisor-tools.ts";
 
 interface Entry {
 	session: McpSession;
@@ -58,7 +60,11 @@ interface Entry {
 }
 
 /** The groups of tools only a session tunelo opened has, and their tools. */
-const TICKET_GROUPS: Readonly<Record<string, readonly string[]>> = { [SECRETS_GROUP]: SECRET_TOOLS, [BROWSER_GROUP]: BROWSER_TOOLS };
+const TICKET_GROUPS: Readonly<Record<string, readonly string[]>> = {
+	[SECRETS_GROUP]: SECRET_TOOLS,
+	[BROWSER_GROUP]: BROWSER_TOOLS,
+	[ADVISOR_GROUP]: ADVISOR_TOOLS,
+};
 
 const NO_SESSION =
 	"This MCP session ended (tunelo restarted); reconnect the MCP client.";
@@ -84,6 +90,8 @@ export interface McpHostOptions {
 	secrets?: () => SecretService | undefined;
 	/** The tunelo browser; without it a session has no browser tools. */
 	browser?: () => RemoteBrowser | undefined;
+	/** Advisor (its threads' state, the key, calls the core can stop); without it a session has no Advisor tools. */
+	advisor?: () => AdvisorHooks | undefined;
 	log?: (line: string) => void;
 }
 
@@ -156,6 +164,12 @@ export class McpHost {
 			const table = new ToolTable();
 			registerBrowserTools(table, { browser, session });
 			tables.set(BROWSER_GROUP, table);
+		}
+		const advisor = this.options.advisor?.();
+		if (advisor) {
+			const table = new ToolTable();
+			registerAdvisorTools(table, { hooks: advisor, threadId });
+			tables.set(ADVISOR_GROUP, table);
 		}
 		return tables;
 	}

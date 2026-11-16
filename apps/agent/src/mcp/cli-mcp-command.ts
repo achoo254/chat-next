@@ -23,6 +23,7 @@ import { redactMessage } from "./redact.js";
 import { TICKET_ENV } from "./session-tickets.js";
 import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
+import { ADVISOR_GROUP, registerAdvisorTools } from "../advisor/advisor-tools.ts";
 
 const NOT_RUNNING =
 	"tunelo is not running in the background: run `tunelo login`, then call the tool again.";
@@ -210,11 +211,12 @@ export function registerMcpCommand(program: Command): void {
 				}
 			}
 
-			// Sign-in secrets and the tunelo browser: only a session tunelo opened has a device to ask.
+			// Sign-in secrets, the tunelo browser and Advisor: only a session tunelo opened has a device to ask and a thread.
 			if (ticket) {
 				const groups: [string, (t: ToolTable) => void][] = [
 					[SECRETS_GROUP, (t) => registerSecretTools(t)],
 					[BROWSER_GROUP, (t) => registerBrowserTools(t)],
+					[ADVISOR_GROUP, (t) => registerAdvisorTools(t)],
 				];
 				for (const [group, register] of groups) {
 					const table = new ToolTable();

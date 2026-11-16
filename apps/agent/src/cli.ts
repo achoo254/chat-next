@@ -35,6 +35,7 @@ import { checkForUpdate, rollback, update } from "./update.ts";
 import { AGENT_VERSION } from "./version.ts";
 import type { SecretService } from "./sign-in-secrets/secret-service.ts";
 import type { RemoteBrowser } from "./remote-browser/remote-browser.ts";
+import type { AdvisorHooks } from "./advisor/advisor-tools.ts";
 
 const log = (line: string) => console.log(line);
 
@@ -69,16 +70,26 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   let sessionBypassed: (threadId: string) => boolean = () => false;
   let secrets: () => SecretService | undefined = () => undefined;
   let browser: () => RemoteBrowser | undefined = () => undefined;
+  let advisor: () => AdvisorHooks | undefined = () => undefined;
   const mcp = new McpHost(dir, {
     log,
     enabledGroups: () => config.get().mcpGroups,
     sessionBypassed: (threadId) => sessionBypassed(threadId),
     secrets: () => secrets(),
     browser: () => browser(),
+    advisor: () => advisor(),
   });
   const machine = new Machine({ config, mcp });
   secrets = () => machine.secrets;
   browser = () => machine.browser;
+  // Advisor runs in this service: the key stays in its own store, the core stops a call when the turn ends.
+  const advisorHooks: AdvisorHooks = {
+    allowed: (threadId) => machine.core.advisorAllowed(threadId),
+    key: () => machine.advisorKeys.key(),
+    call: (threadId, run) => machine.core.advisorCall(threadId, run),
+    isSensitive: (path) => machine.isSensitive(path),
+  };
+  advisor = () => advisorHooks;
   sessionBypassed = (threadId) => machine.core.bypassed(threadId);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;

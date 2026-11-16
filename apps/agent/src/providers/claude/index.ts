@@ -26,6 +26,7 @@ import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import { redactDeep } from "../../mcp/redact.ts";
+import { ADVISOR_OFF_REFUSAL } from "../../advisor/advisor-tools.ts";
 import type { SessionSecretHooks } from "../../sign-in-secrets/secret-env.ts";
 import { envName, envNamesIn } from "../../sign-in-secrets/secret-names.ts";
 import type { AccountsStore } from "../../accounts/store.ts";
@@ -43,6 +44,7 @@ import type {
   Detected,
   DetectOptions,
   ImageInput,
+  SessionNote,
   ProviderCapabilities,
   ProviderEvent,
   ProviderInfo,
@@ -92,6 +94,7 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   permissionModes: ["default", "acceptEdits", "plan", "auto"],
   bypassModeId: BYPASS_MODE,
   sessionMcp: true,
+  sessionNotes: true,
 };
 
 /**
@@ -322,6 +325,60 @@ export const secretRequestHook: HookCallback = async (input) => {
   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
 };
 
+const ADVISOR_WEIGH = `mcp__${SESSION_MCP_SERVER}__advisor_weigh`;
+
+/**
+ * advisor_weigh goes on without an approval card while Advisor may be asked
+ * in the session (it only weighs options; what it sends is checked and shown
+ * in the transcript), and is refused at once while it may not (tunelo would
+ * refuse it anyway): no card either way.
+ */
+export function advisorWeighHook(allowed: () => boolean): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse" || input.tool_name !== ADVISOR_WEIGH) return {};
+    if (!allowed()) {
+      return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ADVISOR_OFF_REFUSAL } };
+    }
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+  };
+}
+
+/**
+ * What tunelo tells Claude beside each message (Advisor's instructions), as
+ * context of that prompt: never the user's words, so the journal, Claude's
+ * own transcript and a command like /compact stay as the user wrote them.
+ * Notes wait in the order their messages were sent. A prompt takes the note
+ * of the waiting message with exactly its text (notes of messages before it
+ * are dropped: those never reached Claude with a hook); a prompt that
+ * matches none takes none. A note dropped or no longer holding was never
+ * delivered, so the core sends it again with the next message.
+ */
+export class PromptNotes {
+  private waiting: { text: string; note: SessionNote }[] = [];
+
+  add(text: string, note: SessionNote): void {
+    this.waiting.push({ text, note });
+  }
+
+  /** The turn was stopped: messages still waiting never reach Claude as they were. */
+  clear(): void {
+    this.waiting = [];
+  }
+
+  readonly hook: HookCallback = async (input) => {
+    if (input.hook_event_name !== "UserPromptSubmit" || this.waiting.length === 0) return {};
+    if (input.prompt.trimStart().startsWith("/")) return {};
+    const at = this.waiting.findIndex((w) => w.text === input.prompt);
+    if (at < 0) return {};
+    const taken = this.waiting[at];
+    this.waiting = this.waiting.slice(at + 1);
+    const text = taken?.note.take();
+    if (!taken || !text) return {};
+    taken.note.delivered();
+    return { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: text } };
+  };
+}
+
 /**
  * After every tool: what happened in the tunelo browser that Claude should
  * know (a page asked for a passkey nobody at the machine can give), once.
@@ -429,6 +486,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   const secrets = policy.sessionMcp?.secrets;
   const browserNotices = policy.sessionMcp?.browserNotices;
   const notices = browserNotices ? [browserNoticeHook(browserNotices)] : [];
+  const advisorAllowed = policy.sessionMcp?.advisorAllowed;
+  const advisorHooks = advisorAllowed ? [advisorWeighHook(advisorAllowed)] : [];
+  const promptNotes = new PromptNotes();
   let interrupted = false;
   let turnStart = 0;
   let turnOpen = false;
@@ -506,9 +566,10 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     // Also guards a `tunelo` MCP the machine's own config adds.
     hooks: {
       PreToolUse: [
-        { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook] },
+        { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
         ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
       ],
+      UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
       PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
       PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
     },
@@ -580,13 +641,15 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
   return {
     events,
-    async send(text, images) {
+    async send(text, images, note) {
       if (closed) throw new Error("session closed");
       turnStart = performance.now();
       turnOpen = true;
+      if (note) promptNotes.add(text, note);
       inbox.push(userMessage(text, images));
     },
     async interrupt() {
+      promptNotes.clear();
       if (closed || !turnOpen) return;
       interrupted = true;
       try {

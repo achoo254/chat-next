@@ -224,6 +224,7 @@ export class Machine {
       onSessionId: (provider, sessionId) => this.usage.launched.add(provider, sessionId),
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
       sessionMcpEnabled: () => this.sessionMcpEnabled(),
+      advisorKeySet: () => this.advisorKeys.status().keySet,
     });
     for (const p of withAccounts(this.providers)) {
       p.accounts?.listen({ onSelect: () => this.core.followMachineAccount(p.id), onChange: () => this.announceAccounts() });

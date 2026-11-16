@@ -4,6 +4,7 @@
 // folder and the AI is told where.
 import { copyFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { withoutAdvisorNote } from "../advisor/advisor-instructions.ts";
 import type { ImageInput } from "../providers/types.ts";
 import { imageType } from "./image-type.ts";
 import { saveInFolder } from "./project-files.ts";
@@ -69,10 +70,22 @@ function sizeText(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const FILES_NOTE = /(?:^|\n\n)The user attached (?:this file|these files), saved in the working directory:(?:\n- [^\n]*)+$/;
+
 /** The message the AI reads: the user's text, then where the files they sent are. */
 export function textForAi(text: string, files: readonly { path: string; size: number }[]): string {
   if (files.length === 0) return text;
   const list = files.map((f) => `- ${f.path} (${sizeText(f.size)})`).join("\n");
   const note = `The user attached ${files.length === 1 ? "this file" : "these files"}, saved in the working directory:\n${list}`;
   return text.trim() === "" ? note : `${text}\n\n${note}`;
+}
+
+/**
+ * A message the AI read, as the user wrote it: without tunelo's Advisor
+ * note and without the list of files they attached (textForAi). For reading
+ * the AI's own transcript back into the journal, which keeps the user's
+ * words only.
+ */
+export function userWords(text: string): string {
+  return withoutAdvisorNote(text).replace(FILES_NOTE, "");
 }

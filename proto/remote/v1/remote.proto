@@ -1655,6 +1655,7 @@ message Item {
     ErrorItem error = 21;
     ModelChangeItem model_change = 22;
     AgentHandoffItem agent_handoff = 23;
+    AdvisorVerdictItem advisor_verdict = 24;
   }
 }
 
@@ -1826,6 +1827,12 @@ message TurnItem {
   // What the turn would cost at the AI's API prices, subagents included, in
   // US dollars. Only an estimate: a subscription plan is not charged by it.
   double cost_usd_estimate = 12;
+  // A COMPLETED turn of a session whose automatic Advisor was on all along
+  // (with a key kept and tunelo's MCP in the session) ended without the AI
+  // asking Advisor for next steps (advisor_weigh kind "next_steps", a call
+  // that failed counts as asked). Never set for an interrupted or failed
+  // turn.
+  bool advisor_missed = 13;
 }
 
 message SubagentItem {
@@ -1853,6 +1860,42 @@ message AgentHandoffItem {
   // The handoff text the new AI received as its first message.
   string summary = 3;
   repeated string files_changed = 4;
+}
+
+// What Advisor made of one call of the advisor_weigh tool of tunelo's MCP
+// (whatever the AI calls it: mcp__tunelo__advisor_weigh,
+// mcp_tunelo_advisor_weigh). The question, options and context are exactly
+// what was sent to Advisor, after secrets were hidden; empty when nothing was
+// sent (the call was refused before).
+message AdvisorVerdictItem {
+  // The tool call it answers (ToolCallItem.tool_id): a device folds that
+  // call and its result into this item.
+  string tool_id = 1;
+  // The TurnItem id of the turn the call ran in.
+  string turn_id = 2;
+  // "decision", "next_steps" or "answer".
+  string kind = 3;
+  string question = 4;
+  // In the order the AI gave them.
+  repeated AdvisorOption options = 5;
+  string context = 6;
+  // Advisor's own confidence in its answer, 0..1.
+  float confidence = 7;
+  // "confident" or "unsure"; empty with an error.
+  string verdict = 8;
+  // Empty when Advisor answered; else one of: "interrupted" (the turn was
+  // stopped), "timeout" (no answer in time), "unavailable" (Advisor's
+  // service failed), "key_invalid" (the key was refused), "no_key", "off"
+  // (Advisor is off for the session), "refused" (the request looked like it
+  // held a secret or a sensitive path), "invalid" (arguments refused).
+  // Devices word each one; an unknown one reads as a failure.
+  string error = 9;
+}
+
+message AdvisorOption {
+  string text = 1;
+  // 0..1; 0 for every option when Advisor did not answer.
+  float probability = 2;
 }
 
 message ProviderCapabilities {

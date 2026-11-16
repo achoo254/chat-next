@@ -42,6 +42,7 @@ import type {
   AskUser,
   HistoryEntry,
   ImageInput,
+  SessionNote,
   LocalSession,
   AccountScopeRef,
   AccountSuggestion,
@@ -66,7 +67,10 @@ import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease } from "../mcp/session-tickets.ts";
 import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
-import { keptImage, prepareAttachments, textForAi } from "../attachments/message-attachments.ts";
+import { keptImage, prepareAttachments, textForAi, userWords } from "../attachments/message-attachments.ts";
+import { type NoteState, advisorNote, noteStateAfterToggle, withNote } from "../advisor/advisor-instructions.ts";
+import { advisorResultOf, isAdvisorWeigh } from "../advisor/advisor-tools.ts";
+import { type AdvisorCall, verdictItem } from "../advisor/advisor-verdict.ts";
 import { imageType } from "../attachments/image-type.ts";
 import { ATTACHMENTS_FOLDER, saveInFolder } from "../attachments/project-files.ts";
 import { type Trash, systemTrash } from "../safety/trash.ts";
@@ -186,8 +190,8 @@ type Thread = {
   session?: ProviderSession;
   starting?: Promise<ProviderSession>;
   queued: boolean;
-  /** Messages for the AI not handed to its session yet. */
-  outbox: { text: string; images?: ImageInput[] }[];
+  /** Messages for the AI not handed to its session yet, with what tunelo tells the AI about Advisor with each. */
+  outbox: { text: string; images?: ImageInput[]; advisor?: PendingNote }[];
   running: boolean;
   turnItem?: string;
   turnCount: number;
@@ -245,7 +249,31 @@ type Thread = {
    * to the machine's own session meanwhile, so two processes never write it.
    */
   launching?: boolean;
+  /** The open session was given tunelo's MCP (meaningful only while it is open). */
+  sessionMcpOpen?: boolean;
+  /** What the session was told about its automatic Advisor (advisor-instructions.ts), as the AI got it. */
+  advisorNote?: NoteState;
+  /** Bumped whenever what the session should hear about Advisor changes (turned on or off, another AI): older notes no longer hold. */
+  advisorGen?: number;
+  /** Calls to Advisor in flight for the thread: stopped when its turn is interrupted or ends, or its session closes. */
+  advisorCalls?: Set<AbortController>;
+  /** advisor_weigh calls started and not answered yet, by tool id. */
+  advisorOpen?: Map<string, AdvisorCall>;
+  /**
+   * The running turn as Advisor sees it: its TurnItem, on from its start to
+   * now, whether it asked for next steps. `mixed`: another message went to
+   * the session while it ran, so which turn ends when is not known (the AI
+   * may answer both in one turn or in two): no such turn is flagged
+   * advisor_missed, and it is kept past an end until a turn starts on an
+   * idle session.
+   */
+  advisorTurn?: { turnId: string; onAllAlong: boolean; askedNext: boolean; mixed: boolean };
+  /** The turn (TurnItem id) the user stopped: an Advisor answer of it that comes late reads as interrupted. */
+  advisorStopped?: string;
 };
+
+/** A note about Advisor waiting with a message: its text, where the session stands once the AI got it, and the generation it holds for. */
+type PendingNote = { note: string; state: NoteState; gen: number };
 
 /** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
 type TurnActivity = {
@@ -329,6 +357,8 @@ export type CoreOptions = {
   onSessionAccount?: (threadId: string) => void;
   /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
   sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
+  /** The machine keeps a key for Advisor (a turn that never asked it is flagged only then). */
+  advisorKeySet?: () => boolean;
   /**
    * Whether the machine runs its sessions with tunelo's MCP now (it may turn
    * it off); whether `sessionMcp` is given when unset.
@@ -1427,12 +1457,22 @@ export class AgentCore {
 
   /** A turn starts with this message for the AI. */
   private async startTurn(t: Thread, message: { text: string; images?: ImageInput[] }): Promise<void> {
+    const busy = t.running;
     t.turnCount += 1;
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
     this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING } });
     t.running = true;
     t.lastActive = this.now();
-    t.outbox.push(message);
+    const on = this.advisorAllowed(t.meta.id);
+    if (busy) {
+      // Queued while a turn runs: the running turn's state stays, now mixed; Advisor's cards go with the newest turn.
+      const turn = (t.advisorTurn ??= { turnId: t.turnItem, onAllAlong: false, askedNext: false, mixed: true });
+      turn.mixed = true;
+      turn.turnId = t.turnItem;
+    } else {
+      t.advisorTurn = { turnId: t.turnItem, onAllAlong: on, askedNext: false, mixed: false };
+    }
+    t.outbox.push(this.noted(t, message, on));
     this.touch(t);
     this.beginActivity(t);
     await this.ensureSession(t);
@@ -1494,6 +1534,8 @@ export class AgentCore {
     const t = this.thread(threadId);
     this.cancelPending(t);
     this.cancelReasks(t);
+    if (t.turnItem) t.advisorStopped = t.turnItem;
+    this.stopAdvisor(t);
     t.outbox = [];
     if (t.session) await t.session.interrupt();
     else if (t.running) this.endTurn(t, TurnState.INTERRUPTED, 0);
@@ -1663,6 +1705,10 @@ export class AgentCore {
     if ((t.meta.advisor === true) === on) return;
     if (on) t.meta.advisor = true;
     else delete t.meta.advisor;
+    t.advisorNote = noteStateAfterToggle(on, t.advisorNote ?? "none");
+    t.advisorGen = (t.advisorGen ?? 0) + 1;
+    // Turned off during a turn: that turn is not held to asking Advisor.
+    if (!on && t.advisorTurn) t.advisorTurn.onAllAlong = false;
     this.saveMeta(t);
     this.opts.audit.write({ device, action: on ? "advisor_on" : "advisor_off", path: t.meta.dir, detail: t.meta.id });
     for (const fn of this.infoListeners) fn(t.meta.id);
@@ -1671,6 +1717,100 @@ export class AgentCore {
   /** The thread's automatic Advisor is on; false for an unknown thread. */
   advisorOn(threadId: string): boolean {
     return this.threads.get(threadId)?.meta.advisor === true;
+  }
+
+  /** Advisor may be asked in the thread now: its automatic Advisor is on and its AI can reach tunelo's MCP. */
+  advisorAllowed(threadId: string): boolean {
+    const t = this.threads.get(threadId);
+    return t !== undefined && t.meta.advisor === true && this.advisorAvailable(t.meta.provider);
+  }
+
+  /**
+   * Runs a call to Advisor for the thread (advisor_weigh): its signal aborts
+   * when the thread's turn is interrupted or ends, or its session closes.
+   */
+  async advisorCall<T>(threadId: string, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const t = this.thread(threadId);
+    const call = new AbortController();
+    const calls = (t.advisorCalls ??= new Set());
+    calls.add(call);
+    try {
+      return await run(call.signal);
+    } finally {
+      calls.delete(call);
+    }
+  }
+
+  /** Stops every call to Advisor the thread has in flight. */
+  private stopAdvisor(t: Thread): void {
+    for (const call of t.advisorCalls ?? []) call.abort();
+    t.advisorCalls?.clear();
+  }
+
+  /**
+   * A message with what tunelo tells the AI about Advisor with it. Where the
+   * session stands changes only once the AI got the note (sessionNote), so a
+   * message lost on the way (stopped, a session that never opened) leaves
+   * the note due for the next one.
+   */
+  private noted(t: Thread, message: { text: string; images?: ImageInput[] }, on: boolean): { text: string; images?: ImageInput[]; advisor?: PendingNote } {
+    const { note, state } = advisorNote(message.text, on, t.advisorNote ?? "none");
+    return note ? { ...message, advisor: { note, state, gen: t.advisorGen ?? 0 } } : message;
+  }
+
+  /** The note of a message, as its session takes it: only while Advisor stayed as it was when the message was sent. */
+  private sessionNote(t: Thread, pending: PendingNote): SessionNote {
+    const holds = () => (t.advisorGen ?? 0) === pending.gen;
+    return {
+      take: () => (holds() ? pending.note : undefined),
+      delivered: () => {
+        if (holds()) t.advisorNote = pending.state;
+      },
+    };
+  }
+
+  /** An advisor_weigh call started or answered: kept, then turned into its transcript item. */
+  private trackAdvisor(t: Thread, e: Extract<ProviderEvent, { type: "tool-start" | "tool-end" }>): void {
+    if (e.type === "tool-start") {
+      if (!isAdvisorWeigh(e.name) || t.advisorOpen?.has(e.toolId)) return;
+      const kind = advisorKindOf(e.input);
+      this.askedFor(t, kind);
+      (t.advisorOpen ??= new Map()).set(e.toolId, { toolId: e.toolId, turnId: t.advisorTurn?.turnId ?? t.turnItem ?? "", kind });
+      return;
+    }
+    const call = t.advisorOpen?.get(e.toolId);
+    if (!call) return;
+    t.advisorOpen?.delete(e.toolId);
+    const result = advisorResultOf(e.output);
+    // The kind its start did not tell (an AI that reports the input later): read from the result, else count it as asked.
+    if (call.kind === "") this.askedFor(t, result?.advisor === "verdict" ? result.kind : (result?.sent?.kind ?? ""));
+    const late = call.turnId !== "" && call.turnId === t.advisorStopped;
+    this.put(t, `advisor:${call.toolId}`, verdictItem(call, result, late));
+  }
+
+  /** The turn called advisor_weigh with this kind; "" when unknown, which counts as asking for next steps (never flag a turn by guess). */
+  private askedFor(t: Thread, kind: string): void {
+    if (t.advisorTurn && (kind === "next_steps" || kind === "")) t.advisorTurn.askedNext = true;
+  }
+
+  /** advisor_weigh calls of the ending turn that never answered: each says it was stopped. */
+  private closeAdvisorCalls(t: Thread): void {
+    for (const call of t.advisorOpen?.values() ?? []) {
+      if (call.kind === "") this.askedFor(t, "");
+      this.put(t, `advisor:${call.toolId}`, verdictItem(call, undefined, true));
+    }
+    t.advisorOpen?.clear();
+  }
+
+  /**
+   * A COMPLETED turn of a session whose automatic Advisor was on all along,
+   * with a key kept and tunelo's MCP in the session, that never asked for
+   * next steps.
+   */
+  private advisorMissed(t: Thread, state: TurnState): boolean {
+    const turn = t.advisorTurn;
+    if (state !== TurnState.COMPLETED || !turn?.onAllAlong || turn.mixed || turn.askedNext) return false;
+    return this.advisorAllowed(t.meta.id) && t.sessionMcpOpen === true && (this.opts.advisorKeySet?.() ?? false);
   }
 
   /** Sessions of this AI can ask Advisor: the AI takes tunelo's MCP and the machine runs its sessions with it. */
@@ -1741,8 +1881,10 @@ export class AgentCore {
     const summary = buildHandoff({ from, to: target.name, dir: t.meta.dir, items: t.journal.since(latestBreakSeq(t.journal)), gitStat: git.stat });
     t.meta.provider = target.id;
     t.meta.model = model;
-    // Another AI: rules in the old one's syntax mean nothing there.
+    // Another AI: rules in the old one's syntax mean nothing there, and it was told nothing about Advisor yet.
     delete t.meta.sessionRules;
+    delete t.advisorNote;
+    t.advisorGen = (t.advisorGen ?? 0) + 1;
     t.meta.segments.push({ provider: target.id, model, startedSeq: String(this.lastSeq(threadId) + 1n) });
     this.saveMeta(t);
     this.put(t, `handoff:${randomUUID()}`, {
@@ -1836,8 +1978,10 @@ export class AgentCore {
     };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
-    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, ...(lease.secrets ? { secrets: lease.secrets } : {}), ...(lease.browserNotices ? { browserNotices: lease.browserNotices } : {}) } } : policy;
+    const advisorAllowed = () => this.advisorAllowed(t.meta.id);
+    const withMcp = lease ? { ...policy, sessionMcp: { ticket: lease.ticket, configDir: lease.configDir, approveWrite: lease.approveWrite, describeWrite: lease.describeWrite, advisorAllowed, ...(lease.secrets ? { secrets: lease.secrets } : {}), ...(lease.browserNotices ? { browserNotices: lease.browserNotices } : {}) } } : policy;
     t.modeUnseen = true;
+    t.sessionMcpOpen = lease !== undefined;
     t.projectLoaded = policy.projectSettings;
     t.starting = provider.start({ policy: withMcp, askUser, ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}) });
     try {
@@ -1858,9 +2002,18 @@ export class AgentCore {
   private async flushOutbox(t: Thread): Promise<void> {
     const s = t.session;
     if (!s) return;
+    const beside = this.provider(t.meta.provider).capabilities.sessionNotes === true;
     while (t.outbox.length) {
       const next = t.outbox.shift();
-      if (next !== undefined) await s.send(next.text, next.images);
+      if (next === undefined) continue;
+      const note = next.advisor ? this.sessionNote(t, next.advisor) : undefined;
+      if (beside || !note) {
+        await s.send(next.text, next.images, note);
+        continue;
+      }
+      // Below the text: taken now, and the AI has it once the session took the message.
+      await s.send(withNote(next.text, note.take()), next.images);
+      note.delivered();
     }
   }
 
@@ -1876,6 +2029,7 @@ export class AgentCore {
     if (!s) return;
     delete t.session;
     this.cancelPending(t);
+    this.stopAdvisor(t);
     await s.close();
     t.meta.closedAt = this.now();
     this.saveMeta(t);
@@ -1963,6 +2117,7 @@ export class AgentCore {
       case "todo": {
         const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
         this.put(t, entry.id, entry.body);
+        if (e.type === "tool-start" || e.type === "tool-end") this.trackAdvisor(t, e);
         return;
       }
       case "subagent": {
@@ -2072,12 +2227,19 @@ export class AgentCore {
   }
 
   private endTurn(t: Thread, state: TurnState, durationMs: number, stats?: TurnStats): void {
+    this.stopAdvisor(t);
+    this.closeAdvisorCalls(t);
+    const missed = this.advisorMissed(t, state);
+    // A mixed turn may end more than once (one end per message): it stays until a turn starts on an idle session.
+    if (!t.advisorTurn?.mixed) delete t.advisorTurn;
+    delete t.advisorStopped;
     if (t.turnItem) {
       const usage = t.usage;
       const share = stats ? this.turnShare(t, stats) : undefined;
       this.update(t, t.turnItem, (b) => {
         if (b.case === "turn") {
           b.value.state = state;
+          if (missed) b.value.advisorMissed = true;
           b.value.durationMs = BigInt(Math.max(0, durationMs));
           if (usage) {
             b.value.contextTokens = BigInt(usage.tokens);
@@ -2834,7 +2996,8 @@ function lastPreview(items: Item[]): string {
 function historyItem(e: HistoryEntry | Extract<ProviderEvent, { type: "tool-start" | "tool-end" | "diff" | "todo" }>, dir: string, isSensitive: (p: string) => boolean): { id: string; body: ItemBody } {
   switch (e.type) {
     case "user":
-      return { id: e.id, body: { case: "text", value: { role: Role.USER, text: e.text } } };
+      // The journal keeps the user's words: never tunelo's note or the list of attached files the AI read with them.
+      return { id: e.id, body: { case: "text", value: { role: Role.USER, text: userWords(e.text) } } };
     case "text":
       return { id: `text:${e.blockId}`, body: { case: "text", value: { role: e.role === "assistant" ? Role.ASSISTANT : Role.THINKING, text: e.text } } };
     case "tool-start":
@@ -2872,5 +3035,15 @@ function historyItem(e: HistoryEntry | Extract<ProviderEvent, { type: "tool-star
       return { id: `sub:${e.toolId}`, body: { case: "subagent", value: { toolId: e.toolId, description: e.description, done: e.done } } };
     case "compaction":
       return { id: `compact:at:${e.at}`, body: { case: "compaction", value: { tokensBefore: BigInt(e.tokensBefore) } } };
+  }
+}
+
+/** The kind of an advisor_weigh call from its input as the AI reported it; "" when it cannot be read. */
+function advisorKindOf(input: string): string {
+  try {
+    const kind = (JSON.parse(input) as { kind?: unknown } | null)?.kind;
+    return typeof kind === "string" ? kind : "";
+  } catch {
+    return "";
   }
 }

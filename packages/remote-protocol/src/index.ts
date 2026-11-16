@@ -4,3 +4,4 @@ export * from "./crypto/framing.ts";
 export * from "./crypto/handshake.ts";
 export * from "./crypto/key-proof.ts";
 export * from "./journal-rules.ts";
+export * from "./advisor-secret-patterns.ts";

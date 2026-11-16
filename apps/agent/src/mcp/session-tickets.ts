@@ -20,6 +20,8 @@ export interface SessionMcp {
 	secrets?: SessionSecretHooks;
 	/** What happened in the tunelo browser that the AI hears with its next tool result, taken once. */
 	browserNotices?: () => string[];
+	/** Advisor may be asked in this session now: its advisor_weigh calls go on without an approval card. */
+	advisorAllowed?: () => boolean;
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */

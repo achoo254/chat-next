@@ -34,6 +34,14 @@ export type ProviderCapabilities = {
   bypassModeId?: string;
   /** Sessions take tunelo's own MCP (and its ticket). */
   sessionMcp?: boolean;
+  /**
+   * The session takes tunelo's notes to the AI (Advisor's instructions)
+   * beside a message, never as the user's words: ProviderSession.send's
+   * `note`, taken when the message reaches the AI. Without it the core
+   * writes a note after the message's text, below a fixed separator
+   * (advisor/advisor-instructions.ts).
+   */
+  sessionNotes?: boolean;
 };
 
 export type LoginState = "ok" | "needs-login" | "unknown";
@@ -92,6 +100,15 @@ export type TurnStats = {
   apiMsTotal: number;
   costUsdTotal: number;
 };
+
+/**
+ * What tunelo tells the AI beside one message. The adapter takes it at the
+ * moment the message reaches the AI: take() gives its text, or undefined
+ * when it no longer holds (Advisor was turned on or off since); once the AI
+ * got it, the adapter says so (delivered). A note never taken leaves the
+ * session as it was, so the next message carries what is still due.
+ */
+export type SessionNote = { take(): string | undefined; delivered(): void };
 
 export type ProviderEvent =
   | ({ type: "info" } & ProviderInfo)
@@ -216,8 +233,11 @@ export type ImageInput = { mediaType: "image/png" | "image/jpeg" | "image/gif" |
 
 export interface ProviderSession {
   readonly events: AsyncIterable<ProviderEvent>;
-  /** `text` may be empty when images go. */
-  send(text: string, images?: readonly ImageInput[]): Promise<void>;
+  /**
+   * `text` may be empty when images go. `note`: what tunelo tells the AI
+   * with this message, only to an AI whose capabilities say `sessionNotes`.
+   */
+  send(text: string, images?: readonly ImageInput[], note?: SessionNote): Promise<void>;
   interrupt(): Promise<void>;
   close(): Promise<void>;
   setModel?(model: string): Promise<void>;

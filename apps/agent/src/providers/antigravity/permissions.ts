@@ -9,7 +9,9 @@
 // the service may run that exact call once (approveWrite). The arguments
 // are agy's input without the `toolSummary` it adds. A tool whose own card
 // on the device is the question (request_secret, request_takeover) goes on
-// without a card here.
+// without a card here, and so does advisor_weigh: allowed while Advisor may
+// be asked in the session, refused otherwise. When agy runs
+// a tool of tunelo's MCP without asking at all, nothing here is needed.
 import type { AcpPermissionOutcome, AcpPermissionParams } from "../acp/acp-session.ts";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
@@ -65,7 +67,7 @@ export type PermissionContext = {
   /** A rule was added: the core keeps it with the thread. */
   onRule: (rule: string) => void;
   /** tunelo's own MCP of the session: its writes are described and approved here. */
-  sessionMcp?: Pick<SessionMcp, "approveWrite" | "describeWrite">;
+  sessionMcp?: Pick<SessionMcp, "approveWrite" | "describeWrite" | "advisorAllowed">;
 };
 
 export async function answerPermission(p: AcpPermissionParams, ctx: PermissionContext, signal: AbortSignal): Promise<AcpPermissionOutcome> {
@@ -78,6 +80,9 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
   const sensitive = toolPaths(call, ctx.dir).some(ctx.isSensitive) || (command !== "" && mentionsSensitive(command, ctx.isSensitive, { cwd: ctx.dir }));
   const own = tuneloTool(call.name ?? "");
   if (own !== "" && ASKS_ON_DEVICE.has(own)) return { outcome: { outcome: "selected", optionId: allow } };
+  // advisor_weigh: allowed while Advisor may be asked in the session, refused at once otherwise (tunelo would refuse it anyway).
+  const advisorAllowed = ctx.sessionMcp?.advisorAllowed;
+  if (own === "advisor_weigh" && advisorAllowed) return { outcome: { outcome: "selected", optionId: advisorAllowed() ? allow : reject } };
   const args = mcpArguments(call.rawInput);
   const write = ctx.sessionMcp && own !== "" && needsApproval(own, args) ? ctx.sessionMcp : undefined;
   // A write tool of tunelo's MCP is asked about every time: no rule for the session lets it through.
