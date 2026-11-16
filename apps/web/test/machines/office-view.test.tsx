@@ -52,11 +52,17 @@ function fakeLink() {
 
 const info = (agentVersion: string) => create(MachineInfoSchema, { agentVersion });
 
+/** Office hours on the viewer's clock: off-duty people stay on the work floors (office-life-schedule.ts). */
+const OFFICE_HOURS = new Date(2026, 10, 16, 10, 0).getTime();
+
 beforeEach(() => {
 	vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+	vi.useFakeTimers({ toFake: ["Date"] });
+	vi.setSystemTime(OFFICE_HOURS);
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	window.localStorage.clear();
 });
@@ -87,6 +93,19 @@ describe("the office tab", () => {
 		expect(within(meeting).getByLabelText("1 người chờ bàn trong phòng họp").textContent).toBe("+1");
 		const lobby = screen.getByRole("region", { name: "Sảnh" });
 		expect(within(lobby).getByRole("region", { name: "Bảng tin" }).textContent).toContain("7");
+	});
+
+	it("after 23:00 sends the off-duty people to bed on floor 4, and following goes there", async () => {
+		vi.setSystemTime(new Date(2026, 10, 16, 23, 30).getTime());
+		const fake = fakeLink();
+		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }) });
+		const dorm = await screen.findByRole("region", { name: "Ký túc" });
+		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
+		expect(within(dorm).getByText("Tí Trinh Sát")).toBeTruthy();
+		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(2);
+		expect(screen.getByRole("button", { name: "T4" }).getAttribute("aria-pressed")).toBe("true");
+		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(2);
 	});
 
 	it("goes to the floor the user picks, and says when the AI does not report its staff", async () => {

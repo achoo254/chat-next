@@ -15,8 +15,9 @@ import { isPhone } from "../viewport-fit.ts";
 import { Office2D } from "./office-2d.tsx";
 import { loadOfficeAssets, type OfficeAssets } from "./office-assets.ts";
 import { connectOffice, documentVisibility, type OfficeConnection } from "./office-client.ts";
+import { officeTalks, type Talk } from "./office-conversations.ts";
 import { officeDaypart } from "./office-daypart.ts";
-import { busyFloors, FIRST_FLOOR, followPreference, latestWork, nextFloor, OfficeFloorTabs, pickFloor, rememberFollow, type FollowState } from "./office-floor-tabs.tsx";
+import { busyFloors, FIRST_FLOOR, followPreference, followTarget, nextFloor, OfficeFloorTabs, pickFloor, rememberFollow, type FollowState } from "./office-floor-tabs.tsx";
 import { deskOrder, type ScreenSize } from "./office-geometry.ts";
 import type { Parsed } from "./office-json.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "./office-layout.ts";
@@ -99,14 +100,21 @@ interface Frame {
 	readonly placements: readonly Placement[];
 	readonly memory: PlacementMemory;
 	readonly floor: FollowState;
+	readonly talks: readonly Talk[];
 }
 
-const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, floor: FIRST_FLOOR };
+const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, floor: FIRST_FLOOR, talks: [] };
 
-/** The next frame: places from the store's state at `now`, then the floor following the newest work. */
+/** The next frame: places from the store's state at `now`, the talks among them, then the floor following the newest work (or the crowd). */
 export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, follow: boolean): Frame {
 	const placed = officePlacement(state, layout, now, prev.memory);
-	return { now, placements: placed.placements, memory: placed.memory, floor: nextFloor(prev.floor, { follow, now, latest: latestWork(placed.placements) }) };
+	return {
+		now,
+		placements: placed.placements,
+		memory: placed.memory,
+		floor: nextFloor(prev.floor, { follow, now, latest: followTarget(placed.placements) }),
+		talks: officeTalks(placed.placements, state, layout, now),
+	};
 }
 
 function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: string; layout: OfficeLayout }) {
@@ -165,7 +173,6 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 	if (refusal !== null) notes.push({ key: "failed", text: refusalText(copy, refusal.err), tone: "warn", retry: isWatchLimit(refusal.err) });
 	if (state.status === "live" && !state.reportsStaff) notes.push({ key: "staff", text: t.noStaff });
 	if (state.power === "out") notes.push({ key: "power", text: t.powerOut, tone: "warn" });
-	else if (state.off) notes.push({ key: "closed", text: t.closed });
 	else if (state.status === "live" && state.awaitingSnapshot) notes.push({ key: "sync", text: t.catchingUp });
 	if (state.session.hiddenActors > 0) notes.push({ key: "hidden", text: t.hidden(state.session.hiddenActors) });
 	return (
@@ -218,7 +225,7 @@ function LiveOffice({ link, threadId, layout }: { link: MachineLink; threadId: s
 					{t.loading}
 				</p>
 			) : (
-				<Renderer state={state} placements={frame.placements} layout={layout} floor={frame.floor.floor} size={size} daypart={officeDaypart(frame.now, state.off)} assets={assets} now={frame.now} sound={sound} />
+				<Renderer state={state} placements={frame.placements} talks={frame.talks} layout={layout} floor={frame.floor.floor} size={size} daypart={officeDaypart(frame.now)} assets={assets} now={frame.now} sound={sound} />
 			)}
 		</div>
 	);

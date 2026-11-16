@@ -5,22 +5,22 @@
 // old one is dropped, a gap stops and asks for a snapshot, another epoch
 // too). The same snapshot and events give the same office whatever the
 // viewer's clock; the clock only drives what time decides: the power cut (no
-// word from the machine for 30 s), the hourglass of a tool running over two
-// minutes, and the building closing after ten idle minutes. The clock is
-// injected, so tests and a future replay drive it.
+// word from the machine for 30 s) and the hourglass of a tool running over two
+// minutes. Nobody goes home: an employee whose subagent left stays as an
+// off-duty resident (office-staff.ts retire). The clock is injected, so tests
+// and a future replay drive it.
 import type { OfficeEvent, OfficeSnapshot } from "@achoo254/chat-proto/remote/remote";
-import { actorOf, activityOf, APPROVALS, EMPTY_SESSION, nestedActor, sessionOf, type ActorRecord, type OfficeState, type SessionView } from "./office-state.ts";
-import { fillDesks, hire, overflowOf, release, reseat, type StaffMember } from "./office-staff.ts";
+import { actorOf, actorViewOf, activityOf, APPROVALS, EMPTY_SESSION, eventActor, nestedActor, sessionOf, type ActorRecord, type OfficeState, type SessionView } from "./office-state.ts";
+import { fillDesks, hire, overflowOf, release, reseat, retire, type StaffMember } from "./office-staff.ts";
+import { approvalDecided, workEnded, type WorkLog } from "./office-work-log.ts";
 
 export type { ActivityView, ActorRole, ActorState, ActorView, AnimGroup, ApprovalState, OfficeState, SessionView } from "./office-state.ts";
 export type { StaffMember } from "./office-staff.ts";
+export type { LastWork, PersonWork, WorkLog } from "./office-work-log.ts";
 
 /** No word from the machine for this long: the power goes out. */
 export const POWER_OUT_MS = 30_000;
-/** A tool running this long shows an hourglass. */
-export const SLOW_TOOL_MS = 120_000;
-/** The session idle this long: the building closes for the day. */
-export const CLOSING_MS = 10 * 60_000;
+export { SLOW_TOOL_MS, STUCK_MS } from "./office-state.ts";
 /**
  * The home desks of the shared work room as anchor ids, in the order they are
  * taken (the views pass the layout's: eight on a wide screen, six on a phone);
@@ -52,6 +52,8 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 	let reportsStaff = true;
 	let actors: ActorRecord[] = [];
 	let staff: StaffMember[] = [];
+	let residents: StaffMember[] = [];
+	let work: WorkLog = {};
 	let visitors: { key: string; enteredAt: number }[] = [];
 	let session: SessionView = EMPTY_SESSION;
 	let lastTurnStart = 0;
@@ -82,23 +84,20 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 
 	const hireActor = (a: ActorRecord): void => {
 		if (a.role !== "employee") return;
-		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, freeAt, desks);
+		staff = hire(staff, { actorId: a.id, agentType: a.agentType, nested: nestedActor(a), enteredAt: a.enteredAt }, freeAt, desks, residents);
+		// A resident back at work is on duty again.
+		residents = residents.filter((r) => !staff.some((m) => m.key === r.key));
 		remember(staff);
 	};
 
 	const build = (): OfficeState => {
 		const now = machineNow();
-		const off = !session.busy && idleSince !== null && now - idleSince >= CLOSING_MS;
 		return {
 			status: live ? "live" : "loading",
 			power,
 			awaitingSnapshot: awaiting,
 			reportsStaff,
-			actors: actors.map(({ beforeApproval: _before, activity, ...rest }) => ({
-				...rest,
-				// Only work still going on runs long: a finished subagent keeps its hand-in spot as an activity.
-				activity: activity === null ? null : { ...activity, slow: rest.state === "working" && activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS },
-			})),
+			actors: actors.map((a) => actorViewOf(a, now)),
 			staff,
 			overflow: overflowOf(staff),
 			deskCount: desks.length,
@@ -106,7 +105,8 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			chairman: live && session.waitingForUser,
 			lastTurnStart,
 			idleSince,
-			off,
+			residents,
+			work,
 			visitors,
 			clockOffset,
 		};
@@ -122,7 +122,9 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 	};
 
 	/** The clock-driven parts of the state: emit only when one of them changed. */
-	const timeKey = (s: OfficeState): string => `${s.power}|${s.off}|${s.actors.map((a) => (a.activity?.slow === true ? "1" : "0")).join("")}`;
+	// A dozing person's "stuck N minutes" changes once a minute.
+	const timeKey = (s: OfficeState): string =>
+		`${s.power}|${s.actors.map((a) => `${a.activity?.slow === true ? "1" : "0"}${a.activity?.stuckMs == null ? "" : Math.floor(a.activity.stuckMs / 60_000)}`).join(",")}`;
 
 	const state = (): OfficeState => {
 		cached ??= build();
@@ -131,6 +133,12 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 
 	const update = (id: string, change: (a: ActorRecord) => ActorRecord): void => {
 		actors = actors.map((a) => (a.id === id ? change(a) : a));
+	};
+
+	/** The person an actor is in the office: "director", an employee's staff key, or null (a machine, an unknown actor). */
+	const personKey = (actorId: string): string | null => {
+		if (actorId === "director") return "director";
+		return staff.find((m) => m.actorId === actorId)?.key ?? null;
 	};
 
 	/** The idle edge of a snapshot: when the last thing anyone did ended (machine time). */
@@ -158,25 +166,37 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 				}
 				break;
 			}
-			case "actorLeave":
+			case "actorLeave": {
 				actors = actors.filter((a) => a.id !== k.value.actorId);
-				staff = release(staff, k.value.actorId, desks);
+				const after = retire(staff, residents, k.value.actorId, desks);
+				staff = after.staff;
+				residents = after.offDuty;
 				break;
+			}
 			case "activityStart": {
 				const activity = activityOf(k.value.activity);
 				update(k.value.actorId, (a) => ({ ...a, activity }));
 				break;
 			}
-			case "activityEnd":
+			case "activityEnd": {
+				const ended = actors.find((a) => a.id === k.value.actorId)?.activity;
+				const key = personKey(k.value.actorId);
+				if (key !== null && ended != null && ended.id === k.value.activityId) {
+					work = workEnded(work, key, { group: ended.group, room: ended.room, ok: k.value.ok, at, ms: ended.startedAt > 0 ? Math.max(0, at - ended.startedAt) : 0 });
+				}
 				update(k.value.actorId, (a) =>
 					a.activity?.id === k.value.activityId ? { ...a, activity: null, lastResult: { ok: k.value.ok, at } } : a,
 				);
 				break;
+			}
 			case "turnStart":
 				lastTurnStart = at;
 				break;
 			case "approval": {
 				const decided = APPROVALS[k.value.state] ?? "cancelled";
+				const waited = actors.find((a) => a.id === k.value.actorId)?.approval;
+				const key = personKey(k.value.actorId);
+				if (decided !== "waiting" && waited?.state === "waiting" && key !== null) work = approvalDecided(work, key, at - waited.at, at);
 				update(k.value.actorId, (a) => {
 					if (decided === "waiting") {
 						return { ...a, state: "awaiting", beforeApproval: a.state === "awaiting" ? a.beforeApproval : a.state, approval: { state: decided, at } };
@@ -209,7 +229,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			const s = snapshot.state;
 			// The same agent run (a gap or a reconnect): the same people, at the same desks, and nobody forgotten from today.
 			const same = live && snapshot.epoch === epoch;
-			const before = { staff, visitors };
+			const before = { staff, visitors, residents, work };
 			epoch = snapshot.epoch;
 			seq = snapshot.seq;
 			awaiting = false;
@@ -218,12 +238,19 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			actors = [];
 			staff = [];
 			visitors = same ? before.visitors : [];
+			residents = same ? before.residents : [];
+			work = same ? before.work : {};
 			for (const a of s?.actors ?? []) {
 				const record = actorOf(a, undefined);
 				actors = [...actors, record];
 				hireActor(record);
 			}
-			if (same) staff = reseat(staff, before.staff, desks);
+			if (same) {
+				staff = reseat(staff, before.staff, desks);
+				// Whoever left while frames were missed is off duty now; whoever came back works again.
+				const gone = before.staff.filter((m) => !staff.some((s) => s.key === m.key)).map((m) => ({ ...m, desk: null }));
+				residents = [...residents.filter((r) => !staff.some((m) => m.key === r.key) && !gone.some((g) => g.key === r.key)), ...gone];
+			}
 			session = sessionOf(s?.session);
 			idleSince = session.busy ? null : idleEdgeOf(actors, session);
 			if (!same) lastTurnStart = 0;
@@ -254,6 +281,9 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 					break;
 				}
 				apply(e);
+				// Any word about an actor wakes them if they dozed off over a long tool.
+				const about = eventActor(e);
+				if (about !== null) update(about, (a) => ({ ...a, heardAt: Math.max(a.heardAt, Number(e.at)) }));
 				seq = e.seq;
 				changed = true;
 				clockOffset = options.now() - Number(e.at);

@@ -13,9 +13,9 @@ import { officeLighting } from "../../src/office-3d/scene/office-lighting.ts";
 
 describe("office lighting", () => {
 	it("blends from day to night and stays within the table", () => {
-		const day = officeLighting(0, false);
-		const night = officeLighting(1, false);
-		const dusk = officeLighting(0.5, false);
+		const day = officeLighting(0);
+		const night = officeLighting(1);
+		const dusk = officeLighting(0.5);
 		expect(night.skyIntensity).toBeLessThan(day.skyIntensity);
 		expect(night.screenGlow).toBeGreaterThan(day.screenGlow);
 		expect(night.bloomWeight).toBeGreaterThan(day.bloomWeight);
@@ -25,17 +25,9 @@ describe("office lighting", () => {
 		expect(dusk.deskLamp).toBeCloseTo(0.5);
 		expect(night.exposure).toBeLessThan(day.exposure);
 		expect(dusk.skyIntensity).toBeCloseTo((day.skyIntensity + night.skyIntensity) / 2);
-		expect(officeLighting(-3, false)).toEqual(day);
-		expect(officeLighting(7, false)).toEqual(night);
-		expect(officeLighting(Number.NaN, false)).toEqual(day);
-	});
-
-	it("turns the lights out when the building is closed, whatever the hour", () => {
-		const closed = officeLighting(0, true);
-		expect(closed).toEqual(officeLighting(1, true));
-		expect(closed.screenGlow).toBe(0);
-		expect(closed.deskLamp).toBe(0);
-		expect(closed.keyIntensity).toBeLessThan(officeLighting(1, false).keyIntensity);
+		expect(officeLighting(-3)).toEqual(day);
+		expect(officeLighting(7)).toEqual(night);
+		expect(officeLighting(Number.NaN)).toEqual(day);
 	});
 });
 

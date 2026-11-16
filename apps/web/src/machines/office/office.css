@@ -16,8 +16,7 @@
 .of-stage { position: relative; flex: 1 0 auto; min-height: 240px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); overflow: hidden; transition: filter 0.4s ease-out; }
 /* Power cut: people freeze, the building goes grey. Closed for the day: dark. */
 .of-stage[data-power="out"] { filter: grayscale(1) brightness(0.85); }
-.of-stage[data-daypart="off"]::after, .of-stage[data-power="out"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--c-bg) 35%, transparent); }
-.of-stage[data-daypart="off"]::after { background: var(--c-backdrop); }
+.of-stage[data-power="out"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--c-bg) 35%, transparent); }
 
 /* Without baked pictures: one card per room of the floor. */
 .of-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: var(--space-2); padding: var(--space-2); }

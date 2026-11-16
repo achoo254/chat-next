@@ -5,8 +5,11 @@
 // come in, named with a number ("Tí Trinh Sát 2"). Each employee keeps one
 // home desk for the whole session; with no desk left they sit in the meeting
 // room and take the first desk that frees up. Employees of a nested subagent
-// or a workflow work from the meeting room and never take a desk. Pure: the
-// store calls these on every change.
+// or a workflow work from the meeting room and never take a desk. An
+// employee whose subagent left does not go home: they stay as an off-duty
+// resident (no desk) and live by the daily schedule; the next subagent of
+// their type brings that same person back to work. Pure: the store calls
+// these on every change.
 
 export interface StaffMember {
 	/** Stable while the employee stays: "<agent type>#<ordinal>" (nested ones carry a "~"). */
@@ -70,13 +73,20 @@ export function reseat(staff: readonly StaffMember[], before: readonly StaffMemb
 	);
 }
 
-/** A subagent came in: the free employee of its type takes it, else a new employee does. */
-export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, desks: readonly string[]): StaffMember[] {
+/**
+ * A subagent came in: the free employee of its type takes it, else an
+ * off-duty resident of the type comes back to work (`offDuty`; the caller
+ * drops them from its list), else a new employee does.
+ */
+export function hire(staff: readonly StaffMember[], next: Hire, freeAt: FreeAt, desks: readonly string[], offDuty: readonly StaffMember[] = []): StaffMember[] {
 	if (staff.some((m) => m.actorId === next.actorId)) return [...staff];
-	const same = staff.filter((m) => m.agentType === next.agentType && m.nested === next.nested);
+	const sameType = (m: StaffMember): boolean => m.agentType === next.agentType && m.nested === next.nested;
+	const same = staff.filter(sameType);
 	const free = same.filter((m) => freeAt(m.actorId, next.enteredAt)).sort((a, b) => a.ordinal - b.ordinal)[0];
 	if (free !== undefined) return staff.map((m) => (m === free ? { ...m, actorId: next.actorId } : m));
-	const used = new Set(same.map((m) => m.ordinal));
+	const resting = offDuty.filter((m) => sameType(m) && !staff.some((s) => s.key === m.key)).sort((a, b) => a.ordinal - b.ordinal)[0];
+	if (resting !== undefined) return fillDesks([...staff, { ...resting, actorId: next.actorId, desk: null }], desks);
+	const used = new Set([...same, ...offDuty.filter(sameType)].map((m) => m.ordinal));
 	let ordinal = 1;
 	while (used.has(ordinal)) ordinal++;
 	const member: StaffMember = {
@@ -98,6 +108,18 @@ export function release(staff: readonly StaffMember[], actorId: string, desks: r
 		staff.filter((m) => m.actorId !== actorId),
 		desks,
 	);
+}
+
+/** The actor left: its employee goes off duty and stays in the building as a resident (desk given up); another employee keeps working. */
+export function retire(
+	staff: readonly StaffMember[],
+	offDuty: readonly StaffMember[],
+	actorId: string,
+	desks: readonly string[],
+): { readonly staff: StaffMember[]; readonly offDuty: StaffMember[] } {
+	const leaving = staff.find((m) => m.actorId === actorId);
+	if (leaving === undefined) return { staff: [...staff], offDuty: [...offDuty] };
+	return { staff: release(staff, actorId, desks), offDuty: [...offDuty.filter((m) => m.key !== leaving.key), { ...leaving, desk: null }] };
 }
 
 /** People waiting for a desk in the meeting room ("+N"); nested employees are not waiting for one. */

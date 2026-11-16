@@ -16,7 +16,7 @@
 // office-assets.ts (shared with the 2D view) checks the 2D pictures.
 import { ASSETS_BASE, layoutHash } from "../../machines/office/office-assets.ts";
 import { arrayOf, isRecord, numberOf, stringOf } from "../../machines/office/office-json.ts";
-import type { FloorLevel } from "../../machines/office/office-rooms.ts";
+import { isFloorLevel, type FloorLevel } from "../../machines/office/office-rooms.ts";
 
 export const SCENE_ASSETS_FORMAT_VERSION = 1;
 
@@ -173,7 +173,7 @@ export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 	for (const entry of arrayOf(json.floors)) {
 		if (!isRecord(entry)) continue;
 		const level = entry.level;
-		if (level !== 1 && level !== 2 && level !== 3) continue;
+		if (!isFloorLevel(level)) continue;
 		if (isRecord(entry.scene)) floors.set(level, floorScene(entry.scene));
 	}
 	return { floors, character: characterOf(json.character), accessories: accessoriesOf(json.accessories), sounds: soundsOf(json.sfx) };

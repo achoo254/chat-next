@@ -11,8 +11,10 @@ import { SceneLoaderFlags } from "@babylonjs/core/Loading/sceneLoaderFlags";
 import { Scene } from "@babylonjs/core/scene";
 import { BOARD_ROOMS } from "../machines/office/office-boards.tsx";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
+import { FLOOR_LEVELS } from "../machines/office/office-rooms.ts";
 import type { OfficeSfx } from "./audio/office-sfx.ts";
 import { createOfficeSfx, eventSoundFiles } from "./audio/office-sfx.ts";
+import { createLifeSounds, type LifeSounds } from "./audio/life-sounds.ts";
 import { createCharacterPool } from "./character/character-pool.ts";
 import { createOfficePeople } from "./character/office-people.ts";
 import { createRouter } from "./character/office-routes.ts";
@@ -62,7 +64,7 @@ export type BootResult = { readonly kind: "ready"; readonly world: OfficeWorld }
 
 /** Frames at the cheapest rung before the real one: depth of field or the shadow light before the first frame blanked the canvas (spike). */
 const WARM_UP_FRAMES = 3;
-/** Floors 2 and 3 are built this long after start, while idle. */
+/** The upper floors are built this long after start, while idle. */
 const PREPARE_AFTER_MS = 2_500;
 /** Light flicker when the power goes out. */
 const FLICKER_MS = 1_200;
@@ -103,6 +105,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	const post = createPostProcessing(scene, camera.camera, "neutral");
 	const pool = createCharacterPool(scene);
 	let sfx: OfficeSfx = createOfficeSfx(new Map(), assetUrl);
+	let lifeSounds: LifeSounds = createLifeSounds(new Map(), assetUrl);
 	const transition = createFloorTransition(opts.props.floor, opts.reducedMotion);
 	const people = createOfficePeople(layout, createRouter(layout, SCENE_LAYOUT.doorSeconds), pool, (event, floor) => {
 		if (event === "approval" || floor === transition.frame(performance.now()).floor) sfx.play(event);
@@ -131,14 +134,14 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	let soundOn = false;
 	let frozen = latest.state.power === "out";
 	let flickerUntil = 0;
-	let light = officeLighting(latest.daypart.nightMix, latest.daypart.phase === "off");
+	let light = officeLighting(latest.daypart.nightMix);
 	let lightKey = latest.daypart;
 	const applyLight = (): void => {
 		lightKey = latest.daypart;
-		light = officeLighting(latest.daypart.nightMix, latest.daypart.phase === "off");
+		light = officeLighting(latest.daypart.nightMix);
 		lights.apply(light);
 		post.applyLight(light.exposure, light.bloomWeight);
-		floors.setNightMix(latest.daypart.nightMix, latest.daypart.phase === "off");
+		floors.setNightMix(latest.daypart.nightMix);
 	};
 	applyLight();
 	floors.show(transition.frame(performance.now()).floor);
@@ -150,6 +153,9 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		sfx.dispose();
 		sfx = createOfficeSfx(eventSoundFiles(assets.sounds), assetUrl);
 		sfx.setEnabled(soundOn);
+		lifeSounds.dispose();
+		lifeSounds = createLifeSounds(assets.sounds, assetUrl);
+		lifeSounds.setEnabled(soundOn);
 		props.setSources(new Map([...propSources(assets)].map(([name, file]) => [name, assetUrl(file)])), opts.signal);
 		const character = assets.character;
 		if (character === null) return;
@@ -167,8 +173,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		lights.refreshCasters(people.meshes());
 	});
 	const prepareTimer = window.setTimeout(() => {
-		floors.prepare(2);
-		floors.prepare(3);
+		for (const level of FLOOR_LEVELS) if (level !== 1) floors.prepare(level);
 	}, PREPARE_AFTER_MS);
 
 	const stats = new FrameStats(3600);
@@ -205,6 +210,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		people.frame(frozen ? 0 : dtMs / 1000, t.floor, fullRate, inView, { x: frame.target.x, z: frame.target.z });
 		const views = people.views();
 		fx.frame(now / 1000, t.floor, views, frozen ? 0 : light.screenGlow, frozen ? 0 : light.deskLamp);
+		lifeSounds.frame(now / 1000, frozen ? [] : views, t.floor);
 		overlay.update(scene, width, height, t.floor, views, boards);
 		fade.style.opacity = t.fade > 0 ? t.fade.toFixed(2) : "";
 		if (now < flickerUntil) post.applyLight(Math.sin(now / 37) > 0.2 ? 0.25 : light.exposure, light.bloomWeight);
@@ -264,8 +270,9 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				if (sound !== soundOn) {
 					soundOn = sound;
 					sfx.setEnabled(sound);
+					lifeSounds.setEnabled(sound);
 				}
-				people.update(next.placements, next.state, next.now);
+				people.update(next.placements, next.state, next.now, next.talks);
 				fx.update(next.state);
 			},
 			bind: overlay.bind,
@@ -280,6 +287,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				removeTestApi();
 				engine.stopRenderLoop();
 				sfx.dispose();
+				lifeSounds.dispose();
 				people.dispose();
 				fx.dispose();
 				floors.dispose();

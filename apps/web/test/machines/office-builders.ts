@@ -18,7 +18,13 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { createOfficeStore, type OfficeStore } from "../../src/machines/office/office-store.ts";
 
-export const T0 = 1_800_000_000_000;
+/** 15:00 on the viewer's clock whatever the time zone: office hours, so off-duty people stay on the work floors (office-life-schedule.ts). */
+export const T0 = new Date(2027, 0, 15, 15, 0).getTime();
+
+/** A viewer time at a local hour and minute of T0's day. */
+export function localAt(hour: number, minute = 0): number {
+	return new Date(2027, 0, 15, hour, minute).getTime();
+}
 
 export function act(id: string, room: OfficeRoom, tool = "Read", startedAt = T0, group = OfficeAnimGroup.READ): OfficeActivity {
 	return create(OfficeActivitySchema, { id, tool, group, room, startedAt: BigInt(startedAt) });

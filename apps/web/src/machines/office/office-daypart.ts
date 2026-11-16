@@ -1,10 +1,11 @@
 // The light of the building by the viewer's clock (the session decides the
 // people; the viewer's hour decides the light), shared by both views: the 2D
 // view picks its day or night picture from `phase`, the 3D scene blends its
-// day and night lightmaps by `nightMix`. A closed building (idle for ten
-// minutes) is dark whatever the hour.
+// day and night lightmaps by `nightMix`. The building never closes: people
+// live in it round the clock (office-life-schedule.ts), so only the hour
+// decides the light.
 
-export type DaypartPhase = "day" | "evening" | "night" | "off";
+export type DaypartPhase = "day" | "evening" | "night";
 
 export interface Daypart {
 	readonly phase: DaypartPhase;
@@ -22,8 +23,7 @@ function smooth(t: number): number {
 }
 
 /** `now` in milliseconds (the injected clock), read in the viewer's time zone. */
-export function officeDaypart(now: number, isOff: boolean): Daypart {
-	if (isOff) return { phase: "off", nightMix: 1 };
+export function officeDaypart(now: number): Daypart {
 	const d = new Date(now);
 	const hour = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
 	let nightMix: number;

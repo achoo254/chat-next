@@ -12,7 +12,8 @@ export interface CharacterVisual {
 	readonly meshes: () => readonly AbstractMesh[];
 	/** Where the name label sits over the feet, metres: just clear of the head. */
 	readonly labelHeight: number;
-	setPose(pose: Pose): void;
+	/** `seat`: where the pelvis rests over the person's root when the pose sits, metres (a chair's height by default). */
+	setPose(pose: Pose, seat?: number): void;
 	/** Animation level of detail (0 stops the clip). */
 	setUpdateEvery(every: UpdateEvery): void;
 	/** Per frame: code motion (bobbing, typing swing, head shake) at `seconds` of the scene clock. */

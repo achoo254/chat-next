@@ -2,14 +2,14 @@
 // began, holding six seconds on a floor, pausing thirty after the user picks
 // one, and not moving with following off.
 import { describe, expect, it } from "vitest";
-import { busyFloors, FIRST_FLOOR, FLOOR_HOLD_MS, latestWork, nextFloor, pickFloor, USER_PAUSE_MS } from "../../src/machines/office/office-floor-tabs.tsx";
+import { busyFloors, FIRST_FLOOR, FLOOR_HOLD_MS, followTarget, latestWork, nextFloor, pickFloor, USER_PAUSE_MS } from "../../src/machines/office/office-floor-tabs.tsx";
 import type { Placement } from "../../src/machines/office/office-placement.ts";
 import type { FloorLevel, RoomCode } from "../../src/machines/office/office-rooms.ts";
 
 const T = 1_000_000;
 
 function placed(key: string, floor: FloorLevel, room: RoomCode, since: number, working = true): Placement {
-	return { key, kind: key === "chairman" ? "chairman" : "employee", actor: null, member: null, floor, room, anchorId: "", since, activityRoom: working ? room : null };
+	return { key, kind: key === "chairman" ? "chairman" : "employee", actor: null, member: null, floor, room, anchorId: "", since, activityRoom: working ? room : null, life: null };
 }
 
 describe("following the work between floors", () => {
@@ -18,6 +18,14 @@ describe("following the work between floors", () => {
 		expect([...busyFloors(list)]).toEqual([2]);
 		expect(latestWork(list)).toEqual({ floor: 2, since: T });
 		expect(latestWork([placed("b", 1, "WORK", T, false)])).toBeNull();
+	});
+
+	it("with nobody working, follows the crowd (the living floor at night) as of the latest arrival there", () => {
+		const night = [placed("a", 4, "DORM", T, false), placed("b", 4, "DORM", T + 5, false), placed("c", 1, "WORK", T + 9, false), placed("chairman", 1, "LOBBY", T + 20)];
+		expect(followTarget(night.filter((p) => p.key !== "chairman"))).toEqual({ floor: 4, since: T + 5 });
+		// Work anywhere wins over the crowd.
+		expect(followTarget([...night.slice(0, 3), placed("d", 2, "LIBRARY", T + 1)])).toEqual({ floor: 2, since: T + 1 });
+		expect(followTarget([])).toBeNull();
 	});
 
 	it("moves to the floor where work just began", () => {

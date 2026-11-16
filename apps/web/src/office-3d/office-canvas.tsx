@@ -8,7 +8,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Office2D } from "../machines/office/office-2d.tsx";
 import { BOARD_ROOMS, OfficeBoard } from "../machines/office/office-boards.tsx";
-import { bubbleText, markerStatus, personColor, personName, type OfficeCopy } from "../machines/office/office-names.ts";
+import { lineOf } from "../machines/office/office-conversations.ts";
+import { markerView, personColor, type OfficeCopy } from "../machines/office/office-names.ts";
 import type { Placement } from "../machines/office/office-placement.ts";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
@@ -24,11 +25,8 @@ function waitingForDesks(placements: readonly Placement[]): number {
 	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
 }
 
-function Person({ p, t, bind }: { p: Placement; t: OfficeCopy; bind: (id: string, el: HTMLElement | null) => void }) {
-	const status = markerStatus(p.kind, p.actor);
-	const name = personName(t, p);
-	const bubble = p.activityRoom === null ? "" : bubbleText(t, p.actor?.activity ?? null);
-	const label = status === "idle" || status === "working" ? name : `${name} · ${t.state[status === "waiting-you" ? "waitingYou" : status]}`;
+function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: string | null; bind: (id: string, el: HTMLElement | null) => void }) {
+	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const id = `person:${p.key}`;
 	const style: ColorStyle = { "--of-color": personColor(p) };
 	return (
@@ -46,7 +44,11 @@ function Person({ p, t, bind }: { p: Placement; t: OfficeCopy; bind: (id: string
 				return () => bind(id, null);
 			}}
 		>
-			{bubble !== "" && <span className="of-bubble">{bubble}</span>}
+			{bubble !== "" && (
+				<span className="of-bubble" data-talk={talking ? "" : undefined}>
+					{bubble}
+				</span>
+			)}
 			<span className="of3d-tag">
 				<span className="of-dot" aria-hidden="true">
 					{status === "slow" ? "⌛" : ""}
@@ -117,7 +119,7 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 					</span>
 				)}
 				{props.placements.map((p) => (
-					<Person key={p.key} p={p} t={t} bind={bind} />
+					<Person key={p.key} p={p} t={t} line={lineOf(props.talks, p.key, props.now)} bind={bind} />
 				))}
 			</div>
 			{status === "loading" && (

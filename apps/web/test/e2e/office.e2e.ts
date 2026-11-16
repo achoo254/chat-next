@@ -12,10 +12,13 @@
 // floors and stops once a floor is picked, a dropped link cuts the power and
 // a reconnect brings the lights back, draw calls stay under 100 at the medium
 // rung on every floor, and the chat tab stops the frames. Then without WebGL
-// (--disable-3d-apis) the 2D view shows the three floors with their pictures,
-// desks, names and boards, each dot within 4 px of its anchor; and an AI
-// that does not report its staff (Antigravity) shows the director alone with
-// a notice and token-only audit numbers. Starts its own Vite dev server of
+// (--disable-3d-apis) the 2D view shows the work floors with their pictures,
+// desks, names and boards, each dot within 4 px of its anchor; an AI that does
+// not report its staff (Antigravity) shows the director alone with a notice
+// and token-only audit numbers; and the residents' day: on a page clock
+// pinned to office hours (Asia/Ho_Chi_Minh), everyone who worked stays after
+// the session ends, goes to bed on floor 4 at 23:30 (the director too, lying
+// in a bed in 3D) and back to the work floors at 10:00. Starts its own Vite dev server of
 // the harness (with the app's public/ for the baked office files), so it
 // needs no backend:
 //
@@ -43,6 +46,11 @@ const FLAGS_3D = "office3d=force&office3d-quality=medium&office3d-test";
 const MOVE_TIMEOUT_MS = 20_000;
 /** The store cuts the power 30 s after the last word from a closed link (office-store.ts). */
 const POWER_OUT_MS = 30_000;
+/** The page's clock: the residents' day runs by the viewer's local time. */
+const TIME_ZONE = "Asia/Ho_Chi_Minh";
+const OFFICE_HOURS = "2026-11-16T10:00:00+07:00";
+const BEDTIME = "2026-11-16T23:30:00+07:00";
+const NEXT_MORNING = "2026-11-17T10:00:00+07:00";
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -209,7 +217,9 @@ async function step(page: Page): Promise<void> {
  * play only through step()), and `flags` for the 3D view.
  */
 async function openOffice(target: Browser, at: string, flags: string): Promise<{ context: BrowserContext; page: Page; errors: string[]; warnings: string[] }> {
-	const context = await target.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 } });
+	const context = await target.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 }, timezoneId: TIME_ZONE });
+	// Office hours on the page's clock (time still flows): off-duty people stay on the work floors (office-life-schedule.ts).
+	await context.clock.install({ time: new Date(OFFICE_HOURS) });
 	await context.addInitScript(
 		([key, value]) => {
 			window.localStorage.setItem(key, value);
@@ -375,7 +385,7 @@ test("the office tab in 3D: every room of the table reached, seq gap, following 
 		const shades = await colours(page, "[data-id=office] canvas.of3d-canvas");
 		assert.ok(shades > 32, `the canvas has ${shades} colours`);
 		const calls: Record<number, number> = {};
-		for (const level of [1, 2, 3]) {
+		for (const level of [1, 2, 3, 4]) {
 			await page.locator(`[data-id=office-floor-${level}]`).click();
 			await poll(`the scene on floor ${level}`, async () => (await readout(page))?.floor ?? 0, (f) => f === level);
 			await page.waitForTimeout(2_500);
@@ -388,7 +398,7 @@ test("the office tab in 3D: every room of the table reached, seq gap, following 
 			assert.ok(most > 0 && most < 100, `floor ${level}: ${most} draw calls`);
 			assert.ok((await colours(page, "[data-id=office] canvas.of3d-canvas")) > 32, `floor ${level} drawn`);
 		}
-		console.log(`office e2e: draw calls (medium) T1 ${calls[1]}, T2 ${calls[2]}, T3 ${calls[3]}`);
+		console.log(`office e2e: draw calls (medium) T1 ${calls[1]}, T2 ${calls[2]}, T3 ${calls[3]}, T4 ${calls[4]}`);
 
 		// The chat tab: the render loop stops within a second. A sampler logs the frame count every 50 ms for as long as
 		// the read-out exists (the scene takes it away when it is disposed).
@@ -538,6 +548,38 @@ test("the viewer's camera: wheel zoom stops at 0.8 and 3.2, a right-drag or shif
 	await page.keyboard.up("Shift");
 	const shifted = (await camera()).yaw;
 	assert.ok(Math.abs(shifted - turned) > 0.05, `shift-drag turns too: ${turned} → ${shifted}`);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("the residents' day: after the session nobody goes home, at 23:30 everyone sleeps on floor 4, at 10:00 they are back on the work floors", async () => {
+	const { context, page, errors } = await openOffice(browser, "machine-chat", FLAGS_3D);
+	const webgl = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
+	if (webgl) await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
+	// The whole script: the session ends (step 20) and every subagent leaves (step 21).
+	for (let i = 0; i <= 21; i++) await step(page);
+	await poll("the staff off duty", async () => (await seen(page)).filter((s) => s.kind === "employee").length, (n) => n >= 8);
+	const staffKeys = (await seen(page)).filter((s) => s.kind === "employee").map((s) => s.key);
+	await poll("the director in the office (idle, office hours)", async () => roomOf((await seen(page)).find((s) => isDirector(s.key)))?.room ?? null, (room) => room === "DIRECTOR");
+	await context.clock.setSystemTime(new Date(BEDTIME));
+	await reaches(page, "the director at bedtime", isDirector, "DORM");
+	await poll("the off-duty staff on floor 4", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.floor === 4).length, (n) => n === staffKeys.length);
+	const anchors = (await seen(page)).filter((s) => s.kind === "director" || s.kind === "employee").map((s) => s.anchor);
+	assert.equal(new Set(anchors).size, anchors.length, `one person per place: ${anchors.join(", ")}`);
+	assert.ok(anchors.filter((a) => a.startsWith("bed-")).length === 8, `the eight beds taken: ${anchors.join(", ")}`);
+	await poll("following to floor 4", () => pressedFloor(page), (f) => f === 4);
+	if (await has3D(page)) {
+		await poll(
+			"the director lying in bed",
+			async () => (await readout(page))?.people.find((p) => isDirector(p.key))?.pose ?? "",
+			(pose) => pose === "sleep",
+			60_000,
+		);
+	}
+	await context.clock.setSystemTime(new Date(NEXT_MORNING));
+	// Placed in the office (a talk may walk the 3D figure over to a neighbour meanwhile: the placement stays).
+	await poll("the director back in the office", async () => roomOf((await seen(page)).find((s) => isDirector(s.key)))?.room ?? null, (room) => room === "DIRECTOR");
+	await poll("the staff back on the work floors", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.floor === 4).length, (n) => n === 0);
 	assert.deepEqual(errors, []);
 	await context.close();
 });

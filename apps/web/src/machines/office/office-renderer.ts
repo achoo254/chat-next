@@ -1,6 +1,7 @@
 // What a way of drawing the office receives (the 2D view here; the 3D scene
 // of apps/web/src/office-3d takes the same). Renderers only read: the store's
 // state, everyone's place, the layout, the floor shown, the light.
+import type { Talk } from "./office-conversations.ts";
 import type { Parsed } from "./office-json.ts";
 import type { OfficeAssets } from "./office-assets.ts";
 import type { Daypart } from "./office-daypart.ts";
@@ -13,6 +14,8 @@ import type { OfficeState } from "./office-store.ts";
 export interface OfficeRendererProps {
 	readonly state: OfficeState;
 	readonly placements: readonly Placement[];
+	/** Residents talking now (office-conversations.ts): who walks to whom, and the lines. */
+	readonly talks: readonly Talk[];
 	readonly layout: OfficeLayout;
 	readonly floor: FloorLevel;
 	readonly size: ScreenSize;

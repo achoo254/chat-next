@@ -1,15 +1,17 @@
 // The office without WebGL (and the first way it is drawn): the floor's
 // picture rendered from the 3D scene (day or night by the viewer's hour,
 // desktop or phone framing), with each person's status dot, name and speech
-// bubble in HTML at the projected point of their anchor, and the rooms'
-// boards at their board anchors. A phone pans the picture sideways. Without
+// bubble in HTML at the projected point of their anchor (a resident walking
+// over for a talk shows at the anchor of the one they talk to, their lines in
+// the bubble in turn), and the rooms' boards at their board anchors. A phone pans the picture sideways. Without
 // a valid asset file (not baked yet, or baked from another layout) the
 // floor's rooms show as cards on a plain background, people listed in each.
 import type { CSSProperties } from "react";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { ASSETS_BASE, type AssetView } from "./office-assets.ts";
 import { BOARD_ROOMS, OfficeBoard } from "./office-boards.tsx";
-import { bubbleText, markerStatus, personColor, personName, type OfficeCopy } from "./office-names.ts";
+import { lineOf, talkOf } from "./office-conversations.ts";
+import { markerView, personColor, type OfficeCopy } from "./office-names.ts";
 import type { Placement } from "./office-placement.ts";
 import type { OfficeRendererProps } from "./office-renderer.ts";
 import type { RoomCode } from "./office-rooms.ts";
@@ -21,12 +23,8 @@ function waitingForDesks(placements: readonly Placement[]): number {
 	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
 }
 
-function Marker({ p, t, placed }: { p: Placement; t: OfficeCopy; placed?: { x: number; y: number; stack: number } }) {
-	const status = markerStatus(p.kind, p.actor);
-	const name = personName(t, p);
-	// A bubble only while at work (not for someone home after handing in their file).
-	const bubble = p.activityRoom === null ? "" : bubbleText(t, p.actor?.activity ?? null);
-	const label = status === "idle" || status === "working" ? name : `${name} · ${t.state[status === "waiting-you" ? "waitingYou" : status]}`;
+function Marker({ p, t, line, placed }: { p: Placement; t: OfficeCopy; line: string | null; placed?: { x: number; y: number; stack: number; anchor: string } }) {
+	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const style: ColorStyle = { "--of-color": personColor(p) };
 	if (placed !== undefined) {
 		style.left = `${placed.x}%`;
@@ -34,13 +32,17 @@ function Marker({ p, t, placed }: { p: Placement; t: OfficeCopy; placed?: { x: n
 		style["--of-stack"] = placed.stack;
 	}
 	return (
-		<div className="of-marker" data-status={status} data-kind={p.kind} data-anchor={p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
+		<div className="of-marker" data-status={status} data-kind={p.kind} data-anchor={placed?.anchor ?? p.anchorId} style={style} title={label} data-id={`office-person-${p.key}`}>
 			<span className="of-dot" aria-hidden="true">
 				{status === "slow" ? "⌛" : ""}
 			</span>
 			<span className="of-name">{name}</span>
 			<span className="sr-only">{label === name ? "" : label.slice(name.length)}</span>
-			{bubble !== "" && <span className="of-bubble">{bubble}</span>}
+			{bubble !== "" && (
+				<span className="of-bubble" data-talk={talking ? "" : undefined}>
+					{bubble}
+				</span>
+			)}
 		</div>
 	);
 }
@@ -56,7 +58,7 @@ function Overflow({ n, t, at }: { n: number; t: OfficeCopy; at?: { x: number; y:
 }
 
 function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRendererProps; t: OfficeCopy; locale: string }) {
-	const { placements, floor, daypart, state, layout, now } = props;
+	const { placements, talks, floor, daypart, state, layout, now } = props;
 	const file = daypart.phase === "day" ? view.day : view.night;
 	const stacks = new Map<string, number>();
 	const shown = placements.filter((p) => p.floor === floor);
@@ -79,11 +81,14 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 						);
 					})}
 				{shown.map((p) => {
-					const at = view.anchors.get(p.anchorId);
+					// The visitor of a talk stands at the host's place.
+					const talk = talkOf(talks, p.key);
+					const anchorId = talk !== null && talk.visitor === p.key ? talk.hostAnchor : p.anchorId;
+					const at = view.anchors.get(anchorId);
 					if (at === undefined) return null;
-					const stack = stacks.get(p.anchorId) ?? 0;
-					stacks.set(p.anchorId, stack + 1);
-					return <Marker key={p.key} p={p} t={t} placed={{ x: at[0], y: at[1], stack }} />;
+					const stack = stacks.get(anchorId) ?? 0;
+					stacks.set(anchorId, stack + 1);
+					return <Marker key={p.key} p={p} t={t} line={lineOf(talks, p.key, now)} placed={{ x: at[0], y: at[1], stack, anchor: anchorId }} />;
 				})}
 				{meetingAt !== undefined && <Overflow n={waitingForDesks(placements)} t={t} at={{ x: meetingAt[0], y: meetingAt[1] }} />}
 			</div>
@@ -92,7 +97,7 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 }
 
 function RoomCards({ props, t, locale }: { props: OfficeRendererProps; t: OfficeCopy; locale: string }) {
-	const { placements, floor, layout, state, now } = props;
+	const { placements, talks, floor, layout, state, now } = props;
 	const rooms: readonly RoomCode[] = layout.floors.find((f) => f.level === floor)?.rooms.map((r) => r.room) ?? [];
 	return (
 		<div className="of-grid" data-id="office-rooms">
@@ -110,7 +115,7 @@ function RoomCards({ props, t, locale }: { props: OfficeRendererProps; t: Office
 							<ul className="of-people">
 								{here.map((p) => (
 									<li key={p.key}>
-										<Marker p={p} t={t} />
+										<Marker p={p} t={t} line={lineOf(talks, p.key, now)} />
 									</li>
 								))}
 							</ul>

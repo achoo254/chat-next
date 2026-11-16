@@ -5,7 +5,7 @@
 // comes in as text so its hash (office-assets.ts) is over the exact bytes the
 // assets were baked from; it lives in the lazy chunk of machines/office/.
 import layoutText from "./office-layout.json?raw";
-import { FLOOR_LEVELS, isRoomCode, ROOM_CODES, type FloorLevel, type RoomCode } from "./office-rooms.ts";
+import { FLOOR_LEVELS, isFloorLevel, isRoomCode, ROOM_CODES, type FloorLevel, type RoomCode } from "./office-rooms.ts";
 import { arrayOf, isRecord, numberOf, stringOf, type Parsed } from "./office-json.ts";
 
 export const LAYOUT_FORMAT_VERSION = 1;
@@ -15,12 +15,40 @@ export const LAYOUT_PHONE_DESKS = 6;
 
 export type Rect = readonly [number, number, number, number];
 
-export type AnchorKind = "desk" | "director" | "work" | "server" | "pantry" | "sofa" | "meeting" | "lobby" | "chairman" | "board" | "elevator";
+export type AnchorKind =
+	| "desk"
+	| "director"
+	| "work"
+	| "server"
+	| "pantry"
+	| "sofa"
+	| "meeting"
+	| "lobby"
+	| "chairman"
+	| "board"
+	| "elevator"
+	| "bed"
+	| "gym"
+	| "tv"
+	| "dine"
+	| "counter";
 
-const ANCHOR_KINDS: readonly AnchorKind[] = ["desk", "director", "work", "server", "pantry", "sofa", "meeting", "lobby", "chairman", "board", "elevator"];
+const ANCHOR_KINDS: readonly AnchorKind[] = ["desk", "director", "work", "server", "pantry", "sofa", "meeting", "lobby", "chairman", "board", "elevator", "bed", "gym", "tv", "dine", "counter"];
 
-/** Anchors a person may stand or sit at while working in a room (desks, the director's chair, the chairman's spot, boards and elevators are not). */
-export const SPOT_KINDS: readonly AnchorKind[] = ["work", "server", "pantry", "sofa", "meeting", "lobby"];
+/** The living floor's places (beds, gym stations, the TV corner's seats, the dining table and the counter): only the daily schedule sends people there. */
+export const LIFE_KINDS: readonly AnchorKind[] = ["bed", "gym", "tv", "dine", "counter"];
+
+/**
+ * Anchors a person may stand, sit or lie at in a room (desks, the director's
+ * chair, the chairman's spot, boards and elevators are not): the work rooms'
+ * spots and the living floor's places.
+ */
+export const SPOT_KINDS: readonly AnchorKind[] = ["work", "server", "pantry", "sofa", "meeting", "lobby", ...LIFE_KINDS];
+
+/** What a gym station is for (the layout's `act`). */
+export type GymAct = "run" | "pushup" | "jacks" | "punch";
+
+const GYM_ACTS: readonly GymAct[] = ["run", "pushup", "jacks", "punch"];
 
 export interface LayoutAnchor {
 	readonly id: string;
@@ -31,6 +59,16 @@ export interface LayoutAnchor {
 	/** Facing, Babylon rotation.y (0 looks to +z). */
 	readonly face: number;
 	readonly node: string;
+	/** Height the person stands or lies at over the floor, metres (a mattress top, a treadmill belt); 0 on the floor. */
+	readonly y: number;
+	/** Lying down there (a bed). */
+	readonly lie: boolean;
+	/** Sitting there (the living floor's seats; work-room seats are known by their kind). */
+	readonly sit: boolean;
+	/** A low seat (a beanbag): sitting near the floor. */
+	readonly low: boolean;
+	/** A gym station's exercise; null elsewhere. */
+	readonly act: GymAct | null;
 }
 
 export interface LayoutRoom {
@@ -105,8 +143,8 @@ function parseCamera(value: unknown, errors: string[]): LayoutCamera {
 function parseFloor(value: unknown, errors: string[]): LayoutFloor | null {
 	if (!isRecord(value)) return null;
 	const level = numberOf(value.level);
-	if (level !== 1 && level !== 2 && level !== 3) {
-		errors.push(`a floor has level ${String(value.level)}, expected 1, 2 or 3`);
+	if (!isFloorLevel(level)) {
+		errors.push(`a floor has level ${String(value.level)}, expected ${FLOOR_LEVELS.join(", ")}`);
 		return null;
 	}
 	const roomOrNull = (v: unknown): RoomCode | null => (isRoomCode(v) ? v : null);
@@ -132,7 +170,22 @@ function parseFloor(value: unknown, errors: string[]): LayoutFloor | null {
 			errors.push(`floor ${level}: anchor ${id || "(no id)"} needs an id, a known kind and x, z`);
 			continue;
 		}
-		anchors.push({ id, kind, room: roomOrNull(rec.room), x, z, face: numberOf(rec.face) ?? 0, node: stringOf(rec.node) });
+		const act = GYM_ACTS.find((g) => g === rec.act) ?? null;
+		if (kind === "gym" && act === null) errors.push(`floor ${level}: gym anchor ${id} needs an act (${GYM_ACTS.join(", ")})`);
+		anchors.push({
+			id,
+			kind,
+			room: roomOrNull(rec.room),
+			x,
+			z,
+			face: numberOf(rec.face) ?? 0,
+			node: stringOf(rec.node),
+			y: numberOf(rec.y) ?? 0,
+			lie: rec.lie === true,
+			sit: rec.sit === true,
+			low: rec.low === true,
+			act,
+		});
 	}
 	const graph = isRecord(value.graph) ? value.graph : {};
 	const nodes = arrayOf(graph.nodes).flatMap((n) => {
@@ -204,7 +257,9 @@ export function parseOfficeLayout(json: unknown): Parsed<OfficeLayout> {
 	const errors: string[] = [];
 	if (json.formatVersion !== LAYOUT_FORMAT_VERSION) return { ok: false, errors: [`format version ${String(json.formatVersion)}, this app reads ${LAYOUT_FORMAT_VERSION}`] };
 	const floors = arrayOf(json.floors).flatMap((f) => parseFloor(f, errors) ?? []);
-	if (floors.length !== 3 || FLOOR_LEVELS.some((level) => floors.filter((f) => f.level === level).length !== 1)) errors.push("expected exactly 3 floors, levels 1, 2 and 3");
+	if (floors.length !== FLOOR_LEVELS.length || FLOOR_LEVELS.some((level) => floors.filter((f) => f.level === level).length !== 1)) {
+		errors.push(`expected exactly ${FLOOR_LEVELS.length} floors, levels ${FLOOR_LEVELS.join(", ")}`);
+	}
 	for (const code of ROOM_CODES) {
 		const count = floors.reduce((n, f) => n + f.rooms.filter((r) => r.room === code).length, 0);
 		if (count !== 1) errors.push(`${code} appears ${count} times, expected once`);
@@ -222,7 +277,7 @@ export function parseOfficeLayout(json: unknown): Parsed<OfficeLayout> {
 	}
 	const lift = isRecord(json.elevator) ? json.elevator : {};
 	const liftNodes = isRecord(lift.nodes) ? lift.nodes : {};
-	const nodes = { 1: stringOf(liftNodes["1"]), 2: stringOf(liftNodes["2"]), 3: stringOf(liftNodes["3"]) };
+	const nodes = { 1: stringOf(liftNodes["1"]), 2: stringOf(liftNodes["2"]), 3: stringOf(liftNodes["3"]), 4: stringOf(liftNodes["4"]) };
 	for (const floor of floors) if (nodes[floor.level] !== floor.elevatorNode || floor.elevatorNode === "") errors.push(`the elevator does not reach floor ${floor.level}`);
 	const travel = numberOf(lift.travelSecondsPerFloor);
 	if (travel === null || travel <= 0) errors.push("elevator.travelSecondsPerFloor must be a positive number");

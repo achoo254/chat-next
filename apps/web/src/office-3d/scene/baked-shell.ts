@@ -27,7 +27,7 @@ import { gammaScale, NO_SHELL_EXTRAS, parseShellExtras, type Rgb, type ShellExtr
 export interface BakedShell {
 	/** Where the floor's props stand per the shell's extras, or null (use the layout's). */
 	readonly places: readonly Place[] | null;
-	setNightMix(nightMix: number, closed: boolean): void;
+	setNightMix(nightMix: number): void;
 	dispose(): void;
 }
 
@@ -156,11 +156,11 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 	}
 	return {
 		places: extras.places,
-		setNightMix(nightMix, closed) {
+		setNightMix(nightMix) {
 			for (const { plugin, glow } of plugins) {
 				plugin.nightMix = nightMix;
-				plugin.scale = lightScale * (closed ? 0.45 : 1);
-				plugin.glow = glow === null || closed ? 0 : glow[0] + (glow[1] - glow[0]) * nightMix;
+				plugin.scale = lightScale;
+				plugin.glow = glow === null ? 0 : glow[0] + (glow[1] - glow[0]) * nightMix;
 			}
 			// Daylight outside by day, the city's dusk blue at night.
 			for (const view of windows) view.emissiveColor = Color3.Lerp(windowDay, windowNight, nightMix);

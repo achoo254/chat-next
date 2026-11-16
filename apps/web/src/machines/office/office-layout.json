@@ -3683,6 +3683,995 @@
 					"picture": 5
 				}
 			]
+		},
+		{
+			"level": 4,
+			"name": "Tầng 4: Ký túc, Phòng gym, Phòng giải trí",
+			"rooms": [
+				{
+					"room": "DORM",
+					"name": "Ký túc",
+					"rect": [
+						-9,
+						-5,
+						-3,
+						5
+					]
+				},
+				{
+					"room": "GYM",
+					"name": "Phòng gym",
+					"rect": [
+						-3,
+						-5,
+						3,
+						5
+					]
+				},
+				{
+					"room": "LOUNGE",
+					"name": "Phòng giải trí",
+					"rect": [
+						3,
+						-5,
+						9,
+						5
+					]
+				}
+			],
+			"circulation": [
+				{
+					"name": "Thang máy và cầu thang",
+					"rect": [
+						-9,
+						-9,
+						-4.5,
+						-5
+					]
+				},
+				{
+					"name": "Hành lang",
+					"rect": [
+						-4.5,
+						-9,
+						9,
+						-5
+					]
+				}
+			],
+			"glass": [
+				[
+					-3,
+					-5,
+					-3,
+					5
+				],
+				[
+					3,
+					-5,
+					3,
+					5
+				],
+				[
+					-4.5,
+					-5,
+					9,
+					-5
+				],
+				[
+					-4.5,
+					-9,
+					-4.5,
+					-5
+				]
+			],
+			"walls": [
+				[
+					-9,
+					-5,
+					-4.5,
+					-5
+				]
+			],
+			"windows": [
+				{
+					"wall": "east",
+					"from": 0.4,
+					"to": 3.4,
+					"sill": 0.95,
+					"top": 2.45
+				}
+			],
+			"doors": [
+				{
+					"id": "door-dorm",
+					"between": [
+						"DORM",
+						null
+					],
+					"at": [
+						-3.75,
+						-5
+					],
+					"width": 1.2,
+					"axis": "x"
+				},
+				{
+					"id": "door-gym",
+					"between": [
+						"GYM",
+						null
+					],
+					"at": [
+						0.0,
+						-5
+					],
+					"width": 1.2,
+					"axis": "x"
+				},
+				{
+					"id": "door-lounge",
+					"between": [
+						"LOUNGE",
+						null
+					],
+					"at": [
+						6.0,
+						-5
+					],
+					"width": 1.2,
+					"axis": "x"
+				},
+				{
+					"id": "door-core",
+					"between": [
+						null,
+						null
+					],
+					"at": [
+						-4.5,
+						-6.5
+					],
+					"width": 1.4,
+					"axis": "z"
+				}
+			],
+			"anchors": [
+				{
+					"id": "f4-elevator",
+					"kind": "elevator",
+					"room": null,
+					"x": -6.6,
+					"z": -6.5,
+					"face": -1.5708,
+					"node": "f4-elevator"
+				},
+				{
+					"id": "bed-0",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -8.45,
+					"z": 3.9,
+					"face": 3.1416,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-1",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -7.25,
+					"z": 3.9,
+					"face": 3.1416,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-2",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -5.25,
+					"z": 3.9,
+					"face": 3.1416,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-3",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -4.05,
+					"z": 3.9,
+					"face": 3.1416,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-4",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -8.45,
+					"z": 0.4,
+					"face": 0.0,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-5",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -7.25,
+					"z": 0.4,
+					"face": 0.0,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-6",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -5.25,
+					"z": 0.4,
+					"face": 0.0,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "bed-7",
+					"kind": "bed",
+					"room": "DORM",
+					"x": -4.05,
+					"z": 0.4,
+					"face": 0.0,
+					"y": 0.5,
+					"lie": true,
+					"node": "f4-dorm"
+				},
+				{
+					"id": "gym-run-0",
+					"kind": "gym",
+					"room": "GYM",
+					"x": -2.2,
+					"z": 3.75,
+					"face": 0.0,
+					"y": 0.18,
+					"act": "run",
+					"node": "f4-gym"
+				},
+				{
+					"id": "gym-run-1",
+					"kind": "gym",
+					"room": "GYM",
+					"x": -0.8,
+					"z": 3.75,
+					"face": 0.0,
+					"y": 0.18,
+					"act": "run",
+					"node": "f4-gym"
+				},
+				{
+					"id": "gym-mat-0",
+					"kind": "gym",
+					"room": "GYM",
+					"x": -2.0,
+					"z": 0.6,
+					"face": 3.1416,
+					"act": "pushup",
+					"node": "f4-gym"
+				},
+				{
+					"id": "gym-mat-1",
+					"kind": "gym",
+					"room": "GYM",
+					"x": -0.4,
+					"z": 0.6,
+					"face": 3.1416,
+					"act": "jacks",
+					"node": "f4-gym"
+				},
+				{
+					"id": "gym-mat-2",
+					"kind": "gym",
+					"room": "GYM",
+					"x": 1.2,
+					"z": 0.6,
+					"face": 3.1416,
+					"act": "pushup",
+					"node": "f4-gym"
+				},
+				{
+					"id": "gym-bag",
+					"kind": "gym",
+					"room": "GYM",
+					"x": 2.3,
+					"z": -2.95,
+					"face": 0.0,
+					"act": "punch",
+					"node": "f4-gym"
+				},
+				{
+					"id": "tv-0",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 5.45,
+					"z": 1.45,
+					"face": 0.0,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-1",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 6.0,
+					"z": 1.45,
+					"face": 0.0,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-2",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 6.55,
+					"z": 1.45,
+					"face": 0.0,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-3",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 3.9,
+					"z": 2.7,
+					"face": 1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-4",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 8.1,
+					"z": 2.7,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-5",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 5.3,
+					"z": 3.3,
+					"face": 0.0,
+					"sit": true,
+					"low": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "tv-6",
+					"kind": "tv",
+					"room": "LOUNGE",
+					"x": 6.7,
+					"z": 3.3,
+					"face": 0.0,
+					"sit": true,
+					"low": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-0",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 4.05,
+					"z": -2.9,
+					"face": 1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-3",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 5.35,
+					"z": -2.9,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-1",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 4.05,
+					"z": -2.2,
+					"face": 1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-4",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 5.35,
+					"z": -2.2,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-2",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 4.05,
+					"z": -1.5,
+					"face": 1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "dine-5",
+					"kind": "dine",
+					"room": "LOUNGE",
+					"x": 5.35,
+					"z": -1.5,
+					"face": -1.5708,
+					"sit": true,
+					"node": "f4-lounge"
+				},
+				{
+					"id": "counter-0",
+					"kind": "counter",
+					"room": "LOUNGE",
+					"x": 7.85,
+					"z": -2.2,
+					"face": 1.5708,
+					"node": "f4-lounge"
+				}
+			],
+			"elevatorNode": "f4-elevator",
+			"graph": {
+				"nodes": [
+					{
+						"id": "f4-elevator",
+						"x": -6.6,
+						"z": -6.5,
+						"room": null
+					},
+					{
+						"id": "f4-door-core",
+						"x": -4.5,
+						"z": -6.5,
+						"room": null
+					},
+					{
+						"id": "f4-hall-dorm",
+						"x": -3.75,
+						"z": -6.6,
+						"room": null
+					},
+					{
+						"id": "f4-door-dorm",
+						"x": -3.75,
+						"z": -5,
+						"room": null
+					},
+					{
+						"id": "f4-dorm",
+						"x": -3.75,
+						"z": -3.6,
+						"room": "DORM"
+					},
+					{
+						"id": "f4-hall-gym",
+						"x": 0.0,
+						"z": -6.6,
+						"room": null
+					},
+					{
+						"id": "f4-door-gym",
+						"x": 0.0,
+						"z": -5,
+						"room": null
+					},
+					{
+						"id": "f4-gym",
+						"x": 0.0,
+						"z": -3.6,
+						"room": "GYM"
+					},
+					{
+						"id": "f4-hall-lounge",
+						"x": 6.0,
+						"z": -6.6,
+						"room": null
+					},
+					{
+						"id": "f4-door-lounge",
+						"x": 6.0,
+						"z": -5,
+						"room": null
+					},
+					{
+						"id": "f4-lounge",
+						"x": 6.0,
+						"z": -3.6,
+						"room": "LOUNGE"
+					}
+				],
+				"edges": [
+					[
+						"f4-elevator",
+						"f4-door-core"
+					],
+					[
+						"f4-door-core",
+						"f4-hall-dorm"
+					],
+					[
+						"f4-hall-dorm",
+						"f4-door-dorm"
+					],
+					[
+						"f4-door-dorm",
+						"f4-dorm"
+					],
+					[
+						"f4-hall-dorm",
+						"f4-hall-gym"
+					],
+					[
+						"f4-hall-gym",
+						"f4-door-gym"
+					],
+					[
+						"f4-door-gym",
+						"f4-gym"
+					],
+					[
+						"f4-hall-gym",
+						"f4-hall-lounge"
+					],
+					[
+						"f4-hall-lounge",
+						"f4-door-lounge"
+					],
+					[
+						"f4-door-lounge",
+						"f4-lounge"
+					]
+				]
+			},
+			"props": [
+				{
+					"name": "floor-plant",
+					"x": -5.0,
+					"z": -5.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "bed",
+					"x": -8.45,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "bed",
+					"x": -7.25,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "bed",
+					"x": -5.25,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "bed",
+					"x": -4.05,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "nightstand",
+					"x": -6.25,
+					"z": 4.65,
+					"rotY": 3.1416
+				},
+				{
+					"name": "desk-lamp",
+					"x": -6.25,
+					"z": 4.65,
+					"rotY": 3.1416,
+					"y": 0.55
+				},
+				{
+					"name": "bed",
+					"x": -8.45,
+					"z": 0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "bed",
+					"x": -7.25,
+					"z": 0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "bed",
+					"x": -5.25,
+					"z": 0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "bed",
+					"x": -4.05,
+					"z": 0.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "nightstand",
+					"x": -6.25,
+					"z": -0.35,
+					"rotY": 0.0
+				},
+				{
+					"name": "desk-lamp",
+					"x": -6.25,
+					"z": -0.35,
+					"rotY": 0.0,
+					"y": 0.55
+				},
+				{
+					"name": "locker",
+					"x": -8.6,
+					"z": -3.2,
+					"rotY": 1.5708
+				},
+				{
+					"name": "locker",
+					"x": -8.6,
+					"z": -4.0,
+					"rotY": 1.5708
+				},
+				{
+					"name": "floor-plant",
+					"x": -3.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "treadmill",
+					"x": -2.2,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "treadmill",
+					"x": -0.8,
+					"z": 3.9,
+					"rotY": 3.1416
+				},
+				{
+					"name": "gym-mat",
+					"x": -2.0,
+					"z": 0.6,
+					"rotY": 0.0
+				},
+				{
+					"name": "gym-mat",
+					"x": -0.4,
+					"z": 0.6,
+					"rotY": 0.0
+				},
+				{
+					"name": "gym-mat",
+					"x": 1.2,
+					"z": 0.6,
+					"rotY": 0.0
+				},
+				{
+					"name": "weight-bench",
+					"x": 1.4,
+					"z": 3.4,
+					"rotY": 1.5708
+				},
+				{
+					"name": "dumbbell-rack",
+					"x": 2.55,
+					"z": 4.5,
+					"rotY": 3.1416
+				},
+				{
+					"name": "punching-bag",
+					"x": 2.3,
+					"z": -2.2,
+					"rotY": 0.0
+				},
+				{
+					"name": "water-cooler",
+					"x": 2.55,
+					"z": -4.3,
+					"rotY": -1.5708
+				},
+				{
+					"name": "floor-plant",
+					"x": -2.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "tv-stand",
+					"x": 6.0,
+					"z": 4.6,
+					"rotY": 3.1416
+				},
+				{
+					"name": "sofa",
+					"x": 6.0,
+					"z": 1.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "armchair",
+					"x": 3.9,
+					"z": 2.7,
+					"rotY": 1.5708
+				},
+				{
+					"name": "armchair",
+					"x": 8.1,
+					"z": 2.7,
+					"rotY": -1.5708
+				},
+				{
+					"name": "beanbag",
+					"x": 5.3,
+					"z": 3.3,
+					"rotY": 0.0
+				},
+				{
+					"name": "beanbag",
+					"x": 6.7,
+					"z": 3.3,
+					"rotY": 0.0
+				},
+				{
+					"name": "dining-table",
+					"x": 4.7,
+					"z": -2.2,
+					"rotY": 0.0
+				},
+				{
+					"name": "dining-chair",
+					"x": 4.05,
+					"z": -2.9,
+					"rotY": 1.5708
+				},
+				{
+					"name": "dining-chair",
+					"x": 5.35,
+					"z": -2.9,
+					"rotY": -1.5708
+				},
+				{
+					"name": "dining-chair",
+					"x": 4.05,
+					"z": -2.2,
+					"rotY": 1.5708
+				},
+				{
+					"name": "dining-chair",
+					"x": 5.35,
+					"z": -2.2,
+					"rotY": -1.5708
+				},
+				{
+					"name": "dining-chair",
+					"x": 4.05,
+					"z": -1.5,
+					"rotY": 1.5708
+				},
+				{
+					"name": "dining-chair",
+					"x": 5.35,
+					"z": -1.5,
+					"rotY": -1.5708
+				},
+				{
+					"name": "kitchen-counter",
+					"x": 8.55,
+					"z": -2.2,
+					"rotY": -1.5708
+				},
+				{
+					"name": "microwave",
+					"x": 8.6,
+					"z": -2.7,
+					"rotY": -1.5708,
+					"y": 0.9
+				},
+				{
+					"name": "fridge",
+					"x": 8.5,
+					"z": -4.3,
+					"rotY": -1.5708
+				},
+				{
+					"name": "floor-plant",
+					"x": 3.5,
+					"z": -4.45,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-lamp",
+					"x": 8.5,
+					"z": 4.4,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": 8.5,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "floor-plant",
+					"x": -4.0,
+					"z": -8.5,
+					"rotY": 0.0
+				},
+				{
+					"name": "water-cooler",
+					"x": 8.55,
+					"z": -6.4,
+					"rotY": -1.5708
+				},
+				{
+					"name": "trash-bin",
+					"x": 2.0,
+					"z": -5.4,
+					"rotY": 0.0
+				}
+			],
+			"smallProps": [
+				{
+					"name": "mug",
+					"x": 4.6,
+					"z": -2.6,
+					"y": 0.75,
+					"rotY": 0.0
+				},
+				{
+					"name": "mug",
+					"x": 4.8,
+					"z": -1.8,
+					"y": 0.75,
+					"rotY": 0.0
+				}
+			],
+			"decor": [
+				{
+					"kind": "elevator",
+					"x": -8.15,
+					"z": -6.5,
+					"width": 1.7,
+					"depth": 2.4,
+					"doorFace": 1.571
+				},
+				{
+					"kind": "stairs",
+					"rect": [
+						-7.2,
+						-9,
+						-4.9,
+						-8.0
+					],
+					"rise": "west"
+				},
+				{
+					"kind": "clock",
+					"wall": "back",
+					"x": -6.0,
+					"y": 2.65,
+					"size": 0.36
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-8.2,
+						1.7,
+						-3.8,
+						2.6
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "art",
+					"wall": "back",
+					"x": -3.6,
+					"y": 2.0,
+					"width": 0.8,
+					"height": 0.6,
+					"picture": 6
+				},
+				{
+					"kind": "board",
+					"wall": "back",
+					"x": 1.2,
+					"y": 1.6,
+					"width": 2.2,
+					"height": 1.24,
+					"picture": "gym-poster"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-2.7,
+						-0.4,
+						2.0,
+						1.6
+					],
+					"colour": "grey"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						4.4,
+						0.9,
+						7.6,
+						4.0
+					],
+					"colour": "lavender"
+				},
+				{
+					"kind": "art",
+					"wall": "back",
+					"x": 3.9,
+					"y": 2.0,
+					"width": 0.8,
+					"height": 0.6,
+					"picture": 7
+				},
+				{
+					"kind": "board",
+					"wall": "east",
+					"z": -2.2,
+					"y": 2.0,
+					"width": 1.2,
+					"height": 0.8,
+					"picture": "menu-board"
+				},
+				{
+					"kind": "rug",
+					"rect": [
+						-3.5,
+						-7.3,
+						7.5,
+						-5.9
+					],
+					"colour": "slate"
+				},
+				{
+					"kind": "art",
+					"wall": "east",
+					"z": -7.6,
+					"y": 1.6,
+					"width": 0.8,
+					"height": 0.6,
+					"picture": 1
+				}
+			]
 		}
 	],
 	"elevator": {
@@ -3691,7 +4680,8 @@
 		"nodes": {
 			"1": "f1-elevator",
 			"2": "f2-elevator",
-			"3": "f3-elevator"
+			"3": "f3-elevator",
+			"4": "f4-elevator"
 		}
 	}
 }

@@ -8,7 +8,7 @@
 import { OFFICE_LAYOUT_TEXT } from "../../machines/office/office-layout.ts";
 import { arrayOf, isRecord, numberOf, stringOf } from "../../machines/office/office-json.ts";
 import type { FloorLevel, RoomCode } from "../../machines/office/office-rooms.ts";
-import { isRoomCode } from "../../machines/office/office-rooms.ts";
+import { isFloorLevel, isRoomCode } from "../../machines/office/office-rooms.ts";
 
 export type Rect = readonly [number, number, number, number];
 /** A straight wall or glass run on the floor, [x0, z0, x1, z1]. */
@@ -92,7 +92,7 @@ function decorOf(value: unknown): Decor | null {
 function floorOf(value: unknown): SceneFloor | null {
 	if (!isRecord(value)) return null;
 	const level = numberOf(value.level);
-	if (level !== 1 && level !== 2 && level !== 3) return null;
+	if (!isFloorLevel(level)) return null;
 	const rooms = arrayOf(value.rooms).flatMap((r) => {
 		if (!isRecord(r) || !isRoomCode(r.room)) return [];
 		const rect = rectOf(r.rect);

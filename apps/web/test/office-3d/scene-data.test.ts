@@ -4,8 +4,8 @@ import { parseSceneLayout, SCENE_LAYOUT, segmentsMinusDoors, type Door } from ".
 import { PROP_SHAPES } from "../../src/office-3d/scene/placeholder-shapes.ts";
 
 describe("scene layout", () => {
-	it("reads all three floors of the shipped layout with their glass, doors and furniture", () => {
-		expect(SCENE_LAYOUT.floors.map((f) => f.level)).toEqual([1, 2, 3]);
+	it("reads all four floors of the shipped layout with their glass, doors and furniture", () => {
+		expect(SCENE_LAYOUT.floors.map((f) => f.level)).toEqual([1, 2, 3, 4]);
 		for (const floor of SCENE_LAYOUT.floors) {
 			expect(floor.rooms.length, `floor ${floor.level}`).toBeGreaterThan(0);
 			expect(floor.glass.length).toBeGreaterThan(0);

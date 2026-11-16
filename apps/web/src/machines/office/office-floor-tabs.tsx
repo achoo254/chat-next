@@ -1,7 +1,7 @@
-// [T1][T2][T3] over the office, shared by the 2D and 3D views (the 3D scene
+// [T1][T2][T3][T4] over the office, shared by the 2D and 3D views (the 3D scene
 // gets the floor as a prop). A dot marks a floor where someone works. Follow
 // mode (on by default, kept on this device) moves to the floor where an
-// activity just began, at most once per FLOOR_HOLD_MS, and pauses for
+// activity just began (or, with nobody working, to where most people are), at most once per FLOOR_HOLD_MS, and pauses for
 // USER_PAUSE_MS after the user picks a floor: a session typically uses all
 // three floors, and without following one would only ever see the first.
 // nextFloor is the decision, pure for tests.
@@ -36,6 +36,25 @@ export function latestWork(placements: readonly Placement[]): { readonly floor: 
 	return latest;
 }
 
+/**
+ * Where following goes: the newest work; with nobody working, the floor where
+ * most people are (the living floor at night), as of the latest arrival
+ * there, so following moves once when people settle somewhere else.
+ */
+export function followTarget(placements: readonly Placement[]): { readonly floor: FloorLevel; readonly since: number } | null {
+	const work = latestWork(placements);
+	if (work !== null) return work;
+	const crowd = new Map<FloorLevel, { count: number; since: number }>();
+	for (const p of placements) {
+		if (p.kind === "chairman") continue;
+		const c = crowd.get(p.floor) ?? { count: 0, since: 0 };
+		crowd.set(p.floor, { count: c.count + 1, since: Math.max(c.since, p.since) });
+	}
+	let best: { floor: FloorLevel; count: number; since: number } | null = null;
+	for (const [floor, c] of crowd) if (best === null || c.count > best.count || (c.count === best.count && floor < best.floor)) best = { floor, ...c };
+	return best === null ? null : { floor: best.floor, since: best.since };
+}
+
 /** Floors where someone works now (the dots). */
 export function busyFloors(placements: readonly Placement[]): ReadonlySet<FloorLevel> {
 	return new Set(placements.filter((p) => p.kind !== "chairman" && p.activityRoom !== null).map((p) => p.floor));
@@ -43,6 +62,8 @@ export function busyFloors(placements: readonly Placement[]): ReadonlySet<FloorL
 
 export function nextFloor(state: FollowState, input: { readonly follow: boolean; readonly now: number; readonly latest: { readonly floor: FloorLevel; readonly since: number } | null }): FollowState {
 	const { follow, now, latest } = input;
+	// The viewer's clock was set back: what happened "later" than now is forgotten.
+	if (now < state.switchedAt || (state.pickedAt !== null && now < state.pickedAt)) return nextFloor({ floor: state.floor, switchedAt: 0, pickedAt: null }, input);
 	if (!follow || latest === null || latest.floor === state.floor) return state;
 	if (latest.since <= state.switchedAt) return state;
 	if (state.switchedAt > 0 && now - state.switchedAt < FLOOR_HOLD_MS) return state;

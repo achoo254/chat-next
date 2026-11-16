@@ -4,27 +4,34 @@
 // logic even on floors not shown, picks each one's pose and animation rate,
 // and reports positions for the HTML labels and speech bubbles. A newcomer
 // after the first frame walks in from the lobby door; someone who left walks
-// out before vanishing. During a power cut everyone freezes.
+// out before vanishing. Residents talk (person-intent.ts: the visitor walks
+// over and both face each other), sleep in the dorm's beds at the mattress's
+// height and get up before walking off, run on the treadmill's belt. During a
+// power cut everyone freezes.
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import type { OfficeLayout } from "../../machines/office/office-layout.ts";
 import { markerStatus } from "../../machines/office/office-names.ts";
 import type { Placement } from "../../machines/office/office-placement.ts";
 import type { FloorLevel } from "../../machines/office/office-rooms.ts";
+import type { Talk } from "../../machines/office/office-conversations.ts";
 import type { OfficeState } from "../../machines/office/office-store.ts";
 import { sampleRoute, type MotionSample } from "./actor-motion.ts";
 import { animationRates, type LodEntry } from "./animation-lod.ts";
-import { poseFor, type Pose } from "./anim-groups.ts";
+import { isLyingPose, poseFor, type Pose, type TalkRole } from "./anim-groups.ts";
 import { personLook } from "./character-look.ts";
 import type { CharacterPool } from "./character-pool.ts";
 import type { CharacterVisual } from "./character-visual.ts";
-import { idlePerformance, type IdleTarget } from "./idle-performer.ts";
+import type { IdleTarget } from "./idle-performer.ts";
 import type { Router, Route } from "./office-routes.ts";
+import { personIntent } from "./person-intent.ts";
 import { nearestNode, personTarget, shareIndices, type PersonTarget } from "./person-target.ts";
 
 /** A pass is cheered this long, a failure smokes this long (viewer ms). */
 export const CHEER_MS = 2_500;
 export const SMOKE_MS = 4_000;
+/** Getting out of bed (LayToIdle) before walking off, scene seconds. */
+export const WAKE_SECONDS = 1.6;
 const ENTRANCE = "lobby-entry";
 
 export type PeopleEvent = "arrive-lift" | "start-work" | "cheer" | "smoke" | "approval";
@@ -43,6 +50,8 @@ export interface PersonView {
 	/** The anchor walked to (or stood at) and the pose now, for tests. */
 	readonly target: string;
 	readonly pose: Pose;
+	/** Dozing off over a stuck tool where they work. */
+	readonly dozing: boolean;
 	/** Height of the name label over the feet, metres (the drawn character's). */
 	readonly labelHeight: number;
 }
@@ -58,6 +67,10 @@ interface Person {
 	routeStart: number;
 	sample: MotionSample;
 	idle: IdleTarget | null;
+	talk: TalkRole | null;
+	/** Waking up in bed until this scene time, then walking to `pending`. */
+	wakeUntil: number;
+	pending: PersonTarget | null;
 	pose: Pose;
 	leaving: boolean;
 	cheering: boolean;
@@ -67,7 +80,7 @@ interface Person {
 }
 
 export interface OfficePeople {
-	update(placements: readonly Placement[], state: OfficeState, now: number): void;
+	update(placements: readonly Placement[], state: OfficeState, now: number, talks?: readonly Talk[]): void;
 	/** Per frame: `dt` seconds of scene clock (0 while frozen). */
 	frame(dt: number, shown: FloorLevel, fullRate: number, inView: (x: number, z: number) => boolean, focus: { x: number; z: number }): void;
 	views(): readonly PersonView[];
@@ -103,20 +116,20 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 		get count() {
 			return people.size;
 		},
-		update(placements, state, now) {
+		update(placements, state, now, talks = []) {
 			const occupiedDesks = placements.filter((p) => p.member?.desk != null && p.room === "WORK").map((p) => p.anchorId);
-			const ctx = { enabled: state.power === "on" && !state.off, pantry, sofas, occupiedDesks };
-			const wanted = placements.map((placement) => {
-				const idle = idlePerformance({ key: placement.key, kind: placement.kind, activityRoom: placement.activityRoom, since: placement.since }, now, ctx);
-				return { placement, idle, anchorId: idle?.anchorId ?? placement.anchorId };
-			});
-			const shares = shareIndices(wanted.map((w) => w.anchorId));
+			const ctx = { enabled: state.power === "on", pantry, sofas, occupiedDesks };
+			const wanted = placements.map((placement) => personIntent(placement, talks, now, ctx));
+			// Standing beside an anchor (a talk's visitor, the director's round) is not a share of the anchor itself.
+			const shares = shareIndices(wanted.map((w) => (w.beside ? `beside:${w.anchorId}` : w.anchorId)));
 			const seen = new Set<string>();
 			wanted.forEach((w, i) => {
 				const key = w.placement.key;
 				seen.add(key);
-				const target = personTarget(layout, w.anchorId, shares[i] ?? 0, w.idle?.act === "patrol") ?? personTarget(layout, w.placement.anchorId, 0, false);
-				if (target === null) return;
+				const found = personTarget(layout, w.anchorId, shares[i] ?? 0, w.beside) ?? personTarget(layout, w.placement.anchorId, 0, false);
+				if (found === null) return;
+				// A standing host turns to the visitor.
+				const target = w.turn !== 0 && !found.seated ? { ...found, face: found.face + w.turn } : found;
 				let p = people.get(key);
 				if (p === undefined) {
 					const index = nextIndex++;
@@ -133,6 +146,9 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 						routeStart: clock,
 						sample: atRest(start),
 						idle: w.idle,
+						talk: w.talk,
+						wakeUntil: 0,
+						pending: null,
 						pose: "stand-idle",
 						leaving: false,
 						cheering: false,
@@ -146,6 +162,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				const wasAwaiting = p.placement.actor?.state === "awaiting";
 				p.placement = w.placement;
 				p.idle = w.idle;
+				p.talk = w.talk;
 				p.leaving = false;
 				const actor = w.placement.actor;
 				if (actor?.state === "awaiting" && !wasAwaiting) onEvent("approval", target.floor);
@@ -159,8 +176,14 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				p.smoking = result?.ok === false && resultAge < SMOKE_MS;
 				p.refused = markerStatus(w.placement.kind, actor) === "denied";
 				const moved = target.anchorId !== p.target.anchorId || Math.hypot(target.x - p.target.x, target.z - p.target.z) > 0.05 || target.floor !== p.target.floor;
+				if (p.pending !== null) p.pending = target;
+				else if (moved && p.sample.done && isLyingPose(p.pose)) {
+					// Out of bed first: get up, then walk.
+					p.wakeUntil = clock + WAKE_SECONDS;
+					p.pending = target;
+				}
 				// In the elevator: finish the ride first, the next update reroutes.
-				if (moved && !p.sample.inLift) startRoute(p, target);
+				else if (moved && !p.sample.inLift) startRoute(p, target);
 				else if (!moved) p.target = target;
 			});
 			for (const p of people.values()) {
@@ -175,6 +198,11 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 			clock += dt;
 			const lod: LodEntry[] = [];
 			for (const p of [...people.values()]) {
+				if (p.pending !== null && clock >= p.wakeUntil) {
+					startRoute(p, p.pending);
+					p.pending = null;
+				}
+				const waking = p.pending !== null;
 				const wasLift = p.sample.inLift;
 				p.sample = sampleRoute(p.route, clock - p.routeStart, { floor: p.target.floor, x: p.target.x, z: p.target.z, heading: p.target.face });
 				if (wasLift && !p.sample.inLift && p.sample.floor === shown) onEvent("arrive-lift", shown);
@@ -189,17 +217,34 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				const visible = !s.inLift && s.floor === shown;
 				p.visual.setVisible(visible);
 				p.blob.setEnabled(visible);
-				p.visual.root.position.set(s.x, 0, s.z);
+				// On the bed or the treadmill once there; on the floor while walking.
+				p.visual.root.position.set(s.x, arrived ? p.target.y : 0, s.z);
 				p.visual.root.rotation.y = arrived ? p.target.face : s.heading;
 				p.blob.position.set(s.x, 0.015, s.z);
 				const busy = p.placement.activityRoom !== null;
-				const group = busy ? (p.placement.actor?.activity?.group ?? null) : null;
-				const pose = poseFor({ moving: s.moving || s.inLift, seated: arrived && p.target.seated, group, idle: arrived ? (p.idle?.act ?? null) : null, cheering: p.cheering, refused: p.refused });
+				const activity = p.placement.actor?.activity ?? null;
+				// Dozing off over a stuck tool: the plain sitting or standing pose where they work.
+				const group = busy && activity?.stuckMs == null ? (activity?.group ?? null) : null;
+				const life = arrived ? (p.placement.life?.act ?? null) : null;
+				// A dancer stands up in front of their seat.
+				const seated = arrived && p.target.seated && life !== "dance";
+				const pose = poseFor({
+					moving: s.moving || s.inLift,
+					seated,
+					group,
+					idle: arrived ? (p.idle?.act ?? null) : null,
+					cheering: p.cheering,
+					refused: p.refused,
+					life,
+					talk: arrived ? p.talk : null,
+					waking,
+					low: p.target.low,
+				});
 				if (pose !== p.pose) {
 					if (visible && p.pose === "walk" && group !== null) onEvent("start-work", shown);
 					p.pose = pose;
 				}
-				p.visual.setPose(pose);
+				p.visual.setPose(pose, p.target.seat);
 				lod.push({ key: p.key, onFloor: visible, onScreen: visible && inView(s.x, s.z), active: s.moving || busy, distance: Math.hypot(s.x - focus.x, s.z - focus.z) });
 			}
 			const rates = animationRates(lod, fullRate);
@@ -220,6 +265,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				deskAnchor: p.sample.done && deskAnchors.has(p.target.anchorId) ? p.target.anchorId : null,
 				target: p.target.anchorId,
 				pose: p.pose,
+				dozing: p.sample.done && p.placement.activityRoom !== null && p.placement.actor?.activity?.stuckMs != null,
 				labelHeight: p.visual.labelHeight,
 			}));
 		},

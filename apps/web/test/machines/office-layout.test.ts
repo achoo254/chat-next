@@ -27,15 +27,38 @@ function errorsOf(json: unknown): readonly string[] {
 }
 
 describe("the building's layout", () => {
-	it("ships valid: 3 floors, the 12 rooms once each, 8 desks and the phone's 6", () => {
+	it("ships valid: 4 floors, the 12 work rooms and the 3 living rooms once each, 8 desks and the phone's 6", () => {
 		const layout = shipped();
-		expect(layout.floors.map((f) => f.level)).toEqual([1, 2, 3]);
+		expect(layout.floors.map((f) => f.level)).toEqual([1, 2, 3, 4]);
 		expect(layout.floors.flatMap((f) => f.rooms.map((r) => r.room)).sort()).toEqual([...ROOM_CODES].sort());
 		expect(deskOrder(layout, "desktop")).toHaveLength(8);
 		expect(deskOrder(layout, "phone")).toHaveLength(6);
 		expect(floorOfRoom(layout, "LOBBY")).toBe(1);
 		expect(floorOfRoom(layout, "POST")).toBe(2);
 		expect(floorOfRoom(layout, "QA")).toBe(3);
+		for (const room of ["DORM", "GYM", "LOUNGE"] as const) expect(floorOfRoom(layout, room), room).toBe(4);
+	});
+
+	it("gives the living floor beds, gym stations with their exercise, TV seats and a dining table", () => {
+		const layout = shipped();
+		const living = layout.floors.find((f) => f.level === 4)?.anchors ?? [];
+		const beds = living.filter((a) => a.kind === "bed");
+		expect(beds).toHaveLength(8);
+		for (const bed of beds) expect(bed).toMatchObject({ room: "DORM", lie: true, y: 0.5 });
+		const gym = living.filter((a) => a.kind === "gym");
+		expect(gym.map((a) => a.act).sort()).toEqual(["jacks", "punch", "pushup", "pushup", "run", "run"]);
+		for (const tread of gym.filter((a) => a.act === "run")) expect(tread.y).toBeCloseTo(0.18);
+		expect(living.filter((a) => a.kind === "tv" && a.sit)).toHaveLength(7);
+		expect(living.filter((a) => a.kind === "tv" && a.low)).toHaveLength(2);
+		expect(living.filter((a) => a.kind === "dine" && a.sit)).toHaveLength(6);
+		expect(living.filter((a) => a.kind === "counter")).toHaveLength(1);
+	});
+
+	it("refuses a gym station without its exercise", () => {
+		const json = JSON.parse(OFFICE_LAYOUT_TEXT) as { floors: { level: number; anchors: { kind: string; act?: string }[] }[] };
+		const station = json.floors.find((f) => f.level === 4)?.anchors.find((a) => a.kind === "gym");
+		if (station !== undefined) delete station.act;
+		expect(errorsOf(json).some((e) => e.includes("needs an act"))).toBe(true);
 	});
 
 	it("gives every room room for at least three people, the director a chair, the chairman a spot, and the four boards", () => {

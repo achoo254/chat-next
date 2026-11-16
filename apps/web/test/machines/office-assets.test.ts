@@ -65,7 +65,7 @@ describe("the office's asset file", () => {
 		const first = result.value.floors.get(1);
 		expect(first?.desktop.anchors.get("desk-0")).toHaveLength(2);
 		expect(first?.phone.day).toBe("office-2d-floor-1-day-phone.webp");
-		expect(result.value.floors.size).toBe(3);
+		expect(result.value.floors.size).toBe(4);
 	});
 
 	it("hashes the layout's text the same with either line ending", async () => {

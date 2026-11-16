@@ -5,7 +5,7 @@
 import { create } from "@bufbuild/protobuf";
 import { OfficeActorState, OfficeApprovalState, OfficeChecksSchema, OfficeRoom, OfficeTodoCountsSchema, OfficeUsageSchema } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it, vi } from "vitest";
-import { CLOSING_MS, DEFAULT_DESKS, POWER_OUT_MS, SLOW_TOOL_MS } from "../../src/machines/office/office-store.ts";
+import { DEFAULT_DESKS, POWER_OUT_MS, SLOW_TOOL_MS } from "../../src/machines/office/office-store.ts";
 
 const WIDE = [...DEFAULT_DESKS];
 /** The layout's phone order (a subset of the eight, in another order). */
@@ -116,7 +116,7 @@ describe("the office store", () => {
 		expect(store.state().actors[0]?.activity?.slow).toBe(true);
 	});
 
-	it("ends the director's work when the session goes idle (machines and background subagents work on), and closes the building ten idle minutes later", () => {
+	it("ends the director's work when the session goes idle (machines and background subagents work on), and never closes the building", () => {
 		const { store, clock } = storeAt();
 		store.applySnapshot(snapshot([director({ activity: act("t1", OfficeRoom.LIBRARY) }), staff("a1", "scout", { activity: act("x", OfficeRoom.LIBRARY) }), machine("m1")]));
 		store.applyEvents(1n, [ev(1, { case: "session", value: session({ busy: false, backgroundMachines: 2 }) }, T0)]);
@@ -126,11 +126,10 @@ describe("the office store", () => {
 			["m1", "m1"],
 		]);
 		expect(store.state().idleSince).toBe(T0);
-		clock.now = T0 + CLOSING_MS;
+		clock.now = T0 + 60 * 60_000;
 		store.tick(clock.now);
-		expect(store.state().off).toBe(true);
-		store.applyEvents(1n, [ev(2, { case: "session", value: session({ busy: true }) }, T0 + CLOSING_MS)]);
-		expect(store.state().off).toBe(false);
+		// An hour idle: everyone is still in the building.
+		expect(store.state().actors.map((a) => a.id)).toEqual(["director", "a1", "m1"]);
 	});
 
 	it("seats nine employees on eight desks with one in the meeting room, and three on a phone's six", () => {

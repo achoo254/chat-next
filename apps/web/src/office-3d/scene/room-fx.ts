@@ -1,10 +1,13 @@
 // Effects tied to the rooms: a glowing screen at each desk where someone
 // works (and, after dark, a warm desk lamp beside it), blinking lights on the server racks while background machines run,
 // a puff of smoke over someone whose last tool failed, and a letter flying
-// from the lobby door to the reception desk when a new turn starts. All
-// blocks from the shared kit (instances: a draw call or two in all).
+// from the lobby door to the reception desk when a new turn starts, and the
+// lounge's TV screen glowing in shifting colours while someone watches. All
+// blocks from the shared kit (instances: a draw call or two in all) but the
+// TV's screen (its own material: one more draw call on the living floor).
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { CreatePlane } from "@babylonjs/core/Meshes/Builders/planeBuilder";
 import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import "@babylonjs/core/Meshes/instancedMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
@@ -30,6 +33,10 @@ const LAMP_COLOR = new Color3(1, 0.72, 0.38);
 const LAMP_SIDE = 0.38;
 const LAMP_UP = 0.3;
 const MAIL_SECONDS = 1.6;
+/** The TV's screen over its stand: size, height of its centre, and how far in front of the stand, metres. */
+const TV_SCREEN = { w: 1.5, h: 0.84, y: 1.12, front: 0.14 } as const;
+/** Poses of someone watching the TV. */
+const WATCHING: ReadonlySet<string> = new Set(["watch", "watch-low", "dance"]);
 
 export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): RoomFx {
 	const roots = new Map<FloorLevel, TransformNode>();
@@ -44,6 +51,12 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 	lamp.isVisible = false;
 	lamp.isPickable = false;
 	const leds: { floor: FloorLevel; mesh: InstancedMesh; phase: number }[] = [];
+	const tvMaterial = new StandardMaterial("tv-screen", scene);
+	tvMaterial.diffuseColor = Color3.Black();
+	tvMaterial.specularColor = Color3.Black();
+	tvMaterial.disableLighting = true;
+	tvMaterial.backFaceCulling = false;
+	const tvs: { floor: FloorLevel; mesh: ReturnType<typeof CreatePlane> }[] = [];
 	for (const floor of layout.floors) {
 		const root = new TransformNode(`fx-${floor.level}`, scene);
 		roots.set(floor.level, root);
@@ -58,6 +71,17 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 				bulb.isPickable = false;
 				bulb.setEnabled(false);
 				lamps.set(p.anchor, bulb);
+			}
+			if (p.name === "tv-stand") {
+				const screen = CreatePlane(`tv-screen-${i}`, { width: TV_SCREEN.w, height: TV_SCREEN.h }, scene);
+				screen.material = tvMaterial;
+				screen.parent = root;
+				screen.isPickable = false;
+				// The plane faces -z by default; the stand's rotY turns it to the room.
+				screen.position.set(p.x + Math.sin(p.rotY) * TV_SCREEN.front, TV_SCREEN.y, p.z + Math.cos(p.rotY) * TV_SCREEN.front);
+				screen.rotation.y = p.rotY + Math.PI;
+				screen.setEnabled(false);
+				tvs.push({ floor: floor.level, mesh: screen });
 			}
 			if (p.name === "server-rack") {
 				for (let k = 0; k < 3; k += 1) {
@@ -99,6 +123,15 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 			for (const [anchor, bulb] of lamps) bulb.setEnabled(lampGlow > 0.05 && working.has(anchor));
 			lampMaterial.emissiveColor.copyFrom(LAMP_COLOR).scaleInPlace(Math.min(1, lampGlow) * 1.6);
 			kit.screenMaterial.emissiveColor.set(0.55 * (0.4 + screenGlow), 0.78 * (0.4 + screenGlow), 1 * (0.4 + screenGlow));
+			const watched = people.some((p) => p.visible && p.floor === shown && WATCHING.has(p.pose));
+			for (const tv of tvs) tv.mesh.setEnabled(watched && tv.floor === shown);
+			if (watched) {
+				// A programme's light: slow shifts of hue with a flicker of cuts.
+				const cut = Math.floor(seconds / 2.7);
+				const hue = (Math.sin(cut * 12.9898) * 43758.5453) % 1;
+				const h = Math.abs(hue);
+				tvMaterial.emissiveColor.set(0.45 + 0.4 * Math.sin(h * 6.28), 0.5 + 0.35 * Math.sin(h * 6.28 + 2.1), 0.6 + 0.35 * Math.sin(h * 6.28 + 4.2));
+			}
 			const rate = machines > 0 ? 2 + Math.min(6, machines) : 0.4;
 			for (const led of leds) led.mesh.setEnabled(led.floor === shown && Math.sin(seconds * rate * Math.PI + led.phase) > -0.2);
 			const smoking = new Set<string>();
@@ -135,6 +168,8 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 		dispose() {
 			for (const list of puffs.values()) for (const m of list) m.dispose();
 			puff.dispose(false, true);
+			for (const tv of tvs) tv.mesh.dispose(false, false);
+			tvMaterial.dispose();
 			lamp.dispose(false, true);
 			for (const root of roots.values()) root.dispose(false, false);
 		},

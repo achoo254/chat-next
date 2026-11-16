@@ -1,4 +1,4 @@
-// The three floors of the building, each a diorama under its own node: built
+// The four floors of the building, each a diorama under its own node: built
 // from the layout in blocks the first time it is needed (floor 1 at start,
 // the others when shown or when the scene is idle), its baked shell swapped
 // in when the asset file lists one, furniture placed through the prop
@@ -30,7 +30,7 @@ export interface FloorLibrary {
 	prepare(level: FloorLevel): void;
 	/** The asset file arrived: swap in baked shells (built floors now, others when built). */
 	setAssets(assets: SceneAssets, lightmapSize: LightmapSize): void;
-	setNightMix(nightMix: number, closed: boolean): void;
+	setNightMix(nightMix: number): void;
 	dispose(): void;
 }
 
@@ -39,7 +39,7 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 	let shown: FloorLevel = 1;
 	let assets: SceneAssets | null = null;
 	let size: LightmapSize = 1024;
-	let light = { nightMix: 0, closed: false };
+	let nightMixNow = 0;
 
 	const bake = (level: FloorLevel, entry: FloorEntry): void => {
 		const files = assets?.floors.get(level);
@@ -50,7 +50,7 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 			entry.loading = false;
 			if (baked === null || signal.aborted) return;
 			entry.baked = baked;
-			baked.setNightMix(light.nightMix, light.closed);
+			baked.setNightMix(nightMixNow);
 			entry.blocks.setEnabled(false);
 			if (baked.places !== null) props.placeFloor(level, entry.root, baked.places);
 		});
@@ -88,9 +88,9 @@ export function createFloorLibrary(scene: Scene, kit: BlockKit, props: PropLibra
 			size = lightmapSize;
 			for (const [level, entry] of floors) bake(level, entry);
 		},
-		setNightMix(nightMix, closed) {
-			light = { nightMix, closed };
-			for (const entry of floors.values()) entry.baked?.setNightMix(nightMix, closed);
+		setNightMix(nightMix) {
+			nightMixNow = nightMix;
+			for (const entry of floors.values()) entry.baked?.setNightMix(nightMix);
 		},
 		dispose() {
 			for (const entry of floors.values()) {

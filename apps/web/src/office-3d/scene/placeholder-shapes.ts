@@ -61,6 +61,21 @@ export const PROP_SHAPES: Readonly<Record<string, Shape>> = {
 	"test-bench": { w: 2, h: 0.9, d: 0.8, color: "#d4d8e2" },
 	"signal-tower": { w: 0.2, h: 1.5, d: 0.2, color: "#4caf50" },
 	"device-shelf": { w: 1.2, h: 1.7, d: 0.45, color: "#b4b9c8" },
+	// The living floor: dorm, gym, lounge and dining.
+	bed: { w: 0.95, h: 0.5, d: 2, color: "#9fb3d9" },
+	nightstand: { w: 0.45, h: 0.55, d: 0.4, color: "#c89b6d" },
+	treadmill: { w: 0.8, h: 0.18, d: 1.8, color: "#3e3a52" },
+	"gym-mat": { w: 0.9, h: 0.03, d: 1.8, color: "#5b7bd5" },
+	"weight-bench": { w: 0.45, h: 0.45, d: 1.3, color: "#3e3a52" },
+	"dumbbell-rack": { w: 1.2, h: 0.8, d: 0.45, color: "#7d7a8c" },
+	"punching-bag": { w: 0.4, h: 1.5, d: 0.4, color: "#c0392b", lift: 0.3 },
+	"tv-stand": { w: 1.8, h: 0.55, d: 0.45, color: "#5a4a6b" },
+	beanbag: { w: 0.75, h: 0.4, d: 0.75, color: "#e9a23b" },
+	"dining-table": { w: 0.9, h: 0.74, d: 2, color: "#c89b6d" },
+	"dining-chair": { w: 0.45, h: 0.9, d: 0.45, color: "#8e7cc3" },
+	"kitchen-counter": { w: 2.2, h: 0.92, d: 0.65, color: "#efe7d8" },
+	microwave: { w: 0.5, h: 0.3, d: 0.38, color: "#d4d8e2" },
+	fridge: { w: 0.7, h: 1.8, d: 0.7, color: "#f4f2f7" },
 	// Small props (y comes from the layout: on a desk).
 	mug: { w: 0.09, h: 0.1, d: 0.09, color: "#f0e6d8" },
 	"paper-stack": { w: 0.3, h: 0.06, d: 0.22, color: "#fbfaf6" },
@@ -87,6 +102,9 @@ export const ROOM_TONES: Readonly<Record<string, string>> = {
 	SECURITY: "#bfc3cf",
 	AUDIT: "#d6b48c",
 	QA: "#d3dbe0",
+	DORM: "#d9cfe6",
+	GYM: "#c9d3dc",
+	LOUNGE: "#e6d6b8",
 };
 
 export const RUG_TONES: Readonly<Record<string, string>> = {

@@ -8,10 +8,12 @@ import {
 	OfficeRole,
 	type OfficeActivity,
 	type OfficeActor,
+	type OfficeEvent,
 	type OfficeSession,
 } from "@achoo254/chat-proto/remote/remote";
 import { roomOf, type RoomCode } from "./office-rooms.ts";
 import type { StaffMember } from "./office-staff.ts";
+import type { WorkLog } from "./office-work-log.ts";
 
 export type ActorRole = "director" | "employee" | "machine";
 export type ActorState = "idle" | "working" | "done" | "awaiting";
@@ -28,6 +30,12 @@ export interface ActivityView {
 	readonly startedAt: number;
 	/** Running over two minutes (an hourglass). */
 	readonly slow: boolean;
+	/**
+	 * Running long with no word about its actor for STUCK_MS: how long that
+	 * silence has lasted (ms); null otherwise. The person dozes off where they
+	 * work ("Zzz") until the next event about them wakes them.
+	 */
+	readonly stuckMs: number | null;
 }
 
 export interface ActorView {
@@ -41,6 +49,8 @@ export interface ActorView {
 	readonly activity: ActivityView | null;
 	readonly enteredAt: number;
 	readonly doneAt: number;
+	/** Machine time of the latest event about this actor (entering, an activity, an approval). */
+	readonly heardAt: number;
 	/** The latest permission prompt of the actor's tool, when one came this session. */
 	readonly approval: { readonly state: ApprovalState; readonly at: number } | null;
 	/** How the actor's latest activity ended (pass or fail, a cheer or smoke). */
@@ -79,8 +89,10 @@ export interface OfficeState {
 	readonly lastTurnStart: number;
 	/** Machine time the session went idle; null while busy. */
 	readonly idleSince: number | null;
-	/** Idle for ten minutes: lights off, people gone home. */
-	readonly off: boolean;
+	/** Employees whose subagent left: off duty, they live in the building by the daily schedule (no desk), in the order they went off duty. */
+	readonly residents: readonly StaffMember[];
+	/** What each person did this session (normalized facts, for their conversations). */
+	readonly work: WorkLog;
 	/** Employees who came in this session (key and first entry, machine time), for "staff today". */
 	readonly visitors: readonly { readonly key: string; readonly enteredAt: number }[];
 	/** Viewer time minus machine time (from the latest events; 0 before any): a machine time plus this is when it happened on the viewer's clock. */
@@ -124,7 +136,39 @@ export const APPROVALS: Readonly<Partial<Record<OfficeApprovalState, ApprovalSta
 };
 
 /** An actor as the store keeps it: the view without what the clock decides, plus the state an approval interrupted. */
-export type ActorRecord = Omit<ActorView, "activity"> & { readonly activity: Omit<ActivityView, "slow"> | null; readonly beforeApproval: ActorState | null };
+export type ActorRecord = Omit<ActorView, "activity"> & { readonly activity: Omit<ActivityView, "slow" | "stuckMs"> | null; readonly beforeApproval: ActorState | null };
+
+/** A tool running this long shows an hourglass. */
+export const SLOW_TOOL_MS = 120_000;
+/** A slow tool whose actor has been silent this long: they doze off where they work. */
+export const STUCK_MS = 5 * 60_000;
+
+/** An actor as the views see it at machine time `now`: whether its work runs long, and whether they doze off over it. */
+export function actorViewOf(record: ActorRecord, now: number): ActorView {
+	const { beforeApproval: _before, activity, ...rest } = record;
+	if (activity === null) return { ...rest, activity: null };
+	// Only work still going on runs long: a finished subagent keeps its hand-in spot as an activity.
+	const slow = rest.state === "working" && activity.startedAt > 0 && now - activity.startedAt >= SLOW_TOOL_MS;
+	const silent = now - Math.max(rest.heardAt, activity.startedAt);
+	return { ...rest, activity: { ...activity, slow, stuckMs: slow && silent >= STUCK_MS ? silent : null } };
+}
+
+/** The actor an event is about, or null (a turn, the session). */
+export function eventActor(e: OfficeEvent): string | null {
+	const k = e.kind;
+	switch (k.case) {
+		case "actorEnter":
+		case "actorUpdate":
+			return k.value.id;
+		case "actorLeave":
+		case "activityStart":
+		case "activityEnd":
+		case "approval":
+			return k.value.actorId;
+		default:
+			return null;
+	}
+}
 
 export function activityOf(a: OfficeActivity | undefined): ActorRecord["activity"] {
 	if (a === undefined || a.id === "") return null;
@@ -148,6 +192,7 @@ export function actorOf(a: OfficeActor, previous: ActorRecord | undefined): Acto
 		activity: activityOf(a.activity),
 		enteredAt: Number(a.enteredAt),
 		doneAt: Number(a.doneAt),
+		heardAt: previous?.heardAt ?? Math.max(Number(a.enteredAt), Number(a.activity?.startedAt ?? 0n)),
 		approval: previous?.approval ?? null,
 		lastResult: previous?.lastResult ?? null,
 		beforeApproval: previous?.beforeApproval ?? null,

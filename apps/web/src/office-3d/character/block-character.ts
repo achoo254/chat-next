@@ -123,6 +123,26 @@ export function createBlockCharacter(scene: Scene, bodies: BlockBodies, key: str
 				case "chat":
 					head.rotation.y = Math.sin(t * 0.9) * 0.3;
 					break;
+				case "sleep":
+					// Lying on the bed (the root is at the mattress).
+					torso.rotation.x = -Math.PI / 2;
+					torso.position.y = 0.22;
+					break;
+				case "run":
+				case "jacks":
+				case "pushup":
+				case "dance":
+					torso.position.y = Math.abs(Math.sin(t * (pose === "dance" ? 4 : 8))) * 0.12;
+					torso.rotation.z = pose === "dance" ? Math.sin(t * 4) * 0.2 : 0;
+					break;
+				case "talk":
+				case "sit-talk":
+				case "clap":
+					head.rotation.x = Math.sin(t * 5) * 0.08;
+					break;
+				case "listen":
+					head.rotation.z = 0.15;
+					break;
 				case "yawn":
 					torso.scaling.y = (seated ? 0.82 : 1) * (1 + Math.max(0, Math.sin(t * 1.5)) * 0.07);
 					break;

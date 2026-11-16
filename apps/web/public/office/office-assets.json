@@ -1,6 +1,6 @@
 {
 	"formatVersion": 1,
-	"layoutSha256": "07e38c35bdf592966eacb88afcec346d82cbbc1251c3df1efc25d309155e2d5a",
+	"layoutSha256": "a7eeb30163fa49f8eb62ce6f139c61672d541c70860f07db5b2e9bde8996f4b5",
 	"note": "Office assets for the 2D view (floors[].views, checked by parseOfficeAssets) and the 3D scene (floors[].scene, character, accessories, sfx). Made by tools/office-art in the workspace; file names carry a content hash.",
 	"floors": [
 		{
@@ -9,8 +9,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-1-day-desktop.3debc69b.webp",
-					"night": "office-2d-floor-1-night-desktop.693bafc6.webp",
+					"day": "office-2d-floor-1-day-desktop.b242c647.webp",
+					"night": "office-2d-floor-1-night-desktop.d018170d.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.98,
@@ -149,8 +149,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-1-day-phone.155ee401.webp",
-					"night": "office-2d-floor-1-night-phone.d6dc0f64.webp",
+					"day": "office-2d-floor-1-day-phone.d2f5d0de.webp",
+					"night": "office-2d-floor-1-night-phone.2ba6cc0d.webp",
 					"anchors": {
 						"f1-elevator": [
 							35.52,
@@ -288,18 +288,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-1.840e399c.glb",
+				"shell": "office-floor-1.2adcf407.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-1-day-1024.4173d8b9.webp",
-						"2048": "lightmap-floor-1-day-2048.d266afc8.webp"
+						"1024": "lightmap-floor-1-day-1024.a799eafe.webp",
+						"2048": "lightmap-floor-1-day-2048.49c7f99b.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-1-night-1024.671e62d2.webp",
-						"2048": "lightmap-floor-1-night-2048.4d514abd.webp"
+						"1024": "lightmap-floor-1-night-1024.dd2745b3.webp",
+						"2048": "lightmap-floor-1-night-2048.5309bb61.webp"
 					}
 				},
-				"props": "office-props-floor-1.025a8dbd.glb",
+				"props": "office-props-floor-1.b10a5d00.glb",
 				"models": [
 					"armchair",
 					"book-stack",
@@ -342,8 +342,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-2-day-desktop.6c53dcf5.webp",
-					"night": "office-2d-floor-2-night-desktop.ebaa6a24.webp",
+					"day": "office-2d-floor-2-day-desktop.363b20d4.webp",
+					"night": "office-2d-floor-2-night-desktop.a7e5e7a6.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.98,
@@ -394,8 +394,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-2-day-phone.d55a30bb.webp",
-					"night": "office-2d-floor-2-night-phone.f6bf2668.webp",
+					"day": "office-2d-floor-2-day-phone.8ddb34a7.webp",
+					"night": "office-2d-floor-2-night-phone.4302c969.webp",
 					"anchors": {
 						"f2-elevator": [
 							35.52,
@@ -445,18 +445,18 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-2.1bbbf3d0.glb",
+				"shell": "office-floor-2.7481c489.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-2-day-1024.81b1c135.webp",
-						"2048": "lightmap-floor-2-day-2048.a877fbaf.webp"
+						"1024": "lightmap-floor-2-day-1024.a547144d.webp",
+						"2048": "lightmap-floor-2-day-2048.2daea84f.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-2-night-1024.3d5a7a0a.webp",
-						"2048": "lightmap-floor-2-night-2048.a56c5576.webp"
+						"1024": "lightmap-floor-2-night-1024.d7c2379f.webp",
+						"2048": "lightmap-floor-2-night-2048.e4d7646b.webp"
 					}
 				},
-				"props": "office-props-floor-2.489b46a8.glb",
+				"props": "office-props-floor-2.8840b7ca.glb",
 				"models": [
 					"globe",
 					"kanban-board",
@@ -476,8 +476,8 @@
 				"desktop": {
 					"width": 1600,
 					"height": 1000,
-					"day": "office-2d-floor-3-day-desktop.d958d274.webp",
-					"night": "office-2d-floor-3-night-desktop.b54e2d4c.webp",
+					"day": "office-2d-floor-3-day-desktop.cb4312f9.webp",
+					"night": "office-2d-floor-3-night-desktop.42b5ffb9.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.98,
@@ -532,8 +532,8 @@
 				"phone": {
 					"width": 1200,
 					"height": 1200,
-					"day": "office-2d-floor-3-day-phone.eedc7e87.webp",
-					"night": "office-2d-floor-3-night-phone.968cbe68.webp",
+					"day": "office-2d-floor-3-day-phone.3ee5be4e.webp",
+					"night": "office-2d-floor-3-night-phone.11a6c367.webp",
 					"anchors": {
 						"f3-elevator": [
 							35.52,
@@ -587,15 +587,15 @@
 				}
 			},
 			"scene": {
-				"shell": "office-floor-3.db758629.glb",
+				"shell": "office-floor-3.607c30c2.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-3-day-1024.739842ae.webp",
-						"2048": "lightmap-floor-3-day-2048.582cb136.webp"
+						"1024": "lightmap-floor-3-day-1024.f61afb15.webp",
+						"2048": "lightmap-floor-3-day-2048.b8e33690.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-3-night-1024.3407fe11.webp",
-						"2048": "lightmap-floor-3-night-2048.727cde2a.webp"
+						"1024": "lightmap-floor-3-night-1024.3ddfa373.webp",
+						"2048": "lightmap-floor-3-night-2048.4170ed96.webp"
 					}
 				},
 				"props": "office-props-floor-3.d699a02c.glb",
@@ -611,17 +611,312 @@
 					"turnstile"
 				]
 			}
+		},
+		{
+			"level": 4,
+			"views": {
+				"desktop": {
+					"width": 1600,
+					"height": 1000,
+					"day": "office-2d-floor-4-day-desktop.faf0a61a.webp",
+					"night": "office-2d-floor-4-night-desktop.1f4d041c.webp",
+					"anchors": {
+						"f4-elevator": [
+							35.98,
+							84.67
+						],
+						"bed-0": [
+							8.46,
+							54.67
+						],
+						"bed-1": [
+							12.67,
+							52.44
+						],
+						"bed-2": [
+							19.67,
+							48.73
+						],
+						"bed-3": [
+							23.88,
+							46.5
+						],
+						"bed-4": [
+							15.54,
+							65.92
+						],
+						"bed-5": [
+							19.75,
+							63.69
+						],
+						"bed-6": [
+							26.75,
+							59.98
+						],
+						"bed-7": [
+							30.96,
+							57.75
+						],
+						"gym-run-0": [
+							30.66,
+							43.55
+						],
+						"gym-run-1": [
+							35.57,
+							40.95
+						],
+						"gym-mat-0": [
+							37.73,
+							53.3
+						],
+						"gym-mat-1": [
+							43.34,
+							50.33
+						],
+						"gym-mat-2": [
+							48.94,
+							47.36
+						],
+						"gym-bag": [
+							59.98,
+							56.74
+						],
+						"tv-0": [
+							62.11,
+							36.74
+						],
+						"tv-1": [
+							64.04,
+							35.72
+						],
+						"tv-2": [
+							65.97,
+							34.7
+						],
+						"tv-3": [
+							54.16,
+							35.6
+						],
+						"tv-4": [
+							68.87,
+							27.81
+						],
+						"tv-5": [
+							57.85,
+							31.07
+						],
+						"tv-6": [
+							62.75,
+							28.47
+						],
+						"dine-0": [
+							66.01,
+							53.33
+						],
+						"dine-3": [
+							70.56,
+							50.91
+						],
+						"dine-1": [
+							64.59,
+							51.08
+						],
+						"dine-4": [
+							69.15,
+							48.66
+						],
+						"dine-2": [
+							63.18,
+							48.83
+						],
+						"dine-5": [
+							67.73,
+							46.41
+						],
+						"counter-0": [
+							77.91,
+							44.02
+						]
+					}
+				},
+				"phone": {
+					"width": 1200,
+					"height": 1200,
+					"day": "office-2d-floor-4-day-phone.76b68cd7.webp",
+					"night": "office-2d-floor-4-night-phone.52412ab1.webp",
+					"anchors": {
+						"f4-elevator": [
+							35.52,
+							72.38
+						],
+						"bed-0": [
+							7.11,
+							53.01
+						],
+						"bed-1": [
+							11.45,
+							51.57
+						],
+						"bed-2": [
+							18.69,
+							49.18
+						],
+						"bed-3": [
+							23.03,
+							47.74
+						],
+						"bed-4": [
+							14.42,
+							60.27
+						],
+						"bed-5": [
+							18.76,
+							58.84
+						],
+						"bed-6": [
+							25.99,
+							56.44
+						],
+						"bed-7": [
+							30.34,
+							55
+						],
+						"gym-run-0": [
+							30.03,
+							45.84
+						],
+						"gym-run-1": [
+							35.1,
+							44.16
+						],
+						"gym-mat-0": [
+							37.33,
+							52.13
+						],
+						"gym-mat-1": [
+							43.12,
+							50.22
+						],
+						"gym-mat-2": [
+							48.91,
+							48.3
+						],
+						"gym-bag": [
+							60.3,
+							54.35
+						],
+						"tv-0": [
+							62.51,
+							41.44
+						],
+						"tv-1": [
+							64.5,
+							40.79
+						],
+						"tv-2": [
+							66.49,
+							40.13
+						],
+						"tv-3": [
+							54.29,
+							40.71
+						],
+						"tv-4": [
+							69.48,
+							35.68
+						],
+						"tv-5": [
+							58.1,
+							37.79
+						],
+						"tv-6": [
+							63.17,
+							36.11
+						],
+						"dine-0": [
+							66.53,
+							52.15
+						],
+						"dine-3": [
+							71.23,
+							50.59
+						],
+						"dine-1": [
+							65.07,
+							50.69
+						],
+						"dine-4": [
+							69.77,
+							49.14
+						],
+						"dine-2": [
+							63.61,
+							49.24
+						],
+						"dine-5": [
+							68.31,
+							47.69
+						],
+						"counter-0": [
+							78.81,
+							46.14
+						]
+					}
+				}
+			},
+			"scene": {
+				"shell": "office-floor-4.c43d5bad.glb",
+				"lightmaps": {
+					"day": {
+						"1024": "lightmap-floor-4-day-1024.438d6ff9.webp",
+						"2048": "lightmap-floor-4-day-2048.852bc513.webp"
+					},
+					"night": {
+						"1024": "lightmap-floor-4-night-1024.83c5d2bb.webp",
+						"2048": "lightmap-floor-4-night-2048.e15aaebd.webp"
+					}
+				},
+				"props": "office-props-floor-4.1bcdde2c.glb",
+				"models": [
+					"beanbag",
+					"bed",
+					"dining-chair",
+					"dining-table",
+					"dumbbell-rack",
+					"fridge",
+					"gym-mat",
+					"kitchen-counter",
+					"microwave",
+					"nightstand",
+					"punching-bag",
+					"treadmill",
+					"tv-stand",
+					"weight-bench"
+				]
+			}
 		}
 	],
 	"propsNote": "floors[].scene.props holds one mesh per model first used on that floor (named like the model); the shell GLB lists every placed model of its floor in asset.extras.instances as [x, y, z, rotY] (layout coordinates). Shell lightmaps: TEXCOORD_1, colour times light, half intensity (multiply by 2).",
 	"character": {
-		"file": "character.568347a1.glb",
+		"file": "character.5cc7bd69.glb",
 		"clips": [
+			"Clapping",
 			"Consume",
+			"Consume_Item",
+			"Dance_Simple",
 			"Idle_A",
+			"Idle_Listening",
+			"Idle_Talking",
 			"Idle_TalkingPhone",
 			"Interact",
+			"Jog",
+			"Jumping_Jacks",
+			"LayToIdle",
 			"PickUp_Table",
+			"Punch_Jab",
+			"Pushup",
+			"Sit_Ground_Idle",
+			"Sleeping",
 			"Victory",
 			"Walk",
 			"Sitting_Idle",
@@ -751,6 +1046,42 @@
 				"loop": false,
 				"seconds": 0.4,
 				"kb": 3
+			},
+			"treadmill": {
+				"file": "sfx/treadmill.0777bdb2.mp3",
+				"loop": true,
+				"seconds": 2,
+				"kb": 12
+			},
+			"punch": {
+				"file": "sfx/punch.bf076059.mp3",
+				"loop": false,
+				"seconds": 0.6,
+				"kb": 4
+			},
+			"tv-show": {
+				"file": "sfx/tv-show.83d2fc62.mp3",
+				"loop": true,
+				"seconds": 3,
+				"kb": 18
+			},
+			"snore": {
+				"file": "sfx/snore.5acdfd33.mp3",
+				"loop": true,
+				"seconds": 3,
+				"kb": 18
+			},
+			"cutlery": {
+				"file": "sfx/cutlery.d710c32e.mp3",
+				"loop": false,
+				"seconds": 1.5,
+				"kb": 9
+			},
+			"cheer-tv": {
+				"file": "sfx/cheer-tv.8d7134db.mp3",
+				"loop": false,
+				"seconds": 1.5,
+				"kb": 9
 			}
 		}
 	}

@@ -33,9 +33,10 @@ export function personColor(p: Pick<Placement, "kind" | "actor" | "member">): st
 	return castOf(p.member?.agentType ?? p.actor?.agentType ?? "").color;
 }
 
-/** The speech bubble: "Read · agent-core.ts", "Bash · git", or what a non-tool activity is. */
+/** The speech bubble of work: "Read · agent-core.ts", "Bash · git", what a non-tool activity is, or a snore over a stuck tool. */
 export function bubbleText(t: OfficeCopy, activity: ActivityView | null): string {
 	if (activity === null) return "";
+	if (activity.stuckMs !== null) return t.snore;
 	if (activity.tool === "") {
 		if (activity.group === "arrive") return t.doing.arrive;
 		if (activity.group === "hand-in") return t.doing.handIn;
@@ -45,16 +46,48 @@ export function bubbleText(t: OfficeCopy, activity: ActivityView | null): string
 	return activity.subject === "" ? activity.tool : `${activity.tool} · ${activity.subject}`;
 }
 
-export type MarkerStatus = "idle" | "working" | "done" | "awaiting" | "slow" | "denied" | "waiting-you";
+export type MarkerStatus = "idle" | "working" | "done" | "awaiting" | "slow" | "stuck" | "denied" | "waiting-you";
 
-/** The status dot of a person. */
+/** The status dot of a person (an off-duty resident without an actor is idle). */
 export function markerStatus(kind: Placement["kind"], actor: ActorView | null): MarkerStatus {
-	if (kind === "chairman" || actor === null) return "waiting-you";
+	if (kind === "chairman") return "waiting-you";
+	if (actor === null) return "idle";
 	if (actor.state === "awaiting") return "awaiting";
 	const approval = actor.approval;
 	if (approval?.state === "denied" && actor.state === "working" && (actor.activity === null || actor.activity.startedAt <= approval.at)) return "denied";
+	if (actor.activity?.stuckMs != null) return "stuck";
 	if (actor.activity?.slow === true) return "slow";
 	if (actor.state === "done") return "done";
 	if (actor.activity !== null || actor.state === "working") return "working";
 	return "idle";
+}
+
+/** What a person's marker shows (2D) or their pin over the scene (3D): the same in both. */
+export interface MarkerView {
+	readonly status: MarkerStatus;
+	readonly name: string;
+	/** The name and, when it says more, the state: "Bé Kiểm Thử · Kẹt 6 phút", "Giám đốc · Đang ngủ". */
+	readonly label: string;
+	/** The bubble's text ("" for none): a line of a conversation, else the work. */
+	readonly bubble: string;
+	/** The bubble is a line of a conversation. */
+	readonly talking: boolean;
+}
+
+/** `line`: what the person says in a conversation now, or null. */
+export function markerView(t: OfficeCopy, p: Placement, line: string | null): MarkerView {
+	const status = markerStatus(p.kind, p.actor);
+	const name = personName(t, p);
+	const activity = p.actor?.activity ?? null;
+	let state: string | null = null;
+	if (status === "stuck") state = t.stuck(Math.floor((activity?.stuckMs ?? 0) / 60_000));
+	else if (status === "waiting-you") state = t.state.waitingYou;
+	// Off duty on the living floor, what they do says more than "done".
+	else if (p.life !== null && p.activityRoom === null && (status === "idle" || status === "done")) state = t.life[p.life.act];
+	else if (status !== "idle" && status !== "working") state = t.state[status];
+	const label = state === null ? name : `${name} · ${state}`;
+	// A work bubble only while at work (not for someone home after handing in their file).
+	const work = p.activityRoom === null ? "" : bubbleText(t, activity);
+	if (line !== null && work === "") return { status, name, label, bubble: line, talking: true };
+	return { status, name, label, bubble: work, talking: false };
 }

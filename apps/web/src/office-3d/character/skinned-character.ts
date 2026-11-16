@@ -6,8 +6,11 @@
 // clip pose first, since a clip without keys for a bone does not reset it).
 // Level of detail runs a clip only every n-th frame at n times the speed
 // (goToFrame on a paused group did not pose in this Babylon version).
-// Sitting lifts or lowers the root once per clip so the pelvis lands on the
-// seat (the CC0 clips are for an adult-sized rig). Each copy wears its skin
+// Sitting lifts or lowers the model so the pelvis lands on the seat (the CC0
+// clips are for an adult-sized rig): the pelvis height of each sitting clip
+// is measured once, the lift follows the seat (a chair, a low beanbag). A
+// lying clip lies on the ground at the root, which the people coordinator
+// puts at the bed's height. Each copy wears its skin
 // cell (character-skins.ts) and its accessory on a bone; the pantry mug shows
 // in the hand only while drinking. A model's own typing clip replaces the
 // coded typing swing.
@@ -27,7 +30,7 @@ import type { CharacterSkins } from "./character-skins.ts";
 import type { CharacterVisual } from "./character-visual.ts";
 import { typingOffsets } from "./typing-motion.ts";
 
-/** Where the pelvis rests when sitting (seat of the chair model plus its cushion). */
+/** Where the pelvis rests when sitting (seat of the chair model plus its cushion), unless the pose says otherwise. */
 const SEAT_PELVIS_HEIGHT = 0.5;
 /**
  * Size of the model in the room: the concept draws big-headed chibi staff
@@ -59,8 +62,8 @@ export async function loadCharacterContainer(scene: Scene, url: string): Promise
 
 const clipFps = (group: AnimationGroup): number => group.targetedAnimations[0]?.animation.framePerSecond ?? 30;
 
-/** Seat lift per sitting clip, shared by everyone (same rig): measured once. */
-const seatLift = new Map<string, number>();
+/** Pelvis height of each sitting clip in the model's own units with no lift, shared by everyone (same rig): measured once. */
+const pelvisOf = new Map<string, number>();
 
 export function createSkinnedCharacter(scene: Scene, container: AssetContainer, key: string, index: number, look: PersonLook, dress: CharacterDress): CharacterVisual {
 	const suffix = `-${key}`;
@@ -95,11 +98,18 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		accessory?.holder.setEnabled(!(drinking && mug !== null && accessory.bone === mug.bone));
 	};
 	let pose: Pose = "stand-idle";
+	let seat = SEAT_PELVIS_HEIGHT;
 	let clip: string | null = null;
 	let every = 1;
 	let frame = 0;
 	let measure = false;
 	const active = (): AnimationGroup | undefined => (clip === null ? undefined : groups.get(clip));
+	/** The model's lift for the clip playing: the seat over the clip's pelvis when sitting, else none. */
+	const liftNow = (): number => {
+		if (clip === null || !isSeatedPose(pose)) return 0;
+		const pelvis = pelvisOf.get(clip);
+		return pelvis === undefined ? 0 : seat / CHARACTER_SCALE - pelvis;
+	};
 
 	const play = (next: string | null): void => {
 		if (next === clip) return;
@@ -111,19 +121,22 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 				if (every === 0) group.pause();
 			} else group.stop();
 		}
-		model.position.y = next !== null && isSeatedPose(pose) ? (seatLift.get(next) ?? 0) : 0;
-		measure = next !== null && isSeatedPose(pose) && !seatLift.has(next);
+		model.position.y = liftNow();
+		measure = next !== null && isSeatedPose(pose) && !pelvisOf.has(next);
 	};
 
 	return {
 		root: holder,
 		labelHeight: LABEL_HEIGHT_UNSCALED * CHARACTER_SCALE,
 		meshes: () => meshes,
-		setPose(next) {
-			if (next === pose && clip !== null) return;
+		setPose(next, nextSeat = SEAT_PELVIS_HEIGHT) {
+			if (next === pose && nextSeat === seat && clip !== null) return;
+			const seatChanged = nextSeat !== seat;
 			pose = next;
+			seat = nextSeat;
 			play(clipFor(next, clips));
-			showItems(next === "coffee");
+			if (seatChanged) model.position.y = liftNow();
+			showItems(next === "coffee" || next === "eat");
 		},
 		setUpdateEvery(next) {
 			if (next === every) return;
@@ -148,9 +161,8 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 				if (pelvis !== undefined) {
 					// In the model's own (unscaled) units: the pelvis height over the holder, without the current lift.
 					const pelvisInModel = (pelvis.computeWorldMatrix(true).getTranslation().y - holder.position.y) / CHARACTER_SCALE - model.position.y;
-					const lift = SEAT_PELVIS_HEIGHT / CHARACTER_SCALE - pelvisInModel;
-					seatLift.set(clip, lift);
-					model.position.y = lift;
+					pelvisOf.set(clip, pelvisInModel);
+					model.position.y = liftNow();
 				}
 				measure = false;
 			}
