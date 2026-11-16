@@ -274,6 +274,15 @@ describe("a session in chat or in its terminal", () => {
 		expect(window.localStorage.getItem("ai:mode:1")).toBeNull();
 	});
 
+	it("a newer terminal process waiting on the machine: the dock says so and links to the machine's page to update it", async () => {
+		host.updateStagedAt = 5_000n;
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "t1" });
+		await waitFor(() => expect(document.querySelector("[data-id=terminal-update-note]")).toBeTruthy());
+		const note = document.querySelector("[data-id=terminal-update-note]");
+		expect(note?.textContent).toContain("Có bản terminal mới đang chờ cài.");
+		expect(note?.querySelector("a")?.getAttribute("href")).toBe("/ai/1/info");
+	});
+
 	it("a turn running in the terminal: the bar above the composer says it runs there, and no header chip repeats it", async () => {
 		held = 5;
 		heldBusy = true;

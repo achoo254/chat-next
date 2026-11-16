@@ -301,6 +301,11 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-terms-head h3 { margin: 0 0 var(--space-1); }
 .mx-terms-head .note { margin: 0; max-width: 62ch; }
 .mx-terms-head .btn { flex: none; width: 36px; padding: 0; justify-content: center; }
+/* A newer terminal process waiting: what it brings, what holds it, and the button to switch now. */
+.mx-terms-update { display: grid; gap: var(--space-1); margin: 0 0 var(--space-3); padding: var(--space-3); border: 1px solid var(--c-warning); border-radius: var(--radius-md); background: color-mix(in srgb, var(--c-warning) 8%, transparent); font-size: 0.8125rem; }
+.mx-terms-update p { margin: 0; color: var(--c-text-muted); }
+.mx-terms-update .acts { margin-top: var(--space-1); }
+.mx-term-text .mx-term-hold { color: var(--c-warning); }
 .mx-terms-summary { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .mx-terms-empty { margin: 0; }
 .mx-terms-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }

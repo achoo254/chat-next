@@ -265,6 +265,8 @@ export class FakeTerminalHost {
 	private readonly conns = new Map<string, Conn>();
 	private nextSession = 1;
 	maxSessions = 20;
+	/** When set, the list says a newer terminal process waits since then (Unix ms). */
+	updateStagedAt: bigint | undefined = undefined;
 	/** Threads whose turn runs in chat: opening their AI in a terminal is refused (THREAD_RUNNING), as the agent does. */
 	readonly runningTurns = new Set<string>();
 
@@ -296,6 +298,7 @@ export class FakeTerminalHost {
 								threadId: this.aiThreads.get(s.id) ?? "",
 							})),
 							maxSessions: this.maxSessions,
+							...(this.updateStagedAt === undefined ? {} : { update: { stagedAt: this.updateStagedAt, holds: [] } }),
 						},
 					},
 				];

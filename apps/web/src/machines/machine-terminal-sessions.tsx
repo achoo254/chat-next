@@ -7,7 +7,7 @@
 // hangs the session up); an AI's conversation stays and opens again resumed.
 // An exited session only waits to be dropped from the list.
 import { useCallback, useEffect, useState } from "react";
-import { ErrorReason, type TermSessionInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, TerminalUpdateHoldReason, type TermListResult, type TermSessionInfo, type TerminalUpdate, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import { Link } from "../router.tsx";
@@ -44,11 +44,29 @@ function titleOf(t: MachinesCopy["terminal"], s: TermSessionInfo, threads: reado
 	return thread?.title || s.title || (s.threadId === "" ? t.shellSession : t.aiSession);
 }
 
+/** Why a session keeps the newer terminal process waiting, in words. */
+export function holdText(u: MachinesCopy["terminal"]["update"], reason: TerminalUpdateHoldReason): string {
+	switch (reason) {
+		case TerminalUpdateHoldReason.AI_ACTIVE:
+			return u.hold.ai;
+		case TerminalUpdateHoldReason.SHELL:
+			return u.hold.shell;
+		case TerminalUpdateHoldReason.CLI_ACTIVE:
+			return u.hold.cli;
+		default:
+			return u.hold.unknown;
+	}
+}
+
 export function MachineTerminalSessions({ machine, link, online, threads }: { machine: string; link: Pick<MachineLink, "request">; online: boolean; threads: readonly ThreadSummary[] }) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const m = tt.manage;
+	const u = tt.update;
 	const [list, setList] = useState<readonly TermSessionInfo[] | null>(null);
+	/** The newer terminal process waiting, as the machine's list says; undefined when none. */
+	const [update, setUpdate] = useState<TerminalUpdate | undefined>(undefined);
+	const [askingUpdate, setAskingUpdate] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	/** A session to stop (asked first), or every unwatched one ("idle"). */
@@ -56,17 +74,36 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 	const [busy, setBusy] = useState(false);
 	const now = useNow();
 
+	const show = useCallback((result: TermListResult) => {
+		setList(result.sessions);
+		setUpdate(result.update);
+	}, []);
 	/** The machine's list again; a failed ask keeps the one shown. */
 	const fetchList = useCallback(
 		(): Promise<void> =>
 			link.request({ case: "termListRequest", value: {} }).then(
 				(frame) => {
-					if (frame.body.case === "termListResult") setList(frame.body.value.sessions);
+					if (frame.body.case === "termListResult") show(frame.body.value);
 				},
 				() => undefined,
 			),
-		[link],
+		[link, show],
 	);
+	/** The machine replaces its terminal process now; it answers with its sessions after. */
+	const updateNow = async () => {
+		setBusy(true);
+		setError("");
+		try {
+			const frame = await link.request({ case: "termUpdateNow", value: {} });
+			if (frame.body.case === "termListResult") show(frame.body.value);
+		} catch {
+			setError(u.failed);
+			await fetchList();
+		} finally {
+			setBusy(false);
+			setAskingUpdate(false);
+		}
+	};
 	const relist = () => {
 		setLoading(true);
 		void fetchList().finally(() => setLoading(false));
@@ -112,6 +149,8 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 	const busyTurn = (s: TermSessionInfo) => s.threadId !== "" && threads.some((x) => x.id === s.threadId && isRunning(x));
 	const idle = sorted.filter((s) => termState(s) === "idle" && !busyTurn(s));
 	const asked = asking !== null && asking !== "idle" ? asking : null;
+	const holdOf = new Map((update?.holds ?? []).map((h) => [h.session, h.reason]));
+	const live = sorted.filter((s) => termState(s) !== "exited");
 
 	return (
 		<section className="card pad mx-card mx-terms" data-id="machine-terminals">
@@ -125,6 +164,19 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 				</button>
 			</header>
 			{!online && <p className="muted">{t.detail.needsLink}</p>}
+			{online && update !== undefined && (
+				<div className="mx-terms-update" role="status" data-id="machine-terminals-update">
+					<b>{u.title}</b>
+					<p>{u.since(openedTime(Number(update.stagedAt), now))}</p>
+					<p>{update.holds.length === 0 ? u.soon : u.waiting(update.holds.length)}</p>
+					<div className="acts">
+						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => setAskingUpdate(true)} data-id="machine-terminals-update-now">
+							<Icon name="refresh" small />
+							{u.now}
+						</button>
+					</div>
+				</div>
+			)}
 			{online && list !== null && sorted.length === 0 && <p className="mx-terms-empty muted">{m.empty}</p>}
 			{online && sorted.length > 0 && (
 				<>
@@ -145,6 +197,11 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 									<span className="mx-term-text">
 										<b title={title}>{title}</b>
 										{facts !== "" && <small title={s.cwd}>{facts}</small>}
+										{holdOf.has(s.session) && (
+											<small className="mx-term-hold" data-id={`machine-terminal-hold-${s.session}`}>
+												{holdText(u, holdOf.get(s.session) ?? TerminalUpdateHoldReason.UNSPECIFIED)}
+											</small>
+										)}
 									</span>
 									<span className={`chip mx-chip mx-term-chip ${state}`}>{state === "exited" ? tt.exitedShort(s.exitCode) : state === "viewed" ? m.viewed : m.idle}</span>
 									<span className="mx-term-acts">
@@ -195,6 +252,52 @@ export function MachineTerminalSessions({ machine, link, online, threads }: { ma
 					danger
 					onConfirm={() => void stop([asked.session])}
 					onClose={() => setAsking(null)}
+				/>
+			)}
+			{askingUpdate && (
+				<ConfirmDialog
+					title={u.confirmTitle}
+					body={
+						<>
+							<p>{u.confirmBody}</p>
+							{live.some((s) => s.threadId !== "") && (
+								<>
+									<p>{u.reopenHead}</p>
+									<ul className="mx-terms-confirm">
+										{live
+											.filter((s) => s.threadId !== "")
+											.map((s) => (
+												<li key={s.session}>
+													<MachineIcon name="ai-session" small />
+													<span>{titleOf(tt, s, threads)}</span>
+												</li>
+											))}
+									</ul>
+								</>
+							)}
+							{live.some((s) => s.threadId === "") && (
+								<>
+									<p>{u.endHead}</p>
+									<ul className="mx-terms-confirm">
+										{live
+											.filter((s) => s.threadId === "")
+											.map((s) => (
+												<li key={s.session}>
+													<MachineIcon name="terminal" small />
+													<span>{titleOf(tt, s, threads)}</span>
+												</li>
+											))}
+									</ul>
+								</>
+							)}
+						</>
+					}
+					action={u.now}
+					busyLabel={u.updating}
+					busy={busy}
+					danger
+					onConfirm={() => void updateNow()}
+					onClose={() => setAskingUpdate(false)}
 				/>
 			)}
 			{asking === "idle" && (

@@ -24,7 +24,7 @@ import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import type { WorkStatus } from "../machines/project-tree.ts";
 import { aiTabTitle } from "../machines/status-glyph.tsx";
 import { Icon } from "../components/screen-icons.tsx";
-import { navigate, paths } from "../router.tsx";
+import { Link, navigate, paths } from "../router.tsx";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
@@ -218,6 +218,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const [titles, setTitles] = useState<ReadonlyMap<number, string>>(() => new Map());
 	const [ended, setEnded] = useState<ReadonlyMap<number, number>>(() => new Map());
 	const [listed, setListed] = useState<readonly TermSessionInfo[]>([]);
+	/** A newer terminal process waits on the machine (its list says so): a line says where to see and update it. */
+	const [updateWaits, setUpdateWaits] = useState(false);
 	const [mods, setMods] = useState<Modifiers>(NO_MODIFIERS);
 	// The phone key row as this device keeps it, and its "more" sheet.
 	const [keyPrefs, setKeyPrefs] = useState<KeyPrefs>(loadPrefs);
@@ -264,7 +266,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			let list: readonly TermSessionInfo[] | null = null;
 			try {
 				const frame = await link.request({ case: "termListRequest", value: {} });
-				if (frame.body.case === "termListResult") list = frame.body.value.sessions;
+				if (frame.body.case === "termListResult") {
+					list = frame.body.value.sessions;
+					setUpdateWaits(frame.body.value.update !== undefined);
+				}
 			} catch (err) {
 				if (live) setNotice(openErrorText(t, err));
 			}
@@ -525,7 +530,10 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const relist = () => {
 		link.request({ case: "termListRequest", value: {} }).then(
 			(frame) => {
-				if (frame.body.case === "termListResult") setListed(frame.body.value.sessions);
+				if (frame.body.case === "termListResult") {
+					setListed(frame.body.value.sessions);
+					setUpdateWaits(frame.body.value.update !== undefined);
+				}
 			},
 			() => undefined,
 		);
@@ -792,6 +800,12 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 					onStartAgent={(provider) => void startAgent(provider)}
 					onMenu={relist}
 				/>
+			)}
+			{updateWaits && (
+				<p className="tx-note update" role="status" data-id="terminal-update-note">
+					{tt.update.dockNote}{" "}
+					<Link to={paths.machineInfo(machine)}>{tt.update.dockLink}</Link>
+				</p>
 			)}
 			{(notice !== "" || relayNote) && (
 				<p className={notice !== "" ? "tx-note" : "tx-note relay"} role="status">

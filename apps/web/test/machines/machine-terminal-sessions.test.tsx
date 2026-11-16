@@ -3,7 +3,7 @@
 // the unwatched ones; an exited one dropped at once). Also the menu's
 // in-place stop button.
 import { create, type MessageInitShape } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, FrameSchema, TermSessionInfoSchema, ThreadState, ThreadSummarySchema, type Frame, type TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, FrameSchema, TermSessionInfoSchema, TerminalUpdateHoldReason, ThreadState, ThreadSummarySchema, type Frame, type TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -157,5 +157,52 @@ describe("StopSessionButton", () => {
 		render(<StopSessionButton t={viMachines.terminal} stop={{ label: "Bỏ khỏi danh sách", exited: true, disabled: false, run: () => stopped++ }} className="tx-stop" />);
 		await user.click(screen.getByRole("button", { name: "Bỏ khỏi danh sách" }));
 		expect(stopped).toBe(1);
+	});
+});
+
+describe("a newer terminal process waiting", () => {
+	/** A machine whose list says a newer terminal process waits, held by sessions 1 (a shell) and 4 (an AI in a turn); TermUpdateNow answers the list after the switch. */
+	function waiting() {
+		const sent: Frame["body"][] = [];
+		let switched = false;
+		const update = { stagedAt: 5_000n, holds: [{ session: 1, reason: TerminalUpdateHoldReason.SHELL }, { session: 4, reason: TerminalUpdateHoldReason.AI_ACTIVE }] };
+		const link = {
+			request: (body: Body) => {
+				const frame = create(FrameSchema, { body });
+				sent.push(frame.body);
+				if (frame.body.case === "termUpdateNow") switched = true;
+				const sessions = switched ? SESSIONS.filter((s) => s.threadId !== "") : SESSIONS;
+				return Promise.resolve(create(FrameSchema, { body: { case: "termListResult", value: { sessions, maxSessions: 20, ...(switched ? {} : { update }) } } }));
+			},
+		};
+		const threads = [create(ThreadSummarySchema, { id: "t-2", title: "Sửa lỗi đăng nhập" }), create(ThreadSummarySchema, { id: "t-4", title: "claude" })];
+		render(
+			<I18nProvider>
+				<MachineTerminalSessions machine="pc" link={link} online threads={threads} />
+			</I18nProvider>,
+		);
+		return sent;
+	}
+
+	it("says so, how many sessions hold it and why each one does", async () => {
+		waiting();
+		const box = await byId("machine-terminals-update");
+		expect(box.textContent).toContain(viMachines.terminal.update.title);
+		expect(box.textContent).toContain(viMachines.terminal.update.waiting(2));
+		expect((await byId("machine-terminal-hold-1")).textContent).toBe(viMachines.terminal.update.hold.shell);
+		expect((await byId("machine-terminal-hold-4")).textContent).toBe(viMachines.terminal.update.hold.ai);
+		expect(document.querySelector('[data-id="machine-terminal-hold-2"]')).toBeNull();
+	});
+
+	it("updates now after a confirmation listing the AI sessions that open again and the others that stop", async () => {
+		const sent = waiting();
+		await userEvent.click(await byId("machine-terminals-update-now"));
+		const dialog = screen.getByRole("dialog");
+		const lists = within(dialog).getAllByRole("list");
+		expect(lists.map((l) => within(l).getAllByRole("listitem").map((li) => li.textContent))).toEqual([["Sửa lỗi đăng nhập", "claude"], ["bash"]]);
+		await userEvent.click(within(dialog).getByRole("button", { name: viMachines.terminal.update.now }));
+		await waitFor(() => expect(document.querySelector('[data-id="machine-terminals-update"]')).toBeNull());
+		expect(sent.filter((b) => b.case === "termUpdateNow")).toHaveLength(1);
+		expect(screen.queryByRole("dialog")).toBeNull();
 	});
 });

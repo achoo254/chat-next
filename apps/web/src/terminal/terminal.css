@@ -42,6 +42,8 @@
 @media (hover: none) { .tx-new .tx-new-stop { opacity: 1; } }
 
 
+.tx-note.update { color: var(--c-text); }
+.tx-note.update a { color: var(--c-primary); }
 .tx-note { margin: 0; padding: var(--space-1) var(--space-3); font-size: 0.75rem; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-subtle); }
 
 .tx-body { position: relative; flex: 1; min-height: 0; background: var(--tx-bg); }
