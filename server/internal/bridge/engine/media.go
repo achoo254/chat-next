@@ -102,7 +102,7 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message 
 		r.logger.Warn("copying a file failed; the message is imported with a label", "kind", med.Kind, "reason", err.Error())
 		return nil
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	if size := stream.Size(); size > limit {
 		return nil
 	}
