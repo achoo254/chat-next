@@ -94,6 +94,11 @@ func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *ap
 	}
 	hasMedia := len(media.MessageFiles(content)) > 0
 	text, ents, err := it.t.s.validateEntities(msg.Text, msg.Entities, hasMedia)
+	if err != nil && len(msg.Entities) > 0 {
+		// A span Chat does not accept (a link scheme it forbids, overlapping
+		// ranges) must not lose the message: it degrades to plain text.
+		text, ents, err = it.t.s.validateEntities(msg.Text, nil, hasMedia)
+	}
 	if err != nil {
 		return "", nil, err
 	}
@@ -253,4 +258,132 @@ func refuseReadOnlyImport(ctx context.Context, q querier, chatID int64) error {
 		return errDenied("imported_chat_read_only: this chat is a copy of a chat in another app; sending into it is not available")
 	}
 	return nil
+}
+
+// ImportedChat describes a chat the bridge creates for a conversation of
+// another app.
+type ImportedChat struct {
+	// Kind is "private", "group" or "channel".
+	Kind  string
+	Title string
+	// Peer is the puppet user of a private chat's other side.
+	Peer int64
+}
+
+// CreateImportedChat creates the chat of owner for an imported conversation
+// and runs link in the same transaction, to record which conversation it
+// is (a failure of link creates no chat). The chat has no creation message
+// and starts with no activity (last_message_at at the epoch), so it is
+// listed by the dates of what is imported into it, not by when it was made.
+func (s *Service) CreateImportedChat(ctx context.Context, owner int64, ic ImportedChat, link func(tx pgx.Tx, chatID int64) error) (int64, error) {
+	var typ string
+	switch ic.Kind {
+	case typePrivate, typeGroup, typeChannel:
+		typ = ic.Kind
+	default:
+		return 0, errInvalid("an imported chat is private, group or channel")
+	}
+	title := ""
+	if typ != typePrivate {
+		var err error
+		if title, err = cleanTitle(ic.Title); err != nil {
+			return 0, err
+		}
+	} else if ic.Peer <= 0 || ic.Peer == owner {
+		return 0, errInvalid("an imported private chat needs the puppet user of the other side")
+	}
+	var chatID int64
+	_, err := s.inTx(ctx, func(t *txn) error {
+		var err error
+		if chatID, err = s.newChatID(ctx, t.tx); err != nil {
+			return err
+		}
+		c := &chatRow{ID: chatID, TenantID: s.cfg.TenantID, Type: typ, Title: title, CreatorID: owner,
+			SyncMode: syncSmall, HistoryVisibility: visShared, DefaultPerms: defaultGroupPerms}
+		if typ == typePrivate {
+			c.DefaultPerms = privatePerms
+		}
+		if err := s.insertChat(ctx, t, c); err != nil {
+			return err
+		}
+		if typ == typePrivate {
+			low, high := min(owner, ic.Peer), max(owner, ic.Peer)
+			if _, err := t.tx.Exec(ctx, `INSERT INTO private_chats (tenant_id, user_low, user_high, chat_id) VALUES ($1, $2, $3, $4)`,
+				s.cfg.TenantID, low, high, chatID); err != nil {
+				return fmt.Errorf("chat: create imported private chat: %w", err)
+			}
+			if _, err := t.tx.Exec(ctx, `INSERT INTO chat_members (chat_id, user_id, role) SELECT $1, u, 'member' FROM unnest($2::bigint[]) u`,
+				chatID, []int64{low, high}); err != nil {
+				return fmt.Errorf("chat: add imported private members: %w", err)
+			}
+			if _, err := t.tx.Exec(ctx, `UPDATE chats SET member_count = 2 WHERE id = $1`, chatID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := t.tx.Exec(ctx, `INSERT INTO chat_members (chat_id, user_id, role, inviter_id) VALUES ($1, $2, 'owner', $2)`, chatID, owner); err != nil {
+				return fmt.Errorf("chat: add imported owner: %w", err)
+			}
+			if _, err := t.tx.Exec(ctx, `UPDATE chats SET member_count = 1 WHERE id = $1`, chatID); err != nil {
+				return err
+			}
+		}
+		if _, err := t.tx.Exec(ctx, `UPDATE chats SET last_message_at = 'epoch' WHERE id = $1`, chatID); err != nil {
+			return fmt.Errorf("chat: imported chat activity: %w", err)
+		}
+		return link(t.tx, chatID)
+	})
+	return chatID, err
+}
+
+// AddMember makes the puppet user a member of the chat (a person who showed
+// up in the imported messages of a group or channel). It announces nothing:
+// there is no one to tell. Adding a member again changes nothing.
+func (it *ImportTx) AddMember(ctx context.Context, puppet int64) error {
+	tag, err := it.t.tx.Exec(ctx, `
+		INSERT INTO chat_members (chat_id, user_id, role, inviter_id) VALUES ($1, $2, 'member', $3)
+		ON CONFLICT (chat_id, user_id) DO NOTHING`, it.c.ID, puppet, it.owner)
+	if err != nil {
+		return fmt.Errorf("chat: add imported member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil
+	}
+	if _, err := it.t.tx.Exec(ctx, `UPDATE chats SET member_count = member_count + 1 WHERE id = $1`, it.c.ID); err != nil {
+		return fmt.Errorf("chat: imported member count: %w", err)
+	}
+	it.c.MemberCount++
+	return nil
+}
+
+// MessageLengthMax is the longest text, in characters, a message may have.
+func (s *Service) MessageLengthMax() int { return s.cfg.MessageLengthMax }
+
+// DeleteImportedChat deletes a chat the bridge filled, for everyone in it,
+// and forgets its link. Only the owner of the import may: a chat that is not
+// linked to an external account of owner is NotFound.
+func (s *Service) DeleteImportedChat(ctx context.Context, owner, chatID int64) error {
+	_, err := s.inTx(ctx, func(t *txn) error {
+		var linked bool
+		if err := t.tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+				WHERE x.chat_id = $1 AND a.owner_id = $2)`, chatID, owner).Scan(&linked); err != nil {
+			return fmt.Errorf("chat: imported chat owner: %w", err)
+		}
+		if !linked {
+			return errNotFound("chat")
+		}
+		c, err := scanChat(t.tx.QueryRow(ctx, `SELECT `+chatColumns+` FROM `+chatFrom+`
+			WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL FOR UPDATE OF c`, chatID, s.cfg.TenantID))
+		if err != nil && !isNoRows(err) {
+			return fmt.Errorf("chat: load chat: %w", err)
+		}
+		if err == nil {
+			if err := t.deleteChat(ctx, c, owner); err != nil {
+				return err
+			}
+		}
+		_, err = t.tx.Exec(ctx, `DELETE FROM external_chats WHERE chat_id = $1`, chatID)
+		return err
+	})
+	return err
 }

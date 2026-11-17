@@ -84,6 +84,11 @@ type Config struct {
 	// port (BOT_WEBHOOK_ALLOW_LOCAL, development only: a local receiver in
 	// development and end-to-end tests).
 	BotWebhookLocal bool
+	// BridgeEnabled turns the Chat Bridge on (BRIDGE_ENABLED, default off):
+	// accounts of other apps are connected and their conversations synced
+	// into Chat (ADR 0022). Without it no bridge loop runs and BridgeService
+	// answers that the feature is off.
+	BridgeEnabled bool
 	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
 	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
 	// server's own public addresses, so a bot webhook or a link preview
@@ -381,6 +386,14 @@ func Load(lookup Lookup) (Config, error) {
 		c.BotWebhookLocal = !production
 	default:
 		errs = append(errs, invalid("BOT_WEBHOOK_ALLOW_LOCAL", "must be true or false"))
+	}
+
+	switch raw := get("BRIDGE_ENABLED"); raw {
+	case "", "false", "0":
+	case "true", "1":
+		c.BridgeEnabled = true
+	default:
+		errs = append(errs, invalid("BRIDGE_ENABLED", "must be true or false"))
 	}
 
 	if raw := get("OUTBOUND_DENY_CIDRS"); raw != "" {

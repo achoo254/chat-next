@@ -296,9 +296,10 @@ type userRow struct {
 	Email    string
 	LastSeen *time.Time
 	IsBot    bool
-	// External: a puppet user standing for a contact of another app
-	// (ADR 0022); it is never found, messaged, added to groups or befriended.
-	External bool
+	// ExternalSource names the app of a puppet user standing for a contact
+	// of another app (ADR 0022), "" for everyone else; such a user is never
+	// found, messaged, added to groups or befriended.
+	ExternalSource string
 	// InlinePlaceholder: a bot with inline mode on ("" when off).
 	InlinePlaceholder string
 	// Deleted: the account is being erased or was erased; others see a
@@ -342,7 +343,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot, u.external_source IS NOT NULL,
+		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot, coalesce(u.external_source, ''),
 			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, ''),
 			coalesce(pf.public_id, '')
 		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
@@ -355,7 +356,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.External, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.ExternalSource, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u
@@ -368,7 +369,10 @@ func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
 		return &appv1.User{Id: u.ID, Deleted: true, IsBlocked: blocked, IsBot: u.IsBot}
 	}
 	out := &appv1.User{Id: u.ID, Username: u.Username, Name: u.Name, Bio: u.Bio, IsSelf: u.ID == viewer, IsBlocked: blocked,
-		IsBot: u.IsBot, BotInlinePlaceholder: u.InlinePlaceholder}
+		IsBot: u.IsBot, BotInlinePlaceholder: u.InlinePlaceholder, ExternalSource: u.ExternalSource}
+	if u.ExternalSource != "" {
+		out.Username = "" // the generated one is of no use to anyone
+	}
 	if u.PhotoID != "" && (u.IsBot || u.ID == viewer || u.photoSeenBy[viewer]) {
 		out.Photo = media.PhotoRef(u.PhotoID)
 	}

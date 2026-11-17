@@ -7,6 +7,8 @@ package bridge
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -91,6 +93,9 @@ type Conversation struct {
 	ID    string
 	Kind  ConvKind
 	Title string
+	// Peer is the other side of a private or bot conversation (nil for a
+	// group or channel): its puppet user is the chat's other member.
+	Peer *Participant
 	// PhotoRef is an opaque handle for FetchMedia; empty when there is none.
 	PhotoRef string
 }
@@ -212,3 +217,29 @@ type MediaStream interface {
 	MimeType() string
 	Size() int64
 }
+
+// RateLimitError is returned by an adapter call the other app throttled
+// (Telegram FloodWait). The engine waits RetryAfter and tries again from the
+// same state instead of treating it as a failure.
+type RateLimitError struct{ RetryAfter time.Duration }
+
+func (e *RateLimitError) Error() string {
+	return fmt.Sprintf("bridge: rate limited, retry after %v", e.RetryAfter)
+}
+
+// ErrSessionRevoked is returned when the other app no longer accepts the
+// stored login (the user ended the session there). The account needs a new
+// login; retrying cannot help.
+var ErrSessionRevoked = errors.New("bridge: session revoked in the other app")
+
+// ErrGapTooLarge is returned by Subscribe when the other app cannot replay
+// what was missed since acct.State. The engine then reconciles the window
+// of every synced chat again.
+var ErrGapTooLarge = errors.New("bridge: update gap too large to replay")
+
+// InputError is returned by Login when the user's answer is wrong (a bad
+// code or password): the step stays open and the message may be shown to
+// the user. Any other error from Login is a failure of the call itself.
+type InputError struct{ Message string }
+
+func (e *InputError) Error() string { return e.Message }

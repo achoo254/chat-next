@@ -36,12 +36,13 @@ func TestString(t *testing.T) {
 
 func TestSensitiveKey(t *testing.T) {
 	for _, k := range []string{"token", "refresh_token", "idToken", "secret", "webhook-secret", "Cookie", "authorization",
-		"email", "code", "nonce", "ip", "api_key", "session.key", "database_url"} {
+		"email", "code", "nonce", "ip", "api_key", "session.key", "database_url",
+		"phone", "auth_key", "phone_code_hash", "session", "message_text"} {
 		if !redact.SensitiveKey(k) {
 			t.Errorf("%q is not sensitive", k)
 		}
 	}
-	for _, k := range []string{"user_id", "bot_id", "sqlstate", "rpc_code", "status", "key", "host", "addr", "reason", "kind"} {
+	for _, k := range []string{"user_id", "bot_id", "sqlstate", "rpc_code", "status", "key", "host", "addr", "reason", "kind", "sessions", "session_id", "external_account_id"} {
 		if redact.SensitiveKey(k) {
 			t.Errorf("%q is sensitive", k)
 		}

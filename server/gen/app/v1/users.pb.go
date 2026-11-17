@@ -292,9 +292,14 @@ type User struct {
 	// Google or GitHub avatar), set only in UsersService answers about the
 	// caller (GetSelf, UpdateProfile, SetUsername); empty when the IdP has
 	// none. Clients show it where the user has no chat photo.
-	IdpPicture    string `protobuf:"bytes,13,opt,name=idp_picture,json=idpPicture,proto3" json:"idp_picture,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	IdpPicture string `protobuf:"bytes,13,opt,name=idp_picture,json=idpPicture,proto3" json:"idp_picture,omitempty"`
+	// The app this user stands for ("telegram"), set on the puppet users of
+	// chats imported by the Chat Bridge (ADR 0022); empty for everyone else.
+	// Such a user has no username to show, cannot sign in and is never found,
+	// messaged or added to a group.
+	ExternalSource string `protobuf:"bytes,14,opt,name=external_source,json=externalSource,proto3" json:"external_source,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -414,6 +419,13 @@ func (x *User) GetDeleted() bool {
 func (x *User) GetIdpPicture() string {
 	if x != nil {
 		return x.IdpPicture
+	}
+	return ""
+}
+
+func (x *User) GetExternalSource() string {
+	if x != nil {
+		return x.ExternalSource
 	}
 	return ""
 }
@@ -2316,7 +2328,7 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"UserStatus\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.app.v1.UserStatusKindR\x04kind\x12\x1f\n" +
 	"\tlast_seen\x18\x02 \x01(\x03B\x020\x02R\blastSeen\x12\x1c\n" +
-	"\aexpires\x18\x03 \x01(\x03B\x020\x02R\aexpires\"\x86\x03\n" +
+	"\aexpires\x18\x03 \x01(\x03B\x020\x02R\aexpires\"\xaf\x03\n" +
 	"\x04User\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +
@@ -2333,7 +2345,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x16bot_inline_placeholder\x18\v \x01(\tR\x14botInlinePlaceholder\x12\x18\n" +
 	"\adeleted\x18\f \x01(\bR\adeleted\x12\x1f\n" +
 	"\vidp_picture\x18\r \x01(\tR\n" +
-	"idpPicture\":\n" +
+	"idpPicture\x12'\n" +
+	"\x0fexternal_source\x18\x0e \x01(\tR\x0eexternalSource\":\n" +
 	"\x0eGetSelfRequest\x12(\n" +
 	"\x10allow_signed_out\x18\x01 \x01(\bR\x0eallowSignedOut\"d\n" +
 	"\x0fGetSelfResponse\x12 \n" +

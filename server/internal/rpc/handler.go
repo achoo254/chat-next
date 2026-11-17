@@ -12,6 +12,7 @@ import (
 	"app.local/server/internal/auth"
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/botupdates"
+	"app.local/server/internal/bridge/engine"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/hooks"
 	"app.local/server/internal/keyproof"
@@ -65,9 +66,12 @@ type Deps struct {
 	KeyProofs *keyproof.Issuer
 	// MachineGrants revokes the IdP grant of a removed machine.
 	MachineGrants MachineGrants
-	TenantID      string
-	TenantName    string
-	Logger        *slog.Logger
+	// Bridge is the Chat Bridge engine; nil when the bridge is off
+	// (BridgeService then answers bridge_disabled).
+	Bridge     *engine.Engine
+	TenantID   string
+	TenantName string
+	Logger     *slog.Logger
 }
 
 // compressMinBytes: smaller answers go out uncompressed.
@@ -76,7 +80,7 @@ const compressMinBytes = 1024
 // NewHandler returns the Connect handler for AuthService, UsersService,
 // ConfigService, ChatsService, MessagesService, UpdatesService,
 // ModerationService, IntegrationsService, MediaService, SearchService,
-// BotsService, BotAdminService, PushService, FeedbackService, PrivacyService, MachinesService, AgentProjectsService and AdvisorService. Every call passes the Origin check, the id-contract check
+// BotsService, BotAdminService, PushService, FeedbackService, PrivacyService, MachinesService, AgentProjectsService, AdvisorService and BridgeService. Every call passes the Origin check, the id-contract check
 // on request and response, and (except public procedures) the session check.
 func NewHandler(d Deps) (http.Handler, error) {
 	if d.Chat == nil || d.Hooks == nil || d.Bots == nil || d.BotUpdates == nil || d.MiniApp == nil || d.Push == nil || d.Privacy == nil || d.SignIn == nil {
@@ -132,5 +136,6 @@ func NewHandler(d Deps) (http.Handler, error) {
 		store: d.Store, announce: d.Chat, tenantID: d.TenantID, logger: d.Logger,
 	}, opts...))
 	mux.Handle(appv1connect.NewAdvisorServiceHandler(&advisorService{chat: d.Chat, logger: d.Logger}, opts...))
+	mux.Handle(appv1connect.NewBridgeServiceHandler(&bridgeService{engine: d.Bridge, logger: d.Logger}, opts...))
 	return mux, nil
 }

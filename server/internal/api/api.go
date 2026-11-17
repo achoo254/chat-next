@@ -35,6 +35,8 @@ import (
 	"app.local/server/internal/botbulk"
 	"app.local/server/internal/botupdates"
 	"app.local/server/internal/brand"
+	"app.local/server/internal/bridge"
+	bridgeengine "app.local/server/internal/bridge/engine"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/chatmcp"
 	"app.local/server/internal/config"
@@ -241,10 +243,19 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		feedback, announcer = assistantSvc, assistantSvc
 		chatSvc.SetNotifier(assistantSvc)
 	}
+	var bridgeEngine *bridgeengine.Engine
+	if cfg.BridgeEnabled {
+		box, err := bridge.NewSecretBox(cfg.SessionKey, cfg.SessionKeyPrevious)
+		if err != nil {
+			return nil, fmt.Errorf("api: bridge secrets: %w", err)
+		}
+		bridgeEngine = bridgeengine.New(bridgeengine.Config{TenantID: cfg.TenantID},
+			bridgeengine.Deps{Pool: st.Pool(), Chat: chatSvc, Box: box, Adapters: bridgeAdapters(), Limiter: limiter, Logger: logger.With("component", "bridge")})
+	}
 	rpcDeps := rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, SignIn: routes, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,
 		Bots: botAdmin, BotUpdates: botUpdates, MiniApp: miniAppSigner, Push: pushSvc, Privacy: privacySvc, Feedback: feedback, Announcer: announcer, TenantID: cfg.TenantID,
-		TenantName: cfg.TenantDomain, Logger: logger, KeyProofs: keyProofs, MachineGrants: grants,
+		TenantName: cfg.TenantDomain, Logger: logger, KeyProofs: keyProofs, MachineGrants: grants, Bridge: bridgeEngine,
 	}
 	rpcHandler, err := rpc.NewHandler(rpcDeps)
 	if err != nil {
@@ -331,6 +342,9 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 	if mediaSvc != nil {
 		app.Handler = byHost(cfg.Media.PublicURL.Host, withExportDownloads(privacySvc, mediaSvc.Handler()), mux)
 		loops = append(loops, mediaSvc.RunLifecycle, mediaSvc.RunWorker)
+	}
+	if bridgeEngine != nil {
+		loops = append(loops, bridgeEngine.Run)
 	}
 	for _, loop := range loops {
 		app.loops.Add(1)

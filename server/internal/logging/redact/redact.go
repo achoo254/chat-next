@@ -68,6 +68,9 @@ func ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 var secretWords = []string{
 	"token", "secret", "password", "passwd", "cookie", "authorization", "credential",
 	"apikey", "api_key", "private_key", "session_key", "signing_key", "database_url", "email",
+	// Chat Bridge: the login state of an account in another app and what
+	// it needs to sign in.
+	"auth_key", "phone_code_hash", "message_text",
 }
 
 // secretKeys are sensitive only as the whole key: "code" is the OIDC
@@ -76,6 +79,9 @@ var secretWords = []string{
 var secretKeys = map[string]bool{
 	"code": true, "nonce": true, "dsn": true,
 	"ip": true, "client_ip": true, "remote_ip": true, "remote_addr": true, "x_forwarded_for": true,
+	// Chat Bridge: a phone number, and the opaque session of another app
+	// ("sessions" and "session_id" stay loggable).
+	"phone": true, "session": true,
 }
 
 // SensitiveKey reports whether a value logged under key must not appear.

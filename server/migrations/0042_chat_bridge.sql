@@ -20,7 +20,7 @@ SET LOCAL lock_timeout = '5s';
 ALTER TABLE users ADD COLUMN external_source text;
 ALTER TABLE users ADD CONSTRAINT users_external_source_check CHECK (external_source IS NULL OR external_source ~ '^[a-z][a-z0-9_]{0,31}$');
 ALTER TABLE users DROP CONSTRAINT users_idp_sub_unless_bot;
-ALTER TABLE users ADD CONSTRAINT users_idp_sub_unless_bot_or_external CHECK (is_bot OR external_source IS NOT NULL OR idp_sub IS NOT NULL);
+ALTER TABLE users ADD CONSTRAINT users_idp_sub_unless_bot_or_external CHECK (is_bot OR external_source IS NOT NULL OR idp_sub IS NOT NULL OR deleted_at IS NOT NULL);
 
 CREATE TABLE external_accounts (
 	id bigserial PRIMARY KEY,
@@ -150,6 +150,6 @@ DROP TABLE external_users;
 DROP TABLE external_chats;
 DROP TABLE external_accounts;
 ALTER TABLE users DROP CONSTRAINT users_idp_sub_unless_bot_or_external;
-ALTER TABLE users ADD CONSTRAINT users_idp_sub_unless_bot CHECK (is_bot OR idp_sub IS NOT NULL);
+ALTER TABLE users ADD CONSTRAINT users_idp_sub_unless_bot CHECK (is_bot OR idp_sub IS NOT NULL OR deleted_at IS NOT NULL);
 ALTER TABLE users DROP CONSTRAINT users_external_source_check;
 ALTER TABLE users DROP COLUMN external_source;

@@ -88,6 +88,11 @@ message User {
   // caller (GetSelf, UpdateProfile, SetUsername); empty when the IdP has
   // none. Clients show it where the user has no chat photo.
   string idp_picture = 13;
+  // The app this user stands for ("telegram"), set on the puppet users of
+  // chats imported by the Chat Bridge (ADR 0022); empty for everyone else.
+  // Such a user has no username to show, cannot sign in and is never found,
+  // messaged or added to a group.
+  string external_source = 14;
 }
 
 message GetSelfRequest {

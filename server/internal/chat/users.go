@@ -197,7 +197,7 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 	}
 	for _, id := range ids {
 		switch {
-		case users[id] == nil || users[id].Deleted || users[id].External:
+		case users[id] == nil || users[id].Deleted || users[id].ExternalSource != "":
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND})
 		case blocks[blockKey{id, me}]:
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_BLOCKED})
