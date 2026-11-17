@@ -399,17 +399,17 @@ export class ChatStore {
 		} else {
 			this.liveRead.delete(chatId);
 		}
-		this.reapplyDialogs();
+		this.reapplyDialog(chatId);
 	}
 
-	/** Applies the source's dialogs again (live reading started or ended). */
-	private reapplyDialogs(): void {
-		const views: DialogView[] = [];
-		for (const chatId of this.order) {
-			const view = this.sourceViews.get(chatId);
-			if (view !== undefined) views.push(view);
-		}
-		if (views.length > 0) this.applyDialogs(views);
+	/**
+	 * Applies the source's dialog of one chat again (its live reading started
+	 * or ended): only that chat's view depends on it, so the other dialogs of
+	 * the list are not compared again on every chat switch.
+	 */
+	private reapplyDialog(chatId: number): void {
+		const view = this.sourceViews.get(chatId);
+		if (view !== undefined && this.applyView(view)) this.refreshEntries();
 	}
 
 	/** The dialog as a live-read chat shows it: everything read; the read is sent once per newest seq. */
@@ -442,26 +442,31 @@ export class ChatStore {
 		return new Promise((resolve) => this.readyWaiters.push(resolve));
 	}
 
+	/** Takes the source's view of one dialog; true when the dialog as shown changed. */
+	private applyView(sourceView: DialogView): boolean {
+		const id = sourceView.dialog.chatId;
+		this.sourceViews.set(id, sourceView);
+		if (this.unreadTracking.has(id)) this.lateUnread(id, sourceView);
+		const view = this.readLive(sourceView);
+		const json = JSON.stringify(view);
+		if (this.dialogJson.get(id) === json) return false;
+		this.dialogJson.set(id, json);
+		this.dialogs.set(id, this.withKnownPeer(view));
+		if (view.chat !== null) this.chats.set(id, view.chat);
+		if (view.peer !== null) this.users.set(view.peer.id, this.shown(view.peer));
+		// A private chat stored without its peer: fetch it so the row is not shown as deleted.
+		else if (view.chat?.type === "private" && view.chat.peerUserId !== 0) this.wantUser(view.chat.peerUserId);
+		const from = view.topMessage?.fromId ?? 0;
+		if (from !== 0 && from !== this.selfId) this.wantUser(from);
+		this.emit(`dialog:${id}`);
+		return true;
+	}
+
 	private applyDialogs(views: readonly DialogView[]): void {
 		const seen = new Set<number>();
 		for (const sourceView of views) {
-			const id = sourceView.dialog.chatId;
-			seen.add(id);
-			this.sourceViews.set(id, sourceView);
-			if (this.unreadTracking.has(id)) this.lateUnread(id, sourceView);
-			const view = this.readLive(sourceView);
-			const json = JSON.stringify(view);
-			if (this.dialogJson.get(id) !== json) {
-				this.dialogJson.set(id, json);
-				this.dialogs.set(id, this.withKnownPeer(view));
-				if (view.chat !== null) this.chats.set(id, view.chat);
-				if (view.peer !== null) this.users.set(view.peer.id, this.shown(view.peer));
-				// A private chat stored without its peer: fetch it so the row is not shown as deleted.
-				else if (view.chat?.type === "private" && view.chat.peerUserId !== 0) this.wantUser(view.chat.peerUserId);
-				const from = view.topMessage?.fromId ?? 0;
-				if (from !== 0 && from !== this.selfId) this.wantUser(from);
-				this.emit(`dialog:${id}`);
-			}
+			seen.add(sourceView.dialog.chatId);
+			this.applyView(sourceView);
 		}
 		for (const id of [...this.dialogs.keys()]) {
 			if (!seen.has(id)) {

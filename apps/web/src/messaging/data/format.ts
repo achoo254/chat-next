@@ -83,11 +83,21 @@ function daysBetween(then: Date, now: Date): number {
 	return Math.round((startOfDay(now) - startOfDay(then)) / DAY_MS);
 }
 
+/**
+ * One HH:mm formatter per language: every message bubble and chat row
+ * shows a time, and building an Intl.DateTimeFormat costs far more than
+ * formatting with one (it was a visible part of each chat switch).
+ */
+const clockFormats = new Map<string, Intl.DateTimeFormat>();
+
 /** HH:mm in the user's time zone. */
 export function clock(unixSeconds: number, locale: string): string {
-	return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(
-		unixSeconds * 1000,
-	);
+	let format = clockFormats.get(locale);
+	if (format === undefined) {
+		format = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+		clockFormats.set(locale, format);
+	}
+	return format.format(unixSeconds * 1000);
 }
 
 const pad = (n: number): string => String(n).padStart(2, "0");
