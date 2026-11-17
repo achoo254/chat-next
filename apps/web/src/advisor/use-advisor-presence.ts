@@ -525,7 +525,8 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			for (const i of fresh) seen.add(i.id);
 			const last = fresh.at(-1)?.body;
 			if (last?.case !== "advisorVerdict" || store.snapshot().open) return;
-			store.setFlash(verdictLine(last.value));
+			// The page as it shows now (the session in its chat, terminal or office view): a tap on the line returns to it.
+				store.setFlash(verdictLine(last.value), window.location.pathname + window.location.search);
 			window.clearTimeout(timer);
 			timer = window.setTimeout(() => store.setFlash(""), FLASH_MS);
 		};

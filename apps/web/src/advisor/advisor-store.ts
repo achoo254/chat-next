@@ -77,6 +77,8 @@ export interface AdvisorState {
 	readonly note: Note;
 	/** A short line beside the mascot (an automatic verdict, an answer ready); "" when none. */
 	readonly flash: string;
+	/** The page (path and query, the session's mode and tab included) the flash line came from; a tap on the line goes back there. "" when none. */
+	readonly flashTarget: string;
 	/** An answer came that this device did not ask for (another device's question). */
 	readonly dot: boolean;
 	readonly dock: Dock;
@@ -174,6 +176,7 @@ export class AdvisorStore {
 			mood: "idle",
 			note: "",
 			flash: "",
+			flashTarget: "",
 			dot: false,
 			dock: readDock(),
 			hidden: readJson(local, HIDDEN_KEY) === true,
@@ -241,7 +244,7 @@ export class AdvisorStore {
 
 	forgetAll(): void {
 		saveQuestions([]);
-		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, open: false, flash: "", dot: false, mood: "idle", note: "" });
+		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, open: false, flash: "", flashTarget: "", dot: false, mood: "idle", note: "" });
 	}
 
 	// --- questions -------------------------------------------------------------
@@ -270,7 +273,7 @@ export class AdvisorStore {
 	setOpen(open: boolean): void {
 		if (open === this.state.open) return;
 		// The dot (another device's answer) stays while the bubble says so; closing it is reading it.
-		this.set(open ? { open, flash: "" } : { open, dot: false });
+		this.set(open ? { open, flash: "", flashTarget: "" } : { open, dot: false });
 	}
 
 	setMood(mood: Mood, note: Note): void {
@@ -278,8 +281,9 @@ export class AdvisorStore {
 		this.set({ mood, note });
 	}
 
-	setFlash(flash: string): void {
-		if (flash !== this.state.flash) this.set({ flash });
+	/** `target`: the page the line is about, so a tap on it brings the user back to that session and tab. */
+	setFlash(flash: string, target = ""): void {
+		if (flash !== this.state.flash || target !== this.state.flashTarget) this.set({ flash, flashTarget: flash === "" ? "" : target });
 	}
 
 	setDot(dot: boolean): void {

@@ -11,7 +11,7 @@
 // sets the route's outer context for them.
 import "./advisor.css";
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
-import type { Route } from "../router.tsx";
+import { navigate, type Route } from "../router.tsx";
 import { listenForCopies, setRouteContext, IGNORE_ATTR, type ScopeContext } from "./advisor-context.tsx";
 import { useMascotDrag } from "./advisor-drag.ts";
 import { advisorStore, useAdvisorState, type AdvisorStore } from "./advisor-store.ts";
@@ -34,6 +34,13 @@ export function routeContextOf(route: Route): ScopeContext {
 		return "machine" in view ? { screen: "machine", machine: view.machine } : { screen: "machine" };
 	}
 	return { screen: route.name };
+}
+
+/** A tap on the line beside the mascot: back to the session and tab it was about (the line goes), else the bubble. */
+function openFlash(store: AdvisorStore, target: string): void {
+	if (target === "") return store.setOpen(true);
+	store.setFlash("");
+	navigate(target);
 }
 
 export default function AdvisorMascot({ route, store = advisorStore }: { route: Route; store?: AdvisorStore }) {
@@ -80,7 +87,7 @@ export default function AdvisorMascot({ route, store = advisorStore }: { route: 
 				</button>
 			)}
 			{!state.hidden && !state.open && flash !== "" && (
-				<button type="button" className="adv-flash" data-side={state.dock.side} style={{ "--adv-y": String(state.dock.y) } as CSSProperties} onClick={() => store.setOpen(true)}>
+				<button type="button" className="adv-flash" data-side={state.dock.side} style={{ "--adv-y": String(state.dock.y) } as CSSProperties} onClick={() => openFlash(store, state.flashTarget)}>
 					{flash}
 				</button>
 			)}
