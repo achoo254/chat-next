@@ -32,6 +32,7 @@ export type Pose =
 	| "chat"
 	| "yawn"
 	| "sleep"
+	| "lounge"
 	| "wake"
 	| "run"
 	| "pushup"
@@ -96,6 +97,8 @@ function lifePose(act: LifeAct, seated: boolean, low: boolean): Pose {
 	switch (act) {
 		case "sleep":
 			return "sleep";
+		case "lounge":
+			return "lounge";
 		case "doze":
 			return seated ? "sit-idle" : "stand-idle";
 		case "eat":
@@ -149,6 +152,7 @@ export const POSE_CLIPS: Readonly<Record<Pose, readonly string[]>> = {
 	chat: ["Sitting_Talking", "Sitting_Idle"],
 	yawn: ["Idle_A", "Idle", "Sitting_Idle"],
 	sleep: ["Sleeping", "Sitting_Idle"],
+	lounge: ["Lying_Lounge", "Sleeping", "Sitting_Idle"],
 	wake: ["LayToIdle", "Idle_A"],
 	run: ["Jog", "Run", "Walk"],
 	// The rig's push-up sinks the big chibi head into the floor: the mat's exercise is jumping jacks.
@@ -182,5 +186,5 @@ export function isSeatedPose(pose: Pose): boolean {
 
 /** Lying down: the clip lies on the ground at the model's root, which goes to the bed's height. */
 export function isLyingPose(pose: Pose): boolean {
-	return pose === "sleep";
+	return pose === "sleep" || pose === "lounge";
 }

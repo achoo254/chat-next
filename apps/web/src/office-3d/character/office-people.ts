@@ -158,7 +158,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				const found = personTarget(layout, w.anchorId, shares[i] ?? 0, w.beside) ?? personTarget(layout, w.placement.anchorId, 0, false);
 				if (found === null) return;
 				// A standing host turns to the visitor; someone lying down keeps the bed's own facing (head on the pillow).
-				const lying = w.placement.life?.act === "sleep";
+				const lying = w.placement.life?.act === "sleep" || w.placement.life?.act === "lounge";
 				const target = w.turn !== 0 && !found.seated && !lying ? { ...found, face: found.face + w.turn } : found;
 				let p = people.get(key);
 				const look = personLook(w.placement);

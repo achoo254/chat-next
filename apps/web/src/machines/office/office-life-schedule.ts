@@ -15,7 +15,7 @@ import type { AnchorKind, LayoutAnchor } from "./office-layout.ts";
 export type LifeSlot = "sleep" | "dawn" | "breakfast" | "work" | "lunch" | "unwind" | "evening";
 
 /** What a resident does at their place on the living floor (the 3D view's pose, the 2D view's status). */
-export type LifeAct = "sleep" | "doze" | "run" | "pushup" | "jacks" | "punch" | "eat" | "watch" | "chat" | "dance";
+export type LifeAct = "sleep" | "lounge" | "doze" | "run" | "pushup" | "jacks" | "punch" | "eat" | "watch" | "chat" | "dance";
 
 export interface LifePlan {
 	readonly slot: LifeSlot;
@@ -30,6 +30,8 @@ export interface LifeTraits {
 	readonly gymLover: boolean;
 	/** Spends the evening in front of the TV (others chat at the dining table). */
 	readonly tvFan: boolean;
+	/** After work, lies on the bed with nothing to do instead of the TV or the dining table (those who do not train). */
+	readonly homebody: boolean;
 }
 
 /** The furthest a person's day runs early or late, minutes. */
@@ -55,6 +57,7 @@ export function lifeTraits(key: string): LifeTraits {
 		shiftMinutes: (h % (2 * SHIFT_MINUTES + 1)) - SHIFT_MINUTES,
 		gymLover: ((h >>> 8) & 1) === 1,
 		tvFan: ((h >>> 9) & 3) !== 0,
+		homebody: ((h >>> 11) & 1) === 1,
 	};
 }
 
@@ -84,7 +87,7 @@ export function lifePlanAt(key: string, now: number): LifePlan {
 		case "lunch":
 			return { slot, kinds: ["dine", "counter", "tv"] };
 		case "unwind":
-			return { slot, kinds: traits.gymLover ? ["gym", "tv", "dine"] : ["tv", "dine", "gym"] };
+			return { slot, kinds: traits.gymLover ? ["gym", "tv", "dine"] : traits.homebody ? ["bed", "tv", "dine"] : ["tv", "dine", "gym"] };
 		case "evening":
 			return { slot, kinds: traits.tvFan ? ["tv", "dine", "counter"] : ["dine", "tv", "counter"] };
 		case "work":
@@ -100,7 +103,8 @@ const DANCE_EVERY = 5;
 export function lifeActAt(anchor: Pick<LayoutAnchor, "kind" | "act">, slot: LifeSlot, key: string, now: number): LifeAct {
 	switch (anchor.kind) {
 		case "bed":
-			return "sleep";
+			// Awake on the bed in the hours after work, asleep in it at night and at dawn.
+			return slot === "unwind" || slot === "evening" ? "lounge" : "sleep";
 		case "gym":
 			return anchor.act ?? "jacks";
 		case "dine":
@@ -117,7 +121,7 @@ export function lifeActAt(anchor: Pick<LayoutAnchor, "kind" | "act">, slot: Life
 	}
 }
 
-/** Whether a resident doing `act` may be drawn into a conversation (never someone asleep). */
+/** Whether a resident doing `act` may be drawn into a conversation (never someone asleep, dozing or lying back resting). */
 export function awakeAct(act: LifeAct): boolean {
-	return act !== "sleep" && act !== "doze";
+	return act !== "sleep" && act !== "doze" && act !== "lounge";
 }

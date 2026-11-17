@@ -125,6 +125,7 @@ export function createBlockCharacter(scene: Scene, bodies: BlockBodies, key: str
 					head.rotation.y = Math.sin(t * 0.9) * 0.3;
 					break;
 				case "sleep":
+				case "lounge":
 					// Lying on the bed (the root is at the mattress).
 					torso.rotation.x = -Math.PI / 2;
 					torso.position.y = 0.22;

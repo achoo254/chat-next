@@ -153,6 +153,13 @@ describe("scene assets: the Director's model", () => {
 		for (const clip of assets.character.clips) expect(assets.directorCharacter.clips, clip).toContain(clip);
 	});
 
+	it("has the lying-back clip on both models, so the rest after work looks the same for everyone", async () => {
+		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
+		const assets = parseSceneAssets(live, await layoutHash());
+		expect(assets.character?.clips).toContain("Lying_Lounge");
+		expect(assets.directorCharacter?.clips).toContain("Lying_Lounge");
+	});
+
 	it("is optional, and left out when its file is missing or unsafe (the Director then wears the staff model)", () => {
 		const read = (directorCharacter: unknown) => parseSceneAssets({ ...(fixture as object), directorCharacter }, FIXTURE_HASH).directorCharacter;
 		expect(parseSceneAssets(fixture, FIXTURE_HASH).directorCharacter).toBeNull();

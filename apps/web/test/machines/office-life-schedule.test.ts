@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { anchorById } from "../../src/machines/office/office-geometry.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
 import { allocateLifePlaces, lifeCandidates } from "../../src/machines/office/office-life-places.ts";
-import { lifeActAt, lifePlanAt, lifeTraits, localHour, SHIFT_MINUTES, slotAt } from "../../src/machines/office/office-life-schedule.ts";
+import { awakeAct, lifeActAt, lifePlanAt, lifeTraits, localHour, SHIFT_MINUTES, slotAt } from "../../src/machines/office/office-life-schedule.ts";
 import { EMPTY_MEMORY, MAX_RESIDENTS, officePlacement, type Placement } from "../../src/machines/office/office-placement.ts";
 import type { OfficeStore } from "../../src/machines/office/office-store.ts";
 import { act, director, ev, localAt, session, snapshot, staff, storeAt } from "./office-builders.ts";
@@ -80,6 +80,20 @@ describe("the parts of the day", () => {
 		for (const key of lovers) expect(lifePlanAt(key, localAt(18, 15)).kinds[0]).toBe("gym");
 	});
 
+	it("sends the homebodies who do not train to lie back on a bed after work, and nobody else", () => {
+		const keys = Array.from({ length: 60 }, (_, i) => `person#${i}`);
+		const homebodies = keys.filter((k) => !lifeTraits(k).gymLover && lifeTraits(k).homebody);
+		const others = keys.filter((k) => lifeTraits(k).gymLover || !lifeTraits(k).homebody);
+		expect(homebodies.length).toBeGreaterThan(5);
+		expect(others.length).toBeGreaterThan(5);
+		for (const key of homebodies) expect(lifePlanAt(key, localAt(18, 15)).kinds[0], key).toBe("bed");
+		for (const key of others) expect(lifePlanAt(key, localAt(18, 15)).kinds[0], key).not.toBe("bed");
+		// Lying back is rest: nobody is pulled out of it into a conversation, like a sleeper.
+		expect(awakeAct("lounge")).toBe(false);
+		expect(awakeAct("sleep")).toBe(false);
+		expect(awakeAct("watch")).toBe(true);
+	});
+
 	it("does at each place what it is for", () => {
 		const place = (kind: "bed" | "gym" | "dine" | "counter" | "tv", act: "run" | "punch" | null = null) => ({ kind, act });
 		expect(lifeActAt(place("bed"), "sleep", "x", localAt(1))).toBe("sleep");
@@ -89,6 +103,10 @@ describe("the parts of the day", () => {
 		expect(lifeActAt(place("dine"), "evening", "x", localAt(20))).toBe("chat");
 		expect(lifeActAt(place("counter"), "breakfast", "x", localAt(7, 30))).toBe("eat");
 		expect(lifeActAt(place("tv"), "sleep", "x", localAt(1))).toBe("doze");
+		// A bed: asleep at night and at dawn, awake and lying back in the hours after work.
+		expect(lifeActAt(place("bed"), "dawn", "x", localAt(6, 30))).toBe("sleep");
+		expect(lifeActAt(place("bed"), "unwind", "x", localAt(18))).toBe("lounge");
+		expect(lifeActAt(place("bed"), "evening", "x", localAt(20))).toBe("lounge");
 		// Some evening windows dance, most watch.
 		const evening = Array.from({ length: 40 }, (_, i) => lifeActAt(place("tv"), "evening", "x", localAt(19) + i * 4 * 60_000));
 		expect(evening).toContain("watch");

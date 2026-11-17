@@ -1311,7 +1311,7 @@ export const zhCNMachines: MachinesCopy = {
 		state: { idle: "空闲", working: "工作中", done: "已完成", awaiting: "等待批准", slow: "运行较久", denied: "被拦在门口", waitingYou: "正在等你" },
 		stuck: (minutes: number) => `卡住 ${minutes} 分钟`,
 		snore: "Zzz",
-		life: { sleep: "睡觉中", doze: "打盹", run: "跑步", pushup: "健身", jacks: "开合跳", punch: "打沙袋", eat: "吃饭", watch: "看电视", chat: "聊天", dance: "跳舞" },
+		life: { sleep: "睡觉中", lounge: "躺着休息", doze: "打盹", run: "跑步", pushup: "健身", jacks: "开合跳", punch: "打沙袋", eat: "吃饭", watch: "看电视", chat: "聊天", dance: "跳舞" },
 		doing: { think: "思考", arrive: "到岗", handIn: "交文件", consult: "请教顾问", weigh: "权衡中" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} 人在会议室等工位`,

@@ -1319,7 +1319,7 @@ export const enMachines: MachinesCopy = {
 		state: { idle: "Idle", working: "Working", done: "Done", awaiting: "Awaiting approval", slow: "Running long", denied: "Stopped at the door", waitingYou: "Waiting for you" },
 		stuck: (minutes: number) => `Stuck ${minutes} min`,
 		snore: "Zzz",
-		life: { sleep: "Sleeping", doze: "Dozing", run: "Running", pushup: "Working out", jacks: "Jumping jacks", punch: "Boxing", eat: "Eating", watch: "Watching TV", chat: "Chatting", dance: "Dancing" },
+		life: { sleep: "Sleeping", lounge: "Lying back", doze: "Dozing", run: "Running", pushup: "Working out", jacks: "Jumping jacks", punch: "Boxing", eat: "Eating", watch: "Watching TV", chat: "Chatting", dance: "Dancing" },
 		doing: { think: "Thinking", arrive: "Arriving", handIn: "Handing in", consult: "Asking Advisor", weigh: "Weighing" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} waiting for a desk in the meeting room`,

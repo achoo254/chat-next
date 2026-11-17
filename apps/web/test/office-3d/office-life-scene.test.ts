@@ -58,6 +58,8 @@ describe("poses of life", () => {
 		expect(poseFor({ ...base, seated: true, life: "watch" })).toBe("watch");
 		expect(poseFor({ ...base, seated: true, low: true, life: "watch" })).toBe("watch-low");
 		expect(poseFor({ ...base, life: "dance" })).toBe("dance");
+		expect(poseFor({ ...base, life: "lounge" })).toBe("lounge");
+		expect(poseFor({ ...base, moving: true, life: "lounge" })).toBe("walk");
 		expect(poseFor({ ...base, seated: true, life: "doze" })).toBe("sit-idle");
 		expect(poseFor({ ...base, moving: true, life: "sleep" })).toBe("walk");
 		expect(poseFor({ ...base, group: "type", life: "sleep" })).toBe("stand-type");
@@ -75,6 +77,9 @@ describe("poses of life", () => {
 		const clip = (pose: Parameters<typeof clipFor>[0], set: ReadonlySet<string>) => clipFor(pose, set);
 		expect(clip("sleep", DELIVERED)).toBe("Sleeping");
 		expect(clip("wake", DELIVERED)).toBe("LayToIdle");
+		// Lying back has its own clip; a model without it lies as the sleeper does.
+		expect(clip("lounge", new Set([...DELIVERED, "Lying_Lounge"]))).toBe("Lying_Lounge");
+		expect(clip("lounge", DELIVERED)).toBe("Sleeping");
 		expect(clip("run", DELIVERED)).toBe("Jog");
 		expect(clip("pushup", DELIVERED)).toBe("Jumping_Jacks");
 		expect(clip("punch", DELIVERED)).toBe("Punch_Jab");
@@ -88,6 +93,7 @@ describe("poses of life", () => {
 			expect(clip(pose, OLDER), pose).not.toBeNull();
 		}
 		expect(isLyingPose("sleep")).toBe(true);
+		expect(isLyingPose("lounge")).toBe(true);
 		expect(isSeatedPose("watch-low")).toBe(true);
 		expect(isSeatedPose("run")).toBe(false);
 	});

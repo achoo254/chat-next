@@ -1337,7 +1337,7 @@ export const viMachines = {
 		state: { idle: "Rảnh", working: "Đang làm", done: "Xong việc", awaiting: "Chờ duyệt", slow: "Chạy lâu", denied: "Bị chặn ở cửa", waitingYou: "Đang chờ bạn" },
 		stuck: (minutes: number) => `Kẹt ${minutes} phút`,
 		snore: "Zzz",
-		life: { sleep: "Đang ngủ", doze: "Ngủ gật", run: "Chạy bộ", pushup: "Tập thể dục", jacks: "Nhảy bật", punch: "Đấm bao cát", eat: "Đang ăn", watch: "Xem tivi", chat: "Tán gẫu", dance: "Nhảy múa" },
+		life: { sleep: "Đang ngủ", lounge: "Nằm thư giãn", doze: "Ngủ gật", run: "Chạy bộ", pushup: "Tập thể dục", jacks: "Nhảy bật", punch: "Đấm bao cát", eat: "Đang ăn", watch: "Xem tivi", chat: "Tán gẫu", dance: "Nhảy múa" },
 		doing: { think: "Suy nghĩ", arrive: "Vào làm", handIn: "Nộp hồ sơ", consult: "Hỏi Cố vấn", weigh: "Đang cân nhắc" },
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} người chờ bàn trong phòng họp`,
