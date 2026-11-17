@@ -35,7 +35,7 @@ thoại) cũng nên chỉ tải một lần rồi phục vụ từ máy.
 
 ## Hệ quả
 
-- Tải lần đầu: lightmap và đồ 3D của cả bốn khu cùng lúc (điện thoại ở bậc 1024 khoảng 3,0 MB cho phần bố cục, cộng nhân vật), thay vì từng tầng; từ lần hai chỉ còn danh mục.
+- Tải lần đầu: lightmap và đồ 3D của cả bốn khu cùng lúc (điện thoại ở bậc 1024 khoảng 3,0 MB cho phần bố cục, cộng nhân vật), thay vì từng tầng; từ lần hai chỉ còn danh mục. Ngân sách tải lần đầu cho điện thoại ở bậc 1024 là tối đa 5,5 MB (chủ sở hữu chốt 17/11/2026, nâng từ 4,5 MB khi thêm mô hình Giám đốc riêng 1,8 MB); đo 5,2 MB.
 - Ngân sách draw call ở bậc medium (chủ sở hữu chốt 17/11/2026): khung mặc định điện thoại tối đa 100, toàn cảnh tối đa 140 (toàn cảnh cao hơn một tầng vì cả bốn khu cùng vẽ; đo 135 ở toàn cảnh desktop, 15 người). Điện thoại không thu ra quá hai khu. Khung mặc định điện thoại chưa đo trên máy thật.
 - Đổi bố cục làm mọi tài sản cũ mất hiệu lực nên bố cục và tài sản lên prod cùng một lần.
 
