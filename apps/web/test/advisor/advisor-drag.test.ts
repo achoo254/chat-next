@@ -4,7 +4,23 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BAND_BOTTOM, BAND_TOP, bandOf, dockFor, isDrag, MASCOT_SIZE, useMascotDrag } from "../../src/advisor/advisor-drag.ts";
+import {
+	BAND_BOTTOM,
+	BAND_TOP,
+	bandOf,
+	BUBBLE_MAX_HEIGHT,
+	BUBBLE_WIDTH,
+	bubblePlacement,
+	dockFor,
+	isDrag,
+	MASCOT_SIZE,
+	MENU_ROOM,
+	menuPlacement,
+	PANEL_GAP,
+	VIEW_MARGIN,
+	type Placement,
+	useMascotDrag,
+} from "../../src/advisor/advisor-drag.ts";
 import { AdvisorStore, DEFAULT_DOCK } from "../../src/advisor/advisor-store.ts";
 
 const desktop = { width: 1366, height: 768 };
@@ -18,7 +34,16 @@ describe("docking", () => {
 		expect(dockFor(196, 400, phone).side).toBe("right");
 	});
 
-	it("keeps the mascot inside the band: never over the header nor the composer", () => {
+	it("goes down to the bottom edge (a composer too, if the user puts it there), never over the header", () => {
+		const band = bandOf({ width: 1376, height: 1450 });
+		// Let go at the very bottom: its bottom a hair off the edge.
+		const dock = dockFor(1370, 1449, { width: 1376, height: 1450 });
+		expect(dock).toEqual({ side: "right", y: 1 });
+		expect(band.bottom + MASCOT_SIZE).toBe(1450 - BAND_BOTTOM);
+		expect(BAND_BOTTOM).toBeLessThanOrEqual(8);
+	});
+
+	it("keeps the mascot inside the band: never over the header", () => {
 		const band = bandOf(desktop);
 		expect(band).toEqual({ top: BAND_TOP, bottom: desktop.height - BAND_BOTTOM - MASCOT_SIZE });
 		// Let go over the header: the top of the band; over the composer: its bottom.
@@ -30,8 +55,8 @@ describe("docking", () => {
 	});
 
 	it("still docks on a screen too short for a band", () => {
-		expect(bandOf({ width: 300, height: 200 })).toEqual({ top: BAND_TOP, bottom: BAND_TOP });
-		expect(dockFor(10, 150, { width: 300, height: 200 })).toEqual({ side: "left", y: 0 });
+		expect(bandOf({ width: 300, height: 120 })).toEqual({ top: BAND_TOP, bottom: BAND_TOP });
+		expect(dockFor(10, 100, { width: 300, height: 120 })).toEqual({ side: "left", y: 0 });
 	});
 
 	it("tells a tap from a drag", () => {
@@ -103,5 +128,67 @@ describe("pressing the mascot", () => {
 		fireEvent(button, pointer("pointerup", 160, 180));
 		fireEvent.click(button);
 		expect(onTap).not.toHaveBeenCalled();
+	});
+});
+
+/** The panel's box once laid out with `height` (at most its cap). */
+function boxOf(p: Placement, height: number, viewHeight: number): { left: number; right: number; top: number; bottom: number } {
+	const h = Math.min(height, p.maxHeight);
+	const top = p.top ?? viewHeight - (p.bottom ?? 0) - h;
+	return { left: p.left, right: p.left + p.width, top, bottom: top + h };
+}
+
+describe("the bubble beside the mascot", () => {
+	const view = { width: 1376, height: 1450 };
+	const inView = (b: { left: number; right: number; top: number; bottom: number }, v: { width: number; height: number }) =>
+		b.left >= VIEW_MARGIN && b.right <= v.width - VIEW_MARGIN && b.top >= VIEW_MARGIN && b.bottom <= v.height - VIEW_MARGIN;
+
+	it("a mascot in the bottom right corner: the bubble opens up from its bottom, on its left", () => {
+		const mascot = { left: 1332, top: 1386, width: 56, height: 56 };
+		const p = bubblePlacement(mascot, view, "right");
+		expect(p.top).toBeUndefined();
+		expect(p.width).toBe(BUBBLE_WIDTH);
+		const b = boxOf(p, 480, view.height);
+		expect(b.right).toBe(mascot.left - PANEL_GAP);
+		expect(view.height - b.bottom).toBe(VIEW_MARGIN);
+		expect(inView(b, view)).toBe(true);
+	});
+
+	it("a mascot high on the left: the bubble opens down from its top, on its right", () => {
+		const mascot = { left: -12, top: 120, width: 56, height: 56 };
+		const p = bubblePlacement(mascot, { width: 1376, height: 900 }, "left");
+		expect(p.top).toBe(120);
+		expect(p.left).toBe(mascot.left + mascot.width + PANEL_GAP);
+		expect(p.maxHeight).toBe(BUBBLE_MAX_HEIGHT);
+		expect(inView(boxOf(p, 600, 900), { width: 1376, height: 900 })).toBe(true);
+	});
+
+	it("stays whole on a short or narrow screen", () => {
+		const small = { width: 420, height: 300 };
+		const p = bubblePlacement({ left: 380, top: 250, width: 56, height: 56 }, small, "right");
+		expect(p.width).toBe(420 - 2 * VIEW_MARGIN);
+		expect(inView(boxOf(p, 1000, small.height), small)).toBe(true);
+	});
+});
+
+describe("the bubble's menu", () => {
+	it("opens under its button, its right edge on the button's, whole on screen", () => {
+		const view = { width: 1376, height: 900 };
+		const button = { left: 1030, top: 300, width: 36, height: 36 };
+		const p = menuPlacement(button, view, 280);
+		expect(p.top).toBe(336 + PANEL_GAP);
+		expect(p.left + p.width).toBe(1066);
+		expect(p.maxHeight).toBeGreaterThanOrEqual(MENU_ROOM);
+	});
+
+	it("opens above a button near the bottom, and never past the left edge", () => {
+		const view = { width: 390, height: 844 };
+		const button = { left: 20, top: 800, width: 36, height: 36 };
+		const p = menuPlacement(button, view, 280);
+		expect(p.top).toBeUndefined();
+		expect(p.bottom).toBe(844 - 800 + PANEL_GAP);
+		expect(p.left).toBe(VIEW_MARGIN);
+		const top = 844 - (p.bottom ?? 0) - Math.min(200, p.maxHeight);
+		expect(top).toBeGreaterThanOrEqual(VIEW_MARGIN);
 	});
 });

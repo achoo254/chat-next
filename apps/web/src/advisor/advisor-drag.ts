@@ -1,9 +1,12 @@
-// Dragging the Advisor mascot: it follows the finger or the mouse, then
-// snaps to the nearer side edge at the height it was let go, inside a band
-// clear of the headers above and the composers below (the main buttons live
-// there). The band's edges and the safe areas are applied in CSS
-// (advisor.css), so the dock stored per device is only a side and a share
-// of the band. A press that moves less than DRAG_SLOP is a tap.
+// Where the Advisor mascot and its bubble sit. Dragging: the mascot follows
+// the finger or the mouse, then snaps to the nearer side edge at the height
+// it was let go, anywhere from below the screen's header down to the bottom
+// edge (the user places it over a composer if they want). The band's edges
+// and the safe areas are applied in CSS (advisor.css), so the dock stored per
+// device is only a side and a share of the band (a dock stored before keeps
+// its meaning: 0 top, 1 bottom). A press that moves less than DRAG_SLOP is a
+// tap. The bubble and its menu open beside what opened them, toward the
+// room there is, always whole on screen (bubblePlacement, menuPlacement).
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import type { Dock } from "./advisor-store.ts";
 
@@ -11,8 +14,8 @@ import type { Dock } from "./advisor-store.ts";
 export const MASCOT_SIZE = 56;
 /** The band's top: below the screen's header. */
 export const BAND_TOP = 72;
-/** The band's bottom margin: above a composer and its send button. */
-export const BAND_BOTTOM = 132;
+/** The band's bottom margin: a hair off the bottom edge (CSS adds the safe area). */
+export const BAND_BOTTOM = 8;
 /** Movement (px) past which a press is a drag, not a tap. */
 export const DRAG_SLOP = 6;
 
@@ -107,5 +110,78 @@ export function useMascotDrag(onTap: () => void, onDock: (dock: Dock) => void): 
 				onTap();
 			},
 		},
+	};
+}
+
+/** A box on screen, CSS pixels (a DOMRect's fields). */
+export interface Box {
+	readonly left: number;
+	readonly top: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+/** Where a floating panel goes: its left and width, and its top or its bottom (from the viewport's bottom), with its height cap. */
+export interface Placement {
+	readonly left: number;
+	readonly width: number;
+	readonly top?: number;
+	readonly bottom?: number;
+	readonly maxHeight: number;
+}
+
+/** The bubble's width and height caps on a wide screen. */
+export const BUBBLE_WIDTH = 400;
+export const BUBBLE_MAX_HEIGHT = 600;
+/** Space kept between a panel and what opened it, and between a panel and the viewport's edges. */
+export const PANEL_GAP = 8;
+export const VIEW_MARGIN = 12;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
+
+/**
+ * The bubble beside the mascot: on its inner side (left of a mascot docked
+ * right), opening upward from the mascot's bottom when the mascot is in the
+ * lower half and downward from its top otherwise; moved and capped to stay
+ * whole in the viewport.
+ */
+export function bubblePlacement(mascot: Box, view: Viewport, side: "left" | "right"): Placement {
+	const width = Math.min(BUBBLE_WIDTH, view.width - 2 * VIEW_MARGIN);
+	const beside = side === "right" ? mascot.left - PANEL_GAP - width : mascot.left + mascot.width + PANEL_GAP;
+	const left = clamp(beside, VIEW_MARGIN, view.width - VIEW_MARGIN - width);
+	const below = mascot.top + mascot.height / 2 > view.height / 2;
+	if (below) {
+		const bottom = clamp(view.height - (mascot.top + mascot.height), VIEW_MARGIN, view.height - 2 * VIEW_MARGIN);
+		return { left, width, bottom, maxHeight: Math.min(BUBBLE_MAX_HEIGHT, view.height - bottom - VIEW_MARGIN) };
+	}
+	const top = clamp(mascot.top, VIEW_MARGIN, view.height - 2 * VIEW_MARGIN);
+	return { left, width, top, maxHeight: Math.min(BUBBLE_MAX_HEIGHT, view.height - top - VIEW_MARGIN) };
+}
+
+/** Room under a menu's button that is enough to open it there. */
+export const MENU_ROOM = 160;
+
+/**
+ * A menu under the button that opened it, its right edge on the button's;
+ * above the button only when there is not MENU_ROOM below and more room
+ * above. Moved and capped to stay whole in the viewport.
+ */
+export function menuPlacement(button: Box, view: Viewport, width: number): Placement {
+	const w = Math.min(width, view.width - 2 * VIEW_MARGIN);
+	const left = clamp(button.left + button.width - w, VIEW_MARGIN, view.width - VIEW_MARGIN - w);
+	const roomBelow = view.height - (button.top + button.height) - PANEL_GAP - VIEW_MARGIN;
+	const roomAbove = button.top - PANEL_GAP - VIEW_MARGIN;
+	if (roomBelow >= MENU_ROOM || roomBelow >= roomAbove) return { left, width: w, top: button.top + button.height + PANEL_GAP, maxHeight: Math.max(0, roomBelow) };
+	return { left, width: w, bottom: view.height - button.top + PANEL_GAP, maxHeight: Math.max(0, roomAbove) };
+}
+
+/** The inline style of a placement (position: fixed in CSS). */
+export function placementStyle(p: Placement): { left: string; width: string; top?: string; bottom?: string; maxHeight: string } {
+	return {
+		left: `${p.left}px`,
+		width: `${p.width}px`,
+		...(p.top !== undefined ? { top: `${p.top}px` } : {}),
+		...(p.bottom !== undefined ? { bottom: `${p.bottom}px` } : {}),
+		maxHeight: `${p.maxHeight}px`,
 	};
 }

@@ -7,7 +7,7 @@
 // while it thinks. Its menu turns the shown session's automatic Advisor on
 // or off. On a phone it is a bottom sheet (docs modal-popup-design.md).
 // Nothing copied inside it is kept for Advisor.
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import type { AdvisorTone } from "@achoo254/chat-core";
 import { ThreadKind } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -23,6 +23,45 @@ import type { AdvisorCopy } from "./copy-vi.ts";
 import { useAdvisorCopy } from "./use-advisor-copy.ts";
 import { isCommand, rankedOptions, useAdvisorPresence, type Answer, type Presence } from "./use-advisor-presence.ts";
 import { hasFinePointer } from "../components/fine-pointer.ts";
+import { usePopover } from "../machines/use-popover.ts";
+import { bubblePlacement, MASCOT_SIZE, menuPlacement, placementStyle, VIEW_MARGIN, type Box, type Viewport } from "./advisor-drag.ts";
+
+/** Where the bubble is a bottom sheet (advisor.css) instead of a panel beside the mascot. */
+const SHEET_QUERY = "(max-width: 760px)";
+/** The menu's width on a wide screen. */
+const MENU_WIDTH = 280;
+
+function subscribeLayout(listener: () => void): () => void {
+	window.addEventListener("resize", listener);
+	window.visualViewport?.addEventListener("resize", listener);
+	return () => {
+		window.removeEventListener("resize", listener);
+		window.visualViewport?.removeEventListener("resize", listener);
+	};
+}
+
+/**
+ * The viewport and the box `read` measures, as a string that changes only
+ * when one of them does (re-read on every render and on resize), then parsed.
+ */
+function useLayout(read: () => Box | null): { readonly view: Viewport; readonly box: Box | null; readonly sheet: boolean } {
+	const snapshot = useCallback(() => {
+		const b = read();
+		// Without matchMedia (an old WebView) the panel is placed beside the mascot.
+		const sheet = typeof window.matchMedia === "function" && window.matchMedia(SHEET_QUERY).matches;
+		return [window.innerWidth, window.innerHeight, sheet ? 1 : 0, ...(b === null ? [] : [b.left, b.top, b.width, b.height])].map((n) => Math.round(n)).join(",");
+	}, [read]);
+	const key = useSyncExternalStore(subscribeLayout, snapshot);
+	const [width = 0, height = 0, sheet = 0, left, top, w, h] = key.split(",").map(Number);
+	const box = left === undefined || top === undefined || w === undefined || h === undefined ? null : { left, top, width: w, height: h };
+	return { view: { width, height }, box, sheet: sheet === 1 };
+}
+
+/** The mascot's box without its hover shift (offset*, which transforms leave alone); null when it is hidden. */
+function mascotBox(): Box | null {
+	const el = document.querySelector<HTMLElement>("[data-id=advisor-mascot]");
+	return el === null ? null : { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight };
+}
 
 export interface AdvisorLiveProps {
 	readonly name: string;
@@ -80,8 +119,12 @@ function Bubble({ name, look, tone, store, presence, attached, setAttached, offe
 		return () => document.removeEventListener("keydown", onKey);
 	}, [store]);
 	const elsewhere = state.dot && current === undefined;
+	// Beside the mascot, toward the room there is (a hidden mascot: its corner); a bottom sheet on a phone (CSS).
+	const layout = useLayout(mascotBox);
+	const anchor = layout.box ?? { left: layout.view.width - MASCOT_SIZE, top: layout.view.height - MASCOT_SIZE - VIEW_MARGIN, width: MASCOT_SIZE, height: MASCOT_SIZE };
+	const style = layout.sheet ? undefined : placementStyle(bubblePlacement(anchor, layout.view, state.dock.side));
 	return (
-		<section ref={ref} className="adv-bubble" role="dialog" aria-label={name} data-side={state.dock.side} {...{ [IGNORE_ATTR]: "" }}>
+		<section ref={ref} className="adv-bubble" role="dialog" aria-label={name} data-side={state.dock.side} style={style} {...{ [IGNORE_ATTR]: "" }}>
 			<header className="adv-head">
 				<img src={pictureOf(look, state.mood)} alt="" className="adv-head-pic" />
 				<b className="grow">{name}</b>
@@ -488,7 +531,8 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 	const t = useAdvisorCopy();
 	const tm = useMachinesCopy();
 	const { session } = useAdvisorState(store);
-	const [open, setOpen] = useState(false);
+	// Closes on a click outside it (or Esc, below).
+	const { open, setOpen, ref } = usePopover();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const link = session === null ? null : presence.hub.link(session.machine);
@@ -506,13 +550,32 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 			.catch((err: unknown) => setError(errorText(tm, err, providerOf(linkState?.info ?? null, thread?.provider ?? "")?.name ?? "AI")))
 			.finally(() => setBusy(false));
 	};
+	const button = useRef<HTMLButtonElement>(null);
+	const readButton = useCallback((): Box | null => {
+		const r = button.current?.getBoundingClientRect();
+		return r === undefined ? null : { left: r.left, top: r.top, width: r.width, height: r.height };
+	}, []);
+	const layout = useLayout(readButton);
+	const place = layout.box === null ? undefined : placementStyle(menuPlacement(layout.box, layout.view, MENU_WIDTH));
+	// Esc closes the menu only, not the bubble around it: taken on the way down, before the bubble hears it.
+	useEffect(() => {
+		if (!open) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			event.stopPropagation();
+			setOpen(false);
+			button.current?.focus();
+		};
+		document.addEventListener("keydown", onKey, true);
+		return () => document.removeEventListener("keydown", onKey, true);
+	}, [open, setOpen]);
 	return (
-		<div className="adv-menu-anchor">
-			<button type="button" className="icon-btn" aria-label={t.menu.label} aria-expanded={open} onClick={() => setOpen(!open)}>
+		<div className="adv-menu-anchor" ref={ref}>
+			<button ref={button} type="button" className="icon-btn" aria-label={t.menu.label} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)}>
 				<Icon name="dots" small />
 			</button>
 			{open && (
-				<div className="adv-menu" role="group" aria-label={t.menu.label}>
+				<div className="adv-menu" role="group" aria-label={t.menu.label} style={place}>
 					{thread !== undefined && (
 						<div className="adv-menu-row">
 							<span className="grow">

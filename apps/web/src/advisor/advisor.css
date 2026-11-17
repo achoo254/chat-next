@@ -1,10 +1,12 @@
 /* Advisor: the floating mascot, the short line beside it and its bubble.
-   The mascot keeps to a band clear of headers (72px) and composers (132px
-   from the bottom), inside the safe areas: only it (what is tapped) minds
-   them. --adv-y is its height in the band (0..1, advisor-drag.ts). */
+   The mascot keeps to a band from below the headers (72px) down to the
+   bottom edge (8px), inside the safe areas: only it (what is tapped) minds
+   them. --adv-y is its height in the band (0..1, advisor-drag.ts). On a wide
+   screen the bubble and its menu are placed beside what opened them by
+   advisor-drag.ts (inline left, width, top or bottom, max-height). */
 .adv-mascot {
 	position: fixed; z-index: 45; width: 56px; height: 56px; padding: 0; border: 0; background: none; cursor: grab; touch-action: none;
-	top: clamp(calc(env(safe-area-inset-top) + 72px), calc(72px + var(--adv-y, 0.62) * (100dvh - 260px)), calc(100dvh - env(safe-area-inset-bottom) - 188px));
+	top: clamp(calc(env(safe-area-inset-top) + 72px), calc(72px + var(--adv-y, 0.62) * (100dvh - 136px)), calc(100dvh - env(safe-area-inset-bottom) - 64px));
 	transition: transform var(--dur-base) var(--ease-standard), right var(--dur-base) var(--ease-standard), left var(--dur-base) var(--ease-standard);
 	-webkit-tap-highlight-color: transparent; user-select: none;
 }
@@ -29,19 +31,19 @@
 .adv-flash {
 	position: fixed; z-index: 45; max-width: min(260px, calc(100vw - 96px)); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
 	border: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text); box-shadow: var(--shadow-md); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer;
-	top: clamp(calc(env(safe-area-inset-top) + 72px), calc(80px + var(--adv-y, 0.62) * (100dvh - 260px)), calc(100dvh - env(safe-area-inset-bottom) - 188px));
+	top: clamp(calc(env(safe-area-inset-top) + 72px), calc(80px + var(--adv-y, 0.62) * (100dvh - 136px)), calc(100dvh - env(safe-area-inset-bottom) - 104px));
 }
 .adv-flash[data-side="right"] { right: calc(env(safe-area-inset-right) + 56px); }
 .adv-flash[data-side="left"] { left: calc(env(safe-area-inset-left) + 56px); }
 
 /* The bubble: beside the mascot on wide screens, a bottom sheet on phones; head and foot always show, the body scrolls. */
+/* The bubble: beside the mascot on wide screens (placed inline), a bottom sheet on phones; head and foot always show, the body scrolls.
+   No transform here: its menu is position: fixed against the viewport. */
 .adv-bubble {
-	position: fixed; z-index: 46; top: 50%; transform: translateY(-50%); width: min(400px, calc(100vw - 112px));
+	position: fixed; z-index: 46; right: calc(env(safe-area-inset-right) + 76px); bottom: var(--space-4); width: min(400px, calc(100vw - 112px));
 	max-height: min(600px, calc(100dvh - 2 * var(--space-4))); display: flex; flex-direction: column; overflow: hidden;
 	border-radius: var(--radius-lg); border: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text); box-shadow: var(--shadow-md);
 }
-.adv-bubble[data-side="right"] { right: calc(env(safe-area-inset-right) + 64px); }
-.adv-bubble[data-side="left"] { left: calc(env(safe-area-inset-left) + 64px); }
 .adv-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
 .adv-head-pic { width: 28px; height: 28px; object-fit: contain; }
 .adv-form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -82,19 +84,19 @@
 .adv-option { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: 0.875rem; }
 .adv-option .grow { min-width: 0; overflow-wrap: anywhere; }
 .adv-option .mx-bar { width: 56px; }
-.adv-menu-anchor { position: relative; }
+/* The bubble's menu: fixed under its button (placed inline), so the bubble's own overflow never cuts it. */
 .adv-menu {
-	position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 1; display: grid; gap: var(--space-1); width: 260px; padding: var(--space-2);
-	border-radius: var(--radius-md); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md);
+	position: fixed; z-index: 47; display: grid; align-content: start; gap: var(--space-1); padding: var(--space-2); overflow-y: auto; overscroll-behavior: contain;
+	border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text); box-shadow: var(--shadow-md);
 }
 .adv-menu-row { display: flex; align-items: center; gap: var(--space-2); }
-.adv-menu-row > .grow { display: grid; gap: 2px; font-size: 0.875rem; }
+.adv-menu-row > .grow { display: grid; gap: 2px; min-width: 0; font-size: 0.875rem; }
 .adv-menu-item { min-height: 36px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
 .adv-menu-item:hover { background: var(--c-hover); }
 
 @media (max-width: 760px) {
 	.adv-bubble, .adv-bubble[data-side="right"], .adv-bubble[data-side="left"] {
-		left: 0; right: 0; top: auto; bottom: 0; transform: none; width: 100%; max-height: 92dvh; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-height: 92dvh; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 	}
 	.adv-foot { padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); }
 	.adv-acts .btn { flex: 1 1 auto; min-height: 44px; }

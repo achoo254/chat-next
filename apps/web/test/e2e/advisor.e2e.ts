@@ -153,6 +153,65 @@ test("a failed push copied from Source Control goes with its failure_id; 'Gửi 
 	await context.close();
 });
 
+for (const height of [900, 1450]) {
+	test(`dragged to the bottom right corner (1376×${height}): it reaches the edge, the bubble opens beside it and its menu is whole`, async () => {
+		const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1376, height } });
+		const page = await context.newPage();
+		const errors: string[] = [];
+		page.on("pageerror", (err) => errors.push(String(err)));
+		await page.goto(`http://localhost:${PORT}/?at=machine-chat`);
+		const mascot = page.locator("[data-id=advisor-mascot]");
+		await mascot.waitFor({ timeout: 30_000 });
+		const start = await mascot.boundingBox();
+		assert.ok(start !== null);
+		await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(1370, height - 2, { steps: 8 });
+		await page.mouse.up();
+		await page.mouse.move(400, 300);
+		// It slides to the bottom edge (over the composer if the user wants it there).
+		await until(page, "at the bottom edge", () => {
+			const r = document.querySelector("[data-id=advisor-mascot]")?.getBoundingClientRect();
+			return r !== undefined && r.bottom >= window.innerHeight - 10;
+		});
+		const m = await mascot.boundingBox();
+		assert.ok(m !== null);
+
+		await mascot.click();
+		const bubble = page.getByRole("dialog", { name: "Cố vấn" });
+		await bubble.waitFor();
+		await page.waitForTimeout(300);
+		const b = await bubble.boundingBox();
+		assert.ok(b !== null);
+		// Beside the mascot, on its left, opening upward from its bottom; whole in the viewport.
+		assert.ok(b.x + b.width <= m.x + 1, `bubble ends at ${b.x + b.width}, mascot starts at ${m.x}`);
+		assert.ok(m.x - (b.x + b.width) <= 40, `bubble ${m.x - (b.x + b.width)} px away from the mascot`);
+		assert.ok(Math.abs(b.y + b.height - (m.y + m.height)) <= 16, `bubble bottom ${b.y + b.height}, mascot bottom ${m.y + m.height}`);
+		assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.width <= 1376 && b.y + b.height <= height);
+
+		await bubble.getByRole("button", { name: "Tuỳ chọn Cố vấn" }).click();
+		const menu = page.getByRole("group", { name: "Tuỳ chọn Cố vấn" });
+		await menu.waitFor();
+		const r = await menu.boundingBox();
+		assert.ok(r !== null);
+		assert.ok(r.x >= 0 && r.y >= 0 && r.x + r.width <= 1376 && r.y + r.height <= height, `menu at ${JSON.stringify(r)}`);
+		// Nothing cuts it: each of its items is what the page shows at its own left edge.
+		for (const name of ["Mở cài đặt Cố vấn", "Ẩn mascot"]) {
+			const item = menu.getByRole("button", { name });
+			const box = await item.boundingBox();
+			assert.ok(box !== null);
+			const hit = await page.evaluate(([x, y, label]) => document.elementFromPoint(x, y)?.closest("button")?.textContent?.trim() === label, [box.x + 6, box.y + box.height / 2, name] as const);
+			assert.ok(hit, `${name} is covered or cut`);
+		}
+		// Esc closes the menu only; the bubble stays.
+		await page.keyboard.press("Escape");
+		await menu.waitFor({ state: "detached" });
+		assert.equal(await bubble.isVisible(), true);
+		assert.deepEqual(errors, []);
+		await context.close();
+	});
+}
+
 test("on a phone the mascot snaps to the edge it is dragged to, keeps it, and the bubble is a bottom sheet", async () => {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 	const page = await context.newPage();
