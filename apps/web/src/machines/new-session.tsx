@@ -12,8 +12,8 @@
 // idle session will be parked when the machine is full. A second tab opens
 // a session the machine already keeps (from a terminal, an IDE, Claude
 // Desktop); it loads only when picked. Where the AI offers it, the session
-// opens in chat or in its own CLI in the machine's terminal (the last choice
-// on the machine comes first); a terminal session needs no first message.
+// opens in chat or in its own CLI in the machine's terminal (the project's
+// own pick, else the last choice on the machine, comes first); a terminal session needs no first message.
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { ErrorCode, LoginState, ThreadState, type DirListResult, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { PlainTextBox } from "../components/plain-text-box.tsx";
@@ -25,7 +25,7 @@ import { AGENT_PARKED_SESSION, versionAtLeast } from "./agent-version.ts";
 import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf, sessionProvider } from "./use-machines.ts";
-import { lastMode, modePath, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { modePath, projectMode, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { loadsProjectConfig } from "./project-config.tsx";
 import { samePath } from "./projects-view.ts";
@@ -67,6 +67,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 	// The project picked (its defaults apply); "" for none.
 	const [projectId, setProjectId] = useState(project?.id ?? "");
 	const [mode, setMode] = useState(project?.defaults?.permissionMode ?? "");
+	const [effort, setEffort] = useState(project?.defaults?.effort ?? "");
 	const projects = state.projects?.projects.filter((p) => !p.missing) ?? [];
 	// The AI of the project picked ("" when it lets each session pick).
 	const [projectAi, setProjectAi] = useState(project?.defaults?.provider ?? "");
@@ -92,9 +93,10 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 	const [error, setError] = useState("");
 	const ai = aiName(state.info, provider);
 	const offered = terminalOffered(state.info, provider);
-	const [picked, setPicked] = useState<SessionMode>(() => lastMode(machine));
+	const [picked, setPicked] = useState<SessionMode>(() => projectMode(project?.defaults, machine));
 	const openIn: SessionMode = offered ? picked : "chat";
 	const models = providerOf(state.info, provider)?.capabilities?.models ?? [];
+	const efforts = providerOf(state.info, provider)?.capabilities?.effortLevels ?? [];
 
 	const browse = (dir: string) => {
 		setTyping(false);
@@ -161,7 +163,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 		const picked = projects.find((p) => p.id === projectId);
 		// The project as the machine lists it now: a device that gave it an AI meanwhile keeps its own.
 		if (chosen === "" || (picked?.defaults?.provider ?? "") !== "" || picked === undefined || !samePath(picked.dir, dir)) return;
-		const defaults = { provider, model: "", permissionMode: "", projectSettings: picked.defaults?.projectSettings ?? false };
+		const defaults = { provider, model: "", permissionMode: "", effort: "", sessionMode: picked.defaults?.sessionMode ?? "", projectSettings: picked.defaults?.projectSettings ?? false };
 		// Nothing depends on it: a refusal leaves the project as it was.
 		link.request({ case: "projectUpdate", value: { id: picked.id, defaults } }).catch(() => undefined);
 	};
@@ -192,6 +194,8 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 					consent: { sensitive: consent, projectSettings: loadProject, trustProject: loadProject && trust },
 					// The project's mode is its own AI's: another AI starts as the machine has it.
 					permissionMode: projectId !== "" && provider === projectAi ? mode : "",
+					// An effort is one of its AI's levels: it never carries over to another AI.
+					effort: efforts.includes(effort) ? effort : "",
 				},
 			})
 			.then(
@@ -275,6 +279,7 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 											onChange={() => {
 												setProvider(p.id);
 												setModel("");
+												setEffort("");
 											}}
 										/>
 										<b>{p.name || p.id}</b>
@@ -311,6 +316,8 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 									setProvider("");
 									if (picked === undefined) return;
 									setModel(picked.defaults?.model ?? "");
+									setEffort(picked.defaults?.effort ?? "");
+									setPicked(projectMode(picked.defaults, machine));
 									setProjectSettings(loadsProjectConfig(picked));
 									browse(picked.dir);
 								}}
@@ -494,6 +501,19 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 								{models.map((m) => (
 									<option key={m.id} value={m.id}>
 										{m.name || m.id}
+									</option>
+								))}
+							</select>
+						</label>
+					)}
+					{efforts.length > 0 && (
+						<label className="mx-field-row">
+							<span>{t.chat.effort}</span>
+							<select className="input" value={efforts.includes(effort) ? effort : ""} onChange={(event) => setEffort(event.target.value)} data-id="new-session-effort">
+								<option value="">{t.chat.effortDefault}</option>
+								{efforts.map((level) => (
+									<option key={level} value={level}>
+										{t.chat.efforts[level] ?? level}
 									</option>
 								))}
 							</select>

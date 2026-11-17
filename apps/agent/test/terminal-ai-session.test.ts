@@ -144,12 +144,12 @@ describe("what a device can ask the terminal to run", () => {
   it("claude: resumes a Claude session id only, picks a new id otherwise, passes only its own models and modes", () => {
     const base = { dir: "/w" };
     const id = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
-    expect(terminalCommand("/bin/claude", { ...base, resumeId: id, account: { id: "p1", dir: "/p1" }, model: "opus", permissionMode: "plan" }, () => "x")).toEqual({
+    expect(terminalCommand("/bin/claude", { ...base, resumeId: id, account: { id: "p1", dir: "/p1" }, model: "opus", effort: "high", permissionMode: "plan" }, () => "x")).toEqual({
       file: "/bin/claude",
-      args: ["--resume", id, "--model", "opus", "--permission-mode", "plan", "--settings", TURN_END_SETTINGS],
+      args: ["--resume", id, "--model", "opus", "--effort", "high", "--permission-mode", "plan", "--settings", TURN_END_SETTINGS],
       env: { CLAUDE_CONFIG_DIR: "/p1" },
     });
-    expect(terminalCommand("/bin/claude", { ...base, model: "--evil", permissionMode: "bypassPermissions" }, () => id)).toEqual({
+    expect(terminalCommand("/bin/claude", { ...base, model: "--evil", effort: "--evil", permissionMode: "bypassPermissions" }, () => id)).toEqual({
       file: "/bin/claude",
       args: ["--session-id", id, "--settings", TURN_END_SETTINGS],
       env: {},

@@ -1173,6 +1173,8 @@ export const viMachines = {
 			modelDefault: (ai: string) => `Mặc định của ${ai}`,
 			mode: "Chế độ quyền mặc định",
 			modeMachine: "Theo cấu hình trên máy",
+			effort: "Mức suy nghĩ mặc định",
+			viewLast: "Lần dùng gần nhất",
 			projectSettings: "Nạp cấu hình AI của dự án",
 			save: "Lưu",
 			sessions: (n: number) => `${n} phiên`,

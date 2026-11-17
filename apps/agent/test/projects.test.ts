@@ -153,21 +153,32 @@ describe("projects", () => {
     mkdirSync(other);
     const a = projects.add({ dir: work, name: "A", sensitive: false, device: "p" });
     const b = projects.add({ dir: other, name: "B", sensitive: false, device: "p" });
-    const modes = (provider: string) => (provider === "claude" ? ["default", "plan"] : undefined);
-    projects.update({ id: b, name: "  Bee  ", pinned: true, defaults: { provider: "claude", model: "sonnet", permissionMode: "plan", projectSettings: true } }, modes);
+    const modes = (provider: string) => (provider === "claude" ? { permissionModes: ["default", "plan"], effortLevels: ["low", "high"] } : undefined);
+    const none = { effort: "", sessionMode: "" };
+    projects.update({ id: b, name: "  Bee  ", pinned: true, defaults: { provider: "claude", model: "sonnet", permissionMode: "plan", effort: "high", sessionMode: "terminal", projectSettings: true } }, modes);
     expect((await projects.list()).projects.map((p) => [p.name, p.pinned])).toEqual([
       ["Bee", true],
       ["A", false],
     ]);
-    expect((await projects.list()).projects.find((p) => p.name === "Bee")?.defaults).toMatchObject({ provider: "claude", model: "sonnet", permissionMode: "plan" });
-    expect(await reason(() => projects.update({ id: a, defaults: { provider: "claude", model: "", permissionMode: "bypassPermissions", projectSettings: false } }, modes))).toBe(
+    expect((await projects.list()).projects.find((p) => p.name === "Bee")?.defaults).toMatchObject({ provider: "claude", model: "sonnet", permissionMode: "plan", effort: "high", sessionMode: "terminal" });
+    expect(await reason(() => projects.update({ id: a, defaults: { provider: "claude", model: "", permissionMode: "bypassPermissions", ...none, projectSettings: false } }, modes))).toBe(
       ErrorReason.PERMISSION_MODE_NOT_ALLOWED,
     );
     // A model or a mode needs the AI it belongs to; an AI the machine does not know is refused.
-    expect(await reason(() => projects.update({ id: a, defaults: { provider: "", model: "sonnet", permissionMode: "", projectSettings: false } }, modes))).toBe(
+    expect(await reason(() => projects.update({ id: a, defaults: { provider: "", model: "sonnet", permissionMode: "", ...none, projectSettings: false } }, modes))).toBe(
       ErrorReason.PROVIDER_REQUIRED,
     );
-    expect(await reason(() => projects.update({ id: a, defaults: { provider: "nope", model: "", permissionMode: "", projectSettings: false } }, modes))).toBe(ErrorReason.UNKNOWN_AI);
+    expect(await reason(() => projects.update({ id: a, defaults: { provider: "nope", model: "", permissionMode: "", ...none, projectSettings: false } }, modes))).toBe(ErrorReason.UNKNOWN_AI);
+    // An effort belongs to its AI as a model does, and must be one the AI accepts.
+    expect(await reason(() => projects.update({ id: a, defaults: { provider: "", model: "", permissionMode: "", effort: "high", sessionMode: "", projectSettings: false } }, modes))).toBe(
+      ErrorReason.PROVIDER_REQUIRED,
+    );
+    expect(await reason(() => projects.update({ id: a, defaults: { provider: "claude", model: "", permissionMode: "", effort: "max", sessionMode: "", projectSettings: false } }, modes))).toBe(
+      ErrorReason.UNKNOWN_EFFORT,
+    );
+    // A view the machine does not know falls back to the one last used on the device.
+    projects.update({ id: a, defaults: { provider: "claude", model: "", permissionMode: "", effort: "", sessionMode: "office", projectSettings: false } }, modes);
+    expect((await projects.list()).projects.find((p) => p.name === "A")?.defaults.sessionMode).toBe("");
     expect(await reason(() => projects.update({ id: a, name: "\u0001\u0002" }, modes))).toBe(ErrorReason.NAME_INVALID);
     projects.update({ id: b, pinned: false }, modes);
     projects.reorder([b, a]);

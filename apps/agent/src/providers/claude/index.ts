@@ -258,7 +258,7 @@ export const TURN_END_SETTINGS = JSON.stringify({ hooks: { Stop: [{ hooks: [{ ty
 /**
  * `claude` for a thread in the terminal, with what the chat view would use:
  * its session (resumed, or a new one with an id picked here), model,
- * permission mode and account, and the hook that marks each turn's end
+ * effort, permission mode and account, and the hook that marks each turn's end
  * (TURN_END_SETTINGS). Only values from Claude's own lists become arguments.
  * Setting sources stay the CLI's own (user, project, local): the folder's
  * skills, commands and settings load as in any terminal, after the CLI's own
@@ -275,6 +275,7 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
     args.push("--session-id", sessionId);
   }
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
+  if (req.effort && CLAUDE_CAPABILITIES.effortLevels.includes(req.effort)) args.push("--effort", req.effort);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
   args.push("--settings", TURN_END_SETTINGS);
   return { file: bin, args, env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {}, ...(sessionId ? { sessionId } : {}) };

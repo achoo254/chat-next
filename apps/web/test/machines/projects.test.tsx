@@ -125,6 +125,23 @@ describe("a workspace row", () => {
 		expect(document.querySelector("[role=dialog]")).toBeNull();
 	});
 
+	it("'+' uses the project's own effort and view over the last one used on the machine", async () => {
+		window.localStorage.setItem("ai:mode:1", "terminal");
+		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { provider: "claude", effort: "high", sessionMode: "chat" } })];
+		const mac = machine(1, "Mac", own, {
+			info: terminal,
+			answer: async (req) => (req.case === "threadCreate" ? ({ body: { case: "threadCreated", value: { thread: { id: "t9", provider: "claude", dir: "/w/app" } } } } as unknown as Frame) : null),
+		});
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 1 }]);
+		const { ctx, node } = await oneProject(server, [mac.view]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={ctx} />);
+		await userEvent.click(screen.getByRole("button", { name: "Phiên mới trong app" }));
+		await waitFor(() => expect(window.location.pathname).toBe("/ai/1/s/t9"));
+		const made = mac.sent.find((r) => r.case === "threadCreate");
+		expect(made?.case === "threadCreate" ? made.value.effort : null).toBe("high");
+	});
+
 	it("offers no new session in a folder that is gone from the machine", async () => {
 		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", missing: true })];
 		const server = new FakeAgentProjects();

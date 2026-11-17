@@ -1,7 +1,7 @@
 // What a machine knows about one of its folders (loaded when first opened):
 // a folder picker (typed, or browsed with git branches) and the settings a
-// new session in a workspace starts with (the AI, its model and permission
-// mode, as that AI offers them), which the machine keeps for the folder, with
+// new session in a workspace starts with (the AI, its model, permission
+// mode and effort, as that AI offers them, and chat or its own CLI), which the machine keeps for the folder, with
 // the folder's AI configuration switch (or, on a machine before it, the
 // per-session tick).
 import { useEffect, useState, type FormEvent } from "react";
@@ -10,6 +10,7 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { projectConfigErrorText, projectConfigUnsupported, setProjectConfig } from "./project-config.tsx";
+import { terminalGate } from "./agent-version.ts";
 import { modeLabel } from "./status-line.ts";
 import { aiName, errorText, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -159,10 +160,16 @@ export function ProjectSettingsDialog({ link, project, state, onClose }: { link:
 	const caps = providerOf(info, provider)?.capabilities;
 	const models = caps?.models ?? [];
 	const modes = caps?.permissionModes ?? [];
+	const efforts = caps?.effortLevels ?? [];
+	// New sessions can open in the AI's own CLI where the machine has its terminal and the AI opens there.
+	const terminalAsk = terminalGate(info) === "available" && (provider === "" || caps?.terminal === true);
 	const bypass = caps?.bypassModeId ?? "";
 	const ai = aiName(info, provider);
 	const [model, setModel] = useState(project.defaults?.model ?? "");
 	const [mode, setMode] = useState(project.defaults?.permissionMode ?? "");
+	const [effort, setEffort] = useState(project.defaults?.effort ?? "");
+	// "chat", "terminal", or "" for the view last used on this device.
+	const [view, setView] = useState(project.defaults?.sessionMode ?? "");
 	const [settings, setSettings] = useState(project.defaults?.projectSettings ?? false);
 	// The folder's own switch where the machine has it; else the per-session tick of new sessions.
 	const [folderOffered, setFolderOffered] = useState(project.projectConfig !== ProjectConfigLevel.UNSPECIFIED);
@@ -191,7 +198,7 @@ export function ProjectSettingsDialog({ link, project, state, onClose }: { link:
 		setBusy(true);
 		// With the folder's switch, new sessions tick what it says, so they never ask to trust a folder that is off.
 		const projectSettings = folderOffered ? folderOn : settings;
-		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { provider, model, permissionMode: mode, projectSettings } } }).then(onClose, (err: unknown) => {
+		link.request({ case: "projectUpdate", value: { id: project.id, defaults: { provider, model, permissionMode: mode, effort, sessionMode: view, projectSettings } } }).then(onClose, (err: unknown) => {
 			setBusy(false);
 			setError(errorText(t, err, ai));
 		});
@@ -208,10 +215,11 @@ export function ProjectSettingsDialog({ link, project, state, onClose }: { link:
 							className="input"
 							value={provider}
 							onChange={(event) => {
-								// Another AI: the model and mode picked were the old one's.
+								// Another AI: the model, mode and effort picked were the old one's.
 								setProvider(event.target.value);
 								setModel("");
 								setMode("");
+								setEffort("");
 							}}
 							data-id="project-settings-ai"
 						>
@@ -247,6 +255,29 @@ export function ProjectSettingsDialog({ link, project, state, onClose }: { link:
 							))}
 						</select>
 					</label>
+					{(efforts.length > 0 || provider === "") && (
+						<label className="mx-field-row">
+							<span>{p.effort}</span>
+							<select className="input" value={effort} disabled={provider === ""} onChange={(event) => setEffort(event.target.value)} data-id="project-settings-effort">
+								<option value="">{p.modelDefault(ai)}</option>
+								{efforts.map((level) => (
+									<option key={level} value={level}>
+										{t.chat.efforts[level] ?? level}
+									</option>
+								))}
+							</select>
+						</label>
+					)}
+					{terminalAsk && (
+						<label className="mx-field-row">
+							<span>{t.terminal.mode.label}</span>
+							<select className="input" value={view} onChange={(event) => setView(event.target.value)} data-id="project-settings-view">
+								<option value="">{p.viewLast}</option>
+								<option value="chat">{t.terminal.mode.chat}</option>
+								<option value="terminal">{t.terminal.mode.terminal}</option>
+							</select>
+						</label>
+					)}
 					{folderOffered ? (
 						<>
 							<label className="mx-check">

@@ -28,7 +28,7 @@ import { SessionTabs } from "./session-tabs.tsx";
 import { sessionScope, type DockLayout } from "../terminal/terminal-layout.ts";
 import { ShellRows, type ShellsByWorkspace } from "./sidebar-shells.tsx";
 import { StatusGlyph } from "./status-glyph.tsx";
-import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
+import { modePath, projectMode, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
 import { aiName, errorText, sessionProvider, type MachineView } from "./use-machines.ts";
 import { samePath } from "./projects-view.ts";
@@ -157,11 +157,14 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 		if (provider === "") return onAsk();
 		setStarting(true);
 		// The project's mode is its own AI's: another AI starts as the machine has it.
-		const permissionMode = d !== undefined && provider === d.provider ? d.permissionMode : "";
+		const own = d !== undefined && provider === d.provider;
+		const permissionMode = own ? d.permissionMode : "";
+		// An effort is one of its AI's levels, so it follows the project's AI only.
+		const effort = own ? d.effort : "";
 		machine.link
 			.request({
 				case: "threadCreate",
-				value: { provider, model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode },
+				value: { provider, model: d?.model ?? "", dir, text: "", consent: { sensitive: false, projectSettings: d?.projectSettings ?? false, trustProject: false }, permissionMode, effort },
 			})
 			.then(
 				(frame) => {
@@ -169,7 +172,7 @@ function useQuickStart(machine: MachineView | null, dir: string, local: Project 
 					const thread = frame.body.case === "threadCreated" ? frame.body.value.thread : undefined;
 					if (thread === undefined) return;
 					adoptStarted(store, { id: machine.entry.id, link: machine.link, state: machine.state }, thread).catch(() => undefined);
-					navigate(modePath(ref, thread.id, terminalOffered(machine.state.info, thread.provider) ? lastMode(ref) : "chat"));
+					navigate(modePath(ref, thread.id, terminalOffered(machine.state.info, thread.provider) ? projectMode(d, ref) : "chat"));
 				},
 				() => {
 					// Anything to ask first (a sensitive folder, a machine before tunelo 2.0.9): the dialog.

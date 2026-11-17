@@ -12,7 +12,7 @@
 // the CLI holds a session, the chat view shows it read-only and points to
 // the terminal: no two views write to one session.
 import { useState, type ReactElement } from "react";
-import type { MachineInfo, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import type { MachineInfo, ProjectDefaults, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import { AGENT_OFFICE, terminalGate, versionAtLeast } from "./agent-version.ts";
@@ -54,6 +54,12 @@ export function lastMode(machine: string): SessionMode {
 	} catch {
 		return "chat";
 	}
+}
+
+/** The mode new sessions of a project open in: the project's own pick (a terminal only where `terminalOffered`), else the last one on the machine. */
+export function projectMode(defaults: Pick<ProjectDefaults, "sessionMode"> | undefined, machine: string): SessionMode {
+	const own = defaults?.sessionMode;
+	return own === "chat" || own === "terminal" ? own : lastMode(machine);
 }
 
 export function rememberMode(machine: string, mode: SessionMode): void {

@@ -1157,6 +1157,8 @@ export const enMachines: MachinesCopy = {
 			modelDefault: (ai: string) => `${ai}'s default`,
 			mode: "Default permission mode",
 			modeMachine: "As set on the machine",
+			effort: "Default effort",
+			viewLast: "As last used",
 			projectSettings: "Load the project's AI settings",
 			save: "Save",
 			sessions: (n: number) => (n === 1 ? "1 session" : `${n} sessions`),

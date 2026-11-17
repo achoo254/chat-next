@@ -364,6 +364,43 @@ describe("the AI of a new session", () => {
 	});
 	const created = (sent: Request[]) => sent.find((r) => r.case === "threadCreate") as (Request & { value: { provider: string; permissionMode: string } }) | undefined;
 
+	it("starts at the project's effort; another AI picked drops it, and an AI without levels shows none", async () => {
+		const withLevels = {
+			agentVersion: "9.9.9",
+			pinnedDirs: [],
+			recentDirs: [],
+			providers: [
+				{ id: "claude", name: "Claude Code", version: "2.1.0", loginState: LoginState.OK, capabilities: { effortLevels: ["low", "high"] } },
+				{ id: "antigravity", name: "Antigravity", version: "1.5.8", loginState: LoginState.OK },
+			],
+		};
+		const project = create(ProjectSchema, { id: "p", name: "app", dir: "/w/app", defaults: { provider: "claude", effort: "high" } });
+		const state = { ...stateWith([], true, withLevels), projects: { projects: [project] } } as unknown as LinkState;
+		const first = fakeLink();
+		const view = render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={first.link} state={state} project={project} onClose={() => {}} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Mức suy nghĩ (effort)" }).value).toBe("high");
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(first.sent.find((r) => r.case === "threadCreate")?.value).toMatchObject({ provider: "claude", effort: "high" }));
+		view.unmount();
+
+		const again = fakeLink();
+		render(
+			<I18nProvider>
+				<NewSession machine="1" name="Mac mini" link={again.link} state={state} project={project} onClose={() => {}} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(folderInput().value).toBe("/w/app"));
+		fireEvent.click(screen.getByRole("radio", { name: /Antigravity/ }));
+		expect(screen.queryByRole("combobox", { name: "Mức suy nghĩ (effort)" })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
+		await waitFor(() => expect(again.sent.find((r) => r.case === "threadCreate")?.value).toMatchObject({ provider: "antigravity", effort: "" }));
+	});
+
 	it("is the machine's first signed-in AI, never a fixed one", async () => {
 		const { link, sent } = fakeLink();
 		open(link, stateWith([thread("b", "/w/chat-next", 2)], true, two(LoginState.NEEDS_LOGIN, LoginState.OK)));
@@ -417,7 +454,7 @@ describe("the AI of a new session", () => {
 		fireEvent.click(screen.getByRole("radio", { name: /Antigravity/ }));
 		fireEvent.click(screen.getByRole("button", { name: "Bắt đầu" }));
 		await waitFor(() => expect(updates(first.sent)).toHaveLength(1));
-		expect(updates(first.sent)[0]?.value).toEqual({ id: "p", defaults: { provider: "antigravity", model: "", permissionMode: "", projectSettings: true } });
+		expect(updates(first.sent)[0]?.value).toEqual({ id: "p", defaults: { provider: "antigravity", model: "", permissionMode: "", effort: "", sessionMode: "", projectSettings: true } });
 		view.unmount();
 
 		// The AI left as it was offered is not a pick: nothing is saved.

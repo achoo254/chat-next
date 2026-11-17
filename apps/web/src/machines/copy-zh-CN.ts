@@ -1150,6 +1150,8 @@ export const zhCNMachines: MachinesCopy = {
 			modelDefault: (ai: string) => `${ai} 的默认值`,
 			mode: "默认权限模式",
 			modeMachine: "按设备上的配置",
+			effort: "默认思考强度",
+			viewLast: "上次使用的方式",
 			projectSettings: "加载项目的 AI 配置",
 			save: "保存",
 			sessions: (n: number) => `${n} 个会话`,

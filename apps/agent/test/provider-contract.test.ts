@@ -146,6 +146,17 @@ describe("claude adapter usage", () => {
 });
 
 describe("effort and permission mode from a device", () => {
+  it("starts a new session at the effort picked, and refuses one the AI does not know", async () => {
+    const p = fakeProvider();
+    const { core, work } = makeCore([p]);
+    const t = await core.create({ provider: p.id, model: "", dir: work, text: "one", effort: "high", consent, device: "phone" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    expect(core.info(t.id)).toMatchObject({ effort: "high" });
+    expect(p.log.starts[0]).toMatchObject({ effort: "high" });
+    await expect(core.create({ provider: p.id, model: "", dir: work, text: "two", effort: "turbo", consent, device: "phone" })).rejects.toMatchObject({ code: ErrorCode.INVALID });
+    await core.stop();
+  });
+
   it("keeps the picks across a parked session and logs a mode change", async () => {
     const p = fakeProvider();
     const { core, work, audit } = makeCore([p]);

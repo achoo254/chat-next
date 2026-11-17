@@ -434,6 +434,8 @@ export type TerminalLaunch = {
   /** The account picked on the machine for this AI; unset for its own sign-in. */
   account?: AccountScopeRef;
   model?: string;
+  /** One of the AI's own effort levels; unset for the AI's default. */
+  effort?: string;
   /** One of the AI's own permission modes (never one that skips every prompt). */
   permissionMode?: string;
 };

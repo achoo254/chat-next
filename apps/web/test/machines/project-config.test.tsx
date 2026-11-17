@@ -2,7 +2,7 @@
 // workspace's settings, the hint over a chat session that runs without it,
 // and what an older machine (no per-folder level) or a sensitive folder gets.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, MachineInfoSchema, ProjectConfigLevel, ProjectSchema, type Project } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, MachineInfoSchema, ProjectConfigLevel, ProjectSchema, TerminalAvailability, type Project } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -173,5 +173,44 @@ describe("the AI of a workspace's new sessions", () => {
 		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "AI" }).value).toBe("");
 		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Chế độ quyền mặc định" }).disabled).toBe(true);
 		expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Model mặc định" }).disabled).toBe(true);
+	});
+});
+
+describe("the effort and the view of a workspace's new sessions", () => {
+	const claude = { id: "claude", name: "Claude Code", capabilities: { terminal: true, effortLevels: ["low", "high"], permissionModes: ["default"] } };
+	const antigravity = { id: "antigravity", name: "Antigravity", capabilities: { permissionModes: ["default"] } };
+	const withTerminal = (terminal: TerminalAvailability) =>
+		({ ...state, info: create(MachineInfoSchema, { terminal, providers: [claude, antigravity] }) }) as unknown as LinkState;
+	const open = (link: MachineLink, p: Project, linkState: LinkState) =>
+		render(
+			<I18nProvider>
+				<ProjectSettingsDialog link={link} project={p} state={linkState} onClose={() => {}} />
+			</I18nProvider>,
+		);
+	const saved = (sent: Request[]) => (sent.find((r) => r.case === "projectUpdate") as unknown as { value: { defaults: { effort: string; sessionMode: string } } }).value.defaults;
+
+	it("saves the AI's own effort and the view, and drops the effort when another AI is picked", async () => {
+		const { link, sent } = fakeLink();
+		open(link, create(ProjectSchema, { id: "p1", name: "app", dir: DIR, defaults: { provider: "claude", effort: "high" } }), withTerminal(TerminalAvailability.AVAILABLE));
+		const effort = screen.getByRole<HTMLSelectElement>("combobox", { name: "Mức suy nghĩ mặc định" });
+		expect(effort.value).toBe("high");
+		expect([...effort.options].map((o) => o.value)).toEqual(["", "low", "high"]);
+		const view = screen.getByRole<HTMLSelectElement>("combobox", { name: "Mở phiên bằng" });
+		expect([...view.options].map((o) => o.value)).toEqual(["", "chat", "terminal"]);
+		await userEvent.selectOptions(view, "terminal");
+		await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+		await waitFor(() => expect(sent.find((r) => r.case === "projectUpdate")).toBeTruthy());
+		expect(saved(sent)).toMatchObject({ effort: "high", sessionMode: "terminal" });
+	});
+
+	it("keeps no effort for an AI that has none, and offers no view where the machine has no terminal", async () => {
+		const { link, sent } = fakeLink();
+		open(link, create(ProjectSchema, { id: "p1", name: "app", dir: DIR, defaults: { provider: "claude", effort: "high" } }), withTerminal(TerminalAvailability.MISSING));
+		expect(screen.queryByRole("combobox", { name: "Mở phiên bằng" })).toBeNull();
+		await userEvent.selectOptions(screen.getByRole("combobox", { name: "AI" }), "antigravity");
+		expect(screen.queryByRole("combobox", { name: "Mức suy nghĩ mặc định" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+		await waitFor(() => expect(sent.find((r) => r.case === "projectUpdate")).toBeTruthy());
+		expect(saved(sent)).toMatchObject({ effort: "", sessionMode: "" });
 	});
 });

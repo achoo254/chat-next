@@ -573,9 +573,9 @@ export class Connection {
             id: v.id,
             ...(v.name !== undefined ? { name: v.name } : {}),
             ...(v.pinned !== undefined ? { pinned: v.pinned } : {}),
-            ...(d ? { defaults: { provider: d.provider, model: d.model, permissionMode: d.permissionMode, projectSettings: d.projectSettings } } : {}),
+            ...(d ? { defaults: { provider: d.provider, model: d.model, permissionMode: d.permissionMode, effort: d.effort, sessionMode: d.sessionMode, projectSettings: d.projectSettings } } : {}),
           },
-          (provider) => this.ctx.core.aiPermissionModes(provider),
+          (provider) => this.ctx.core.aiLimits(provider),
         );
         return sendList();
       }
@@ -638,6 +638,7 @@ export class Connection {
             dir: v.dir,
             text: v.text,
             permissionMode: v.permissionMode,
+            effort: v.effort,
             consent: {
               sensitive: Boolean(v.consent?.sensitive),
               projectSettings: Boolean(v.consent?.projectSettings),

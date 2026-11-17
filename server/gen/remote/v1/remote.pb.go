@@ -5628,7 +5628,10 @@ type ThreadCreate struct {
 	// Only for an AI whose ProviderCapabilities.advisor_session is set (refused
 	// with ERROR_REASON_ADVISOR_UNAVAILABLE otherwise); machines before that
 	// know no such field and would open an ordinary thread.
-	Kind          ThreadKind `protobuf:"varint,7,opt,name=kind,proto3,enum=remote.v1.ThreadKind" json:"kind,omitempty"`
+	Kind ThreadKind `protobuf:"varint,7,opt,name=kind,proto3,enum=remote.v1.ThreadKind" json:"kind,omitempty"`
+	// One of the AI's effort_levels to start in (a project's default); empty
+	// follows the AI's own default. Machines that predate this field ignore it.
+	Effort        string `protobuf:"bytes,8,opt,name=effort,proto3" json:"effort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5710,6 +5713,13 @@ func (x *ThreadCreate) GetKind() ThreadKind {
 		return x.Kind
 	}
 	return ThreadKind_THREAD_KIND_UNSPECIFIED
+}
+
+func (x *ThreadCreate) GetEffort() string {
+	if x != nil {
+		return x.Effort
+	}
+	return ""
 }
 
 // What the user confirmed on A before opening the session.
@@ -8849,8 +8859,15 @@ type ProjectDefaults struct {
 	PermissionMode string `protobuf:"bytes,2,opt,name=permission_mode,json=permissionMode,proto3" json:"permission_mode,omitempty"`
 	// Load the project's own .claude settings (still asked to trust once).
 	ProjectSettings bool `protobuf:"varint,3,opt,name=project_settings,json=projectSettings,proto3" json:"project_settings,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// One of the AI's effort_levels; empty: the AI's default. Needs provider
+	// set, like model. Machines that predate this field drop it.
+	Effort string `protobuf:"bytes,5,opt,name=effort,proto3" json:"effort,omitempty"`
+	// How new sessions of the project open: "chat" or "terminal" (the AI's own
+	// CLI in the machine's terminal); empty: the view last used on the device.
+	// A device ignores "terminal" where the AI does not open in the terminal.
+	SessionMode   string `protobuf:"bytes,6,opt,name=session_mode,json=sessionMode,proto3" json:"session_mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProjectDefaults) Reset() {
@@ -8909,6 +8926,20 @@ func (x *ProjectDefaults) GetProjectSettings() bool {
 		return x.ProjectSettings
 	}
 	return false
+}
+
+func (x *ProjectDefaults) GetEffort() string {
+	if x != nil {
+		return x.Effort
+	}
+	return ""
+}
+
+func (x *ProjectDefaults) GetSessionMode() string {
+	if x != nil {
+		return x.SessionMode
+	}
+	return ""
 }
 
 type GitStatus struct {
@@ -23500,7 +23531,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04bodyJ\x04\bf\x10gJ\x04\bg\x10hJ\x04\bh\x10iR\btotp_setR\x13totp_status_requestR\vtotp_status\"&\n" +
 	"\n" +
 	"ThreadList\x12\x18\n" +
-	"\aadvisor\x18\x01 \x01(\bR\aadvisor\"\xe8\x01\n" +
+	"\aadvisor\x18\x01 \x01(\bR\aadvisor\"\x80\x02\n" +
 	"\fThreadCreate\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x10\n" +
@@ -23508,7 +23539,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12,\n" +
 	"\aconsent\x18\x05 \x01(\v2\x12.remote.v1.ConsentR\aconsent\x12'\n" +
 	"\x0fpermission_mode\x18\x06 \x01(\tR\x0epermissionMode\x12)\n" +
-	"\x04kind\x18\a \x01(\x0e2\x15.remote.v1.ThreadKindR\x04kind\"w\n" +
+	"\x04kind\x18\a \x01(\x0e2\x15.remote.v1.ThreadKindR\x04kind\x12\x16\n" +
+	"\x06effort\x18\b \x01(\tR\x06effort\"w\n" +
 	"\aConsent\x12\x1c\n" +
 	"\tsensitive\x18\x01 \x01(\bR\tsensitive\x12)\n" +
 	"\x10project_settings\x18\x02 \x01(\bR\x0fprojectSettings\x12#\n" +
@@ -23717,12 +23749,14 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eProjectReorder\x12\x10\n" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\"\x1f\n" +
 	"\rProjectRemove\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x97\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xd2\x01\n" +
 	"\x0fProjectDefaults\x12\x1a\n" +
 	"\bprovider\x18\x04 \x01(\tR\bprovider\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12'\n" +
 	"\x0fpermission_mode\x18\x02 \x01(\tR\x0epermissionMode\x12)\n" +
-	"\x10project_settings\x18\x03 \x01(\bR\x0fprojectSettings\"\x99\x01\n" +
+	"\x10project_settings\x18\x03 \x01(\bR\x0fprojectSettings\x12\x16\n" +
+	"\x06effort\x18\x05 \x01(\tR\x06effort\x12!\n" +
+	"\fsession_mode\x18\x06 \x01(\tR\vsessionMode\"\x99\x01\n" +
 	"\tGitStatus\x12\x10\n" +
 	"\x03git\x18\x01 \x01(\bR\x03git\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12\x18\n" +

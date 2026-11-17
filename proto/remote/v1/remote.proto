@@ -362,6 +362,9 @@ message ThreadCreate {
   // with ERROR_REASON_ADVISOR_UNAVAILABLE otherwise); machines before that
   // know no such field and would open an ordinary thread.
   ThreadKind kind = 7;
+  // One of the AI's effort_levels to start in (a project's default); empty
+  // follows the AI's own default. Machines that predate this field ignore it.
+  string effort = 8;
 }
 
 // What a thread is for.
@@ -913,6 +916,13 @@ message ProjectDefaults {
   string permission_mode = 2;
   // Load the project's own .claude settings (still asked to trust once).
   bool project_settings = 3;
+  // One of the AI's effort_levels; empty: the AI's default. Needs provider
+  // set, like model. Machines that predate this field drop it.
+  string effort = 5;
+  // How new sessions of the project open: "chat" or "terminal" (the AI's own
+  // CLI in the machine's terminal); empty: the view last used on the device.
+  // A device ignores "terminal" where the AI does not open in the terminal.
+  string session_mode = 6;
 }
 
 message GitStatus {

@@ -1168,6 +1168,8 @@ export class AgentCore {
     device: string;
     /** One of the AI's permission modes to start in; "" or unset follows the machine. */
     permissionMode?: string;
+    /** One of the AI's effort levels to start in; "" or unset follows the AI's default. */
+    effort?: string;
   }): Promise<ThreadSummary> {
     const provider = this.namedProvider(req.provider);
     const dir = resolve(req.dir);
@@ -1175,6 +1177,10 @@ export class AgentCore {
     const mode = req.permissionMode ?? "";
     if (mode !== "" && !provider.capabilities.permissionModes.includes(mode)) {
       throw new AgentError(ErrorCode.INVALID, "permission mode not allowed", { reason: ErrorReason.PERMISSION_MODE_NOT_ALLOWED, subject: mode });
+    }
+    const effort = req.effort ?? "";
+    if (effort !== "" && !provider.capabilities.effortLevels.includes(effort)) {
+      throw new AgentError(ErrorCode.INVALID, `unknown effort "${effort}"`, { reason: ErrorReason.UNKNOWN_EFFORT, subject: effort });
     }
     await this.admit(provider, dir, req.consent, req.device);
     const t = this.addThread({
@@ -1184,8 +1190,12 @@ export class AgentCore {
       model: req.model,
       projectSettings: req.consent.projectSettings,
     });
-    if (mode !== "") {
-      t.meta.permissionMode = mode;
+    if (mode !== "" || effort !== "") {
+      if (mode !== "") t.meta.permissionMode = mode;
+      if (effort !== "") {
+        t.meta.effort = effort;
+        t.info.effort = effort;
+      }
       this.saveMeta(t);
     }
     // No first message: the session waits, parked, for the one typed in it.
@@ -1865,10 +1875,10 @@ export class AgentCore {
     this.touch(t);
   }
 
-  /** Permission modes a device may pick for sessions of this AI; undefined for an AI the machine does not know. */
-  aiPermissionModes(provider: string): string[] | undefined {
+  /** Permission modes and effort levels a device may pick for sessions of this AI; undefined for an AI the machine does not know. */
+  aiLimits(provider: string): { permissionModes: string[]; effortLevels: string[] } | undefined {
     const p = this.opts.providers.find((x) => x.id === provider);
-    return p ? [...p.capabilities.permissionModes] : undefined;
+    return p ? { permissionModes: [...p.capabilities.permissionModes], effortLevels: [...p.capabilities.effortLevels] } : undefined;
   }
 
   /** Hides a thread from the list on every device, or shows it again; nothing on disk changes. */
@@ -3086,6 +3096,7 @@ export class AgentCore {
         ...(seg?.sessionId ? { resumeId: seg.sessionId } : {}),
         ...(account.scope ? { account: account.scope } : {}),
         ...(t.meta.model ? { model: t.meta.model } : {}),
+        ...(t.meta.effort ? { effort: t.meta.effort } : {}),
         ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
       });
     } catch (err) {
