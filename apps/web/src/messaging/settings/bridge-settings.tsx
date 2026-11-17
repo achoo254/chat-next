@@ -434,7 +434,7 @@ function SyncedChat({
 	);
 }
 
-/** The conversations of the account, to pick the ones to copy and how much history of each. */
+/** The conversations of the account, to pick the ones to copy (several at once, one history choice for all) and how much history of each. */
 function ChatPicker({
 	account,
 	api,
@@ -450,7 +450,7 @@ function ChatPicker({
 	const { toasts } = useServices();
 	const [list, setList] = useState<readonly BridgeConversation[] | "loading" | null>(null);
 	const [query, setQuery] = useState("");
-	const [choosing, setChoosing] = useState<string | null>(null);
+	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [kind, setKind] = useState<ConversationKind | "all">("all");
 	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
 	const [busy, setBusy] = useState(false);
@@ -479,15 +479,36 @@ function ChatPicker({
 	const byName = list.filter((c) => needle === "" || c.title.toLocaleLowerCase().includes(needle));
 	const shown = byName.filter((c) => kind === "all" || c.kind === kind);
 	const kinds = KIND_ORDER.filter((k) => byName.some((c) => c.kind === k));
-	const start = (conversation: BridgeConversation) => {
+	const chosen = list.filter((c) => selected.has(c.id) && c.chatId === 0);
+	const toggle = (id: string) =>
+		setSelected((now) => {
+			const next = new Set(now);
+			if (!next.delete(id)) next.add(id);
+			return next;
+		});
+	// One sign-in covers the whole batch: the chats go one after another within seconds. A refusal for an old sign-in
+	// stops it and keeps what is not done selected, so the same click finishes it after signing in again.
+	const start = async () => {
 		setBusy(true);
-		api.enable(account.id, conversation.id, window).then(() => {
-			setBusy(false);
-			setChoosing(null);
+		const left = new Set(selected);
+		let started = 0;
+		for (const conversation of chosen) {
+			try {
+				await api.enable(account.id, conversation.id, window);
+				left.delete(conversation.id);
+				started++;
+			} catch (err) {
+				fail(err);
+				if (bridgeError(err).kind === "reauth") break;
+			}
+		}
+		setBusy(false);
+		setSelected(left);
+		if (started > 0) {
 			toasts.show(t.pick.started);
-			setList(null);
+			api.conversations(account.id).then(setList, () => setList(null));
 			onChange();
-		}, fail);
+		}
 	};
 	return (
 		<div className="br-picker" data-id="bridge-picker">
@@ -508,10 +529,17 @@ function ChatPicker({
 			{shown.length === 0 && <p className="note br-pad">{t.pick.empty}</p>}
 			<div className="br-list" role="list">
 				{shown.map((conversation) => {
-					const open = choosing === conversation.id;
+					const synced = conversation.chatId !== 0;
+					const checked = selected.has(conversation.id);
+					const Row = synced ? "div" : "label";
 					return (
-						<div key={conversation.id} className="br-conv" data-open={open} data-id="bridge-conversation" role="listitem">
-							<div className="br-conv-main">
+						<div key={conversation.id} className="br-conv" data-selected={checked && !synced} data-id="bridge-conversation" role="listitem">
+							<Row className="br-conv-main">
+								{synced ? (
+									<span className="br-check-gap" aria-hidden="true" />
+								) : (
+									<input type="checkbox" className="br-check" checked={checked} disabled={busy} onChange={() => toggle(conversation.id)} />
+								)}
 								<span className={`avatar sm ${KIND_TONE[conversation.kind]}`} aria-hidden="true">
 									{titleInitials(conversation.title)}
 								</span>
@@ -519,46 +547,38 @@ function ChatPicker({
 									<b>{conversation.title}</b>
 									<small>{t.pick.kind[conversation.kind]}</small>
 								</span>
-								{conversation.chatId !== 0 ? (
-									<span className="tag-neutral">{t.pick.synced}</span>
-								) : (
-									<button
-										type="button"
-										className="btn btn-sm"
-										aria-expanded={open}
-										disabled={busy}
-										onClick={() => setChoosing(open ? null : conversation.id)}
-									>
-										{t.pick.sync}
-									</button>
-								)}
-							</div>
-							{open && (
-								<div className="br-panel" data-id="bridge-start">
-									<div className="br-window">
-										<span className="label">{t.pick.window}</span>
-										<Choice<string>
-											label={t.pick.window}
-											value={String(window)}
-											options={HISTORY_WINDOWS.map((n) => ({ value: String(n), label: t.pick.windowOption(n) }))}
-											onChange={(value) => setWindow(Number(value))}
-										/>
-									</div>
-									<p className="note">{t.pick.windowNote}</p>
-									<div className="br-actions end">
-										<button type="button" className="btn btn-sm" onClick={() => setChoosing(null)}>
-											{t.pick.cancel}
-										</button>
-										<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => start(conversation)}>
-											{t.pick.start}
-										</button>
-									</div>
-								</div>
-							)}
+								{synced && <span className="tag-neutral">{t.pick.synced}</span>}
+							</Row>
 						</div>
 					);
 				})}
 			</div>
+			{chosen.length > 0 && (
+				<div className="br-bar" data-id="bridge-start" role="group" aria-label={t.pick.selected(chosen.length)}>
+					<div className="br-bar-top">
+						<b>{t.pick.selected(chosen.length)}</b>
+						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => setSelected(new Set())}>
+							{t.pick.clear}
+						</button>
+					</div>
+					<div className="br-window">
+						<span className="label">{t.pick.window}</span>
+						<Choice<string>
+							label={t.pick.window}
+							value={String(window)}
+							disabled={busy}
+							options={HISTORY_WINDOWS.map((n) => ({ value: String(n), label: t.pick.windowOption(n) }))}
+							onChange={(value) => setWindow(Number(value))}
+						/>
+					</div>
+					<p className="note">{t.pick.windowNote}</p>
+					<div className="br-actions end">
+						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void start()}>
+							{t.pick.start(chosen.length)}
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

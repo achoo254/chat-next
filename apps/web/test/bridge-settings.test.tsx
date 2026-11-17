@@ -73,7 +73,7 @@ describe("connecting an app", () => {
 		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
 		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
 		const row = within(picker).getByText("Anh Đô CEO").closest("[data-id=bridge-conversation]") as HTMLElement;
-		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ" }));
+		await userEvent.click(within(row).getByRole("checkbox"));
 		fixture.bridge.reauth = true;
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
 		expect(await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG)).toBeTruthy();
@@ -97,7 +97,7 @@ describe("choosing conversations", () => {
 		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
 		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
 		const row = within(picker).getByText("Anh Đô CEO").closest("[data-id=bridge-conversation]") as HTMLElement;
-		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ" }));
+		await userEvent.click(within(row).getByRole("checkbox"));
 		expect(screen.getByText(/không đổi được: Chat không tải thêm được lịch sử cũ hơn/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "500" }));
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
@@ -108,6 +108,33 @@ describe("choosing conversations", () => {
 		await userEvent.click(within(synced).getByRole("button", { name: "Xoá bản sao" }));
 		await userEvent.click(within(synced).getByRole("button", { name: "Xoá" }));
 		await waitFor(() => expect(fixture.bridge.calls).toContain("remove:user:7"));
+	});
+});
+
+describe("choosing several conversations at once", () => {
+	it("syncs every ticked chat with one history choice and one click; an old sign-in stops it and keeps the choice", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Anh Đô CEO/ }));
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Nhóm dự án/ }));
+		expect(screen.getByText("Đã chọn 2 chat")).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "500" }));
+		// The sign-in is too old: nothing starts, and the choice is still there to finish after signing in again.
+		fixture.bridge.reauth = true;
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ 2 chat" }));
+		expect(await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual([]);
+		expect(screen.getByText("Đã chọn 2 chat")).toBeTruthy();
+		fixture.bridge.reauth = false;
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ 2 chat" }));
+		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500", "enable:chat:3:500"]));
+		await waitFor(() => expect(screen.queryByText("Đã chọn 2 chat")).toBeNull());
+		// The two are marked synced in the list now, and cannot be ticked again.
+		await waitFor(() => expect(within(picker).queryAllByText("Đã đồng bộ")).toHaveLength(2));
+		expect(within(picker).queryAllByRole("checkbox")).toHaveLength(0);
 	});
 });
 

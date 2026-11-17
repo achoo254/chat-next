@@ -519,9 +519,11 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 	"bridge-pick": async () => {
 		await click("button", "Hiện danh sách chat");
 		await find(() => document.querySelector("[data-id=bridge-picker] [data-id=bridge-conversation]"));
-		const row = await find(() => [...document.querySelectorAll("[data-id=bridge-conversation]")].find((r) => r.textContent?.includes("tg_cloudpanel_staging_bot")));
-		const button = row.querySelector("button");
-		if (button instanceof HTMLElement) button.click();
+		for (const title of ["tg_cloudpanel_staging_bot", "Anh em đoàn kết"]) {
+			const row = await find(() => [...document.querySelectorAll("[data-id=bridge-conversation]")].find((r) => r.textContent?.includes(title)));
+			const box = row.querySelector("input[type=checkbox]");
+			if (box instanceof HTMLElement) box.click();
+		}
 		await find(() => document.querySelector("[data-id=bridge-start]"));
 	},
 	// The composer's "/" picker of the demo session's commands and skills.
