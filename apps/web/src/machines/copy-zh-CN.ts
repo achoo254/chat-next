@@ -834,15 +834,6 @@ export const zhCNMachines: MachinesCopy = {
 			right: "右箭头",
 		},
 	},
-	localForward: {
-		title: "Localman 访问 localhost",
-		label: "允许 Localman 向这台机器的 localhost 发送请求",
-		onNote:
-			"用你自己的账号登录的 Localman 可以向这台机器的 localhost:<端口> 发送请求。危险端口（Docker、调试器、数据库、tunelo 和 IDE 的端口）始终被拒绝。每个请求都记录在机器上的 tunelo 日志中（tunelo logs）。",
-		offNote: "已关闭：Localman 会提示这台机器已关闭转发。可在此开启，或在机器上运行 tunelo config local-forward on。",
-		unavailable: "隧道服务器尚未转发这些请求（或机器尚未连接隧道），因此目前不会转发任何内容。",
-		failed: "无法更改设置。请重试。",
-	},
 	aiAccounts: {
 		title: "AI 账号",
 		entryNote: "添加、选择并查看这台电脑上每个 AI 的账号用量。",

@@ -841,15 +841,6 @@ export const enMachines: MachinesCopy = {
 			right: "Arrow right",
 		},
 	},
-	localForward: {
-		title: "Localman to localhost",
-		label: "Let Localman send requests to localhost on this machine",
-		onNote:
-			"Localman, signed in with your own account, can send requests to localhost:<port> on this machine. Risky ports (Docker, debuggers, databases, tunelo's and IDE ports) are always refused. Each request is written to tunelo's log on the machine (tunelo logs).",
-		offNote: "Off: Localman reports forwarding as turned off for this machine. Turn it on here, or run tunelo config local-forward on on the machine.",
-		unavailable: "The tunnel server does not carry these requests yet (or the machine tunnel is not connected), so nothing is forwarded for now.",
-		failed: "Could not change the setting. Try again.",
-	},
 	aiAccounts: {
 		title: "AI accounts",
 		entryNote: "Add, pick and check the usage of each AI's accounts on this machine.",

@@ -854,15 +854,6 @@ export const viMachines = {
 			right: "Mũi tên phải",
 		},
 	},
-	localForward: {
-		title: "Localman gọi localhost",
-		label: "Cho Localman gửi request tới localhost trên máy này",
-		onNote:
-			"Localman, đăng nhập bằng chính tài khoản của bạn, gửi được request tới localhost:<cổng> trên máy này. Cổng nguy hiểm (Docker, debug, cơ sở dữ liệu, cổng của tunelo và IDE) luôn bị chặn. Mỗi request được ghi vào nhật ký của tunelo trên máy (tunelo logs).",
-		offNote: "Đã tắt: Localman báo máy này đã tắt chuyển tiếp. Bật lại ở đây hoặc chạy tunelo config local-forward on trên máy.",
-		unavailable: "Máy chủ tunnel chưa chuyển các request này (hoặc máy chưa kết nối tunnel), nên hiện chưa có gì được chuyển.",
-		failed: "Không đổi được cài đặt. Thử lại.",
-	},
 	/** "Tài khoản AI" of a machine (machines/ai-accounts): one block per AI that keeps several accounts. */
 	aiAccounts: {
 		title: "Tài khoản AI",

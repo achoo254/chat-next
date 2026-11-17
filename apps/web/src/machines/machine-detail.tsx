@@ -1,6 +1,5 @@
 // A machine's settings (its sessions are the column's and the overview's): its terminals, a way to its AI accounts (ai-accounts/),
 // what the AI uses on it (browser, website sign-ins, screen),
-// whether Localman may send requests to localhost on it (local-forward-setting.tsx),
 // the consent log kept on the machine (opening sensitive folders, loading
 // project settings, approving sensitive tools, devices the account added or
 // revoked), what it runs, and renaming or removing the machine. Removing it
@@ -19,7 +18,6 @@ import { LOCAL_REF, setLocalMachine } from "./link/link-hub.ts";
 import { cachedProviders } from "./link/provider-cache.ts";
 import { DiskAccessBanner } from "./disk-access-banner.tsx";
 import { LinkBanner } from "./link-banner.tsx";
-import { LocalForwardSetting } from "./local-forward-setting.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
@@ -127,11 +125,10 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</div>
 					</section>
 				)}
-				{/* What the AI uses on the machine (its browser, the web sign-ins it fills there, the screen), then Localman's own setting. */}
+				{/* What the AI uses on the machine (its browser, the web sign-ins it fills there, the screen). */}
 				{state.info?.browser?.available === true && <MachineBrowser link={link} state={state} ai={mcpAi} />}
 				{state.info?.secrets === true && <SavedSecrets link={link} online={online} ai={mcpAi} />}
 				{state.info?.screenShare === true && <MachineScreen link={link} state={state} ai={mcpAi} />}
-				{state.info?.settings !== undefined && <LocalForwardSetting link={link} settings={state.info.settings} online={online} />}
 				<section className="card pad mx-card">
 					<h3>{t.detail.audit}</h3>
 					<p className="note">{t.detail.auditNote(name)}</p>
