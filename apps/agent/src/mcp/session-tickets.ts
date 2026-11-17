@@ -24,6 +24,8 @@ export interface SessionMcp {
 	advisorAllowed?: () => boolean;
 	/** The session is an Advisor thread's: its `tunelo mcp` offers Advisor's tools only (TUNELO_MCP_ADVISOR). */
 	advisorSession?: boolean;
+	/** The ticket offers advisor_weigh and nothing else (a terminal's CLI): its `tunelo mcp` lists that tool only (TUNELO_MCP_ADVISOR_WEIGH). */
+	advisorWeighOnly?: boolean;
 }
 
 /** A session's MCP, with the end of its ticket (when the session ends). */
@@ -34,20 +36,34 @@ export interface SessionMcpLease extends SessionMcp {
 export const TICKET_ENV = "TUNELO_MCP_TICKET";
 /** Set ("1") for an Advisor thread's `tunelo mcp`: it lists Advisor's tools and nothing else. */
 export const ADVISOR_MCP_ENV = "TUNELO_MCP_ADVISOR";
+/** Set ("1") for the `tunelo mcp` of a CLI in a terminal: it lists advisor_weigh and nothing else. */
+export const ADVISOR_WEIGH_MCP_ENV = "TUNELO_MCP_ADVISOR_WEIGH";
+
+/**
+ * What a ticket offers: every tool of a session tunelo opened ("session"),
+ * or advisor_weigh alone ("advisor-weigh": the AI's own CLI in a terminal,
+ * which gets no secrets, browser, Chat or Localman tools).
+ */
+export type TicketScope = "session" | "advisor-weigh";
 
 export class SessionTickets {
-	private readonly owners = new Map<string, string>();
+	private readonly owners = new Map<string, { label: string; scope: TicketScope }>();
 
 	/** A new ticket (256 bits) for the session `label` names. */
-	issue(label: string): string {
+	issue(label: string, scope: TicketScope = "session"): string {
 		const ticket = randomBytes(32).toString("base64url");
-		this.owners.set(ticket, label);
+		this.owners.set(ticket, { label, scope });
 		return ticket;
 	}
 
 	/** The session of a live ticket. */
 	owner(ticket: string): string | undefined {
-		return this.owners.get(ticket);
+		return this.owners.get(ticket)?.label;
+	}
+
+	/** What a live ticket offers; undefined for an unknown or ended one. */
+	scope(ticket: string): TicketScope | undefined {
+		return this.owners.get(ticket)?.scope;
 	}
 
 	revoke(ticket: string): void {

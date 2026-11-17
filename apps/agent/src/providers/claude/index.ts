@@ -23,6 +23,7 @@ import {
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
+import { TERMINAL_ADVISOR_MCP_SERVER } from "../../mcp/session-mcp-server.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import { redactDeep } from "../../mcp/redact.ts";
@@ -99,6 +100,8 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   sessionNotes: true,
   // Every tool call reaches tunelo's PreToolUse hook and canUseTool, in any mode.
   advisorSession: true,
+  // The CLI takes --mcp-config and a UserPromptSubmit hook (terminalCommand).
+  terminalAdvisor: true,
 };
 
 /**
@@ -253,18 +256,64 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * minute after its last write (local-sessions.ts). --settings adds this to
  * the user's own settings and hooks; "exit 0" runs in any shell claude uses.
  */
-export const TURN_END_SETTINGS = JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "exit 0" }] }] } });
+const TURN_END_HOOK = { hooks: [{ type: "command", command: "exit 0" }] };
+export const TURN_END_SETTINGS = JSON.stringify({ hooks: { Stop: [TURN_END_HOOK] } });
+
+/** How long the CLI waits for Advisor's note before a message goes on without it (the command itself gives up sooner). */
+const NOTE_HOOK_TIMEOUT_S = 5;
+
+/** advisor_weigh as the CLI in a terminal lists it: tunelo's MCP there is named apart from a "tunelo" the user added. */
+const TERMINAL_ADVISOR_TOOL = { server: TERMINAL_ADVISOR_MCP_SERVER, fullName: `mcp__${TERMINAL_ADVISOR_MCP_SERVER}__advisor_weigh` };
+
+/**
+ * One argument for the shell the CLI runs a hook's command in (`sh -c` on
+ * macOS and Linux, Git Bash on Windows): single-quoted, so nothing in it is
+ * expanded. Where the CLI falls back to PowerShell (Windows without Git
+ * Bash) the line does not parse and the hook fails with exit 1, which never
+ * holds a message back (only exit 2 does).
+ */
+export function shellArg(arg: string): string {
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * --settings and --mcp-config for automatic Advisor in the terminal (see
+ * TerminalLaunch.advisor): the turn-end hook plus a UserPromptSubmit hook
+ * that prints Advisor's note with each message, advisor_weigh allowed
+ * without a prompt, and tunelo's MCP with the thread's ticket (advisor_weigh
+ * only) under its own name (TERMINAL_ADVISOR_MCP_SERVER), so a "tunelo" MCP
+ * the user added keeps working beside it. No key goes into either: the
+ * ticket names the thread, the service holds the key. On macOS and Linux the
+ * hook names tunelo's config folder (TUNELO_HOME), so a service running on
+ * another folder than the default is the one asked; on Windows it does not
+ * (Git Bash's own environment syntax is not relied on there).
+ */
+function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): string[] {
+  if (advisor.noteCommand.length === 0) throw new Error("no command for Advisor's note");
+  const home = platform === "win32" ? "" : `TUNELO_HOME=${shellArg(advisor.configDir)} `;
+  const settings = {
+    hooks: {
+      Stop: [TURN_END_HOOK],
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: home + advisor.noteCommand.map(shellArg).join(" "), timeout: NOTE_HOOK_TIMEOUT_S }] }],
+    },
+    permissions: { allow: [TERMINAL_ADVISOR_TOOL.fullName] },
+  };
+  const mcp = { type: "stdio", ...sessionMcpLaunch({ ticket: advisor.ticket, configDir: advisor.configDir, advisorWeighOnly: true }) };
+  return ["--settings", JSON.stringify(settings), "--mcp-config", JSON.stringify({ mcpServers: { [TERMINAL_ADVISOR_MCP_SERVER]: mcp } })];
+}
 
 /**
  * `claude` for a thread in the terminal, with what the chat view would use:
  * its session (resumed, or a new one with an id picked here), model,
  * effort, permission mode and account, and the hook that marks each turn's end
- * (TURN_END_SETTINGS). Only values from Claude's own lists become arguments.
+ * (TURN_END_SETTINGS); with `req.advisor`, automatic Advisor's hook, tool and
+ * MCP in the same --settings, then --mcp-config (advisorArgs). Only values
+ * from Claude's own lists become arguments.
  * Setting sources stay the CLI's own (user, project, local): the folder's
  * skills, commands and settings load as in any terminal, after the CLI's own
  * folder trust prompt.
  */
-export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => string): TerminalCommand {
+export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => string, platform: NodeJS.Platform = process.platform): TerminalCommand {
   const args: string[] = [];
   let sessionId: string | undefined;
   if (req.resumeId !== undefined) {
@@ -277,8 +326,15 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
   if (req.effort && CLAUDE_CAPABILITIES.effortLevels.includes(req.effort)) args.push("--effort", req.effort);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
-  args.push("--settings", TURN_END_SETTINGS);
-  return { file: bin, args, env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {}, ...(sessionId ? { sessionId } : {}) };
+  if (req.advisor) args.push(...advisorArgs(req.advisor, platform));
+  else args.push("--settings", TURN_END_SETTINGS);
+  return {
+    file: bin,
+    args,
+    env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {},
+    ...(sessionId ? { sessionId } : {}),
+    ...(req.advisor ? { advisorTool: TERMINAL_ADVISOR_TOOL } : {}),
+  };
 }
 
 /**

@@ -544,8 +544,9 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 	const linkState = session === null ? null : presence.stateOf(session.machine);
 	const thread = session === null ? undefined : linkState?.threads.find((x) => x.id === session.threadId && x.kind !== ThreadKind.ADVISOR);
 	const caps = providerOf(linkState?.info ?? null, thread?.provider ?? "")?.capabilities;
-	// A session held by a terminal runs the CLI directly: no tunelo MCP and no note beside the messages, so automatic Advisor cannot work there.
-	const inTerminal = thread !== undefined && thread.terminalSession !== 0;
+	// A session held by a terminal runs the AI's own CLI: automatic Advisor works there only when the machine gives that CLI
+	// tunelo's MCP and Advisor's note (terminal_advisor); an older machine or another AI does not.
+	const inTerminal = thread !== undefined && thread.terminalSession !== 0 && caps?.terminalAdvisor !== true;
 	const available = linkState?.status.kind === "open" && caps?.sessionMcp === true && linkState.info?.advisor?.available === true && !inTerminal;
 	const on = session === null ? false : (linkState?.threadInfo.get(session.threadId)?.advisor ?? false);
 	const toggle = (next: boolean) => {

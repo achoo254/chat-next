@@ -36,6 +36,8 @@ let interrupts: { threadId: string; clientMsgId: string }[];
 /** What the machine says about Advisor: tunelo before 3.13 says nothing. */
 let advisor: { available: boolean; keySet: boolean } | undefined;
 let advisorSession: boolean;
+/** The machine gives Claude's CLI in a terminal Advisor too (tunelo after 3.13 says so). */
+let terminalAdvisor: boolean;
 let needsConsent: boolean;
 /** The machine answers a question at once; false leaves it running. */
 let answers: boolean;
@@ -113,6 +115,7 @@ beforeEach(async () => {
 	interrupts = [];
 	advisor = { available: true, keySet: true };
 	advisorSession = true;
+	terminalAdvisor = false;
 	needsConsent = false;
 	answers = true;
 	queued = false;
@@ -140,7 +143,7 @@ beforeEach(async () => {
 							maxSessions: 3,
 							...(advisor === undefined ? {} : { advisor: { ...advisor, keyFingerprint: advisor.keySet ? "a1b2c3" : "" } }),
 							providers: [
-								{ id: "claude", name: "Claude Code", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession } },
+								{ id: "claude", name: "Claude Code", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession, terminalAdvisor } },
 								{ id: "antigravity", name: "Antigravity", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession: false } },
 							],
 						},
@@ -286,6 +289,24 @@ describe("automatic Advisor in the menu", () => {
 			await screen.findByText(t.menu.autoTerminal, undefined, WAIT);
 			const off = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
 			expect((off as HTMLButtonElement).disabled).toBe(true);
+		} finally {
+			SESSION.terminalSession = 0;
+		}
+	});
+
+	it("is switchable for a session held by a terminal when the machine gives the terminal's CLI Advisor", async () => {
+		terminalAdvisor = true;
+		SESSION.terminalSession = 2;
+		try {
+			const store = new AdvisorStore();
+			store.setSession({ machine: "1", threadId: "s1" });
+			store.setOpen(true);
+			open(store);
+			await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
+			const toggle = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
+			await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), WAIT);
+			expect(screen.getByText(t.menu.autoHint)).toBeTruthy();
+			expect(screen.queryByText(t.menu.autoTerminal)).toBeNull();
 		} finally {
 			SESSION.terminalSession = 0;
 		}

@@ -20,7 +20,7 @@ import type { OfferedTool } from "./mcp-host.ts";
 import { failure } from "./mcp-result.js";
 import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { redactMessage } from "./redact.js";
-import { ADVISOR_MCP_ENV, TICKET_ENV } from "./session-tickets.js";
+import { ADVISOR_MCP_ENV, ADVISOR_WEIGH_MCP_ENV, TICKET_ENV } from "./session-tickets.js";
 import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
 import { ADVISOR_GROUP, registerAdvisorTools } from "../advisor/advisor-tools.ts";
@@ -183,8 +183,10 @@ export function registerMcpCommand(program: Command): void {
 				}
 			};
 
-			// Advisor's own session lists Advisor's tools and nothing else (the service refuses the rest anyway).
-			const advisorOnly = ticket !== undefined && process.env[ADVISOR_MCP_ENV] === "1";
+			// Advisor's own session lists Advisor's tools and nothing else; the AI's CLI in a terminal lists advisor_weigh
+			// alone (the service refuses the rest anyway).
+			const weighOnly = ticket !== undefined && process.env[ADVISOR_WEIGH_MCP_ENV] === "1";
+			const advisorOnly = ticket !== undefined && (process.env[ADVISOR_MCP_ENV] === "1" || weighOnly);
 			// A client that may not write does not see write tools (the service refuses them anyway).
 			const offered = advisorOnly ? { tools: [], writes: false } : await offeredTools(dir, context, ticket);
 			if (!offered.writes && !advisorOnly) context.log(LOCAL_WRITES_OFF);
@@ -218,7 +220,7 @@ export function registerMcpCommand(program: Command): void {
 				const all: [string, (t: ToolTable) => void][] = [
 					[SECRETS_GROUP, (t) => registerSecretTools(t)],
 					[BROWSER_GROUP, (t) => registerBrowserTools(t)],
-					[ADVISOR_GROUP, (t) => registerAdvisorTools(t, undefined, advisorOnly ? "advisor-session" : "work-session")],
+					[ADVISOR_GROUP, (t) => registerAdvisorTools(t, undefined, advisorOnly && !weighOnly ? "advisor-session" : "work-session")],
 				];
 				const groups = advisorOnly ? all.filter(([group]) => group === ADVISOR_GROUP) : all;
 				for (const [group, register] of groups) {

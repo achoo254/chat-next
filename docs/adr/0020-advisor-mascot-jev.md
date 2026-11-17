@@ -58,6 +58,30 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   chỉ dẫn qua hook `UserPromptSubmit` (`additionalContext`): phiên được resume dùng lại system prompt đã ghi, nên đổi system prompt không có tác
   dụng giữa phiên, còn hook thì có tác dụng từ lượt sau mà không mở lại phiên. AI không có kênh ghi chú (Antigravity) nhận chỉ dẫn sau dấu ngăn
   cố định trong tin. Cả hai kênh không vào journal, lịch sử CLI hay `/compact`; tin bắt đầu bằng `/` không bị chèn.
+- **Phiên Claude mở ở terminal cũng có chế độ tự động** (`ProviderCapabilities.terminal_advisor`; Claude bật, AI khác không). Chỉ khi máy
+  có khoá Cố vấn lúc mở CLI ở terminal, core xin một vé MCP phạm vi "advisor-weigh" cho thread (giữ từ lúc mở tới khi terminal kết thúc, bị
+  bỏ dở, thread bị xoá hay dịch vụ dừng); máy không có khoá thì lệnh terminal giữ nguyên như trước Cố vấn, và khoá đặt sau khi terminal đã mở
+  có tác dụng từ lần mở terminal kế tiếp. Có vé thì `terminalCommand` thêm vào cùng một chuỗi `--settings` hook `UserPromptSubmit` chạy
+  `tunelo advisor note <thread>` và quyền cho sẵn `mcp__tunelo-advisor__advisor_weigh`, rồi `--mcp-config` với server **`tunelo-advisor`**
+  (`tunelo mcp` mang vé và `TUNELO_MCP_ADVISOR_WEIGH=1`). Tên riêng, không phải `tunelo`, để MCP `tunelo` người dùng tự thêm
+  (`claude mcp add tunelo -- tunelo mcp`) vẫn chạy song song, không bên nào che bên nào; chỉ dẫn gửi cho CLI này nêu đúng tên đầy đủ
+  `mcp__tunelo-advisor__advisor_weigh` (phiên chat giữ `tunelo`). Vé phạm vi này chỉ có `advisor_weigh`: dịch vụ từ chối mọi nhóm khác (bí
+  mật, trình duyệt, Chat, Localman, đường hầm, `advisor_git`/`advisor_grep`) và không liệt kê tool của app.
+- **Chỉ dẫn ở terminal.** `tunelo advisor note` (không chạy bước chuẩn bị nào khác của CLI) gửi qua control socket (`POST /advisor/note`) 64
+  ký tự đầu của tin, `session_id` của CLI và mốc nó thôi chờ; core trả cùng chỉ dẫn như đường chat (`advisorNote`). Tin bắt đầu bằng `/`,
+  `!` (shell của CLI) hay `#` (bộ nhớ) không nhận gì và không đổi trạng thái. `session_id` khác lần trước (sau `/clear`, `/resume` sang hội
+  thoại khác) nghĩa là hội thoại mới chưa nghe gì: bản chỉ dẫn đầy đủ được gửi lại. Hook không xác nhận AI đã nhận, nên trạng thái "đã báo"
+  đổi khi dịch vụ trả ghi chú; quá mốc thì dịch vụ không trả và không đổi gì, còn câu trả lời tới đúng lúc hook vừa bỏ cuộc (khe dưới
+  0,2 giây) thì vẫn có thể bị tính là đã báo. Không có dịch vụ, lỗi hay quá 1,5 giây thì in `{}` và thoát 0: tin của người dùng không bao
+  giờ bị chặn. Lệnh hook dùng đường dẫn tuyệt đối của tunelo, từng đối số trong nháy đơn cho `sh`/Git Bash, và trên macOS/Linux có tiền tố
+  `TUNELO_HOME='…'` để hỏi đúng dịch vụ khi thư mục cấu hình không phải mặc định; trên Windows không có tiền tố này (dịch vụ ở thư mục khác
+  mặc định thì hook không tìm thấy nó, in `{}`), và không có Git Bash (CLI dùng PowerShell) thì hook không chạy được, lỗi đó không chặn tin.
+- **Giới hạn của đường terminal.** Vé nằm trong argv của `claude` (JSON của `--mcp-config`), nên mọi tiến trình cùng user, kể cả Bash của AI
+  trong terminal, đọc được bằng `ps`; với vé đó chỉ gọi được `advisor_weigh` cho đúng thread (tốn lượt TypeSafe, có thể thêm thẻ nhận định),
+  không chạm bí mật, Chat hay Localman. Vé chỉ sống trong bộ nhớ: dịch vụ khởi động lại khi CLI còn chạy thì CLI đó mất Cố vấn (không nhận
+  chỉ dẫn, `advisor_weigh` báo vé đã hết) tới lần mở lại terminal, dù web vẫn cho bật công tắc. Thẻ nhận định của phiên terminal dựng từ
+  transcript khi máy đọc lại (lời gọi `advisor_weigh` cùng kết quả), không gắn lượt nào nên không có `advisor_missed`. Web chỉ làm mờ công tắc
+  ở phiên terminal khi máy không báo `terminal_advisor` cho AI của phiên.
 - **Tự cho phép khi được phép.** `advisor_weigh` được tự cho phép (không thẻ duyệt) chỉ khi chế độ tự động bật hoặc thread là ADVISOR; tắt thì
   từ chối không thẻ. Phiên làm việc gọi `advisor_git`/`advisor_grep` cũng bị từ chối không thẻ.
 - **Ngưỡng `confident`:** phương án cao nhất ≥ 0,6, hơn phương án nhì ≥ 0,2 và độ tin của Jev ≥ 0,5 (`advisor-verdict.ts`); còn lại `unsure`.

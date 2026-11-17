@@ -12,9 +12,8 @@
 // the AI's own transcript back takes the note off again (userWords in
 // attachments/message-attachments.ts).
 
-export const AUTO_INSTRUCTIONS = [
-  "Advisor is on for this session. Advisor weighs options and returns how likely each is right; it never writes or runs anything.",
-  "advisor_weigh is a tool of the tunelo MCP server; its full name may carry a prefix (for example mcp__tunelo__advisor_weigh). If your tool",
+/** The lines after the tool's name: how and when to ask Advisor. */
+const AUTO_RULES = [
   "list shows it by name only, load its definition first (tool search), then call it. Do not skip it because it is not loaded yet.",
   '- When you are unsure between approaches, call advisor_weigh(kind="decision") before acting. If the result is "confident" and the',
   "  chosen action is non-destructive and inside the user's request, follow it. Deleting, pushing, deploying, sending anything outside",
@@ -23,10 +22,39 @@ export const AUTO_INSTRUCTIONS = [
   '- Before you end every turn, call advisor_weigh(kind="next_steps") with 2-5 short next steps the user could send you, in the user\'s',
   '  language, never starting with "/" or "!".',
   "- Send only a short abstract summary: never keys, passwords, tokens, private paths, personal data or code.",
-].join("\n");
+];
 
-export const AUTO_REMINDER =
-  'Advisor is on: call the tunelo MCP tool advisor_weigh (load its definition first if it is listed by name only): kind="decision" when unsure, and kind="next_steps" before you end this turn.';
+/**
+ * advisor_weigh as the session's AI sees it: the MCP server that has it and,
+ * when the adapter knows it for sure, the tool's full name there (the AI's
+ * CLI in a terminal: `mcp__tunelo-advisor__advisor_weigh`). Without a full
+ * name the instructions give the usual prefix as an example (agy's differs).
+ */
+export type AdvisorToolName = { server: string; fullName?: string };
+
+/** advisor_weigh in a session tunelo opens (SDK, ACP): of the "tunelo" server. */
+const SESSION_TOOL: AdvisorToolName = { server: "tunelo" };
+
+/** The whole text of the instructions for advisor_weigh named so. */
+export function autoInstructions(tool: AdvisorToolName = SESSION_TOOL): string {
+  const named = tool.fullName
+    ? `its full name is ${tool.fullName}.`
+    : `its full name may carry a prefix (for example mcp__${tool.server}__advisor_weigh).`;
+  return [
+    "Advisor is on for this session. Advisor weighs options and returns how likely each is right; it never writes or runs anything.",
+    `advisor_weigh is a tool of the ${tool.server} MCP server; ${named} If your tool`,
+    ...AUTO_RULES,
+  ].join("\n");
+}
+
+/** The one-line reminder for advisor_weigh named so. */
+export function autoReminder(tool: AdvisorToolName = SESSION_TOOL): string {
+  return `Advisor is on: call the ${tool.server} MCP tool ${tool.fullName ?? "advisor_weigh"} (load its definition first if it is listed by name only): kind="decision" when unsure, and kind="next_steps" before you end this turn.`;
+}
+
+export const AUTO_INSTRUCTIONS = autoInstructions();
+
+export const AUTO_REMINDER = autoReminder();
 
 export const ADVISOR_OFF = "Advisor is now off for this session: do not call advisor_weigh.";
 
@@ -47,9 +75,9 @@ export function noteStateAfterToggle(on: boolean, state: NoteState): NoteState {
 }
 
 /** tunelo's note for a message to the AI (none for a command), and where the session stands after it. */
-export function advisorNote(text: string, on: boolean, state: NoteState): { note?: string; state: NoteState } {
+export function advisorNote(text: string, on: boolean, state: NoteState, tool?: AdvisorToolName): { note?: string; state: NoteState } {
   if (text.trimStart().startsWith("/")) return { state };
-  if (on) return { note: state === "briefed" ? AUTO_REMINDER : AUTO_INSTRUCTIONS, state: "briefed" };
+  if (on) return { note: state === "briefed" ? autoReminder(tool) : autoInstructions(tool), state: "briefed" };
   if (state === "off-due") return { note: ADVISOR_OFF, state: "none" };
   return { state };
 }

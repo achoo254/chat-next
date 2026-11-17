@@ -208,7 +208,9 @@ export function buildProgram(): Command {
     .name("tunelo")
     .version(AGENT_VERSION)
     .description("Your account's devices driving the AI coding CLI of this machine, end-to-end encrypted; and tunnels to localhost")
-    .hook("preAction", async () => {
+    .hook("preAction", async (_program, action) => {
+      // Advisor's note runs before every message typed in a terminal: nothing else on its way, it answers in time or not at all.
+      if (action.name() === "advisor" && action.args[0] === "note") return;
       // Older installs left their sign-ins in plain text; move them under the key store once.
       await importLegacySignIns(configDir()).catch((err: Error) => console.error(`tunelo: could not move the earlier sign-in yet (${err.message})`));
     });

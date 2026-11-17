@@ -50,6 +50,14 @@ export type ProviderCapabilities = {
    * cannot be sure to hear of every call: no Advisor thread opens on it.
    */
   advisorSession?: boolean;
+  /**
+   * The AI's own CLI in a terminal (TerminalRunner) takes Advisor too:
+   * TerminalLaunch.advisor becomes tunelo's MCP with advisor_weigh only and
+   * a hook that asks the service for Advisor's note with each message
+   * (`tunelo advisor note`). Unset: automatic Advisor works only in the
+   * chat view.
+   */
+  terminalAdvisor?: boolean;
 };
 
 export type LoginState = "ok" | "needs-login" | "unknown";
@@ -446,6 +454,14 @@ export type TerminalLaunch = {
   effort?: string;
   /** One of the AI's own permission modes (never one that skips every prompt). */
   permissionMode?: string;
+  /**
+   * Automatic Advisor for the CLI (ProviderCapabilities.terminalAdvisor):
+   * the ticket of tunelo's MCP for the thread (advisor_weigh only), tunelo's
+   * config folder, and the argv that prints Advisor's note for a message
+   * (`tunelo advisor note <thread>`, reading the hook's JSON on stdin).
+   * Unset when the machine runs no session MCP.
+   */
+  advisor?: { ticket: string; configDir: string; noteCommand: string[] };
 };
 
 /** The program the terminal process runs for a TerminalLaunch: argv, never a shell line. */
@@ -456,6 +472,11 @@ export type TerminalCommand = {
   env: Record<string, string>;
   /** The new session's id, when the CLI lets the caller pick it (so the thread knows it at once). */
   sessionId?: string;
+  /**
+   * With TerminalLaunch.advisor: advisor_weigh as the CLI lists it (the MCP
+   * server tunelo gave it, and the tool's full name), for Advisor's note.
+   */
+  advisorTool?: { server: string; fullName: string };
 };
 
 /** The AI's own CLI in a terminal of the machine, for users who prefer it to the chat view. */

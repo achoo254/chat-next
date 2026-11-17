@@ -13806,8 +13806,14 @@ type ProviderCapabilities struct {
 	// own settings say. Unset for an AI where tunelo cannot (yet) make sure of
 	// that; ThreadCreate is then refused with ERROR_REASON_ADVISOR_UNAVAILABLE.
 	AdvisorSession bool `protobuf:"varint,18,opt,name=advisor_session,json=advisorSession,proto3" json:"advisor_session,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// A thread's session opened in the machine's terminal (the AI's own CLI)
+	// follows the thread's automatic Advisor too: the CLI starts with tunelo's
+	// MCP offering advisor_weigh only and hears Advisor's instructions with each
+	// message. Unset (an older machine, or an AI whose CLI cannot): automatic
+	// Advisor works only in the chat view while the terminal holds the session.
+	TerminalAdvisor bool `protobuf:"varint,19,opt,name=terminal_advisor,json=terminalAdvisor,proto3" json:"terminal_advisor,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ProviderCapabilities) Reset() {
@@ -13962,6 +13968,13 @@ func (x *ProviderCapabilities) GetAccounts() bool {
 func (x *ProviderCapabilities) GetAdvisorSession() bool {
 	if x != nil {
 		return x.AdvisorSession
+	}
+	return false
+}
+
+func (x *ProviderCapabilities) GetTerminalAdvisor() bool {
+	if x != nil {
+		return x.TerminalAdvisor
 	}
 	return false
 }
@@ -24125,7 +24138,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x05error\x18\t \x01(\tR\x05error\"E\n" +
 	"\rAdvisorOption\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
-	"\vprobability\x18\x02 \x01(\x02R\vprobability\"\xe3\x04\n" +
+	"\vprobability\x18\x02 \x01(\x02R\vprobability\"\x8e\x05\n" +
 	"\x14ProviderCapabilities\x12\x1c\n" +
 	"\tinterrupt\x18\x01 \x01(\bR\tinterrupt\x12\x16\n" +
 	"\x06resume\x18\x02 \x01(\bR\x06resume\x12#\n" +
@@ -24148,7 +24161,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vsession_mcp\x18\x10 \x01(\bR\n" +
 	"sessionMcp\x12\x1a\n" +
 	"\baccounts\x18\x11 \x01(\bR\baccounts\x12'\n" +
-	"\x0fadvisor_session\x18\x12 \x01(\bR\x0eadvisorSession\"1\n" +
+	"\x0fadvisor_session\x18\x12 \x01(\bR\x0eadvisorSession\x12)\n" +
+	"\x10terminal_advisor\x18\x13 \x01(\bR\x0fterminalAdvisor\"1\n" +
 	"\vModelOption\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x99\x02\n" +

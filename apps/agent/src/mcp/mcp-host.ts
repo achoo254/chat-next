@@ -71,6 +71,7 @@ const NO_SESSION =
 const TICKET_ENDED =
 	"This claude session's access to tunelo ended; start a new session.";
 const ADVISOR_ONLY = "Advisor's session only has advisor_weigh, advisor_git and advisor_grep.";
+const WEIGH_ONLY = "In a terminal, tunelo's MCP only has advisor_weigh.";
 const NOT_APPROVED =
 	"This was not approved on the device: tunelo runs it only after the user approves this exact call.";
 /** How long a card waits for the name of the chat a message goes to. */
@@ -130,6 +131,7 @@ export class McpHost {
 
 	/** Whether a client presenting `ticket` (or none) may run write tools at all. */
 	maySeeWrites(ticket?: string): boolean {
+		if (ticket !== undefined && this.tickets.scope(ticket) === "advisor-weigh") return false;
 		return (ticket !== undefined && this.tickets.owner(ticket) !== undefined) || this.localWrites();
 	}
 
@@ -157,6 +159,15 @@ export class McpHost {
 		if (!threadId) return tables;
 		const session = { key: ticket, threadId };
 		const advisor = this.options.advisor?.();
+		// The AI's own CLI in a terminal asks Advisor and nothing else: no secrets, no browser.
+		if (this.tickets.scope(ticket) === "advisor-weigh") {
+			if (advisor && !this.advisorThread(threadId)) {
+				const table = new ToolTable();
+				registerAdvisorTools(table, { hooks: advisor, threadId }, "work-session");
+				tables.set(ADVISOR_GROUP, table);
+			}
+			return tables;
+		}
 		// An Advisor thread's session has Advisor's tools and nothing else (none at all without them).
 		if (this.advisorThread(threadId)) {
 			if (advisor) {
@@ -200,6 +211,10 @@ export class McpHost {
 		if (entry.ticket && groupName !== ADVISOR_GROUP && this.advisorThread(who)) {
 			this.log(`mcp ${who}: ${groupName} ${tool} refused (Advisor's session)`);
 			return failure(new Error(ADVISOR_ONLY));
+		}
+		if (entry.ticket && this.tickets.scope(entry.ticket) === "advisor-weigh" && (groupName !== ADVISOR_GROUP || tool !== "advisor_weigh")) {
+			this.log(`mcp ${who}: ${groupName} ${tool} refused (terminal: advisor_weigh only)`);
+			return failure(new Error(WEIGH_ONLY));
 		}
 		if (Object.hasOwn(TICKET_GROUPS, groupName)) return this.callTicketTool(entry, who, groupName, tool, args);
 		const group = toolGroup(groupName);
@@ -325,6 +340,7 @@ export class McpHost {
 	 * list; a group whose server cannot be reached now is left out, with why.
 	 */
 	async remoteTools(ticket?: string): Promise<{ tools: OfferedTool[]; unavailable: { group: GroupName; reason: string }[]; writes: boolean }> {
+		if (ticket !== undefined && this.tickets.scope(ticket) === "advisor-weigh") return { tools: [], unavailable: [], writes: false };
 		const writes = this.maySeeWrites(ticket);
 		const groups = TOOL_GROUPS.filter((g) => !g.register && this.enabled(g.name));
 		const settled = await Promise.allSettled(groups.map((g) => this.remote.tools(g)));

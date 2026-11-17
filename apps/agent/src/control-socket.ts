@@ -29,6 +29,8 @@ const controlFile = (configDir: string) => join(configDir, "control.json");
 const TOKEN_HEADER = "x-tunelo-token";
 const NOT_RUNNING = "tunelo is not running in the background (`tunelo login` starts it)";
 const MAX_BODY_BYTES = 1024 * 1024;
+/** How much of a message `tunelo advisor note` sends: the note depends only on whether it starts with "/". */
+export const ADVISOR_NOTE_PROMPT_CHARS = 64;
 /** Streams send a line this often, so neither side mistakes a quiet tunnel for a dead one. */
 const STREAM_PING_MS = 5_000;
 /** How often the service checks that the process holding a stream still runs. */
@@ -89,6 +91,17 @@ const mcpSession = z.object({ server: z.string().min(1).max(512), ticket: z.stri
 const forwardToggle = z.object({ enabled: z.boolean() });
 const forwardBlocked = z.object({ ports: z.array(z.number().int().min(1).max(65_535)).min(1).max(100), blocked: z.boolean() });
 const mcpTools = z.object({ ticket: z.string().min(1).max(64).optional() });
+/**
+ * `tunelo advisor note`: the thread, the start of the message (enough to tell
+ * a "/" command), the CLI's conversation (its session id) and when the hook
+ * stops waiting (Unix ms).
+ */
+const advisorNoteInput = z.object({
+  thread: z.string().min(1).max(64),
+  prompt: z.string().max(ADVISOR_NOTE_PROMPT_CHARS),
+  session: z.string().min(1).max(128).optional(),
+  deadline: z.number().int().positive().optional(),
+});
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -173,6 +186,18 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
   "POST /advisor/changed": (t) => {
     machineOf(t).advisorKeyChanged();
     return { announced: true };
+  },
+  /**
+   * `tunelo advisor note <thread>`, the UserPromptSubmit hook of a thread's
+   * CLI in a terminal: Advisor's note for the message typed there, if any
+   * (AgentCore.terminalNote). Fixed text only; never a key.
+   */
+  "POST /advisor/note": (t, input) => {
+    const { thread, prompt, session, deadline } = advisorNoteInput.parse(input);
+    // The hook gave up already: nothing is handed out, so the next message still gets what this one would have.
+    if (deadline !== undefined && Date.now() >= deadline) return {};
+    const note = machineOf(t).core.terminalNote(thread, prompt, session);
+    return note === undefined ? {} : { note };
   },
   /** A stream's holder is still there (see streamControl). */
   "POST /streams/alive": (t, input) => {

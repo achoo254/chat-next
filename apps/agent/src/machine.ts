@@ -24,7 +24,7 @@ import type { AccountScopeRef, AccountsFacet, AgentProvider, Detected } from "./
 import { logFile } from "./log-tail.ts";
 import { startLogRotation } from "./log-rotate.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
-import type { SessionMcpLease } from "./mcp/session-tickets.ts";
+import type { SessionMcpLease, TicketScope } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit, underLaunchAgent } from "./service.ts";
@@ -786,17 +786,30 @@ function refusalReason(verdict: string): string {
  * A new session's MCP: a ticket of `mcp` for the thread, ended with the
  * session; none when the machine turned tunelo's MCP off (`sessionMcp: false`).
  * With `secrets`, the session's commands can read the secrets it was given;
- * with `browser`, it hears what happened in the tunelo browser.
+ * with `browser`, it hears what happened in the tunelo browser. A ticket of
+ * scope "advisor-weigh" (the AI's CLI in a terminal) offers advisor_weigh
+ * only: no secrets in its commands, no browser notices.
  */
 export function sessionMcpFor(
   mcp: McpHost,
   config: ConfigStore,
   secrets?: SecretService,
   browser?: RemoteBrowser,
-): (threadId: string) => SessionMcpLease | undefined {
-  return (threadId) => {
+): (threadId: string, scope?: TicketScope) => SessionMcpLease | undefined {
+  return (threadId, scope = "session") => {
     if (config.get().sessionMcp === false) return undefined;
-    const ticket = mcp.tickets.issue(threadId);
+    const ticket = mcp.tickets.issue(threadId, scope);
+    if (scope === "advisor-weigh") {
+      return {
+        ticket,
+        configDir: config.dir,
+        advisorWeighOnly: true,
+        // advisor_weigh is never a write: nothing to approve or describe.
+        approveWrite: () => undefined,
+        describeWrite: () => Promise.resolve(undefined),
+        release: () => mcp.release(ticket),
+      };
+    }
     // The Chat and Localman tool lists, ready by the time claude asks for them.
     mcp.warm();
     let env: SessionSecretEnv | undefined;

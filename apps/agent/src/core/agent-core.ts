@@ -58,6 +58,7 @@ import type {
   SessionPage,
   SessionQuery,
   ToolKind as Kind,
+  TerminalLaunch,
   TerminalRunner,
   TurnStats,
 } from "../providers/types.ts";
@@ -66,10 +67,11 @@ import { type GitChangesResult, type GitFileChange, readGitChanges, readGitFileD
 import { gitBranch, gitRoot } from "../safety/dirs.ts";
 import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
-import type { SessionMcpLease } from "../mcp/session-tickets.ts";
+import type { SessionMcpLease, TicketScope } from "../mcp/session-tickets.ts";
+import { advisorNoteCommand } from "../mcp/session-mcp-launch.ts";
 import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
 import { keptImage, prepareAttachments, textForAi, userWords } from "../attachments/message-attachments.ts";
-import { type NoteState, advisorNote, noteStateAfterToggle, withNote } from "../advisor/advisor-instructions.ts";
+import { type AdvisorToolName, type NoteState, advisorNote, noteStateAfterToggle, withNote } from "../advisor/advisor-instructions.ts";
 import { advisorResultOf, isAdvisorWeigh } from "../advisor/advisor-tools.ts";
 import { type AdvisorCall, verdictItem } from "../advisor/advisor-verdict.ts";
 import {
@@ -271,6 +273,14 @@ type Thread = {
    * to the machine's own session meanwhile, so two processes never write it.
    */
   launching?: boolean;
+  /**
+   * Automatic Advisor of the thread's CLI in a terminal (TerminalAdvisor):
+   * the one it runs with, from terminalStarted until that terminal ends or
+   * the thread goes. `launchLease`: the one of a CLI being started (from
+   * terminalLaunch until terminalStarted or terminalAbandoned).
+   */
+  terminalLease?: TerminalAdvisor;
+  launchLease?: TerminalAdvisor;
   /** The open session was given tunelo's MCP (meaningful only while it is open). */
   sessionMcpOpen?: boolean;
   /** What the session was told about its automatic Advisor (advisor-instructions.ts), as the AI got it. */
@@ -310,6 +320,14 @@ type Thread = {
 
 /** A note about Advisor waiting with a message: its text, where the session stands once the AI got it, and the generation it holds for. */
 type PendingNote = { note: string; state: NoteState; gen: number };
+
+/**
+ * What the thread's CLI in a terminal asks Advisor with: the ticket of
+ * tunelo's MCP (advisor_weigh only), advisor_weigh as that CLI lists it, and
+ * the CLI's conversation that heard Advisor's notes so far (its session id;
+ * another one, after /clear or /resume, has heard nothing).
+ */
+type TerminalAdvisor = { lease: SessionMcpLease; tool?: AdvisorToolName; session?: string };
 
 /** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
 type TurnActivity = {
@@ -392,7 +410,8 @@ export type CoreOptions = {
   /** A session finished moving to the machine's account of its AI. */
   onSessionAccount?: (threadId: string) => void;
   /** tunelo's own MCP for a new session of the thread `threadId`; none when it is off. */
-  sessionMcp?: (threadId: string) => SessionMcpLease | undefined;
+  /** A ticket of tunelo's MCP for the thread; scope "advisor-weigh" for the AI's CLI in a terminal (advisor_weigh only). */
+  sessionMcp?: (threadId: string, scope?: TicketScope) => SessionMcpLease | undefined;
   /** The machine keeps a key for Advisor (a turn that never asked it is flagged only then). */
   advisorKeySet?: () => boolean;
   /** A folder the machine knows (one of its projects): an Advisor thread opens only in such a folder or one of a session. */
@@ -572,6 +591,8 @@ export class AgentCore {
     for (const t of this.threads.values()) {
       this.endActivity(t);
       this.clearAsking(t);
+      this.releaseLease(t, "terminalLease");
+      this.releaseLease(t, "launchLease");
     }
     // Prompts waiting for the user expire with the service; its next start asks the questions again.
     for (const t of this.threads.values()) this.expirePending(t);
@@ -1505,6 +1526,10 @@ export class AgentCore {
         }
       }
       items.push(t.journal.put(entry.id, entry.body, { provider: t.meta.provider, model: t.meta.model, now: e.at || this.now() }));
+      if (e.type === "tool-end") {
+        const verdict = this.readVerdict(t, e, shownFrom);
+        if (verdict) items.push(t.journal.put(verdict.id, verdict.body, { provider: t.meta.provider, model: t.meta.model, now: e.at || this.now() }));
+      }
     }
     if (items.length === 0) return 0;
     for (const fn of this.listeners) fn(t.meta.id, items);
@@ -1932,6 +1957,8 @@ export class AgentCore {
       throw new AgentError(ErrorCode.INTERNAL, `the trash did not take the files: ${why}`, { reason: ErrorReason.TRASH_UNAVAILABLE, subject: why });
     }
     t.deleted = true;
+    this.releaseLease(t, "terminalLease");
+    this.releaseLease(t, "launchLease");
     clearTimeout(t.flushTimer);
     this.clearAsking(t);
     this.endActivity(t);
@@ -2117,6 +2144,21 @@ export class AgentCore {
     if (call.kind === "") this.askedFor(t, result?.advisor === "verdict" ? result.kind : (result?.sent?.kind ?? ""));
     const late = call.turnId !== "" && call.turnId === t.advisorStopped;
     this.put(t, `advisor:${call.toolId}`, verdictItem(call, result, late));
+  }
+
+  /**
+   * The verdict item of an advisor_weigh call read back from the AI's
+   * transcript (its CLI in a terminal asked Advisor: no live tool events),
+   * when the journal does not have it yet. No turn of this machine's own
+   * holds it, so it names none.
+   */
+  private readVerdict(t: Thread, e: Extract<HistoryEntry, { type: "tool-end" }>, shownFrom: bigint): { id: string; body: ItemBody } | undefined {
+    const id = `advisor:${e.toolId}`;
+    const seen = t.journal.get(id);
+    if (seen && seen.seq > shownFrom) return undefined;
+    const call = t.journal.get(`tool:${e.toolId}`)?.body;
+    if (call?.case !== "toolCall" || !isAdvisorWeigh(call.value.name)) return undefined;
+    return { id, body: verdictItem({ toolId: e.toolId, turnId: "", kind: advisorKindOf(call.value.input) }, advisorResultOf(e.output), false) };
   }
 
   /** The turn called advisor_weigh with this kind; "" when unknown, which counts as asking for next steps (never flag a turn by guess). */
@@ -3089,6 +3131,9 @@ export class AgentCore {
     if (t.session || this.turnHolds(t)) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
     // From here until the terminal runs the CLI (terminalStarted) or gives up (terminalAbandoned), chat sends nothing.
     t.launching = true;
+    // A launch that never reported back gives way to this one.
+    this.releaseLease(t, "launchLease");
+    const lease = this.terminalAdvisorLease(t, provider);
     let command: Awaited<ReturnType<TerminalRunner["command"]>>;
     try {
       command = await provider.terminal.command({
@@ -3098,12 +3143,15 @@ export class AgentCore {
         ...(t.meta.model ? { model: t.meta.model } : {}),
         ...(t.meta.effort ? { effort: t.meta.effort } : {}),
         ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
+        ...(lease ? { advisor: lease.advisor } : {}),
       });
     } catch (err) {
+      lease?.lease.release();
       delete t.launching;
       throw err;
     }
     if (!command) {
+      lease?.lease.release();
       delete t.launching;
       throw new AgentError(ErrorCode.PROVIDER_UNAVAILABLE, `${provider.name} is not installed`, { reason: ErrorReason.AI_NOT_INSTALLED, subject: provider.name });
     }
@@ -3115,8 +3163,67 @@ export class AgentCore {
       this.pendingTerminalSession.set(t.meta.id, command.sessionId);
     }
     if (seg?.sessionId) this.opts.onSessionId?.(seg.provider, seg.sessionId);
+    if (lease) {
+      t.launchLease = {
+        lease: lease.lease,
+        ...(command.advisorTool ? { tool: command.advisorTool } : {}),
+        ...(seg?.sessionId ? { session: seg.sessionId } : {}),
+      };
+    }
     this.saveMeta(t);
     return { shell: command.file, args: command.args, cwd: dir, env: command.env };
+  }
+
+  /**
+   * A ticket of tunelo's MCP (advisor_weigh only) for the thread's CLI in a
+   * terminal, with what its adapter needs: only for an AI whose CLI takes
+   * Advisor, on a machine that runs its sessions with tunelo's MCP and keeps
+   * a key for Advisor (a key set later counts from the next terminal; without
+   * one the CLI opens exactly as it did before Advisor). The ticket is issued
+   * whether or not automatic Advisor is on now, so turning it on works from
+   * the next message without opening the CLI again.
+   */
+  private terminalAdvisorLease(t: Thread, provider: AgentProvider): { lease: SessionMcpLease; advisor: NonNullable<TerminalLaunch["advisor"]> } | undefined {
+    if (provider.capabilities.terminalAdvisor !== true || !this.sessionMcpEnabled() || this.opts.advisorKeySet?.() !== true) return undefined;
+    const noteCommand = advisorNoteCommand(t.meta.id);
+    if (!noteCommand) return undefined;
+    const lease = this.opts.sessionMcp?.(t.meta.id, "advisor-weigh");
+    if (!lease) return undefined;
+    return { lease, advisor: { ticket: lease.ticket, configDir: lease.configDir, noteCommand } };
+  }
+
+  /** Ends a ticket of the thread's CLI in a terminal (running, or being started), if any. */
+  private releaseLease(t: Thread, which: "terminalLease" | "launchLease"): void {
+    const at = t[which];
+    if (which === "terminalLease") delete t.terminalLease;
+    else delete t.launchLease;
+    at?.lease.release();
+  }
+
+  /**
+   * Advisor's note for a message typed into the thread's CLI in a terminal
+   * (its UserPromptSubmit hook, `tunelo advisor note`): as a chat message
+   * would carry it (advisorNote: the whole text first, then a reminder; one
+   * line once it is turned off; nothing for a "/" command, nor for the
+   * CLI's "!" shell or "#" memory input, which the model may never get).
+   * Only while the terminal holds the thread with the ticket this service
+   * issued. `session`: the CLI's conversation the message goes to; another
+   * one than before (/clear, /resume) has heard nothing, so it gets the whole
+   * text again. Where the session stands changes as the note is handed out:
+   * the hook gives no word that the AI got it.
+   */
+  terminalNote(threadId: string, prompt: string, session?: string): string | undefined {
+    const t = this.threads.get(threadId);
+    const at = t?.terminalLease;
+    if (!t || !at || t.deleted || t.meta.kind === "advisor" || !t.meta.terminal) return undefined;
+    if (session !== undefined && session !== at.session) {
+      at.session = session;
+      t.advisorNote = "none";
+    }
+    if (/^[!#]/.test(prompt.trimStart())) return undefined;
+    const { note, state } = advisorNote(prompt, this.autoAdvisor(t), t.advisorNote ?? "none", at.tool);
+    t.advisorNote = state;
+    return note;
   }
 
   /**
@@ -3169,7 +3276,9 @@ export class AgentCore {
   /** Starting the thread's CLI in a terminal did not go through: chat may write to the thread again. */
   terminalAbandoned(threadId: string): void {
     const t = this.threads.get(threadId);
-    if (t) delete t.launching;
+    if (!t) return;
+    delete t.launching;
+    this.releaseLease(t, "launchLease");
   }
 
   /** The terminal session of terminal process `pid` running the thread's AI; undefined when none. */
@@ -3244,6 +3353,10 @@ export class AgentCore {
     this.pendingTerminalSession.delete(threadId);
     delete t.launching;
     delete t.lastTerminal;
+    // The CLI that ran before in another terminal process (replaced) is gone: its ticket ends; this one's holds.
+    this.releaseLease(t, "terminalLease");
+    if (t.launchLease) t.terminalLease = t.launchLease;
+    delete t.launchLease;
     t.meta.terminal = { session, pid, startedAt: this.now(), ...(newSession ? { newSession } : {}) };
     this.saveMeta(t);
     this.announce(t);
@@ -3351,6 +3464,7 @@ export class AgentCore {
     if (t.meta.terminal?.startedAt !== undefined) t.lastTerminal = { startedAt: t.meta.terminal.startedAt, endedAt: this.now() };
     const started = t.meta.terminal?.newSession;
     delete t.meta.terminal;
+    this.releaseLease(t, "terminalLease");
     t.meta.closedAt = this.now();
     const seg = t.meta.segments.at(-1);
     const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;

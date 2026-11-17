@@ -2029,6 +2029,12 @@ message ProviderCapabilities {
   // own settings say. Unset for an AI where tunelo cannot (yet) make sure of
   // that; ThreadCreate is then refused with ERROR_REASON_ADVISOR_UNAVAILABLE.
   bool advisor_session = 18;
+  // A thread's session opened in the machine's terminal (the AI's own CLI)
+  // follows the thread's automatic Advisor too: the CLI starts with tunelo's
+  // MCP offering advisor_weigh only and hears Advisor's instructions with each
+  // message. Unset (an older machine, or an AI whose CLI cannot): automatic
+  // Advisor works only in the chat view while the terminal holds the session.
+  bool terminal_advisor = 19;
 }
 
 message ModelOption {

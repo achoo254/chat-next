@@ -33,6 +33,8 @@ let localPort = 0;
 const answers: string[] = [];
 
 let advisorChanges = 0;
+/** What the core was asked for Advisor's note (thread, start of the message). */
+const notesAsked: [string, string, string | undefined][] = [];
 let forwardOn = true;
 let forwardBlocked: number[] = [];
 
@@ -47,6 +49,12 @@ function fakeMachine(): Machine {
     audit: { write: () => undefined, list: () => [] },
     advisorKeyChanged: () => {
       advisorChanges++;
+    },
+    core: {
+      terminalNote: (thread: string, prompt: string, session?: string) => {
+        notesAsked.push([thread, prompt, session]);
+        return thread === "held" ? "Advisor is on" : undefined;
+      },
     },
     localForward: {
       state: () => ({ enabled: forwardOn, available: false, blockedPorts: forwardBlocked }),
@@ -119,6 +127,7 @@ describe("control socket", () => {
         "GET /apps",
         "GET /local-forward",
         "POST /advisor/changed",
+        "POST /advisor/note",
         "GET /status",
         "GET /trust",
         "GET /tunnels",
@@ -140,6 +149,21 @@ describe("control socket", () => {
     const before = advisorChanges;
     expect(await call("POST", "/advisor/changed")).toEqual({ announced: true });
     expect(advisorChanges).toBe(before + 1);
+  });
+
+  test("advisor/note answers the note of a thread held by a terminal, nothing for any other, and refuses a long message", async () => {
+    expect(await call("POST", "/advisor/note", { thread: "held", prompt: "fix the push" })).toEqual({ note: "Advisor is on" });
+    expect(await call("POST", "/advisor/note", { thread: "other", prompt: "fix the push", session: "s2", deadline: Date.now() + 60_000 })).toEqual({});
+    expect(notesAsked).toEqual([
+      ["held", "fix the push", undefined],
+      ["other", "fix the push", "s2"],
+    ]);
+    // The hook gave up already: the core is not asked, so nothing counts as said.
+    expect(await call("POST", "/advisor/note", { thread: "held", prompt: "late", deadline: Date.now() - 1 })).toEqual({});
+    // Only the start of a message comes here (`tunelo advisor note` cuts it): a whole one is refused.
+    expect(await call("POST", "/advisor/note", { thread: "held", prompt: "x".repeat(65) })).toHaveProperty("error");
+    expect(await call("POST", "/advisor/note", { prompt: "hi" })).toHaveProperty("error");
+    expect(notesAsked).toHaveLength(2);
   });
 
   test("refuses a caller without the token of control.json", async () => {
