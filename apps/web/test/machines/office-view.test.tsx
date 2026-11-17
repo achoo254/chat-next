@@ -88,7 +88,7 @@ describe("the office tab", () => {
 		expect(screen.getByRole("button", { name: "T2, có người đang làm" }).getAttribute("aria-pressed")).toBe("true");
 		await userEvent.click(screen.getByRole("button", { name: "T1" }));
 		const work = screen.getByRole("region", { name: "Phòng làm việc chung" });
-		expect(within(work).getByText("Tí Trinh Sát")).toBeTruthy();
+		expect(within(work).getByText("Trinh sát viên")).toBeTruthy();
 		const meeting = screen.getByRole("region", { name: "Phòng họp" });
 		expect(within(meeting).getByLabelText("1 người chờ bàn trong phòng họp").textContent).toBe("+1");
 		const lobby = screen.getByRole("region", { name: "Sảnh" });
@@ -102,7 +102,7 @@ describe("the office tab", () => {
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }) });
 		const dorm = await screen.findByRole("region", { name: "Ký túc" });
 		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
-		expect(within(dorm).getByText("Tí Trinh Sát")).toBeTruthy();
+		expect(within(dorm).getByText("Trinh sát viên")).toBeTruthy();
 		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(2);
 		expect(screen.getByRole("button", { name: "T4" }).getAttribute("aria-pressed")).toBe("true");
 		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(2);

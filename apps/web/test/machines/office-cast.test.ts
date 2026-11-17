@@ -11,7 +11,7 @@ describe("the office's cast", () => {
 		expect(castOf("tester").accessory).toBe("hardhat");
 		expect(castOf("code-reviewer").accessory).toBe("glasses");
 		expect(castOf("Code-Reviewer")).toEqual(castOf("code-reviewer"));
-		expect(viMachines.office.cast[castOf("scout").key ?? "scout"]).toBe("Tí Trinh Sát");
+		expect(viMachines.office.cast[castOf("scout").key ?? "scout"]).toBe("Trinh sát viên");
 	});
 
 	it("hashes an unknown type into the fixed palette, stably, and builds its name from the type", () => {
@@ -29,8 +29,8 @@ describe("the office's cast", () => {
 	it("names employees with a number from the second of a type, and an unnamed type as a new hire", () => {
 		const t = viMachines.office;
 		const member = (agentType: string, ordinal: number) => ({ key: `${agentType}#${ordinal}`, agentType, ordinal, actorId: "x", desk: null, nested: false, firstEnteredAt: 0 });
-		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 1) })).toBe("Tí Trinh Sát");
-		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 2) })).toBe("Tí Trinh Sát 2");
+		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 1) })).toBe("Trinh sát viên");
+		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 2) })).toBe("Trinh sát viên 2");
 		expect(personName(t, { kind: "employee", actor: null, member: member("docs-manager", 1) })).toBe("Docs Manager");
 		expect(personName(t, { kind: "employee", actor: null, member: member("", 1) })).toBe("Nhân viên mới");
 		expect(personName(t, { kind: "director", actor: null, member: null })).toBe("Giám đốc");

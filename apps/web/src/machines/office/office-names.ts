@@ -103,7 +103,7 @@ export function markerStatus(kind: Placement["kind"], actor: ActorView | null): 
 export interface MarkerView {
 	readonly status: MarkerStatus;
 	readonly name: string;
-	/** The name and, when it says more, the state: "Bé Kiểm Thử · Kẹt 6 phút", "Giám đốc · Đang ngủ". */
+	/** The name and, when it says more, the state: "Kiểm thử viên · Kẹt 6 phút", "Giám đốc · Đang ngủ". */
 	readonly label: string;
 	/** The bubble's text ("" for none): a line of a conversation, else the work. */
 	readonly bubble: string;

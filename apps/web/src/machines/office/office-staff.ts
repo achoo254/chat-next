@@ -2,7 +2,7 @@
 // subagent as its own actor, the office folds them into people. A new
 // subagent of a type whose employee has finished is that same employee back
 // at work; only when every employee of the type is busy does someone new
-// come in, named with a number ("Tí Trinh Sát 2"). Each employee keeps one
+// come in, named with a number ("Trinh sát viên 2"). Each employee keeps one
 // home desk for the whole session; with no desk left they sit in the meeting
 // room and take the first desk that frees up. Employees of a nested subagent
 // or a workflow work from the meeting room and never take a desk. An

@@ -198,7 +198,7 @@ describe("the office store", () => {
 	it("keeps one employee per agent type: a new subagent of a type whose employee finished is that employee", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), staff("a1", "scout")]));
-		// Another scout while the first one works: "Tí Trinh Sát 2".
+		// Another scout while the first one works: "Trinh sát viên 2".
 		store.applyEvents(1n, [ev(1, { case: "actorEnter", value: staff("a2", "scout", { enteredAt: BigInt(T0 + 1000) }) })]);
 		expect(store.state().staff.map((m) => [m.agentType, m.ordinal, m.actorId])).toEqual([
 			["scout", 1, "a1"],

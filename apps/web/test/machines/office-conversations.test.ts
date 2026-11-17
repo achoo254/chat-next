@@ -26,7 +26,7 @@ const ALL_LINES: readonly string[] = [
 ];
 
 const FULL: Readonly<Record<DialogueSlot, string>> = {
-	ten: "Tí Trinh Sát",
+	ten: "Trinh sát viên",
 	viec: "viết code",
 	phong: "ở phòng QA",
 	lau: "3 phút",
