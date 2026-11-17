@@ -111,6 +111,8 @@ export class OfficeThread {
   /** Prompts in the journal still waiting (approvals and questions). */
   private readonly openPrompts = new Set<string>();
   private summary: ThreadSummary | undefined;
+  /** Background tasks (by their tool call's id) whose end the tracker has been told, so a repeated report applies once. */
+  private readonly endedApplied = new Set<string>();
   private readonly builtAt: number;
   /**
    * Reads of the subagents' records due: after the office is built (turns
@@ -134,7 +136,7 @@ export class OfficeThread {
   }
 
   /** Builds the office from the thread's journal (its times), then its summary now. */
-  seed(items: readonly Item[], summary: ThreadSummary, now: number): void {
+  seed(items: readonly Item[], summary: ThreadSummary, now: number, ended: ReadonlyMap<string, boolean> = new Map()): void {
     let last = 0;
     for (const item of items) {
       const at = Number(item.at) || now;
@@ -146,8 +148,23 @@ export class OfficeThread {
       }
       this.item(item, at);
     }
+    this.backgroundEnded(ended, now);
     this.setSummary(summary, now);
     this.tracker.settle(last || now, now);
+  }
+
+  /**
+   * Background tasks the AI's record says ended, by the id of the tool call that launched each (true: finished by itself).
+   * Told before the summary's count of the tasks still running, so a fall in that count finds the machines that left
+   * already gone and does not send away the oldest one, which may still be running.
+   */
+  backgroundEnded(ended: ReadonlyMap<string, boolean>, at: number): void {
+    for (const [toolId, finished] of ended) {
+      if (this.endedApplied.has(toolId)) continue;
+      this.endedApplied.add(toolId);
+      this.tracker.backgroundEnded(toolId, finished, at);
+    }
+    for (const toolId of this.endedApplied) if (!ended.has(toolId)) this.endedApplied.delete(toolId);
   }
 
   setSummary(s: ThreadSummary, at: number): void {

@@ -194,7 +194,7 @@ export class OfficeHub {
     const thread = new OfficeThread(threadId, reportsStaff, this.memory, now);
     // Advisor sits in before the journal is read: it hears the calls still open, and its last answer.
     thread.tracker.setAdvisor(this.core.advisorAllowed(threadId), now);
-    thread.seed(this.core.snapshot(threadId), summary, now);
+    thread.seed(this.core.snapshot(threadId), summary, now, this.endedBackground(summary.provider, thread.sessionId));
     // Nobody has seen these events: the snapshot holds what they did.
     thread.tracker.drain();
     return { thread, sinks: new Map(), reading: false, lastRead: 0 };
@@ -219,7 +219,10 @@ export class OfficeHub {
         this.guard("thread status", () => {
           const office = this.offices.get(summary.id);
           if (!office) return;
-          office.thread.setSummary(summary, this.now());
+          const now = this.now();
+          // Before the count of tasks still running: a fall in it must find the machines that ended already gone.
+          office.thread.backgroundEnded(this.endedBackground(summary.provider, office.thread.sessionId), now);
+          office.thread.setSummary(summary, now);
           this.changed();
         }),
       ),
@@ -328,6 +331,12 @@ export class OfficeHub {
       });
     }
     this.changed();
+  }
+
+  /** The background tasks the AI's record of the session says ended (empty when it does not keep them). */
+  private endedBackground(provider: string, sessionId: string): ReadonlyMap<string, boolean> {
+    if (sessionId === "") return new Map();
+    return this.opts.providers.find((p) => p.id === provider)?.history?.endedBackground?.(sessionId) ?? new Map();
   }
 
   /** Reads the subagents' records of a session run elsewhere, one read at a time per office. */

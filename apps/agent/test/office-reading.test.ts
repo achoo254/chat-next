@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { ItemSchema, OfficeActorState, ThreadState, ThreadSummarySchema } from "@achoo254/chat-proto/remote/remote";
+import { ItemSchema, OfficeActorState, OfficeRole, ThreadState, ThreadSummarySchema, ToolKind } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { readLinesUntil } from "../src/office/office-bounded-lines.ts";
 import { OfficeProblems, errorKind } from "../src/office/office-problem-log.ts";
@@ -202,5 +202,61 @@ describe("when the subagents' records are read", () => {
     const t = new OfficeThread("t1", true, new OfficeMemory(), 0);
     t.setSummary(summary({ busyElsewhere: true }), 1);
     expect(t.wantsSubagentRecords()).toBe(false);
+  });
+});
+
+describe("which machine leaves when background work ends", () => {
+  const summary = (backgroundTasks: number) =>
+    create(ThreadSummarySchema, { id: "t1", provider: "claude", state: ThreadState.IDLE, busyElsewhere: true, backgroundTasks });
+  const start = (t: OfficeThread, toolId: string, command: string, at: number): void =>
+    t.tracker.toolStart({ toolId, name: "Bash", kind: "shell", summary: command, sensitive: false, background: true }, at);
+  const machines = (t: OfficeThread): string[] => t.tracker.snapshot().actors.filter((a) => a.role === OfficeRole.MACHINE).map((a) => a.id);
+  /** A session run in a terminal: the dev server first, then a sleep, then a second server that dies. */
+  const running = (): OfficeThread => {
+    const t = new OfficeThread("t1", true, Object.assign(new OfficeMemory(), { sessionIds: new Map([["t1", "session-1"]]) }), 0);
+    t.setSummary(summary(1), 1);
+    start(t, "dev", "cd /w && python3 -m http.server 5173", 2);
+    start(t, "sleep", "sleep 420", 3);
+    start(t, "second", "cd /w && PORT=5174 python3 -m http.server 5174", 4);
+    t.setSummary(summary(3), 4);
+    return t;
+  };
+
+  it("the machine whose task the record says ended leaves, not the oldest one that still runs", () => {
+    const t = running();
+    // The record's pass gives the ended task and the lower count together: the ended task is told first.
+    t.backgroundEnded(new Map([["second", false]]), 5);
+    t.setSummary(summary(2), 5);
+    expect(machines(t)).toEqual(["dev", "sleep"]);
+  });
+
+  it("told again and again, an end applies once", () => {
+    const t = running();
+    const ended = new Map([["second", false]]);
+    t.backgroundEnded(ended, 5);
+    t.setSummary(summary(2), 5);
+    t.tracker.drain();
+    t.backgroundEnded(ended, 6);
+    t.setSummary(summary(2), 6);
+    expect(machines(t)).toEqual(["dev", "sleep"]);
+    expect(t.tracker.drain().filter((e) => e.kind.case === "actorLeave" || e.kind.case === "actorUpdate")).toEqual([]);
+  });
+
+  it("without the record's word, a fall in the count still sends the oldest machine away", () => {
+    const t = running();
+    t.setSummary(summary(2), 5);
+    expect(machines(t)).toEqual(["sleep", "second"]);
+  });
+
+  it("an office built from the journal drops the ended machine at once", () => {
+    const built = new OfficeThread("t1", true, Object.assign(new OfficeMemory(), { sessionIds: new Map([["t1", "session-1"]]) }), 10);
+    const item = (id: string, at: bigint, command: string) =>
+      create(ItemSchema, {
+        id: `tool:${id}`,
+        at,
+        body: { case: "toolCall", value: { toolId: id, name: "Bash", kind: ToolKind.SHELL, summary: command, input: JSON.stringify({ command, run_in_background: true }) } },
+      });
+    built.seed([item("dev", 1_000n, "python3 -m http.server 5173"), item("second", 2_000n, "python3 -m http.server 5174")], summary(1), 10, new Map([["second", false]]));
+    expect(machines(built)).toEqual(["dev"]);
   });
 });

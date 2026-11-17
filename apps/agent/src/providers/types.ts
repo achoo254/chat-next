@@ -373,6 +373,14 @@ export interface SessionHistory {
    */
   backgroundTasks?(sessionId: string): number;
   /**
+   * Which of those tasks ended, by the id of the tool call that launched each
+   * (true: it finished by itself; false: it failed or was stopped), from the
+   * same record pass as backgroundTasks(), so the office can tell which
+   * machine left when the count falls. The most recent ones only; empty when
+   * there are none or no record. Never fails.
+   */
+  endedBackground?(sessionId: string): ReadonlyMap<string, boolean>;
+  /**
    * What the session's subagents did, from the AI's own record of them, for
    * the office view of a session the machine does not run: each subagent's
    * kind and state, the tool calls of each read since the previous call (by

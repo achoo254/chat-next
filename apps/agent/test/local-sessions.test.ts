@@ -337,13 +337,13 @@ describe("background shells and subagents", () => {
     t.user([{ tool_use_id: "toolu_a", type: "tool_result", content: [{ type: "text", text: `Async agent launched successfully.\nagentId: ${id} (internal ID)` }] }], {
       toolUseResult: { isAsync: true, status: "async_launched", agentId: id, description: "review", prompt: "a long prompt" },
     });
-  const launchShell = (t: Transcript, id: string) =>
-    t.user([{ tool_use_id: "toolu_s", type: "tool_result", content: `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).` }], {
+  const launchShell = (t: Transcript, id: string, tool = "toolu_s") =>
+    t.user([{ tool_use_id: tool, type: "tool_result", content: `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).` }], {
       toolUseResult: { stdout: "", stderr: "", interrupted: false, backgroundTaskId: id },
     });
-  const notice = (id: string, status = "completed") => `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>toolu_x</tool-use-id>\n<status>${status}</status>\n<summary>done</summary>\n</task-notification>`;
+  const notice = (id: string, status = "completed", tool = "toolu_x") => `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>${tool}</tool-use-id>\n<status>${status}</status>\n<summary>done</summary>\n</task-notification>`;
   /** The notification as a message between turns. */
-  const finished = (t: Transcript, id: string, status = "completed") => t.user(notice(id, status), { origin: { kind: "task-notification" } });
+  const finished = (t: Transcript, id: string, status = "completed", tool = "toolu_x") => t.user(notice(id, status, tool), { origin: { kind: "task-notification" } });
 
   test("a launch counts until its task-notification, whatever the task's end (finished, failed, stopped)", () => {
     const home = tempDir("claude-home-");
@@ -363,6 +363,43 @@ describe("background shells and subagents", () => {
     finished(t, "a77e01", "killed");
     t.write(home);
     expect(s.backgroundTasks(id)).toBe(0);
+  });
+
+  test("the tool call of each task that ended is told, with whether it finished by itself, beside the count", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    launchShell(t, "b1x9", "toolu_dev");
+    launchShell(t, "b2y8", "toolu_sleep");
+    launchShell(t, "b3z7", "toolu_other");
+    t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(3);
+    expect([...s.endedBackground(id)]).toEqual([]);
+    // The notification names the launching tool call itself: the one that died is told, not the oldest.
+    finished(t, "b3z7", "failed", "toolu_other");
+    t.write(home);
+    expect(s.backgroundTasks(id)).toBe(2);
+    expect([...s.endedBackground(id)]).toEqual([["toolu_other", false]]);
+    finished(t, "b1x9", "completed", "toolu_dev");
+    finished(t, "b2y8", "running", "toolu_sleep");
+    t.write(home);
+    // A status that is only progress ends nothing; asking again changes nothing.
+    expect([...s.endedBackground(id)]).toEqual([["toolu_other", false], ["toolu_dev", true]]);
+    expect([...s.endedBackground(id)]).toHaveLength(2);
+  });
+
+  test("a task the AI stopped itself is told by the tool call that launched it", () => {
+    const home = tempDir("claude-home-");
+    const id = randomUUID();
+    const t = new Transcript(id, "/w/x").opening();
+    launchShell(t, "b1x9", "toolu_dev");
+    launchAgent(t, "a77e01");
+    t.user([{ tool_use_id: "toolu_stop", type: "tool_result", content: "ok" }], { toolUseResult: { message: "Successfully stopped task: b1x9 (npm run dev)", task_id: "b1x9" } });
+    t.write(home);
+    const s = sessions([home]);
+    expect(s.backgroundTasks(id)).toBe(1);
+    expect([...s.endedBackground(id)]).toEqual([["toolu_dev", false]]);
   });
 
   test("a task the AI stopped itself (TaskStop, or KillShell before it) ends with the stop's result: no notification comes", () => {

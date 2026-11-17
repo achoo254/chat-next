@@ -55,6 +55,10 @@ const BACKGROUND_TAIL_BYTES = 4 * 1024 * 1024;
 const BACKGROUND_KEEP = COUNT_KEEP;
 const TASK_ID = /<task-id>([A-Za-z0-9_-]+)<\/task-id>/;
 const TASK_STATUS = /<status>([a-z_]+)<\/status>/;
+/** The tool call that launched the task, as the notification names it. */
+const TOOL_USE_ID = /<tool-use-id>([A-Za-z0-9_-]+)<\/tool-use-id>/;
+/** The tool call a result record answers. */
+const RESULT_TOOL_USE_ID = /"tool_use_id":"([A-Za-z0-9_-]+)"/;
 const TITLE_MAX = 120;
 const DIRS_MAX = 50;
 export const PAGE_DEFAULT = 30;
@@ -128,7 +132,13 @@ function isLocalCommand(rec: { type?: unknown; subtype?: unknown; message?: { co
  * transcript does not show finished, read from `pos` on (the part before it is
  * done with).
  */
-type Background = { pos: number; running: Set<string> };
+/**
+ * Background work read from a transcript: the tasks running, the tool call that launched each (by task id), and how the
+ * tasks that ended ended (by the launching tool call's id, true when it finished by itself), kept for the office to tell
+ * which machine left. The ended ones are the last ENDED_KEEP.
+ */
+type Background = { pos: number; running: Set<string>; launchedBy: Map<string, string>; ended: Map<string, boolean> };
+const ENDED_KEEP = 256;
 /**
  * A running claude's record in its Claude folder's register: the session it
  * holds now, where it works, when it started (Unix ms), its process's
@@ -334,15 +344,29 @@ export class LocalSessions implements SessionHistory {
       let bg = k.background;
       if (bg && k.size < bg.pos) bg = undefined;
       const first = bg === undefined;
-      bg ??= { pos: Math.max(0, k.size - BACKGROUND_TAIL_BYTES), running: new Set<string>() };
+      bg ??= { pos: Math.max(0, k.size - BACKGROUND_TAIL_BYTES), running: new Set<string>(), launchedBy: new Map<string, string>(), ended: new Map<string, boolean>() };
       if (bg.pos < k.size) {
-        const running = bg.running;
-        bg.pos = withFile(k.file, (fd) => scanLines(fd, bg.pos, k.size, BACKGROUND_KEEP, (line, whole) => noteBackground(running, line.toString("utf8"), whole), first && bg.pos > 0));
+        const found = bg;
+        bg.pos = withFile(k.file, (fd) => scanLines(fd, bg.pos, k.size, BACKGROUND_KEEP, (line, whole) => noteBackground(found.running, line.toString("utf8"), whole, found), first && bg.pos > 0));
       }
       k.background = bg;
       return bg.running.size;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * The background tasks of the session that ended, by the id of the tool call that launched each, and whether it
+   * finished by itself (a stop or a failure is false): the last ENDED_KEEP, read from the same pass that counts the
+   * running ones, so the count and this never disagree. Empty when the transcript has no such. Never fails.
+   */
+  endedBackground(sessionId: string): ReadonlyMap<string, boolean> {
+    this.backgroundTasks(sessionId);
+    try {
+      return this.locate(sessionId)?.background?.ended ?? new Map<string, boolean>();
+    } catch {
+      return new Map<string, boolean>();
     }
   }
 
@@ -790,25 +814,44 @@ export class LocalSessions implements SessionHistory {
  * message, or, when it arrived during a turn, as a queued command and an
  * attachment. A task the AI stopped itself (TaskStop, KillShell before it)
  * gets no notification: the structured result of the stop ends it. A
- * subagent's own records are not the session's.
+ * subagent's own records are not the session's. With `tools`, it also notes
+ * which tool call launched each task and which of them ended (the notification
+ * names its tool call; a stop is matched through the launch), for the office.
  */
-export function noteBackground(running: Set<string>, line: string, whole: boolean): void {
+export function noteBackground(running: Set<string>, line: string, whole: boolean, tools?: Pick<Background, "launchedBy" | "ended">): void {
   if (line.includes('"isSidechain":true')) return;
   if (line.includes("<task-notification>")) {
     const id = TASK_ID.exec(line)?.[1];
     const status = TASK_STATUS.exec(line)?.[1];
-    if (id !== undefined && status !== undefined && status !== "running") running.delete(id);
+    if (id !== undefined && status !== undefined && status !== "running") {
+      running.delete(id);
+      if (tools) noteEnded(tools, TOOL_USE_ID.exec(line)?.[1] ?? tools.launchedBy.get(id), status === "completed");
+    }
     return;
   }
   if (whole && line.includes('"toolUseResult"') && (line.includes("Successfully stopped task") || line.includes("Successfully killed shell"))) {
     const stopped = stoppedTask(parseRecord(line)?.toolUseResult);
-    if (stopped !== undefined) running.delete(stopped);
+    if (stopped !== undefined) {
+      running.delete(stopped);
+      if (tools) noteEnded(tools, tools.launchedBy.get(stopped), false);
+    }
     return;
   }
   if (!whole || !line.includes('"toolUseResult"') || !(line.includes('"backgroundTaskId"') || line.includes('"async_launched"'))) return;
   const result = parseRecord(line)?.toolUseResult as { backgroundTaskId?: unknown; isAsync?: unknown; status?: unknown; agentId?: unknown } | undefined;
-  if (typeof result?.backgroundTaskId === "string") running.add(result.backgroundTaskId);
-  else if (result?.isAsync === true && result.status === "async_launched" && typeof result.agentId === "string") running.add(result.agentId);
+  const launched = typeof result?.backgroundTaskId === "string" ? result.backgroundTaskId : result?.isAsync === true && result.status === "async_launched" && typeof result.agentId === "string" ? result.agentId : undefined;
+  if (launched === undefined) return;
+  running.add(launched);
+  const tool = RESULT_TOOL_USE_ID.exec(line)?.[1];
+  if (tools && tool !== undefined) tools.launchedBy.set(launched, tool);
+}
+
+/** The tool call `toolUseId` launched a task that ended (undefined when the record does not say which). */
+function noteEnded(tools: Pick<Background, "ended">, toolUseId: string | undefined, finished: boolean): void {
+  if (toolUseId === undefined) return;
+  tools.ended.delete(toolUseId);
+  tools.ended.set(toolUseId, finished);
+  if (tools.ended.size > ENDED_KEEP) tools.ended.delete(tools.ended.keys().next().value ?? "");
 }
 
 /** The task a stop tool's structured result names: TaskStop's `task_id`, or the older KillShell's `shell_id`. */
