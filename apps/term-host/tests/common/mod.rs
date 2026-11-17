@@ -135,6 +135,26 @@ pub fn run(t: &mut TermClient, session: u32, cmd: &str, expect: &str) -> Vec<u8>
         .unwrap_or_else(|| panic!("no {expect:?} after {cmd:?}"))
 }
 
+/// Like `run`, for a command that is safe to type again (it only reads state,
+/// like `stty size`): the shell may be redrawing its prompt after a resize
+/// signal when the first copy arrives, and a slow runner can lose that line;
+/// the command is typed again, up to `attempts` times, each waiting a share of T.
+pub fn run_again(
+    t: &mut TermClient,
+    session: u32,
+    cmd: &str,
+    expect: &str,
+    attempts: u32,
+) -> Vec<u8> {
+    for _ in 0..attempts {
+        t.input(session, cmd.as_bytes()).expect("input");
+        if let Some(out) = t.read_until(session, T / attempts, |b| contains(b, expect.as_bytes())) {
+            return out;
+        }
+    }
+    panic!("no {expect:?} after {cmd:?}, typed {attempts} times");
+}
+
 /// Run `cmd` (which must print `SH=$$`) and return the shell's pid.
 pub fn shell_pid(t: &mut TermClient, session: u32, cmd: &str) -> i32 {
     t.input(session, cmd.as_bytes()).expect("input");

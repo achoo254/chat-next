@@ -34,7 +34,7 @@ fn shell_echo_resize_snapshot_and_replay() {
     agent
         .call("resize", json!({ "session": s, "cols": 90, "rows": 20 }))
         .expect("resize cmd");
-    run(&mut t, s, "stty size\r", "20 90");
+    run_again(&mut t, s, "stty size\r", "20 90", 3);
     let list = agent.call("list", json!({})).expect("list");
     assert_eq!(list[0]["cols"], 90);
     assert_eq!(list[0]["attached"], true);
