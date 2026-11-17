@@ -43,6 +43,7 @@ const WHERE: Readonly<Record<RoomCode, string>> = {
 	DORM: "ở ký túc",
 	GYM: "ở phòng gym",
 	LOUNGE: "ở phòng giải trí",
+	ADVISOR: "ở phòng Cố vấn",
 };
 
 /** A duration in plain Vietnamese: "chưa tới một phút", "3 phút", "1 tiếng 5 phút". */

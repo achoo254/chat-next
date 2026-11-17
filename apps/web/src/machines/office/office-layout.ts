@@ -81,6 +81,8 @@ export interface LayoutAnchor {
 	readonly low: boolean;
 	/** A gym station's exercise; null elsewhere. */
 	readonly act: GymAct | null;
+	/** The staff key (tools/office-art/staff-cast.json), "director" or "advisor" whose seat this is; null for a seat anyone may take. */
+	readonly home: string | null;
 }
 
 export interface LayoutRoom {
@@ -248,6 +250,7 @@ function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 			sit: rec.sit === true,
 			low: rec.low === true,
 			act,
+			home: stringOf(rec.home) || null,
 		});
 	}
 	return anchors;

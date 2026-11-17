@@ -124,7 +124,8 @@ describe("places in the living rooms", () => {
 		const ids = [...places.values()].map((a) => a.id);
 		expect(ids).toHaveLength(15);
 		expect(new Set(ids).size).toBe(15);
-		expect(ids.filter((id) => id.startsWith("bed-"))).toHaveLength(8);
+		// Sixteen beds: fifteen sleepers all lie down.
+		expect(ids.filter((id) => id.startsWith("bed-"))).toHaveLength(15);
 	});
 
 	it("keeps the place someone already has", () => {
@@ -139,7 +140,7 @@ describe("living by the schedule", () => {
 	it("puts the idle director in a bed at 23:30, at the TV or the table at 20:00, and in the office at 10:00", () => {
 		const store = resting();
 		const night = find(placeAt(store, localAt(23, 30)), "director");
-		expect(night.anchorId).toMatch(/^bed-\d$/);
+		expect(night.anchorId).toMatch(/^bed-\d+$/);
 		expect(night).toMatchObject({ room: "DORM", activityRoom: null, life: { slot: "sleep", act: "sleep" } });
 		expect(zoneOfRoom(layout(), night.room)).toBe("d");
 		const evening = find(placeAt(store, localAt(20)), "director");
@@ -178,7 +179,7 @@ describe("living by the schedule", () => {
 		expect(zoneOfRoom(layout(), find(day, "tester#1").room)).not.toBe("d");
 	});
 
-	it("shows at most twelve residents, never two on one place, from the dorm into the lounge when the beds are full", () => {
+	it("shows at most twelve residents, never two on one place, each in a bed of the sixteen at night", () => {
 		const types = Array.from({ length: 14 }, (_, i) => `type-${i}`);
 		const store = resting(types);
 		// Every subagent left: fourteen off-duty residents and the director.
@@ -192,7 +193,7 @@ describe("living by the schedule", () => {
 		expect(residents).toHaveLength(MAX_RESIDENTS);
 		const ids = residents.map((p) => p.anchorId);
 		expect(new Set(ids).size).toBe(ids.length);
-		expect(ids.filter((id) => id.startsWith("bed-"))).toHaveLength(8);
+		expect(ids.filter((id) => id.startsWith("bed-"))).toHaveLength(MAX_RESIDENTS);
 		for (const p of residents) expect(anchorById(layout(), p.anchorId)?.room, p.key).toMatch(/^(DORM|LOUNGE)$/);
 	});
 });

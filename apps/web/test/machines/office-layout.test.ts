@@ -29,12 +29,12 @@ function errorsOf(json: unknown): readonly string[] {
 }
 
 describe("the office's layout", () => {
-	it("ships valid: one plan of four zones, the 12 work rooms and the 3 living rooms once each, 8 desks and the phone's 6", () => {
+	it("ships valid: one plan of four zones, the 12 work rooms, the 3 living rooms and the advisor's once each, 8 desks and the phone's 6", () => {
 		const layout = shipped();
 		expect(layout.zones.map((z) => [z.id, [...z.rooms].sort()])).toEqual([
 			["a", ["DIRECTOR", "LOBBY", "MEETING", "PANTRY", "SERVER", "WORK"]],
 			["b", ["LIBRARY", "PLANNING", "POST"]],
-			["c", ["AUDIT", "QA", "SECURITY"]],
+			["c", ["ADVISOR", "AUDIT", "QA", "SECURITY"]],
 			["d", ["DORM", "GYM", "LOUNGE"]],
 		]);
 		expect(layout.rooms.map((r) => r.room).sort()).toEqual([...ROOM_CODES].sort());
@@ -50,14 +50,14 @@ describe("the office's layout", () => {
 		const layout = shipped();
 		const living = layout.anchors.filter((a) => a.room !== null && zoneOfRoom(layout, a.room) === "d");
 		const beds = living.filter((a) => a.kind === "bed");
-		expect(beds).toHaveLength(8);
+		expect(beds).toHaveLength(16);
 		for (const bed of beds) expect(bed).toMatchObject({ room: "DORM", lie: true, y: 0.5 });
 		const gym = living.filter((a) => a.kind === "gym");
 		expect(gym.map((a) => a.act).sort()).toEqual(["jacks", "punch", "pushup", "pushup", "run", "run"]);
 		for (const tread of gym.filter((a) => a.act === "run")) expect(tread.y).toBeCloseTo(0.18);
-		expect(living.filter((a) => a.kind === "tv" && a.sit)).toHaveLength(7);
-		expect(living.filter((a) => a.kind === "tv" && a.low)).toHaveLength(2);
-		expect(living.filter((a) => a.kind === "dine" && a.sit)).toHaveLength(6);
+		expect(living.filter((a) => a.kind === "tv" && a.sit)).toHaveLength(8);
+		expect(living.filter((a) => a.kind === "tv" && a.low)).toHaveLength(3);
+		expect(living.filter((a) => a.kind === "dine" && a.sit)).toHaveLength(8);
 		expect(living.filter((a) => a.kind === "counter")).toHaveLength(1);
 	});
 
@@ -207,5 +207,45 @@ describe("the office's layout", () => {
 		const errors = errorsOf(noDoor);
 		expect(errors).toContain("QA has no door");
 		expect(errors).toContain("AUDIT has no place to stand");
+	});
+
+	it("has seats for the whole cast: the minimum places each room needs, and the advisor's room", () => {
+		const layout = shipped();
+		const count = (room: string, kind: string, sit = false): number => layout.anchors.filter((a) => a.room === room && a.kind === kind && (!sit || a.sit)).length;
+		expect(count("MEETING", "meeting", true)).toBeGreaterThanOrEqual(8);
+		expect(count("DORM", "bed")).toBeGreaterThanOrEqual(16);
+		expect(layout.anchors.filter((a) => a.kind === "gym").length).toBeGreaterThanOrEqual(4);
+		expect(layout.anchors.filter((a) => a.kind === "tv" && a.sit).length).toBeGreaterThanOrEqual(8);
+		expect(layout.anchors.filter((a) => a.kind === "dine" && a.sit).length).toBeGreaterThanOrEqual(8);
+		// The advisor's room: the advisor's seat and three places for those who come to ask.
+		expect(count("ADVISOR", "meeting", true)).toBe(1);
+		expect(layout.anchors.filter((a) => a.room === "ADVISOR" && a.kind === "work" && a.sit)).toHaveLength(3);
+	});
+
+	it("names a home seat for every one of the cast, in the room the cast gives them", () => {
+		const layout = shipped();
+		const homes = new Map(layout.anchors.flatMap((a) => (a.home === null ? [] : [[a.home, a.room] as const])));
+		const cast: Readonly<Record<string, string>> = {
+			director: "DIRECTOR",
+			advisor: "ADVISOR",
+			"producer-pm": "PLANNING",
+			"tech-lead": "WORK",
+			"gameplay-developer": "WORK",
+			"backend-devops": "SERVER",
+			"game-designer": "PLANNING",
+			"ui-ux-designer": "WORK",
+			"artist-2d-3d": "WORK",
+			"qa-tester": "WORK",
+			"code-security-reviewer": "AUDIT",
+			"content-marketing": "PLANNING",
+			"growth-analytics": "LIBRARY",
+			"research-analyst": "LIBRARY",
+			"ai-finance-controller": "AUDIT",
+		};
+		expect(Object.keys(cast)).toHaveLength(15);
+		for (const [key, room] of Object.entries(cast)) expect(homes.get(key), key).toBe(room);
+		// No seat is claimed by someone outside the cast, and nobody has two seats.
+		expect([...homes.keys()].filter((k) => cast[k] === undefined)).toEqual([]);
+		expect(layout.anchors.filter((a) => a.home !== null)).toHaveLength(15);
 	});
 });

@@ -75,6 +75,7 @@
 			],
 			"rooms": [
 				"SECURITY",
+				"ADVISOR",
 				"AUDIT",
 				"QA"
 			]
@@ -192,6 +193,16 @@
 			"rect": [
 				10.5,
 				-5.0,
+				16.5,
+				0.0
+			]
+		},
+		{
+			"room": "ADVISOR",
+			"name": "Phòng Cố vấn",
+			"rect": [
+				10.5,
+				0.0,
 				16.5,
 				5.0
 			]
@@ -344,6 +355,12 @@
 			-5.0
 		],
 		[
+			10.5,
+			0.0,
+			16.5,
+			0.0
+		],
+		[
 			16.5,
 			10.0,
 			16.5,
@@ -380,6 +397,12 @@
 		[
 			10.5,
 			-5.0,
+			10.5,
+			1.9
+		],
+		[
+			10.5,
+			3.1,
 			10.5,
 			5.0
 		],
@@ -594,6 +617,19 @@
 			"axis": "x"
 		},
 		{
+			"id": "door-advisor",
+			"between": [
+				"ADVISOR",
+				null
+			],
+			"at": [
+				10.5,
+				2.5
+			],
+			"width": 1.2,
+			"axis": "z"
+		},
+		{
 			"id": "door-audit",
 			"between": [
 				"AUDIT",
@@ -699,6 +735,7 @@
 				"z": 2.56,
 				"rotY": 0.0
 			},
+			"home": "qa-tester",
 			"node": "work-north-west"
 		},
 		{
@@ -714,6 +751,7 @@
 				"z": 2.56,
 				"rotY": 0.0
 			},
+			"home": "tech-lead",
 			"node": "work-north-west"
 		},
 		{
@@ -729,6 +767,7 @@
 				"z": 2.56,
 				"rotY": 0.0
 			},
+			"home": "gameplay-developer",
 			"node": "work-north-east"
 		},
 		{
@@ -774,6 +813,7 @@
 				"z": 1.84,
 				"rotY": 3.1416
 			},
+			"home": "ui-ux-designer",
 			"node": "work-aisle-west"
 		},
 		{
@@ -789,6 +829,7 @@
 				"z": 1.84,
 				"rotY": 3.1416
 			},
+			"home": "artist-2d-3d",
 			"node": "work-aisle-east"
 		},
 		{
@@ -841,6 +882,7 @@
 			"z": 3.75,
 			"face": 3.1416,
 			"sit": true,
+			"home": "director",
 			"node": "director"
 		},
 		{
@@ -898,10 +940,21 @@
 			"node": "server"
 		},
 		{
+			"id": "server-desk",
+			"kind": "server",
+			"room": "SERVER",
+			"x": -6.4,
+			"z": -3.55,
+			"face": 3.1416,
+			"sit": true,
+			"home": "backend-devops",
+			"node": "server"
+		},
+		{
 			"id": "meeting-0",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 5.3,
+			"x": 5.05,
 			"z": -2.5,
 			"face": 1.5708,
 			"sit": true,
@@ -911,7 +964,7 @@
 			"id": "meeting-1",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 6.25,
+			"x": 5.85,
 			"z": -1.55,
 			"face": 3.1416,
 			"sit": true,
@@ -921,7 +974,7 @@
 			"id": "meeting-2",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 7.3,
+			"x": 6.75,
 			"z": -1.55,
 			"face": 3.1416,
 			"sit": true,
@@ -931,9 +984,9 @@
 			"id": "meeting-3",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 8.2,
-			"z": -2.5,
-			"face": -1.5708,
+			"x": 7.65,
+			"z": -1.55,
+			"face": 3.1416,
 			"sit": true,
 			"node": "meeting"
 		},
@@ -941,9 +994,9 @@
 			"id": "meeting-4",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 7.3,
-			"z": -3.45,
-			"face": 0.0,
+			"x": 8.2,
+			"z": -2.5,
+			"face": -1.5708,
 			"sit": true,
 			"node": "meeting"
 		},
@@ -951,7 +1004,27 @@
 			"id": "meeting-5",
 			"kind": "meeting",
 			"room": "MEETING",
-			"x": 6.25,
+			"x": 7.65,
+			"z": -3.45,
+			"face": 0.0,
+			"sit": true,
+			"node": "meeting"
+		},
+		{
+			"id": "meeting-6",
+			"kind": "meeting",
+			"room": "MEETING",
+			"x": 6.75,
+			"z": -3.45,
+			"face": 0.0,
+			"sit": true,
+			"node": "meeting"
+		},
+		{
+			"id": "meeting-7",
+			"kind": "meeting",
+			"room": "MEETING",
+			"x": 5.85,
 			"z": -3.45,
 			"face": 0.0,
 			"sit": true,
@@ -1070,6 +1143,39 @@
 			"node": "planning"
 		},
 		{
+			"id": "planning-desk-0",
+			"kind": "work",
+			"room": "PLANNING",
+			"x": -8.0,
+			"z": 17.9,
+			"face": 3.1416,
+			"sit": true,
+			"home": "producer-pm",
+			"node": "planning"
+		},
+		{
+			"id": "planning-desk-1",
+			"kind": "work",
+			"room": "PLANNING",
+			"x": -6.0,
+			"z": 17.9,
+			"face": 3.1416,
+			"sit": true,
+			"home": "game-designer",
+			"node": "planning"
+		},
+		{
+			"id": "planning-desk-2",
+			"kind": "work",
+			"room": "PLANNING",
+			"x": -4.0,
+			"z": 17.9,
+			"face": 3.1416,
+			"sit": true,
+			"home": "content-marketing",
+			"node": "planning"
+		},
+		{
 			"id": "library-work-0",
 			"kind": "work",
 			"room": "LIBRARY",
@@ -1094,6 +1200,28 @@
 			"x": -1.8,
 			"z": 16.4,
 			"face": -1.5708,
+			"node": "library"
+		},
+		{
+			"id": "library-seat-0",
+			"kind": "work",
+			"room": "LIBRARY",
+			"x": 0.6,
+			"z": 16.45,
+			"face": 3.1416,
+			"sit": true,
+			"home": "research-analyst",
+			"node": "library"
+		},
+		{
+			"id": "library-seat-1",
+			"kind": "work",
+			"room": "LIBRARY",
+			"x": 0.6,
+			"z": 14.75,
+			"face": 0.0,
+			"sit": true,
+			"home": "growth-analytics",
 			"node": "library"
 		},
 		{
@@ -1128,9 +1256,10 @@
 			"kind": "work",
 			"room": "SECURITY",
 			"x": 13.5,
-			"z": 2.5,
+			"z": -2.6,
 			"face": 0.0,
 			"sit": true,
+			"greets": "code-security-reviewer",
 			"node": "security"
 		},
 		{
@@ -1138,7 +1267,7 @@
 			"kind": "work",
 			"room": "SECURITY",
 			"x": 11.8,
-			"z": 2.5,
+			"z": -2.6,
 			"face": 0.0,
 			"sit": true,
 			"node": "security"
@@ -1151,6 +1280,47 @@
 			"z": -3.4,
 			"face": 1.5708,
 			"node": "security"
+		},
+		{
+			"id": "advisor-seat",
+			"kind": "meeting",
+			"room": "ADVISOR",
+			"x": 14.1,
+			"z": 3.9,
+			"face": 3.1416,
+			"sit": true,
+			"home": "advisor",
+			"node": "advisor"
+		},
+		{
+			"id": "advisor-visit-0",
+			"kind": "work",
+			"room": "ADVISOR",
+			"x": 12.5,
+			"z": 1.5,
+			"face": 0.0,
+			"sit": true,
+			"node": "advisor"
+		},
+		{
+			"id": "advisor-visit-1",
+			"kind": "work",
+			"room": "ADVISOR",
+			"x": 13.9,
+			"z": 1.5,
+			"face": 0.0,
+			"sit": true,
+			"node": "advisor"
+		},
+		{
+			"id": "advisor-visit-2",
+			"kind": "work",
+			"room": "ADVISOR",
+			"x": 15.3,
+			"z": 1.5,
+			"face": 0.0,
+			"sit": true,
+			"node": "advisor"
 		},
 		{
 			"id": "audit-board",
@@ -1170,6 +1340,7 @@
 			"z": 1.6,
 			"face": 3.1416,
 			"sit": true,
+			"home": "code-security-reviewer",
 			"node": "audit"
 		},
 		{
@@ -1180,6 +1351,7 @@
 			"z": 1.6,
 			"face": 3.1416,
 			"sit": true,
+			"home": "ai-finance-controller",
 			"node": "audit"
 		},
 		{
@@ -1233,89 +1405,177 @@
 			"id": "bed-0",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 11.05,
-			"z": 18.9,
-			"face": 3.1416,
+			"x": 11.55,
+			"z": 10.6,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-0"
 		},
 		{
 			"id": "bed-1",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 12.25,
-			"z": 18.9,
-			"face": 3.1416,
+			"x": 11.55,
+			"z": 11.7,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-0"
 		},
 		{
 			"id": "bed-2",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 14.25,
-			"z": 18.9,
-			"face": 3.1416,
+			"x": 11.55,
+			"z": 12.8,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-0"
 		},
 		{
 			"id": "bed-3",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 15.45,
-			"z": 18.9,
-			"face": 3.1416,
+			"x": 11.55,
+			"z": 13.9,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-1"
 		},
 		{
 			"id": "bed-4",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 11.05,
-			"z": 15.4,
-			"face": 0.0,
+			"x": 11.55,
+			"z": 15.0,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-1"
 		},
 		{
 			"id": "bed-5",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 12.25,
-			"z": 15.4,
-			"face": 0.0,
+			"x": 11.55,
+			"z": 16.1,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-2"
 		},
 		{
 			"id": "bed-6",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 14.25,
-			"z": 15.4,
-			"face": 0.0,
+			"x": 11.55,
+			"z": 17.2,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-2"
 		},
 		{
 			"id": "bed-7",
 			"kind": "bed",
 			"room": "DORM",
-			"x": 15.45,
-			"z": 15.4,
-			"face": 0.0,
+			"x": 11.55,
+			"z": 18.3,
+			"face": 1.5708,
 			"y": 0.5,
 			"lie": true,
-			"node": "dorm"
+			"node": "dorm-aisle-3"
+		},
+		{
+			"id": "bed-8",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 11.55,
+			"z": 19.4,
+			"face": 1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-3"
+		},
+		{
+			"id": "bed-9",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 12.1,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-0"
+		},
+		{
+			"id": "bed-10",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 13.2,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-1"
+		},
+		{
+			"id": "bed-11",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 14.3,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-1"
+		},
+		{
+			"id": "bed-12",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 15.4,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-1"
+		},
+		{
+			"id": "bed-13",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 16.5,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-2"
+		},
+		{
+			"id": "bed-14",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 17.6,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-2"
+		},
+		{
+			"id": "bed-15",
+			"kind": "bed",
+			"room": "DORM",
+			"x": 15.45,
+			"z": 18.7,
+			"face": -1.5708,
+			"y": 0.5,
+			"lie": true,
+			"node": "dorm-aisle-3"
 		},
 		{
 			"id": "gym-run-0",
@@ -1433,8 +1693,8 @@
 			"id": "tv-5",
 			"kind": "tv",
 			"room": "LOUNGE",
-			"x": 24.8,
-			"z": 18.3,
+			"x": 24.2,
+			"z": 18.6,
 			"face": 0.0,
 			"sit": true,
 			"low": true,
@@ -1444,8 +1704,19 @@
 			"id": "tv-6",
 			"kind": "tv",
 			"room": "LOUNGE",
-			"x": 26.2,
-			"z": 18.3,
+			"x": 25.4,
+			"z": 18.6,
+			"face": 0.0,
+			"sit": true,
+			"low": true,
+			"node": "lounge"
+		},
+		{
+			"id": "tv-7",
+			"kind": "tv",
+			"room": "LOUNGE",
+			"x": 26.6,
+			"z": 18.6,
 			"face": 0.0,
 			"sit": true,
 			"low": true,
@@ -1456,27 +1727,7 @@
 			"kind": "dine",
 			"room": "LOUNGE",
 			"x": 23.55,
-			"z": 12.1,
-			"face": 1.5708,
-			"sit": true,
-			"node": "lounge"
-		},
-		{
-			"id": "dine-3",
-			"kind": "dine",
-			"room": "LOUNGE",
-			"x": 24.85,
-			"z": 12.1,
-			"face": -1.5708,
-			"sit": true,
-			"node": "lounge"
-		},
-		{
-			"id": "dine-1",
-			"kind": "dine",
-			"room": "LOUNGE",
-			"x": 23.55,
-			"z": 12.8,
+			"z": 11.95,
 			"face": 1.5708,
 			"sit": true,
 			"node": "lounge"
@@ -1486,17 +1737,17 @@
 			"kind": "dine",
 			"room": "LOUNGE",
 			"x": 24.85,
-			"z": 12.8,
+			"z": 11.95,
 			"face": -1.5708,
 			"sit": true,
 			"node": "lounge"
 		},
 		{
-			"id": "dine-2",
+			"id": "dine-1",
 			"kind": "dine",
 			"room": "LOUNGE",
 			"x": 23.55,
-			"z": 13.5,
+			"z": 12.45,
 			"face": 1.5708,
 			"sit": true,
 			"node": "lounge"
@@ -1506,7 +1757,47 @@
 			"kind": "dine",
 			"room": "LOUNGE",
 			"x": 24.85,
-			"z": 13.5,
+			"z": 12.45,
+			"face": -1.5708,
+			"sit": true,
+			"node": "lounge"
+		},
+		{
+			"id": "dine-2",
+			"kind": "dine",
+			"room": "LOUNGE",
+			"x": 23.55,
+			"z": 12.95,
+			"face": 1.5708,
+			"sit": true,
+			"node": "lounge"
+		},
+		{
+			"id": "dine-6",
+			"kind": "dine",
+			"room": "LOUNGE",
+			"x": 24.85,
+			"z": 12.95,
+			"face": -1.5708,
+			"sit": true,
+			"node": "lounge"
+		},
+		{
+			"id": "dine-3",
+			"kind": "dine",
+			"room": "LOUNGE",
+			"x": 23.55,
+			"z": 13.45,
+			"face": 1.5708,
+			"sit": true,
+			"node": "lounge"
+		},
+		{
+			"id": "dine-7",
+			"kind": "dine",
+			"room": "LOUNGE",
+			"x": 24.85,
+			"z": 13.45,
 			"face": -1.5708,
 			"sit": true,
 			"node": "lounge"
@@ -1724,6 +2015,18 @@
 				"room": "SECURITY"
 			},
 			{
+				"id": "door-advisor",
+				"x": 10.5,
+				"z": 2.5,
+				"room": null
+			},
+			{
+				"id": "advisor",
+				"x": 12.1,
+				"z": 2.6,
+				"room": "ADVISOR"
+			},
+			{
 				"id": "hall-audit",
 				"x": 19.5,
 				"z": -6.6,
@@ -1799,6 +2102,30 @@
 				"id": "dorm",
 				"x": 15.75,
 				"z": 11.4,
+				"room": "DORM"
+			},
+			{
+				"id": "dorm-aisle-0",
+				"x": 13.5,
+				"z": 11.6,
+				"room": "DORM"
+			},
+			{
+				"id": "dorm-aisle-1",
+				"x": 13.5,
+				"z": 14.5,
+				"room": "DORM"
+			},
+			{
+				"id": "dorm-aisle-2",
+				"x": 13.5,
+				"z": 17.4,
+				"room": "DORM"
+			},
+			{
+				"id": "dorm-aisle-3",
+				"x": 13.5,
+				"z": 19.2,
 				"room": "DORM"
 			},
 			{
@@ -1980,6 +2307,10 @@
 				"security"
 			],
 			[
+				"door-advisor",
+				"advisor"
+			],
+			[
 				"hall-security",
 				"hall-audit"
 			],
@@ -2028,6 +2359,22 @@
 				"dorm"
 			],
 			[
+				"dorm",
+				"dorm-aisle-0"
+			],
+			[
+				"dorm-aisle-0",
+				"dorm-aisle-1"
+			],
+			[
+				"dorm-aisle-1",
+				"dorm-aisle-2"
+			],
+			[
+				"dorm-aisle-2",
+				"dorm-aisle-3"
+			],
+			[
 				"hall-dorm",
 				"hall-gym"
 			],
@@ -2066,6 +2413,10 @@
 			[
 				"link-mid",
 				"link-back"
+			],
+			[
+				"link-mid",
+				"door-advisor"
 			],
 			[
 				"hall-post",
@@ -2523,34 +2874,39 @@
 			"name": "desk",
 			"x": -6.4,
 			"z": -4.35,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "chair",
 			"x": -6.4,
 			"z": -3.55,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "monitor",
 			"x": -6.68,
 			"z": -4.5,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "monitor",
 			"x": -6.12,
 			"z": -4.5,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "keyboard",
 			"x": -6.4,
 			"z": -4.23,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "filing-cabinet",
@@ -2572,45 +2928,59 @@
 		},
 		{
 			"name": "chair",
-			"x": 5.3,
+			"x": 5.05,
 			"z": -2.5,
 			"rotY": 1.5708,
 			"anchor": "meeting-0"
 		},
 		{
 			"name": "chair",
-			"x": 6.25,
+			"x": 5.85,
 			"z": -1.55,
 			"rotY": 3.1416,
 			"anchor": "meeting-1"
 		},
 		{
 			"name": "chair",
-			"x": 7.3,
+			"x": 6.75,
 			"z": -1.55,
 			"rotY": 3.1416,
 			"anchor": "meeting-2"
 		},
 		{
 			"name": "chair",
-			"x": 8.2,
-			"z": -2.5,
-			"rotY": -1.5708,
+			"x": 7.65,
+			"z": -1.55,
+			"rotY": 3.1416,
 			"anchor": "meeting-3"
 		},
 		{
 			"name": "chair",
-			"x": 7.3,
-			"z": -3.45,
-			"rotY": 0.0,
+			"x": 8.2,
+			"z": -2.5,
+			"rotY": -1.5708,
 			"anchor": "meeting-4"
 		},
 		{
 			"name": "chair",
-			"x": 6.25,
+			"x": 7.65,
 			"z": -3.45,
 			"rotY": 0.0,
 			"anchor": "meeting-5"
+		},
+		{
+			"name": "chair",
+			"x": 6.75,
+			"z": -3.45,
+			"rotY": 0.0,
+			"anchor": "meeting-6"
+		},
+		{
+			"name": "chair",
+			"x": 5.85,
+			"z": -3.45,
+			"rotY": 0.0,
+			"anchor": "meeting-7"
 		},
 		{
 			"name": "floor-plant",
@@ -2753,36 +3123,101 @@
 		},
 		{
 			"name": "desk",
-			"x": -4.2,
-			"z": 15.4,
-			"rotY": 0.0
+			"x": -8.0,
+			"z": 17.1,
+			"rotY": 0.0,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "chair",
-			"x": -4.2,
-			"z": 16.2,
-			"rotY": 3.1416
+			"x": -8.0,
+			"z": 17.9,
+			"rotY": 3.1416,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "monitor",
-			"x": -4.2,
-			"z": 15.25,
+			"x": -8.0,
+			"z": 16.95,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "keyboard",
-			"x": -4.2,
-			"z": 15.52,
+			"x": -8.0,
+			"z": 17.22,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "desk-lamp",
-			"x": -3.65,
-			"z": 15.28,
+			"x": -7.45,
+			"z": 16.98,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "planning-desk-0"
+		},
+		{
+			"name": "desk",
+			"x": -6.0,
+			"z": 17.1,
+			"rotY": 0.0,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "chair",
+			"x": -6.0,
+			"z": 17.9,
+			"rotY": 3.1416,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "monitor",
+			"x": -6.0,
+			"z": 16.95,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "keyboard",
+			"x": -6.0,
+			"z": 17.22,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "desk",
+			"x": -4.0,
+			"z": 17.1,
+			"rotY": 0.0,
+			"anchor": "planning-desk-2"
+		},
+		{
+			"name": "chair",
+			"x": -4.0,
+			"z": 17.9,
+			"rotY": 3.1416,
+			"anchor": "planning-desk-2"
+		},
+		{
+			"name": "monitor",
+			"x": -4.0,
+			"z": 16.95,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "planning-desk-2"
+		},
+		{
+			"name": "keyboard",
+			"x": -4.0,
+			"z": 17.22,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "planning-desk-2"
 		},
 		{
 			"name": "round-table",
@@ -2866,13 +3301,15 @@
 			"name": "chair",
 			"x": 0.6,
 			"z": 16.45,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "library-seat-0"
 		},
 		{
 			"name": "chair",
 			"x": 0.6,
 			"z": 14.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "library-seat-1"
 		},
 		{
 			"name": "desk-lamp",
@@ -3005,66 +3442,66 @@
 		{
 			"name": "cctv-wall",
 			"x": 13.5,
-			"z": 4.8,
+			"z": -0.25,
 			"rotY": 3.1416,
 			"y": 0.9
 		},
 		{
 			"name": "desk",
 			"x": 13.5,
-			"z": 3.3,
+			"z": -1.8,
 			"rotY": 3.1416
 		},
 		{
 			"name": "chair",
 			"x": 13.5,
-			"z": 2.5,
+			"z": -2.6,
 			"rotY": 0.0
 		},
 		{
 			"name": "monitor",
 			"x": 13.78,
-			"z": 3.45,
+			"z": -1.65,
 			"rotY": 3.1416,
 			"y": 0.75
 		},
 		{
 			"name": "monitor",
 			"x": 13.22,
-			"z": 3.45,
+			"z": -1.65,
 			"rotY": 3.1416,
 			"y": 0.75
 		},
 		{
 			"name": "keyboard",
 			"x": 13.5,
-			"z": 3.18,
+			"z": -1.92,
 			"rotY": 3.1416,
 			"y": 0.75
 		},
 		{
 			"name": "desk",
 			"x": 11.8,
-			"z": 3.3,
+			"z": -1.8,
 			"rotY": 3.1416
 		},
 		{
 			"name": "chair",
 			"x": 11.8,
-			"z": 2.5,
+			"z": -2.6,
 			"rotY": 0.0
 		},
 		{
 			"name": "monitor",
 			"x": 11.8,
-			"z": 3.45,
+			"z": -1.65,
 			"rotY": 3.1416,
 			"y": 0.75
 		},
 		{
 			"name": "keyboard",
 			"x": 11.8,
-			"z": 3.18,
+			"z": -1.92,
 			"rotY": 3.1416,
 			"y": 0.75
 		},
@@ -3077,31 +3514,120 @@
 		{
 			"name": "locker",
 			"x": 10.9,
-			"z": 0.6,
+			"z": -0.9,
 			"rotY": 1.5708
 		},
 		{
 			"name": "locker",
 			"x": 10.9,
-			"z": -0.2,
+			"z": -1.7,
 			"rotY": 1.5708
 		},
 		{
 			"name": "filing-cabinet",
 			"x": 15.95,
-			"z": 4.6,
+			"z": -0.4,
 			"rotY": 3.1416
 		},
 		{
 			"name": "floor-plant",
 			"x": 11.0,
-			"z": 4.45,
+			"z": -0.55,
 			"rotY": 0.0
 		},
 		{
 			"name": "floor-plant",
 			"x": 11.0,
 			"z": -4.45,
+			"rotY": 0.0
+		},
+		{
+			"name": "desk",
+			"x": 14.1,
+			"z": 3.1,
+			"rotY": 0.0,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "chair",
+			"x": 14.1,
+			"z": 3.9,
+			"rotY": 3.1416,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "monitor",
+			"x": 14.1,
+			"z": 2.95,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "keyboard",
+			"x": 14.1,
+			"z": 3.22,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "desk-lamp",
+			"x": 14.65,
+			"z": 2.98,
+			"rotY": 0.0,
+			"y": 0.75,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "chair",
+			"x": 12.5,
+			"z": 1.5,
+			"rotY": 0.0,
+			"anchor": "advisor-visit-0"
+		},
+		{
+			"name": "chair",
+			"x": 13.9,
+			"z": 1.5,
+			"rotY": 0.0,
+			"anchor": "advisor-visit-1"
+		},
+		{
+			"name": "chair",
+			"x": 15.3,
+			"z": 1.5,
+			"rotY": 0.0,
+			"anchor": "advisor-visit-2"
+		},
+		{
+			"name": "bookshelf",
+			"x": 15.5,
+			"z": 4.72,
+			"rotY": 3.1416
+		},
+		{
+			"name": "bookshelf",
+			"x": 11.5,
+			"z": 4.72,
+			"rotY": 3.1416
+		},
+		{
+			"name": "floor-lamp",
+			"x": 10.9,
+			"z": 3.6,
+			"rotY": 0.0
+		},
+		{
+			"name": "floor-plant",
+			"x": 15.95,
+			"z": 0.55,
+			"rotY": 0.0
+		},
+		{
+			"name": "floor-plant",
+			"x": 11.0,
+			"z": 0.55,
 			"rotY": 0.0
 		},
 		{
@@ -3302,93 +3828,122 @@
 		},
 		{
 			"name": "bed",
-			"x": 11.05,
-			"z": 18.9,
-			"rotY": 3.1416
+			"x": 11.55,
+			"z": 10.6,
+			"rotY": 1.5708
 		},
 		{
 			"name": "bed",
-			"x": 12.25,
-			"z": 18.9,
-			"rotY": 3.1416
+			"x": 11.55,
+			"z": 11.7,
+			"rotY": 1.5708
 		},
 		{
 			"name": "bed",
-			"x": 14.25,
-			"z": 18.9,
-			"rotY": 3.1416
+			"x": 11.55,
+			"z": 12.8,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 13.9,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 15.0,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 16.1,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 17.2,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 18.3,
+			"rotY": 1.5708
+		},
+		{
+			"name": "bed",
+			"x": 11.55,
+			"z": 19.4,
+			"rotY": 1.5708
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
-			"z": 18.9,
-			"rotY": 3.1416
+			"z": 12.1,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 13.2,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 14.3,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 15.4,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 16.5,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 17.6,
+			"rotY": -1.5708
+		},
+		{
+			"name": "bed",
+			"x": 15.45,
+			"z": 18.7,
+			"rotY": -1.5708
 		},
 		{
 			"name": "nightstand",
-			"x": 13.25,
-			"z": 19.65,
+			"x": 13.5,
+			"z": 19.7,
 			"rotY": 3.1416
 		},
 		{
 			"name": "desk-lamp",
-			"x": 13.25,
-			"z": 19.65,
+			"x": 13.5,
+			"z": 19.7,
 			"rotY": 3.1416,
 			"y": 0.55
 		},
 		{
-			"name": "bed",
-			"x": 11.05,
-			"z": 15.4,
-			"rotY": 0.0
-		},
-		{
-			"name": "bed",
-			"x": 12.25,
-			"z": 15.4,
-			"rotY": 0.0
-		},
-		{
-			"name": "bed",
-			"x": 14.25,
-			"z": 15.4,
-			"rotY": 0.0
-		},
-		{
-			"name": "bed",
-			"x": 15.45,
-			"z": 15.4,
-			"rotY": 0.0
-		},
-		{
-			"name": "nightstand",
-			"x": 13.25,
-			"z": 14.65,
-			"rotY": 0.0
-		},
-		{
-			"name": "desk-lamp",
-			"x": 13.25,
-			"z": 14.65,
-			"rotY": 0.0,
-			"y": 0.55
-		},
-		{
 			"name": "locker",
-			"x": 10.9,
-			"z": 11.8,
-			"rotY": 1.5708
-		},
-		{
-			"name": "locker",
-			"x": 10.9,
-			"z": 11.0,
-			"rotY": 1.5708
+			"x": 15.5,
+			"z": 19.65,
+			"rotY": 3.1416
 		},
 		{
 			"name": "floor-plant",
-			"x": 16.0,
+			"x": 15.9,
 			"z": 10.55,
 			"rotY": 0.0
 		},
@@ -3478,14 +4033,20 @@
 		},
 		{
 			"name": "beanbag",
-			"x": 24.8,
-			"z": 18.3,
+			"x": 24.2,
+			"z": 18.6,
 			"rotY": 0.0
 		},
 		{
 			"name": "beanbag",
-			"x": 26.2,
-			"z": 18.3,
+			"x": 25.4,
+			"z": 18.6,
+			"rotY": 0.0
+		},
+		{
+			"name": "beanbag",
+			"x": 26.6,
+			"z": 18.6,
 			"rotY": 0.0
 		},
 		{
@@ -3497,37 +4058,49 @@
 		{
 			"name": "dining-chair",
 			"x": 23.55,
-			"z": 12.1,
+			"z": 11.95,
 			"rotY": 1.5708
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
-			"z": 12.1,
+			"z": 11.95,
 			"rotY": -1.5708
 		},
 		{
 			"name": "dining-chair",
 			"x": 23.55,
-			"z": 12.8,
+			"z": 12.45,
 			"rotY": 1.5708
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
-			"z": 12.8,
+			"z": 12.45,
 			"rotY": -1.5708
 		},
 		{
 			"name": "dining-chair",
 			"x": 23.55,
-			"z": 13.5,
+			"z": 12.95,
 			"rotY": 1.5708
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
-			"z": 13.5,
+			"z": 12.95,
+			"rotY": -1.5708
+		},
+		{
+			"name": "dining-chair",
+			"x": 23.55,
+			"z": 13.45,
+			"rotY": 1.5708
+		},
+		{
+			"name": "dining-chair",
+			"x": 24.85,
+			"z": 13.45,
 			"rotY": -1.5708
 		},
 		{
@@ -3814,18 +4387,20 @@
 			"x": -6.9,
 			"z": -4.25,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "sticky-notes",
 			"x": -5.98,
 			"z": -4.25,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "server-desk"
 		},
 		{
 			"name": "mug",
-			"x": 6.3,
+			"x": 6.2,
 			"z": -2.2,
 			"y": 0.74,
 			"rotY": 0.0
@@ -3909,24 +4484,59 @@
 		},
 		{
 			"name": "mug",
-			"x": -4.7,
-			"z": 15.5,
+			"x": -8.5,
+			"z": 17.2,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "sticky-notes",
-			"x": -3.78,
-			"z": 15.5,
+			"x": -7.58,
+			"z": 17.2,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "planning-desk-0"
 		},
 		{
 			"name": "paper-stack",
-			"x": -4.7,
-			"z": 15.22,
+			"x": -8.5,
+			"z": 16.92,
 			"y": 0.75,
-			"rotY": 0.6
+			"rotY": 0.6,
+			"anchor": "planning-desk-0"
+		},
+		{
+			"name": "mug",
+			"x": -6.5,
+			"z": 17.2,
+			"y": 0.75,
+			"rotY": 0.0,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "sticky-notes",
+			"x": -5.58,
+			"z": 17.2,
+			"y": 0.75,
+			"rotY": 0.3,
+			"anchor": "planning-desk-1"
+		},
+		{
+			"name": "mug",
+			"x": -4.5,
+			"z": 17.2,
+			"y": 0.75,
+			"rotY": 0.0,
+			"anchor": "planning-desk-2"
+		},
+		{
+			"name": "paper-stack",
+			"x": -3.58,
+			"z": 17.2,
+			"y": 0.75,
+			"rotY": 0.3,
+			"anchor": "planning-desk-2"
 		},
 		{
 			"name": "sticky-notes",
@@ -3980,23 +4590,39 @@
 		{
 			"name": "mug",
 			"x": 14.0,
-			"z": 3.2,
+			"z": -1.9,
 			"y": 0.75,
 			"rotY": 0.0
 		},
 		{
 			"name": "paper-stack",
 			"x": 13.08,
-			"z": 3.2,
+			"z": -1.9,
 			"y": 0.75,
 			"rotY": 0.3
 		},
 		{
 			"name": "mug",
 			"x": 12.3,
-			"z": 3.2,
+			"z": -1.9,
 			"y": 0.75,
 			"rotY": 0.0
+		},
+		{
+			"name": "mug",
+			"x": 13.6,
+			"z": 3.2,
+			"y": 0.75,
+			"rotY": 0.0,
+			"anchor": "advisor-seat"
+		},
+		{
+			"name": "paper-stack",
+			"x": 14.52,
+			"z": 3.2,
+			"y": 0.75,
+			"rotY": 0.3,
+			"anchor": "advisor-seat"
 		},
 		{
 			"name": "paper-stack",
@@ -4281,11 +4907,21 @@
 			"kind": "rug",
 			"rect": [
 				11.2,
-				1.8,
+				-3.2,
 				15.2,
-				3.0
+				-2.0
 			],
 			"colour": "grey"
+		},
+		{
+			"kind": "rug",
+			"rect": [
+				11.5,
+				0.8,
+				15.9,
+				4.0
+			],
+			"colour": "lavender"
 		},
 		{
 			"kind": "board",
@@ -4358,10 +4994,10 @@
 		{
 			"kind": "rug",
 			"rect": [
-				11.3,
-				16.7,
-				15.7,
-				17.6
+				12.6,
+				11.4,
+				14.4,
+				19.4
 			],
 			"colour": "lavender"
 		},

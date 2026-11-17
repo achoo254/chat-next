@@ -47,7 +47,7 @@ export interface OfficeAdvisor {
 }
 
 /** Advisor's room: it sits at the room's first meeting seat (the head of the table). */
-export const ADVISOR_ROOM: RoomCode = "MEETING";
+export const ADVISOR_ROOM: RoomCode = "ADVISOR";
 
 export interface Placement {
 	/** "director", "chairman", an employee's staff key, or "machine:<actor id>". */

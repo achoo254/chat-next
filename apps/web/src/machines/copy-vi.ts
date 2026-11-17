@@ -1303,6 +1303,7 @@ export const viMachines = {
 			DORM: "Ký túc",
 			GYM: "Phòng gym",
 			LOUNGE: "Phòng giải trí và nhà ăn",
+			ADVISOR: "Phòng Cố vấn",
 		},
 		director: "Giám đốc",
 		chairman: "Chủ tịch (bạn)",

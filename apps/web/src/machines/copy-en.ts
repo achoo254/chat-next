@@ -1285,6 +1285,7 @@ export const enMachines: MachinesCopy = {
 			DORM: "Dorm",
 			GYM: "Gym",
 			LOUNGE: "Lounge and dining",
+			ADVISOR: "Advisor's room",
 		},
 		director: "Director",
 		chairman: "Chairman (you)",

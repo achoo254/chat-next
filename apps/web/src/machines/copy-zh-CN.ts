@@ -1277,6 +1277,7 @@ export const zhCNMachines: MachinesCopy = {
 			DORM: "宿舍",
 			GYM: "健身房",
 			LOUNGE: "休息区和餐厅",
+			ADVISOR: "顾问室",
 		},
 		director: "总经理",
 		chairman: "董事长（你）",

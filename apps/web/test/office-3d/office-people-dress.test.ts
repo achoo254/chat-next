@@ -100,7 +100,7 @@ describe("drawing Advisor again when its look changes", () => {
 		const again = pool.drawn.slice(drawnBefore);
 		expect(again.map((d) => d.key)).toEqual(["advisor"]);
 		expect(again[0]?.look.accessory).toBe("advisor-cat-ears");
-		expect(people.views().find((v) => v.key === "advisor")?.target).toBe("meeting-0");
+		expect(people.views().find((v) => v.key === "advisor")?.target).toBe("advisor-seat");
 		people.dispose();
 	});
 });

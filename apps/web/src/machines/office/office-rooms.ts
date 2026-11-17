@@ -11,12 +11,15 @@ export const WORK_ROOM_CODES = ["LOBBY", "DIRECTOR", "WORK", "SERVER", "MEETING"
 
 export const LIVING_ROOM_CODES = ["DORM", "GYM", "LOUNGE"] as const;
 
-/** Every room of the office: the work rooms, then the living ones. */
-export const ROOM_CODES = [...WORK_ROOM_CODES, ...LIVING_ROOM_CODES] as const;
+/** The advisor's own room: the web's, like the living rooms (the wire has no room for it; the advisor and those who ask it are placed there by the placement). */
+export const ADVISOR_ROOM_CODE = "ADVISOR" as const;
+
+/** Every room of the office: the work rooms, the living ones, then the advisor's. */
+export const ROOM_CODES = [...WORK_ROOM_CODES, ...LIVING_ROOM_CODES, ADVISOR_ROOM_CODE] as const;
 
 export type WorkRoomCode = (typeof WORK_ROOM_CODES)[number];
 export type LivingRoomCode = (typeof LIVING_ROOM_CODES)[number];
-export type RoomCode = WorkRoomCode | LivingRoomCode;
+export type RoomCode = WorkRoomCode | LivingRoomCode | typeof ADVISOR_ROOM_CODE;
 
 const BY_ENUM: Readonly<Partial<Record<OfficeRoom, WorkRoomCode>>> = {
 	[OfficeRoom.LOBBY]: "LOBBY",

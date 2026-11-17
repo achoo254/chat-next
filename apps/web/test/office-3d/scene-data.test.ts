@@ -6,8 +6,8 @@ import { outerWallRuns, zoneOfPoint } from "../../src/office-3d/scene/placeholde
 import { OFFICE_LAYOUT } from "../../src/machines/office/office-layout.ts";
 
 describe("scene layout", () => {
-	it("reads the shipped plan whole: all fifteen rooms, glass, walls, low walls, windows, doors and furniture", () => {
-		expect(SCENE_LAYOUT.rooms).toHaveLength(15);
+	it("reads the shipped plan whole: all sixteen rooms, glass, walls, low walls, windows, doors and furniture", () => {
+		expect(SCENE_LAYOUT.rooms).toHaveLength(16);
 		expect(SCENE_LAYOUT.glass.length).toBeGreaterThan(0);
 		expect(SCENE_LAYOUT.walls.length).toBeGreaterThan(0);
 		expect(SCENE_LAYOUT.lowWalls.length).toBeGreaterThan(0);

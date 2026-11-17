@@ -105,6 +105,7 @@ export const ROOM_TONES: Readonly<Record<string, string>> = {
 	DORM: "#d9cfe6",
 	GYM: "#c9d3dc",
 	LOUNGE: "#e6d6b8",
+	ADVISOR: "#d9cdea",
 };
 
 export const RUG_TONES: Readonly<Record<string, string>> = {

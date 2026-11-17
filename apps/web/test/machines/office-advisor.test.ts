@@ -98,12 +98,12 @@ describe("Advisor in the store", () => {
 });
 
 describe("Advisor's place", () => {
-	it("sits at the head of the meeting table, by day and by night, never in the living rooms", () => {
+	it("sits at its own seat in its own room, by day and by night, never in the living rooms", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), advisor()], { session: session({ busy: false }) }));
 		for (const now of [T0, localAt(2), localAt(19, 30), localAt(6, 30)]) {
 			const p = placed(officePlacement(store.state(), layout(), now, EMPTY_MEMORY, PROFILE).placements, "advisor");
-			expect([p.room, p.anchorId, zoneOfRoom(layout(), p.room), p.life, p.activityRoom]).toEqual([ADVISOR_ROOM, seatOfAdvisor(), "a", null, null]);
+			expect([p.room, p.anchorId, zoneOfRoom(layout(), p.room), p.life, p.activityRoom]).toEqual([ADVISOR_ROOM, seatOfAdvisor(), "c", null, null]);
 			expect(p.advisor).toEqual(PROFILE);
 		}
 	});
