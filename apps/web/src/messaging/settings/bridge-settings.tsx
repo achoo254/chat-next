@@ -504,10 +504,13 @@ function ChatPicker({
 	const resume = useEffectEvent(() => {
 		const pending = takePending(account.id);
 		if (pending === null || pending.ids.length === 0) return;
-		setBusy(true);
-		setList("loading");
-		setWindow(pending.window);
-		setSelected(new Set(pending.ids));
+		// The list shows the batch as chosen and busy right away (set from a callback, not from the effect itself).
+		queueMicrotask(() => {
+			setBusy(true);
+			setList("loading");
+			setWindow(pending.window);
+			setSelected(new Set(pending.ids));
+		});
 		api.conversations(account.id).then(
 			(all) => {
 				setList(all);
