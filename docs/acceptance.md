@@ -130,7 +130,7 @@ cáo nghiệm thu.
 - App iOS/Android chưa lên store (iOS mới có TestFlight nội bộ, xem [`mobile-app.md`](mobile-app.md)); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt. Không có app desktop riêng (huỷ R8 ngày 20/10/2026: desktop = PWA).
 - Server chưa có ffmpeg: video, audio do bot gửi chưa có ảnh xem trước, sóng âm và thời lượng.
 - Ở bề rộng 761–1100 px, cột thông tin và Mini App phủ lên phần phải khung chat thay vì xếp thành cột riêng.
-- Phiên Cố vấn chưa chạy với Antigravity (chờ thử tay xác nhận agy xin quyền từng tool); chế độ tự động của phiên Antigravity vẫn dùng được. Ô skin và phụ kiện riêng của 4 ngoại hình Cố vấn trong văn phòng 3D chưa có: Cố vấn dùng ô skin tạm, chỉ ngoại hình cú có kính.
+- Phiên Cố vấn với Antigravity chạy được khi agy đặt `request-review` (đã thử tay 17/11/2026: agy xin quyền trước shell, ghi tệp và MCP); máy để `always-proceed` bị từ chối phiên Cố vấn. Chế độ tự động của phiên Antigravity vẫn dùng được. Ô skin và phụ kiện riêng của 4 ngoại hình Cố vấn trong văn phòng 3D chưa có: Cố vấn dùng ô skin tạm, chỉ ngoại hình cú có kính.
 - Mỗi process phục vụ tối đa 1000 người online cùng lúc (giới hạn đã đo trên máy hiện tại); vượt thì người sau chờ "Đang kết nối…".
 
 ## Gửi phản hồi

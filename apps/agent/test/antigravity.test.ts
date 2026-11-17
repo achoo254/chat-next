@@ -15,6 +15,7 @@ import { AgyHistory, entriesOf, userText } from "../src/providers/antigravity/hi
 import { FULL_ACCESS, createAntigravityProvider, modeRefusal } from "../src/providers/antigravity/index.ts";
 import { parseUsage } from "../src/providers/antigravity/quota.ts";
 import { WRITER_SETTINGS, writerAnswer, writerArgs } from "../src/providers/antigravity/writer.ts";
+import type { AskUser } from "../src/providers/types.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
 import { fakeAgy } from "./support/fake-agy.ts";
 
@@ -119,6 +120,17 @@ describe("Antigravity sessions", () => {
     expect(core.bypassed(t.id)).toBe(true);
     await expect(core.setPermissionMode(t.id, "default", "phone")).rejects.toThrow(/always-proceed/);
     await core.stop();
+  });
+
+  it("keeps an Advisor session where agy asks before tools, and refuses it under always-proceed", async () => {
+    const advisorPolicy = { dir: "/work", mcpServers: {}, projectSettings: false, isSensitive: () => false, advisorSession: true };
+    const askUser = (async () => ({ decision: "deny" })) as unknown as AskUser;
+    const asking = agyProvider("request-review").provider;
+    expect(asking.capabilities.advisorSession).toBe(true);
+    const session = await asking.start({ policy: advisorPolicy, askUser });
+    await session.close();
+    const unasked = agyProvider("always-proceed").provider;
+    await expect(unasked.start({ policy: advisorPolicy, askUser })).rejects.toThrow(/Advisor cannot keep an agy session to reading/);
   });
 
   it("elsewhere offers agy's own modes and never full access", async () => {

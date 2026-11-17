@@ -34,9 +34,10 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   mọi thứ khác bị từ chối ngay kèm câu giải thích cho AI, không thẻ duyệt, không gì chờ người dùng. Chế độ `plan` không được dùng vì AI tự rời được.
   Grep có sẵn của AI chỉ trả tên tệp hoặc số đếm; tìm nội dung đi qua `advisor_grep`, lọc theo đúng luật của Read. Git đi qua `advisor_git`, chạy
   bằng runner git an toàn của workspace (không hook, không chương trình cấu hình của repo), không bao giờ qua Bash.
-- **Antigravity chưa có phiên Cố vấn** (`advisorSession: false`, `apps/agent/src/providers/antigravity/index.ts`): tunelo chỉ từ chối được tool
-  mà AI xin quyền, và chưa xác nhận agy xin quyền cho từng tool kể cả tool MCP. Bật cờ sau khi thử tay xác nhận điều đó. Chế độ tự động của
-  phiên làm việc agy vẫn dùng được.
+- **Antigravity có phiên Cố vấn khi agy xin quyền.** Thử tay 17/11/2026 trên agy 1.5.8 với `toolPermission: "request-review"`: agy gửi
+  `session/request_permission` trước shell, tool tạo/sửa tệp riêng và tool MCP; bị từ chối thì tool không chạy và MCP server không nhận lời
+  gọi. Đọc tệp agy chạy không hỏi. Với `always-proceed` agy không hỏi gì, nên `start()` từ chối phiên Cố vấn ở máy đó (`strict` và
+  `proceed-in-sandbox` chưa thử). Cờ `advisorSession: true` ở `apps/agent/src/providers/antigravity/index.ts`.
 - **Lỗi git đầy đủ ở lại trên máy.** Thiết bị chỉ nhận dòng cuối của lỗi kèm `Error.failure_id`; máy giữ toàn văn trong bộ nhớ 10 phút
   (`git-failure-memory.ts`). Câu hỏi đính kèm `failure_id` thì máy bổ sung toàn văn đã làm sạch (`scrub-git-output.ts`: bỏ đường dẫn tuyệt đối,
   user/token trong URL, chuỗi giống bí mật), chỉ khi lỗi thuộc đúng thư mục của phiên Cố vấn.

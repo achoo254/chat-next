@@ -113,12 +113,12 @@ export function createAntigravityProvider(
     permissionModes: [...AGY_MODES],
     bypassModeId: FULL_ACCESS,
     sessionMcp: true,
-    // Off until it is seen on a real agy that it asks (session/request_permission)
-    // before every tool that is not a read, its MCP tools included: agy runs some
-    // tools without asking (and every tool under "always-proceed"), and a call
-    // it never asks about cannot be refused. The read-only guard below is
-    // ready for that day (permissions.ts).
-    advisorSession: false,
+    // Seen on agy 1.5.8 under toolPermission "request-review": it asks
+    // (session/request_permission) before a shell command, its own file
+    // create/edit tool and an MCP tool, and a refused call neither runs nor
+    // reaches the MCP server. Reads run without asking. Under "always-proceed"
+    // agy asks about nothing, so start() refuses an Advisor session there.
+    advisorSession: true,
   };
   const listSessions = async (): Promise<ListedSession[]> => {
     const live = await acp.get();
