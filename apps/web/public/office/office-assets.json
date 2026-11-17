@@ -948,7 +948,7 @@
 		}
 	},
 	"accessories": {
-		"file": "accessories.58a4b5f9.glb",
+		"file": "accessories.d9b2a350.glb",
 		"items": {
 			"magnifier": {
 				"bone": "hand_r",
@@ -981,6 +981,39 @@
 			"mug": {
 				"bone": "hand_r",
 				"scale": 1
+			},
+			"advisor-antenna-band": {
+				"bone": "head",
+				"scale": 2.2,
+				"shift": [
+					0,
+					0.26,
+					0
+				]
+			},
+			"advisor-cat-ears": {
+				"bone": "head",
+				"scale": 2.2,
+				"shift": [
+					0,
+					0.29,
+					0
+				]
+			},
+			"advisor-chart-tablet": {
+				"bone": "hand_r",
+				"scale": 1.4,
+				"shift": [
+					0,
+					0.12,
+					0.1
+				],
+				"turn": [
+					0,
+					0,
+					1,
+					-1.5707963267948966
+				]
 			}
 		}
 	},
