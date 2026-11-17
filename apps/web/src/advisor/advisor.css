@@ -11,11 +11,9 @@
 	transition: transform var(--dur-base) var(--ease-standard), right var(--dur-base) var(--ease-standard), left var(--dur-base) var(--ease-standard);
 	-webkit-tap-highlight-color: transparent; user-select: none;
 }
-/* Docked, it tucks a little into the edge so it covers less; hover or focus brings it out. */
-.adv-mascot[data-side="right"] { right: calc(env(safe-area-inset-right) - 12px); }
-.adv-mascot[data-side="left"] { left: calc(env(safe-area-inset-left) - 12px); }
-.adv-mascot:hover, .adv-mascot:focus-visible, .adv-mascot[aria-expanded="true"] { transform: translateX(var(--adv-out, -14px)); }
-.adv-mascot[data-side="left"] { --adv-out: 14px; }
+/* Docked, it sits whole against the edge (nothing of it cut off). */
+.adv-mascot[data-side="right"] { right: env(safe-area-inset-right); }
+.adv-mascot[data-side="left"] { left: env(safe-area-inset-left); }
 .adv-mascot:focus-visible { outline: none; }
 .adv-mascot:focus-visible img { filter: drop-shadow(0 0 0 var(--c-primary)) drop-shadow(0 0 3px var(--c-primary)); }
 .adv-mascot[data-dragging] { right: auto; left: auto; transform: none; transition: none; cursor: grabbing; }
@@ -47,6 +45,8 @@
 }
 .adv-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
 .adv-head-pic { width: 28px; height: 28px; object-fit: contain; }
+/* The name takes the room, so the menu and close buttons sit at the far right. */
+.adv-head > .grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adv-form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .adv-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: var(--space-2); padding: var(--space-3); }
 .adv-foot { display: grid; gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-3); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); }

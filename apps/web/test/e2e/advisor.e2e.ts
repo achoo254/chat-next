@@ -176,6 +176,7 @@ for (const height of [900, 1450]) {
 		});
 		const m = await mascot.boundingBox();
 		assert.ok(m !== null);
+		assert.ok(m.x + m.width <= 1376 + 0.5, `the mascot is cut off at the right edge (ends at ${m.x + m.width})`);
 
 		await mascot.click();
 		const bubble = page.getByRole("dialog", { name: "Cố vấn" });
@@ -188,6 +189,13 @@ for (const height of [900, 1450]) {
 		assert.ok(m.x - (b.x + b.width) <= 40, `bubble ${m.x - (b.x + b.width)} px away from the mascot`);
 		assert.ok(Math.abs(b.y + b.height - (m.y + m.height)) <= 16, `bubble bottom ${b.y + b.height}, mascot bottom ${m.y + m.height}`);
 		assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.width <= 1376 && b.y + b.height <= height);
+
+		// The menu and close buttons sit at the far right of the head, the close button last.
+		const close = await bubble.getByRole("button", { name: "Đóng" }).boundingBox();
+		const more = await bubble.getByRole("button", { name: "Tuỳ chọn Cố vấn" }).boundingBox();
+		assert.ok(close !== null && more !== null);
+		assert.ok(b.x + b.width - (close.x + close.width) <= 16, `close button ${b.x + b.width - (close.x + close.width)} px from the bubble's right edge`);
+		assert.ok(close.x - (more.x + more.width) <= 12, `menu button ${close.x - (more.x + more.width)} px left of the close button`);
 
 		await bubble.getByRole("button", { name: "Tuỳ chọn Cố vấn" }).click();
 		const menu = page.getByRole("group", { name: "Tuỳ chọn Cố vấn" });
@@ -229,9 +237,11 @@ test("on a phone the mascot snaps to the edge it is dragged to, keeps it, and th
 	await page.mouse.move(80, 300, { steps: 8 });
 	await page.mouse.up();
 	await until(page, "docked left", () => document.querySelector("[data-id=advisor-mascot]")?.getAttribute("data-side") === "left");
-	// It slides to the edge (a short transition), tucked a little into it.
+	// It slides to the edge (a short transition) and sits whole against it: none of it is cut off.
 	await page.mouse.move(300, 700);
-	await until(page, "at the left edge", () => (document.querySelector("[data-id=advisor-mascot]")?.getBoundingClientRect().x ?? 99) < 0);
+	await until(page, "at the left edge", () => (document.querySelector("[data-id=advisor-mascot]")?.getBoundingClientRect().x ?? 99) <= 1);
+	const docked = await mascot.boundingBox();
+	assert.ok(docked !== null && docked.x >= -0.5, "the mascot is cut off at the left edge");
 	await page.reload();
 	await mascot.waitFor({ timeout: 30_000 });
 	assert.equal(await mascot.getAttribute("data-side"), "left");
