@@ -73,6 +73,7 @@ type ChatExtras = {
 	about?: string;
 	historyVisibility?: HistoryVisibility;
 	forum?: boolean;
+	externalSource?: string;
 	title?: string;
 	photo?: WireMediaRef;
 };

@@ -231,6 +231,8 @@ function Subtitle({ chat, topic, groupTitle }: { chat: Chat; topic: Topic | null
 
 function canSend(chat: Chat): boolean {
 	if (chat.left) return false;
+	// A read-only copy of another app (Chat Bridge): the server refuses every send, so the composer gives way to a note.
+	if (chat.externalSource !== undefined) return false;
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	if (chat.type === "channel") return admin;
 	if (chat.type === "group") return admin || (chat.myPermissions & Permission.sendMessages) !== 0;
@@ -521,7 +523,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 			) : (
 				<div className="closed-bar" role="status">
 					<Icon name="lock" small />
-					{peerDeleted ? copy.convo.deletedPeer : copy.convo.readOnly}
+					{peerDeleted ? copy.convo.deletedPeer : chat.externalSource !== undefined ? copy.convo.syncedReadOnly(chat.externalSource === "telegram" ? "Telegram" : chat.externalSource) : copy.convo.readOnly}
 				</div>
 			)}
 			<MessageMenu chat={chat} readOutboxMaxSeq={view?.dialog.readOutboxMaxSeq ?? 0} />

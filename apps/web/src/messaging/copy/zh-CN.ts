@@ -124,6 +124,7 @@ export const zhCN: MessagingCopy = {
 		mute: "关闭通知",
 		unmute: "开启通知",
 		readOnly: "你无法在此聊天中发送消息。",
+		syncedReadOnly: (app) => `这是来自 ${app} 的只读副本，无法在此发送消息。`,
 		deletedPeer: "你无法给已删除的账号发消息。",
 		savedSubtitle: "仅你可见 · 所有设备同步",
 	},

@@ -127,6 +127,7 @@ export const en: MessagingCopy = {
 		mute: "Turn off notifications",
 		unmute: "Turn on notifications",
 		readOnly: "You cannot send messages in this chat.",
+		syncedReadOnly: (app) => `This is a read-only copy from ${app}: you cannot send messages here.`,
 		deletedPeer: "You cannot message a deleted account.",
 		savedSubtitle: "Only you · synced on every device",
 	},

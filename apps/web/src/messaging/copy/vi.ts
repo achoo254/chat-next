@@ -130,6 +130,7 @@ export const vi = {
 		mute: "Tắt thông báo",
 		unmute: "Bật thông báo",
 		readOnly: "Bạn không có quyền gửi tin trong chat này.",
+		syncedReadOnly: (app: string): string => `Đây là bản sao chỉ đọc từ ${app}: bạn không gửi tin vào đây được.`,
 		deletedPeer: "Không nhắn tin được cho tài khoản đã xoá.",
 		savedSubtitle: "Chỉ mình bạn thấy · đồng bộ mọi máy",
 	},
