@@ -1,3 +1,4 @@
+/* Class names here avoid .adv-key, .adv-top and .adv-link: ad blockers hide elements with exactly those names (an owner's settings list and the bubble's answer vanished). */
 /* Advisor: the floating mascot, the short line beside it and its bubble.
    The mascot keeps to a band from below the headers (72px) down to the
    bottom edge (8px), inside the safe areas: only it (what is tapped) minds
@@ -55,7 +56,7 @@
 .adv-pickers { display: flex; gap: var(--space-2); }
 .adv-pickers .input { min-height: 36px; font-size: 0.875rem; }
 .adv-note { margin: 0; font-size: 0.875rem; }
-.adv-link { padding: 0; border: 0; background: none; color: var(--c-primary); font: inherit; text-decoration: underline; cursor: pointer; }
+.adv-text-link { padding: 0; border: 0; background: none; color: var(--c-primary); font: inherit; text-decoration: underline; cursor: pointer; }
 .adv-chip-row { display: flex; align-items: center; gap: var(--space-1); }
 .adv-chip {
 	display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; max-width: 100%; padding: var(--space-1) var(--space-3);
@@ -79,7 +80,7 @@
 .adv-asked span, .adv-reply, .adv-sent { white-space: pre-wrap; overflow-wrap: anywhere; }
 .adv-attached-line { display: flex; align-items: center; gap: var(--space-1); margin: 0; font-size: 0.8125rem; }
 .adv-reply { margin: 0; line-height: 1.5; }
-.adv-top, .adv-all, .adv-sessions { display: grid; gap: var(--space-1); }
+.adv-best, .adv-all, .adv-sessions { display: grid; gap: var(--space-1); }
 .adv-all p { display: grid; gap: 2px; margin: var(--space-1) 0 0; font-size: 0.8125rem; }
 .adv-option { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: 0.875rem; }
 .adv-option .grow { min-width: 0; overflow-wrap: anywhere; }
@@ -113,8 +114,8 @@
 }
 .adv-look[aria-pressed="true"] { background: var(--c-selected); }
 .adv-look img { width: 56px; height: 56px; object-fit: contain; }
-.adv-key { padding-top: var(--space-2); padding-bottom: var(--space-2); border-top: 1px solid var(--c-border-subtle); }
-.adv-key .row { padding-left: 0; padding-right: 0; }
-.adv-key .row small { display: block; }
+.adv-machine-key { padding-top: var(--space-2); padding-bottom: var(--space-2); border-top: 1px solid var(--c-border-subtle); }
+.adv-machine-key .row { padding-left: 0; padding-right: 0; }
+.adv-machine-key .row small { display: block; }
 .adv-key-form { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
 .adv-key-form p { margin: 0; }

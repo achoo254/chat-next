@@ -165,7 +165,7 @@ function MachineKey({ view }: { view: MachineView }) {
 		run(() => view.link.request({ case: "advisorSetKey", value: { key: value } }));
 	};
 	return (
-		<div className="adv-key pad-x" data-id={`advisor-key-${view.entry.ref}`}>
+		<div className="adv-machine-key pad-x" data-id={`advisor-key-${view.entry.ref}`}>
 			<div className="row">
 				<span className="grow">
 					{view.entry.name}

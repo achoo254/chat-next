@@ -129,7 +129,7 @@ describe("Settings › Cố vấn", () => {
 	it("sets a machine's key over the link, shows its fingerprint and where it came from, and removes it", async () => {
 		open();
 		const card = await screen.findByText(t.key.noKey, undefined, WAIT);
-		const row = card.closest(".adv-key") as HTMLElement;
+		const row = card.closest(".adv-machine-key") as HTMLElement;
 		expect(row.closest("[data-advisor-ignore]")).not.toBeNull();
 		await userEvent.click(within(row).getByRole("button", { name: t.key.paste }));
 		const field = within(row).getByLabelText(t.key.field) as HTMLInputElement;

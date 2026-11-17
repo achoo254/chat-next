@@ -176,7 +176,7 @@ function NoteLine({ presence, store }: { presence: Presence; store: AdvisorStore
 			{note === "no-key" && (
 				<>
 					{" "}
-					<button type="button" className="adv-link" onClick={() => openSettings(store)}>
+					<button type="button" className="adv-text-link" onClick={() => openSettings(store)}>
 						{t.ask.settings}
 					</button>
 				</>
@@ -415,7 +415,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 				{answer !== undefined && answer.text !== "" && <p className="adv-reply">{answer.text}</p>}
 				{verdict !== null && verdict.error !== "" && <p className="adv-note mx-error">{t.answer.errors[verdict.error] ?? t.answer.otherError}</p>}
 				{top !== undefined && verdict !== null && (
-					<div className="adv-top">
+					<div className="adv-best">
 						<small className="muted">
 							{t.answer.top} · {verdict.verdict === "confident" ? t.answer.confident : t.answer.unsure} · {t.answer.confidence(Math.round(verdict.confidence * 100))}
 						</small>
