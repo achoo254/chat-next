@@ -23,6 +23,7 @@ import (
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestMain(m *testing.M) {
@@ -637,4 +638,45 @@ func TestDisconnectWithDeleteRemovesEverything(t *testing.T) {
 			t.Fatalf("%s = %d, %v, want 0", q, n, err)
 		}
 	}
+}
+
+func TestMessagesWithoutTextOrMediaChatCannotShowGetALabel(t *testing.T) {
+	e := newEnv(t)
+	conv := e.group("g1")
+	photo := e.msg("1", lan, "", 0)
+	photo.Media = []bridge.Media{{Kind: "photo", Ref: "g1/1"}}
+	captioned := e.msg("2", lan, "xem này", 1)
+	captioned.Media = []bridge.Media{{Kind: "video", Ref: "g1/2"}}
+	captioned.Entities = []bridge.Entity{{Kind: "bold", Offset: 0, Length: 3}}
+	doc := e.msg("3", lan, "", 2)
+	doc.Media = []bridge.Media{{Kind: "document", Name: "hợp đồng.pdf"}}
+	poll := e.msg("4", lan, "", 3)
+	poll.Media = []bridge.Media{{Kind: "poll"}}
+	empty := e.msg("5", lan, "", 4)
+	e.fake.AddHistory("g1", photo, captioned, doc, poll, empty)
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"[Ảnh]", "[Video]\nxem này", "[Tệp: hợp đồng.pdf]", "[Bình chọn]", "[Tin nhắn không hỗ trợ]"})
+	// The bold span moved with the text it styles ("[Video]\n" is 8 units).
+	var raw []byte
+	if err := e.st.Pool().QueryRow(context.Background(), `SELECT content FROM messages WHERE chat_id = $1 AND text LIKE '[Video]%'`, chatID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var content appv1.Message
+	if err := proto.Unmarshal(raw, &content); err != nil {
+		t.Fatal(err)
+	}
+	if ents := content.GetEntities(); len(ents) != 1 || ents[0].GetOffset() != 8 || ents[0].GetLength() != 3 {
+		t.Fatalf("entities = %v, want one bold span at offset 8", ents)
+	}
+}
+
+func TestSpansChatRefusesDegradeToPlainTextWithoutLosingTheMessage(t *testing.T) {
+	e := newEnv(t)
+	conv := e.group("g1")
+	bad := e.msg("1", lan, "mở https://example.com ra", 0)
+	bad.Entities = []bridge.Entity{{Kind: "bold", Offset: 0, Length: 3}, {Kind: "bold", Offset: 1, Length: 30}} // overlapping, out of range
+	good := e.msg("2", lan, "tin sau", 1)
+	e.fake.AddHistory("g1", bad, good)
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"mở https://example.com ra", "tin sau"})
 }

@@ -89,6 +89,12 @@ type Config struct {
 	// into Chat (ADR 0022). Without it no bridge loop runs and BridgeService
 	// answers that the feature is off.
 	BridgeEnabled bool
+	// TelegramAPIID and TelegramAPIHash are the app registered at
+	// my.telegram.org (TELEGRAM_API_ID, TELEGRAM_API_HASH). With both set
+	// the bridge can connect Telegram accounts; with neither it offers no
+	// Telegram. The hash is a secret: it is never logged or sent to a client.
+	TelegramAPIID   int
+	TelegramAPIHash string
 	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
 	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
 	// server's own public addresses, so a bot webhook or a link preview
@@ -394,6 +400,19 @@ func Load(lookup Lookup) (Config, error) {
 		c.BridgeEnabled = true
 	default:
 		errs = append(errs, invalid("BRIDGE_ENABLED", "must be true or false"))
+	}
+
+	if raw := get("TELEGRAM_API_ID"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			errs = append(errs, invalid("TELEGRAM_API_ID", "must be the numeric api_id of the app"))
+		} else {
+			c.TelegramAPIID = n
+		}
+	}
+	c.TelegramAPIHash = get("TELEGRAM_API_HASH")
+	if (c.TelegramAPIID == 0) != (c.TelegramAPIHash == "") {
+		errs = append(errs, invalid("TELEGRAM_API_ID", "and TELEGRAM_API_HASH must be set together"))
 	}
 
 	if raw := get("OUTBOUND_DENY_CIDRS"); raw != "" {

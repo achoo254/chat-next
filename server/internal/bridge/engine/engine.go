@@ -19,6 +19,7 @@ import (
 	"slices"
 	"time"
 
+	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/chat"
 	"connectrpc.com/connect"
@@ -44,6 +45,9 @@ type Config struct {
 	// ReconcileEvery is how often accounts to connect and logouts to carry
 	// out are looked for.
 	ReconcileEvery time.Duration
+	// MediaMaxBytes is the largest file copied from the other app (default
+	// 25 MiB); a bigger one is left there and the message says so.
+	MediaMaxBytes int64
 	// Holder names this process in lease rows.
 	Holder string
 }
@@ -69,6 +73,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.BackoffMax <= 0 {
 		c.BackoffMax = 5 * time.Minute
+	}
+	if c.MediaMaxBytes <= 0 {
+		c.MediaMaxBytes = defaultMediaMax
 	}
 	if c.ReconcileEvery <= 0 {
 		c.ReconcileEvery = 10 * time.Second
@@ -326,11 +333,20 @@ func (r *runner) backfill(ctx context.Context, l *chatLink) error {
 	for start := 0; start < len(msgs); start += r.e.cfg.BatchSize {
 		batch := msgs[start:min(start+r.e.cfg.BatchSize, len(msgs))]
 		if err := r.importBatch(ctx, l, batch); err != nil {
-			if isSkippable(err) {
-				r.logger.Warn("history batch skipped", "reason", err.Error(), "messages", len(batch))
-				continue
+			if !isSkippable(err) {
+				return err
 			}
-			return err
+			// Chat refused something in the batch: take the messages one by
+			// one, so a single bad message costs only itself.
+			r.logger.Warn("history batch refused; importing its messages one by one", "reason", err.Error(), "messages", len(batch))
+			for i := range batch {
+				if err := r.importBatch(ctx, l, batch[i:i+1]); err != nil {
+					if !isSkippable(err) {
+						return err
+					}
+					r.logger.Warn("history message skipped", "reason", err.Error())
+				}
+			}
 		}
 		if _, ok := r.links[l.ExternalChat]; !ok {
 			return nil // the chat is gone
@@ -362,6 +378,10 @@ func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Me
 		senders[m.From.ID] = id
 		r.puppets[m.From.ID] = id
 	}
+	files, err := r.copyFiles(ctx, l, batch)
+	if err != nil {
+		return err
+	}
 	return r.withLink(ctx, l, func(it *chat.ImportTx) error {
 		ids := make([]string, len(batch))
 		for i, m := range batch {
@@ -385,13 +405,13 @@ func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Me
 				fresh = append(fresh, m)
 			}
 		}
-		return r.appendMessages(ctx, it, l, fresh, senders)
+		return r.appendMessages(ctx, it, l, fresh, senders, files)
 	})
 }
 
 // appendMessages writes fresh messages (oldest first) into the chat, records
 // their keys, and wires replies in both directions.
-func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatLink, fresh []bridge.Message, senders map[string]int64) error {
+func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatLink, fresh []bridge.Message, senders map[string]int64, files map[string]*appv1.Message) error {
 	if len(fresh) == 0 {
 		return nil
 	}
@@ -404,8 +424,14 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 				return err
 			}
 		}
-		text, ents := mapContent(m.Text, m.Entities, r.e.chat.MessageLengthMax(), r.userOf)
-		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents}
+		content := files[m.ID]
+		label := labelFor(m, content != nil)
+		if label == "" && m.Text == "" && content == nil {
+			label = "[Tin nhắn không hỗ trợ]" // an empty message cannot be stored
+		}
+		labelled, moved := withLabel(label, m.Text, m.Entities)
+		text, ents := mapContent(labelled, moved, r.e.chat.MessageLengthMax(), r.userOf)
+		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content}
 		if m.ReplyTo != "" {
 			target, err := lookupMessage(ctx, it.Tx(), r.account.ID, l.ExternalChat, m.ReplyTo)
 			if err != nil {
@@ -477,6 +503,10 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 		return false, err
 	}
 	r.puppets[m.From.ID] = from
+	files, err := r.copyFiles(ctx, l, []bridge.Message{m})
+	if err != nil {
+		return false, err
+	}
 	err = r.withLink(ctx, l, func(it *chat.ImportTx) error {
 		k := messageKey{r.account.ID, l.ExternalChat, m.ID}
 		have, err := lookupMessage(ctx, it.Tx(), k.account, k.chat, k.msg)
@@ -496,7 +526,7 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 				return err
 			}
 			if ok {
-				if err := r.appendMessages(ctx, it, l, []bridge.Message{m}, map[string]int64{m.From.ID: from}); err != nil {
+				if err := r.appendMessages(ctx, it, l, []bridge.Message{m}, map[string]int64{m.From.ID: from}, files); err != nil {
 					return err
 				}
 			}
@@ -578,4 +608,38 @@ func (r *runner) onDelete(ctx context.Context, ev bridge.Event, d bridge.Delete)
 		return true, err
 	}
 	return false, nil
+}
+
+// copyFiles copies the files of the messages of batch that are not yet
+// imported, before any Chat transaction opens (a download can take long and
+// the chat is locked while a transaction is open). Messages already imported
+// are skipped, so repeating an import does not download twice.
+func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Message) (map[string]*appv1.Message, error) {
+	var withMedia []bridge.Message
+	for _, m := range batch {
+		if len(m.Media) > 0 {
+			withMedia = append(withMedia, m)
+		}
+	}
+	if len(withMedia) == 0 || r.e.mediaSvc == nil {
+		return nil, nil
+	}
+	ids := make([]string, len(withMedia))
+	for i, m := range withMedia {
+		ids[i] = m.ID
+	}
+	known, err := knownMessages(ctx, r.e.db.pool, r.account.ID, l.ExternalChat, ids)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string]*appv1.Message{}
+	for _, m := range withMedia {
+		if known[m.ID] {
+			continue
+		}
+		if content := r.copyFile(ctx, m); content != nil {
+			files[m.ID] = content
+		}
+	}
+	return files, nil
 }

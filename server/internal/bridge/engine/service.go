@@ -10,6 +10,7 @@ import (
 
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/chat"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/sealbox"
 	"github.com/jackc/pgx/v5"
@@ -28,6 +29,9 @@ type Deps struct {
 	Box *sealbox.Box
 	// Adapters is the static set of supported apps, by Adapter.Name.
 	Adapters map[string]bridge.Adapter
+	// Media stores copied files; nil means files are not copied (the message
+	// says what it had).
+	Media *media.Service
 	// Limiter bounds the logins a user starts; nil means no bound.
 	Limiter ratelimit.Limiter
 	Logger  *slog.Logger
@@ -43,6 +47,7 @@ type Engine struct {
 	adapters map[string]bridge.Adapter
 	logger   *slog.Logger
 	limiter  ratelimit.Limiter
+	mediaSvc *media.Service
 
 	mu      sync.Mutex
 	runners map[int64]*runnerHandle
@@ -59,7 +64,7 @@ type runnerHandle struct {
 func New(cfg Config, d Deps) *Engine {
 	cfg = cfg.withDefaults()
 	return &Engine{cfg: cfg, db: &db{pool: d.Pool, tenantID: cfg.TenantID}, chat: d.Chat, box: d.Box,
-		adapters: d.Adapters, logger: d.Logger, limiter: d.Limiter, runners: map[int64]*runnerHandle{}}
+		adapters: d.Adapters, logger: d.Logger, limiter: d.Limiter, mediaSvc: d.Media, runners: map[int64]*runnerHandle{}}
 }
 
 // Run connects the active accounts and keeps them connected until ctx ends,
