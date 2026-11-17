@@ -28,6 +28,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0018 Văn phòng của phiên AI](./adr/0018-office-view-babylon-normalized-agent-stream.md) | Toà nhà 3D Babylon.js (bản 2D khi không có WebGL) vẽ từ luồng hoạt động agent chuẩn hoá trên máy; chỉ tên tool, phòng, số đếm rời máy. |
 | [0019 Tầng sinh hoạt và trò chuyện](./adr/0019-office-living-floor-and-resident-talks.md) | Nhân vật sống 24/7 theo lịch giờ người xem, bỏ tan ca, trò chuyện viết sẵn điền bằng dữ kiện chuẩn hoá, ngủ gật khi kẹt. |
 | [0020 Cố vấn (Jev)](./adr/0020-advisor-mascot-jev.md) | Mascot trên mọi màn, ngữ cảnh copy chỉ gửi khi người dùng đính, phiên Cố vấn chỉ đọc do tunelo ép theo (máy, thư mục, AI), Jev bằng khoá TypeSafe BYOK trên máy, chế độ tự động theo phiên. |
+| [0022 Chat Bridge](./adr/0022-chat-bridge.md) | Đưa chat của ứng dụng khác (Telegram trước) vào Chat một chiều: adapter Go, người dùng ảo, đường ghi nội bộ `ImportTx`, khoá chống trùng, không tải thêm lịch sử cũ. |
 
 Đổi một quyết định: viết ADR mới mang số kế tiếp, ghi ADR cũ là "Bị thay thế bởi ADR NNNN" trong dòng trạng thái, và làm theo mục "Cách thay đổi" của ADR cũ.
 
