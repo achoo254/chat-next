@@ -7,6 +7,25 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { UpdateEvery } from "./animation-lod.ts";
 import type { Pose } from "./anim-groups.ts";
 
+/** A point in the scene, metres. */
+export interface ScenePoint {
+	readonly x: number;
+	readonly y: number;
+	readonly z: number;
+}
+
+/** Where the body is as drawn now: key bones and the box round the skinned meshes, in scene coordinates (tests only). */
+export interface VisualProbe {
+	/** The person's root: on the floor, or on the bed's mattress. */
+	readonly root: ScenePoint;
+	readonly pelvis: ScenePoint | null;
+	readonly head: ScenePoint | null;
+	readonly footL: ScenePoint | null;
+	readonly footR: ScenePoint | null;
+	readonly min: ScenePoint;
+	readonly max: ScenePoint;
+}
+
 export interface CharacterVisual {
 	/** What draws it: placeholder blocks, the rigged person, or the service robot. */
 	readonly model: "block" | "skinned" | "robot";
@@ -25,5 +44,7 @@ export interface CharacterVisual {
 	setDozing?(dozing: boolean): void;
 	/** Where the head is from the root on the floor plane, metres, as drawn now (tests: which way a body lies); absent without a head bone. */
 	headOffset?(): { readonly x: number; readonly z: number } | null;
+	/** Key bones and the body's box as drawn now (tests: whether a body sits on its seat or lies inside its bed); absent for blocks and robots. */
+	probe?(): VisualProbe | null;
 	dispose(): void;
 }

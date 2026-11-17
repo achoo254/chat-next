@@ -23,7 +23,7 @@ import { animationRates, type LodEntry } from "./animation-lod.ts";
 import { isLyingPose, poseFor, type Pose, type TalkRole } from "./anim-groups.ts";
 import { dressKey, personLook } from "./character-look.ts";
 import type { CharacterPool } from "./character-pool.ts";
-import type { CharacterVisual } from "./character-visual.ts";
+import type { CharacterVisual, VisualProbe } from "./character-visual.ts";
 import type { IdleTarget } from "./idle-performer.ts";
 import type { Router, Route } from "./office-routes.ts";
 import { personIntent } from "./person-intent.ts";
@@ -96,6 +96,8 @@ export interface OfficePeople {
 	views(): readonly PersonView[];
 	/** Each drawn person's head from their root on the floor plane (tests only: computed on call). */
 	headOffsets(): ReadonlyMap<string, { readonly x: number; readonly z: number }>;
+	/** Each drawn person's bones and body box in scene coordinates (tests only: computed on call). */
+	probes(): ReadonlyMap<string, VisualProbe>;
 	/** Rebuilds every visual (the character model arrived). */
 	rebuild(): void;
 	meshes(): readonly AbstractMesh[];
@@ -316,6 +318,14 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 			for (const p of people.values()) {
 				const offset = p.visual.headOffset?.() ?? null;
 				if (offset !== null) out.set(p.key, offset);
+			}
+			return out;
+		},
+		probes() {
+			const out = new Map<string, VisualProbe>();
+			for (const p of people.values()) {
+				const probe = p.visual.probe?.() ?? null;
+				if (probe !== null) out.set(p.key, probe);
 			}
 			return out;
 		},

@@ -250,6 +250,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	const removeTestApi = opts.testApi
 		? exposeTestApi(() => {
 				const heads = people.headOffsets();
+				const probes = people.probes();
 				return {
 					backend,
 					quality: scaler.level.id,
@@ -271,6 +272,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 						dozing: p.dozing,
 						heading: p.heading,
 						head: heads.get(p.key) ?? null,
+						probe: probes.get(p.key) ?? null,
 						screen: overlay.screen.get(p.key) ?? null,
 					})),
 					resetStats: () => stats.reset(),

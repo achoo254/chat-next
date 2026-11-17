@@ -3,6 +3,7 @@
 // them), and window.__office, the read-out tests and on-device measurement
 // use (only when the address asks for it).
 import type { OfficeLayout } from "../machines/office/office-layout.ts";
+import type { VisualProbe } from "./character/character-visual.ts";
 import type { FrameSummary } from "./engine/frame-stats.ts";
 import type { Rect } from "./scene/scene-layout.ts";
 
@@ -29,7 +30,7 @@ export interface OfficeTestReadout {
 	readonly stats: FrameSummary;
 	/** The viewer's zoom (1 = default framing) and turn off the default yaw, radians. */
 	readonly camera: { readonly zoom: number; readonly yaw: number };
-	readonly people: readonly { readonly key: string; readonly floor: number; readonly x: number; readonly z: number; readonly visible: boolean; readonly target: string; readonly pose: string; readonly model: string; readonly dozing: boolean; readonly heading: number; readonly head: { readonly x: number; readonly z: number } | null; readonly screen: readonly [number, number] | null }[];
+	readonly people: readonly { readonly key: string; readonly floor: number; readonly x: number; readonly z: number; readonly visible: boolean; readonly target: string; readonly pose: string; readonly model: string; readonly dozing: boolean; readonly heading: number; readonly head: { readonly x: number; readonly z: number } | null; readonly probe: VisualProbe | null; readonly screen: readonly [number, number] | null }[];
 	resetStats(): void;
 }
 

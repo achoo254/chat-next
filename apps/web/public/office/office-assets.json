@@ -898,7 +898,7 @@
 	],
 	"propsNote": "floors[].scene.props holds one mesh per model first used on that floor (named like the model); the shell GLB lists every placed model of its floor in asset.extras.instances as [x, y, z, rotY] (layout coordinates). Shell lightmaps: TEXCOORD_1, colour times light, half intensity (multiply by 2).",
 	"character": {
-		"file": "character.5f436d01.glb",
+		"file": "character.c8cce0cf.glb",
 		"clips": [
 			"Sitting_Idle",
 			"Sitting_Talking",
@@ -949,7 +949,7 @@
 		}
 	},
 	"directorCharacter": {
-		"file": "character-director.0f2c3f3c.glb",
+		"file": "character-director.26a50630.glb",
 		"clips": [
 			"Sitting_Idle",
 			"Sitting_Talking",

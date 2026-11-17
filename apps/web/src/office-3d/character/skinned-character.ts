@@ -27,7 +27,7 @@ import { clipFor, isSeatedPose, typesWith, type Pose } from "./anim-groups.ts";
 import type { CharacterAccessories, WornAccessory } from "./character-accessories.ts";
 import { COFFEE_ITEM, skinCellFor, type PersonLook } from "./character-look.ts";
 import type { CharacterSkins } from "./character-skins.ts";
-import type { CharacterVisual } from "./character-visual.ts";
+import type { CharacterVisual, ScenePoint } from "./character-visual.ts";
 import { typingOffsets } from "./typing-motion.ts";
 
 /** Where the pelvis rests when sitting (seat of the chair model plus its cushion), unless the pose says otherwise. */
@@ -140,6 +140,28 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			const at = head.computeWorldMatrix(true).getTranslation();
 			const root = holder.computeWorldMatrix(true).getTranslation();
 			return { x: at.x - root.x, z: at.z - root.z };
+		},
+		probe() {
+			const at = (name: string): ScenePoint | null => {
+				const t = nodes.get(name);
+				if (t === undefined) return null;
+				const v = t.computeWorldMatrix(true).getTranslation();
+				return { x: v.x, y: v.y, z: v.z };
+			};
+			const min = { x: Infinity, y: Infinity, z: Infinity };
+			const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+			for (const mesh of meshes) {
+				mesh.refreshBoundingInfo({ applySkeleton: true });
+				const box = mesh.getBoundingInfo().boundingBox;
+				min.x = Math.min(min.x, box.minimumWorld.x);
+				min.y = Math.min(min.y, box.minimumWorld.y);
+				min.z = Math.min(min.z, box.minimumWorld.z);
+				max.x = Math.max(max.x, box.maximumWorld.x);
+				max.y = Math.max(max.y, box.maximumWorld.y);
+				max.z = Math.max(max.z, box.maximumWorld.z);
+			}
+			const root = holder.computeWorldMatrix(true).getTranslation();
+			return { root: { x: root.x, y: root.y, z: root.z }, pelvis: at("pelvis"), head: at("head"), footL: at("foot_l"), footR: at("foot_r"), min, max };
 		},
 		root: holder,
 		labelHeight: LABEL_HEIGHT_UNSCALED * CHARACTER_SCALE,
