@@ -291,18 +291,46 @@ type ReplacedSession struct {
 // ReplaceSession revokes the active session whose token hashes to tokenHash,
 // unless it is newID (the session that replaces it), and clears its sealed
 // tokens. ErrNotFound when no such active session exists.
+//
+// When newID belongs to the same user, the old session's live device keys
+// move to newID first, so the revocation does not take them along: the
+// browser that signed in again still holds those keys (a sign-in for a
+// recent authentication must not cut it off from the user's machines).
+// Under another user they are revoked with the session, as before.
 func (s *Store) ReplaceSession(ctx context.Context, tenantID string, tokenHash []byte, newID int64) (ReplacedSession, error) {
 	var r ReplacedSession
-	err := s.pool.QueryRow(ctx, `
-		WITH target AS (
-			SELECT s.id, s.token_hash, s.refresh_token_enc, s.user_id, coalesce(s.idp_sid, '') AS idp_sid, s.idp_client_id FROM user_sessions s
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			SELECT s.id, s.token_hash, s.refresh_token_enc, s.user_id, coalesce(s.idp_sid, ''), s.idp_client_id FROM user_sessions s
 			WHERE s.tenant_id = $1 AND s.token_hash = $2 AND s.id <> $3 AND `+activeSession+`
-			FOR UPDATE)
-		UPDATE user_sessions u SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
-			revoke_reason = `+reasonReplaced+`
-		FROM target WHERE u.id = target.id
-		RETURNING u.id, target.token_hash, target.refresh_token_enc, target.user_id, target.idp_sid, target.idp_client_id`,
-		tenantID, tokenHash, newID).Scan(&r.ID, &r.TokenHash, &r.RefreshTokenEnc, &r.UserID, &r.IdPSID, &r.IdPClientID)
+			FOR UPDATE`,
+			tenantID, tokenHash, newID).Scan(&r.ID, &r.TokenHash, &r.RefreshTokenEnc, &r.UserID, &r.IdPSID, &r.IdPClientID)
+		if err != nil {
+			return err
+		}
+		// The new session is held while the keys move to it, so a revocation
+		// of it waits and its trigger then revokes them with it.
+		var sameUser bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM user_sessions n
+				WHERE n.id = $1 AND n.tenant_id = $2 AND n.user_id = $3 AND n.revoked_at IS NULL FOR SHARE)`,
+			newID, tenantID, r.UserID).Scan(&sameUser); err != nil {
+			return fmt.Errorf("new session: %w", err)
+		}
+		if sameUser {
+			if _, err := tx.Exec(ctx, `
+				UPDATE account_devices SET session_id = $3
+				WHERE tenant_id = $1 AND user_id = $4 AND session_id = $2 AND revoked_at IS NULL`,
+				tenantID, r.ID, newID, r.UserID); err != nil {
+				return fmt.Errorf("move devices: %w", err)
+			}
+		}
+		_, err = tx.Exec(ctx, `
+			UPDATE user_sessions SET revoked_at = now(), refresh_token_enc = NULL, id_token_enc = NULL,
+				revoke_reason = `+reasonReplaced+`
+			WHERE id = $1`, r.ID)
+		return err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ReplacedSession{}, ErrNotFound
 	}

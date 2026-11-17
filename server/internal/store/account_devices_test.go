@@ -195,6 +195,83 @@ func TestSessionEndRevokesItsDevices(t *testing.T) {
 	}
 }
 
+// Signing in again in the same browser (a recent sign-in, say) replaces its
+// session; the browser still holds its device keys, so they move to the new
+// session instead of being revoked. Another user's sign-in revokes them.
+func TestReplaceSessionKeepsTheSameUsersDevices(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	u, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_1", PreferredUsername: "dat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.UpsertIdPUser(ctx, tenant, store.IdPProfile{Sub: "acc_2", PreferredUsername: "binh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := newSession(t, s, u.ID, "old", "sid-1")
+	if _, _, err := s.RegisterAccountDevice(ctx, tenant, u.ID, old, deviceInput(1, "Edge")); err != nil {
+		t.Fatal(err)
+	}
+	// A key revoked before stays revoked and bound to its session.
+	if _, err := s.Pool().Exec(ctx, `
+		INSERT INTO account_devices (tenant_id, user_id, session_id, public_key, name, platform, revoked_at)
+		VALUES ($1, $2, $3, $4, 'old', 'web', now())`, tenant, u.ID, old, bytes.Repeat([]byte{5}, 32)); err != nil {
+		t.Fatal(err)
+	}
+	again := newSession(t, s, u.ID, "again", "sid-1")
+	r, err := s.ReplaceSession(ctx, tenant, hashOf("old"), again)
+	if err != nil || r.ID != old || r.UserID != u.ID || string(r.RefreshTokenEnc) != "rt-old" {
+		t.Fatalf("replace: %+v %v", r, err)
+	}
+	list, err := s.ListAccountDevices(ctx, tenant, u.ID)
+	if err != nil || len(list) != 2 || !list[0].RevokedAt.IsZero() || list[0].SessionID != again ||
+		list[1].RevokedAt.IsZero() || list[1].SessionID != old {
+		t.Fatalf("after the same user's sign-in: %+v %v", list, err)
+	}
+	m, _, err := s.RegisterMachine(ctx, tenant, u.ID, newMachineInput("mac", 7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trusted, err := s.MachineHeartbeat(ctx, tenant, m.ID, "", "3.0.0", nil); err != nil || !sameKeys(keysOf(trusted), 1) {
+		t.Fatalf("trusted after the same user's sign-in: %x %v", keysOf(trusted), err)
+	}
+	// The same key from the new session only renames it.
+	if _, created, err := s.RegisterAccountDevice(ctx, tenant, u.ID, again, deviceInput(1, "Edge · Windows")); err != nil || created {
+		t.Fatalf("register again: created %v %v", created, err)
+	}
+
+	theirs := newSession(t, s, other.ID, "theirs", "sid-2")
+	if _, err := s.ReplaceSession(ctx, tenant, hashOf("again"), theirs); err != nil {
+		t.Fatal(err)
+	}
+	list, err = s.ListAccountDevices(ctx, tenant, u.ID)
+	if err != nil || len(list) != 2 || list[0].RevokedAt.IsZero() || list[1].RevokedAt.IsZero() {
+		t.Fatalf("after another user's sign-in: %+v %v", list, err)
+	}
+	if theirList, _ := s.ListAccountDevices(ctx, tenant, other.ID); len(theirList) != 0 {
+		t.Fatalf("the other user got devices: %+v", theirList)
+	}
+
+	// A replacing session already revoked takes no keys: they end with the old one.
+	first := newSession(t, s, u.ID, "first", "sid-3")
+	if _, _, err := s.RegisterAccountDevice(ctx, tenant, u.ID, first, deviceInput(7, "Chrome")); err != nil {
+		t.Fatal(err)
+	}
+	gone := newSession(t, s, u.ID, "gone", "sid-3")
+	if _, err := s.RevokeSession(ctx, tenant, u.ID, gone, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ReplaceSession(ctx, tenant, hashOf("first"), gone); err != nil {
+		t.Fatal(err)
+	}
+	var revoked bool
+	if err := s.Pool().QueryRow(ctx, `SELECT revoked_at IS NOT NULL FROM account_devices WHERE public_key = $1`,
+		bytes.Repeat([]byte{7}, 32)).Scan(&revoked); err != nil || !revoked {
+		t.Fatalf("key of a session replaced by a revoked one: revoked %v %v", revoked, err)
+	}
+}
+
 func TestHeartbeatTrustedDevices(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
