@@ -28,7 +28,11 @@ export const viAdvisor = {
 		machine: "Máy",
 		ai: "AI",
 		attach: "Đính kèm đoạn vừa copy",
-		recent: "Các lần copy gần đây",
+		recent: (count: number) => `Chọn đoạn copy khác để đính kèm (${count})`,
+		attachedTitle: "Đính kèm cùng câu hỏi",
+		attachedHint: "Cố vấn sẽ đọc đoạn này và xem thư mục nơi bạn copy để trả lời sát hơn. Bấm ✕ nếu không muốn gửi kèm.",
+		placeholderAttached: "Hỏi gì về đoạn này?",
+		recentHint: "Các đoạn bạn copy gần đây trong ứng dụng, chỉ lưu trong trang này và chỉ gửi đi khi bạn đính kèm.",
 		dismiss: "Bỏ qua",
 		remove: "Bỏ đính kèm",
 		where: {

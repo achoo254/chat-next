@@ -29,7 +29,11 @@ export const enAdvisor: AdvisorCopy = {
 		machine: "Machine",
 		ai: "AI",
 		attach: "Attach what you just copied",
-		recent: "Recent copies",
+		recent: (count: number) => `Pick another copy to attach (${count})`,
+		attachedTitle: "Attached to your question",
+		attachedHint: "Advisor reads this text and looks at the folder you copied it from to answer more closely. Press ✕ to leave it out.",
+		placeholderAttached: "What about this text?",
+		recentHint: "What you copied lately in the app, kept in this page only and sent only when you attach it.",
 		dismiss: "Dismiss",
 		remove: "Remove attachment",
 		where: {

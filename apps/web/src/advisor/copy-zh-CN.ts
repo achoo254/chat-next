@@ -29,7 +29,11 @@ export const zhCNAdvisor: AdvisorCopy = {
 		machine: "设备",
 		ai: "AI",
 		attach: "附上刚复制的内容",
-		recent: "最近复制",
+		recent: (count: number) => `选择其他复制内容附上（${count}）`,
+		attachedTitle: "随问题附上",
+		attachedHint: "顾问会阅读这段内容，并查看你复制它的文件夹，以便更贴切地回答。不想附上请点 ✕。",
+		placeholderAttached: "想问这段内容的什么？",
+		recentHint: "你最近在应用中复制的内容，只保存在此页面，仅在你附上时才发送。",
 		dismiss: "忽略",
 		remove: "移除附件",
 		where: {

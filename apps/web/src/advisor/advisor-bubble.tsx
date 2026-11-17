@@ -244,6 +244,8 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 		event.preventDefault();
 		void submit(false);
 	};
+	/** The recent copies still to pick: the ones already attached are above. */
+	const choices = copies.filter((copy) => !attached.some((c) => c.id === copy.id));
 	const attach = (copy: CopyRecord) => {
 		if (attached.some((c) => c.id === copy.id)) return;
 		setAttached([copy, ...attached].slice(0, 5));
@@ -253,6 +255,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 			<div className="adv-body">
 				{elsewhere && <p className="adv-note muted">{t.answer.elsewhere}</p>}
 				<NoteLine presence={presence} store={store} />
+				{attached.length > 0 && <p className="adv-attach-title">{t.ask.attachedTitle}</p>}
 				{attached.map((copy) => (
 					<div key={copy.id} className="adv-attached">
 						<span className="grow">
@@ -264,6 +267,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 						</button>
 					</div>
 				))}
+				{attached.length > 0 && <p className="adv-note muted">{t.ask.attachedHint}</p>}
 				{offered !== null && (
 					<div className="adv-chip-row">
 						<button type="button" className="adv-chip" onClick={() => attach(offered)}>
@@ -277,13 +281,14 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 						</button>
 					</div>
 				)}
-				{copies.length > 0 && (
+				{choices.length > 0 && (
 					<details className="adv-recent" open={showRecent} onToggle={(event) => setShowRecent(event.currentTarget.open)}>
-						<summary>{t.ask.recent}</summary>
+						<summary>{t.ask.recent(choices.length)}</summary>
+						<p className="adv-note muted">{t.ask.recentHint}</p>
 						<ul>
-							{copies.map((copy) => (
+							{choices.map((copy) => (
 								<li key={copy.id}>
-									<button type="button" className="adv-recent-item" disabled={attached.some((c) => c.id === copy.id)} onClick={() => attach(copy)}>
+									<button type="button" className="adv-recent-item" onClick={() => attach(copy)}>
 										<small className="muted">
 											{whereOf(t, copy.context)} · {t.ask.ago(Math.max(0, Math.floor((now - copy.at) / 60_000)))}
 										</small>
@@ -342,7 +347,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 						className="input"
 						rows={2}
 						maxLength={2000}
-						placeholder={t.ask.placeholder}
+						placeholder={attached.length > 0 ? t.ask.placeholderAttached : t.ask.placeholder}
 						aria-label={t.ask.placeholder}
 						value={text}
 						onChange={(event) => setText(event.target.value)}

@@ -242,6 +242,26 @@ async function ask(question: string) {
 	await userEvent.click(send);
 }
 
+describe("attached and recent copies", () => {
+	it("says what an attached copy is for, and lists only the copies not attached yet (none: no list)", async () => {
+		const store = new AdvisorStore();
+		store.remember("lỗi một", scmCopy);
+		store.remember("lỗi hai", { ...scmCopy, failureId: "fail-43" });
+		store.setOpen(true);
+		open(store);
+		// The newest is offered as a chip; the other waits in the list of recent copies.
+		await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${t.ask.attach}`) }, WAIT));
+		expect(await screen.findByText(t.ask.attachedTitle, undefined, WAIT)).toBeTruthy();
+		expect(screen.getByText(t.ask.attachedHint)).toBeTruthy();
+		expect(screen.getByPlaceholderText(t.ask.placeholderAttached)).toBeTruthy();
+		expect(screen.getByText(t.ask.recent(1))).toBeTruthy();
+		// Attach the other too: nothing is left to pick, so the list goes.
+		await userEvent.click(screen.getByText(t.ask.recent(1)));
+		await userEvent.click(await screen.findByText("lỗi một", { selector: ".adv-recent-item .adv-clip" }, WAIT));
+		await waitFor(() => expect(screen.queryByText(t.ask.recent(1))).toBeNull(), WAIT);
+	});
+});
+
 describe("automatic Advisor in the menu", () => {
 	it("is switchable for a session in Chat mode and says why it is not for one held by a terminal", async () => {
 		const store = new AdvisorStore();
