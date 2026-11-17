@@ -1,6 +1,7 @@
 // What a background shell command is, as the office labels its machine
 // (docs/office-wire.md, part 4): read on the machine only, through the same
-// walk as the room (office-command-walk.ts), into one of seven kinds, plus
+// walk as the room (office-command-walk.ts), of the line's last command that
+// says what it is (`git pull && pnpm dev` is a dev server), into one of seven kinds, plus
 // the TCP port a dev server or database was told to listen on when the
 // command's own words say so (`--port 5173`, `-p 3000`, `PORT=8080`). No
 // system scan; only the kind's enum and the port's number leave the machine,
@@ -139,6 +140,44 @@ function portInLine(line: string, flags: ReadonlySet<string>, nested: boolean): 
   return 0;
 }
 
+/** `raw` without the opener of a group at its start (`(nc` is `nc`, `{` is nothing). */
+const withoutOpener = (raw: string): string => raw.replace(/^[({]+/, "");
+
+/** `raw` without the closer of a group at its end (`5173)` is `5173`); a pair inside the word (`$(date)`, `${PORT}`) stays. */
+function withoutCloser(raw: string): string {
+  const count = (word: string, ch: string): number => word.split(ch).length - 1;
+  let word = raw;
+  while ((word.endsWith(")") && count(word, "(") < count(word, ")")) || (word.endsWith("}") && count(word, "{") < count(word, "}"))) word = word.slice(0, -1);
+  return word;
+}
+
+/** The simple commands of a line as lines of their own, as typed, with the grouping of a subshell or brace group taken off. */
+function chainParts(command: string): string[] {
+  return simpleCommands(command)
+    .map(({ words }) => {
+      const raws = words.map((w) => w.raw);
+      raws[0] = withoutOpener(raws[0] ?? "");
+      raws[raws.length - 1] = withoutCloser(raws[raws.length - 1] ?? "");
+      return raws.filter((w) => w !== "").join(" ");
+    })
+    .filter((part) => part !== "");
+}
+
+/**
+ * The command of a chain that is the service: the last one that says what it is. Whatever comes before runs first
+ * and is preparation (`git pull && pnpm dev`, `nc -z host 5173 || vite --port 5173`, `pkill x; PORT=5173 serve`), and
+ * whatever comes after only looks at it (`pnpm dev | tee log`, `serve & sleep 2; curl localhost`). A line none of
+ * whose commands says anything has none.
+ */
+function mainCommand(parts: readonly string[]): { line: string; kind: OfficeServiceKind } | undefined {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const line = parts[i] ?? "";
+    const kind = walkCommand(line, SERVICE_RULES);
+    if (kind !== K.SCRIPT) return { line, kind };
+  }
+  return undefined;
+}
+
 /**
  * The label of a background shell command: its kind and, for a dev server or
  * a database, the port its words name (0 when they name none): `--port`
@@ -147,7 +186,14 @@ function portInLine(line: string, flags: ReadonlySet<string>, nested: boolean): 
  * another kind of command (`ssh -p 22`, `mkdir -p`) is never read.
  */
 export function classifyService(command: string): ServiceLabel {
-  const kind = walkCommand(command, SERVICE_RULES);
-  const listens = kind === K.DEV_SERVER || kind === K.DATABASE;
-  return { kind, port: listens ? portInLine(command, portFlags(walkCommand(command, PROGRAM_NAME)), false) : 0 };
+  const parts = chainParts(command);
+  const main = mainCommand(parts);
+  if (main === undefined || (main.kind !== K.DEV_SERVER && main.kind !== K.DATABASE)) return { kind: main?.kind ?? K.SCRIPT, port: 0 };
+  // The port may stand in a command of the chain before the service (`export PORT=3000; vite`), read with the service's own flags.
+  const flags = portFlags(walkCommand(main.line, PROGRAM_NAME));
+  for (const part of parts) {
+    const port = portInLine(part, flags, false);
+    if (port > 0) return { kind: main.kind, port };
+  }
+  return { kind: main.kind, port: 0 };
 }

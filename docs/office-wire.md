@@ -190,7 +190,9 @@ Bảng ví dụ đầy đủ: `apps/agent/test/office-activity-map.test.ts`.
 Tool bên trong subagent được phân phòng giống hệt (lệnh shell của subagent cũng chỉ đọc trên máy).
 
 **Nhãn dịch vụ** (`classifyService`, `apps/agent/src/office/office-service-kind.ts`): lệnh nền của một máy được đọc qua cùng bước 1-4 ở trên
-(`office-command-walk.ts`, dùng chung với phân phòng), rồi theo chương trình hoặc tên script cuối cùng:
+(`office-command-walk.ts`, dùng chung với phân phòng), rồi theo chương trình hoặc tên script cuối cùng. Dòng ghép (`&&`, `||`, `;`, `|`, `&`, nhóm `( )` hay
+`{ }`) được đọc theo **lệnh cuối cùng nói lên được nó là gì** (`git pull && pnpm dev` là máy chủ dev; `nc -z host 5173 || vite --port 5173` cũng vậy), vì lệnh
+đứng trước chỉ chuẩn bị và lệnh đứng sau chỉ xem nó (`pnpm dev | tee log`); không lệnh nào nói lên được thì `SCRIPT`. Bảng nhãn:
 
 | Nhãn | Ví dụ |
 |---|---|

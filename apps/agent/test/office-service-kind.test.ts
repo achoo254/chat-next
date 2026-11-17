@@ -93,3 +93,32 @@ describe("service kind", () => {
     }
   });
 });
+
+describe("a chain of commands is read by its last command that says what it is", () => {
+  it.each([
+    // The commands of the experiment that came out as scripts: a guard in front, a kill before, a group.
+    ["nc -z 127.0.0.1 5174 || PORT=5174 python3 -m http.server 5174 --bind 127.0.0.1", K.DEV_SERVER, 5174],
+    ["(nc -z 127.0.0.1 5174 && echo busy) || PORT=5174 python3 -m http.server 5174", K.DEV_SERVER, 5174],
+    ['pkill -f "http.server 5174"; sleep 1; cd /w && PORT=5175 python3 -m http.server 5175 --bind 127.0.0.1', K.DEV_SERVER, 5175],
+    // Preparation in front.
+    ["git pull && pnpm dev --port 5173", K.DEV_SERVER, 5173],
+    ["pnpm install && pnpm dev", K.DEV_SERVER, 0],
+    ["pnpm build && node dist/server.js", K.DEV_SERVER, 0],
+    ["sleep 5 && git push", K.GIT, 0],
+    // Something that only watches it behind.
+    ["pnpm dev --port 3000 | tee dev.log", K.DEV_SERVER, 3000],
+    ["pnpm dev & sleep 2; curl localhost:5173", K.DEV_SERVER, 0],
+    // Groups.
+    ["(cd web && vite --port 5173) &", K.DEV_SERVER, 5173],
+    ["{ pnpm dev --port 3000; }", K.DEV_SERVER, 3000],
+    // The port set in a command before the service still counts; one the guard checks does not.
+    ["export PORT=3000; vite", K.DEV_SERVER, 3000],
+    ["nc -z 127.0.0.1 5174 && vite", K.DEV_SERVER, 0],
+    // No command says anything: a script, with no port.
+    ["echo starting; sleep 600", K.SCRIPT, 0],
+    ["nc -z 127.0.0.1 5174 || echo free", K.SCRIPT, 0],
+    ["$(cat cmd) dev --port 5173", K.SCRIPT, 0],
+  ])("%s", (command, kind, port) => {
+    expect(classifyService(command)).toEqual({ kind, port });
+  });
+});
