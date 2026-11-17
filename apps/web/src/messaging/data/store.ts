@@ -136,27 +136,52 @@ function unreadFrom(view: DialogView): number {
 	return view.dialog.unreadCount > 0 ? view.dialog.readInboxMaxSeq + 1 : 0;
 }
 
-/** Runs `task` at most once at a time; calls made meanwhile collapse into one rerun. */
-class Coalescer {
+/** The least time between two reloads of a chat's window while events keep arriving. */
+const REFRESH_MIN_GAP_MS = 750;
+
+/**
+ * Runs `task` at most once at a time; calls made meanwhile collapse into one
+ * rerun. A rerun starts at least `minGapMs` after the previous run began, so a
+ * steady stream of events (an import filling a chat) cannot keep the task, and
+ * the screen it redraws, running back to back. The first run after a quiet
+ * spell starts at once.
+ */
+export class Coalescer {
 	private running = false;
 	private again = false;
+	private startedAt = 0;
+	private timer: ReturnType<typeof setTimeout> | null = null;
 
-	constructor(private readonly task: () => Promise<void>) {}
+	constructor(
+		private readonly task: () => Promise<void>,
+		private readonly minGapMs = 0,
+	) {}
 
 	run(): void {
+		// A rerun is already waiting for its turn.
+		if (this.timer !== null) return;
 		if (this.running) {
 			this.again = true;
 			return;
 		}
+		// Too soon after the last run began (even if it has finished): one run waits for the gap.
+		const wait = this.startedAt + this.minGapMs - Date.now();
+		if (this.startedAt !== 0 && wait > 0) {
+			this.timer = setTimeout(() => {
+				this.timer = null;
+				this.run();
+			}, wait);
+			return;
+		}
 		this.running = true;
+		this.startedAt = Date.now();
 		void this.task()
 			.catch(() => undefined)
 			.finally(() => {
 				this.running = false;
-				if (this.again) {
-					this.again = false;
-					this.run();
-				}
+				if (!this.again) return;
+				this.again = false;
+				this.run();
 			});
 	}
 }
@@ -880,7 +905,7 @@ export class ChatStore {
 			items: new Map(),
 			signatures: new Map(),
 			generation: 0,
-			refresh: new Coalescer(() => this.reloadWindow(chatId)),
+			refresh: new Coalescer(() => this.reloadWindow(chatId), REFRESH_MIN_GAP_MS),
 		};
 		this.windows.set(chatId, state);
 		while (this.windows.size > KEPT_WINDOWS) {
