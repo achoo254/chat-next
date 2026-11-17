@@ -1,5 +1,5 @@
-// Who is who in the office: each agent type keeps one friendly name, one
-// accessory, one colour and one home room across every session. The names
+// Who is who in the office: each agent type belongs to one of the 13 job titles
+// of the studio (name, character model, colour, home room), the same across every session. The names
 // live in the copy (copy-*.ts, office.cast); an agent type this table does
 // not know gets a colour hashed from its name into a fixed palette and a name
 // built from the type itself. This palette is the only place the office
@@ -7,39 +7,93 @@
 import type { RoomCode } from "./office-rooms.ts";
 import type { ServiceKind } from "./office-state.ts";
 
-/** The friendly names the copy carries (office.cast in copy-*.ts). */
-export type CastKey = "scout" | "explore" | "generalPurpose" | "tester" | "codeReviewer" | "researcher" | "planner" | "debugger";
+/** The job titles the copy names (office.cast in copy-*.ts): the 13 staff of the AI game studio. */
+export type CastKey =
+	| "producerPm"
+	| "techLead"
+	| "gameplayDeveloper"
+	| "backendDevops"
+	| "gameDesigner"
+	| "uiUxDesigner"
+	| "artist"
+	| "qaTester"
+	| "codeSecurityReviewer"
+	| "contentMarketing"
+	| "growthAnalytics"
+	| "researchAnalyst"
+	| "financeController";
 
 /** What a character holds or wears (the 3D scene attaches the prop; 2D only shows the colour). */
 export type Accessory = "magnifier" | "map" | "toolbox" | "hardhat" | "glasses" | "books" | "clipboard" | "flashlight" | "none";
 
 export interface CastEntry {
-	/** null for a type the table does not know: the name is built from the type. */
+	/** null for a type no job title claims: the name is built from the type, and it works as the fallback title (Gameplay Developer's model). */
 	readonly key: CastKey | null;
 	readonly accessory: Accessory;
 	readonly color: string;
 	/** Where the employee types and thinks (only replaces WORK). */
 	readonly homeRoom: RoomCode;
+	/** The character model of the job title (a key of office-assets.json staffCharacters). */
+	readonly model: string;
 }
 
-interface Known {
+interface Title {
 	readonly key: CastKey;
-	readonly accessory: Accessory;
+	/** The built character model of the title. */
+	readonly model: string;
 	readonly color: string;
+	readonly homeRoom: RoomCode;
+	/** Agent types by their lower-case name. */
+	readonly types: readonly string[];
+	/** Starts of a word in an unknown type's name that send the type to this title. */
+	readonly words: readonly string[];
 }
 
-/** Agent types by their lower-case name. */
-const KNOWN: Readonly<Record<string, Known>> = {
-	scout: { key: "scout", accessory: "magnifier", color: "#2a9d8f" },
-	explore: { key: "explore", accessory: "map", color: "#3f8f5f" },
-	"general-purpose": { key: "generalPurpose", accessory: "toolbox", color: "#5b7bd5" },
-	tester: { key: "tester", accessory: "hardhat", color: "#e9a23b" },
-	"code-reviewer": { key: "codeReviewer", accessory: "glasses", color: "#8e6bd8" },
-	researcher: { key: "researcher", accessory: "books", color: "#3a86c8" },
-	planner: { key: "planner", accessory: "clipboard", color: "#4caf73" },
-	plan: { key: "planner", accessory: "clipboard", color: "#4caf73" },
-	debugger: { key: "debugger", accessory: "flashlight", color: "#d9534f" },
-};
+/**
+ * The 13 staff of the studio (tools/office-art/staff-cast.json in the workspace holds the same table). Order matters for
+ * the words: the first title with a matching word claims an unknown type, so "security" is the reviewer's before anything else.
+ */
+const TITLES: readonly Title[] = [
+	{ key: "codeSecurityReviewer", model: "code-reviewer", color: "#6b6f78", homeRoom: "AUDIT", types: ["code-reviewer", "content-reviewer", "security", "cti-expert"], words: ["security", "review", "audit", "cti", "vuln"] },
+	{ key: "qaTester", model: "tester", color: "#5cc3a0", homeRoom: "WORK", types: ["tester"], words: ["test", "qa"] },
+	{ key: "backendDevops", model: "it-operator", color: "#f08a24", homeRoom: "SERVER", types: ["git-manager", "database-admin", "devops", "deploy"], words: ["git", "deploy", "devops", "database", "backend", "server", "infra", "release"] },
+	{ key: "uiUxDesigner", model: "ui-ux-designer", color: "#d9a520", homeRoom: "WORK", types: ["ui-ux-designer"], words: ["ui", "ux", "interface"] },
+	{ key: "artist", model: "artist", color: "#c9b27a", homeRoom: "WORK", types: [], words: ["artist", "illustrat", "image", "3d", "texture"] },
+	{ key: "gameDesigner", model: "game-designer", color: "#e0594f", homeRoom: "PLANNING", types: ["brainstormer"], words: ["design", "level", "balance", "brainstorm"] },
+	{ key: "producerPm", model: "planner", color: "#b07a4a", homeRoom: "PLANNING", types: ["planner", "plan", "project-manager", "journal-writer"], words: ["plan", "project", "produc", "journal", "roadmap"] },
+	{ key: "researchAnalyst", model: "researcher", color: "#7a5a3a", homeRoom: "LIBRARY", types: ["researcher", "docs-seeker", "claude-code-guide"], words: ["research", "seek", "guide", "lookup"] },
+	{ key: "techLead", model: "tech-lead", color: "#6fa8dc", homeRoom: "WORK", types: ["scout", "scout-external", "explore", "code-simplifier"], words: ["tech", "scout", "explor", "simplif", "architect"] },
+	{
+		key: "growthAnalytics",
+		model: "data-analyst",
+		color: "#2a9d9a",
+		homeRoom: "LIBRARY",
+		types: ["analytics-analyst", "funnel-architect", "lead-qualifier", "sale-enabler", "upsell-maximizer", "campaign-manager", "continuity-specialist", "attraction-specialist"],
+		words: ["data", "analytic", "growth", "funnel", "lead", "sale", "campaign", "upsell", "attraction", "continuity"],
+	},
+	{
+		key: "contentMarketing",
+		model: "content-writer",
+		color: "#e58fa8",
+		homeRoom: "PLANNING",
+		types: ["content-creator", "copywriter", "social-media-manager", "email-wizard", "seo-specialist", "docs-manager", "community-manager"],
+		words: ["content", "copy", "seo", "social", "email", "doc", "market", "writ", "communit"],
+	},
+	{ key: "financeController", model: "finance-accountant", color: "#3f8a4f", homeRoom: "AUDIT", types: [], words: ["financ", "cost", "token", "budget"] },
+	{ key: "gameplayDeveloper", model: "fullstack-developer", color: "#7a7f87", homeRoom: "WORK", types: ["fullstack-developer", "debugger", "campaign-debugger", "statusline-setup", "general-purpose"], words: ["debug", "fix", "bug", "develop", "implement", "code"] },
+];
+
+/** The model of unknown types: the hands-on Gameplay Developer's. */
+const FALLBACK_MODEL = "fullstack-developer";
+
+const BY_TYPE: ReadonlyMap<string, Title> = new Map(TITLES.flatMap((title) => title.types.map((type) => [type, title] as const)));
+
+function titleOf(type: string): Title | null {
+	const exact = BY_TYPE.get(type);
+	if (exact !== undefined) return exact;
+	const words = type.split(/[-_\s:/.]+/).filter((w) => w !== "");
+	return TITLES.find((title) => title.words.some((prefix) => words.some((w) => w.startsWith(prefix)))) ?? null;
+}
 
 /** Colours of agent types the table does not know, picked by a hash of the name. */
 export const UNKNOWN_PALETTE: readonly string[] = ["#c0607a", "#4f9da6", "#a07b3b", "#6a7fdb", "#b5652d", "#3d9970", "#9b59b6", "#d4813a", "#5a8f29", "#c2549d", "#2f7fa3", "#8c6d4f"];
@@ -68,32 +122,17 @@ export function nameHash(name: string): number {
 	return h;
 }
 
-/** The home room of an agent type: planner, researcher, code-reviewer, tester and any "security" type have one; the rest work in WORK. */
+/** The home room of an agent type: its job title's room (a security type works at AUDIT, git and deploy at SERVER, ...); unknown types work in WORK. */
 export function homeRoomOf(agentType: string): RoomCode {
-	const type = agentType.trim().toLowerCase();
-	if (type.includes("security")) return "SECURITY";
-	switch (type) {
-		case "planner":
-		case "plan":
-			return "PLANNING";
-		case "researcher":
-			return "LIBRARY";
-		case "code-reviewer":
-			return "AUDIT";
-		case "tester":
-			return "QA";
-		default:
-			return "WORK";
-	}
+	return titleOf(agentType.trim().toLowerCase())?.homeRoom ?? "WORK";
 }
 
 export function castOf(agentType: string): CastEntry {
 	const type = agentType.trim().toLowerCase();
-	const known = KNOWN[type];
-	const homeRoom = homeRoomOf(type);
-	if (known !== undefined) return { ...known, homeRoom };
+	const title = titleOf(type);
+	if (title !== null) return { key: title.key, accessory: "none", color: title.color, homeRoom: title.homeRoom, model: title.model };
 	const color = UNKNOWN_PALETTE[nameHash(type) % UNKNOWN_PALETTE.length] ?? ROLE_COLORS.machine;
-	return { key: null, accessory: "none", color, homeRoom };
+	return { key: null, accessory: "none", color, homeRoom: "WORK", model: FALLBACK_MODEL };
 }
 
 /** A readable name from an agent type the copy does not name: "docs-manager" → "Docs Manager"; "" → "". */

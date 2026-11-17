@@ -112,7 +112,7 @@ describe("the office tab", () => {
 		expect(within(post).getByText("Giám đốc")).toBeTruthy();
 		const management = screen.getByRole("region", { name: "Điều hành" });
 		const work = within(management).getByRole("region", { name: "Phòng làm việc chung" });
-		expect(within(work).getByText("Trinh sát viên")).toBeTruthy();
+		expect(within(work).getByText("Trưởng kỹ thuật")).toBeTruthy();
 		const meeting = within(management).getByRole("region", { name: "Phòng họp" });
 		expect(within(meeting).getByLabelText("1 người chờ bàn trong phòng họp").textContent).toBe("+1");
 		const lobby = within(management).getByRole("region", { name: "Sảnh" });
@@ -144,7 +144,7 @@ describe("the office tab", () => {
 		const living = await screen.findByRole("region", { name: "Sinh hoạt" });
 		const dorm = within(living).getByRole("region", { name: "Ký túc" });
 		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
-		expect(within(dorm).getByText("Trinh sát viên")).toBeTruthy();
+		expect(within(dorm).getByText("Trưởng kỹ thuật")).toBeTruthy();
 		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(2);
 		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(2);
 	});

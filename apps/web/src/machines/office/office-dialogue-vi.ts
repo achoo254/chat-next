@@ -101,14 +101,19 @@ export type QuirkKey = CastKey | "director" | "other";
 /** A closing line in each character's own voice. */
 export const QUIRKS: Readonly<Record<QuirkKey, readonly string[]>> = {
 	director: ["Giám đốc thấy vui khi cả đội vui.", "Cứ thong thả, có việc tôi gọi.", "Làm tốt lắm, cảm ơn mọi người."],
-	scout: ["Để mình đi dò thêm quanh đây.", "Có gì lạ là mình phát hiện ngay!", "Kính lúp lúc nào cũng trong túi."],
-	explore: ["Đường nào mình cũng thuộc hết.", "Đi một vòng là biết ngay.", "Bản đồ nằm cả trong đầu mình đây."],
-	generalPurpose: ["Cần gì cứ gọi, việc gì mình cũng làm.", "Hộp đồ nghề lúc nào cũng sẵn.", "Một tay mình lo được hết."],
-	tester: ["Nhưng phải thử lại cho chắc đã.", "Không kiểm thì không yên tâm.", "Mũ bảo hộ đội rồi, sẵn sàng!"],
-	codeReviewer: ["Để mình soát lại lần nữa cho chắc.", "Chi tiết nhỏ cũng phải đúng.", "Đeo kính vào là thấy lỗi ngay."],
-	researcher: ["Để mình tra thêm tài liệu.", "Sách nói thế đấy, tin được.", "Biết càng nhiều càng vui."],
-	planner: ["Mình ghi vào kế hoạch rồi nhé.", "Việc nào ra việc nấy, theo lịch.", "Mai mình cập nhật bảng kế hoạch."],
-	debugger: ["Có con bọ nào là mình bắt liền.", "Đèn pin lúc nào cũng sáng.", "Lỗi khó cỡ nào cũng tìm ra."],
+	producerPm: ["Mình ghi vào kế hoạch rồi nhé.", "Việc nào ra việc nấy, theo lịch.", "Mai mình cập nhật bảng tiến độ."],
+	techLead: ["Để mình xem lại hướng kỹ thuật đã.", "Đi một vòng mã nguồn là rõ ngay.", "Cấu trúc gọn thì sau này đỡ khổ."],
+	gameplayDeveloper: ["Để mình viết thử rồi chạy xem sao.", "Có lỗi nào là mình bắt liền.", "Việc gì cần tay mình lo được."],
+	backendDevops: ["Máy chủ vẫn chạy ổn nhé.", "Để mình xem lại đường triển khai.", "Đèn xanh hết rồi, yên tâm."],
+	gameDesigner: ["Mình nghĩ ra thêm một ý hay nữa.", "Chơi thử mới biết có vui không.", "Cân bằng lại một chút là ổn."],
+	uiUxDesigner: ["Màu này hợp hơn đó.", "Nhìn thoáng là phải hiểu ngay.", "Để mình chỉnh lại khoảng cách."],
+	artist: ["Mình phác thêm một bản nữa.", "Màu sắc làm nên không khí đó.", "Tạp dề dính màu là dấu hiệu làm việc chăm."],
+	qaTester: ["Nhưng phải thử lại cho chắc đã.", "Không kiểm thì không yên tâm.", "Áo blouse mặc rồi, sẵn sàng!"],
+	codeSecurityReviewer: ["Để mình soát lại lần nữa cho chắc.", "Chi tiết nhỏ cũng phải đúng.", "Chỗ này cần kiểm bảo mật thêm."],
+	contentMarketing: ["Mình viết lại cho dễ đọc hơn.", "Câu chữ gọn là hay nhất.", "Để mình lên bài tuần này."],
+	growthAnalytics: ["Số liệu nói thế này nè.", "Để mình xem lại phễu chuyển đổi.", "Con số không biết nói dối."],
+	researchAnalyst: ["Để mình tra thêm tài liệu.", "Sách nói thế đấy, tin được.", "Biết càng nhiều càng vui."],
+	financeController: ["Chi phí hôm nay vẫn trong ngân sách.", "Để mình cộng lại chi phí cho chắc.", "Bảng chi phí mình cập nhật liên tục."],
 	other: ["Mình mới vào nhưng vui lắm.", "Ở đây ai cũng dễ thương.", "Học được nhiều thứ hay ghê."],
 };
 

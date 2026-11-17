@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { layoutHash } from "../../src/machines/office/office-assets.ts";
+import { castOf } from "../../src/machines/office/office-cast.ts";
 import { eventSoundFiles, SOUND_FILES } from "../../src/office-3d/audio/office-sfx.ts";
 import { ACCESSORY_ITEMS, personLook, skinCellFor } from "../../src/office-3d/character/character-look.ts";
 import { lightmapPair, NO_SCENE_ASSETS, parseSceneAssets, propSources, skinCell, type SceneAssets } from "../../src/office-3d/scene/scene-assets.ts";
@@ -181,6 +182,36 @@ describe("scene assets: the Director's model", () => {
 	});
 });
 
+describe("scene assets: the job titles' models", () => {
+	const jointNames = (file: string): Set<string> => {
+		const json = glbJson(join(PUBLIC_OFFICE, file)) as { nodes?: { name?: string }[]; skins?: { joints?: number[] }[] };
+		const nodes = json.nodes ?? [];
+		return new Set((json.skins?.[0]?.joints ?? []).map((i) => nodes[i]?.name ?? ""));
+	};
+
+	it("has a model for every title the cast names, and the Advisor's, on the staff skeleton with every staff clip", async () => {
+		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
+		const assets = parseSceneAssets(live, await layoutHash());
+		if (assets.character === null) throw new Error("the live file has no staff model");
+		const staff = jointNames(assets.character.file);
+		const wanted = new Set(["advisor", ...["planner", "scout", "general-purpose", "git-manager", "brainstormer", "ui-ux-designer", "tester", "code-reviewer", "content-creator", "analytics-analyst", "researcher", "finance"].map((type) => castOf(type).model)]);
+		for (const model of wanted) {
+			const entry = assets.staffCharacters.get(model);
+			expect(entry, model).toBeDefined();
+			if (entry === undefined) continue;
+			expect(jointNames(entry.file), model).toEqual(staff);
+			for (const clip of assets.character.clips) expect(entry.clips, `${model} ${clip}`).toContain(clip);
+		}
+	});
+
+	it("is optional, and a model with an unsafe name or file is left out", () => {
+		const read = (staffCharacters: unknown) => parseSceneAssets({ ...(fixture as object), staffCharacters }, FIXTURE_HASH).staffCharacters;
+		expect(parseSceneAssets(fixture, FIXTURE_HASH).staffCharacters.size).toBe(0);
+		expect([...read({ planner: { file: "p.glb", clips: ["Idle_A"] }, "bad name": { file: "x.glb", clips: [] }, hacker: { file: "../x.glb", clips: [] } }).keys()]).toEqual(["planner"]);
+		expect(read("planner").size).toBe(0);
+	});
+});
+
 describe("scene assets: broken input", () => {
 	it("uses nothing from a file for another layout or version, or not an object", () => {
 		expect(parseSceneAssets(fixture, "other")).toBe(NO_SCENE_ASSETS);
@@ -284,19 +315,25 @@ describe("skins and accessories", () => {
 		expect(skinCellFor({ kind: "employee", key: "scout#1" }, 1)).toBe(0);
 	});
 
-	it("gives employees their cast accessory by the asset file's names, nobody else one", () => {
+	it("gives each employee the model of their job title, and the Advisor its own, nobody else one", () => {
 		const member = (agentType: string): Parameters<typeof personLook>[0] => ({
 			key: `${agentType}#1`,
 			kind: "employee",
 			actor: null,
 			member: { key: `${agentType}#1`, agentType, ordinal: 1, actorId: "a", desk: null, nested: false, firstEnteredAt: 0 },
 		});
-		expect(personLook(member("code-reviewer")).accessory).toBe("glasses");
-		expect(personLook(member("tester")).accessory).toBe("hard-hat");
-		expect(personLook(member("researcher")).accessory).toBe("book-stack");
-		expect(personLook(member("explore")).accessory).toBeNull();
-		expect(personLook(member("docs-manager")).accessory).toBeNull();
-		expect(personLook({ key: "director", kind: "director", actor: null, member: null }).accessory).toBeNull();
+		expect(personLook(member("code-reviewer")).model).toBe("code-reviewer");
+		expect(personLook(member("security")).model).toBe("code-reviewer");
+		expect(personLook(member("tester")).model).toBe("tester");
+		expect(personLook(member("researcher")).model).toBe("researcher");
+		expect(personLook(member("explore")).model).toBe("tech-lead");
+		expect(personLook(member("docs-manager")).model).toBe("content-writer");
+		// A type no title claims wears the Gameplay Developer's model.
+		expect(personLook(member("zebra-wrangler")).model).toBe("fullstack-developer");
+		expect(personLook({ key: "director", kind: "director", actor: null, member: null }).model).toBeNull();
+		expect(personLook({ key: "advisor", kind: "advisor", actor: null, member: null, advisor: { lookId: "owl" } as never }).model).toBe("advisor");
+		// The studio's people carry no accessory (their props are the scene's); the Advisor's look keeps its own.
+		expect(personLook(member("code-reviewer")).accessory).toBeNull();
 		expect(Object.values(ACCESSORY_ITEMS).filter((v) => v !== null)).toHaveLength(6);
 	});
 });

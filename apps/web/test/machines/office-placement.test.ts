@@ -76,9 +76,9 @@ describe("office placement", () => {
 	});
 
 	it("replaces only WORK with an agent type's home room", () => {
-		const store = fresh([director(), staff("a1", "tester", { activity: act("e", OfficeRoom.WORK, "Edit") }), staff("a2", "code-reviewer", { activity: act("r", OfficeRoom.LIBRARY) })]);
+		const store = fresh([director(), staff("a1", "planner", { activity: act("e", OfficeRoom.WORK, "Edit") }), staff("a2", "code-reviewer", { activity: act("r", OfficeRoom.LIBRARY) })]);
 		const places = placer(store)(T0);
-		expect(find(places, "tester#1").room).toBe("QA");
+		expect(find(places, "planner#1").room).toBe("PLANNING");
 		// An activity with its own room goes there, home room or not.
 		expect(find(places, "code-reviewer#1").room).toBe("LIBRARY");
 		// Without a home room, typing happens at the employee's own desk.

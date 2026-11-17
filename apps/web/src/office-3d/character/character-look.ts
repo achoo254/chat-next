@@ -25,6 +25,8 @@ export interface PersonLook {
 	readonly accessoryScale: number;
 	/** Skin names of the atlas to wear, the first one it has wins; empty: a cell by the key. */
 	readonly skins: readonly string[];
+	/** The job title's own model (a key of staffCharacters), or null: the staff model with a skin cell, the Director's own, a machine's robot. */
+	readonly model: string | null;
 }
 
 /**
@@ -59,6 +61,9 @@ export const ACCESSORY_ITEMS: Readonly<Record<Accessory, string | null>> = {
 	none: null,
 };
 
+/** The Advisor's own model (office-assets.json staffCharacters). */
+export const ADVISOR_MODEL = "advisor";
+
 /** The item held while drinking at the pantry. */
 export const COFFEE_ITEM = "mug";
 
@@ -67,11 +72,13 @@ export function personLook(p: Pick<Placement, "key" | "kind" | "actor" | "member
 		const id = p.advisor?.lookId ?? "";
 		// An unknown look (a newer app's) dresses as the first one, as the mascot shows it.
 		const dress = ADVISOR_DRESS[isLookId(id) ? id : "owl"];
-		return { color: personColor(p), kind: p.kind, key: p.key, accessory: dress.accessory, accessoryScale: dress.accessoryScale, skins: dress.skins };
+		// Its own model once loaded; the look's skin and accessory dress the staff model until then.
+		return { color: personColor(p), kind: p.kind, key: p.key, accessory: dress.accessory, accessoryScale: dress.accessoryScale, skins: dress.skins, model: ADVISOR_MODEL };
 	}
 	const type = p.member?.agentType ?? p.actor?.agentType ?? "";
-	const accessory = p.kind === "employee" ? ACCESSORY_ITEMS[castOf(type).accessory] : null;
-	return { color: personColor(p), kind: p.kind, key: p.key, accessory, accessoryScale: 1, skins: [] };
+	const cast = p.kind === "employee" ? castOf(type) : null;
+	const accessory = cast === null ? null : ACCESSORY_ITEMS[cast.accessory];
+	return { color: personColor(p), kind: p.kind, key: p.key, accessory, accessoryScale: 1, skins: [], model: cast?.model ?? null };
 }
 
 /**
@@ -80,7 +87,7 @@ export function personLook(p: Pick<Placement, "key" | "kind" | "actor" | "member
  * profile, read late or changed, names another look).
  */
 export function dressKey(look: PersonLook): string {
-	return [look.kind, look.color, look.skins.join("+"), look.accessory ?? "", look.accessoryScale].join("|");
+	return [look.kind, look.color, look.skins.join("+"), look.accessory ?? "", look.accessoryScale, look.model ?? ""].join("|");
 }
 
 /**

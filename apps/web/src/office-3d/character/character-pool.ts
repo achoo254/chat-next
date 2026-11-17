@@ -29,6 +29,8 @@ export interface CharacterFiles {
 	readonly model: string;
 	/** The Director's own model (same skeleton), or null: the Director then wears the staff model. */
 	readonly director: string | null;
+	/** The job titles' own models (same skeleton) by model key, loaded the first time someone of the title is drawn. */
+	readonly staff: ReadonlyMap<string, string>;
 	readonly skins: { readonly url: string; readonly atlas: SkinAtlas } | null;
 	readonly accessories: { readonly url: string; readonly items: ReadonlyMap<string, AccessoryItem> } | null;
 }
@@ -40,6 +42,8 @@ export interface CharacterPool {
 	readonly skinned: boolean;
 	/** Loads the character model (with skins and accessories when listed); true when the model is in (callers then rebuild their visuals). */
 	load(files: CharacterFiles, signal: AbortSignal): Promise<boolean>;
+	/** Called when a job title's model has arrived (callers then rebuild their visuals; several arrivals may come close together). */
+	onStaffModel(callback: () => void): void;
 	/** Loads the services' robot; true when it is in (callers then rebuild their visuals). */
 	loadRobot(url: string, robot: RobotAssets, signal: AbortSignal): Promise<boolean>;
 	dispose(): void;
@@ -94,6 +98,30 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 	const bodies = createBlockBodies(scene);
 	let container: AssetContainer | null = null;
 	let directorContainer: AssetContainer | null = null;
+	// The job titles' models: urls by model key, containers once loaded, keys asked for (each file loads once).
+	let staffUrls: ReadonlyMap<string, string> = new Map();
+	const staffContainers = new Map<string, AssetContainer>();
+	const staffAsked = new Set<string>();
+	let staffSignal: AbortSignal | null = null;
+	let staffArrived: (() => void) | null = null;
+	const askStaff = (model: string): void => {
+		const url = staffUrls.get(model);
+		if (url === undefined || staffAsked.has(model)) return;
+		staffAsked.add(model);
+		loadCharacterContainer(scene, url).then(
+			(loaded) => {
+				if (staffSignal?.aborted === true) {
+					loaded.dispose();
+					return;
+				}
+				staffContainers.set(model, loaded);
+				staffArrived?.();
+			},
+			(error: unknown) => {
+				if (staffSignal?.aborted !== true) console.warn(`office: model ${model} not loaded, its people wear the staff model`, error);
+			},
+		);
+	};
 	let skins: CharacterSkins | null = null;
 	let accessories: CharacterAccessories | null = null;
 	let robot: RobotModel | null = null;
@@ -122,6 +150,18 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 					console.warn("office: robot copy failed, drawing the service as a person", error);
 				}
 			}
+			if (look.model !== null && look.kind !== "director") {
+				const own = staffContainers.get(look.model);
+				if (own === undefined) askStaff(look.model);
+				else {
+					try {
+						// Its own texture is the whole look: no skin cell on top; the Advisor's look accessory belongs to the staff model.
+						return createSkinnedCharacter(scene, own, key, index, look, { skins: null, accessories: look.kind === "advisor" ? null : accessories });
+					} catch (error) {
+						console.warn("office: job title model copy failed, using the staff model", error);
+					}
+				}
+			}
 			if (look.kind === "director" && directorContainer !== null) {
 				try {
 					// Its own texture is the whole look: no skin cell on top.
@@ -145,7 +185,12 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 			instance.isPickable = false;
 			return instance;
 		},
+		onStaffModel(callback) {
+			staffArrived = callback;
+		},
 		async load(files, signal) {
+			staffUrls = files.staff;
+			staffSignal = signal;
 			try {
 				const loaded = await loadCharacterContainer(scene, files.model);
 				const [dressSkins, dressAccessories, loadedDirector] = await Promise.all([
@@ -189,6 +234,8 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 			skins?.dispose();
 			accessories?.dispose();
 			directorContainer?.dispose();
+			staffContainers.forEach((c) => c.dispose());
+			staffContainers.clear();
 			container?.dispose();
 			bodies.dispose();
 			blob.dispose(false, true);

@@ -174,6 +174,17 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				refreshCasters();
 			});
 		}
+		// A job title's model loads the first time someone of the title is drawn; several arriving together rebuild everyone once.
+		let staffRebuild: ReturnType<typeof setTimeout> | undefined;
+		pool.onStaffModel(() => {
+			if (staffRebuild !== undefined) return;
+			staffRebuild = setTimeout(() => {
+				staffRebuild = undefined;
+				if (opts.signal.aborted) return;
+				people.rebuild();
+				refreshCasters();
+			}, 120);
+		});
 		const character = assets.character;
 		if (character === null) return;
 		const accessories = assets.accessories;
@@ -181,6 +192,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 			{
 				model: assetUrl(character.file),
 				director: assets.directorCharacter === null ? null : assetUrl(assets.directorCharacter.file),
+				staff: new Map([...assets.staffCharacters].map(([model, entry]) => [model, assetUrl(entry.file)])),
 				skins: character.skins === null ? null : { url: assetUrl(character.skins.file), atlas: character.skins },
 				accessories: accessories === null ? null : { url: assetUrl(accessories.file), items: accessories.items },
 			},

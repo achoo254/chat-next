@@ -42,6 +42,7 @@ function fakePool(scene: Scene): CharacterPool & { readonly drawn: { key: string
 		drawn,
 		disposed,
 		skinned: true,
+		onStaffModel: () => undefined,
 		create(key, look): CharacterVisual {
 			drawn.push({ key, look });
 			const root = new TransformNode(`person-${key}`, scene);

@@ -9,6 +9,8 @@
 //                   (columns × rows cells, `count` of them used, named);
 //   directorCharacter  the Director's own model: another mesh and texture on
 //                   the same skeleton, with its clip names (no skins);
+//   staffCharacters  one such model per job title (and the Advisor's), by the
+//                   model key office-cast.ts names; loaded on demand;
 //   accessories    one GLB with a named node per accessory and, per name,
 //                   the bone it hangs from and a scale;
 //   sfx.sounds      sound files by name, with loop flag and length;
@@ -58,6 +60,9 @@ export interface DirectorAssets {
 	readonly clips: readonly string[];
 }
 
+/** One job title's model (the Advisor's too): own mesh and texture on the staff skeleton, no skin atlas. */
+export type StaffModelAssets = DirectorAssets;
+
 export interface AccessoryItem {
 	readonly bone: string;
 	readonly scale: number;
@@ -87,6 +92,8 @@ export interface SceneAssets {
 	readonly character: CharacterAssets | null;
 	/** The Director's own model, or null (the Director wears the staff model's concept skin). */
 	readonly directorCharacter: DirectorAssets | null;
+	/** The job titles' own models by model key (empty: everyone wears the staff model and a skin cell). */
+	readonly staffCharacters: ReadonlyMap<string, StaffModelAssets>;
 	readonly accessories: AccessoryAssets | null;
 	/** Sound files by the asset file's names (office-sfx.ts maps them to scene events). */
 	readonly sounds: ReadonlyMap<string, SoundFile>;
@@ -94,7 +101,7 @@ export interface SceneAssets {
 	readonly serviceRobot: RobotAssets | null;
 }
 
-export const NO_SCENE_ASSETS: SceneAssets = { zones: new Map(), character: null, directorCharacter: null, accessories: null, sounds: new Map(), serviceRobot: null };
+export const NO_SCENE_ASSETS: SceneAssets = { zones: new Map(), character: null, directorCharacter: null, staffCharacters: new Map(), accessories: null, sounds: new Map(), serviceRobot: null };
 
 /** A file under ASSETS_BASE: a name, or one folder and a name; nothing that climbs out. */
 const SAFE_PATH = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)?$/;
@@ -168,6 +175,16 @@ function directorOf(value: unknown): DirectorAssets | null {
 	return model === null ? null : { file: model, clips: names(value.clips) };
 }
 
+function staffModelsOf(value: unknown): Map<string, StaffModelAssets> {
+	const out = new Map<string, StaffModelAssets>();
+	if (!isRecord(value)) return out;
+	for (const [name, entry] of Object.entries(value)) {
+		const model = SAFE_NAME.test(name) ? directorOf(entry) : null;
+		if (model !== null) out.set(name, model);
+	}
+	return out;
+}
+
 function accessoriesOf(value: unknown): AccessoryAssets | null {
 	if (!isRecord(value)) return null;
 	const glb = file(value.file);
@@ -225,6 +242,7 @@ export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 		zones,
 		character: characterOf(json.character),
 		directorCharacter: directorOf(json.directorCharacter),
+		staffCharacters: staffModelsOf(json.staffCharacters),
 		accessories: accessoriesOf(json.accessories),
 		sounds: soundsOf(json.sfx),
 		serviceRobot: robotOf(json.serviceRobot),
