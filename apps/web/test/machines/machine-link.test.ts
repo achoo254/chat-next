@@ -447,7 +447,79 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
-	it("stops for good, without retrying, when the account revoked this device", async () => {
+	it("registers again once when the machine says the key was revoked, and opens with the new key", async () => {
+		const renewed = await generateKeyPair();
+		machine.trusted = [renewed.publicKey];
+		machine.revoked = [device.publicKey];
+		let current = device;
+		const asked: (KeyPair | undefined)[] = [];
+		const l = link({
+			device: (opts) => {
+				asked.push(opts?.revoked);
+				if (opts?.revoked === current) current = renewed;
+				return Promise.resolve(current);
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open with the new key");
+		expect(asked).toEqual([undefined, device, undefined]);
+		expect(machine.sockets).toHaveLength(2);
+		l.stop();
+	});
+
+	it("tries again later when registering again fails on the network, then opens with the new key", async () => {
+		const renewed = await generateKeyPair();
+		machine.trusted = [renewed.publicKey];
+		machine.revoked = [device.publicKey];
+		let current = device;
+		let offline = true;
+		const l = link({
+			device: (opts) => {
+				if (opts?.revoked !== undefined && offline) {
+					offline = false;
+					current = renewed;
+					return Promise.reject(new Error("offline"));
+				}
+				return Promise.resolve(current);
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open after the retry");
+		expect(offline).toBe(false);
+		expect(machine.sockets).toHaveLength(2);
+		l.stop();
+	});
+
+	it("says to sign in again when the account refuses to register again", async () => {
+		machine.trusted = [];
+		machine.revoked = [device.publicKey];
+		const l = link({
+			device: (opts) => (opts?.revoked !== undefined ? Promise.reject(new DeviceRegistrationRefused("session-revoked")) : Promise.resolve(device)),
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "refused");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "session-revoked" });
+	});
+
+	it("stops after the new key is refused as revoked too", async () => {
+		const renewed = await generateKeyPair();
+		machine.trusted = [];
+		machine.revoked = [device.publicKey, renewed.publicKey];
+		let current = device;
+		const l = link({
+			device: (opts) => {
+				if (opts?.revoked === current) current = renewed;
+				return Promise.resolve(current);
+			},
+		});
+		l.start();
+		await until(() => l.snapshot().status.kind === "failed", "revoked twice");
+		expect(l.snapshot().status).toEqual({ kind: "failed", reason: "revoked" });
+		await new Promise((r) => setTimeout(r, 20));
+		expect(machine.sockets).toHaveLength(2);
+	});
+
+	it("stops for good when the account hands back the same revoked key", async () => {
 		machine.trusted = [];
 		machine.revoked = [device.publicKey];
 		const l = link();

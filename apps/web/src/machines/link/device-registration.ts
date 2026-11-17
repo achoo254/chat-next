@@ -8,9 +8,10 @@
 // A key the account revoked (or another session holds) never comes back:
 // the device makes a new key and registers that one, once. A session that
 // already lost a device to a revocation cannot register any key: it must
-// sign in again.
+// sign in again. A machine refusing the page's key as revoked (the account
+// revoked it after this page registered it) makes the page register again.
 import { Code, ConnectError } from "@connectrpc/connect";
-import { proveKeyPossession, type KeyPair } from "@achoo254/chat-remote-protocol";
+import { equal, proveKeyPossession, type KeyPair } from "@achoo254/chat-remote-protocol";
 import type { MachinesDirectory } from "../machines-client.ts";
 import type { DeviceKeyStore } from "./device-keys.ts";
 
@@ -54,13 +55,23 @@ async function register(registry: Registry, device: KeyPair, identity: DeviceIde
 }
 
 /**
+ * Asks for this device's registered key. `revoked`: a machine refused that
+ * key as revoked, so the result shared for the page is stale (the account may
+ * have revoked it after this page registered it, say when the session it was
+ * bound to ended): register again, which renews a key the account refused.
+ */
+export type RegisteredDevice = (opts?: { readonly revoked?: KeyPair }) => Promise<KeyPair>;
+
+/**
  * The device key, registered with the account; the first call registers it
  * (and renews it once when the account refused it), later calls share that
  * result. A failure is not kept: the next call tries again. Rejects with
  * DeviceRegistrationRefused when only the user can unblock it.
  */
-export function registeredDevice(keys: DeviceKeyStore, registry: Registry, identity: DeviceIdentity): () => Promise<KeyPair> {
+export function registeredDevice(keys: DeviceKeyStore, registry: Registry, identity: DeviceIdentity): RegisteredDevice {
 	let pending: Promise<KeyPair> | null = null;
+	/** The key `pending` resolved with, once it did. */
+	let settled: KeyPair | null = null;
 	const run = async (): Promise<KeyPair> => {
 		const device = await keys.device();
 		try {
@@ -84,11 +95,22 @@ export function registeredDevice(keys: DeviceKeyStore, registry: Registry, ident
 		}
 		return renewed;
 	};
-	return () => {
-		pending ??= run().catch((err: unknown) => {
+	return (opts) => {
+		// Only the links holding the stale key start over; one registering again already is shared.
+		if (opts?.revoked !== undefined && settled !== null && equal(settled.publicKey, opts.revoked.publicKey)) {
 			pending = null;
-			throw err;
-		});
+			settled = null;
+		}
+		pending ??= run().then(
+			(device) => {
+				settled = device;
+				return device;
+			},
+			(err: unknown) => {
+				pending = null;
+				throw err;
+			},
+		);
 		return pending;
 	};
 }

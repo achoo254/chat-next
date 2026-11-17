@@ -38,7 +38,7 @@ import {
 import { HandshakeFailure, equal, startHandshake, type KeyPair, type Session } from "@achoo254/chat-remote-protocol";
 import { applyEarlier, applyItems, EMPTY_JOURNAL, resetJournal, type Journal } from "../transcript/reducer.ts";
 import type { PendingSend, ShownAttachment } from "../transcript/tool-fold.ts";
-import { DeviceRegistrationRefused } from "./device-registration.ts";
+import { DeviceRegistrationRefused, type RegisteredDevice } from "./device-registration.ts";
 import { allowedTunnel, frameBytes, type SocketFactory, type SocketLike } from "./socket.ts";
 
 export const PING_MS = 10_000;
@@ -182,7 +182,7 @@ const systemTimers: Timers = {
 
 export interface LinkDeps {
 	/** This device's key, registered with the account. */
-	readonly device: () => Promise<KeyPair>;
+	readonly device: RegisteredDevice;
 	/** The machine's key as the directory lists it now; null while unknown. */
 	readonly expectedKey: () => Uint8Array | null;
 	/** The key the machine answered with when a link last opened; null before (or not kept). */
@@ -263,6 +263,12 @@ export class MachineLink {
 	private unknownDevice = 0;
 	/** The machine key the current socket expects. */
 	private expected: Uint8Array | null = null;
+	/** The device key the current socket proves. */
+	private deviceKey: KeyPair | null = null;
+	/** The machine refused a key as revoked and this link registered again since (until a link opens). */
+	private reregistered = false;
+	/** Counts start() and stop(): a callback of an earlier run does nothing. */
+	private run = 0;
 	private retryTimer: unknown = null;
 	private pingTimer: unknown = null;
 	/** The ping asked on wake() waits for its answer. */
@@ -335,13 +341,16 @@ export class MachineLink {
 	start(): void {
 		if (!this.stopped) return;
 		this.stopped = false;
+		this.run += 1;
 		this.attempt = 0;
 		this.unknownDevice = 0;
+		this.reregistered = false;
 		void this.connect();
 	}
 
 	stop(): void {
 		this.stopped = true;
+		this.run += 1;
 		this.timers.clearTimeout(this.retryTimer);
 		this.retryTimer = null;
 		this.dropSocket();
@@ -550,6 +559,7 @@ export class MachineLink {
 			return this.fail("key-changed");
 		}
 		this.expected = expected;
+		this.deviceKey = device;
 		let socket: SocketLike;
 		try {
 			socket = this.deps.socket(url);
@@ -602,6 +612,7 @@ export class MachineLink {
 	private opened(): void {
 		this.attempt = 0;
 		this.unknownDevice = 0;
+		this.reregistered = false;
 		const key = this.expected;
 		if (key !== null) this.deps.rememberKey?.(key).catch(() => undefined);
 		// The machine sends every prompt and takeover still open again on this connection.
@@ -643,7 +654,7 @@ export class MachineLink {
 				case HandshakeErrorCode.UNKNOWN_DEVICE:
 					return this.notKnownYet();
 				case HandshakeErrorCode.REVOKED:
-					return this.fail("revoked");
+					return this.revokedKey();
 				case HandshakeErrorCode.VERSION_UNSUPPORTED:
 					return this.fail("version");
 				case HandshakeErrorCode.BUSY:
@@ -687,6 +698,38 @@ export class MachineLink {
 			this.retryTimer = null;
 			void this.connect();
 		}, wait);
+	}
+
+	/**
+	 * The machine refused this device's key as revoked. The key this page
+	 * registered may have been revoked since (its session ended while the page
+	 * stayed open), so register once more: the account then hands a new key,
+	 * which the machine learns at its next sync (UNKNOWN_DEVICE waits for it).
+	 * The same key again, or a second refusal before any link opened, is final.
+	 */
+	private revokedKey(): void {
+		const stale = this.deviceKey;
+		this.dropSocket();
+		if (this.stopped) return;
+		if (this.reregistered || stale === null) return this.fail("revoked");
+		this.reregistered = true;
+		this.set({ status: { kind: "connecting", attempt: Math.max(1, this.attempt) } });
+		// A stop(), start() or wake() meanwhile owns the link from then on.
+		const run = this.run;
+		const current = () => run === this.run && !this.stopped && this.socket === null;
+		this.deps.device({ revoked: stale }).then(
+			(device) => {
+				if (!current()) return;
+				if (equal(device.publicKey, stale.publicKey)) return this.fail("revoked");
+				void this.connect();
+			},
+			(err: unknown) => {
+				if (!current()) return;
+				if (err instanceof DeviceRegistrationRefused) return this.fail(err.reason);
+				// Registering failed (network, server): try again later; connect() registers again.
+				this.retry();
+			},
+		);
 	}
 
 	/** The machine cannot check this device now: say so, and ask again only after a long wait. */

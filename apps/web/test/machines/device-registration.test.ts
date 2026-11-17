@@ -98,6 +98,22 @@ describe("registering this device with the account", () => {
 		expect((err as DeviceRegistrationRefused).reason).toBe("too-many-devices");
 	});
 
+	it("registers again when a machine refused the shared key as revoked, renewing it, and only once for every link", async () => {
+		const device = registeredDevice(keys, directory, identity);
+		const first = await device();
+		// The account revoked the key after this page registered it (its session ended).
+		service.refuse.push("device_revoked");
+		const [a, b] = await Promise.all([device({ revoked: first }), device({ revoked: first })]);
+		expect(a).toBe(b);
+		expect(a.publicKey).not.toEqual(first.publicKey);
+		expect(keys.renewed).toBe(1);
+		expect(service.registrations).toEqual([first.publicKey, a.publicKey]);
+		// A link still holding the old key does not start over again.
+		expect(await device({ revoked: first })).toBe(a);
+		expect(await device()).toBe(a);
+		expect(service.registrations).toHaveLength(2);
+	});
+
 	it("keeps no failure: the next call tries again", async () => {
 		const challenge = vi.spyOn(directory, "keyChallenge").mockRejectedValueOnce(new Error("offline"));
 		const device = registeredDevice(keys, directory, identity);

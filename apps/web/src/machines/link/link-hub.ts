@@ -4,10 +4,9 @@
 // (connection-provider.tsx). In development a machine on this computer
 // ("local", `tunelo run --port N`) can stand in for the directory: it is one
 // of the directory's machines, reached on 127.0.0.1 instead of its tunnel.
-import type { KeyPair } from "@achoo254/chat-remote-protocol";
 import type { MachineEntry, MachinesDirectory } from "../machines-client.ts";
 import type { DeviceKeyStore } from "./device-keys.ts";
-import { registeredDevice, type DeviceIdentity } from "./device-registration.ts";
+import { registeredDevice, type DeviceIdentity, type RegisteredDevice } from "./device-registration.ts";
 import { MachineLink } from "./machine-link.ts";
 import { forgetProviders, rememberProviders } from "./provider-cache.ts";
 import type { SocketFactory } from "./socket.ts";
@@ -84,7 +83,7 @@ export class LinkHub {
 	/** Machines whose link pings whatever screen shows: Advisor waits for an answer there (hold). */
 	private readonly held = new Map<string, number>();
 	/** This device's key, registered with the account on first use. */
-	readonly device: () => Promise<KeyPair>;
+	readonly device: RegisteredDevice;
 
 	constructor(readonly deps: HubDeps) {
 		this.device = registeredDevice(deps.keys, deps.directory, deps.identity);
