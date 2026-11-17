@@ -70,6 +70,28 @@ async function noSideScroll(page: Page): Promise<void> {
 	assert.ok(scroll <= client + 1, `horizontal overflow: ${scroll}px in ${client}px`);
 }
 
+/** Nothing of Advisor's panels scrolls sideways: no child reaches past its panel's right edge and none has a horizontal scrollbar. */
+async function noPanelOverflow(page: Page, label: string): Promise<void> {
+	const bad = await page.evaluate(() => {
+		const out: string[] = [];
+		for (const root of document.querySelectorAll<HTMLElement>(".adv-bubble, .adv-menu, [data-id=advisor-keys], [data-id=advisor-profile], .mx-advisor")) {
+			const box = root.getBoundingClientRect();
+			const rootName = root.className.toString().split(" ")[0] || root.dataset.id || root.tagName;
+			for (const el of root.querySelectorAll<HTMLElement>("*")) {
+				if (el.closest(".adv-menu") !== null && !root.classList.contains("adv-menu")) continue;
+				const style = getComputedStyle(el);
+				if (style.display === "none" || style.position === "fixed") continue;
+				const r = el.getBoundingClientRect();
+				if (r.width > 0 && r.right > box.right + 1) out.push(`${rootName}: ${el.tagName.toLowerCase()}.${el.className.toString().split(" ")[0]} ends ${Math.round(r.right - box.right)}px past the panel`);
+				if ((style.overflowX === "auto" || style.overflowX === "scroll") && el.scrollWidth > el.clientWidth + 1) out.push(`${rootName}: ${el.tagName.toLowerCase()}.${el.className.toString().split(" ")[0]} scrolls sideways`);
+			}
+			if (root.scrollWidth > root.clientWidth + 1) out.push(`${rootName}: itself scrolls sideways`);
+		}
+		return out.slice(0, 5);
+	});
+	assert.deepEqual(bad, [], `${label}: horizontal overflow in Advisor's panels`);
+}
+
 test("opened cold in a chat: the mascot is there, a chat copy goes with no id or name, and the answer comes back", async () => {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1366, height: 768 } });
 	const page = await context.newPage();
@@ -129,10 +151,15 @@ test("a failed push copied from Source Control goes with its failure_id; 'Gửi 
 
 	await page.locator("[data-id=advisor-mascot]").click();
 	const bubble = page.getByRole("dialog", { name: "Cố vấn" });
-	await bubble.getByRole("button", { name: /Đính kèm đoạn vừa copy \(Quản lý mã nguồn · chat-next/ }).click();
+	const offer = bubble.getByRole("button", { name: /Đính kèm đoạn vừa copy \(Quản lý mã nguồn · chat-next/ });
+	await offer.waitFor();
+	await noPanelOverflow(page, "a long attach chip");
+	await offer.click();
+	await noPanelOverflow(page, "an attached copy");
 	await bubble.getByRole("textbox", { name: "Bạn đang phân vân điều gì?" }).fill("Vì sao push hỏng?");
 	await bubble.getByRole("button", { name: "Hỏi" }).click();
 	await bubble.getByText(PICK).waitFor({ timeout: 15_000 });
+	await noPanelOverflow(page, "an answer");
 	const [sent] = await sends(page);
 	const ctx = sent?.advisorAttachments[0]?.context ?? {};
 	assert.equal(ctx.panel, "scm");
@@ -252,6 +279,7 @@ test("on a phone the mascot snaps to the edge it is dragged to, keeps it, and th
 	const sheet = await bubble.boundingBox();
 	assert.deepEqual([Math.round(sheet?.x ?? -1), Math.round(sheet?.width ?? 0), Math.round((sheet?.y ?? 0) + (sheet?.height ?? 0))], [0, 390, 844]);
 	await noSideScroll(page);
+	await noPanelOverflow(page, "the phone sheet");
 	assert.deepEqual(errors, []);
 	await context.close();
 });
@@ -281,6 +309,7 @@ for (const viewport of [
 		const text = (await page.locator(".mx-messages").textContent()) ?? "";
 		assert.ok(!text.includes("raw-input-not-shown") && !text.includes("advisor_weigh"), "the call's raw input shows");
 		await noSideScroll(page);
+		await noPanelOverflow(page, "the verdict card");
 		const box = await card.boundingBox();
 		assert.ok(box !== null && box.x >= 0 && box.x + box.width <= viewport.width, `card ${box?.x}+${box?.width} outside ${viewport.width}`);
 		assert.deepEqual(errors, []);
