@@ -149,8 +149,8 @@ const REFRESH_MIN_GAP_MS = 750;
 export class Coalescer {
 	private running = false;
 	private again = false;
-	private startedAt = 0;
-	private timer: ReturnType<typeof setTimeout> | null = null;
+	private waiting = false;
+	private startedAt = -Infinity;
 
 	constructor(
 		private readonly task: () => Promise<void>,
@@ -158,17 +158,17 @@ export class Coalescer {
 	) {}
 
 	run(): void {
-		// A rerun is already waiting for its turn.
-		if (this.timer !== null) return;
-		if (this.running) {
+		if (this.running || this.waiting) {
 			this.again = true;
 			return;
 		}
-		// Too soon after the last run began (even if it has finished): one run waits for the gap.
+		// Too soon after the last run began (even if it has finished): the run waits for the gap.
 		const wait = this.startedAt + this.minGapMs - Date.now();
-		if (this.startedAt !== 0 && wait > 0) {
-			this.timer = setTimeout(() => {
-				this.timer = null;
+		if (wait > 0) {
+			this.waiting = true;
+			setTimeout(() => {
+				this.waiting = false;
+				this.again = false;
 				this.run();
 			}, wait);
 			return;
@@ -179,9 +179,10 @@ export class Coalescer {
 			.catch(() => undefined)
 			.finally(() => {
 				this.running = false;
-				if (!this.again) return;
-				this.again = false;
-				this.run();
+				if (this.again) {
+					this.again = false;
+					this.run();
+				}
 			});
 	}
 }

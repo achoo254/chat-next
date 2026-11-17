@@ -30,9 +30,11 @@ export const BUNDLE_BUDGET = {
 	 * 150.5 KB with the lazy 3D office: no app module entered startup, but
 	 * Babylon's on-demand chunks also use the bundler's runtime helpers, so
 	 * rolldown moved them out of the react vendor chunk into a startup chunk
-	 * of their own (149.74 → 150.05 KB, the split's overhead).
+	 * of their own (149.74 → 150.05 KB, the split's overhead). 150.6 KB with the
+	 * minimum gap between reloads of a chat's window (message store, about
+	 * 0.1 KB), which the budget of 151 KB leaves room for.
 	 */
-	startupJsGzip: 150.5 * 1024,
+	startupJsGzip: 151 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;
