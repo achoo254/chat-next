@@ -204,6 +204,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 				<DeleteThreadDialog
 					link={machine.link}
 					thread={thread}
+					machineRef={machine.entry.ref}
 					machine={machine.entry.name}
 					ai={aiName(machine.state.info, thread.provider)}
 					onClose={() => setDeleting(false)}

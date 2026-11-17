@@ -975,3 +975,9 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 .mx-ws .mx-shells { padding-top: 0; }
 /* Under the name, as a session row's second line sits after its 16px mode mark. */
 .mx-shell .mx-shell-sub { padding-left: calc(16px + var(--space-2)); overflow: hidden; color: var(--c-text-muted); font-size: 0.8125rem; text-overflow: ellipsis; white-space: nowrap; }
+/* A session's terminal tabs under its row (session-tabs.tsx), as Orca lists a worktree's agents: one line each, one step further in; the tab in front of the open session is marked. */
+.mx-tabs { padding-top: 0; }
+.mx-tab.mx-srow.slim { min-height: 32px; }
+.mx-ws .mx-tab .tx { padding-left: calc(var(--mx-indent) * 3); }
+.mx-tab .name { font-size: 0.875rem; }
+.mx-tab[aria-current="true"] { background: var(--c-selected); }

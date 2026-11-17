@@ -3,7 +3,8 @@
 // empty) sits under the workspace of its machine whose folder holds it most
 // closely (the folder itself, else the deepest parent). A shell outside every
 // workspace stays on the machine's page ("Terminal đang chạy trên máy"); an AI's
-// own CLI is its session's row already. The lists are asked of every online
+// own CLI is its session's row already, and a shell open in a tab of a
+// session's dock is listed under that session (SessionTabs). The lists are asked of every online
 // machine with a terminal: when the column shows, on every page change (a
 // shell opened or closed in the dock; once more a moment later, when the dock
 // has attached to it) and every 30 seconds while visible.
@@ -13,6 +14,8 @@ import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
 import { followInApp, usePathname, useSearch } from "../router.tsx";
 import { terminalGate } from "./agent-version.ts";
 import type { AgentProject } from "./agent-projects-client.ts";
+import type { DockLayout } from "../terminal/terminal-layout.ts";
+import { sessionTabShells } from "./session-tabs.tsx";
 import { aiPaths } from "./ai-paths.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { folderName } from "./new-session-hints.ts";
@@ -25,6 +28,14 @@ const SETTLE_MS = 3_000;
 
 /** Live shells by workspace id. */
 export type ShellsByWorkspace = ReadonlyMap<number, readonly TermSessionInfo[]>;
+
+/** What the column knows of the machines' terminals. */
+export interface SidebarTerminals {
+	/** Shells under the workspaces holding their folder, without those in a tab of a session's dock. */
+	readonly shells: ShellsByWorkspace;
+	/** Each listable machine's sessions as it last listed them, by machine ref. */
+	readonly lists: ReadonlyMap<string, readonly TermSessionInfo[]>;
+}
 
 /** A folder to compare: one kind of separator, no trailing one, case folded on Windows. */
 function folderKey(dir: string, windows: boolean): string {
@@ -55,8 +66,8 @@ function listable(machines: readonly MachineView[]): MachineView[] {
 	return machines.filter((m) => m.conn.kind === "on" && terminalGate(m.state.info) === "available");
 }
 
-/** Every listable machine's shells, placed under the projects' workspaces on it. */
-export function useSidebarShells(machines: readonly MachineView[], projects: readonly AgentProject[]): ShellsByWorkspace {
+/** Every listable machine's shells, placed under the projects' workspaces on it (`layouts`: the docks' tabs, see useDockLayouts). */
+export function useSidebarShells(machines: readonly MachineView[], projects: readonly AgentProject[], layouts: ReadonlyMap<string, DockLayout>): SidebarTerminals {
 	const page = `${usePathname()}?${useSearch()}`;
 	const [lists, setLists] = useState<ReadonlyMap<string, readonly TermSessionInfo[]>>(new Map());
 	const hosts = listable(machines);
@@ -96,9 +107,11 @@ export function useSidebarShells(machines: readonly MachineView[], projects: rea
 		const sessions = lists.get(m.entry.ref);
 		if (sessions === undefined) continue;
 		const workspaces = projects.flatMap((p) => p.workspaces).filter((w) => w.machineId === m.entry.id);
-		for (const [id, shells] of placeShells(workspaces, sessions, m.entry.os === "win32")) placed.set(id, shells);
+		const inTabs = sessionTabShells(layouts, m);
+		const apart = sessions.filter((s) => !inTabs.has(s.session));
+		for (const [id, shells] of placeShells(workspaces, apart, m.entry.os === "win32")) placed.set(id, shells);
 	}
-	return placed;
+	return { shells: placed, lists };
 }
 
 /** The shells under a workspace's sessions: name, where in the folder, and whether a device shows it. */

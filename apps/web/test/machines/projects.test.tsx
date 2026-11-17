@@ -5,7 +5,7 @@
 // folder in one tap, a sensitive folder asked first, a folder of another
 // repository refused; "Thêm dự án" from a folder on a picked machine.
 import { create } from "@bufbuild/protobuf";
-import { ActivityPhase, ErrorCode, ErrorReason, ProjectSchema, TerminalAvailability, ThreadState, ThreadSummarySchema, type Frame, type Project, type ThreadActivity, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ActivityPhase, ErrorCode, ErrorReason, ProjectSchema, TermSessionInfoSchema, TerminalAvailability, ThreadState, ThreadSummarySchema, type Frame, type Project, type ThreadActivity, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -20,6 +20,7 @@ import { ProjectItem, type TreeContext } from "../../src/machines/project-tree-v
 import { inFolder, projectsSupported, samePath } from "../../src/machines/projects-view.ts";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 import { FakeAgentProjects } from "../support/fake-agent-projects.ts";
+import { addTab, EMPTY_LAYOUT } from "../../src/terminal/terminal-layout.ts";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 
 /** The app's toasts (a workspace's settings say there why the machine refused). */
@@ -96,7 +97,7 @@ describe("folders as the machine names them", () => {
 async function oneProject(server: FakeAgentProjects, views: MachineView[]) {
 	const store = new AgentProjectsStore(server.api());
 	await store.refresh();
-	const ctx: TreeContext = { store, projects: store.snapshot().projects, machines: views, now: Date.now(), seen: new Map(), current: null, shells: new Map() };
+	const ctx: TreeContext = { store, projects: store.snapshot().projects, machines: views, now: Date.now(), seen: new Map(), current: null, shells: new Map(), terminals: new Map(), layouts: new Map() };
 	const node = buildTree(store.snapshot().projects, views, "all", new Map()).projects[0];
 	if (node === undefined) throw new Error("no project");
 	return { store, ctx, node };
@@ -131,6 +132,36 @@ describe("a workspace row", () => {
 		const { ctx, node } = await oneProject(server, [machine(1, "Mac", own).view]);
 		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={ctx} />);
 		expect((screen.getByRole("button", { name: "Phiên mới trong app" }) as HTMLButtonElement).disabled).toBe(true);
+	});
+});
+
+describe("a session's terminal tabs", () => {
+	const t1 = create(ThreadSummarySchema, { id: "t1", title: "Sửa sidebar", dir: "/w/app", provider: "claude", state: ThreadState.IDLE, updatedAt: 1n, terminalSession: 1 });
+
+	it("lists each tab of a session with more than one under its row; a pick opens the session with that tab in front", async () => {
+		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app" })];
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 3 }]);
+		const { ctx, node } = await oneProject(server, [machine(1, "Mac", own, { threads: [t1] }).view]);
+		const layout = addTab(addTab(EMPTY_LAYOUT, 1, true), 2);
+		const listed = [create(TermSessionInfoSchema, { session: 1, title: "✳ Claude Code", threadId: "t1" }), create(TermSessionInfoSchema, { session: 2, title: "", cwd: "/w/app" })];
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={{ ...ctx, current: { machine: "1", thread: "t1" }, layouts: new Map([["1/s/t1", layout]]), terminals: new Map([["1", listed]]) }} />);
+		const tabs = screen.getByRole("list", { name: "Các tab của Sửa sidebar" });
+		const rows = within(tabs).getAllByRole("link");
+		expect(rows.map((r) => r.textContent)).toEqual(["Claude Code", "Terminal 2"]);
+		// The shell's tab is in front of the open session.
+		expect(rows[1]?.getAttribute("aria-current")).toBe("true");
+		await userEvent.click(rows[0] as HTMLElement);
+		expect(window.location.pathname + window.location.search).toBe(`/ai/1/s/t1/terminal?tab=${encodeURIComponent(layout.tabs[0]?.id ?? "")}`);
+	});
+
+	it("lists nothing under a session with one tab", async () => {
+		const own = [create(ProjectSchema, { id: "p", name: "app", dir: "/w/app" })];
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 3 }]);
+		const { ctx, node } = await oneProject(server, [machine(1, "Mac", own, { threads: [t1] }).view]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={{ ...ctx, layouts: new Map([["1/s/t1", addTab(EMPTY_LAYOUT, 1, true)]]) }} />);
+		expect(screen.queryByRole("list", { name: "Các tab của Sửa sidebar" })).toBeNull();
 	});
 });
 

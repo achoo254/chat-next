@@ -4,7 +4,9 @@
 // a machine's layout in IndexedDB between visits. Storage is best effort: a
 // browser without IndexedDB (or one that refuses it, like private modes)
 // keeps the layout in memory for the page's lifetime and the dock works the
-// same. Only session ids and sizes are stored, never terminal content.
+// same. Only session ids and sizes are stored, never terminal content. The
+// AI Agent column reads the same store (sharedLayouts) to list a session's
+// tabs under its row, so it can be watched and read whole.
 
 export type SplitDir = "row" | "column";
 
@@ -265,6 +267,14 @@ export function parseLayout(value: unknown): DockLayout | null {
 export interface LayoutStore {
 	load(machine: string): Promise<DockLayout | null>;
 	save(machine: string, layout: DockLayout): Promise<void>;
+	/** The layouts this page knows now (saved here, or read by load or loadAll), by scope. */
+	known(): ReadonlyMap<string, DockLayout>;
+	/** Reads every stored layout once, for peek; later calls do nothing. */
+	loadAll(): Promise<void>;
+	/** Called when a layout this page knows changes; returns the unsubscribe. */
+	subscribe(listener: () => void): () => void;
+	/** Changes with every change, for useSyncExternalStore. */
+	version(): number;
 }
 
 const DATABASE = "terminal-layout";
@@ -284,6 +294,13 @@ function promised<T>(request: IDBRequest<T>): Promise<T> {
  */
 export function layoutStore(factory: IDBFactory | undefined = typeof indexedDB === "undefined" ? undefined : indexedDB): LayoutStore {
 	const memory = new Map<string, DockLayout>();
+	const listeners = new Set<() => void>();
+	let changes = 0;
+	const changed = () => {
+		changes += 1;
+		for (const fn of listeners) fn();
+	};
+	let everything: Promise<void> | null = null;
 	let database: Promise<IDBDatabase | null> | null = null;
 	const open = (): Promise<IDBDatabase | null> => {
 		database ??= (async () => {
@@ -308,13 +325,19 @@ export function layoutStore(factory: IDBFactory | undefined = typeof indexedDB =
 				const db = await open();
 				if (db === null) return null;
 				const value: unknown = await promised(db.transaction(STORE, "readonly").objectStore(STORE).get(machine));
-				return parseLayout(value);
+				const layout = parseLayout(value);
+				if (layout !== null && !memory.has(machine)) {
+					memory.set(machine, layout);
+					changed();
+				}
+				return memory.get(machine) ?? layout;
 			} catch {
 				return null;
 			}
 		},
 		async save(machine, layout) {
 			memory.set(machine, layout);
+			changed();
 			try {
 				const db = await open();
 				if (db === null) return;
@@ -323,5 +346,46 @@ export function layoutStore(factory: IDBFactory | undefined = typeof indexedDB =
 				// Storage refused (quota, private mode): this page still has it in memory.
 			}
 		},
+		known: () => memory,
+		loadAll() {
+			everything ??= (async () => {
+				try {
+					const db = await open();
+					if (db === null) return;
+					const store = db.transaction(STORE, "readonly").objectStore(STORE);
+					const [keys, values] = await Promise.all([promised(store.getAllKeys()), promised(store.getAll())]);
+					let any = false;
+					keys.forEach((key, i) => {
+						const layout = parseLayout(values[i]);
+						// What this page saved meanwhile is newer than what was stored.
+						if (typeof key !== "string" || layout === null || memory.has(key)) return;
+						memory.set(key, layout);
+						any = true;
+					});
+					if (any) changed();
+				} catch {
+					// Nothing stored can be read: the column shows the tabs of the docks opened on this page.
+				}
+			})();
+			return everything;
+		},
+		subscribe(listener) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+		version: () => changes,
 	};
+}
+
+let shared: LayoutStore | null = null;
+
+/** The one store of the page: the docks save their layouts in it, the AI Agent column reads them. */
+export function sharedLayouts(): LayoutStore {
+	shared ??= layoutStore();
+	return shared;
+}
+
+/** A session's dock keeps its tabs under this scope; the machine's own dock under the machine's ref. */
+export function sessionScope(machine: string, threadId: string): string {
+	return `${machine}/s/${threadId}`;
 }

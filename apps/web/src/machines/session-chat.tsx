@@ -14,7 +14,8 @@ import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
-import { Link, navigate, paths } from "../router.tsx";
+import { Link, navigate, paths, useSearch } from "../router.tsx";
+import { aiPaths } from "./ai-paths.ts";
 import { AdvisorVerdictCard } from "./cards/advisor-verdict.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
@@ -97,6 +98,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const [link, state] = useLink(hub, machine);
 	useWatch(link, threadId);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
+	// `?tab=<id>`: one of the session's terminal tabs to bring to the front (its row in the AI Agent column).
+	const pickedTab = new URLSearchParams(useSearch()).get("tab") || undefined;
 	// Advisor's own thread ("Xem phiên Cố vấn"): read only here; questions go through the mascot, which names them.
 	const advisorThread = state.advisorThreads.some((x) => x.id === threadId);
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
@@ -328,6 +331,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							<TerminalScreen
 								machine={machine}
 								thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId), running: turnHolds, inTerminal: thread.terminalSession !== 0, status: threadStatus(thread, false), provider: thread.provider, aiName: ai }}
+								showTab={pickedTab}
+								// The tab is in front: the address goes back to the session's terminal.
+								onTabShown={() => navigate(aiPaths.sessionTerminal(machine, threadId), { replace: true })}
 							/>
 						</Suspense>
 					) : (
@@ -561,6 +567,7 @@ function HeadMenu({
 				<DeleteThreadDialog
 					link={manage.link}
 					thread={manage.thread}
+					machineRef={machine}
 					machine={machineName}
 					ai={manage.ai}
 					onClose={() => setDeleting(false)}

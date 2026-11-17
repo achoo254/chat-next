@@ -13,7 +13,7 @@
 // column's arrow keys. The dialogs load when opened.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { ErrorReason, ProjectSchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorReason, ProjectSchema, type Project, type TermSessionInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { navigate } from "../router.tsx";
 import type { AgentProject } from "./agent-projects-client.ts";
@@ -24,6 +24,8 @@ import { folderName } from "./new-session-hints.ts";
 import { adoptStarted, isNeedsConsent, knownFolder, placeByHand, splitWorkspace, workspaceRemote } from "./project-actions.ts";
 import { type LooseFolder, type ProjectNode, type SeenMap, type WorkspaceLabel, type WorkspaceNode, projectIcon, shortHost, unseenDone, workspaceIcon, workspaceLabels } from "./project-tree.ts";
 import { SessionRow } from "./session-row.tsx";
+import { SessionTabs } from "./session-tabs.tsx";
+import { sessionScope, type DockLayout } from "../terminal/terminal-layout.ts";
 import { ShellRows, type ShellsByWorkspace } from "./sidebar-shells.tsx";
 import { StatusGlyph } from "./status-glyph.tsx";
 import { lastMode, modePath, terminalOffered } from "./session-mode.tsx";
@@ -58,6 +60,10 @@ export interface TreeContext {
 	readonly current: { readonly machine: string; readonly thread: string } | null;
 	/** Live shells of the machines, under the workspace that holds their folder. */
 	readonly shells: ShellsByWorkspace;
+	/** Each machine's terminal sessions as it last listed them, by machine ref (a session's tabs are checked against it). */
+	readonly terminals: ReadonlyMap<string, readonly TermSessionInfo[]>;
+	/** The terminal docks' tabs on this device, by scope. */
+	readonly layouts: ReadonlyMap<string, DockLayout>;
 }
 
 type MenuItem = { label: string; icon: Parameters<typeof Icon>[0]["name"]; run: () => void; danger?: boolean } | null;
@@ -118,6 +124,14 @@ function Sessions({ machine, threads, ctx }: { machine: MachineView; threads: re
 				{shown.map((thread) => (
 					<li key={thread.id}>
 						<SessionRow machine={machine} thread={thread} now={ctx.now} current={thread.id === current} done={unseenDone(thread, ctx.seen)} />
+						<SessionTabs
+							machine={machine}
+							thread={thread}
+							listed={ctx.terminals.get(machine.entry.ref)}
+							layout={ctx.layouts.get(sessionScope(machine.entry.ref, thread.id))}
+							current={thread.id === current}
+							online={machine.conn.kind === "on"}
+						/>
 					</li>
 				))}
 			</ul>

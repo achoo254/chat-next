@@ -51,11 +51,12 @@ import {
 	EMPTY_LAYOUT,
 	focusPane,
 	isSplitPane,
-	layoutStore,
 	panesOf,
 	pruneForScope,
 	selectTab,
+	sessionScope,
 	sessionsOf,
+	sharedLayouts,
 	setPaneSession,
 	setRatio,
 	splitPane,
@@ -80,12 +81,7 @@ import "./terminal.css";
 const SAVE_DELAY_MS = 300;
 const encoder = new TextEncoder();
 
-let sharedStore: LayoutStore | null = null;
-
-function defaultStore(): LayoutStore {
-	sharedStore ??= layoutStore();
-	return sharedStore;
-}
+const defaultStore = sharedLayouts;
 
 /** How often a phone in front asks the machine which terminals it runs. */
 const RELIST_MS = 30_000;
@@ -140,10 +136,29 @@ function showInLayout(layout: DockLayout, session: number, listed: readonly Term
 	return listed.some((s) => s.session === session && s.threadId === "" && !s.exited) ? addTab(layout, session, false) : null;
 }
 
+/** The layout with tab `id` in front; as it is when it has no such tab (closed meanwhile). */
+function withTab(layout: DockLayout, id: string): DockLayout {
+	return selectTab(layout, layout.tabs.findIndex((x) => x.id === id));
+}
+
 /** What Claude Code prints when `--resume` names a session it has no transcript of. */
 const LOST_SESSION = /No conversation found with session ID/;
 
-export default function TerminalScreen({ machine, thread, openShellIn, showSession }: { machine: string; thread?: DockThread | undefined; openShellIn?: string | undefined; showSession?: number | undefined }) {
+export default function TerminalScreen({
+	machine,
+	thread,
+	openShellIn,
+	showSession,
+	showTab,
+	onTabShown,
+}: {
+	machine: string;
+	thread?: DockThread | undefined;
+	openShellIn?: string | undefined;
+	showSession?: number | undefined;
+	showTab?: string | undefined;
+	onTabShown?: (() => void) | undefined;
+}) {
 	const hub = useHub();
 	const [link, state] = useLink(hub, machine);
 	const terminal = terminalLinkFor(hub, machine);
@@ -170,6 +185,8 @@ export default function TerminalScreen({ machine, thread, openShellIn, showSessi
 			agents={agents}
 			openShellIn={openShellIn}
 			showSession={showSession}
+			showTab={showTab}
+			onTabShown={onTabShown}
 			// The request is done: the address goes back to the plain terminal page.
 			onShellOpened={() => navigate(paths.machineTerminal(machine), { replace: true })}
 		/>
@@ -189,6 +206,10 @@ export interface TerminalDockProps {
 	/** One of the machine's sessions to show in a tab ("Mở" on the machine's page). */
 	showSession?: number | undefined;
 	onShellOpened?: () => void;
+	/** One of the session's tabs to bring to the front (a tab row of the AI Agent column), by its id. */
+	showTab?: string | undefined;
+	/** The tab asked by showTab is in front (or no longer exists): the address can drop it. */
+	onTabShown?: (() => void) | undefined;
 	store?: LayoutStore;
 	touch?: boolean;
 	/** What the machine takes, when it saves an image for the session's terminal (tunelo 2.7.1+). */
@@ -204,7 +225,23 @@ export interface DockAgents {
 	onStarted?(thread: ThreadSummary): void;
 }
 
-export function TerminalDock({ machine, link, online, terminal, back, thread, openShellIn, showSession, onShellOpened, store = defaultStore(), touch = isTouch(), imageLimits = null, agents }: TerminalDockProps) {
+export function TerminalDock({
+	machine,
+	link,
+	online,
+	terminal,
+	back,
+	thread,
+	openShellIn,
+	showSession,
+	onShellOpened,
+	showTab,
+	onTabShown,
+	store = defaultStore(),
+	touch = isTouch(),
+	imageLimits = null,
+	agents,
+}: TerminalDockProps) {
 	const t = useMachinesCopy();
 	const tt = t.terminal;
 	const status = useSyncExternalStore(terminal.subscribe, terminal.status);
@@ -243,7 +280,7 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	useAdvisorScope(root, { screen: "terminal", machine });
 	const shellOpening = useRef(false);
 	/** Each scope keeps its own tabs. */
-	const scope = thread === undefined ? machine : `${machine}/s/${thread.id}`;
+	const scope = thread === undefined ? machine : sessionScope(machine, thread.id);
 	const threadId = thread?.id;
 	/** Shells start in the session's folder, or the home folder. */
 	const shellDir = thread?.dir ?? "";
@@ -259,6 +296,9 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	// mounts the dock afresh for each such visit), then the address goes back to the plain terminal page.
 	const showAtStart = useRef(showSession);
 	const afterShow = useEffectEvent(() => onShellOpened?.());
+	// A tab row of the AI Agent column names the tab to show: on load, and again while the dock shows.
+	const tabAtStart = useRef(showTab);
+	const afterTab = useEffectEvent(() => onTabShown?.());
 
 	// The stored layout, without the sessions the machine no longer has.
 	useEffect(() => {
@@ -282,10 +322,12 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 			const pruned = list === null ? (stored ?? EMPTY_LAYOUT) : pruneForScope(stored ?? EMPTY_LAYOUT, list, threadId);
 			const wanted = showAtStart.current;
 			const shown = wanted === undefined ? pruned : showInLayout(pruned, wanted, list ?? []);
-			setLayout(shown ?? pruned);
+			const tabbed = tabAtStart.current === undefined ? (shown ?? pruned) : withTab(shown ?? pruned, tabAtStart.current);
+			setLayout(tabbed);
 			if (shown === null) setNotice(t.terminal.gone);
 			setReady(true);
 			if (showAtStart.current !== undefined) afterShow();
+			if (tabAtStart.current !== undefined) afterTab();
 		})();
 		return () => {
 			live = false;
@@ -337,17 +379,24 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 		for (const session of before) if (!after.has(session) && !ai.has(session)) closeSessionOnMachine(session);
 	};
 
-	/** The session's AI in a tab of its own (the one already running, if any), shown. */
-	const showAi = async (): Promise<void> => {
+	/**
+	 * The session's AI in a tab of its own (the one already running, if any), shown; `behind`: opened (when
+	 * not yet) without taking the front from the tab shown now (one picked in the AI Agent column).
+	 */
+	const showAi = async (behind = false): Promise<void> => {
 		const shown = aiPane(layout);
 		if (shown !== null) {
-			setLayout((l) => focusPane(l, shown.id));
+			if (!behind) setLayout((l) => focusPane(l, shown.id));
 			return;
 		}
 		const session = await openSession(shellDir, true);
 		if (session === null) return;
 		setWaitingTurn(false);
-		setLayout((l) => (aiPane(l) === null ? addTab(l, session, true) : l));
+		setLayout((l) => {
+			if (aiPane(l) !== null) return l;
+			const added = addTab(l, session, true);
+			return behind && l.active !== "" ? { ...added, active: l.active } : added;
+		});
 	};
 
 	const run = async (action: DockAction): Promise<void> => {
@@ -417,7 +466,8 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	const openFirst = useEffectEvent(() => {
 		if (threadId !== undefined) {
 			if (turnBusy) setWaitingTurn(true);
-			else void showAi();
+			// A tab picked in the AI Agent column stays in front.
+			else void showAi(tabAtStart.current !== undefined && layout.tabs.some((x) => x.id === tabAtStart.current));
 		} else if (openShellIn === undefined && showAtStart.current === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
 	});
 	useEffect(() => {
@@ -476,6 +526,22 @@ export function TerminalDock({ machine, link, online, terminal, back, thread, op
 	useEffect(() => {
 		if (picks > 0) shownPicked();
 	}, [picks]);
+
+	// A tab picked in the AI Agent column while the dock already shows: brought to the front, then the address drops it.
+	const [pickedTab, setPickedTab] = useState(showTab);
+	const [tabPicks, setTabPicks] = useState(0);
+	if (showTab !== pickedTab) {
+		setPickedTab(showTab);
+		if (ready && showTab !== undefined) {
+			const id = showTab;
+			setLayout((l) => withTab(l, id));
+			setTabPicks((n) => n + 1);
+		}
+	}
+	const shownTab = useEffectEvent(() => onTabShown?.());
+	useEffect(() => {
+		if (tabPicks > 0) shownTab();
+	}, [tabPicks]);
 
 	// The text size of every terminal (this browser keeps it); the default follows the screen.
 	const fallbackSize = touch ? FONT_SIZE_TOUCH : FONT_SIZE_DEFAULT;

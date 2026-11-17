@@ -4,6 +4,8 @@
 // moves Claude's record of the session and the files sent in it to its
 // Trash, where they can be restored. A session running a turn asks to stop
 // it first; one that seems open elsewhere on the machine warns before going on.
+// A session whose AI runs in the machine's terminal has that terminal stopped
+// first: left running, its CLI would outlive the session as a nameless shell.
 import { useState } from "react";
 import { ErrorReason, ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -11,6 +13,7 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { AGENT_SAFE_CLOSE, AGENT_THREAD_ACTIONS, versionAtLeast } from "./agent-version.ts";
 import { RemoteError, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
+import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { errorText } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -94,17 +97,24 @@ export function ThreadMenuItems({
 	);
 }
 
-/** Confirms and deletes; asks again when the machine says the session runs or seems open elsewhere. */
+/**
+ * Confirms and deletes; asks again when the machine says the session runs or seems open elsewhere. Its AI running
+ * in the machine's terminal (`terminalSession`) is stopped there first, once, and nothing is deleted if that fails.
+ */
 export function DeleteThreadDialog({
 	link,
 	thread,
+	machineRef,
 	machine,
 	ai,
 	onClose,
 	onDeleted,
 }: {
 	link: ThreadLink;
-	thread: Pick<ThreadSummary, "id" | "title">;
+	thread: Pick<ThreadSummary, "id" | "title"> & Partial<Pick<ThreadSummary, "terminalSession">>;
+	/** The machine's ref, which names its terminal sessions on this page. */
+	machineRef: string;
+	/** The machine's name, for the words. */
 	machine: string;
 	ai: string;
 	onClose: () => void;
@@ -117,9 +127,29 @@ export function DeleteThreadDialog({
 	const [stopRunning, setStopRunning] = useState(false);
 	const [openAnyway, setOpenAnyway] = useState(false);
 	const [ask, setAsk] = useState<"running" | "elsewhere" | null>(null);
-	const run = (stop: boolean, anyway: boolean) => {
+	const terminalSession = thread.terminalSession ?? 0;
+	/** The terminal holding the AI was stopped already (an answer asked again does not stop it twice). */
+	const [terminalStopped, setTerminalStopped] = useState(false);
+	const stopTerminal = async (): Promise<boolean> => {
+		if (terminalSession === 0 || terminalStopped) return true;
+		endOnPurpose(machineRef, terminalSession);
+		try {
+			await link.request({ case: "termClose", value: { session: terminalSession } });
+			setTerminalStopped(true);
+			return true;
+		} catch {
+			forgetEnded(machineRef, terminalSession);
+			return false;
+		}
+	};
+	const run = async (stop: boolean, anyway: boolean) => {
 		setBusy(true);
 		setError("");
+		if (!(await stopTerminal())) {
+			setBusy(false);
+			setError(t.agent.thread.deleteStopFailed);
+			return;
+		}
 		link.request({ case: "threadDelete", value: { threadId: thread.id, stopRunning: stop, openAnyway: anyway } }).then(
 			() => {
 				setBusy(false);
@@ -140,7 +170,7 @@ export function DeleteThreadDialog({
 		setStopRunning(stop);
 		setOpenAnyway(anyway);
 		setAsk(null);
-		run(stop, anyway);
+		void run(stop, anyway);
 	};
 	const label = busy ? t.agent.thread.deleting : ask === "running" ? t.agent.thread.stopAndDelete : ask === "elsewhere" ? t.agent.thread.deleteAnyway : t.agent.thread.delete;
 	return (
@@ -148,6 +178,7 @@ export function DeleteThreadDialog({
 			<DialogHead id={id} title={t.agent.thread.deleteTitle} onClose={onClose} />
 			<div className="dlg-body stack">
 				<p>{t.agent.thread.deleteBody(thread.title, machine)}</p>
+				{terminalSession > 0 && !terminalStopped && <p className="mx-warn">{t.agent.thread.deleteInTerminal(ai)}</p>}
 				{ask === "running" && (
 					<p className="mx-warn" role="alert">
 						{t.agent.thread.deleteRunning(ai)}

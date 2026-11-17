@@ -630,6 +630,51 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a session's tab picked in the AI Agent column comes to the front, on load and while the dock shows", async () => {
+		const store = refusing();
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const thread = { id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" };
+		const first = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={thread} store={store} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await userEvent.click(await screen.findByRole("button", { name: "Mở mới" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Terminal mới" }));
+		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+		// The AI's tab in front, as the store keeps it.
+		await userEvent.click(screen.getAllByRole("tab")[0] as HTMLElement);
+		await act(() => new Promise((r) => setTimeout(r, 400)));
+		const kept = store.known().get("1/s/t1");
+		const [aiTab, shellTab] = kept?.tabs ?? [];
+		expect(kept?.active).toBe(aiTab?.id);
+		first.unmount();
+		// Opened from the shell's row: the shell stays in front (the AI's tab is there, behind it).
+		let shown = 0;
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={thread} store={store} touch={false} showTab={shellTab?.id} onTabShown={() => (shown += 1)} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+		await act(() => new Promise((r) => setTimeout(r, 100)));
+		expect(screen.getAllByRole("tab")[1]?.getAttribute("aria-selected")).toBe("true");
+		expect(shown).toBe(1);
+		// Picked again while the dock shows: the AI's row.
+		view.rerender(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={thread} store={store} touch={false} showTab={aiTab?.id} onTabShown={() => (shown += 1)} />
+			</I18nProvider>,
+		);
+		await waitFor(() => expect(screen.getAllByRole("tab")[0]?.getAttribute("aria-selected")).toBe("true"));
+		expect(shown).toBe(2);
+		expect(sent("termOpen")).toHaveLength(2);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
 	it("a file dropped on a session's terminal goes into the session's folder and its path is typed into the pane", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");

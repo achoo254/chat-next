@@ -40,7 +40,7 @@ describe("deleting a session", () => {
 	it("says the files go to the Trash on the machine, then deletes", async () => {
 		const { link, sent } = fakeLink(() => Promise.resolve({} as Frame));
 		const onDeleted = vi.fn();
-		wrap(<DeleteThreadDialog link={link} thread={{ id: "t1", title: "Sửa CSS" }} machine="Mac mini" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
+		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "Sửa CSS" }} machine="Mac mini" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
 		expect(screen.getByText(/Thùng rác trên Mac mini, khôi phục được từ Thùng rác/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
 		await waitFor(() => expect(onDeleted).toHaveBeenCalled());
@@ -50,7 +50,7 @@ describe("deleting a session", () => {
 	it("asks to stop a running session, then a session open elsewhere, and keeps both answers", async () => {
 		const { link, sent } = fakeLink((_req, n) => (n === 1 ? refuse(ErrorReason.THREAD_RUNNING) : n === 2 ? refuse(ErrorReason.SESSION_OPEN_ELSEWHERE) : Promise.resolve({} as Frame)));
 		const onDeleted = vi.fn();
-		wrap(<DeleteThreadDialog link={link} thread={{ id: "t1", title: "x" }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
+		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x" }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
 		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
 		expect((await screen.findByRole("alert")).textContent).toContain("đang chạy một lượt");
 		await userEvent.click(screen.getByRole("button", { name: "Dừng và xoá" }));
@@ -64,10 +64,33 @@ describe("deleting a session", () => {
 		]);
 	});
 
+	it("stops the AI in the machine's terminal first, so its CLI never outlives the session as a shell", async () => {
+		const { link, sent } = fakeLink((_req, n) => (n === 2 ? refuse(ErrorReason.SESSION_OPEN_ELSEWHERE) : Promise.resolve({} as Frame)));
+		const onDeleted = vi.fn();
+		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x", terminalSession: 7 }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
+		expect(screen.getByText(/xoá sẽ dừng nó trước/)).toBeTruthy();
+		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Vẫn xoá" }));
+		await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+		// Stopped once, before the first delete; asked again, it is not stopped twice.
+		expect(sent.map((r) => r.case)).toEqual(["termClose", "threadDelete", "threadDelete"]);
+		expect(sent[0]).toEqual({ case: "termClose", value: { session: 7 } });
+	});
+
+	it("deletes nothing when the terminal could not be stopped", async () => {
+		const { link, sent } = fakeLink(() => Promise.reject(new RemoteError(ErrorCode.INTERNAL, "", ErrorReason.UNSPECIFIED, "")));
+		const onDeleted = vi.fn();
+		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x", terminalSession: 7 }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
+		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
+		expect((await screen.findByRole("alert")).textContent).toContain("Không dừng được AI trong terminal");
+		expect(sent.map((r) => r.case)).toEqual(["termClose"]);
+		expect(onDeleted).not.toHaveBeenCalled();
+	});
+
 	it("says when the machine's Trash refused, and deletes nothing", async () => {
 		const { link } = fakeLink(() => Promise.reject(new RemoteError(ErrorCode.INTERNAL, "", ErrorReason.TRASH_UNAVAILABLE, "no trash")));
 		const onDeleted = vi.fn();
-		wrap(<DeleteThreadDialog link={link} thread={{ id: "t1", title: "x" }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
+		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x" }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
 		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
 		expect((await screen.findByRole("alert")).textContent).toContain("chưa xoá gì: no trash");
 		expect(onDeleted).not.toHaveBeenCalled();

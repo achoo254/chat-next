@@ -154,7 +154,7 @@ const archivedIds = (sent: Req[], archived: boolean) => sent.flatMap((r) => (r.c
 async function looseCtx(machines: MachineView[]): Promise<TreeContext> {
 	const store = new AgentProjectsStore(new FakeAgentProjects().api());
 	await store.refresh();
-	return { store, projects: [], machines, now: Date.now(), seen: new Map(), current: null, shells: new Map() };
+	return { store, projects: [], machines, now: Date.now(), seen: new Map(), current: null, shells: new Map(), terminals: new Map(), layouts: new Map() };
 }
 
 describe("a session row's glyph", () => {
