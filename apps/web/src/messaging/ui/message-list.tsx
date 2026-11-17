@@ -194,6 +194,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const positioned = useRef("");
 	// The view still shows where it was placed: the reader has not scrolled it since.
 	const pinned = useRef(false);
+	// Where the placement left the view: a scroll to anywhere else (by the reader, however) ends it.
+	const placedTop = useRef(0);
 	const lastRead = useRef(0);
 	const [atBottom, setAtBottom] = useState(true);
 	// Newest message on screen; messages are read as they come into view.
@@ -231,6 +233,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 			const target = place(element, window_.focusSeq, store.position(chatId, topicId));
 			if (target !== null && window_.focusSeq !== 0) target.classList.add("flash");
 			pinned.current = true;
+			placedTop.current = element.scrollTop;
 			// Whether the newest message is on screen decides marking as read.
 			const bottom = element.scrollHeight - element.scrollTop - element.clientHeight < BOTTOM_PX;
 			stick.current = bottom;
@@ -272,7 +275,10 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 			const element = scroller.current;
 			if (element === null || window_?.status !== "ready") return;
 			if (stick.current && window_.live) element.scrollTop = element.scrollHeight;
-			else if (pinned.current) place(element, window_.focusSeq, store.position(chatId, topicId));
+			else if (pinned.current) {
+				place(element, window_.focusSeq, store.position(chatId, topicId));
+				placedTop.current = element.scrollTop;
+			}
 		};
 	});
 	const mounted = loader === null && window_ !== undefined;
@@ -302,6 +308,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const onScroll = () => {
 		const element = scroller.current;
 		if (element === null || window_ === undefined) return;
+		// Moved away from the placement by something else than the placement (a scrollbar drag, a scroll from code).
+		if (pinned.current && Math.abs(element.scrollTop - placedTop.current) > 1) unpin();
 		const fromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
 		stick.current = fromBottom < BOTTOM_PX;
 		setAtBottom(stick.current && window_.live);
