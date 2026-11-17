@@ -172,6 +172,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		const ok = await pool.load(
 			{
 				model: assetUrl(character.file),
+				director: assets.directorCharacter === null ? null : assetUrl(assets.directorCharacter.file),
 				skins: character.skins === null ? null : { url: assetUrl(character.skins.file), atlas: character.skins },
 				accessories: accessories === null ? null : { url: assetUrl(accessories.file), items: accessories.items },
 			},

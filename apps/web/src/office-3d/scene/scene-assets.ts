@@ -7,7 +7,9 @@
 //                   the shell GLB's asset.extras (shell-extras.ts);
 //   character       the rigged model, its clip names and one skin atlas
 //                   (columns × rows cells, `count` of them used, named);
-//   accessories     one GLB with a named node per accessory and, per name,
+//   directorCharacter  the Director's own model: another mesh and texture on
+//                   the same skeleton, with its clip names (no skins);
+//   accessories    one GLB with a named node per accessory and, per name,
 //                   the bone it hangs from and a scale;
 //   sfx.sounds      sound files by name, with loop flag and length;
 //   serviceRobot    the toy robot background services are drawn as: its GLB,
@@ -50,6 +52,12 @@ export interface CharacterAssets {
 	readonly skins: SkinAtlas | null;
 }
 
+/** The Director's model: own mesh and texture, same skeleton and clip names as the staff model, no skin atlas. */
+export interface DirectorAssets {
+	readonly file: string;
+	readonly clips: readonly string[];
+}
+
 export interface AccessoryItem {
 	readonly bone: string;
 	readonly scale: number;
@@ -77,6 +85,8 @@ export interface RobotAssets {
 export interface SceneAssets {
 	readonly floors: ReadonlyMap<FloorLevel, FloorAssets>;
 	readonly character: CharacterAssets | null;
+	/** The Director's own model, or null (the Director wears the staff model's concept skin). */
+	readonly directorCharacter: DirectorAssets | null;
 	readonly accessories: AccessoryAssets | null;
 	/** Sound files by the asset file's names (office-sfx.ts maps them to scene events). */
 	readonly sounds: ReadonlyMap<string, SoundFile>;
@@ -84,7 +94,7 @@ export interface SceneAssets {
 	readonly serviceRobot: RobotAssets | null;
 }
 
-export const NO_SCENE_ASSETS: SceneAssets = { floors: new Map(), character: null, accessories: null, sounds: new Map(), serviceRobot: null };
+export const NO_SCENE_ASSETS: SceneAssets = { floors: new Map(), character: null, directorCharacter: null, accessories: null, sounds: new Map(), serviceRobot: null };
 
 /** A file under ASSETS_BASE: a name, or one folder and a name; nothing that climbs out. */
 const SAFE_PATH = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)?$/;
@@ -152,6 +162,12 @@ function characterOf(value: unknown): CharacterAssets | null {
 	return { file: model, clips: names(value.clips), skins: skinAtlas(value.skins) };
 }
 
+function directorOf(value: unknown): DirectorAssets | null {
+	if (!isRecord(value)) return null;
+	const model = file(value.file);
+	return model === null ? null : { file: model, clips: names(value.clips) };
+}
+
 function accessoriesOf(value: unknown): AccessoryAssets | null {
 	if (!isRecord(value)) return null;
 	const glb = file(value.file);
@@ -208,6 +224,7 @@ export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 	return {
 		floors,
 		character: characterOf(json.character),
+		directorCharacter: directorOf(json.directorCharacter),
 		accessories: accessoriesOf(json.accessories),
 		sounds: soundsOf(json.sfx),
 		serviceRobot: robotOf(json.serviceRobot),

@@ -947,6 +947,34 @@
 			"hand": "hand_r"
 		}
 	},
+	"directorCharacter": {
+		"file": "character-director.fb60f547.glb",
+		"clips": [
+			"Sitting_Idle",
+			"Sitting_Talking",
+			"Sitting_Writing",
+			"Typing",
+			"Clapping",
+			"Consume",
+			"Consume_Item",
+			"Dance_Simple",
+			"Idle_A",
+			"Idle_Listening",
+			"Idle_Talking",
+			"Idle_TalkingPhone",
+			"Interact",
+			"Jog",
+			"Jumping_Jacks",
+			"LayToIdle",
+			"PickUp_Table",
+			"Punch_Jab",
+			"Pushup",
+			"Sit_Ground_Idle",
+			"Sleeping",
+			"Victory",
+			"Walk"
+		]
+	},
 	"accessories": {
 		"file": "accessories.0b0096a5.glb",
 		"items": {

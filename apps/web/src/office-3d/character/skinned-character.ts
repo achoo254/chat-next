@@ -62,10 +62,16 @@ export async function loadCharacterContainer(scene: Scene, url: string): Promise
 
 const clipFps = (group: AnimationGroup): number => group.targetedAnimations[0]?.animation.framePerSecond ?? 30;
 
-/** Pelvis height of each sitting clip in the model's own units with no lift, shared by everyone (same rig): measured once. */
-const pelvisOf = new Map<string, number>();
+/** Pelvis height of each sitting clip in the model's own units with no lift, shared by everyone on one model (same rig): measured once per model. */
+const pelvisByModel = new WeakMap<AssetContainer, Map<string, number>>();
 
 export function createSkinnedCharacter(scene: Scene, container: AssetContainer, key: string, index: number, look: PersonLook, dress: CharacterDress): CharacterVisual {
+	// The Director's model has its own proportions, so its pelvis heights are not the staff model's.
+	let pelvisOf = pelvisByModel.get(container);
+	if (pelvisOf === undefined) {
+		pelvisOf = new Map<string, number>();
+		pelvisByModel.set(container, pelvisOf);
+	}
 	const suffix = `-${key}`;
 	const entries = container.instantiateModelsToScene((name) => `${name}${suffix}`, false, { doNotInstantiate: false });
 	const holder = new TransformNode(`person-${key}`, scene);

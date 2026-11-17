@@ -24,9 +24,11 @@ import type { CharacterVisual } from "./character-visual.ts";
 import { loadRobotModel, type RobotModel } from "./robot-character.ts";
 import { createSkinnedCharacter, loadCharacterContainer } from "./skinned-character.ts";
 
-/** The character's files as URLs: the model, and optionally its skin atlas and the accessories GLB. */
+/** The character's files as URLs: the model, and optionally the Director's own model, its skin atlas and the accessories GLB. */
 export interface CharacterFiles {
 	readonly model: string;
+	/** The Director's own model (same skeleton), or null: the Director then wears the staff model. */
+	readonly director: string | null;
 	readonly skins: { readonly url: string; readonly atlas: SkinAtlas } | null;
 	readonly accessories: { readonly url: string; readonly items: ReadonlyMap<string, AccessoryItem> } | null;
 }
@@ -49,6 +51,17 @@ async function loadSkins(scene: Scene, container: AssetContainer, files: Charact
 		return createCharacterSkins(container, files.skins.atlas, await loadTexture(scene, files.skins.url));
 	} catch (error) {
 		console.warn("office: skin atlas not loaded, everyone wears the model's own skin", error);
+		return null;
+	}
+}
+
+/** The Director's model: it is optional, so a model that fails to load leaves the Director on the staff model. */
+async function loadDirector(scene: Scene, files: CharacterFiles): Promise<AssetContainer | null> {
+	if (files.director === null) return null;
+	try {
+		return await loadCharacterContainer(scene, files.director);
+	} catch (error) {
+		console.warn("office: director model not loaded, the director wears the staff model", error);
 		return null;
 	}
 }
@@ -80,6 +93,7 @@ function blobTexture(scene: Scene): RawTexture {
 export function createCharacterPool(scene: Scene): CharacterPool {
 	const bodies = createBlockBodies(scene);
 	let container: AssetContainer | null = null;
+	let directorContainer: AssetContainer | null = null;
 	let skins: CharacterSkins | null = null;
 	let accessories: CharacterAccessories | null = null;
 	let robot: RobotModel | null = null;
@@ -108,6 +122,14 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 					console.warn("office: robot copy failed, drawing the service as a person", error);
 				}
 			}
+			if (look.kind === "director" && directorContainer !== null) {
+				try {
+					// Its own texture is the whole look: no skin cell on top.
+					return createSkinnedCharacter(scene, directorContainer, key, index, look, { skins: null, accessories });
+				} catch (error) {
+					console.warn("office: director copy failed, using the staff model", error);
+				}
+			}
 			if (container !== null) {
 				try {
 					return createSkinnedCharacter(scene, container, key, index, look, { skins, accessories });
@@ -126,14 +148,20 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 		async load(files, signal) {
 			try {
 				const loaded = await loadCharacterContainer(scene, files.model);
-				const [dressSkins, dressAccessories] = await Promise.all([loadSkins(scene, loaded, files), loadAccessories(scene, files)]);
+				const [dressSkins, dressAccessories, loadedDirector] = await Promise.all([
+					loadSkins(scene, loaded, files),
+					loadAccessories(scene, files),
+					loadDirector(scene, files),
+				]);
 				if (signal.aborted) {
 					dressSkins?.dispose();
 					dressAccessories?.dispose();
+					loadedDirector?.dispose();
 					loaded.dispose();
 					return false;
 				}
 				container = loaded;
+				directorContainer = loadedDirector;
 				skins = dressSkins;
 				accessories = dressAccessories;
 				return true;
@@ -160,6 +188,7 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 			robot?.dispose();
 			skins?.dispose();
 			accessories?.dispose();
+			directorContainer?.dispose();
 			container?.dispose();
 			bodies.dispose();
 			blob.dispose(false, true);

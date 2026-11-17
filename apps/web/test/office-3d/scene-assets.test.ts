@@ -134,6 +134,35 @@ describe("scene assets: the service robot", () => {
 	});
 });
 
+describe("scene assets: the Director's model", () => {
+	const jointNames = (file: string): Set<string> => {
+		const json = glbJson(join(PUBLIC_OFFICE, file)) as { nodes?: { name?: string }[]; skins?: { joints?: number[] }[] };
+		const nodes = json.nodes ?? [];
+		return new Set((json.skins?.[0]?.joints ?? []).map((i) => nodes[i]?.name ?? ""));
+	};
+
+	it("is the live second model: same skeleton and every clip of the staff model, so poses and seats work unchanged", async () => {
+		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
+		const assets = parseSceneAssets(live, await layoutHash());
+		expect(assets.directorCharacter).not.toBeNull();
+		if (assets.directorCharacter === null || assets.character === null) return;
+		expect(assets.directorCharacter.file).not.toBe(assets.character.file);
+		const staff = jointNames(assets.character.file);
+		expect(staff.size).toBeGreaterThan(10);
+		expect(jointNames(assets.directorCharacter.file)).toEqual(staff);
+		for (const clip of assets.character.clips) expect(assets.directorCharacter.clips, clip).toContain(clip);
+	});
+
+	it("is optional, and left out when its file is missing or unsafe (the Director then wears the staff model)", () => {
+		const read = (directorCharacter: unknown) => parseSceneAssets({ ...(fixture as object), directorCharacter }, FIXTURE_HASH).directorCharacter;
+		expect(parseSceneAssets(fixture, FIXTURE_HASH).directorCharacter).toBeNull();
+		expect(read({ file: "director.glb", clips: ["Idle_A", "bad name"] })).toEqual({ file: "director.glb", clips: ["Idle_A"] });
+		expect(read({ file: "../director.glb", clips: [] })).toBeNull();
+		expect(read({ clips: ["Idle_A"] })).toBeNull();
+		expect(read("director")).toBeNull();
+	});
+});
+
 describe("scene assets: broken input", () => {
 	it("uses nothing from a file for another layout or version, or not an object", () => {
 		expect(parseSceneAssets(fixture, "other")).toBe(NO_SCENE_ASSETS);
