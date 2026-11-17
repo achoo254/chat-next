@@ -263,7 +263,8 @@ async function colours(page: Page, selector: string): Promise<number> {
 
 const isDirector = (k: string) => k === "director";
 const isChairman = (k: string) => k === "chairman";
-const typeIs = (type: string) => (k: string) => k.startsWith(`${type}#`);
+/** The person of a job title (office-cast.ts: a title is one person whatever the subagents are). */
+const person = (title: string) => (k: string) => k === `title:${title}`;
 
 test("the office tab in 3D: every room of the table reached, seq gap, the framing button, power cut, draw calls, frames stop on the chat tab", async () => {
 	const { context, page, errors, warnings } = await openOffice(browser, "machine-chat", FLAGS_3D);
@@ -293,14 +294,17 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	// 1 with its first event lost (a seq gap): the director's Read only reaches the page through the fresh snapshot.
 	await page.evaluate(() => (window as TestWindow).__fakeOffice?.gapNext());
 	await step(page);
-	await reaches(page, "the director (Read, after the gap's snapshot)", isDirector, "LIBRARY");
-	await poll("the scout", async () => (await seen(page)).some((s) => typeIs("scout")(s.key)), (v) => v);
+	// The director only directs: his Read is the research analyst's work.
+	await reaches(page, "the research analyst (the director's Read, after the gap's snapshot)", person("researchAnalyst"), "LIBRARY");
+	await reaches(page, "the director at his chair meanwhile", isDirector, "DIRECTOR");
+	await poll("the scout", async () => (await seen(page)).some((s) => person("techLead")(s.key)), (v) => v);
 
 	await step(page); // 2: the scout greps, the tester and the planner come in
 	await step(page); // 3: git, a test command, TodoWrite
-	await reaches(page, "the director (git)", isDirector, "POST");
-	await reaches(page, "the tester (test command)", typeIs("tester"), "QA");
-	await reaches(page, "the planner (todo)", typeIs("planner"), "PLANNING");
+	// Backend & DevOps never leaves the server room, whatever the tool.
+	await reaches(page, "Backend & DevOps (git, in the server room)", person("backendDevops"), "SERVER");
+	await reaches(page, "the QA tester (test command)", person("qaTester"), "QA");
+	await reaches(page, "the producer (todo)", person("producerPm"), "PLANNING");
 	await step(page); // 4: the test fails; a background shell
 	await reaches(page, "the background machine", (k) => k === "machine:m-dev", "SERVER");
 	// Named by what it runs, its port and minutes in the bubble; drawn as the toy robot in 3D.
@@ -311,16 +315,16 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	if (three) await poll("the dev server drawn as a robot", async () => (await readout(page))?.people.find((p) => p.key === "machine:m-dev")?.model ?? "", (m) => m === "robot", 30_000);
 	await step(page); // 5: the director edits; a code reviewer and a researcher come in
 	await step(page); // 6: the reviewer edits (their home room replaces WORK)
-	await reaches(page, "the code reviewer (edit, home room)", typeIs("code-reviewer"), "AUDIT");
+	await reaches(page, "the code reviewer (edit, home room)", person("codeSecurityReviewer"), "AUDIT");
 	await step(page); // 7
 	await step(page); // 8
 	await step(page); // 9: a nested subagent comes in; a general-purpose employee writes at their desk
-	await reaches(page, "the first general-purpose employee (Write)", typeIs("general-purpose"), "WORK");
+	await reaches(page, "the gameplay developer (a general-purpose subagent writes)", person("gameplayDeveloper"), "WORK");
 
-	// 10: an approval waits: the director to Security, the chairman (you) in the lobby. The framing stays where it was:
+	// 10: an approval waits: the reviewer greets at Security, the chairman (you) in the lobby. The framing stays where it was:
 	// the camera does not move on its own to the work.
 	await step(page);
-	await reaches(page, "the director (awaiting approval)", isDirector, "SECURITY");
+	await reaches(page, "the reviewer (awaiting approval)", person("codeSecurityReviewer"), "SECURITY");
 	await reaches(page, "the chairman", isChairman, "LOBBY");
 	assert.equal(await framingOf(page), "overview", "the framing does not follow the work");
 
@@ -334,17 +338,13 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	assert.equal(await framingOf(page), "overview");
 	assert.equal(await framing.textContent(), "Về khu làm việc");
 
-	// 11: denied: the director leaves Security, the chairman goes.
+	// 11: denied: the reviewer leaves Security, the chairman goes.
 	await step(page);
-	await leaves(page, "the director (denied)", isDirector, "SECURITY");
-	// The nested subagent, between its tools: the meeting room.
-	await reaches(page, "the nested subagent", (k) => k.startsWith("~"), "MEETING");
+	await leaves(page, "the reviewer (denied)", person("codeSecurityReviewer"), "SECURITY");
 	await poll("the chairman gone", async () => (await seen(page)).some((s) => isChairman(s.key)), (v) => !v);
-	await step(page); // 12: tunelo's own MCP (a message to you) in the lobby; a coffee in the pantry
-	await reaches(page, "the director (tunelo MCP)", isDirector, "LOBBY");
-	await reaches(page, "the second general-purpose employee (coffee)", (k) => k === "general-purpose#2", "PANTRY");
+	await step(page); // 12: tunelo's own MCP (a message to you) in the lobby: nobody's department, so nobody goes; no coffee in office hours
 	await step(page); // 13: an external MCP: the post room
-	await reaches(page, "the docs manager (external MCP)", typeIs("docs-manager"), "POST");
+	await reaches(page, "content marketing (external MCP)", person("contentMarketing"), "POST");
 
 	// The link drops and stays down: 30 s later the power goes out; a reconnect brings the lights back.
 	await page.evaluate(() => {
@@ -364,7 +364,7 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	await until(page, "the lights back", () => document.querySelector("[data-id=office] .of-stage")?.getAttribute("data-power") === "on", 30_000);
 	assert.equal(await page.getByText("Mất điện", { exact: false }).count(), 0);
 	// The fresh snapshot keeps everyone where the script left them.
-	await reaches(page, "the docs manager after the reconnect", typeIs("docs-manager"), "POST");
+	await reaches(page, "content marketing after the reconnect", person("contentMarketing"), "POST");
 
 	if (three) {
 		// The canvas is not blank, and both framings stay within the medium rung's draw-call budget: at most 100 for a
@@ -457,7 +457,7 @@ test("without WebGL (--disable-3d-apis): the 2D view shows the plan's picture wi
 		// People in several zones at once: the director and staff (records and control zones), then a background
 		// machine (the server room of the work zone), all on the one picture.
 		for (let i = 0; i < 4; i++) await step(page);
-		await reaches(page, "the tester", typeIs("tester"), "QA");
+		await reaches(page, "the QA tester", person("qaTester"), "QA");
 		await step(page);
 		const anchors = pictureAnchors();
 		const img = page.locator("[data-id=office-picture] img");
@@ -515,20 +515,17 @@ test("without WebGL (--disable-3d-apis): the 2D view shows the plan's picture wi
 	}
 });
 
-test("an AI that does not report its staff (Antigravity): the director alone walks to the rooms of its tools, a notice, token-only audit numbers", async () => {
+test("an AI that does not report its staff (Antigravity): the director directs while the departments do the work of its tools, a notice, token-only audit numbers", async () => {
 	const { context, page, errors } = await openOffice(browser, "machine-secret", FLAGS_3D);
 	await page.getByText("AI này chưa báo cáo nhân viên: chỉ có Giám đốc.").waitFor({ timeout: 30_000 });
 	await step(page); // 0: a turn begins
 	await step(page); // 1: view_file: the library
-	await reaches(page, "the director (view_file)", isDirector, "LIBRARY");
+	await reaches(page, "the research analyst (the director's view_file)", person("researchAnalyst"), "LIBRARY");
 	await step(page); // 2: a test command: QA
-	await reaches(page, "the director (run_command, tests)", isDirector, "QA");
+	await reaches(page, "the QA tester (the director's run_command, tests)", person("qaTester"), "QA");
 	const people = await seen(page);
-	assert.deepEqual(
-		people.map((p) => p.kind),
-		["director"],
-		"the director alone",
-	);
+	// The fifteen are always in the building, whatever the AI reports.
+	assert.equal(people.filter((p) => p.kind === "director" || p.kind === "employee" || p.kind === "advisor").length, 15, "the fifteen of the office");
 	// Audit's board (in the control zone, beside QA where the director works now): tokens, no cost.
 	const audit = page.locator("[data-id=office-board-audit]").first();
 	await audit.waitFor({ state: "attached" });
@@ -588,15 +585,17 @@ test("the residents' day: after the session nobody goes home, at 23:30 everyone 
 	if (webgl) await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
 	// The whole script: the session ends (step 20) and every subagent leaves (step 21).
 	for (let i = 0; i <= 21; i++) await step(page);
-	await poll("the staff off duty", async () => (await seen(page)).filter((s) => s.kind === "employee").length, (n) => n >= 8);
+	await poll("the staff off duty", async () => (await seen(page)).filter((s) => s.kind === "employee").length, (n) => n >= 13);
 	const staffKeys = (await seen(page)).filter((s) => s.kind === "employee").map((s) => s.key);
 	await poll("the director in the office (idle, office hours)", async () => roomOf((await seen(page)).find((s) => isDirector(s.key)))?.room ?? null, (room) => room === "DIRECTOR");
 	await context.clock.setSystemTime(new Date(BEDTIME));
 	await reaches(page, "the director at bedtime", isDirector, "DORM");
-	await poll("the off-duty staff in the living zone", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.zone === LIVING_ZONE).length, (n) => n === staffKeys.length);
+	await poll("the off-duty staff in the living zone", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.zone === LIVING_ZONE).length, (n) => n === staffKeys.length - 1);
+	// Backend & DevOps stays on duty in the server room.
+	await reaches(page, "Backend & DevOps on duty at night", person("backendDevops"), "SERVER");
 	const anchors = (await seen(page)).filter((s) => s.kind === "director" || s.kind === "employee").map((s) => s.anchor);
 	assert.equal(new Set(anchors).size, anchors.length, `one person per place: ${anchors.join(", ")}`);
-	assert.ok(anchors.filter((a) => a.startsWith("bed-")).length === 8, `the eight beds taken: ${anchors.join(", ")}`);
+	assert.ok(anchors.filter((a) => a.startsWith("bed-")).length === 13, `thirteen of the sixteen beds taken: ${anchors.join(", ")}`);
 	if (await has3D(page)) {
 		await poll(
 			"the director lying in bed",

@@ -9,7 +9,7 @@ import { anchorById, zoneOfRoom } from "../../src/machines/office/office-geometr
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
 import { allocateLifePlaces, lifeCandidates } from "../../src/machines/office/office-life-places.ts";
 import { awakeAct, lifeActAt, lifePlanAt, lifeTraits, localHour, SHIFT_MINUTES, slotAt } from "../../src/machines/office/office-life-schedule.ts";
-import { EMPTY_MEMORY, MAX_RESIDENTS, officePlacement, type Placement } from "../../src/machines/office/office-placement.ts";
+import { EMPTY_MEMORY, officePlacement, type Placement } from "../../src/machines/office/office-placement.ts";
 import type { OfficeStore } from "../../src/machines/office/office-store.ts";
 import { act, director, ev, localAt, session, snapshot, staff, storeAt } from "./office-builders.ts";
 
@@ -159,41 +159,42 @@ describe("living by the schedule", () => {
 		expect(find(back.placements, "director").room).toBe("DIRECTOR");
 	});
 
-	it("lets real work win: the director working at 23:30 is at the room of the tool", () => {
+	it("lets real work win: a working employee at 23:30 is at the room of the tool, the director stays at his chair", () => {
 		const { store } = storeAt();
-		store.applySnapshot(snapshot([director({ activity: act("t1", OfficeRoom.LIBRARY) })], { session: session({ busy: true }) }));
-		expect(find(placeAt(store, localAt(23, 30)), "director")).toMatchObject({ room: "LIBRARY", life: null });
+		store.applySnapshot(snapshot([director(), staff("s0", "scout", { activity: act("t1", OfficeRoom.LIBRARY) })], { session: session({ busy: true }) }));
+		const night = placeAt(store, localAt(23, 30));
+		expect(find(night, "title:techLead")).toMatchObject({ room: "LIBRARY", life: null });
+		// While an agent runs nobody goes to bed or to the TV: everyone is at their seat.
+		expect(night.filter((p) => p.life !== null)).toHaveLength(0);
+		expect(find(night, "director")).toMatchObject({ room: "DIRECTOR", anchorId: "director" });
 		// Between two tools of a running turn nobody goes to bed.
 		const between = resting();
 		between.applyEvents(1n, [ev(1, { case: "session", value: session({ busy: true }) })]);
 		expect(find(placeAt(between, localAt(23, 30)), "director").room).toBe("DIRECTOR");
 	});
 
-	it("sends finished employees to bed at night and keeps them in the work rooms in office hours", () => {
+	it("sends the staff to bed at night and keeps them at their seats in office hours", () => {
 		const store = resting(["scout", "tester"]);
 		const night = placeAt(store, localAt(1));
-		expect(find(night, "scout#1").room).toBe("DORM");
-		expect(find(night, "tester#1").room).toBe("DORM");
+		expect(find(night, "title:techLead").room).toBe("DORM");
+		expect(find(night, "title:qaTester").room).toBe("DORM");
 		const day = placeAt(store, localAt(10));
-		expect(find(day, "scout#1").room).toBe("WORK");
-		expect(zoneOfRoom(layout(), find(day, "tester#1").room)).not.toBe("d");
+		expect(find(day, "title:techLead")).toMatchObject({ room: "WORK", anchorId: "desk-1", life: null });
+		expect(zoneOfRoom(layout(), find(day, "title:qaTester").room)).not.toBe("d");
 	});
 
-	it("shows at most twelve residents, never two on one place, each in a bed of the sixteen at night", () => {
-		const types = Array.from({ length: 14 }, (_, i) => `type-${i}`);
-		const store = resting(types);
-		// Every subagent left: fourteen off-duty residents and the director.
-		store.applyEvents(
-			1n,
-			types.map((_, i) => ev(i + 1, { case: "actorLeave", value: { actorId: `s${i}` } })),
-		);
-		expect(store.state().residents).toHaveLength(14);
+	it("shows fifteen people whatever the agents did, never two on one place, thirteen of them in beds of the sixteen at night; Backend & DevOps and Advisor stay on duty", () => {
+		const store = resting();
 		const placed = placeAt(store, localAt(1));
-		const residents = placed.filter((p) => p.kind === "director" || p.kind === "employee");
-		expect(residents).toHaveLength(MAX_RESIDENTS);
-		const ids = residents.map((p) => p.anchorId);
+		const people = placed.filter((p) => p.kind === "director" || p.kind === "employee" || p.kind === "advisor");
+		expect(people).toHaveLength(15);
+		const ids = people.map((p) => p.anchorId);
 		expect(new Set(ids).size).toBe(ids.length);
-		expect(ids.filter((id) => id.startsWith("bed-"))).toHaveLength(MAX_RESIDENTS);
-		for (const p of residents) expect(anchorById(layout(), p.anchorId)?.room, p.key).toMatch(/^(DORM|LOUNGE)$/);
+		const inBed = people.filter((p) => p.life?.act === "sleep");
+		expect(inBed.length).toBeGreaterThanOrEqual(1);
+		for (const p of people.filter((x) => x.life !== null)) expect(anchorById(layout(), p.anchorId)?.room, p.key).toMatch(/^(DORM|LOUNGE|GYM)$/);
+		expect(people.filter((p) => p.life !== null)).toHaveLength(13);
+		expect(find(placed, "title:backendDevops")).toMatchObject({ room: "SERVER", life: null });
+		expect(find(placed, "advisor")).toMatchObject({ room: "ADVISOR", life: null });
 	});
 });

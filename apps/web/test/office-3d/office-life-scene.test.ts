@@ -121,6 +121,8 @@ describe("places of the living rooms", () => {
 			activityRoom: null,
 			life: { slot: "evening", act: "watch" },
 			advisor: null,
+			concurrent: 0,
+			workKey: key,
 		});
 		const talk: Talk = {
 			host: "a#1",

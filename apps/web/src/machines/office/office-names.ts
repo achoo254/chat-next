@@ -15,7 +15,7 @@ import type { AnimGroup, ServiceView } from "./office-state.ts";
 
 export type OfficeCopy = MachinesCopy["office"];
 
-export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | "member"> & Partial<Pick<Placement, "advisor">>): string {
+export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | "member"> & Partial<Pick<Placement, "advisor" | "concurrent">>): string {
 	switch (p.kind) {
 		case "director":
 			return t.director;
@@ -34,6 +34,8 @@ export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | 
 			const key = castOf(type).key;
 			const base = key === null ? nameFromType(type) || t.unnamed : t.cast[key];
 			const ordinal = p.member?.ordinal ?? 1;
+			// Several subagents of one job title are this one person: the count of those at work at once.
+			if ((p.concurrent ?? 0) > 1) return `${base} ×${p.concurrent}`;
 			return ordinal > 1 ? t.numbered(base, ordinal) : base;
 		}
 	}

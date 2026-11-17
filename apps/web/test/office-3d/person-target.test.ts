@@ -19,7 +19,8 @@ describe("person target", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), staff("a1", "researcher", { activity: act("a1-1", OfficeRoom.LIBRARY) }), staff("a2", "tester")]));
 		const { placements } = officePlacement(store.state(), l, T0, EMPTY_MEMORY);
-		expect(placements.length).toBe(3);
+		// The fifteen of the office (the director, Advisor and the 13 staff), all on an anchor.
+		expect(placements.length).toBe(15);
 		for (const p of placements) {
 			const t = personTarget(l, p.anchorId, 0, false);
 			const a = anchorById(l, p.anchorId);

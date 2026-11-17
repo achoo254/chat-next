@@ -15,7 +15,7 @@ const t = viMachines.office;
 
 function tester(store: OfficeStore, now: number): Placement {
 	if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("\n"));
-	const p = officePlacement(store.state(), OFFICE_LAYOUT.value, now, EMPTY_MEMORY).placements.find((x) => x.key === "tester#1");
+	const p = officePlacement(store.state(), OFFICE_LAYOUT.value, now, EMPTY_MEMORY).placements.find((x) => x.key === "title:qaTester");
 	if (p === undefined) throw new Error("tester not placed");
 	return p;
 }

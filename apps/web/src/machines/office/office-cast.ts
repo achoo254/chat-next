@@ -83,6 +83,45 @@ const TITLES: readonly Title[] = [
 	{ key: "gameplayDeveloper", model: "fullstack-developer", color: "#7a7f87", homeRoom: "WORK", types: ["fullstack-developer", "debugger", "campaign-debugger", "statusline-setup", "general-purpose"], words: ["debug", "fix", "bug", "develop", "implement", "code"] },
 ];
 
+/**
+ * The permanent staff of the office: one person per job title, always in the building (office-placement.ts). `homeKey` is the
+ * staff key the layout's anchors carry as `home` (tools/office-art/staff-cast.json); `repType` is the agent type the person
+ * goes by (their name, model and colour come from it).
+ */
+export interface StudioTitle {
+	readonly key: CastKey;
+	readonly homeKey: string;
+	readonly repType: string;
+	readonly homeRoom: RoomCode;
+}
+
+const TITLE_META: Readonly<Record<CastKey, { readonly homeKey: string; readonly repType: string }>> = {
+	producerPm: { homeKey: "producer-pm", repType: "planner" },
+	techLead: { homeKey: "tech-lead", repType: "scout" },
+	gameplayDeveloper: { homeKey: "gameplay-developer", repType: "fullstack-developer" },
+	backendDevops: { homeKey: "backend-devops", repType: "devops" },
+	gameDesigner: { homeKey: "game-designer", repType: "brainstormer" },
+	uiUxDesigner: { homeKey: "ui-ux-designer", repType: "ui-ux-designer" },
+	artist: { homeKey: "artist-2d-3d", repType: "artist" },
+	qaTester: { homeKey: "qa-tester", repType: "tester" },
+	codeSecurityReviewer: { homeKey: "code-security-reviewer", repType: "code-reviewer" },
+	contentMarketing: { homeKey: "content-marketing", repType: "content-creator" },
+	growthAnalytics: { homeKey: "growth-analytics", repType: "analytics-analyst" },
+	researchAnalyst: { homeKey: "research-analyst", repType: "researcher" },
+	financeController: { homeKey: "ai-finance-controller", repType: "finance" },
+};
+
+/** The 13 permanent staff, in the table's order. */
+export const STUDIO_TITLES: readonly StudioTitle[] = TITLES.map((t) => ({ key: t.key, homeKey: TITLE_META[t.key].homeKey, repType: TITLE_META[t.key].repType, homeRoom: t.homeRoom }));
+
+/** The title an agent type belongs to; one no title claims is the Gameplay Developer's (the hands-on fallback). */
+export function titleKeyOf(agentType: string): CastKey {
+	return titleOf(agentType.trim().toLowerCase())?.key ?? "gameplayDeveloper";
+}
+
+/** Backend & DevOps is always on duty in the server room: never at rest, never away. */
+export const ALWAYS_ON_DUTY: CastKey = "backendDevops";
+
 /** The model of unknown types: the hands-on Gameplay Developer's. */
 const FALLBACK_MODEL = "fullstack-developer";
 

@@ -29,6 +29,11 @@ export interface IdleContext {
 	readonly sofas: readonly string[];
 	/** Desks someone sits at, for the director's round. */
 	readonly occupiedDesks: readonly string[];
+	/**
+	 * Office hours (the default): nobody leaves their seat for a coffee or a chat on the sofa, they only stretch; the director's
+	 * round of the desks goes on. Outside them the pantry and the sofa are free to go to.
+	 */
+	readonly officeHours?: boolean;
 }
 
 /** Free this long before any show. */
@@ -67,12 +72,15 @@ export function idlePerformance(person: IdlePerson, now: number, ctx: IdleContex
 		const desk = pick(ctx.occupiedDesks, roll >>> 3);
 		return desk === undefined ? null : { act: "patrol", anchorId: desk };
 	}
+	const breaks = ctx.officeHours === false;
 	switch (roll % 5) {
 		case 0: {
+			if (!breaks) return null;
 			const spot = pick(ctx.pantry, roll >>> 3);
 			return spot === undefined ? null : { act: "coffee", anchorId: spot };
 		}
 		case 1: {
+			if (!breaks) return null;
 			const spot = pick(ctx.sofas, roll >>> 3);
 			return spot === undefined ? null : { act: "chat", anchorId: spot };
 		}

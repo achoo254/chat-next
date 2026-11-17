@@ -95,6 +95,11 @@ export function lifePlanAt(key: string, now: number): LifePlan {
 	}
 }
 
+/** Whether it is office hours for `key` at `now` (the "work" parts of the day): breakfast, lunch and the evening are not. Nobody rests or plays during these. */
+export function isOfficeHours(key: string, now: number): boolean {
+	return lifePlanAt(key, now).slot === "work";
+}
+
 /** Evening dancing in front of the TV: one window in DANCE_EVERY of DANCE_WINDOW_MS for each person, by their key. */
 const DANCE_WINDOW_MS = 4 * 60_000;
 const DANCE_EVERY = 5;

@@ -1,29 +1,36 @@
 // Where everyone in the office is: the room and the anchor they stand or
 // sit at, from the store's state, the layout and the clock. Shared by the 2D
-// and 3D views. The agent picks the room of each activity on the machine; here:
-// an agent type's home room replaces WORK; with nothing to do an employee goes
-// to their desk (or the meeting room without one, or as a nested subagent),
-// the director to their office; a pending approval takes the person to
-// Security; the chairman waits in the lobby. Short tools must not send people
-// running across the plan: whoever entered a room stays at least MIN_STAY_MS,
-// and after the work there ends lingers LINGER_MS (gathering the next tools)
-// before going home. The speech bubble shows the real tool at once anyway.
-// Nobody leaves the office: whoever is off duty (the director while the
-// session rests, a finished employee, a resident whose subagent left) lives
-// by the daily schedule (office-life-schedule.ts) in the living rooms, and
-// spends office hours in the work rooms as before (a resident in their
-// agent type's home room). Real work always wins over the schedule. Advisor,
-// while the session's automatic Advisor is on, keeps its own seat at the head
-// of the meeting table day and night (no schedule, no talks); whoever asks it
-// walks over to its seat.
+// and 3D views. Fifteen people are always in the building: the director, the
+// advisor and the 13 staff of the studio (one per job title, whatever the
+// agents are doing: office-cast.ts says which title an agent type is). Each
+// title's person has a home seat (the layout's `home` anchors) in their home
+// room and is shown busy only when real events say so: the subagent of their
+// title (or, for the director's own tools, the department the tool belongs to)
+// runs a tool. Several subagents of one title are the same person (with a
+// count). A tool takes its person to the room it happens in and back after
+// MIN_STAY_MS / LINGER_MS; a pending approval takes the person to Security and
+// the Code & Security Reviewer greets at its door; asking Advisor takes the
+// asker to Advisor's room. Rest, play and sleep (office-life-schedule.ts)
+// happen only outside office hours and only while no agent runs; as soon as
+// one runs everyone is at their seat again. Backend & DevOps never leaves the
+// server room. The director sits at one seat, goes to a meeting, walks the
+// desks to check (3D idle show), rests like the others, and only directs:
+// the work of a tool belongs to its department; a subagent starting shows the
+// director handing the job over. The chairman waits in the lobby.
 // Pure: the memory of the last call goes in, the new one comes out.
-import { homeRoomOf } from "./office-cast.ts";
+import {
+	ALWAYS_ON_DUTY,
+	STUDIO_TITLES,
+	titleKeyOf,
+	type CastKey,
+	type StudioTitle,
+} from "./office-cast.ts";
 import { anchorById, anchorOfKind, spotsOf } from "./office-geometry.ts";
 import type { LayoutAnchor, OfficeLayout } from "./office-layout.ts";
 import { allocateLifePlaces } from "./office-life-places.ts";
 import { lifeActAt, lifePlanAt, type LifeAct, type LifePlan, type LifeSlot } from "./office-life-schedule.ts";
 import type { RoomCode } from "./office-rooms.ts";
-import type { ActorView, OfficeState, StaffMember } from "./office-store.ts";
+import type { ActivityView, ActorView, OfficeState, StaffMember } from "./office-store.ts";
 
 /** Whoever entered a room stays at least this long. */
 export const MIN_STAY_MS = 4_000;
@@ -35,8 +42,8 @@ export const LINGER_MS = 6_000;
  * when it began, then they go home.
  */
 export const HAND_IN_MS = 5_000;
-/** At most this many residents (the director and employees, on duty or not) are shown; off-duty ones beyond it stay out of sight. */
-export const MAX_RESIDENTS = 12;
+/** The director hands a job over (a hand-in gesture) this long after a subagent really starts. */
+export const DELEGATE_MS = 4_000;
 
 export type PersonKind = "director" | "employee" | "machine" | "chairman" | "advisor";
 
@@ -67,6 +74,10 @@ export interface Placement {
 	readonly life: { readonly slot: LifeSlot; readonly act: LifeAct } | null;
 	/** Advisor's name and look, from the viewer's Advisor profile; null for everyone else. */
 	readonly advisor: OfficeAdvisor | null;
+	/** How many subagents of the person's job title are at work at once (they are all this one person); 0 when none. */
+	readonly concurrent: number;
+	/** The key of the person's work log (state.work): the title's latest staff member's; the person's own key when none. */
+	readonly workKey: string;
 }
 
 interface Remembered {
@@ -86,6 +97,9 @@ interface Person {
 	readonly kind: PersonKind;
 	readonly actor: ActorView | null;
 	readonly member: StaffMember | null;
+	readonly title: StudioTitle | null;
+	readonly concurrent: number;
+	readonly workKey: string;
 }
 
 interface Wish {
@@ -108,21 +122,70 @@ interface Decision {
 	readonly life: LifePlan | null;
 }
 
-function people(state: OfficeState): Person[] {
+/** An actor is doing real work now (a tool is running, or its hand-in is still on). */
+function working(a: ActorView): boolean {
+	return a.activity !== null && a.state !== "done";
+}
+
+/** Whether any agent is running: the session is busy, or an actor (not a background machine) is at work. */
+export function agentRunning(state: OfficeState): boolean {
+	return state.session.busy || state.actors.some((a) => a.role !== "machine" && a.role !== "advisor" && a.state === "working");
+}
+
+/** The tools of the director that are his own work: thinking and asking Advisor. Every other tool he runs belongs to a department. */
+function directing(activity: ActivityView): boolean {
+	return activity.group === "think" || activity.group === "consult";
+}
+
+/** The title whose department a room of the director's tool belongs to (none: nobody's, he does not do it). */
+const DEPARTMENT: Readonly<Partial<Record<RoomCode, CastKey>>> = {
+	WORK: "gameplayDeveloper",
+	LIBRARY: "researchAnalyst",
+	SERVER: "backendDevops",
+	POST: "backendDevops",
+	PLANNING: "producerPm",
+	AUDIT: "codeSecurityReviewer",
+	SECURITY: "codeSecurityReviewer",
+	QA: "qaTester",
+};
+
+/** The actor a title's person is shown as: the one at work (latest news first), else the latest heard of, else none. */
+function pickActor(candidates: readonly ActorView[]): ActorView | null {
+	const rank = (a: ActorView): number => (working(a) ? 2 : a.activity !== null ? 1 : 0);
+	return [...candidates].sort((a, b) => rank(b) - rank(a) || b.heardAt - a.heardAt)[0] ?? null;
+}
+
+/** The director's tool done by the title's person: the director's actor as a member of the title's department. */
+function delegated(director: ActorView, title: StudioTitle): ActorView {
+	return { ...director, id: `${director.id}>${title.key}`, role: "employee", agentType: title.repType, parentId: director.id, spawnDepth: 1, state: "working" };
+}
+
+function people(state: OfficeState, now: number): Person[] {
 	const list: Person[] = [];
-	const director = state.actors.find((a) => a.role === "director");
-	if (director !== undefined) list.push({ key: "director", kind: "director", actor: director, member: null });
-	for (const member of state.staff) {
-		const actor = state.actors.find((a) => a.id === member.actorId);
-		if (actor !== undefined) list.push({ key: member.key, kind: "employee", actor, member });
+	const director = state.actors.find((a) => a.role === "director") ?? null;
+	// The director directs: his own tools are for his department's person; a subagent starting shows the hand-over.
+	const starting = state.actors.find((a) => a.role === "employee" && a.state === "working" && a.enteredAt > 0 && now - (a.enteredAt + state.clockOffset) >= 0 && now - (a.enteredAt + state.clockOffset) < DELEGATE_MS);
+	const doing = director !== null && director.state !== "done" ? director.activity : null;
+	const handOver: ActivityView | null =
+		starting === undefined ? null : { id: `delegate:${starting.id}`, tool: "", group: "hand-in", room: "DIRECTOR", subject: "", startedAt: starting.enteredAt, slow: false, stuckMs: null };
+	const own = doing !== null && directing(doing) ? doing : handOver;
+	list.push({ key: "director", kind: "director", actor: director === null ? null : { ...director, activity: own }, member: null, title: null, concurrent: 0, workKey: "director" });
+	const advisor = state.actors.find((a) => a.role === "advisor") ?? null;
+	list.push({ key: "advisor", kind: "advisor", actor: advisor, member: null, title: null, concurrent: 0, workKey: "advisor" });
+	const employees = state.actors.filter((a) => a.role === "employee");
+	const department = doing !== null && !directing(doing) ? DEPARTMENT[doing.room] : undefined;
+	for (const title of STUDIO_TITLES) {
+		const mine = employees.filter((a) => titleKeyOf(a.agentType) === title.key);
+		const extra = director !== null && department === title.key ? [delegated(director, title)] : [];
+		const actor = pickActor([...mine, ...extra]);
+		const members = state.staff.filter((m) => titleKeyOf(m.agentType) === title.key).sort((a, b) => b.firstEnteredAt - a.firstEnteredAt);
+		const key = `title:${title.key}`;
+		// A person of the title has their own seat and never waits for a desk or comes in through the lobby: `nested` keeps them out of the meeting room's "+N".
+		const member: StaffMember = { key, agentType: title.repType, ordinal: 1, actorId: actor?.id ?? "", desk: null, nested: true, firstEnteredAt: 0 };
+		list.push({ key, kind: "employee", actor, member, title, concurrent: mine.filter(working).length, workKey: members[0]?.key ?? key });
 	}
-	// Off-duty residents fill what the cap leaves, longest off duty first.
-	const room = Math.max(0, MAX_RESIDENTS - list.length);
-	for (const member of state.residents.slice(0, room)) list.push({ key: member.key, kind: "employee", actor: null, member });
-	for (const actor of state.actors) if (actor.role === "machine") list.push({ key: `machine:${actor.id}`, kind: "machine", actor, member: null });
-	const advisor = state.actors.find((a) => a.role === "advisor");
-	if (advisor !== undefined) list.push({ key: "advisor", kind: "advisor", actor: advisor, member: null });
-	if (state.chairman) list.push({ key: "chairman", kind: "chairman", actor: null, member: null });
+	for (const actor of state.actors) if (actor.role === "machine") list.push({ key: `machine:${actor.id}`, kind: "machine", actor, member: null, title: null, concurrent: 0, workKey: `machine:${actor.id}` });
+	if (state.chairman) list.push({ key: "chairman", kind: "chairman", actor: null, member: null, title: null, concurrent: 0, workKey: "chairman" });
 	return list;
 }
 
@@ -139,43 +202,54 @@ function livingPlan(key: string, now: number): LifePlan | null {
 	return plan.kinds.length === 0 ? null : plan;
 }
 
-function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: number): Wish {
+/** The anchor that is `homeKey`'s own seat in the layout (the `home` of the anchor), or null. */
+function homeSeat(layout: OfficeLayout, homeKey: string): string | null {
+	return layout.anchors.find((a) => a.home === homeKey)?.id ?? null;
+}
+
+function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: number, running: boolean): Wish {
 	const actor = person.actor;
 	if (person.kind === "chairman") return { room: "LOBBY", working: false, own: anchorOfKind(layout, "LOBBY", "chairman")?.id ?? null, life: null };
-	if (actor === null) {
-		// An off-duty resident: the living rooms, or their agent type's home room in office hours.
-		return { room: homeRoomOf(person.member?.agentType ?? ""), working: false, own: null, life: livingPlan(person.key, now) };
-	}
 	const advisorSeat = anchorOfKind(layout, ADVISOR_ROOM, "meeting")?.id ?? null;
-	// Advisor never leaves its seat: listening there is its work.
-	if (person.kind === "advisor") return { room: ADVISOR_ROOM, working: actor.activity !== null, own: advisorSeat, life: null };
-	if (actor.state === "awaiting") return { room: "SECURITY", working: true, own: null, life: null };
-	const deskId = person.member?.desk ?? null;
-	const directorChair = anchorOfKind(layout, "DIRECTOR", "director")?.id ?? null;
-	const activity = currentActivity(actor, now, state.clockOffset);
-	// Asking Advisor: at its seat (the views stand them beside it), when Advisor is in.
-	if (activity !== null && activity.group === "consult" && state.actors.some((a) => a.role === "advisor")) {
-		return { room: ADVISOR_ROOM, working: true, own: advisorSeat, life: null };
-	}
-	if (activity !== null) {
-		let room = activity.room;
-		if (room === "WORK" && person.kind === "employee") room = homeRoomOf(actor.agentType);
-		if (person.kind === "director" && room === "DIRECTOR") return { room, working: true, own: directorChair, life: null };
-		return { room, working: true, own: room === "WORK" && person.kind === "employee" ? deskId : null, life: null };
+	// Advisor never leaves its seat day or night; it counts as busy only while someone really asks it.
+	if (person.kind === "advisor") {
+		const asked = state.actors.some((a) => a.role !== "advisor" && a.state !== "done" && a.activity?.group === "consult");
+		return { room: ADVISOR_ROOM, working: asked, own: advisorSeat, life: null };
 	}
 	if (person.kind === "machine") return { room: "SERVER", working: true, own: null, life: null };
-	// Off duty: the director while the session rests, an employee whose subagent finished. Between two tools of a
-	// running turn nobody is off duty (no running to bed and back).
-	const offDuty = person.kind === "director" ? !state.session.busy : actor.state === "done";
-	const life = offDuty ? livingPlan(person.key, now) : null;
-	if (person.kind === "director") return { room: "DIRECTOR", working: false, own: directorChair, life };
-	if (person.member?.nested === true || deskId === null) return { room: "MEETING", working: false, own: null, life };
-	return { room: "WORK", working: false, own: deskId, life };
+	// Rest, play and sleep only off office hours and only while no agent runs: otherwise everyone is at their seat.
+	const rests = (): LifePlan | null => (running ? null : livingPlan(person.key, now));
+	const activity = actor === null ? null : currentActivity(actor, now, state.clockOffset);
+	if (person.kind === "director") {
+		const chair = anchorOfKind(layout, "DIRECTOR", "director")?.id ?? null;
+		// Asking Advisor: the director goes there; thinking and the hand-over stay at his chair.
+		if (activity !== null && activity.group === "consult") return { room: ADVISOR_ROOM, working: true, own: advisorSeat, life: null };
+		if (activity !== null) return { room: "DIRECTOR", working: true, own: chair, life: null };
+		return { room: "DIRECTOR", working: false, own: chair, life: rests() };
+	}
+	const title = person.title;
+	if (title === null) return { room: "WORK", working: false, own: null, life: null };
+	const seat = homeSeat(layout, title.homeKey);
+	// Backend & DevOps is always on duty in the server room.
+	if (title.key === ALWAYS_ON_DUTY) return { room: "SERVER", working: activity !== null, own: seat, life: null };
+	// Someone waits for an approval: the reviewer greets at the door of Security (the anchor that greets for their title).
+	if (title.key === "codeSecurityReviewer" && state.actors.some((a) => a.state === "awaiting" && a.role !== "machine")) {
+		return { room: "SECURITY", working: true, own: layout.anchors.find((a) => a.greets === title.homeKey)?.id ?? null, life: null };
+	}
+	if (actor !== null && actor.state === "awaiting") return { room: "SECURITY", working: true, own: null, life: null };
+	if (activity !== null) {
+		// Asking Advisor: beside its seat. A tool in WORK is done at the title's home room; any other room is visited.
+		if (activity.group === "consult") return { room: ADVISOR_ROOM, working: true, own: advisorSeat, life: null };
+		const room = activity.room === "WORK" ? title.homeRoom : activity.room;
+		return { room, working: true, own: room === title.homeRoom ? seat : null, life: null };
+	}
+	return { room: title.homeRoom, working: false, own: seat, life: rests() };
 }
 
 /** Everyone's wish, with the living rooms' places allocated: the room and own place of whoever follows the schedule now. */
 function wishes(list: readonly Person[], layout: OfficeLayout, state: OfficeState, now: number, memory: PlacementMemory): Wish[] {
-	const raw = list.map((person) => wish(person, layout, state, now));
+	const running = agentRunning(state);
+	const raw = list.map((person) => wish(person, layout, state, now, running));
 	const seekers = list.flatMap((person, i) => {
 		const plan = raw[i]?.life ?? null;
 		return plan === null ? [] : [{ key: person.key, plan, had: memory.get(person.key)?.anchorId ?? null }];
@@ -198,9 +272,11 @@ export function officePlacement(
 	memory: PlacementMemory,
 	advisor: OfficeAdvisor | null = null,
 ): { readonly placements: readonly Placement[]; readonly memory: PlacementMemory } {
+	// Before the first snapshot nobody is placed (the fifteen would otherwise be held in their seats when the first events come).
+	if (state.status === "loading") return { placements: [], memory: EMPTY_MEMORY };
 	const frozen = state.power === "out";
 	const decided: Decision[] = [];
-	const everyone = people(state);
+	const everyone = people(state, now);
 	const wanted = wishes(everyone, layout, state, now, memory);
 	everyone.forEach((person, i) => {
 		const want = wanted[i];
@@ -274,6 +350,8 @@ export function officePlacement(
 			life: d.life === null || place === undefined ? null : { slot: d.life.slot, act: lifeActAt(place, d.life.slot, d.person.key, now) },
 			// Advisor is who the viewer's profile says (the machine belongs to the viewer's account): no profile, the defaults.
 			advisor: d.person.kind === "advisor" ? (advisor ?? { name: "", lookId: "" }) : null,
+			concurrent: d.person.concurrent,
+			workKey: d.person.workKey,
 		};
 	});
 	return { placements, memory: next };

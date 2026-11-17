@@ -105,16 +105,18 @@ describe("the office tab", () => {
 		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
 		const types = ["scout", "tester", "planner", "debugger", "docs-manager", "general-purpose", "a", "b", "c"];
 		const staffList = types.map((t, i) => staff(`s${i}`, t, { state: OfficeActorState.DONE }));
-		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ activity: act("t1", OfficeRoom.POST, "Bash") }), ...staffList], { session: session({ tasksDone: 7 }) }) });
-		// The director works in the post room of the records zone, shown beside the work zone without any pick.
+		const sender = staff("s9", "researcher", { activity: act("t1", OfficeRoom.POST, "Bash") });
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director(), ...staffList, sender], { session: session({ tasksDone: 7 }) }) });
+		// The research analyst works in the post room of the records zone, shown beside the work zone without any pick.
 		const records = await screen.findByRole("region", { name: "Hồ sơ" });
 		const post = within(records).getByRole("region", { name: "Bưu phòng" });
-		expect(within(post).getByText("Giám đốc")).toBeTruthy();
+				expect(within(post).getByText("Chuyên viên nghiên cứu")).toBeTruthy();
 		const management = screen.getByRole("region", { name: "Điều hành" });
 		const work = within(management).getByRole("region", { name: "Phòng làm việc chung" });
 		expect(within(work).getByText("Trưởng kỹ thuật")).toBeTruthy();
+		// Everyone has a seat of their own: nobody waits for a desk in the meeting room.
 		const meeting = within(management).getByRole("region", { name: "Phòng họp" });
-		expect(within(meeting).getByLabelText("1 người chờ bàn trong phòng họp").textContent).toBe("+1");
+		expect(within(meeting).queryByLabelText(/người chờ bàn trong phòng họp/)).toBeNull();
 		const lobby = within(management).getByRole("region", { name: "Sảnh" });
 		expect(within(lobby).getByRole("region", { name: "Bảng tin" }).textContent).toContain("7");
 		// No floor tabs and no follow switch any more.
@@ -145,8 +147,9 @@ describe("the office tab", () => {
 		const dorm = within(living).getByRole("region", { name: "Ký túc" });
 		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
 		expect(within(dorm).getByText("Trưởng kỹ thuật")).toBeTruthy();
-		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(2);
-		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(2);
+		// The director and the 12 staff off duty sleep; Backend & DevOps stays in the server room, Advisor in its room.
+		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(13);
+		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(13);
 	});
 
 	it("says when the AI does not report its staff, with the lobby and the QA room both in view", async () => {
@@ -156,7 +159,8 @@ describe("the office tab", () => {
 		expect(await screen.findByText("AI này chưa báo cáo nhân viên: chỉ có Giám đốc.")).toBeTruthy();
 		expect(screen.getByRole("region", { name: "Sảnh" })).toBeTruthy();
 		const control = screen.getByRole("region", { name: "Kiểm soát" });
-		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Giám đốc")).toBeTruthy();
+		// The director's tool in the QA room is the QA tester's work.
+		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Kiểm thử viên")).toBeTruthy();
 	});
 
 	it("opens a phone on the work zone and a wide screen on the whole plan", () => {
@@ -202,8 +206,8 @@ describe("the office tab", () => {
 		});
 		expect(picture.getAttribute("src")).toMatch(/^\/office\/office-2d-plan-(day|night)-(desktop|phone)\.webp$/);
 		const size: ScreenSize = picture.getAttribute("src")?.includes("phone") === true ? "phone" : "desktop";
-		const desk = FIXTURE.views[size].anchors["desk-0"];
-		const marker = document.querySelector<HTMLElement>('[data-id="office-person-scout#1"]');
+		const desk = FIXTURE.views[size].anchors["desk-1"];
+		const marker = document.querySelector<HTMLElement>('[data-id="office-person-title:techLead"]');
 		expect(marker?.style.left).toBe(`${desk?.[0]}%`);
 		expect(marker?.style.top).toBe(`${desk?.[1]}%`);
 	});

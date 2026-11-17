@@ -83,6 +83,8 @@ export interface LayoutAnchor {
 	readonly act: GymAct | null;
 	/** The staff key (tools/office-art/staff-cast.json), "director" or "advisor" whose seat this is; null for a seat anyone may take. */
 	readonly home: string | null;
+	/** The staff key that greets at this spot (the Code & Security Reviewer at the door of Security); null elsewhere. */
+	readonly greets: string | null;
 }
 
 export interface LayoutRoom {
@@ -251,6 +253,7 @@ function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 			low: rec.low === true,
 			act,
 			home: stringOf(rec.home) || null,
+			greets: stringOf(rec.greets) || null,
 		});
 	}
 	return anchors;

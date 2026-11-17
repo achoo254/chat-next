@@ -88,6 +88,8 @@ describe("asking Advisor in 3D", () => {
 			activityRoom: "MEETING",
 			life: null,
 			advisor: null,
+			concurrent: 0,
+			workKey: key,
 		});
 		const ctx = { enabled: true, pantry: [], sofas: [], occupiedDesks: [] };
 		expect(personIntent(person("director", "director"), [], 0, ctx)).toMatchObject({ anchorId: "meeting-0", beside: true });

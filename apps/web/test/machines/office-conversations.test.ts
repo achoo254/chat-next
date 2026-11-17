@@ -162,7 +162,7 @@ describe("who talks", () => {
 		}
 		// Find an evening talk, then send its visitor to work.
 		const { store } = storeAt();
-		store.applySnapshot(snapshot([director({ state: OfficeActorState.IDLE }), staff("s0", "scout", { state: OfficeActorState.DONE }), staff("s1", "tester", { state: OfficeActorState.DONE }), staff("s2", "planner", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }));
+		store.applySnapshot(snapshot([director({ state: OfficeActorState.IDLE }), ...["scout", "tester", "planner", "researcher", "fullstack-developer", "devops", "brainstormer", "ui-ux-designer", "artist", "code-reviewer", "content-creator", "analytics-analyst", "finance"].map((t, i) => staff(`s${i}`, t, { state: OfficeActorState.DONE }))], { session: session({ busy: false }) }));
 		const placed = (now: number): readonly Placement[] => officePlacement(store.state(), layout(), now, EMPTY_MEMORY).placements.map((p) => ({ ...p, since: 0 }));
 		let found: { now: number; visitor: string } | null = null;
 		for (let w = 0; w < 60 && found === null; w += 1) {
@@ -172,8 +172,8 @@ describe("who talks", () => {
 		}
 		expect(found).not.toBeNull();
 		if (found === null) return;
-		const actorId = store.state().staff.find((m) => m.key === found?.visitor)?.actorId ?? "director";
-		store.applyEvents(1n, [ev(1, { case: "activityStart", value: { actorId, activity: act("w1", OfficeRoom.LIBRARY, "Read", T0, OfficeAnimGroup.READ) } })]);
+		const actorId = placed(found.now).find((p) => p.key === found?.visitor)?.actor?.id ?? "director";
+		store.applyEvents(1n, [ev(1, { case: "activityStart", value: { actorId, activity: found.visitor === "director" ? act("w1", OfficeRoom.DIRECTOR, "", T0, OfficeAnimGroup.THINK) : act("w1", OfficeRoom.LIBRARY, "Read", T0, OfficeAnimGroup.READ) } })]);
 		const after = officeTalks(placed(found.now), store.state(), layout(), found.now);
 		expect(after.some((t) => t.visitor === found?.visitor || t.host === found?.visitor)).toBe(false);
 	});

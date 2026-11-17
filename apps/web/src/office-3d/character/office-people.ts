@@ -152,7 +152,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 			return people.size;
 		},
 		update(placements, state, now, talks = []) {
-			const occupiedDesks = placements.filter((p) => p.member?.desk != null && p.room === "WORK").map((p) => p.anchorId);
+			const occupiedDesks = placements.filter((p) => p.kind === "employee" && p.room === "WORK" && deskAnchors.has(p.anchorId)).map((p) => p.anchorId);
 			const ctx = { enabled: state.power === "on", pantry, sofas, occupiedDesks };
 			const wanted = placements.map((placement) => personIntent(placement, talks, now, ctx));
 			// Standing beside an anchor (a talk's visitor, the director's round) is not a share of the anchor itself.

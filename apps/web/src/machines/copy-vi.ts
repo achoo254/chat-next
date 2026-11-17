@@ -1330,7 +1330,7 @@ export const viMachines = {
 			backendDevops: "Kỹ sư Backend và DevOps",
 			gameDesigner: "Thiết kế game",
 			uiUxDesigner: "Thiết kế giao diện",
-			artist: "Họa sĩ 2D/3D",
+			artist: "Họa sĩ 2D và 3D",
 			qaTester: "Kiểm thử viên",
 			codeSecurityReviewer: "Kiểm soát mã và bảo mật",
 			contentMarketing: "Marketing nội dung",

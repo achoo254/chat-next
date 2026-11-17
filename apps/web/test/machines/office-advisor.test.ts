@@ -132,12 +132,13 @@ describe("Advisor's place", () => {
 		expect(placed(back.placements, "director").room).toBe("DIRECTOR");
 	});
 
-	it("asking Advisor while it is not in (turned off meanwhile): the meeting room, like any activity there", () => {
+	it("asking Advisor while no Advisor actor is in (turned off meanwhile): its room all the same, and Advisor still sits there", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director({ activity: consult("w1") })]));
-		const d = placed(officePlacement(store.state(), layout(), T0, EMPTY_MEMORY, PROFILE).placements, "director");
-		expect([d.room, d.activityRoom]).toEqual(["MEETING", "MEETING"]);
-		expect(officePlacement(store.state(), layout(), T0, EMPTY_MEMORY, PROFILE).placements.some((p) => p.kind === "advisor")).toBe(false);
+		const places = officePlacement(store.state(), layout(), T0, EMPTY_MEMORY, PROFILE).placements;
+		const d = placed(places, "director");
+		expect([d.room, d.activityRoom]).toEqual([ADVISOR_ROOM, ADVISOR_ROOM]);
+		expect(places.some((p) => p.kind === "advisor")).toBe(true);
 	});
 
 	it("never talks with the residents", () => {

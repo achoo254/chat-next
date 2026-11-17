@@ -104,14 +104,16 @@ test("everyone on a bed rests on the mattress and stays within the bed: asleep a
 			const probe = p.probe;
 			assert.ok(probe);
 			assert.ok(Math.abs(rel(p, probe.min.y)) < 0.04, `${label}: ${p.key} rests on the mattress (lowest point ${rel(p, probe.min.y).toFixed(3)} m from it)`);
-			assert.ok(probe.max.x - probe.min.x <= MAX_BODY_WIDTH_ON_BED, `${label}: ${p.key} stays within the bed (${(probe.max.x - probe.min.x).toFixed(2)} m wide)`);
+			// The beds lie along x with the head to the wall (some across it): the body's short side is its width on the bed.
+			const width = Math.min(probe.max.x - probe.min.x, probe.max.z - probe.min.z);
+			assert.ok(width <= MAX_BODY_WIDTH_ON_BED, `${label}: ${p.key} stays within the bed (${width.toFixed(2)} m wide)`);
 		}
 	}
 });
 
-test("standing and walking people have their feet on the floor: the director as the staff", async () => {
+test("standing and walking people have their feet on the floor (the director sits at his chair and only stands on his round)", async () => {
 	const people = await peopleOn(9, null);
 	const standing = people.filter((p) => p.pose.startsWith("stand") || p.pose === "walk");
-	assert.ok(standing.some((p) => p.key === "director"), "the director stands somewhere");
+	assert.ok(standing.length > 0, "someone stands or walks somewhere");
 	for (const p of standing) assert.ok(Math.abs(rel(p, p.probe?.min.y ?? NaN)) < 0.04, `${p.key} (${p.pose}) feet at the floor: ${rel(p, p.probe?.min.y ?? NaN).toFixed(3)}`);
 });

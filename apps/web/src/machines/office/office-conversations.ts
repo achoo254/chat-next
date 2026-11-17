@@ -107,7 +107,7 @@ function pick<T>(list: readonly T[], seed: number): T | undefined {
 /** The lines of a talk, timed from `from`. */
 function linesOf(state: OfficeState, visitor: Placement, host: Placement, now: number, from: number, seed: string): { topic: TalkTopic; lines: TalkLine[] } {
 	const facts = talkFacts({
-		work: state.work[visitor.key] ?? EMPTY_WORK,
+		work: state.work[visitor.workKey] ?? EMPTY_WORK,
 		session: state.session,
 		clockOffset: state.clockOffset,
 		now,

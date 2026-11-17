@@ -124,8 +124,10 @@ describe("idle show", () => {
 		for (let t = 0; t < IDLE_AFTER_MS; t += 500) expect(idlePerformance(person({ since: 0 }), t, ctx)).toBeNull();
 	});
 
-	it("gives employees coffee, sofa chats and yawns, at most ACT_MS in a slot, the same for every caller", () => {
-		const acts = actsOver(person());
+	it("gives employees only a stretch in office hours, and coffee, sofa chats and yawns outside them, at most ACT_MS in a slot, the same for every caller", () => {
+		// Office hours (the default): nobody leaves their seat for a break.
+		expect(new Set(actsOver(person()))).toEqual(new Set(["yawn"]));
+		const acts = actsOver(person(), { ...ctx, officeHours: false });
 		expect(new Set(acts)).toEqual(new Set(["coffee", "chat", "yawn"]));
 		expect(acts.length).toBeLessThanOrEqual(40 * (ACT_MS / 1000) + 1);
 		const t = IDLE_AFTER_MS * 3;

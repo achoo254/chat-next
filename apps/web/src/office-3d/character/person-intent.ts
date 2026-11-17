@@ -10,7 +10,7 @@
 // there) facing it while the call runs.
 // Pure, no engine.
 import { lineOf, talkOf, type Talk } from "../../machines/office/office-conversations.ts";
-import { awakeAct } from "../../machines/office/office-life-schedule.ts";
+import { awakeAct, isOfficeHours } from "../../machines/office/office-life-schedule.ts";
 import type { Placement } from "../../machines/office/office-placement.ts";
 import type { TalkRole } from "./anim-groups.ts";
 import { idlePerformance, type IdleContext, type IdleTarget } from "./idle-performer.ts";
@@ -53,7 +53,7 @@ export function personIntent(placement: Placement, talks: readonly Talk[], now: 
 	}
 	const idle =
 		placement.life === null
-			? idlePerformance({ key: placement.key, kind: placement.kind, activityRoom: placement.activityRoom, since: placement.since }, now, ctx)
+			? idlePerformance({ key: placement.key, kind: placement.kind, activityRoom: placement.activityRoom, since: placement.since }, now, { ...ctx, officeHours: isOfficeHours(placement.key, now) })
 			: null;
 	const consulting = placement.kind !== "advisor" && placement.activityRoom !== null && placement.actor?.activity?.group === "consult";
 	return { placement, idle, anchorId: idle?.anchorId ?? placement.anchorId, beside: idle?.act === "patrol" || consulting, turn: 0, talk: null };
