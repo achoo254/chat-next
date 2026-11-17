@@ -15,7 +15,7 @@ function layout(): OfficeLayout {
 describe("person target", () => {
 	const l = layout();
 
-	it("puts every placement of a busy office on its anchor's floor and spot, seated at desks and the director's chair", () => {
+	it("puts every placement of a busy office on its anchor's spot, seated at desks and the director's chair", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), staff("a1", "researcher", { activity: act("a1-1", OfficeRoom.LIBRARY) }), staff("a2", "tester")]));
 		const { placements } = officePlacement(store.state(), l, T0, EMPTY_MEMORY);
@@ -24,11 +24,12 @@ describe("person target", () => {
 			const t = personTarget(l, p.anchorId, 0, false);
 			const a = anchorById(l, p.anchorId);
 			expect(t, p.key).not.toBeNull();
-			expect(t).toMatchObject({ floor: p.floor, x: a?.x, z: a?.z, face: a?.face, node: a?.node });
+			expect(t).toMatchObject({ x: a?.x, z: a?.z, face: a?.face, node: a?.node });
 		}
 		expect(personTarget(l, "desk-1", 0, false)?.seated).toBe(true);
 		expect(personTarget(l, "director", 0, false)?.seated).toBe(true);
-		expect(personTarget(l, "library-work-0", 0, false)).toMatchObject({ floor: 2, seated: false });
+		const library = anchorById(l, "library-work-0");
+		expect(personTarget(l, "library-work-0", 0, false)).toMatchObject({ x: library?.x, z: library?.z, seated: false });
 	});
 
 	it("steps people sharing an anchor aside, alternating right and left, standing", () => {
@@ -56,7 +57,10 @@ describe("person target", () => {
 
 	it("knows no unknown anchor and finds the nearest walkway node", () => {
 		expect(personTarget(l, "nowhere", 0, false)).toBeNull();
-		const lift = l.floors[0]?.graph.nodes.find((n) => n.id === l.elevator.nodes[1]);
-		expect(nearestNode(l, 1, (lift?.x ?? 0) + 0.1, lift?.z ?? 0)).toBe(l.elevator.nodes[1]);
+		// Any node of the plan, in any zone: a point just beside it rejoins the walkways there.
+		for (const node of [l.graph.nodes[0], l.graph.nodes[l.graph.nodes.length - 1]]) {
+			if (node === undefined) throw new Error("the plan has no walkway nodes");
+			expect(nearestNode(l, node.x + 0.1, node.z)).toBe(node.id);
+		}
 	});
 });

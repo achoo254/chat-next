@@ -4,7 +4,8 @@
 // from the lobby door to the reception desk when a new turn starts, and the
 // lounge's TV screen glowing in shifting colours while someone watches. All
 // blocks from the shared kit (instances: a draw call or two in all) but the
-// TV's screen (its own material: one more draw call on the living floor).
+// TV's screen (its own material: one more draw call while it glows). Placed
+// in plan coordinates under one node; Babylon culls what the camera misses.
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreatePlane } from "@babylonjs/core/Meshes/Builders/planeBuilder";
@@ -13,16 +14,15 @@ import "@babylonjs/core/Meshes/instancedMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
-import type { FloorLevel } from "../../machines/office/office-rooms.ts";
 import type { OfficeState } from "../../machines/office/office-store.ts";
 import type { PersonView } from "../character/office-people.ts";
 import type { BlockKit } from "./block-kit.ts";
-import { sceneFloor, type SceneLayout } from "./scene-layout.ts";
+import type { SceneLayout } from "./scene-layout.ts";
 
 export interface RoomFx {
 	update(state: OfficeState): void;
 	/** `lampGlow`: how bright the desk lamps burn (0 by day, office-lighting.ts). */
-	frame(seconds: number, shown: FloorLevel, people: readonly PersonView[], screenGlow: number, lampGlow: number): void;
+	frame(seconds: number, people: readonly PersonView[], screenGlow: number, lampGlow: number): void;
 	dispose(): void;
 }
 
@@ -39,7 +39,7 @@ const TV_SCREEN = { w: 1.5, h: 0.84, y: 1.12, front: 0.14 } as const;
 const WATCHING: ReadonlySet<string> = new Set(["watch", "watch-low", "dance"]);
 
 export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): RoomFx {
-	const roots = new Map<FloorLevel, TransformNode>();
+	const root = new TransformNode("room-fx", scene);
 	const screens = new Map<string, InstancedMesh>();
 	const lamps = new Map<string, InstancedMesh>();
 	const lampMaterial = new StandardMaterial("desk-lamp", scene);
@@ -50,47 +50,43 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 	lamp.material = lampMaterial;
 	lamp.isVisible = false;
 	lamp.isPickable = false;
-	const leds: { floor: FloorLevel; mesh: InstancedMesh; phase: number }[] = [];
+	const leds: { mesh: InstancedMesh; phase: number }[] = [];
 	const tvMaterial = new StandardMaterial("tv-screen", scene);
 	tvMaterial.diffuseColor = Color3.Black();
 	tvMaterial.specularColor = Color3.Black();
 	tvMaterial.disableLighting = true;
 	tvMaterial.backFaceCulling = false;
-	const tvs: { floor: FloorLevel; mesh: ReturnType<typeof CreatePlane> }[] = [];
-	for (const floor of layout.floors) {
-		const root = new TransformNode(`fx-${floor.level}`, scene);
-		roots.set(floor.level, root);
-		floor.props.forEach((p, i) => {
-			if (p.name === "monitor" && p.anchor !== "") {
-				const screen = kit.block(root, `screen-${p.anchor}`, { x: p.x + Math.sin(p.rotY) * 0.05, y: p.y + 0.08, z: p.z + Math.cos(p.rotY) * 0.05, w: 0.48, h: 0.3, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
-				screen.setEnabled(false);
-				screens.set(p.anchor, screen);
-				const bulb = lamp.createInstance(`lamp-${p.anchor}`);
-				bulb.parent = root;
-				bulb.position.set(p.x + Math.cos(p.rotY) * LAMP_SIDE, p.y + LAMP_UP, p.z - Math.sin(p.rotY) * LAMP_SIDE);
-				bulb.isPickable = false;
-				bulb.setEnabled(false);
-				lamps.set(p.anchor, bulb);
+	const tvs: ReturnType<typeof CreatePlane>[] = [];
+	layout.props.forEach((p, i) => {
+		if (p.name === "monitor" && p.anchor !== "") {
+			const screen = kit.block(root, `screen-${p.anchor}`, { x: p.x + Math.sin(p.rotY) * 0.05, y: p.y + 0.08, z: p.z + Math.cos(p.rotY) * 0.05, w: 0.48, h: 0.3, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
+			screen.setEnabled(false);
+			screens.set(p.anchor, screen);
+			const bulb = lamp.createInstance(`lamp-${p.anchor}`);
+			bulb.parent = root;
+			bulb.position.set(p.x + Math.cos(p.rotY) * LAMP_SIDE, p.y + LAMP_UP, p.z - Math.sin(p.rotY) * LAMP_SIDE);
+			bulb.isPickable = false;
+			bulb.setEnabled(false);
+			lamps.set(p.anchor, bulb);
+		}
+		if (p.name === "tv-stand") {
+			const screen = CreatePlane(`tv-screen-${i}`, { width: TV_SCREEN.w, height: TV_SCREEN.h }, scene);
+			screen.material = tvMaterial;
+			screen.parent = root;
+			screen.isPickable = false;
+			// The plane faces -z by default; the stand's rotY turns it to the room.
+			screen.position.set(p.x + Math.sin(p.rotY) * TV_SCREEN.front, TV_SCREEN.y, p.z + Math.cos(p.rotY) * TV_SCREEN.front);
+			screen.rotation.y = p.rotY + Math.PI;
+			screen.setEnabled(false);
+			tvs.push(screen);
+		}
+		if (p.name === "server-rack") {
+			for (let k = 0; k < 3; k += 1) {
+				const led = kit.block(root, `led-${i}-${k}`, { x: p.x + Math.sin(p.rotY) * 0.46, y: 0.9 + k * 0.32, z: p.z + Math.cos(p.rotY) * 0.46, w: 0.3, h: 0.04, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
+				leds.push({ mesh: led, phase: i * 1.7 + k * 0.9 });
 			}
-			if (p.name === "tv-stand") {
-				const screen = CreatePlane(`tv-screen-${i}`, { width: TV_SCREEN.w, height: TV_SCREEN.h }, scene);
-				screen.material = tvMaterial;
-				screen.parent = root;
-				screen.isPickable = false;
-				// The plane faces -z by default; the stand's rotY turns it to the room.
-				screen.position.set(p.x + Math.sin(p.rotY) * TV_SCREEN.front, TV_SCREEN.y, p.z + Math.cos(p.rotY) * TV_SCREEN.front);
-				screen.rotation.y = p.rotY + Math.PI;
-				screen.setEnabled(false);
-				tvs.push({ floor: floor.level, mesh: screen });
-			}
-			if (p.name === "server-rack") {
-				for (let k = 0; k < 3; k += 1) {
-					const led = kit.block(root, `led-${i}-${k}`, { x: p.x + Math.sin(p.rotY) * 0.46, y: 0.9 + k * 0.32, z: p.z + Math.cos(p.rotY) * 0.46, w: 0.3, h: 0.04, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
-					leds.push({ floor: floor.level, mesh: led, phase: i * 1.7 + k * 0.9 });
-				}
-			}
-		});
-	}
+		}
+	});
 	const smokeMaterial = new StandardMaterial("smoke", scene);
 	smokeMaterial.diffuseColor = new Color3(0.42, 0.42, 0.46);
 	smokeMaterial.specularColor = Color3.Black();
@@ -100,11 +96,10 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 	puff.isVisible = false;
 	puff.isPickable = false;
 	const puffs = new Map<string, InstancedMesh[]>();
-	const first = sceneFloor(layout, 1);
-	const door = first?.doors.find((d) => d.id === "entrance");
-	const desk = first?.props.find((p) => p.name === "reception-desk");
-	const mail = roots.get(1) === undefined ? null : kit.block(roots.get(1) as TransformNode, "mail", { x: 0, y: 0, z: 0, w: 0.3, h: 0.02, d: 0.2, color: "#fff4d6" }, true);
-	mail?.setEnabled(false);
+	const door = layout.doors.find((d) => d.id === "entrance");
+	const desk = layout.props.find((p) => p.name === "reception-desk");
+	const mail = kit.block(root, "mail", { x: 0, y: 0, z: 0, w: 0.3, h: 0.02, d: 0.2, color: "#fff4d6" }, true);
+	mail.setEnabled(false);
 	let lastTurn = -1;
 	let mailStart: number | null = null;
 	let machines = 0;
@@ -115,16 +110,15 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 			if (lastTurn >= 0 && state.lastTurnStart > lastTurn) mailStart = now;
 			lastTurn = state.lastTurnStart;
 		},
-		frame(seconds, shown, people, screenGlow, lampGlow) {
+		frame(seconds, people, screenGlow, lampGlow) {
 			now = seconds;
-			for (const [level, root] of roots) root.setEnabled(level === shown);
 			const working = new Set(people.filter((p) => p.working && p.deskAnchor !== null).map((p) => p.deskAnchor));
 			for (const [anchor, screen] of screens) screen.setEnabled(screenGlow > 0 && working.has(anchor));
 			for (const [anchor, bulb] of lamps) bulb.setEnabled(lampGlow > 0.05 && working.has(anchor));
 			lampMaterial.emissiveColor.copyFrom(LAMP_COLOR).scaleInPlace(Math.min(1, lampGlow) * 1.6);
 			kit.screenMaterial.emissiveColor.set(0.55 * (0.4 + screenGlow), 0.78 * (0.4 + screenGlow), 1 * (0.4 + screenGlow));
-			const watched = people.some((p) => p.visible && p.floor === shown && WATCHING.has(p.pose));
-			for (const tv of tvs) tv.mesh.setEnabled(watched && tv.floor === shown);
+			const watched = people.some((p) => WATCHING.has(p.pose));
+			for (const tv of tvs) tv.setEnabled(watched);
 			if (watched) {
 				// A programme's light: slow shifts of hue with a flicker of cuts.
 				const cut = Math.floor(seconds / 2.7);
@@ -133,10 +127,10 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 				tvMaterial.emissiveColor.set(0.45 + 0.4 * Math.sin(h * 6.28), 0.5 + 0.35 * Math.sin(h * 6.28 + 2.1), 0.6 + 0.35 * Math.sin(h * 6.28 + 4.2));
 			}
 			const rate = machines > 0 ? 2 + Math.min(6, machines) : 0.4;
-			for (const led of leds) led.mesh.setEnabled(led.floor === shown && Math.sin(seconds * rate * Math.PI + led.phase) > -0.2);
+			for (const led of leds) led.mesh.setEnabled(Math.sin(seconds * rate * Math.PI + led.phase) > -0.2);
 			const smoking = new Set<string>();
 			for (const p of people) {
-				if (!p.smoking || !p.visible || p.floor !== shown) continue;
+				if (!p.smoking) continue;
 				smoking.add(p.key);
 				let list = puffs.get(p.key);
 				if (list === undefined) {
@@ -158,9 +152,9 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 				for (const m of list) m.dispose();
 				puffs.delete(key);
 			}
-			if (mail !== null && door !== undefined && desk !== undefined) {
+			if (door !== undefined && desk !== undefined) {
 				const t = mailStart === null ? 1 : (seconds - mailStart) / MAIL_SECONDS;
-				mail.setEnabled(t < 1 && shown === 1);
+				mail.setEnabled(t < 1);
 				if (t < 1) mail.position.set(door.at[0] + (desk.x - door.at[0]) * t, 1.1 + Math.sin(t * Math.PI) * 0.8, door.at[1] + (desk.z - door.at[1]) * t);
 				else mailStart = null;
 			}
@@ -168,10 +162,10 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 		dispose() {
 			for (const list of puffs.values()) for (const m of list) m.dispose();
 			puff.dispose(false, true);
-			for (const tv of tvs) tv.mesh.dispose(false, false);
+			for (const tv of tvs) tv.dispose(false, false);
 			tvMaterial.dispose();
 			lamp.dispose(false, true);
-			for (const root of roots.values()) root.dispose(false, false);
+			root.dispose(false, false);
 		},
 	};
 }

@@ -1,16 +1,14 @@
-// Where a placed person stands or sits in the 3D building: the anchor of
-// their placement (or of the idle show), its floor, position, facing and
+// Where a placed person stands or sits in the 3D office: the anchor of
+// their placement (or of the idle show), its position, facing and
 // walkway node, whether they sit there (desks, the director's chair, the
-// meeting table, the sofa, the living floor's seats), how high they stand or
+// meeting table, the sofa, the living rooms' seats), how high they stand or
 // lie there (a bed, a treadmill) and how low they sit, and a sideways step for someone sharing an anchor
 // with others (a full room: the placement lets people share places) or
 // standing beside a desk on the director's round. Pure, no engine.
 import type { OfficeLayout } from "../../machines/office/office-layout.ts";
-import type { FloorLevel } from "../../machines/office/office-rooms.ts";
 
 export interface PersonTarget {
 	readonly anchorId: string;
-	readonly floor: FloorLevel;
 	readonly x: number;
 	readonly z: number;
 	/** Babylon rotation.y they face once there. */
@@ -39,31 +37,27 @@ export const LOW_SEAT_HEIGHT = 0.26;
  * (alternating right and left). `beside`: stand next to it facing it.
  */
 export function personTarget(layout: OfficeLayout, anchorId: string, share: number, beside: boolean): PersonTarget | null {
-	for (const floor of layout.floors) {
-		const a = floor.anchors.find((anchor) => anchor.id === anchorId);
-		if (a === undefined) continue;
-		// The right hand of someone facing `face` (rotation.y) in Babylon's left-handed frame.
-		const rightX = Math.cos(a.face);
-		const rightZ = -Math.sin(a.face);
-		if (beside) {
-			return { anchorId, floor: floor.level, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: SEAT_HEIGHT, low: false };
-		}
-		const steps = share <= 0 ? 0 : Math.ceil(share / 2) * (share % 2 === 1 ? 1 : -1);
-		return {
-			anchorId,
-			floor: floor.level,
-			x: a.x + rightX * SHARE_STEP * steps,
-			z: a.z + rightZ * SHARE_STEP * steps,
-			face: a.face,
-			node: a.node,
-			seated: share <= 0 && (SEAT_KINDS.has(a.kind) || a.sit),
-			// Only the first at an anchor is on the bed or the treadmill; the others stand beside it.
-			y: share <= 0 ? a.y : 0,
-			seat: a.low ? LOW_SEAT_HEIGHT : SEAT_HEIGHT,
-			low: share <= 0 && a.low,
-		};
+	const a = layout.anchors.find((anchor) => anchor.id === anchorId);
+	if (a === undefined) return null;
+	// The right hand of someone facing `face` (rotation.y) in Babylon's left-handed frame.
+	const rightX = Math.cos(a.face);
+	const rightZ = -Math.sin(a.face);
+	if (beside) {
+		return { anchorId, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: SEAT_HEIGHT, low: false };
 	}
-	return null;
+	const steps = share <= 0 ? 0 : Math.ceil(share / 2) * (share % 2 === 1 ? 1 : -1);
+	return {
+		anchorId,
+		x: a.x + rightX * SHARE_STEP * steps,
+		z: a.z + rightZ * SHARE_STEP * steps,
+		face: a.face,
+		node: a.node,
+		seated: share <= 0 && (SEAT_KINDS.has(a.kind) || a.sit),
+		// Only the first at an anchor is on the bed or the treadmill; the others stand beside it.
+		y: share <= 0 ? a.y : 0,
+		seat: a.low ? LOW_SEAT_HEIGHT : SEAT_HEIGHT,
+		low: share <= 0 && a.low,
+	};
 }
 
 /** For people in order wanting anchors, each one's place in the queue at their anchor. */
@@ -76,12 +70,11 @@ export function shareIndices(anchorIds: readonly string[]): number[] {
 	});
 }
 
-/** The walkway node nearest a point of a floor (to rejoin the graph from anywhere). */
-export function nearestNode(layout: OfficeLayout, floor: FloorLevel, x: number, z: number): string | null {
-	const f = layout.floors.find((fl) => fl.level === floor);
+/** The walkway node nearest a point of the plan (to rejoin the graph from anywhere). */
+export function nearestNode(layout: OfficeLayout, x: number, z: number): string | null {
 	let best: string | null = null;
 	let bestD = Infinity;
-	for (const n of f?.graph.nodes ?? []) {
+	for (const n of layout.graph.nodes) {
 		const d = Math.hypot(n.x - x, n.z - z);
 		if (d < bestD) {
 			bestD = d;

@@ -34,8 +34,11 @@ describe("Advisor's dress", () => {
 			// Never the director's concept skin.
 			expect(cell).toBeGreaterThan(0);
 		}
-		// The look's own cell wins once the atlas has it.
-		expect(skinCellFor(personLook(advisorAt("cat")), 12, [...names, "advisor-cat"])).toBe(names.length);
+		// The look's own cell is in the shipped atlas and wins over the nearest-colour one.
+		for (const look of LOOKS) expect(names[skinCellFor(personLook(advisorAt(look.id)), count, names)]).toBe(`advisor-${look.id}`);
+		// An atlas without the own cells falls back to the nearest colour.
+		const plain = names.filter((n) => !n.startsWith("advisor-"));
+		expect(plain[skinCellFor(personLook(advisorAt("cat")), plain.length, plain)]).toBe("mustard");
 	});
 
 	it("the owl wears the staff's glasses made larger; the other accessories come with the accessories GLB", () => {
@@ -79,7 +82,6 @@ describe("asking Advisor in 3D", () => {
 				service: null,
 			},
 			member: null,
-			floor: 1,
 			room: "MEETING",
 			anchorId: "meeting-0",
 			since: 0,

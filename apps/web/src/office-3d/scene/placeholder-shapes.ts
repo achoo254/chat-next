@@ -61,7 +61,7 @@ export const PROP_SHAPES: Readonly<Record<string, Shape>> = {
 	"test-bench": { w: 2, h: 0.9, d: 0.8, color: "#d4d8e2" },
 	"signal-tower": { w: 0.2, h: 1.5, d: 0.2, color: "#4caf50" },
 	"device-shelf": { w: 1.2, h: 1.7, d: 0.45, color: "#b4b9c8" },
-	// The living floor: dorm, gym, lounge and dining.
+	// The living rooms: dorm, gym, lounge and dining.
 	bed: { w: 0.95, h: 0.5, d: 2, color: "#9fb3d9" },
 	nightstand: { w: 0.45, h: 0.55, d: 0.4, color: "#c89b6d" },
 	treadmill: { w: 0.8, h: 0.18, d: 1.8, color: "#3e3a52" },

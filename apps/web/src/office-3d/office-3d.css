@@ -8,9 +8,12 @@
 .of3d-layer .of-marker { flex-direction: column; align-items: center; gap: 2px; max-width: 200px; translate: -50% -100%; }
 .of3d-tag { display: flex; align-items: center; gap: 6px; max-width: 180px; padding: 2px 8px 2px 2px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); }
 .of3d-layer .of-bubble { max-width: 200px; background: var(--c-surface); color: var(--c-text); box-shadow: var(--shadow-sm); }
+/* Zoomed far out, an idle person's label is only its status dot (office-overlay.ts sets data-dot). */
+.of3d-layer .of-marker[data-dot] .of-name, .of3d-layer .of-marker[data-dot] .of-bubble { display: none; }
+.of3d-layer .of-marker[data-dot] .of3d-tag { padding: 2px; }
+/* A board hangs from its anchor at its bottom centre; zoomed far out office-overlay.ts adds a scale to its transform (data-compact), shrinking it about that point. */
 .of3d-board { width: 150px; translate: -50% -100%; transform-origin: bottom center; }
 .of3d-overflow { translate: -50% -50%; }
-.of3d-fade { position: absolute; inset: 0; pointer-events: none; background: var(--c-bg); opacity: 0; }
 .of3d-loading { position: absolute; left: var(--space-3); bottom: var(--space-3); margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 @container (max-width: 640px) {
 	.of-stage.of3d { min-height: min(64vh, 560px); }

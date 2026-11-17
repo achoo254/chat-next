@@ -31,17 +31,17 @@ function clone<T>(value: T): T {
 describe("scene assets: the delivered manifest", () => {
 	const assets = parseSceneAssets(fixture, FIXTURE_HASH);
 
-	it("reads every floor's shell, lightmaps, props GLB and model list", () => {
-		expect([...assets.floors.keys()]).toEqual([1, 2, 3]);
-		const one = assets.floors.get(1);
-		expect(one?.shell).toBe("office-floor-1.840e399c.glb");
-		expect(one?.props).toBe("office-props-floor-1.0ffcdbdb.glb");
-		expect(one?.models).toHaveLength(30);
-		expect(one?.models).toEqual(expect.arrayContaining(["desk", "chair", "monitor", "sofa", "paper-stack"]));
-		expect(assets.floors.get(2)?.models).toEqual([]);
-		if (one === undefined) throw new Error("floor 1 missing");
-		expect(lightmapPair(one, 1024)).toEqual({ day: "lightmap-floor-1-day-1024.426f0710.webp", night: "lightmap-floor-1-night-1024.97efd27f.webp" });
-		expect(lightmapPair(one, 2048)?.night).toBe("lightmap-floor-1-night-2048.c720e4e2.webp");
+	it("reads every zone's shell, lightmaps, props GLB and model list", () => {
+		expect([...assets.zones.keys()]).toEqual(["a", "b", "c"]);
+		const a = assets.zones.get("a");
+		expect(a?.shell).toBe("office-zone-a.840e399c.glb");
+		expect(a?.props).toBe("office-props-zone-a.0ffcdbdb.glb");
+		expect(a?.models).toHaveLength(30);
+		expect(a?.models).toEqual(expect.arrayContaining(["desk", "chair", "monitor", "sofa", "paper-stack"]));
+		expect(assets.zones.get("b")?.models).toEqual([]);
+		if (a === undefined) throw new Error("zone a missing");
+		expect(lightmapPair(a, 1024)).toEqual({ day: "lightmap-zone-a-day-1024.426f0710.webp", night: "lightmap-zone-a-night-1024.97efd27f.webp" });
+		expect(lightmapPair(a, 2048)?.night).toBe("lightmap-zone-a-night-2048.c720e4e2.webp");
 	});
 
 	it("reads the character with its clips and the skin atlas grid", () => {
@@ -59,11 +59,22 @@ describe("scene assets: the delivered manifest", () => {
 		expect(assets.sounds.size).toBe(9);
 	});
 
-	it("maps each model name to the first floor's props GLB that holds it", () => {
+	it("maps each model name to the first zone's props GLB that holds it", () => {
 		const sources = propSources(assets);
-		expect(sources.get("desk")).toBe("office-props-floor-1.0ffcdbdb.glb");
+		expect(sources.get("desk")).toBe("office-props-zone-a.0ffcdbdb.glb");
 		expect(sources.has("coffee-table")).toBe(false);
 		expect(sources.size).toBe(30);
+	});
+
+	it("lets zone a win a model name over later zones, whatever order the file lists them in", () => {
+		const shuffled = clone(fixture) as { zones: { id: string; scene: { models: string[] } }[] };
+		const [a, b] = shuffled.zones;
+		if (a === undefined || b === undefined) throw new Error("fixture zones missing");
+		b.scene.models = ["desk", "treadmill"];
+		shuffled.zones = [b, a];
+		const sources = propSources(parseSceneAssets(shuffled, FIXTURE_HASH));
+		expect(sources.get("desk")).toBe("office-props-zone-a.0ffcdbdb.glb");
+		expect(sources.get("treadmill")).toBe("office-props-zone-b.7a878a33.glb");
 	});
 });
 
@@ -73,7 +84,7 @@ describe("scene assets: the live manifest", () => {
 		const assets = parseSceneAssets(live, await layoutHash());
 		expect(assets).not.toBe(NO_SCENE_ASSETS);
 		const files = [
-			...[...assets.floors.values()].flatMap((f) => [f.shell, f.props, ...Object.values(f.lightmaps.day), ...Object.values(f.lightmaps.night)]),
+			...[...assets.zones.values()].flatMap((z) => [z.shell, z.props, ...Object.values(z.lightmaps.day), ...Object.values(z.lightmaps.night)]),
 			assets.character?.file,
 			assets.character?.skins?.file,
 			assets.accessories?.file,
@@ -86,11 +97,11 @@ describe("scene assets: the live manifest", () => {
 	it("has shells whose extras place props by the layout's own names", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
 		const assets = parseSceneAssets(live, await layoutHash());
-		const layoutNames = new Set(SCENE_LAYOUT.floors.flatMap((f) => [...f.props, ...f.smallProps].map((p) => p.name)));
-		for (const [level, floor] of assets.floors) {
-			if (floor.shell === null) continue;
-			const extras = parseShellExtras(glbJson(join(PUBLIC_OFFICE, floor.shell)));
-			expect(extras.places, `floor ${level}`).not.toBeNull();
+		const layoutNames = new Set([...SCENE_LAYOUT.props, ...SCENE_LAYOUT.smallProps].map((p) => p.name));
+		for (const [id, zone] of assets.zones) {
+			if (zone.shell === null) continue;
+			const extras = parseShellExtras(glbJson(join(PUBLIC_OFFICE, zone.shell)));
+			expect(extras.places, `zone ${id}`).not.toBeNull();
 			for (const place of extras.places ?? []) expect(layoutNames.has(place.name), place.name).toBe(true);
 			expect(extras.intensityScale).toBe(2);
 		}
@@ -99,11 +110,11 @@ describe("scene assets: the live manifest", () => {
 	it("has a props GLB node for every model the manifest lists", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
 		const assets = parseSceneAssets(live, await layoutHash());
-		for (const floor of assets.floors.values()) {
-			if (floor.props === null || floor.models.length === 0) continue;
-			const json = glbJson(join(PUBLIC_OFFICE, floor.props)) as { nodes?: { name?: string }[] };
+		for (const zone of assets.zones.values()) {
+			if (zone.props === null || zone.models.length === 0) continue;
+			const json = glbJson(join(PUBLIC_OFFICE, zone.props)) as { nodes?: { name?: string }[] };
 			const nodes = new Set((json.nodes ?? []).map((n) => n.name));
-			for (const model of floor.models) expect(nodes.has(model), model).toBe(true);
+			for (const model of zone.models) expect(nodes.has(model), model).toBe(true);
 		}
 	});
 });
@@ -173,35 +184,37 @@ describe("scene assets: the Director's model", () => {
 describe("scene assets: broken input", () => {
 	it("uses nothing from a file for another layout or version, or not an object", () => {
 		expect(parseSceneAssets(fixture, "other")).toBe(NO_SCENE_ASSETS);
-		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 2 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
+		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 1 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
+		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 3 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 		expect(parseSceneAssets("nope", FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 		expect(parseSceneAssets(null, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 	});
 
-	it("drops each bad piece on its own: climbing paths, odd levels, bad names, bad grids", () => {
-		const bad = clone(fixture) as { floors: Record<string, unknown>[]; character: Record<string, unknown>; accessories: Record<string, unknown>; sfx: Record<string, unknown> };
-		const [one, two, three] = bad.floors;
-		if (one === undefined || two === undefined || three === undefined) throw new Error("fixture floors missing");
-		one.scene = { ...(one.scene as object), shell: "../secret.glb", models: ["desk", "Bad Name!", 7, "desk"] };
-		two.scene = { ...(two.scene as object), props: "/etc/passwd" };
-		three.level = 7;
+	it("drops each bad piece on its own: climbing paths, odd zone ids, bad names, bad grids", () => {
+		const bad = clone(fixture) as { zones: Record<string, unknown>[]; character: Record<string, unknown>; accessories: Record<string, unknown>; sfx: Record<string, unknown> };
+		const [a, b, c] = bad.zones;
+		if (a === undefined || b === undefined || c === undefined) throw new Error("fixture zones missing");
+		a.scene = { ...(a.scene as object), shell: "../secret.glb", models: ["desk", "Bad Name!", 7, "desk"] };
+		b.scene = { ...(b.scene as object), props: "/etc/passwd" };
+		c.id = "z";
 		bad.character = { ...bad.character, skins: { file: "skins.webp", columns: 0, rows: 3, count: 4 } };
 		bad.accessories = { file: "acc.glb", items: { glasses: { bone: "head", scale: -1 }, "../x": { bone: "head" }, cup: { bone: "hand r" }, mug: { bone: "hand_r" } } };
 		bad.sfx = { sounds: { cheer: { file: "../cheer.mp3" }, ding: { file: "sfx/ding.mp3", loop: "yes", seconds: -2 } } };
 		const assets = parseSceneAssets(bad, FIXTURE_HASH);
-		expect(assets.floors.get(1)?.shell).toBeNull();
-		expect(assets.floors.get(1)?.models).toEqual(["desk"]);
-		expect(assets.floors.get(2)?.props).toBeNull();
-		expect(assets.floors.has(3)).toBe(false);
+		expect(assets.zones.get("a")?.shell).toBeNull();
+		expect(assets.zones.get("a")?.models).toEqual(["desk"]);
+		expect(assets.zones.get("b")?.props).toBeNull();
+		expect(assets.zones.has("c")).toBe(false);
+		expect([...assets.zones.keys()]).toEqual(["a", "b"]);
 		expect(assets.character?.file).toBe("character.97b412fb.glb");
 		expect(assets.character?.skins).toBeNull();
 		expect([...(assets.accessories?.items.keys() ?? [])]).toEqual(["mug"]);
 		expect([...assets.sounds]).toEqual([["ding", { file: "sfx/ding.mp3", loop: false, seconds: 0 }]]);
 	});
 
-	it("reads a manifest without the 3D parts as an empty scene that still has its floors' pictures elsewhere", () => {
-		const assets = parseSceneAssets({ formatVersion: 1, layoutSha256: "h", floors: [{ level: 1, views: {} }], character: { file: 3 }, accessories: { file: "a.glb", items: {} } }, "h");
-		expect(assets.floors.size).toBe(0);
+	it("reads a manifest without the 3D parts as an empty scene that still has its plan's pictures elsewhere", () => {
+		const assets = parseSceneAssets({ formatVersion: 2, layoutSha256: "h", zones: [{ id: "a" }], views: {}, character: { file: 3 }, accessories: { file: "a.glb", items: {} } }, "h");
+		expect(assets.zones.size).toBe(0);
 		expect(assets.character).toBeNull();
 		expect(assets.accessories).toBeNull();
 		expect(assets.sounds.size).toBe(0);
@@ -209,13 +222,13 @@ describe("scene assets: broken input", () => {
 
 	it("caps the skin count at the grid and needs both times of day for a lightmap pair", () => {
 		const assets: SceneAssets = parseSceneAssets(
-			{ formatVersion: 1, layoutSha256: "h", floors: [{ level: 1, scene: { lightmaps: { day: { 1024: "d.webp" } } } }], character: { file: "c.glb", skins: { file: "s.webp", columns: 2, rows: 2, count: 9 } } },
+			{ formatVersion: 2, layoutSha256: "h", zones: [{ id: "a", scene: { lightmaps: { day: { 1024: "d.webp" } } } }], character: { file: "c.glb", skins: { file: "s.webp", columns: 2, rows: 2, count: 9 } } },
 			"h",
 		);
 		expect(assets.character?.skins?.count).toBe(4);
-		const floor = assets.floors.get(1);
-		if (floor === undefined) throw new Error("floor 1 missing");
-		expect(lightmapPair(floor, 1024)).toBeNull();
+		const zone = assets.zones.get("a");
+		if (zone === undefined) throw new Error("zone a missing");
+		expect(lightmapPair(zone, 1024)).toBeNull();
 	});
 });
 
@@ -292,13 +305,14 @@ describe("office sounds", () => {
 	it("maps scene events to the asset file's sound names, leaving the rest to tones", () => {
 		const assets = parseSceneAssets(fixture, FIXTURE_HASH);
 		const files = eventSoundFiles(assets.sounds);
-		expect(files.get("arrive-lift")).toBe("sfx/elevator-ding.745bd5a2.mp3");
+		// The elevator's ding is in the file still but no event plays it.
+		expect([...files.values()]).not.toContain("sfx/elevator-ding.745bd5a2.mp3");
 		expect(files.get("start-work")).toBe("sfx/typing.aa1b7357.mp3");
 		expect(files.get("cheer")).toBe("sfx/cheer.8c1362c0.mp3");
 		expect(files.get("smoke")).toBe("sfx/steam-puff.c4e5a5e1.mp3");
 		expect(files.get("approval")).toBe("sfx/phone-ring.5b6332fd.mp3");
 		expect(files.has("power-off")).toBe(false);
 		expect(eventSoundFiles(new Map([["light-switch", { file: "sfx/light.mp3", loop: false, seconds: 0.3 }]])).get("power-on")).toBe("sfx/light.mp3");
-		expect(Object.keys(SOUND_FILES)).toHaveLength(7);
+		expect(Object.keys(SOUND_FILES)).toHaveLength(6);
 	});
 });

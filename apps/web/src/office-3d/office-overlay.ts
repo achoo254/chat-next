@@ -2,27 +2,36 @@
 // person's name, status dot and speech bubble over their head, and the room
 // boards at their board anchors. React renders the elements
 // (office-canvas.tsx) and binds them here by key; every frame this moves
-// them with a transform (no React render per frame) and hides those on
-// another floor or off the canvas.
+// them with a transform (no React render per frame) and hides those off the
+// canvas. Zoomed far out (`far`), the label of an idle person (its element
+// carries `data-idle`) shrinks to its status dot (`data-dot`, office-3d.css);
+// people at work keep their name and speech bubble, and the boards shrink to
+// BOARD_FAR_SCALE about their anchor (their numbers still readable) so four of
+// them do not cover the whole plan and the labels in it.
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { FloorLevel } from "../machines/office/office-rooms.ts";
 import type { PersonView } from "./character/office-people.ts";
 
 export interface BoardPin {
 	readonly id: string;
-	readonly floor: FloorLevel;
 	readonly x: number;
 	readonly y: number;
 	readonly z: number;
+	/** Shrinks when the view is far (a room board; not the meeting room's small "+N"). */
+	readonly shrinksWhenFar: boolean;
 }
+
+/** A board's size when the view is far, of its full size (office-3d.css anchors it at its bottom centre). */
+export const BOARD_FAR_SCALE = 0.6;
 
 export interface OfficeOverlay {
 	bind(id: string, el: HTMLElement | null): void;
-	/** Positions every bound element; `width`/`height`: the canvas in CSS pixels. */
-	update(scene: Scene, width: number, height: number, shown: FloorLevel, people: readonly PersonView[], boards: readonly BoardPin[]): void;
+	/** Positions every bound element; `width`/`height`: the canvas in CSS pixels; `far`: idle people show as dots, boards compact. */
+	update(scene: Scene, width: number, height: number, people: readonly PersonView[], boards: readonly BoardPin[], far: boolean): void;
 	/** Screen position (CSS px) of each person shown, for tests. */
 	readonly screen: ReadonlyMap<string, readonly [number, number]>;
+	/** How many people on the canvas show as a dot now, for tests. */
+	readonly dots: number;
 	dispose(): void;
 }
 
@@ -64,6 +73,8 @@ export function stackLabels<T extends StackedLabel>(labels: readonly T[]): T[] {
 export function createOfficeOverlay(): OfficeOverlay {
 	const elements = new Map<string, HTMLElement>();
 	const written = new Map<string, string>();
+	const dotted = new Set<string>();
+	let dots = 0;
 	const screen = new Map<string, readonly [number, number]>();
 	const point = new Vector3();
 	const out = new Vector3();
@@ -83,28 +94,47 @@ export function createOfficeOverlay(): OfficeOverlay {
 					}
 				});
 
-	const place = (id: string, el: HTMLElement, visible: boolean, x: number, y: number): void => {
-		const value = visible ? `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)` : "hidden";
+	/** Moves an element to (x, y), scaled about its anchor by `scale`; written only on a change. */
+	const place = (id: string, el: HTMLElement, visible: boolean, x: number, y: number, scale = 1): void => {
+		const move = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+		const value = visible ? (scale === 1 ? move : `${move} scale(${scale})`) : "hidden";
 		if (written.get(id) === value) return;
 		written.set(id, value);
 		el.hidden = !visible;
 		if (visible) el.style.transform = value;
 	};
 
+	/** Shrinks (or restores) a person's label; written only on a change. */
+	const dot = (id: string, el: HTMLElement, on: boolean): void => {
+		if (dotted.has(id) === on) return;
+		if (on) dotted.add(id);
+		else dotted.delete(id);
+		el.toggleAttribute("data-dot", on);
+	};
+
 	return {
 		screen,
+		get dots() {
+			return dots;
+		},
 		bind(id, el) {
 			const before = elements.get(id);
 			if (before !== undefined && before !== el && id.startsWith("person:")) sizer?.unobserve(before);
 			if (el === null) {
 				elements.delete(id);
 				written.delete(id);
+				dotted.delete(id);
 			} else {
+				// A new element for the id starts hidden and full size: write it afresh.
+				if (before !== el) {
+					written.delete(id);
+					dotted.delete(id);
+				}
 				elements.set(id, el);
 				if (id.startsWith("person:")) sizer?.observe(el);
 			}
 		},
-		update(scene, width, height, shown, people, boards) {
+		update(scene, width, height, people, boards, far) {
 			matrix.copyFrom(scene.getTransformMatrix());
 			const project = (x: number, y: number, z: number): readonly [number, number] | null => {
 				point.set(x, y, z);
@@ -113,15 +143,21 @@ export function createOfficeOverlay(): OfficeOverlay {
 				return [((out.x + 1) / 2) * width, ((1 - out.y) / 2) * height];
 			};
 			screen.clear();
+			dots = 0;
 			const labels: (StackedLabel & { key: string; el: HTMLElement | undefined })[] = [];
 			for (const p of people) {
 				const el = elements.get(`person:${p.key}`);
-				const at = p.visible && p.floor === shown ? project(p.x, p.labelHeight, p.z) : null;
+				const at = project(p.x, p.labelHeight, p.z);
 				if (at === null) {
 					if (el !== undefined) place(`person:${p.key}`, el, false, 0, 0);
 					continue;
 				}
 				screen.set(p.key, at);
+				if (el !== undefined) {
+					const small = far && el.hasAttribute("data-idle");
+					dot(`person:${p.key}`, el, small);
+					if (small) dots += 1;
+				}
 				labels.push({ key: p.key, el, x: at[0], y: at[1], ...((el === undefined ? undefined : sizes.get(el)) ?? LABEL_SIZE) });
 			}
 			for (const label of stackLabels(labels)) {
@@ -130,8 +166,11 @@ export function createOfficeOverlay(): OfficeOverlay {
 			for (const b of boards) {
 				const el = elements.get(`board:${b.id}`);
 				if (el === undefined) continue;
-				const at = b.floor === shown ? project(b.x, b.y, b.z) : null;
-				place(`board:${b.id}`, el, at !== null, at?.[0] ?? 0, at?.[1] ?? 0);
+				const at = project(b.x, b.y, b.z);
+				const compact = far && b.shrinksWhenFar;
+				// The element's own transform-origin (bottom centre) keeps the anchor in place while it scales.
+				place(`board:${b.id}`, el, at !== null, at?.[0] ?? 0, at?.[1] ?? 0, compact ? BOARD_FAR_SCALE : 1);
+				if (el.hasAttribute("data-compact") !== compact) el.toggleAttribute("data-compact", compact);
 			}
 		},
 		dispose() {

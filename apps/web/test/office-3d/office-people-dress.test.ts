@@ -1,6 +1,8 @@
 // A person of the 3D office is drawn again when what they wear changes:
 // Advisor first drawn in the default look (the viewer's profile not read yet)
 // changes to the profile's look once it is in, where it sits, and only then.
+// Someone who arrives between two frames is seen (or not) by the camera's
+// last view at once, so their first cheer sounds when it should.
 // Babylon's NullEngine stands in for the GPU; the pool is a fake that records
 // what it was asked to draw.
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
@@ -77,7 +79,7 @@ describe("drawing Advisor again when its look changes", () => {
 		engines.push(engine);
 		const scene = new Scene(engine);
 		const pool = fakePool(scene);
-		const people = createOfficePeople(layout(), createRouter(layout(), 1), pool, () => undefined);
+		const people = createOfficePeople(layout(), createRouter(layout()), pool, () => undefined);
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), advisorActor]));
 		const state = store.state();
@@ -99,6 +101,30 @@ describe("drawing Advisor again when its look changes", () => {
 		expect(again.map((d) => d.key)).toEqual(["advisor"]);
 		expect(again[0]?.look.accessory).toBe("advisor-cat-ears");
 		expect(people.views().find((v) => v.key === "advisor")?.target).toBe("meeting-0");
+		people.dispose();
+	});
+});
+
+describe("a person who arrives between frames", () => {
+	it("knows from the last frame's view whether they are seen, before a frame of their own", () => {
+		const engine = new NullEngine();
+		engines.push(engine);
+		const scene = new Scene(engine);
+		const events: { event: string; inView: boolean }[] = [];
+		const people = createOfficePeople(layout(), createRouter(layout()), fakePool(scene), (event, inView) => events.push({ event, inView }));
+		const { store } = storeAt();
+		store.applySnapshot(snapshot([director()]));
+		const alone = store.state();
+		people.update(placementsFor(alone, null), alone, T0);
+		// The camera sees the whole plan.
+		people.frame(0.016, 1, () => true, { x: 0, z: 0 });
+		// Advisor arrives, then finishes a task before any frame has run since.
+		store.applySnapshot(snapshot([director(), advisorActor]));
+		const both = store.state();
+		people.update(placementsFor(both, null), both, T0 + 1_000);
+		const finished = placementsFor(both, null).map((p) => (p.key === "advisor" && p.actor !== null ? { ...p, actor: { ...p.actor, lastResult: { ok: true, at: T0 + 1_500 } } } : p));
+		people.update(finished, both, T0 + 2_000);
+		expect(events).toContainEqual({ event: "cheer", inView: true });
 		people.dispose();
 	});
 });

@@ -1,5 +1,5 @@
-// What the asset pipeline writes into a floor shell GLB's asset.extras:
-// where every prop of the floor stands (instances: model name → list of
+// What the asset pipeline writes into a zone shell GLB's asset.extras:
+// where every prop of the zone stands (instances: model name → list of
 // [x, y, z, rotY] in layout coordinates, the same places the bake cast their
 // shadows from), how the lightmap is stored (intensityScale: the bake wrote
 // light at 1 / scale) and the window panes' day and night colours. Read from
@@ -12,7 +12,7 @@ import type { Place } from "./scene-layout.ts";
 export type Rgb = readonly [number, number, number];
 
 export interface ShellExtras {
-	/** Every placed prop of the floor, or null when the shell lists none. */
+	/** Every placed prop of the zone, or null when the shell lists none. */
 	readonly places: readonly Place[] | null;
 	/** Linear-light factor the lightmap was divided by, or null. */
 	readonly intensityScale: number | null;
@@ -22,7 +22,7 @@ export interface ShellExtras {
 export const NO_SHELL_EXTRAS: ShellExtras = { places: null, intensityScale: null, windowColours: null };
 
 const MODEL_NAME = /^[A-Za-z0-9_-]{1,64}$/;
-/** Props further than this from the floor's centre are a broken entry, not furniture. */
+/** Props further than this from the plan's origin are a broken entry, not furniture. */
 const MAX_COORD = 200;
 
 function rgb(value: unknown): Rgb | null {

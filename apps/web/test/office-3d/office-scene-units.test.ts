@@ -1,6 +1,6 @@
 // The small pure parts of the 3D office: lighting by the hour, the render
-// loop gate, animation level of detail, poses, the idle show, the floor-change
-// glide, frame timing and the address switches.
+// loop gate, animation level of detail, poses, the idle show, the level of
+// detail by zoom, frame timing and the address switches.
 import { describe, expect, it } from "vitest";
 import { animationRates, type LodEntry } from "../../src/office-3d/character/animation-lod.ts";
 import { clipFor, isSeatedPose, poseFor, typesWith } from "../../src/office-3d/character/anim-groups.ts";
@@ -8,8 +8,8 @@ import { ACT_MS, IDLE_AFTER_MS, idlePerformance, SLOT_MS, type IdleContext, type
 import { FrameStats } from "../../src/office-3d/engine/frame-stats.ts";
 import { LOOP_START, loopShouldRun } from "../../src/office-3d/engine/render-loop-gate.ts";
 import { office3DFlags } from "../../src/office-3d/office-flags.ts";
-import { createFloorTransition, TRANSITION_MS } from "../../src/office-3d/scene/floor-transition.ts";
 import { officeLighting } from "../../src/office-3d/scene/office-lighting.ts";
+import { FAR_PIXELS_PER_METRE, NEAR_PIXELS_PER_METRE, nextFar } from "../../src/office-3d/scene/zoom-detail.ts";
 
 describe("office lighting", () => {
 	it("blends from day to night and stays within the table", () => {
@@ -42,7 +42,7 @@ describe("render loop gate", () => {
 });
 
 describe("animation level of detail", () => {
-	const entry = (key: string, over: Partial<LodEntry> = {}): LodEntry => ({ key, onFloor: true, onScreen: true, active: false, distance: 1, ...over });
+	const entry = (key: string, over: Partial<LodEntry> = {}): LodEntry => ({ key, onScreen: true, active: false, distance: 1, ...over });
 
 	it("gives the busiest and nearest full rate, then half, then a quarter", () => {
 		const rates = animationRates([entry("far", { distance: 9 }), entry("busy", { active: true, distance: 20 }), entry("near"), entry("mid", { distance: 5 }), entry("last", { distance: 30 })], 2);
@@ -53,10 +53,10 @@ describe("animation level of detail", () => {
 		expect(rates.get("last")).toBe(4);
 	});
 
-	it("stops people on other floors or out of the frame", () => {
-		const rates = animationRates([entry("up", { onFloor: false }), entry("off", { onScreen: false }), entry("here")], 4);
-		expect(rates.get("up")).toBe(0);
+	it("stops people out of the frame, busy or not", () => {
+		const rates = animationRates([entry("off", { onScreen: false }), entry("busy-off", { onScreen: false, active: true }), entry("here")], 4);
 		expect(rates.get("off")).toBe(0);
+		expect(rates.get("busy-off")).toBe(0);
 		expect(rates.get("here")).toBe(1);
 	});
 });
@@ -139,24 +139,27 @@ describe("idle show", () => {
 	});
 });
 
-describe("floor transition", () => {
-	it("glides and fades, swapping the floor at the darkest moment", () => {
-		const t = createFloorTransition(1, false);
-		t.request(2, 0);
-		const early = t.frame(TRANSITION_MS * 0.25);
-		expect(early.floor).toBe(1);
-		expect(early.fade).toBeCloseTo(0.5);
-		expect(early.lift).toBeGreaterThan(0);
-		const late = t.frame(TRANSITION_MS * 0.75);
-		expect(late.floor).toBe(2);
-		expect(late.lift).toBeLessThan(0);
-		expect(t.frame(TRANSITION_MS * 1.1)).toEqual({ floor: 2, lift: 0, fade: 0 });
+describe("level of detail by zoom", () => {
+	it("goes far below the threshold measured on the plan: the zone framings stay near, the whole plan and two zones go far", () => {
+		// About 40 px a metre (a zone on a desktop or a phone) keeps everything.
+		expect(nextFar(false, 40)).toBe(false);
+		expect(nextFar(false, 42)).toBe(false);
+		// The whole plan on a desktop (about 20) and two zones on a phone (about 12) drop the details.
+		expect(nextFar(false, 20)).toBe(true);
+		expect(nextFar(false, 12)).toBe(true);
+		expect(FAR_PIXELS_PER_METRE).toBe(25);
 	});
 
-	it("cuts at once with reduced motion", () => {
-		const t = createFloorTransition(1, true);
-		t.request(3, 0);
-		expect(t.frame(1)).toEqual({ floor: 3, lift: 0, fade: 0 });
+	it("needs a little more zoom to come back than to go, so a pinch resting at the threshold does not flicker", () => {
+		expect(NEAR_PIXELS_PER_METRE).toBeGreaterThan(FAR_PIXELS_PER_METRE);
+		const between = (FAR_PIXELS_PER_METRE + NEAR_PIXELS_PER_METRE) / 2;
+		expect(nextFar(false, between)).toBe(false);
+		expect(nextFar(true, between)).toBe(true);
+		expect(nextFar(true, NEAR_PIXELS_PER_METRE + 0.1)).toBe(false);
+		expect(nextFar(false, FAR_PIXELS_PER_METRE - 0.1)).toBe(true);
+		// A broken reading keeps what was.
+		expect(nextFar(true, Number.NaN)).toBe(true);
+		expect(nextFar(false, Number.POSITIVE_INFINITY)).toBe(false);
 	});
 });
 

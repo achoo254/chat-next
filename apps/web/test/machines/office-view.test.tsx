@@ -1,8 +1,9 @@
-// The office tab: the note for an older tunelo (and no frame to it), the
-// rooms of a floor with their people and boards on a plain background, the
-// floor tabs, the line for an AI that does not report its staff, the baked
-// picture with each person at their anchor, and the session header's view
-// switch (shown only with two views or more) with the office's route.
+// The office tab: the note for an older tunelo (and no frame to it), every
+// room of the plan grouped by zone with its people and boards on a plain
+// background, the framing button, the line for an AI that does not report its
+// staff, the baked picture with each person at their anchor and the work
+// zone's framing on a phone, and the session header's view switch (shown only
+// with two views or more) with the office's route.
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, MachineInfoSchema, OfficeActorState, OfficeRoom, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { act as reactAct, render, screen, waitFor, within } from "@testing-library/react";
@@ -15,10 +16,33 @@ import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { aiPaths } from "../../src/machines/ai-paths.ts";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
-import OfficeView, { refusalText } from "../../src/machines/office/office-view.tsx";
+import OfficeView, { openingFraming, refusalText } from "../../src/machines/office/office-view.tsx";
+import { Office2D, pictureFraming, WORK_ZONE, zoneBox } from "../../src/machines/office/office-2d.tsx";
+import type { AssetView, OfficeAssets } from "../../src/machines/office/office-assets.ts";
+import { officeDaypart } from "../../src/machines/office/office-daypart.ts";
+import type { ScreenSize } from "../../src/machines/office/office-geometry.ts";
+import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
+import { EMPTY_MEMORY, officePlacement } from "../../src/machines/office/office-placement.ts";
+import type { OfficeFraming } from "../../src/machines/office/office-renderer.ts";
 import { ModeSwitch, modePath, officeOffered, openSessionIn, pickedMode, rememberSessionMode, rowMode, sessionModeOf, sessionModes, sessionPath } from "../../src/machines/session-mode.tsx";
 import { matchRoute } from "../../src/router.tsx";
-import { act, director, session, snapshot, staff } from "./office-builders.ts";
+import { act, director, session, snapshot, staff, storeAt } from "./office-builders.ts";
+
+/** The shipped layout (the tests of office-layout.ts check it parses). */
+function shippedLayout(): OfficeLayout {
+	if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("; "));
+	return OFFICE_LAYOUT.value;
+}
+
+type FixtureView = { width: number; height: number; day: string; night: string; anchors: Record<string, [number, number]> };
+const FIXTURE_TEXT = readFileSync(resolve(process.cwd(), "test/machines/fixtures/office-assets.json"), "utf8");
+const FIXTURE = JSON.parse(FIXTURE_TEXT) as { views: Record<ScreenSize, FixtureView> };
+
+function assetView(view: FixtureView): AssetView {
+	return { width: view.width, height: view.height, day: view.day, night: view.night, anchors: new Map(Object.entries(view.anchors)) };
+}
+
+const FIXTURE_ASSETS: OfficeAssets = { views: { desktop: assetView(FIXTURE.views.desktop), phone: assetView(FIXTURE.views.phone) } };
 
 type Body = Parameters<MachineLink["request"]>[0];
 
@@ -75,53 +99,99 @@ describe("the office tab", () => {
 		expect(fake.sent).toEqual([]);
 	});
 
-	it("shows the floor's rooms with their people, the meeting room's +N and the boards", async () => {
+	it("shows every room of the plan at once, grouped by zone, with their people, the meeting room's +N and the boards", async () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
 		const types = ["scout", "tester", "planner", "debugger", "docs-manager", "general-purpose", "a", "b", "c"];
 		const staffList = types.map((t, i) => staff(`s${i}`, t, { state: OfficeActorState.DONE }));
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ activity: act("t1", OfficeRoom.POST, "Bash") }), ...staffList], { session: session({ tasksDone: 7 }) }) });
-		// The director works in the post room, on floor 2: following goes there.
-		const post = await screen.findByRole("region", { name: "Bưu phòng" });
+		// The director works in the post room of the records zone, shown beside the work zone without any pick.
+		const records = await screen.findByRole("region", { name: "Hồ sơ" });
+		const post = within(records).getByRole("region", { name: "Bưu phòng" });
 		expect(within(post).getByText("Giám đốc")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "T2, có người đang làm" }).getAttribute("aria-pressed")).toBe("true");
-		await userEvent.click(screen.getByRole("button", { name: "T1" }));
-		const work = screen.getByRole("region", { name: "Phòng làm việc chung" });
+		const management = screen.getByRole("region", { name: "Điều hành" });
+		const work = within(management).getByRole("region", { name: "Phòng làm việc chung" });
 		expect(within(work).getByText("Trinh sát viên")).toBeTruthy();
-		const meeting = screen.getByRole("region", { name: "Phòng họp" });
+		const meeting = within(management).getByRole("region", { name: "Phòng họp" });
 		expect(within(meeting).getByLabelText("1 người chờ bàn trong phòng họp").textContent).toBe("+1");
-		const lobby = screen.getByRole("region", { name: "Sảnh" });
+		const lobby = within(management).getByRole("region", { name: "Sảnh" });
 		expect(within(lobby).getByRole("region", { name: "Bảng tin" }).textContent).toContain("7");
+		// No floor tabs and no follow switch any more.
+		expect(document.querySelector('[data-id="office-floors"]')).toBeNull();
+		expect(document.querySelector('[data-id="office-follow"]')).toBeNull();
 	});
 
-	it("after 23:00 sends the off-duty people to bed on floor 4, and following goes there", async () => {
+	it("groups the room cards by the layout's zones, in its order, each zone with exactly its rooms", async () => {
+		const layout = shippedLayout();
+		const fake = fakeLink();
+		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
+		const zones = await screen.findAllByRole("region", { name: /^(Điều hành|Hồ sơ|Kiểm soát|Sinh hoạt)$/ });
+		expect(zones.map((z) => z.getAttribute("data-zone"))).toEqual(layout.zones.map((z) => z.id));
+		for (const [i, zone] of layout.zones.entries()) {
+			const section = zones[i];
+			if (section === undefined) throw new Error(`no section for zone ${zone.id}`);
+			expect([...section.querySelectorAll(".of-room")].map((r) => r.getAttribute("data-room"))).toEqual([...zone.rooms]);
+		}
+	});
+
+	it("after 23:00 sends the off-duty people to bed in the living zone", async () => {
 		vi.setSystemTime(new Date(2026, 10, 16, 23, 30).getTime());
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }) });
-		const dorm = await screen.findByRole("region", { name: "Ký túc" });
+		const living = await screen.findByRole("region", { name: "Sinh hoạt" });
+		const dorm = within(living).getByRole("region", { name: "Ký túc" });
 		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
 		expect(within(dorm).getByText("Trinh sát viên")).toBeTruthy();
 		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(2);
-		expect(screen.getByRole("button", { name: "T4" }).getAttribute("aria-pressed")).toBe("true");
 		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(2);
 	});
 
-	it("goes to the floor the user picks, and says when the AI does not report its staff", async () => {
+	it("says when the AI does not report its staff, with the lobby and the QA room both in view", async () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ activity: act("t1", OfficeRoom.QA, "run_command") })], { reportsStaff: false }) });
 		expect(await screen.findByText("AI này chưa báo cáo nhân viên: chỉ có Giám đốc.")).toBeTruthy();
-		await userEvent.click(screen.getByRole("button", { name: "T1" }));
 		expect(screen.getByRole("region", { name: "Sảnh" })).toBeTruthy();
-		const audit = screen.queryByRole("region", { name: "Phòng Kiểm toán" });
-		expect(audit).toBeNull();
+		const control = screen.getByRole("region", { name: "Kiểm soát" });
+		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Giám đốc")).toBeTruthy();
 	});
 
-	it("puts each person at their anchor on the baked picture", async () => {
-		const fixture = readFileSync(resolve(process.cwd(), "test/machines/fixtures/office-assets.json"), "utf8");
-		vi.stubGlobal("fetch", vi.fn(async () => new Response(fixture, { status: 200, headers: { "content-type": "application/json" } })));
+	it("opens a phone on the work zone and a wide screen on the whole plan", () => {
+		expect(openingFraming("phone")).toBe("work");
+		expect(openingFraming("desktop")).toBe("overview");
+	});
+
+	it("toggles the framing with one button naming the other framing: a wide screen opens on the whole plan", async () => {
+		const fake = fakeLink();
+		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
+		const stage = await waitFor(() => {
+			const el = document.querySelector<HTMLElement>('[data-renderer="2d"]');
+			if (el === null) throw new Error("no 2D stage yet");
+			return el;
+		});
+		// The test's window is a desktop one: it opens on the overview, the button offers the work zone.
+		expect(stage.getAttribute("data-framing")).toBe("overview");
+		expect(screen.queryByRole("button", { name: "Toàn cảnh" })).toBeNull();
+		const back = screen.getByRole("button", { name: "Về khu làm việc" });
+		expect(back.getAttribute("data-id")).toBe("office-framing");
+		expect(back.getAttribute("title")).toBe("Quay về khung nhìn khu làm việc");
+		await userEvent.click(back);
+		expect(document.querySelector('[data-renderer="2d"]')?.getAttribute("data-framing")).toBe("work");
+		const button = screen.getByRole("button", { name: "Toàn cảnh" });
+		expect(button.getAttribute("title")).toBe("Thu ra xem nhiều khu hơn");
+		await userEvent.click(button);
+		expect(screen.getByRole("button", { name: "Về khu làm việc" })).toBeTruthy();
+		expect(document.querySelector('[data-renderer="2d"]')?.getAttribute("data-framing")).toBe("overview");
+		// The old follow choice is no longer read or written.
+		expect(window.localStorage.getItem("ai:office:follow")).toBeNull();
+	});
+
+	it("puts each person at their anchor on the baked picture of the whole plan", async () => {
+		vi.stubGlobal("fetch", vi.fn(async () => new Response(FIXTURE_TEXT, { status: 200, headers: { "content-type": "application/json" } })));
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }) });
@@ -130,13 +200,123 @@ describe("the office tab", () => {
 			if (img === null) throw new Error("no picture yet");
 			return img;
 		});
-		expect(picture.getAttribute("src")).toMatch(/^\/office\/office-2d-floor-1-(day|night)-(desktop|phone)\.webp$/);
-		const parsed = JSON.parse(fixture) as { floors: { views: Record<string, { anchors: Record<string, [number, number]> }> }[] };
-		const size = picture.getAttribute("src")?.includes("phone") === true ? "phone" : "desktop";
-		const desk = parsed.floors[0]?.views[size]?.anchors["desk-0"];
+		expect(picture.getAttribute("src")).toMatch(/^\/office\/office-2d-plan-(day|night)-(desktop|phone)\.webp$/);
+		const size: ScreenSize = picture.getAttribute("src")?.includes("phone") === true ? "phone" : "desktop";
+		const desk = FIXTURE.views[size].anchors["desk-0"];
 		const marker = document.querySelector<HTMLElement>('[data-id="office-person-scout#1"]');
 		expect(marker?.style.left).toBe(`${desk?.[0]}%`);
 		expect(marker?.style.top).toBe(`${desk?.[1]}%`);
+	});
+});
+
+describe("the 2D picture", () => {
+	/** The 2D view of `size` and `framing` with the director and a scout at office hours. */
+	function draw(size: ScreenSize, framing: OfficeFraming) {
+		const layout = shippedLayout();
+		const { store } = storeAt(OFFICE_HOURS);
+		store.applySnapshot(snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }));
+		const state = store.state();
+		const { placements } = officePlacement(state, layout, OFFICE_HOURS, EMPTY_MEMORY, null);
+		return wrap(<Office2D state={state} placements={placements} talks={[]} layout={layout} framing={framing} size={size} daypart={officeDaypart(OFFICE_HOURS)} assets={{ ok: true, value: FIXTURE_ASSETS }} now={OFFICE_HOURS} />);
+	}
+
+	it("places every person's dot at the asset's anchor percent, on the day picture of the screen size", () => {
+		draw("phone", "work");
+		expect(document.querySelector("img")?.getAttribute("src")).toBe(`/office/${FIXTURE.views.phone.day}`);
+		const markers = [...document.querySelectorAll<HTMLElement>(".of-picture .of-marker")];
+		expect(markers.length).toBeGreaterThanOrEqual(2);
+		for (const m of markers) {
+			const anchor = m.getAttribute("data-anchor") ?? "";
+			const at = FIXTURE.views.phone.anchors[anchor];
+			if (at === undefined) throw new Error(`no fixture point for ${anchor}`);
+			expect(m.style.left).toBe(`${at[0]}%`);
+			expect(m.style.top).toBe(`${at[1]}%`);
+		}
+	});
+
+	it("zooms the picture onto the work zone in work on any screen, and fits the whole plan in the overview", () => {
+		const layout = shippedLayout();
+		const box = zoneBox(layout, "phone", WORK_ZONE);
+		if (box === null) throw new Error("no work zone");
+		// The work zone's box holds every anchor of its rooms on the baked phone picture.
+		const zone = layout.zones.find((z) => z.id === WORK_ZONE);
+		const inZone = layout.anchors.filter((a) => a.room !== null && zone?.rooms.includes(a.room) === true);
+		expect(inZone.length).toBeGreaterThan(0);
+		for (const a of inZone) {
+			const at = FIXTURE.views.phone.anchors[a.id];
+			if (at === undefined) throw new Error(`no fixture point for ${a.id}`);
+			expect(at[0]).toBeGreaterThanOrEqual(box.left);
+			expect(at[0]).toBeLessThanOrEqual(box.right);
+			expect(at[1]).toBeGreaterThanOrEqual(box.top);
+			expect(at[1]).toBeLessThanOrEqual(box.bottom);
+		}
+		const work = pictureFraming(layout, "phone", "work");
+		expect(work.zoomX).toBeCloseTo(100 / (box.right - box.left), 6);
+		expect(work.zoomY).toBeCloseTo(100 / (box.bottom - box.top), 6);
+		expect(work.zoomX).toBeGreaterThan(1);
+		expect(work.focus).toEqual([(box.left + box.right) / 2, (box.top + box.bottom) / 2]);
+		expect(pictureFraming(layout, "phone", "overview")).toEqual({ zoomX: 1, zoomY: 1, focus: [50, 50] });
+		expect(pictureFraming(layout, "desktop", "overview")).toEqual({ zoomX: 1, zoomY: 1, focus: [50, 50] });
+		// A wide screen's work framing zooms its picture onto the same zone.
+		const wide = zoneBox(layout, "desktop", WORK_ZONE);
+		if (wide === null) throw new Error("no work zone on the desktop picture");
+		const desktopWork = pictureFraming(layout, "desktop", "work");
+		expect(desktopWork.zoomX).toBeCloseTo(100 / (wide.right - wide.left), 6);
+		expect(desktopWork.zoomY).toBeCloseTo(100 / (wide.bottom - wide.top), 6);
+		expect(desktopWork.zoomX).toBeGreaterThan(1);
+		expect(desktopWork.focus).toEqual([(wide.left + wide.right) / 2, (wide.top + wide.bottom) / 2]);
+		for (const a of inZone) {
+			const at = FIXTURE.views.desktop.anchors[a.id];
+			if (at === undefined) throw new Error(`no fixture point for ${a.id}`);
+			expect(at[0]).toBeGreaterThanOrEqual(wide.left);
+			expect(at[0]).toBeLessThanOrEqual(wide.right);
+		}
+
+		const { unmount } = draw("phone", "work");
+		const picture = document.querySelector<HTMLElement>(".of-picture");
+		expect(Number(picture?.style.getPropertyValue("--of-zoom-x"))).toBeCloseTo(work.zoomX, 6);
+		expect(Number(picture?.style.getPropertyValue("--of-zoom-y"))).toBeCloseTo(work.zoomY, 6);
+		expect(Number(picture?.style.getPropertyValue("--of-aspect"))).toBe(FIXTURE.views.phone.width / FIXTURE.views.phone.height);
+		unmount();
+		draw("phone", "overview");
+		expect(document.querySelector<HTMLElement>(".of-picture")?.style.getPropertyValue("--of-zoom-x")).toBe("1");
+	});
+
+	it("centres the work zone again when the frame changes size (a phone turned)", () => {
+		const observers: (() => void)[] = [];
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				constructor(private readonly callback: () => void) {}
+				observe(): void {
+					observers.push(this.callback);
+				}
+				disconnect(): void {}
+			},
+		);
+		const { focus } = pictureFraming(shippedLayout(), "phone", "work");
+		draw("phone", "work");
+		const frame = document.querySelector<HTMLElement>('[data-id="office-picture"]');
+		const picture = document.querySelector<HTMLElement>(".of-picture");
+		if (frame === null || picture === null) throw new Error("no picture");
+		const sizeTo = (frameW: number, frameH: number, pictureW: number, pictureH: number): void => {
+			Object.defineProperty(frame, "clientWidth", { configurable: true, value: frameW });
+			Object.defineProperty(frame, "clientHeight", { configurable: true, value: frameH });
+			Object.defineProperty(picture, "offsetWidth", { configurable: true, value: pictureW });
+			Object.defineProperty(picture, "offsetHeight", { configurable: true, value: pictureH });
+		};
+		expect(observers).toHaveLength(1);
+		// Turned to landscape: the frame is wider, the picture larger; the zone's point is centred again.
+		sizeTo(800, 360, 2400, 1800);
+		frame.scrollLeft = 0;
+		frame.scrollTop = 0;
+		observers.forEach((notify) => notify());
+		expect(frame.scrollLeft).toBeCloseTo(Math.max(0, (focus[0] / 100) * 2400 - 400));
+		expect(frame.scrollTop).toBeCloseTo(Math.max(0, (focus[1] / 100) * 1800 - 180));
+		// A notice without a size change leaves the viewer's own scrolling alone.
+		frame.scrollLeft = 7;
+		observers.forEach((notify) => notify());
+		expect(frame.scrollLeft).toBe(7);
 	});
 });
 

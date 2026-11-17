@@ -21,7 +21,7 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { createOfficeStore, type OfficeStore } from "../../src/machines/office/office-store.ts";
 
-/** 15:00 on the viewer's clock whatever the time zone: office hours, so off-duty people stay on the work floors (office-life-schedule.ts). */
+/** 15:00 on the viewer's clock whatever the time zone: office hours, so off-duty people stay in the work rooms (office-life-schedule.ts). */
 export const T0 = new Date(2027, 0, 15, 15, 0).getTime();
 
 /** A viewer time at a local hour and minute of T0's day. */

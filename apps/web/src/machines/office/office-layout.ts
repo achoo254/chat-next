@@ -1,19 +1,32 @@
-// The building's layout (office-layout.json, in metres): the single source of
+// The office's layout (office-layout.json, in metres): the single source of
 // its geometry for the 2D view, the 3D scene and the Blender assembly and
-// bake (which reads the same file). parseOfficeLayout checks what everything
-// downstream relies on and says what is wrong instead of throwing. The file
-// comes in as text so its hash (office-assets.ts) is over the exact bytes the
-// assets were baked from; it lives in the lazy chunk of machines/office/.
+// bake (which reads the same file). One floor plan of four zones; rooms,
+// anchors and the walkway graph are the plan's, not a floor's. parseOfficeLayout
+// checks what everything downstream relies on and says what is wrong instead
+// of throwing. The file comes in as text so its hash (office-assets.ts) is
+// over the exact bytes the assets were baked from; it lives in the lazy chunk
+// of machines/office/.
 import layoutText from "./office-layout.json?raw";
-import { FLOOR_LEVELS, isFloorLevel, isRoomCode, ROOM_CODES, type FloorLevel, type RoomCode } from "./office-rooms.ts";
+import { isRoomCode, ROOM_CODES, type RoomCode } from "./office-rooms.ts";
 import { arrayOf, isRecord, numberOf, stringOf, type Parsed } from "./office-json.ts";
+import { buildWalkGraph, longestWalk } from "./office-walkways.ts";
 
-export const LAYOUT_FORMAT_VERSION = 1;
-/** Home desks of the shared work room on floor 1, and how many of them a phone uses. */
+export const LAYOUT_FORMAT_VERSION = 2;
+/** Home desks of the shared work room, and how many of them a phone uses. */
 export const LAYOUT_DESKS = 8;
 export const LAYOUT_PHONE_DESKS = 6;
+/** The longest walk between two nodes anchors use, metres (the walk time cap in actor-motion.ts is sized for it). */
+export const MAX_WALK_METRES = 45;
 
 export type Rect = readonly [number, number, number, number];
+
+/** The four zones of the plan: the unit of baked assets (one shell, lightmap pair and furniture file each). */
+export const ZONE_IDS = ["a", "b", "c", "d"] as const;
+export type ZoneId = (typeof ZONE_IDS)[number];
+
+export function isZoneId(value: unknown): value is ZoneId {
+	return typeof value === "string" && (ZONE_IDS as readonly string[]).includes(value);
+}
 
 export type AnchorKind =
 	| "desk"
@@ -26,22 +39,21 @@ export type AnchorKind =
 	| "lobby"
 	| "chairman"
 	| "board"
-	| "elevator"
 	| "bed"
 	| "gym"
 	| "tv"
 	| "dine"
 	| "counter";
 
-const ANCHOR_KINDS: readonly AnchorKind[] = ["desk", "director", "work", "server", "pantry", "sofa", "meeting", "lobby", "chairman", "board", "elevator", "bed", "gym", "tv", "dine", "counter"];
+const ANCHOR_KINDS: readonly AnchorKind[] = ["desk", "director", "work", "server", "pantry", "sofa", "meeting", "lobby", "chairman", "board", "bed", "gym", "tv", "dine", "counter"];
 
-/** The living floor's places (beds, gym stations, the TV corner's seats, the dining table and the counter): only the daily schedule sends people there. */
+/** The living rooms' places (beds, gym stations, the TV corner's seats, the dining table and the counter): only the daily schedule sends people there. */
 export const LIFE_KINDS: readonly AnchorKind[] = ["bed", "gym", "tv", "dine", "counter"];
 
 /**
  * Anchors a person may stand, sit or lie at in a room (desks, the director's
- * chair, the chairman's spot, boards and elevators are not): the work rooms'
- * spots and the living floor's places.
+ * chair, the chairman's spot and boards are not): the work rooms' spots and
+ * the living rooms' places.
  */
 export const SPOT_KINDS: readonly AnchorKind[] = ["work", "server", "pantry", "sofa", "meeting", "lobby", ...LIFE_KINDS];
 
@@ -63,7 +75,7 @@ export interface LayoutAnchor {
 	readonly y: number;
 	/** Lying down there (a bed). */
 	readonly lie: boolean;
-	/** Sitting there (the living floor's seats; work-room seats are known by their kind). */
+	/** Sitting there (the living rooms' seats; work-room seats are known by their kind). */
 	readonly sit: boolean;
 	/** A low seat (a beanbag): sitting near the floor. */
 	readonly low: boolean;
@@ -75,18 +87,21 @@ export interface LayoutRoom {
 	readonly room: RoomCode;
 	readonly name: string;
 	readonly rect: Rect;
+	/** The zone the room is in (the zones' own room lists). */
+	readonly zone: ZoneId;
 }
 
-export interface LayoutFloor {
-	readonly level: FloorLevel;
+export interface LayoutZone {
+	readonly id: ZoneId;
 	readonly name: string;
-	readonly rooms: readonly LayoutRoom[];
-	readonly doors: readonly { readonly id: string; readonly between: readonly (RoomCode | null)[] }[];
-	readonly anchors: readonly LayoutAnchor[];
-	/** The six desks a phone uses, in the order employees take them (floor 1 only). */
-	readonly phoneDeskOrder: readonly string[];
-	readonly graph: { readonly nodes: readonly { readonly id: string; readonly x: number; readonly z: number }[]; readonly edges: readonly (readonly [string, string])[] };
-	readonly elevatorNode: string;
+	readonly rect: Rect;
+	readonly rooms: readonly RoomCode[];
+}
+
+export interface LayoutNode {
+	readonly id: string;
+	readonly x: number;
+	readonly z: number;
 }
 
 export interface CameraView {
@@ -97,26 +112,50 @@ export interface CameraView {
 export interface LayoutCamera {
 	readonly yaw: number;
 	readonly pitch: number;
+	/** The middle of the whole plan; the views frame all of it. */
 	readonly target: readonly [number, number, number];
 	readonly views: { readonly desktop: CameraView; readonly phone: CameraView };
 }
 
 /**
- * What the app reads of the layout. The file holds more (glass walls, door
- * positions, furniture and small props) for the 3D scene and the Blender
+ * What the app reads of the layout. The file holds more (glass and low walls,
+ * door positions, furniture and small props) for the 3D scene and the Blender
  * assembly, which read those fields themselves.
  */
 export interface OfficeLayout {
 	readonly formatVersion: number;
-	readonly floors: readonly LayoutFloor[];
+	/** The whole plan [x0, z0, x1, z1]; only its back (largest z) and right (largest x) edges have tall walls. */
+	readonly footprint: Rect;
+	readonly zones: readonly LayoutZone[];
+	readonly rooms: readonly LayoutRoom[];
+	readonly doors: readonly { readonly id: string; readonly between: readonly (RoomCode | null)[] }[];
+	readonly anchors: readonly LayoutAnchor[];
+	/** The six desks a phone uses, in the order employees take them. */
+	readonly phoneDeskOrder: readonly string[];
+	readonly graph: { readonly nodes: readonly LayoutNode[]; readonly edges: readonly (readonly [string, string])[] };
 	readonly camera: LayoutCamera;
-	readonly elevator: { readonly travelSecondsPerFloor: number; readonly nodes: Readonly<Record<FloorLevel, string>> };
 }
 
 export type { Parsed } from "./office-json.ts";
 
 /** The layout file's text exactly as shipped (hashed by office-assets.ts). */
 export const OFFICE_LAYOUT_TEXT: string = layoutText;
+
+function rectOf(value: unknown): Rect | null {
+	const r = arrayOf(value).map(numberOf);
+	const [x0, z0, x1, z1] = r;
+	return r.length === 4 && x0 != null && z0 != null && x1 != null && z1 != null ? [x0, z0, x1, z1] : null;
+}
+
+/** Rounding the layout writer may leave on a shared edge, metres. */
+const EDGE_TOLERANCE = 1e-6;
+
+/** Whether `inner` lies within `outer` (either corner order), edges shared allowed. */
+function rectInside(inner: Rect, outer: Rect): boolean {
+	const span = (a: number, b: number): [number, number] => (a <= b ? [a, b] : [b, a]);
+	const within = (i: [number, number], o: [number, number]): boolean => i[0] >= o[0] - EDGE_TOLERANCE && i[1] <= o[1] + EDGE_TOLERANCE;
+	return within(span(inner[0], inner[2]), span(outer[0], outer[2])) && within(span(inner[1], inner[3]), span(outer[1], outer[3]));
+}
 
 function parseCamera(value: unknown, errors: string[]): LayoutCamera {
 	const c = isRecord(value) ? value : {};
@@ -140,38 +179,62 @@ function parseCamera(value: unknown, errors: string[]): LayoutCamera {
 	};
 }
 
-function parseFloor(value: unknown, errors: string[]): LayoutFloor | null {
-	if (!isRecord(value)) return null;
-	const level = numberOf(value.level);
-	if (!isFloorLevel(level)) {
-		errors.push(`a floor has level ${String(value.level)}, expected ${FLOOR_LEVELS.join(", ")}`);
-		return null;
-	}
-	const roomOrNull = (v: unknown): RoomCode | null => (isRoomCode(v) ? v : null);
-	const rooms: LayoutRoom[] = [];
-	for (const r of arrayOf(value.rooms)) {
-		const rec = isRecord(r) ? r : {};
-		const rect = arrayOf(rec.rect).map(numberOf);
-		if (!isRoomCode(rec.room)) {
-			errors.push(`floor ${level}: unknown room ${String(rec.room)}`);
+function parseZones(value: unknown, errors: string[]): LayoutZone[] {
+	const zones: LayoutZone[] = [];
+	for (const z of arrayOf(value)) {
+		const rec = isRecord(z) ? z : {};
+		const rect = rectOf(rec.rect);
+		if (!isZoneId(rec.id) || rect === null) {
+			errors.push(`a zone needs an id (${ZONE_IDS.join(", ")}) and a rect [x0, z0, x1, z1]`);
 			continue;
 		}
-		if (rect.length !== 4 || rect.some((n) => n === null)) errors.push(`floor ${level}: ${rec.room} needs a rect [x0, z0, x1, z1]`);
-		rooms.push({ room: rec.room, name: stringOf(rec.name), rect: [rect[0] ?? 0, rect[1] ?? 0, rect[2] ?? 0, rect[3] ?? 0] });
+		zones.push({ id: rec.id, name: stringOf(rec.name), rect, rooms: arrayOf(rec.rooms).filter(isRoomCode) });
 	}
+	if (zones.length !== ZONE_IDS.length || ZONE_IDS.some((id) => zones.filter((z) => z.id === id).length !== 1)) errors.push(`expected exactly the zones ${ZONE_IDS.join(", ")}`);
+	// A room belongs to one zone: listed twice, its zone would depend on the order of the file.
+	for (const room of new Set(zones.flatMap((z) => z.rooms))) {
+		const listing = zones.filter((z) => z.rooms.includes(room)).map((z) => z.id);
+		if (listing.length > 1) errors.push(`${room} is listed by more than one zone (${listing.join(", ")})`);
+	}
+	return zones;
+}
+
+function parseRooms(value: unknown, zones: readonly LayoutZone[], errors: string[]): LayoutRoom[] {
+	const rooms: LayoutRoom[] = [];
+	for (const r of arrayOf(value)) {
+		const rec = isRecord(r) ? r : {};
+		const rect = rectOf(rec.rect);
+		if (!isRoomCode(rec.room)) {
+			errors.push(`unknown room ${String(rec.room)}`);
+			continue;
+		}
+		const zone = zones.find((z) => z.rooms.includes(rec.room as RoomCode));
+		if (rect === null) errors.push(`${rec.room} needs a rect [x0, z0, x1, z1]`);
+		if (zone === undefined) {
+			errors.push(`${rec.room} is in no zone`);
+			continue;
+		}
+		if (rect !== null && !rectInside(rect, zone.rect)) errors.push(`${rec.room} reaches outside its zone ${zone.id}`);
+		rooms.push({ room: rec.room, name: stringOf(rec.name), rect: rect ?? [0, 0, 0, 0], zone: zone.id });
+	}
+	return rooms;
+}
+
+function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 	const anchors: LayoutAnchor[] = [];
-	for (const a of arrayOf(value.anchors)) {
+	const roomOrNull = (v: unknown): RoomCode | null => (isRoomCode(v) ? v : null);
+	for (const a of arrayOf(value)) {
 		const rec = isRecord(a) ? a : {};
 		const kind = ANCHOR_KINDS.find((k) => k === rec.kind);
 		const x = numberOf(rec.x);
 		const z = numberOf(rec.z);
 		const id = stringOf(rec.id);
 		if (id === "" || kind === undefined || x === null || z === null) {
-			errors.push(`floor ${level}: anchor ${id || "(no id)"} needs an id, a known kind and x, z`);
+			errors.push(`anchor ${id || "(no id)"} needs an id, a known kind and x, z`);
 			continue;
 		}
 		const act = GYM_ACTS.find((g) => g === rec.act) ?? null;
-		if (kind === "gym" && act === null) errors.push(`floor ${level}: gym anchor ${id} needs an act (${GYM_ACTS.join(", ")})`);
+		if (kind === "gym" && act === null) errors.push(`gym anchor ${id} needs an act (${GYM_ACTS.join(", ")})`);
 		anchors.push({
 			id,
 			kind,
@@ -187,8 +250,65 @@ function parseFloor(value: unknown, errors: string[]): LayoutFloor | null {
 			act,
 		});
 	}
-	const graph = isRecord(value.graph) ? value.graph : {};
-	const nodes = arrayOf(graph.nodes).flatMap((n) => {
+	return anchors;
+}
+
+function inside(rect: Rect, x: number, z: number): boolean {
+	return x >= rect[0] && x <= rect[2] && z >= rect[1] && z <= rect[3];
+}
+
+/** What must hold of the plan for the views to work: every room has a door and a place to stand, every anchor sits in its room's zone, the walkways join everything. */
+function checkPlan(layout: Omit<OfficeLayout, "formatVersion" | "camera">, errors: string[]): void {
+	const nodeIds = new Set(layout.graph.nodes.map((n) => n.id));
+	if (nodeIds.size !== layout.graph.nodes.length) errors.push("walkway node ids used twice");
+	for (const [a, b] of layout.graph.edges) if (!nodeIds.has(a) || !nodeIds.has(b)) errors.push(`edge ${a} - ${b} uses an unknown node`);
+	const entry = layout.anchors.find((a) => a.id === "lobby-entry");
+	if (entry === undefined) errors.push("no lobby-entry anchor to start the walkway check from");
+	for (const a of layout.anchors) {
+		if (!nodeIds.has(a.node)) errors.push(`anchor ${a.id} points at unknown node ${a.node}`);
+		if (a.room === null) continue;
+		const room = layout.rooms.find((r) => r.room === a.room);
+		const zone = layout.zones.find((z) => z.id === room?.zone);
+		if (room === undefined || zone === undefined) errors.push(`anchor ${a.id} is in ${a.room}, which the plan does not have`);
+		else if (!inside(zone.rect, a.x, a.z)) errors.push(`anchor ${a.id} stands outside ${zone.name} (zone ${zone.id}), the zone of ${a.room}`);
+	}
+	for (const r of layout.rooms) {
+		if (!layout.doors.some((d) => d.between.includes(r.room))) errors.push(`${r.room} has no door`);
+		if (!layout.anchors.some((a) => a.room === r.room && SPOT_KINDS.includes(a.kind))) errors.push(`${r.room} has no place to stand`);
+	}
+	if (entry === undefined || errors.length > 0) return;
+	const walk = buildWalkGraph(layout.graph);
+	const cut = layout.graph.nodes.filter((n) => !walk.reachable(entry.node).has(n.id)).map((n) => n.id);
+	if (cut.length > 0) errors.push(`walkway graph is cut, ${cut.join(", ")} not reachable from the lobby entrance`);
+	else {
+		const longest = longestWalk(walk, [...new Set(layout.anchors.map((a) => a.node))]);
+		if (longest.metres > MAX_WALK_METRES) errors.push(`the walk from ${longest.from} to ${longest.to} is ${longest.metres.toFixed(1)} m, more than ${MAX_WALK_METRES} m`);
+	}
+}
+
+/** Reads and checks a layout file; `errors` say what is wrong, never a throw. */
+export function parseOfficeLayout(json: unknown): Parsed<OfficeLayout> {
+	if (!isRecord(json)) return { ok: false, errors: ["the layout is not a JSON object"] };
+	if (json.formatVersion !== LAYOUT_FORMAT_VERSION) return { ok: false, errors: [`format version ${String(json.formatVersion)}, this app reads ${LAYOUT_FORMAT_VERSION}`] };
+	const errors: string[] = [];
+	const zones = parseZones(json.zones, errors);
+	const rooms = parseRooms(json.rooms, zones, errors);
+	for (const code of ROOM_CODES) {
+		const count = rooms.filter((r) => r.room === code).length;
+		if (count !== 1) errors.push(`${code} appears ${count} times, expected once`);
+	}
+	const anchors = parseAnchors(json.anchors, errors);
+	const ids = anchors.map((a) => a.id);
+	const repeated = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+	if (repeated.length > 0) errors.push(`anchor ids used twice: ${repeated.join(", ")}`);
+	const desks = anchors.filter((a) => a.kind === "desk" && a.room === "WORK");
+	if (desks.length !== LAYOUT_DESKS) errors.push(`WORK has ${desks.length} desks, expected ${LAYOUT_DESKS}`);
+	const phoneDeskOrder = arrayOf(json.phoneDeskOrder).map(stringOf);
+	if (phoneDeskOrder.length !== LAYOUT_PHONE_DESKS || new Set(phoneDeskOrder).size !== phoneDeskOrder.length || phoneDeskOrder.some((id) => !desks.some((d) => d.id === id))) {
+		errors.push(`phoneDeskOrder must name ${LAYOUT_PHONE_DESKS} different desks of WORK`);
+	}
+	const graph = isRecord(json.graph) ? json.graph : {};
+	const nodes = arrayOf(graph.nodes).flatMap((n): LayoutNode[] => {
 		const rec = isRecord(n) ? n : {};
 		const id = stringOf(rec.id);
 		return id === "" ? [] : [{ id, x: numberOf(rec.x) ?? 0, z: numberOf(rec.z) ?? 0 }];
@@ -197,93 +317,17 @@ function parseFloor(value: unknown, errors: string[]): LayoutFloor | null {
 		const pair = arrayOf(e).map(stringOf);
 		return pair.length === 2 ? [[pair[0] ?? "", pair[1] ?? ""]] : [];
 	});
-	const doors = arrayOf(value.doors).map((d) => {
+	const doors = arrayOf(json.doors).map((d) => {
 		const rec = isRecord(d) ? d : {};
-		return { id: stringOf(rec.id), between: arrayOf(rec.between).map(roomOrNull) };
+		return { id: stringOf(rec.id), between: arrayOf(rec.between).map((v) => (isRoomCode(v) ? v : null)) };
 	});
-	return {
-		level,
-		name: stringOf(value.name),
-		rooms,
-		doors,
-		anchors,
-		phoneDeskOrder: arrayOf(value.phoneDeskOrder).map(stringOf),
-		graph: { nodes, edges },
-		elevatorNode: stringOf(value.elevatorNode),
-	};
-}
-
-/** Every node of the floor is reachable from its elevator. */
-function connected(floor: LayoutFloor): string[] {
-	const links = new Map<string, string[]>(floor.graph.nodes.map((n) => [n.id, []]));
-	for (const [a, b] of floor.graph.edges) {
-		links.get(a)?.push(b);
-		links.get(b)?.push(a);
-	}
-	const reached = new Set<string>(links.has(floor.elevatorNode) ? [floor.elevatorNode] : []);
-	const queue = [...reached];
-	for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-		for (const next of links.get(id) ?? []) {
-			if (!reached.has(next)) {
-				reached.add(next);
-				queue.push(next);
-			}
-		}
-	}
-	return floor.graph.nodes.filter((n) => !reached.has(n.id)).map((n) => n.id);
-}
-
-function checkFloor(floor: LayoutFloor, errors: string[]): void {
-	const at = `floor ${floor.level}`;
-	const nodeIds = new Set(floor.graph.nodes.map((n) => n.id));
-	for (const [a, b] of floor.graph.edges) if (!nodeIds.has(a) || !nodeIds.has(b)) errors.push(`${at}: edge ${a} - ${b} uses an unknown node`);
-	if (!nodeIds.has(floor.elevatorNode)) errors.push(`${at}: no elevator node in its walkway graph`);
-	const cut = connected(floor);
-	if (cut.length > 0) errors.push(`${at}: walkway graph is cut, ${cut.join(", ")} not reachable from the elevator`);
-	const here = new Set(floor.rooms.map((r) => r.room));
-	for (const a of floor.anchors) {
-		if (!nodeIds.has(a.node)) errors.push(`${at}: anchor ${a.id} points at unknown node ${a.node}`);
-		if (a.room !== null && !here.has(a.room)) errors.push(`${at}: anchor ${a.id} is in ${a.room}, which is not on this floor`);
-	}
-	for (const r of floor.rooms) {
-		if (!floor.doors.some((d) => d.between.includes(r.room))) errors.push(`${at}: ${r.room} has no door`);
-		if (!floor.anchors.some((a) => a.room === r.room && SPOT_KINDS.includes(a.kind))) errors.push(`${at}: ${r.room} has no place to stand`);
-	}
-}
-
-/** Reads and checks a layout file; `errors` say what is wrong, never a throw. */
-export function parseOfficeLayout(json: unknown): Parsed<OfficeLayout> {
-	if (!isRecord(json)) return { ok: false, errors: ["the layout is not a JSON object"] };
-	const errors: string[] = [];
-	if (json.formatVersion !== LAYOUT_FORMAT_VERSION) return { ok: false, errors: [`format version ${String(json.formatVersion)}, this app reads ${LAYOUT_FORMAT_VERSION}`] };
-	const floors = arrayOf(json.floors).flatMap((f) => parseFloor(f, errors) ?? []);
-	if (floors.length !== FLOOR_LEVELS.length || FLOOR_LEVELS.some((level) => floors.filter((f) => f.level === level).length !== 1)) {
-		errors.push(`expected exactly ${FLOOR_LEVELS.length} floors, levels ${FLOOR_LEVELS.join(", ")}`);
-	}
-	for (const code of ROOM_CODES) {
-		const count = floors.reduce((n, f) => n + f.rooms.filter((r) => r.room === code).length, 0);
-		if (count !== 1) errors.push(`${code} appears ${count} times, expected once`);
-	}
-	for (const floor of floors) checkFloor(floor, errors);
-	const ids = floors.flatMap((f) => f.anchors.map((a) => a.id));
-	const repeated = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
-	if (repeated.length > 0) errors.push(`anchor ids used twice: ${repeated.join(", ")}`);
-	const first = floors.find((f) => f.level === 1);
-	const desks = first?.anchors.filter((a) => a.kind === "desk" && a.room === "WORK") ?? [];
-	if (desks.length !== LAYOUT_DESKS) errors.push(`floor 1 has ${desks.length} desks in WORK, expected ${LAYOUT_DESKS}`);
-	const phone = first?.phoneDeskOrder ?? [];
-	if (phone.length !== LAYOUT_PHONE_DESKS || new Set(phone).size !== phone.length || phone.some((id) => !desks.some((d) => d.id === id))) {
-		errors.push(`floor 1 phoneDeskOrder must name ${LAYOUT_PHONE_DESKS} different desks of WORK`);
-	}
-	const lift = isRecord(json.elevator) ? json.elevator : {};
-	const liftNodes = isRecord(lift.nodes) ? lift.nodes : {};
-	const nodes = { 1: stringOf(liftNodes["1"]), 2: stringOf(liftNodes["2"]), 3: stringOf(liftNodes["3"]), 4: stringOf(liftNodes["4"]) };
-	for (const floor of floors) if (nodes[floor.level] !== floor.elevatorNode || floor.elevatorNode === "") errors.push(`the elevator does not reach floor ${floor.level}`);
-	const travel = numberOf(lift.travelSecondsPerFloor);
-	if (travel === null || travel <= 0) errors.push("elevator.travelSecondsPerFloor must be a positive number");
+	const footprint = rectOf(json.footprint);
+	if (footprint === null) errors.push("footprint needs [x0, z0, x1, z1]");
+	const plan = { footprint: footprint ?? ([0, 0, 0, 0] as const), zones, rooms, doors, anchors, phoneDeskOrder, graph: { nodes, edges } };
+	checkPlan(plan, errors);
 	const camera = parseCamera(json.defaultCamera, errors);
 	if (errors.length > 0) return { ok: false, errors };
-	return { ok: true, value: { formatVersion: LAYOUT_FORMAT_VERSION, floors: [...floors].sort((a, b) => a.level - b.level), camera, elevator: { travelSecondsPerFloor: travel ?? 1, nodes } } };
+	return { ok: true, value: { formatVersion: LAYOUT_FORMAT_VERSION, ...plan, camera } };
 }
 
 function readShipped(): Parsed<OfficeLayout> {

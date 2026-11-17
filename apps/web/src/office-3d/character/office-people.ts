@@ -1,8 +1,8 @@
 // The people of the 3D office: turns each placement (office-placement.ts,
 // shared with 2D) and the idle show into a target spot, walks people there
-// along the walkways and through the elevator, keeps everyone moving on in
-// logic even on floors not shown, picks each one's pose and animation rate,
-// and reports positions for the HTML labels and speech bubbles. Whoever is
+// along the walkways of the plan, keeps everyone moving on in logic even out
+// of the camera's view, picks each one's pose and animation rate, and reports
+// positions for the HTML labels and speech bubbles. Whoever is
 // there when the office is first seen live (opening the tab, a reload, coming
 // back to it) is already at their place; only someone who came in after the
 // tab opened (by their entry time) walks in from the lobby door, as does the
@@ -15,7 +15,6 @@ import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import type { OfficeLayout } from "../../machines/office/office-layout.ts";
 import { markerStatus } from "../../machines/office/office-names.ts";
 import type { Placement } from "../../machines/office/office-placement.ts";
-import type { FloorLevel } from "../../machines/office/office-rooms.ts";
 import type { Talk } from "../../machines/office/office-conversations.ts";
 import type { OfficeState } from "../../machines/office/office-store.ts";
 import { sampleRoute, type MotionSample } from "./actor-motion.ts";
@@ -38,14 +37,13 @@ const ENTRANCE = "lobby-entry";
 /** Entry times this close before the tab opened still count as before it (clocks and frames lag a little), viewer ms. */
 const ENTERED_BEFORE_SLACK_MS = 2_000;
 
-export type PeopleEvent = "arrive-lift" | "start-work" | "cheer" | "smoke" | "approval";
+export type PeopleEvent = "start-work" | "cheer" | "smoke" | "approval";
 
 export interface PersonView {
 	readonly key: string;
-	readonly floor: FloorLevel;
 	readonly x: number;
 	readonly z: number;
-	/** Drawn on the floor shown (not in the elevator, not on another floor). */
+	/** In the camera's view (as of the last frame): their sounds play, their animation runs. */
 	readonly visible: boolean;
 	readonly smoking: boolean;
 	readonly working: boolean;
@@ -76,6 +74,8 @@ interface Person {
 	route: Route;
 	routeStart: number;
 	sample: MotionSample;
+	/** In the camera's view at the last frame. */
+	inView: boolean;
 	idle: IdleTarget | null;
 	talk: TalkRole | null;
 	/** Waking up in bed until this scene time, then walking to `pending`. */
@@ -91,8 +91,8 @@ interface Person {
 
 export interface OfficePeople {
 	update(placements: readonly Placement[], state: OfficeState, now: number, talks?: readonly Talk[]): void;
-	/** Per frame: `dt` seconds of scene clock (0 while frozen). */
-	frame(dt: number, shown: FloorLevel, fullRate: number, inView: (x: number, z: number) => boolean, focus: { x: number; z: number }): void;
+	/** Per frame: `dt` seconds of scene clock (0 while frozen); `inView` says what the camera shows. */
+	frame(dt: number, fullRate: number, inView: (x: number, z: number) => boolean, focus: { x: number; z: number }): void;
 	views(): readonly PersonView[];
 	/** Each drawn person's head from their root on the floor plane (tests only: computed on call). */
 	headOffsets(): ReadonlyMap<string, { readonly x: number; readonly z: number }>;
@@ -100,7 +100,8 @@ export interface OfficePeople {
 	probes(): ReadonlyMap<string, VisualProbe>;
 	/** Rebuilds every visual (the character model arrived). */
 	rebuild(): void;
-	meshes(): readonly AbstractMesh[];
+	/** The drawn meshes of everyone, or only of those in the camera's view. */
+	meshes(inViewOnly?: boolean): readonly AbstractMesh[];
 	readonly count: number;
 	dispose(): void;
 }
@@ -121,27 +122,30 @@ export function cameInAfterOpening(
 	return entered > 0 && entered + state.clockOffset >= liveSince - ENTERED_BEFORE_SLACK_MS;
 }
 
-export function createOfficePeople(layout: OfficeLayout, router: Router, pool: CharacterPool, onEvent: (e: PeopleEvent, floor: FloorLevel) => void): OfficePeople {
+/** `onEvent`: something happened to a person, and whether they are in the camera's view. */
+export function createOfficePeople(layout: OfficeLayout, router: Router, pool: CharacterPool, onEvent: (e: PeopleEvent, inView: boolean) => void): OfficePeople {
 	const people = new Map<string, Person>();
 	let clock = 0;
 	/** Viewer time the office was first seen live (the snapshot came); null before. */
 	let liveSince: number | null = null;
 	let nextIndex = 0;
-	const deskAnchors = new Set(layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "desk").map((a) => a.id)));
-	const pantry = layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "pantry").map((a) => a.id));
-	const sofas = layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "sofa").map((a) => a.id));
+	/** The camera's view as of the last frame: someone who arrives between frames knows at once whether they are seen. */
+	let lastInView: ((x: number, z: number) => boolean) | null = null;
+	const deskAnchors = new Set(layout.anchors.filter((a) => a.kind === "desk").map((a) => a.id));
+	const pantry = layout.anchors.filter((a) => a.kind === "pantry").map((a) => a.id);
+	const sofas = layout.anchors.filter((a) => a.kind === "sofa").map((a) => a.id);
 	const entrance = personTarget(layout, ENTRANCE, 0, false);
 
 	const startRoute = (p: Person, to: PersonTarget): void => {
 		const s = p.sample;
 		// Mid-walk: rejoin at the node of the segment walked; at rest: the node of the anchor stood at.
-		const node = s.resume?.node ?? (s.done ? p.target.node : null) ?? nearestNode(layout, s.floor, s.x, s.z) ?? to.node;
-		p.route = router.route({ floor: s.floor, x: s.x, z: s.z, node }, { floor: to.floor, x: to.x, z: to.z, node: to.node });
+		const node = s.resume?.node ?? (s.done ? p.target.node : null) ?? nearestNode(layout, s.x, s.z) ?? to.node;
+		p.route = router.route({ x: s.x, z: s.z, node }, { x: to.x, z: to.z, node: to.node });
 		p.routeStart = clock;
 		p.target = to;
 	};
 
-	const atRest = (t: PersonTarget): MotionSample => ({ floor: t.floor, x: t.x, z: t.z, heading: t.face, moving: false, inLift: false, done: true, resume: null });
+	const atRest = (t: PersonTarget): MotionSample => ({ x: t.x, z: t.z, heading: t.face, moving: false, done: true, resume: null });
 
 	return {
 		get count() {
@@ -179,6 +183,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 						route: { legs: [] },
 						routeStart: clock,
 						sample: atRest(start),
+						inView: lastInView?.(start.x, start.z) ?? false,
 						idle: w.idle,
 						talk: w.talk,
 						wakeUntil: 0,
@@ -206,37 +211,37 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				p.talk = w.talk;
 				p.leaving = false;
 				const actor = w.placement.actor;
-				if (actor?.state === "awaiting" && !wasAwaiting) onEvent("approval", target.floor);
+				if (actor?.state === "awaiting" && !wasAwaiting) onEvent("approval", p.inView);
 				const result = actor?.lastResult ?? null;
 				const resultAge = result === null ? Infinity : now - (result.at + state.clockOffset);
 				if (result !== null && result.at !== p.lastResultAt) {
 					p.lastResultAt = result.at;
-					if (resultAge < SMOKE_MS) onEvent(result.ok ? "cheer" : "smoke", p.sample.floor);
+					if (resultAge < SMOKE_MS) onEvent(result.ok ? "cheer" : "smoke", p.inView);
 				}
 				p.cheering = result?.ok === true && resultAge < CHEER_MS;
 				p.smoking = result?.ok === false && resultAge < SMOKE_MS;
 				p.refused = markerStatus(w.placement.kind, actor) === "denied";
-				const moved = target.anchorId !== p.target.anchorId || Math.hypot(target.x - p.target.x, target.z - p.target.z) > 0.05 || target.floor !== p.target.floor;
+				const moved = target.anchorId !== p.target.anchorId || Math.hypot(target.x - p.target.x, target.z - p.target.z) > 0.05;
 				if (p.pending !== null) p.pending = target;
 				else if (moved && p.sample.done && isLyingPose(p.pose)) {
 					// Out of bed first: get up, then walk.
 					p.wakeUntil = clock + WAKE_SECONDS;
 					p.pending = target;
 				}
-				// In the elevator: finish the ride first, the next update reroutes.
-				else if (moved && !p.sample.inLift) startRoute(p, target);
+				else if (moved) startRoute(p, target);
 				else if (!moved) p.target = target;
 			});
 			for (const p of people.values()) {
 				if (seen.has(p.key) || p.leaving) continue;
 				p.leaving = true;
-				if (entrance !== null && !p.sample.inLift && p.placement.kind !== "director") startRoute(p, entrance);
+				if (entrance !== null && p.placement.kind !== "director") startRoute(p, entrance);
 				else p.route = { legs: [] };
 			}
 			if (liveSince === null && state.status === "live") liveSince = now;
 		},
-		frame(dt, shown, fullRate, inView, focus) {
+		frame(dt, fullRate, inView, focus) {
 			clock += dt;
+			lastInView = inView;
 			const lod: LodEntry[] = [];
 			for (const p of [...people.values()]) {
 				if (p.pending !== null && clock >= p.wakeUntil) {
@@ -244,9 +249,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					p.pending = null;
 				}
 				const waking = p.pending !== null;
-				const wasLift = p.sample.inLift;
-				p.sample = sampleRoute(p.route, clock - p.routeStart, { floor: p.target.floor, x: p.target.x, z: p.target.z, heading: p.target.face });
-				if (wasLift && !p.sample.inLift && p.sample.floor === shown) onEvent("arrive-lift", shown);
+				p.sample = sampleRoute(p.route, clock - p.routeStart, { x: p.target.x, z: p.target.z, heading: p.target.face });
 				if (p.leaving && p.sample.done) {
 					p.visual.dispose();
 					p.blob.dispose();
@@ -255,9 +258,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				}
 				const s = p.sample;
 				const arrived = s.done;
-				const visible = !s.inLift && s.floor === shown;
-				p.visual.setVisible(visible);
-				p.blob.setEnabled(visible);
+				p.inView = inView(s.x, s.z);
 				// On the bed or the treadmill once there; on the floor while walking.
 				p.visual.root.position.set(s.x, arrived ? p.target.y : 0, s.z);
 				p.visual.root.rotation.y = arrived ? p.target.face : s.heading;
@@ -270,7 +271,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				// A dancer stands up in front of their seat.
 				const seated = arrived && p.target.seated && life !== "dance";
 				const pose = poseFor({
-					moving: s.moving || s.inLift,
+					moving: s.moving,
 					seated,
 					group,
 					idle: arrived ? (p.idle?.act ?? null) : null,
@@ -282,12 +283,12 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					low: p.target.low,
 				});
 				if (pose !== p.pose) {
-					if (visible && p.pose === "walk" && group !== null) onEvent("start-work", shown);
+					if (p.pose === "walk" && group !== null) onEvent("start-work", p.inView);
 					p.pose = pose;
 				}
 				p.visual.setPose(pose, p.target.seat);
 				p.visual.setDozing?.(arrived && busy && activity?.stuckMs != null);
-				lod.push({ key: p.key, onFloor: visible, onScreen: visible && inView(s.x, s.z), active: s.moving || busy, distance: Math.hypot(s.x - focus.x, s.z - focus.z) });
+				lod.push({ key: p.key, onScreen: p.inView, active: s.moving || busy, distance: Math.hypot(s.x - focus.x, s.z - focus.z) });
 			}
 			const rates = animationRates(lod, fullRate);
 			for (const p of people.values()) {
@@ -298,10 +299,9 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 		views() {
 			return [...people.values()].map((p) => ({
 				key: p.key,
-				floor: p.sample.floor,
 				x: p.sample.x,
 				z: p.sample.z,
-				visible: !p.sample.inLift,
+				visible: p.inView,
 				smoking: p.smoking,
 				working: p.placement.activityRoom !== null && p.sample.done,
 				deskAnchor: p.sample.done && deskAnchors.has(p.target.anchorId) ? p.target.anchorId : null,
@@ -338,8 +338,8 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 				p.pose = "stand-idle";
 			}
 		},
-		meshes() {
-			return [...people.values()].flatMap((p) => p.visual.meshes());
+		meshes(inViewOnly = false) {
+			return [...people.values()].flatMap((p) => (inViewOnly && !p.inView ? [] : p.visual.meshes()));
 		},
 		dispose() {
 			for (const p of people.values()) {

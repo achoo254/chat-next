@@ -4,7 +4,9 @@
 // context, it shows the 2D office instead. React only wraps the canvas: the
 // scene (office-world.ts, its own chunk with Babylon) reads the same props
 // through `update`, and the HTML over it (names, speech bubbles, boards, the
-// meeting room's "+N") is rendered here and moved by the scene each frame.
+// meeting room's "+N") is rendered here and moved by the scene each frame. A
+// label marked `data-idle` (free, with nothing to say) is one the scene may
+// shrink to its status dot when zoomed far out.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Office2D } from "../machines/office/office-2d.tsx";
 import { BOARD_ROOMS, OfficeBoard } from "../machines/office/office-boards.tsx";
@@ -28,6 +30,7 @@ function waitingForDesks(placements: readonly Placement[]): number {
 function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: string | null; bind: (id: string, el: HTMLElement | null) => void }) {
 	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const id = `person:${p.key}`;
+	const idle = (status === "idle" || status === "done") && bubble === "";
 	const style: ColorStyle = { "--of-color": personColor(p) };
 	return (
 		<div
@@ -37,6 +40,7 @@ function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: strin
 			data-service={p.actor?.service?.kind}
 			data-group={workGroup(p)}
 			data-anchor={p.anchorId}
+			data-idle={idle ? "" : undefined}
 			style={style}
 			title={label}
 			data-id={`office-person-${p.key}`}
@@ -66,7 +70,7 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 	const copy = useMachinesCopy();
 	const t = copy.office;
 	const host = useRef<HTMLDivElement>(null);
-	const { status, world } = useOfficeWorld(host, props, flags, t.floorNames[props.floor]);
+	const { status, world } = useOfficeWorld(host, props, flags, copy.terminal.mode.office);
 	const worldRef = useRef<OfficeWorld | null>(null);
 	const pins = useRef(new Map<string, HTMLElement>());
 	useEffect(() => {
@@ -85,7 +89,7 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 		else pins.current.set(id, el);
 		worldRef.current?.bind(id, el);
 	};
-	const boards = props.layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === "board" && a.room !== null && BOARD_ROOMS.includes(a.room)));
+	const boards = props.layout.anchors.filter((a) => a.kind === "board" && a.room !== null && BOARD_ROOMS.includes(a.room));
 	const overflow = waitingForDesks(props.placements);
 	return (
 		<div className="of-stage of3d" ref={host} data-power={props.state.power} data-daypart={props.daypart.phase} data-renderer="3d" data-ready={status === "ready"}>

@@ -3,7 +3,7 @@
 // machine, phone, arrive, hand-in, think; asking Advisor talks: the asker
 // standing beside Advisor's seat, Advisor seated; an unknown tool types), a recent
 // pass (a cheer) or a refusal at Security (a head shake), a conversation
-// (talking, listening, clapping), life on the living floor (sleeping in a
+// (talking, listening, clapping), life in the living rooms (sleeping in a
 // bed and getting up, the gym, meals, the TV, dancing) and the idle show.
 // Each pose names the clips it prefers, first one the model has wins, so a
 // clip phase 4 adds later (a typing clip, a standing idle) takes over without
@@ -61,7 +61,7 @@ export interface PoseInput {
 	readonly cheering: boolean;
 	/** Refused at Security a moment ago. */
 	readonly refused: boolean;
-	/** What they do on the living floor (once there); null or absent elsewhere. */
+	/** What they do in the living rooms (once there); null or absent elsewhere. */
 	readonly life?: LifeAct | null;
 	/** Their part in a conversation; null or absent when not talking. */
 	readonly talk?: TalkRole | null;

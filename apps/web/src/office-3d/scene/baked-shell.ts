@@ -1,12 +1,12 @@
-// A floor's baked shell (office-floor-N.glb from the bake: slab, walls,
-// glass, elevator, stairs, rugs, wall art, joined per material, lightmap UVs
-// in the second UV set) with its day and night lightmaps. Every mesh with
-// lightmap UVs gets an unlit StandardMaterial with the blend plugin; glass
-// gets a plain see-through material; the panes behind the windows glow,
-// tinted by the hour (the colours from the shell's extras when given). The
-// shell's asset.extras also say where the floor's props stand and how bright
-// the lightmap was stored (shell-extras.ts). Loaded into the floor's node;
-// the caller hides the placeholder shell once it is in.
+// A zone's baked shell (office-zone-<id>.glb from the bake: slab, walls,
+// low walls, glass, rugs, boards and art, joined per material, in plan
+// coordinates, lightmap UVs in the second UV set) with its day and night
+// lightmaps. Every mesh with lightmap UVs gets an unlit StandardMaterial with
+// the blend plugin; glass gets a plain see-through material; the panes behind
+// the windows glow, tinted by the hour (the colours from the shell's extras
+// when given). The shell's asset.extras also say where the zone's props stand
+// and how bright the lightmap was stored (shell-extras.ts). Loaded into the
+// zone's node; the caller hides the placeholder shell once it is in.
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
@@ -25,7 +25,7 @@ import type { Place } from "./scene-layout.ts";
 import { gammaScale, NO_SHELL_EXTRAS, parseShellExtras, type Rgb, type ShellExtras } from "./shell-extras.ts";
 
 export interface BakedShell {
-	/** Where the floor's props stand per the shell's extras, or null (use the layout's). */
+	/** Where the zone's props stand per the shell's extras, or null (use the layout's). */
 	readonly places: readonly Place[] | null;
 	setNightMix(nightMix: number): void;
 	dispose(): void;
@@ -75,7 +75,7 @@ export async function loadBakedShell(scene: Scene, parent: TransformNode, urls: 
 			},
 		});
 	} catch (error) {
-		if (!signal.aborted) console.warn("office: floor shell not loaded, keeping blocks", error);
+		if (!signal.aborted) console.warn("office: zone shell not loaded, keeping blocks", error);
 		return null;
 	}
 	if (signal.aborted) {

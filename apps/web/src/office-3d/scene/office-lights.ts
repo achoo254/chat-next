@@ -1,8 +1,11 @@
 // The live lights of the office: a sky light for everything not baked
 // (characters, furniture models, placeholder blocks), one key light that on
 // the high rungs casts the characters' shadows onto a see-through catcher
-// over the floor (plan decision L; furniture shadows live in the lightmaps),
-// and the backdrop colour. Values come from office-lighting.ts by the hour.
+// over the whole plan (plan decision L; furniture shadows live in the
+// lightmaps), and the backdrop colour. The shadow map covers only the casters
+// it is given (the world hands it the people in the camera's view), so its
+// texels stay on what is seen instead of spreading over the whole plan.
+// Values come from office-lighting.ts by the hour.
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
@@ -21,7 +24,7 @@ export interface OfficeLights {
 	apply(light: OfficeLight): void;
 	/** 0 turns the shadow light off (blob shadows only). */
 	setShadowMapSize(size: number, casters: () => readonly AbstractMesh[]): void;
-	/** New characters joined: the shadow light must draw them too. */
+	/** The characters the shadow light draws now (those in view): its frustum fits them. */
 	refreshCasters(casters: readonly AbstractMesh[]): void;
 	dispose(): void;
 }
@@ -31,8 +34,10 @@ const color3 = (c: Rgb): Color3 => new Color3(c[0], c[1], c[2]);
 export function createOfficeLights(scene: Scene, footprint: Rect): OfficeLights {
 	const sky = new HemisphericLight("office-sky", new Vector3(0.1, 1, -0.2), scene);
 	const key = new DirectionalLight("office-key", new Vector3(0.45, -0.8, 0.4), scene);
-	key.position = new Vector3(-6, 14, -6);
 	const [x0, z0, x1, z1] = footprint;
+	// Up the light's ray from the middle of the plan, far enough that every corner lies in front of it.
+	const reach = Math.hypot(x1 - x0, z1 - z0);
+	key.position = new Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2).subtract(key.direction.normalizeToNew().scale(reach));
 	const catcher = CreateGround("shadow-catcher", { width: x1 - x0, height: z1 - z0 }, scene);
 	catcher.position.set((x0 + x1) / 2, 0.02, (z0 + z1) / 2);
 	catcher.isPickable = false;

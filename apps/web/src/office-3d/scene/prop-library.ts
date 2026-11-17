@@ -1,8 +1,10 @@
 // Furniture and small props: every model name is loaded once and drawn as GPU
-// instances wherever a floor places it, on every floor (one draw call per
-// model part however many desks; plan decision M as changed by the spike:
-// only the shell is baked, repeated furniture is instanced). The asset file
-// ships one props GLB per floor holding the models first used there, one
+// instances wherever the plan places it (one draw call per model part however
+// many desks; plan decision M as changed by the spike: only the shell is
+// baked, repeated furniture is instanced). Places come in named groups (a
+// zone's furniture, a zone's small props) under a parent node each, so a
+// group is re-placed or hidden in one go. The asset file ships one props GLB
+// per zone holding the models first used there, one
 // named node per model (a node of several parts when the model has several
 // materials); a GLB is fetched the first time a placed name needs it. Until a
 // name's model arrives (or when it has none, or fails) its places show
@@ -27,8 +29,8 @@ interface Placed {
 }
 
 export interface PropLibrary {
-	/** Places (or re-places) the props of floor `key` under `parent`, dropping that floor's earlier ones. */
-	placeFloor(key: number, parent: TransformNode, places: readonly Place[]): void;
+	/** Places (or re-places) the props of group `key` under `parent`, dropping that group's earlier ones. */
+	placeGroup(key: string, parent: TransformNode, places: readonly Place[]): void;
 	/** Where each model lives (name → GLB URL); placed names load their GLB on demand from now on. */
 	setSources(sources: ReadonlyMap<string, string>, signal: AbortSignal): void;
 	/** The meshes the live props light should reach. */
@@ -37,7 +39,7 @@ export interface PropLibrary {
 }
 
 export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
-	const floors = new Map<number, Placed[]>();
+	const groups = new Map<string, Placed[]>();
 	const models = new Map<string, Mesh[]>();
 	const containers: AssetContainer[] = [];
 	const loading = new Set<string>();
@@ -70,7 +72,7 @@ export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
 	const swapIn = (name: string): void => {
 		const parts = models.get(name);
 		if (parts === undefined) return;
-		for (const list of floors.values()) for (const p of list) if (p.place.name === name) modelFor(p, parts);
+		for (const list of groups.values()) for (const p of list) if (p.place.name === name) modelFor(p, parts);
 	};
 
 	const loadFile = async (url: string, abort: AbortSignal): Promise<void> => {
@@ -120,8 +122,8 @@ export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
 	};
 
 	return {
-		placeFloor(key, parent, places) {
-			for (const old of floors.get(key) ?? []) old.holder.dispose(false, false);
+		placeGroup(key, parent, places) {
+			for (const old of groups.get(key) ?? []) old.holder.dispose(false, false);
 			const list = places.map((place, i): Placed => {
 				const holder = new TransformNode(`prop-${key}-${place.name}-${i}`, scene);
 				holder.parent = parent;
@@ -134,19 +136,19 @@ export function createPropLibrary(scene: Scene, kit: BlockKit): PropLibrary {
 				else modelFor(p, parts);
 				return p;
 			});
-			floors.set(key, list);
+			groups.set(key, list);
 			ensure(new Set(places.map((p) => p.name)));
 		},
 		setSources(next, abort) {
 			sources = next;
 			signal = abort;
-			ensure(new Set([...floors.values()].flatMap((list) => list.map((p) => p.place.name))));
+			ensure(new Set([...groups.values()].flatMap((list) => list.map((p) => p.place.name))));
 		},
 		litMeshes: () => [...kit.sources, ...[...models.values()].flat()],
 		dispose() {
 			disposed = true;
-			for (const list of floors.values()) for (const p of list) p.holder.dispose(false, false);
-			floors.clear();
+			for (const list of groups.values()) for (const p of list) p.holder.dispose(false, false);
+			groups.clear();
 			models.clear();
 			// The containers own the model parts, their materials and textures.
 			for (const container of containers) container.dispose();

@@ -1,5 +1,5 @@
-// The sounds of life on the floor shown (off by default, like every office
-// sound): loops while someone there runs on a treadmill, watches TV or sleeps
+// The sounds of life in the camera's view (off by default, like every office
+// sound): loops while someone in view runs on a treadmill, watches TV or sleeps
 // (a bed, or dozing off over a stuck tool), and short cues now and then while
 // someone punches the bag, eats or watches TV. Only the asset file's sound
 // files play (no tones: a missing file is silence). lifeSoundsWanted is the
@@ -14,7 +14,7 @@ export type LifeCue = "punch" | "cutlery" | "cheer-tv";
 export const CUE_EVERY: Readonly<Record<LifeCue, number>> = { punch: 1.2, cutlery: 5, "cheer-tv": 25 };
 
 export interface HeardPerson {
-	readonly floor: number;
+	/** In the camera's view. */
 	readonly visible: boolean;
 	readonly pose: Pose;
 	readonly dozing: boolean;
@@ -23,12 +23,12 @@ export interface HeardPerson {
 const LOOP_OF: Partial<Record<Pose, LifeLoop>> = { run: "treadmill", watch: "tv-show", "watch-low": "tv-show", dance: "tv-show", sleep: "snore" };
 const CUE_OF: Partial<Record<Pose, LifeCue>> = { punch: "punch", eat: "cutlery", "sit-eat": "cutlery", watch: "cheer-tv", "watch-low": "cheer-tv" };
 
-/** The loops and cues the people of floor `shown` call for. */
-export function lifeSoundsWanted(people: readonly HeardPerson[], shown: number): { readonly loops: ReadonlySet<LifeLoop>; readonly cues: ReadonlySet<LifeCue> } {
+/** The loops and cues the people in the camera's view call for. */
+export function lifeSoundsWanted(people: readonly HeardPerson[]): { readonly loops: ReadonlySet<LifeLoop>; readonly cues: ReadonlySet<LifeCue> } {
 	const loops = new Set<LifeLoop>();
 	const cues = new Set<LifeCue>();
 	for (const p of people) {
-		if (!p.visible || p.floor !== shown) continue;
+		if (!p.visible) continue;
 		const loop = p.dozing ? "snore" : LOOP_OF[p.pose];
 		if (loop !== undefined) loops.add(loop);
 		const cue = CUE_OF[p.pose];
@@ -39,7 +39,7 @@ export function lifeSoundsWanted(people: readonly HeardPerson[], shown: number):
 
 export interface LifeSounds {
 	setEnabled(on: boolean): void;
-	frame(seconds: number, people: readonly HeardPerson[], shown: number): void;
+	frame(seconds: number, people: readonly HeardPerson[]): void;
 	dispose(): void;
 }
 
@@ -91,10 +91,10 @@ export function createLifeSounds(sounds: ReadonlyMap<string, SoundFile>, urlOf: 
 			if (context === null && typeof AudioContext === "function") context = new AudioContext();
 			if (context !== null) load(context);
 		},
-		frame(seconds, people, shown) {
+		frame(seconds, people) {
 			const ctx = context;
 			if (!enabled || ctx === null) return;
-			const wanted = lifeSoundsWanted(people, shown);
+			const wanted = lifeSoundsWanted(people);
 			for (const [loop, node] of playing) {
 				if (wanted.loops.has(loop)) continue;
 				node.stop();

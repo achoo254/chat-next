@@ -1,305 +1,23 @@
 {
-	"formatVersion": 1,
+	"formatVersion": 2,
 	"layoutSha256": "07e38c35bdf592966eacb88afcec346d82cbbc1251c3df1efc25d309155e2d5a",
-	"note": "Office assets for the 2D view (floors[].views, checked by parseOfficeAssets) and the 3D scene (floors[].scene, character, accessories, sfx). Made by tools/office-art in the workspace; file names carry a content hash.",
-	"floors": [
+	"note": "Office assets for the 3D scene (zones[].scene, character, accessories, sfx) and the 2D view (views, checked by parseOfficeAssets; left out of this sample). Made by tools/office-art in the workspace; file names carry a content hash.",
+	"zones": [
 		{
-			"level": 1,
-			"views": {
-				"desktop": {
-					"width": 1600,
-					"height": 1000,
-					"day": "office-2d-floor-1-day-desktop.1f24ba77.webp",
-					"night": "office-2d-floor-1-night-desktop.a8e02a7f.webp",
-					"anchors": {
-						"f1-elevator": [
-							35.98,
-							84.67
-						],
-						"desk-0": [
-							29.1,
-							46.05
-						],
-						"desk-1": [
-							34.15,
-							43.37
-						],
-						"desk-2": [
-							44.17,
-							38.06
-						],
-						"desk-3": [
-							49.21,
-							35.39
-						],
-						"desk-4": [
-							33.8,
-							53.51
-						],
-						"desk-5": [
-							38.84,
-							50.83
-						],
-						"desk-6": [
-							48.86,
-							45.52
-						],
-						"desk-7": [
-							53.91,
-							42.85
-						],
-						"work-spot-0": [
-							40.58,
-							66.37
-						],
-						"work-spot-1": [
-							47.24,
-							62.84
-						],
-						"work-spot-2": [
-							45.83,
-							67.66
-						],
-						"director": [
-							14.72,
-							51.99
-						],
-						"director-front": [
-							18.36,
-							57.78
-						],
-						"director-work-1": [
-							11.14,
-							52.61
-						],
-						"director-work-2": [
-							25.01,
-							58.33
-						],
-						"server-0": [
-							20.56,
-							72.05
-						],
-						"server-1": [
-							24.07,
-							70.19
-						],
-						"server-2": [
-							27.57,
-							68.33
-						],
-						"meeting-0": [
-							69.58,
-							49.72
-						],
-						"meeting-1": [
-							70.98,
-							44.9
-						],
-						"meeting-2": [
-							74.66,
-							42.95
-						],
-						"meeting-3": [
-							79.74,
-							44.34
-						],
-						"meeting-4": [
-							78.51,
-							49.06
-						],
-						"meeting-5": [
-							74.83,
-							51.01
-						],
-						"pantry-coffee": [
-							60.04,
-							27.13
-						],
-						"sofa-0": [
-							71.26,
-							29.75
-						],
-						"sofa-1": [
-							69.44,
-							26.86
-						],
-						"lobby-entry": [
-							77.36,
-							71.75
-						],
-						"chairman": [
-							68.54,
-							72.57
-						],
-						"chairman-meet": [
-							66.11,
-							68.71
-						],
-						"lobby-board": [
-							92.35,
-							58.66
-						],
-						"board-view": [
-							87.55,
-							61.21
-						]
-					}
-				},
-				"phone": {
-					"width": 1200,
-					"height": 1200,
-					"day": "office-2d-floor-1-day-phone.d3daca74.webp",
-					"night": "office-2d-floor-1-night-phone.e88bb56d.webp",
-					"anchors": {
-						"f1-elevator": [
-							35.52,
-							72.38
-						],
-						"desk-0": [
-							28.42,
-							47.45
-						],
-						"desk-1": [
-							33.63,
-							45.72
-						],
-						"desk-2": [
-							43.98,
-							42.3
-						],
-						"desk-3": [
-							49.19,
-							40.57
-						],
-						"desk-4": [
-							33.27,
-							52.26
-						],
-						"desk-5": [
-							38.48,
-							50.54
-						],
-						"desk-6": [
-							48.82,
-							47.11
-						],
-						"desk-7": [
-							54.03,
-							45.39
-						],
-						"work-spot-0": [
-							40.28,
-							60.57
-						],
-						"work-spot-1": [
-							47.15,
-							58.29
-						],
-						"work-spot-2": [
-							45.7,
-							61.4
-						],
-						"director": [
-							13.57,
-							51.29
-						],
-						"director-front": [
-							17.33,
-							55.02
-						],
-						"director-work-1": [
-							9.87,
-							51.68
-						],
-						"director-work-2": [
-							24.2,
-							55.38
-						],
-						"server-0": [
-							19.6,
-							64.23
-						],
-						"server-1": [
-							23.22,
-							63.03
-						],
-						"server-2": [
-							26.84,
-							61.83
-						],
-						"meeting-0": [
-							70.22,
-							49.82
-						],
-						"meeting-1": [
-							71.67,
-							46.71
-						],
-						"meeting-2": [
-							75.47,
-							45.45
-						],
-						"meeting-3": [
-							80.71,
-							46.35
-						],
-						"meeting-4": [
-							79.44,
-							49.4
-						],
-						"meeting-5": [
-							75.64,
-							50.65
-						],
-						"pantry-coffee": [
-							60.36,
-							35.24
-						],
-						"sofa-0": [
-							71.96,
-							36.93
-						],
-						"sofa-1": [
-							70.08,
-							35.07
-						],
-						"lobby-entry": [
-							78.25,
-							64.03
-						],
-						"chairman": [
-							69.14,
-							64.56
-						],
-						"chairman-meet": [
-							66.63,
-							62.07
-						],
-						"lobby-board": [
-							93.73,
-							55.59
-						],
-						"board-view": [
-							88.77,
-							57.23
-						]
-					}
-				}
-			},
+			"id": "a",
 			"scene": {
-				"shell": "office-floor-1.840e399c.glb",
+				"shell": "office-zone-a.840e399c.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-1-day-1024.426f0710.webp",
-						"2048": "lightmap-floor-1-day-2048.0480c13d.webp"
+						"1024": "lightmap-zone-a-day-1024.426f0710.webp",
+						"2048": "lightmap-zone-a-day-2048.0480c13d.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-1-night-1024.97efd27f.webp",
-						"2048": "lightmap-floor-1-night-2048.c720e4e2.webp"
+						"1024": "lightmap-zone-a-night-1024.97efd27f.webp",
+						"2048": "lightmap-zone-a-night-2048.c720e4e2.webp"
 					}
 				},
-				"props": "office-props-floor-1.0ffcdbdb.glb",
+				"props": "office-props-zone-a.0ffcdbdb.glb",
 				"models": [
 					"armchair",
 					"bookshelf",
@@ -335,263 +53,43 @@
 			}
 		},
 		{
-			"level": 2,
-			"views": {
-				"desktop": {
-					"width": 1600,
-					"height": 1000,
-					"day": "office-2d-floor-2-day-desktop.a579b8d7.webp",
-					"night": "office-2d-floor-2-night-desktop.2b49c564.webp",
-					"anchors": {
-						"f2-elevator": [
-							35.98,
-							84.67
-						],
-						"planning-board": [
-							14.88,
-							46.68
-						],
-						"planning-work-0": [
-							14.85,
-							52.57
-						],
-						"planning-work-1": [
-							20.46,
-							49.6
-						],
-						"planning-work-2": [
-							17.71,
-							63.06
-						],
-						"library-work-0": [
-							32.86,
-							42.6
-						],
-						"library-work-1": [
-							40.57,
-							38.51
-						],
-						"library-work-2": [
-							36.82,
-							50.36
-						],
-						"post-work-0": [
-							55.64,
-							30.53
-						],
-						"post-work-1": [
-							62.64,
-							26.82
-						],
-						"post-work-2": [
-							63.43,
-							34.76
-						]
-					}
-				},
-				"phone": {
-					"width": 1200,
-					"height": 1200,
-					"day": "office-2d-floor-2-day-phone.6371cba8.webp",
-					"night": "office-2d-floor-2-night-phone.6c14022e.webp",
-					"anchors": {
-						"f2-elevator": [
-							35.52,
-							72.38
-						],
-						"planning-board": [
-							13.74,
-							47.86
-						],
-						"planning-work-0": [
-							13.7,
-							51.66
-						],
-						"planning-work-1": [
-							19.49,
-							49.74
-						],
-						"planning-work-2": [
-							16.66,
-							58.43
-						],
-						"library-work-0": [
-							32.31,
-							45.22
-						],
-						"library-work-1": [
-							40.26,
-							42.59
-						],
-						"library-work-2": [
-							36.39,
-							50.23
-						],
-						"post-work-0": [
-							55.82,
-							37.43
-						],
-						"post-work-1": [
-							63.06,
-							35.04
-						],
-						"post-work-2": [
-							63.87,
-							40.16
-						]
-					}
-				}
-			},
+			"id": "b",
 			"scene": {
-				"shell": "office-floor-2.1bbbf3d0.glb",
+				"shell": "office-zone-b.1bbbf3d0.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-2-day-1024.19269783.webp",
-						"2048": "lightmap-floor-2-day-2048.9fec03c6.webp"
+						"1024": "lightmap-zone-b-day-1024.19269783.webp",
+						"2048": "lightmap-zone-b-day-2048.9fec03c6.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-2-night-1024.8cba8910.webp",
-						"2048": "lightmap-floor-2-night-2048.44e6a7d5.webp"
+						"1024": "lightmap-zone-b-night-1024.8cba8910.webp",
+						"2048": "lightmap-zone-b-night-2048.44e6a7d5.webp"
 					}
 				},
-				"props": "office-props-floor-2.7a878a33.glb",
+				"props": "office-props-zone-b.7a878a33.glb",
 				"models": []
 			}
 		},
 		{
-			"level": 3,
-			"views": {
-				"desktop": {
-					"width": 1600,
-					"height": 1000,
-					"day": "office-2d-floor-3-day-desktop.a0d2a613.webp",
-					"night": "office-2d-floor-3-night-desktop.88656e94.webp",
-					"anchors": {
-						"f3-elevator": [
-							35.98,
-							84.67
-						],
-						"security-work-0": [
-							19.88,
-							54.62
-						],
-						"security-work-1": [
-							13.92,
-							57.78
-						],
-						"security-work-2": [
-							36.37,
-							71.18
-						],
-						"audit-board": [
-							35.9,
-							35.54
-						],
-						"audit-work-0": [
-							38.51,
-							48.6
-						],
-						"audit-work-1": [
-							46.92,
-							44.15
-						],
-						"audit-work-2": [
-							38.27,
-							39.3
-						],
-						"qa-board": [
-							59.02,
-							23.29
-						],
-						"qa-work-0": [
-							54.79,
-							31.41
-						],
-						"qa-work-1": [
-							69.26,
-							36.6
-						],
-						"qa-work-2": [
-							68.43,
-							29.33
-						]
-					}
-				},
-				"phone": {
-					"width": 1200,
-					"height": 1200,
-					"day": "office-2d-floor-3-day-phone.aaad78d5.webp",
-					"night": "office-2d-floor-3-night-phone.76dcf064.webp",
-					"anchors": {
-						"f3-elevator": [
-							35.52,
-							72.38
-						],
-						"security-work-0": [
-							18.9,
-							52.98
-						],
-						"security-work-1": [
-							12.75,
-							55.02
-						],
-						"security-work-2": [
-							35.92,
-							63.67
-						],
-						"audit-board": [
-							35.44,
-							40.67
-						],
-						"audit-work-0": [
-							38.14,
-							49.1
-						],
-						"audit-work-1": [
-							46.82,
-							46.22
-						],
-						"audit-work-2": [
-							37.89,
-							43.1
-						],
-						"qa-board": [
-							59.32,
-							32.76
-						],
-						"qa-work-0": [
-							54.94,
-							38
-						],
-						"qa-work-1": [
-							69.89,
-							41.35
-						],
-						"qa-work-2": [
-							69.03,
-							36.66
-						]
-					}
-				}
-			},
+			"id": "c",
 			"scene": {
-				"shell": "office-floor-3.db758629.glb",
+				"shell": "office-zone-c.db758629.glb",
 				"lightmaps": {
 					"day": {
-						"1024": "lightmap-floor-3-day-1024.6d4bb8a9.webp",
-						"2048": "lightmap-floor-3-day-2048.eb32c73a.webp"
+						"1024": "lightmap-zone-c-day-1024.6d4bb8a9.webp",
+						"2048": "lightmap-zone-c-day-2048.eb32c73a.webp"
 					},
 					"night": {
-						"1024": "lightmap-floor-3-night-1024.b811731f.webp",
-						"2048": "lightmap-floor-3-night-2048.02ecda08.webp"
+						"1024": "lightmap-zone-c-night-1024.b811731f.webp",
+						"2048": "lightmap-zone-c-night-2048.02ecda08.webp"
 					}
 				},
-				"props": "office-props-floor-3.7a878a33.glb",
+				"props": "office-props-zone-c.7a878a33.glb",
 				"models": []
 			}
 		}
 	],
-	"propsNote": "floors[].scene.props holds one mesh per model first used on that floor (named like the model); the shell GLB lists every placed model of its floor in asset.extras.instances as [x, y, z, rotY] (layout coordinates). Shell lightmaps: TEXCOORD_1, colour times light, half intensity (multiply by 2).",
+	"propsNote": "zones[].scene.props holds one mesh per model first used in that zone (named like the model); the shell GLB lists every placed model of its zone in asset.extras.instances as [x, y, z, rotY] (layout coordinates). Shell lightmaps: TEXCOORD_1, colour times light, half intensity (multiply by 2).",
 	"character": {
 		"file": "character.97b412fb.glb",
 		"clips": [

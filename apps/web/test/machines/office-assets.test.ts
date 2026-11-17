@@ -16,7 +16,7 @@ import { OFFICE_LAYOUT, OFFICE_LAYOUT_TEXT, type OfficeLayout } from "../../src/
 
 const FIXTURE = resolve(process.cwd(), "test/machines/fixtures/office-assets.json");
 const SHIPPED = resolve(process.cwd(), "public/office/office-assets.json");
-const PICTURE = { desktop: { width: 1600, height: 1000 }, phone: { width: 1200, height: 1200 } } as const;
+const PICTURE = { desktop: { width: 2400, height: 1500 }, phone: { width: 1600, height: 1600 } } as const;
 
 function layout(): OfficeLayout {
 	if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("\n"));
@@ -31,20 +31,17 @@ async function expectedFixture(): Promise<Record<string, unknown>> {
 	return {
 		formatVersion: ASSETS_FORMAT_VERSION,
 		layoutSha256: await layoutHash(OFFICE_LAYOUT_TEXT),
-		floors: l.floors.map((floor) => ({
-			level: floor.level,
-			views: Object.fromEntries(
-				(["desktop", "phone"] as const).map((size) => [
-					size,
-					{
-						...PICTURE[size],
-						day: `office-2d-floor-${floor.level}-day-${size}.webp`,
-						night: `office-2d-floor-${floor.level}-night-${size}.webp`,
-						anchors: Object.fromEntries(floor.anchors.map((a) => [a.id, projectPoint(l.camera, l.camera.views[size], a.x, 0, a.z).map(round)])),
-					},
-				]),
-			),
-		})),
+		views: Object.fromEntries(
+			(["desktop", "phone"] as const).map((size) => [
+				size,
+				{
+					...PICTURE[size],
+					day: `office-2d-plan-day-${size}.webp`,
+					night: `office-2d-plan-night-${size}.webp`,
+					anchors: Object.fromEntries(l.anchors.map((a) => [a.id, projectPoint(l.camera, l.camera.views[size], a.x, 0, a.z).map(round)])),
+				},
+			]),
+		),
 	};
 }
 
@@ -59,13 +56,14 @@ describe("the office's asset file", () => {
 		expect(fixture(), "the layout changed: write the fixture again (see the top of this file)").toEqual(expected);
 	});
 
-	it("reads the fixture: every anchor of every floor, both sizes", async () => {
+	it("reads the fixture: one picture of the plan per size, with every anchor of the layout", async () => {
 		const result = parseOfficeAssets(fixture(), layout(), await layoutHash());
 		if (!result.ok) throw new Error(result.errors.join("\n"));
-		const first = result.value.floors.get(1);
-		expect(first?.desktop.anchors.get("desk-0")).toHaveLength(2);
-		expect(first?.phone.day).toBe("office-2d-floor-1-day-phone.webp");
-		expect(result.value.floors.size).toBe(4);
+		const { desktop, phone } = result.value.views;
+		expect(desktop.anchors.get("desk-0")).toHaveLength(2);
+		expect(phone.day).toBe("office-2d-plan-day-phone.webp");
+		expect(desktop).toMatchObject(PICTURE.desktop);
+		for (const view of [desktop, phone]) expect([...view.anchors.keys()].sort()).toEqual(layout().anchors.map((a) => a.id).sort());
 	});
 
 	it("hashes the layout's text the same with either line ending", async () => {
@@ -79,13 +77,25 @@ describe("the office's asset file", () => {
 		const stale = { ...fixture(), layoutSha256: "0".repeat(64) };
 		expect(parseOfficeAssets(stale, layout(), hash)).toEqual({ ok: false, errors: ["the assets were baked from another layout (layoutSha256 differs): bake them again"] });
 		const missing = fixture();
-		const floors = missing.floors as { views: { phone: { anchors: Record<string, unknown> } } }[];
-		const phone = floors[1]?.views.phone;
-		if (phone !== undefined) delete phone.anchors["library-work-0"];
+		const views = missing.views as { phone: { anchors: Record<string, unknown> } };
+		delete views.phone.anchors["library-work-0"];
 		const result = parseOfficeAssets(missing, layout(), hash);
-		expect(result.ok ? [] : result.errors).toEqual(["floor 2 phone has no position for library-work-0"]);
-		expect(parseOfficeAssets({ ...fixture(), formatVersion: 9 }, layout(), hash)).toEqual({ ok: false, errors: ["asset format version 9, this app reads 1"] });
-		expect(parseOfficeAssets({ ...fixture(), floors: [] }, layout(), hash).ok).toBe(false);
+		expect(result.ok ? [] : result.errors).toEqual(["phone view has no position for library-work-0"]);
+		expect(parseOfficeAssets({ ...fixture(), formatVersion: 1 }, layout(), hash)).toEqual({ ok: false, errors: ["asset format version 1, this app reads 2"] });
+		expect(parseOfficeAssets({ ...fixture(), formatVersion: 9 }, layout(), hash)).toEqual({ ok: false, errors: ["asset format version 9, this app reads 2"] });
+		expect(parseOfficeAssets({ ...fixture(), views: {} }, layout(), hash)).toEqual({ ok: false, errors: ["desktop view is missing", "phone view is missing"] });
+	});
+
+	it("refuses picture names that leave the assets folder or start with a dot", async () => {
+		const hash = await layoutHash();
+		for (const bad of ["..", ".hidden.webp", "../secret.webp", "a/b.webp", ""]) {
+			const json = fixture();
+			const views = json.views as { desktop: { day: string } };
+			views.desktop.day = bad;
+			const result = parseOfficeAssets(json, layout(), hash);
+			expect(result.ok ? [] : result.errors, JSON.stringify(bad)).toEqual(["desktop view needs day and night file names"]);
+		}
+		expect(parseOfficeAssets(fixture(), layout(), hash).ok).toBe(true);
 	});
 
 	it("falls back when the file is missing or not JSON", async () => {

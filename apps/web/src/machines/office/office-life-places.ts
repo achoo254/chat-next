@@ -1,4 +1,4 @@
-// Which place of the living floor each free resident takes for their part of
+// Which place of the living rooms each free resident takes for their part of
 // the day (office-life-schedule.ts says the kinds of place, best first): a
 // person keeps the place they already have while it still fits, otherwise
 // takes the first free one, trying places in an order of their own (stable by
@@ -18,7 +18,7 @@ export interface LifeSeeker {
 }
 
 function placesOf(layout: OfficeLayout, kind: LayoutAnchor["kind"]): readonly LayoutAnchor[] {
-	return layout.floors.flatMap((f) => f.anchors.filter((a) => a.kind === kind));
+	return layout.anchors.filter((a) => a.kind === kind);
 }
 
 /** The places of `plan` for `key`, best kind first, each kind's places rotated by the person's own offset. */

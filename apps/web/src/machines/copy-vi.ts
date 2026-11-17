@@ -1279,12 +1279,12 @@ export const viMachines = {
 		powerOut: "Mất điện: chưa nghe tin từ máy hơn 30 giây. Đèn sáng lại khi máy nối lại.",
 		catchingUp: "Đang cập nhật văn phòng…",
 		hidden: (n: number) => `Còn ${n} người nữa không hiện.`,
-		floorsLabel: "Tầng",
-		floors: { 1: "T1", 2: "T2", 3: "T3", 4: "T4" },
-		floorNames: { 1: "Tầng 1", 2: "Tầng 2", 3: "Tầng 3", 4: "Tầng 4: sinh hoạt" },
-		floorBusy: (floor: string) => `${floor}, có người đang làm`,
-		follow: "Tự theo",
-		followHint: "Tự chuyển tới tầng vừa có việc",
+		/** The framing button: its label is what a press shows next. The overview hint must hold on a portrait phone too, where it shows two zones, not the whole plan. */
+		overview: "Toàn cảnh",
+		overviewHint: "Thu ra xem nhiều khu hơn",
+		backToWork: "Về khu làm việc",
+		backToWorkHint: "Quay về khung nhìn khu làm việc",
+		zones: { a: "Điều hành", b: "Hồ sơ", c: "Kiểm soát", d: "Sinh hoạt" },
 		sound: "Âm thanh",
 		soundHint: "Bật hoặc tắt âm thanh của văn phòng",
 		rooms: {

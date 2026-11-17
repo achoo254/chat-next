@@ -1,14 +1,15 @@
 // The residents' talks: the Vietnamese pool is big enough, every line fills
 // from facts with no slot left, no internal word slips in; topics follow the
 // facts; pairs form only among free, awake people in the same or a
-// neighbouring room, at most two a floor, never twice inside three minutes;
+// neighbouring room, at most two a zone, never twice inside three minutes;
 // lines alternate, 2.5 to 4 s each; the same people and time give the same
 // talk.
 import { OfficeActorState, OfficeAnimGroup, OfficeRoom } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { lineOf, neighbourRooms, officeTalks, TALK_COOLDOWN_WINDOWS, TALK_WINDOW_MS, talkWindowOf, LINE_MAX_MS, LINE_MIN_MS } from "../../src/machines/office/office-conversations.ts";
+import { lineOf, MAX_TALKS_PER_ZONE, neighbourRooms, officeTalks, TALK_COOLDOWN_WINDOWS, TALK_WINDOW_MS, talkWindowOf, LINE_MAX_MS, LINE_MIN_MS } from "../../src/machines/office/office-conversations.ts";
 import { DIALOGUE_SLOTS, DIALOGUE_VI, fillLine, QUIRKS, slotsOf, type DialogueSlot } from "../../src/machines/office/office-dialogue-vi.ts";
-import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
+import { zoneOfRoom } from "../../src/machines/office/office-geometry.ts";
+import { OFFICE_LAYOUT, type OfficeLayout, type ZoneId } from "../../src/machines/office/office-layout.ts";
 import { EMPTY_MEMORY, officePlacement, type Placement } from "../../src/machines/office/office-placement.ts";
 import { talkFacts } from "../../src/machines/office/office-talk-facts.ts";
 import { EMPTY_SESSION, type OfficeState } from "../../src/machines/office/office-state.ts";
@@ -114,9 +115,15 @@ describe("who talks", () => {
 		expect(neighbourRooms(layout(), "GYM", "LOUNGE")).toBe(true);
 		expect(neighbourRooms(layout(), "DORM", "LOUNGE")).toBe(false);
 		expect(neighbourRooms(layout(), "WORK", "QA")).toBe(false);
+		expect(neighbourRooms(layout(), "WORK", "DIRECTOR")).toBe(true);
+		expect(neighbourRooms(layout(), "AUDIT", "QA")).toBe(true);
+		// Rooms of two zones are never neighbours: a corridor runs between them.
+		for (const a of layout().rooms) {
+			for (const b of layout().rooms) if (a.zone !== b.zone) expect(neighbourRooms(layout(), a.room, b.room), `${a.room} ${b.room}`).toBe(false);
+		}
 	});
 
-	it("pairs free residents of a floor in turn, two talks at most, lines alternating 2.5 to 4 s, the same for every viewer", () => {
+	it("pairs free residents of a zone in turn, two talks at most, lines alternating 2.5 to 4 s, the same for every viewer", () => {
 		const { state, at } = resting(["scout", "tester", "planner", "researcher", "debugger", "explore"]);
 		let talked = 0;
 		for (let w = 0; w < 30; w += 1) {
@@ -124,10 +131,10 @@ describe("who talks", () => {
 			const placements = at(now);
 			const talks = officeTalks(placements, state, layout(), now);
 			expect(talks).toEqual(officeTalks(placements, state, layout(), now));
-			const perFloor = new Map<number, number>();
+			const perZone = new Map<ZoneId, number>();
 			for (const talk of talks) {
 				talked += 1;
-				perFloor.set(talk.floor, (perFloor.get(talk.floor) ?? 0) + 1);
+				perZone.set(talk.zone, (perZone.get(talk.zone) ?? 0) + 1);
 				expect(talk.lines.length).toBeGreaterThanOrEqual(2);
 				expect(talk.lines.length).toBeLessThanOrEqual(4);
 				talk.lines.forEach((line, i) => {
@@ -137,9 +144,12 @@ describe("who talks", () => {
 					expect(line.text).not.toMatch(FORBIDDEN);
 				});
 				const host = placements.find((p) => p.key === talk.host);
+				const visitor = placements.find((p) => p.key === talk.visitor);
 				expect(talk.hostAnchor).toBe(host?.anchorId);
+				// Both of the pair are in the talk's zone.
+				for (const p of [host, visitor]) expect(p === undefined ? null : zoneOfRoom(layout(), p.room)).toBe(talk.zone);
 			}
-			for (const n of perFloor.values()) expect(n).toBeLessThanOrEqual(2);
+			for (const n of perZone.values()) expect(n).toBeLessThanOrEqual(MAX_TALKS_PER_ZONE);
 		}
 		expect(talked).toBeGreaterThan(0);
 	});

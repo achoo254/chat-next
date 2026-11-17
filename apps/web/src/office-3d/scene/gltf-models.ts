@@ -1,4 +1,4 @@
-// Finding the models in a loaded GLB that holds several (the floor props, the
+// Finding the models in a loaded GLB that holds several (the zone props, the
 // accessories): one named top-level node per model, under the glTF loader's
 // root node; a model with several materials is a node with one child mesh per
 // part, a model with one material is a single mesh.

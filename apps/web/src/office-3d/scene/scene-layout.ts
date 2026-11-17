@@ -1,14 +1,15 @@
-// The parts of office-layout.json only the 3D scene draws: the footprint, the
-// wall height, and per floor the walkways, glass, walls, windows, doors with
+// The parts of office-layout.json only the 3D scene draws, for the whole
+// plan: the footprint, the wall heights (tall outer walls, low walls between
+// zones), the rooms, walkways, glass, walls, low walls, windows, doors with
 // their openings, furniture and small props (instanced by name) and the decor
-// the Blender bake builds (elevator, stairs, rugs, boards). office-layout.ts
-// (shared with the 2D view) checks the rest; this reader never throws: a
-// missing or odd field reads as empty, so a newer layout cannot break the
-// scene. Pure, no engine.
+// the Blender bake builds (rugs, boards, art). office-layout.ts (shared with
+// the 2D view) checks the rest; this reader never throws: a missing or odd
+// field reads as empty, so a newer layout cannot break the scene. Pure, no
+// engine.
 import { OFFICE_LAYOUT_TEXT } from "../../machines/office/office-layout.ts";
 import { arrayOf, isRecord, numberOf, stringOf } from "../../machines/office/office-json.ts";
-import type { FloorLevel, RoomCode } from "../../machines/office/office-rooms.ts";
-import { isFloorLevel, isRoomCode } from "../../machines/office/office-rooms.ts";
+import type { RoomCode } from "../../machines/office/office-rooms.ts";
+import { isRoomCode } from "../../machines/office/office-rooms.ts";
 
 export type Rect = readonly [number, number, number, number];
 /** A straight wall or glass run on the floor, [x0, z0, x1, z1]. */
@@ -32,7 +33,11 @@ export interface Place {
 	readonly anchor: string;
 }
 
-/** Decor as the layout lists it: a kind and its numbers (the scene picks what it draws). */
+/**
+ * Decor as the layout lists it: a kind and its numbers (the scene picks what
+ * it draws). `wall` names the outer wall it hangs on ("back", "east"), or
+ * "free" for a board standing in the room, turned by `num.face`.
+ */
 export interface Decor {
 	readonly kind: string;
 	readonly wall: string;
@@ -42,26 +47,36 @@ export interface Decor {
 	readonly num: Readonly<Record<string, number>>;
 }
 
-export interface SceneFloor {
-	readonly level: FloorLevel;
+/** A window in an outer wall: the wall, its span along it and its sill and top heights, metres. */
+export interface SceneWindow {
+	readonly wall: string;
+	readonly from: number;
+	readonly to: number;
+	readonly sill: number;
+	readonly top: number;
+}
+
+export interface SceneLayout {
+	/** The whole plan [x0, z0, x1, z1]. */
+	readonly footprint: Rect;
+	readonly wallHeight: number;
+	/** Height of the low walls between zones. */
+	readonly lowWallHeight: number;
 	readonly rooms: readonly { readonly room: RoomCode; readonly rect: Rect }[];
 	readonly circulation: readonly Rect[];
 	readonly glass: readonly Segment[];
 	readonly walls: readonly Segment[];
+	readonly lowWalls: readonly Segment[];
+	readonly windows: readonly SceneWindow[];
 	readonly doors: readonly Door[];
 	readonly props: readonly Place[];
 	readonly smallProps: readonly Place[];
 	readonly decor: readonly Decor[];
 }
 
-export interface SceneLayout {
-	readonly footprint: Rect;
-	readonly wallHeight: number;
-	readonly doorSeconds: number;
-	readonly floors: readonly SceneFloor[];
-}
-
 const DEFAULT_FOOTPRINT: Rect = [-9, -9, 9, 5];
+const DEFAULT_WALL_HEIGHT = 3;
+const DEFAULT_LOW_WALL_HEIGHT = 1.1;
 
 function rectOf(value: unknown): Rect | null {
 	const n = arrayOf(value).map(numberOf);
@@ -89,16 +104,31 @@ function decorOf(value: unknown): Decor | null {
 	return { kind: stringOf(value.kind), wall: stringOf(value.wall), colour: stringOf(value.colour), axis: stringOf(value.axis), rect: rectOf(value.rect), num };
 }
 
-function floorOf(value: unknown): SceneFloor | null {
+function windowOf(value: unknown): SceneWindow | null {
 	if (!isRecord(value)) return null;
-	const level = numberOf(value.level);
-	if (!isFloorLevel(level)) return null;
-	const rooms = arrayOf(value.rooms).flatMap((r) => {
+	const from = numberOf(value.from);
+	const to = numberOf(value.to);
+	const sill = numberOf(value.sill);
+	const top = numberOf(value.top);
+	if (from === null || to === null || sill === null || top === null) return null;
+	return { wall: stringOf(value.wall), from, to, sill, top };
+}
+
+/** A list of segments; rects are arrays themselves, so map then drop the misses (flatMap would flatten them). */
+function segmentsOf(value: unknown): Segment[] {
+	return arrayOf(value)
+		.map(rectOf)
+		.filter((r): r is Segment => r !== null);
+}
+
+export function parseSceneLayout(json: unknown): SceneLayout {
+	const root = isRecord(json) ? json : {};
+	const rooms = arrayOf(root.rooms).flatMap((r) => {
 		if (!isRecord(r) || !isRoomCode(r.room)) return [];
 		const rect = rectOf(r.rect);
 		return rect === null ? [] : [{ room: r.room, rect }];
 	});
-	const doors = arrayOf(value.doors).flatMap((d): Door[] => {
+	const doors = arrayOf(root.doors).flatMap((d): Door[] => {
 		if (!isRecord(d)) return [];
 		const at = arrayOf(d.at).map(numberOf);
 		const x = at[0];
@@ -108,35 +138,21 @@ function floorOf(value: unknown): SceneFloor | null {
 		return [{ id: stringOf(d.id), at: [x, z], width, axis: d.axis === "z" ? "z" : "x" }];
 	});
 	return {
-		level,
+		footprint: rectOf(root.footprint) ?? DEFAULT_FOOTPRINT,
+		wallHeight: numberOf(root.wallHeight) ?? DEFAULT_WALL_HEIGHT,
+		lowWallHeight: numberOf(root.lowWallHeight) ?? DEFAULT_LOW_WALL_HEIGHT,
 		rooms,
-		// Rects are arrays themselves: map then drop the misses (flatMap would flatten them).
-		circulation: arrayOf(value.circulation)
+		circulation: arrayOf(root.circulation)
 			.map((c) => (isRecord(c) ? rectOf(c.rect) : null))
 			.filter((r): r is Rect => r !== null),
-		glass: arrayOf(value.glass)
-			.map(rectOf)
-			.filter((r): r is Segment => r !== null),
-		walls: arrayOf(value.walls)
-			.map(rectOf)
-			.filter((r): r is Segment => r !== null),
+		glass: segmentsOf(root.glass),
+		walls: segmentsOf(root.walls),
+		lowWalls: segmentsOf(root.lowWalls),
+		windows: arrayOf(root.windows).flatMap((w) => windowOf(w) ?? []),
 		doors,
-		props: arrayOf(value.props).flatMap((p) => placeOf(p) ?? []),
-		smallProps: arrayOf(value.smallProps).flatMap((p) => placeOf(p) ?? []),
-		decor: arrayOf(value.decor).flatMap((d) => decorOf(d) ?? []),
-	};
-}
-
-export function parseSceneLayout(json: unknown): SceneLayout {
-	const root = isRecord(json) ? json : {};
-	const lift = isRecord(root.elevator) ? root.elevator : {};
-	return {
-		footprint: rectOf(root.footprint) ?? DEFAULT_FOOTPRINT,
-		wallHeight: numberOf(root.wallHeight) ?? 3,
-		doorSeconds: Math.max(0, numberOf(lift.doorSeconds) ?? 1),
-		floors: arrayOf(root.floors)
-			.flatMap((f) => floorOf(f) ?? [])
-			.sort((a, b) => a.level - b.level),
+		props: arrayOf(root.props).flatMap((p) => placeOf(p) ?? []),
+		smallProps: arrayOf(root.smallProps).flatMap((p) => placeOf(p) ?? []),
+		decor: arrayOf(root.decor).flatMap((d) => decorOf(d) ?? []),
 	};
 }
 
@@ -150,10 +166,6 @@ function readShipped(): SceneLayout {
 
 /** The shipped layout's scene parts. */
 export const SCENE_LAYOUT: SceneLayout = readShipped();
-
-export function sceneFloor(layout: SceneLayout, level: FloorLevel): SceneFloor | undefined {
-	return layout.floors.find((f) => f.level === level);
-}
 
 const EPS = 1e-6;
 

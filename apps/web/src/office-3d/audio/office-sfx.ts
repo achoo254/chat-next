@@ -1,5 +1,6 @@
-// Office sounds, off by default (plan decision 3): played for events on the
-// floor shown only (the approval chime plays from any floor), and only once
+// Office sounds, off by default (plan decision 3): played for events of the
+// people in the camera's view only (the approval chime plays wherever the
+// person is), and only once
 // the viewer turned sound on (that tap also unlocks audio in the browser).
 // Uses the sound files the asset file lists when present (its names are the
 // sounds' own, mapped to scene events by SOUND_FILES), else short tones made
@@ -18,7 +19,6 @@ export interface OfficeSfx {
 
 /** Tone recipes: [frequency Hz, start s, length s] notes, and the wave. */
 const TONES: Readonly<Record<OfficeSound, { wave: OscillatorType; notes: readonly (readonly [number, number, number])[]; gain: number }>> = {
-	"arrive-lift": { wave: "sine", notes: [[1318, 0, 0.35]], gain: 0.12 },
 	"start-work": { wave: "square", notes: [[1900, 0, 0.02], [1700, 0.08, 0.02], [2000, 0.15, 0.02]], gain: 0.025 },
 	cheer: { wave: "triangle", notes: [[660, 0, 0.12], [880, 0.12, 0.12], [1320, 0.24, 0.25]], gain: 0.1 },
 	smoke: { wave: "sawtooth", notes: [[180, 0, 0.4]], gain: 0.04 },
@@ -28,12 +28,11 @@ const TONES: Readonly<Record<OfficeSound, { wave: OscillatorType; notes: readonl
 };
 
 /**
- * The asset file's sound names each event uses, best first: the lift's ding on arrival, keys when work starts, the
+ * The asset file's sound names each event uses, best first: keys when work starts, the
  * crowd's cheer on a pass, a puff of steam for the failure's smoke, the phone ringing for an approval waiting on the
  * viewer, the light switch on power changes. An event with none of its names in the file plays its tone.
  */
 export const SOUND_FILES: Readonly<Record<OfficeSound, readonly string[]>> = {
-	"arrive-lift": ["elevator-ding", "door-open"],
 	"start-work": ["typing"],
 	cheer: ["cheer"],
 	smoke: ["steam-puff"],

@@ -1,28 +1,28 @@
-// Where everyone in the office is: floor, room and the anchor they stand or
+// Where everyone in the office is: the room and the anchor they stand or
 // sit at, from the store's state, the layout and the clock. Shared by the 2D
 // and 3D views. The agent picks the room of each activity on the machine; here:
 // an agent type's home room replaces WORK; with nothing to do an employee goes
 // to their desk (or the meeting room without one, or as a nested subagent),
 // the director to their office; a pending approval takes the person to
 // Security; the chairman waits in the lobby. Short tools must not send people
-// running between floors: whoever entered a room stays at least MIN_STAY_MS,
+// running across the plan: whoever entered a room stays at least MIN_STAY_MS,
 // and after the work there ends lingers LINGER_MS (gathering the next tools)
 // before going home. The speech bubble shows the real tool at once anyway.
-// Nobody leaves the building: whoever is off duty (the director while the
+// Nobody leaves the office: whoever is off duty (the director while the
 // session rests, a finished employee, a resident whose subagent left) lives
-// by the daily schedule (office-life-schedule.ts) on the living floor, and
-// spends office hours on the work floors as before (a resident in their
+// by the daily schedule (office-life-schedule.ts) in the living rooms, and
+// spends office hours in the work rooms as before (a resident in their
 // agent type's home room). Real work always wins over the schedule. Advisor,
 // while the session's automatic Advisor is on, keeps its own seat at the head
 // of the meeting table day and night (no schedule, no talks); whoever asks it
 // walks over to its seat.
 // Pure: the memory of the last call goes in, the new one comes out.
 import { homeRoomOf } from "./office-cast.ts";
-import { anchorById, anchorOfKind, floorOfRoom, spotsOf } from "./office-geometry.ts";
+import { anchorById, anchorOfKind, spotsOf } from "./office-geometry.ts";
 import type { LayoutAnchor, OfficeLayout } from "./office-layout.ts";
 import { allocateLifePlaces } from "./office-life-places.ts";
 import { lifeActAt, lifePlanAt, type LifeAct, type LifePlan, type LifeSlot } from "./office-life-schedule.ts";
-import type { FloorLevel, RoomCode } from "./office-rooms.ts";
+import type { RoomCode } from "./office-rooms.ts";
 import type { ActorView, OfficeState, StaffMember } from "./office-store.ts";
 
 /** Whoever entered a room stays at least this long. */
@@ -57,14 +57,13 @@ export interface Placement {
 	readonly actor: ActorView | null;
 	/** The employee's staff entry (name, number, desk). */
 	readonly member: StaffMember | null;
-	readonly floor: FloorLevel;
 	readonly room: RoomCode;
 	readonly anchorId: string;
 	/** Viewer time the person entered this room. */
 	readonly since: number;
 	/** The room the person works in now; null when free (idle play may take them to the pantry or around their desk). */
 	readonly activityRoom: RoomCode | null;
-	/** Off duty at a place of the living floor: the part of the day and what they do there; null otherwise. */
+	/** Off duty at a place of the living rooms: the part of the day and what they do there; null otherwise. */
 	readonly life: { readonly slot: LifeSlot; readonly act: LifeAct } | null;
 	/** Advisor's name and look, from the viewer's Advisor profile; null for everyone else. */
 	readonly advisor: OfficeAdvisor | null;
@@ -92,7 +91,7 @@ interface Person {
 interface Wish {
 	readonly room: RoomCode;
 	readonly working: boolean;
-	/** An anchor that is the person's own there: a desk, the director's chair, the chairman's spot, a place of the living floor. */
+	/** An anchor that is the person's own there: a desk, the director's chair, the chairman's spot, a place of the living rooms. */
 	readonly own: string | null;
 	/** Off duty outside office hours: the schedule's plan (the place is allocated with everyone else's). */
 	readonly life: LifePlan | null;
@@ -134,7 +133,7 @@ export function currentActivity(actor: ActorView, now: number, clockOffset: numb
 	return a;
 }
 
-/** A plan that sends the person to the living floor (outside office hours), or null. */
+/** A plan that sends the person to the living rooms (outside office hours), or null. */
 function livingPlan(key: string, now: number): LifePlan | null {
 	const plan = lifePlanAt(key, now);
 	return plan.kinds.length === 0 ? null : plan;
@@ -144,7 +143,7 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 	const actor = person.actor;
 	if (person.kind === "chairman") return { room: "LOBBY", working: false, own: anchorOfKind(layout, "LOBBY", "chairman")?.id ?? null, life: null };
 	if (actor === null) {
-		// An off-duty resident: the living floor, or their agent type's home room in office hours.
+		// An off-duty resident: the living rooms, or their agent type's home room in office hours.
 		return { room: homeRoomOf(person.member?.agentType ?? ""), working: false, own: null, life: livingPlan(person.key, now) };
 	}
 	const advisorSeat = anchorOfKind(layout, ADVISOR_ROOM, "meeting")?.id ?? null;
@@ -174,7 +173,7 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 	return { room: "WORK", working: false, own: deskId, life };
 }
 
-/** Everyone's wish, with the living floor's places allocated: the room and own place of whoever follows the schedule now. */
+/** Everyone's wish, with the living rooms' places allocated: the room and own place of whoever follows the schedule now. */
 function wishes(list: readonly Person[], layout: OfficeLayout, state: OfficeState, now: number, memory: PlacementMemory): Wish[] {
 	const raw = list.map((person) => wish(person, layout, state, now));
 	const seekers = list.flatMap((person, i) => {
@@ -185,7 +184,7 @@ function wishes(list: readonly Person[], layout: OfficeLayout, state: OfficeStat
 	return raw.map((w, i) => {
 		const place: LayoutAnchor | undefined = places.get(list[i]?.key ?? "");
 		if (w.life === null) return w;
-		// A layout without living places: the work floors, as in office hours.
+		// A layout without living places: the work rooms, as in office hours.
 		if (place === undefined || place.room === null) return { ...w, life: null };
 		return { room: place.room, working: false, own: place.id, life: w.life };
 	});
@@ -268,7 +267,6 @@ export function officePlacement(
 			kind: d.person.kind,
 			actor: d.person.actor,
 			member: d.person.member,
-			floor: floorOfRoom(layout, d.room),
 			room: d.room,
 			anchorId,
 			since: d.since,

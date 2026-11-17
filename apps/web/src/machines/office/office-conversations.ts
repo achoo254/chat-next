@@ -2,9 +2,9 @@
 // in windows of TALK_WINDOW_MS. A person may start a talk in a window picked
 // by a hash of their key and the hour, never in two windows within
 // TALK_COOLDOWN_WINDOWS (so nobody talks twice inside three minutes); two
-// such people on one floor, free (no work, not asleep), settled where they
-// are since before the window and in the same or a neighbouring room, pair
-// up, at most MAX_TALKS_PER_FLOOR pairs a floor. The visitor walks over during
+// such people in one zone of the plan, free (no work, not asleep), settled
+// where they are since before the window and in the same or a neighbouring
+// room, pair up, at most MAX_TALKS_PER_ZONE pairs a zone. The visitor walks over during
 // WALK_LEAD_MS, then they speak two to four lines in turn (dialogue in
 // office-dialogue-vi.ts filled with facts of office-talk-facts.ts), each
 // 2.5 to 4 s by its length. Real work ends a talk at once: a person pulled
@@ -14,19 +14,19 @@
 import { viMachines } from "../copy-vi.ts";
 import { castOf, nameHash } from "./office-cast.ts";
 import { DIALOGUE_VI, fillLine, QUIRKS, slotsOf, type DialogueSlot, type QuirkKey, type TalkTopic } from "./office-dialogue-vi.ts";
-import { anchorById } from "./office-geometry.ts";
-import type { OfficeLayout, Rect } from "./office-layout.ts";
+import { anchorById, zoneOfRoom } from "./office-geometry.ts";
+import type { OfficeLayout, Rect, ZoneId } from "./office-layout.ts";
 import { awakeAct, localHour, slotAt } from "./office-life-schedule.ts";
 import { personName } from "./office-names.ts";
 import type { Placement } from "./office-placement.ts";
-import type { FloorLevel, RoomCode } from "./office-rooms.ts";
+import type { RoomCode } from "./office-rooms.ts";
 import type { OfficeState } from "./office-store.ts";
 import { talkFacts } from "./office-talk-facts.ts";
 import { EMPTY_WORK } from "./office-work-log.ts";
 
 export const TALK_WINDOW_MS = 60_000;
 export const TALK_COOLDOWN_WINDOWS = 3;
-export const MAX_TALKS_PER_FLOOR = 2;
+export const MAX_TALKS_PER_ZONE = 2;
 /** The visitor's walk before the first line. */
 export const WALK_LEAD_MS = 6_000;
 export const LINE_MIN_MS = 2_500;
@@ -46,7 +46,8 @@ export interface Talk {
 	readonly host: string;
 	readonly visitor: string;
 	readonly hostAnchor: string;
-	readonly floor: FloorLevel;
+	/** The zone both are in. */
+	readonly zone: ZoneId;
 	readonly topic: TalkTopic;
 	/** Viewer times: the window's start (the visitor sets off) and the last line's end. */
 	readonly start: number;
@@ -73,15 +74,12 @@ function touching(a: Rect, b: Rect): boolean {
 	return (overlapX > eps && Math.abs(overlapZ) <= eps) || (overlapZ > eps && Math.abs(overlapX) <= eps);
 }
 
-/** The same room, or two rooms of one floor sharing a wall. */
+/** The same room, or two rooms of one zone sharing a wall (zones are apart, across the corridors). */
 export function neighbourRooms(layout: OfficeLayout, a: RoomCode, b: RoomCode): boolean {
 	if (a === b) return true;
-	for (const floor of layout.floors) {
-		const ra = floor.rooms.find((r) => r.room === a);
-		const rb = floor.rooms.find((r) => r.room === b);
-		if (ra !== undefined && rb !== undefined) return touching(ra.rect, rb.rect);
-	}
-	return false;
+	const ra = layout.rooms.find((r) => r.room === a);
+	const rb = layout.rooms.find((r) => r.room === b);
+	return ra !== undefined && rb !== undefined && ra.zone === rb.zone && touching(ra.rect, rb.rect);
 }
 
 /**
@@ -153,14 +151,15 @@ export function officeTalks(placements: readonly Placement[], state: OfficeState
 		.filter((p) => free(p, state.session.busy, windowStart) && talkWindowOf(p.key, w))
 		.sort((a, b) => nameHash(`pair:${a.key}#${w}`) - nameHash(`pair:${b.key}#${w}`) || a.key.localeCompare(b.key));
 	const paired = new Set<string>();
-	const perFloor = new Map<FloorLevel, number>();
+	const perZone = new Map<ZoneId, number>();
 	for (const a of ready) {
-		if (paired.has(a.key) || (perFloor.get(a.floor) ?? 0) >= MAX_TALKS_PER_FLOOR) continue;
-		const b = ready.find((o) => o.key !== a.key && !paired.has(o.key) && o.floor === a.floor && neighbourRooms(layout, a.room, o.room));
+		const zone = zoneOfRoom(layout, a.room);
+		if (paired.has(a.key) || (perZone.get(zone) ?? 0) >= MAX_TALKS_PER_ZONE) continue;
+		const b = ready.find((o) => o.key !== a.key && !paired.has(o.key) && neighbourRooms(layout, a.room, o.room));
 		if (b === undefined) continue;
 		paired.add(a.key);
 		paired.add(b.key);
-		perFloor.set(a.floor, (perFloor.get(a.floor) ?? 0) + 1);
+		perZone.set(zone, (perZone.get(zone) ?? 0) + 1);
 		// A seated (or lying) person stays; else the first of the pair does.
 		const seated = (p: Placement): boolean => {
 			const anchor = anchorById(layout, p.anchorId);
@@ -171,7 +170,7 @@ export function officeTalks(placements: readonly Placement[], state: OfficeState
 		const { topic, lines } = linesOf(state, visitor, host, now, windowStart + WALK_LEAD_MS, seed);
 		const end = lines[lines.length - 1]?.to ?? windowStart;
 		if (now >= end) continue;
-		talks.push({ host: host.key, visitor: visitor.key, hostAnchor: host.anchorId, floor: host.floor, topic, start: windowStart, end, lines });
+		talks.push({ host: host.key, visitor: visitor.key, hostAnchor: host.anchorId, zone, topic, start: windowStart, end, lines });
 	}
 	return talks;
 }

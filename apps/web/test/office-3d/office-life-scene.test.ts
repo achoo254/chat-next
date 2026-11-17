@@ -1,7 +1,7 @@
-// The living floor in the 3D scene, without an engine: the poses of life,
+// The living rooms in the 3D scene, without an engine: the poses of life,
 // talk and waking and the clips they pick from the delivered character (with
 // fallbacks), where a person lies, runs or sits low, a talk's visitor beside
-// the host, and the sounds the people of the floor shown call for.
+// the host, and the sounds the people in the camera's view call for.
 import { describe, expect, it } from "vitest";
 import type { Talk } from "../../src/machines/office/office-conversations.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
@@ -99,9 +99,9 @@ describe("poses of life", () => {
 	});
 });
 
-describe("places of the living floor", () => {
+describe("places of the living rooms", () => {
 	it("lies on the bed's mattress, runs on the treadmill's belt, sits low on a beanbag", () => {
-		expect(personTarget(layout(), "bed-0", 0, false)).toMatchObject({ floor: 4, y: 0.5, seated: false });
+		expect(personTarget(layout(), "bed-0", 0, false)).toMatchObject({ y: 0.5, seated: false });
 		expect(personTarget(layout(), "gym-run-0", 0, false)?.y).toBeCloseTo(0.18);
 		expect(personTarget(layout(), "tv-5", 0, false)).toMatchObject({ seated: true, low: true, seat: LOW_SEAT_HEIGHT });
 		expect(personTarget(layout(), "dine-2", 0, false)).toMatchObject({ seated: true, low: false, seat: SEAT_HEIGHT });
@@ -115,7 +115,6 @@ describe("places of the living floor", () => {
 			kind: "employee",
 			actor: null,
 			member: null,
-			floor: 4,
 			room: "LOUNGE",
 			anchorId,
 			since: 0,
@@ -127,7 +126,7 @@ describe("places of the living floor", () => {
 			host: "a#1",
 			visitor: "b#1",
 			hostAnchor: "counter-0",
-			floor: 4,
+			zone: "d",
 			topic: "testsPass",
 			start: 0,
 			end: 20_000,
@@ -156,20 +155,22 @@ describe("places of the living floor", () => {
 });
 
 describe("sounds of life", () => {
-	it("loops the treadmill, the TV and snoring, and cues punches, cutlery and TV cheers, on the floor shown only", () => {
-		const heard = [
-			{ floor: 4, visible: true, pose: "run" as const, dozing: false },
-			{ floor: 4, visible: true, pose: "sleep" as const, dozing: false },
-			{ floor: 4, visible: true, pose: "watch" as const, dozing: false },
-			{ floor: 4, visible: true, pose: "punch" as const, dozing: false },
-			{ floor: 4, visible: true, pose: "sit-eat" as const, dozing: false },
-			{ floor: 3, visible: true, pose: "stand-idle" as const, dozing: true },
+	it("loops the treadmill, the TV and snoring, and cues punches, cutlery and TV cheers, for people in view only", () => {
+		const living = [
+			{ visible: true, pose: "run" as const, dozing: false },
+			{ visible: true, pose: "sleep" as const, dozing: false },
+			{ visible: true, pose: "watch" as const, dozing: false },
+			{ visible: true, pose: "punch" as const, dozing: false },
+			{ visible: true, pose: "sit-eat" as const, dozing: false },
 		];
-		const four = lifeSoundsWanted(heard, 4);
-		expect([...four.loops].sort()).toEqual(["snore", "treadmill", "tv-show"]);
-		expect([...four.cues].sort()).toEqual(["cheer-tv", "cutlery", "punch"]);
-		const three = lifeSoundsWanted(heard, 3);
-		expect([...three.loops]).toEqual(["snore"]);
-		expect(lifeSoundsWanted(heard, 1).loops.size).toBe(0);
+		const dozer = { visible: true, pose: "stand-idle" as const, dozing: true };
+		const all = lifeSoundsWanted([...living, dozer]);
+		expect([...all.loops].sort()).toEqual(["snore", "treadmill", "tv-show"]);
+		expect([...all.cues].sort()).toEqual(["cheer-tv", "cutlery", "punch"]);
+		// The living rooms panned out of view: only the dozer at work is heard.
+		const away = lifeSoundsWanted([...living.map((p) => ({ ...p, visible: false })), dozer]);
+		expect([...away.loops]).toEqual(["snore"]);
+		expect(away.cues.size).toBe(0);
+		expect(lifeSoundsWanted([{ ...dozer, visible: false }]).loops.size).toBe(0);
 	});
 });

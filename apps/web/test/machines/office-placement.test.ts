@@ -1,11 +1,11 @@
-// Where everyone is: each room of the table reached on its floor, home rooms
+// Where everyone is: each room of the table reached in its zone, home rooms
 // replacing only WORK, holds against running about, lingering then going
 // home, approvals to Security, the chairman in the lobby, no two people on
 // one spot, and the same input giving the same places.
 import { OfficeActorState, OfficeAnimGroup, OfficeRoom } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { deskOrder } from "../../src/machines/office/office-geometry.ts";
-import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
+import { anchorById, deskOrder, zoneOfRoom } from "../../src/machines/office/office-geometry.ts";
+import { OFFICE_LAYOUT, type OfficeLayout, type ZoneId } from "../../src/machines/office/office-layout.ts";
 import { EMPTY_MEMORY, HAND_IN_MS, LINGER_MS, MIN_STAY_MS, officePlacement, type Placement, type PlacementMemory } from "../../src/machines/office/office-placement.ts";
 import type { OfficeStore } from "../../src/machines/office/office-store.ts";
 import { act, director, ev, machine, session, snapshot, staff, storeAt, T0 } from "./office-builders.ts";
@@ -48,25 +48,26 @@ function fresh(actors: Parameters<typeof snapshot>[0], options: Parameters<typeo
 }
 
 describe("office placement", () => {
-	it("takes each person to the room of their activity, on its floor", () => {
-		const rooms: [OfficeRoom, string, 1 | 2 | 3][] = [
-			[OfficeRoom.LOBBY, "LOBBY", 1],
-			[OfficeRoom.DIRECTOR, "DIRECTOR", 1],
-			[OfficeRoom.WORK, "WORK", 1],
-			[OfficeRoom.SERVER, "SERVER", 1],
-			[OfficeRoom.MEETING, "MEETING", 1],
-			[OfficeRoom.PANTRY, "PANTRY", 1],
-			[OfficeRoom.PLANNING, "PLANNING", 2],
-			[OfficeRoom.LIBRARY, "LIBRARY", 2],
-			[OfficeRoom.POST, "POST", 2],
-			[OfficeRoom.SECURITY, "SECURITY", 3],
-			[OfficeRoom.AUDIT, "AUDIT", 3],
-			[OfficeRoom.QA, "QA", 3],
+	it("takes each person to the room of their activity, in its zone", () => {
+		const rooms: [OfficeRoom, string, ZoneId][] = [
+			[OfficeRoom.LOBBY, "LOBBY", "a"],
+			[OfficeRoom.DIRECTOR, "DIRECTOR", "a"],
+			[OfficeRoom.WORK, "WORK", "a"],
+			[OfficeRoom.SERVER, "SERVER", "a"],
+			[OfficeRoom.MEETING, "MEETING", "a"],
+			[OfficeRoom.PANTRY, "PANTRY", "a"],
+			[OfficeRoom.PLANNING, "PLANNING", "b"],
+			[OfficeRoom.LIBRARY, "LIBRARY", "b"],
+			[OfficeRoom.POST, "POST", "b"],
+			[OfficeRoom.SECURITY, "SECURITY", "c"],
+			[OfficeRoom.AUDIT, "AUDIT", "c"],
+			[OfficeRoom.QA, "QA", "c"],
 		];
-		for (const [room, code, floor] of rooms) {
+		for (const [room, code, zone] of rooms) {
 			const store = fresh([director({ activity: act("t", room) })]);
 			const p = find(placer(store)(T0), "director");
-			expect([p.room, p.floor], code).toEqual([code, floor]);
+			expect([p.room, zoneOfRoom(layout(), p.room)], code).toEqual([code, zone]);
+			expect(anchorById(layout(), p.anchorId)?.room, code).toBe(code);
 			expect(p.activityRoom).toBe(code);
 		}
 		// A room the agent does not know (or UNSPECIFIED) is WORK.
@@ -121,6 +122,35 @@ describe("office placement", () => {
 		expect(rooms).toEqual(["LIBRARY", "LIBRARY", "LIBRARY", "LIBRARY", "LIBRARY", "WORK"]);
 	});
 
+	it("sends a rapid burst of tools to the same rooms and places across the plan", () => {
+		const store = fresh([director(), staff("a1", "scout"), staff("a2", "tester")]);
+		const place = placer(store);
+		const seen: string[] = [];
+		const note = (now: number): void => {
+			const places = place(now);
+			seen.push(["director", "scout#1", "tester#1"].map((key) => `${find(places, key).room}:${find(places, key).anchorId}`).join(" "));
+		};
+		startOn(store, "director", "r1", OfficeRoom.LIBRARY);
+		startOn(store, "a1", "s1", OfficeRoom.LIBRARY);
+		startOn(store, "a2", "q1", OfficeRoom.QA, "Bash");
+		note(T0);
+		endOn(store, "director", "r1");
+		startOn(store, "director", "e1", OfficeRoom.WORK, "Edit");
+		endOn(store, "a1", "s1");
+		startOn(store, "a1", "e2", OfficeRoom.WORK, "Edit");
+		note(T0 + 400);
+		endOn(store, "a2", "q1");
+		startOn(store, "a2", "b1", OfficeRoom.SECURITY, "Bash");
+		note(T0 + 1_000);
+		note(T0 + MIN_STAY_MS);
+		expect(seen).toEqual([
+			"LIBRARY:library-work-0 LIBRARY:library-work-1 QA:qa-work-0",
+			"LIBRARY:library-work-0 LIBRARY:library-work-1 QA:qa-work-0",
+			"LIBRARY:library-work-0 LIBRARY:library-work-1 QA:qa-work-0",
+			"WORK:work-spot-0 WORK:desk-0 SECURITY:security-work-0",
+		]);
+	});
+
 	it("lingers six seconds where the work ended, then goes home", () => {
 		const store = fresh([director(), staff("a1", "scout")]);
 		const place = placer(store);
@@ -146,8 +176,9 @@ describe("office placement", () => {
 	it("takes whoever waits for an approval to Security, and puts the chairman in the lobby", () => {
 		const store = fresh([director({ state: OfficeActorState.AWAITING_APPROVAL, activity: act("b", OfficeRoom.SERVER, "Bash") })], { session: session({ waitingForUser: true }) });
 		const places = placer(store)(T0);
-		expect(find(places, "director")).toMatchObject({ room: "SECURITY", floor: 3 });
-		expect(find(places, "chairman")).toMatchObject({ room: "LOBBY", floor: 1, anchorId: "chairman", activityRoom: null });
+		expect(find(places, "director")).toMatchObject({ room: "SECURITY", anchorId: "security-work-0" });
+		expect(zoneOfRoom(layout(), "SECURITY")).toBe("c");
+		expect(find(places, "chairman")).toMatchObject({ room: "LOBBY", anchorId: "chairman", activityRoom: null });
 	});
 
 	it("never puts two people on one spot while the room has free ones", () => {

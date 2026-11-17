@@ -2,7 +2,7 @@
 // build with blocks from the layout first, swap in the real models as they
 // come, like Chùa Nhỏ's placeholder kit). One unit box drawn as GPU instances
 // with a colour per instance, one see-through box for glass and one glowing
-// box for screens: a whole placeholder floor costs three draw calls.
+// box for screens: a whole placeholder zone costs three draw calls.
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";

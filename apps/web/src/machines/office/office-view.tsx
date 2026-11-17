@@ -1,7 +1,8 @@
 // The "Văn phòng" tab of a session: watches the session's office on the
 // machine (office-client.ts), keeps it in an OfficeStore, places everyone
-// (office-placement.ts), follows the work between floors, and hands all of
-// that to a renderer. View only: no input, the chat is untouched. A machine
+// (office-placement.ts) on the one floor plan, and hands all of that to a
+// renderer with the framing the viewer asked for (the work zone or the
+// whole plan; a phone opens on the first, a wide screen on the other). View only: no input, the chat is untouched. A machine
 // whose tunelo predates the office gets a note to update and no frame.
 // Loaded on demand with the rest of machines/office/ (and its styles).
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
@@ -18,18 +19,17 @@ import { loadOfficeAssets, type OfficeAssets } from "./office-assets.ts";
 import { connectOffice, documentVisibility, type OfficeConnection } from "./office-client.ts";
 import { officeTalks, type Talk } from "./office-conversations.ts";
 import { officeDaypart } from "./office-daypart.ts";
-import { busyFloors, FIRST_FLOOR, followPreference, followTarget, nextFloor, OfficeFloorTabs, pickFloor, rememberFollow, type FollowState } from "./office-floor-tabs.tsx";
 import { deskOrder, type ScreenSize } from "./office-geometry.ts";
 import type { Parsed } from "./office-json.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "./office-layout.ts";
 import { EMPTY_MEMORY, officePlacement, type OfficeAdvisor, type Placement, type PlacementMemory } from "./office-placement.ts";
-import type { OfficeRendererProps } from "./office-renderer.ts";
+import type { OfficeFraming, OfficeRendererProps } from "./office-renderer.ts";
 import { createOfficeStore, type OfficeState } from "./office-store.ts";
 import "./office.css";
 
 /** The office's frame below this width uses the phone framing and six desks. */
 export const PHONE_WIDTH = 640;
-/** How often placement and following look at the clock. */
+/** How often placement looks at the clock. */
 const FRAME_TICK_MS = 1_000;
 const SOUND_KEY = "ai:office:sound";
 
@@ -95,27 +95,41 @@ function useScreenSize(ref: RefObject<HTMLDivElement | null>): ScreenSize {
 	return size;
 }
 
-/** What the office shows at one moment: everyone's place (with the memory that keeps people from running about) and the floor. */
+/** What the office shows at one moment: everyone's place (with the memory that keeps people from running about) and the talks among them. */
 interface Frame {
 	readonly now: number;
 	readonly placements: readonly Placement[];
 	readonly memory: PlacementMemory;
-	readonly floor: FollowState;
 	readonly talks: readonly Talk[];
 }
 
-const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, floor: FIRST_FLOOR, talks: [] };
+const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, talks: [] };
 
-/** The next frame: places from the store's state at `now`, the talks among them, then the floor following the newest work (or the crowd). `advisor`: who Advisor is to the viewer. */
-export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, follow: boolean, advisor: OfficeAdvisor | null = null): Frame {
+/** The next frame: places from the store's state at `now`, then the talks among them. `advisor`: who Advisor is to the viewer. */
+export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, advisor: OfficeAdvisor | null = null): Frame {
 	const placed = officePlacement(state, layout, now, prev.memory, advisor);
 	return {
 		now,
 		placements: placed.placements,
 		memory: placed.memory,
-		floor: nextFloor(prev.floor, { follow, now, latest: followTarget(placed.placements) }),
 		talks: officeTalks(placed.placements, state, layout, now),
 	};
+}
+
+/** The framing a frame of `size` opens with: a phone on the work zone, a wide screen on the whole plan. */
+export function openingFraming(size: ScreenSize): OfficeFraming {
+	return size === "phone" ? "work" : "overview";
+}
+
+/** The framing button: its label names the other framing, one press goes there. No mode, no memory across visits. */
+function FramingButton({ framing, onChange }: { framing: OfficeFraming; onChange: (framing: OfficeFraming) => void }) {
+	const t = useMachinesCopy().office;
+	const overview = framing === "overview";
+	return (
+		<button type="button" className="of-toggle of-framing" title={overview ? t.backToWorkHint : t.overviewHint} onClick={() => onChange(overview ? "work" : "overview")} data-framing={framing} data-id="office-framing">
+			{overview ? t.backToWork : t.overview}
+		</button>
+	);
 }
 
 function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; threadId: string; layout: OfficeLayout; advisor: OfficeAdvisor | null }) {
@@ -139,13 +153,11 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	const size = useScreenSize(box);
 	// The phone uses six of the eight desks: people keep theirs when it stays offered.
 	useEffect(() => store.setDesks(deskOrder(layout, size)), [store, layout, size]);
-	const [follow, setFollow] = useState(followPreference);
-	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), follow, advisor));
-	// The frame moves on with every change of the store and every second while the page shows (holds and following run on the clock).
-	const following = useRef(follow);
-	useEffect(() => {
-		following.current = follow;
-	}, [follow]);
+	// Until the viewer presses the framing button, the framing follows the frame's size.
+	const [chosenFraming, setFraming] = useState<OfficeFraming | null>(null);
+	const framing: OfficeFraming = chosenFraming ?? openingFraming(size);
+	const [frame, setFrame] = useState<Frame>(() => advanceFrame(EMPTY_FRAME, store.state(), layout, Date.now(), advisor));
+	// The frame moves on with every change of the store and every second while the page shows (holds run on the clock).
 	// Advisor's name or look changed in the profile: the next frame (at most a second later) shows it.
 	const advisorNow = useRef(advisor);
 	useEffect(() => {
@@ -154,7 +166,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	useEffect(() => {
 		const step = (): void => {
 			if (documentVisibility.hidden()) return;
-			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), following.current, advisorNow.current));
+			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), advisorNow.current));
 		};
 		const off = store.subscribe(step);
 		const timer = window.setInterval(step, FRAME_TICK_MS);
@@ -188,16 +200,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	return (
 		<div className="of" ref={box} data-id="office" data-size={size}>
 			<div className="of-bar">
-				<OfficeFloorTabs
-					floor={frame.floor.floor}
-					busy={busyFloors(frame.placements)}
-					follow={follow}
-					onPick={(level) => setFrame((prev) => ({ ...prev, floor: pickFloor(level, Date.now()) }))}
-					onFollow={(on) => {
-						rememberFollow(on);
-						setFollow(on);
-					}}
-				/>
+				<FramingButton framing={framing} onChange={setFraming} />
 				<button
 					type="button"
 					className="of-toggle"
@@ -235,7 +238,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 					{t.loading}
 				</p>
 			) : (
-				<Renderer state={state} placements={frame.placements} talks={frame.talks} layout={layout} floor={frame.floor.floor} size={size} daypart={officeDaypart(frame.now)} assets={assets} now={frame.now} sound={sound} />
+				<Renderer state={state} placements={frame.placements} talks={frame.talks} layout={layout} framing={framing} size={size} daypart={officeDaypart(frame.now)} assets={assets} now={frame.now} sound={sound} />
 			)}
 		</div>
 	);

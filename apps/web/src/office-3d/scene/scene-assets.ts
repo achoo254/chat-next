@@ -1,8 +1,8 @@
 // The 3D part of public/office/office-assets.json (written by the asset
 // pipeline next to the 2D pictures):
-//   floors[].scene  the floor's baked shell GLB, its day and night lightmaps
+//   zones[].scene   the zone's baked shell GLB, its day and night lightmaps
 //                   at 1024 and 2048, one props GLB holding every model first
-//                   used on that floor (one named node per model) and the
+//                   used in that zone (one named node per model) and the
 //                   list of those model names; where each prop stands is in
 //                   the shell GLB's asset.extras (shell-extras.ts);
 //   character       the rigged model, its clip names and one skin atlas
@@ -21,17 +21,17 @@
 // office-assets.ts (shared with the 2D view) checks the 2D pictures.
 import { ASSETS_BASE, layoutHash } from "../../machines/office/office-assets.ts";
 import { arrayOf, isRecord, numberOf, stringOf } from "../../machines/office/office-json.ts";
-import { isFloorLevel, type FloorLevel } from "../../machines/office/office-rooms.ts";
+import { isZoneId, ZONE_IDS, type ZoneId } from "../../machines/office/office-layout.ts";
 
-export const SCENE_ASSETS_FORMAT_VERSION = 1;
+export const SCENE_ASSETS_FORMAT_VERSION = 2;
 
 export type LightmapSize = 1024 | 2048;
 
-export interface FloorAssets {
+export interface ZoneAssets {
 	readonly shell: string | null;
 	/** Lightmap file by time of day and edge size. */
 	readonly lightmaps: { readonly day: Partial<Record<LightmapSize, string>>; readonly night: Partial<Record<LightmapSize, string>> };
-	/** The GLB with the models first used on this floor (one node per model), or null. */
+	/** The GLB with the models first used in this zone (one node per model), or null. */
 	readonly props: string | null;
 	/** The model names that GLB holds. */
 	readonly models: readonly string[];
@@ -83,7 +83,7 @@ export interface RobotAssets {
 }
 
 export interface SceneAssets {
-	readonly floors: ReadonlyMap<FloorLevel, FloorAssets>;
+	readonly zones: ReadonlyMap<ZoneId, ZoneAssets>;
 	readonly character: CharacterAssets | null;
 	/** The Director's own model, or null (the Director wears the staff model's concept skin). */
 	readonly directorCharacter: DirectorAssets | null;
@@ -94,7 +94,7 @@ export interface SceneAssets {
 	readonly serviceRobot: RobotAssets | null;
 }
 
-export const NO_SCENE_ASSETS: SceneAssets = { floors: new Map(), character: null, directorCharacter: null, accessories: null, sounds: new Map(), serviceRobot: null };
+export const NO_SCENE_ASSETS: SceneAssets = { zones: new Map(), character: null, directorCharacter: null, accessories: null, sounds: new Map(), serviceRobot: null };
 
 /** A file under ASSETS_BASE: a name, or one folder and a name; nothing that climbs out. */
 const SAFE_PATH = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)?$/;
@@ -127,7 +127,7 @@ function sizes(value: unknown): Partial<Record<LightmapSize, string>> {
 	return out;
 }
 
-function floorScene(value: unknown): FloorAssets {
+function zoneScene(value: unknown): ZoneAssets {
 	const scene = isRecord(value) ? value : {};
 	const lightmaps = isRecord(scene.lightmaps) ? scene.lightmaps : {};
 	const props = file(scene.props);
@@ -214,15 +214,15 @@ function soundsOf(value: unknown): Map<string, SoundFile> {
 /** The 3D assets of a parsed asset file, or none when it is not for `hash` (the current layout's). */
 export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 	if (!isRecord(json) || json.formatVersion !== SCENE_ASSETS_FORMAT_VERSION || json.layoutSha256 !== hash) return NO_SCENE_ASSETS;
-	const floors = new Map<FloorLevel, FloorAssets>();
-	for (const entry of arrayOf(json.floors)) {
+	const zones = new Map<ZoneId, ZoneAssets>();
+	for (const entry of arrayOf(json.zones)) {
 		if (!isRecord(entry)) continue;
-		const level = entry.level;
-		if (!isFloorLevel(level)) continue;
-		if (isRecord(entry.scene)) floors.set(level, floorScene(entry.scene));
+		const id = entry.id;
+		if (!isZoneId(id)) continue;
+		if (isRecord(entry.scene)) zones.set(id, zoneScene(entry.scene));
 	}
 	return {
-		floors,
+		zones,
 		character: characterOf(json.character),
 		directorCharacter: directorOf(json.directorCharacter),
 		accessories: accessoriesOf(json.accessories),
@@ -231,22 +231,21 @@ export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
 	};
 }
 
-/** The lightmap pair for a floor at a size (falling back to the other size), or null without both. */
-export function lightmapPair(floor: FloorAssets, size: LightmapSize): { readonly day: string; readonly night: string } | null {
+/** The lightmap pair for a zone at a size (falling back to the other size), or null without both. */
+export function lightmapPair(zone: ZoneAssets, size: LightmapSize): { readonly day: string; readonly night: string } | null {
 	const other = size === 1024 ? 2048 : 1024;
-	const day = floor.lightmaps.day[size] ?? floor.lightmaps.day[other];
-	const night = floor.lightmaps.night[size] ?? floor.lightmaps.night[other];
+	const day = zone.lightmaps.day[size] ?? zone.lightmaps.day[other];
+	const night = zone.lightmaps.night[size] ?? zone.lightmaps.night[other];
 	return day === undefined || night === undefined ? null : { day, night };
 }
 
-/** Model name → the props GLB holding it, over every floor (the first floor listing a name wins). */
+/** Model name → the props GLB holding it, over every zone in a, b, c, d order (the first zone listing a name wins). */
 export function propSources(assets: SceneAssets): ReadonlyMap<string, string> {
 	const out = new Map<string, string>();
-	const levels = [...assets.floors.keys()].sort((a, b) => a - b);
-	for (const level of levels) {
-		const floor = assets.floors.get(level);
-		if (floor?.props == null) continue;
-		for (const name of floor.models) if (!out.has(name)) out.set(name, floor.props);
+	for (const id of ZONE_IDS) {
+		const zone = assets.zones.get(id);
+		if (zone?.props == null) continue;
+		for (const name of zone.models) if (!out.has(name)) out.set(name, zone.props);
 	}
 	return out;
 }

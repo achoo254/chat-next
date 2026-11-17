@@ -41,8 +41,8 @@ after(async () => {
 	await server?.close();
 });
 
-/** The people of `floor` after `steps` of the fake office's script and, when given, the page clock set to `at`. */
-async function peopleOn(floor: number, steps: number, at: string | null): Promise<readonly Person[]> {
+/** The people drawn on the plan after `steps` of the fake office's script and, when given, the page clock set to `at`. */
+async function peopleOn(steps: number, at: string | null): Promise<readonly Person[]> {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 }, timezoneId: TIME_ZONE });
 	try {
 		await context.clock.install({ time: new Date(OFFICE_HOURS) });
@@ -50,7 +50,6 @@ async function peopleOn(floor: number, steps: number, at: string | null): Promis
 			([key, value]) => {
 				window.localStorage.setItem(key, value);
 				window.localStorage.setItem("ai:office:sound", "off");
-				window.localStorage.setItem("ai:office:follow", "off");
 			},
 			["ai:office:3d-flags", FLAGS_3D] as const,
 		);
@@ -60,6 +59,9 @@ async function peopleOn(floor: number, steps: number, at: string | null): Promis
 		await page.evaluate(() => (window as TestWindow).__fakeOffice?.pause());
 		await page.locator("[data-id=session-mode-office]").click();
 		await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
+		// A desktop window opens on the whole plan, so every place measured is in view; the framing button is never pressed.
+		const framing = page.locator("[data-id=office] [data-id=office-framing]");
+		assert.equal(await framing.getAttribute("data-framing"), "overview", "the office opens on the whole plan");
 		for (let i = 0; i <= steps; i += 1) {
 			await page.evaluate(() => (window as TestWindow).__fakeOffice?.step());
 			await page.waitForTimeout(200);
@@ -69,11 +71,11 @@ async function peopleOn(floor: number, steps: number, at: string | null): Promis
 			await context.clock.setSystemTime(new Date(at));
 			await page.waitForTimeout(3000);
 		}
-		await page.locator(`[data-id=office-floor-${floor}]`).click();
 		await page.waitForTimeout(22_000);
+		assert.equal(await framing.getAttribute("data-framing"), "overview", "the office stays on the whole plan");
 		const read = await page.evaluate(() => (window as TestWindow).__office?.read());
 		assert.ok(read, "the test API is there");
-		return read.people.filter((p) => p.floor === floor && p.probe !== null);
+		return read.people.filter((p) => p.probe !== null);
 	} finally {
 		await context.close();
 	}
@@ -82,7 +84,7 @@ async function peopleOn(floor: number, steps: number, at: string | null): Promis
 const rel = (p: Person, y: number): number => y - (p.probe?.root.y ?? 0);
 
 test("the director sits like the staff: pelvis on the seat, feet clear of the floor", async () => {
-	const people = await peopleOn(1, 0, null);
+	const people = await peopleOn(0, null);
 	const director = people.find((p) => p.key === "director");
 	assert.ok(director?.probe, "the director is drawn");
 	assert.equal(director.pose, "sit-think");
@@ -95,7 +97,7 @@ test("everyone on a bed rests on the mattress and stays within the bed: asleep a
 		["asleep", BEDTIME, "sleep"],
 		["lying back", AFTER_WORK, "lounge"],
 	] as const) {
-		const people = await peopleOn(4, 21, at);
+		const people = await peopleOn(21, at);
 		const lying = people.filter((p) => p.pose === pose);
 		assert.ok(lying.length >= 3, `${label}: several people lie on beds (${lying.length})`);
 		for (const p of lying) {
@@ -108,7 +110,7 @@ test("everyone on a bed rests on the mattress and stays within the bed: asleep a
 });
 
 test("standing and walking people have their feet on the floor: the director as the staff", async () => {
-	const people = await peopleOn(1, 9, null);
+	const people = await peopleOn(9, null);
 	const standing = people.filter((p) => p.pose.startsWith("stand") || p.pose === "walk");
 	assert.ok(standing.some((p) => p.key === "director"), "the director stands somewhere");
 	for (const p of standing) assert.ok(Math.abs(rel(p, p.probe?.min.y ?? NaN)) < 0.04, `${p.key} (${p.pose}) feet at the floor: ${rel(p, p.probe?.min.y ?? NaN).toFixed(3)}`);

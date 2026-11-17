@@ -5,7 +5,7 @@
 // winning and never two people on one place.
 import { OfficeActorState, OfficeRoom } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { anchorById } from "../../src/machines/office/office-geometry.ts";
+import { anchorById, zoneOfRoom } from "../../src/machines/office/office-geometry.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
 import { allocateLifePlaces, lifeCandidates } from "../../src/machines/office/office-life-places.ts";
 import { awakeAct, lifeActAt, lifePlanAt, lifeTraits, localHour, SHIFT_MINUTES, slotAt } from "../../src/machines/office/office-life-schedule.ts";
@@ -114,7 +114,7 @@ describe("the parts of the day", () => {
 	});
 });
 
-describe("places on the living floor", () => {
+describe("places in the living rooms", () => {
 	it("tries places in each person's own order and never gives one place to two", () => {
 		const plan = { slot: "sleep" as const, kinds: ["bed", "tv"] as const };
 		const orders = ["a#1", "b#1", "c#1"].map((k) => lifeCandidates(layout(), k, { ...plan, kinds: [...plan.kinds] })[0]?.id);
@@ -140,12 +140,14 @@ describe("living by the schedule", () => {
 		const store = resting();
 		const night = find(placeAt(store, localAt(23, 30)), "director");
 		expect(night.anchorId).toMatch(/^bed-\d$/);
-		expect(night).toMatchObject({ floor: 4, room: "DORM", activityRoom: null, life: { slot: "sleep", act: "sleep" } });
+		expect(night).toMatchObject({ room: "DORM", activityRoom: null, life: { slot: "sleep", act: "sleep" } });
+		expect(zoneOfRoom(layout(), night.room)).toBe("d");
 		const evening = find(placeAt(store, localAt(20)), "director");
 		expect(evening.anchorId).toMatch(/^(tv|dine)-\d$/);
-		expect(evening.floor).toBe(4);
+		expect(zoneOfRoom(layout(), evening.room)).toBe("d");
 		const morning = find(placeAt(store, localAt(10)), "director");
-		expect(morning).toMatchObject({ floor: 1, room: "DIRECTOR", life: null });
+		expect(morning).toMatchObject({ room: "DIRECTOR", anchorId: "director", life: null });
+		expect(zoneOfRoom(layout(), morning.room)).toBe("a");
 	});
 
 	it("follows a clock set back at once (no hold on time that has not passed)", () => {
@@ -166,14 +168,14 @@ describe("living by the schedule", () => {
 		expect(find(placeAt(between, localAt(23, 30)), "director").room).toBe("DIRECTOR");
 	});
 
-	it("sends finished employees to bed at night and keeps them on the work floors in office hours", () => {
+	it("sends finished employees to bed at night and keeps them in the work rooms in office hours", () => {
 		const store = resting(["scout", "tester"]);
 		const night = placeAt(store, localAt(1));
 		expect(find(night, "scout#1").room).toBe("DORM");
 		expect(find(night, "tester#1").room).toBe("DORM");
 		const day = placeAt(store, localAt(10));
 		expect(find(day, "scout#1").room).toBe("WORK");
-		expect(find(day, "tester#1").floor).not.toBe(4);
+		expect(zoneOfRoom(layout(), find(day, "tester#1").room)).not.toBe("d");
 	});
 
 	it("shows at most twelve residents, never two on one place, from the dorm into the lounge when the beds are full", () => {
