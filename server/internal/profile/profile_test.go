@@ -12,7 +12,7 @@ func TestValidUsername(t *testing.T) {
 			t.Errorf("ValidUsername(%q) = false", u)
 		}
 	}
-	for _, u := range []string{"", "ab", "Abc", "a-b", "a.b", "ab c", strings.Repeat("a", 33), "tên"} {
+	for _, u := range []string{"", "ab", "Abc", "a-b", "a.b", "ab c", "ext_123", strings.Repeat("a", 33), "tên"} {
 		if ValidUsername(u) {
 			t.Errorf("ValidUsername(%q) = true", u)
 		}

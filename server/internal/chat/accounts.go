@@ -131,7 +131,7 @@ func (s *Service) LeaveAllChats(ctx context.Context, userID int64) error {
 	for chatID, peer := range peers {
 		var keep bool
 		if err := s.pool.QueryRow(ctx, `
-			SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND NOT is_bot AND deleted_at IS NULL)`, peer).Scan(&keep); err != nil {
+			SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND NOT is_bot AND external_source IS NULL AND deleted_at IS NULL)`, peer).Scan(&keep); err != nil {
 			return fmt.Errorf("chat: private chat peer: %w", err)
 		}
 		if !keep {
@@ -176,7 +176,7 @@ func (t *txn) leaveForErasure(ctx context.Context, chatID, userID int64) error {
 		err := t.tx.QueryRow(ctx, `
 			SELECT m.user_id FROM chat_members m JOIN users u ON u.id = m.user_id
 			WHERE m.chat_id = $1 AND m.left_at IS NULL AND m.user_id <> $2
-				AND NOT u.is_bot AND u.deletion_requested_at IS NULL AND u.deleted_at IS NULL
+				AND NOT u.is_bot AND u.external_source IS NULL AND u.deletion_requested_at IS NULL AND u.deleted_at IS NULL
 			ORDER BY m.role = 'admin' DESC, m.joined_at, m.user_id LIMIT 1`, chatID, userID).Scan(&heir)
 		switch {
 		case isNoRows(err):

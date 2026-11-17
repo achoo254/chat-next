@@ -156,7 +156,7 @@ func (d *Digest) Stats(ctx context.Context, day time.Time) (*DigestStats, error)
 	tenant := d.cfg.TenantID
 	err := d.cfg.Pool.QueryRow(ctx, `
 		SELECT
-			(SELECT count(*) FROM users WHERE tenant_id = $1 AND created_at >= $2 AND created_at < $3 AND NOT is_bot),
+			(SELECT count(*) FROM users WHERE tenant_id = $1 AND created_at >= $2 AND created_at < $3 AND NOT is_bot AND external_source IS NULL),
 			(SELECT count(*) FROM feedback WHERE tenant_id = $1 AND created_at >= $2 AND created_at < $3),
 			(SELECT count(*) FROM feedback WHERE tenant_id = $1 AND status = 'open'),
 			(SELECT count(*) FROM reports WHERE tenant_id = $1 AND created_at >= $2 AND created_at < $3),
@@ -168,7 +168,7 @@ func (d *Digest) Stats(ctx context.Context, day time.Time) (*DigestStats, error)
 	if err := d.cfg.Pool.QueryRow(ctx, `
 		SELECT count(*), count(DISTINCT m.from_id)
 		FROM messages m JOIN chats c ON c.id = m.chat_id JOIN users u ON u.id = m.from_id
-		WHERE m.id >= $2 AND m.id < $3 AND c.tenant_id = $1 AND NOT u.is_bot AND (m.text <> '' OR m.media_kind <> 0)`,
+		WHERE m.id >= $2 AND m.id < $3 AND c.tenant_id = $1 AND NOT u.is_bot AND u.external_source IS NULL AND (m.text <> '' OR m.media_kind <> 0)`,
 		tenant, ids.SnowflakeFloor(start), ids.SnowflakeFloor(end)).Scan(&s.Messages, &s.Senders); err != nil {
 		return nil, fmt.Errorf("watch: digest messages: %w", err)
 	}

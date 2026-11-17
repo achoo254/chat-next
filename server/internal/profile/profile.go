@@ -47,8 +47,12 @@ var usernamePattern = regexp.MustCompile(`^[a-z0-9_]{3,32}$`)
 // ValidUsername reports whether u is an acceptable username (already
 // lowercase).
 func ValidUsername(u string) bool {
-	return usernamePattern.MatchString(u)
+	return usernamePattern.MatchString(u) && !strings.HasPrefix(u, ExternalUsernamePrefix)
 }
+
+// ExternalUsernamePrefix starts the username of every puppet user of an
+// imported chat (ADR 0022); no one else may choose it.
+const ExternalUsernamePrefix = "ext_"
 
 // NormalizeUsername lowercases user input and trims surrounding white space;
 // the result still has to pass ValidUsername.

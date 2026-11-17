@@ -7,6 +7,7 @@ import (
 
 	"app.local/server/internal/auth"
 	"app.local/server/internal/botupdates"
+	"app.local/server/internal/bridge"
 	"app.local/server/internal/config"
 	"app.local/server/internal/sealbox"
 	"app.local/server/internal/store"
@@ -35,6 +36,9 @@ func reseal(ctx context.Context, cfg config.Config, logger *slog.Logger) (unread
 		}},
 		{"bot webhook secrets", func() (sealbox.Count, error) {
 			return botupdates.ResealWebhookSecrets(ctx, st.Pool(), cfg.TenantID, cfg.SessionKey, cfg.SessionKeyPrevious)
+		}},
+		{"bridge account secrets", func() (sealbox.Count, error) {
+			return bridge.ResealSecrets(ctx, st.Pool(), cfg.SessionKey, cfg.SessionKeyPrevious)
 		}},
 	} {
 		n, err := part.run()

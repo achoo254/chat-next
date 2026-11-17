@@ -296,6 +296,9 @@ type userRow struct {
 	Email    string
 	LastSeen *time.Time
 	IsBot    bool
+	// External: a puppet user standing for a contact of another app
+	// (ADR 0022); it is never found, messaged, added to groups or befriended.
+	External bool
 	// InlinePlaceholder: a bot with inline mode on ("" when off).
 	InlinePlaceholder string
 	// Deleted: the account is being erased or was erased; others see a
@@ -339,7 +342,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot,
+		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot, u.external_source IS NOT NULL,
 			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, ''),
 			coalesce(pf.public_id, '')
 		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
@@ -352,7 +355,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.External, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u

@@ -90,8 +90,13 @@ func (s *Service) activeChatFor(ctx context.Context, q querier, chatID, userID i
 }
 
 // activeMembers returns the user ids of the chat's current members.
+// Puppet users of an imported chat (users.external_source) are left out:
+// they never sign in, so they get no update log, user_state row or unread
+// count (ADR 0022).
 func activeMembers(ctx context.Context, q querier, chatID int64) ([]int64, error) {
-	rows, err := q.Query(ctx, `SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL ORDER BY user_id`, chatID)
+	rows, err := q.Query(ctx, `
+		SELECT m.user_id FROM chat_members m JOIN users u ON u.id = m.user_id
+		WHERE m.chat_id = $1 AND m.left_at IS NULL AND u.external_source IS NULL ORDER BY m.user_id`, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("chat: list members: %w", err)
 	}
@@ -154,6 +159,9 @@ func (s *Service) CreatePrivate(ctx context.Context, me, peer int64) (*appv1.Cha
 		}
 		if !isNoRows(err) {
 			return fmt.Errorf("chat: find private chat: %w", err)
+		}
+		if err := s.refuseExternal(ctx, t.tx, peer); err != nil {
+			return err
 		}
 		if err := s.checkCanMessage(ctx, t.tx, me, peer); err != nil {
 			return err

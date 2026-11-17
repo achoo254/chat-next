@@ -74,7 +74,7 @@ func humansOf(ctx context.Context, q querier, ids []int64) ([]int64, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	rows, err := q.Query(ctx, `SELECT id FROM users WHERE id = ANY($1) AND NOT is_bot ORDER BY id`, ids)
+	rows, err := q.Query(ctx, `SELECT id FROM users WHERE id = ANY($1) AND NOT is_bot AND external_source IS NULL ORDER BY id`, ids)
 	if err != nil {
 		return nil, fmt.Errorf("chat: notice users: %w", err)
 	}

@@ -6,7 +6,7 @@ Runbook đổi khoá và secret của app chat trên production. Mọi lệnh ch
 
 | Khoá, secret | Nằm ở | Bảo vệ gì | Cách đổi |
 |---|---|---|---|
-| `SESSION_KEY` | `/opt/chat/.env` | Refresh token và ID token của IdP trong `user_sessions`, secret webhook của bot trong `bots`, cookie đăng nhập, URL tải media và URL tải bản xuất dữ liệu | [Mục dưới](#session_key), không ai bị đăng xuất |
+| `SESSION_KEY` | `/opt/chat/.env` | Refresh token và ID token của IdP trong `user_sessions`, secret webhook của bot trong `bots`, trạng thái đăng nhập của tài khoản app ngoài (Chat Bridge) trong `external_accounts`, cookie đăng nhập, URL tải media và URL tải bản xuất dữ liệu | [Mục dưới](#session_key), không ai bị đăng xuất |
 | `OIDC_CLIENT_SECRET` | `/opt/chat/.env` | Client `chat-web` khi gọi IdP | [Mục dưới](#oidc_client_secret) |
 | Mật khẩu role Postgres `chat` | `DATABASE_URL` trong `/opt/chat/.env` | Database `chat` | [Mục dưới](#mật-khẩu-database) |
 | `WEB_PUSH_VAPID_PRIVATE_KEY` | `/opt/chat/.env` | Đăng ký Web Push | **Không đổi**: đổi làm mất mọi đăng ký push. Chỉ đổi khi khoá lộ, chấp nhận người dùng phải bật lại thông báo |
@@ -22,7 +22,7 @@ Mỗi giá trị lưu bằng `SESSION_KEY` mang key id của khoá đã niêm ph
 
 Script [`infra/chat/rotate-session-key.sh`](../../infra/chat/rotate-session-key.sh) làm cả quy trình cho `/opt/chat/.env` và pm2 `chat-api`.
 
-1. Bắt đầu: `bash /opt/chat/infra/rotate-session-key.sh start`. Script backup database (`backup-chat-db.sh`) và env file (`<env>.rotate-bak-<thời gian>`), chuyển khoá cũ sang `SESSION_KEY_PREVIOUS`, sinh `SESSION_KEY` mới, ghi thời điểm bắt đầu (`<env>.rotation-started`), reload `chat-api` rồi chạy `reseal`. Kết quả đúng: hai dòng log `resealed session IdP tokens` và `resealed bot webhook secrets` với `unreadable: 0`, `key_id` mới khác `previous_key_id`. Nếu reload hoặc `reseal` lỗi, khoá mới đã nằm trong file: sửa nguyên nhân rồi chạy `rotate-session-key.sh reseal`, không chạy lại `start` và chưa chạy `finish`.
+1. Bắt đầu: `bash /opt/chat/infra/rotate-session-key.sh start`. Script backup database (`backup-chat-db.sh`) và env file (`<env>.rotate-bak-<thời gian>`), chuyển khoá cũ sang `SESSION_KEY_PREVIOUS`, sinh `SESSION_KEY` mới, ghi thời điểm bắt đầu (`<env>.rotation-started`), reload `chat-api` rồi chạy `reseal`. Kết quả đúng: ba dòng log `resealed session IdP tokens`, `resealed bot webhook secrets` và `resealed bridge account secrets` với `unreadable: 0`, `key_id` mới khác `previous_key_id`. Nếu reload hoặc `reseal` lỗi, khoá mới đã nằm trong file: sửa nguyên nhân rồi chạy `rotate-session-key.sh reseal`, không chạy lại `start` và chưa chạy `finish`.
 2. Chờ ít nhất 6 giờ: URL tải lên phần media sống 6 giờ, URL tải media 1 giờ, URL tải bản xuất 10 phút, cookie đăng nhập 10 phút. Các token này không lưu nên `reseal` không chuyển được, chúng còn hợp lệ nhờ khoá cũ.
 3. Kết thúc: `bash /opt/chat/infra/rotate-session-key.sh finish`. Script từ chối nếu chưa đủ 6 giờ từ `start`. Nó chạy `reseal` khi khoá cũ còn trong file và dừng nếu có giá trị không đọc được; sạch thì xoá `SESSION_KEY_PREVIOUS`, reload, chạy `reseal` lần nữa (mọi giá trị phải là `current`) rồi xoá các bản `rotate-bak` của lần xoay này, vì đó là bản cuối còn giữ khoá cũ.
 
@@ -36,7 +36,7 @@ Khoá cũ còn ở hai nơi script không dọn: các bản `.env.bak-*` do ngư
 
 ### Khi `reseal` báo `unreadable` khác 0
 
-Role trả mã thoát 1 và script dừng; ở bước 3 script dừng trước khi bỏ khoá cũ. Giữ nguyên `SESSION_KEY_PREVIOUS`. Nguyên nhân thường gặp: dữ liệu niêm phong bằng một khoá cũ hơn khoá trước đó (đã xoay hai lần mà lần trước chưa `finish`), hoặc env file khôi phục nhầm bản backup. Tìm bản `.env.bak-*` có khoá đúng và chạy `reseal` với khoá đó làm `SESSION_KEY_PREVIOUS`. Không tìm được thì chấp nhận: phiên có token không mở được bị kết thúc ở lần kiểm tra grant tới (người dùng đăng nhập lại), webhook của bot báo `secret_unreadable` cho tới khi chủ bot lưu lại webhook.
+Role trả mã thoát 1 và script dừng; ở bước 3 script dừng trước khi bỏ khoá cũ. Giữ nguyên `SESSION_KEY_PREVIOUS`. Nguyên nhân thường gặp: dữ liệu niêm phong bằng một khoá cũ hơn khoá trước đó (đã xoay hai lần mà lần trước chưa `finish`), hoặc env file khôi phục nhầm bản backup. Tìm bản `.env.bak-*` có khoá đúng và chạy `reseal` với khoá đó làm `SESSION_KEY_PREVIOUS`. Không tìm được thì chấp nhận: phiên có token không mở được bị kết thúc ở lần kiểm tra grant tới (người dùng đăng nhập lại), webhook của bot báo `secret_unreadable` cho tới khi chủ bot lưu lại webhook, tài khoản app ngoài có secret không mở được phải đăng nhập lại app đó (Chat Bridge).
 
 ### Rollback
 

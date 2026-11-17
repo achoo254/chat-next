@@ -42,6 +42,9 @@ type newMessage struct {
 	groupedID int64
 	text      string
 	content   *appv1.Message
+	// date is the original send time of an imported message; zero means now.
+	// It never lies in the future.
+	date time.Time
 }
 
 // postMessage issues the next seq of a locked chat, stores the message and
@@ -63,9 +66,16 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 	}
 	m := &messageRow{ChatID: c.ID, TopicID: nm.topicID, FromID: nm.fromID, RandomID: nm.randomID, Text: nm.text,
 		Content: content, ReplyToSeq: nm.replyTo, GroupedID: nm.groupedID}
+	// An imported message keeps its original date (never after now()), and a
+	// chat is listed by its newest message, so an old import never moves it up.
+	var sentAt *time.Time
+	if !nm.date.IsZero() {
+		sentAt = &nm.date
+	}
 	if err := t.tx.QueryRow(ctx, `
-		UPDATE chats SET last_seq = last_seq + 1, last_message_at = now(), updated_at = now() WHERE id = $1
-		RETURNING last_seq, now()`, c.ID).Scan(&m.Seq, &m.Date); err != nil {
+		UPDATE chats SET last_seq = last_seq + 1, last_message_at = greatest(last_message_at, x.d), updated_at = now()
+		FROM (SELECT least(coalesce($2::timestamptz, now()), now()) AS d) x WHERE id = $1
+		RETURNING last_seq, x.d`, c.ID, sentAt).Scan(&m.Seq, &m.Date); err != nil {
 		return nil, fmt.Errorf("chat: next seq: %w", err)
 	}
 	sf := search.FieldsOf(c.Type, m.Text, nm.content)
@@ -169,6 +179,17 @@ func utf16Slice(text string, offset, length int) string {
 // the links, e-mails, mentions and hashtags of the plain text
 // (withDetectedEntities).
 func (s *Service) validateText(text string, ents []*appv1.MessageEntity, allowEmpty bool) (string, []*appv1.MessageEntity, error) {
+	text, out, err := s.validateEntities(text, ents, allowEmpty)
+	if err != nil {
+		return "", nil, err
+	}
+	return text, s.withDetectedEntities(text, out), nil
+}
+
+// validateEntities is validateText without the detection of links,
+// mentions and hashtags in plain text: what an import keeps is exactly the
+// entities the other app sent.
+func (s *Service) validateEntities(text string, ents []*appv1.MessageEntity, allowEmpty bool) (string, []*appv1.MessageEntity, error) {
 	if !utf8.ValidString(text) || strings.ContainsRune(text, 0) {
 		return "", nil, errInvalid("text is not valid UTF-8")
 	}
@@ -219,7 +240,7 @@ func (s *Service) validateText(text string, ents []*appv1.MessageEntity, allowEm
 			}
 		}
 	}
-	return text, s.withDetectedEntities(text, out), nil
+	return text, out, nil
 }
 
 var bareURL = regexp.MustCompile(`https?://[^\s<>"'` + "`" + `]+`)
@@ -318,6 +339,9 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 		return 0, errDenied("you cannot send messages in this chat")
 	}
 	if err := s.checkUnrestricted(ctx, q, me); err != nil {
+		return 0, err
+	}
+	if err := refuseReadOnlyImport(ctx, q, c.ID); err != nil {
 		return 0, err
 	}
 	if err := checkPrivatePeer(ctx, q, c, me); err != nil {
@@ -472,8 +496,9 @@ func (t *txn) fanoutSeeing(ctx context.Context, c *chatRow, seq int64) ([]int64,
 		return nil, nil
 	}
 	rows, err := t.tx.Query(ctx, `
-		SELECT user_id FROM chat_members WHERE chat_id = $1 AND left_at IS NULL AND visible_from_seq <= $2
-		ORDER BY user_id`, c.ID, seq)
+		SELECT m.user_id FROM chat_members m JOIN users u ON u.id = m.user_id
+		WHERE m.chat_id = $1 AND m.left_at IS NULL AND m.visible_from_seq <= $2 AND u.external_source IS NULL
+		ORDER BY m.user_id`, c.ID, seq)
 	if err != nil {
 		return nil, fmt.Errorf("chat: list members: %w", err)
 	}

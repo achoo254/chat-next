@@ -41,7 +41,7 @@ const liveUser = `u.deletion_requested_at IS NULL AND u.deleted_at IS NULL`
 // findableUser (alias u) is a live user others may find by username, email
 // or search: not one tunelo created before the person opened the chat
 // (profile_pending, placeholder username and name).
-const findableUser = liveUser + ` AND NOT u.profile_pending`
+const findableUser = liveUser + ` AND NOT u.profile_pending AND u.external_source IS NULL`
 
 type privacyRow struct {
 	LastSeen, ProfilePhoto, FindByEmail, FindByUsername, AddToGroups, SendMessages int16
@@ -197,7 +197,7 @@ func (s *Service) filterAddable(ctx context.Context, q querier, me int64, userID
 	}
 	for _, id := range ids {
 		switch {
-		case users[id] == nil || users[id].Deleted:
+		case users[id] == nil || users[id].Deleted || users[id].External:
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_NOT_FOUND})
 		case blocks[blockKey{id, me}]:
 			failed = append(failed, addFailure{id, appv1.AddMemberFailureReason_ADD_MEMBER_FAILURE_REASON_BLOCKED})
@@ -507,6 +507,9 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 	}
 	if id == me {
 		return nil, errInvalid("you cannot add yourself")
+	}
+	if err := s.refuseExternal(ctx, s.pool, id); err != nil {
+		return nil, err
 	}
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
@@ -823,6 +826,21 @@ func (s *Service) checkChatMentions(ctx context.Context, q querier, chatID int64
 	}
 	if n != len(ids) {
 		return errMentionHidden
+	}
+	return nil
+}
+
+// refuseExternal returns NotFound when any of ids is a puppet user of an
+// imported chat: such a user is not a person of this chat system and cannot
+// be messaged, added to a group or made a contact.
+func (s *Service) refuseExternal(ctx context.Context, q querier, ids ...int64) error {
+	var found bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE id = ANY($1) AND tenant_id = $2 AND external_source IS NOT NULL)`,
+		ids, s.cfg.TenantID).Scan(&found); err != nil {
+		return fmt.Errorf("chat: external users: %w", err)
+	}
+	if found {
+		return errNotFound("user")
 	}
 	return nil
 }

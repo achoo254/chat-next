@@ -121,7 +121,7 @@ func ageText(age time.Duration) string {
 var strangerChats24hSQL = `(SELECT count(*) FROM chats c JOIN private_chats pc ON pc.chat_id = c.id
 	WHERE c.creator_id = $1 AND c.type = 'private' AND c.created_at > now() - interval '24 hours'
 		AND pc.user_low <> pc.user_high
-		AND NOT EXISTS (SELECT 1 FROM users b WHERE b.id = pc.user_low + pc.user_high - $1 AND b.is_bot)
+		AND NOT EXISTS (SELECT 1 FROM users b WHERE b.id = pc.user_low + pc.user_high - $1 AND (b.is_bot OR b.external_source IS NOT NULL))
 		AND NOT ` + knowsSQL("pc.user_low + pc.user_high - $1") + `)`
 
 // knowsSQL is an SQL condition, true when the user other (an SQL
