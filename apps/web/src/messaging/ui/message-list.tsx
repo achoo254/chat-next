@@ -155,6 +155,28 @@ function firstMention(store: ChatStore, chatId: number, readInbox: number, self:
 	return 0;
 }
 
+/**
+ * Places the view of a chat just opened, or jumped in: back where the reader
+ * left it scrolled up (as Telegram does; a jump goes first), else at the
+ * jumped-to message, else with the unread divider at the top, else at the
+ * newest message. Returns the message or divider it placed at, if any.
+ */
+function place(element: HTMLElement, focusSeq: number, kept: { seq: number; offset: number } | undefined): HTMLElement | null {
+	const keptNode = focusSeq !== 0 || kept === undefined ? null : element.querySelector<HTMLElement>(`[data-key][data-seq="${kept.seq}"]`);
+	if (kept !== undefined && keptNode !== null) {
+		element.scrollTop = keptNode.offsetTop - kept.offset;
+		return keptNode;
+	}
+	const target =
+		focusSeq !== 0 ? element.querySelector<HTMLElement>(`[data-seq="${focusSeq}"]`) : element.querySelector<HTMLElement>(".unread-div");
+	if (target !== null) {
+		element.scrollTop = Math.max(0, target.offsetTop - (focusSeq !== 0 ? element.clientHeight / 3 : 8));
+		return target;
+	}
+	element.scrollTop = element.scrollHeight;
+	return null;
+}
+
 export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: MessageListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
@@ -170,6 +192,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const keptRow = useRef<{ seq: number; offset: number } | null>(null);
 	const stick = useRef(true);
 	const positioned = useRef("");
+	// The view still shows where it was placed: the reader has not scrolled it since.
+	const pinned = useRef(false);
 	const lastRead = useRef(0);
 	const [atBottom, setAtBottom] = useState(true);
 	// Newest message on screen; messages are read as they come into view.
@@ -204,21 +228,9 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		const placement = `${window_.openings}:${window_.focusToken}`;
 		if (positioned.current !== placement) {
 			positioned.current = placement;
-			// Left scrolled up last time: back where the reader was, as Telegram does (a jump goes first).
-			const kept = window_.focusSeq === 0 ? store.position(chatId, topicId) : undefined;
-			const keptNode = kept === undefined ? null : element.querySelector<HTMLElement>(`[data-key][data-seq="${kept.seq}"]`);
-			const target =
-				window_.focusSeq !== 0
-					? element.querySelector<HTMLElement>(`[data-seq="${window_.focusSeq}"]`)
-					: element.querySelector<HTMLElement>(".unread-div");
-			if (kept !== undefined && keptNode !== null) {
-				element.scrollTop = keptNode.offsetTop - kept.offset;
-			} else if (target !== null) {
-				element.scrollTop = Math.max(0, target.offsetTop - (window_.focusSeq !== 0 ? element.clientHeight / 3 : 8));
-				if (window_.focusSeq !== 0) target.classList.add("flash");
-			} else {
-				element.scrollTop = element.scrollHeight;
-			}
+			const target = place(element, window_.focusSeq, store.position(chatId, topicId));
+			if (target !== null && window_.focusSeq !== 0) target.classList.add("flash");
+			pinned.current = true;
 			// Whether the newest message is on screen decides marking as read.
 			const bottom = element.scrollHeight - element.scrollTop - element.clientHeight < BOTTOM_PX;
 			stick.current = bottom;
@@ -250,6 +262,42 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		},
 		[store, chatId, topicId],
 	);
+
+	// Bubbles grow after the view is placed (buttons and media whose code
+	// loads later, a side panel narrowing the list): until the reader
+	// scrolls, the placement holds, so the unread messages show in full.
+	const reflow = useRef<() => void>(() => {});
+	useLayoutEffect(() => {
+		reflow.current = () => {
+			const element = scroller.current;
+			if (element === null || window_?.status !== "ready") return;
+			if (stick.current && window_.live) element.scrollTop = element.scrollHeight;
+			else if (pinned.current) place(element, window_.focusSeq, store.position(chatId, topicId));
+		};
+	});
+	const mounted = loader === null && window_ !== undefined;
+	useEffect(() => {
+		const element = scroller.current;
+		if (!mounted || element === null || typeof ResizeObserver === "undefined") return;
+		const resized = new ResizeObserver(() => reflow.current());
+		resized.observe(element);
+		for (const row of element.children) resized.observe(row);
+		const rows = new MutationObserver((records) => {
+			for (const record of records) {
+				for (const node of record.addedNodes) if (node instanceof Element) resized.observe(node);
+				for (const node of record.removedNodes) if (node instanceof Element) resized.unobserve(node);
+			}
+		});
+		rows.observe(element, { childList: true });
+		return () => {
+			resized.disconnect();
+			rows.disconnect();
+		};
+	}, [mounted]);
+	// Scrolling by the reader (wheel, touch, keys, the scrollbar) ends the placement.
+	const unpin = () => {
+		pinned.current = false;
+	};
 
 	const onScroll = () => {
 		const element = scroller.current;
@@ -297,6 +345,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	}, [reading, liveRead, atNewest, shownSeq, topSeq, readInbox, chatId, topicId, source, backend, store]);
 
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+		unpin();
 		if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
 		const current = (event.target as HTMLElement).closest<HTMLElement>("[data-key]");
 		if (current === null || current !== event.target) return;
@@ -374,6 +423,9 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 				className="messages"
 				ref={scroller}
 				onScroll={onScroll}
+				onWheel={unpin}
+				onTouchStart={unpin}
+				onPointerDown={unpin}
 				onPointerOver={placeQuickActions}
 				onKeyDown={onKeyDown}
 				onFocus={(event) => {

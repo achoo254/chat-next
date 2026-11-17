@@ -70,6 +70,92 @@ describe("unread divider", () => {
 	});
 });
 
+/**
+ * Lays out the message list as a browser would, 100 px per row in a 500 px
+ * tall view, with rows that can grow later; `resize` delivers what a
+ * ResizeObserver would report then.
+ */
+function growingLayout(): { grow(row: Element, by: number): void; resize(): void; restore(): void } {
+	const extra = new Map<Element, number>();
+	const tops = new WeakMap<Element, number>();
+	const observers: (() => void)[] = [];
+	const list = (element: Element): boolean => element.classList.contains("messages");
+	const height = (element: Element): number => 100 + (extra.get(element) ?? 0);
+	const rowTop = (element: Element): number => {
+		let top = 0;
+		for (let node = element.previousElementSibling; node !== null; node = node.previousElementSibling) top += height(node);
+		return top;
+	};
+	const full = (element: Element): number => [...element.children].reduce((sum, row) => sum + height(row), 0);
+	const proto = HTMLElement.prototype;
+	const saved = ["offsetTop", "offsetHeight", "clientHeight", "scrollHeight", "scrollTop"].map(
+		(name) => [name, Object.getOwnPropertyDescriptor(proto, name)] as const,
+	);
+	Object.defineProperties(proto, {
+		offsetTop: { configurable: true, get(this: HTMLElement) { return this.parentElement !== null && list(this.parentElement) ? rowTop(this) : 0; } },
+		offsetHeight: { configurable: true, get(this: HTMLElement) { return this.parentElement !== null && list(this.parentElement) ? height(this) : 0; } },
+		clientHeight: { configurable: true, get(this: HTMLElement) { return list(this) ? 500 : 0; } },
+		scrollHeight: { configurable: true, get(this: HTMLElement) { return list(this) ? full(this) : 0; } },
+		scrollTop: {
+			configurable: true,
+			get(this: HTMLElement) { return tops.get(this) ?? 0; },
+			set(this: HTMLElement, value: number) { tops.set(this, list(this) ? Math.max(0, Math.min(value, full(this) - 500)) : 0); },
+		},
+	});
+	const globals = globalThis as { ResizeObserver?: unknown };
+	const previous = globals.ResizeObserver;
+	globals.ResizeObserver = class {
+		constructor(callback: () => void) {
+			observers.push(callback);
+		}
+		observe(): void {}
+		unobserve(): void {}
+		disconnect(): void {}
+	};
+	return {
+		grow(row, by) {
+			extra.set(row, (extra.get(row) ?? 0) + by);
+		},
+		resize() {
+			for (const callback of observers) callback();
+		},
+		restore() {
+			for (const [name, descriptor] of saved) {
+				if (descriptor === undefined) Reflect.deleteProperty(proto, name);
+				else Object.defineProperty(proto, name, descriptor);
+			}
+			globals.ResizeObserver = previous;
+		},
+	};
+}
+
+describe("opening at the unread messages", () => {
+	it("keeps the unread messages in full when they grow after the view is placed", async () => {
+		const layout = growingLayout();
+		try {
+			const fixture = new ChatFixture();
+			const ngan = fixture.addUser("Ngân");
+			const chat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, ngan]);
+			for (let i = 1; i <= 10; i++) fixture.send(ngan, chat, `tin ${i}`);
+			fixture.server.readHistory(fixture.selfId, chat, 9);
+			renderMessaging(fixture, `/c/${chat}`);
+			const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+			const divider = await within(log).findByRole("separator", {}, LONG);
+			const last = divider.nextElementSibling;
+			if (last === null) throw new Error("no message under the divider");
+
+			// Its buttons or a narrower list make the unread message taller.
+			layout.grow(last, 300);
+			layout.resize();
+			const bottom = (last as HTMLElement).offsetTop + (last as HTMLElement).offsetHeight;
+			expect(bottom).toBeLessThanOrEqual(log.scrollTop + log.clientHeight);
+			expect(divider.offsetTop).toBeGreaterThanOrEqual(log.scrollTop);
+		} finally {
+			layout.restore();
+		}
+	});
+});
+
 describe("marking read", () => {
 	it("reads the chat opened after a chat with more messages", async () => {
 		const fixture = new ChatFixture();
