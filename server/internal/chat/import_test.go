@@ -97,8 +97,15 @@ func TestImportAppendKeepsOrderDatesAndSkipsPuppets(t *testing.T) {
 	if silent != 3 {
 		t.Fatalf("%d imported messages carry the silent content, want 3", silent)
 	}
-	if got := len(h.logOf(owner)); got < 3 {
-		t.Fatalf("owner log has %d updates, want one per message", got)
+	log := h.logOf(owner)
+	if len(log) < 3 {
+		t.Fatalf("owner log has %d updates, want one per message", len(log))
+	}
+	// Each imported message reaches the owner's sessions as a new, unread
+	// message; the last update must tell them nothing is unread.
+	told := log[len(log)-1].GetRead()
+	if told == nil || told.GetMaxSeq() != seqs[2] || told.GetUnreadCount() != 0 || told.GetUnreadMentionsCount() != 0 || told.GetOutbox() {
+		t.Fatalf("last owner update = %v, want an inbox read up to %d with no unread", log[len(log)-1], seqs[2])
 	}
 }
 

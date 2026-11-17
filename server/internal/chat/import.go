@@ -186,6 +186,33 @@ func (it *ImportTx) markOwnerRead(ctx context.Context) error {
 		it.c.ID, it.owner, it.c.LastSeq); err != nil {
 		return fmt.Errorf("chat: import read position: %w", err)
 	}
+	return it.tellOwnerRead(ctx)
+}
+
+// tellOwnerRead sends the owner's sessions the read position the import just
+// set. Each imported message reaches a session as a new message, which it
+// counts as unread; without this update the count stays at the number of
+// imported messages (999+ after a long history) although the server counts
+// none unread. The counts are taken after pts allocation, as ReadHistory does.
+func (it *ImportTx) tellOwnerRead(ctx context.Context) error {
+	_, m, err := it.t.s.chatFor(ctx, it.t.tx, it.c.ID, it.owner, false)
+	if err != nil {
+		return fmt.Errorf("chat: import owner member: %w", err)
+	}
+	inbox := &appv1.UpdateRead{ChatId: it.c.ID, MaxSeq: it.c.LastSeq}
+	ev := it.t.event(kindRead, it.c.ID, it.owner)
+	it.t.toUsers(ev, []int64{it.owner}, &appv1.Update{Kind: &appv1.Update_Read{Read: inbox}})
+	it.t.beforeWrite = append(it.t.beforeWrite, func(ctx context.Context) error {
+		rs, err := it.t.s.readState(ctx, it.t.tx, it.c, m)
+		if err != nil {
+			return err
+		}
+		inbox.UnreadCount, inbox.UnreadMentionsCount, inbox.TopSeq = rs.unread, rs.mentions, rs.topSeq
+		if it.c.SyncMode == syncLarge {
+			inbox.ChatPts = rs.chatPts
+		}
+		return nil
+	})
 	return nil
 }
 
