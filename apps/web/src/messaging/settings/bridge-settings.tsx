@@ -4,7 +4,7 @@
 // the settings frame (docs/settings-menu.md); a confirmation is inline, never a
 // dialog standing in for the page. The phone number, code and password go to
 // the server in the call that needs them and are never kept here.
-import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { signInUrl } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -35,7 +35,9 @@ export default function BridgeSettings() {
 	const { transport } = useServices();
 	const api = bridgeClient(transport);
 	const [load, setLoad] = useState<Load>({ status: "loading" });
-	const [reauth, setReauth] = useState(false);
+	// How many times an action was refused for a sign-in that is too old.
+	const [reauth, setReauth] = useState(0);
+	const reauthBanner = useRef<HTMLDivElement>(null);
 	/** The app being signed in to (a new connection, or an account that needs a new login). */
 	const [signingIn, setSigningIn] = useState<string | null>(null);
 
@@ -58,9 +60,13 @@ export default function BridgeSettings() {
 
 	const onError = (err: unknown): BridgeError => {
 		const error = bridgeError(err);
-		if (error.kind === "reauth") setReauth(true);
+		if (error.kind === "reauth") setReauth((n) => n + 1);
 		return error;
 	};
+	// The refused action may be far below the banner (the chat picker): bring the banner into view each time, or the click looks like it did nothing.
+	useEffect(() => {
+		if (reauth > 0) reauthBanner.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+	}, [reauth]);
 
 	if (load.status === "loading") return <div className="set-body" aria-busy="true" />;
 	if (load.status === "error") {
@@ -86,7 +92,11 @@ export default function BridgeSettings() {
 				<Icon name="plug" small />
 				{t.lede}
 			</p>
-			{reauth && <ReauthBanner />}
+			{reauth > 0 && (
+				<div ref={reauthBanner}>
+					<ReauthBanner />
+				</div>
+			)}
 			{accounts.map((account) => (
 				<AccountCard
 					key={account.id}

@@ -3,7 +3,7 @@
 // disconnecting. The server is a fake BridgeService.
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { matchRoute } from "../src/router.tsx";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
@@ -62,6 +62,23 @@ describe("connecting an app", () => {
 		expect(link.getAttribute("href")).toContain("reauth");
 		// The banner is the only message: the card does not add a second, misleading error.
 		expect(screen.queryByText("Chưa làm được, thử lại sau.")).toBeNull();
+	});
+
+	it("brings the sign-in banner into view when starting a sync is refused, far below the banner", async () => {
+		const scrolled = vi.fn();
+		Element.prototype.scrollIntoView = scrolled;
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		const row = within(picker).getByText("Anh Đô CEO").closest(".row") as HTMLElement;
+		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ" }));
+		fixture.bridge.reauth = true;
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
+		expect(await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG)).toBeTruthy();
+		await waitFor(() => expect(scrolled).toHaveBeenCalled());
+		expect(fixture.bridge.calls.some((c) => c.startsWith("enable:"))).toBe(false);
 	});
 
 	it("says so when the server has the bridge off", async () => {
