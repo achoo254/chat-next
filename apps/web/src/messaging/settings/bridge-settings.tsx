@@ -146,9 +146,14 @@ function ReauthBanner() {
 	);
 }
 
-/** What a failed login step says to the user. */
+/**
+ * What a failed login step says to the user. A reauthentication needs no text
+ * here: the page banner already carries the "sign in again" link.
+ */
 function loginErrorText(error: BridgeError, t: ReturnType<typeof useBridgeCopy>): string {
 	switch (error.kind) {
+		case "reauth":
+			return "";
 		case "wrong_input":
 			return t.login.errors[error.detail] ?? t.failed;
 		case "rate_limited":

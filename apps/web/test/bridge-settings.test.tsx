@@ -60,6 +60,8 @@ describe("connecting an app", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Kết nối" }));
 		const link = await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG);
 		expect(link.getAttribute("href")).toContain("reauth");
+		// The banner is the only message: the card does not add a second, misleading error.
+		expect(screen.queryByText("Chưa làm được, thử lại sau.")).toBeNull();
 	});
 
 	it("says so when the server has the bridge off", async () => {
