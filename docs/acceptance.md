@@ -125,12 +125,30 @@ cáo nghiệm thu.
 | F15 | Cài đặt › Cố vấn: đổi tên, ngoại hình, giọng văn trên một thiết bị | Mascot, bong bóng, thẻ và văn phòng trên mọi thiết bị đổi theo; câu trả lời sau đổi giọng | Chưa chạy |
 | F16 | Máy có khoá Cố vấn và đã `claude mcp add tunelo -- tunelo mcp`; phiên Claude mở ở tab Terminal (tunelo có `terminal_advisor`): menu ⋯ của mascot › bật "Tự theo dõi phiên này", gõ ba tin; `/clear` rồi gõ một tin; `!ls` và `# ghi nhớ`; tắt công tắc, gõ thêm một tin; mở cùng phiên trên máy chạy tunelo cũ hoặc máy chưa có khoá; đo thời gian hook mỗi tin bằng bản biên dịch | Công tắc bật được (không mờ); `/mcp` thấy cả `tunelo` của người dùng (đủ tool) lẫn `tunelo-advisor` (chỉ `advisor_weigh`); AI gọi `mcp__tunelo-advisor__advisor_weigh`, không hỏi quyền trong terminal; thẻ "Cố vấn nhận định" hiện trong web khi transcript được đọc; tin đầu sau `/clear` nhận lại bản chỉ dẫn đầy đủ; `/`, `!`, `#` không bị chèn; tin sau khi tắt có dòng "Advisor is now off…" một lần, sau đó không gọi; máy cũ: công tắc mờ kèm "Chưa dùng được khi phiên chạy ở terminal"; máy chưa có khoá: lệnh terminal như trước (không hook, không `tunelo-advisor`); hook dưới 1,5 giây | Chưa chạy |
 
+### Chat Bridge
+
+Cần tài khoản Telegram thật (mã đăng nhập gửi tới app của người dùng, mật khẩu hai bước nếu có) và `BRIDGE_ENABLED=true` cùng `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` trên server ([`operations/chat-bridge.md`](operations/chat-bridge.md)). Quyết định: [ADR 0022](adr/0022-chat-bridge.md). Dùng một chat nhỏ, ít nhạy cảm; chạy chậm vì Telegram có thể khoá tài khoản dùng API quá dồn.
+
+| # | Thao tác | Kết quả đúng | Kết quả |
+|---|---|---|---|
+| G1 | Cài đặt › Kết nối ứng dụng › Telegram › Kết nối: số điện thoại, mã, mật khẩu hai bước | Tài khoản hiện "Đang kết nối"; DB không có số điện thoại hay mã; `external_accounts.secret` là bytes đã niêm phong; sai mã báo "Mã chưa đúng" và giữ bước | Đã kiểm bằng bài thử trực tiếp 17/11/2026 (Postgres cục bộ, qua `BridgeService`): đăng nhập đủ ba bước, 189 hội thoại. Chưa kiểm trong giao diện thật trên production |
+| G2 | Hiện danh sách chat, chọn một chat riêng, cửa sổ 200, bắt đầu | Chat hiện trong danh sách với nhãn Telegram, ô soạn tin khoá; lịch sử về đủ, đúng thứ tự thời gian gốc, chat không nhảy lên đầu vì ngày nhập; không thông báo đẩy, không tin chưa đọc | Đã kiểm 17/11/2026 bài thử trực tiếp (150 tin, đúng thứ tự, 12 tệp sao chép, 0 chưa đọc). Chưa kiểm trên production |
+| G3 | Tắt `chat-api` vài phút, gửi, sửa và xoá một tin bên Telegram, bật lại | Ba thay đổi về đủ, không trùng, không mất | Chưa chạy trên Telegram thật; có test với adapter giả (phát lại theo trạng thái) |
+| G4 | Khởi động lại `chat-api` | Số tin không đổi, không trùng | Đạt 17/11/2026 (bài thử trực tiếp, 150 tin trước và sau) |
+| G5 | Gửi, sửa (cả tin cũ hơn 48 giờ) và xoá tin bên Telegram khi `chat-api` chạy | Chat cập nhật sau vài giây; ghi độ trễ | Chưa chạy trên Telegram thật |
+| G6 | Người dùng Chat khác tìm tên hoặc username của người trong chat; thử nhắn, thêm vào nhóm, thêm danh bạ | Không tìm thấy, không nhắn, không thêm được | Đạt bằng test tự động (`TestPuppetsAreNotFindableMessageableOrAddable`); chưa thử bằng hai tài khoản thật |
+| G7 | Gửi tin vào chat đã đồng bộ (web, MCP, Bot API) | Bị từ chối (`PermissionDenied`); ô soạn tin khoá | Đạt bằng test tự động (`TestLinkedChatRefusesSending`); chưa thử trong giao diện thật |
+| G8 | Ngắt kết nối, chọn giữ chat; rồi ngắt kết nối kèm xoá | Giữ: chat chỉ đọc, phiên Chat biến khỏi Cài đặt › Thiết bị của Telegram; xoá: chat, liên hệ và dữ liệu `external_*` biến mất | Đã kiểm đăng xuất và xoá ở bài thử trực tiếp; chưa kiểm trong giao diện thật |
+| G9 | Xoá tài khoản hoandat.com thử (tài khoản phụ có kết nối) | Phiên Telegram bị đăng xuất, `external_*` rỗng, người dùng ảo mất tên | Đạt bằng test tự động (`TestErasingTheOwnerRemovesImportedData`, `TestErasedAccountIsLoggedOutOfTheOtherApp`); chưa thử thật |
+| G10 | Xoay `SESSION_KEY` theo [`key-rotation.md`](operations/key-rotation.md) khi có tài khoản Telegram kết nối | `reseal` in `resealed bridge account secrets` với `unreadable: 0`; chat vẫn nhận tin sau xoay | Chưa chạy (chỉ có test tự động của `reseal`); cần duyệt riêng vì đổi khoá dùng chung |
+
 ## Giới hạn đã biết
 
 - App iOS/Android chưa lên store (iOS mới có TestFlight nội bộ, xem [`mobile-app.md`](mobile-app.md)); trên điện thoại dùng bản web hoặc cài thành app từ trình duyệt. Không có app desktop riêng (huỷ R8 ngày 20/10/2026: desktop = PWA).
 - Server chưa có ffmpeg: video, audio do bot gửi chưa có ảnh xem trước, sóng âm và thời lượng.
 - Ở bề rộng 761–1100 px, cột thông tin và Mini App phủ lên phần phải khung chat thay vì xếp thành cột riêng.
 - Phiên Cố vấn với Antigravity chạy được khi agy đặt `request-review` (đã thử tay 17/11/2026: agy xin quyền trước shell, ghi tệp và MCP); máy để `always-proceed` bị từ chối phiên Cố vấn. Chế độ tự động của phiên Antigravity vẫn dùng được. Ô skin và phụ kiện riêng của 4 ngoại hình Cố vấn trong văn phòng 3D chưa có: Cố vấn dùng ô skin tạm, chỉ ngoại hình cú có kính.
+- Chat Bridge: không tải thêm lịch sử cũ sau khi đã đồng bộ, chưa có ảnh đại diện của người liên hệ bên ứng dụng kia, và các kịch bản G3, G5 và G10 chưa chạy trên Telegram thật.
 - Mỗi process phục vụ tối đa 1000 người online cùng lúc (giới hạn đã đo trên máy hiện tại); vượt thì người sau chờ "Đang kết nối…".
 
 ## Gửi phản hồi
