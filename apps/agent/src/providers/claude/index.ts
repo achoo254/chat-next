@@ -247,12 +247,22 @@ export function createClaudeProvider(
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * A Stop hook that does nothing, for the terminal's CLI: with any Stop hook,
+ * claude records the end of each turn in the transcript (a stop_hook_summary
+ * record), so the session reads idle the moment a turn ends rather than a
+ * minute after its last write (local-sessions.ts). --settings adds this to
+ * the user's own settings and hooks; "exit 0" runs in any shell claude uses.
+ */
+export const TURN_END_SETTINGS = JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "exit 0" }] }] } });
+
+/**
  * `claude` for a thread in the terminal, with what the chat view would use:
  * its session (resumed, or a new one with an id picked here), model,
- * permission mode and account. Only values from Claude's own lists become
- * arguments. Setting sources stay the CLI's own (user, project, local): the
- * folder's skills, commands and settings load as in any terminal, after the
- * CLI's own folder trust prompt.
+ * permission mode and account, and the hook that marks each turn's end
+ * (TURN_END_SETTINGS). Only values from Claude's own lists become arguments.
+ * Setting sources stay the CLI's own (user, project, local): the folder's
+ * skills, commands and settings load as in any terminal, after the CLI's own
+ * folder trust prompt.
  */
 export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => string): TerminalCommand {
   const args: string[] = [];
@@ -266,6 +276,7 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
   }
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
+  args.push("--settings", TURN_END_SETTINGS);
   return { file: bin, args, env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {}, ...(sessionId ? { sessionId } : {}) };
 }
 

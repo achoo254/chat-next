@@ -10,7 +10,7 @@ import { ErrorReason, type Frame, ProjectConfigLevel, TurnState, type Item } fro
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentCore } from "../src/core/agent-core.ts";
 import { projectListBody } from "../src/link/connection.ts";
-import { createClaudeProvider, terminalCommand } from "../src/providers/claude/index.ts";
+import { TURN_END_SETTINGS, createClaudeProvider, terminalCommand } from "../src/providers/claude/index.ts";
 import type { AgentProvider, TerminalLaunch } from "../src/providers/types.ts";
 import { fakeQuery } from "./fake-sdk.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
@@ -244,12 +244,14 @@ describe("chat sessions in a folder follow its level", () => {
 
 describe("the AI's own CLI in a terminal", () => {
   it("is never restricted to some setting sources, and keeps the session, model, permission mode and account arguments", () => {
+    // --settings adds one layer on top of the user's, project and local settings (the hook marking each turn's end); it restricts none.
     const id = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
     const resumed = terminalCommand("/bin/claude", { dir: "/w", resumeId: id, account: { id: "p1", dir: "/p1" }, model: "opus", permissionMode: "plan" }, () => "x");
-    expect(resumed).toEqual({ file: "/bin/claude", args: ["--resume", id, "--model", "opus", "--permission-mode", "plan"], env: { CLAUDE_CONFIG_DIR: "/p1" } });
+    expect(resumed).toEqual({ file: "/bin/claude", args: ["--resume", id, "--model", "opus", "--permission-mode", "plan", "--settings", TURN_END_SETTINGS], env: { CLAUDE_CONFIG_DIR: "/p1" } });
     const fresh = terminalCommand("/bin/claude", { dir: "/w" }, () => id);
-    expect(fresh.args).toEqual(["--session-id", id]);
-    expect([...resumed.args, ...fresh.args].some((a) => a.startsWith("--setting-sources") || a === "--settings")).toBe(false);
+    expect(fresh.args).toEqual(["--session-id", id, "--settings", TURN_END_SETTINGS]);
+    expect([...resumed.args, ...fresh.args].some((a) => a.startsWith("--setting-sources"))).toBe(false);
+    expect(JSON.parse(TURN_END_SETTINGS)).toEqual({ hooks: { Stop: [{ hooks: [{ type: "command", command: "exit 0" }] }] } });
   });
 
   it("opens the same whatever the thread's consent or its folder's level", async () => {
@@ -263,7 +265,7 @@ describe("the AI's own CLI in a terminal", () => {
     const a = await m.core.terminalLaunch(plain.id);
     const b = await m.core.terminalLaunch(consented.id);
     expect(launches).toEqual([{ dir: m.work }, { dir: m.work }]);
-    expect(a.args.filter((x) => x !== a.args[1])).toEqual(["--session-id"]);
-    expect(b.args.filter((x) => x !== b.args[1])).toEqual(["--session-id"]);
+    expect(a.args.filter((x) => x !== a.args[1])).toEqual(["--session-id", "--settings", TURN_END_SETTINGS]);
+    expect(b.args.filter((x) => x !== b.args[1])).toEqual(["--session-id", "--settings", TURN_END_SETTINGS]);
   });
 });

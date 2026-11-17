@@ -1112,7 +1112,7 @@ describe("the dock", () => {
 		// Never opened: the machine had no room, so the AI is in no terminal.
 		host.maxSessions = 0;
 		const view = render(dockFor(false));
-		expect(await screen.findByText("Phiên này chưa mở trong terminal.")).toBeTruthy();
+		expect(await screen.findByText("Phiên này đang không mở trong terminal.")).toBeTruthy();
 		host.maxSessions = 20;
 		await userEvent.click(screen.getByRole("button", { name: "Mở trong terminal" }));
 		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());

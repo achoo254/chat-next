@@ -98,6 +98,45 @@ describe("the AI's liveness of a session (Claude transcripts and processes)", ()
     expect((await again.liveness(t.sessionId)).state).toBe("busy");
   });
 
+  test("reopened with claude --resume soon after /exit: the /exit is not a running turn", async () => {
+    // /exit 38 s ago (within the busy minute), then reopening appends bookkeeping only.
+    const home = tempDir("claude-home-");
+    const t = new Transcript(randomUUID(), "/w/x", "cli", NOW - HOUR).opening();
+    t.user("Build it");
+    t.assistant([{ type: "text", text: "On it." }]);
+    const t2 = new Transcript(t.sessionId, "/w/x", "cli", NOW - 42_000);
+    t2.localCommand("clear", "").localCommand("exit", "See ya!");
+    t.lines.push(...t2.lines);
+    t.aiTitle("Build");
+    setTime(t.write(home), NOW - 1_000);
+    const live = await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(t.sessionId) }).liveness(t.sessionId);
+    expect(live.state).toBe("idle");
+    // A slash command that asks the model is followed by its request: busy at once.
+    const from = t2.lines.length;
+    t2.localCommand("review", "").apiRequest();
+    t.lines.push(...t2.lines.slice(from));
+    setTime(t.write(home), NOW - 1_000);
+    expect((await new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(undefined) }).liveness(t.sessionId)).state).toBe("busy");
+  });
+
+  test("a turn claude marks ended (its Stop hooks ran) is idle at once, not a minute after its last write", async () => {
+    const home = tempDir("claude-home-");
+    const t = new Transcript(randomUUID(), "/w/x", "cli", NOW - 10_000).opening();
+    t.user("explain the build");
+    t.apiRequest();
+    t.assistant([{ type: "text", text: "It runs make." }]);
+    t.turnEnd().aiTitle("Build");
+    setTime(t.write(home), NOW - 2_000);
+    const fresh = (held: string | undefined) => new LocalSessions({ homes: () => [home], now: () => NOW, processes: probe(held) });
+    expect((await fresh(t.sessionId).liveness(t.sessionId)).state).toBe("idle");
+    expect(fresh(undefined).find(t.sessionId)?.busy).toBe(false);
+    // A Stop hook that sends claude on (or the next prompt) is a turn again.
+    t.user("Stop hook feedback: run the tests too");
+    t.apiRequest();
+    setTime(t.write(home), NOW - 1_000);
+    expect((await fresh(t.sessionId).liveness(t.sessionId)).state).toBe("busy");
+  });
+
   test("the model thinking: the bookkeeping claude writes right after the request does not hide the turn", async () => {
     const home = tempDir("claude-home-");
     const t = new Transcript(randomUUID(), "/w/x", "cli", NOW - 20_000).opening();

@@ -72,6 +72,18 @@ export class Transcript {
     return this.user(text, { isMeta: true });
   }
 
+  /** What claude writes once a turn ended and its Stop hooks ran. */
+  turnEnd(): this {
+    return this.push({ type: "system", subtype: "stop_hook_summary", hookCount: 1, hookInfos: [{ command: "exit 0" }], hookErrors: [], preventedContinuation: false, stopReason: "", hasOutput: false, level: "suggestion", timestamp: this.stamp(), uuid: randomUUID(), isSidechain: false, ...this.common() });
+  }
+
+  /** A slash command claude runs itself (/exit, /clear): a caveat, the command, its output; no request to the model. */
+  localCommand(name: string, stdout: string): this {
+    this.meta("<local-command-caveat>The command below was run directly in Claude Code, not sent to you as a request.</local-command-caveat>");
+    this.user(`<command-name>/${name}</command-name>\n            <command-message>${name}</command-message>\n            <command-args></command-args>`);
+    return this.user(`<local-command-stdout>${stdout}</local-command-stdout>`);
+  }
+
   /** One assistant message; claude writes one record per content block. */
   assistant(blocks: ({ type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: object } | { type: "thinking"; thinking: string })[]): string {
     // The API's message ids are unique across sessions, as the journal's item ids made from them assume.

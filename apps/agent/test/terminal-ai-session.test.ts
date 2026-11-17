@@ -7,7 +7,7 @@ import { rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ErrorCode, ErrorReason, TermOpenSchema, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
-import { terminalCommand } from "../src/providers/claude/index.ts";
+import { TURN_END_SETTINGS, terminalCommand } from "../src/providers/claude/index.ts";
 import type { AgentProvider, TerminalLaunch } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { tempDir } from "./harness.ts";
@@ -146,12 +146,12 @@ describe("what a device can ask the terminal to run", () => {
     const id = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
     expect(terminalCommand("/bin/claude", { ...base, resumeId: id, account: { id: "p1", dir: "/p1" }, model: "opus", permissionMode: "plan" }, () => "x")).toEqual({
       file: "/bin/claude",
-      args: ["--resume", id, "--model", "opus", "--permission-mode", "plan"],
+      args: ["--resume", id, "--model", "opus", "--permission-mode", "plan", "--settings", TURN_END_SETTINGS],
       env: { CLAUDE_CONFIG_DIR: "/p1" },
     });
     expect(terminalCommand("/bin/claude", { ...base, model: "--evil", permissionMode: "bypassPermissions" }, () => id)).toEqual({
       file: "/bin/claude",
-      args: ["--session-id", id],
+      args: ["--session-id", id, "--settings", TURN_END_SETTINGS],
       env: {},
       sessionId: id,
     });

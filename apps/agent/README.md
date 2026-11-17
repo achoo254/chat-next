@@ -160,6 +160,9 @@ Có gì ở 2.6.0:
   chạy chương trình nào của repo.
 - **Terminal theo phiên**: một phiên AI mở được ngay trong terminal của máy (CLI của chính phiên đó); thiết bị chỉ nêu phiên, còn
   chạy gì do tunelo chọn. Hai thiết bị mở cùng lúc dùng chung một terminal; thoát CLI thì chat gõ tiếp được.
+  Claude mở từ terminal của app chạy kèm một hook Stop rỗng (`--settings`, cộng thêm vào cài đặt và hook của người dùng):
+  Claude ghi dấu kết thúc lượt vào transcript nên phiên hết "đang chạy" ngay khi lượt xong. Lượt bị ngắt, hook bị tắt, hay
+  phiên mở ngoài app vẫn đoán theo transcript (ghi trong một phút gần nhất).
 - **Đường dẫn cho quyền Full Disk Access**: khi còn thiếu quyền, máy gửi kèm đường dẫn tệp chạy của tunelo
   (`MachineInfo.agent_binary`) để banner trên web chỉ đúng tệp cần kéo vào danh sách.
 

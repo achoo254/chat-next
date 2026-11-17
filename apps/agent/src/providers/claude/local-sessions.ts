@@ -16,8 +16,9 @@
 // Liveness (is a turn running now?) is narrower: the transcript was written
 // in the last minute, or it holds a tool call with no result yet (a long
 // command writes nothing until it ends) for at most ten minutes while a
-// running claude still holds the session. Whether a running claude holds the
-// session at all (busy or idle) is told beside it, from the same reads.
+// running claude still holds the session. A turn that claude marks ended (a
+// Stop hook ran: stop_hook_summary) is idle at once. Whether a running claude
+// holds the session at all (busy or idle) is told beside it, from the same reads.
 import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery, SubagentReport } from "../types.ts";
@@ -79,7 +80,16 @@ type OpenTool = {
    */
   activeAt: number | null;
   bookkeepingSince: boolean;
+  /** The newest record of a turn is claude's own mark of its end (TURN_END): nothing runs, however fresh the file. */
+  ended: boolean;
 };
+
+/**
+ * What claude writes once a turn has ended, after its Stop hooks ran: only
+ * while some Stop hook is set (the user's own, or the one the terminal's CLI
+ * gets, claude/index.ts TURN_END_SETTINGS), so its absence tells nothing.
+ */
+const TURN_END = new Set(["stop_hook_summary", "turn_duration"]);
 
 /** Records claude writes about a session rather than as part of a turn (opening one, its title, costs, settings). */
 const BOOKKEEPING = new Set([
@@ -98,6 +108,20 @@ const BOOKKEEPING = new Set([
   "summary",
   "tag",
 ]);
+
+/** The start of what claude records for a slash command it runs itself (/exit, /clear, /model), as a user message. */
+const LOCAL_COMMAND = /^<(?:command-name|local-command-(?:caveat|stdout|stderr))>/;
+
+/**
+ * A record of a slash command claude runs without the model: no turn, like
+ * bookkeeping. Reopening a session soon after /exit must not read the /exit as
+ * work. A command that asks the model is followed by its request, which is.
+ */
+function isLocalCommand(rec: { type?: unknown; subtype?: unknown; message?: { content?: unknown } | null }): boolean {
+  if (rec.type === "system") return rec.subtype === "local_command";
+  const content = rec.message?.content;
+  return rec.type === "user" && typeof content === "string" && LOCAL_COMMAND.test(content.trimStart());
+}
 
 /**
  * The shells and subagents the session started in the background that its
@@ -276,9 +300,17 @@ export class LocalSessions implements SessionHistory {
     if (pending && quiet >= BUSY_MS) await this.processes.refresh();
     const held = this.held(k);
     const withHeld = held ? { held } : {};
+    // The turn ended by claude's own record: idle at once, not a minute after the last write.
+    if (open.ended) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
     if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, turnOpen, via: "transcript" };
     if (!pending) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
     return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, turnOpen, via: "process" } : { state: "idle", since, turnOpen, via: "process" };
+  }
+
+  /** A turn wrote in the last minute and did not end since. */
+  private recentTurn(k: Known): boolean {
+    const open = this.openWork(k);
+    return !open.ended && this.now() - this.lastTurnWrite(k, open) < BUSY_MS;
   }
 
   /**
@@ -419,10 +451,12 @@ export class LocalSessions implements SessionHistory {
     let request = false;
     let activeAt: number | null = null;
     let bookkeepingSince = false;
-    const turnRecord = (timestamp: unknown) => {
+    let ended = false;
+    const turnRecord = (timestamp: unknown, end = false) => {
       const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
       activeAt = Number.isNaN(at) ? null : at;
       bookkeepingSince = false;
+      ended = end;
     };
     try {
       withFile(k.file, (fd) =>
@@ -443,8 +477,8 @@ export class LocalSessions implements SessionHistory {
             }
             const rec = parseRecord(line);
             if (!rec || rec.isSidechain === true) return;
-            if (typeof rec.type === "string" && BOOKKEEPING.has(rec.type)) bookkeepingSince = true;
-            else turnRecord(rec.timestamp);
+            if ((typeof rec.type === "string" && BOOKKEEPING.has(rec.type)) || isLocalCommand(rec)) bookkeepingSince = true;
+            else turnRecord(rec.timestamp, rec.type === "system" && typeof rec.subtype === "string" && TURN_END.has(rec.subtype));
             if (rec.type === "api-request" || rec.type === "user" || rec.type === "assistant") request = rec.type === "api-request";
             if (!Array.isArray(rec.message?.content)) return;
             for (const block of rec.message.content as { type?: unknown; id?: unknown; name?: unknown; tool_use_id?: unknown }[]) {
@@ -460,9 +494,9 @@ export class LocalSessions implements SessionHistory {
         ),
       );
     } catch {
-      return { size: k.size, mtimeMs: k.mtimeMs, name: "", request: false, activeAt: null, bookkeepingSince: false };
+      return { size: k.size, mtimeMs: k.mtimeMs, name: "", request: false, activeAt: null, bookkeepingSince: false, ended: false };
     }
-    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name: [...open.values()].at(-1) ?? "", request, activeAt, bookkeepingSince };
+    k.tool = { size: k.size, mtimeMs: k.mtimeMs, name: [...open.values()].at(-1) ?? "", request, activeAt, bookkeepingSince, ended };
     return k.tool;
   }
 
@@ -741,7 +775,7 @@ export class LocalSessions implements SessionHistory {
       messages: counted,
       entrypoint: head.entrypoint,
       // A file written in the last minute reads its tail only then: bookkeeping alone is not a running turn.
-      busy: (this.now() - k.mtimeMs < BUSY_MS && this.now() - this.lastTurnWrite(k, this.openWork(k)) < BUSY_MS) || running.has(k.sessionId),
+      busy: (this.now() - k.mtimeMs < BUSY_MS && this.recentTurn(k)) || running.has(k.sessionId),
     };
   }
 }

@@ -774,7 +774,7 @@ export const zhCNMachines: MachinesCopy = {
 		backToChat: "返回聊天",
 		closePaneAi: "关闭窗格（会话继续运行）",
 		detached: "会话仍在设备上运行，但未在此显示。",
-		notOpened: "此会话尚未在终端中打开。",
+		notOpened: "此会话当前未在终端中打开。",
 		openAi: "在终端中打开",
 		waitTurn: "此会话正在聊天中运行一轮。该轮结束后终端会自动打开。",
 		busyRetry: "设备正忙于此会话，暂时无法打开终端。请稍后重试。",
