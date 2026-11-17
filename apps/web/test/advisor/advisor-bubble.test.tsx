@@ -204,12 +204,12 @@ afterEach(() => {
 	window.WebSocket = NativeWebSocket;
 });
 
-function open(store: AdvisorStore) {
+function open(store: AdvisorStore, lastSeenAt = Math.floor(Date.now() / 1000)) {
 	const machines = new FakeMachines();
-	machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(Math.floor(Date.now() / 1000)), publicKey: machine.keys.publicKey });
+	machines.add({ name: "Mac mini", tunnelUrl: "wss://m-1.tunnel.hoandat.com", lastSeenAt: BigInt(lastSeenAt), publicKey: machine.keys.publicKey });
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => machines.routes(r)) });
 	const services = { toasts: { show: () => undefined }, transport } as unknown as Services;
-	return render(
+	const view = render(
 		<I18nProvider>
 			<ServicesContext value={services}>
 				<MachineLinksProvider>
@@ -218,6 +218,7 @@ function open(store: AdvisorStore) {
 			</ServicesContext>
 		</I18nProvider>,
 	);
+	return Object.assign(view, { machines });
 }
 
 const scmCopy: CopyContext = {
@@ -240,6 +241,23 @@ async function ask(question: string) {
 	await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false), WAIT);
 	await userEvent.click(send);
 }
+
+describe("a page left open", () => {
+	it("looks at the directory again when the bubble opens, so a machine seen since is found", async () => {
+		const store = new AdvisorStore();
+		// The page loaded when the machine had not been seen for an hour: nothing to ask yet.
+		const view = open(store, Math.floor(Date.now() / 1000) - 3600);
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 200));
+		});
+		const first = view.machines.machines[0];
+		if (first === undefined) throw new Error("no machine");
+		first.lastSeenAt = BigInt(Math.floor(Date.now() / 1000));
+		act(() => store.setOpen(true));
+		await ask("Còn máy nào không?");
+		await waitFor(() => expect(sends).toHaveLength(1), WAIT);
+	});
+});
 
 describe("asking", () => {
 	it("opens the Advisor thread of the copy's folder, sends the question with the copy, and shows the pick", async () => {

@@ -239,6 +239,12 @@ export function useAdvisorPresence(attachedMachine: string, open: boolean, store
 		if (hub.directory().status !== "ready") hub.refresh().catch(() => undefined);
 	}, [hub]);
 
+	// "Last seen" in the directory ages while a page stays open: look again each time the bubble opens
+	// (one request at a time, the hub shares it), or a machine that came back is not found.
+	useEffect(() => {
+		if (open) hub.refresh().catch(() => undefined);
+	}, [hub, open]);
+
 	const known = (ref: string) => ref !== "" && machines.some((m) => m.ref === ref);
 	const now = useNow();
 	const online = machines.filter((m) => shouldConnect(m, now)).map((m) => m.ref);
