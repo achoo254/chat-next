@@ -331,6 +331,7 @@ func (e *env) currentSessionID(t *testing.T, cl clients) int64 {
 	cookie := e.cookie(t, cl.browser, auth.SessionCookieName)
 	if cookie == nil {
 		t.Fatal("no session cookie")
+		return 0
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
 	if err != nil {

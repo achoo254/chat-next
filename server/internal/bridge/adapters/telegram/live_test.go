@@ -143,6 +143,7 @@ func TestLiveTelegram(t *testing.T) {
 	}
 	if pick == nil {
 		t.Fatalf("no conversation whose title contains %q", want)
+		return
 	}
 	window := 150
 	if n, err := strconv.Atoi(os.Getenv("BRIDGE_LIVE_WINDOW")); err == nil && n > 0 {
