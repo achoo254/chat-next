@@ -584,7 +584,8 @@ export const viMachines = {
 		more: (n: number) => `Còn ${n} yêu cầu nữa`,
 		savedTitle: "Mật khẩu web cho AI",
 		savedNote: (ai: string) => `Mật khẩu, token của các trang web bạn đã cho ${ai} dùng khi tự đăng nhập trong trình duyệt của máy. Đây không phải tài khoản của ${ai} (xem Tài khoản AI). Giá trị không bao giờ hiện ở đây; ${ai} chỉ điền vào đúng trang web của nó.`,
-		savedEmpty: "Chưa lưu bí mật nào trên máy này.",
+		savedEmpty: (ai: string) =>
+			`Chưa lưu bí mật nào trên máy này. Bạn không cần nhập ở đây: khi ${ai} cần đăng nhập một trang, nó hỏi ngay trong phiên. Chọn "Lưu trên máy cho lần sau" thì bí mật hiện ở đây.`,
 		lastUsed: (when: string) => `Dùng lần cuối ${when}`,
 		neverUsed: "Chưa dùng",
 		remove: "Xoá",

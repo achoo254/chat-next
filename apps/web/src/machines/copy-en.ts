@@ -572,7 +572,8 @@ export const enMachines: MachinesCopy = {
 		more: (n: number) => `${n} more ${n === 1 ? "request" : "requests"}`,
 		savedTitle: "Website sign-ins for the AI",
 		savedNote: (ai) => `Passwords and tokens of websites you let ${ai} use when it signs in through the machine's browser. These are not ${ai}'s own accounts (see AI accounts). Values are never shown here; ${ai} only fills them into their own website.`,
-		savedEmpty: "No secrets are saved on this machine.",
+		savedEmpty: (ai) =>
+			`No secrets are saved on this machine. You don't enter them here: when ${ai} needs to sign in to a site, it asks right in the session. Choose "Save on the machine for next time" and the secret shows here.`,
 		lastUsed: (when: string) => `Last used ${when}`,
 		neverUsed: "Not used yet",
 		remove: "Remove",

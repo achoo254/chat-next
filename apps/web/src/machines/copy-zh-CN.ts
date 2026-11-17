@@ -566,7 +566,7 @@ export const zhCNMachines: MachinesCopy = {
 		more: (n: number) => `还有 ${n} 个请求`,
 		savedTitle: "供 AI 使用的网站登录",
 		savedNote: (ai) => `你允许 ${ai} 在这台机器的浏览器中登录网站时使用的密码和令牌。这些不是 ${ai} 自己的账号（见 AI 账号）。这里从不显示值；${ai} 只会把它填入对应的网站。`,
-		savedEmpty: "这台机器上还没有保存密钥。",
+		savedEmpty: (ai) => `这台机器上还没有保存密钥。无需在这里填写：${ai} 需要登录某个网站时，会直接在会话中询问。勾选“保存在机器上供下次使用”后，密钥会显示在这里。`,
 		lastUsed: (when: string) => `上次使用：${when}`,
 		neverUsed: "尚未使用",
 		remove: "删除",

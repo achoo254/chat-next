@@ -134,7 +134,7 @@ describe("saved secrets on a machine's page", () => {
 				<SavedSecrets link={link} online ai="Claude" />
 			</I18nProvider>,
 		);
-		expect(await screen.findByText("Chưa lưu bí mật nào trên máy này.")).toBeTruthy();
+		expect(await screen.findByText(/^Chưa lưu bí mật nào trên máy này\. Bạn không cần nhập ở đây: khi Claude cần đăng nhập/)).toBeTruthy();
 	});
 });
 
