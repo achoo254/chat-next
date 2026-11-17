@@ -72,7 +72,7 @@ describe("connecting an app", () => {
 		await signIn();
 		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
 		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
-		const row = within(picker).getByText("Anh Đô CEO").closest(".row") as HTMLElement;
+		const row = within(picker).getByText("Anh Đô CEO").closest("[data-id=bridge-conversation]") as HTMLElement;
 		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ" }));
 		fixture.bridge.reauth = true;
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
@@ -96,13 +96,13 @@ describe("choosing conversations", () => {
 		await signIn();
 		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
 		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
-		const row = within(picker).getByText("Anh Đô CEO").closest(".row") as HTMLElement;
+		const row = within(picker).getByText("Anh Đô CEO").closest("[data-id=bridge-conversation]") as HTMLElement;
 		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ" }));
 		expect(screen.getByText(/không đổi được: Chat không tải thêm được lịch sử cũ hơn/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "500" }));
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
 		await waitFor(() => expect(fixture.bridge.calls).toContain("enable:user:7:500"));
-		const synced = (await screen.findByText("500 tin gần nhất · Đã nhập xong, tin mới về trực tiếp", { exact: false }, LONG)).closest(".row") as HTMLElement;
+		const synced = (await screen.findByText("500 tin gần nhất", { exact: false }, LONG)).closest("[data-id=bridge-chat]") as HTMLElement;
 		expect(within(synced).getByText("Anh Đô CEO")).toBeTruthy();
 		expect(screen.getByText(/chỉ để đọc: bạn không gửi tin vào đó được/)).toBeTruthy();
 		await userEvent.click(within(synced).getByRole("button", { name: "Xoá bản sao" }));

@@ -65,6 +65,7 @@ export const zhCNBridge: BridgeCopy = {
 		readOnly: "这些聊天是只读的：你不能向其中发送消息。",
 	},
 	pick: {
+		all: "全部",
 		title: "选择要同步的聊天",
 		load: "显示我的聊天",
 		loading: "正在加载列表…",

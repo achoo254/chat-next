@@ -66,6 +66,7 @@ export const viBridge = {
 		readOnly: "Các chat này chỉ để đọc: bạn không gửi tin vào đó được.",
 	},
 	pick: {
+		all: "Tất cả",
 		title: "Chọn chat để đồng bộ",
 		load: "Hiện danh sách chat",
 		loading: "Đang tải danh sách…",

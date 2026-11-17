@@ -65,6 +65,7 @@ export const enBridge: BridgeCopy = {
 		readOnly: "These chats are read-only: you cannot send messages into them.",
 	},
 	pick: {
+		all: "All",
 		title: "Choose chats to sync",
 		load: "Show my chats",
 		loading: "Loading the list…",

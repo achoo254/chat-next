@@ -6,6 +6,7 @@
 // the server in the call that needs them and are never kept here.
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { signInUrl } from "@achoo254/chat-core";
+import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
@@ -20,10 +21,21 @@ import {
 	type BridgeChat,
 	type BridgeConversation,
 	type BridgeStatus,
+	type ConversationKind,
 	type LoginStep,
 } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
+import "./bridge-settings.css";
+
+/** Initials for an avatar from a title that may carry emoji or symbols. */
+function titleInitials(title: string): string {
+	return initials(title.replace(/[^\p{L}\p{N}\s]/gu, ""));
+}
+
+/** The kinds of conversation in the order the filter lists them, and the avatar tone of each. */
+const KIND_ORDER: readonly ConversationKind[] = ["private", "group", "bot", "channel"];
+const KIND_TONE: Record<ConversationKind, string> = { private: "av-blue", group: "av-violet", bot: "av-amber", channel: "av-green" };
 
 /** How often the progress of an import is read while one runs. */
 const PROGRESS_POLL_MS = 3000;
@@ -299,11 +311,17 @@ function AccountCard({
 		}, fail);
 	};
 	return (
-		<section className="card" data-id="bridge-account">
-			<div className="row pad-x">
-				<span className="grow">
+		<section className="card br-account" data-id="bridge-account">
+			<div className="br-head">
+				<span className="avatar av-blue" aria-hidden="true">
+					{initials(appName)}
+				</span>
+				<span className="grow br-text">
 					<b>{appName}</b>
-					<small>{t.account.status[account.status]}</small>
+					<small className="br-status" data-state={account.status}>
+						<i aria-hidden="true" />
+						{t.account.status[account.status]}
+					</small>
 					{account.lastError !== "" && <small>{t.account.lastError(account.lastError)}</small>}
 				</span>
 				{account.status === "needs_login" && (
@@ -326,7 +344,7 @@ function AccountCard({
 						<button type="button" className="btn btn-sm" disabled={busy} onClick={() => disconnect(false)}>
 							{t.disconnect.keep}
 						</button>
-						<button type="button" className="btn btn-sm danger" disabled={busy} onClick={() => disconnect(true)}>
+						<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => disconnect(true)}>
 							{t.disconnect.deleteAll}
 						</button>
 						<button type="button" className="btn btn-sm" onClick={() => setDisconnecting(false)}>
@@ -335,13 +353,18 @@ function AccountCard({
 					</div>
 				</div>
 			)}
-			<h3 className="card-title">{t.chats.title}</h3>
+			<h3 className="br-title">{t.chats.title}</h3>
 			{account.chats.length === 0 ? (
-				<p className="note pad-x">{t.chats.none}</p>
+				<p className="note br-pad">{t.chats.none}</p>
 			) : (
 				account.chats.map((chat) => <SyncedChat key={chat.conversationId} account={account} chat={chat} api={api} onChange={onChange} onError={onError} />)
 			)}
-			{account.chats.length > 0 && <p className="note pad-x">{t.chats.readOnly}</p>}
+			{account.chats.length > 0 && (
+				<p className="note br-readonly">
+					<Icon name="lock" small />
+					{t.chats.readOnly}
+				</p>
+			)}
 			{account.status === "active" && <ChatPicker account={account} api={api} onChange={onChange} onError={onError} />}
 		</section>
 	);
@@ -372,32 +395,40 @@ function SyncedChat({
 		});
 	};
 	return (
-		<div className="row pad-x" data-id="bridge-chat">
-			<span className="grow">
-				{chat.title}
-				<small>
-					{t.chats.window(chat.historyWindow)} · {chat.caughtUp ? t.chats.caughtUp : t.chats.importing}
+		<div className="br-chat" data-id="bridge-chat">
+			<span className="avatar sm av-violet" aria-hidden="true">
+				{titleInitials(chat.title)}
+			</span>
+			<span className="grow br-text">
+				<b>{chat.title}</b>
+				<small className="br-status" data-state={chat.caughtUp ? "active" : "importing"}>
+					<i aria-hidden="true" />
+					{chat.caughtUp ? t.chats.caughtUp : t.chats.importing}
+					<span className="br-sep" aria-hidden="true">
+						·
+					</span>
+					{t.chats.window(chat.historyWindow)}
 				</small>
 			</span>
 			{confirming ? (
-				<>
+				<span className="br-actions">
 					<span className="note">{t.chats.removeConfirm}</span>
-					<button type="button" className="btn btn-sm danger" disabled={busy} onClick={remove}>
+					<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={remove}>
 						{t.chats.removeYes}
 					</button>
 					<button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>
 						{t.pick.cancel}
 					</button>
-				</>
+				</span>
 			) : (
-				<>
+				<span className="br-actions">
 					<Link to={paths.chat(chat.chatId)} className="btn btn-sm">
 						{t.chats.open}
 					</Link>
-					<button type="button" className="btn btn-sm" onClick={() => setConfirming(true)}>
+					<button type="button" className="btn btn-sm btn-quiet" onClick={() => setConfirming(true)}>
 						{t.chats.remove}
 					</button>
-				</>
+				</span>
 			)}
 		</div>
 	);
@@ -420,6 +451,7 @@ function ChatPicker({
 	const [list, setList] = useState<readonly BridgeConversation[] | "loading" | null>(null);
 	const [query, setQuery] = useState("");
 	const [choosing, setChoosing] = useState<string | null>(null);
+	const [kind, setKind] = useState<ConversationKind | "all">("all");
 	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
 	const [busy, setBusy] = useState(false);
 	const fail = (err: unknown) => {
@@ -435,16 +467,18 @@ function ChatPicker({
 	};
 	if (list === null) {
 		return (
-			<div className="row pad-x">
+			<div className="br-pad">
 				<button type="button" className="btn" onClick={load}>
 					{t.pick.load}
 				</button>
 			</div>
 		);
 	}
-	if (list === "loading") return <p className="note pad-x">{t.pick.loading}</p>;
+	if (list === "loading") return <p className="note br-pad">{t.pick.loading}</p>;
 	const needle = query.trim().toLocaleLowerCase();
-	const shown = list.filter((c) => needle === "" || c.title.toLocaleLowerCase().includes(needle));
+	const byName = list.filter((c) => needle === "" || c.title.toLocaleLowerCase().includes(needle));
+	const shown = byName.filter((c) => kind === "all" || c.kind === kind);
+	const kinds = KIND_ORDER.filter((k) => byName.some((c) => c.kind === k));
 	const start = (conversation: BridgeConversation) => {
 		setBusy(true);
 		api.enable(account.id, conversation.id, window).then(() => {
@@ -456,49 +490,75 @@ function ChatPicker({
 		}, fail);
 	};
 	return (
-		<div data-id="bridge-picker">
-			<h3 className="card-title">{t.pick.title}</h3>
-			<div className="row pad-x">
-				<input className="input grow" type="search" aria-label={t.pick.search} placeholder={t.pick.search} value={query} onChange={(event) => setQuery(event.target.value)} />
+		<div className="br-picker" data-id="bridge-picker">
+			<h3 className="br-title">{t.pick.title}</h3>
+			<div className="br-pad">
+				<input className="input" type="search" aria-label={t.pick.search} placeholder={t.pick.search} value={query} onChange={(event) => setQuery(event.target.value)} />
 			</div>
-			{shown.length === 0 && <p className="note pad-x">{t.pick.empty}</p>}
-			{shown.map((conversation) => (
-				<div key={conversation.id}>
-					<div className="row pad-x">
-						<span className="grow">
-							{conversation.title}
-							<small>{t.pick.kind[conversation.kind]}</small>
-						</span>
-						{conversation.chatId !== 0 ? (
-							<span className="tag">{t.pick.synced}</span>
-						) : (
-							<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setChoosing(choosing === conversation.id ? null : conversation.id)}>
-								{t.pick.sync}
-							</button>
-						)}
-					</div>
-					{choosing === conversation.id && (
-						<div className="callout pad-x">
-							<p>{t.pick.window}</p>
-							<Choice<string>
-								label={t.pick.window}
-								value={String(window)}
-								options={HISTORY_WINDOWS.map((n) => ({ value: String(n), label: t.pick.windowOption(n) }))}
-								onChange={(value) => setWindow(Number(value))}
-							/>
-							<p className="note">{t.pick.windowNote}</p>
-							<div className="row">
-								<button type="button" className="btn btn-sm primary" disabled={busy} onClick={() => start(conversation)}>
-									{t.pick.start}
-								</button>
-								<button type="button" className="btn btn-sm" onClick={() => setChoosing(null)}>
-									{t.pick.cancel}
-								</button>
+			<div className="br-filters" role="group" aria-label={t.pick.title}>
+				<button type="button" className="btn btn-sm br-chip" aria-pressed={kind === "all"} onClick={() => setKind("all")}>
+					{t.pick.all} <span>{byName.length}</span>
+				</button>
+				{kinds.map((k) => (
+					<button key={k} type="button" className="btn btn-sm br-chip" aria-pressed={kind === k} onClick={() => setKind(kind === k ? "all" : k)}>
+						{t.pick.kind[k]} <span>{byName.filter((c) => c.kind === k).length}</span>
+					</button>
+				))}
+			</div>
+			{shown.length === 0 && <p className="note br-pad">{t.pick.empty}</p>}
+			<div className="br-list" role="list">
+				{shown.map((conversation) => {
+					const open = choosing === conversation.id;
+					return (
+						<div key={conversation.id} className="br-conv" data-open={open} data-id="bridge-conversation" role="listitem">
+							<div className="br-conv-main">
+								<span className={`avatar sm ${KIND_TONE[conversation.kind]}`} aria-hidden="true">
+									{titleInitials(conversation.title)}
+								</span>
+								<span className="grow br-text">
+									<b>{conversation.title}</b>
+									<small>{t.pick.kind[conversation.kind]}</small>
+								</span>
+								{conversation.chatId !== 0 ? (
+									<span className="tag-neutral">{t.pick.synced}</span>
+								) : (
+									<button
+										type="button"
+										className="btn btn-sm"
+										aria-expanded={open}
+										disabled={busy}
+										onClick={() => setChoosing(open ? null : conversation.id)}
+									>
+										{t.pick.sync}
+									</button>
+								)}
 							</div>
+							{open && (
+								<div className="br-panel" data-id="bridge-start">
+									<div className="br-window">
+										<span className="label">{t.pick.window}</span>
+										<Choice<string>
+											label={t.pick.window}
+											value={String(window)}
+											options={HISTORY_WINDOWS.map((n) => ({ value: String(n), label: t.pick.windowOption(n) }))}
+											onChange={(value) => setWindow(Number(value))}
+										/>
+									</div>
+									<p className="note">{t.pick.windowNote}</p>
+									<div className="br-actions end">
+										<button type="button" className="btn btn-sm" onClick={() => setChoosing(null)}>
+											{t.pick.cancel}
+										</button>
+										<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => start(conversation)}>
+											{t.pick.start}
+										</button>
+									</div>
+								</div>
+							)}
 						</div>
-					)}
-				</div>
-			))}
+					);
+				})}
+			</div>
 		</div>
 	);
 }

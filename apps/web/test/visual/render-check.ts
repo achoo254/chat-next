@@ -59,6 +59,9 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"settings-app": "?at=settings-app",
 	"settings-appearance": "?at=settings-appearance",
 	"settings-mcp": "?at=settings-mcp",
+	"settings-bridge": "?at=settings-bridge",
+	"settings-bridge-list": "?at=settings-bridge&open=bridge-list",
+	"settings-bridge-pick": "?at=settings-bridge&open=bridge-pick",
 	// AI Agent: the sessions of every machine, the "Cần bạn" board, an unpaired machine, the machines page;
 	// a session with markdown, the docked prompt, the status bar's details, the changes panel and "@" files.
 	"machine-chat": "?at=machine-chat",

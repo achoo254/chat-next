@@ -26,6 +26,50 @@ export class FakeBridge {
 	readonly calls: string[] = [];
 	private nextChat = 900n;
 
+	/** A connected account with two synced chats (one still importing) and a long list to pick from: the visual harness. */
+	seedDemo(): void {
+		const synced = (conversationId: string, chatId: bigint, title: string, window: number, caughtUp: boolean) => ({
+			$typeName: "app.v1.BridgeSyncedChat" as const,
+			conversationId,
+			chatId,
+			caughtUp,
+			historyWindow: window,
+			title,
+		});
+		this.accounts = [
+			{
+				$typeName: "app.v1.BridgeAccount",
+				id: 1n,
+				source: "telegram",
+				status: BridgeAccountStatus.ACTIVE,
+				lastError: "",
+				chats: [synced("user:7", 900n, "Anh Đô CEO", 2000, true), synced("chat:9", 901n, "Work - OneDash Audit Logs", 500, false)],
+			},
+		];
+		const conv = (id: string, kind: BridgeConversationKind, title: string, chatId = 0n): BridgeConversation => ({
+			$typeName: "app.v1.BridgeConversation",
+			id,
+			kind,
+			title,
+			chatId,
+		});
+		this.conversations = [
+			conv("user:7", BridgeConversationKind.PRIVATE, "Anh Đô CEO", 900n),
+			conv("chat:9", BridgeConversationKind.GROUP, "Work - OneDash Audit Logs", 901n),
+			conv("bot:1", BridgeConversationKind.BOT, "tg_cloudpanel_staging_bot"),
+			conv("chat:10", BridgeConversationKind.GROUP, "Anh em đoàn kết 🙈"),
+			conv("chat:11", BridgeConversationKind.GROUP, "Work - Onemail monitor logs"),
+			conv("bot:2", BridgeConversationKind.BOT, "cloudpanel_dev_bot"),
+			conv("user:8", BridgeConversationKind.PRIVATE, "Telegram"),
+			conv("bot:3", BridgeConversationKind.BOT, "Bot_OneMail"),
+			conv("chat:12", BridgeConversationKind.GROUP, "Work - iNET Helpdesk Center"),
+			conv("chan:1", BridgeConversationKind.CHANNEL, "Tin công nghệ mỗi ngày"),
+			conv("chat:13", BridgeConversationKind.GROUP, "Work - Nền tảng"),
+			conv("user:9", BridgeConversationKind.PRIVATE, "Nguyễn Thị Lan"),
+			conv("chat:14", BridgeConversationKind.GROUP, "Work - Claude Engineer Marketing"),
+		];
+	}
+
 	private guard(mutating: boolean): void {
 		if (this.disabled) throw new ConnectError("bridge_disabled: off", Code.FailedPrecondition);
 		if (mutating && this.reauth) throw new ConnectError("reauth_required: sign in again", Code.FailedPrecondition);

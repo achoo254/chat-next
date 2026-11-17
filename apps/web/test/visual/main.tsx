@@ -298,6 +298,8 @@ const SCREENS: Record<string, string> = {
 	// The shared language and theme switches (@achoo254/app-shell) in Settings › Giao diện.
 	"settings-appearance": "/settings/appearance",
 	"settings-mcp": "/settings/mcp",
+	// Settings › Kết nối ứng dụng with a connected Telegram account (test/support/fake-bridge.ts seedDemo).
+	"settings-bridge": "/settings/bridge",
 	// AI Agent with a paired demo machine, an unpaired and an offline one (test/support/remote-machine-demo.ts):
 	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
@@ -333,6 +335,7 @@ const SCREENS: Record<string, string> = {
 	"machine-add": paths.machinesAdd(),
 };
 const at = params.get("at");
+if (at === "settings-bridge") f.bridge.seedDemo();
 if (at === "settings-app") {
 	// The browser offers to install (beforeinstallprompt); the harness has no manifest to make it do so.
 	captureInstallPrompt();
@@ -508,6 +511,19 @@ async function seedTerminalSessions(onMachinePage = true): Promise<void> {
 }
 
 const SCENARIOS: Record<string, () => Promise<void>> = {
+	// Settings › Kết nối ứng dụng: the conversation list is open (?bridge-list) or a bot is chosen with its history choice (?bridge-pick).
+	"bridge-list": async () => {
+		await click("button", "Hiện danh sách chat");
+		await find(() => document.querySelector("[data-id=bridge-picker] [data-id=bridge-conversation]"));
+	},
+	"bridge-pick": async () => {
+		await click("button", "Hiện danh sách chat");
+		await find(() => document.querySelector("[data-id=bridge-picker] [data-id=bridge-conversation]"));
+		const row = await find(() => [...document.querySelectorAll("[data-id=bridge-conversation]")].find((r) => r.textContent?.includes("tg_cloudpanel_staging_bot")));
+		const button = row.querySelector("button");
+		if (button instanceof HTMLElement) button.click();
+		await find(() => document.querySelector("[data-id=bridge-start]"));
+	},
 	// The composer's "/" picker of the demo session's commands and skills.
 	slash: async () => {
 		await find(() => document.querySelector(".mx-status .mx-mode"));

@@ -1,0 +1,44 @@
+/* Settings › Kết nối ứng dụng: the account card, its synced chats, and the list to pick more from. */
+.br-account { overflow: hidden; }
+.br-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); }
+.br-head .avatar { width: 44px; height: 44px; font-size: 1.0625rem; }
+.br-head b { font-size: 1rem; }
+.br-text { flex: 1; min-width: 0; }
+.br-text b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-text small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-1); color: var(--c-text-muted); font-size: 0.8125rem; }
+.br-status i { width: 8px; height: 8px; margin-right: 2px; border-radius: var(--radius-full); background: var(--c-success); flex: none; }
+.br-status[data-state="importing"] i { background: var(--c-warning); }
+.br-status[data-state="needs_login"] i, .br-status[data-state="stopped"] i { background: var(--c-text-muted); }
+.br-sep { opacity: 0.6; }
+.br-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-2); border-top: 1px solid var(--c-border-subtle); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-muted); }
+.br-pad { padding: var(--space-1) var(--space-4) var(--space-3); }
+.br-chat, .br-conv-main { display: flex; align-items: center; gap: var(--space-3); min-height: 56px; padding: var(--space-2) var(--space-4); }
+.br-chat + .br-chat { border-top: 1px solid var(--c-border-subtle); }
+.br-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; }
+.br-actions.end { justify-content: flex-end; }
+.br-actions .note { flex-basis: 100%; text-align: right; }
+.btn-quiet { border-color: transparent; background: none; color: var(--c-text-muted); }
+.btn-quiet:hover { color: var(--c-error); background: color-mix(in srgb, var(--c-error) 8%, transparent); border-color: transparent; }
+.br-readonly { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+.br-readonly .icon { flex: none; }
+.br-picker .input { min-height: 40px; }
+.br-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 var(--space-4) var(--space-3); }
+.br-chip { border-radius: var(--radius-full); min-height: 32px; gap: var(--space-1); }
+.br-chip span { color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.br-chip[aria-pressed="true"] span { color: inherit; }
+.br-list { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--c-border-subtle); }
+.br-conv + .br-conv { border-top: 1px solid var(--c-border-subtle); }
+.br-conv-main:hover { background: var(--c-hover); }
+.br-conv[data-open="true"] { background: var(--c-selected); }
+.br-panel { display: grid; gap: var(--space-3); padding: var(--space-1) var(--space-4) var(--space-4) calc(var(--space-4) + var(--avatar-sm) + var(--space-3)); }
+.br-window { display: grid; gap: var(--space-1); }
+.br-window .label { font-size: 0.8125rem; font-weight: 500; }
+.br-window .choice { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 360px; }
+.br-window .choice button { justify-content: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+	.br-panel { padding-left: var(--space-4); }
+	.br-chat { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; row-gap: var(--space-2); }
+	.br-chat .br-actions { grid-column: 2; margin-left: 0; }
+	.br-actions .note { text-align: left; }
+	.br-window .choice { max-width: none; }
+}
