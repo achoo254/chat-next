@@ -227,6 +227,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 	const [starting, start] = useQuickStart(machine, workspace.dir, local, ctx.store, () => setDialog("custom"));
 	const missing = local?.missing === true;
 	const settings = useWorkspaceSettings(machine, workspace.dir, name, local, () => setDialog("settings"));
+	const { archive, bar } = useArchiveWithUndo();
+	const liveHere = machine === null ? [] : archivable([{ machine, threads: node.threads }]);
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
 			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
@@ -258,6 +260,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 										splitWorkspace(ctx.store, workspace, workspaceRemote(machine === null ? null : { id: machine.entry.id, link: machine.link, state: machine.state }, workspace.dir)).catch((err: unknown) => console.warn("ai: could not split the workspace", err)),
 								}
 							: null,
+						liveHere.length > 0 ? { label: p.archiveAll(node.threads.length), icon: "inbox", run: () => archive(liveHere) } : null,
 						{ label: p.detach, icon: "trash", run: () => setDialog("detach"), danger: true },
 					]}
 				/>
@@ -265,6 +268,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 			</div>
 			{machine !== null && <Sessions machine={machine} threads={node.threads} ctx={ctx} />}
 			{machine !== null && <ShellRows machine={machine} dir={workspace.dir} shells={ctx.shells.get(workspace.id) ?? []} now={ctx.now} />}
+			{bar}
 			{dialog === "custom" && machine !== null && (
 				<NewSession
 					machine={machine.entry.ref}
@@ -323,6 +327,9 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 		return m === undefined ? null : { id: m.entry.id, link: m.link, state: m.state };
 	};
 	const empty = project.workspaces.length === 0;
+	const { archive, bar } = useArchiveWithUndo();
+	const liveSessions = archivable(node.workspaces.flatMap((w) => (w.machine === null ? [] : [{ machine: w.machine, threads: w.threads }])));
+	const sessionCount = liveSessions.reduce((n, f) => n + f.threads.length, 0);
 	const labels = workspaceLabels(project.name, node.workspaces);
 	const offline = node.workspaces.length > 0 && node.workspaces.every((w) => w.offline);
 	const usage = projectUsagePath({ gitRemote: project.gitRemote, workspaces: node.workspaces.map((w) => ({ dir: w.workspace.dir, machine: w.machine?.entry.ref ?? null, online: !w.offline })) });
@@ -349,6 +356,7 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 						place?.up != null ? { label: p.moveUp, icon: "arrow-up", run: place.up } : null,
 						place?.down != null ? { label: p.moveDown, icon: "arrow-down", run: place.down } : null,
 						usage !== null ? { label: t.usage.open, icon: "database", run: () => navigate(usage) } : null,
+						sessionCount > 0 ? { label: p.archiveAll(sessionCount), icon: "inbox", run: () => archive(liveSessions) } : null,
 						{ label: p.remove, icon: "trash", run: () => setDialog("delete"), danger: true },
 					]}
 				/>
@@ -365,6 +373,7 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 				) : (
 					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} label={labels.get(w.workspace.id) ?? { title: folderName(w.workspace.dir), byBranch: false, sub: "", primary: false }} project={project} ctx={ctx} />)
 				))}
+			{bar}
 			<Suspense fallback={null}>
 				{dialog === "add" && <AddWorkspaceDialog store={ctx.store} project={project} machines={ctx.machines} onClose={() => setDialog(null)} />}
 				{dialog === "rename" && <RenameProjectDialog store={ctx.store} project={project} onClose={() => setDialog(null)} />}
@@ -467,16 +476,20 @@ export async function setFoldersArchived(folders: readonly Pick<LooseFolder, "ma
 /** How long "Hoàn tác" stays offered. */
 export const UNDO_MS = 8_000;
 
-export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly LooseFolder[]; ctx: TreeContext; open: boolean; onToggle: () => void }): ReactNode {
+/** Sessions whose machine is reachable: what "Lưu trữ tất cả" can reach. */
+const archivable = (folders: readonly Pick<LooseFolder, "machine" | "threads">[]) => folders.filter((f) => f.machine.conn.kind === "on" && f.threads.length > 0);
+
+/** Archiving many sessions at once, with "Hoàn tác" for a few seconds: the action and the bar to render. */
+function useArchiveWithUndo(): { archive: (picked: readonly Pick<LooseFolder, "machine" | "threads">[]) => void; bar: ReactNode } {
 	const t = useMachinesCopy();
 	const p = t.agent.projects;
-	const [undo, setUndo] = useState<{ text: string; folders: readonly LooseFolder[]; ids: ReadonlySet<string> } | null>(null);
+	const [undo, setUndo] = useState<{ text: string; folders: readonly Pick<LooseFolder, "machine" | "threads">[]; ids: ReadonlySet<string> } | null>(null);
 	useEffect(() => {
 		if (undo === null) return;
 		const timer = window.setTimeout(() => setUndo(null), UNDO_MS);
 		return () => window.clearTimeout(timer);
 	}, [undo]);
-	const archive = (picked: readonly LooseFolder[]) => {
+	const archive = (picked: readonly Pick<LooseFolder, "machine" | "threads">[]) => {
 		void setFoldersArchived(picked, true).then((ids) => {
 			if (ids.length > 0) setUndo({ text: p.archivedCount(ids.length), folders: picked, ids: new Set(ids) });
 		});
@@ -492,9 +505,25 @@ export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly
 			ids,
 		);
 	};
+	const bar =
+		undo === null ? null : (
+			<div className="mx-undo" role="status" data-id="sidebar-undo">
+				<span className="grow">{undo.text}</span>
+				<button type="button" className="btn btn-sm" onClick={restore}>
+					{p.undo}
+				</button>
+			</div>
+		);
+	return { archive, bar };
+}
+
+export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly LooseFolder[]; ctx: TreeContext; open: boolean; onToggle: () => void }): ReactNode {
+	const t = useMachinesCopy();
+	const p = t.agent.projects;
+	const { archive, bar } = useArchiveWithUndo();
 	const sessions = folders.reduce((n, f) => n + f.threads.length, 0);
-	const live = folders.filter((f) => f.machine.conn.kind === "on" && f.threads.length > 0);
-	if (folders.length === 0 && undo === null) return null;
+	const live = archivable(folders);
+	if (folders.length === 0 && bar === null) return null;
 	return (
 		<div className="mx-project mx-loose" data-id="sidebar-uncategorized">
 			{folders.length > 0 && (
@@ -508,14 +537,7 @@ export function LooseGroup({ folders, ctx, open, onToggle }: { folders: readonly
 			)}
 			{open && folders.length > 0 && <p className="mx-loose-hint">{p.looseHint}</p>}
 			{open && folders.map((f) => <LooseItem key={`${f.machine.entry.ref}\n${f.dir}`} folder={f} ctx={ctx} onArchive={archive} />)}
-			{undo !== null && (
-				<div className="mx-undo" role="status" data-id="sidebar-undo">
-					<span className="grow">{undo.text}</span>
-					<button type="button" className="btn btn-sm" onClick={restore}>
-						{p.undo}
-					</button>
-				</div>
-			)}
+			{bar}
 		</div>
 	);
 }
