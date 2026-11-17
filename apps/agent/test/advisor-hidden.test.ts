@@ -185,9 +185,10 @@ describe("on the machine", () => {
     expect(JSON.stringify(refused.content)).toContain("only has advisor_weigh, advisor_git and advisor_grep");
     const weigh = await host.call(session, "advisor", "advisor_weigh", { kind: "answer", question: "Why?", options: ["A", "B"] });
     expect(JSON.stringify(weigh.content)).toContain("no_key");
-    // An ordinary session's advisor_git says it is not for it.
+    // An ordinary session is not even offered advisor_git or advisor_grep: only advisor_weigh.
     const other = host.open("https://tunnel.example", host.tickets.issue(plain.id));
-    expect(JSON.stringify((await host.call(other, "advisor", "advisor_git", { command: "status" })).content)).toContain("only for Advisor's own session");
+    expect(JSON.stringify((await host.call(other, "advisor", "advisor_git", { command: "status" })).content)).toContain("Unknown tool");
+    expect(JSON.stringify((await host.call(other, "advisor", "advisor_grep", { pattern: "x" })).content)).toContain("Unknown tool");
     // The core's own word decides, even without Advisor's hooks: an Advisor thread's session gets no other tool.
     const bare = new McpHost(dir, { isAdvisorThread: (id) => id === t.id, localWrites: () => false });
     const closed = bare.open("https://tunnel.example", bare.tickets.issue(t.id));

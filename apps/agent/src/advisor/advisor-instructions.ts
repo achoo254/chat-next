@@ -14,6 +14,8 @@
 
 export const AUTO_INSTRUCTIONS = [
   "Advisor is on for this session. Advisor weighs options and returns how likely each is right; it never writes or runs anything.",
+  "advisor_weigh is a tool of the tunelo MCP server; its full name may carry a prefix (for example mcp__tunelo__advisor_weigh). If your tool",
+  "list shows it by name only, load its definition first (tool search), then call it. Do not skip it because it is not loaded yet.",
   '- When you are unsure between approaches, call advisor_weigh(kind="decision") before acting. If the result is "confident" and the',
   "  chosen action is non-destructive and inside the user's request, follow it. Deleting, pushing, deploying, sending anything outside",
   "  this machine, or going beyond the request still needs the user: ask them, quoting Advisor's probabilities.",
@@ -24,7 +26,7 @@ export const AUTO_INSTRUCTIONS = [
 ].join("\n");
 
 export const AUTO_REMINDER =
-  'Advisor is on: call advisor_weigh(kind="decision") when unsure, and advisor_weigh(kind="next_steps") before you end this turn.';
+  'Advisor is on: call the tunelo MCP tool advisor_weigh (load its definition first if it is listed by name only): kind="decision" when unsure, and kind="next_steps" before you end this turn.';
 
 export const ADVISOR_OFF = "Advisor is now off for this session: do not call advisor_weigh.";
 

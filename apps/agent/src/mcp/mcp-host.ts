@@ -180,7 +180,7 @@ export class McpHost {
 		}
 		if (advisor) {
 			const table = new ToolTable();
-			registerAdvisorTools(table, { hooks: advisor, threadId });
+			registerAdvisorTools(table, { hooks: advisor, threadId }, "work-session");
 			tables.set(ADVISOR_GROUP, table);
 		}
 		return tables;

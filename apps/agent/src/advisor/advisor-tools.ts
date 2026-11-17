@@ -102,11 +102,14 @@ function refusal(error: AdvisorErrorCode, message: string, sent?: WeighBody): Ca
 }
 
 /**
- * Registers advisor_weigh. `bound` is what it runs with and the thread it
- * runs for; absent where the tool is only listed (`tunelo mcp`).
+ * Registers advisor_weigh, and for Advisor's own session advisor_git and
+ * advisor_grep. `bound` is what it runs with and the thread it runs for;
+ * absent where the tools are only listed (`tunelo mcp`).
  */
-export function registerAdvisorTools(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; threadId: string }): void {
+export function registerAdvisorTools(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; threadId: string }, scope: "work-session" | "advisor-session" = "advisor-session"): void {
   registerWeigh(server, bound);
+  // A work session only asks Advisor (advisor_weigh); the read tools are for Advisor's own session.
+  if (scope === "work-session") return;
   const { sessionDir, git } = bound?.hooks ?? {};
   const gitBound = bound && sessionDir && git ? { hooks: { sessionDir, git, isSensitive: (p: string) => bound.hooks.isSensitive(p) }, threadId: bound.threadId } : undefined;
   registerAdvisorGitTool(server, gitBound);

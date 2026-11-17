@@ -218,7 +218,7 @@ export function registerMcpCommand(program: Command): void {
 				const all: [string, (t: ToolTable) => void][] = [
 					[SECRETS_GROUP, (t) => registerSecretTools(t)],
 					[BROWSER_GROUP, (t) => registerBrowserTools(t)],
-					[ADVISOR_GROUP, (t) => registerAdvisorTools(t)],
+					[ADVISOR_GROUP, (t) => registerAdvisorTools(t, undefined, advisorOnly ? "advisor-session" : "work-session")],
 				];
 				const groups = advisorOnly ? all.filter(([group]) => group === ADVISOR_GROUP) : all;
 				for (const [group, register] of groups) {
