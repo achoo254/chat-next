@@ -2,9 +2,11 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 	"unicode/utf16"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -106,7 +108,7 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message 
 	if size := stream.Size(); size > limit {
 		return nil
 	}
-	file, err := r.e.mediaSvc.UploadStream(ctx, r.account.OwnerID, media.StreamUpload{
+	file, err := r.uploadPaced(ctx, media.StreamUpload{
 		Kind: kind, FileName: fileNameOf(med), Body: io.LimitReader(stream, limit+1), MaxBytes: limit,
 	})
 	if err != nil {
@@ -114,6 +116,27 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message 
 		return nil
 	}
 	return &appv1.Message{Media: file.Ref()}
+}
+
+// uploadRetryWait is how long an import waits when the owner's upload rate is
+// used up: the limit refills at two files a second, so half a second frees a
+// slot.
+const uploadRetryWait = 500 * time.Millisecond
+
+// uploadPaced stores the file as the account's owner and, when the owner's
+// upload rate is used up (an import copies many files at once), waits and
+// tries again instead of giving the file up. The rate check comes before the
+// body is read, so the same body can be offered again.
+func (r *runner) uploadPaced(ctx context.Context, in media.StreamUpload) (*media.File, error) {
+	for {
+		file, err := r.e.mediaSvc.UploadStream(ctx, r.account.OwnerID, in)
+		if !errors.Is(err, media.ErrRateLimited) {
+			return file, err
+		}
+		if err := sleep(ctx, uploadRetryWait); err != nil {
+			return nil, err
+		}
+	}
 }
 
 // fileNameOf is the name given to the stored file.

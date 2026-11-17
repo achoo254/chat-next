@@ -182,9 +182,14 @@ func errUnavailable(err error) error {
 	return connect.NewError(connect.CodeUnavailable, fmt.Errorf("media storage is busy, try again: %w", err))
 }
 
+// ErrRateLimited is what errors.Is finds in an upload refused for the owner's
+// upload rate. The refusal comes before any byte of the body is read, so a
+// caller that can wait (the bridge) may call again with the same body.
+var ErrRateLimited = errors.New("too many requests; slow down")
+
 func (s *Service) allow(rule ratelimit.Rule, bucket string, userID int64) error {
 	if !s.limiter.Allow(rule, fmt.Sprintf("media-%s:%d", bucket, userID)) {
-		return errExhausted("too many requests; slow down")
+		return connect.NewError(connect.CodeResourceExhausted, ErrRateLimited)
 	}
 	return nil
 }
