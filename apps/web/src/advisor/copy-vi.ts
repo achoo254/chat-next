@@ -99,6 +99,7 @@ export const viAdvisor = {
 		auto: "Tự theo dõi phiên này",
 		autoHint: "AI tự hỏi Cố vấn khi phân vân và cuối mỗi lượt.",
 		autoUnavailable: "AI của phiên này chưa dùng được Cố vấn tự động.",
+		autoTerminal: "Chưa dùng được khi phiên chạy ở terminal. Mở phiên ở chế độ Trò chuyện để dùng.",
 		hide: "Ẩn mascot",
 	},
 	settings: {

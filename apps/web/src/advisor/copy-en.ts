@@ -100,6 +100,7 @@ export const enAdvisor: AdvisorCopy = {
 		auto: "Watch this session",
 		autoHint: "The AI asks Advisor when unsure and at the end of each turn.",
 		autoUnavailable: "This session's AI cannot use automatic Advisor yet.",
+		autoTerminal: "Not available while the session runs in the terminal. Open it in Chat mode to use it.",
 		hide: "Hide the mascot",
 	},
 	settings: {

@@ -539,7 +539,9 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 	const linkState = session === null ? null : presence.stateOf(session.machine);
 	const thread = session === null ? undefined : linkState?.threads.find((x) => x.id === session.threadId && x.kind !== ThreadKind.ADVISOR);
 	const caps = providerOf(linkState?.info ?? null, thread?.provider ?? "")?.capabilities;
-	const available = linkState?.status.kind === "open" && caps?.sessionMcp === true && linkState.info?.advisor?.available === true;
+	// A session held by a terminal runs the CLI directly: no tunelo MCP and no note beside the messages, so automatic Advisor cannot work there.
+	const inTerminal = thread !== undefined && thread.terminalSession !== 0;
+	const available = linkState?.status.kind === "open" && caps?.sessionMcp === true && linkState.info?.advisor?.available === true && !inTerminal;
 	const on = session === null ? false : (linkState?.threadInfo.get(session.threadId)?.advisor ?? false);
 	const toggle = (next: boolean) => {
 		if (link === null || session === null) return;
@@ -580,7 +582,7 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 						<div className="adv-menu-row">
 							<span className="grow">
 								<span>{t.menu.auto}</span>
-								<small className="muted">{available ? t.menu.autoHint : t.menu.autoUnavailable}</small>
+								<small className="muted">{inTerminal ? t.menu.autoTerminal : available ? t.menu.autoHint : t.menu.autoUnavailable}</small>
 							</span>
 							<Switch checked={on} label={t.menu.auto} disabled={!available || busy} onChange={toggle} />
 						</div>

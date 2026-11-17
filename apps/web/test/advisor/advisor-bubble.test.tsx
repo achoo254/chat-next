@@ -8,7 +8,7 @@
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AdvisorTone, ErrorCode, ErrorReason, LoginState, Role, ThreadKind, ThreadState, TurnState, type Frame, type ThreadCreate, type ThreadSend } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdvisorLive from "../../src/advisor/advisor-bubble.tsx";
@@ -64,7 +64,7 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 const NativeWebSocket = window.WebSocket;
 const WAIT = { timeout: 4000 };
 const ADVISOR_THREAD = "advisor-1";
-const SESSION = { id: "s1", title: "Sửa lỗi push", dir: "/w/app", provider: "claude", model: "", state: ThreadState.IDLE, pending: 0, updatedAt: 1n, open: false, preview: "", previewTool: "" };
+const SESSION = { id: "s1", title: "Sửa lỗi push", dir: "/w/app", provider: "claude", model: "", state: ThreadState.IDLE, pending: 0, updatedAt: 1n, open: false, preview: "", previewTool: "", terminalSession: 0 };
 const PICK = "Rebase lên origin/main rồi push lại";
 
 /** The Advisor thread's journal for a question: the question, its turn, the AI's reply and Jev's verdict. */
@@ -241,6 +241,36 @@ async function ask(question: string) {
 	await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false), WAIT);
 	await userEvent.click(send);
 }
+
+describe("automatic Advisor in the menu", () => {
+	it("is switchable for a session in Chat mode and says why it is not for one held by a terminal", async () => {
+		const store = new AdvisorStore();
+		store.setSession({ machine: "1", threadId: "s1" });
+		store.setOpen(true);
+		open(store);
+		await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
+		const toggle = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
+		await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), WAIT);
+		expect(screen.getByText(t.menu.autoHint)).toBeTruthy();
+		await userEvent.keyboard("{Escape}");
+		cleanup();
+
+		// The same session, now run by the terminal's own claude.
+		SESSION.terminalSession = 2;
+		try {
+			const held = new AdvisorStore();
+			held.setSession({ machine: "1", threadId: "s1" });
+			held.setOpen(true);
+			open(held);
+			await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
+			await screen.findByText(t.menu.autoTerminal, undefined, WAIT);
+			const off = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
+			expect((off as HTMLButtonElement).disabled).toBe(true);
+		} finally {
+			SESSION.terminalSession = 0;
+		}
+	});
+});
 
 describe("a page left open", () => {
 	it("looks at the directory again when the bubble opens, so a machine seen since is found", async () => {

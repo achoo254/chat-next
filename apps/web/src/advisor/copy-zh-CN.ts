@@ -100,6 +100,7 @@ export const zhCNAdvisor: AdvisorCopy = {
 		auto: "自动关注此会话",
 		autoHint: "AI 拿不准时以及每轮结束时会自动询问顾问。",
 		autoUnavailable: "该会话的 AI 暂时无法使用自动顾问。",
+		autoTerminal: "会话在终端中运行时暂不可用。请在聊天模式下打开它。",
 		hide: "隐藏吉祥物",
 	},
 	settings: {
