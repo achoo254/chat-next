@@ -79,6 +79,7 @@ export const viBridge = {
 		start: (n: number): string => (n === 1 ? "Bắt đầu đồng bộ" : `Bắt đầu đồng bộ ${n} chat`),
 		selected: (n: number): string => `Đã chọn ${n} chat`,
 		clear: "Bỏ chọn",
+		resume: (n: number): string => `Đăng nhập lại xong, ${n} chat sẽ tự đồng bộ tiếp.`,
 		cancel: "Huỷ",
 		started: "Đang nhập lịch sử, tin sẽ hiện dần trong Chat.",
 		kind: { private: "Chat riêng", bot: "Bot", group: "Nhóm", channel: "Kênh" } as Record<ConversationKind, string>,

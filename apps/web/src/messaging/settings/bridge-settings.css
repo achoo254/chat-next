@@ -35,6 +35,7 @@ label.br-conv-main:hover { background: var(--c-hover); }
 .br-check-gap { width: 18px; flex: none; }
 .br-conv[data-selected="true"] { background: var(--c-selected); }
 .br-bar { position: sticky; bottom: 0; display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--c-border); background: var(--c-surface); box-shadow: 0 -6px 12px -8px color-mix(in srgb, var(--c-text) 25%, transparent); }
+.br-resume { color: var(--c-warning-text); }
 .br-bar-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .br-window { display: grid; gap: var(--space-1); }
 .br-window .label { font-size: 0.8125rem; font-weight: 500; }

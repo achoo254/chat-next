@@ -1,14 +1,17 @@
 // Settings > Kết nối ứng dụng (Chat Bridge): the sign-in steps, picking
 // conversations with a history window, the progress of what is synced, and
 // disconnecting. The server is a fake BridgeService.
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { matchRoute } from "../src/router.tsx";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
 const LONG = { timeout: 8000 };
+
+// A batch stopped by an old sign-in is kept in the tab's session storage: one test must not start another's.
+beforeEach(() => window.sessionStorage.clear());
 
 async function openPage(fixture: ChatFixture): Promise<HTMLElement> {
 	renderMessaging(fixture, "/settings/bridge");
@@ -135,6 +138,42 @@ describe("choosing several conversations at once", () => {
 		// The two are marked synced in the list now, and cannot be ticked again.
 		await waitFor(() => expect(within(picker).queryAllByText("Đã đồng bộ")).toHaveLength(2));
 		expect(within(picker).queryAllByRole("checkbox")).toHaveLength(0);
+	});
+});
+
+describe("a batch stopped by an old sign-in", () => {
+	it("carries on by itself, with the same history choice, when the page opens again after signing in", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Anh Đô CEO/ }));
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Nhóm dự án/ }));
+		await userEvent.click(screen.getByRole("button", { name: "500" }));
+		fixture.bridge.reauth = true;
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ 2 chat" }));
+		expect(await screen.findByText("Đăng nhập lại xong, 2 chat sẽ tự đồng bộ tiếp.", {}, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual([]);
+		// The user signs in again: the page is left and opened anew, with a fresh sign-in.
+		cleanup();
+		fixture.bridge.reauth = false;
+		await openPage(fixture);
+		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500", "enable:chat:3:500"]), LONG);
+		// It ran once: nothing is left waiting, and a new visit does not start anything again.
+		expect(window.sessionStorage.getItem("chat.bridge.pending")).toBeNull();
+	});
+
+	it("does not start a batch that waited too long for the sign-in", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		window.sessionStorage.setItem("chat.bridge.pending", JSON.stringify({ account: 1, ids: ["user:7"], window: 500, at: Date.now() - 20 * 60 * 1000 }));
+		cleanup();
+		await openPage(fixture);
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG);
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual([]);
 	});
 });
 

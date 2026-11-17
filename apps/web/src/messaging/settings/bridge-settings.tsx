@@ -25,6 +25,7 @@ import {
 	type LoginStep,
 } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
+import { savePending, takePending } from "./bridge-pending.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
@@ -454,6 +455,8 @@ function ChatPicker({
 	const [kind, setKind] = useState<ConversationKind | "all">("all");
 	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
 	const [busy, setBusy] = useState(false);
+	// How many chats wait for the sign-in to carry on by themselves.
+	const [waiting, setWaiting] = useState(0);
 	const fail = (err: unknown) => {
 		setBusy(false);
 		if (onError(err).kind !== "reauth") toasts.show(t.failed);
@@ -465,6 +468,60 @@ function ChatPicker({
 			fail(err);
 		});
 	};
+	// One sign-in covers the whole batch: the chats go one after another within seconds. A refusal for an old sign-in
+	// stops it, keeps what is not done selected and remembers it for this tab: after signing in again the page opens
+	// anew and the batch carries on by itself (resume below).
+	const runBatch = async (conversations: readonly BridgeConversation[], ids: readonly string[], howMany: number) => {
+		setBusy(true);
+		setWaiting(0);
+		const todo = conversations.filter((c) => ids.includes(c.id) && c.chatId === 0);
+		const left = new Set(todo.map((c) => c.id));
+		let started = 0;
+		let stopped = false;
+		for (const conversation of todo) {
+			try {
+				await api.enable(account.id, conversation.id, howMany);
+				left.delete(conversation.id);
+				started++;
+			} catch (err) {
+				fail(err);
+				if (bridgeError(err).kind === "reauth") {
+					stopped = true;
+					break;
+				}
+			}
+		}
+		setBusy(false);
+		setSelected(left);
+		savePending({ account: account.id, ids: stopped ? [...left] : [], window: howMany });
+		setWaiting(stopped ? left.size : 0);
+		if (started > 0) {
+			toasts.show(t.pick.started);
+			api.conversations(account.id).then(setList, () => setList(null));
+			onChange();
+		}
+	};
+	const resume = useEffectEvent(() => {
+		const pending = takePending(account.id);
+		if (pending === null || pending.ids.length === 0) return;
+		setBusy(true);
+		setList("loading");
+		setWindow(pending.window);
+		setSelected(new Set(pending.ids));
+		api.conversations(account.id).then(
+			(all) => {
+				setList(all);
+				return runBatch(all, pending.ids, pending.window);
+			},
+			(err: unknown) => {
+				setList(null);
+				fail(err);
+			},
+		);
+	});
+	useEffect(() => {
+		resume();
+	}, []);
 	if (list === null) {
 		return (
 			<div className="br-pad">
@@ -486,30 +543,6 @@ function ChatPicker({
 			if (!next.delete(id)) next.add(id);
 			return next;
 		});
-	// One sign-in covers the whole batch: the chats go one after another within seconds. A refusal for an old sign-in
-	// stops it and keeps what is not done selected, so the same click finishes it after signing in again.
-	const start = async () => {
-		setBusy(true);
-		const left = new Set(selected);
-		let started = 0;
-		for (const conversation of chosen) {
-			try {
-				await api.enable(account.id, conversation.id, window);
-				left.delete(conversation.id);
-				started++;
-			} catch (err) {
-				fail(err);
-				if (bridgeError(err).kind === "reauth") break;
-			}
-		}
-		setBusy(false);
-		setSelected(left);
-		if (started > 0) {
-			toasts.show(t.pick.started);
-			api.conversations(account.id).then(setList, () => setList(null));
-			onChange();
-		}
-	};
 	return (
 		<div className="br-picker" data-id="bridge-picker">
 			<h3 className="br-title">{t.pick.title}</h3>
@@ -557,7 +590,10 @@ function ChatPicker({
 				<div className="br-bar" data-id="bridge-start" role="group" aria-label={t.pick.selected(chosen.length)}>
 					<div className="br-bar-top">
 						<b>{t.pick.selected(chosen.length)}</b>
-						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => setSelected(new Set())}>
+						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => {
+								setSelected(new Set());
+								setWaiting(0);
+							}}>
 							{t.pick.clear}
 						</button>
 					</div>
@@ -572,8 +608,13 @@ function ChatPicker({
 						/>
 					</div>
 					<p className="note">{t.pick.windowNote}</p>
+					{waiting > 0 && (
+						<p className="note br-resume" role="status">
+							{t.pick.resume(waiting)}
+						</p>
+					)}
 					<div className="br-actions end">
-						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void start()}>
+						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void runBatch(list, [...selected], window)}>
 							{t.pick.start(chosen.length)}
 						</button>
 					</div>

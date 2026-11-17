@@ -78,6 +78,7 @@ export const zhCNBridge: BridgeCopy = {
 		start: (n) => (n === 1 ? "开始同步" : `开始同步 ${n} 个聊天`),
 		selected: (n) => `已选 ${n} 个聊天`,
 		clear: "清除",
+		resume: (n) => `重新登录后，将自动继续同步 ${n} 个聊天。`,
 		cancel: "取消",
 		started: "正在导入历史记录，消息会陆续出现在 Chat 中。",
 		kind: { private: "私聊", bot: "机器人", group: "群组", channel: "频道" } satisfies Record<ConversationKind, string>,

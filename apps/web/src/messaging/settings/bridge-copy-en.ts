@@ -78,6 +78,7 @@ export const enBridge: BridgeCopy = {
 		start: (n) => (n === 1 ? "Start syncing" : `Start syncing ${n} chats`),
 		selected: (n) => `${n} selected`,
 		clear: "Clear",
+		resume: (n) => `Once you sign in again, ${n} chat${n === 1 ? "" : "s"} will carry on syncing by themselves.`,
 		cancel: "Cancel",
 		started: "Importing history; messages appear in Chat as they arrive.",
 		kind: { private: "Private chat", bot: "Bot", group: "Group", channel: "Channel" } satisfies Record<ConversationKind, string>,
