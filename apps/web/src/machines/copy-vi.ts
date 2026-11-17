@@ -1191,12 +1191,7 @@ export const viMachines = {
 			deleteTitle: "Xoá phiên này?",
 			deleteBody: (title: string, machine: string) =>
 				`“${title}” biến mất khỏi mọi thiết bị. Bản ghi của AI và các tệp đã gửi trong phiên được chuyển vào Thùng rác trên ${machine}, khôi phục được từ Thùng rác.`,
-			deleteRunning: (ai: string) => `${ai} đang chạy một lượt trong phiên này. Dừng lượt đó rồi xoá?`,
-			stopAndDelete: "Dừng và xoá",
-			deleteElsewhere: "Phiên này có vẻ đang mở ở nơi khác trên máy (Terminal, IDE). Xoá vẫn chuyển bản ghi vào Thùng rác; nơi đang mở có thể ghi tiếp vào bản mới.",
-			deleteInTerminal: (ai: string) => `${ai} của phiên đang chạy trong terminal của máy: xoá sẽ dừng nó trước.`,
 			deleteStopFailed: "Không dừng được AI trong terminal của máy, nên chưa xoá gì.",
-			deleteAnyway: "Vẫn xoá",
 			rowMenu: (title: string) => `Tuỳ chọn cho ${title}`,
 			archived: "Đã lưu trữ",
 		},

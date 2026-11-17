@@ -1175,12 +1175,7 @@ export const enMachines: MachinesCopy = {
 			deleteTitle: "Delete this session?",
 			deleteBody: (title: string, machine: string) =>
 				`“${title}” goes away on every device. The AI's record of it and the files sent in it move to the Trash on ${machine}, where you can restore them.`,
-			deleteRunning: (ai: string) => `${ai} is running a turn in this session. Stop it and delete?`,
-			stopAndDelete: "Stop and delete",
-			deleteElsewhere: "This session seems open elsewhere on the machine (a terminal, an IDE). Deleting still moves its record to the Trash; where it is open may write a new one.",
-			deleteInTerminal: (ai: string) => `This session's ${ai} runs in a terminal of the machine: deleting stops it first.`,
 			deleteStopFailed: "Could not stop the AI in the machine's terminal, so nothing was deleted.",
-			deleteAnyway: "Delete anyway",
 			rowMenu: (title: string) => `Options for ${title}`,
 			archived: "Archived",
 		},

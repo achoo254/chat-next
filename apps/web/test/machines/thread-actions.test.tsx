@@ -34,47 +34,29 @@ const listed = (over: { archived?: boolean; open?: boolean; state?: ThreadState;
 });
 /** A machine whose tunelo refuses to close a busy session. */
 const SAFE = { agentVersion: "3.3.5" };
-const refuse = (reason: ErrorReason) => Promise.reject(new RemoteError(ErrorCode.INVALID, "", reason));
 
 describe("deleting a session", () => {
-	it("says the files go to the Trash on the machine, then deletes", async () => {
+	it("says the files go to the Trash on the machine, then deletes on one confirmation, even mid-turn or open elsewhere", async () => {
 		const { link, sent } = fakeLink(() => Promise.resolve({} as Frame));
 		const onDeleted = vi.fn();
 		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "Sửa CSS" }} machine="Mac mini" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
 		expect(screen.getByText(/Thùng rác trên Mac mini, khôi phục được từ Thùng rác/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
 		await waitFor(() => expect(onDeleted).toHaveBeenCalled());
-		expect(sent).toEqual([{ case: "threadDelete", value: { threadId: "t1", stopRunning: false, openAnyway: false } }]);
-	});
-
-	it("asks to stop a running session, then a session open elsewhere, and keeps both answers", async () => {
-		const { link, sent } = fakeLink((_req, n) => (n === 1 ? refuse(ErrorReason.THREAD_RUNNING) : n === 2 ? refuse(ErrorReason.SESSION_OPEN_ELSEWHERE) : Promise.resolve({} as Frame)));
-		const onDeleted = vi.fn();
-		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x" }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
-		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
-		expect((await screen.findByRole("alert")).textContent).toContain("đang chạy một lượt");
-		await userEvent.click(screen.getByRole("button", { name: "Dừng và xoá" }));
-		expect((await screen.findByRole("alert")).textContent).toContain("đang mở ở nơi khác");
-		await userEvent.click(screen.getByRole("button", { name: "Vẫn xoá" }));
-		await waitFor(() => expect(onDeleted).toHaveBeenCalled());
-		expect(sent.map((r) => (r.case === "threadDelete" ? [r.value.stopRunning, r.value.openAnyway] : []))).toEqual([
-			[false, false],
-			[true, false],
-			[true, true],
-		]);
+		expect(sent).toEqual([{ case: "threadDelete", value: { threadId: "t1", stopRunning: true, openAnyway: true } }]);
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("stops the AI in the machine's terminal first, so its CLI never outlives the session as a shell", async () => {
-		const { link, sent } = fakeLink((_req, n) => (n === 2 ? refuse(ErrorReason.SESSION_OPEN_ELSEWHERE) : Promise.resolve({} as Frame)));
+		const { link, sent } = fakeLink(() => Promise.resolve({} as Frame));
 		const onDeleted = vi.fn();
 		wrap(<DeleteThreadDialog link={link} machineRef="m1" thread={{ id: "t1", title: "x", terminalSession: 7 }} machine="Mac" ai="Claude Code" onClose={() => undefined} onDeleted={onDeleted} />);
-		expect(screen.getByText(/xoá sẽ dừng nó trước/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "Xoá phiên" }));
-		await userEvent.click(await screen.findByRole("button", { name: "Vẫn xoá" }));
 		await waitFor(() => expect(onDeleted).toHaveBeenCalled());
-		// Stopped once, before the first delete; asked again, it is not stopped twice.
-		expect(sent.map((r) => r.case)).toEqual(["termClose", "threadDelete", "threadDelete"]);
-		expect(sent[0]).toEqual({ case: "termClose", value: { session: 7 } });
+		expect(sent).toEqual([
+			{ case: "termClose", value: { session: 7 } },
+			{ case: "threadDelete", value: { threadId: "t1", stopRunning: true, openAnyway: true } },
+		]);
 	});
 
 	it("deletes nothing when the terminal could not be stopped", async () => {

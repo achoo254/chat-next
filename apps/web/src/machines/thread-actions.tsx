@@ -2,16 +2,16 @@
 // menu and from its row in the AI Agent column. Archiving only hides it on
 // every device. Deleting asks first and says where things go: the machine
 // moves Claude's record of the session and the files sent in it to its
-// Trash, where they can be restored. A session running a turn asks to stop
-// it first; one that seems open elsewhere on the machine warns before going on.
-// A session whose AI runs in the machine's terminal has that terminal stopped
+// Trash, where they can be restored. That one confirmation is all: a turn
+// running is stopped and a session open elsewhere on the machine is deleted
+// all the same, with no second question. A session whose AI runs in the machine's terminal has that terminal stopped
 // first: left running, its CLI would outlive the session as a nameless shell.
 import { useState } from "react";
-import { ErrorReason, ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ThreadState, type MachineInfo, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { AGENT_SAFE_CLOSE, AGENT_THREAD_ACTIONS, versionAtLeast } from "./agent-version.ts";
-import { RemoteError, type MachineLink } from "./link/machine-link.ts";
+import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { errorText } from "./use-machines.ts";
@@ -98,8 +98,9 @@ export function ThreadMenuItems({
 }
 
 /**
- * Confirms and deletes; asks again when the machine says the session runs or seems open elsewhere. Its AI running
- * in the machine's terminal (`terminalSession`) is stopped there first, once, and nothing is deleted if that fails.
+ * Confirms once and deletes: a turn running is stopped and a session that seems open elsewhere is deleted anyway.
+ * Its AI running in the machine's terminal (`terminalSession`) is stopped there first, and nothing is deleted if
+ * that fails.
  */
 export function DeleteThreadDialog({
 	link,
@@ -124,11 +125,8 @@ export function DeleteThreadDialog({
 	const id = useDomId("delete-thread");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
-	const [stopRunning, setStopRunning] = useState(false);
-	const [openAnyway, setOpenAnyway] = useState(false);
-	const [ask, setAsk] = useState<"running" | "elsewhere" | null>(null);
 	const terminalSession = thread.terminalSession ?? 0;
-	/** The terminal holding the AI was stopped already (an answer asked again does not stop it twice). */
+	/** The terminal holding the AI was stopped already (a retry after an error does not stop it twice). */
 	const [terminalStopped, setTerminalStopped] = useState(false);
 	const stopTerminal = async (): Promise<boolean> => {
 		if (terminalSession === 0 || terminalStopped) return true;
@@ -142,7 +140,7 @@ export function DeleteThreadDialog({
 			return false;
 		}
 	};
-	const run = async (stop: boolean, anyway: boolean) => {
+	const confirm = async () => {
 		setBusy(true);
 		setError("");
 		if (!(await stopTerminal())) {
@@ -150,7 +148,7 @@ export function DeleteThreadDialog({
 			setError(t.agent.thread.deleteStopFailed);
 			return;
 		}
-		link.request({ case: "threadDelete", value: { threadId: thread.id, stopRunning: stop, openAnyway: anyway } }).then(
+		link.request({ case: "threadDelete", value: { threadId: thread.id, stopRunning: true, openAnyway: true } }).then(
 			() => {
 				setBusy(false);
 				onDeleted?.();
@@ -158,37 +156,16 @@ export function DeleteThreadDialog({
 			},
 			(err: unknown) => {
 				setBusy(false);
-				if (err instanceof RemoteError && err.reason === ErrorReason.THREAD_RUNNING) return setAsk("running");
-				if (err instanceof RemoteError && err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE) return setAsk("elsewhere");
 				setError(errorText(t, err, ai));
 			},
 		);
 	};
-	const confirm = () => {
-		const stop = stopRunning || ask === "running";
-		const anyway = openAnyway || ask === "elsewhere";
-		setStopRunning(stop);
-		setOpenAnyway(anyway);
-		setAsk(null);
-		void run(stop, anyway);
-	};
-	const label = busy ? t.agent.thread.deleting : ask === "running" ? t.agent.thread.stopAndDelete : ask === "elsewhere" ? t.agent.thread.deleteAnyway : t.agent.thread.delete;
+	const label = busy ? t.agent.thread.deleting : t.agent.thread.delete;
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={t.agent.thread.deleteTitle} onClose={onClose} />
 			<div className="dlg-body stack">
 				<p>{t.agent.thread.deleteBody(thread.title, machine)}</p>
-				{terminalSession > 0 && !terminalStopped && <p className="mx-warn">{t.agent.thread.deleteInTerminal(ai)}</p>}
-				{ask === "running" && (
-					<p className="mx-warn" role="alert">
-						{t.agent.thread.deleteRunning(ai)}
-					</p>
-				)}
-				{ask === "elsewhere" && (
-					<p className="mx-warn" role="alert">
-						{t.agent.thread.deleteElsewhere}
-					</p>
-				)}
 				{error !== "" && (
 					<p className="mx-error" role="alert">
 						{error}
@@ -199,7 +176,7 @@ export function DeleteThreadDialog({
 				<button type="button" className="btn" onClick={onClose}>
 					{t.newSession.cancel}
 				</button>
-				<button type="button" className="btn btn-danger" disabled={busy} onClick={confirm}>
+				<button type="button" className="btn btn-danger" disabled={busy} onClick={() => void confirm()}>
 					{label}
 				</button>
 			</div>

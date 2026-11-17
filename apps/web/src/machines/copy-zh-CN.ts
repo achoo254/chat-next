@@ -1168,12 +1168,7 @@ export const zhCNMachines: MachinesCopy = {
 			deleteTitle: "删除此会话？",
 			deleteBody: (title: string, machine: string) =>
 				`“${title}”将从所有设备上消失。AI 的会话记录和会话中发送的文件会移到 ${machine} 的废纸篓，可从废纸篓恢复。`,
-			deleteRunning: (ai: string) => `${ai} 正在此会话中运行一轮。停止后删除？`,
-			stopAndDelete: "停止并删除",
-			deleteElsewhere: "此会话似乎正在电脑上的其他地方打开（终端、IDE）。删除仍会把记录移到废纸篓；打开它的地方可能会写入新的记录。",
-			deleteInTerminal: (ai: string) => `此会话的 ${ai} 正在电脑的终端中运行：删除前会先停止它。`,
 			deleteStopFailed: "无法停止电脑终端中的 AI，因此未删除任何内容。",
-			deleteAnyway: "仍然删除",
 			rowMenu: (title: string) => `${title} 的选项`,
 			archived: "已归档",
 		},
