@@ -36,7 +36,7 @@ export interface PersonLook {
  * packed into the accessories GLB (until then, nothing).
  */
 export const ADVISOR_DRESS: Readonly<Record<LookId, { readonly skins: readonly string[]; readonly accessory: string; readonly accessoryScale: number }>> = {
-	owl: { skins: ["advisor-owl", "grey-red-hair"], accessory: "glasses", accessoryScale: 1.5 },
+	owl: { skins: ["advisor-owl", "grey-red-hair"], accessory: "glasses", accessoryScale: 1.1 },
 	robot: { skins: ["advisor-robot", "teal-overalls"], accessory: "advisor-antenna-band", accessoryScale: 1 },
 	suit: { skins: ["advisor-suit", "rose-shirt"], accessory: "advisor-chart-tablet", accessoryScale: 1 },
 	cat: { skins: ["advisor-cat", "mustard"], accessory: "advisor-cat-ears", accessoryScale: 1 },

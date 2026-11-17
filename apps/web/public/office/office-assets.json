@@ -948,7 +948,7 @@
 		}
 	},
 	"accessories": {
-		"file": "accessories.d9b2a350.glb",
+		"file": "accessories.0b0096a5.glb",
 		"items": {
 			"magnifier": {
 				"bone": "hand_r",
@@ -956,11 +956,21 @@
 			},
 			"hard-hat": {
 				"bone": "head",
-				"scale": 1.6
+				"scale": 2,
+				"shift": [
+					0,
+					0.34,
+					0
+				]
 			},
 			"glasses": {
 				"bone": "head",
-				"scale": 1.8
+				"scale": 2.4,
+				"shift": [
+					0,
+					0.2,
+					0.22
+				]
 			},
 			"book-stack": {
 				"bone": "hand_r",
@@ -976,7 +986,12 @@
 			},
 			"headphones": {
 				"bone": "head",
-				"scale": 2.2
+				"scale": 2.9,
+				"shift": [
+					0,
+					0.14,
+					0
+				]
 			},
 			"mug": {
 				"bone": "hand_r",
