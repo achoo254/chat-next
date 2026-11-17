@@ -49,6 +49,9 @@ CREATE TABLE external_chats (
 	account_id bigint NOT NULL REFERENCES external_accounts (id) ON DELETE CASCADE,
 	external_chat_id text NOT NULL,
 	chat_id bigint NOT NULL REFERENCES chats (id),
+	-- The conversation's name in the other app when it was enabled, for the
+	-- list of synced chats (a private chat's own title is empty).
+	title text NOT NULL DEFAULT '' CHECK (octet_length(title) <= 256),
 	-- 'in': the other app is the source and Chat refuses to send into the
 	-- chat. 'both' is for a later step (a send queue).
 	direction text NOT NULL DEFAULT 'in' CHECK (direction IN ('in', 'both')),

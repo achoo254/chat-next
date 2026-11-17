@@ -272,7 +272,15 @@ func TestLinkedChatRefusesSending(t *testing.T) {
 	if _, err := h.st.Pool().Exec(ctx, `INSERT INTO external_chats (account_id, external_chat_id, chat_id) VALUES ($1, 'c1', $2)`, accountID, chatID); err != nil {
 		t.Fatal(err)
 	}
-	_, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "hello"})
+	got, _, err := h.svc.GetChat(ctx, owner, chatID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetExternalSource() != "telegram" || got.GetMyPermissions()&(permSend|permMedia) != 0 {
+		t.Fatalf("a linked chat shows source %q and permissions %b: it must name its app and carry no right to send",
+			got.GetExternalSource(), got.GetMyPermissions())
+	}
+	_, err = h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "hello"})
 	if codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("send into a linked chat = %v, want PermissionDenied", err)
 	}

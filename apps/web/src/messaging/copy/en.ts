@@ -73,6 +73,7 @@ export const en: MessagingCopy = {
 		typeForum: "Group with topics",
 		typeChannel: "Channel",
 		typeBot: "Bot",
+		copyOf: (app) => `Read-only copy from ${app}`,
 		muted: "Notifications off",
 		pinned: "Pinned",
 		mention: "Someone mentioned you",

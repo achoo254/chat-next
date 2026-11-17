@@ -38,6 +38,7 @@ export const vi = {
 		console: "Developer Console",
 		mcp: "Kết nối AI (MCP)",
 		advisor: "Cố vấn",
+		bridge: "Kết nối ứng dụng",
 		account: "Tài khoản",
 		feedback: "Góp ý",
 		signOut: "Đăng xuất",

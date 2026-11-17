@@ -76,6 +76,7 @@ export const vi = {
 		typeForum: "Nhóm có chủ đề",
 		typeChannel: "Kênh",
 		typeBot: "Bot",
+		copyOf: (app: string): string => `Bản sao chỉ đọc từ ${app}`,
 		muted: "Đã tắt thông báo",
 		pinned: "Đã ghim",
 		mention: "Có người nhắc bạn",

@@ -19,6 +19,9 @@ import { useUi } from "./ui-context.tsx";
 
 const LONG_PRESS_MS = 500;
 
+/** How the app a chat is copied from is named in the list (Chat Bridge). */
+const sourceName = (source: string): string => (source === "telegram" ? "Telegram" : source);
+
 /** Row heights: fixed per kind so the list can position rows absolutely. */
 export const ROW_HEIGHT = 64;
 export const TWO_LINE_ROW_HEIGHT = 84;
@@ -244,6 +247,11 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 							<LabelledIcon name={kindIcon} label={kindLabel(kind, copy)} className="type-ico" />
 						)}
 						<span className="title-text">{title}</span>
+						{view.chat?.externalSource !== undefined && (
+							<span className="tag" title={copy.list.copyOf(sourceName(view.chat.externalSource))}>
+								{sourceName(view.chat.externalSource)}
+							</span>
+						)}
 						{muted && <LabelledIcon name="bell-off" label={copy.list.muted} />}
 					</span>
 					<Preview view={view} kind={kind} saved={saved} draft={draft} topics={topics} />

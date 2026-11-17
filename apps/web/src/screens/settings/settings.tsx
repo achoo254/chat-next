@@ -79,7 +79,7 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false, sec
 	const available =
 		section !== undefined ||
 		groups.some((group) => group.some((item) => item.tab === tab)) ||
-		(messaging !== undefined && (tab === "mcp" || tab === "advisor" || tab === "account")) ||
+		(messaging !== undefined && (tab === "mcp" || tab === "advisor" || tab === "bridge" || tab === "account")) ||
 		(tab === "feedback" && messaging?.feedback !== undefined);
 	/** Whether the entry for `item` is the one shown. */
 	const isCurrent = (item: SettingsTab): boolean => section === undefined && item === tab;
@@ -127,6 +127,10 @@ export function Settings({ tab, self, onSelfChange, messaging, list = false, sec
 						<Link to={paths.settings("advisor")} current={isCurrent("advisor")}>
 							<Icon name="bulb" />
 							<span>{t.settings.advisor}</span>
+						</Link>
+						<Link to={paths.settings("bridge")} current={isCurrent("bridge")}>
+							<Icon name="link" />
+							<span>{t.settings.bridge}</span>
 						</Link>
 						<Link to={paths.settings("account")} current={isCurrent("account")}>
 							<Icon name="key" />

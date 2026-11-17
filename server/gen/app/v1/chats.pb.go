@@ -497,9 +497,13 @@ type Chat struct {
 	Left bool `protobuf:"varint,15,opt,name=left,proto3" json:"left,omitempty"`
 	// GROUP only: messages are organised in forum topics (ForumTopic). Once on
 	// it stays on.
-	Forum         bool `protobuf:"varint,16,opt,name=forum,proto3" json:"forum,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Forum bool `protobuf:"varint,16,opt,name=forum,proto3" json:"forum,omitempty"`
+	// The app this chat is a read-only copy of ("telegram"), set on chats the
+	// Chat Bridge fills (ADR 0022); empty for every other chat. The caller's
+	// my_permissions then carry no right to send.
+	ExternalSource string `protobuf:"bytes,17,opt,name=external_source,json=externalSource,proto3" json:"external_source,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Chat) Reset() {
@@ -642,6 +646,13 @@ func (x *Chat) GetForum() bool {
 		return x.Forum
 	}
 	return false
+}
+
+func (x *Chat) GetExternalSource() string {
+	if x != nil {
+		return x.ExternalSource
+	}
+	return ""
 }
 
 type ChatMember struct {
@@ -5213,7 +5224,7 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\x12app/v1/chats.proto\x12\x06app.v1\x1a\x12app/v1/media.proto\x1a\x15app/v1/messages.proto\x1a\x12app/v1/users.proto\"g\n" +
 	"\x10AddMemberFailure\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x126\n" +
-	"\x06reason\x18\x02 \x01(\x0e2\x1e.app.v1.AddMemberFailureReasonR\x06reason\"\xcb\x04\n" +
+	"\x06reason\x18\x02 \x01(\x0e2\x1e.app.v1.AddMemberFailureReasonR\x06reason\"\xf4\x04\n" +
 	"\x04Chat\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12$\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x10.app.v1.ChatTypeR\x04type\x12\x14\n" +
@@ -5234,7 +5245,8 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\amy_role\x18\r \x01(\x0e2\x12.app.v1.MemberRoleR\x06myRole\x12%\n" +
 	"\x0emy_permissions\x18\x0e \x01(\rR\rmyPermissions\x12\x12\n" +
 	"\x04left\x18\x0f \x01(\bR\x04left\x12\x14\n" +
-	"\x05forum\x18\x10 \x01(\bR\x05forum\"\xb7\x01\n" +
+	"\x05forum\x18\x10 \x01(\bR\x05forum\x12'\n" +
+	"\x0fexternal_source\x18\x11 \x01(\tR\x0eexternalSource\"\xb7\x01\n" +
 	"\n" +
 	"ChatMember\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12&\n" +

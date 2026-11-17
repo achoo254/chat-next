@@ -46,6 +46,7 @@ type chatLink struct {
 	Kind         bridge.ConvKind
 	HistoryMax   int
 	BackfillDone bool
+	Title        string
 }
 
 // messageKey is what the other app calls a message.
@@ -133,14 +134,14 @@ func saveState(ctx context.Context, q querier, accountID int64, state []byte) er
 
 func (d *db) links(ctx context.Context, accountID int64) ([]*chatLink, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done FROM external_chats
+		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title FROM external_chats
 		WHERE account_id = $1 ORDER BY id`, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list synced chats: %w", err)
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (*chatLink, error) {
 		l := &chatLink{}
-		err := r.Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone)
+		err := r.Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title)
 		return l, err
 	})
 }
@@ -148,9 +149,9 @@ func (d *db) links(ctx context.Context, accountID int64) ([]*chatLink, error) {
 func (d *db) link(ctx context.Context, accountID int64, externalChat string) (*chatLink, error) {
 	l := &chatLink{}
 	err := d.pool.QueryRow(ctx, `
-		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done FROM external_chats
+		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title FROM external_chats
 		WHERE account_id = $1 AND external_chat_id = $2`, accountID, externalChat).
-		Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone)
+		Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

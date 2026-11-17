@@ -243,6 +243,8 @@ type BridgeSyncedChat struct {
 	// The first import has caught up with the newest message.
 	CaughtUp      bool  `protobuf:"varint,3,opt,name=caught_up,json=caughtUp,proto3" json:"caught_up,omitempty"`
 	HistoryWindow int32 `protobuf:"varint,4,opt,name=history_window,json=historyWindow,proto3" json:"history_window,omitempty"`
+	// The conversation's name in the app when it was enabled.
+	Title         string `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -303,6 +305,13 @@ func (x *BridgeSyncedChat) GetHistoryWindow() int32 {
 		return x.HistoryWindow
 	}
 	return 0
+}
+
+func (x *BridgeSyncedChat) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
 }
 
 type BridgeAccount struct {
@@ -1239,12 +1248,13 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\n" +
 	"\x13app/v1/bridge.proto\x12\x06app.v1\"#\n" +
 	"\tBridgeApp\x12\x16\n" +
-	"\x06source\x18\x01 \x01(\tR\x06source\"\x9c\x01\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\"\xb2\x01\n" +
 	"\x10BridgeSyncedChat\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x1b\n" +
 	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\tcaught_up\x18\x03 \x01(\bR\bcaughtUp\x12%\n" +
-	"\x0ehistory_window\x18\x04 \x01(\x05R\rhistoryWindow\"\xbf\x01\n" +
+	"\x0ehistory_window\x18\x04 \x01(\x05R\rhistoryWindow\x12\x14\n" +
+	"\x05title\x18\x05 \x01(\tR\x05title\"\xbf\x01\n" +
 	"\rBridgeAccount\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x123\n" +

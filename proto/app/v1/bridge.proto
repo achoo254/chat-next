@@ -61,6 +61,8 @@ message BridgeSyncedChat {
   // The first import has caught up with the newest message.
   bool caught_up = 3;
   int32 history_window = 4;
+  // The conversation's name in the app when it was enabled.
+  string title = 5;
 }
 
 message BridgeAccount {

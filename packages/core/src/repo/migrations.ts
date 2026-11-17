@@ -345,6 +345,15 @@ export const MIGRATIONS: readonly Migration[] = [
 			)`,
 		],
 	},
+	{
+		version: 16,
+		statements: [
+			// The app a read-only copy of a chat comes from (Chat Bridge, ADR 0022); '' for every other chat.
+			"ALTER TABLE chats ADD COLUMN external_source TEXT NOT NULL DEFAULT ''",
+			// Chats already stored lack it: dropping the sync position makes the next start take a fresh snapshot.
+			"DELETE FROM sync_state",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

@@ -40,6 +40,7 @@ export const en: Messages = {
 		console: "Developer Console",
 		mcp: "AI tools (MCP)",
 		advisor: "Advisor",
+		bridge: "Connected apps",
 		account: "Account",
 		feedback: "Feedback",
 		signOut: "Sign out",

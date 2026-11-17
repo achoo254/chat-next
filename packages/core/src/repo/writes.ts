@@ -84,8 +84,8 @@ export function putUser(w: WriteBatch, user: User): void {
 export function putChat(w: WriteBatch, chat: Chat): void {
 	w.add(
 		`INSERT INTO chats (id, type, title, about, peer_user_id, sync_mode, history_shared, member_count,
-			default_permissions, pinned_seq, created_at, my_role, my_permissions, left_chat, forum, photo_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			default_permissions, pinned_seq, created_at, my_role, my_permissions, left_chat, forum, photo_id, external_source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET type = excluded.type, title = excluded.title, about = excluded.about,
 			peer_user_id = excluded.peer_user_id,
 			sync_mode = CASE WHEN chats.sync_mode = 'large' THEN 'large' ELSE excluded.sync_mode END,
@@ -94,7 +94,7 @@ export function putChat(w: WriteBatch, chat: Chat): void {
 			created_at = excluded.created_at, my_role = excluded.my_role,
 			my_permissions = excluded.my_permissions,
 			left_chat = CASE WHEN excluded.left_chat <> 0 AND chats.left_chat = ${LEFT_REMOVED} THEN chats.left_chat ELSE excluded.left_chat END,
-			forum = excluded.forum, photo_id = excluded.photo_id`,
+			forum = excluded.forum, photo_id = excluded.photo_id, external_source = excluded.external_source`,
 		[
 			chat.id,
 			chat.type,
@@ -112,6 +112,7 @@ export function putChat(w: WriteBatch, chat: Chat): void {
 			flag(chat.left),
 			flag(chat.forum),
 			chat.photoId ?? "",
+			chat.externalSource ?? "",
 		],
 	);
 	w.emit(EventKeys.chat(chat.id));

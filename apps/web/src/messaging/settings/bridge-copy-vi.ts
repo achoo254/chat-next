@@ -1,0 +1,95 @@
+// Vietnamese copy of Settings › Kết nối ứng dụng (Chat Bridge). The other
+// languages (bridge-copy-en.ts, bridge-copy-zh-CN.ts) must give the same keys.
+import type { ConversationKind } from "./bridge-api.ts";
+
+export const viBridge = {
+	title: "Kết nối ứng dụng",
+	lede: "Sao chép các cuộc trò chuyện của bạn ở ứng dụng khác vào Chat để đọc và tìm kiếm ở đây. Chỉ một chiều: từ ứng dụng đó sang Chat, Chat không gửi gì ngược lại.",
+	disabled: "Máy chủ này chưa bật tính năng kết nối ứng dụng.",
+	loadFailed: "Chưa tải được. Thử lại.",
+	retry: "Thử lại",
+	failed: "Chưa làm được, thử lại sau.",
+	reauth: {
+		body: "Thao tác này cần đăng nhập trong 10 phút gần đây.",
+		signIn: "Đăng nhập lại",
+	},
+	apps: { telegram: "Telegram" } as Record<string, string>,
+	appFallback: (source: string): string => source,
+	sources: {
+		title: "Ứng dụng có thể kết nối",
+		none: "Máy chủ chưa có ứng dụng nào để kết nối.",
+		connect: "Kết nối",
+		note: "Đăng nhập bằng số điện thoại của tài khoản. Chat không lưu số điện thoại hay mã xác nhận, chỉ giữ phiên đăng nhập đã mã hoá.",
+	},
+	login: {
+		title: (app: string): string => `Đăng nhập ${app}`,
+		next: "Tiếp tục",
+		cancel: "Huỷ",
+		scan: "Quét mã này bằng ứng dụng",
+		confirm: "Xác nhận đăng nhập trên thiết bị khác của bạn.",
+		fields: {
+			phone: "Số điện thoại, kèm mã quốc gia (ví dụ +84…)",
+			code: "Mã đăng nhập (gửi tới app trên thiết bị khác, hoặc SMS)",
+			password: "Mật khẩu xác minh hai bước",
+		} as Record<string, string>,
+		errors: {
+			invalid_phone: "Số điện thoại chưa đúng. Nhập kèm mã quốc gia, ví dụ +84…",
+			wrong_code: "Mã chưa đúng. Nhập lại.",
+			code_expired: "Mã đã hết hạn. Bắt đầu đăng nhập lại.",
+			wrong_password: "Mật khẩu chưa đúng. Nhập lại.",
+			phone_banned: "Ứng dụng từ chối số điện thoại này.",
+			too_many_attempts: "Ứng dụng báo thử quá nhiều lần. Đợi một lúc rồi thử lại.",
+			login_expired: "Phiên đăng nhập đã hết hạn. Bắt đầu lại.",
+		} as Record<string, string>,
+		rateLimited: "Thử đăng nhập quá nhiều lần. Đợi vài phút rồi thử lại.",
+		accountTaken: "Tài khoản này đang được người dùng khác kết nối.",
+	},
+	account: {
+		status: {
+			active: "Đang kết nối",
+			needs_login: "Cần đăng nhập lại",
+			stopped: "Đã ngắt kết nối, các chat còn lại ở chế độ chỉ đọc",
+		} as Record<string, string>,
+		lastError: (text: string): string => `Lỗi gần nhất: ${text}`,
+		reconnect: "Đăng nhập lại",
+	},
+	chats: {
+		title: "Chat đã đồng bộ",
+		none: "Chưa chọn chat nào để đồng bộ.",
+		importing: "Đang nhập lịch sử…",
+		caughtUp: "Đã nhập xong, tin mới về trực tiếp",
+		window: (n: number): string => `${n.toLocaleString("vi")} tin gần nhất`,
+		open: "Mở chat",
+		remove: "Xoá bản sao",
+		removeConfirm: "Xoá chat này khỏi Chat? Bản gốc ở ứng dụng kia không bị ảnh hưởng.",
+		removeYes: "Xoá",
+		readOnly: "Các chat này chỉ để đọc: bạn không gửi tin vào đó được.",
+	},
+	pick: {
+		title: "Chọn chat để đồng bộ",
+		load: "Hiện danh sách chat",
+		loading: "Đang tải danh sách…",
+		search: "Tìm theo tên",
+		empty: "Không có chat nào khớp.",
+		synced: "Đã đồng bộ",
+		sync: "Đồng bộ",
+		window: "Số tin gần nhất cần tải",
+		windowOption: (n: number): string => n.toLocaleString("vi"),
+		windowNote: "Chọn một lần, không đổi được: Chat không tải thêm được lịch sử cũ hơn về sau.",
+		start: "Bắt đầu đồng bộ",
+		cancel: "Huỷ",
+		started: "Đang nhập lịch sử, tin sẽ hiện dần trong Chat.",
+		kind: { private: "Chat riêng", bot: "Bot", group: "Nhóm", channel: "Kênh" } as Record<ConversationKind, string>,
+	},
+	disconnect: {
+		button: "Ngắt kết nối",
+		title: "Ngắt kết nối tài khoản?",
+		body: "Phiên đăng nhập của Chat trên ứng dụng kia sẽ bị đăng xuất. Chọn cách xử lý các chat đã sao chép.",
+		keep: "Giữ chat (chỉ đọc)",
+		deleteAll: "Xoá hết chat và liên hệ đã nhập",
+		cancel: "Huỷ",
+		done: "Đã ngắt kết nối.",
+	},
+};
+
+export type BridgeCopy = typeof viBridge;

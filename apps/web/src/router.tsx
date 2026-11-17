@@ -1,7 +1,7 @@
 // Minimal history-based routing: a handful of screens do not justify a router library.
 import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 
-export type SettingsTab = "profile" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts" | "app" | "account" | "mcp" | "advisor" | "feedback";
+export type SettingsTab = "profile" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts" | "app" | "account" | "mcp" | "advisor" | "bridge" | "feedback";
 
 /**
  * What the chat column shows next to the conversation list: the chat, its
@@ -82,7 +82,7 @@ export function inSettingsFrame(route: Route): boolean {
 	return SETTINGS_FRAME.has(route.name);
 }
 
-const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "app", "account", "mcp", "advisor", "feedback"];
+const SETTINGS_TABS: readonly SettingsTab[] = ["profile", "privacy", "blocked", "notifications", "appearance", "shortcuts", "app", "account", "mcp", "advisor", "bridge", "feedback"];
 
 export const paths = {
 	home: "/",

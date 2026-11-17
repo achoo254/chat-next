@@ -72,12 +72,17 @@ type chatRow struct {
 	UserLow, UserHigh int64
 	// PhotoID is the file_id of the group's or channel's photo ("" without one).
 	PhotoID string
+	// ExternalSource names the app of a chat the Chat Bridge fills ("" for
+	// any other chat): such a chat only receives, so nobody may send into it.
+	ExternalSource string
 }
 
 const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, c.sync_mode, c.history_visibility,
 	c.default_permissions, c.forum, c.last_seq, c.chat_pts, c.last_topic_id, c.member_count, c.pinned_seq, c.created_at,
 	c.last_message_at, coalesce(p.user_low, 0), coalesce(p.user_high, 0),
-	coalesce((SELECT cf.public_id FROM files cf WHERE cf.id = c.photo_file_id), '')`
+	coalesce((SELECT cf.public_id FROM files cf WHERE cf.id = c.photo_file_id), ''),
+	coalesce((SELECT a.source FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+		WHERE x.chat_id = c.id AND x.direction = 'in'), '')`
 
 const chatFrom = `chats c LEFT JOIN private_chats p ON p.chat_id = c.id`
 
@@ -86,7 +91,7 @@ func scanChat(row pgx.Row) (*chatRow, error) {
 	var perms int32
 	err := row.Scan(&c.ID, &c.TenantID, &c.Type, &c.Title, &c.About, &c.CreatorID, &c.SyncMode, &c.HistoryVisibility,
 		&perms, &c.Forum, &c.LastSeq, &c.ChatPts, &c.LastTopicID, &c.MemberCount, &c.PinnedSeq, &c.CreatedAt,
-		&c.LastMessageAt, &c.UserLow, &c.UserHigh, &c.PhotoID)
+		&c.LastMessageAt, &c.UserLow, &c.UserHigh, &c.PhotoID, &c.ExternalSource)
 	c.DefaultPerms = uint32(perms)
 	return c, err
 }
@@ -170,6 +175,14 @@ func (m *memberRow) isAdmin() bool {
 
 // permsOf returns the effective ChatPermission bits of a member.
 func (c *chatRow) permsOf(m *memberRow) uint32 {
+	perms := c.memberPerms(m)
+	if c.ExternalSource != "" {
+		perms &^= permSend | permMedia
+	}
+	return perms
+}
+
+func (c *chatRow) memberPerms(m *memberRow) uint32 {
 	if !m.active() {
 		return 0
 	}
@@ -221,6 +234,7 @@ func (c *chatRow) render(viewer int64, m *memberRow) *appv1.Chat {
 		MyPermissions:      c.permsOf(m),
 		Left:               !m.active(),
 		Forum:              c.Forum,
+		ExternalSource:     c.ExternalSource,
 	}
 	if c.SyncMode == syncLarge {
 		out.SyncMode = appv1.SyncMode_SYNC_MODE_LARGE

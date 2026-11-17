@@ -40,6 +40,7 @@ export const zhCN: Messages = {
 		console: "开发者控制台",
 		mcp: "AI 工具 (MCP)",
 		advisor: "顾问",
+		bridge: "连接应用",
 		account: "账号",
 		feedback: "反馈",
 		signOut: "退出登录",

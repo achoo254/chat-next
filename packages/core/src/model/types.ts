@@ -44,6 +44,8 @@ export interface Chat {
 	readonly removed: boolean;
 	/** Groups only: messages are organised in forum topics. */
 	readonly forum: boolean;
+	/** The app this chat is a read-only copy of ("telegram"), set by the Chat Bridge; absent for every other chat. */
+	readonly externalSource?: string;
 	/** Groups and channels: file_id of the chat's photo, fetched with MediaRequest.chatPhotoOf; absent without one. */
 	readonly photoId?: string;
 }

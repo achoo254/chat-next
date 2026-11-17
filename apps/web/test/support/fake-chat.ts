@@ -43,6 +43,7 @@ import type { RemoteApi } from "../../../../packages/core/src/protocol/api.ts";
 import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
 import { FakePush } from "./fake-push.ts";
+import { FakeBridge } from "./fake-bridge.ts";
 import { FakePrivacy } from "./fake-privacy.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
@@ -316,6 +317,8 @@ export class ChatFixture {
 	readonly push = new FakePush();
 	/** PrivacyService: data export. */
 	readonly privacy = new FakePrivacy();
+	/** BridgeService: connected apps. */
+	readonly bridge = new FakeBridge();
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
@@ -777,6 +780,7 @@ export class ChatFixture {
 		this.bots.routes(router);
 		this.push.routes(router);
 		this.privacy.routes(router);
+		this.bridge.routes(router);
 	}
 
 	/** The private chat of the signed-in user with `userId`, created when missing. */

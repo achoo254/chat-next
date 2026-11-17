@@ -70,6 +70,7 @@ export const zhCN: MessagingCopy = {
 		typeForum: "话题群组",
 		typeChannel: "频道",
 		typeBot: "机器人",
+		copyOf: (app) => `来自${app}的只读副本`,
 		muted: "通知已关闭",
 		pinned: "已置顶",
 		mention: "有人提到了你",

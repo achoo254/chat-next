@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -312,8 +313,8 @@ func (e *Engine) EnableChat(ctx context.Context, accountID int64, conv bridge.Co
 	}
 	chatID, err := e.chat.CreateImportedChat(ctx, a.OwnerID, ic, func(tx pgx.Tx, chatID int64) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO external_chats (account_id, external_chat_id, chat_id, history_window) VALUES ($1, $2, $3, $4)`,
-			accountID, conv.ID, chatID, history)
+			INSERT INTO external_chats (account_id, external_chat_id, chat_id, history_window, title) VALUES ($1, $2, $3, $4, $5)`,
+			accountID, conv.ID, chatID, history, cleanTitle(conv.Title))
 		return err
 	})
 	if err != nil {
@@ -333,4 +334,13 @@ func (e *Engine) stopRunner(accountID int64) {
 	}
 	h.cancel()
 	<-h.done
+}
+
+// cleanTitle fits a conversation's name into external_chats.title.
+func cleanTitle(title string) string {
+	title = strings.ToValidUTF8(title, "")
+	if len(title) > 256 {
+		title = string([]rune(title)[:60])
+	}
+	return title
 }

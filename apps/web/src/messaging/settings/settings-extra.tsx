@@ -32,6 +32,8 @@ import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
 
 /** Advisor's settings load with the machines' link code (each machine's key), only when opened. */
 const AdvisorSettings = lazy(() => import("../../screens/settings/advisor-settings.tsx"));
+/** Connected apps load with the Connect client of BridgeService, only when opened. */
+const BridgeSettings = lazy(() => import("./bridge-settings.tsx"));
 
 /** `self` and `onSelfChange`: the Profile tab's photo field, the only part of that tab drawn here. */
 export default function SettingsExtra({ tab, self, onSelfChange }: { tab: SettingsTab; self?: SelfUser; onSelfChange?: (self: SelfUser) => void }) {
@@ -56,6 +58,8 @@ export default function SettingsExtra({ tab, self, onSelfChange }: { tab: Settin
 			return <McpSettings />;
 		case "advisor":
 			return <AdvisorSettings />;
+		case "bridge":
+			return <BridgeSettings />;
 		default:
 			return null;
 	}

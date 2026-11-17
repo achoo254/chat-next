@@ -202,6 +202,10 @@ message Chat {
   // GROUP only: messages are organised in forum topics (ForumTopic). Once on
   // it stays on.
   bool forum = 16;
+  // The app this chat is a read-only copy of ("telegram"), set on chats the
+  // Chat Bridge fills (ADR 0022); empty for every other chat. The caller's
+  // my_permissions then carry no right to send.
+  string external_source = 17;
 }
 
 message ChatMember {

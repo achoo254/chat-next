@@ -182,6 +182,7 @@ type ChatView struct {
 	ChatID         int64
 	CaughtUp       bool
 	HistoryWindow  int
+	Title          string
 }
 
 // Accounts lists the accounts of owner.
@@ -204,7 +205,7 @@ func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, erro
 			return nil, err
 		}
 		for _, l := range links {
-			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax})
+			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title})
 		}
 	}
 	return accounts, nil

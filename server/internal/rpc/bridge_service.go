@@ -176,7 +176,7 @@ func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
 	}
 	for _, c := range a.Chats {
 		out.Chats = append(out.Chats, &appv1.BridgeSyncedChat{
-			ConversationId: c.ConversationID, ChatId: c.ChatID, CaughtUp: c.CaughtUp, HistoryWindow: int32(c.HistoryWindow),
+			ConversationId: c.ConversationID, ChatId: c.ChatID, CaughtUp: c.CaughtUp, HistoryWindow: int32(c.HistoryWindow), Title: c.Title,
 		})
 	}
 	return out
