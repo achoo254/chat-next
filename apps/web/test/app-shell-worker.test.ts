@@ -11,7 +11,7 @@ import {
 	type WindowClientLike,
 } from "../src/sw/app-shell-worker.ts";
 import { askBuild, BUILD_QUERY, BUILD_REPLY } from "../src/sw/build-messages.ts";
-import { CACHE_PREFIX } from "../src/sw/shell-routes.ts";
+import { CACHE_PREFIX, OFFICE_CACHE } from "../src/sw/shell-routes.ts";
 
 const ORIGIN = "https://chat.hoandat.com";
 const url = (path: string) => new URL(path, ORIGIN).toString();
@@ -19,6 +19,8 @@ const url = (path: string) => new URL(path, ORIGIN).toString();
 /** CacheStorage in memory; keys() keeps the creation order, as browsers do. */
 class MemoryCaches {
 	readonly stores = new Map<string, Map<string, string>>();
+	/** Every put fails, as when the origin is out of quota. */
+	failPuts = false;
 
 	open(name: string): Promise<Cache> {
 		let store = this.stores.get(name);
@@ -34,6 +36,7 @@ class MemoryCaches {
 				return Promise.resolve(body === undefined ? undefined : new Response(body));
 			},
 			put: async (request: RequestInfo | URL, response: Response) => {
+				if (this.failPuts) throw new DOMException("quota", "QuotaExceededError");
 				entries.set(key(request), await response.text());
 			},
 			addAll: async (requests: RequestInfo[]) => {
@@ -88,6 +91,8 @@ interface Harness {
 	readonly calls: string[];
 	readonly tabs: WindowClientLike[];
 	online: boolean;
+	/** The network's status for every answer (200 by default). */
+	status: number;
 	install(): Promise<void>;
 	activate(): Promise<void>;
 	request(path: string, mode?: string): Promise<Response | null>;
@@ -112,6 +117,7 @@ function startWorker(shell: AppShellBuild, caches = new MemoryCaches()): Harness
 		calls,
 		tabs,
 		online: true,
+		status: 200,
 		async install() {
 			await dispatchExtendable("install");
 		},
@@ -120,17 +126,22 @@ function startWorker(shell: AppShellBuild, caches = new MemoryCaches()): Harness
 		},
 		async request(path, mode = "cors") {
 			let response: Promise<Response> | null = null;
+			const background: Promise<unknown>[] = [];
 			const event: FetchEventLike = {
 				request: new Request(url(path), mode === "navigate" ? {} : { mode: mode as RequestMode }),
 				respondWith: (promise) => {
 					response = promise;
 				},
-				waitUntil: () => undefined,
+				waitUntil: (promise) => background.push(promise),
 			};
 			// navigate cannot be set on a Request built outside a browser.
 			if (mode === "navigate") Object.defineProperty(event.request, "mode", { value: "navigate" });
 			(listeners.get("fetch") as (event: FetchEventLike) => void)(event);
-			return response;
+			if (response === null) return null;
+			const answer = await (response as Promise<Response>);
+			// Work the worker keeps doing after answering (a copy being stored).
+			await Promise.all(background);
+			return answer;
 		},
 		async ask() {
 			const pending: Promise<unknown>[] = [];
@@ -150,7 +161,7 @@ function startWorker(shell: AppShellBuild, caches = new MemoryCaches()): Harness
 		fetch: (request) => {
 			calls.push(`fetch ${new URL(request.url).pathname}`);
 			if (!harness.online) return Promise.reject(new TypeError("offline"));
-			const response = new Response(`network ${new URL(request.url).pathname}`);
+			const response = new Response(`network ${new URL(request.url).pathname}`, { status: harness.status });
 			// A same-origin answer, as the browser's fetch gives it.
 			Object.defineProperty(response, "type", { value: "basic" });
 			return Promise.resolve(response);
@@ -254,5 +265,75 @@ describe("app shell worker: requests", () => {
 		expect(worker.caches.stores.get(`${CACHE_PREFIX}new`)?.get("/assets/chunk-from-a-newer-tab.js")).toBe("network /assets/chunk-from-a-newer-tab.js");
 		expect(await worker.request("/rpc/app.v1.UsersService/GetSelf")).toBeNull();
 		expect(await worker.request("/auth/login", "navigate")).toBeNull();
+	});
+});
+
+describe("app shell worker: office assets", () => {
+	const GLB = "/office/character.5cc7bd69.glb";
+	const LIST = "/office/office-assets.json";
+	const office = (caches: MemoryCaches) => caches.stores.get(OFFICE_CACHE);
+
+	it("downloads an office file once, then serves it from its own cache, offline too", async () => {
+		const worker = startWorker(NEW);
+		await worker.install();
+		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
+		expect(office(worker.caches)?.get(GLB)).toBe(`network ${GLB}`);
+		worker.online = false;
+		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
+		expect(worker.calls.filter((call) => call === `fetch ${GLB}`)).toHaveLength(1);
+		// Not in any build's cache, so pruning builds never drops it.
+		expect(worker.caches.stores.get(`${CACHE_PREFIX}new`)?.has(GLB)).toBe(false);
+	});
+
+	it("keeps the office cache across builds", async () => {
+		const caches = new MemoryCaches();
+		const old = startWorker(OLD, caches);
+		await old.install();
+		await old.request(GLB);
+		const worker = startWorker(NEW, caches);
+		await worker.install();
+		await worker.activate();
+		await worker.ask();
+		// The old build's cache went with its last tab; the office cache stayed.
+		expect([...caches.stores.keys()]).toEqual([OFFICE_CACHE, `${CACHE_PREFIX}new`]);
+		worker.online = false;
+		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
+	});
+
+	it("asks the network for the asset list every time and answers with the stored copy offline", async () => {
+		const worker = startWorker(NEW);
+		await worker.install();
+		await worker.request(LIST);
+		await worker.request(LIST);
+		expect(worker.calls.filter((call) => call === `fetch ${LIST}`)).toHaveLength(2);
+		expect(office(worker.caches)?.get(LIST)).toBe(`network ${LIST}`);
+		worker.online = false;
+		expect(await (await worker.request(LIST))?.text()).toBe(`network ${LIST}`);
+	});
+
+	it("fails offline when it never had the file or the list", async () => {
+		const worker = startWorker(NEW);
+		await worker.install();
+		worker.online = false;
+		await expect(worker.request(GLB)).rejects.toThrow("offline");
+		await expect(worker.request(LIST)).rejects.toThrow("offline");
+	});
+
+	it("does not keep error answers", async () => {
+		const worker = startWorker(NEW);
+		await worker.install();
+		worker.status = 404;
+		expect((await worker.request(GLB))?.status).toBe(404);
+		expect((await worker.request(LIST))?.status).toBe(404);
+		expect(office(worker.caches)?.size ?? 0).toBe(0);
+	});
+
+	it("still answers when storing a copy fails (out of quota)", async () => {
+		const worker = startWorker(NEW);
+		await worker.install();
+		worker.caches.failPuts = true;
+		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
+		expect(await (await worker.request(LIST))?.text()).toBe(`network ${LIST}`);
+		expect(office(worker.caches)?.size ?? 0).toBe(0);
 	});
 });

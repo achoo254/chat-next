@@ -13,6 +13,7 @@ import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { isPhone } from "../viewport-fit.ts";
 import { Office2D } from "./office-2d.tsx";
+import { keepOfficeAssetsCached } from "./office-asset-cache.ts";
 import { loadOfficeAssets, type OfficeAssets } from "./office-assets.ts";
 import { connectOffice, documentVisibility, type OfficeConnection } from "./office-client.ts";
 import { officeTalks, type Talk } from "./office-conversations.ts";
@@ -166,11 +167,15 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	const [assets, setAssets] = useState<Parsed<OfficeAssets> | null>(null);
 	useEffect(() => {
 		let alive = true;
+		let stopCaching: (() => void) | null = null;
 		void loadOfficeAssets(layout).then((result) => {
-			if (alive) setAssets(result);
+			if (!alive) return;
+			setAssets(result);
+			if (result.ok) stopCaching = keepOfficeAssetsCached();
 		});
 		return () => {
 			alive = false;
+			stopCaching?.();
 		};
 	}, [layout]);
 	const [sound, setSound] = useState(soundPreference);

@@ -15,8 +15,13 @@
 //   tabs still run, since nginx serves only the current release's files and
 //   those tabs load lazy chunks of their own build. Tabs then show the
 //   "Đã có bản mới" bar (register-service-worker.ts); nothing reloads them.
+// - The office's hashed assets live in their own cache (OFFICE_CACHE), kept
+//   across builds: cache first, cached on the way in. Its asset list is
+//   network first, so a new bake is seen at once, with the cached copy
+//   offline. The office tab prunes and fills that cache
+//   (machines/office/office-asset-cache.ts).
 import { answerBuild, askBuild, isBuildQuery, type MessageTarget } from "./build-messages.ts";
-import { CACHE_PREFIX, cachesToDelete, isHashedAsset, SHELL_PAGE, shellRoute } from "./shell-routes.ts";
+import { CACHE_PREFIX, cachesToDelete, isHashedAsset, OFFICE_CACHE, SHELL_PAGE, shellRoute } from "./shell-routes.ts";
 
 export interface AppShellBuild {
 	readonly version: string;
@@ -89,6 +94,8 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 		const route = shellRoute(event.request, scope.location.origin, files);
 		if (route === "page") event.respondWith(page(event.request));
 		else if (route === "file") event.respondWith(file(event.request));
+		else if (route === "office-file") event.respondWith(officeFile(event));
+		else if (route === "office-manifest") event.respondWith(officeManifest(event.request));
 	});
 
 	scope.addEventListener("message", (event) => {
@@ -122,6 +129,45 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 				.catch(() => undefined);
 		}
 		return response;
+	}
+
+	async function officeFile(event: FetchEventLike): Promise<Response> {
+		const { request } = event;
+		const cached = await caches.match(request, { cacheName: OFFICE_CACHE });
+		if (cached !== undefined) return cached;
+		const response = await fetch(request);
+		// Stored in the background: the page reads the file while it streams in.
+		if (keepable(response)) event.waitUntil(storeOffice(request, response.clone()));
+		return response;
+	}
+
+	async function officeManifest(request: Request): Promise<Response> {
+		let response: Response;
+		try {
+			response = await fetch(request);
+		} catch (err) {
+			const cached = await caches.match(request, { cacheName: OFFICE_CACHE });
+			if (cached !== undefined) return cached;
+			throw err;
+		}
+		// Stored before answering: once the page has the list, the cached
+		// copy is the same one (office-asset-cache.ts reads it from there).
+		if (keepable(response)) await storeOffice(request, response.clone());
+		return response;
+	}
+
+	/** Only whole same-origin answers are worth keeping (no errors, no 206 parts). */
+	function keepable(response: Response): boolean {
+		return response.status === 200 && response.type === "basic";
+	}
+
+	async function storeOffice(request: Request, response: Response): Promise<void> {
+		try {
+			const cache = await caches.open(OFFICE_CACHE);
+			await cache.put(request, response);
+		} catch {
+			// Out of quota or storage gone: not caching only costs a download next time.
+		}
 	}
 
 	/** Deletes the previous builds' caches that no open tab runs. */

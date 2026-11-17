@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CACHE_PREFIX, cachesToDelete, MAX_UNKNOWN_KEPT, shellRoute } from "../src/sw/shell-routes.ts";
+import { CACHE_PREFIX, cachesToDelete, isOfficeFile, MAX_UNKNOWN_KEPT, OFFICE_CACHE, shellRoute } from "../src/sw/shell-routes.ts";
 import { appShell, entryScript, SERVICE_WORKER_FILE } from "../vite-service-worker.ts";
 
 const ORIGIN = "https://chat.hoandat.com";
@@ -37,6 +37,41 @@ describe("service worker routes", () => {
 		expect(shellRoute(get("/robots.txt"), ORIGIN, FILES)).toBe("network");
 		// Names that only start like a server path are app routes.
 		expect(shellRoute(get("/botanist", "navigate"), ORIGIN, FILES)).toBe("page");
+	});
+
+	it("serves the office's hashed assets from their own cache and its asset list network first", () => {
+		const files = [
+			"/office/character.5cc7bd69.glb",
+			"/office/lightmap-floor-1-day-1024.76b39f5d.webp",
+			"/office/office-2d-floor-1-night-phone.320794d2.webp",
+			"/office/sfx/typing.aa1b7357.mp3",
+		];
+		for (const path of files) expect(shellRoute(get(path), ORIGIN, FILES), path).toBe("office-file");
+		expect(shellRoute(get("/office/office-assets.json"), ORIGIN, FILES)).toBe("office-manifest");
+		expect(OFFICE_CACHE.startsWith(CACHE_PREFIX)).toBe(false);
+	});
+
+	it("leaves office files without a hash, with a query or of another type to the network", () => {
+		const others = [
+			"/office/character.glb",
+			"/office/character.5cc7bd6.glb",
+			"/office/character.5CC7BD69.glb",
+			"/office/character.5cc7bd69.png",
+			"/office/character.5cc7bd69.glb?v=2",
+			"/office/office-assets.json?x=1",
+			"/office/other/typing.aa1b7357.mp3",
+			"/office/.5cc7bd69.glb",
+			"/office/../character.5cc7bd69.glb",
+		];
+		for (const path of others) expect(shellRoute(get(path), ORIGIN, FILES), path).toBe("network");
+		expect(shellRoute({ method: "HEAD", mode: "cors", url: `${ORIGIN}/office/character.5cc7bd69.glb` }, ORIGIN, FILES)).toBe("network");
+		expect(shellRoute(get("https://media-chat.hoandat.com/office/character.5cc7bd69.glb"), ORIGIN, FILES)).toBe("network");
+	});
+
+	it("tells the office's hashed file names apart", () => {
+		expect(isOfficeFile("/office/sfx/cheer-tv.8d7134db.mp3")).toBe(true);
+		expect(isOfficeFile("/office/office-assets.json")).toBe(false);
+		expect(isOfficeFile("/assets/character.5cc7bd69.glb")).toBe(false);
 	});
 
 	it("deletes only other builds' shell caches that no open tab runs", () => {
@@ -131,5 +166,28 @@ describe("service worker kill switch (infra/chat/sw-kill-switch.js)", () => {
 		expect(location).toContain("try_files /sw-override/sw.js /current/web/sw.js =404;");
 		expect(location).toContain('Cache-Control "no-cache"');
 		expect(location).not.toContain("index.html");
+	});
+});
+
+describe("office asset headers (infra/chat/nginx/chat.hoandat.com.conf)", () => {
+	it("keeps the hashed office files for a year and revalidates their list", () => {
+		const conf = repoFile("infra/chat/nginx/chat.hoandat.com.conf");
+		// A regex with braces must be quoted, or nginx fails to load the file.
+		const match = /location ~ "([^"]+)" \{([^}]*)\}/g;
+		const office = [...conf.matchAll(match)].find((m) => m[1]?.startsWith("^/office/"));
+		expect(office).toBeDefined();
+		const pattern = new RegExp(office?.[1] ?? "$^");
+		const body = office?.[2] ?? "";
+		expect(body).toContain("expires 1y;");
+		expect(body).toContain('Cache-Control "public, immutable"');
+		expect(body).toContain("X-Content-Type-Options nosniff");
+		expect(body).toContain("try_files $uri =404;");
+		// nginx and the worker agree on what is hashed.
+		for (const path of ["/office/character.5cc7bd69.glb", "/office/sfx/typing.aa1b7357.mp3", "/office/office-2d-floor-1-day-phone.ce536219.webp"]) {
+			expect(pattern.test(path), path).toBe(true);
+			expect(isOfficeFile(path), path).toBe(true);
+		}
+		// The list falls to "location /": no-cache.
+		expect(pattern.test("/office/office-assets.json")).toBe(false);
 	});
 });
