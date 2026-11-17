@@ -395,6 +395,20 @@ describe("asking", () => {
 		expect(isCommand(PICK)).toBe(false);
 	});
 
+	it("'Gửi sang phiên' goes straight to the session the user has open, without the list", async () => {
+		const store = new AdvisorStore();
+		store.setOpen(true);
+		open(store);
+		act(() => store.remember("error", scmCopy));
+		await userEvent.click(await screen.findByRole("button", { name: /Đính kèm đoạn vừa copy/ }, WAIT));
+		await ask("Sửa sao?");
+		act(() => store.setSession({ machine: "1", threadId: "s1" }));
+		await userEvent.click(await screen.findByRole("button", { name: t.answer.toSession }, WAIT));
+		expect(screen.queryByText(t.answer.pickSession)).toBeNull();
+		expect(window.location.pathname).toBe("/ai/1/s/s1");
+		expect(store.snapshot().fills.get("1\ns1")?.text).toBe(PICK);
+	});
+
 	it("asks before reading in a sensitive folder, then sends the consent", async () => {
 		needsConsent = true;
 		const store = new AdvisorStore();

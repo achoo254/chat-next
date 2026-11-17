@@ -367,6 +367,30 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 	);
 }
 
+/** Copies one option so the user can paste it into any session themselves. */
+function CopyOption({ text }: { readonly text: string }) {
+	const t = useAdvisorCopy();
+	const [done, setDone] = useState(false);
+	return (
+		<button
+			type="button"
+			className="btn btn-sm"
+			data-advisor-ignore
+			onClick={() => {
+				navigator.clipboard.writeText(text).then(
+					() => {
+						setDone(true);
+						window.setTimeout(() => setDone(false), 1500);
+					},
+					() => undefined,
+				);
+			}}
+		>
+			{done ? t.answer.copied : t.answer.copy}
+		</button>
+	);
+}
+
 interface AnswerViewProps {
 	readonly question: Question;
 	readonly answer: Answer | undefined;
@@ -395,6 +419,12 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 		store.setOpen(false);
 		navigate(paths.machineSession(question.machine, threadId));
 	};
+	// The session the user has open right now (on the machine that answered, not Advisor's own thread) gets it at once; the list is for when none is.
+	const open = useAdvisorState(store).session;
+	const active =
+		open !== null && open.machine === question.machine
+			? (presence.stateOf(question.machine)?.threads.find((x) => x.id === open.threadId && !x.archived && x.kind !== ThreadKind.ADVISOR)?.id ?? "")
+			: "";
 	const sessions = picking ? presence.sessionsFor(question) : [];
 	return (
 		<>
@@ -426,6 +456,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 						</small>
 						<div className="adv-option">
 							<span className="grow">{top.text}</span>
+							<CopyOption text={top.text} />
 							<PercentBar pct={Math.round(top.probability * 100)} />
 							<b>{Math.round(top.probability * 100)}%</b>
 						</div>
@@ -436,6 +467,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 						{ranked.slice(1).map((option) => (
 							<div key={option.text} className="adv-option">
 								<span className="grow">{option.text}</span>
+								<CopyOption text={option.text} />
 								<PercentBar pct={Math.round(option.probability * 100)} />
 								<span>{Math.round(option.probability * 100)}%</span>
 							</div>
@@ -494,7 +526,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 					</button>
 				)}
 				{!running && top !== undefined && !isCommand(top.text) && (
-					<button type="button" className="btn btn-sm" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+					<button type="button" className="btn btn-sm" aria-expanded={active === "" && picking} onClick={() => (active !== "" ? toSession(active) : setPicking(!picking))}>
 						{t.answer.toSession}
 					</button>
 				)}

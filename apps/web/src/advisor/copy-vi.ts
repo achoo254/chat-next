@@ -61,6 +61,8 @@ export const viAdvisor = {
 		question: "Câu hỏi đã gửi",
 		context: "Bối cảnh đã gửi",
 		toSession: "Gửi sang phiên",
+		copy: "Sao chép",
+		copied: "Đã chép",
 		pickSession: "Điền vào ô nhập của phiên:",
 		noSession: "Không có phiên nào trong thư mục này.",
 		again: "Hỏi tiếp",

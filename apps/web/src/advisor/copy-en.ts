@@ -62,6 +62,8 @@ export const enAdvisor: AdvisorCopy = {
 		question: "Question sent",
 		context: "Context sent",
 		toSession: "Send to session",
+		copy: "Copy",
+		copied: "Copied",
 		pickSession: "Fill the composer of:",
 		noSession: "No session works in this folder.",
 		again: "Ask more",
