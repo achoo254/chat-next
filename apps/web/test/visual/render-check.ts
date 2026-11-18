@@ -70,6 +70,9 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-terminal-text": "?at=machine-terminal&open=terminal-sample",
 	// A session in its terminal: the "Trò chuyện | Terminal" switch, the path pill and "Kết thúc" in the header.
 	"machine-session-terminal": "?at=machine-session-terminal",
+	// The scenes of a session pane: the mascot for a session with nothing in it, the terminal drawing while it opens.
+	"machine-session-empty": "?at=machine-session-empty",
+	"machine-terminal-loading": "?at=machine-terminal-loading",
 	"machine-home": "?at=machine-home",
 	"machine-need": "?at=machine-need",
 	"machine-unpaired": "?at=machine-unpaired",

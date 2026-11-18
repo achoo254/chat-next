@@ -332,6 +332,9 @@ const SCREENS: Record<string, string> = {
 	"machine-terminal": paths.machineTerminal("1"),
 	// A session with no turn running in chat: the machine opens its AI in the terminal (the demo thread waits mid-turn, so its terminal waits for the turn).
 	"machine-session-terminal": "/ai/1/s/demo-hi/terminal",
+	// A session with nothing in it yet; a session at its terminal whose details have not arrived (the opening scene stays).
+	"machine-session-empty": paths.machineSession("1", "demo-hi"),
+	"machine-terminal-loading": "/ai/1/s/demo-missing/terminal",
 	"machine-info": paths.machineInfo("1"),
 	// "Tài khoản AI" of the demo machine: a Claude block and an Antigravity block.
 	"machine-ai-accounts": paths.machineAccounts("1"),
