@@ -1,6 +1,6 @@
 // A forum the Chat Bridge copies from another app has its topics managed there:
 // the server takes the right to manage topics away, so an admin gets no topic menu.
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
 import { ChatFixture } from "./support/fake-chat.ts";
@@ -39,5 +39,19 @@ describe("topics of a copied forum", () => {
 		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
 		fireEvent.contextMenu(within(topics).getAllByRole("button")[0] as HTMLElement);
 		expect(await screen.findByRole("menu", {}, LONG)).toBeTruthy();
+	});
+
+	it("lets an owner pin a topic of a copy that sends on to the other app, and nothing else", async () => {
+		const { fixture, chatId } = forum(WITHOUT_MANAGE_TOPICS);
+		fixture.bridge.seedTwoWay(chatId);
+		renderMessaging(fixture, `/c/${chatId}`);
+		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
+		const row = within(topics).getAllByRole("button")[0] as HTMLElement;
+		await waitFor(() => {
+			fireEvent.contextMenu(row);
+			expect(screen.queryByRole("menu")).not.toBeNull();
+		}, LONG);
+		const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
+		expect(items.map((item) => item.textContent)).toEqual(["Ghim chủ đề"]);
 	});
 });

@@ -36,11 +36,29 @@ function TopicPreview({ topic }: { topic: Topic }) {
 
 interface TopicMenuProps {
 	topic: Topic;
+	/** A chat that sends on to another app lets only the pin of a topic change here; the rest is managed there. */
+	pinOnly: boolean;
 	onAction: (change: TopicChange, done: string) => void;
 	onClose: () => void;
 }
 
-function TopicMenu({ topic, onAction, onClose }: TopicMenuProps) {
+/** Whether the chat sends what is written in it on to another app (Chat Bridge); asked on demand, so a chat that is not connected loads nothing. */
+function useSendsOn(chatId: number): boolean {
+	const { transport } = useServices();
+	const [sends, setSends] = useState(false);
+	useEffect(() => {
+		let alive = true;
+		void import("../settings/bridge-delivery.ts")
+			.then((m) => m.twoWayChats(transport))
+			.then((chats) => alive && setSends(chats.has(chatId)));
+		return () => {
+			alive = false;
+		};
+	}, [chatId, transport]);
+	return sends;
+}
+
+function TopicMenu({ topic, pinOnly, onAction, onClose }: TopicMenuProps) {
 	const copy = useCopy();
 	return (
 		<PopupMenu className="topic-menu" label={copy.topics.menu(topic.title)} onClose={onClose}>
@@ -48,7 +66,7 @@ function TopicMenu({ topic, onAction, onClose }: TopicMenuProps) {
 				<Icon name="pin" />
 				{topic.pinned ? copy.topics.unpin : copy.topics.pin}
 			</button>
-			{!topic.general && (
+			{!topic.general && !pinOnly && (
 				<button
 					type="button"
 					role="menuitem"
@@ -60,7 +78,7 @@ function TopicMenu({ topic, onAction, onClose }: TopicMenuProps) {
 					{topic.closed ? copy.topics.reopenTopic : copy.topics.close}
 				</button>
 			)}
-			{!topic.general && (
+			{!topic.general && !pinOnly && (
 				<button type="button" role="menuitem" onClick={() => onAction({ hidden: true }, copy.topics.hiddenDone)}>
 					<Icon name="eye-off" />
 					{copy.topics.hide}
@@ -108,6 +126,9 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	// A chat copied from another app has its topics managed there: the server takes the right away, so no menu opens here.
 	const canManage = admin && (chat.myPermissions & Permission.manageTopics) !== 0;
+	// ...except pinning, which a chat that sends on to the other app carries over to it.
+	const sendsOn = useSendsOn(chat.id);
+	const canPin = !canManage && admin && sendsOn;
 	const sorted = sortTopics(topics);
 	const visible = sorted.filter((topic) => !topic.hidden);
 	const hidden = sorted.filter((topic) => topic.hidden);
@@ -121,7 +142,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 		);
 	};
 	const openMenu = (topic: Topic) => (event: MouseEvent | KeyboardEvent) => {
-		if (!canManage) return;
+		if (!canManage && !canPin) return;
 		if ("key" in event && event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
 		event.preventDefault();
 		setMenuFor(topic.id);
@@ -180,7 +201,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 								</span>
 							</button>
 							{menuFor === topic.id && (
-								<TopicMenu topic={topic} onAction={(update, done) => change(topic, update, done)} onClose={() => setMenuFor(0)} />
+								<TopicMenu topic={topic} pinOnly={!canManage} onAction={(update, done) => change(topic, update, done)} onClose={() => setMenuFor(0)} />
 							)}
 						</li>
 					))}
