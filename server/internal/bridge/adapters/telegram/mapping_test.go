@@ -114,3 +114,26 @@ func TestTranslateErrors(t *testing.T) {
 	}
 	var _ error = (*bridge.RateLimitError)(nil)
 }
+
+func TestMapMessageKeepsLinkButtonsOnly(t *testing.T) {
+	markup := &tg.ReplyInlineMarkup{Rows: []tg.KeyboardInlineButtonRow{
+		{Buttons: []tg.KeyboardInlineButton{
+			{Text: "Mở trong OneDash", Type: &tg.InlineButtonTypeURL{URL: "https://one.example/x"}},
+			{Text: "Duyệt", Type: &tg.InlineButtonTypeCallback{Data: []byte("ok")}},
+			{Text: "Mở issue", Type: &tg.InlineButtonTypeURL{URL: "https://git.example/1"}},
+		}},
+		{Buttons: []tg.KeyboardInlineButton{{Text: "Chỉ callback", Type: &tg.InlineButtonTypeCallback{Data: []byte("x")}}}},
+	}}
+	got, ok := book().mapMessage(&tg.Message{ID: 5, PeerID: &tg.PeerUser{UserID: 9}, Message: "x", ReplyMarkup: markup}, selfID)
+	if !ok || len(got.Buttons) != 1 || len(got.Buttons[0]) != 2 {
+		t.Fatalf("buttons = %+v", got.Buttons)
+	}
+	if got.Buttons[0][0] != (bridge.Button{Text: "Mở trong OneDash", URL: "https://one.example/x"}) || got.Buttons[0][1].Text != "Mở issue" {
+		t.Fatalf("buttons = %+v", got.Buttons)
+	}
+	// A reply keyboard is not a set of link buttons.
+	plain, _ := book().mapMessage(&tg.Message{ID: 6, PeerID: &tg.PeerUser{UserID: 9}, Message: "x", ReplyMarkup: &tg.ReplyKeyboardHide{}}, selfID)
+	if plain.Buttons != nil {
+		t.Fatalf("buttons = %+v", plain.Buttons)
+	}
+}

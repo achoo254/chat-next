@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/entities"
 	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
@@ -42,6 +44,10 @@ type ImportMessage struct {
 	// Content carries parts the text cannot (media); its entities and silent
 	// flag are replaced.
 	Content *appv1.Message
+	// Buttons are link buttons under the message, one slice per row. A button
+	// Chat does not allow (a URL scheme it forbids, a limit exceeded) is
+	// dropped; it never loses the message.
+	Buttons [][]IntegrationButton
 }
 
 // ImportTx is a transaction on one chat the bridge fills with messages of
@@ -111,7 +117,35 @@ func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *ap
 	}
 	content.Entities = ents
 	content.Silent = true
+	content.ReplyMarkup = it.t.s.importKeyboard(msg.Buttons)
 	return text, content, nil
+}
+
+// importKeyboard builds the keyboard of an imported message from the buttons
+// that pass the same checks as an integration's, skipping the ones that do
+// not. It is nil when none is left.
+func (s *Service) importKeyboard(rows [][]IntegrationButton) *appv1.ReplyMarkup {
+	var kept [][]IntegrationButton
+	for _, row := range rows {
+		var ok []IntegrationButton
+		for _, b := range row {
+			if len(ok) == inlineButtonsPerRow {
+				break
+			}
+			if utf8.ValidString(b.Text) && b.Text != "" && utf8.RuneCountInString(b.Text) <= inlineButtonTextMax &&
+				len(b.URL) <= inlineButtonURLBytes && entities.IsAllowedURL(b.URL, s.cfg.AppScheme) {
+				ok = append(ok, b)
+			}
+		}
+		if len(ok) > 0 && len(kept) < inlineRowsMax {
+			kept = append(kept, ok)
+		}
+	}
+	markup, err := s.inlineURLKeyboard(kept)
+	if err != nil {
+		return nil
+	}
+	return markup
 }
 
 func (it *ImportTx) keepMemberMentions(ctx context.Context, ents []*appv1.MessageEntity) ([]*appv1.MessageEntity, error) {

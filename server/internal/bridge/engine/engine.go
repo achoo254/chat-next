@@ -490,7 +490,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)
 		text, ents := mapContent(labelled, moved, r.e.chat.MessageLengthMax(), r.userOf)
-		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic]}
+		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic], Buttons: chatButtons(m.Buttons)}
 		if m.ReplyTo != "" {
 			target, err := lookupMessage(ctx, it.Tx(), r.account.ID, l.ExternalChat, m.ReplyTo)
 			if err != nil {
@@ -619,7 +619,7 @@ func (r *runner) mayImport(ctx context.Context, it *chat.ImportTx, k messageKey,
 // applyEdit rewrites an imported message when m is newer than the stored one.
 func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey, have *importedMessage, m bridge.Message) error {
 	text, ents := mapContent(m.Text, m.Entities, r.e.chat.MessageLengthMax(), r.userOf)
-	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents}); err != nil {
+	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons)}); err != nil {
 		return err
 	}
 	return setVersion(ctx, it.Tx(), k, m.Version)
@@ -704,4 +704,17 @@ func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Mess
 		}
 	}
 	return files, nil
+}
+
+// chatButtons turns the link buttons of a bridge message into the buttons of
+// an imported Chat message.
+func chatButtons(rows [][]bridge.Button) [][]chat.IntegrationButton {
+	out := make([][]chat.IntegrationButton, len(rows))
+	for i, row := range rows {
+		out[i] = make([]chat.IntegrationButton, len(row))
+		for j, b := range row {
+			out[i][j] = chat.IntegrationButton{Text: b.Text, URL: b.URL}
+		}
+	}
+	return out
 }

@@ -145,6 +145,14 @@ type Media struct {
 	Duration time.Duration
 }
 
+// Button is a link button of a message (an inline keyboard button that opens
+// a URL). Buttons that do something else, such as a bot callback, have no
+// counterpart and are not carried.
+type Button struct {
+	Text string
+	URL  string
+}
+
 // Message is a message in a conversation. Version orders edits of the same
 // message: an event with a version not above the stored one is dropped.
 type Message struct {
@@ -155,7 +163,9 @@ type Message struct {
 	Text         string
 	Entities     []Entity
 	Media        []Media
-	ReplyTo      string // Message.ID in the same conversation
+	// Buttons are the link buttons under the message, one slice per row.
+	Buttons [][]Button
+	ReplyTo string // Message.ID in the same conversation
 	// Topic is the topic the message is in, an opaque id; empty outside a
 	// forum. A message of a forum that belongs to no topic is in the general
 	// topic, which the adapter names like any other.

@@ -174,6 +174,29 @@ func mapEntities(ents []tg.MessageEntityClass) []bridge.Entity {
 	return out
 }
 
+// mapButtons keeps the link buttons of an inline keyboard. Buttons that act
+// on the bot (callbacks, games, payments) have no counterpart in Chat and
+// are dropped, and so is a row left empty.
+func mapButtons(m tg.ReplyMarkupClass) [][]bridge.Button {
+	inline, ok := m.(*tg.ReplyInlineMarkup)
+	if !ok {
+		return nil
+	}
+	var rows [][]bridge.Button
+	for _, r := range inline.Rows {
+		var row []bridge.Button
+		for _, b := range r.Buttons {
+			if u, ok := b.Type.(*tg.InlineButtonTypeURL); ok && b.Text != "" && u.URL != "" {
+				row = append(row, bridge.Button{Text: b.Text, URL: u.URL})
+			}
+		}
+		if len(row) > 0 {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
 // mapMedia lists what a message carries besides text. It describes; the
 // bytes are fetched on demand (FetchMedia), by the message they belong to.
 func mapMedia(m tg.MessageMediaClass) []bridge.Media {
@@ -245,6 +268,7 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 		Text:         msg.Message,
 		Entities:     mapEntities(msg.Entities),
 		Media:        mapMedia(msg.Media),
+		Buttons:      mapButtons(msg.ReplyMarkup),
 		Version:      int64(msg.EditDate),
 	}
 	for i := range out.Media {
