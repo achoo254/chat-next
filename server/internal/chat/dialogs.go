@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"context"
 	"fmt"
 	"slices"
@@ -61,7 +62,7 @@ func (s *Service) SetDialogMute(ctx context.Context, me, chatID int64, durationS
 		t.toUsers(ev, []int64{me}, &appv1.Update{Kind: &appv1.Update_DialogMute{DialogMute: &appv1.UpdateDialogMute{
 			ChatId: c.ID, MuteUntil: until,
 		}}})
-		return nil
+		return t.queueDialogState(ctx, c.ID, me, feature.Notify, "set_mute", map[string]any{"until": until})
 	})
 	if err != nil {
 		return nil, err
@@ -83,7 +84,10 @@ func (s *Service) SetDialogUnreadMark(ctx context.Context, me, chatID int64, unr
 		if m.UnreadMark == unread {
 			return nil
 		}
-		return t.setUnreadMark(ctx, c.ID, me, unread)
+		if err := t.setUnreadMark(ctx, c.ID, me, unread); err != nil {
+			return err
+		}
+		return t.queueDialogState(ctx, c.ID, me, feature.Dialog, "set_unread_mark", map[string]any{"unread": unread})
 	})
 	if err != nil {
 		return nil, err
@@ -165,6 +169,9 @@ func (s *Service) SetDialogPinned(ctx context.Context, me, chatID int64, pinned 
 		} else if _, err := t.tx.Exec(ctx, `UPDATE chat_members SET pin_rank = NULL WHERE chat_id = $1 AND user_id = $2`,
 			chatID, me); err != nil {
 			return fmt.Errorf("chat: unpin dialog: %w", err)
+		}
+		if err := t.queueDialogState(ctx, chatID, me, feature.Dialog, "set_dialog_pin", map[string]any{"pinned": pinned}); err != nil {
+			return err
 		}
 		list, err = s.announcePins(ctx, t, me)
 		return err

@@ -127,7 +127,7 @@ func (e *env) engine() *engine.Engine {
 	}
 	return engine.New(engine.Config{TenantID: "primary", PageSize: 7, PageDelay: time.Millisecond, BatchSize: 5, BackoffMin: 10 * time.Millisecond,
 		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test",
-		OutboxPoll: 10 * time.Millisecond, SendGap: time.Millisecond, TopicRefreshGap: time.Millisecond},
+		OutboxPoll: 10 * time.Millisecond, StatePoll: 30 * time.Millisecond, SendGap: time.Millisecond, TopicRefreshGap: time.Millisecond},
 		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: quiet})
 }
 

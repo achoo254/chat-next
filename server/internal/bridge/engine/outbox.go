@@ -41,13 +41,15 @@ type outboxRow struct {
 	Due          time.Time
 	// Pinned is the state wanted by a pin row.
 	Pinned bool
+	// Payload is the state wanted by a row of a feature whose change is more than a message number (JSON).
+	Payload []byte
 }
 
 // outboxHeads returns the oldest queued row of each synced chat of the
 // account, oldest first.
 func (d *db) outboxHeads(ctx context.Context, accountID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned FROM (
+		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM (
 			SELECT DISTINCT ON (external_chat_id) * FROM external_outbox
 			WHERE account_id = $1 AND status IN ('pending', 'sending') ORDER BY external_chat_id, id
 		) h ORDER BY id`, accountID)
@@ -60,7 +62,7 @@ func (d *db) outboxHeads(ctx context.Context, accountID int64) ([]*outboxRow, er
 // outboxFollowing returns the queued sends of a chat after row id, oldest first.
 func (d *db) outboxFollowing(ctx context.Context, accountID int64, externalChat string, afterID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned FROM external_outbox
+		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM external_outbox
 		WHERE account_id = $1 AND external_chat_id = $2 AND id > $3 AND op = 'send' AND status IN ('pending', 'sending')
 		ORDER BY id LIMIT $4`, accountID, externalChat, afterID, sendAlbumMax)
 	if err != nil {
@@ -71,7 +73,7 @@ func (d *db) outboxFollowing(ctx context.Context, accountID int64, externalChat 
 
 func scanOutbox(r pgx.CollectableRow) (*outboxRow, error) {
 	var o outboxRow
-	err := r.Scan(&o.ID, &o.ChatID, &o.Seq, &o.ExternalChat, &o.Op, &o.RandomID, &o.Status, &o.Attempts, &o.Due, &o.Pinned)
+	err := r.Scan(&o.ID, &o.ChatID, &o.Seq, &o.ExternalChat, &o.Op, &o.RandomID, &o.Status, &o.Attempts, &o.Due, &o.Pinned, &o.Payload)
 	return &o, err
 }
 

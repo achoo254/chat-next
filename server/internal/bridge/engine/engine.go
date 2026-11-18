@@ -50,6 +50,9 @@ type Config struct {
 	MediaMaxBytes int64
 	// OutboxPoll is how often the outbox of a connected account is looked at.
 	OutboxPoll time.Duration
+	// StatePoll is how often the state of the synced chats that the other app
+	// does not announce (mute, pinned, marked unread) is read from it (default 2 min).
+	StatePoll time.Duration
 	// SendGap is the least time between two sends of one account, so what a
 	// user types never looks like a flood to the other app.
 	SendGap time.Duration
@@ -97,6 +100,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.ReconcileEvery <= 0 {
 		c.ReconcileEvery = 10 * time.Second
+	}
+	if c.StatePoll <= 0 {
+		c.StatePoll = 2 * time.Minute
 	}
 	if c.OutboxPoll <= 0 {
 		c.OutboxPoll = 500 * time.Millisecond
@@ -194,12 +200,21 @@ func (r *runner) run(ctx context.Context) error {
 	}
 	outbox := time.NewTicker(e.cfg.OutboxPoll)
 	defer outbox.Stop()
+	states := time.NewTicker(e.cfg.StatePoll)
+	defer states.Stop()
+	if err := r.pollAll(runCtx); err != nil {
+		return r.settle(runCtx, err)
+	}
 	for {
 		select {
 		case <-runCtx.Done():
 			return r.settle(runCtx, context.Cause(runCtx))
 		case <-outbox.C:
 			if err := r.sendDue(runCtx); err != nil {
+				return r.settle(runCtx, err)
+			}
+		case <-states.C:
+			if err := r.pollAll(runCtx); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case err := <-subDone:

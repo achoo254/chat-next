@@ -24,9 +24,31 @@ type handler struct {
 	apply func(r *runner, ctx context.Context, ev bridge.Event) (saved bool, err error)
 	// ops are the outbox ops of the feature, by name.
 	ops map[string]func(r *runner, ctx context.Context, h *outboxRow) error
+	// poll asks the other app for the state of the feature, for what it does not
+	// tell when it changes; called on a timer for an account that is connected.
+	poll func(r *runner, ctx context.Context) error
 }
 
+// noEvents is the match of a feature that is read by polling and has no event.
+func noEvents(bridge.Event) (string, bool) { return "", false }
+
 var handlers = []handler{
+	{
+		feature: feature.Notify,
+		match:   noEvents,
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"set_mute": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doDialogState(ctx, h) },
+		},
+		poll: func(r *runner, ctx context.Context) error { return r.pollDialogs(ctx) },
+	},
+	{
+		feature: feature.Dialog,
+		match:   noEvents,
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"set_dialog_pin":  func(r *runner, ctx context.Context, h *outboxRow) error { return r.doDialogState(ctx, h) },
+			"set_unread_mark": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doDialogState(ctx, h) },
+		},
+	},
 	{
 		feature: feature.Messages,
 		// Messages always come in; the chat decides only whether Chat sends back.

@@ -43,6 +43,7 @@ func Run(t *testing.T, newSubject func(t *testing.T) Subject) {
 	})
 	t.Run("messages", func(t *testing.T) { checkMessages(t, newSubject(t)) })
 	t.Run("pins", func(t *testing.T) { checkPins(t, newSubject(t)) })
+	t.Run("dialogs", func(t *testing.T) { checkDialogs(t, newSubject(t)) })
 }
 
 // declarationProblems needs no app: what an adapter says it can do must match what
@@ -88,6 +89,16 @@ func declarationProblems(s Subject) []string {
 	}
 	if sup[feature.Topics].Out && !pinner {
 		fail("topics go out (their pin) but the adapter is not a bridge.Pinner")
+	}
+	_, dialogReader := a.(bridge.DialogReader)
+	_, dialogWriter := a.(bridge.DialogWriter)
+	for _, f := range []feature.Feature{feature.Notify, feature.Dialog} {
+		if sup[f].In && !dialogReader {
+			fail("%s comes in but the adapter is not a bridge.DialogReader", f)
+		}
+		if sup[f].Out && !dialogWriter {
+			fail("%s goes out but the adapter is not a bridge.DialogWriter", f)
+		}
 	}
 	for f, v := range sup {
 		if !v.In && !v.Out {
@@ -211,6 +222,76 @@ func checkPins(t *testing.T, s Subject) {
 		}
 		if sup.In && slices.Contains(list(), id) != step.pinned {
 			t.Errorf("after PinMessage(%v) the pinned list is %v", step.pinned, list())
+		}
+	}
+}
+
+// checkDialogs reads the state of a conversation and, if the app takes it, sets each
+// kind twice to a state and back: setting what already is must succeed.
+func checkDialogs(t *testing.T, s Subject) {
+	sup := bridge.FeaturesOf(s.Adapter)
+	if !(sup[feature.Notify].In || sup[feature.Notify].Out || sup[feature.Dialog].In || sup[feature.Dialog].Out) {
+		t.Skip("the adapter has no dialog state")
+	}
+	if !s.ready() {
+		t.Skip("no conversation given")
+	}
+	ctx := context.Background()
+	if r, ok := s.Adapter.(bridge.DialogReader); ok {
+		got, err := r.DialogStates(ctx, s.Account, []string{s.Conversation})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := got[s.Conversation]; !ok {
+			t.Fatalf("DialogStates does not answer for %s", s.Conversation)
+		}
+	}
+	w, ok := s.Adapter.(bridge.DialogWriter)
+	if !ok {
+		return
+	}
+	read := func() bridge.DialogState {
+		r, ok := s.Adapter.(bridge.DialogReader)
+		if !ok {
+			return bridge.DialogState{}
+		}
+		got, err := r.DialogStates(ctx, s.Account, []string{s.Conversation})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got[s.Conversation]
+	}
+	before := read()
+	defer func() { // leave the conversation as it was
+		_ = w.SetDialogPinned(ctx, s.Account, s.Conversation, before.Pinned)
+		_ = w.SetUnreadMark(ctx, s.Account, s.Conversation, before.UnreadMark)
+		_ = w.SetMute(ctx, s.Account, s.Conversation, before.MuteUntil)
+	}()
+	for i := 0; i < 2; i++ {
+		if sup[feature.Dialog].Out {
+			if err := w.SetDialogPinned(ctx, s.Account, s.Conversation, !before.Pinned); err != nil {
+				if errors.Is(err, bridge.ErrNotAllowed) {
+					t.Skipf("the test account may not do this here: %v", err)
+				}
+				t.Fatalf("SetDialogPinned attempt %d: %v", i+1, err)
+			}
+			if err := w.SetUnreadMark(ctx, s.Account, s.Conversation, !before.UnreadMark); err != nil {
+				t.Fatalf("SetUnreadMark attempt %d: %v", i+1, err)
+			}
+		}
+		if sup[feature.Notify].Out {
+			if err := w.SetMute(ctx, s.Account, s.Conversation, 2147483647); err != nil {
+				t.Fatalf("SetMute attempt %d: %v", i+1, err)
+			}
+		}
+	}
+	if _, ok := s.Adapter.(bridge.DialogReader); ok {
+		now := read()
+		if sup[feature.Dialog].Out && (now.Pinned == before.Pinned || now.UnreadMark == before.UnreadMark) {
+			t.Errorf("the dialog state read back is %+v after setting it from %+v", now, before)
+		}
+		if sup[feature.Notify].Out && now.MuteUntil == before.MuteUntil && before.MuteUntil != 2147483647 {
+			t.Errorf("the mute read back is %d after muting", now.MuteUntil)
 		}
 	}
 }

@@ -41,6 +41,8 @@ type Fake struct {
 	topics                                     map[string][]bridge.Topic
 	pinned                                     map[string][]string // newest first
 	support                                    map[feature.Feature]feature.Support
+	dialogs                                    map[string]bridge.DialogState
+	dialogCalls                                []string
 	pinCalls                                   []PinCall
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
@@ -54,7 +56,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -63,6 +65,8 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Pins:     {In: true, Out: true},
 		feature.Topics:   {In: true, Out: true},
 		feature.Read:     {In: true},
+		feature.Notify:   {In: true, Out: true},
+		feature.Dialog:   {In: true, Out: true},
 	}
 }
 
@@ -500,3 +504,71 @@ func (f *Fake) PinTopic(_ context.Context, _ bridge.Account, conv, topic string,
 
 var _ bridge.Pinner = (*Fake)(nil)
 var _ bridge.Featured = (*Fake)(nil)
+
+// SetDialogState sets how the owner has a conversation in the app, as if they had
+// changed it there; DialogStates answers it.
+func (f *Fake) SetDialogState(conv string, st bridge.DialogState) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dialogs[conv] = st
+}
+
+// DialogState is what the app has now for a conversation.
+func (f *Fake) DialogState(conv string) bridge.DialogState {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.dialogs[conv]
+}
+
+// DialogCalls lists the calls Chat made to change the state of a conversation, as
+// "mute:<conv>:<until>", "pin:<conv>:<bool>" and "unread:<conv>:<bool>".
+func (f *Fake) DialogCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.dialogCalls...)
+}
+
+// DialogStates implements bridge.DialogReader.
+func (f *Fake) DialogStates(_ context.Context, _ bridge.Account, convs []string) (map[string]bridge.DialogState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[string]bridge.DialogState{}
+	for _, c := range convs {
+		out[c] = f.dialogs[c]
+	}
+	return out, nil
+}
+
+func (f *Fake) writeDialog(feat feature.Feature, call string, change func()) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feat].Out {
+		return fmt.Errorf("%w: this app does not take that from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	f.dialogCalls = append(f.dialogCalls, call)
+	change()
+	return nil
+}
+
+// SetMute implements bridge.DialogWriter.
+func (f *Fake) SetMute(_ context.Context, _ bridge.Account, conv string, until int64) error {
+	return f.writeDialog(feature.Notify, fmt.Sprintf("mute:%s:%d", conv, until), func() { st := f.dialogs[conv]; st.MuteUntil = until; f.dialogs[conv] = st })
+}
+
+// SetDialogPinned implements bridge.DialogWriter.
+func (f *Fake) SetDialogPinned(_ context.Context, _ bridge.Account, conv string, pinned bool) error {
+	return f.writeDialog(feature.Dialog, fmt.Sprintf("pin:%s:%v", conv, pinned), func() { st := f.dialogs[conv]; st.Pinned = pinned; f.dialogs[conv] = st })
+}
+
+// SetUnreadMark implements bridge.DialogWriter.
+func (f *Fake) SetUnreadMark(_ context.Context, _ bridge.Account, conv string, unread bool) error {
+	return f.writeDialog(feature.Dialog, fmt.Sprintf("unread:%s:%v", conv, unread), func() { st := f.dialogs[conv]; st.UnreadMark = unread; f.dialogs[conv] = st })
+}
+
+var (
+	_ bridge.DialogReader = (*Fake)(nil)
+	_ bridge.DialogWriter = (*Fake)(nil)
+)
