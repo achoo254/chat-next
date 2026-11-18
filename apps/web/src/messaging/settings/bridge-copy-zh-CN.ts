@@ -91,6 +91,16 @@ export const zhCNBridge: BridgeCopy = {
 		started: "正在导入历史记录，消息会陆续出现在 Chat 中。",
 		kind: { private: "私聊", bot: "机器人", group: "群组", channel: "频道" } satisfies Record<ConversationKind, string>,
 	},
+	delivery: {
+		note: (app) => `你在此处输入的内容也会发送到 ${app}。`,
+		sending: (app) => `正在发送到 ${app}`,
+		failed: (app) => `未发送到 ${app}`,
+		unknown: (app) => `不确定是否已到达 ${app}`,
+		editFailed: (app) => `修改未同步到 ${app}`,
+		resend: "重新发送",
+		discard: "删除消息",
+		dismiss: "忽略",
+	},
 	disconnect: {
 		button: "断开连接",
 		title: "断开此账号？",

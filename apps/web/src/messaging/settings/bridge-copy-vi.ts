@@ -92,6 +92,17 @@ export const viBridge = {
 		started: "Đang nhập lịch sử, tin sẽ hiện dần trong Chat.",
 		kind: { private: "Chat riêng", bot: "Bot", group: "Nhóm", channel: "Kênh" } as Record<ConversationKind, string>,
 	},
+	/** Messages of a chat that sends on to the app: where each is on its way (shown in the conversation). */
+	delivery: {
+		note: (app: string): string => `Tin bạn gõ ở đây cũng được gửi sang ${app}.`,
+		sending: (app: string): string => `Đang gửi sang ${app}`,
+		failed: (app: string): string => `Chưa gửi sang ${app}`,
+		unknown: (app: string): string => `Chưa rõ đã gửi sang ${app} chưa`,
+		editFailed: (app: string): string => `Bản sửa chưa sang ${app}`,
+		resend: "Gửi lại",
+		discard: "Xoá tin",
+		dismiss: "Bỏ qua",
+	},
 	disconnect: {
 		button: "Ngắt kết nối",
 		title: "Ngắt kết nối tài khoản?",

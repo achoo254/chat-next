@@ -24,9 +24,10 @@ import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useSurface } from "./surface.ts";
-import { BridgeDeliveryContext, bridgeAppName, useBridgeDelivery } from "./bridge-delivery.tsx";
+import { BridgeDeliveryContext, bridgeChunk, useBridgeDelivery } from "./bridge-delivery.tsx";
 import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
+const BridgeNote = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeNote })));
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
 // The composer and its editor load apart from the startup code (fetched when
 // the browser is idle, or with the first chat opened), as Telegram Web loads
@@ -516,10 +517,9 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 			) : sendable ? (
 				<>
 					{delivery !== null && (
-						<p className="bridge-note" role="note">
-							<Icon name="info" small />
-							{copy.message.bridgeNote(bridgeAppName(delivery.app))}
-						</p>
+						<Suspense fallback={null}>
+							<BridgeNote app={delivery.app} />
+						</Suspense>
 					)}
 				<ChatComposer
 					key={`${chatId}:${effectiveTopic}`}

@@ -91,6 +91,16 @@ export const enBridge: BridgeCopy = {
 		started: "Importing history; messages appear in Chat as they arrive.",
 		kind: { private: "Private chat", bot: "Bot", group: "Group", channel: "Channel" } satisfies Record<ConversationKind, string>,
 	},
+	delivery: {
+		note: (app) => `What you type here is also sent to ${app}.`,
+		sending: (app) => `Sending to ${app}`,
+		failed: (app) => `Not sent to ${app}`,
+		unknown: (app) => `Unclear whether it reached ${app}`,
+		editFailed: (app) => `Edit did not reach ${app}`,
+		resend: "Resend",
+		discard: "Delete message",
+		dismiss: "Dismiss",
+	},
 	disconnect: {
 		button: "Disconnect",
 		title: "Disconnect this account?",

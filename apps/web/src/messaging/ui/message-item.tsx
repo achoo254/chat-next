@@ -12,7 +12,6 @@
 import { Suspense, lazy, memo, useContext, useState, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import type { BridgeOutboxItem } from "../settings/bridge-api.ts";
 import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -24,7 +23,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
-import { bridgeAppName, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
+import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
@@ -33,6 +32,9 @@ import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 const mediaChunk = () => import("../media/media-content.tsx");
 // Buttons under webhook and bot messages, with the press handling: loaded with the first such message.
 const MessageButtons = lazy(() => import("./message-buttons.tsx"));
+// What a message of a chat that sends on to another app says about its way there (Chat Bridge): loaded only for such chats.
+const BridgeStamp = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeStamp })));
+const BridgeFailedRow = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeFailedRow })));
 const ReactionBar = lazy(() => import("./message-menu.tsx").then((m) => ({ default: m.ReactionBar })));
 const MessageMedia = lazy(() => mediaChunk().then((m) => ({ default: m.MessageMedia })));
 const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia })));
@@ -501,7 +503,7 @@ export function MessageBubble({
 	runNext = false,
 }: BubbleProps) {
 	const copy = useCopy();
-	const { store, self, backend, source, toasts } = useServices();
+	const { store, self, backend } = useServices();
 	const ui = useUi();
 	const ctx = useRichContext(message.fromId);
 	const intent = useIntent(chatId);
@@ -553,15 +555,9 @@ export function MessageBubble({
 		>
 			{mine && !recalled && !isSavedChat(chat, null) && (
 				onItsWay !== null && delivery !== null ? (
-					<LabelledIcon
-						name={onItsWay.status === "pending" || onItsWay.status === "sending" ? "clock" : "alert"}
-						label={
-							onItsWay.status === "failed" || onItsWay.status === "unknown"
-								? deliveryNote(copy, onItsWay, bridgeAppName(delivery.app))
-								: copy.message.bridgeSending(bridgeAppName(delivery.app))
-						}
-						className={onItsWay.status === "failed" || onItsWay.status === "unknown" ? "fail" : undefined}
-					/>
+					<Suspense fallback={null}>
+						<BridgeStamp item={onItsWay} app={delivery.app} />
+					</Suspense>
 				) : (
 					<LabelledIcon
 						name={read ? "checks" : "check"}
@@ -699,38 +695,14 @@ export function MessageBubble({
 					)}
 					<Reactions message={message} chat={chat} />
 					{mine && !inert && delivery !== null && onItsWay !== null && (onItsWay.status === "failed" || onItsWay.status === "unknown") && (
-						<div className="failed-row" role="status">
-							{deliveryNote(copy, onItsWay, bridgeAppName(delivery.app))}
-							<button type="button" className="btn btn-sm" onClick={() => delivery.retry(message.seq)}>
-								{copy.message.resend}
-							</button>
-							{onItsWay.op === "send" ? (
-								<button
-									type="button"
-									className="btn btn-sm btn-quiet"
-									onClick={() => {
-										source.deleteMessages(chatId, [message.seq], true).catch(() => toasts.show(copy.common.failed));
-									}}
-								>
-									{copy.message.bridgeDiscard}
-								</button>
-							) : (
-								<button type="button" className="btn btn-sm btn-quiet" onClick={() => delivery.dismiss(message.seq)}>
-									{copy.message.bridgeDismiss}
-								</button>
-							)}
-						</div>
+						<Suspense fallback={null}>
+							<BridgeFailedRow chatId={chatId} seq={message.seq} />
+						</Suspense>
 					)}
 				</div>
 			)}
 		</div>
 	);
-}
-
-/** What a message that did not go out says, for the time line and the row under it. */
-function deliveryNote(copy: ReturnType<typeof useCopy>, item: BridgeOutboxItem, app: string): string {
-	if (item.status === "unknown") return copy.message.bridgeUnknown(app);
-	return item.op === "send" ? copy.message.bridgeFailed(app) : copy.message.bridgeEditFailed(app);
 }
 
 interface PendingProps {

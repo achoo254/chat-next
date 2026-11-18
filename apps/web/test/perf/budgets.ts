@@ -32,9 +32,13 @@ export const BUNDLE_BUDGET = {
 	 * rolldown moved them out of the react vendor chunk into a startup chunk
 	 * of their own (149.74 → 150.05 KB, the split's overhead). 150.6 KB with the
 	 * minimum gap between reloads of a chat's window (message store, about
-	 * 0.1 KB), which the budget of 151 KB leaves room for.
+	 * 0.1 KB), which the budget of 151 KB leaves room for. 151.4 KB with the
+	 * delivery state of chats that send on to another app (Chat Bridge: a small
+	 * hook, its context and the marks in a message bubble, about 0.7 KB; the
+	 * watcher that asks the server and everything drawn load only for such a
+	 * chat), so the budget is 152 KB.
 	 */
-	startupJsGzip: 151 * 1024,
+	startupJsGzip: 152 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;
