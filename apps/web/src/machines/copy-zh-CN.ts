@@ -980,6 +980,25 @@ export const zhCNMachines: MachinesCopy = {
 			onPhone: "你正在使用手机：请在要控制的电脑上打开此页面，并在那里运行安装命令。",
 			start: "连接第一台电脑",
 		},
+		steps: {
+			title: "开始使用 AI Agent",
+			machine: {
+				title: "连接你的电脑",
+				body: "在装有 AI 编程助手的电脑上运行一条命令，安装 tunelo 并与此账号配对。",
+			},
+			project: {
+				title: "添加项目",
+				body: "项目汇集一个产品的文件夹和会话。选择电脑上的文件夹，或粘贴 git 仓库地址。",
+				locked: "请先连接电脑",
+			},
+			session: {
+				title: "打开第一个会话",
+				body: "在项目中添加工作区（电脑上的一个文件夹），然后点击新会话与 AI 对话。",
+				locked: "请先添加项目",
+			},
+			done: "完成",
+			more: "更多选项",
+		},
 		title: "AI Agent",
 		sessionsLabel: "所有电脑上的 AI 会话",
 		listResize: "会话列表宽度",

@@ -988,6 +988,25 @@ export const enMachines: MachinesCopy = {
 			onPhone: "You are on a phone: open this page on the computer you want to control and run the install command there.",
 			start: "Connect your first computer",
 		},
+		steps: {
+			title: "Get started with AI Agent",
+			machine: {
+				title: "Connect your computer",
+				body: "Run one command on the computer that has your AI coding agent to install tunelo and pair it with this account.",
+			},
+			project: {
+				title: "Add a project",
+				body: "A project groups the folders and sessions of one product. Pick a folder on your computer or paste a git repository address.",
+				locked: "Connect a computer first",
+			},
+			session: {
+				title: "Open your first session",
+				body: "In the project, add a workspace (a folder on your computer), then press New session to chat with the AI.",
+				locked: "Add a project first",
+			},
+			done: "Done",
+			more: "More options",
+		},
 		title: "AI Agent",
 		sessionsLabel: "AI sessions on every machine",
 		listResize: "Width of the session list",

@@ -146,6 +146,7 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 
 	// No Terminal entry in the column; its refresh button is there.
 	assert.equal(await page.locator(".mx-list a", { hasText: /^Terminal$/ }).count(), 0);
+	await page.locator("[data-id=sidebar-more]").click();
 	assert.equal(await page.locator("[data-id=sidebar-refresh]").count(), 1);
 	assert.deepEqual(errors, []);
 	await context.close();

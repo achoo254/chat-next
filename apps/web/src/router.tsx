@@ -338,6 +338,8 @@ interface LinkProps {
 	/** An address for the element (tests, people pointing at it); never styling. */
 	"data-id"?: string;
 	title?: string;
+	/** Runs on every click of the link, as it navigates (to close a menu it sits in). */
+	onNavigate?: () => void;
 	children: ReactNode;
 }
 
@@ -367,9 +369,12 @@ export function BackLink({ fallback, className, label, children }: { fallback: s
 }
 
 /** In-app link: plain clicks navigate without a reload, modified clicks keep browser behaviour. */
-export function Link({ to, className, current, title, children, ...rest }: LinkProps) {
+export function Link({ to, className, current, title, onNavigate, children, ...rest }: LinkProps) {
 	"use no memo";
-	const onClick = (event: MouseEvent<HTMLAnchorElement>) => followInApp(event, to);
+	const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+		onNavigate?.();
+		followInApp(event, to);
+	};
 	return (
 		<a
 			href={to}

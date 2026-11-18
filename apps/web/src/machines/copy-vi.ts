@@ -1003,6 +1003,25 @@ export const viMachines = {
 			onPhone: "Bạn đang dùng điện thoại: mở trang này trên máy tính bạn muốn điều khiển rồi chạy lệnh cài ở đó.",
 			start: "Kết nối máy đầu tiên",
 		},
+		steps: {
+			title: "Bắt đầu với AI Agent",
+			machine: {
+				title: "Kết nối máy của bạn",
+				body: "Chạy một lệnh trên máy tính có AI lập trình để cài tunelo và ghép máy với tài khoản này.",
+			},
+			project: {
+				title: "Thêm dự án",
+				body: "Dự án gom thư mục và phiên làm việc của một sản phẩm. Chọn thư mục trên máy hoặc dán địa chỉ repo git.",
+				locked: "Cần kết nối máy trước",
+			},
+			session: {
+				title: "Mở phiên đầu tiên",
+				body: "Trong dự án, thêm workspace (một thư mục trên máy), rồi bấm Phiên mới để chat với AI.",
+				locked: "Cần có dự án trước",
+			},
+			done: "Xong",
+			more: "Thêm tuỳ chọn",
+		},
 		title: "AI Agent",
 		sessionsLabel: "Phiên AI trên mọi máy",
 		listResize: "Độ rộng danh sách phiên",

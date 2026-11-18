@@ -1,27 +1,28 @@
 // The AI Agent column, the same on every AI Agent page. It speaks of
 // projects, never of machines: Project (kept by the server, empty or linked
 // to a git repository) > Workspace (a folder on one machine, with its own
-// state) > sessions (project-tree.ts, project-tree-view.tsx). On top:
-// "Quản lý máy" (machines, their state, pairing, overview, settings and
-// plain shells; a dot when one needs the user), beside "Làm mới danh sách"
-// and "+" for "Thêm dự án" in the column's head.
+// state) > sessions (project-tree.ts, project-tree-view.tsx). On top: "Thêm
+// dự án" (once a machine is connected) and a "⋯" menu holding "Quản lý máy"
+// (machines, their state, pairing, overview, settings and plain shells; a dot
+// when one needs the user) and "Làm mới danh sách". An account that has not
+// connected a machine, added a project and opened a session yet sees those
+// three steps first (first-steps.tsx).
 // Folders whose sessions no workspace holds wait, folded, in "Chưa phân
 // loại" at the bottom; archived sessions show only behind "Đã lưu trữ" at the column's foot.
 // While it shows, the sync tidies the workspaces the user added (never adds
 // one: project-actions.ts), and each session this device opens counts as seen.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Icon } from "../components/screen-icons.tsx";
-import { Link, type MachinesView } from "../router.tsx";
-import { aiPaths } from "./ai-paths.ts";
+import { type MachinesView } from "../router.tsx";
 import { useAgentProjects } from "./agent-projects-store.ts";
-import { FirstMachine } from "./first-machine.tsx";
-import { MachineIcon } from "./machine-icons.tsx";
+import { FirstSteps, stepsPending } from "./first-steps.tsx";
 import { isBlocked, type Conn } from "./machine-status.ts";
 import { useProjectSync, type SyncHost } from "./project-actions.ts";
 import { buildTree, locate, type Filter } from "./project-tree.ts";
 import { movedTo, useProjectDrag } from "./project-drag.ts";
 import { LooseGroup, ProjectItem, type ProjectPlace, type TreeContext } from "./project-tree-view.tsx";
 import { projectsSupported } from "./projects-view.ts";
+import { HeadMenu } from "./sidebar-head-menu.tsx";
 import { useSeen } from "./seen-sessions.ts";
 import { useSidebarShells } from "./sidebar-shells.tsx";
 import { useDockLayouts } from "./session-tabs.tsx";
@@ -227,9 +228,10 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		};
 	};
 	const directory = hub.directory();
-	// Nothing to list yet (and every machine that can answer did): one empty state for the whole list.
+	// Every machine that can answer did: the account's progress (first-steps.tsx) can be told.
 	const settled = snapshot.status !== "loading" && machines.every((m) => m.conn.kind !== "on" || m.state.listed);
-	const empty = filter === "all" && machines.length > 0 && settled && tree.projects.length === 0 && tree.loose.length === 0;
+	const progress = { machines: machines.length, projects: snapshot.projects.length, sessions: threads.length };
+	const showSteps = filter === "all" && directory.status === "ready" && (machines.length === 0 || settled) && stepsPending(progress);
 	// Machines that need the user ("Quản lý máy" counts them): blocked on this device, or a tunelo too old to talk to.
 	const blocked = machines.filter((m) => isBlocked(m.conn)).length;
 	const outdated = machines.filter((m) => m.conn.kind === "update").length;
@@ -238,17 +240,8 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
 				<h2>{t.agent.title}</h2>
-				<RefreshList machines={machines} refreshProjects={() => store.refresh()} />
-				<AddProject machines={machines} compact />
-				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={hostNote === "" ? t.agent.machines : `${t.agent.machines}: ${hostNote}`} current={view.page === "machines" || view.page === "add"}>
-					<MachineIcon name="monitor" small />
-					<span>{t.agent.machines}</span>
-					{hostNote !== "" && (
-						<span className="mx-manage-count" role="img" aria-label={hostNote} data-id="machines-need-you">
-							{blocked + outdated}
-						</span>
-					)}
-				</Link>
+				{machines.length > 0 && !(showSteps && progress.projects === 0) && <AddProject machines={machines} />}
+				<HeadMenu machines={machines} refreshProjects={() => store.refresh()} hostNote={hostNote} attention={blocked + outdated} manageCurrent={view.page === "machines" || view.page === "add"} />
 			</header>
 			{filter === "archived" && <p className="mx-archived-head">{t.sessions.archivedTitle(archived)}</p>}
 			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
@@ -262,13 +255,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 					const open = isOpen(node.project.id, node.need, node.status, node.project.workspaces.length === 0);
 					return <ProjectItem key={node.project.id} node={node} open={open} onToggle={() => toggle(node.project.id, open)} ctx={ctx} place={placeOf(node.project.id)} />;
 				})}
-				{empty && (
-					<div className="mx-empty-list" data-id="sidebar-empty">
-						<p>{t.agent.projects.none}</p>
-						<AddProject machines={machines} primary />
-					</div>
-				)}
-				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
+				{showSteps && <FirstSteps progress={progress} addProject={<AddProject machines={machines} />} />}
 				<LooseGroup folders={tree.loose} ctx={ctx} open={looseOpen || tree.loose.some((f) => f.machine.entry.ref === current?.machine && f.threads.some((x) => x.id === current.thread))} onToggle={() => setLooseOpen((v) => !v)} />
 			</div>
 			{(archived > 0 || filter === "archived") && (
@@ -285,43 +272,17 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	);
 }
 
-/**
- * "Làm mới danh sách": lists the machines, the projects and each reachable
- * machine's sessions and folders again, for a column that looks stale
- * without reloading the app.
- */
-function RefreshList({ machines, refreshProjects }: { machines: readonly MachineView[]; refreshProjects: () => Promise<void> }) {
-	const t = useMachinesCopy();
-	const hub = useHub();
-	const [busy, setBusy] = useState(false);
-	const refresh = () => {
-		setBusy(true);
-		const online = machines.filter((m) => m.conn.kind === "on");
-		Promise.allSettled([
-			hub.refresh(),
-			refreshProjects(),
-			...online.map((m) => m.link.request({ case: "threadList", value: { advisor: true } })),
-			...online.filter((m) => projectsSupported(m.state.info?.agentVersion)).map((m) => m.link.request({ case: "projectList", value: {} })),
-		]).finally(() => setBusy(false));
-	};
-	return (
-		<button type="button" className="icon-btn" data-id="sidebar-refresh" aria-label={t.sessions.refresh} title={t.sessions.refresh} disabled={busy} onClick={refresh}>
-			{busy ? <span className="spin" aria-hidden="true" /> : <Icon name="refresh" small />}
-		</button>
-	);
-}
-
-/** "Thêm dự án"; the dialog loads when opened. `compact`: an icon button. */
-function AddProject({ machines, compact = false, primary = false }: { machines: readonly MachineView[]; compact?: boolean; primary?: boolean }) {
+/** "Thêm dự án", in the column's head or as the step's button; the dialog loads when opened. */
+function AddProject({ machines }: { machines: readonly MachineView[] }) {
 	const t = useMachinesCopy();
 	const [store] = useAgentProjects();
 	const [open, setOpen] = useState(false);
 	const label = t.agent.projects.add;
 	return (
 		<>
-			<button type="button" className={compact ? "icon-btn" : primary ? "btn btn-sm btn-primary" : "btn btn-sm"} aria-label={label} title={label} onClick={() => setOpen(true)} data-id="add-project">
+			<button type="button" className="btn btn-sm btn-primary" onClick={() => setOpen(true)} data-id="add-project">
 				<Icon name="plus" small />
-				{!compact && label}
+				{label}
 			</button>
 			{open && (
 				<Suspense fallback={null}>

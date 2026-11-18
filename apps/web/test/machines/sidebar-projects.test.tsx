@@ -20,6 +20,7 @@ import { MachineLinksProvider } from "../../src/machines/link/connection-provide
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { AgentWorkspaceKind } from "../../src/machines/agent-projects-client.ts";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
+import { machinesServices } from "../support/machines-services.ts";
 import type { MachinesView } from "../../src/router.tsx";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { routerFetch } from "../support/router-fetch.ts";
@@ -42,7 +43,7 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	}),
 }));
 
-const services = { toasts: { show: () => undefined } } as unknown as Services;
+const services = machinesServices;
 const NativeWebSocket = window.WebSocket;
 const thread = (id: string, dir: string, state: number) => ({ id, title: id, dir, provider: "claude", state, updatedAt: 1n });
 const own = (id: string, dir: string, gitRemote = "", branch = "main") => create(ProjectSchema, { id, name: dir.split("/").at(-1) ?? dir, dir, gitRemote, git: { git: true, branch } });
@@ -170,13 +171,17 @@ describe("the project column", () => {
 		// The session outside every workspace waits, folded, in "Chưa phân loại".
 		expect(within(list).getByRole("button", { name: "Chưa phân loại (1)" }).getAttribute("aria-expanded")).toBe("false");
 		expect(within(list).queryByText("t3")).toBeNull();
-		// The column's head: "Làm mới danh sách" and "+" for a project beside "Quản lý máy"; no filter switch.
+		// The column's head: "Thêm dự án" with its label and a "⋯" menu holding "Làm mới danh sách" and "Quản lý máy"; no filter switch.
 		const row = list.querySelector<HTMLElement>(".mx-list-head");
 		if (row === null) throw new Error("no head");
-		expect(within(row).getByRole("button", { name: "Làm mới danh sách" })).toBeTruthy();
 		expect(within(row).queryByRole("switch")).toBeNull();
 		expect(within(row).getByRole("button", { name: "Thêm dự án" })).toBeTruthy();
-		expect(within(list).getByRole("link", { name: /Quản lý máy/ })).toBeTruthy();
+		expect(within(row).queryByRole("button", { name: "Làm mới danh sách" })).toBeNull();
+		await userEvent.click(within(row).getByRole("button", { name: /Thêm tuỳ chọn/ }));
+		expect(within(row).getByRole("button", { name: "Làm mới danh sách" })).toBeTruthy();
+		expect(within(row).getByRole("link", { name: /Quản lý máy/ })).toBeTruthy();
+		// Every step is done (a machine, projects, sessions): no first steps.
+		expect(list.querySelector("[data-id=first-steps]")).toBeNull();
 	});
 
 	it("a folder the machine keeps that nobody added never shows as a project by itself: its sessions wait in 'Chưa phân loại'", async () => {
@@ -299,7 +304,8 @@ describe("the project column", () => {
 		await within(list).findByText("t1", undefined, WAIT);
 		threads = [...threads, thread("t4", "/w/app", 3)];
 		expect(within(list).queryByText("t4")).toBeNull();
-		await userEvent.click(within(list).getByRole("button", { name: "Làm mới danh sách" }));
+		await userEvent.click(within(list).getByRole("button", { name: /Thêm tuỳ chọn/ }));
+	await userEvent.click(within(list).getByRole("button", { name: "Làm mới danh sách" }));
 		expect(await within(list).findByText("t4", undefined, WAIT)).toBeTruthy();
 	});
 
@@ -334,10 +340,16 @@ describe("the project column", () => {
 			{ name: "Mac mini", online: true },
 			{ name: "Mac studio", online: true },
 		]);
-		const empty = await within(list).findByText("Chưa có dự án", undefined, WAIT);
-		expect(within(list).getAllByText("Chưa có dự án")).toHaveLength(1);
-		const box = empty.closest<HTMLElement>("[data-id=sidebar-empty]");
-		if (box === null) throw new Error("no empty state");
+		const box = await waitFor(() => {
+			const found = list.querySelector<HTMLElement>("[data-id=first-steps]");
+			if (found === null) throw new Error("no first steps yet");
+			return found;
+		}, WAIT);
+		// A machine is connected: step 1 is done, adding a project is the current step with the only "Thêm dự án" button, the session step waits.
+		expect(box.querySelector("[data-step=machine]")?.getAttribute("data-state")).toBe("done");
+		expect(box.querySelector("[data-step=project]")?.getAttribute("data-state")).toBe("current");
+		expect(box.querySelector("[data-step=session]")?.getAttribute("data-state")).toBe("todo");
+		expect(within(list).getAllByRole("button", { name: "Thêm dự án" })).toHaveLength(1);
 		expect(within(box).getByRole("button", { name: "Thêm dự án" }).className).toContain("btn-primary");
 	});
 
