@@ -262,6 +262,8 @@ type OutMessage struct {
 	// RandomID makes the send idempotent: the engine stores it before the
 	// call and repeats it when a retry follows a crash, so the other app can
 	// answer with the message it already took instead of creating a second.
+	// An album takes one RandomID; the adapter derives the id of item i as
+	// RandomID+i, the same way on every retry.
 	RandomID int64
 }
 

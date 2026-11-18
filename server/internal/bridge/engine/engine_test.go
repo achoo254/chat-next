@@ -20,6 +20,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/ids"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
@@ -52,13 +53,17 @@ type env struct {
 	owner   int64
 	account int64
 	base    time.Time
+	media   *media.Service
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	done   chan struct{}
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { return newEnvWithMedia(t, false) }
+
+// newEnvWithMedia is newEnv with a file store, for what sends files.
+func newEnvWithMedia(t *testing.T, withMedia bool) *env {
 	t.Helper()
 	ctx := context.Background()
 	st := testdb.Open(t)
@@ -70,8 +75,19 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{}), quiet)
+	var mediaSvc *media.Service
+	if withMedia {
+		files, err := media.NewFilesystem(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if mediaSvc, err = media.New(media.Config{TenantID: "primary", PublicOrigin: "https://media.example.test", UploadMaxBytes: 50 << 20,
+			UserQuotaBytes: 1 << 30, SessionKey: bytes.Repeat([]byte{5}, 32)}, st.Pool(), files, allowAll{}, quiet); err != nil {
+			t.Fatal(err)
+		}
+	}
 	svc, err := chat.New(chat.Config{TenantID: "primary", PublicOrigin: "https://chat.example.test", AppScheme: "com.example.chat"},
-		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Limiter: allowAll{}, Logger: quiet})
+		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Media: mediaSvc, Limiter: allowAll{}, Logger: quiet})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +103,7 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, st: st, chat: svc, fake: contracttest.NewFake("fake"), box: box, owner: u.ID,
+	e := &env{t: t, st: st, chat: svc, fake: contracttest.NewFake("fake"), box: box, owner: u.ID, media: mediaSvc,
 		base: time.Now().Add(-48 * time.Hour).Truncate(time.Second)}
 	if err := st.Pool().QueryRow(ctx, `INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, 'fake', 'fake-user-1', '\x00') RETURNING id`,
 		u.ID).Scan(&e.account); err != nil {
@@ -104,8 +120,9 @@ func newEnv(t *testing.T) *env {
 func (e *env) engine() *engine.Engine {
 	box, _ := bridge.NewSecretBox(bytes.Repeat([]byte{3}, 32), nil)
 	return engine.New(engine.Config{TenantID: "primary", PageSize: 7, PageDelay: time.Millisecond, BatchSize: 5, BackoffMin: 10 * time.Millisecond,
-		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test"},
-		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Adapters: map[string]bridge.Adapter{"fake": e.fake}, Logger: quiet})
+		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test",
+		OutboxPoll: 10 * time.Millisecond, SendGap: time.Millisecond},
+		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": e.fake}, Logger: quiet})
 }
 
 // start runs a new engine process (stopping the previous one first).

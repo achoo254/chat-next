@@ -48,6 +48,20 @@ type Config struct {
 	// MediaMaxBytes is the largest file copied from the other app (default
 	// 25 MiB); a bigger one is left there and the message says so.
 	MediaMaxBytes int64
+	// OutboxPoll is how often the outbox of a connected account is looked at.
+	OutboxPoll time.Duration
+	// SendGap is the least time between two sends of one account, so what a
+	// user types never looks like a flood to the other app.
+	SendGap time.Duration
+	// SendBatch is how many sends one look at the outbox makes, so live events
+	// are not held back by a long queue.
+	SendBatch int
+	// SendAttempts is how many times a send is tried before it is given up
+	// as failed (a limit of the other app's answer, not of its being busy).
+	SendAttempts int
+	// SendRetryWindow is how long a send in flight is repeated on its own
+	// after a restart; later it becomes 'unknown' and the user decides.
+	SendRetryWindow time.Duration
 	// Holder names this process in lease rows.
 	Holder string
 }
@@ -80,6 +94,21 @@ func (c Config) withDefaults() Config {
 	if c.ReconcileEvery <= 0 {
 		c.ReconcileEvery = 10 * time.Second
 	}
+	if c.OutboxPoll <= 0 {
+		c.OutboxPoll = 500 * time.Millisecond
+	}
+	if c.SendGap == 0 {
+		c.SendGap = 700 * time.Millisecond
+	}
+	if c.SendBatch <= 0 {
+		c.SendBatch = 10
+	}
+	if c.SendAttempts <= 0 {
+		c.SendAttempts = 10
+	}
+	if c.SendRetryWindow <= 0 {
+		c.SendRetryWindow = 10 * time.Minute
+	}
 	if c.Holder == "" {
 		c.Holder = fmt.Sprintf("bridge-%d", time.Now().UnixNano())
 	}
@@ -102,6 +131,9 @@ type runner struct {
 	cmds chan *chatLink
 	// puppets caches participant id to Chat user for mentions.
 	puppets map[string]int64
+	// pause holds every send until then (the other app asked to wait);
+	// nextSend spaces two sends by Config.SendGap.
+	pause, nextSend time.Time
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -142,10 +174,16 @@ func (r *runner) run(ctx context.Context) error {
 			return r.settle(runCtx, err)
 		}
 	}
+	outbox := time.NewTicker(e.cfg.OutboxPoll)
+	defer outbox.Stop()
 	for {
 		select {
 		case <-runCtx.Done():
 			return r.settle(runCtx, context.Cause(runCtx))
+		case <-outbox.C:
+			if err := r.sendDue(runCtx); err != nil {
+				return r.settle(runCtx, err)
+			}
 		case err := <-subDone:
 			if err == nil {
 				err = errors.New("bridge: subscription ended")

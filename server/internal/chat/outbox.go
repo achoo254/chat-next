@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	appv1 "app.local/server/gen/app/v1"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
 )
 
 // The outbox is what Chat sends to the app a chat is linked to (ADR 0022).
@@ -200,4 +202,47 @@ func cancelQueued(ctx context.Context, tx pgx.Tx, chatID int64) error {
 		return fmt.Errorf("chat: cancel queued: %w", err)
 	}
 	return nil
+}
+
+// Outbound is a message of Chat as the bridge sends it to another app.
+type Outbound struct {
+	FromID   int64
+	Text     string
+	Entities []*appv1.MessageEntity
+	// FileID is the public id of the attached file; empty for a text message.
+	FileID string
+	// ReplyToSeq is the message answered; 0 for none.
+	ReplyToSeq int64
+	// GroupedID is shared by the items of one album; 0 for none.
+	GroupedID int64
+	// Deleted is true once the message was deleted for everyone.
+	Deleted bool
+}
+
+// OutboundMessage reads a message for the bridge to send, or nil when there
+// is no such message. The sender reads at send time, so what goes out is
+// what the message says then.
+func (s *Service) OutboundMessage(ctx context.Context, chatID, seq int64) (*Outbound, error) {
+	var (
+		o       Outbound
+		content []byte
+	)
+	err := s.pool.QueryRow(ctx, `
+		SELECT from_id, text, content, reply_to_seq, grouped_id, deleted_at IS NOT NULL FROM messages WHERE chat_id = $1 AND seq = $2`,
+		chatID, seq).Scan(&o.FromID, &o.Text, &content, &o.ReplyToSeq, &o.GroupedID, &o.Deleted)
+	if isNoRows(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("chat: read outbound message: %w", err)
+	}
+	if len(content) > 0 {
+		var c appv1.Message
+		if err := proto.Unmarshal(content, &c); err != nil {
+			return nil, fmt.Errorf("chat: decode outbound message: %w", err)
+		}
+		o.Entities = c.GetEntities()
+		o.FileID = c.GetMedia().GetFileId()
+	}
+	return &o, nil
 }
