@@ -29,6 +29,22 @@ UPDATE external_outbox SET status = 'cancelled' WHERE status IN ('pending', 'sen
 
 Migration `0044_external_outbox.sql` thêm bảng `external_outbox` (hàng đợi gửi, không chứa nội dung tin: engine đọc tin theo `chat_id`, `seq` lúc gửi). Migration `0042_chat_bridge.sql` chỉ thêm: bảng `external_accounts`, `external_chats`, `external_users`, `external_messages`, `external_tombstones`, `external_logouts`, cột `users.external_source` và trigger xoá tài khoản. Binary trước chạy được trên schema mới. Không có chiều xuống cần chạy khi rollback code (xem [Hoàn tác](#bật-và-tắt)); `activate-release.sh` sao lưu DB trước khi migrate. Danh mục dữ liệu: [`privacy/data-inventory.md`](../privacy/data-inventory.md).
 
+## Topic của nhóm forum
+
+Migration `0045_external_topics.sql` thêm bảng `external_topics` (id topic của app ngoài sang id topic của Chat; id Telegram là id tin mở topic, không liên tục). Một nhóm Chat là bản sao forum khi `chats.forum` đúng và có dòng trong `external_topics`:
+
+```sql
+SELECT x.external_chat_id, c.forum, count(t.*) AS topics_mapped
+FROM external_chats x JOIN chats c ON c.id = x.chat_id
+LEFT JOIN external_topics t ON t.account_id = x.account_id AND t.external_chat_id = x.external_chat_id
+GROUP BY 1, 2 ORDER BY 1;
+```
+
+- Nhóm đã đồng bộ phẳng từ trước có `forum = false` và không có dòng ánh xạ; chỉ đổi bằng "Đồng bộ lại theo chủ đề" của người dùng (xoá rồi bật lại), không có việc nào trong DB để chạy tay.
+- Không có cờ riêng cho topic: engine dùng topic khi adapter khai `topics` và hội thoại là forum. Gặp sự cố thì đưa bản server trước lên (hoàn tác theo [`deployment-guide.md`](../deployment-guide.md)); dữ liệu topic đã nhập vô hại với bản cũ (bảng mới bị bỏ qua, nhóm vẫn là forum bình thường).
+- Log: khi nhóm vượt 1.000 topic, `chat-api` ghi một dòng cảnh báo cho mỗi topic thừa ("the chat holds the most topics it may"); tin của topic đó nằm ở General.
+- Tin gửi vào topic không có ánh xạ báo `failed` với lý do `topic_unmapped` trong `external_outbox.last_error`.
+
 ## Khoá
 
 Phiên Telegram niêm phong bằng `SESSION_KEY` (nhãn riêng, AAD gắn id tài khoản, chủ và ứng dụng). Xoay khoá theo [`key-rotation.md`](./key-rotation.md): `reseal` in dòng `resealed bridge account secrets`; secret không mở được (`unreadable`) thì tài khoản đó phải đăng nhập lại.
