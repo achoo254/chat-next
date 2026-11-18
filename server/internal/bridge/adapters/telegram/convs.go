@@ -92,7 +92,9 @@ func (b *peerBook) conversationOf(p tg.PeerClass, self int64) (bridge.Conversati
 		return bridge.Conversation{ID: id, Kind: kind, Title: userName(u), Peer: &peer}, true
 	case *tg.PeerChat:
 		ch := b.chats[v.ChatID]
-		if ch == nil || ch.Deactivated {
+		// A basic group the account left stays in the dialog list, marked as left; it is
+		// no longer a conversation of the account (a supergroup it left drops out by itself).
+		if ch == nil || ch.Deactivated || ch.Left {
 			return bridge.Conversation{}, false
 		}
 		return bridge.Conversation{ID: id, Kind: bridge.ConvGroup, Title: ch.Title}, true
