@@ -14,6 +14,7 @@ import {
 	SESSION_FILE,
 	type SessionDeps,
 	SessionExpiredError,
+	accountLabel,
 	appResources,
 } from "../../src/identity/session.ts";
 import { seal } from "../../src/keystore.ts";
@@ -270,8 +271,25 @@ describe("identity session", () => {
 		);
 		expect(revokeError).toBeUndefined();
 		expect(info.sub).toBe("acc_bob");
+		expect(info.email).toBeUndefined();
+		expect(accountLabel(info)).toBe("acc_bob");
 		expect(revoked).toEqual([{ refreshToken: "rt-1", clientId: "tunelo-cli" }]);
 		expect(sessionText()).not.toContain("rt-new");
+	});
+
+	test("keeps the email of the ID token, so the terminal names the account by it", async () => {
+		const session = new IdentitySession(dir, deps(rotatingRefresh().refresh));
+		const { info } = await session.replace(
+			"https://idp",
+			{ accessToken: fakeJwt("acc_bob"), refreshToken: "rt-new", idToken: fakeJwt("acc_bob", { email: "bob@example.com" }), expiresIn: 300 },
+			TUNNEL,
+		);
+		expect(info).toMatchObject({ sub: "acc_bob", email: "bob@example.com" });
+		expect(session.info()).toMatchObject({ sub: "acc_bob", email: "bob@example.com" });
+		expect(accountLabel(info)).toBe("bob@example.com");
+		// A refresh rewrites the file and keeps the email.
+		expect((await session.renew(0)).renewed).toBe(true);
+		expect(session.info()?.email).toBe("bob@example.com");
 	});
 
 	test("sign-out forgets the session even when revoking fails", async () => {

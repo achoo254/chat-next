@@ -54,7 +54,7 @@ export function credentialNotices(
 		if (event.type === "legacy-token") cutoff = event.date;
 		if (event.type !== "connected" || shown) return;
 		shown = true;
-		if (credential.kind === "account") display.showAccount(credential.sub);
+		if (credential.kind === "account") display.showAccount(credential.account);
 		else if (credential.anonymous) display.showLegacyReminder(cutoff);
 	};
 }

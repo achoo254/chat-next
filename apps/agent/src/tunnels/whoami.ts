@@ -16,7 +16,7 @@ export async function whoAmI(
 	const credential = resolveCredential(undefined, serverUrl, dir);
 	if (!credential) return { kind: "none" };
 	if (credential.kind === "account") {
-		return { kind: "account", account: credential.sub };
+		return { kind: "account", account: credential.account };
 	}
 	const result = await verifyKey(
 		getApiBaseUrl(serverUrl),

@@ -8,7 +8,7 @@
 // `fullDiskAccess` from it) with the account and the apps added.
 import { ConfigStore, configDir } from "../config.ts";
 import { callControl, controlPid } from "../control-socket.ts";
-import { AGENT_CLIENT_ID, identitySession } from "../identity/session.ts";
+import { AGENT_CLIENT_ID, accountLabel, identitySession } from "../identity/session.ts";
 import { type AppsReport, describeApps, storedReport } from "../registration-status.ts";
 import { diskAccessSteps } from "../safety/disk-access.ts";
 import { tunnelRunLines } from "../tunnels/cli-status-commands.ts";
@@ -59,7 +59,7 @@ export async function status(options: { json?: boolean }): Promise<number> {
     apps = storedReport(new ConfigStore(dir), session);
   }
   const renewedAt = session.lastRenewedAt();
-  const account = info ? { issuer: info.issuer, sub: info.sub, renewedAt: renewedAt ?? null } : null;
+  const account = info ? { issuer: info.issuer, sub: info.sub, email: info.email ?? null, renewedAt: renewedAt ?? null } : null;
 
   if (options.json || process.stdout.isTTY !== true) {
     // Scripts wait for this to succeed: no service, nothing on stdout.
@@ -75,7 +75,7 @@ export async function status(options: { json?: boolean }): Promise<number> {
   try {
     console.log(describeWhoAmI(await whoAmI(resolveServerUrl(undefined, printServerMigration), dir)));
   } catch (err) {
-    console.log(`Account: ${info?.sub ?? "not signed in"} (could not reach the tunnel server: ${(err as Error).message})`);
+    console.log(`Account: ${info ? accountLabel(info) : "not signed in"} (could not reach the tunnel server: ${(err as Error).message})`);
   }
   if (info) console.log(renewedLine(renewedAt));
   if (info && info.clientId !== AGENT_CLIENT_ID) console.log("This sign-in covers the tunnel only: run `tunelo login` once for Chat and Localman too.");

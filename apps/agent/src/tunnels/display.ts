@@ -157,8 +157,8 @@ export class Display {
 		console.log(chalk.yellow(`  ${legacyReminder(cutoff)}`));
 	}
 
-	showAccount(sub: string): void {
-		console.log(chalk.green("  Account:   ") + chalk.gray(sub));
+	showAccount(account: string): void {
+		console.log(chalk.green("  Account:   ") + chalk.gray(account));
 	}
 
 	showError(message: string): void {

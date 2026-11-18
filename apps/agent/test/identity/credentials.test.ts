@@ -76,7 +76,7 @@ describe("server and credentials", () => {
 		saveSettings({ key: "tunelo_anon" }, dir);
 		await signIn("https://auth.hoandat.com", "acc_a");
 		const official = "https://tunnel.hoandat.com";
-		expect(resolveCredential(undefined, official, dir)).toMatchObject({ kind: "account", sub: "acc_a" });
+		expect(resolveCredential(undefined, official, dir)).toMatchObject({ kind: "account", account: "acc_a" });
 		expect(resolveCredential("tunelo_flag", official, dir)).toMatchObject({ kind: "key", anonymous: true });
 	});
 

@@ -10,7 +10,7 @@ import { type MachineSetupDeps, connectMachine, defaultMachineSetupDeps, service
 import { configDir } from "../config.ts";
 import { pollAgentTokens, startAgentAuthorization } from "../identity/agent-login.ts";
 import { updateSettings } from "../identity/cli-settings.ts";
-import { AGENT_CLIENT_ID, appResources, identitySession } from "../identity/session.ts";
+import { AGENT_CLIENT_ID, accountLabel, appResources, identitySession } from "../identity/session.ts";
 import { getApiBaseUrl, verifyKey } from "./api-client.js";
 import { openBrowser } from "./open-browser.js";
 import { printServerMigration, resolveServerUrl } from "./server-url.js";
@@ -103,18 +103,18 @@ async function deviceLogin(issuer: string): Promise<string> {
 			`  Could not revoke the previous sign-in at ${issuer} (${revokeError.message}); revoke it at ${issuer}/account.`,
 		);
 	}
-	return info.sub;
+	return accountLabel(info);
 }
 
 /**
  * Signs this machine in for `serverUrl` unless it already is (or `force`).
- * Resolves with the account id, and whether a sign-in happened now; rejects
+ * Resolves with the account (its email, else its id), and whether a sign-in happened now; rejects
  * when the sign-in fails (the stored session is then unchanged).
  */
 export async function signInForServer(
 	serverUrl: string,
 	force = false,
-): Promise<{ sub: string; signedInNow: boolean }> {
+): Promise<{ account: string; signedInNow: boolean }> {
 	const issuer = issuerFor(serverUrl);
 	const session = identitySession(configDir());
 	const existing = session.info();
@@ -128,12 +128,12 @@ export async function signInForServer(
 		(await session.isUsable())
 	) {
 		console.log(
-			`  Already signed in (account ${existing.sub}). Use --force to sign in again.`,
+			`  Already signed in (${accountLabel(existing)}). Use --force to sign in again.`,
 		);
-		return { sub: existing.sub, signedInNow: false };
+		return { account: accountLabel(existing), signedInNow: false };
 	}
-	const sub = await deviceLogin(issuer);
-	return { sub, signedInNow: true };
+	const account = await deviceLogin(issuer);
+	return { account, signedInNow: true };
 }
 
 export function registerLoginCommand(
@@ -178,14 +178,14 @@ export function registerLoginCommand(
 				const serverUrl = options.server
 					? normalizeServer(options.server)
 					: resolveServerUrl(undefined, printServerMigration);
-				const { sub, signedInNow } = await signInForServer(
+				const { account, signedInNow } = await signInForServer(
 					serverUrl,
 					options.force === true,
 				).catch((err: Error) => fail(err.message));
 				if (options.server) {
 					updateSettings((settings) => ({ ...settings, server: serverUrl }));
 				}
-				if (signedInNow) console.log(`  ✓ Signed in (account ${sub}).`);
+				if (signedInNow) console.log(`  ✓ Signed in (${account}).`);
 				if (problem) {
 					console.log("  Run: tunelo http <port>");
 					return;

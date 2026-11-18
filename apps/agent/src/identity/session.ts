@@ -51,7 +51,7 @@ export const SESSION_FILE = "session.json";
 export const AGENT_CLIENT_ID = "tunelo-agent";
 /** Everything `tunelo-agent` asks for (the IdP grants this client no more). */
 export const AGENT_SCOPE =
-	"openid offline_access tunnels:open tunnels:read chat:read chat:write machines:write mock:read mock:write client:read client:write client:send";
+	"openid offline_access email tunnels:open tunnels:read chat:read chat:write machines:write mock:read mock:write client:read client:write client:send";
 
 /** The apps of the one sign-in. */
 export const APPS = ["tunnel", "chat", "localman"] as const;
@@ -95,8 +95,27 @@ export interface SessionInfo {
 	issuer: string;
 	/** Account id (`sub`). */
 	sub: string;
+	/** The account's email from the ID token; absent for sign-ins made before it was asked for. */
+	email?: string;
 	/** OAuth client the grant belongs to. */
 	clientId: string;
+}
+
+/** How the terminal names the signed-in account: its email, else its id. */
+export function accountLabel(info: { sub: string; email?: string | undefined }): string {
+	return info.email ?? info.sub;
+}
+
+/** The `email` claim of an ID token, or undefined. The token came straight from the IdP, so it is read, not verified. */
+function emailOf(idToken: string | null): string | undefined {
+	const payload = idToken?.split(".")[1];
+	if (!payload) return undefined;
+	try {
+		const claims: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+		return isRecord(claims) ? text(claims.email) : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 interface SealedToken {
@@ -198,6 +217,8 @@ function readSession(dir: string): SessionFile | undefined {
 		resources: parseResources(raw.resources, issuer, clientId),
 		access: parseAccess(raw.access),
 	};
+	const email = text(raw.email);
+	if (email) session.email = email;
 	if (typeof raw.renewedAt === "number" && Number.isFinite(raw.renewedAt)) {
 		session.renewedAt = raw.renewedAt;
 	}
@@ -275,8 +296,8 @@ export class IdentitySession {
 	info(): SessionInfo | undefined {
 		const session = readSession(this.dir);
 		if (!session) return undefined;
-		const { issuer, sub, clientId } = session;
-		return { issuer, sub, clientId };
+		const { issuer, sub, email, clientId } = session;
+		return email ? { issuer, sub, email, clientId } : { issuer, sub, clientId };
 	}
 
 	/** When the grant was last renewed (epoch ms), or undefined. Reads no secret. */
@@ -518,6 +539,7 @@ export class IdentitySession {
 			throw new Error("The identity provider returned no refresh token");
 		}
 		const refreshToken = tokens.refreshToken;
+		const email = emailOf(tokens.idToken);
 		const previous = await withFileLock(this.lockPath, async () => {
 			const old = readSession(this.dir);
 			const now = this.deps.now();
@@ -525,6 +547,7 @@ export class IdentitySession {
 				version: 1,
 				issuer,
 				sub,
+				...(email ? { email } : {}),
 				clientId,
 				generation: randomUUID(),
 				refreshToken: await seal(this.dir, refreshToken),
@@ -541,7 +564,7 @@ export class IdentitySession {
 			writeSession(this.dir, fresh);
 			return old;
 		});
-		const info = { issuer, sub, clientId };
+		const info: SessionInfo = email ? { issuer, sub, email, clientId } : { issuer, sub, clientId };
 		if (!previous) return { info };
 		const revokeError = await this.revokeGrant(previous);
 		return revokeError ? { info, revokeError } : { info };

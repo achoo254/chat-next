@@ -24,7 +24,7 @@ export function registerConfigCommand(program: Command): Command {
 					...rest,
 					...(key ? { key: "(saved)" } : {}),
 					...(session
-						? { session: { issuer: session.issuer, account: session.sub } }
+						? { session: { issuer: session.issuer, account: session.sub, ...(session.email ? { email: session.email } : {}) } }
 						: {}),
 				};
 				console.log(`Config path: ${settingsPath()}`);

@@ -75,8 +75,8 @@ export async function startFakeIdp(): Promise<FakeIdp> {
 }
 
 /** An unsigned JWT-shaped token carrying `sub` (the CLI only reads it). */
-export function fakeJwt(sub: string): string {
+export function fakeJwt(sub: string, extra: Record<string, unknown> = {}): string {
 	const part = (value: unknown) =>
 		Buffer.from(JSON.stringify(value)).toString("base64url");
-	return `${part({ alg: "none" })}.${part({ sub })}.sig`;
+	return `${part({ alg: "none" })}.${part({ ...extra, sub })}.sig`;
 }

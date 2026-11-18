@@ -6,7 +6,7 @@ import {
 } from "@tunelo/client";
 import { configDir } from "../config.ts";
 import { loadSettings } from "./cli-settings.ts";
-import { identitySession } from "./session.ts";
+import { accountLabel, identitySession } from "./session.ts";
 
 /**
  * What `tunelo http|tcp|mcp` authenticates with, in order: `--key`,
@@ -14,7 +14,7 @@ import { identitySession } from "./session.ts";
  * token saved by an older CLI (works until the server's cutoff date).
  */
 export type Credential =
-	| { kind: "account"; sub: string; getKey: () => Promise<string> }
+	| { kind: "account"; /** The account's email, else its id. */ account: string; getKey: () => Promise<string> }
 	| { kind: "key"; anonymous: boolean; getKey: () => Promise<string> };
 
 export const UNTRUSTED_SERVER_MESSAGE =
@@ -85,7 +85,7 @@ export function resolveCredential(
 	if (info && accountServes(serverUrl, info.issuer)) {
 		return {
 			kind: "account",
-			sub: info.sub,
+			account: accountLabel(info),
 			getKey: accountKeyFor(serverUrl, dir),
 		};
 	}
