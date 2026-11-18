@@ -61,7 +61,33 @@ export function bubbleText(t: OfficeCopy, activity: ActivityView | null): string
 	// Whatever the AI called it (an MCP tool): the visit to Advisor.
 	if (activity.group === "consult") return t.doing.consult;
 	// An MCP tool comes as "mcp" with the tool's own name as its subject: "mcp · create_issue".
-	return activity.subject === "" ? activity.tool : `${activity.tool} · ${activity.subject}`;
+	const subject = activitySubject(activity);
+	return subject === "" ? activity.tool : `${activity.tool} · ${subject}`;
+}
+
+/**
+ * The subject a bubble shows after the tool's name ("agent-core.ts", "git", a
+ * domain): "" whenever the bubble says something else (a snore over a stuck
+ * tool, a hand-in, a thought, the visit to Advisor) or the tool has none. The
+ * single rule for the bubble and for the inspector panel. The web never checks
+ * whose activity it is: the agent sends a subject only for the director's tools
+ * (docs/office-wire.md section 5), and that is where the privacy rule is kept.
+ */
+export function activitySubject(activity: ActivityView | null): string {
+	if (activity === null || activity.stuckMs !== null || activity.tool === "" || activity.group === "consult") return "";
+	return activity.subject;
+}
+
+/**
+ * The subject shown for a person: what their work bubble says after the tool's
+ * name. "" while they are not at work, and while a labelled service is named by
+ * what it runs instead of its tool.
+ */
+export function workSubject(p: Pick<Placement, "activityRoom" | "actor">): string {
+	const actor = p.actor;
+	if (p.activityRoom === null || actor === null) return "";
+	if (actor.service !== null && actor.activity !== null && actor.activity.stuckMs === null) return "";
+	return activitySubject(actor.activity);
 }
 
 /** A service's bubble: "Máy chủ dev · cổng 5173 · 12 phút" (the port only when known). */

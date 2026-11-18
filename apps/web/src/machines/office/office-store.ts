@@ -13,11 +13,14 @@ import type { OfficeEvent, OfficeSnapshot } from "@achoo254/chat-proto/remote/re
 import { actorOf, actorViewOf, activityOf, APPROVALS, EMPTY_SESSION, eventActor, nestedActor, sessionOf, type ActorRecord, type OfficeState, type SessionView } from "./office-state.ts";
 import { formerStaffOf, hireOrder } from "./office-former-staff.ts";
 import { fillDesks, hire, overflowOf, release, reseat, retire, type FreeAt, type StaffMember } from "./office-staff.ts";
+import { activityOwnerKey } from "./office-placement.ts";
+import { timelineApproval, timelineEnded, type Timeline, type TimelineResult } from "./office-timeline.ts";
 import { approvalDecided, workEnded, type WorkLog } from "./office-work-log.ts";
 
 export type { ActivityView, ActorRole, ActorState, ActorView, AnimGroup, ApprovalState, OfficeState, SessionView } from "./office-state.ts";
 export type { StaffMember } from "./office-staff.ts";
 export type { LastWork, PersonWork, WorkLog } from "./office-work-log.ts";
+export type { PersonTimeline, Timeline, TimelineEntry, TimelineResult } from "./office-timeline.ts";
 
 /** No word from the machine for this long: the power goes out. */
 export const POWER_OUT_MS = 30_000;
@@ -55,6 +58,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 	let staff: StaffMember[] = [];
 	let residents: StaffMember[] = [];
 	let work: WorkLog = {};
+	let timeline: Timeline = {};
 	let visitors: { key: string; enteredAt: number }[] = [];
 	let session: SessionView = EMPTY_SESSION;
 	let lastTurnStart = 0;
@@ -108,6 +112,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			idleSince,
 			residents,
 			work,
+			timeline,
 			visitors,
 			clockOffset,
 		};
@@ -143,6 +148,16 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 		return staff.find((m) => m.actorId === actorId)?.key ?? null;
 	};
 
+	/**
+	 * An activity of `actor` ended (at machine time `at`) with `result`: on the timeline of the person it was shown on.
+	 * An activity the agent never ended (replaced by another, cut off with the turn) comes here with "unknown".
+	 */
+	const finished = (actor: ActorRecord, activity: NonNullable<ActorRecord["activity"]>, result: TimelineResult, at: number): void => {
+		const key = activityOwnerKey(actor, activity);
+		if (key === null) return;
+		timeline = timelineEnded(timeline, key, { group: activity.group, room: activity.room, result, ms: activity.startedAt > 0 ? Math.max(0, at - activity.startedAt) : 0, at });
+	};
+
 	/** The idle edge of a snapshot: when the last thing anyone did ended (machine time). */
 	const idleEdgeOf = (list: readonly ActorRecord[], s: SessionView): number =>
 		Math.max(s.startedAt, ...list.map((a) => Math.max(a.enteredAt, a.doneAt, a.activity?.startedAt ?? 0)));
@@ -161,6 +176,8 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 					actors = [...actors, next];
 					hireActor(next);
 				} else {
+					// The new actor replaces the old one whole: an activity it no longer carries ended without the agent saying so (a hand-in replaces the last tool).
+					if (previous.activity !== null && next.activity?.id !== previous.activity.id) finished(previous, previous.activity, "unknown", at);
 					update(next.id, () => next);
 					// Its agent type or nesting became known or changed: it is someone else (another name, a desk or the meeting room).
 					if (next.role === "employee" && (previous.agentType !== next.agentType || nestedActor(previous) !== nestedActor(next))) {
@@ -179,15 +196,20 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			}
 			case "activityStart": {
 				const activity = activityOf(k.value.activity);
+				// A new activity over one that is still open and has another id: the old one ended without an end event.
+				const open = actors.find((a) => a.id === k.value.actorId);
+				if (open?.activity != null && activity !== null && open.activity.id !== activity.id) finished(open, open.activity, "unknown", at);
 				update(k.value.actorId, (a) => ({ ...a, activity }));
 				break;
 			}
 			case "activityEnd": {
-				const ended = actors.find((a) => a.id === k.value.actorId)?.activity;
+				const owner = actors.find((a) => a.id === k.value.actorId);
+				const ended = owner?.activity;
 				const key = personKey(k.value.actorId);
 				if (key !== null && ended != null && ended.id === k.value.activityId) {
 					work = workEnded(work, key, { group: ended.group, room: ended.room, ok: k.value.ok, at, ms: ended.startedAt > 0 ? Math.max(0, at - ended.startedAt) : 0 });
 				}
+				if (owner !== undefined && ended != null && ended.id === k.value.activityId) finished(owner, ended, k.value.ok ? "ok" : "failed", at);
 				update(k.value.actorId, (a) =>
 					a.activity?.id === k.value.activityId ? { ...a, activity: null, lastResult: { ok: k.value.ok, at } } : a,
 				);
@@ -201,6 +223,11 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 				const waited = actors.find((a) => a.id === k.value.actorId)?.approval;
 				const key = personKey(k.value.actorId);
 				if (decided !== "waiting" && waited?.state === "waiting" && key !== null) work = approvalDecided(work, key, at - waited.at, at);
+				const approver = actors.find((a) => a.id === k.value.actorId);
+				if (decided !== "waiting" && waited?.state === "waiting" && approver !== undefined) {
+					const person = approver.role === "employee" ? activityOwnerKey(approver, { group: "type", room: "WORK" }) : approver.role === "director" ? "director" : null;
+					if (person !== null) timeline = timelineApproval(timeline, person, at - waited.at, at);
+				}
 				update(k.value.actorId, (a) => {
 					if (decided === "waiting") {
 						return { ...a, state: "awaiting", beforeApproval: a.state === "awaiting" ? a.beforeApproval : a.state, approval: { state: decided, at } };
@@ -215,6 +242,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 				if (session.busy && !next.busy) {
 					idleSince = at;
 					// The director's turn is over; machines and background subagents work on (the agent ends theirs).
+					for (const a of actors) if (a.role === "director" && a.activity !== null) finished(a, a.activity, "unknown", at);
 					actors = actors.map((a) => (a.role === "director" && a.activity !== null ? { ...a, activity: null } : a));
 				} else if (next.busy) idleSince = null;
 				else idleSince ??= at;
@@ -233,7 +261,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			const s = snapshot.state;
 			// The same agent run (a gap or a reconnect): the same people, at the same desks, and nobody forgotten from today.
 			const same = live && snapshot.epoch === epoch;
-			const before = { staff, visitors, residents, work };
+			const before = { staff, visitors, residents, work, timeline };
 			epoch = snapshot.epoch;
 			seq = snapshot.seq;
 			awaiting = false;
@@ -244,6 +272,7 @@ export function createOfficeStore(options: { now: () => number; desks?: readonly
 			visitors = same ? before.visitors : [];
 			residents = same ? before.residents : [];
 			work = same ? before.work : {};
+			timeline = same ? before.timeline : {};
 			actors = (s?.actors ?? []).flatMap((a) => actorOf(a, undefined) ?? []);
 			// Opened afresh: those who had left are hired back first in the order everyone came in (a free one makes
 			// room for the next of the type from when they finished or left), then go off duty, so everyone keeps the

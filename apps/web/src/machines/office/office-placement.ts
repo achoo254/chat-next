@@ -133,7 +133,7 @@ export function agentRunning(state: OfficeState): boolean {
 }
 
 /** The tools of the director that are his own work: thinking and asking Advisor. Every other tool he runs belongs to a department. */
-function directing(activity: ActivityView): boolean {
+function directing(activity: Pick<ActivityView, "group">): boolean {
 	return activity.group === "think" || activity.group === "consult";
 }
 
@@ -148,6 +148,29 @@ const DEPARTMENT: Readonly<Partial<Record<RoomCode, CastKey>>> = {
 	SECURITY: "codeSecurityReviewer",
 	QA: "qaTester",
 };
+
+/**
+ * The key of the person an actor's activity is shown on (the placement key the
+ * inspector panel is opened with): the director's own work is his, any other
+ * tool he runs is its department's person's (null when no department claims its
+ * room: nobody does it and no bubble shows it), a subagent's is its job title's,
+ * Advisor's is Advisor's, a machine's is that machine's.
+ */
+export function activityOwnerKey(actor: Pick<ActorView, "id" | "role" | "agentType">, activity: Pick<ActivityView, "group" | "room">): string | null {
+	switch (actor.role) {
+		case "director": {
+			if (directing(activity)) return "director";
+			const department = DEPARTMENT[activity.room];
+			return department === undefined ? null : `title:${department}`;
+		}
+		case "advisor":
+			return "advisor";
+		case "machine":
+			return `machine:${actor.id}`;
+		case "employee":
+			return `title:${titleKeyOf(actor.agentType)}`;
+	}
+}
 
 /** The actor a title's person is shown as: the one at work (latest news first), else the latest heard of, else none. */
 function pickActor(candidates: readonly ActorView[]): ActorView | null {

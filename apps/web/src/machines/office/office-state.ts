@@ -15,6 +15,7 @@ import {
 } from "@achoo254/chat-proto/remote/remote";
 import { roomOf, type RoomCode } from "./office-rooms.ts";
 import type { StaffMember } from "./office-staff.ts";
+import type { Timeline } from "./office-timeline.ts";
 import type { WorkLog } from "./office-work-log.ts";
 
 /** Advisor sits in while the session's automatic Advisor is on (from tunelo 3.13.0, to a watch that says it draws Advisor). */
@@ -110,6 +111,8 @@ export interface OfficeState {
 	readonly residents: readonly StaffMember[];
 	/** What each person did this session (normalized facts, for their conversations). */
 	readonly work: WorkLog;
+	/** What each person finished this session, keyed by the inspector's person key (office-timeline.ts). */
+	readonly timeline: Timeline;
 	/** Employees who came in this session (key and first entry, machine time), for "staff today". */
 	readonly visitors: readonly { readonly key: string; readonly enteredAt: number }[];
 	/** Viewer time minus machine time (from the latest events; 0 before any): a machine time plus this is when it happened on the viewer's clock. */
