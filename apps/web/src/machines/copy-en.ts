@@ -139,8 +139,9 @@ export const enMachines: MachinesCopy = {
 	},
 	sessions: {
 		refresh: "Refresh the list",
-		showArchived: (n: number) => `Archived (${n})`,
-		hideArchived: "Hide archived sessions",
+		archived: "Archived",
+		archivedTitle: (n: number) => `Archived sessions (${n})`,
+		hideArchived: "Back to sessions",
 		label: (machine) => `Sessions on ${machine}`,
 		need: (n) => (n > 0 ? `Needs you (${n})` : "Needs you"),
 		running: (n) => (n > 0 ? `Running (${n})` : "Running"),

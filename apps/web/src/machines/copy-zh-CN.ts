@@ -139,8 +139,9 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	sessions: {
 		refresh: "刷新列表",
-		showArchived: (n: number) => `已归档（${n}）`,
-		hideArchived: "隐藏已归档会话",
+		archived: "已归档",
+		archivedTitle: (n: number) => `已归档的会话（${n}）`,
+		hideArchived: "返回会话列表",
 		label: (machine) => `${machine} 上的会话`,
 		need: (n) => (n > 0 ? `需要你（${n}）` : "需要你"),
 		running: (n) => (n > 0 ? `运行中（${n}）` : "运行中"),

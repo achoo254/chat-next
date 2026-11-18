@@ -44,7 +44,15 @@
 .mx-groups > .empty { padding: var(--space-6) var(--space-4); }
 .mx-groups { padding-top: var(--space-2); }
 .mx-host { flex: none; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 400; color: var(--c-text-muted); }
-.mx-archived-link { display: block; margin: var(--space-2) var(--space-3) 0; padding: 0; border: 0; background: none; color: var(--c-text-muted); font: inherit; font-size: 0.75rem; text-decoration: underline; cursor: pointer; }
+/* "Đã lưu trữ" at the column's foot, out of the scrolling list: a row like the list's own, its count on the right; pressed, it leads back. */
+.mx-list-foot { flex: none; padding: var(--space-1) var(--space-2) calc(var(--space-1) + env(safe-area-inset-bottom)); border-top: 1px solid var(--c-border-subtle); }
+.mx-archived { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+.mx-archived .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-archived:hover { background: var(--c-hover); color: var(--c-text); }
+.mx-archived[aria-pressed="true"] { color: var(--c-text); }
+.mx-archived-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: var(--radius-full); background: var(--c-hover); color: var(--c-text-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; line-height: 20px; text-align: center; }
+.mx-archived:hover .mx-archived-count { background: var(--c-surface); }
+.mx-archived-head { flex: none; margin: 0; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); color: var(--c-text-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; }
 /* "Trò chuyện | Terminal": a calm track, the picked side a solid accent pill. */
 .mx-view-switch { display: inline-flex; flex: none; gap: 2px; box-sizing: border-box; height: 40px; padding: 3px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-text) 5%, var(--c-surface)); }
 .mx-view-switch button { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: none; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 0.12s ease-out, color 0.12s ease-out; }
@@ -778,7 +786,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 }
 /* Touch: the small text controls of tool rows still get a full-size target. */
 @media (pointer: coarse) {
-	.mx-link, .mx-run-out summary, button.mx-mode { min-height: 44px; }
+	.mx-link, .mx-run-out summary, button.mx-mode, .mx-archived { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.mx-agent.streaming::after, .mx-agent.md.streaming > :last-child::after, .mx-typing i { animation: none; }

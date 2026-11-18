@@ -276,6 +276,24 @@ describe("the project column", () => {
 		expect(await screen.findByRole("dialog", { name: "Thêm workspace vào Kế hoạch" })).toBeTruthy();
 	});
 
+	it("archived sessions wait behind one row at the column's foot, which leads back too", async () => {
+		threads = [...threads, { ...thread("t9", "/w/app", 1), archived: true }];
+		const { list } = column([{ name: "Mac mini", online: true }]);
+		await within(list).findByText("t1", undefined, WAIT);
+		expect(within(list).queryByText("t9")).toBeNull();
+		const foot = list.querySelector<HTMLElement>(".mx-list-foot");
+		if (foot === null) throw new Error("no foot");
+		await userEvent.click(within(foot).getByRole("button", { name: "Phiên đã lưu trữ (1)" }));
+		expect(await within(list).findByText("Phiên đã lưu trữ (1)")).toBeTruthy();
+		expect(await within(list).findByText("t9")).toBeTruthy();
+		expect(within(list).queryByText("t1")).toBeNull();
+		const back = within(foot).getByRole("button", { name: "Quay lại danh sách phiên" });
+		expect(back.getAttribute("aria-pressed")).toBe("true");
+		await userEvent.click(back);
+		expect(await within(list).findByText("t1")).toBeTruthy();
+		expect(within(list).queryByText("Phiên đã lưu trữ (1)")).toBeNull();
+	});
+
 	it("the refresh button lists the machine's sessions again", async () => {
 		const { list } = column([{ name: "Mac mini", online: true }]);
 		await within(list).findByText("t1", undefined, WAIT);

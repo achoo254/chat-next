@@ -143,8 +143,9 @@ export const viMachines = {
 	},
 	sessions: {
 		refresh: "Làm mới danh sách",
-		showArchived: (n: number) => `Đã lưu trữ (${n})`,
-		hideArchived: "Ẩn phiên đã lưu trữ",
+		archived: "Đã lưu trữ",
+		archivedTitle: (n: number) => `Phiên đã lưu trữ (${n})`,
+		hideArchived: "Quay lại danh sách phiên",
 		label: (machine: string) => `Phiên trên ${machine}`,
 		need: (n: number) => (n > 0 ? `Cần bạn (${n})` : "Cần bạn"),
 		running: (n: number) => (n > 0 ? `Đang chạy (${n})` : "Đang chạy"),

@@ -702,6 +702,11 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await dropFiles([await pngFile("ban-thiet-ke.png"), new File([new Uint8Array(180_000)], "bao-cao-quy-3.pdf", { type: "application/pdf" })]);
 		await find(() => (document.querySelectorAll(".mx-tray-item.ready").length === 2 ? document.querySelector(".mx-tray") : null));
 	},
+	// "Đã lưu trữ" at the column's foot, opened: the archived sessions under their heading, the same row leading back.
+	"sidebar-archived": async () => {
+		await click("[data-id=sidebar-archived]", /Phiên đã lưu trữ/);
+		await find(() => document.querySelector(".mx-archived-head"));
+	},
 	// An image of the tray opened in its preview.
 	"attach-preview": async () => {
 		await dropFiles([await pngFile("ban-thiet-ke.png")]);

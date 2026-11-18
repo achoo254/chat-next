@@ -6,7 +6,7 @@
 // plain shells; a dot when one needs the user), beside "Làm mới danh sách"
 // and "+" for "Thêm dự án" in the column's head.
 // Folders whose sessions no workspace holds wait, folded, in "Chưa phân
-// loại" at the bottom; archived sessions show only behind their own link.
+// loại" at the bottom; archived sessions show only behind "Đã lưu trữ" at the column's foot.
 // While it shows, the sync tidies the workspaces the user added (never adds
 // one: project-actions.ts), and each session this device opens counts as seen.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -249,6 +249,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 					)}
 				</Link>
 			</header>
+			{filter === "archived" && <p className="mx-archived-head">{t.sessions.archivedTitle(archived)}</p>}
 			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
 				{snapshot.status === "loading" && machines.length > 0 && (
 					<ul className="mx-rows skeleton" aria-hidden="true">
@@ -268,12 +269,17 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				)}
 				{directory.status === "ready" && machines.length === 0 && <FirstMachine compact />}
 				<LooseGroup folders={tree.loose} ctx={ctx} open={looseOpen || tree.loose.some((f) => f.machine.entry.ref === current?.machine && f.threads.some((x) => x.id === current.thread))} onToggle={() => setLooseOpen((v) => !v)} />
-				{(archived > 0 || filter === "archived") && (
-					<button type="button" className="mx-archived-link" onClick={() => setFilter(filter === "archived" ? "all" : "archived")} aria-pressed={filter === "archived"}>
-						{filter === "archived" ? t.sessions.hideArchived : t.sessions.showArchived(archived)}
-					</button>
-				)}
 			</div>
+			{(archived > 0 || filter === "archived") && (
+				// Kept at the foot of the column, out of the scrolling list: one row in, the same row back out.
+				<footer className="mx-list-foot">
+					<button type="button" className="mx-archived" onClick={() => setFilter(filter === "archived" ? "all" : "archived")} aria-pressed={filter === "archived"} aria-label={filter === "archived" ? t.sessions.hideArchived : t.sessions.archivedTitle(archived)} data-id="sidebar-archived">
+						<Icon name={filter === "archived" ? "chevron-left" : "inbox"} small />
+						<span className="grow">{filter === "archived" ? t.sessions.hideArchived : t.sessions.archived}</span>
+						{filter !== "archived" && <span className="mx-archived-count">{archived}</span>}
+					</button>
+				</footer>
+			)}
 		</section>
 	);
 }
