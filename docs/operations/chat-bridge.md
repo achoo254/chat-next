@@ -45,6 +45,21 @@ GROUP BY 1, 2 ORDER BY 1;
 - Log: khi nhóm vượt 1.000 topic, `chat-api` ghi một dòng cảnh báo cho mỗi topic thừa ("the chat holds the most topics it may"); tin của topic đó nằm ở General.
 - Tin gửi vào topic không có ánh xạ báo `failed` với lý do `topic_unmapped` trong `external_outbox.last_error`.
 
+## Ghim
+
+Migration `0047_external_outbox_pins.sql` thêm hai kiểu việc `pin_message` và `pin_topic` và cột `pinned` (trạng thái muốn có) vào `external_outbox`; một hàng cho mỗi tin hay topic, nên ghim rồi bỏ ghim liên tiếp chỉ gửi trạng thái cuối. Với `pin_topic`, cột `seq` giữ id topic của Chat. Migration `0046_external_messages_orphans.sql` xoá khoá tin mồ côi của các bản sao đã gỡ (trước đó gỡ rồi bật lại cùng một chat đồng bộ không nhập được tin nào).
+
+- Danh sách tin ghim của Telegram đọc mỗi lần backfill xong và mỗi lần engine khởi động với chat đã đồng bộ; chỉ thêm ghim, không gỡ ghim đặt trong Chat.
+- Ghim bị Telegram từ chối dứt khoát: hàng chuyển `failed` kèm lý do ở `last_error`, trạng thái ghim trong Chat được trả về như cũ; giao diện nhận một thông báo qua `ListBridgeOutbox` (hàng được đóng `cancelled` ngay khi liệt kê nên chỉ báo một lần). Truy vấn xem:
+
+```sql
+SELECT chat_id, seq, op, pinned, status, last_error FROM external_outbox
+WHERE op IN ('pin_message', 'pin_topic') ORDER BY id DESC LIMIT 20;
+```
+
+- Log `chat-api`: dòng "pinned messages outside the imported history are not pinned in Chat" kèm số tin bị bỏ qua vì cũ hơn cửa sổ lịch sử.
+- Hoàn tác: bản server trước bỏ qua các hàng ghim (kiểu việc lạ làm hàng thất bại, không ảnh hưởng gửi tin); không có việc chạy tay trong DB.
+
 ## Khoá
 
 Phiên Telegram niêm phong bằng `SESSION_KEY` (nhãn riêng, AAD gắn id tài khoản, chủ và ứng dụng). Xoay khoá theo [`key-rotation.md`](./key-rotation.md): `reseal` in dòng `resealed bridge account secrets`; secret không mở được (`unreadable`) thì tài khoản đó phải đăng nhập lại.

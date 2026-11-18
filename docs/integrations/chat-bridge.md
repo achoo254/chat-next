@@ -18,6 +18,12 @@ Chat hai chiều hiện ghi chú "Tin bạn gõ ở đây cũng được gửi s
 
 Mỗi tin gửi đi có trạng thái ngay trên tin: đồng hồ là đang gửi (Chat xếp hàng và gửi từng tin, cách nhau chừng 0,7 giây, theo đúng thứ tự). Lỗi hiện thành dòng "Chưa gửi sang Telegram" kèm **Gửi lại** và **Xoá tin** (xoá là cách bỏ tin gửi hỏng). Tạm mất mạng hoặc Telegram bảo chờ thì Chat tự thử lại, không mất tin và không gửi trùng. Nếu server dừng đúng lúc đang gửi và quá 10 phút mới chạy lại, tin hiện "Chưa rõ đã gửi sang Telegram chưa": kiểm trong Telegram rồi chọn **Gửi lại** hoặc **Xoá tin**. Bản sửa không sang được (ví dụ Telegram không cho sửa tin cũ nữa) hiện "Bản sửa chưa sang Telegram" kèm **Gửi lại** và **Bỏ qua**.
 
+## Ghim
+
+- **Từ Telegram sang Chat:** khi bật đồng bộ, các tin đã ghim ở Telegram (nằm trong cửa sổ lịch sử đã nhập) được ghim trong Chat; ghim và bỏ ghim tin, ghim và bỏ ghim topic ở Telegram hiện sang Chat ngay. Chat đồng bộ từ trước nhận ghim khi server chạy lại. Tin ghim cũ hơn cửa sổ lịch sử không có trong Chat nên không ghim được (nhóm làm việc thường ghim tin rất cũ). Chat không thêm dòng "đã ghim" cho ghim đến từ Telegram.
+- **Từ Chat sang Telegram (chat hai chiều):** ghim, bỏ ghim tin và **ghim topic** (menu chuột phải của topic chỉ còn mục Ghim) đổi theo ở Telegram, im lặng (không báo thành viên). Cần quyền ghim ở nhóm Telegram. Nếu Telegram từ chối (không phải quản trị viên, ghim quá nhiều) thì Chat trả ghim về như cũ và báo "Telegram không cho ghim…". Chat chỉ đọc giữ ghim riêng trong Chat, không gửi gì ra ngoài. Tên, màu, đóng và ẩn topic vẫn chỉ đổi ở Telegram.
+- Sau khi ghim tin từ Chat, Telegram đăng một dòng "đã ghim tin nhắn" trong nhóm cho mọi người thấy; bỏ ghim thì không có dòng nào.
+
 Chat đã đồng bộ hiện nhãn nhỏ tên ứng dụng ở danh sách. Người gửi hiện bằng tên của họ ở Telegram; tin của chính bạn bên Telegram hiện là tin của bạn.
 
 ## Nhóm có chủ đề (forum)
@@ -25,7 +31,7 @@ Chat đã đồng bộ hiện nhãn nhỏ tên ứng dụng ở danh sách. Ngư
 Nhóm Telegram bật chủ đề đồng bộ thành **nhóm dạng forum** trong Chat: mỗi topic của Telegram là một topic của Chat (topic mặc định là General), tin về đúng topic, topic mới, đổi tên, đổi màu, đóng và ghim ở Telegram phản ánh sang Chat. Ở danh sách chọn chat, nhóm như vậy có nhãn **Nhóm có chủ đề**; chat đã đồng bộ có nhãn **Có chủ đề**.
 
 - **Gõ trong topic nào thì tin vào đúng topic đó bên Telegram** (nếu chat bật Gửi tin từ Chat). Topic đã đóng hoặc đã xoá bên Telegram thì tin báo lỗi như các lỗi gửi khác, các tin sau vẫn đi.
-- **Topic do Telegram quản lý:** tạo, đổi tên, đóng, ghim topic chỉ làm ở Telegram; ở Chat các thao tác đó bị chặn và không còn menu.
+- **Topic do Telegram quản lý:** tạo, đổi tên, đổi màu, đóng, ẩn topic chỉ làm ở Telegram; ở Chat các thao tác đó bị chặn và không còn menu. Ghim topic là ngoại lệ ở chat hai chiều (xem [Ghim](#ghim)).
 - **Nhóm đã đồng bộ từ trước (trước khi có chủ đề) vẫn là một dòng tin trộn các topic.** Muốn tách: ở danh sách chọn chat bấm **Đồng bộ lại theo chủ đề** (xoá bản sao rồi bật lại với cùng cửa sổ lịch sử và cùng hướng gửi; những gì chỉ có ở Chat sẽ mất).
 - **Cửa sổ lịch sử vẫn áp cho cả nhóm:** topic chỉ có tin cũ hơn cửa sổ thì có mặt (danh sách topic được nạp đủ) nhưng rỗng cho tới khi có tin mới.
 - **Nhóm quá 1.000 topic** (giới hạn của Chat): tin của topic thừa vào General, đồng bộ vẫn tiếp tục.
