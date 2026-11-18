@@ -49,3 +49,25 @@ func (it *ImportTx) SetPinned(ctx context.Context, seq int64, pinned bool) (bool
 	}
 	return true, nil
 }
+
+// SetTopicPinned pins or unpins a topic as the other app says, or puts it back
+// when the other app refused a pin made in Chat. It reports whether the topic
+// changed.
+func (it *ImportTx) SetTopicPinned(ctx context.Context, topicID int64, pinned bool) (bool, error) {
+	if !it.c.Forum {
+		return false, nil
+	}
+	topic, err := scanTopic(it.t.tx.QueryRow(ctx, `
+		UPDATE forum_topics AS t SET pinned = $3 WHERE t.chat_id = $1 AND t.id = $2 AND t.pinned <> $3 RETURNING `+topicColumns,
+		it.c.ID, topicID, pinned))
+	if isNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("chat: set topic pinned: %w", err)
+	}
+	if err := it.t.topicChanged(ctx, it.c, it.owner, topic); err != nil {
+		return false, err
+	}
+	return true, nil
+}

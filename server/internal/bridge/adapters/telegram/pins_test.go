@@ -5,6 +5,9 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"app.local/server/internal/bridge"
+	"github.com/gotd/td/tgerr"
 )
 
 func TestListPinnedReadsPageAfterPageUntilAShortOne(t *testing.T) {
@@ -41,5 +44,27 @@ func TestListPinnedStopsOnAnError(t *testing.T) {
 	boom := errors.New("boom")
 	if _, err := listPinned(context.Background(), func(int) ([]int, error) { return nil, boom }); !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestTranslatePin(t *testing.T) {
+	for _, tc := range []struct {
+		rpc  string
+		want error // nil: the pin is already as asked, so the call succeeded
+		not  bool  // true: ErrNotAllowed
+	}{
+		{rpc: "CHAT_NOT_MODIFIED"},
+		{rpc: "PINNED_TOPIC_NOT_MODIFIED"},
+		{rpc: "CHAT_ADMIN_REQUIRED", not: true},
+		{rpc: "PIN_RESTRICTED", not: true},
+		{rpc: "PINNED_TOO_MUCH", not: true},
+	} {
+		err := translatePin(tgerr.New(400, tc.rpc))
+		if tc.not != errors.Is(err, bridge.ErrNotAllowed) || (!tc.not && err != nil) {
+			t.Errorf("%s -> %v, not allowed wanted = %v", tc.rpc, err, tc.not)
+		}
+	}
+	if translatePin(nil) != nil {
+		t.Error("nil became an error")
 	}
 }

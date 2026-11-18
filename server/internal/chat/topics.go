@@ -351,7 +351,11 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 // changeTopic loads a topic under the chat lock, checks who may change it
 // (admins; the topic's creator with MANAGE_TOPICS unless adminOnly), lets
 // edit change it and announces the result.
-func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, adminOnly bool,
+//
+// pinOnly marks a change that only pins or unpins the topic: in a chat that
+// sends to another app for me it is allowed and goes to that app too; any
+// other change of such a chat's topics is refused.
+func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, adminOnly, pinOnly bool,
 	edit func(t *topicRow) (changed bool, err error),
 ) (*appv1.ForumTopic, *appv1.SyncAck, error) {
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
@@ -363,8 +367,14 @@ func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, ad
 		if err != nil {
 			return err
 		}
+		sendsOut := false
 		if c.ExternalLinked {
-			return errDenied(errTopicsManagedElsewhere)
+			if sendsOut, err = t.mayPinTopicOutward(ctx, chatID, me); err != nil {
+				return err
+			}
+			if !pinOnly || !sendsOut {
+				return errDenied(errTopicsManagedElsewhere)
+			}
 		}
 		topic, err = scanTopic(t.tx.QueryRow(ctx, `SELECT `+topicColumns+` FROM forum_topics t WHERE t.chat_id = $1 AND t.id = $2`,
 			chatID, topicID))
@@ -378,9 +388,15 @@ func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, ad
 		if !m.isAdmin() && !creatorMay {
 			return errDenied("you cannot change this topic")
 		}
+		pinnedBefore := topic.Pinned
 		changed, err := edit(topic)
 		if err != nil || !changed {
 			return err
+		}
+		if sendsOut && topic.Pinned != pinnedBefore {
+			if err := t.queueTopicPin(ctx, chatID, me, topicID, topic.Pinned); err != nil {
+				return err
+			}
 		}
 		if _, err := t.tx.Exec(ctx, `
 			UPDATE forum_topics SET title = $3, icon_color = $4, icon = $5, pinned = $6, closed = $7, hidden = $8
@@ -417,7 +433,8 @@ func (s *Service) EditForumTopic(ctx context.Context, me int64, req *appv1.EditF
 			return nil, nil, err
 		}
 	}
-	return s.changeTopic(ctx, me, req.GetChatId(), req.GetTopicId(), req.Pinned != nil, func(t *topicRow) (bool, error) {
+	pinOnly := req.Pinned != nil && req.Title == nil && req.IconColor == nil && req.Icon == nil
+	return s.changeTopic(ctx, me, req.GetChatId(), req.GetTopicId(), req.Pinned != nil, pinOnly, func(t *topicRow) (bool, error) {
 		before := *t
 		if req.Title != nil {
 			t.Title = title
@@ -437,7 +454,7 @@ func (s *Service) EditForumTopic(ctx context.Context, me int64, req *appv1.EditF
 
 // CloseForumTopic closes or reopens a topic.
 func (s *Service) CloseForumTopic(ctx context.Context, me, chatID, topicID int64, closed bool) (*appv1.ForumTopic, *appv1.SyncAck, error) {
-	return s.changeTopic(ctx, me, chatID, topicID, false, func(t *topicRow) (bool, error) {
+	return s.changeTopic(ctx, me, chatID, topicID, false, false, func(t *topicRow) (bool, error) {
 		if t.Closed == closed {
 			return false, nil
 		}
@@ -448,7 +465,7 @@ func (s *Service) CloseForumTopic(ctx context.Context, me, chatID, topicID int64
 
 // HideForumTopic hides or shows a topic in the list (admins only).
 func (s *Service) HideForumTopic(ctx context.Context, me, chatID, topicID int64, hidden bool) (*appv1.ForumTopic, *appv1.SyncAck, error) {
-	return s.changeTopic(ctx, me, chatID, topicID, true, func(t *topicRow) (bool, error) {
+	return s.changeTopic(ctx, me, chatID, topicID, true, false, func(t *topicRow) (bool, error) {
 		if t.Hidden == hidden {
 			return false, nil
 		}

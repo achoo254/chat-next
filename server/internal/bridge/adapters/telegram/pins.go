@@ -2,10 +2,12 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"app.local/server/internal/bridge"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
 const (
@@ -113,4 +115,62 @@ func registerPins(d tg.UpdateDispatcher, c *conn, emit func(context.Context, bri
 		}
 		return emit(ctx, bridge.Event{Topic: &bridge.TopicChange{Conversation: conv, Topic: t}})
 	})
+}
+
+var _ bridge.Pinner = (*Adapter)(nil)
+
+// translatePin is translateSend plus what only a pin can answer: pinning what is
+// already pinned (or unpinning what is not) is done, not a failure; a pin the
+// group will not take is a refusal that retrying cannot change.
+func translatePin(err error) error {
+	if err == nil {
+		return nil
+	}
+	if rpc, ok := tgerr.As(err); ok {
+		switch rpc.Type {
+		case "CHAT_NOT_MODIFIED", "PINNED_TOPIC_NOT_MODIFIED":
+			return nil
+		case "PIN_RESTRICTED", "PINNED_TOO_MUCH", "MESSAGE_ID_INVALID", "TOPIC_CLOSED":
+			return fmt.Errorf("%w: %s", bridge.ErrNotAllowed, rpc.Type)
+		}
+	}
+	return translateSend(err)
+}
+
+// PinMessage implements bridge.Pinner. Pinning is silent: it does not notify the members.
+func (a *Adapter) PinMessage(ctx context.Context, acct bridge.Account, conv, id string, pinned bool) error {
+	mid, err := strconv.Atoi(id)
+	if err != nil {
+		return fmt.Errorf("telegram: bad message id %q", id)
+	}
+	c, release, err := a.acquire(ctx, acct)
+	if err != nil {
+		return err
+	}
+	defer release()
+	peer, err := c.inputPeer(ctx, conv)
+	if err != nil {
+		return err
+	}
+	_, err = c.live.api().MessagesUpdatePinnedMessage(ctx, &tg.MessagesUpdatePinnedMessageRequest{Peer: peer, ID: mid, Unpin: !pinned, Silent: true})
+	return translatePin(err)
+}
+
+// PinTopic implements bridge.Pinner.
+func (a *Adapter) PinTopic(ctx context.Context, acct bridge.Account, conv, topic string, pinned bool) error {
+	tid, err := strconv.Atoi(topic)
+	if err != nil {
+		return fmt.Errorf("telegram: bad topic id %q", topic)
+	}
+	c, release, err := a.acquire(ctx, acct)
+	if err != nil {
+		return err
+	}
+	defer release()
+	peer, err := c.inputPeer(ctx, conv)
+	if err != nil {
+		return err
+	}
+	_, err = c.live.api().MessagesUpdatePinnedForumTopic(ctx, &tg.MessagesUpdatePinnedForumTopicRequest{Peer: peer, TopicID: tid, Pinned: pinned})
+	return translatePin(err)
 }

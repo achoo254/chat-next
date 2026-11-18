@@ -1556,6 +1556,9 @@ func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64) (*appv1
 		if tag.RowsAffected() == 0 {
 			return nil
 		}
+		if err := t.queuePin(ctx, chatID, me, seq, true); err != nil {
+			return err
+		}
 		if err := t.refreshPinned(ctx, c); err != nil {
 			return fmt.Errorf("chat: pin: %w", err)
 		}
@@ -1599,6 +1602,9 @@ func (s *Service) UnpinMessage(ctx context.Context, me, chatID, seq int64) (*app
 		}
 		if tag.RowsAffected() == 0 {
 			return nil
+		}
+		if err := t.queuePin(ctx, chatID, me, seq, false); err != nil {
+			return err
 		}
 		if err := t.refreshPinned(ctx, c); err != nil {
 			return fmt.Errorf("chat: unpin: %w", err)
@@ -1651,6 +1657,11 @@ func (s *Service) UnpinAllMessages(ctx context.Context, me, chatID, topicID int6
 			return nil
 		}
 		slices.Sort(unpinned)
+		for _, seq := range unpinned {
+			if err := t.queuePin(ctx, chatID, me, seq, false); err != nil {
+				return err
+			}
+		}
 		if err := t.refreshPinned(ctx, c); err != nil {
 			return fmt.Errorf("chat: unpin all: %w", err)
 		}

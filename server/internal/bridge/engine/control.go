@@ -433,7 +433,7 @@ func (e *Engine) Outbox(ctx context.Context, owner, chatID int64) ([]OutboxItem,
 	}
 	rows, err := e.db.pool.Query(ctx, `
 		SELECT seq, op, status, last_error, attempts FROM external_outbox
-		WHERE chat_id = $1 AND status IN ('pending', 'sending', 'failed', 'unknown') ORDER BY id`, chatID)
+		WHERE chat_id = $1 AND op IN ('send', 'edit', 'delete') AND status IN ('pending', 'sending', 'failed', 'unknown') ORDER BY id`, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list outbox: %w", err)
 	}

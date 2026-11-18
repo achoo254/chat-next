@@ -7,6 +7,7 @@ package contracttest
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -38,6 +39,8 @@ type Fake struct {
 	nextID                                     int
 	topics                                     map[string][]bridge.Topic
 	pinned                                     map[string][]string // newest first
+	pinCalls                                   []PinCall
+	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
 	DedupeRandomID bool
@@ -363,3 +366,74 @@ func (f *Fake) ListPinned(_ context.Context, _ bridge.Account, conv string) ([]s
 }
 
 var _ bridge.PinReader = (*Fake)(nil)
+
+// PinCall is one call to PinMessage (Topic empty) or PinTopic.
+type PinCall struct {
+	Conversation string
+	Message      string
+	Topic        string
+	Pinned       bool
+}
+
+// FailPin makes the next pin calls return errs, one each.
+func (f *Fake) FailPin(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failPin = append(f.failPin, errs...)
+}
+
+// Pins returns the pin calls made so far.
+func (f *Fake) Pins() []PinCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]PinCall(nil), f.pinCalls...)
+}
+
+func (f *Fake) nextPinFailure() error {
+	if len(f.failPin) == 0 {
+		return nil
+	}
+	err := f.failPin[0]
+	f.failPin = f.failPin[1:]
+	return err
+}
+
+// PinMessage implements bridge.Pinner; like the other app it tells the account
+// owner what changed (EchoSent).
+func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, pinned bool) error {
+	f.mu.Lock()
+	if err := f.nextPinFailure(); err != nil {
+		f.mu.Unlock()
+		return err
+	}
+	f.pinCalls = append(f.pinCalls, PinCall{Conversation: conv, Message: id, Pinned: pinned})
+	list := slices.DeleteFunc(append([]string(nil), f.pinned[conv]...), func(x string) bool { return x == id })
+	if pinned {
+		list = append([]string{id}, list...)
+	}
+	f.pinned[conv] = list
+	echo := f.EchoSent
+	f.mu.Unlock()
+	if echo {
+		f.Push(bridge.Event{Pin: &bridge.PinChange{Conversation: conv, IDs: []string{id}, Pinned: pinned}})
+	}
+	return nil
+}
+
+// PinTopic implements bridge.Pinner.
+func (f *Fake) PinTopic(_ context.Context, _ bridge.Account, conv, topic string, pinned bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	f.pinCalls = append(f.pinCalls, PinCall{Conversation: conv, Topic: topic, Pinned: pinned})
+	for i := range f.topics[conv] {
+		if f.topics[conv][i].ID == topic {
+			f.topics[conv][i].Pinned = pinned
+		}
+	}
+	return nil
+}
+
+var _ bridge.Pinner = (*Fake)(nil)
