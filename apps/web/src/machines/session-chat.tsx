@@ -11,7 +11,7 @@
 // instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
-import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type SlashCommand, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch } from "../router.tsx";
@@ -38,6 +38,7 @@ import { profileById, sessionProfileId, switchPending, useProfiles } from "./mac
 import { PageHead } from "./page-head.tsx";
 import { ProjectConfigHint } from "./project-config.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
+import { leadingCommand } from "./slash-commands.ts";
 import { StatusBar } from "./status-bar.tsx";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block, type ShownAttachment } from "./transcript/tool-fold.ts";
@@ -368,6 +369,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							loadOlder={() => link.loadEarlier(threadId)}
 							onSend={verdictChipsSend(state.listed, advisorThread) ? (text) => send(text, []) : undefined}
 							sendLocked={!canSend}
+							commands={threadInfo?.commands}
 						/>
 					)}
 					{suggestion !== undefined && (
@@ -677,6 +679,8 @@ interface TranscriptProps {
 	onSend?: ((text: string) => Promise<void>) | undefined;
 	/** The session cannot take a message now (offline, held by its terminal): chips are dimmed like during a turn. */
 	sendLocked?: boolean;
+	/** The AI's commands and skills, so a sent "/skill" stands out; none while unknown. */
+	commands?: readonly SlashCommand[] | undefined;
 }
 
 /**
@@ -718,7 +722,9 @@ export const TRANSCRIPT_PAGE = 40;
 const EARLIER_PX = 600;
 
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
-export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false }: TranscriptProps) {
+const NO_COMMANDS: readonly SlashCommand[] = [];
+
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false, commands = NO_COMMANDS }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -886,6 +892,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 							ai={aiName(state.info, thread?.provider ?? "")}
 							onSend={onSend}
 							sendLocked={sendLocked}
+							commands={commands}
 						/>
 					)),
 					previous === null || before < start ? null : (
@@ -944,21 +951,28 @@ interface BlockViewProps {
 	ai: string;
 	onSend: ((text: string) => Promise<void>) | undefined;
 	sendLocked: boolean;
+	commands: readonly SlashCommand[];
 }
 
-function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked }: BlockViewProps) {
+function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands }: BlockViewProps) {
 	const { locale } = useI18n();
 	switch (block.kind) {
-		case "user":
+		case "user": {
+			// The files sit above the bubble on the user's side; a "/skill" the message starts with stands out.
+			const command = leadingCommand(block.text, commands);
 			return (
-				<div className="mx-msg mine">
-					<div className="bubble" aria-busy={block.pending}>
-						{block.attachments.length > 0 && <MessageAttachments link={link} threadId={threadId} files={block.attachments} />}
-						{block.text}
-						{block.pending && <span className="sr-only">{t.chat.sending}</span>}
-					</div>
+				<div className="mx-msg mine" aria-busy={block.pending}>
+					{block.attachments.length > 0 && <MessageAttachments link={link} threadId={threadId} files={block.attachments} />}
+					{block.text !== "" && (
+						<div className="bubble">
+							{command > 0 && <span className="mx-skill">{block.text.slice(0, command)}</span>}
+							{block.text.slice(command)}
+						</div>
+					)}
+					{block.pending && <span className="sr-only">{t.chat.sending}</span>}
 				</div>
 			);
+		}
 		case "text":
 			return <AgentText text={block.text} streaming={block.partial} />;
 		case "who":

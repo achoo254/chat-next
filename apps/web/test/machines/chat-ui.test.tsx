@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { ToolRunCard } from "../../src/machines/cards/tool-run.tsx";
 import { Composer } from "../../src/machines/composer.tsx";
-import { filterCommands, flatCommands } from "../../src/machines/slash-commands.ts";
+import { filterCommands, flatCommands, leadingCommand } from "../../src/machines/slash-commands.ts";
 import { commandToken } from "../../src/components/plain-text-box.tsx";
 import type { MachineLink } from "../../src/machines/link/machine-link.ts";
 import { StatusBar } from "../../src/machines/status-bar.tsx";
@@ -238,11 +238,32 @@ describe("slash commands", () => {
 		expect(flatCommands(filterCommands(commands, "zzz"))).toEqual([]);
 	});
 
+	it("marks a known command the message starts with, never a path or a command the AI lacks", () => {
+		expect(leadingCommand("/ak-review src", commands)).toBe(10);
+		expect(leadingCommand("/deploy", commands)).toBe(7);
+		expect(leadingCommand("/unknown x", commands)).toBe(0);
+		expect(leadingCommand("/Users/me/app", [])).toBe(0);
+		expect(leadingCommand("see /deploy", commands)).toBe(0);
+		// Commands not known yet: a name alone counts.
+		expect(leadingCommand("/clear", [])).toBe(6);
+	});
+
 	const composer = (list = commands) => {
 		const onSend = vi.fn(() => Promise.resolve());
 		wrap(<Composer ai="Claude Code" machine="Mac" online running={false} prompting={false} commands={list} onSend={onSend} onStop={() => Promise.resolve()} />);
 		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) };
 	};
+
+	it("shows the picked skill marked in the box", async () => {
+		const user = userEvent.setup();
+		const { field } = composer();
+		await user.type(field, "/dep");
+		expect(field.querySelector(".plain-text-mark")).toBeNull();
+		await user.keyboard("{Tab}");
+		await waitFor(() => expect(field.querySelector(".plain-text-mark")?.textContent).toBe("/deploy"));
+		await user.type(field, "now");
+		expect(field.querySelector(".plain-text-mark")?.textContent).toBe("/deploy");
+	});
 
 	it("is an editor rather than a form field, which password managers leave alone", () => {
 		const { field } = composer();

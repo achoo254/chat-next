@@ -700,6 +700,19 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await dropFiles([await pngFile("ban-thiet-ke.png"), new File([new Uint8Array(180_000)], "bao-cao-quy-3.pdf", { type: "application/pdf" })]);
 		await find(() => (document.querySelectorAll(".mx-tray-item.ready").length === 2 ? document.querySelector(".mx-tray") : null));
 	},
+	// An image of the tray opened in its preview.
+	"attach-preview": async () => {
+		await dropFiles([await pngFile("ban-thiet-ke.png")]);
+		await find(() => document.querySelector(".mx-tray-item.ready"));
+		await click(".mx-tray-open", "Xem ban-thiet-ke.png");
+		await find(() => document.querySelector(".mx-preview .mx-preview-img"));
+	},
+	// A skill typed at the start of the message, marked in the box.
+	"slash-mark": async () => {
+		const field = await find(() => document.querySelector<HTMLElement>("[data-composer][contenteditable=true]"));
+		typeInto(field, "/ak-cook thêm nút làm mới");
+		await find(() => field.querySelector(".plain-text-mark"));
+	},
 	// A large file uploading (the machine stops answering at about 40 %), next to an uploaded image.
 	"attach-progress": async () => {
 		await dropFiles([await pngFile("ban-thiet-ke.png"), new File([new Uint8Array(2_000_000)], "stall-du-lieu-mau.zip", { type: "application/zip" })]);

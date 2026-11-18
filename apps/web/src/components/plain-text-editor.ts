@@ -23,7 +23,7 @@ import { Placeholder, UndoRedo } from "@tiptap/extensions";
 import { closeHistory } from "@tiptap/pm/history";
 import type { Node as PmNode, Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection as PmTextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
-import type { EditorView } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { Suggestion, exitSuggestion, type SuggestionMatch } from "@tiptap/suggestion";
 
 /** Offsets in the plain text value; start <= end. */
@@ -68,6 +68,8 @@ export interface EditorProps {
 	/** At most this many UTF-16 code units, as a textarea's maxLength. */
 	readonly maxLength?: number | undefined;
 	readonly suggestions?: readonly SuggestionTrigger[] | undefined;
+	/** A part of the value to mark (a "/command" it starts with); null for none. Read on each change of the box. */
+	readonly highlight?: ((value: string) => TextSelection | null) | undefined;
 	readonly onValueChange: (value: string, selection: TextSelection) => void;
 	readonly onKeyDown?: ((event: KeyboardEvent) => void) | undefined;
 	readonly onPaste?: ((event: ClipboardEvent) => void) | undefined;
@@ -166,6 +168,19 @@ function maxLengthPlugin(live: Live): Plugin {
 			if (max === undefined || !tr.docChanged || tr.getMeta(OUTSIDE) === true) return true;
 			const length = valueLength(tr.doc);
 			return length <= max || length <= valueLength(state.doc);
+		},
+	});
+}
+
+/** The part the composer marks, as a decoration: the text stays plain, only its look changes. */
+function highlightPlugin(live: Live): Plugin {
+	return new Plugin({
+		props: {
+			decorations: (state: EditorState) => {
+				const range = live.props.highlight?.(plainText(state.doc)) ?? null;
+				if (range === null || range.end <= range.start) return DecorationSet.empty;
+				return DecorationSet.create(state.doc, [Decoration.inline(range.start + 1, range.end + 1, { class: "plain-text-mark" })]);
+			},
 		},
 	});
 }
@@ -310,7 +325,7 @@ export function createEditor(element: HTMLDivElement, live: Live): Editor {
 			Extension.create({
 				name: "plainTextLimits",
 				addProseMirrorPlugins() {
-					return [maxLengthPlugin(live), ...suggestionPlugins(this.editor, live)];
+					return [maxLengthPlugin(live), highlightPlugin(live), ...suggestionPlugins(this.editor, live)];
 				},
 			}),
 		],

@@ -1214,6 +1214,10 @@ export const viMachines = {
 			savedAt: (path: string) => `Đã lưu trên máy: ${path}`,
 			imageLoading: (name: string) => `Đang tải ảnh ${name}`,
 			imageFailed: (name: string) => `Không tải được ảnh ${name}`,
+			preview: (name: string) => `Xem ${name}`,
+			previewNone: "Không xem trước được loại tệp này. Tải về để mở.",
+			previewCut: (max: string) => `Chỉ hiện ${max} đầu của tệp.`,
+			download: "Tải về",
 		},
 		dock: {
 			label: "Việc chờ bạn",

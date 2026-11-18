@@ -1190,6 +1190,10 @@ export const zhCNMachines: MachinesCopy = {
 			savedAt: (path: string) => `已保存在电脑上：${path}`,
 			imageLoading: (name: string) => `正在加载图片 ${name}`,
 			imageFailed: (name: string) => `无法加载图片 ${name}`,
+			preview: (name: string) => `查看 ${name}`,
+			previewNone: "此类文件无法预览，请下载后打开。",
+			previewCut: (max: string) => `仅显示文件的前 ${max}。`,
+			download: "下载",
 		},
 		dock: {
 			label: "等你处理",

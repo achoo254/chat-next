@@ -162,7 +162,7 @@ function transcript(now: number): Item[] {
 			case: "text",
 			value: {
 				role: Role.USER,
-				text: "Chạy test của màn Máy của tôi rồi sửa chỗ lỗi giúp mình",
+				text: "/ak-debug Chạy test của màn Máy của tôi rồi sửa chỗ lỗi giúp mình",
 				attachments: [
 					{ id: DEMO_IMAGE, name: "man-may-375.png", mimeType: "image/png", size: 48_213n, image: true },
 					{ id: "demo-file-1", name: "loi-tran-ngang.log", mimeType: "text/plain", size: 3_412n, path: ".tunelo-attachments/2026-11-09/loi-tran-ngang.log" },

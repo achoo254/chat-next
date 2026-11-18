@@ -49,6 +49,8 @@ export interface Attachments {
 	sent(files: readonly ShownAttachment[]): void;
 	/** The message failed: the files come back and upload again. */
 	putBack(files: readonly ShownAttachment[]): void;
+	/** The file behind a tray item, for its preview. */
+	file(id: string): File | undefined;
 }
 
 /** The size the limits count: an image the browser will shrink counts as at most the image limit. */
@@ -251,6 +253,7 @@ export function useAttachments(link: UploadLink, threadId: string, limits: Limit
 			take,
 			sent,
 			putBack,
+			file: (id: string) => files.current.get(id),
 		}),
 		[limits, items, notice, add, remove, retry, take, sent, putBack],
 	);

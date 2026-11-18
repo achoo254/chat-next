@@ -24,3 +24,18 @@ export function filterCommands(commands: readonly SlashCommand[], query: string)
 export function flatCommands(groups: CommandGroups): SlashCommand[] {
 	return [...groups.builtin, ...groups.skills];
 }
+
+/** A command name as the AIs name theirs ("clear", "ak-cook", "plugin:skill"); a path ("/Users/x") is not one. */
+const COMMAND_AT_START = /^\/([A-Za-z0-9][\w:.-]*)(?=\s|$)/;
+
+/**
+ * The length of the "/command" a message starts with, 0 when it starts with
+ * none. Once the AI's commands are known, only one of them counts.
+ */
+export function leadingCommand(text: string, commands: readonly SlashCommand[]): number {
+	const match = COMMAND_AT_START.exec(text);
+	if (match === null) return 0;
+	const name = match[1] ?? "";
+	if (commands.length > 0 && !commands.some((c) => c.name === name)) return 0;
+	return name.length + 1;
+}

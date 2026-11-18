@@ -2,15 +2,17 @@
 // also offers the camera), the tray of files waiting in the composer (a
 // preview or a file card, upload progress, remove, try again), the drop zone
 // shown while files are dragged over the session, and the files of a sent
-// message in the thread (images fetched again from the machine over the
-// end-to-end encrypted link when no preview is kept here).
+// message in the thread, above its bubble on the user's side (images fetched
+// again from the machine over the end-to-end encrypted link when no preview
+// is kept here). A file in the tray and a sent image open in a preview.
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { fileExt, formatBytes } from "../messaging/media/media-format.ts";
+import { AttachmentPreview, type PreviewTarget } from "./attachment-preview.tsx";
 import { fetchPreview, knownPreview, type UploadLink } from "./attachments.ts";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
-import type { Attachments } from "./use-attachments.ts";
+import type { Attachments, TrayItem } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
 
@@ -159,12 +161,32 @@ export function AttachButton({ attach, disabled }: { attach: Attachments; disabl
 	);
 }
 
+/**
+ * The tray item open in the preview: its own preview URL, or one made for
+ * the file while the preview shows (revoked once it closes).
+ */
+function useTrayPreview(attach: Attachments) {
+	const [shown, setShown] = useState<(PreviewTarget & { readonly owned: boolean }) | null>(null);
+	useEffect(() => {
+		if (shown === null || !shown.owned) return;
+		return () => URL.revokeObjectURL(shown.url);
+	}, [shown]);
+	const open = (item: TrayItem) => {
+		const file = attach.file(item.id);
+		if (item.preview !== "") setShown({ name: item.name, size: item.size, url: item.preview, image: item.image, file, owned: false });
+		else if (file !== undefined) setShown({ name: item.name, size: item.size, url: URL.createObjectURL(file), image: item.image, file, owned: true });
+	};
+	return { shown, open, close: () => setShown(null) };
+}
+
 export function AttachTray({ attach }: { attach: Attachments }) {
 	const t = useMachinesCopy();
 	const { locale } = useI18n();
+	const preview = useTrayPreview(attach);
 	if (attach.items.length === 0 && attach.notice === "") return null;
 	return (
 		<div className="mx-tray" role="group" aria-label={t.agent.attach.tray}>
+			{preview.shown !== null && <AttachmentPreview target={preview.shown} onClose={preview.close} />}
 			{attach.notice !== "" && (
 				<p className="mx-tray-notice" role="alert">
 					<span>{attach.notice}</span>
@@ -179,25 +201,34 @@ export function AttachTray({ attach }: { attach: Attachments }) {
 						const percent = item.size > 0 ? Math.min(100, Math.round((item.sent / item.size) * 100)) : 100;
 						return (
 							<li key={item.id} className={`mx-tray-item ${item.state}`} data-image={item.image ? "" : undefined}>
-								{item.image && item.preview !== "" ? (
-									<img className="mx-tray-thumb" src={item.preview} alt="" />
-								) : (
-									<span className="mx-tray-file" aria-hidden="true">
-										{item.state === "preparing" ? <Icon name="photo" small /> : fileExt(item.name)}
+								<button
+									type="button"
+									className="mx-tray-open"
+									aria-label={t.agent.attach.preview(item.name)}
+									title={t.agent.attach.preview(item.name)}
+									disabled={item.state === "preparing"}
+									onClick={() => preview.open(item)}
+								>
+									{item.image && item.preview !== "" ? (
+										<img className="mx-tray-thumb" src={item.preview} alt="" />
+									) : (
+										<span className="mx-tray-file" aria-hidden="true">
+											{item.state === "preparing" ? <Icon name="photo" small /> : fileExt(item.name)}
+										</span>
+									)}
+									<span className="mx-tray-text">
+										<b title={item.name}>{item.name}</b>
+										<small>
+											{item.state === "preparing"
+												? t.agent.attach.preparing
+												: item.state === "uploading"
+													? t.agent.attach.uploading(percent)
+													: item.state === "failed"
+														? item.error || t.agent.attach.failed
+														: formatBytes(item.size, locale)}
+										</small>
 									</span>
-								)}
-								<span className="mx-tray-text">
-									<b title={item.name}>{item.name}</b>
-									<small>
-										{item.state === "preparing"
-											? t.agent.attach.preparing
-											: item.state === "uploading"
-												? t.agent.attach.uploading(percent)
-												: item.state === "failed"
-													? item.error || t.agent.attach.failed
-													: formatBytes(item.size, locale)}
-									</small>
-								</span>
+								</button>
 								{item.state === "uploading" && (
 									<span className="mx-tray-bar" role="progressbar" aria-label={item.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
 										<i style={{ width: `${percent}%` }} />
@@ -239,8 +270,9 @@ export function DropZone({ ai, maxBytes, supported }: { ai: string; maxBytes: nu
 	);
 }
 
-/** An image of a sent message: the preview kept here, else fetched from the machine when shown. */
+/** An image of a sent message: the preview kept here, else fetched from the machine when shown; a tap opens it whole. */
 function SentImage({ link, threadId, file }: { link: UploadLink; threadId: string; file: ShownAttachment }) {
+	const [open, setOpen] = useState(false);
 	const t = useMachinesCopy();
 	const [url, setUrl] = useState(() => file.preview || knownPreview(threadId, file.id) || "");
 	const [failed, setFailed] = useState(false);
@@ -263,9 +295,12 @@ function SentImage({ link, threadId, file }: { link: UploadLink; threadId: strin
 		);
 	}
 	return (
-		<a className="mx-sent-img" href={url} target="_blank" rel="noreferrer" title={file.name}>
-			<img src={url} alt={file.name} />
-		</a>
+		<>
+			<button type="button" className="mx-sent-img" title={file.name} aria-label={t.agent.attach.preview(file.name)} onClick={() => setOpen(true)}>
+				<img src={url} alt="" />
+			</button>
+			{open && <AttachmentPreview target={{ name: file.name, size: file.size, url, image: true }} onClose={() => setOpen(false)} />}
+		</>
 	);
 }
 

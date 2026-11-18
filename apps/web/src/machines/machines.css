@@ -427,11 +427,15 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
    and the composer share both edges; wider tables, code and diffs scroll sideways inside their block. */
 .mx-chat { --mx-col: 800px; }
 .mx-messages > * { flex: none; max-width: var(--mx-col); width: 100%; min-width: 0; margin-inline: auto; }
-.mx-msg.mine { display: flex; justify-content: flex-end; }
+/* The user's message: its files, then its bubble, on the right; the bubble no wider than a comfortable line. */
+.mx-msg.mine { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+.mx-msg.mine[aria-busy="true"] { opacity: 0.6; }
 /* Earlier blocks of a long session (they also come in on scrolling up). */
 .mx-earlier { align-self: center; margin: var(--space-2) auto; }
-.mx-msg .bubble { max-width: 80%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-md); background: var(--c-mine); color: var(--c-on-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
-.mx-msg .bubble[aria-busy="true"] { opacity: 0.6; }
+.mx-msg .bubble { max-width: min(75%, 600px); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-md); background: var(--c-mine); color: var(--c-on-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A "/skill" the message starts with, in the composer and in the sent bubble. */
+.mx-field .plain-text-mark { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary) 14%, transparent); color: var(--c-primary); font-weight: 600; }
+.mx-msg .mx-skill { padding: 0 4px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-on-primary) 22%, transparent); font-weight: 600; }
 .mx-agent.streaming::after { content: "▍"; color: var(--c-primary); animation: mx-blink 1s steps(2) infinite; }
 @keyframes mx-blink { 50% { opacity: 0; } }
 .mx-who { display: flex; }
@@ -570,8 +574,12 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-tray-notice { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-error) 10%, var(--c-surface)); color: var(--c-error-text); font-size: 0.8125rem; }
 .mx-tray-notice span { flex: 1; }
 .mx-tray-list { display: flex; flex-wrap: wrap; gap: var(--space-2); max-height: 40vh; margin: 0; padding: 0; list-style: none; overflow-y: auto; }
-.mx-tray-item { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); flex: 0 0 auto; width: 240px; min-height: 56px; padding: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); overflow: hidden; }
+.mx-tray-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); flex: 0 0 auto; width: 240px; min-height: 56px; padding: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); overflow: hidden; }
 .mx-tray-item.failed { border-color: var(--c-error); }
+/* The file's picture and name open its preview. */
+.mx-tray-open { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: var(--space-2); min-width: 0; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: zoom-in; }
+.mx-tray-open:disabled { cursor: default; }
+.mx-tray-open:hover:not(:disabled) b { text-decoration: underline; }
 .mx-tray-thumb { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; background: var(--c-hover); }
 .mx-tray-file { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--c-hover); color: var(--c-text-muted); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; }
 .mx-tray-text { display: grid; min-width: 0; }
@@ -585,15 +593,12 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-drop .icon { width: 36px; height: 36px; color: var(--c-primary); }
 .mx-drop strong { font-size: 1.125rem; font-weight: 600; }
 .mx-drop span { max-width: 44ch; font-size: 0.875rem; color: var(--c-text-muted); }
-.mx-sent-files { display: grid; gap: var(--space-2); margin-bottom: var(--space-1); white-space: normal; }
-.mx-sent-files:last-child { margin-bottom: 0; }
-.mx-sent-imgs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.mx-sent-img { display: grid; place-items: center; width: 120px; height: 120px; border-radius: var(--radius-sm); overflow: hidden; background: color-mix(in srgb, var(--c-on-primary) 15%, transparent); color: inherit; }
+.mx-sent-files { display: grid; justify-items: end; gap: var(--space-1); max-width: min(75%, 600px); }
+.mx-sent-imgs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
+.mx-sent-img { display: grid; place-items: center; width: 120px; height: 120px; padding: 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--c-hover); color: var(--c-text-muted); cursor: zoom-in; }
 .mx-sent-img img { width: 100%; height: 100%; object-fit: cover; }
 .mx-sent-img.placeholder .icon { opacity: 0.7; }
-.mx-sent-file { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: var(--space-2); }
-.mx-sent-file .mx-tray-file { background: color-mix(in srgb, var(--c-on-primary) 15%, transparent); color: inherit; }
-.mx-sent-file .mx-tray-text small { color: inherit; opacity: 0.8; }
+.mx-sent-file { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: var(--space-2); width: 260px; max-width: 100%; padding: var(--space-2); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); }
 .mx-slash .file .cmd { align-items: center; }
 .mx-slash .file b { font-weight: 500; }
 .mx-dock { padding: var(--space-2) var(--space-5) 0; background: var(--c-bg); }
@@ -703,7 +708,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 /* The machine's Claude account in the status line, its menu, and the limit bar. */
 .mx-account { min-width: 0; flex: 0 1 auto; }
 /* The account is an icon in the composer's row (the AI-drawn mark is a span too, so it stays); its name and plan are in its menu and in "Chi tiết". */
-.mx-compose-box .mx-account .mx-st-btn > span:not(.ai-mark) { display: none; }
+.mx-compose-box .mx-account .mx-st-btn > span:not(.ai-mark) { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-status-note { display: flex; align-items: center; gap: var(--space-1); max-width: var(--mx-col); margin: 0 auto var(--space-1); font-size: 0.75rem; color: var(--c-warning-text); }
 .mx-menu-hint { margin: 0 var(--space-2) var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-profiles { max-height: min(480px, 70dvh); overflow-y: auto; }
@@ -760,7 +765,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 	.mx-head { padding: var(--space-2) var(--space-2); }
 	.mx-body { padding: var(--space-3); }
 	.mx-messages { padding: var(--space-3); }
-	.mx-msg .bubble { max-width: 92%; }
+	.mx-msg .bubble, .mx-sent-files { max-width: 92%; }
 	.mx-dock, .mx-limit { padding: var(--space-2) var(--space-3) 0; }
 	.mx-dock .mx-action { gap: var(--space-1); padding: var(--space-2) var(--space-3); }
 	.mx-dock .mx-reason { display: none; }
@@ -972,3 +977,12 @@ html.keyboard-open, html.keyboard-open body { overflow: hidden; overscroll-behav
 .mx-ws .mx-tab .tx { padding-left: calc(var(--mx-indent) * 3); }
 .mx-tab .name { font-size: 0.875rem; }
 .mx-tab[aria-current="true"] { background: var(--c-selected); }
+
+/* The preview of an attached file: the file fitted into the dialog, its size and "Tải về" below. */
+dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; min-height: 160px; padding: var(--space-3); }
+.mx-preview-img, .mx-preview-media { display: block; max-width: 100%; max-height: calc(100dvh - 220px); object-fit: contain; border-radius: var(--radius-sm); }
+.mx-preview-frame { width: 100%; height: calc(100dvh - 220px); border: 0; border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
+.mx-preview-text { justify-self: stretch; margin: 0; max-height: calc(100dvh - 240px); padding: var(--space-3); overflow: auto; border-radius: var(--radius-sm); background: var(--c-surface-subtle); font-family: var(--font-mono); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mx-preview-none { display: grid; justify-items: center; gap: var(--space-2); text-align: center; }
+.mx-preview .dlg-foot { align-items: center; }
+.mx-preview-size { margin-right: auto; font-size: 0.8125rem; }

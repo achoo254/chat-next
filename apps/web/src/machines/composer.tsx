@@ -18,7 +18,7 @@ import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
 import type { Attachments } from "./use-attachments.ts";
-import { filterCommands, flatCommands } from "./slash-commands.ts";
+import { filterCommands, flatCommands, leadingCommand } from "./slash-commands.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 /** Files of the session's folder matching a prefix; null when the machine cannot list them. */
@@ -107,6 +107,11 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const filesWaiting = attach !== undefined && (attach.busy || attach.failed);
 	const stopMode = running && text.trim() === "" && (attach?.items.length ?? 0) === 0;
 	const canSend = online && !filesWaiting && (text.trim() !== "" || filesReady);
+	/** A "/skill" the message starts with, marked in the box as in the sent message. */
+	const highlight = (value: string) => {
+		const length = leadingCommand(value, commands);
+		return length > 0 ? { start: 0, end: length } : null;
+	};
 
 	useEffect(() => {
 		if (open) document.getElementById(`${listId}-${index}`)?.scrollIntoView?.({ block: "nearest" });
@@ -335,6 +340,9 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					ref={field}
 					className="mx-field"
 					data-composer=""
+					// Changes when the commands arrive or the mark comes and goes, so the box draws the mark again.
+					data-command={leadingCommand(text, commands) > 0 ? String(commands.length) : undefined}
+					highlight={highlight}
 					ariaLabel={t.chat.message}
 					aria-autocomplete="list"
 					aria-controls={open ? listId : undefined}

@@ -1198,6 +1198,10 @@ export const enMachines: MachinesCopy = {
 			savedAt: (path: string) => `Saved on the machine: ${path}`,
 			imageLoading: (name: string) => `Loading image ${name}`,
 			imageFailed: (name: string) => `Could not load image ${name}`,
+			preview: (name: string) => `View ${name}`,
+			previewNone: "This kind of file has no preview. Download it to open.",
+			previewCut: (max: string) => `Only the first ${max} of the file is shown.`,
+			download: "Download",
 		},
 		dock: {
 			label: "Waiting for you",

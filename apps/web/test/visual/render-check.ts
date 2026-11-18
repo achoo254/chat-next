@@ -113,6 +113,8 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-attach-tray": "?at=machine-chat&open=attach-tray",
 	"machine-attach-progress": "?at=machine-chat&open=attach-progress",
 	"machine-attach-history": "?at=machine-chat&open=attach-history",
+	"machine-attach-preview": "?at=machine-chat&open=attach-preview",
+	"machine-slash-mark": "?at=machine-chat&open=slash-mark",
 	// Archive and delete: the session's menu and the delete confirmation.
 	"machine-thread-menu": "?at=machine-chat&open=thread-menu",
 	"machine-thread-delete": "?at=machine-chat&open=thread-delete",

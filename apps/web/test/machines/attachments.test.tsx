@@ -4,12 +4,13 @@
 // file, a machine too old to take files, and the files of a sent message in
 // the thread (images fetched again from the machine).
 import { ErrorCode, ErrorReason, Role, type Frame, type Item } from "@achoo254/chat-proto/remote/remote";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { fitScale, renamed } from "../../src/machines/attachment-image.ts";
+import { previewKind } from "../../src/machines/attachment-preview.tsx";
 import { MessageAttachments, useFileDrop } from "../../src/machines/attachment-tray.tsx";
 import { admit, UploadCancelled, uploadFile, type Limits, type UploadLink } from "../../src/machines/attachments.ts";
 import { Composer } from "../../src/machines/composer.tsx";
@@ -186,6 +187,26 @@ describe("the composer's files", () => {
 		}
 	});
 
+	it("opens a file of the tray in a preview: text shows as text, and closing leaves the file in the tray", async () => {
+		const { link } = fakeLink();
+		wrap(<Session link={link} limits={LIMITS} onSend={() => Promise.resolve()} />);
+		paste([file("log.txt", 6)]);
+		await userEvent.click(await screen.findByRole("button", { name: "Xem log.txt" }));
+		const dialog = await screen.findByRole("dialog", { name: "log.txt" });
+		expect(await within(dialog).findByText("AAAAAA")).toBeTruthy();
+		await userEvent.click(within(dialog).getByRole("button", { name: "Đóng" }));
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		expect(screen.getByText("log.txt")).toBeTruthy();
+	});
+
+	it("says a file without a preview can be downloaded", () => {
+		expect(previewKind("a.zip", "application/zip", false)).toBe("none");
+		expect(previewKind("notes.markdown", "", false)).toBe("text");
+		expect(previewKind("page.html", "text/html", false)).toBe("text");
+		expect(previewKind("spec.pdf", "", false)).toBe("pdf");
+		expect(previewKind("shot", "", true)).toBe("image");
+	});
+
 	it("removes a file and drops its upload on the machine", async () => {
 		const { link, sent } = fakeLink();
 		wrap(<Session link={link} limits={LIMITS} onSend={() => Promise.resolve()} />);
@@ -261,8 +282,14 @@ describe("files of a sent message", () => {
 		await act(async () => {
 			wrap(<MessageAttachments link={link} threadId="t9" files={files} />);
 		});
-		expect(await screen.findByRole("img", { name: "a.png" })).toBeTruthy();
+		const open = await screen.findByRole("button", { name: "Xem a.png" });
+		await waitFor(() => expect(open.querySelector("img")).not.toBeNull());
 		expect(sent).toEqual([{ case: "attachmentFetch", value: { threadId: "t9", attachmentId: "img-9" } }]);
 		expect(screen.getByText(".tunelo-attachments/2026-11-09/spec.pdf")).toBeTruthy();
+		// A tap opens the image whole in the session, with its download.
+		await userEvent.click(open);
+		const dialog = await screen.findByRole("dialog", { name: "a.png" });
+		expect(within(dialog).getByRole("img", { name: "a.png" })).toBeTruthy();
+		expect(within(dialog).getByRole("link", { name: "Tải về" }).getAttribute("download")).toBe("a.png");
 	});
 });
