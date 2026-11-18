@@ -283,20 +283,6 @@ func sameContent(stored []byte, content *appv1.Message) bool {
 	return bytes.Equal(stored, raw)
 }
 
-// refuseReadOnlyImport denies sending into a chat the bridge fills from
-// another app and that only receives (external_chats.direction = 'in').
-// Sending back is a later step (ADR 0022).
-func refuseReadOnlyImport(ctx context.Context, q querier, chatID int64) error {
-	var readOnly bool
-	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM external_chats WHERE chat_id = $1 AND direction = 'in')`, chatID).Scan(&readOnly); err != nil {
-		return fmt.Errorf("chat: check imported chat: %w", err)
-	}
-	if readOnly {
-		return errDenied("imported_chat_read_only: this chat is a copy of a chat in another app; sending into it is not available")
-	}
-	return nil
-}
-
 // ImportedChat describes a chat the bridge creates for a conversation of
 // another app.
 type ImportedChat struct {

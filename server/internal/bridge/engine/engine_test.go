@@ -617,6 +617,36 @@ func TestDisconnectKeepsReadOnlyChatsOrDeletesThem(t *testing.T) {
 	}
 }
 
+func TestDisconnectTurnsATwoWayChatReadOnlyAndDropsWhatWasQueued(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	conv := e.group("g1")
+	e.fake.AddHistory("g1", numbered(e, lan, 2)...)
+	eng := e.start()
+	chatID, err := eng.EnableChat(ctx, e.account, conv, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.waitTexts(chatID, []string{"tin 1", "tin 2"})
+	if err := e.chat.SetImportedDirection(ctx, e.owner, chatID, chat.DirectionBoth); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.chat.SendMessage(ctx, e.owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "queued"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := eng.Disconnect(ctx, e.owner, e.account, false); err != nil {
+		t.Fatal(err)
+	}
+	var direction string
+	if err := e.st.Pool().QueryRow(ctx, `SELECT direction FROM external_chats WHERE chat_id = $1`, chatID).Scan(&direction); err != nil || direction != chat.DirectionIn {
+		t.Fatalf("direction after disconnecting = %q, %v; want the chat read-only", direction, err)
+	}
+	var live int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1 AND status NOT IN ('sent', 'cancelled')`, chatID).Scan(&live); err != nil || live != 0 {
+		t.Fatalf("%d queue rows still live after disconnecting, %v", live, err)
+	}
+}
+
 func TestDisconnectWithDeleteRemovesEverything(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()

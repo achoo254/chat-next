@@ -107,7 +107,7 @@ func (s *Service) postMedia(ctx context.Context, me int64, p mediaPost) (*appv1.
 	)
 	t, err := s.inTx(ctx, func(t *txn) error {
 		posted, duplicate = nil, nil
-		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, p.topicID, p.replyTo)
+		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, p.topicID, p.replyTo, p.viaBot == 0 && p.markup == nil)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ func (s *Service) postMedia(ctx context.Context, me int64, p mediaPost) (*appv1.
 			return err
 		}
 		t.recordRandomID(me, p.randomID, posted.Seq, chatID)
-		return nil
+		return t.queueSend(ctx, chatID, me, posted.Seq)
 	})
 	if err != nil {
 		return nil, err
@@ -152,12 +152,12 @@ func (s *Service) postMedia(ctx context.Context, me int64, p mediaPost) (*appv1.
 
 // mediaTarget locks the chat and checks me may post media there (and reply
 // to replyTo); it returns the topic to post in.
-func (t *txn) mediaTarget(ctx context.Context, me, chatID, topic, replyTo int64) (*chatRow, *memberRow, int64, error) {
+func (t *txn) mediaTarget(ctx context.Context, me, chatID, topic, replyTo int64, plain bool) (*chatRow, *memberRow, int64, error) {
 	c, m, err := t.s.activeChatFor(ctx, t.tx, chatID, me, true)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	topicID, err := t.s.postable(ctx, t.tx, c, m, me, topic)
+	topicID, err := t.s.postable(ctx, t.tx, c, m, me, topic, plain)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -238,7 +238,7 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 	var dup []*sendDedupe
 	t, err := s.inTx(ctx, func(t *txn) error {
 		posted, dup = nil, nil
-		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, req.GetTopicId(), req.GetReplyToSeq())
+		c, _, topicID, err := t.mediaTarget(ctx, me, chatID, req.GetTopicId(), req.GetReplyToSeq(), true)
 		if err != nil {
 			return err
 		}
@@ -280,6 +280,9 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 				return err
 			}
 			t.recordRandomID(me, it.randomID, p.Seq, chatID)
+			if err := t.queueSend(ctx, chatID, me, p.Seq); err != nil {
+				return err
+			}
 			posted = append(posted, p)
 		}
 		return nil

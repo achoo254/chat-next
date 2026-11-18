@@ -333,15 +333,18 @@ func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, 
 	return blocked, nil
 }
 
-// postable checks that me may post in the chat (and topic).
-func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64) (int64, error) {
+// postable checks that me may post in the chat (and topic). plain says the
+// message is me's own text or file (not a bot message, a forward, an inline
+// result or a service message): only that kind may go into a chat linked to
+// another app, and only when the link sends on (see linkedSendRule).
+func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64, plain bool) (int64, error) {
 	if !c.can(m, permSend) {
 		return 0, errDenied("you cannot send messages in this chat")
 	}
 	if err := s.checkUnrestricted(ctx, q, me); err != nil {
 		return 0, err
 	}
-	if err := refuseReadOnlyImport(ctx, q, c.ID); err != nil {
+	if err := linkedSendRule(ctx, q, c.ID, me, plain); err != nil {
 		return 0, err
 	}
 	if err := checkPrivatePeer(ctx, q, c, me); err != nil {
@@ -442,7 +445,7 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 				return err
 			}
 		}
-		topicID, err := s.postable(ctx, t.tx, c, m, me, p.topicID)
+		topicID, err := s.postable(ctx, t.tx, c, m, me, p.topicID, p.viaBot == 0 && p.action == nil && p.markup == nil)
 		if err != nil {
 			return err
 		}
@@ -462,7 +465,7 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 			return err
 		}
 		t.recordRandomID(me, p.randomID, posted.Seq, chatID)
-		return nil
+		return t.queueSend(ctx, chatID, me, posted.Seq)
 	})
 	if err != nil {
 		return nil, err
@@ -783,7 +786,7 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 			return err
 		}
 		edited = m
-		return nil
+		return t.queueEdit(ctx, chatID, me, seq)
 	})
 	if err != nil {
 		return nil, err
@@ -830,7 +833,10 @@ func (s *Service) DeleteMessages(ctx context.Context, me, chatID int64, seqs []i
 		if !forEveryone {
 			return t.hideMessages(ctx, c, m, me, seqs)
 		}
-		return t.deleteMessages(ctx, c, c.Type == typePrivate || m.isAdmin(), me, seqs)
+		if err := t.deleteMessages(ctx, c, c.Type == typePrivate || m.isAdmin(), me, seqs); err != nil {
+			return err
+		}
+		return t.queueDeletes(ctx, chatID, me, seqs)
 	})
 	if err != nil {
 		return nil, err
@@ -1088,7 +1094,7 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 		if err != nil {
 			return err
 		}
-		topicID, err := s.postable(ctx, t.tx, c, m, me, toTopic)
+		topicID, err := s.postable(ctx, t.tx, c, m, me, toTopic, false)
 		if err != nil {
 			return err
 		}

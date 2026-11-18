@@ -160,7 +160,7 @@ func (s *Service) CheckBotPost(ctx context.Context, botID, chatID, topicID int64
 	if err != nil {
 		return 0, err
 	}
-	return s.postable(ctx, s.pool, c, m, botID, topicID)
+	return s.postable(ctx, s.pool, c, m, botID, topicID, false)
 }
 
 // MemberInfo is a chat member as the Bot API shows it.

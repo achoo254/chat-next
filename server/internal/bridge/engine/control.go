@@ -321,7 +321,15 @@ func (e *Engine) Disconnect(ctx context.Context, owner, accountID int64, deleteC
 		return e.removeAccount(ctx, a)
 	}
 	// Chats stay: the account keeps its row (and the links that make them
-	// read-only) but loses its login.
+	// read-only) but loses its login. Nothing queued can be sent any more.
+	if _, err = e.db.pool.Exec(ctx, `UPDATE external_chats SET direction = 'in' WHERE account_id = $1`, a.ID); err != nil {
+		return err
+	}
+	if _, err = e.db.pool.Exec(ctx, `
+		UPDATE external_outbox SET status = 'cancelled', updated_at = now()
+		WHERE account_id = $1 AND status IN ('pending', 'sending', 'failed', 'unknown')`, a.ID); err != nil {
+		return err
+	}
 	_, err = e.db.pool.Exec(ctx, `
 		UPDATE external_accounts SET status = 'stopped', secret = '\x00', update_state = NULL, lease_holder = NULL, lease_until = NULL, updated_at = now()
 		WHERE id = $1`, a.ID)
