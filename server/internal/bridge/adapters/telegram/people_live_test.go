@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -97,6 +98,66 @@ func TestLiveTelegramPeople(t *testing.T) {
 			after, _, err := a.ListMembers(ctx, acct, conv)
 			step("list members after", err)
 			t.Logf("members after: %d", len(after))
+		}
+	}
+
+	// description: change it and put it back, three times in a row, as fast as the calls go.
+	// Telegram throttles this (FLOOD_WAIT, seen as 3 seconds in the spike), so each call is
+	// made the way the engine makes it: when the answer is a rate limit, wait as long as it
+	// says and call again. The description the group had is restored at the end whatever
+	// happened, and read back to prove it.
+	waited := time.Duration(0)
+	waiting := func(call func() error) error {
+		for {
+			err := call()
+			var limit *bridge.RateLimitError
+			if !errors.As(err, &limit) {
+				return err
+			}
+			t.Logf("  throttled, waiting %v as asked", limit.RetryAfter)
+			waited += limit.RetryAfter
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(limit.RetryAfter):
+			}
+		}
+	}
+	readInfo := func() (bridge.GroupInfo, error) {
+		var got bridge.GroupInfo
+		err := waiting(func() error {
+			infos, err := a.GroupInfos(ctx, acct, []string{conv})
+			got = infos[conv]
+			return err
+		})
+		return got, err
+	}
+	original, err := readInfo()
+	step("read group info", err)
+	if err == nil {
+		setAbout := func(about string) error {
+			return waiting(func() error {
+				return a.SetGroupInfo(ctx, acct, conv, bridge.GroupInfo{Title: original.Title, About: about})
+			})
+		}
+		restored := false
+		defer func() {
+			if !restored {
+				if err := setAbout(original.About); err != nil {
+					t.Errorf("the description could not be put back: %v", err)
+				}
+			}
+		}()
+		for i := 1; i <= 3; i++ {
+			step("description set #"+strconv.Itoa(i), setAbout("bridge live test "+strconv.Itoa(i)))
+			step("description put back #"+strconv.Itoa(i), setAbout(original.About))
+		}
+		restored = step("description set again (idempotent)", setAbout(original.About))
+		t.Logf("total waited for rate limits: %v", waited)
+		back, err := readInfo()
+		step("read group info after", err)
+		if back.About != original.About || back.Title != original.Title {
+			t.Errorf("the group info is not what it was: have %+v, want %+v", back, original)
 		}
 	}
 
