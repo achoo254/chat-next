@@ -87,12 +87,19 @@ func shortError(msg string) string {
 
 // setOutbox moves rows to status; due, when set, is when a pending row may
 // be tried again.
+//
+// A row is only marked sent while it is the call in flight ('sending'). Chat queues a state
+// (the name of a topic, closed, pin, mute) by overwriting the row of the same kind and putting
+// it back to 'pending' with the newer payload; if that happens while the older payload is on
+// its way, marking the row sent would drop the newer one without it ever reaching the other
+// app. A row put back to pending stays so and goes out again.
 func (d *db) setOutbox(ctx context.Context, ids []int64, status, lastError string, due time.Time) error {
 	if due.IsZero() {
 		due = time.Now()
 	}
 	_, err := d.pool.Exec(ctx, `
-		UPDATE external_outbox SET status = $2, last_error = $3, next_attempt_at = $4, updated_at = now() WHERE id = ANY($1)`,
+		UPDATE external_outbox SET status = $2, last_error = $3, next_attempt_at = $4, updated_at = now()
+		WHERE id = ANY($1) AND NOT ($2::text = 'sent' AND status = 'pending')`,
 		ids, status, shortError(lastError), due)
 	if err != nil {
 		return fmt.Errorf("bridge: update outbox: %w", err)
@@ -105,6 +112,20 @@ func (d *db) setOutbox(ctx context.Context, ids []int64, status, lastError strin
 // random_id.
 func (d *db) startSending(ctx context.Context, ids []int64) error {
 	_, err := d.pool.Exec(ctx, `UPDATE external_outbox SET status = 'sending', attempts = attempts + 1, updated_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("bridge: mark sending: %w", err)
+	}
+	return nil
+}
+
+// startSendingState is startSending for a row that carries a state (payload, pinned) and
+// hands back the state as it is now: Chat overwrites such a row in place when the owner changes
+// the same thing again, possibly after the row was read and before it is claimed here, and
+// the state read earlier would then be sent instead of the newer one.
+func (d *db) startSendingState(ctx context.Context, h *outboxRow) error {
+	err := d.pool.QueryRow(ctx, `
+		UPDATE external_outbox SET status = 'sending', attempts = attempts + 1, updated_at = now()
+		WHERE id = $1 RETURNING payload, pinned`, h.ID).Scan(&h.Payload, &h.Pinned)
 	if err != nil {
 		return fmt.Errorf("bridge: mark sending: %w", err)
 	}

@@ -147,6 +147,9 @@ func (r *runner) doDialogState(ctx context.Context, h *outboxRow) error {
 	if !ok {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "dialog_unsupported: this app cannot take this from Chat", time.Time{})
 	}
+	if err := db.startSendingState(ctx, h); err != nil {
+		return err
+	}
 	var p struct {
 		Until  int64 `json:"until"`
 		Pinned bool  `json:"pinned"`
@@ -154,9 +157,6 @@ func (r *runner) doDialogState(ctx context.Context, h *outboxRow) error {
 	}
 	if err := json.Unmarshal(h.Payload, &p); err != nil {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
-	}
-	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
-		return err
 	}
 	var err error
 	switch h.Op {

@@ -116,7 +116,7 @@ func (r *runner) doPin(ctx context.Context, sender bridge.Sender, h *outboxRow, 
 		}
 		conv, ext = k.chat, k.msg
 	}
-	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
+	if err := db.startSendingState(ctx, h); err != nil {
 		return err
 	}
 	var err error

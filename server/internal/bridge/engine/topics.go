@@ -235,15 +235,15 @@ func (r *runner) doTopicEdit(ctx context.Context, h *outboxRow) error {
 	if !found {
 		return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
 	}
+	if err := db.startSendingState(ctx, h); err != nil {
+		return err
+	}
 	var p struct {
 		Title  string `json:"title"`
 		Closed bool   `json:"closed"`
 	}
 	if err := json.Unmarshal(h.Payload, &p); err != nil {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
-	}
-	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
-		return err
 	}
 	if err := writer.EditTopic(ctx, r.acct, h.ExternalChat, ext, bridge.TopicEdit{Title: &p.Title, Closed: &p.Closed}); err != nil {
 		if serr := r.settleCall(ctx, []*outboxRow{h}, err); serr != nil {

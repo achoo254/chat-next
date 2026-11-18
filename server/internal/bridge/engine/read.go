@@ -41,6 +41,9 @@ func (r *runner) doMarkRead(ctx context.Context, h *outboxRow) error {
 	if !ok {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "read_unsupported: this app cannot be told what was read from Chat", time.Time{})
 	}
+	if err := db.startSendingState(ctx, h); err != nil {
+		return err
+	}
 	var p struct {
 		Seq int64 `json:"seq"`
 	}
@@ -57,9 +60,6 @@ func (r *runner) doMarkRead(ctx context.Context, h *outboxRow) error {
 	}
 	if err != nil {
 		return fmt.Errorf("bridge: newest message to mark read: %w", err)
-	}
-	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
-		return err
 	}
 	if err := w.MarkRead(ctx, r.acct, h.ExternalChat, id); err != nil {
 		return r.settleCall(ctx, []*outboxRow{h}, err)

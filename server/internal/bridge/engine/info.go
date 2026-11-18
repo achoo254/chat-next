@@ -74,15 +74,15 @@ func (r *runner) doInfo(ctx context.Context, h *outboxRow) error {
 	if !ok {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "info_unsupported: this app cannot take this from Chat", time.Time{})
 	}
+	if err := db.startSendingState(ctx, h); err != nil {
+		return err
+	}
 	var p struct {
 		Title string `json:"title"`
 		About string `json:"about"`
 	}
 	if err := json.Unmarshal(h.Payload, &p); err != nil {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
-	}
-	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
-		return err
 	}
 	if err := writer.SetGroupInfo(ctx, r.acct, h.ExternalChat, bridge.GroupInfo{Title: p.Title, About: p.About}); err != nil {
 		if serr := r.settleCall(ctx, []*outboxRow{h}, err); serr != nil {
