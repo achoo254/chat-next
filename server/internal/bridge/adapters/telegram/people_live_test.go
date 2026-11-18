@@ -70,15 +70,23 @@ func TestLiveTelegramPeople(t *testing.T) {
 		step("revoke again (idempotent)", a.RevokeInvite(ctx, acct, conv, link.Link))
 	}
 
-	// members: take the first other person, or bot, of the group
+	// members: take the first other person, or bot, of the group (see below)
 	members, complete, err := a.ListMembers(ctx, acct, conv)
 	step("list members", err)
 	t.Logf("members listed: %d complete=%v", len(members), complete)
 	for _, m := range members {
 		t.Logf("  member id=%s bot=%v admin=%v perms=%v", m.Participant.ID, m.Participant.IsBot, m.Admin, m.Perms != nil)
 	}
-	if len(members) > 0 {
-		target := members[0].Participant.ID
+	// the first member that is not an admin: the owner of the account is an admin of the test
+	// group, and Telegram refuses to restrict or remove oneself
+	target := ""
+	for _, m := range members {
+		if !m.Admin {
+			target = m.Participant.ID
+			break
+		}
+	}
+	if target != "" {
 		step("promote", a.SetMemberAdmin(ctx, acct, conv, target, true))
 		step("promote again (idempotent)", a.SetMemberAdmin(ctx, acct, conv, target, true))
 		step("demote", a.SetMemberAdmin(ctx, acct, conv, target, false))
