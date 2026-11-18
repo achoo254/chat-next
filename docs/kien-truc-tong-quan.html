@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiến trúc Chat · Tunelo · AI Agent · Chat Bridge · Bảo mật</title>
+<meta name="description" content="Tổng quan kiến trúc hoạt động của các module chính trong Chat hoandat: đồng bộ tin nhắn, Tunelo, AI Agent, đồng bộ Telegram và các lớp bảo mật.">
+<style>
+:root{
+  --hue:275;
+  --bg:oklch(0.15 0.035 var(--hue));
+  --bg-2:oklch(0.19 0.04 var(--hue));
+  --glass:oklch(0.26 0.045 var(--hue) / .55);
+  --glass-strong:oklch(0.3 0.05 var(--hue) / .75);
+  --line:oklch(0.5 0.06 var(--hue) / .45);
+  --line-soft:oklch(0.5 0.05 var(--hue) / .25);
+  --text:oklch(0.95 0.01 var(--hue));
+  --muted:oklch(0.78 0.025 var(--hue));
+  --cyan:oklch(0.83 0.13 205);
+  --violet:oklch(0.74 0.16 295);
+  --amber:oklch(0.85 0.13 80);
+  --green:oklch(0.83 0.15 160);
+  --rose:oklch(0.78 0.15 10);
+  --r-sm:10px; --r:18px; --r-lg:28px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:72px; --s9:120px;
+  --shadow:0 20px 60px -20px oklch(0.05 0.05 var(--hue) / .8);
+  --t-fast:200ms; --t-mid:280ms;
+  --ease:cubic-bezier(.22,.7,.2,1);
+  --serif:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;
+  --sans:ui-sans-serif,-apple-system,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{
+  margin:0;color:var(--text);font:400 1.0625rem/1.65 var(--sans);
+  background:
+    radial-gradient(1100px 600px at 12% -5%, oklch(0.4 0.14 295 / .35), transparent 60%),
+    radial-gradient(900px 600px at 95% 10%, oklch(0.5 0.12 205 / .25), transparent 60%),
+    radial-gradient(900px 700px at 50% 110%, oklch(0.4 0.14 330 / .25), transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+a{color:var(--cyan);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--text)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:6px}
+code{font-family:var(--mono);font-size:.88em;background:oklch(0.3 0.05 var(--hue)/.7);border:1px solid var(--line-soft);padding:.08em .4em;border-radius:6px;color:var(--cyan)}
+h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;line-height:1.15;margin:0}
+h1{font-size:clamp(2.4rem,6.2vw,4.6rem)}
+h2{font-size:clamp(1.9rem,4vw,3rem)}
+h3{font-size:1.3rem;font-family:var(--sans);font-weight:650;letter-spacing:0}
+p{margin:0}
+.wrap{width:min(1180px,100% - 2*var(--s5));margin-inline:auto}
+
+/* stars */
+#stars{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.star{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.5;animation:tw 4s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.15;transform:scale(.7)}50%{opacity:.95;transform:scale(1.5)}}
+
+/* nav */
+nav.top{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);background:oklch(0.15 0.035 var(--hue)/.7);border-bottom:1px solid var(--line-soft)}
+nav.top .wrap{display:flex;align-items:center;gap:var(--s5);min-height:60px}
+nav.top .brand{font-family:var(--serif);font-weight:700;white-space:nowrap}
+nav.top .links{display:flex;gap:var(--s2);overflow-x:auto;scrollbar-width:none;margin-left:auto}
+nav.top .links::-webkit-scrollbar{display:none}
+nav.top .links a{color:var(--muted);text-decoration:none;padding:10px 14px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px;white-space:nowrap;font-size:.95rem;transition:background var(--t-fast),color var(--t-fast)}
+nav.top .links a:hover{background:var(--glass);color:var(--text)}
+
+/* hero */
+.hero{padding:var(--s9) 0 var(--s8);position:relative}
+.eyebrow{display:inline-flex;gap:var(--s2);align-items:center;font:600 .8rem/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--glass)}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.hero h1{margin:var(--s5) 0 var(--s5);max-width:15ch}
+.shine{background:linear-gradient(100deg,var(--cyan),var(--violet) 45%,var(--rose) 80%);-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:shift 9s ease-in-out infinite alternate}
+@keyframes shift{to{background-position:100% 0}}
+.hero .lead{max-width:58ch;color:var(--muted);font-size:1.2rem}
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--s4);margin-top:var(--s7)}
+.chip{display:flex;flex-direction:column;gap:var(--s2);padding:var(--s5);text-decoration:none;color:var(--text);border-radius:var(--r);border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(10px);transition:transform var(--t-mid) var(--ease),border-color var(--t-mid),box-shadow var(--t-mid)}
+.chip:hover{transform:translateY(-4px);border-color:var(--c,var(--cyan));box-shadow:0 12px 40px -12px var(--c,var(--cyan))}
+.chip b{font-family:var(--serif);font-size:1.35rem}
+.chip span{color:var(--muted);font-size:.95rem}
+.chip .dot{width:12px;height:12px;border-radius:50%;background:var(--c,var(--cyan));box-shadow:0 0 16px var(--c,var(--cyan))}
+
+/* sections */
+section.block{padding:var(--s9) 0 0}
+.sec-head{display:grid;gap:var(--s4);max-width:760px;margin-bottom:var(--s7)}
+.sec-head .kicker{font:600 .8rem/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--c,var(--cyan))}
+.sec-head p{color:var(--muted)}
+.panel{border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(12px);border-radius:var(--r-lg);padding:var(--s6);box-shadow:var(--shadow)}
+.grid{display:grid;gap:var(--s4)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{border:1px solid var(--line-soft);background:var(--glass);border-radius:var(--r);padding:var(--s5);display:grid;gap:var(--s3);align-content:start;transition:border-color var(--t-fast),transform var(--t-mid) var(--ease)}
+.card:hover{border-color:var(--c,var(--cyan));transform:translateY(-2px)}
+.card p{color:var(--muted);font-size:.98rem}
+.tag{display:inline-block;font:600 .72rem/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:5px 9px;border-radius:999px;border:1px solid var(--c,var(--cyan));color:var(--c,var(--cyan));width:fit-content}
+
+/* diagrams */
+.diagram{width:100%;height:auto;display:block}
+.diagram text{font-family:var(--sans);fill:var(--text);font-size:14px}
+.diagram .sub{fill:var(--muted);font-size:12px}
+.diagram .nd{fill:oklch(0.26 0.05 var(--hue)/.9);stroke:var(--line);stroke-width:1.2}
+.diagram .nd.c{stroke:var(--cyan)} .diagram .nd.v{stroke:var(--violet)} .diagram .nd.a{stroke:var(--amber)} .diagram .nd.g{stroke:var(--green)}
+.diagram .flow{fill:none;stroke:var(--cyan);stroke-width:2;stroke-dasharray:5 9;animation:dash 1.4s linear infinite;stroke-linecap:round}
+.diagram .flow.v{stroke:var(--violet)} .diagram .flow.a{stroke:var(--amber)} .diagram .flow.g{stroke:var(--green)}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.diagram .ring{fill:none;stroke:var(--line-soft);stroke-dasharray:3 6}
+.pk{fill:var(--cyan);filter:drop-shadow(0 0 6px var(--cyan))}
+.pk.v{fill:var(--violet);filter:drop-shadow(0 0 6px var(--violet))}
+.pk.g{fill:var(--green);filter:drop-shadow(0 0 6px var(--green))}
+
+/* flow list */
+.steps{counter-reset:s;display:grid;gap:var(--s3);padding:0;margin:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:var(--s3);align-items:start;color:var(--muted);font-size:.98rem}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--c,var(--cyan));color:var(--c,var(--cyan));font-weight:700;font-size:.9rem}
+.steps li b{color:var(--text)}
+
+/* stepper */
+.stepper{display:grid;gap:var(--s5)}
+.stepper .tabs{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.btn{font:600 .95rem/1 var(--sans);color:var(--text);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:0 var(--s5);min-height:44px;cursor:pointer;transition:background var(--t-fast),border-color var(--t-fast),transform var(--t-fast)}
+.btn:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.btn[aria-pressed="true"],.btn[aria-selected="true"]{background:linear-gradient(120deg,oklch(0.5 0.14 205/.6),oklch(0.45 0.16 295/.6));border-color:var(--cyan)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.stage{min-height:150px;padding:var(--s5);border-radius:var(--r);border:1px dashed var(--line);background:oklch(0.2 0.04 var(--hue)/.6)}
+.stage h3{margin-bottom:var(--s2)}
+.stage p{color:var(--muted)}
+.stage .eq{font-family:var(--mono);font-size:.9rem;color:var(--cyan);margin-top:var(--s3);display:block;overflow-wrap:anywhere}
+
+/* security */
+.filters{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s5)}
+.sec-card{--c:var(--cyan)}
+.sec-card[data-layer="id"]{--c:var(--cyan)}
+.sec-card[data-layer="data"]{--c:var(--green)}
+.sec-card[data-layer="channel"]{--c:var(--violet)}
+.sec-card[data-layer="agent"]{--c:var(--amber)}
+.sec-card[data-layer="bridge"]{--c:var(--rose)}
+.sec-card[data-layer="edge"]{--c:oklch(0.8 0.1 240)}
+.sec-card ul{margin:0;padding-left:1.1em;color:var(--muted);font-size:.95rem;display:grid;gap:6px}
+.sec-card[hidden]{display:none}
+.trade{border-color:oklch(0.85 0.13 80/.5);background:linear-gradient(160deg,oklch(0.3 0.06 80/.28),var(--glass))}
+.trade h3{color:var(--amber)}
+
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--s3);margin-top:var(--s5)}
+.kv div{padding:var(--s4);border-radius:var(--r-sm);background:oklch(0.2 0.04 var(--hue)/.6);border:1px solid var(--line-soft)}
+.kv b{display:block;font-family:var(--serif);font-size:1.5rem;color:var(--c,var(--cyan))}
+.kv span{font-size:.88rem;color:var(--muted)}
+
+footer{margin-top:var(--s9);padding:var(--s7) 0 var(--s8);border-top:1px solid var(--line-soft);color:var(--muted);font-size:.92rem}
+footer ul{columns:2 260px;padding-left:1.1em;margin:var(--s3) 0 0}
+
+/* reveal: chỉ ẩn khi JS bật */
+.js .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.js .reveal.in{opacity:1;transform:none}
+
+@media (max-width:640px){
+  .hero{padding-top:var(--s7)} section.block{padding-top:var(--s8)}
+  .panel{padding:var(--s4)} nav.top .brand{display:none}
+}
+@media (max-width:820px){
+  .panel:has(> svg.diagram){overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .panel:has(> svg.diagram)::before{content:"Vuốt ngang để xem toàn sơ đồ →";display:block;position:sticky;left:0;color:var(--muted);font-size:.82rem;margin-bottom:var(--s2)}
+  svg.diagram{min-width:760px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .js .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div id="stars" aria-hidden="true"></div>
+
+<nav class="top" aria-label="Điều hướng nhanh">
+  <div class="wrap">
+    <span class="brand">✦ Kiến trúc Chat</span>
+    <div class="links">
+      <a href="#tong-quan">Tổng quan</a>
+      <a href="#chat">Chat</a>
+      <a href="#tunelo">Tunelo</a>
+      <a href="#ai-agent">AI Agent</a>
+      <a href="#telegram">Telegram</a>
+      <a href="#bao-mat">Bảo mật</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><i></i> Tài liệu kiến trúc · cập nhật 18/11/2026</span>
+    <h1>Bên trong <span class="shine">Chat hoandat</span>, từng lớp một.</h1>
+    <p class="lead">Một ứng dụng chat web-first, một tiến trình nền để điều khiển AI lập trình từ xa, một cầu nối đưa Telegram vào cùng một dòng thời gian, và những lớp bảo mật xếp chồng giữa chúng. Trang này tóm tắt cách các phần ăn khớp với nhau, bám sát các ADR 0001–0022.</p>
+    <div class="chips">
+      <a class="chip" href="#chat" style="--c:var(--cyan)"><span class="dot"></span><b>Chat</b><span>Đồng bộ có thứ tự, outbox, realtime, cache cục bộ.</span></a>
+      <a class="chip" href="#tunelo" style="--c:var(--violet)"><span class="dot"></span><b>Tunelo</b><span>Một tiến trình máy, một lần đăng nhập, tunnel và relay.</span></a>
+      <a class="chip" href="#ai-agent" style="--c:var(--amber)"><span class="dot"></span><b>AI Agent</b><span>Chat với Claude Code trên máy riêng, mã hoá đầu cuối.</span></a>
+      <a class="chip" href="#telegram" style="--c:var(--rose)"><span class="dot"></span><b>Chat Bridge</b><span>Telegram vào Chat, và từ Chat ra Telegram.</span></a>
+      <a class="chip" href="#bao-mat" style="--c:var(--green)"><span class="dot"></span><b>Bảo mật</b><span>Sáu lớp phòng thủ và những đánh đổi nói thẳng.</span></a>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ============ TỔNG QUAN ============ -->
+<section class="block" id="tong-quan">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Bức tranh lớn</span>
+      <h2>Ba bề mặt, một server Go, một IdP duy nhất</h2>
+      <p>Web/PWA là bản chính; iOS và Android là vỏ Capacitor bọc cùng một codebase. Mọi người dùng đăng nhập qua <code>auth-next</code>, Chat không có mật khẩu riêng. Server là một binary Go chạy theo role, đứng sau nginx.</p>
+    </div>
+    <div class="panel reveal">
+      <svg class="diagram" viewBox="0 0 1000 440" role="img" aria-label="Sơ đồ tổng quan: client, nginx, server Go, PostgreSQL, media, IdP auth-next, relay Tunelo và máy người dùng">
+        <!-- clients -->
+        <rect class="nd c" x="20" y="40" width="190" height="62" rx="14"/><text x="115" y="68" text-anchor="middle">Web / PWA</text><text class="sub" x="115" y="88" text-anchor="middle">sync trong worker, SQLite OPFS</text>
+        <rect class="nd c" x="20" y="124" width="190" height="62" rx="14"/><text x="115" y="152" text-anchor="middle">iOS · Android</text><text class="sub" x="115" y="172" text-anchor="middle">Capacitor, SQLCipher, bearer</text>
+        <rect class="nd v" x="20" y="300" width="190" height="62" rx="14"/><text x="115" y="328" text-anchor="middle">Thiết bị đã đăng nhập</text><text class="sub" x="115" y="348" text-anchor="middle">khoá X25519 theo tài khoản</text>
+
+        <!-- edge -->
+        <rect class="nd" x="290" y="70" width="120" height="96" rx="14"/><text x="350" y="108" text-anchor="middle">nginx</text><text class="sub" x="350" y="128" text-anchor="middle">rate limit, CSP</text><text class="sub" x="350" y="146" text-anchor="middle">Cloudflare phía trước</text>
+
+        <!-- server -->
+        <rect x="490" y="20" width="270" height="250" rx="20" fill="oklch(0.22 0.05 275/.8)" stroke="var(--cyan)" stroke-width="1.4"/>
+        <text x="625" y="46" text-anchor="middle" style="font-weight:700">server (Go, role api)</text>
+        <rect class="nd" x="506" y="60" width="115" height="34" rx="9"/><text x="563" y="82" text-anchor="middle" style="font-size:12.5px">Connect RPC /rpc</text>
+        <rect class="nd" x="629" y="60" width="115" height="34" rx="9"/><text x="686" y="82" text-anchor="middle" style="font-size:12.5px">WebSocket /ws</text>
+        <rect class="nd" x="506" y="102" width="115" height="34" rx="9"/><text x="563" y="124" text-anchor="middle" style="font-size:12.5px">Sync + Outbox</text>
+        <rect class="nd" x="629" y="102" width="115" height="34" rx="9"/><text x="686" y="124" text-anchor="middle" style="font-size:12.5px">Bot API · hooks</text>
+        <rect class="nd" x="506" y="144" width="115" height="34" rx="9"/><text x="563" y="166" text-anchor="middle" style="font-size:12.5px">MCP /mcp</text>
+        <rect class="nd" x="629" y="144" width="115" height="34" rx="9"/><text x="686" y="166" text-anchor="middle" style="font-size:12.5px">Machine API</text>
+        <rect class="nd v" x="506" y="186" width="238" height="34" rx="9"/><text x="625" y="208" text-anchor="middle" style="font-size:12.5px">Chat Bridge (adapter Telegram)</text>
+        <text class="sub" x="625" y="244" text-anchor="middle">gọi thẳng chat.Service, không tiến trình thứ hai</text>
+
+        <!-- stores / idp -->
+        <rect class="nd g" x="830" y="30" width="150" height="62" rx="14"/><text x="905" y="58" text-anchor="middle">PostgreSQL 16</text><text class="sub" x="905" y="78" text-anchor="middle">tin, pts, outbox</text>
+        <rect class="nd g" x="830" y="112" width="150" height="62" rx="14"/><text x="905" y="140" text-anchor="middle">Kho media</text><text class="sub" x="905" y="160" text-anchor="middle">filesystem hoặc S3</text>
+        <rect class="nd a" x="830" y="194" width="150" height="62" rx="14"/><text x="905" y="222" text-anchor="middle">auth-next (IdP)</text><text class="sub" x="905" y="242" text-anchor="middle">OIDC, Google · GitHub</text>
+
+        <!-- relay & machine -->
+        <rect class="nd v" x="290" y="300" width="170" height="62" rx="14"/><text x="375" y="328" text-anchor="middle">Relay Tunelo</text><text class="sub" x="375" y="348" text-anchor="middle">chỉ chuyển bản mã</text>
+        <rect class="nd v" x="560" y="300" width="200" height="62" rx="14"/><text x="660" y="328" text-anchor="middle">Máy của bạn · tunelo</text><text class="sub" x="660" y="348" text-anchor="middle">nối claude CLI đã cài</text>
+        <rect class="nd" x="830" y="300" width="150" height="62" rx="14"/><text x="905" y="328" text-anchor="middle">Telegram</text><text class="sub" x="905" y="348" text-anchor="middle">MTProto, tài khoản bạn</text>
+
+        <path class="flow" d="M210 71 C250 71 250 100 290 100"/>
+        <path class="flow" d="M210 155 C250 155 250 135 290 135"/>
+        <path class="flow" d="M410 118 L490 118"/>
+        <path class="flow g" d="M760 61 L830 61"/>
+        <path class="flow g" d="M760 143 L830 143"/>
+        <path class="flow a" d="M760 225 L830 225"/>
+        <path class="flow v" d="M210 331 L290 331"/>
+        <path class="flow v" d="M460 331 L560 331"/>
+        <path class="flow v" d="M625 270 C625 285 600 290 600 300" />
+        <path class="flow v" d="M744 203 C800 270 840 280 905 300"/>
+        <text class="sub" x="375" y="400" text-anchor="middle">kênh điều khiển máy: thiết bị ⇄ relay ⇄ máy, mã hoá đầu cuối</text>
+        <circle class="pk" r="5" style="offset-path:path('M210 71 C250 71 250 100 290 100 L490 118');offset-distance:0;animation:mv 3.2s linear infinite"/>
+        <circle class="pk v" r="5" style="offset-path:path('M210 331 L560 331');offset-distance:0;animation:mv 3.6s linear infinite .8s"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CHAT ============ -->
+<section class="block" id="chat" style="--c:var(--cyan)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Module 1 · Chat</span>
+      <h2>Đúng thứ tự, kể cả khi mạng chập chờn</h2>
+      <p>Realtime qua WebSocket không bao giờ tin cậy tuyệt đối, nên tính đúng đắn đến từ cơ chế bắt kịp có thứ tự: mỗi người dùng có một nhật ký update với <code>pts</code> tăng dần, cấp ngay trong transaction ghi dữ liệu.</p>
+    </div>
+    <div class="grid g2">
+      <div class="panel reveal">
+        <h3>Vòng đồng bộ</h3>
+        <ol class="steps" style="margin-top:var(--s4)">
+          <li><span><b>Ghi một lần, nhiều nơi biết.</b> Tin mới ghi cùng <code>pts</code> và dòng outbox trong cùng một transaction; sweeper bảo đảm giao dù tiến trình chết giữa chừng.</span></li>
+          <li><span><b>Đẩy nhanh.</b> Gateway bắn update qua <code>/ws</code> trong vài chục mili-giây.</span></li>
+          <li><span><b>Bắt kịp có thứ tự.</b> Mất mạng hay ngủ máy thì client gọi <code>GetDifference(pts)</code>; chat lớn dùng <code>GetChatDifference(chat_pts)</code>.</span></li>
+          <li><span><b>Tụt quá xa thì nạp lại.</b> Server trả <code>too_long</code> (nhật ký giữ 30 ngày) và client tải lại trạng thái.</span></li>
+        </ol>
+      </div>
+      <div class="grid">
+        <div class="card reveal"><span class="tag">small</span><h3>Fan-out khi ghi</h3><p>Chat tới 200 thành viên: mỗi thành viên nhận một dòng trong nhật ký của mình. Đọc rẻ, bắt kịp đơn giản.</p></div>
+        <div class="card reveal"><span class="tag" style="--c:var(--violet)">large</span><h3>Nhật ký riêng theo chat</h3><p>Chat lớn có <code>chat_pts</code> riêng; không ghi hàng trăm nghìn dòng cho mỗi tin. Chuyển mode một chiều, từ small sang large.</p></div>
+      </div>
+    </div>
+    <div class="grid g3" style="margin-top:var(--s4)">
+      <div class="card reveal"><h3>Id gọn, an toàn cho JS</h3><p>Mọi id lộ ra ngoài nhỏ hơn 2^53. Tin nhắn lộ ra bằng cặp <code>(chat_id, seq)</code>; Snowflake chỉ dùng nội bộ.</p></div>
+      <div class="card reveal"><h3>Văn bản có cấu trúc</h3><p><code>text + entities[]</code> với offset UTF-16, allowlist scheme URL; tìm kiếm tiếng Việt bỏ dấu bằng một hàm có test vector dùng chung TypeScript và Go.</p></div>
+      <div class="card reveal"><h3>Cache cục bộ theo từng người</h3><p>Web: SQLite trên OPFS trong worker, xoá sạch khi đăng xuất. Mobile: SQLCipher, khoá trong Keychain/Keystore. Dữ liệu tách theo <code>(tenant, user)</code>.</p></div>
+    </div>
+    <div class="panel reveal" style="margin-top:var(--s4)">
+      <h3>Hợp đồng viết một lần, dùng hai ngôn ngữ</h3>
+      <p style="color:var(--muted);margin-top:var(--s2)">Contract client ⇄ server nằm trong <code>proto/</code>, sinh mã cho cả Go và TypeScript; thay đổi phá vỡ contract bị chặn bằng <code>pnpm proto:breaking</code>. Ngoài người dùng, hệ thống còn mở <b>Bot API</b> (long poll, webhook ký HMAC) và <b>MCP</b> cho công cụ AI.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TUNELO ============ -->
+<section class="block" id="tunelo" style="--c:var(--violet)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Module 2 · Tunelo</span>
+      <h2>Một tiến trình trên máy, ba dịch vụ phía sau</h2>
+      <p><code>tunelo</code> gộp CLI tunnel cũ với tiến trình nền của AI Agent: một file chạy duy nhất, một lần đăng nhập, phát hành qua GitHub Releases (không dùng npm).</p>
+    </div>
+    <div class="panel reveal">
+      <svg class="diagram" viewBox="0 0 1000 250" role="img" aria-label="tunelo đăng nhập một lần, nhận một grant cho ba tài nguyên: tunnel, Chat, Localman">
+        <rect class="nd v" x="20" y="80" width="190" height="90" rx="16"/><text x="115" y="118" text-anchor="middle" style="font-weight:700">tunelo login</text><text class="sub" x="115" y="140" text-anchor="middle">device flow, bấm Đồng ý</text>
+        <rect class="nd a" x="300" y="80" width="190" height="90" rx="16"/><text x="395" y="115" text-anchor="middle" style="font-weight:700">auth-next</text><text class="sub" x="395" y="137" text-anchor="middle">client tunelo-agent</text><text class="sub" x="395" y="155" text-anchor="middle">1 refresh token, 3 tài nguyên</text>
+        <rect class="nd c" x="640" y="14" width="200" height="62" rx="14"/><text x="740" y="42" text-anchor="middle">Tunnel</text><text class="sub" x="740" y="60" text-anchor="middle">localhost → HTTPS</text>
+        <rect class="nd c" x="640" y="94" width="200" height="62" rx="14"/><text x="740" y="122" text-anchor="middle">Chat</text><text class="sub" x="740" y="140" text-anchor="middle">AI Agent, MCP</text>
+        <rect class="nd c" x="640" y="174" width="200" height="62" rx="14"/><text x="740" y="202" text-anchor="middle">Localman</text><text class="sub" x="740" y="220" text-anchor="middle">gửi request tới localhost</text>
+        <path class="flow v" d="M210 125 L300 125"/>
+        <path class="flow" d="M490 110 C560 80 580 50 640 45"/>
+        <path class="flow" d="M490 125 L640 125"/>
+        <path class="flow" d="M490 140 C560 170 580 200 640 205"/>
+      </svg>
+    </div>
+    <div class="grid g3" style="margin-top:var(--s4)">
+      <div class="card reveal"><h3>Tunnel qua relay</h3><p><code>tunelo http 3000</code> đưa dịch vụ localhost ra HTTPS qua subdomain wildcard. Request đi vào inspector chạy cục bộ trên <code>127.0.0.1</code>.</p></div>
+      <div class="card reveal"><h3>Token không rời tiến trình</h3><p>Refresh token niêm phong bằng Keychain (macOS), DPAPI (Windows) hoặc tệp 0600 (Linux). Không route nào trả token thô; dịch vụ tự gắn Bearer.</p></div>
+      <div class="card reveal"><h3>Cài và cập nhật có chữ ký</h3><p>Một lệnh cố định không tham số. Mỗi bản phát hành ký minisign từng file; <code>tunelo update --rollback</code> kiểm chữ ký từng binary.</p></div>
+    </div>
+    <div class="panel reveal" style="margin-top:var(--s4)">
+      <h3>Vòng đời một máy</h3>
+      <ol class="steps" style="margin-top:var(--s4)">
+        <li><span><b>Đăng ký theo tài khoản.</b> <code>tunelo login</code> đăng ký máy kèm chứng minh sở hữu khoá, không còn mã cài.</span></li>
+        <li><span><b>Heartbeat hai chiều.</b> Máy báo còn sống; Chat trả về danh sách khoá thiết bị tin cậy của chủ.</span></li>
+        <li><span><b>Gỡ dứt điểm.</b> <code>tunelo logout</code> hoặc xoá máy trên web sẽ thu hồi luôn grant của máy ở IdP.</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AI AGENT ============ -->
+<section class="block" id="ai-agent" style="--c:var(--amber)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Module 3 · AI Agent</span>
+      <h2>Điều khiển AI lập trình trên máy riêng, từ điện thoại</h2>
+      <p>Chat với Claude Code đang chạy trên máy của chính bạn: xem chữ chạy, thẻ tool, diff, bấm duyệt quyền, dừng, mở lại phiên. Nội dung chỉ nằm ở hai đầu; server giữ danh bạ máy và gửi push không chứa nội dung.</p>
+    </div>
+
+    <div class="panel reveal">
+      <svg class="diagram" viewBox="0 0 1000 260" role="img" aria-label="Thiết bị A mã hoá đầu cuối với máy B qua relay; relay và server Chat chỉ thấy bản mã">
+        <rect class="nd c" x="20" y="70" width="210" height="110" rx="18"/><text x="125" y="105" text-anchor="middle" style="font-weight:700">Thiết bị A</text><text class="sub" x="125" y="127" text-anchor="middle">web · PWA · điện thoại</text><text class="sub" x="125" y="147" text-anchor="middle">khoá X25519 không trích xuất</text>
+        <rect class="nd" x="390" y="90" width="220" height="70" rx="18" stroke-dasharray="4 5"/><text x="500" y="120" text-anchor="middle" style="font-weight:700">Relay Tunelo</text><text class="sub" x="500" y="141" text-anchor="middle">thấy bản mã, không thấy nội dung</text>
+        <rect class="nd a" x="770" y="70" width="210" height="110" rx="18"/><text x="875" y="105" text-anchor="middle" style="font-weight:700">Máy B · tunelo</text><text class="sub" x="875" y="127" text-anchor="middle">chạy đúng claude CLI đã cài</text><text class="sub" x="875" y="147" text-anchor="middle">journal theo luồng chat</text>
+        <path class="flow v" d="M230 125 L390 125"/><path class="flow v" d="M610 125 L770 125"/>
+        <rect x="395" y="190" width="210" height="44" rx="12" fill="oklch(0.3 0.05 80/.3)" stroke="var(--amber)" stroke-dasharray="3 4"/><text x="500" y="217" text-anchor="middle" style="font-size:12.5px;fill:var(--amber)">Chat server: danh bạ máy + push</text>
+        <path class="flow a" d="M500 160 L500 190" style="animation-duration:2s"/>
+        <circle class="pk v" r="5" style="offset-path:path('M230 125 L770 125');offset-distance:0;animation:mv 3.4s linear infinite"/>
+        <circle class="pk" r="5" style="offset-path:path('M770 138 L230 138');offset-distance:0;animation:mv 3.4s linear infinite 1.7s"/>
+        <text class="sub" x="125" y="215" text-anchor="middle">🔒 secretbox · nonce tăng đúng 1</text>
+      </svg>
+    </div>
+
+    <div class="panel reveal stepper" style="margin-top:var(--s4)" id="hs">
+      <div>
+        <span class="tag">Bấm để xem</span>
+        <h3 style="margin-top:var(--s3)">Bắt tay Noise KK, năm bước</h3>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Các bước bắt tay"></div>
+      <div class="stage" role="region" aria-live="polite"></div>
+      <noscript><p style="color:var(--muted)">Cần JavaScript để bấm từng bước. Tóm tắt: hai bên kiểm khoá tĩnh của nhau, tính ba phép X25519, rút khoá bằng HKDF-SHA256, rồi mọi khung đều là secretbox có bộ đếm tăng đúng 1.</p></noscript>
+    </div>
+
+    <div class="grid g3" style="margin-top:var(--s4)">
+      <div class="card reveal"><h3>Journal chống mất tin</h3><p>Mỗi luồng chat có <code>seq</code> và <code>revision</code>; thiết bị nối lại theo con trỏ <code>{epoch, seq}</code>. Epoch đổi hay phần đã nén thì nhận <code>ThreadReset</code> và tải lại.</p></div>
+      <div class="card reveal"><h3>Không gắn với một AI</h3><p>Khung tin dùng loại tool chuẩn (<code>read, edit, shell, search, web, mcp, subagent, todo, other</code>) và cờ khả năng của adapter, nên web không đọc tên tool riêng.</p></div>
+      <div class="card reveal"><h3>MCP của tunelo trong phiên</h3><p>Phiên có sẵn tool tunnel, Chat và Localman. Token do tiến trình nền gắn, Claude không bao giờ thấy. Gửi tin hay request luôn hiện thẻ duyệt trên thiết bị.</p></div>
+    </div>
+    <div class="grid g3" style="margin-top:var(--s4)">
+      <div class="card reveal"><span class="tag">Văn phòng 3D</span><h3>Phiên thành một toà nhà</h3><p>Babylon.js vẽ agent chính là Giám đốc, subagent là nhân viên. Chỉ tên tool, phòng và số đếm rời máy, không có lệnh hay nội dung.</p></div>
+      <div class="card reveal"><span class="tag">Cố vấn</span><h3>Jev cho xác suất từng phương án</h3><p>Phiên Cố vấn chỉ đọc do tunelo ép; Jev của TypeSafe chạy bằng khoá của chính người dùng đặt trên máy.</p></div>
+      <div class="card reveal"><span class="tag">Bí mật</span><h3>Mật khẩu đi bằng tham chiếu</h3><p>Token và mật khẩu đi mã hoá đầu cuối tới máy; Claude chỉ nhận tham chiếu để tunelo điền vào trang cùng site hoặc đặt vào biến môi trường của lệnh đã duyệt.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELEGRAM ============ -->
+<section class="block" id="telegram" style="--c:var(--rose)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Module 4 · Chat Bridge</span>
+      <h2>Telegram vào Chat, lõi không phải sửa</h2>
+      <p>Lớp bridge chung, adapter riêng cho từng ứng dụng. Telegram là adapter đầu tiên (MTProto bằng tài khoản của chính bạn); thêm Zalo sau này chỉ thêm một gói adapter.</p>
+    </div>
+    <div class="panel reveal">
+      <svg class="diagram" viewBox="0 0 1000 300" role="img" aria-label="Luồng Chat Bridge: Telegram, adapter, engine, ImportTx, Chat; chiều ngược lại qua external_outbox và Sender">
+        <rect class="nd a" x="20" y="40" width="150" height="70" rx="14"/><text x="95" y="70" text-anchor="middle" style="font-weight:700">Telegram</text><text class="sub" x="95" y="90" text-anchor="middle">tài khoản của bạn</text>
+        <rect class="nd v" x="240" y="40" width="170" height="70" rx="14"/><text x="325" y="70" text-anchor="middle" style="font-weight:700">Adapter</text><text class="sub" x="325" y="90" text-anchor="middle">Login · Backfill · Subscribe</text>
+        <rect class="nd v" x="480" y="40" width="170" height="70" rx="14"/><text x="565" y="70" text-anchor="middle" style="font-weight:700">Engine</text><text class="sub" x="565" y="90" text-anchor="middle">khoá idempotent</text>
+        <rect class="nd c" x="720" y="40" width="130" height="70" rx="14"/><text x="785" y="70" text-anchor="middle" style="font-weight:700">ImportTx</text><text class="sub" x="785" y="90" text-anchor="middle">ghi nội bộ</text>
+        <rect class="nd g" x="880" y="40" width="105" height="70" rx="14"/><text x="932" y="70" text-anchor="middle" style="font-weight:700">Chat</text><text class="sub" x="932" y="90" text-anchor="middle">seq · realtime</text>
+
+        <path class="flow a" d="M170 75 L240 75"/><path class="flow v" d="M410 75 L480 75"/><path class="flow v" d="M650 75 L720 75"/><path class="flow" d="M850 75 L880 75"/>
+
+        <rect class="nd" x="880" y="190" width="105" height="70" rx="14"/><text x="932" y="220" text-anchor="middle" style="font-weight:700">Bạn gõ</text><text class="sub" x="932" y="240" text-anchor="middle">ở Chat</text>
+        <rect class="nd v" x="660" y="190" width="170" height="70" rx="14"/><text x="745" y="220" text-anchor="middle" style="font-weight:700">external_outbox</text><text class="sub" x="745" y="240" text-anchor="middle">cùng giao dịch với tin</text>
+        <rect class="nd v" x="420" y="190" width="170" height="70" rx="14"/><text x="505" y="220" text-anchor="middle" style="font-weight:700">Sender</text><text class="sub" x="505" y="240" text-anchor="middle">RandomID, thử lại an toàn</text>
+        <path class="flow g" d="M880 225 L830 225"/><path class="flow v" d="M660 225 L590 225"/><path class="flow a" d="M420 225 C200 225 95 200 95 110"/>
+        <text class="sub" x="500" y="285" text-anchor="middle">chiều ra: chỉ tin do chính chủ viết, chat nào bật mới gửi</text>
+        <circle class="pk" r="5" style="offset-path:path('M170 75 L880 75');offset-distance:0;animation:mv 4s linear infinite"/>
+      </svg>
+    </div>
+    <div class="grid g3" style="margin-top:var(--s4)">
+      <div class="card reveal"><h3>Chống trùng, chống đè</h3><p>Khoá <code>(external_account, external_chat, external_msg)</code>; so sánh <code>Version</code> để bản cũ không đè bản mới; lệnh xoá đến trước tin gốc để lại tombstone.</p></div>
+      <div class="card reveal"><h3>Chết giữa chừng thì phát lại</h3><p>Trạng thái update của tài khoản là blob do adapter sở hữu, lưu cùng transaction với việc ghi tin. Backfill đi tăng dần theo thời gian gốc, tin live xếp hàng chờ.</p></div>
+      <div class="card reveal"><h3>Người dùng ảo (puppet)</h3><p>Mỗi liên hệ ngoài là một user gắn cờ <code>external_source</code>: loại khỏi tìm kiếm, DM, nhóm và danh bạ; không sinh unread hay push; không đăng nhập được.</p></div>
+    </div>
+    <div class="panel reveal" style="margin-top:var(--s4)">
+      <h3>Ánh xạ loại chat và giới hạn thật</h3>
+      <div class="kv">
+        <div style="--c:var(--rose)"><b>private</b><span>chat riêng và bot, giữa chủ và puppet</span></div>
+        <div style="--c:var(--rose)"><b>group</b><span>nhóm và supergroup, forum thành topic</span></div>
+        <div style="--c:var(--rose)"><b>channel</b><span>kênh; đăng được khi bạn là quản trị viên</span></div>
+        <div style="--c:var(--amber)"><b>2.000 tin</b><span>cửa sổ lịch sử mặc định, chọn một lần lúc bật</span></div>
+        <div style="--c:var(--amber)"><b>25 MiB</b><span>file lớn hơn chỉ hiện một dòng chữ</span></div>
+        <div style="--c:var(--amber)"><b>E2E bỏ qua</b><span>chat bí mật của Telegram không đồng bộ được</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BẢO MẬT ============ -->
+<section class="block" id="bao-mat" style="--c:var(--green)">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kicker">Bảo mật</span>
+      <h2>Sáu lớp xếp chồng, không lớp nào đứng một mình</h2>
+      <p>Mỗi cơ chế dưới đây có nguồn ở ADR hoặc tài liệu vận hành. Chọn một lớp để lọc.</p>
+    </div>
+    <div class="filters reveal" role="group" aria-label="Lọc theo lớp bảo mật" id="filters">
+      <button class="btn" data-f="all" aria-pressed="true">Tất cả</button>
+      <button class="btn" data-f="id" aria-pressed="false">Danh tính</button>
+      <button class="btn" data-f="data" aria-pressed="false">Dữ liệu</button>
+      <button class="btn" data-f="channel" aria-pressed="false">Kênh máy</button>
+      <button class="btn" data-f="agent" aria-pressed="false">Phiên AI</button>
+      <button class="btn" data-f="bridge" aria-pressed="false">Bridge</button>
+      <button class="btn" data-f="edge" aria-pressed="false">Biên mạng</button>
+    </div>
+    <div class="grid g3" id="seccards">
+      <article class="card sec-card reveal" data-layer="id"><span class="tag">Danh tính</span><h3>Chỉ đăng nhập qua IdP</h3><ul><li>Không mật khẩu, không OTP riêng; Code + PKCE S256.</li><li>Phiên chat: token opaque 256 bit, chỉ lưu hash, so sánh constant-time.</li><li>Phiên chết theo grant ở IdP (back-channel logout).</li></ul></article>
+      <article class="card sec-card reveal" data-layer="id"><span class="tag">Danh tính</span><h3>Cookie và origin</h3><ul><li>Web: cookie <code>__Host-</code>, HttpOnly, Secure, SameSite=Strict.</li><li>RPC đổi trạng thái và handshake WS kiểm <code>Origin</code> theo allowlist.</li><li>Native chỉ dùng bearer, không bao giờ cho cookie.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="id"><span class="tag">Danh tính</span><h3>Xoá tài khoản một nơi</h3><ul><li>IdP gửi SET <code>account.deleted</code> ký, Chat kiểm JWKS và <code>aud</code>.</li><li>Trả <code>202</code> cả khi không có người dùng, IdP không dò được tài khoản.</li><li>Xoá luôn phiên Telegram, chat đồng bộ và puppet.</li></ul></article>
+
+      <article class="card sec-card reveal" data-layer="data"><span class="tag">Dữ liệu</span><h3>Token IdP không xuống client</h3><ul><li>Refresh và ID token mã hoá cột bằng AES-256-GCM, khoá <code>SESSION_KEY</code>.</li><li>Xoay khoá không đăng xuất ai (<code>SESSION_KEY_PREVIOUS</code>, role <code>reseal</code>).</li></ul></article>
+      <article class="card sec-card reveal" data-layer="data"><span class="tag">Dữ liệu</span><h3>Cache cục bộ</h3><ul><li>Mobile: SQLCipher, khoá trong Keychain/Keystore.</li><li>Web: cache OPFS xoá sạch khi đăng xuất hoặc gặp 401.</li><li>Gỡ khỏi chat hay tin bị xoá thì client xoá cả dòng FTS và media cache.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="data"><span class="tag">Dữ liệu</span><h3>Secret niêm phong</h3><ul><li>Phiên Telegram niêm phong bằng <code>sealbox</code>, AAD gắn tài khoản, chủ và ứng dụng.</li><li>Không lưu số điện thoại hay mã đăng nhập.</li></ul></article>
+
+      <article class="card sec-card reveal" data-layer="channel"><span class="tag">Kênh máy</span><h3>Mã hoá đầu cuối Noise KK</h3><ul><li>X25519 + HKDF-SHA256, hai khoá một chiều, khung secretbox.</li><li>Bộ đếm phải tăng đúng 1: phát lại hay đảo thứ tự làm hỏng phiên.</li><li>Giao thức lệch phiên bản thì báo bên nào cần cập nhật.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="channel"><span class="tag">Kênh máy</span><h3>Tài khoản là gốc tin cậy</h3><ul><li>Khoá thiết bị gắn phiên; phiên kết thúc thì trigger DB thu hồi khoá.</li><li>Chứng minh sở hữu khoá bằng thử thách Diffie-Hellman do server cấp.</li><li>Khoá mới: push tới mọi thiết bị và hiện ở "Thiết bị của tài khoản".</li></ul></article>
+      <article class="card sec-card reveal" data-layer="channel"><span class="tag">Kênh máy</span><h3>Thu hồi dứt điểm</h3><ul><li>Xoá máy thu hồi luôn grant <code>tunelo-agent</code> ở IdP.</li><li>Khoá máy đổi thì thiết bị không mở kênh, chờ người dùng đồng ý.</li><li>Link điền sẵn mã chỉ nhận khi IP trình duyệt trùng IP máy.</li></ul></article>
+
+      <article class="card sec-card reveal" data-layer="agent"><span class="tag">Phiên AI</span><h3>Cấu hình dự án mặc định tắt</h3><ul><li><code>settingSources: ['user']</code>; hook và settings dự án không có hiệu lực.</li><li>Bật theo thư mục, máy nhớ và ghi nhật ký đồng ý.</li><li><code>strictMcpConfig</code>: chỉ MCP người dùng bật tại máy.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="agent"><span class="tag">Phiên AI</span><h3>Quyền do máy quyết</h3><ul><li><code>bypassPermissions</code> chỉ chọn lại được khi chính máy đã bật sẵn.</li><li>Mỗi lần đổi chế độ quyền ghi vào nhật ký trên máy.</li><li>Thư mục nhạy cảm (<code>~</code>, <code>~/.ssh</code>…) phải xác nhận.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="agent"><span class="tag">Phiên AI</span><h3>Gửi đi luôn cần duyệt</h3><ul><li>Token do tiến trình nền gắn, mọi chuỗi trả về che token.</li><li>Gửi tin hay request: thẻ duyệt ghi người nhận hoặc URL; Bash trong phiên không gửi thay được.</li><li>MCP ngoài phiên mặc định chỉ đọc.</li></ul></article>
+
+      <article class="card sec-card reveal" data-layer="bridge"><span class="tag">Bridge</span><h3>Quyền ghi sang Telegram hẹp</h3><ul><li>Chỉ tin do chủ chat viết; bot, Bot API, người khác bị từ chối.</li><li>Cờ riêng từng chat, trần tốc độ gửi mỗi tài khoản, log kiểm toán mỗi lần đổi hướng.</li><li>Chat tắt gửi thì server bỏ quyền gửi, kể cả qua MCP.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="bridge"><span class="tag">Bridge</span><h3>Đăng nhập lại khi cấp quyền</h3><ul><li>Hai bước đăng nhập Telegram đòi đăng nhập Chat trong 10 phút gần đây.</li><li>Tính năng tắt mặc định; hoàn tác chỉ là tắt cờ.</li><li>Tôn trọng giới hạn tốc độ của Telegram.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="bridge"><span class="tag">Bridge</span><h3>Cô lập người dùng ảo</h3><ul><li>Người dùng Chat khác không nhắn được puppet.</li><li>Ngắt kết nối thì đăng xuất phiên ở Telegram; chọn giữ hay xoá chat đã nhập.</li></ul></article>
+
+      <article class="card sec-card reveal" data-layer="edge"><span class="tag">Biên mạng</span><h3>nginx và header</h3><ul><li>Rate limit riêng cho auth, RPC, WS, hook, Bot API.</li><li>CSP với <code>frame-ancestors 'none'</code>; log không ghi query và che secret.</li><li><code>X-Real-IP</code> chỉ tin khi peer là loopback.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="edge"><span class="tag">Biên mạng</span><h3>Gọi ra ngoài có hàng rào</h3><ul><li>Webhook bot và xem trước link không gọi tới dải <code>OUTBOUND_DENY_CIDRS</code>, kể cả địa chỉ công khai của chính server.</li><li>Production bắt buộc https.</li></ul></article>
+      <article class="card sec-card reveal" data-layer="edge"><span class="tag">Biên mạng</span><h3>MCP có hai bước xác nhận</h3><ul><li>Access token của IdP với <code>aud</code> riêng cho <code>/mcp</code>.</li><li>Quản trị bot cần scope riêng; tạo, xoay vòng hay xoá webhook đòi xác nhận hai bước.</li></ul></article>
+    </div>
+
+    <div class="panel trade reveal" style="margin-top:var(--s6)">
+      <h3>Những đánh đổi nói thẳng</h3>
+      <p style="color:var(--muted);margin:var(--s2) 0 var(--s4)">Không có hệ thống nào kín tuyệt đối. Đây là những điểm tài liệu đã ghi nhận là chấp nhận có chủ đích.</p>
+      <ol class="steps" style="--c:var(--amber)">
+        <li><span><b>Người vận hành server</b> về lý thuyết cài được khoá giả ở một trong hai chiều của kênh máy; lộ phiên tài khoản là vào được máy tới khi chủ thấy push và thu hồi. Đổi lại: bỏ ghép thiết bị, bỏ TOTP, thêm máy bằng một lệnh.</span></li>
+        <li><span><b>XSS trên chat.hoandat.com</b> dùng được khoá thiết bị (không trích xuất được) trong lúc trang mở. Giảm bằng CSP chặt và xoá khoá khi đăng xuất.</span></li>
+        <li><span><b>Chat sập tối đa 24 giờ:</b> thiết bị bị thu hồi trong lúc đó vẫn vào được tới 24 giờ, vì máy dùng danh sách tin cậy đã lưu.</span></li>
+        <li><span><b>Phiên ở bypassPermissions:</b> nội dung độc trong tin nhắn hay response có thể dụ Claude gửi đi mà không ai duyệt (prompt injection).</span></li>
+        <li><span><b>Chat Bridge</b> thêm quyền mới: một phiên Chat bị lộ không chỉ đọc được mà còn gửi được tin giả danh chủ ở Telegram. Giảm bằng cờ từng chat và trần tốc độ.</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Trang này là bản tóm tắt trực quan; khi lệch với nguồn thì nguồn đúng. Các nguồn đã dùng (trong <code>chat-next/docs/</code>):</p>
+    <ul>
+      <li>ADR 0001, 0002, 0003: id, đồng bộ, outbox</li>
+      <li>ADR 0006, 0009, 0011: đăng nhập, lưu cục bộ, phiên native</li>
+      <li>ADR 0012: endpoint MCP</li>
+      <li>ADR 0013, 0014, 0017: AI Agent, Tunelo, không gắn một AI</li>
+      <li>ADR 0016: xoá tài khoản chỉ ở IdP</li>
+      <li>ADR 0018–0021: văn phòng 3D và Cố vấn</li>
+      <li>ADR 0022 và <code>integrations/chat-bridge.md</code>: Chat Bridge</li>
+      <li><code>infrastructure-inventory.md</code>, <code>server/README.md</code>: biên mạng, cấu hình</li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.documentElement.classList.add('js');
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // sao lấp lánh
+  var box = document.getElementById('stars'), n = reduce ? 40 : 90;
+  for (var i=0;i<n;i++){
+    var s = document.createElement('i'); s.className='star';
+    s.style.left = Math.random()*100+'%'; s.style.top = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*4)+'s';
+    s.style.animationDuration = (3+Math.random()*4)+'s';
+    var z = Math.random()<.15 ? 3 : 2; s.style.width = s.style.height = z+'px';
+    box.appendChild(s);
+  }
+
+  // reveal khi cuộn
+  var els = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && !reduce){
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+    },{rootMargin:'0px 0px -8% 0px',threshold:.05});
+    els.forEach(function(el){ io.observe(el); });
+  } else { els.forEach(function(el){ el.classList.add('in'); }); }
+
+  // stepper bắt tay
+  var steps = [
+    {t:'A gửi Hello (Plain)', p:'Trước bắt tay chỉ có thông điệp Plain. Thiết bị A gửi khoá tạm, khoá tĩnh và một nonce, kèm protocolVersion và minProtocolVersion. Hai bên lệch phiên bản thì được báo bên nào cần cập nhật.', e:'A → B: ephemeral_A, static_A, nonce_A'},
+    {t:'B kiểm khoá của A', p:'Máy B chỉ nhận khoá tĩnh nằm trong danh sách thiết bị tin cậy, danh sách này đến từ Chat qua heartbeat. Khoá lạ làm máy hỏi Chat ngay, mỗi khoá tối đa một lần trong 30 giây. Quá 24 giờ không đồng bộ được thì từ chối mọi bắt tay mới.', e:'static_A ∈ trusted_devices ?'},
+    {t:'A kiểm khoá của B', p:'Thiết bị lấy khoá máy mong đợi từ danh sách máy của tài khoản mỗi lần kết nối. Khác khoá đã thấy lần trước thì không mở kênh, báo khoá máy đã đổi; người dùng làm mới trạng thái máy mới là đồng ý nhận khoá mới.', e:'static_B == ListMachines[].public_key ?'},
+    {t:'Rút khoá phiên', p:'Hai bên tính ba phép Diffie-Hellman X25519 (ee, es, se) rồi HKDF-SHA256 với salt là SHA-256 của hai nonce nối nhau và info là băm transcript. Kết quả: hai khoá một chiều và một mã phiên 15 byte.', e:'HKDF(ee ‖ es ‖ se, salt = SHA256(nonce_A ‖ nonce_B), info = H(transcript))'},
+    {t:'Ready và khung đầu tiên', p:'Ready mang bản niêm phong của transcript để A xác nhận khoá B; khung đầu của A xác nhận khoá A. Từ đây mọi tin là một khung secretbox, nonce gồm mã phiên, chiều và bộ đếm 64-bit phải tăng đúng 1.', e:'nonce = session_id(15B) ‖ direction ‖ counter(64-bit)'}
+  ];
+  var hs = document.getElementById('hs');
+  if (hs){
+    var tabs = hs.querySelector('.tabs'), stage = hs.querySelector('.stage'), cur = 0, btns = [];
+    function show(i){
+      cur = i;
+      btns.forEach(function(b,k){ b.setAttribute('aria-selected', k===i ? 'true':'false'); });
+      var s = steps[i];
+      stage.innerHTML = '';
+      var h = document.createElement('h3'); h.textContent = (i+1)+'. '+s.t;
+      var p = document.createElement('p'); p.textContent = s.p;
+      var c = document.createElement('code'); c.className='eq'; c.textContent = s.e;
+      stage.append(h,p,c);
+    }
+    steps.forEach(function(s,i){
+      var b = document.createElement('button');
+      b.className='btn'; b.type='button'; b.setAttribute('role','tab');
+      b.textContent = 'Bước '+(i+1);
+      b.addEventListener('click', function(){ show(i); });
+      b.addEventListener('keydown', function(e){
+        if(e.key==='ArrowRight'){ btns[(cur+1)%btns.length].focus(); show((cur+1)%btns.length); }
+        if(e.key==='ArrowLeft'){ btns[(cur+btns.length-1)%btns.length].focus(); show((cur+btns.length-1)%btns.length); }
+      });
+      tabs.appendChild(b); btns.push(b);
+    });
+    show(0);
+  }
+
+  // lọc bảo mật
+  var fwrap = document.getElementById('filters');
+  if (fwrap){
+    var fb = fwrap.querySelectorAll('button'), cards = document.querySelectorAll('#seccards .sec-card');
+    fb.forEach(function(b){
+      b.addEventListener('click', function(){
+        var f = b.dataset.f;
+        fb.forEach(function(x){ x.setAttribute('aria-pressed', x===b ? 'true':'false'); });
+        cards.forEach(function(c){
+          var on = f==='all' || c.dataset.layer===f;
+          c.hidden = !on; if(on) c.classList.add('in');
+        });
+      });
+    });
+  }
+})();
+</script>
+<style>@keyframes mv{from{offset-distance:0%}to{offset-distance:100%}}</style>
+</body>
+</html>
