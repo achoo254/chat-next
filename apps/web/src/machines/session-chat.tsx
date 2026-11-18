@@ -58,6 +58,7 @@ import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
+import { SessionEmpty, SessionLoading } from "./session-scene.tsx";
 import { useAdvisorScope, useAdvisorSession } from "../advisor/advisor-context.tsx";
 import { useAdvisorIdentity } from "../advisor/use-advisor-identity.ts";
 import { advisorStore, useSessionFill } from "../advisor/advisor-store.ts";
@@ -330,7 +331,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			) : mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (
-						<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
+						<Suspense fallback={<SessionLoading label={t.terminal.loading} />}>
 							<TerminalScreen
 								machine={machine}
 								thread={{ id: threadId, dir: thread.dir, chat: paths.machineSession(machine, threadId), running: turnHolds, inTerminal: thread.terminalSession !== 0, status: threadStatus(thread, false), provider: thread.provider, aiName: ai }}
@@ -340,9 +341,13 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							/>
 						</Suspense>
 					) : (
-						<p className="note mx-group-note" role="status">
-							{state.info === null || thread === null ? t.terminal.loading : t.terminal.offerFailed}
-						</p>
+						state.info === null || thread === null ? (
+							<SessionLoading label={t.terminal.loading} />
+						) : (
+							<p className="note mx-group-note" role="status">
+								{t.terminal.offerFailed}
+							</p>
+						)
 					)}
 					{workspacePanel}
 				</div>
@@ -902,7 +907,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 					),
 					before - start,
 				)}
-				{blocks.length === 0 && !running && <p className="muted mx-center">{t.transcript.empty}</p>}
+				{blocks.length === 0 && !running && <SessionEmpty label={t.transcript.empty} />}
 				<ActivityLine
 					source={link}
 					threadId={threadId}

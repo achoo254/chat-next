@@ -105,6 +105,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-project-head:hover > .mx-row-menu, .mx-project-head:focus-within > .mx-row-menu, .mx-project-head > .mx-row-menu:has([aria-expanded="true"]) { opacity: 1; }
 .mx-ws { padding-left: 0; }
 .mx-ws-head { min-height: 40px; padding-top: 0; padding-bottom: 0; }
+.mx-ws-toggle { display: flex; flex: none; align-items: center; justify-content: center; align-self: stretch; width: 20px; padding: 0; border: 0; background: none; color: var(--c-icon-muted); cursor: pointer; }
 .mx-ws-name { display: grid; flex: 1; min-width: 0; }
 .mx-ws-title { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .mx-ws-title b { min-width: 0; font-weight: 500; }
@@ -996,3 +997,18 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 .mx-preview-none { display: grid; justify-items: center; gap: var(--space-2); text-align: center; }
 .mx-preview .dlg-foot { align-items: center; }
 .mx-preview-size { margin-right: auto; font-size: 0.8125rem; }
+
+/* Session pane scenes: opening the terminal, and an empty session. */
+.mx-scene { box-sizing: border-box; width: 100%; display: grid; justify-items: center; align-content: center; gap: var(--space-3); min-height: 12rem; padding: var(--space-4); color: var(--c-text-muted); }
+.mx-scene-label { margin: 0; font-size: 0.875rem; }
+.mx-scene-art { width: 7.5rem; height: auto; overflow: visible; }
+.mx-scene-fill { fill: var(--c-surface-subtle); stroke: var(--c-border-strong); stroke-width: 1.5; }
+.mx-scene-line { stroke: var(--c-border-subtle); stroke-width: 1.5; fill: none; }
+.mx-scene-dot { fill: var(--c-border-strong); }
+.mx-scene-prompt { stroke: var(--c-primary-solid); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.mx-scene-cursor { fill: var(--c-primary-solid); animation: mx-blink 1s steps(1) infinite; }
+.mx-scene-ghost { fill: var(--c-border-subtle); }
+.mx-scene-mascot { width: 10rem; height: auto; animation: mx-scene-bob 3.2s ease-in-out infinite; }
+.mx-scene-term { animation: mx-scene-bob 2.4s ease-in-out infinite; }
+@keyframes mx-scene-bob { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .mx-scene-term, .mx-scene-mascot { animation: none; } }

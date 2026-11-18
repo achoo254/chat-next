@@ -38,3 +38,9 @@ ngoài repo này.
 mỗi tệp dưới 19 KB. Vẽ offline trên GPU cục bộ ngày 16/11/2026: ảnh `idle` bằng Qwen-Image-2512, ba trạng thái còn lại bằng FLUX.2 klein 4B
 (chỉnh sửa từ ảnh `idle`), tách nền bằng flood-fill từ bốn góc rồi xuất WebP. Cả hai model đều Apache-2.0. Không chứa chữ, không siêu dữ liệu.
 Quyền với tệp: sở hữu của hoandat, giữ mọi quyền (không phải CC0). Prompt và ảnh gốc nằm ngoài repo này.
+
+## Ảnh phiên trống (`apps/web/src/machines/assets/`)
+
+`empty-session.webp`: mascot bong bóng thoại hiện trong phiên AI Agent chưa có nội dung, 384 px, nền trong suốt, 12 KB. Vẽ offline trên GPU
+cục bộ ngày 18/11/2026 bằng Z-Image-Turbo (Apache-2.0), nền màu phẳng được tách thành trong suốt rồi xuất WebP. Không chứa chữ, không siêu
+dữ liệu. Quyền với tệp: sở hữu của hoandat, giữ mọi quyền (không phải CC0). Prompt và ảnh gốc nằm ngoài repo này.

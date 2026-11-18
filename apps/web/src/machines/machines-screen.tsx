@@ -23,6 +23,7 @@ import { SessionChat } from "./session-chat.tsx";
 import { SessionSidebar } from "./session-sidebar.tsx";
 import { useHub, useHubPresence, useLink } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+import { SessionLoading } from "./session-scene.tsx";
 import "./machines.css";
 
 /** "Hiệu quả": loaded, with its styles, the first time it opens. */
@@ -121,7 +122,7 @@ function TerminalPage({ machine, openShellIn, showSession }: { machine: string; 
 	const gate = terminalGate(state.info);
 	if (gate === "available") {
 		return (
-			<Suspense fallback={<p className="mx-group-note muted">{t.terminal.loading}</p>}>
+			<Suspense fallback={<SessionLoading label={t.terminal.loading} />}>
 				<TerminalScreen machine={machine} openShellIn={openShellIn} showSession={showSession} />
 			</Suspense>
 		);
