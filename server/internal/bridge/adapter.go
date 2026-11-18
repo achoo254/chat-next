@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -22,6 +23,9 @@ const (
 	CapEdits   Capability = "edits"
 	CapDeletes Capability = "deletes"
 	CapMedia   Capability = "media"
+	// CapSend means the adapter also implements Sender: Chat can send,
+	// edit and delete messages in the other app.
+	CapSend Capability = "send"
 )
 
 // Capabilities is the set an adapter declares.
@@ -243,3 +247,74 @@ var ErrGapTooLarge = errors.New("bridge: update gap too large to replay")
 type InputError struct{ Message string }
 
 func (e *InputError) Error() string { return e.Message }
+
+// OutMessage is a message Chat sends into a conversation of the other app.
+type OutMessage struct {
+	Conversation string
+	Text         string
+	Entities     []Entity
+	// ReplyTo is the Message.ID of the message answered, in the same
+	// conversation; empty for a plain message.
+	ReplyTo string
+	// Media is empty for a text message, one item for a photo or file, and
+	// several for an album. Text then is the caption of the first item.
+	Media []OutMedia
+	// RandomID makes the send idempotent: the engine stores it before the
+	// call and repeats it when a retry follows a crash, so the other app can
+	// answer with the message it already took instead of creating a second.
+	RandomID int64
+}
+
+// OutMedia is a file attached to an OutMessage. Open returns the bytes anew
+// on each call so a retry can read them again; the caller closes the reader.
+type OutMedia struct {
+	Kind     string // photo, video, audio, voice, document ...
+	MimeType string
+	Name     string
+	Size     int64
+	Width    int
+	Height   int
+	Duration time.Duration
+	Open     func() (io.ReadCloser, error)
+}
+
+// SentRef says what the other app created for one OutMessage: one id for a
+// message, one per item for an album.
+type SentRef struct {
+	IDs  []string
+	Date time.Time
+}
+
+// EditRequest replaces the text of a message sent by the account owner.
+type EditRequest struct {
+	Conversation string
+	ID           string
+	Text         string
+	Entities     []Entity
+}
+
+// Sender is implemented by an adapter that declares CapSend. Calls follow
+// the Adapter rules: one account at a time, from one goroutine at a time.
+type Sender interface {
+	// SendMessage creates the message and returns its ids. A repeated
+	// RandomID must not create a second message; if the app cannot promise
+	// that, the adapter must not declare CapSend.
+	SendMessage(ctx context.Context, acct Account, m OutMessage) (SentRef, error)
+	// EditMessage changes the text of a message the account owner sent.
+	EditMessage(ctx context.Context, acct Account, e EditRequest) error
+	// DeleteMessages removes messages for everyone in the conversation.
+	DeleteMessages(ctx context.Context, acct Account, d Delete) error
+}
+
+// ErrNotAllowed is returned when the other app refuses the action for
+// this account (no right to post in a channel, blocked by the user, not a
+// member). Retrying cannot help; the message is shown as failed with the
+// reason (wrap the error to carry it).
+var ErrNotAllowed = errors.New("bridge: not allowed in the other app")
+
+// ErrEditExpired is returned when a message can no longer be edited or
+// deleted in the other app (a time limit passed). Retrying cannot help.
+var ErrEditExpired = errors.New("bridge: message can no longer be changed in the other app")
+
+// ErrTooLarge is returned when a file is over the other app's size limit.
+var ErrTooLarge = errors.New("bridge: file too large for the other app")

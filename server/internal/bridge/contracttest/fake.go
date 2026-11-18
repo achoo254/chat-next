@@ -30,11 +30,24 @@ type Fake struct {
 	BeforePage                                 func(conv string, pageNo int)
 	pages                                      map[string]int
 	backfillCalls, subscribeCalls, logoutCalls int
+	failSend                                   []error
+	sentByRandom                               map[int64]bridge.SentRef
+	sent                                       []bridge.OutMessage
+	edits                                      []bridge.EditRequest
+	deletes                                    []bridge.Delete
+	nextID                                     int
+	// DedupeRandomID makes a repeated RandomID answer with the message already
+	// sent, as the other app does; a test turns it off to see a duplicate.
+	DedupeRandomID bool
+	// EchoSent pushes each sent message back as a live event of the account
+	// owner, as the other app does for the account that sent it.
+	EchoSent bool
 }
 
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
-	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{}}
+	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
+		sentByRandom: map[int64]bridge.SentRef{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 // AddConversation lists a conversation.
@@ -89,7 +102,7 @@ func (f *Fake) Name() string { return f.name }
 
 // Capabilities implements bridge.Adapter.
 func (f *Fake) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true}
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true}
 }
 
 // Login implements bridge.Adapter: two input steps, then done.
@@ -224,3 +237,94 @@ func (f *Fake) SubscribeCalls() int { f.mu.Lock(); defer f.mu.Unlock(); return f
 
 // LogoutCalls is how many sessions were logged out.
 func (f *Fake) LogoutCalls() int { f.mu.Lock(); defer f.mu.Unlock(); return f.logoutCalls }
+
+// FailSend makes the next SendMessage calls return errs, one each.
+func (f *Fake) FailSend(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failSend = append(f.failSend, errs...)
+}
+
+// SendMessage implements bridge.Sender.
+func (f *Fake) SendMessage(_ context.Context, _ bridge.Account, m bridge.OutMessage) (bridge.SentRef, error) {
+	f.mu.Lock()
+	if len(f.failSend) > 0 {
+		err := f.failSend[0]
+		f.failSend = f.failSend[1:]
+		f.mu.Unlock()
+		return bridge.SentRef{}, err
+	}
+	if f.DedupeRandomID && m.RandomID != 0 {
+		if ref, ok := f.sentByRandom[m.RandomID]; ok {
+			f.mu.Unlock()
+			return ref, nil
+		}
+	}
+	count := max(len(m.Media), 1)
+	ref := bridge.SentRef{Date: time.Now()}
+	var echoes []bridge.Message
+	for i := 0; i < count; i++ {
+		f.nextID++
+		id := strconv.Itoa(f.nextID)
+		ref.IDs = append(ref.IDs, id)
+		msg := bridge.Message{Conversation: m.Conversation, ID: id, From: bridge.Participant{ID: "self", IsSelf: true},
+			Date: ref.Date, ReplyTo: m.ReplyTo}
+		if i == 0 {
+			msg.Text, msg.Entities = m.Text, m.Entities
+		}
+		echoes = append(echoes, msg)
+	}
+	f.sent = append(f.sent, m)
+	if m.RandomID != 0 {
+		f.sentByRandom[m.RandomID] = ref
+	}
+	echo := f.EchoSent
+	f.mu.Unlock()
+	if echo {
+		for i := range echoes {
+			msg := echoes[i]
+			f.Push(bridge.Event{Message: &msg})
+		}
+	}
+	return ref, nil
+}
+
+// EditMessage implements bridge.Sender.
+func (f *Fake) EditMessage(_ context.Context, _ bridge.Account, e bridge.EditRequest) error {
+	f.mu.Lock()
+	f.edits = append(f.edits, e)
+	f.mu.Unlock()
+	return nil
+}
+
+// DeleteMessages implements bridge.Sender.
+func (f *Fake) DeleteMessages(_ context.Context, _ bridge.Account, d bridge.Delete) error {
+	f.mu.Lock()
+	f.deletes = append(f.deletes, d)
+	f.mu.Unlock()
+	return nil
+}
+
+// Sent is every message that SendMessage accepted (a deduplicated repeat is
+// not counted twice).
+func (f *Fake) Sent() []bridge.OutMessage {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.OutMessage(nil), f.sent...)
+}
+
+// Edits is every edit received.
+func (f *Fake) Edits() []bridge.EditRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.EditRequest(nil), f.edits...)
+}
+
+// Deletes is every delete received.
+func (f *Fake) Deletes() []bridge.Delete {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.Delete(nil), f.deletes...)
+}
+
+var _ bridge.Sender = (*Fake)(nil)

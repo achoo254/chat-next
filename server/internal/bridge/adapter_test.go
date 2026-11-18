@@ -33,3 +33,24 @@ func TestCapabilitiesHas(t *testing.T) {
 		t.Fatalf("unexpected capabilities: %v", cs)
 	}
 }
+
+// sender proves a Sender can be added without touching the Adapter interface.
+type sender struct{ stub }
+
+func (sender) Capabilities() Capabilities { return Capabilities{CapHistory: true, CapSend: true} }
+func (sender) SendMessage(context.Context, Account, OutMessage) (SentRef, error) {
+	return SentRef{}, nil
+}
+func (sender) EditMessage(context.Context, Account, EditRequest) error { return nil }
+func (sender) DeleteMessages(context.Context, Account, Delete) error   { return nil }
+
+var _ Sender = sender{}
+
+func TestSendIsACapabilityNotARequirement(t *testing.T) {
+	if (stub{}).Capabilities().Has(CapSend) {
+		t.Fatal("an adapter without Sender must not declare CapSend")
+	}
+	if !(sender{}).Capabilities().Has(CapSend) {
+		t.Fatal("a Sender declares CapSend")
+	}
+}
