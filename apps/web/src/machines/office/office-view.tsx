@@ -2,10 +2,11 @@
 // machine (office-client.ts), keeps it in an OfficeStore, places everyone
 // (office-placement.ts) on the one floor plan, and hands all of that to a
 // renderer with the framing the viewer asked for (the work zone or the
-// whole plan; a phone opens on the first, a wide screen on the other). View only: no input, the chat is untouched. A machine
-// whose tunelo predates the office gets a note to update and no frame.
+// whole plan; a phone opens on the first, a wide screen on the other). View only: the one thing a viewer can do is open a
+// person's inspector panel (office-inspector-panel.tsx); the chat is untouched. A machine whose tunelo predates the office
+// gets a note to update and no frame.
 // Loaded on demand with the rest of machines/office/ (and its styles).
-import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
 import { ErrorReason, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { AGENT_OFFICE, versionAtLeast } from "../agent-version.ts";
 import type { MachinesCopy } from "../copy-vi.ts";
@@ -24,6 +25,8 @@ import type { Parsed } from "./office-json.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "./office-layout.ts";
 import { EMPTY_MEMORY, officePlacement, type OfficeAdvisor, type Placement, type PlacementMemory } from "./office-placement.ts";
 import type { OfficeFraming, OfficeRendererProps } from "./office-renderer.ts";
+import { holdInspected, LEFT_SHOWN_MS, type HeldInspected } from "./office-inspector.ts";
+import { InspectorPanel } from "./office-inspector-panel.tsx";
 import { createOfficeStore, type OfficeState } from "./office-store.ts";
 import "./office.css";
 
@@ -101,18 +104,21 @@ interface Frame {
 	readonly placements: readonly Placement[];
 	readonly memory: PlacementMemory;
 	readonly talks: readonly Talk[];
+	/** The person whose panel is open, as last seen (kept for a while when they have gone). */
+	readonly held: HeldInspected | null;
 }
 
-const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, talks: [] };
+const EMPTY_FRAME: Frame = { now: 0, placements: [], memory: EMPTY_MEMORY, talks: [], held: null };
 
-/** The next frame: places from the store's state at `now`, then the talks among them. `advisor`: who Advisor is to the viewer. */
-export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, advisor: OfficeAdvisor | null = null): Frame {
+/** The next frame: places from the store's state at `now`, then the talks among them. `advisor`: who Advisor is to the viewer; `selectedKey`: whose panel is open. */
+export function advanceFrame(prev: Frame, state: OfficeState, layout: OfficeLayout, now: number, advisor: OfficeAdvisor | null = null, selectedKey: string | null = null): Frame {
 	const placed = officePlacement(state, layout, now, prev.memory, advisor);
 	return {
 		now,
 		placements: placed.placements,
 		memory: placed.memory,
 		talks: officeTalks(placed.placements, state, layout, now),
+		held: holdInspected(prev.held, selectedKey, placed.placements, state, now).shown,
 	};
 }
 
@@ -163,18 +169,24 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	useEffect(() => {
 		advisorNow.current = advisor;
 	}, [advisor]);
+	// The panel's person for the next frame, and a way to take that frame at once (a press should show its panel now, not up to a second later).
+	const selectedNow = useRef<string | null>(null);
+	const stepNow = useRef<() => void>(() => undefined);
 	useEffect(() => {
 		const step = (): void => {
 			if (documentVisibility.hidden()) return;
-			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), advisorNow.current));
+			setFrame((prev) => advanceFrame(prev, store.state(), layout, Date.now(), advisorNow.current, selectedNow.current));
 		};
+		stepNow.current = step;
 		const off = store.subscribe(step);
 		const timer = window.setInterval(step, FRAME_TICK_MS);
 		return () => {
 			off();
 			window.clearInterval(timer);
+			stepNow.current = () => undefined;
 		};
 	}, [store, layout]);
+
 	const [Renderer] = useState(chooseRenderer);
 	const [assets, setAssets] = useState<Parsed<OfficeAssets> | null>(null);
 	useEffect(() => {
@@ -191,6 +203,52 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 		};
 	}, [layout]);
 	const [sound, setSound] = useState(soundPreference);
+	// The person whose panel is open, by placement key (not by actor: subagents of one title replace one another). Not kept across a reload.
+	const [selected, setSelected] = useState<string | null>(null);
+	// The next frame takes the selection from here (the timer that closes the panel of someone who left clears it too).
+	useEffect(() => {
+		selectedNow.current = selected;
+	}, [selected]);
+	const shown = selected !== null && frame.held?.key === selected ? frame.held : null;
+	// A person who has gone says so for a while, then the panel closes; a key never shown closes at once.
+	const closeIn = selected === null ? null : shown === null ? 0 : shown.leftAt === null ? null : Math.max(0, LEFT_SHOWN_MS - (frame.now - shown.leftAt));
+	useEffect(() => {
+		if (closeIn === null) return;
+		const timer = window.setTimeout(() => setSelected(null), closeIn);
+		return () => window.clearTimeout(timer);
+	}, [closeIn]);
+	const stage = useRef<HTMLDivElement>(null);
+	const choose = useCallback((key: string | null) => {
+		const next = key === null || key === selectedNow.current ? null : key;
+		selectedNow.current = next;
+		setSelected(next);
+		stepNow.current();
+	}, [setSelected]);
+	// Esc closes the panel and puts the focus back on the person's name when it is on screen, else on the scene.
+	const closePanel = (): void => {
+		const key = selected;
+		choose(null);
+		if (key === null) return;
+		const tag = Array.from(box.current?.querySelectorAll<HTMLElement>("[data-id^='office-person-']") ?? []).find((el) => el.getAttribute("data-id") === `office-person-${key}`);
+		const button = tag?.closest("[hidden]") === null ? tag?.querySelector<HTMLElement>("button") : null;
+		(button ?? stage.current)?.focus();
+	};
+	const closeOnEscape = useRef(closePanel);
+	useEffect(() => {
+		closeOnEscape.current = closePanel;
+	});
+	// Esc anywhere in the office closes the panel (a listener, not a handler on the frame: the frame is not a control).
+	useEffect(() => {
+		const el = box.current;
+		if (el === null || selected === null) return;
+		const onKey = (e: globalThis.KeyboardEvent): void => {
+			if (e.key !== "Escape") return;
+			e.stopPropagation();
+			closeOnEscape.current();
+		};
+		el.addEventListener("keydown", onKey);
+		return () => el.removeEventListener("keydown", onKey);
+	}, [selected, box]);
 	const notes: { key: string; text: string; tone?: "warn"; retry?: boolean }[] = [];
 	if (refusal !== null) notes.push({ key: "failed", text: refusalText(copy, refusal.err), tone: "warn", retry: isWatchLimit(refusal.err) });
 	if (state.status === "live" && !state.reportsStaff) notes.push({ key: "staff", text: t.noStaff });
@@ -238,7 +296,23 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 					{t.loading}
 				</p>
 			) : (
-				<Renderer state={state} placements={frame.placements} talks={frame.talks} layout={layout} framing={framing} size={size} daypart={officeDaypart(frame.now)} assets={assets} now={frame.now} sound={sound} />
+				<div className="of-body" ref={stage} tabIndex={-1} data-panel={shown === null ? undefined : "open"}>
+					<Renderer
+						state={state}
+						placements={frame.placements}
+						talks={frame.talks}
+						layout={layout}
+						framing={framing}
+						size={size}
+						daypart={officeDaypart(frame.now)}
+						assets={assets}
+						now={frame.now}
+						sound={sound}
+						selectedKey={shown?.key ?? null}
+						onSelect={choose}
+					/>
+					{shown !== null && <InspectorPanel held={shown} onClose={closePanel} />}
+				</div>
 			)}
 		</div>
 	);
@@ -272,5 +346,6 @@ export default function OfficeView({
 			</div>
 		);
 	}
-	return <LiveOffice link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} advisor={advisor} />;
+	// A new store and a closed panel for each session.
+	return <LiveOffice key={threadId} link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} advisor={advisor} />;
 }

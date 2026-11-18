@@ -20,3 +20,8 @@
 	.of3d-board { width: 128px; font-size: 0.75rem; }
 	.of3d-layer .of-bubble { max-width: 150px; }
 }
+/* The name tag is a real button (keyboard and screen readers) but takes no pointer: a press on the scene reaches the canvas, which tells a tap from a drag of the camera and finds the tag under it (office-camera.ts, pick-tag.ts). */
+button.of3d-tag { border: 0; color: inherit; font: inherit; text-align: left; }
+button.of3d-tag:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.of3d-layer .of-marker[data-selected] { outline: none; }
+.of3d-layer .of-marker[data-selected] .of3d-tag { outline: 2px solid var(--c-primary); outline-offset: 1px; }

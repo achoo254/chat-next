@@ -7,7 +7,7 @@
 // meeting room's "+N") is rendered here and moved by the scene each frame. A
 // label marked `data-idle` (free, with nothing to say) is one the scene may
 // shrink to its status dot when zoomed far out.
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Office2D } from "../machines/office/office-2d.tsx";
 import { BOARD_ROOMS, OfficeBoard } from "../machines/office/office-boards.tsx";
 import { lineOf } from "../machines/office/office-conversations.ts";
@@ -16,6 +16,7 @@ import type { Placement } from "../machines/office/office-placement.ts";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { hardware3DAvailable, office3DFlags, type Office3DFlags } from "./office-flags.ts";
+import { tagAt, type TagBox } from "./pick-tag.ts";
 import type { OfficeWorld } from "./office-world.ts";
 import { useOfficeWorld } from "./use-office-world.ts";
 import "./office-3d.css";
@@ -27,7 +28,7 @@ function waitingForDesks(placements: readonly Placement[]): number {
 	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
 }
 
-function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: string | null; bind: (id: string, el: HTMLElement | null) => void }) {
+function Person({ p, t, line, selected, onPick, bind }: { p: Placement; t: OfficeCopy; line: string | null; selected: boolean; onPick: (key: string) => void; bind: (id: string, el: HTMLElement | null) => void }) {
 	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const id = `person:${p.key}`;
 	const idle = (status === "idle" || status === "done") && bubble === "";
@@ -41,6 +42,7 @@ function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: strin
 			data-group={workGroup(p)}
 			data-anchor={p.anchorId}
 			data-idle={idle ? "" : undefined}
+			data-selected={selected ? "" : undefined}
 			style={style}
 			title={label}
 			data-id={`office-person-${p.key}`}
@@ -55,12 +57,22 @@ function Person({ p, t, line, bind }: { p: Placement; t: OfficeCopy; line: strin
 					{bubble}
 				</span>
 			)}
-			<span className="of3d-tag">
-				<span className="of-dot" aria-hidden="true">
-					{status === "slow" ? "⌛" : ""}
+			{p.kind === "chairman" ? (
+				<span className="of3d-tag">
+					<span className="of-dot" aria-hidden="true">
+						{status === "slow" ? "⌛" : ""}
+					</span>
+					<span className="of-name">{name}</span>
 				</span>
-				<span className="of-name">{name}</span>
-			</span>
+			) : (
+				// A button for the keyboard and screen readers; the mouse and touch reach it through the canvas's tap (pick-tag.ts).
+				<button type="button" className="of3d-tag" aria-pressed={selected} aria-label={t.inspector.openHint(name)} onClick={() => onPick(p.key)}>
+					<span className="of-dot" aria-hidden="true">
+						{status === "slow" ? "⌛" : ""}
+					</span>
+					<span className="of-name">{name}</span>
+				</button>
+			)}
 			<span className="sr-only">{label === name ? "" : label.slice(name.length)}</span>
 		</div>
 	);
@@ -70,9 +82,23 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 	const copy = useMachinesCopy();
 	const t = copy.office;
 	const host = useRef<HTMLDivElement>(null);
-	const { status, world } = useOfficeWorld(host, props, flags, copy.terminal.mode.office);
 	const worldRef = useRef<OfficeWorld | null>(null);
 	const pins = useRef(new Map<string, HTMLElement>());
+	// A tap on the canvas (not a drag of the camera): the name under it is chosen, a tap on nothing asks for none.
+	const select = props.onSelect;
+	const onTap = useCallback(
+		(x: number, y: number): void => {
+			const boxes: TagBox[] = [];
+			for (const [id, el] of pins.current) {
+				if (!id.startsWith("person:") || el.hidden || el.dataset.kind === "chairman") continue;
+				const rect = el.querySelector(".of3d-tag")?.getBoundingClientRect();
+				if (rect !== undefined) boxes.push({ key: id.slice("person:".length), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+			}
+			select?.(tagAt(boxes, x, y));
+		},
+		[select],
+	);
+	const { status, world } = useOfficeWorld(host, props, flags, copy.terminal.mode.office, onTap);
 	useEffect(() => {
 		if (status === "failed") onFail();
 	}, [status, onFail]);
@@ -125,7 +151,7 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 					</span>
 				)}
 				{props.placements.map((p) => (
-					<Person key={p.key} p={p} t={t} line={lineOf(props.talks, p.key, props.now)} bind={bind} />
+					<Person key={p.key} p={p} t={t} line={lineOf(props.talks, p.key, props.now)} selected={props.selectedKey === p.key} onPick={(key) => select?.(key)} bind={bind} />
 				))}
 			</div>
 			{status === "loading" && (

@@ -1348,6 +1348,41 @@ export const zhCNMachines: MachinesCopy = {
 		snore: "Zzz",
 		life: { sleep: "睡觉中", lounge: "躺着休息", doze: "打盹", run: "跑步", pushup: "健身", jacks: "开合跳", punch: "打沙袋", eat: "吃饭", watch: "看电视", chat: "聊天", dance: "跳舞" },
 		doing: { think: "思考", arrive: "到岗", handIn: "交文件", consult: "请教顾问", weigh: "权衡中" },
+		/** The inspector panel of a person (office-inspector-panel.tsx): plain facts the office wire carries, no files or commands. */
+		inspector: {
+			label: "角色信息",
+			close: "关闭",
+			openHint: (name: string) => `查看${name}的信息`,
+			homeRoom: "所属房间",
+			nowIn: "当前位置",
+			working: "工作中",
+			idle: "空闲",
+			simulated: "日常生活（模拟，并非 AI 的工作）",
+			left: "已离开办公室",
+			stale: "等待更新…",
+			groups: { read: "阅读", type: "输入", machine: "运行机器", phone: "通话", arrive: "到岗", "hand-in": "交文件", think: "思考", consult: "请教顾问" },
+			doingNow: "正在做",
+			runningFor: (duration: string) => `已运行${duration}`,
+			description: "任务描述",
+			lastResult: "最近结果",
+			passed: "成功",
+			failed: "失败",
+			unknownResult: "结果未知",
+			ago: (duration: string) => `${duration}前`,
+			session: "本次会话",
+			done: "已完成",
+			approvalWait: "最近一次等待审批",
+			service: "后台任务",
+			timeline: "最近",
+			timelineNote: "仅记录你打开办公室之后的内容。",
+			timelineEmpty: "你打开办公室之后还没有完成的任务。",
+			duration: (ms: number) => {
+				const seconds = Math.floor(ms / 1000);
+				if (seconds < 60) return `${seconds}秒`;
+				const minutes = Math.floor(seconds / 60);
+				return minutes < 60 ? `${minutes}分钟` : `${Math.floor(minutes / 60)}小时${minutes % 60}分钟`;
+			},
+		},
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} 人在会议室等工位`,
 		empty: "空",

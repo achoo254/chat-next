@@ -1375,6 +1375,41 @@ export const viMachines = {
 		snore: "Zzz",
 		life: { sleep: "Đang ngủ", lounge: "Nằm thư giãn", doze: "Ngủ gật", run: "Chạy bộ", pushup: "Tập thể dục", jacks: "Nhảy bật", punch: "Đấm bao cát", eat: "Đang ăn", watch: "Xem tivi", chat: "Tán gẫu", dance: "Nhảy múa" },
 		doing: { think: "Suy nghĩ", arrive: "Vào làm", handIn: "Nộp hồ sơ", consult: "Hỏi Cố vấn", weigh: "Đang cân nhắc" },
+		/** The inspector panel of a person (office-inspector-panel.tsx): plain facts the office wire carries, no files or commands. */
+		inspector: {
+			label: "Thông tin nhân vật",
+			close: "Đóng",
+			openHint: (name: string) => `Xem thông tin ${name}`,
+			homeRoom: "Phòng của họ",
+			nowIn: "Đang ở",
+			working: "Đang làm việc",
+			idle: "Rảnh",
+			simulated: "Sinh hoạt (mô phỏng, không phải việc của AI)",
+			left: "Đã rời văn phòng",
+			stale: "Chờ cập nhật…",
+			groups: { read: "Đọc", type: "Gõ", machine: "Chạy máy", phone: "Gọi", arrive: "Vào làm", "hand-in": "Nộp hồ sơ", think: "Suy nghĩ", consult: "Hỏi Cố vấn" },
+			doingNow: "Việc đang làm",
+			runningFor: (duration: string) => `đã chạy ${duration}`,
+			description: "Mô tả việc",
+			lastResult: "Kết quả gần nhất",
+			passed: "Đạt",
+			failed: "Lỗi",
+			unknownResult: "Không rõ kết quả",
+			ago: (duration: string) => `${duration} trước`,
+			session: "Trong phiên",
+			done: "Việc đã xong",
+			approvalWait: "Lần chờ duyệt gần nhất",
+			service: "Việc chạy nền",
+			timeline: "Gần đây",
+			timelineNote: "Chỉ ghi từ lúc bạn mở văn phòng.",
+			timelineEmpty: "Chưa có việc nào xong từ lúc bạn mở văn phòng.",
+			duration: (ms: number) => {
+				const seconds = Math.floor(ms / 1000);
+				if (seconds < 60) return `${seconds} giây`;
+				const minutes = Math.floor(seconds / 60);
+				return minutes < 60 ? `${minutes} phút` : `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`;
+			},
+		},
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} người chờ bàn trong phòng họp`,
 		empty: "Trống",

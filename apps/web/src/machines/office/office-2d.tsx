@@ -64,7 +64,13 @@ function waitingForDesks(placements: readonly Placement[]): number {
 	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
 }
 
-function Marker({ p, t, line, placed }: { p: Placement; t: OfficeCopy; line: string | null; placed?: { x: number; y: number; stack: number; anchor: string } }) {
+/** What a marker needs to open its person's panel: whether it is the chosen one and what a press does (the chairman is nobody to inspect). */
+interface Pick {
+	readonly selected: boolean;
+	readonly onPick: (key: string) => void;
+}
+
+function Marker({ p, t, line, placed, pick }: { p: Placement; t: OfficeCopy; line: string | null; placed?: { x: number; y: number; stack: number; anchor: string }; pick?: Pick | undefined }) {
 	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const style: ColorStyle = { "--of-color": personColor(p) };
 	if (placed !== undefined) {
@@ -83,11 +89,23 @@ function Marker({ p, t, line, placed }: { p: Placement; t: OfficeCopy; line: str
 			style={style}
 			title={label}
 			data-id={`office-person-${p.key}`}
+			data-selected={pick?.selected === true ? "" : undefined}
 		>
-			<span className="of-dot" aria-hidden="true">
-				{status === "slow" ? "⌛" : ""}
-			</span>
-			<span className="of-name">{name}</span>
+			{pick !== undefined && p.kind !== "chairman" ? (
+				<button type="button" className="of-pick" aria-pressed={pick.selected} aria-label={t.inspector.openHint(name)} onClick={() => pick.onPick(p.key)}>
+					<span className="of-dot" aria-hidden="true">
+						{status === "slow" ? "⌛" : ""}
+					</span>
+					<span className="of-name">{name}</span>
+				</button>
+			) : (
+				<>
+					<span className="of-dot" aria-hidden="true">
+						{status === "slow" ? "⌛" : ""}
+					</span>
+					<span className="of-name">{name}</span>
+				</>
+			)}
 			<span className="sr-only">{label === name ? "" : label.slice(name.length)}</span>
 			{bubble !== "" && (
 				<span className="of-bubble" data-talk={talking ? "" : undefined}>
@@ -106,6 +124,12 @@ function Overflow({ n, t, at }: { n: number; t: OfficeCopy; at?: { x: number; y:
 			{t.overflow(n)}
 		</span>
 	);
+}
+
+/** The pick of a person from the renderer's props: none without a view that listens (the tests of the plain drawing). */
+function pickOf(props: OfficeRendererProps, key: string): Pick | undefined {
+	const onSelect = props.onSelect;
+	return onSelect === undefined ? undefined : { selected: props.selectedKey === key, onPick: onSelect };
 }
 
 function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRendererProps; t: OfficeCopy; locale: string }) {
@@ -164,7 +188,7 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 					if (at === undefined) return null;
 					const stack = stacks.get(anchorId) ?? 0;
 					stacks.set(anchorId, stack + 1);
-					return <Marker key={p.key} p={p} t={t} line={lineOf(talks, p.key, now)} placed={{ x: at[0], y: at[1], stack, anchor: anchorId }} />;
+					return <Marker key={p.key} p={p} t={t} line={lineOf(talks, p.key, now)} placed={{ x: at[0], y: at[1], stack, anchor: anchorId }} pick={pickOf(props, p.key)} />;
 				})}
 				{meetingAt !== undefined && <Overflow n={waitingForDesks(placements)} t={t} at={{ x: meetingAt[0], y: meetingAt[1] }} />}
 			</div>
@@ -194,7 +218,7 @@ function RoomCards({ props, t, locale }: { props: OfficeRendererProps; t: Office
 										<ul className="of-people">
 											{here.map((p) => (
 												<li key={p.key}>
-													<Marker p={p} t={t} line={lineOf(talks, p.key, now)} />
+													<Marker p={p} t={t} line={lineOf(talks, p.key, now)} pick={pickOf(props, p.key)} />
 												</li>
 											))}
 										</ul>
@@ -215,7 +239,19 @@ export function Office2D(props: OfficeRendererProps) {
 	const t = copy.office;
 	const view = props.assets?.ok === true ? props.assets.value.views[props.size] : undefined;
 	return (
-		<div className="of-stage" data-power={props.state.power} data-daypart={props.daypart.phase} data-renderer="2d" data-view={view === undefined ? "rooms" : "picture"} data-framing={props.framing}>
+		// A press on nothing (the picture, a room card's blank) closes the panel; names are buttons and keep the press for themselves; Esc and the panel's own button close it from the keyboard.
+		// eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+		<div
+			className="of-stage"
+			onClick={(e) => {
+				if (props.selectedKey != null && !(e.target as Element).closest("button")) props.onSelect?.(null);
+			}}
+			data-power={props.state.power}
+			data-daypart={props.daypart.phase}
+			data-renderer="2d"
+			data-view={view === undefined ? "rooms" : "picture"}
+			data-framing={props.framing}
+		>
 			{view === undefined ? <RoomCards props={props} t={t} locale={copy.usage.locale} /> : <Picture view={view} props={props} t={t} locale={copy.usage.locale} />}
 		</div>
 	);

@@ -4,7 +4,8 @@
 // sideways) that glides back to the default after a few seconds untouched,
 // and drag to pan within the plan. The viewer's framing button (`work` or
 // `overview`, fit-office-camera.ts) glides the camera there; nothing else
-// ever moves it (it does not follow people). View only: nothing is picked.
+// ever moves it (it does not follow people). It also tells a tap from a drag (isTap) and reports a tap to the
+// view, which finds the name under it (pick-tag.ts); the camera itself picks nothing.
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import { TargetCamera } from "@babylonjs/core/Cameras/targetCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -23,6 +24,31 @@ export interface OfficeCamera {
 	dispose(): void;
 }
 
+/** A press that moves this far (CSS px) is a drag of the camera, not a tap. */
+export const TAP_SLOP_PX = 6;
+
+/** What a press did from its first finger down to its last one up. */
+export interface PointerGesture {
+	/** The most fingers or pointers down at once. */
+	readonly maxPointers: number;
+	/** The button of the first press: 0 is the primary one (a finger or the left button). */
+	readonly button: number;
+	/** Shift was held (a drag with it turns the camera). */
+	readonly shift: boolean;
+	/** The farthest the press got from where it began, px. */
+	readonly travel: number;
+}
+
+/**
+ * Whether a press was a tap: one pointer the whole time, the primary button, no
+ * shift, hardly moved. A pan (left drag), a turn (right or shift drag), a pinch
+ * (two fingers) and a wheel are not taps, so they never choose anyone or close
+ * the panel.
+ */
+export function isTap(g: PointerGesture): boolean {
+	return g.maxPointers === 1 && g.button === 0 && !g.shift && g.travel < TAP_SLOP_PX;
+}
+
 /** The turn glides back to the default after this long untouched. */
 const RETURN_AFTER_MS = 5_000;
 const RETURN_GLIDE_MS = 900;
@@ -32,7 +58,7 @@ const TURN_PER_PIXEL = 0.006;
 const FRAMING_GLIDE_MS = 700;
 
 /** `framing`: the framing to open with. */
-export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan: CameraPlan, framing: Framing, reducedMotion: boolean): OfficeCamera {
+export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan: CameraPlan, framing: Framing, reducedMotion: boolean, onTap?: (clientX: number, clientY: number) => void): OfficeCamera {
 	const camera = new TargetCamera("office-camera", new Vector3(0, 30, -30), scene);
 	camera.mode = Camera.ORTHOGRAPHIC_CAMERA;
 	camera.minZ = 1;
@@ -48,6 +74,8 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan
 	/** The glide under way to `wanted`, from the viewer's state at the press. */
 	let glide: { readonly from: CameraUser; readonly start: number } | null = null;
 	const pointers = new Map<number, { x: number; y: number }>();
+	/** The press under way, from its first pointer down to its last one up. */
+	let gesture: { startX: number; startY: number; maxPointers: number; button: number; shift: boolean; travel: number } | null = null;
 	const target = new Vector3();
 
 	const aspect = (): number => size.width / Math.max(1, size.height);
@@ -72,13 +100,19 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan
 
 	const onDown = (e: PointerEvent): void => {
 		touch();
+		if (pointers.size === 0) gesture = { startX: e.clientX, startY: e.clientY, maxPointers: 1, button: e.button, shift: e.shiftKey, travel: 0 };
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (gesture !== null) gesture.maxPointers = Math.max(gesture.maxPointers, pointers.size);
 		canvas.setPointerCapture(e.pointerId);
 	};
 	const onMove = (e: PointerEvent): void => {
 		const was = pointers.get(e.pointerId);
 		if (was === undefined) return;
 		touch();
+		if (gesture !== null) {
+			gesture.travel = Math.max(gesture.travel, Math.hypot(e.clientX - gesture.startX, e.clientY - gesture.startY));
+			gesture.shift ||= e.shiftKey;
+		}
 		const dx = e.clientX - was.x;
 		const dy = e.clientY - was.y;
 		if (pointers.size >= 2) {
@@ -96,6 +130,14 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan
 	};
 	const onUp = (e: PointerEvent): void => {
 		pointers.delete(e.pointerId);
+		if (pointers.size > 0) return;
+		const done = gesture;
+		gesture = null;
+		if (done !== null && isTap(done)) onTap?.(e.clientX, e.clientY);
+	};
+	const onCancel = (e: PointerEvent): void => {
+		pointers.delete(e.pointerId);
+		if (pointers.size === 0) gesture = null;
 	};
 	const onWheel = (e: WheelEvent): void => {
 		e.preventDefault();
@@ -106,7 +148,7 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan
 	canvas.addEventListener("pointerdown", onDown);
 	canvas.addEventListener("pointermove", onMove);
 	canvas.addEventListener("pointerup", onUp);
-	canvas.addEventListener("pointercancel", onUp);
+	canvas.addEventListener("pointercancel", onCancel);
 	canvas.addEventListener("wheel", onWheel, { passive: false });
 	canvas.addEventListener("contextmenu", onMenu);
 
@@ -159,7 +201,7 @@ export function createOfficeCamera(scene: Scene, canvas: HTMLCanvasElement, plan
 			canvas.removeEventListener("pointerdown", onDown);
 			canvas.removeEventListener("pointermove", onMove);
 			canvas.removeEventListener("pointerup", onUp);
-			canvas.removeEventListener("pointercancel", onUp);
+			canvas.removeEventListener("pointercancel", onCancel);
 			canvas.removeEventListener("wheel", onWheel);
 			canvas.removeEventListener("contextmenu", onMenu);
 			camera.dispose();

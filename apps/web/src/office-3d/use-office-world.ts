@@ -15,11 +15,22 @@ function mediaMatches(query: string): boolean {
 	return typeof window.matchMedia === "function" && window.matchMedia(query).matches;
 }
 
-export function useOfficeWorld(host: RefObject<HTMLDivElement | null>, props: OfficeRendererProps, flags: Office3DFlags, canvasLabel: string): { status: WorldStatus; world: OfficeWorld | null } {
+export function useOfficeWorld(
+	host: RefObject<HTMLDivElement | null>,
+	props: OfficeRendererProps,
+	flags: Office3DFlags,
+	canvasLabel: string,
+	/** A tap on the canvas, at a client point; the latest one passed is the one called. */
+	onTap: (clientX: number, clientY: number) => void,
+): { status: WorldStatus; world: OfficeWorld | null } {
 	const [state, setState] = useState<{ status: WorldStatus; world: OfficeWorld | null }>({ status: "loading", world: null });
 	// What the world boots with; later changes go through `update`.
 	const initial = useRef(props);
 	const label = useRef(canvasLabel);
+	const tap = useRef(onTap);
+	useEffect(() => {
+		tap.current = onTap;
+	}, [onTap]);
 	useEffect(() => {
 		const el = host.current;
 		if (el === null) return;
@@ -45,6 +56,7 @@ export function useOfficeWorld(host: RefObject<HTMLDivElement | null>, props: Of
 					signal: abort.signal,
 					canvasLabel: label.current,
 					onLost: () => fail(new Error("GPU context lost")),
+					onTap: (x, y) => tap.current(x, y),
 				}),
 			)
 			.then((result) => {

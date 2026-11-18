@@ -52,6 +52,8 @@ export interface WorldOptions {
 	readonly canvasLabel: string;
 	/** The GPU context was lost (iOS under memory pressure): the view falls back to 2D. */
 	readonly onLost: () => void;
+	/** A tap on the canvas (not a drag of the camera), at this client point. */
+	readonly onTap?: (clientX: number, clientY: number) => void;
 }
 
 export interface OfficeWorld {
@@ -99,7 +101,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	const props = createPropLibrary(scene, kit);
 	const zones = createZoneLibrary(scene, kit, props, SCENE_LAYOUT, layout.zones, opts.signal);
 	const lights = createOfficeLights(scene, SCENE_LAYOUT.footprint);
-	const camera = createOfficeCamera(scene, canvas, cameraPlan(layout, SCENE_LAYOUT.footprint), opts.props.framing, opts.reducedMotion);
+	const camera = createOfficeCamera(scene, canvas, cameraPlan(layout, SCENE_LAYOUT.footprint), opts.props.framing, opts.reducedMotion, opts.onTap);
 	const post = createPostProcessing(scene, camera.camera, "neutral");
 	const pool = createCharacterPool(scene);
 	let sfx: OfficeSfx = createOfficeSfx(new Map(), assetUrl);

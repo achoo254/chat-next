@@ -1356,6 +1356,41 @@ export const enMachines: MachinesCopy = {
 		snore: "Zzz",
 		life: { sleep: "Sleeping", lounge: "Lying back", doze: "Dozing", run: "Running", pushup: "Working out", jacks: "Jumping jacks", punch: "Boxing", eat: "Eating", watch: "Watching TV", chat: "Chatting", dance: "Dancing" },
 		doing: { think: "Thinking", arrive: "Arriving", handIn: "Handing in", consult: "Asking Advisor", weigh: "Weighing" },
+		/** The inspector panel of a person (office-inspector-panel.tsx): plain facts the office wire carries, no files or commands. */
+		inspector: {
+			label: "Character details",
+			close: "Close",
+			openHint: (name: string) => `Show details of ${name}`,
+			homeRoom: "Their room",
+			nowIn: "Now in",
+			working: "At work",
+			idle: "Free",
+			simulated: "Daily life (simulated, not the AI's work)",
+			left: "Left the office",
+			stale: "Waiting for an update…",
+			groups: { read: "Reading", type: "Typing", machine: "Running a machine", phone: "Calling", arrive: "Arriving", "hand-in": "Handing in", think: "Thinking", consult: "Asking Advisor" },
+			doingNow: "Working on",
+			runningFor: (duration: string) => `running ${duration}`,
+			description: "What it is about",
+			lastResult: "Latest result",
+			passed: "Passed",
+			failed: "Failed",
+			unknownResult: "Result unknown",
+			ago: (duration: string) => `${duration} ago`,
+			session: "This session",
+			done: "Finished",
+			approvalWait: "Latest approval wait",
+			service: "Background job",
+			timeline: "Recently",
+			timelineNote: "Recorded only since you opened the office.",
+			timelineEmpty: "Nothing finished since you opened the office.",
+			duration: (ms: number) => {
+				const seconds = Math.floor(ms / 1000);
+				if (seconds < 60) return `${seconds} s`;
+				const minutes = Math.floor(seconds / 60);
+				return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+			},
+		},
 		overflow: (n: number) => `+${n}`,
 		overflowLabel: (n: number) => `${n} waiting for a desk in the meeting room`,
 		empty: "Empty",

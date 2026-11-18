@@ -71,3 +71,39 @@
 	.of-stage[data-view="picture"] { min-height: min(64vh, 560px); }
 	.of { padding: var(--space-2); }
 }
+
+/* The scene and, when a person is opened, their inspector panel (office-inspector-panel.tsx): a column beside the scene on a wide screen, a sheet under it on a phone; the scene shrinks to make room, so the person chosen is never behind the panel. */
+.of-body { display: flex; flex: 1 0 auto; gap: var(--space-2); min-width: 0; min-height: 0; outline: none; }
+.of .of-body > .of-stage { flex: 1 1 0; min-width: 0; }
+.of[data-size="phone"] .of-body { flex-direction: column; }
+.of[data-size="phone"] .of-body > .of-stage { flex: 1 1 auto; }
+.of-panel { display: grid; align-content: start; gap: var(--space-2); flex: 0 0 300px; box-sizing: border-box; align-self: flex-start; max-height: min(72vh, 680px); padding: var(--space-3); overflow-y: auto; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); animation: of-panel-in 0.18s ease-out; }
+.of[data-size="phone"] .of-panel { flex: 0 0 auto; align-self: stretch; max-height: 42vh; padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); }
+.of-panel[data-left] { opacity: 0.7; }
+.of-panel-head { display: flex; align-items: center; gap: var(--space-2); }
+.of-panel-dot { margin: 0 var(--space-1); }
+.of-panel-title { flex: 1; min-width: 0; }
+.of-panel-title h3 { margin: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.of-panel-title p { margin: 0; }
+.of-panel-close { flex: none; min-width: 44px; padding: 0; font-size: 1.25rem; line-height: 1; }
+.of-panel-muted { font-size: 0.8125rem; color: var(--c-text-muted); }
+.of-panel-status { margin: 0; font-size: 0.875rem; font-weight: 600; }
+.of-panel-status[data-status="denied"] { color: var(--c-error-text); }
+.of-panel-status[data-status="awaiting"], .of-panel-status[data-status="slow"], .of-panel-status[data-status="stuck"] { color: var(--c-warning-text); }
+.of-panel-rows { display: grid; gap: var(--space-1); margin: 0; }
+.of-panel-row { display: grid; gap: 2px; font-size: 0.875rem; }
+.of-panel-row dt { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
+.of-panel-row dd { margin: 0; overflow-wrap: anywhere; }
+.of-panel-mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+.of-panel-timeline h4 { margin: 0 0 var(--space-1); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
+.of-panel-entries { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.of-panel-entry { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); font-size: 0.8125rem; }
+.of-panel-entry[data-result="failed"] .of-panel-result { color: var(--c-error-text); }
+.of-panel-entry[data-result="ok"] .of-panel-result { color: var(--c-success-text); }
+@keyframes of-panel-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .of-panel { animation: none; } }
+
+/* A person's name is a button that opens their panel (both views); the chosen one is ringed. */
+.of-pick { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.of-pick:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-full); }
+.of-marker[data-selected] { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-full); }

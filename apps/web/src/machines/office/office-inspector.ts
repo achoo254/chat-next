@@ -140,3 +140,32 @@ export function inspectorOf(placements: readonly Placement[], key: string, state
 		stale: state.awaitingSnapshot || state.power === "out",
 	};
 }
+
+/** How long the panel of someone who left says so before it closes (viewer time). */
+export const LEFT_SHOWN_MS = 4_000;
+
+/** What the panel shows for the person chosen: their record and placement as last seen, and since when they are gone (null while they are here). */
+export interface HeldInspected {
+	readonly key: string;
+	readonly model: InspectorModel;
+	readonly placement: Placement;
+	readonly leftAt: number | null;
+}
+
+/**
+ * The panel's content for the chosen person `key` (null: none chosen) at viewer
+ * time `now`, and whether the panel should close. A person who is here shows as
+ * they are. One who has gone (a machine whose command ended is dropped from the
+ * state at once) keeps the record last seen with the time they left, until
+ * LEFT_SHOWN_MS has passed; a key that was never shown closes at once. Pure:
+ * `prev` is what this returned last.
+ */
+export function holdInspected(prev: HeldInspected | null, key: string | null, placements: readonly Placement[], state: OfficeState, now: number): { readonly shown: HeldInspected | null; readonly close: boolean } {
+	if (key === null) return { shown: null, close: false };
+	const model = inspectorOf(placements, key, state, now);
+	const placement = placements.find((p) => p.key === key);
+	if (model !== null && placement !== undefined) return { shown: { key, model, placement, leftAt: null }, close: false };
+	if (prev === null || prev.key !== key) return { shown: null, close: true };
+	const leftAt = prev.leftAt ?? now;
+	return { shown: { ...prev, leftAt }, close: now - leftAt >= LEFT_SHOWN_MS };
+}

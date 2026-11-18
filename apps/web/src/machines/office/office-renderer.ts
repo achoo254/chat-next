@@ -32,4 +32,8 @@ export interface OfficeRendererProps {
 	readonly now: number;
 	/** The viewer turned the office's sound on (the 3D scene plays it; 2D is silent). */
 	readonly sound?: boolean;
+	/** The person whose inspector panel is open (the placement key); null or missing: none. Drawn with a ring and `aria-pressed`. */
+	readonly selectedKey?: string | null;
+	/** The viewer chose a person (their placement key) or asked for none (null: a press on nothing). The same key again is up to the view. */
+	readonly onSelect?: (key: string | null) => void;
 }
