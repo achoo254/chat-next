@@ -15,6 +15,7 @@ import { navigate, paths } from "../router.tsx";
 import { errorText, folderName, providerOf, useNow } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { PercentBar } from "../machines/percent-bar.tsx";
+import { AgentText } from "../machines/rich/agent-text.tsx";
 import { IGNORE_ATTR } from "./advisor-context.tsx";
 import { advisorStore, offerOf, sameCopy, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type HistoryEntry, type Question } from "./advisor-store.ts";
 import { pictureOf, type Look } from "./looks.ts";
@@ -527,7 +528,11 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 				)}
 				{state === "stopped" && <p className="adv-note muted">{t.answer.stopped}</p>}
 				{state === "failed" && <p className="adv-note mx-error">{answer?.error || t.answer.failed}</p>}
-				{answer !== undefined && answer.text !== "" && <p className="adv-reply">{answer.text}</p>}
+				{answer !== undefined && answer.text !== "" && (
+					<div className="adv-reply">
+						<AgentText text={answer.text} streaming={false} />
+					</div>
+				)}
 				{verdict !== null && verdict.error !== "" && <p className="adv-note mx-error">{t.answer.errors[verdict.error] ?? t.answer.otherError}</p>}
 				{top !== undefined && verdict !== null && (
 					<div className="adv-best">

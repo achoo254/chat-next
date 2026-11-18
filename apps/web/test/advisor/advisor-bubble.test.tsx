@@ -77,7 +77,7 @@ function answerItems(id: string, text: string, done: boolean): Body {
 	];
 	if (done) {
 		items.push(
-			{ id: `a-${id}`, seq: 3n, revision: 1, at: 3n, body: { case: "text", value: { role: Role.ASSISTANT, text: "Nhánh của máy đi sau origin 1 commit.", clientMsgId: "" } } } as never,
+			{ id: `a-${id}`, seq: 3n, revision: 1, at: 3n, body: { case: "text", value: { role: Role.ASSISTANT, text: "Nhánh của máy đi **sau origin** 1 commit.", clientMsgId: "" } } } as never,
 			{
 				id: `v-${id}`,
 				seq: 4n,
@@ -381,7 +381,9 @@ describe("asking", () => {
 
 		expect(await screen.findByText(PICK, undefined, WAIT)).toBeTruthy();
 		expect(screen.getByText("82%")).toBeTruthy();
-		expect(screen.getByText("Nhánh của máy đi sau origin 1 commit.")).toBeTruthy();
+		// The reply is markdown: bold shows as bold, no asterisks left.
+		expect(await screen.findByText("sau origin", { selector: "strong" }, WAIT)).toBeTruthy();
+		expect(screen.queryByText(/\*\*/)).toBeNull();
 		expect(screen.getByText("Vì sao push hỏng?")).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: t.answer.all }));
 		expect(screen.getByText("/reset --hard")).toBeTruthy();
