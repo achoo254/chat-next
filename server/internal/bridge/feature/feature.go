@@ -35,9 +35,12 @@ const (
 	Typing Feature = "typing"
 	// Lifecycle: leaving and deleting a group in the other app.
 	Lifecycle Feature = "lifecycle"
+	// Alerts: a new message of the other app notifies in Chat (push and unread count), as
+	// it does in the app it comes from. Off until switched on for the chat.
+	Alerts Feature = "alerts"
 )
 
-var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing, Lifecycle}
+var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing, Lifecycle, Alerts}
 
 // All lists every feature, in the order they are shown.
 func All() []Feature { return append([]Feature(nil), all...) }
@@ -110,10 +113,14 @@ func (d Direction) Sends() bool { return d == Out || d == Both }
 //   - the owner's own state and pins (R1) and the structure of a group (R2) follow
 //     the messages, so a chat that sends on also carries these;
 //   - acting on people and groups (R3) is Off until it is switched on for the chat;
-//   - typing only comes in, and is Off until switched on.
+//   - typing only comes in, and is Off until switched on;
+//   - alerts are Off until switched on, so a busy group does not start to notify by itself.
 func Default(f Feature, messages Direction) Direction {
 	if f == Messages {
 		return messages
+	}
+	if f == Alerts {
+		return Off
 	}
 	switch RiskOf(f) {
 	case R3:

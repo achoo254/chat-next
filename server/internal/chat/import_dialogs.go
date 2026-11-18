@@ -96,3 +96,25 @@ func (it *ImportTx) SetOwnerDialogPinned(ctx context.Context, pinned bool) (bool
 	}
 	return true, nil
 }
+
+// MarkOwnerRead moves the owner's read position of the chat up to upToSeq, as the other app
+// says they read there (on another device). It never moves back and does not go past the newest
+// message. It reports whether the position moved.
+func (it *ImportTx) MarkOwnerRead(ctx context.Context, upToSeq int64) (bool, error) {
+	upToSeq = min(upToSeq, it.c.LastSeq)
+	if upToSeq <= 0 {
+		return false, nil
+	}
+	tag, err := it.t.tx.Exec(ctx, `
+		INSERT INTO chat_read_states (chat_id, user_id, topic_id, read_inbox_max_seq) VALUES ($1, $2, 0, $3)
+		ON CONFLICT (chat_id, user_id, topic_id) DO UPDATE
+			SET read_inbox_max_seq = excluded.read_inbox_max_seq, updated_at = now()
+			WHERE chat_read_states.read_inbox_max_seq < excluded.read_inbox_max_seq`, it.c.ID, it.owner, upToSeq)
+	if err != nil {
+		return false, fmt.Errorf("chat: owner read position: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	return true, it.tellOwnerRead(ctx)
+}

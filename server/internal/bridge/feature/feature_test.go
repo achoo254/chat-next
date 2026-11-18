@@ -31,7 +31,7 @@ func TestDefaultsFollowTheMessagesExceptForPeopleAndTyping(t *testing.T) {
 		{Pins, In, In}, {Pins, Both, Both},
 		{Reactions, Both, Both}, {Read, In, In}, {Notify, Both, Both}, {Dialog, Both, Both},
 		{Topics, Both, Both}, {Info, In, In},
-		{Members, Both, Off}, {Invites, Both, Off}, {Typing, Both, Off}, {Lifecycle, Both, Off},
+		{Members, Both, Off}, {Invites, Both, Off}, {Typing, Both, Off}, {Lifecycle, Both, Off}, {Alerts, Both, Off}, {Alerts, In, Off},
 	} {
 		if got := Default(tc.f, tc.messages); got != tc.want {
 			t.Errorf("Default(%s, %s) = %s, want %s", tc.f, tc.messages, got, tc.want)

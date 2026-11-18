@@ -41,6 +41,10 @@ type ImportMessage struct {
 	// with ImportTx.CreateTopic); 0 is the General topic. A chat without topics
 	// takes only 0.
 	TopicID int64
+	// Notify makes a message of somebody else that just arrived notify like any new
+	// message (push, and it counts as unread). History and the owner's own messages
+	// never notify.
+	Notify bool
 	// Content carries parts the text cannot (media); its entities and silent
 	// flag are replaced.
 	Content *appv1.Message
@@ -116,7 +120,7 @@ func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *ap
 		return "", nil, err
 	}
 	content.Entities = ents
-	content.Silent = true
+	content.Silent = !msg.Notify
 	content.ReplyMarkup = it.t.s.importKeyboard(msg.Buttons)
 	return text, content, nil
 }
@@ -194,6 +198,7 @@ func (it *ImportTx) Append(ctx context.Context, msgs []ImportMessage) ([]int64, 
 	if err != nil {
 		return nil, err
 	}
+	before := it.c.LastSeq
 	seqs := make([]int64, len(msgs))
 	for i, msg := range msgs {
 		text, content, err := it.content(ctx, msg)
@@ -212,20 +217,33 @@ func (it *ImportTx) Append(ctx context.Context, msgs []ImportMessage) ([]int64, 
 		}
 		seqs[i] = posted.Seq
 	}
-	if err := it.markOwnerRead(ctx); err != nil {
+	// A message that notifies stays unread; the rest of an import adds no unread.
+	for _, msg := range msgs {
+		if msg.Notify {
+			return seqs, nil
+		}
+	}
+	if err := it.markOwnerRead(ctx, before); err != nil {
 		return nil, err
 	}
 	return seqs, nil
 }
 
-// markOwnerRead moves the owner's read position to the newest message.
-func (it *ImportTx) markOwnerRead(ctx context.Context) error {
-	if _, err := it.t.tx.Exec(ctx, `
+// markOwnerRead moves the owner's read position to the newest message, unless the owner had
+// not read up to before (the newest message before this import): a message that notified
+// earlier stays unread.
+func (it *ImportTx) markOwnerRead(ctx context.Context, before int64) error {
+	tag, err := it.t.tx.Exec(ctx, `
 		INSERT INTO chat_read_states (chat_id, user_id, topic_id, read_inbox_max_seq) VALUES ($1, $2, 0, $3)
 		ON CONFLICT (chat_id, user_id, topic_id) DO UPDATE
-			SET read_inbox_max_seq = greatest(chat_read_states.read_inbox_max_seq, excluded.read_inbox_max_seq), updated_at = now()`,
-		it.c.ID, it.owner, it.c.LastSeq); err != nil {
+			SET read_inbox_max_seq = greatest(chat_read_states.read_inbox_max_seq, excluded.read_inbox_max_seq), updated_at = now()
+			WHERE chat_read_states.read_inbox_max_seq >= $4`,
+		it.c.ID, it.owner, it.c.LastSeq, before)
+	if err != nil {
 		return fmt.Errorf("chat: import read position: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil
 	}
 	return it.tellOwnerRead(ctx)
 }
@@ -254,6 +272,36 @@ func (it *ImportTx) tellOwnerRead(ctx context.Context) error {
 		}
 		return nil
 	})
+	return nil
+}
+
+// MarkPeerRead records that the other side of the chat read the owner's
+// messages up to upToSeq: the owner's newest own message at or below it
+// becomes the outbox read position (the second check mark). It never moves
+// the position back, and does nothing when no message of the owner is newly
+// read.
+func (it *ImportTx) MarkPeerRead(ctx context.Context, upToSeq int64) error {
+	var seq int64
+	if err := it.t.tx.QueryRow(ctx, `
+		SELECT coalesce(max(seq), 0) FROM messages
+		WHERE chat_id = $1 AND from_id = $2 AND seq <= $3 AND deleted_at IS NULL`,
+		it.c.ID, it.owner, upToSeq).Scan(&seq); err != nil {
+		return fmt.Errorf("chat: newest read message: %w", err)
+	}
+	tag, err := it.t.tx.Exec(ctx, `
+		UPDATE chat_members SET read_outbox_max_seq = $3
+		WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL AND read_outbox_max_seq < $3`,
+		it.c.ID, it.owner, seq)
+	if err != nil {
+		return fmt.Errorf("chat: outbox read position: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil
+	}
+	ev := it.t.event(kindRead, it.c.ID, it.owner)
+	it.t.toUsers(ev, []int64{it.owner}, &appv1.Update{Kind: &appv1.Update_Read{Read: &appv1.UpdateRead{
+		ChatId: it.c.ID, MaxSeq: seq, Outbox: true,
+	}}})
 	return nil
 }
 

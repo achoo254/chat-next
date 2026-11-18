@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -205,6 +206,25 @@ func lookupMessage(ctx context.Context, q querier, account int64, chat, msg stri
 	return m, nil
 }
 
+// newestSeqUpTo is the seq of the newest imported message of conv whose
+// external id, a decimal integer, is at most maxID; 0 when there is none or
+// maxID is not a number.
+func newestSeqUpTo(ctx context.Context, q querier, account int64, conv, maxID string) (int64, error) {
+	upTo, err := strconv.ParseInt(maxID, 10, 64)
+	if err != nil {
+		return 0, nil
+	}
+	var seq int64
+	err = q.QueryRow(ctx, `
+		SELECT coalesce(max(seq), 0) FROM external_messages
+		WHERE account_id = $1 AND external_chat_id = $2 AND external_msg_id ~ '^[0-9]{1,18}$'
+			AND external_msg_id::bigint <= $3`, account, conv, upTo).Scan(&seq)
+	if err != nil {
+		return 0, fmt.Errorf("bridge: newest read message: %w", err)
+	}
+	return seq, nil
+}
+
 // knownMessages returns which of ids are already imported into chat.
 func knownMessages(ctx context.Context, q querier, account int64, chat string, ids []string) (map[string]bool, error) {
 	rows, err := q.Query(ctx, `SELECT external_msg_id FROM external_messages WHERE account_id = $1 AND external_chat_id = $2 AND external_msg_id = ANY($3)`,
@@ -305,7 +325,7 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			SELECT u.id, u.name FROM external_users x JOIN users u ON u.id = x.user_id
 			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current)
 		if err == nil {
-			if current != name {
+			if current != name && !p.NameUnknown {
 				if _, err := d.pool.Exec(ctx, `UPDATE users SET name = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, id, name); err != nil {
 					return 0, fmt.Errorf("bridge: rename puppet: %w", err)
 				}

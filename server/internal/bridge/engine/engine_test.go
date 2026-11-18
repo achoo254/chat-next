@@ -409,6 +409,56 @@ func TestPrivateConversationIsAPrivateChatWithAPuppet(t *testing.T) {
 	}
 }
 
+func TestLiveMessageWithOnlyAnIdDoesNotRenameThePuppet(t *testing.T) {
+	e := newEnv(t)
+	conv := bridge.Conversation{ID: "dm1", Kind: bridge.ConvPrivate, Peer: &lan}
+	e.fake.AddConversation(conv)
+	e.fake.AddHistory("dm1", e.msg("1", lan, "chào đại ca", 0))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"chào đại ca"})
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "no backfill" })
+	standIn := bridge.Participant{ID: lan.ID, Name: "Telegram 42", NameUnknown: true}
+	live := e.msg("2", standIn, "tin mới", 1)
+	live.Conversation = "dm1"
+	e.fake.Push(bridge.Event{Message: &live})
+	e.waitTexts(chatID, []string{"chào đại ca", "tin mới"})
+	var name string
+	if err := e.st.Pool().QueryRow(context.Background(), `
+		SELECT u.name FROM external_users x JOIN users u ON u.id = x.user_id
+		WHERE x.account_id = $1 AND x.external_user_id = $2`, e.account, lan.ID).Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != lan.Name {
+		t.Fatalf("puppet name = %q, want %q", name, lan.Name)
+	}
+}
+
+func TestPeerReadMovesTheOwnersOutboxPosition(t *testing.T) {
+	e := newEnv(t)
+	conv := bridge.Conversation{ID: "dm1", Kind: bridge.ConvPrivate, Peer: &lan}
+	e.fake.AddConversation(conv)
+	e.fake.AddHistory("dm1", e.msg("1", lan, "chào đại ca", 0), e.msg("2", me, "chào Lan", 1), e.msg("4", me, "ăn chưa", 2))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"chào đại ca", "chào Lan", "ăn chưa"})
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "no backfill" })
+	outbox := func() (pos, seqOfFirst int64) {
+		if err := e.st.Pool().QueryRow(context.Background(), `
+			SELECT (SELECT read_outbox_max_seq FROM chat_members WHERE chat_id = $1 AND user_id = $2),
+				(SELECT seq FROM messages WHERE chat_id = $1 AND text = 'chào Lan')`, chatID, e.owner).Scan(&pos, &seqOfFirst); err != nil {
+			t.Fatal(err)
+		}
+		return pos, seqOfFirst
+	}
+	// Telegram says the other person read up to message 3: only message 2 of
+	// the owner is covered; message 4 is not.
+	e.fake.Push(bridge.Event{Read: &bridge.Read{Conversation: "dm1", MaxID: "3"}})
+	e.eventually(func() bool { pos, first := outbox(); return pos == first && pos > 0 },
+		func() string {
+			pos, first := outbox()
+			return fmt.Sprintf("outbox = %d, first message = %d", pos, first)
+		})
+}
+
 func TestRateLimitWaitsAndContinues(t *testing.T) {
 	e := newEnv(t)
 	conv := e.group("g1")

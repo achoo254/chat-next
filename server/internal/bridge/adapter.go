@@ -125,6 +125,10 @@ type Participant struct {
 	// real Chat user.
 	IsSelf   bool
 	PhotoRef string
+	// NameUnknown marks a Name that is only a stand-in (the app named the
+	// person by id alone). The engine uses it to create a missing puppet but
+	// never to rename one that already has a real name.
+	NameUnknown bool
 }
 
 // Entity is a normalised text span. Kinds the engine does not know are
@@ -224,8 +228,17 @@ type Delete struct {
 	IDs          []string
 }
 
+// Read tells that the other side of a conversation read the owner's
+// messages up to MaxID. Message ids of an adapter that sends it are decimal
+// integers that grow with time, so the engine can tell which messages that
+// covers without having imported MaxID itself.
+type Read struct {
+	Conversation string
+	MaxID        string
+}
+
 // Event is one normalised update. Exactly one of Message, Edit, Delete,
-// Conversation or Topic is set. State is the account state after this event; the
+// Conversation, Topic, Pin or Read is set. State is the account state after this event; the
 // engine stores it in the same transaction as the write, so a crash between
 // the two is replayed, not lost.
 type Event struct {
@@ -235,6 +248,8 @@ type Event struct {
 	Conversation *Conversation
 	Topic        *TopicChange
 	Pin          *PinChange
+	Seen         *Seen
+	Read         *Read
 	Participant  *Participant
 	State        []byte
 }

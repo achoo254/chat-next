@@ -91,24 +91,26 @@ func userName(u *tg.User) string {
 
 // participantUser is a Telegram user as a bridge participant.
 func participantUser(u *tg.User, self int64) bridge.Participant {
-	return bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self}
+	named := strings.TrimSpace(u.FirstName+" "+u.LastName) != "" || u.Username != ""
+	return bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self, NameUnknown: !named}
 }
 
 // participantOf finds who a peer is. A user Telegram did not send along is
-// still a person (named by their id); a channel stands for itself.
+// still a person (named by their id, flagged NameUnknown: updates in short
+// form carry no users); a channel stands for itself.
 func (b *peerBook) participantOf(p tg.PeerClass, self int64) bridge.Participant {
 	switch v := p.(type) {
 	case *tg.PeerUser:
 		if u := b.users[v.UserID]; u != nil {
 			return participantUser(u, self)
 		}
-		return bridge.Participant{ID: strconv.FormatInt(v.UserID, 10), Name: "Telegram " + strconv.FormatInt(v.UserID, 10), IsSelf: v.UserID == self}
+		return bridge.Participant{ID: strconv.FormatInt(v.UserID, 10), Name: "Telegram " + strconv.FormatInt(v.UserID, 10), IsSelf: v.UserID == self, NameUnknown: true}
 	case *tg.PeerChannel:
 		id := prefixChannel + strconv.FormatInt(v.ChannelID, 10)
 		if c := b.channels[v.ChannelID]; c != nil {
 			return bridge.Participant{ID: id, Name: c.Title, Username: c.Username}
 		}
-		return bridge.Participant{ID: id, Name: "Telegram channel"}
+		return bridge.Participant{ID: id, Name: "Telegram channel", NameUnknown: true}
 	case *tg.PeerChat:
 		id := prefixChat + strconv.FormatInt(v.ChatID, 10)
 		if c := b.chats[v.ChatID]; c != nil {

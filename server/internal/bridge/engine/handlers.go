@@ -139,6 +139,27 @@ var handlers = []handler{
 			},
 		},
 	},
+	{
+		feature: feature.Read,
+		match: func(ev bridge.Event) (string, bool) {
+			if ev.Seen != nil {
+				return ev.Seen.Conversation, true
+			}
+			if ev.Read == nil {
+				return "", false
+			}
+			return ev.Read.Conversation, true
+		},
+		apply: func(r *runner, ctx context.Context, ev bridge.Event) (bool, error) {
+			if ev.Seen != nil {
+				return r.onSeen(ctx, ev, *ev.Seen)
+			}
+			return r.onRead(ctx, ev, *ev.Read)
+		},
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"mark_read": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doMarkRead(ctx, h) },
+		},
+	},
 }
 
 // opHandler finds the handler that owns an outbox op.

@@ -115,6 +115,19 @@ func TestTranslateErrors(t *testing.T) {
 	var _ error = (*bridge.RateLimitError)(nil)
 }
 
+// A message in short form names its sender by id only; the stand-in name is
+// flagged so it never replaces a real one.
+func TestMapMessageFromUnknownUserFlagsTheStandInName(t *testing.T) {
+	m, ok := newPeerBook().mapMessage(withFrom(&tg.Message{ID: 5, PeerID: &tg.PeerUser{UserID: 7}, Message: "chào"}, 7, nil), selfID)
+	if !ok || m.From.ID != "7" || !m.From.NameUnknown {
+		t.Fatalf("from = %+v", m.From)
+	}
+	known, _ := book().mapMessage(withFrom(&tg.Message{ID: 6, PeerID: &tg.PeerUser{UserID: 7}, Message: "chào"}, 7, nil), selfID)
+	if known.From.NameUnknown {
+		t.Fatalf("a known user is flagged: %+v", known.From)
+	}
+}
+
 func TestMapMessageKeepsLinkButtonsOnly(t *testing.T) {
 	markup := &tg.ReplyInlineMarkup{Rows: []tg.KeyboardInlineButtonRow{
 		{Buttons: []tg.KeyboardInlineButton{

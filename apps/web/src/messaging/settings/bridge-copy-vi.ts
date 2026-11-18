@@ -139,6 +139,7 @@ export const viBridge = {
 			invites: "Link mời",
 			typing: "Đang gõ",
 			lifecycle: "Rời và xoá nhóm",
+			alerts: "Thông báo tin mới",
 		} as Record<string, string>,
 		direction: { off: "Tắt", in: "Chỉ nhận", out: "Chỉ gửi", both: "Hai chiều" } as Record<string, string>,
 		risk: {

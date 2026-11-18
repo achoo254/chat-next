@@ -1332,7 +1332,13 @@ func (s *Service) ReadHistory(ctx context.Context, me, chatID, maxSeq, topicID i
 			return errInvalid("this chat has no topics")
 		}
 		maxSeq = min(maxSeq, c.LastSeq)
-		return t.read(ctx, c, m, maxSeq, topicID)
+		if err := t.read(ctx, c, m, maxSeq, topicID); err != nil {
+			return err
+		}
+		if topicID == 0 {
+			return t.queueRead(ctx, chatID, me, maxSeq)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

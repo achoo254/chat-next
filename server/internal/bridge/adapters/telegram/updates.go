@@ -12,7 +12,8 @@ import (
 )
 
 // Subscribe implements bridge.Adapter: the account's live updates (new,
-// edited and deleted messages of every conversation), until ctx ends.
+// edited and deleted messages of every conversation, and the other person of
+// a private chat reading what the owner sent), until ctx ends.
 //
 // Telegram's update manager keeps the common box (pts, qts, seq, date) and
 // the pts of each channel, fetching what was missed with getDifference. That
@@ -73,6 +74,17 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 		return message(ctx, e, u.Message, true)
 	})
 	registerPins(d, c, emit)
+	registerSeen(d, emit)
+	d.OnReadHistoryOutbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadHistoryOutbox) error {
+		// Only a private chat tells that the other person read: a group
+		// does not say who did.
+		peer, ok := u.Peer.(*tg.PeerUser)
+		if !ok {
+			return nil
+		}
+		return emit(ctx, bridge.Event{Read: &bridge.Read{
+			Conversation: prefixUser + strconv.FormatInt(peer.UserID, 10), MaxID: strconv.Itoa(u.MaxID)}})
+	})
 	d.OnDeleteMessages(func(ctx context.Context, _ tg.Entities, u *tg.UpdateDeleteMessages) error {
 		// A delete in a private chat or basic group names no chat: the core
 		// finds the message by its id (ids are unique per account there).

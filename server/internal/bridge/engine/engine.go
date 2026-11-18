@@ -21,6 +21,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/feature"
 	"app.local/server/internal/chat"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
@@ -494,19 +495,28 @@ func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Me
 				fresh = append(fresh, m)
 			}
 		}
-		return r.appendMessages(ctx, it, l, fresh, senders, files)
+		return r.appendMessages(ctx, it, l, fresh, senders, files, false)
 	})
 }
 
 // appendMessages writes fresh messages (oldest first) into the chat, records
 // their keys, and wires replies in both directions.
-func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatLink, fresh []bridge.Message, senders map[string]int64, files map[string]*appv1.Message) error {
+func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatLink, fresh []bridge.Message, senders map[string]int64, files map[string]*appv1.Message, live bool) error {
 	if len(fresh) == 0 {
 		return nil
 	}
 	topicIDs, err := r.topicIDs(ctx, it, l, fresh)
 	if err != nil {
 		return err
+	}
+	// A message that just arrived notifies, when the alerts feature receives for this chat; history does not.
+	notify := false
+	if live {
+		dir, err := r.e.db.featureDirection(ctx, r.account.ID, l.ExternalChat, feature.Alerts)
+		if err != nil {
+			return err
+		}
+		notify = dir.Receives()
 	}
 	imports := make([]chat.ImportMessage, len(fresh))
 	replyTo := make([]string, len(fresh))
@@ -524,7 +534,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)
 		text, ents := mapContent(labelled, moved, r.e.chat.MessageLengthMax(), r.userOf)
-		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic], Buttons: chatButtons(m.Buttons)}
+		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic], Buttons: chatButtons(m.Buttons), Notify: notify && from != r.account.OwnerID}
 		if m.ReplyTo != "" {
 			target, err := lookupMessage(ctx, it.Tx(), r.account.ID, l.ExternalChat, m.ReplyTo)
 			if err != nil {
@@ -622,7 +632,7 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 				return err
 			}
 			if ok {
-				if err := r.appendMessages(ctx, it, l, []bridge.Message{m}, map[string]int64{m.From.ID: from}, files); err != nil {
+				if err := r.appendMessages(ctx, it, l, []bridge.Message{m}, map[string]int64{m.From.ID: from}, files, !isEdit); err != nil {
 					return err
 				}
 			}
@@ -661,6 +671,26 @@ func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey,
 
 // onDelete removes messages, or remembers the delete for a message that has
 // not arrived yet.
+// onRead moves the owner's outbox read position: the other side read what the
+// owner sent up to rd.MaxID.
+func (r *runner) onRead(ctx context.Context, ev bridge.Event, rd bridge.Read) (bool, error) {
+	l := r.links[rd.Conversation]
+	if l == nil || !l.BackfillDone {
+		return false, nil
+	}
+	seq, err := newestSeqUpTo(ctx, r.e.db.pool, r.account.ID, rd.Conversation, rd.MaxID)
+	if err != nil || seq == 0 {
+		return false, err
+	}
+	err = r.withLink(ctx, l, func(it *chat.ImportTx) error {
+		if err := it.MarkPeerRead(ctx, seq); err != nil {
+			return err
+		}
+		return saveState(ctx, it.Tx(), r.account.ID, ev.State)
+	})
+	return true, err
+}
+
 func (r *runner) onDelete(ctx context.Context, ev bridge.Event, d bridge.Delete) (bool, error) {
 	// Group what exists by chat; the rest become tombstones.
 	byChat := map[int64][]int64{}

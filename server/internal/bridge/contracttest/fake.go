@@ -50,6 +50,7 @@ type Fake struct {
 	partial                                    map[string]bool
 	memberCalls                                []string
 	invites                                    map[string][]bridge.InviteLink
+	reads                                      []string
 	lifecycle                                  []string
 	pinCalls                                   []PinCall
 	failPin                                    []error
@@ -72,7 +73,8 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Messages:  {In: true, Out: true},
 		feature.Pins:      {In: true, Out: true},
 		feature.Topics:    {In: true, Out: true},
-		feature.Read:      {In: true},
+		feature.Read:      {In: true, Out: true},
+		feature.Alerts:    {In: true},
 		feature.Notify:    {In: true, Out: true},
 		feature.Dialog:    {In: true, Out: true},
 		feature.Info:      {In: true, Out: true},
@@ -844,7 +846,26 @@ func (f *Fake) DeleteGroup(_ context.Context, _ bridge.Account, conv string) err
 	return f.lifecycleCall("delete:" + conv)
 }
 
+// MarkReads lists what Chat told the app it read, as "conversation:id".
+func (f *Fake) MarkReads() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.reads...)
+}
+
+// MarkRead implements bridge.ReadWriter.
+func (f *Fake) MarkRead(_ context.Context, _ bridge.Account, conv, upToID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Read].Out {
+		return fmt.Errorf("%w: this app does not take that from Chat", bridge.ErrNotAllowed)
+	}
+	f.reads = append(f.reads, conv+":"+upToID)
+	return nil
+}
+
 var (
+	_ bridge.ReadWriter     = (*Fake)(nil)
 	_ bridge.MemberAdder    = (*Fake)(nil)
 	_ bridge.PermWriter     = (*Fake)(nil)
 	_ bridge.InviteManager  = (*Fake)(nil)
