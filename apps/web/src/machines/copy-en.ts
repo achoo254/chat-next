@@ -1320,7 +1320,6 @@ export const enMachines: MachinesCopy = {
 		director: "Director",
 		chairman: "Chairman (you)",
 		advisor: "Advisor",
-		machine: (tool: string) => (tool === "" ? "Background machine" : `${tool} machine`),
 		service: {
 			names: {
 				"dev-server": "Dev server",

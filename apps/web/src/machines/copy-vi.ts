@@ -1338,8 +1338,7 @@ export const viMachines = {
 		director: "Giám đốc điều hành",
 		chairman: "Chủ tịch (bạn)",
 		advisor: "Cố vấn chiến lược",
-		machine: (tool: string) => (tool === "" ? "Máy chạy nền" : `Máy ${tool}`),
-		/** A background service as the agent labelled it on the machine (never its command): its name and bubble. */
+		/** A background service as the agent labelled it on the machine (never its command): the bubble and inspector of the person who runs it. */
 		service: {
 			names: {
 				"dev-server": "Máy chủ dev",

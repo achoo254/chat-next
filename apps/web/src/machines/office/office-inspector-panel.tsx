@@ -106,26 +106,24 @@ export function InspectorPanel({ held, onClose }: { held: HeldInspected; onClose
 						<span className="of-panel-muted"> · {t.inspector.ago(t.inspector.duration(model.lastResult.agoMs))}</span>
 					</Row>
 				)}
-				{model.kind !== "machine" && <Row label={t.inspector.done}>{model.done}</Row>}
+				<Row label={t.inspector.done}>{model.done}</Row>
 				{model.approvalWaitMs !== null && <Row label={t.inspector.approvalWait}>{t.inspector.duration(model.approvalWaitMs)}</Row>}
 			</dl>
-			{model.kind !== "machine" && (
-				<section className="of-panel-timeline" aria-label={t.inspector.timeline}>
-					<h4>{t.inspector.timeline}</h4>
-					{model.timeline.length === 0 ? (
-						<p className="of-note">{t.inspector.timelineEmpty}</p>
-					) : (
-						<>
-							<ul className="of-panel-entries">
-								{model.timeline.map((e, i) => (
-									<Entry key={`${e.agoMs}-${i}`} entry={e} t={t} />
-								))}
-							</ul>
-							<p className="of-note">{t.inspector.timelineNote}</p>
-						</>
-					)}
-				</section>
-			)}
+			<section className="of-panel-timeline" aria-label={t.inspector.timeline}>
+				<h4>{t.inspector.timeline}</h4>
+				{model.timeline.length === 0 ? (
+					<p className="of-note">{t.inspector.timelineEmpty}</p>
+				) : (
+					<>
+						<ul className="of-panel-entries">
+							{model.timeline.map((e, i) => (
+								<Entry key={`${e.agoMs}-${i}`} entry={e} t={t} />
+							))}
+						</ul>
+						<p className="of-note">{t.inspector.timelineNote}</p>
+					</>
+				)}
+			</section>
 		</aside>
 	);
 }

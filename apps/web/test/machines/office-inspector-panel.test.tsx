@@ -1,11 +1,12 @@
 // Opening a person's panel in the office tab: a press on a name opens it beside
 // the scene (a column; a sheet on a phone), the same name again, Esc or its
 // close button closes it and puts the focus back on the name, a press on
-// nothing closes it, the chairman is nobody to open, a machine that left says
-// so for a while and then the panel goes, and another session starts with no
-// panel. The holder of the panel's content is pure (holdInspected).
+// nothing closes it, the chairman is nobody to open, a background service shows
+// on the panel of the person who runs it, and another session starts with no
+// panel. The holder of the panel's content is pure (holdInspected): someone who
+// left says so for a while and then the panel goes.
 import { create } from "@bufbuild/protobuf";
-import { MachineInfoSchema, OfficeActorState, OfficeEventsSchema, OfficeRoom, type Frame } from "@achoo254/chat-proto/remote/remote";
+import { MachineInfoSchema, OfficeActorState, OfficeEventsSchema, OfficeRoom, OfficeServiceKind, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { act as reactAct, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -116,15 +117,17 @@ describe("the inspector panel in the office tab", () => {
 		expect(chairman?.querySelector("button")).toBeNull();
 	});
 
-	it("shows a machine that has left as gone for a while and then closes", async () => {
+	it("shows a background service on the panel of the person who runs it, who stays when it stops", async () => {
 		const user = userEvent.setup();
-		const { fake } = await openOffice([director(), machine("m1")]);
-		await user.click(nameButton("Máy Bash"));
-		await screen.findByRole("complementary", { name: "Thông tin nhân vật" });
+		const { fake } = await openOffice([director(), machine("m1", OfficeRoom.SERVER, { kind: OfficeServiceKind.DEV_SERVER, port: 5173, startedAt: BigInt(OFFICE_HOURS) })]);
+		expect(document.querySelector('[data-id="office-person-machine:m1"]')).toBeNull();
+		await user.click(nameButton("Backend & Hạ tầng"));
+		const opened = await screen.findByRole("complementary", { name: "Thông tin nhân vật" });
+		expect(opened.textContent).toContain("Máy chủ dev");
+		expect(opened.textContent).toContain("cổng 5173");
 		await fake.deliver({ case: "officeEvents", value: create(OfficeEventsSchema, { threadId: "t1", epoch: 1n, events: [ev(1, { case: "actorLeave", value: { actorId: "m1" } })] }) });
-		expect((await screen.findByRole("complementary", { name: "Thông tin nhân vật" })).textContent).toContain("Đã rời văn phòng");
-		vi.setSystemTime(OFFICE_HOURS + LEFT_SHOWN_MS + 2_000);
-		await waitFor(() => expect(panel()).toBeNull(), { timeout: 4_000 });
+		await waitFor(() => expect(screen.getByRole("complementary", { name: "Thông tin nhân vật" }).textContent).not.toContain("Máy chủ dev"));
+		expect(panel()?.textContent).not.toContain("Đã rời văn phòng");
 	});
 
 	it("starts another session with no panel", async () => {
@@ -162,12 +165,12 @@ describe("what the panel holds for the person chosen", () => {
 
 	it("keeps the record last seen of someone who has gone, with when they left, and closes after a while", () => {
 		const { store, placements } = placed();
-		const here = holdInspected(null, "machine:m1", placements, store.state(), T0).shown;
-		const without = placements.filter((p) => p.key !== "machine:m1");
-		const gone = holdInspected(here, "machine:m1", without, store.state(), T0 + 1_000);
+		const here = holdInspected(null, "title:gameplayDeveloper", placements, store.state(), T0).shown;
+		const without = placements.filter((p) => p.key !== "title:gameplayDeveloper");
+		const gone = holdInspected(here, "title:gameplayDeveloper", without, store.state(), T0 + 1_000);
 		expect(gone.close).toBe(false);
-		expect(gone.shown).toMatchObject({ key: "machine:m1", leftAt: T0 + 1_000 });
-		const later = holdInspected(gone.shown, "machine:m1", without, store.state(), T0 + 1_000 + LEFT_SHOWN_MS);
+		expect(gone.shown).toMatchObject({ key: "title:gameplayDeveloper", leftAt: T0 + 1_000 });
+		const later = holdInspected(gone.shown, "title:gameplayDeveloper", without, store.state(), T0 + 1_000 + LEFT_SHOWN_MS);
 		expect(later.close).toBe(true);
 	});
 

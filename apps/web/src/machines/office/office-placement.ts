@@ -16,10 +16,14 @@
 // server room. The director sits at one seat, goes to a meeting, walks the
 // desks to check (3D idle show), rests like the others, and only directs:
 // the work of a tool belongs to its department; a subagent starting shows the
-// director handing the job over. The chairman waits in the lobby.
+// director handing the job over. A background service the agent runs (a
+// machine on the wire) is no person of its own: it is the work of the title
+// that owns its kind (office-cast.ts serviceOwnerOf), done at their desk. The
+// chairman waits in the lobby.
 // Pure: the memory of the last call goes in, the new one comes out.
 import {
 	ALWAYS_ON_DUTY,
+	serviceOwnerOf,
 	STUDIO_TITLES,
 	titleKeyOf,
 	type CastKey,
@@ -30,6 +34,7 @@ import type { LayoutAnchor, OfficeLayout } from "./office-layout.ts";
 import { allocateLifePlaces } from "./office-life-places.ts";
 import { lifeActAt, lifePlanAt, type LifeAct, type LifePlan, type LifeSlot } from "./office-life-schedule.ts";
 import type { RoomCode } from "./office-rooms.ts";
+import type { ServiceKind } from "./office-state.ts";
 import type { ActivityView, ActorView, OfficeState, StaffMember } from "./office-store.ts";
 
 /** Whoever entered a room stays at least this long. */
@@ -45,7 +50,7 @@ export const HAND_IN_MS = 5_000;
 /** The director hands a job over (a hand-in gesture) this long after a subagent really starts. */
 export const DELEGATE_MS = 4_000;
 
-export type PersonKind = "director" | "employee" | "machine" | "chairman" | "advisor";
+export type PersonKind = "director" | "employee" | "chairman" | "advisor";
 
 /** Who Advisor is to the viewer (their Advisor profile): its name and look. */
 export interface OfficeAdvisor {
@@ -57,7 +62,7 @@ export interface OfficeAdvisor {
 export const ADVISOR_ROOM: RoomCode = "ADVISOR";
 
 export interface Placement {
-	/** "director", "chairman", an employee's staff key, or "machine:<actor id>". */
+	/** "director", "advisor", "chairman", or "title:<castKey>" for a job title's person. */
 	readonly key: string;
 	readonly kind: PersonKind;
 	/** The actor shown (null for the chairman and for an off-duty resident whose subagent left). */
@@ -127,7 +132,7 @@ function working(a: ActorView): boolean {
 	return a.activity !== null && a.state !== "done";
 }
 
-/** Whether any agent is running: the session is busy, or an actor (not a background machine) is at work. */
+/** Whether any agent is running: the session is busy, or an actor (not a background service) is at work. */
 export function agentRunning(state: OfficeState): boolean {
 	return state.session.busy || state.actors.some((a) => a.role !== "machine" && a.role !== "advisor" && a.state === "working");
 }
@@ -154,9 +159,12 @@ const DEPARTMENT: Readonly<Partial<Record<RoomCode, CastKey>>> = {
  * inspector panel is opened with): the director's own work is his, any other
  * tool he runs is its department's person's (null when no department claims its
  * room: nobody does it and no bubble shows it), a subagent's is its job title's,
- * Advisor's is Advisor's, a machine's is that machine's.
+ * Advisor's is Advisor's, a background service's is the title that owns its kind.
  */
-export function activityOwnerKey(actor: Pick<ActorView, "id" | "role" | "agentType">, activity: Pick<ActivityView, "group" | "room">): string | null {
+export function activityOwnerKey(
+	actor: Pick<ActorView, "role" | "agentType"> & { readonly service: { readonly kind: ServiceKind } | null },
+	activity: Pick<ActivityView, "group" | "room">,
+): string | null {
 	switch (actor.role) {
 		case "director": {
 			if (directing(activity)) return "director";
@@ -166,7 +174,7 @@ export function activityOwnerKey(actor: Pick<ActorView, "id" | "role" | "agentTy
 		case "advisor":
 			return "advisor";
 		case "machine":
-			return `machine:${actor.id}`;
+			return `title:${serviceOwnerOf(actor.service?.kind)}`;
 		case "employee":
 			return `title:${titleKeyOf(actor.agentType)}`;
 	}
@@ -183,6 +191,15 @@ function delegated(director: ActorView, title: StudioTitle): ActorView {
 	return { ...director, id: `${director.id}>${title.key}`, role: "employee", agentType: title.repType, parentId: director.id, spawnDepth: 1, state: "working" };
 }
 
+/**
+ * A background service run by the title's person: the machine's actor as a member of the title, working at the person's
+ * own desk (a tool in WORK is done in the title's home room). It keeps its service label, so the bubble and the inspector say what runs.
+ */
+function serviceWork(machine: ActorView, title: StudioTitle): ActorView {
+	const activity: ActivityView | null = machine.activity === null ? null : { ...machine.activity, room: "WORK" };
+	return { ...machine, role: "employee", agentType: title.repType, activity };
+}
+
 function people(state: OfficeState, now: number): Person[] {
 	const list: Person[] = [];
 	const director = state.actors.find((a) => a.role === "director") ?? null;
@@ -197,17 +214,19 @@ function people(state: OfficeState, now: number): Person[] {
 	list.push({ key: "advisor", kind: "advisor", actor: advisor, member: null, title: null, concurrent: 0, workKey: "advisor" });
 	const employees = state.actors.filter((a) => a.role === "employee");
 	const department = doing !== null && !directing(doing) ? DEPARTMENT[doing.room] : undefined;
+	// Background services at work; one that is not (no activity) has nothing to show.
+	const services = state.actors.filter((a) => a.role === "machine" && working(a));
 	for (const title of STUDIO_TITLES) {
 		const mine = employees.filter((a) => titleKeyOf(a.agentType) === title.key);
 		const extra = director !== null && department === title.key ? [delegated(director, title)] : [];
-		const actor = pickActor([...mine, ...extra]);
+		const runs = services.filter((a) => serviceOwnerOf(a.service?.kind) === title.key).map((a) => serviceWork(a, title));
+		const actor = pickActor([...mine, ...extra, ...runs]);
 		const members = state.staff.filter((m) => titleKeyOf(m.agentType) === title.key).sort((a, b) => b.firstEnteredAt - a.firstEnteredAt);
 		const key = `title:${title.key}`;
 		// A person of the title has their own seat and never waits for a desk or comes in through the lobby: `nested` keeps them out of the meeting room's "+N".
 		const member: StaffMember = { key, agentType: title.repType, ordinal: 1, actorId: actor?.id ?? "", desk: null, nested: true, firstEnteredAt: 0 };
 		list.push({ key, kind: "employee", actor, member, title, concurrent: mine.filter(working).length, workKey: members[0]?.key ?? key });
 	}
-	for (const actor of state.actors) if (actor.role === "machine") list.push({ key: `machine:${actor.id}`, kind: "machine", actor, member: null, title: null, concurrent: 0, workKey: `machine:${actor.id}` });
 	if (state.chairman) list.push({ key: "chairman", kind: "chairman", actor: null, member: null, title: null, concurrent: 0, workKey: "chairman" });
 	return list;
 }
@@ -239,7 +258,6 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 		const asked = state.actors.some((a) => a.role !== "advisor" && a.state !== "done" && a.activity?.group === "consult");
 		return { room: ADVISOR_ROOM, working: asked, own: advisorSeat, life: null };
 	}
-	if (person.kind === "machine") return { room: "SERVER", working: true, own: null, life: null };
 	// Rest, play and sleep only off office hours and only while no agent runs: otherwise everyone is at their seat.
 	const rests = (): LifePlan | null => (running ? null : livingPlan(person.key, now));
 	const activity = actor === null ? null : currentActivity(actor, now, state.clockOffset);

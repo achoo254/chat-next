@@ -55,3 +55,13 @@ chỉ dùng dữ kiện agent đã chuẩn hoá, không gọi model khi chạy.
   một người ngủ thì cuộc của cả hai kết thúc); e2e đo xương đầu của mô hình: người nằm dọc giường, đầu về phía gối, ở tâm neo.
 - **Chế độ phiên**: mở một phiên từ danh sách theo chế độ chọn gần nhất trên thiết bị (nếu phiên đó có); biểu tượng trên hàng phiên vẫn theo trạng thái thật và
   trí nhớ của chính phiên đó.
+
+## Bổ sung (18/11/2026): bỏ robot, việc của dịch vụ nền giao cho nhân sự
+
+- **Bỏ robot**: văn phòng chỉ còn 15 người; dịch vụ nền không còn là người riêng (bỏ `serviceRobot` và tệp GLB của nó, `SERVICE_COLORS`, chấm vuông có
+  ăng-ten ở bản 2D). Thay mục **Robot** ở trên. Wire không đổi: web vẫn nhận actor `MACHINE` cùng `service`.
+- **Việc giao cho chức danh theo nhóm** (`serviceOwnerOf`, `apps/web/src/machines/office/office-cast.ts`): máy chủ dev, build, cơ sở dữ liệu cho Backend &
+  Hạ tầng; theo dõi test cho Kiểm thử phần mềm; theo dõi CI cho Giám đốc Công nghệ; git, script, nhóm lạ hay máy không nhãn cho Lập trình viên. Người đó làm
+  tại chỗ ngồi của mình, bong bóng và bảng thông tin vẫn nói dịch vụ gì, cổng, chạy bao lâu; dòng thời gian ghi vào người đó. Có subagent cùng chức danh
+  đang làm thì người đó hiện việc mới nhất (dịch vụ không tính vào số "×N"). Dịch vụ không tính là "agent đang chạy", nên ngoài giờ những người khác vẫn
+  nghỉ.

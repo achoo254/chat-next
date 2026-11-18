@@ -25,7 +25,7 @@ export interface PersonLook {
 	readonly accessoryScale: number;
 	/** Skin names of the atlas to wear, the first one it has wins; empty: a cell by the key. */
 	readonly skins: readonly string[];
-	/** The job title's own model (a key of staffCharacters), or null: the staff model with a skin cell, the Director's own, a machine's robot. */
+	/** The job title's own model (a key of staffCharacters), or null: the staff model with a skin cell, the Director's own. */
 	readonly model: string | null;
 }
 

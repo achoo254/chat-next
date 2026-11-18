@@ -135,9 +135,8 @@ describe("idle show", () => {
 		return acts;
 	};
 
-	it("never takes someone at work, a machine or the chairman, nor during a power cut or after closing", () => {
+	it("never takes someone at work or the chairman, nor during a power cut or after closing", () => {
 		expect(actsOver(person({ activityRoom: "LIBRARY" }))).toEqual([]);
-		expect(actsOver(person({ kind: "machine" }))).toEqual([]);
 		expect(actsOver(person({ kind: "chairman" }))).toEqual([]);
 		expect(actsOver(person(), { ...ctx, enabled: false })).toEqual([]);
 	});

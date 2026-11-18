@@ -2,9 +2,7 @@
 // loaded, the rigged model after (the coordinator rebuilds everyone when it
 // arrives) dressed in a skin cell of the atlas and their accessory when those
 // load too (each is optional), and under each one a soft blob shadow (one
-// instanced quad, every quality rung; plan decision L). A background service
-// is drawn as the toy robot once its model is loaded (robot-character.ts),
-// as a person until then or when it fails.
+// instanced quad, every quality rung).
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -15,13 +13,12 @@ import "@babylonjs/core/Meshes/instancedMesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
-import type { AccessoryItem, RobotAssets, SkinAtlas } from "../scene/scene-assets.ts";
+import type { AccessoryItem, SkinAtlas } from "../scene/scene-assets.ts";
 import { createBlockBodies, createBlockCharacter } from "./block-character.ts";
 import { createCharacterAccessories, type CharacterAccessories } from "./character-accessories.ts";
 import type { PersonLook } from "./character-look.ts";
 import { createCharacterSkins, loadTexture, type CharacterSkins } from "./character-skins.ts";
 import type { CharacterVisual } from "./character-visual.ts";
-import { loadRobotModel, type RobotModel } from "./robot-character.ts";
 import { createSkinnedCharacter, loadCharacterContainer } from "./skinned-character.ts";
 
 /** The character's files as URLs: the model, and optionally the Director's own model, its skin atlas and the accessories GLB. */
@@ -44,8 +41,6 @@ export interface CharacterPool {
 	load(files: CharacterFiles, signal: AbortSignal): Promise<boolean>;
 	/** Called when a job title's model has arrived (callers then rebuild their visuals; several arrivals may come close together). */
 	onStaffModel(callback: () => void): void;
-	/** Loads the services' robot; true when it is in (callers then rebuild their visuals). */
-	loadRobot(url: string, robot: RobotAssets, signal: AbortSignal): Promise<boolean>;
 	dispose(): void;
 }
 
@@ -124,7 +119,6 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 	};
 	let skins: CharacterSkins | null = null;
 	let accessories: CharacterAccessories | null = null;
-	let robot: RobotModel | null = null;
 	const blobMaterial = new StandardMaterial("blob", scene);
 	const blobMap = blobTexture(scene);
 	blobMaterial.diffuseTexture = blobMap;
@@ -143,13 +137,6 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 			return container !== null;
 		},
 		create(key, look, index) {
-			if (look.kind === "machine" && robot !== null) {
-				try {
-					return robot.create(key, look, index);
-				} catch (error) {
-					console.warn("office: robot copy failed, drawing the service as a person", error);
-				}
-			}
 			if (look.model !== null && look.kind !== "director") {
 				const own = staffContainers.get(look.model);
 				if (own === undefined) askStaff(look.model);
@@ -215,22 +202,7 @@ export function createCharacterPool(scene: Scene): CharacterPool {
 				return false;
 			}
 		},
-		async loadRobot(url, assets, signal) {
-			try {
-				const loaded = await loadRobotModel(scene, url, assets);
-				if (signal.aborted) {
-					loaded.dispose();
-					return false;
-				}
-				robot = loaded;
-				return true;
-			} catch (error) {
-				if (!signal.aborted) console.warn("office: service robot not loaded, services stay people", error);
-				return false;
-			}
-		},
 		dispose() {
-			robot?.dispose();
 			skins?.dispose();
 			accessories?.dispose();
 			directorContainer?.dispose();

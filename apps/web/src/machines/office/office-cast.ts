@@ -137,19 +137,32 @@ function titleOf(type: string): Title | null {
 /** Colours of agent types the table does not know, picked by a hash of the name. */
 export const UNKNOWN_PALETTE: readonly string[] = ["#c0607a", "#4f9da6", "#a07b3b", "#6a7fdb", "#b5652d", "#3d9970", "#9b59b6", "#d4813a", "#5a8f29", "#c2549d", "#2f7fa3", "#8c6d4f"];
 
-/** The director, the user (chairman) and the machines. */
-export const ROLE_COLORS = { director: "#2c3e66", chairman: "#8a6d1f", machine: "#5f6b7a" } as const;
+/** The director and the user (chairman). */
+export const ROLE_COLORS = { director: "#2c3e66", chairman: "#8a6d1f" } as const;
 
-/** A background service's robot by what it runs (a script keeps the machines' grey). */
-export const SERVICE_COLORS: Readonly<Record<ServiceKind, string>> = {
-	"dev-server": "#3d9970",
-	"test-watch": "#9b59b6",
-	build: "#d4813a",
-	"ci-watch": "#2f7fa3",
-	git: "#c0503f",
-	database: "#6a7fdb",
-	script: ROLE_COLORS.machine,
+/** A neutral grey for the indexed palette read's type (the hashed index is always in range). */
+const FALLBACK_COLOR = "#5f6b7a";
+
+/**
+ * Whose work a background service is, by what it runs: the dev server, builds
+ * and databases are Backend & DevOps's, test watchers QA's, CI watching the
+ * Tech Lead's, git and any other script (or a kind the agent did not send) the
+ * Gameplay Developer's.
+ */
+const SERVICE_OWNERS: Readonly<Record<ServiceKind, CastKey>> = {
+	"dev-server": "backendDevops",
+	build: "backendDevops",
+	database: "backendDevops",
+	"test-watch": "qaTester",
+	"ci-watch": "techLead",
+	git: "gameplayDeveloper",
+	script: "gameplayDeveloper",
 };
+
+/** The job title a background service's run is shown on; an unlabelled one (an older agent's) is the Gameplay Developer's. */
+export function serviceOwnerOf(kind: ServiceKind | null | undefined): CastKey {
+	return kind === null || kind === undefined ? "gameplayDeveloper" : SERVICE_OWNERS[kind];
+}
 
 /** A stable 32-bit hash of the type's name (FNV-1a), so a colour never changes between sessions. */
 export function nameHash(name: string): number {
@@ -170,7 +183,7 @@ export function castOf(agentType: string): CastEntry {
 	const type = agentType.trim().toLowerCase();
 	const title = titleOf(type);
 	if (title !== null) return { key: title.key, accessory: "none", color: title.color, homeRoom: title.homeRoom, model: title.model };
-	const color = UNKNOWN_PALETTE[nameHash(type) % UNKNOWN_PALETTE.length] ?? ROLE_COLORS.machine;
+	const color = UNKNOWN_PALETTE[nameHash(type) % UNKNOWN_PALETTE.length] ?? FALLBACK_COLOR;
 	return { key: null, accessory: "none", color, homeRoom: "WORK", model: FALLBACK_MODEL };
 }
 

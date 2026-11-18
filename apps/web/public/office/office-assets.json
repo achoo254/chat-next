@@ -1673,15 +1673,5 @@
 				"kb": 9
 			}
 		}
-	},
-	"serviceRobot": {
-		"file": "service-robot.00350b2e.glb",
-		"heightM": 0.62,
-		"parts": {
-			"body": "robot-body",
-			"screen": "robot-screen",
-			"eyes": "robot-eyes",
-			"light": "robot-light"
-		}
 	}
 }

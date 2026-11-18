@@ -312,13 +312,13 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	await reaches(page, "the QA tester (test command)", person("qaTester"), "QA");
 	await reaches(page, "the producer (todo)", person("producerPm"), "PLANNING");
 	await step(page); // 4: the test fails; a background shell
-	await reaches(page, "the background machine", (k) => k === "machine:m-dev", "SERVER");
-	// Named by what it runs, its port and minutes in the bubble; drawn as the toy robot in 3D.
-	const machinePin = page.locator("[data-id='office-person-machine:m-dev']");
-	assert.equal(await machinePin.locator(".of-name").textContent(), "Máy chủ dev");
-	assert.match((await machinePin.locator(".of-bubble").textContent()) ?? "", /^Máy chủ dev · cổng 5173 · (vừa chạy|\d+ phút)$/);
-	assert.equal(await machinePin.getAttribute("data-service"), "dev-server");
-	if (three) await poll("the dev server drawn as a robot", async () => (await readout(page))?.people.find((p) => p.key === "machine:m-dev")?.model ?? "", (m) => m === "robot", 30_000);
+	// The background dev server is no person of its own: Backend & DevOps runs it in the server room, and their bubble says what it is.
+	await reaches(page, "Backend & DevOps (the background dev server)", person("backendDevops"), "SERVER");
+	assert.equal(await page.locator("[data-id='office-person-machine:m-dev']").count(), 0);
+	const devopsPin = page.locator("[data-id='office-person-title:backendDevops']");
+	await poll("the dev server in Backend & DevOps's bubble", async () => (await devopsPin.locator(".of-bubble").textContent()) ?? "", (b) => /^Máy chủ dev · cổng 5173 · (vừa chạy|\d+ phút)$/.test(b));
+	assert.equal(await devopsPin.locator(".of-name").textContent(), "Backend & Hạ tầng");
+	assert.equal(await devopsPin.getAttribute("data-service"), "dev-server");
 	await step(page); // 5: the director edits; a code reviewer and a researcher come in
 	await step(page); // 6: the reviewer edits (their home room replaces WORK)
 	await reaches(page, "the code reviewer (edit, home room)", person("codeSecurityReviewer"), "AUDIT");
@@ -460,8 +460,8 @@ test("without WebGL (--disable-3d-apis): the 2D view shows the plan's picture wi
 		const { context, page, errors } = await openOffice(plain, "machine-chat", "office3d-test");
 		await page.locator("[data-id=office] .of-stage[data-renderer='2d'] [data-id=office-picture]").waitFor({ timeout: 30_000 });
 		assert.equal(await has3D(page), false, "no 3D scene");
-		// People in several zones at once: the director and staff (records and control zones), then a background
-		// machine (the server room of the work zone), all on the one picture.
+		// People in several zones at once: the director and staff (records and control zones), then Backend & DevOps
+		// running a background service (the server room of the work zone), all on the one picture.
 		for (let i = 0; i < 4; i++) await step(page);
 		await reaches(page, "the QA tester", person("qaTester"), "QA");
 		await step(page);

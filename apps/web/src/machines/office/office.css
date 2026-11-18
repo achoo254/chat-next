@@ -32,9 +32,6 @@
 .of-marker[data-status="done"] .of-dot { --of-ring: var(--c-success); }
 .of-marker[data-status="awaiting"] .of-dot, .of-marker[data-status="slow"] .of-dot, .of-marker[data-status="waiting-you"] .of-dot { --of-ring: var(--c-warning); }
 .of-marker[data-status="denied"] .of-dot { --of-ring: var(--c-error); }
-/* A background service is a little robot: a square screen-head with an antenna, in its kind's colour. */
-.of-marker[data-kind="machine"] .of-dot { position: relative; border-radius: var(--radius-xs); }
-.of-marker[data-kind="machine"] .of-dot::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 2px; height: 5px; margin-left: -1px; border-radius: var(--radius-full); background: var(--of-color); }
 /* Advisor: a rounded square ringed in its look's colour; its bubble is its latest answer, in plain text. Whoever asks it bobs as they talk. */
 .of-marker[data-kind="advisor"] .of-dot { border-radius: var(--radius-xs); --of-ring: var(--of-color); }
 .of-marker[data-kind="advisor"] .of-bubble, .of-marker[data-group="consult"] .of-bubble { font-family: inherit; color: var(--c-text); }
