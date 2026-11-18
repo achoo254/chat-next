@@ -2,12 +2,96 @@ package telegram
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gotd/td/tg"
+
 	"app.local/server/internal/bridge"
 )
+
+// TestLiveTelegramLeaveGroup leaves one group that still exists, through the adapter as the
+// engine calls it, and looks that it is gone from the list afterwards. Leaving is final:
+// the account is back in only if someone invites it. By hand, never on its own:
+//
+//	BRIDGE_LIVE_LEAVE=<exact title of the group> BRIDGE_LIVE_DIR=/some/dir TELEGRAM_API_ID=… \
+//	  TELEGRAM_API_HASH=… go test ./internal/bridge/adapters/telegram -run LiveTelegramLeaveGroup -timeout 15m -v
+func TestLiveTelegramLeaveGroup(t *testing.T) {
+	want := os.Getenv("BRIDGE_LIVE_LEAVE")
+	if want == "" {
+		t.Skip("set BRIDGE_LIVE_LEAVE to the exact title of a group to leave it on a real Telegram account")
+	}
+	ctx, a, acct := liveSession(t, "live-leave", 14*time.Minute)
+	convs, err := a.ListConversations(ctx, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var conv string
+	for _, c := range convs {
+		if c.Title == want && c.Kind == bridge.ConvGroup {
+			if conv != "" {
+				t.Fatalf("more than one group titled %q, refusing to pick one", want)
+			}
+			conv = c.ID
+		}
+	}
+	if conv == "" {
+		t.Fatalf("no group titled exactly %q", want)
+	}
+	t.Logf("group %s", conv)
+
+	if err := a.LeaveGroup(ctx, acct, conv); err != nil {
+		t.Fatalf("leave group: %v", err)
+	}
+	t.Log("leave group                    ok")
+	after, err := a.ListConversations(ctx, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, c := range after {
+		listed = listed || c.ID == conv
+	}
+	t.Logf("groups listed before %d, after %d; the group is still listed: %v", len(convs), len(after), listed)
+
+	// A basic group the account left stays in the dialog list, marked as left; only a
+	// channel or supergroup drops out. So what proves the leaving is the flag, not the list.
+	if id, ok := strings.CutPrefix(conv, "chat:"); ok {
+		chatID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, release, err := a.acquire(ctx, acct)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := c.live.api().MessagesGetChats(ctx, []int64{chatID})
+		release()
+		if err != nil {
+			t.Fatal(err)
+		}
+		left := false
+		for _, raw := range res.GetChats() {
+			switch ch := raw.(type) {
+			case *tg.Chat:
+				left = ch.Left
+				t.Logf("telegram says: left=%v deactivated=%v members=%d", ch.Left, ch.Deactivated, ch.ParticipantsCount)
+			case *tg.ChatForbidden:
+				left = true
+				t.Logf("telegram says: forbidden (%s)", ch.Title)
+			}
+		}
+		if !left {
+			t.Errorf("the account is not marked as having left %s", conv)
+		}
+	} else if listed {
+		t.Errorf("the group %s is still listed after leaving", conv)
+	}
+	// leaving again: the call may be throttled, so the answer is only recorded
+	t.Logf("leave again                    err=%v", a.LeaveGroup(ctx, acct, conv))
+}
 
 // TestLiveTelegramGroupLifecycle deletes, then tries to leave, a basic group made only for
 // this test, through the adapter as the engine calls it. It cannot be undone: the group is
