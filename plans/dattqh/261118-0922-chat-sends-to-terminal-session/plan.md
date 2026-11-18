@@ -1,7 +1,7 @@
 ---
 title: "Trò chuyện gửi được tin cho phiên đang mở trong terminal"
 description: "Trò chuyện và terminal ngang nhau: gửi tin từ Trò chuyện khi terminal đang giữ phiên thì phiên chuyển sang Trò chuyện, như mở terminal lấy phiên khỏi Trò chuyện."
-status: in-progress
+status: completed
 priority: P2
 tags: [agent, web, proto, terminal]
 blockedBy: []
@@ -11,7 +11,7 @@ created: 2026-11-18
 
 # Trò chuyện gửi được tin cho phiên đang mở trong terminal
 
-Trạng thái: phase 1, 2 xong, chờ phase 3 (phát hành tunelo) · Tier: L (proto + agent + web + docs + phát hành tunelo)
+Trạng thái: xong 18/11/2026 (tunelo 3.18.0) · Tier: L (proto + agent + web + docs + phát hành tunelo)
 
 ## Kết quả mong muốn
 - Phiên AI đang mở trong terminal không còn làm màn Trò chuyện thành "chỉ xem". Ô soạn tin luôn dùng được như khi
@@ -57,7 +57,7 @@ chạy, Trò chuyện chỉ hiện theo transcript.
 |---|---|---|---|
 | 1 | [Proto + agent: gửi tin lấy phiên khỏi terminal](phase-01-agent-takeover.md) | M | xong |
 | 2 | [Web: bỏ chế độ chỉ xem](phase-02-web-composer.md) | S | xong |
-| 3 | [Docs, phát hành tunelo, nghiệm thu máy thật](phase-03-docs-release.md) | S | chờ |
+| 3 | [Docs, phát hành tunelo, nghiệm thu máy thật](phase-03-docs-release.md) | S | xong |
 
 Phase 2 phụ thuộc phase 1 (cờ capability). Phase 3 sau cùng.
 
