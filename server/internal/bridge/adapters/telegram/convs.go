@@ -128,6 +128,10 @@ func (c *conn) inputPeer(ctx context.Context, conv string) (tg.InputPeerClass, e
 	if kind == "chat" {
 		return &tg.InputPeerChat{ChatID: id}, nil
 	}
+	if kind == "user" && id == c.live.self {
+		// "Saved Messages", the chat with oneself, needs no access hash.
+		return &tg.InputPeerSelf{}, nil
+	}
 	if _, err := c.loadDialogs(ctx); err != nil {
 		return nil, err
 	}
