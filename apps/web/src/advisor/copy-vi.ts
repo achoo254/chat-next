@@ -1,7 +1,7 @@
 // Vietnamese copy of Advisor (the mascot, its bubble and its settings).
 // "Jev" and "TypeSafe" are named only in the key section (key.*).
 export const viAdvisor = {
-	defaultName: "Cố vấn",
+	defaultName: "Cố vấn chiến lược",
 	mascot: {
 		open: (name: string) => `${name}: hỏi khi bạn phân vân`,
 		close: "Đóng",
