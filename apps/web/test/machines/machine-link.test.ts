@@ -364,6 +364,24 @@ describe("MachineLink", () => {
 		l.stop();
 	});
 
+	it("shows where macOS stands once it starts asking for a folder (a card allowed in a session), once per ask", async () => {
+		const asking = (access: number) => ({ case: "machineInfo", value: { name: "m", macFolders: [{ path: "/Users/u/Documents", access }] } });
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		machine.send(machine.socket, asking(2) as never);
+		await until(() => l.snapshot().macFolderAsk === "/Users/u/Documents", "asking shown");
+		l.dismissMacFolderAsk();
+		// Still asking: the dismissed question does not come back.
+		machine.send(machine.socket, asking(2) as never);
+		machine.send(machine.socket, asking(3) as never);
+		await until(() => l.snapshot().info?.macFolders[0]?.access === 3, "granted info");
+		expect(l.snapshot().macFolderAsk).toBeNull();
+		l.showMacFolderAsk("/Users/u/Documents");
+		expect(l.snapshot().macFolderAsk).toBe("/Users/u/Documents");
+		l.stop();
+	});
+
 	it("a folder macOS protects, refused by the machine, waits for the user's answer until dismissed", async () => {
 		machine.handler = (frame) =>
 			frame.body.case === "dirList"

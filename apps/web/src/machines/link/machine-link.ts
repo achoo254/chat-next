@@ -18,6 +18,7 @@ import { backoffDelay } from "@achoo254/chat-core";
 import {
 	ErrorCode,
 	ErrorReason,
+	MacFolderAccess,
 	FrameSchema,
 	HandshakeErrorCode,
 	type BrowserTakeover,
@@ -827,9 +828,17 @@ export class MachineLink {
 				this.set({ threads: keepOrder(this.current.threads, listed), advisorThreads, listed: true, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
 				break;
 			}
-			case "machineInfo":
-				this.set({ info: b.value, openSessions: b.value.openSessions, maxSessions: b.value.maxSessions });
+			case "machineInfo": {
+				// macOS started asking for a folder (a device agreed, maybe on a card in a session): show where it stands.
+				const asking = b.value.macFolders.find((f) => f.access === MacFolderAccess.ASKING && !this.wasAsking(f.path));
+				this.set({
+					info: b.value,
+					openSessions: b.value.openSessions,
+					maxSessions: b.value.maxSessions,
+					...(asking !== undefined && this.current.macFolderAsk === null ? { macFolderAsk: asking.path } : {}),
+				});
 				break;
+			}
 			case "threadInfo": {
 				const threadInfo = new Map(this.current.threadInfo);
 				threadInfo.set(b.value.threadId, mergeThreadInfo(this.current.threadInfo.get(b.value.threadId), b.value));
@@ -899,6 +908,16 @@ export class MachineLink {
 			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject, b.value.failureId));
 		}
 		else waiter.resolve(frame);
+	}
+
+	/** Whether the machine's last info said macOS was being asked for `folder` already. */
+	private wasAsking(folder: string): boolean {
+		return this.current.info?.macFolders.some((f) => f.path === folder && f.access === MacFolderAccess.ASKING) === true;
+	}
+
+	/** Opens the question about a folder macOS protects (from a turn stopped on it). */
+	showMacFolderAsk(folder: string): void {
+		if (folder !== "" && this.current.macFolderAsk !== folder) this.set({ macFolderAsk: folder });
 	}
 
 	/** The user closed the question about a folder macOS protects. */

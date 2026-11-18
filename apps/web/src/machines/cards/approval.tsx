@@ -132,7 +132,8 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 	const pending = approval.state === PromptState.PENDING;
 	const sites = secretSites(approval);
 	const secrets = sites.length > 0 ? sites.map((s) => s.name) : secretsInCommand(approval);
-	const canSession = !approval.sensitive && sessionAllow && !compact && secrets.length === 0;
+	// Asking macOS for a protected folder is never allowed for the session.
+	const canSession = !approval.sensitive && sessionAllow && !compact && secrets.length === 0 && !approval.macFolder;
 	const decide = (decision: Decision, note?: string) => {
 		if (busy) return;
 		setBusy(true);
@@ -203,7 +204,12 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 					))}
 				</ul>
 			)}
-			{secrets.length > 0 ? (
+			{approval.macFolder ? (
+				// Worded here: the machine's English reason says the same.
+				<p className="mx-warn mx-reason" data-id="approval-mac-folder">
+					{t.approval.macFolder(approval.macFolder)}
+				</p>
+			) : secrets.length > 0 ? (
 				// Worded here: tunelo 2.0.8 sent its own English reason for these, which is left out.
 				<p className="muted mx-reason">{t.approval.secretCommand(secrets.join(", "))}</p>
 			) : (

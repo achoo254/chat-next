@@ -660,7 +660,7 @@ interface TranscriptProps {
 	/** A prompt waits in the dock. */
 	waiting: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
-	link: UploadLink & ActivitySource;
+	link: UploadLink & ActivitySource & Partial<Pick<MachineLink, "showMacFolderAsk">>;
 	threadId: string;
 	thread: ThreadSummary | null;
 	/** The machine tells what a running turn does (ThreadActivity). */
@@ -948,7 +948,7 @@ interface BlockViewProps {
 	running: boolean;
 	fetchFull: (itemId: string) => Promise<void>;
 	t: MachinesCopy;
-	link: UploadLink;
+	link: UploadLink & Partial<Pick<MachineLink, "showMacFolderAsk">>;
 	threadId: string;
 	ai: string;
 	onSend: ((text: string) => Promise<void>) | undefined;
@@ -1034,7 +1034,17 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, on
 		case "status":
 			return <div className="mx-line">{block.text}</div>;
 		case "error":
-			return (
+			// A turn stopped on a folder macOS protects: worded here, with the way to ask for the folder.
+			return block.macFolder ? (
+				<div className="mx-line error" role="alert" data-id="mac-folder-stopped">
+					<span>{t.macFolder.macFolderStopped(block.macFolder)}</span>{" "}
+					{link.showMacFolderAsk !== undefined && (
+						<button type="button" className="btn btn-sm" onClick={() => link.showMacFolderAsk?.(block.macFolder)} data-id="mac-folder-stopped-ask">
+							{t.macFolder.macFolderAsk}
+						</button>
+					)}
+				</div>
+			) : (
 				<div className="mx-line error" role="alert">
 					{block.message}
 				</div>

@@ -133,6 +133,9 @@ export const enMachines: MachinesCopy = {
 		close: "Close",
 		askFailed: "Could not send the request to the machine.",
 		sessionHint: "macOS protects this folder: when you start, Chat asks you before tunelo asks macOS for it.",
+		macFolderStopped: (folder: string) =>
+			`A tool waited too long in ${folder} (a folder macOS protects; macOS may be asking on the Mac's screen). tunelo stopped the turn so you can go on; send a message for the AI to continue.`,
+		macFolderAsk: "Ask for this folder",
 	},
 	sessions: {
 		refresh: "Refresh the list",
@@ -374,6 +377,8 @@ export const enMachines: MachinesCopy = {
 		secretSites: "Secrets the command uses, by site",
 		secretNoSite: "not given to this session",
 		secretCommand: (names: string) => `This command uses the sign-in secret ${names}. tunelo asks you every time a command uses a secret, never for the whole session.`,
+		macFolder: (folder: string) =>
+			`This needs ${folder}, a folder macOS protects. Allowing it lets tunelo ask macOS first (macOS may show a prompt on the Mac's screen); if macOS refuses or nobody answers within 45 seconds, the AI skips this and goes on.`,
 	},
 	question: {
 		label: (ai) => `${ai} asks`,

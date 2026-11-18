@@ -1,10 +1,11 @@
 // A folder macOS protects: the question before tunelo asks macOS, then the
 // machine's answer as its info reports it.
 import { create } from "@bufbuild/protobuf";
-import { MacFolderAccess, MachineInfoSchema } from "@achoo254/chat-proto/remote/remote";
+import { ApprovalItemSchema, MacFolderAccess, MachineInfoSchema, PromptState, ToolKind } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
+import { ApprovalCard } from "../../src/machines/cards/approval.tsx";
 import type { LinkState } from "../../src/machines/link/machine-link.ts";
 import { MacFolderAccessDialog, folderLabel } from "../../src/machines/mac-folder-access.tsx";
 
@@ -95,5 +96,31 @@ describe("folderLabel", () => {
 	it("shortens the home folder to ~", () => {
 		expect(folderLabel(DOCS, HOME)).toBe("~/Documents");
 		expect(folderLabel("/Volumes/USB", HOME)).toBe("/Volumes/USB");
+	});
+});
+
+describe("an approval card for a call naming a folder macOS protects", () => {
+	const card = (macFolder: string) =>
+		create(ApprovalItemSchema, { toolId: "tu", kind: ToolKind.READ, name: "Read", summary: `${DOCS}/a.md`, input: "{}", reason: "It names a folder macOS protects", macFolder, state: PromptState.PENDING });
+
+	it("says in the user's language that macOS is asked first and the AI goes on, never for the session", () => {
+		render(
+			<I18nProvider>
+				<ApprovalCard approval={card(DOCS)} ai="Claude" sessionAllow onDecide={async () => undefined} />
+			</I18nProvider>,
+		);
+		expect(screen.getByText(/thư mục macOS bảo vệ/).textContent).toMatch(/45 giây thì AI bỏ qua việc này và làm tiếp/);
+		expect(screen.queryByText(/It names a folder macOS protects/)).toBeNull();
+		expect(screen.queryByRole("button", { name: /Cho phép trong phiên này/ })).toBeNull();
+	});
+
+	it("keeps the usual card otherwise", () => {
+		render(
+			<I18nProvider>
+				<ApprovalCard approval={card("")} ai="Claude" sessionAllow onDecide={async () => undefined} />
+			</I18nProvider>,
+		);
+		expect(document.querySelector('[data-id="approval-mac-folder"]')).toBeNull();
+		expect(screen.getByRole("button", { name: /Cho phép trong phiên này/ })).toBeTruthy();
 	});
 });

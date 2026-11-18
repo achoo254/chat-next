@@ -133,6 +133,9 @@ export const zhCNMachines: MachinesCopy = {
 		close: "关闭",
 		askFailed: "无法将请求发送到电脑。",
 		sessionHint: "macOS 保护此文件夹：开始时，Chat 会在 tunelo 向 macOS 请求权限之前先询问你。",
+		macFolderStopped: (folder: string) =>
+			`有工具在 ${folder} 中等待过久（macOS 保护的文件夹，macOS 可能正在 Mac 屏幕上询问）。tunelo 已停止本轮以便你继续；发送消息即可让 AI 继续。`,
+		macFolderAsk: "请求进入此文件夹",
 	},
 	sessions: {
 		refresh: "刷新列表",
@@ -371,6 +374,8 @@ export const zhCNMachines: MachinesCopy = {
 		secretSites: "命令使用的密钥及其网站",
 		secretNoSite: "本会话尚未获得此密钥",
 		secretCommand: (names: string) => `此命令使用登录密钥 ${names}。每次有命令使用密钥时 tunelo 都会询问你，不会对整个会话放行。`,
+		macFolder: (folder: string) =>
+			`此操作需要进入 ${folder}，这是 macOS 保护的文件夹。允许后 tunelo 会先询问 macOS（macOS 可能在 Mac 屏幕上显示对话框）；如果 macOS 拒绝或 45 秒内无人回应，AI 会跳过此操作并继续。`,
 	},
 	question: {
 		label: (ai) => `${ai} 提问`,

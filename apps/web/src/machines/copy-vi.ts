@@ -137,6 +137,9 @@ export const viMachines = {
 		close: "Đóng",
 		askFailed: "Không gửi được yêu cầu tới máy.",
 		sessionHint: "macOS bảo vệ thư mục này: khi bắt đầu, Chat sẽ hỏi bạn trước khi tunelo xin quyền vào.",
+		macFolderStopped: (folder: string) =>
+			`Một công cụ chờ quá lâu trong ${folder} (thư mục macOS bảo vệ, có thể macOS đang hỏi trên màn hình Mac). tunelo đã dừng lượt để bạn dùng tiếp; gửi tin nhắn để AI làm tiếp.`,
+		macFolderAsk: "Xin quyền vào thư mục",
 	},
 	sessions: {
 		refresh: "Làm mới danh sách",
@@ -383,6 +386,8 @@ export const viMachines = {
 		secretSites: "Bí mật lệnh dùng, theo trang",
 		secretNoSite: "phiên chưa có bí mật này",
 		secretCommand: (names: string) => `Lệnh này dùng bí mật đăng nhập ${names}. tunelo hỏi bạn mỗi lần một lệnh dùng bí mật, không cho phép cả phiên.`,
+		macFolder: (folder: string) =>
+			`Việc này cần vào ${folder}, thư mục macOS bảo vệ. Cho phép thì tunelo hỏi macOS trước (macOS có thể hiện hộp thoại trên màn hình Mac); macOS không cho hoặc không ai trả lời trong 45 giây thì AI bỏ qua việc này và làm tiếp.`,
 	},
 	question: {
 		label: (ai: string) => `${ai} hỏi`,

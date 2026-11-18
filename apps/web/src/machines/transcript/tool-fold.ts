@@ -62,7 +62,7 @@ export type Block =
 	| { readonly kind: "handoff"; readonly id: string; readonly handoff: AgentHandoffItem }
 	| { readonly kind: "compaction"; readonly id: string }
 	| { readonly kind: "status"; readonly id: string; readonly text: string }
-	| { readonly kind: "error"; readonly id: string; readonly message: string };
+	| { readonly kind: "error"; readonly id: string; readonly message: string; readonly macFolder: string };
 
 /** A message the user sent that the machine has not echoed yet. */
 /** A file that went with a user message, as the thread shows it. */
@@ -254,7 +254,7 @@ function single(item: Item): Block | null {
 		case "status":
 			return b.value.text.trim() === "" ? null : { kind: "status", id: item.id, text: b.value.text };
 		case "error":
-			return { kind: "error", id: item.id, message: b.value.message };
+			return { kind: "error", id: item.id, message: b.value.message, macFolder: b.value.macFolder };
 		default:
 			return null;
 	}
