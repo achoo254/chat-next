@@ -21,6 +21,8 @@ const BEDTIME = "2026-11-16T23:30:00+07:00";
 const AFTER_WORK = "2026-11-16T18:00:00+07:00";
 /** Where a seated pelvis rests over the floor (SEAT_PELVIS_HEIGHT in skinned-character.ts). */
 const SEAT_PELVIS = 0.5;
+/** How far a seated pelvis may be from the seat's centre across the floor (m). */
+const MAX_PELVIS_OFF_SEAT = 0.05;
 /** A bed is 0.95 m wide; arms and legs may reach this far beyond it (m). */
 const MAX_BODY_WIDTH_ON_BED = 1.12;
 
@@ -90,6 +92,18 @@ test("the director sits like the staff: pelvis on the seat, feet clear of the fl
 	assert.equal(director.pose, "sit-think");
 	assert.ok(Math.abs(rel(director, director.probe.pelvis?.y ?? NaN) - SEAT_PELVIS) < 0.02, `pelvis ${rel(director, director.probe.pelvis?.y ?? NaN)}`);
 	assert.ok(rel(director, director.probe.min.y) > 0.1, "legs hang above the floor on a doll's seat, none through it");
+});
+
+test("everyone seated during office hours has the pelvis over the seat's centre, not behind the chair", async () => {
+	const people = await peopleOn(0, null);
+	const seated = people.filter((p) => p.pose.startsWith("sit"));
+	assert.ok(seated.length >= 10, `most of the cast sits at their seats in office hours (${seated.length})`);
+	for (const p of seated) {
+		const probe = p.probe;
+		assert.ok(probe?.pelvis, `${p.key} has a pelvis`);
+		const off = Math.hypot(probe.pelvis.x - probe.root.x, probe.pelvis.z - probe.root.z);
+		assert.ok(off < MAX_PELVIS_OFF_SEAT, `${p.key} sits over the seat (pelvis ${off.toFixed(3)} m from its centre)`);
+	}
 });
 
 test("everyone on a bed rests on the mattress and stays within the bed: asleep at night, lying back after work (the director too)", async () => {

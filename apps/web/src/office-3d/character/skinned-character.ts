@@ -6,9 +6,11 @@
 // clip pose first, since a clip without keys for a bone does not reset it).
 // Level of detail runs a clip only every n-th frame at n times the speed
 // (goToFrame on a paused group did not pose in this Babylon version).
-// Sitting lifts or lowers the model so the pelvis lands on the seat (the CC0
-// clips are for an adult-sized rig): the pelvis height of each sitting clip
-// is measured once, the lift follows the seat (a chair, a low beanbag). A
+// Sitting moves the model so the pelvis lands on the seat (the CC0 clips are
+// for an adult-sized rig and sit the pelvis well behind the root): where each
+// sitting clip puts the pelvis is measured once, then the model is lifted to
+// the seat (a chair, a low beanbag) and slid so the pelvis is over the
+// seat's centre, the anchor, instead of behind the chair's back. A
 // lying clip lies on the ground at the root, which the people coordinator
 // puts at the bed's height. Each copy wears its skin
 // cell (character-skins.ts) and its accessory on a bone; the pantry mug shows
@@ -18,7 +20,7 @@ import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import { Axis } from "@babylonjs/core/Maths/math.axis";
-import { Quaternion } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
@@ -62,14 +64,26 @@ export async function loadCharacterContainer(scene: Scene, url: string): Promise
 
 const clipFps = (group: AnimationGroup): number => group.targetedAnimations[0]?.animation.framePerSecond ?? 30;
 
-/** Pelvis height of each sitting clip in the model's own units with no lift, shared by everyone on one model (same rig): measured once per model. */
-const pelvisByModel = new WeakMap<AssetContainer, Map<string, number>>();
+/** Where a sitting clip puts the pelvis, in the person's own frame (holder units, before the model is moved). */
+interface ClipPelvis {
+	readonly x: number;
+	readonly y: number;
+	readonly z: number;
+}
+
+/** The pelvis of each sitting clip, shared by everyone on one model (same rig): measured once per model. */
+const pelvisByModel = new WeakMap<AssetContainer, Map<string, ClipPelvis>>();
+
+/** How far the model moves for a sitting clip: up to the seat, and across so the pelvis is over the anchor. */
+export function seatedOffset(pelvis: ClipPelvis, seatHeight: number, scale: number): ClipPelvis {
+	return { x: -pelvis.x, y: seatHeight / scale - pelvis.y, z: -pelvis.z };
+}
 
 export function createSkinnedCharacter(scene: Scene, container: AssetContainer, key: string, index: number, look: PersonLook, dress: CharacterDress): CharacterVisual {
 	// The Director's model has its own proportions, so its pelvis heights are not the staff model's.
 	let pelvisOf = pelvisByModel.get(container);
 	if (pelvisOf === undefined) {
-		pelvisOf = new Map<string, number>();
+		pelvisOf = new Map<string, ClipPelvis>();
 		pelvisByModel.set(container, pelvisOf);
 	}
 	const suffix = `-${key}`;
@@ -111,11 +125,14 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 	let frame = 0;
 	let measure = false;
 	const active = (): AnimationGroup | undefined => (clip === null ? undefined : groups.get(clip));
-	/** The model's lift for the clip playing: the seat over the clip's pelvis when sitting, else none. */
-	const liftNow = (): number => {
-		if (clip === null || !isSeatedPose(pose)) return 0;
-		const pelvis = pelvisOf.get(clip);
-		return pelvis === undefined ? 0 : seat / CHARACTER_SCALE - pelvis;
+	/** Moves the model for the clip playing: pelvis onto the seat and over the anchor when sitting, else back to the root. */
+	const placeModel = (): void => {
+		const pelvis = clip === null || !isSeatedPose(pose) ? undefined : pelvisOf.get(clip);
+		if (pelvis === undefined) model.position.set(0, 0, 0);
+		else {
+			const o = seatedOffset(pelvis, seat, CHARACTER_SCALE);
+			model.position.set(o.x, o.y, o.z);
+		}
 	};
 
 	const play = (next: string | null): void => {
@@ -128,7 +145,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 				if (every === 0) group.pause();
 			} else group.stop();
 		}
-		model.position.y = liftNow();
+		placeModel();
 		measure = next !== null && isSeatedPose(pose) && !pelvisOf.has(next);
 	};
 
@@ -172,7 +189,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			pose = next;
 			seat = nextSeat;
 			play(clipFor(next, clips));
-			if (seatChanged) model.position.y = liftNow();
+			if (seatChanged) placeModel();
 			showItems(next === "coffee" || next === "eat");
 		},
 		setUpdateEvery(next) {
@@ -196,10 +213,11 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			if (measure && clip !== null) {
 				const pelvis = nodes.get("pelvis");
 				if (pelvis !== undefined) {
-					// In the model's own (unscaled) units: the pelvis height over the holder, without the current lift.
-					const pelvisInModel = (pelvis.computeWorldMatrix(true).getTranslation().y - holder.position.y) / CHARACTER_SCALE - model.position.y;
-					pelvisOf.set(clip, pelvisInModel);
-					model.position.y = liftNow();
+					// In the holder's own frame (unscaled, unturned), without the model's current move.
+					const toHolder = Matrix.Invert(holder.computeWorldMatrix(true));
+					const at = Vector3.TransformCoordinates(pelvis.computeWorldMatrix(true).getTranslation(), toHolder).subtractInPlace(model.position);
+					pelvisOf.set(clip, { x: at.x, y: at.y, z: at.z });
+					placeModel();
 				}
 				measure = false;
 			}
