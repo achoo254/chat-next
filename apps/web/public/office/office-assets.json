@@ -1052,7 +1052,7 @@
 		}
 	},
 	"directorCharacter": {
-		"file": "character-director.4e548dcb.glb",
+		"file": "character-director.5d09fe20.glb",
 		"clips": [
 			"Sitting_Idle",
 			"Sitting_Talking",
@@ -1077,12 +1077,13 @@
 			"Sleeping",
 			"Victory",
 			"Walk",
-			"Lying_Lounge"
+			"Lying_Lounge",
+			"Sleeping_Side"
 		]
 	},
 	"staffCharacters": {
 		"planner": {
-			"file": "character-staff-planner.f49e6cf4.glb",
+			"file": "character-staff-planner.122daad7.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1107,11 +1108,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"tech-lead": {
-			"file": "character-staff-tech-lead.54083eeb.glb",
+			"file": "character-staff-tech-lead.f4d4a625.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1136,11 +1138,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"fullstack-developer": {
-			"file": "character-staff-fullstack-developer.45767018.glb",
+			"file": "character-staff-fullstack-developer.208cdc54.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1165,11 +1168,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"it-operator": {
-			"file": "character-staff-it-operator.c7f1233c.glb",
+			"file": "character-staff-it-operator.72fff203.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1194,11 +1198,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"game-designer": {
-			"file": "character-staff-game-designer.a04bf20c.glb",
+			"file": "character-staff-game-designer.a216ab99.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1223,11 +1228,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"ui-ux-designer": {
-			"file": "character-staff-ui-ux-designer.40221fd1.glb",
+			"file": "character-staff-ui-ux-designer.b7953992.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1252,11 +1258,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"artist": {
-			"file": "character-staff-artist.310c0323.glb",
+			"file": "character-staff-artist.d19a7b4a.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1281,11 +1288,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"tester": {
-			"file": "character-staff-tester.cf6a178f.glb",
+			"file": "character-staff-tester.977a348d.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1310,11 +1318,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"code-reviewer": {
-			"file": "character-staff-code-reviewer.49d01044.glb",
+			"file": "character-staff-code-reviewer.114de342.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1339,11 +1348,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"content-writer": {
-			"file": "character-staff-content-writer.be6f143d.glb",
+			"file": "character-staff-content-writer.019d0a45.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1368,11 +1378,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"data-analyst": {
-			"file": "character-staff-data-analyst.0fc57cda.glb",
+			"file": "character-staff-data-analyst.4593eefc.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1397,11 +1408,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"researcher": {
-			"file": "character-staff-researcher.2b8cd9f2.glb",
+			"file": "character-staff-researcher.aedf00ee.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1426,11 +1438,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"finance-accountant": {
-			"file": "character-staff-finance-accountant.0fdc7823.glb",
+			"file": "character-staff-finance-accountant.85e01386.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1455,11 +1468,12 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		},
 		"advisor": {
-			"file": "character-staff-advisor.714866d6.glb",
+			"file": "character-staff-advisor.16ae7447.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1484,7 +1498,8 @@
 				"Sleeping",
 				"Victory",
 				"Walk",
-				"Lying_Lounge"
+				"Lying_Lounge",
+				"Sleeping_Side"
 			]
 		}
 	},

@@ -183,7 +183,7 @@ describe("living by the schedule", () => {
 		expect(zoneOfRoom(layout(), find(day, "title:qaTester").room)).not.toBe("d");
 	});
 
-	it("shows fifteen people whatever the agents did, never two on one place, thirteen of them in beds of the sixteen at night; Backend & DevOps and Advisor stay on duty", () => {
+	it("shows fifteen people whatever the agents did, never two on one place, all fifteen living on the lower floor at night, Backend & DevOps and Advisor too", () => {
 		const store = resting();
 		const placed = placeAt(store, localAt(1));
 		const people = placed.filter((p) => p.kind === "director" || p.kind === "employee" || p.kind === "advisor");
@@ -193,8 +193,8 @@ describe("living by the schedule", () => {
 		const inBed = people.filter((p) => p.life?.act === "sleep");
 		expect(inBed.length).toBeGreaterThanOrEqual(1);
 		for (const p of people.filter((x) => x.life !== null)) expect(anchorById(layout(), p.anchorId)?.room, p.key).toMatch(/^(DORM|LOUNGE|GYM)$/);
-		expect(people.filter((p) => p.life !== null)).toHaveLength(13);
-		expect(find(placed, "title:backendDevops")).toMatchObject({ room: "SERVER", life: null });
-		expect(find(placed, "advisor")).toMatchObject({ room: "ADVISOR", life: null });
+		expect(people.filter((p) => p.life !== null)).toHaveLength(15);
+		expect(find(placed, "title:backendDevops").life).not.toBeNull();
+		expect(find(placed, "advisor").life).not.toBeNull();
 	});
 });

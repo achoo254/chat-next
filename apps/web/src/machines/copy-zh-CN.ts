@@ -1387,8 +1387,6 @@ export const zhCNMachines: MachinesCopy = {
 		overflowLabel: (n: number) => `${n} 人在会议室等工位`,
 		empty: "空",
 		board: {
-			lobby: "公告板",
-			staffToday: "今日员工",
 			tasksDone: "已完成任务",
 			sessionTime: "会话时长",
 			planning: "待办",
@@ -1403,6 +1401,27 @@ export const zhCNMachines: MachinesCopy = {
 			qa: "检查",
 			passed: "通过",
 			failed: "失败",
+		},
+		/** The panel beside the scene, from the start: who works on what, who rests, the counts the wall boards used to show. */
+		summary: {
+			label: "办公室概览",
+			title: "正在进行",
+			headline: (working: number, resting: number) => {
+				const parts: string[] = [];
+				if (working > 0) parts.push(`${working} 人在工作`);
+				if (resting > 0) parts.push(`${resting} 人在休息`);
+				return parts.length > 0 ? parts.join(" · ") : "整个办公室都空闲";
+			},
+			working: "工作中",
+			workingNone: "还没有人接活。",
+			resting: "休息中",
+			restingNone: "没有人在休息：还在上班时间，或任务仍在运行。",
+			atSeat: (n: number) => `${n} 人在座位上待命`,
+			background: (n: number) => `${n} 个后台任务`,
+			progress: "任务进度",
+			progressNone: "还没有待办列表。",
+			progressOf: (done: number, total: number) => `已完成 ${done}/${total}`,
+			session: "本次会话",
 		},
 	},
 };
