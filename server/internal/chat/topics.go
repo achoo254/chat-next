@@ -25,6 +25,10 @@ const (
 	topicsPageMax    = 500
 )
 
+// errTopicsManagedElsewhere is the refusal to open, change or close a topic of a
+// chat the bridge links to another app: its topics follow that app's.
+const errTopicsManagedElsewhere = "imported_chat_topics_managed_elsewhere: the topics of this chat are managed in the other app"
+
 type topicRow struct {
 	ChatID       int64
 	ID           int64
@@ -316,6 +320,9 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 		if err != nil {
 			return err
 		}
+		if c.ExternalLinked {
+			return errDenied(errTopicsManagedElsewhere)
+		}
 		if !c.can(m, permManageTopics) {
 			return errDenied("you cannot create topics in this chat")
 		}
@@ -355,6 +362,9 @@ func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, ad
 		c, m, err := s.forumFor(ctx, t.tx, chatID, me, true)
 		if err != nil {
 			return err
+		}
+		if c.ExternalLinked {
+			return errDenied(errTopicsManagedElsewhere)
 		}
 		topic, err = scanTopic(t.tx.QueryRow(ctx, `SELECT `+topicColumns+` FROM forum_topics t WHERE t.chat_id = $1 AND t.id = $2`,
 			chatID, topicID))

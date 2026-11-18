@@ -35,6 +35,10 @@ type ImportMessage struct {
 	Entities []*appv1.MessageEntity
 	// ReplyToSeq is the seq of the replied message in this chat, 0 for none.
 	ReplyToSeq int64
+	// TopicID is the topic of a forum chat the message goes in (a topic made
+	// with ImportTx.CreateTopic); 0 is the General topic. A chat without topics
+	// takes only 0.
+	TopicID int64
 	// Content carries parts the text cannot (media); its entities and silent
 	// flag are replaced.
 	Content *appv1.Message
@@ -149,6 +153,9 @@ func (it *ImportTx) Append(ctx context.Context, msgs []ImportMessage) ([]int64, 
 	if len(msgs) > importBatchMax {
 		return nil, errInvalid("an import batch holds at most %d messages", importBatchMax)
 	}
+	if err := it.checkTopics(ctx, msgs); err != nil {
+		return nil, err
+	}
 	members, err := it.t.fanoutMembers(ctx, it.c)
 	if err != nil {
 		return nil, err
@@ -164,7 +171,7 @@ func (it *ImportTx) Append(ctx context.Context, msgs []ImportMessage) ([]int64, 
 		}
 		ev := it.t.event(kindMessageNew, it.c.ID, msg.FromID)
 		posted, err := it.t.postMessage(ctx, ev, it.c, members, newMessage{
-			fromID: msg.FromID, replyTo: msg.ReplyToSeq, text: text, content: content, date: msg.Date,
+			fromID: msg.FromID, topicID: msg.TopicID, replyTo: msg.ReplyToSeq, text: text, content: content, date: msg.Date,
 		})
 		if err != nil {
 			return nil, err
@@ -291,6 +298,9 @@ type ImportedChat struct {
 	Title string
 	// Peer is the puppet user of a private chat's other side.
 	Peer int64
+	// Forum makes a group a forum: it starts with the General topic and the
+	// bridge opens the others as it learns them.
+	Forum bool
 }
 
 // CreateImportedChat creates the chat of owner for an imported conversation
@@ -322,12 +332,17 @@ func (s *Service) CreateImportedChat(ctx context.Context, owner int64, ic Import
 			return err
 		}
 		c := &chatRow{ID: chatID, TenantID: s.cfg.TenantID, Type: typ, Title: title, CreatorID: owner,
-			SyncMode: syncSmall, HistoryVisibility: visShared, DefaultPerms: defaultGroupPerms}
+			SyncMode: syncSmall, HistoryVisibility: visShared, DefaultPerms: defaultGroupPerms, Forum: ic.Forum && typ == typeGroup}
 		if typ == typePrivate {
 			c.DefaultPerms = privatePerms
 		}
 		if err := s.insertChat(ctx, t, c); err != nil {
 			return err
+		}
+		if c.Forum {
+			if err := t.createGeneralTopic(ctx, c, owner); err != nil {
+				return err
+			}
 		}
 		if typ == typePrivate {
 			low, high := min(owner, ic.Peer), max(owner, ic.Peer)

@@ -75,6 +75,9 @@ type chatRow struct {
 	// ExternalSource names the app of a chat the Chat Bridge fills ("" for
 	// any other chat): such a chat only receives, so nobody may send into it.
 	ExternalSource string
+	// ExternalLinked is true for any chat the bridge links to another app, in
+	// either direction: its topics are managed in the other app, never in Chat.
+	ExternalLinked bool
 }
 
 const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, c.sync_mode, c.history_visibility,
@@ -82,7 +85,8 @@ const chatColumns = `c.id, c.tenant_id, c.type, c.title, c.about, c.creator_id, 
 	c.last_message_at, coalesce(p.user_low, 0), coalesce(p.user_high, 0),
 	coalesce((SELECT cf.public_id FROM files cf WHERE cf.id = c.photo_file_id), ''),
 	coalesce((SELECT a.source FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
-		WHERE x.chat_id = c.id AND x.direction = 'in'), '')`
+		WHERE x.chat_id = c.id AND x.direction = 'in'), ''),
+	EXISTS (SELECT 1 FROM external_chats x WHERE x.chat_id = c.id)`
 
 const chatFrom = `chats c LEFT JOIN private_chats p ON p.chat_id = c.id`
 
@@ -91,7 +95,7 @@ func scanChat(row pgx.Row) (*chatRow, error) {
 	var perms int32
 	err := row.Scan(&c.ID, &c.TenantID, &c.Type, &c.Title, &c.About, &c.CreatorID, &c.SyncMode, &c.HistoryVisibility,
 		&perms, &c.Forum, &c.LastSeq, &c.ChatPts, &c.LastTopicID, &c.MemberCount, &c.PinnedSeq, &c.CreatedAt,
-		&c.LastMessageAt, &c.UserLow, &c.UserHigh, &c.PhotoID, &c.ExternalSource)
+		&c.LastMessageAt, &c.UserLow, &c.UserHigh, &c.PhotoID, &c.ExternalSource, &c.ExternalLinked)
 	c.DefaultPerms = uint32(perms)
 	return c, err
 }
@@ -178,6 +182,9 @@ func (c *chatRow) permsOf(m *memberRow) uint32 {
 	perms := c.memberPerms(m)
 	if c.ExternalSource != "" {
 		perms &^= permSend | permMedia
+	}
+	if c.ExternalLinked {
+		perms &^= permManageTopics
 	}
 	return perms
 }
