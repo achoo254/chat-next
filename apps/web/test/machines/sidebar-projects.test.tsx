@@ -27,7 +27,7 @@ import { defaultAnswer, FakeMachine } from "./fake-machine.ts";
 
 let machine: FakeMachine;
 let device: KeyPair;
-type Row = ReturnType<typeof thread>;
+type Row = ReturnType<typeof thread> & { archived?: boolean };
 let threads: Row[];
 let projects: Project[];
 let suggestions: { dir: string; sessions: number; gitRemote: string; branch: string }[];

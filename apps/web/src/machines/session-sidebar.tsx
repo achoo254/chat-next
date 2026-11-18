@@ -192,8 +192,9 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	const currentMachine = current === null ? undefined : machines.find((m) => m.entry.ref === current.machine);
 	const currentDir = currentMachine?.state.threads.find((x) => x.id === current?.thread)?.dir;
 	const selected = currentMachine === undefined || currentDir === undefined ? null : locate(snapshot.projects, currentMachine.entry.id, currentDir)?.project.id;
-	// Open: the selected project, one needing the user or running, and an empty one (its "Thêm workspace" is the next step).
-	const isOpen = (id: number, need: number, status: string, empty: boolean) => opened[id] ?? (id === selected || need > 0 || status === "running" || empty);
+	// Open: every project of the archived list (nothing else to see there), the selected project, one needing the user or
+	// running, and an empty one (its "Thêm workspace" is the next step).
+	const isOpen = (id: number, need: number, status: string, empty: boolean) => opened[id] ?? (filter === "archived" || id === selected || need > 0 || status === "running" || empty);
 	const toggle = (id: number, wasOpen: boolean) => {
 		const next = { ...opened, [id]: !wasOpen };
 		setOpened(next);

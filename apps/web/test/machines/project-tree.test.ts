@@ -82,6 +82,16 @@ describe("a workspace's state", () => {
 		expect(busy.projects[0]?.status).toBe("running");
 	});
 
+	it("the archived list marks a project and its workspace by the archived sessions only", () => {
+		const m = machine(1, "Mac", [thread("w", "/w/app", ThreadState.WAITING), thread("a", "/w/app", ThreadState.IDLE, 1000, { archived: true })]);
+		const all = buildTree([project(1, "App", [ws(1, 1, "/w/app")])], [m], "all", none);
+		expect(all.projects[0]).toMatchObject({ need: 1, status: "need" });
+		const archived = buildTree([project(1, "App", [ws(1, 1, "/w/app")])], [m], "archived", none);
+		expect(archived.projects[0]).toMatchObject({ need: 0, status: "idle" });
+		expect(archived.projects[0]?.workspaces[0]?.status).toBe("idle");
+		expect(archived.projects[0]?.workspaces[0]?.threads.map((t) => t.id)).toEqual(["a"]);
+	});
+
 	it("done only for a session seen before that changed since; one never seen here is not", () => {
 		expect(unseenDone(thread("d", "/w", ThreadState.IDLE, 2000), new Map([["d", 1000]]))).toBe(true);
 		expect(unseenDone(thread("d", "/w", ThreadState.IDLE, 1000), new Map([["d", 1000]]))).toBe(false);

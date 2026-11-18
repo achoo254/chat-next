@@ -71,9 +71,9 @@ export function threadStatus(thread: ThreadSummary, done: boolean): WorkStatus {
 	return thread.terminalSession > 0 ? "open" : "idle";
 }
 
-/** The state of a set of sessions (archived ones never count). */
-export function statusOf(threads: readonly ThreadSummary[], seen: SeenMap): WorkStatus {
-	return worstStatus(threads.filter((x) => !x.archived).map((x) => threadStatus(x, unseenDone(x, seen))));
+/** The state of a set of sessions: archived ones never count, except when `archived` (the archived list) where only they do. */
+export function statusOf(threads: readonly ThreadSummary[], seen: SeenMap, archived = false): WorkStatus {
+	return worstStatus(threads.filter((x) => x.archived === archived).map((x) => threadStatus(x, unseenDone(x, seen))));
 }
 
 export function worstStatus(list: readonly WorkStatus[]): WorkStatus {
@@ -84,10 +84,11 @@ export function worstStatus(list: readonly WorkStatus[]): WorkStatus {
  * The AI doing the work of a set of sessions (a workspace, a project, a loose folder):
  * the one AI of every session working now (threadStatus "running"), so the set
  * shows that AI's mark as its session rows do; undefined when none works or
- * several AIs do (the plain spinner then). Archived sessions never count.
+ * several AIs do (the plain spinner then). Archived sessions never count,
+ * except when `archived` (the archived list) where only they do.
  */
-export function runningAi(threads: readonly ThreadSummary[]): string | undefined {
-	const working = new Set(threads.filter((x) => !x.archived && x.provider !== "" && threadStatus(x, false) === "running").map((x) => x.provider));
+export function runningAi(threads: readonly ThreadSummary[], archived = false): string | undefined {
+	const working = new Set(threads.filter((x) => x.archived === archived && x.provider !== "" && threadStatus(x, false) === "running").map((x) => x.provider));
 	return working.size === 1 ? [...working][0] : undefined;
 }
 
@@ -142,6 +143,8 @@ function holder(workspaces: readonly AgentWorkspace[], machineId: number, dir: s
 }
 
 export function buildTree(projects: readonly AgentProject[], machines: readonly MachineView[], filter: Filter, seen: SeenMap): Tree {
+	// The archived list marks its projects and workspaces by its own sessions, not by the ones it does not show.
+	const archived = filter === "archived";
 	const all = projects.flatMap((p) => p.workspaces);
 	const byMachine = new Map(machines.map((m) => [m.entry.id, m]));
 	// Every session of every machine, to its workspace or to its loose folder.
@@ -178,8 +181,8 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 					local,
 					branch,
 					threads: sortForList(threads.filter((t) => matches(filter, t))),
-					status: statusOf(threads, seen),
-					ai: runningAi(threads),
+					status: statusOf(threads, seen, archived),
+					ai: runningAi(threads, archived),
 					offline: machine === null || machine.conn.kind !== "on",
 					activity: newest(threads),
 				};
@@ -191,14 +194,14 @@ export function buildTree(projects: readonly AgentProject[], machines: readonly 
 			project,
 			workspaces,
 			status: worstStatus(workspaces.map((w) => w.status)),
-			ai: runningAi(everyThread),
-			need: everyThread.filter((t) => !t.archived && t.state === ThreadState.WAITING).length,
+			ai: runningAi(everyThread, archived),
+			need: everyThread.filter((t) => t.archived === archived && t.state === ThreadState.WAITING).length,
 		};
 	});
 	// In the user's order (dragged, or "Lên trên"/"Xuống dưới"): a project never jumps on its own.
 	const shown = nodes.filter((n) => filter === "all" || n.workspaces.length > 0).sort((a, b) => a.project.order - b.project.order || a.project.id - b.project.id);
 	const folders = [...loose.values()]
-		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen), ai: runningAi(g.threads) }))
+		.map((g) => ({ machine: g.machine, dir: g.dir, threads: sortForList(g.threads.filter((t) => matches(filter, t))), status: statusOf(g.threads, seen, archived), ai: runningAi(g.threads, archived) }))
 		.filter((g) => g.threads.length > 0)
 		.sort((a, b) => a.dir.localeCompare(b.dir));
 	return { projects: shown, loose: folders };
