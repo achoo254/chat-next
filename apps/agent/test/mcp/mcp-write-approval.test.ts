@@ -107,11 +107,11 @@ function fakeClaude(mode: string, allowRules: string[]) {
 }
 
 /** Runs `calls` in one thread, answering every card with `answer`; returns how many cards came. */
-async function run(mode: string, allowRules: string[], calls: [string, Record<string, unknown>][], answer = Decision.ALLOW, sessionMcp?: CoreOptions["sessionMcp"]) {
+async function run(mode: string, allowRules: string[], calls: [string, Record<string, unknown>][], answer = Decision.ALLOW, sessionMcp?: CoreOptions["sessionMcp"], more: Partial<CoreOptions> = {}) {
   const claude = fakeClaude(mode, allowRules);
   const provider = createClaudeProvider({ query: claude.fn, findBinary: async () => "claude" });
   provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
-  const { core, work } = makeCore([provider], sessionMcp ? { sessionMcp } : {});
+  const { core, work } = makeCore([provider], { ...(sessionMcp ? { sessionMcp } : {}), more });
   const answered = new Set<string>();
   const answerCards = (c: AgentCore, threadId: string) => {
     for (const card of byCase(c.snapshot(threadId), "approval")) {
@@ -138,7 +138,14 @@ async function run(mode: string, allowRules: string[], calls: [string, Record<st
   off();
   const approvals = byCase(core.snapshot(t.id), "approval");
   await core.stop();
-  return { cards: approvals.length, summaries: approvals.map((a) => a.body.value.summary), reasons: approvals.map((a) => a.body.value.reason), ran: claude.ran, options: claude.options };
+  return {
+    cards: approvals.length,
+    summaries: approvals.map((a) => a.body.value.summary),
+    reasons: approvals.map((a) => a.body.value.reason),
+    macFolders: approvals.map((a) => a.body.value.macFolder),
+    ran: claude.ran,
+    options: claude.options,
+  };
 }
 
 const SEND: [string, Record<string, unknown>] = ["mcp__tunelo__chat_send_message", { chat_id: 7, text: "test" }];
@@ -220,5 +227,42 @@ describe("write tools in a session", () => {
       const r = await run("default", [], [["mcp__tunelo__chat_send_message", { chat_id: 7, text: "x".repeat(5000) }]], Decision.ALLOW, sessionMcp);
       expect(r.reasons[0]).toMatch(/cut: \d+ characters in all/);
     });
+  });
+});
+
+describe("a call naming a folder macOS protects that tunelo may not enter yet", () => {
+  const DOCS = "/Users/an/Documents";
+  const READ: [string, Record<string, unknown>] = ["Read", { file_path: `${DOCS}/notes.md` }];
+  function gate(outcome: "granted" | "denied" | "unanswered") {
+    let granted = false;
+    const asked: string[] = [];
+    const macFolders: CoreOptions["macFolders"] = {
+      ungrantedIn: (text) => (!granted && text.includes(DOCS) ? DOCS : undefined),
+      askAndWait: async (folder) => {
+        asked.push(folder);
+        if (outcome === "granted") granted = true;
+        return outcome;
+      },
+    };
+    return { macFolders, asked };
+  }
+
+  it("gets a card naming the folder even under an allow rule in auto, asks macOS once allowed, then runs", async () => {
+    const { macFolders, asked } = gate("granted");
+    const r = await run("auto", ["Read"], [READ, READ], Decision.ALLOW_SESSION, undefined, { macFolders });
+    expect(r.macFolders).toEqual([DOCS]);
+    expect(asked).toEqual([DOCS]);
+    // Granted: the second read runs without a card.
+    expect(r.ran).toEqual(["Read", "Read"]);
+  });
+
+  it("does not run when the user says no, or macOS refuses or nobody answers it; the turn ends either way", async () => {
+    const no = gate("granted");
+    const denied = await run("auto", ["Read"], [READ], Decision.DENY, undefined, { macFolders: no.macFolders });
+    expect([denied.ran, no.asked]).toEqual([[], []]);
+    for (const outcome of ["denied", "unanswered"] as const) {
+      const r = await run("default", [], [READ], Decision.ALLOW, undefined, { macFolders: gate(outcome).macFolders });
+      expect(r.ran).toEqual([]);
+    }
   });
 });

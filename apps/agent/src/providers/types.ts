@@ -7,6 +7,7 @@
 // every permission through `askUser`.
 
 import type { SessionMcp } from "../mcp/session-tickets.ts";
+import type { MacFolderGate } from "../safety/mac-folders.ts";
 
 export type ToolKind = "read" | "edit" | "shell" | "search" | "web" | "mcp" | "subagent" | "todo" | "other";
 
@@ -191,6 +192,11 @@ export type ApprovalRequest = {
   reason?: string;
   /** Sign-in secrets the command reads, with the site each belongs to ("" when the session holds none of that name). */
   secrets?: { name: string; origin: string }[];
+  /**
+   * A folder macOS protects that the call names and tunelo may not enter yet:
+   * allowing also asks macOS for it (macFolderBeforeCall). Never "allow for the session".
+   */
+  macFolder?: string;
 };
 
 export type Question = {
@@ -221,6 +227,8 @@ export type SessionPolicy = {
   projectSettings: boolean;
   /** Tells whether a path is sensitive (for the approval card label). */
   isSensitive: (path: string) => boolean;
+  /** macOS: the folders it protects; a call naming one tunelo may not enter yet asks the user first (safety/mac-folders.ts). */
+  macFolders?: MacFolderGate;
   model?: string;
   /** Picked from a device; unset keeps the machine's own settings. */
   effort?: string;

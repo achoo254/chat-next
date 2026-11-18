@@ -87,6 +87,12 @@ function fakeSession(id: string, policy: SessionPolicy, askUser: AskUser, log: F
         signal,
       );
       say("cancelled" in ans ? "no answer" : `you picked ${ans.answers[0]?.join(",")}`);
+    } else if (text.startsWith("stuck ")) {
+      // A tool that never ends by itself (a read held by a macOS prompt nobody answers), until the turn stops.
+      const path = text.slice(6);
+      events.push({ type: "tool-start", toolId: `tool${turn}`, kind: "read", name: "Read", summary: path, input: JSON.stringify({ file_path: path }) });
+      await new Promise<void>((r) => (signal.aborted ? r() : signal.addEventListener("abort", () => r())));
+      return events.push({ type: "turn-end", state: "interrupted", durationMs: 1 });
     } else if (text === "slow") {
       while (!signal.aborted) {
         events.push({ type: "text-delta", blockId: block, role: "assistant", text: "." });

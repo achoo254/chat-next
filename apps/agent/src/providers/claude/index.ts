@@ -38,6 +38,7 @@ import { claudeEnv, readAccount } from "./accounts/account.ts";
 import { CLAUDE_PROVIDER_ID, defaultClaudeHome, profilesRoot } from "./accounts/paths.ts";
 import { ClaudeProfiles } from "./accounts/service.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
+import { macFolderBeforeCall, macFolderRefusedByUser } from "../../safety/mac-folders.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
   AccountInfo,
@@ -381,6 +382,22 @@ export const writeApprovalHook: HookCallback = async (input) => {
   };
 };
 
+const MAC_FOLDER_REASON = "It names a folder macOS protects that tunelo may not enter yet: tunelo asks you first.";
+
+/**
+ * PreToolUse, every tool and every mode: a call naming a folder macOS
+ * protects that tunelo may not enter yet goes to the device as a card
+ * (canUseTool), so it never runs into a macOS prompt nobody at the machine
+ * answers, and the turn goes on whatever the answer.
+ */
+export function macFolderHook(policy: Pick<SessionPolicy, "dir" | "macFolders">): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse" || !policy.macFolders) return {};
+    if (policy.macFolders.ungrantedIn(JSON.stringify(input.tool_input ?? {}), policy.dir) === undefined) return {};
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: MAC_FOLDER_REASON } };
+  };
+}
+
 const TUNELO_PREFIX = `mcp__${SESSION_MCP_SERVER}__`;
 
 /** A Claude tool name as tunelo's MCP serves it (`mcp__tunelo__chat_send_message` → `chat_send_message`); "" for any other tool. */
@@ -651,6 +668,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     }
     const paths = [...toolPaths(input), ...(opts.blockedPath ? [opts.blockedPath] : [])];
     const command = typeof input.command === "string" ? input.command : "";
+    // A folder macOS protects that tunelo may not enter yet: the card says so, and allowing it asks macOS first.
+    const macFolder = policy.macFolders?.ungrantedIn(`${JSON.stringify(input)} ${opts.blockedPath ?? ""}`, policy.dir);
     const sensitive = paths.some(policy.isSensitive) || (command !== "" && mentionsSensitive(command, policy.isSensitive, { cwd: policy.dir }));
     // A write of tunelo's MCP: the card names what it does, and the service runs it only once approved here.
     const ownTool = tuneloTool(toolName);
@@ -672,16 +691,23 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       ...(reason ? { reason } : {}),
       // Named with their sites, so the card shows where each one belongs.
       ...(usesSecret ? { secrets: secrets ? secrets.sitesIn(command) : envNamesIn(command).map((name) => ({ name, origin: "" })) } : {}),
+      ...(macFolder !== undefined ? { macFolder } : {}),
     };
     const answer = await askUser(req, opts.signal);
-    if (answer.decision === "deny") return { behavior: "deny", message: denialText(answer.message) };
+    if (answer.decision === "deny") {
+      return { behavior: "deny", message: macFolder !== undefined && !answer.message ? macFolderRefusedByUser(macFolder) : denialText(answer.message) };
+    }
+    if (macFolder !== undefined && policy.macFolders) {
+      const refused = await macFolderBeforeCall(policy.macFolders, macFolder);
+      if (refused !== undefined) return { behavior: "deny", message: refused };
+    }
     const { decision } = answer;
     write?.approveWrite(ownTool, input);
     // Approved: the secrets the command names go where its shell loads them, until it ends.
     if (secrets && toolName === "Bash" && opts.toolUseID) await secrets.beforeCommand(opts.toolUseID, command);
     // A write tool of tunelo's MCP is asked about every time: no rule for the session.
     // A command reading a sign-in secret is asked about every time: an older device's "allow for the session" counts once.
-    if (decision === "allow-session" && !sensitive && !isWriteTool(ownTool) && !usesSecret) {
+    if (decision === "allow-session" && !sensitive && macFolder === undefined && !isWriteTool(ownTool) && !usesSecret) {
       // Only allow rules for this session: a remote "allow for the session"
       // must never switch the permission mode or add directories.
       const suggested = (opts.suggestions ?? []).filter((s) => s.type === "addRules" && s.behavior === "allow");
@@ -728,6 +754,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
           PreToolUse: [
             { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
             ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
+            { hooks: [macFolderHook(policy)] },
           ],
           UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
           PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],

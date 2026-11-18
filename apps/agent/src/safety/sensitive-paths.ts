@@ -93,15 +93,24 @@ export function mentionsSensitive(
   // naming tunelo's items by account alone (session-key, machine-key).
   if (/\bsecurity\s+find-(generic|internet)-password\b[^\n]*\s-[a-zA-Z]*[wg]\b/.test(text)) return true;
   if (/\bsecurity\s+[a-z-]+\b[^\n]*\b(session-key|machine-key)\b/i.test(text)) return true;
+  return pathsIn(text, { home, ...(opts.cwd ? { cwd: opts.cwd } : {}) }).some(isSensitive);
+}
+
+/**
+ * The paths a command line or tool input names: ~ and $HOME expanded,
+ * relative ones (with a slash) from `cwd`. Words without a slash are not
+ * paths here.
+ */
+export function pathsIn(text: string, opts: { home: string; cwd?: string }): string[] {
   // JSON inputs escape Windows backslashes; undo that before splitting.
   const unescaped = text
     .replaceAll("\\\\", "\\")
-    .replace(/\$\{?HOME\}?|%USERPROFILE%|\$env:USERPROFILE/gi, home);
+    .replace(/\$\{?HOME\}?|%USERPROFILE%|\$env:USERPROFILE/gi, opts.home);
   const words = unescaped.split(/[\s"'=,;()[\]{}]+/);
-  return words.some((w) => {
-    if (w.startsWith("~")) return isSensitive(join(home, w.slice(1)));
-    if (!/[\\/]/.test(w)) return false;
+  return words.flatMap((w) => {
+    if (w.startsWith("~")) return [join(opts.home, w.slice(1))];
+    if (!/[\\/]/.test(w)) return [];
     // Relative paths count from the session folder, not the agent's.
-    return isSensitive(opts.cwd ? resolve(opts.cwd, w) : w);
+    return [opts.cwd ? resolve(opts.cwd, w) : w];
   });
 }

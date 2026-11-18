@@ -467,9 +467,19 @@ Disk Access (quyết định 18/11/2026). Mã: [`src/safety/mac-folders.ts`](src
   thống › Quyền riêng tư & Bảo mật › Tệp và thư mục rồi bấm "Kiểm tra lại".
 - Máy đã cấp Full Disk Access cho tunelo trước 3.17.0 coi mọi thư mục là đã cho, không hỏi gì. `OpenDiskAccessSettings` bị từ chối
   (`UNSUPPORTED_REQUEST`); script cài, `tunelo login` và `tunelo status` không còn mở hay nhắc cài đặt nào.
+- Trong phiên AI (3.19.0), cuộc trò chuyện không bao giờ kẹt vì một hộp thoại của macOS không ai bấm:
+  - Claude Code: hook `PreToolUse` (mọi tool, mọi chế độ) trả `ask` cho lời gọi nhắc tới thư mục chưa được cho, nên lời gọi đi qua
+    thẻ duyệt (`canUseTool`). agy: thẻ của `session/request_permission` (lệnh shell, sửa file, MCP). Thẻ mang
+    `ApprovalItem.mac_folder` và không bao giờ "cho phép cả phiên". Cho phép thì tunelo hỏi macOS và chờ tối đa 45 giây
+    (`MAC_ASK_IN_TURN_MS`): macOS cho thì lời gọi chạy; từ chối hoặc không ai trả lời thì lời gọi bị từ chối kèm lời giải thích cho
+    AI, và AI làm tiếp. Từ chối thẻ cũng vậy.
+  - Mọi AI (core, `watchMacStall`): lời gọi tool nhắc tới thư mục chưa được cho mà chạy quá 60 giây (`MAC_STALL_MS`, không tính lúc
+    còn thẻ chờ người dùng) thì tunelo dừng lượt và ghi `ErrorItem.mac_folder`; tin nhắn tiếp theo tới AI bình thường, web có nút
+    xin quyền thư mục đó. Đây là lớp chặn cho thao tác đọc của agy (không qua thẻ) và lời gọi chưa thấy đường dẫn trước.
+  - Khi macOS bắt đầu hỏi một thư mục (`MAC_FOLDER_ACCESS_ASKING`), web tự mở hộp thoại kèm nút mở màn hình máy.
 - Giới hạn: hộp thoại của macOS chỉ bấm được trên Mac (hoặc qua màn hình máy). `tunelo-term-host` chạy dưới launchd riêng nên
-  macOS hỏi quyền cho terminal riêng; lệnh do AI hoặc terminal tự chạy vào một thư mục được bảo vệ khác giữa phiên vẫn có thể gặp
-  hộp thoại của macOS mà web không biết trước. Đường dẫn qua symlink trỏ vào thư mục được bảo vệ không bị cổng nhận ra.
+  macOS hỏi quyền cho terminal riêng. Đường dẫn tunelo không thấy được (symlink, biến môi trường khác `$HOME`, tên thư mục không
+  kèm `/`) không bị chặn trước; lớp dừng lượt chỉ bắt lời gọi có đường dẫn thấy được.
 
 ## Linux: dịch vụ systemd của người dùng (2.2.0)
 

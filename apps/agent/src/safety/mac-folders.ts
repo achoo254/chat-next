@@ -11,11 +11,24 @@ import { execFile } from "node:child_process";
 import { lstatSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
+import { pathsIn } from "./sensitive-paths.ts";
 
 export type MacAccess = "not-asked" | "asking" | "granted" | "denied";
 export type MacFolderState = { path: string; access: MacAccess };
 /** What one try at the folder found; "missing": the folder is not there (a volume taken out). */
 export type ProbeAnswer = "granted" | "denied" | "missing";
+/** How asking macOS from inside an AI's turn ended: allowed, refused, or nobody answered macOS in time. */
+export type AskOutcome = "granted" | "denied" | "unanswered";
+
+/**
+ * What an AI's session needs of the folders macOS protects (SessionPolicy
+ * and the core): the folder a tool call names that tunelo may not enter yet,
+ * and asking macOS for it while the turn waits, for at most `waitMs`.
+ */
+export interface MacFolderGate {
+  ungrantedIn(text: string, cwd: string): string | undefined;
+  askAndWait(folder: string, waitMs: number): Promise<AskOutcome>;
+}
 
 /** Work in a protected folder tunelo may not enter yet. `folder` is the protected folder itself. */
 export class MacFolderRefused extends Error {
@@ -144,8 +157,9 @@ export interface MacFoldersOptions {
   isStartupVolume?: (p: string) => boolean;
 }
 
-export class MacFolders {
-  private readonly asking = new Set<string>();
+export class MacFolders implements MacFolderGate {
+  /** Folders being asked for now, with the try that answers. */
+  private readonly asking = new Map<string, Promise<ProbeAnswer | undefined>>();
 
   constructor(private readonly opts: MacFoldersOptions) {}
 
@@ -182,6 +196,40 @@ export class MacFolders {
     if (access !== "granted") throw new MacFolderRefused(folder, access);
   }
 
+  /**
+   * The first protected folder tunelo may not enter yet that `text` (a tool's
+   * input, a command line) names, ~ and $HOME included, relative paths from
+   * `cwd`; undefined when it names none.
+   */
+  ungrantedIn(text: string, cwd: string): string | undefined {
+    if (!this.applies || text === "") return undefined;
+    for (const path of pathsIn(text, { home: this.opts.home, cwd })) {
+      const folder = this.folderOf(path);
+      if (folder !== undefined && this.access(folder) !== "granted") return folder;
+    }
+    return undefined;
+  }
+
+  /**
+   * Asks macOS for `folder` (the user agreed on a device) and waits for its
+   * answer, at most `waitMs`: an AI's turn waits on it and must go on either
+   * way. The try keeps running after that, so a late answer is still kept.
+   */
+  async askAndWait(folder: string, waitMs: number): Promise<AskOutcome> {
+    if (this.access(folder) === "granted") return "granted";
+    if (!this.ask(folder)) return "denied";
+    const running = this.asking.get(resolve(folder));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"late">((done) => {
+      timer = setTimeout(() => done("late"), waitMs);
+    });
+    const answer = await Promise.race([running ?? Promise.resolve(undefined), late]);
+    clearTimeout(timer);
+    if (answer === "granted") return "granted";
+    if (answer === "denied") return "denied";
+    return "unanswered";
+  }
+
   /** The protected folders and the access to each, for MachineInfo; empty off macOS. */
   list(): MacFolderState[] {
     if (!this.applies) return [];
@@ -198,13 +246,11 @@ export class MacFolders {
     if (!this.applies || this.folderOf(folder) !== resolve(folder)) return false;
     const key = resolve(folder);
     if (this.asking.has(key)) return true;
-    this.asking.add(key);
-    this.opts.onChange();
-    this.opts.log(`asking macOS for ${key}`);
-    void this.opts
+    const running = this.opts
       .probe(key)
       .catch((): undefined => undefined)
       .then((answer) => {
+        // Saved before anyone waiting on the try hears it, so they find the answer kept.
         this.asking.delete(key);
         if (answer === "granted" || answer === "denied") {
           this.opts.save(key, answer);
@@ -213,7 +259,33 @@ export class MacFolders {
           this.opts.log(answer === "missing" ? `${key} is not there` : `nobody answered macOS for ${key}`);
         }
         this.opts.onChange();
+        return answer;
       });
+    this.asking.set(key, running);
+    this.opts.onChange();
+    this.opts.log(`asking macOS for ${key}`);
     return true;
   }
+}
+
+/** How long an AI's call waits for macOS's answer once the user allowed asking: the turn goes on after that either way. */
+export const MAC_ASK_IN_TURN_MS = 45_000;
+
+/** What the AI reads when the user did not let tunelo ask macOS for `folder`: the call did not run, and the turn goes on. */
+export function macFolderRefusedByUser(folder: string): string {
+  return `The user did not let tunelo into ${folder}, a folder macOS protects, so this call did not run. Do not try it again; go on without that folder, or ask the user.`;
+}
+
+/**
+ * Once the user allowed it, asks macOS for `folder` while the call waits
+ * (MAC_ASK_IN_TURN_MS at most). Undefined when macOS allowed it and the call
+ * may run; otherwise what the AI reads instead, so it goes on.
+ */
+export async function macFolderBeforeCall(gate: MacFolderGate, folder: string): Promise<string | undefined> {
+  const outcome = await gate.askAndWait(folder, MAC_ASK_IN_TURN_MS);
+  if (outcome === "granted") return undefined;
+  if (outcome === "denied") {
+    return `macOS does not let tunelo into ${folder}, so this call did not run. The user can allow it on the Mac in System Settings > Privacy & Security > Files and Folders. Do not try it again now; go on without that folder.`;
+  }
+  return `tunelo asked macOS for ${folder}, but nobody answered macOS's prompt on the machine in time, so this call did not run. Do not try it again now; go on without that folder, or ask the user to allow it and say when.`;
 }

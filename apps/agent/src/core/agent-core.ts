@@ -35,6 +35,7 @@ import {
 import { type Resume, conversationBreakItem, isConversationBreak, resumeFrom } from "@achoo254/chat-remote-protocol";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { mentionsSensitive } from "../safety/sensitive-paths.ts";
+import type { MacFolderGate } from "../safety/mac-folders.ts";
 import { type Page, earlierPage, pageSize, tailPage } from "../threads/journal-pages.ts";
 import type {
   AgentProvider,
@@ -226,6 +227,8 @@ type Thread = {
   textItems: Map<string, string>;
   dirtyText: Set<string>;
   flushTimer?: ReturnType<typeof setTimeout>;
+  /** Running tool calls that name a folder macOS protects and tunelo may not enter yet, by tool id (watchMacStall). */
+  macStalls?: Map<string, { folder: string; timer: ReturnType<typeof setTimeout> }>;
   usage?: { tokens: number; window: number };
   info: Omit<ProviderInfo, "rateLimits" | "account">;
   clientMsgIds: Set<string>;
@@ -384,6 +387,9 @@ export type SessionAccountState = { threadId: string; provider: string; accountI
 /** One account of one AI, as a map key. */
 const accountKey = (provider: string, id: string): string => `${provider}\n${id}`;
 
+/** How long a tool call in a folder macOS protects (not yet granted) may run before the turn stops (watchMacStall). */
+export const MAC_STALL_MS = 60_000;
+
 export type CoreOptions = {
   dataDir: string;
   /** Diagnostics: one line per call. */
@@ -396,6 +402,8 @@ export type CoreOptions = {
    * has not let tunelo into yet; checked before anything touches the folder.
    */
   assertMacFolder?: (path: string) => void;
+  /** macOS: what sessions need of the protected folders (approval cards, the stall watch). */
+  macFolders?: MacFolderGate;
   /** Project settings load only in folders the owner trusted (on the machine, or from a device with consent). */
   isTrusted?: (dir: string) => boolean;
   /** Trusts a folder for a device that asked with consent; writes the consent log. */
@@ -2380,6 +2388,7 @@ export class AgentCore {
           mcpServers: {},
           projectSettings: false,
           isSensitive: this.opts.isSensitive,
+          ...(this.opts.macFolders ? { macFolders: this.opts.macFolders } : {}),
           advisorSession: true,
           ...(t.meta.model ? { model: t.meta.model } : {}),
           ...(t.meta.effort ? { effort: t.meta.effort } : {}),
@@ -2390,6 +2399,7 @@ export class AgentCore {
           mcpServers: this.opts.mcpServers ?? {},
           projectSettings: this.loadsProject(t),
           isSensitive: this.opts.isSensitive,
+          ...(this.opts.macFolders ? { macFolders: this.opts.macFolders } : {}),
           ...(t.meta.model ? { model: t.meta.model } : {}),
           ...(t.meta.effort ? { effort: t.meta.effort } : {}),
           ...(t.meta.permissionMode ? { permissionMode: t.meta.permissionMode } : {}),
@@ -2604,7 +2614,10 @@ export class AgentCore {
       case "todo": {
         const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
         this.put(t, entry.id, entry.body);
-        if (e.type === "tool-start" || e.type === "tool-end") this.trackAdvisor(t, e);
+        if (e.type === "tool-start" || e.type === "tool-end") {
+          this.trackAdvisor(t, e);
+          this.watchMacStall(t, e);
+        }
         return;
       }
       case "subagent": {
@@ -2713,7 +2726,70 @@ export class AgentCore {
     t.dirtyText.clear();
   }
 
+  /**
+   * A tool call naming a folder macOS protects that tunelo may not enter yet
+   * may wait on a macOS prompt nobody at the machine answers, and with it the
+   * whole turn. Once such a call has run MAC_STALL_MS (while no card waits for
+   * the user), the turn stops with an error item naming the folder, so the
+   * user's next message reaches the AI; the device offers asking macOS for
+   * the folder. Works the same for every AI: it only reads tool events.
+   */
+  private watchMacStall(t: Thread, e: Extract<ProviderEvent, { type: "tool-start" | "tool-end" }>): void {
+    const gate = this.opts.macFolders;
+    if (!gate) return;
+    if (e.type === "tool-end") {
+      const watched = t.macStalls?.get(e.toolId);
+      if (watched) clearTimeout(watched.timer);
+      t.macStalls?.delete(e.toolId);
+      return;
+    }
+    const text = `${e.summary} ${e.input}`;
+    const folder = gate.ungrantedIn(text, t.meta.dir);
+    if (folder === undefined) return;
+    const stalls = (t.macStalls ??= new Map());
+    const arm = (): ReturnType<typeof setTimeout> => {
+      const timer = setTimeout(() => {
+        if (!stalls.has(e.toolId)) return;
+        // A card still waits for the user (this call's own approval among them): not stuck on macOS.
+        if (t.pending.size > 0) {
+          stalls.set(e.toolId, { folder, timer: arm() });
+          return;
+        }
+        // Allowed meanwhile (from a device): the call goes on.
+        if (!t.running || gate.ungrantedIn(text, t.meta.dir) === undefined) {
+          stalls.delete(e.toolId);
+          return;
+        }
+        this.stopMacStall(t, folder);
+      }, MAC_STALL_MS);
+      timer.unref?.();
+      return timer;
+    };
+    const previous = stalls.get(e.toolId);
+    if (previous) clearTimeout(previous.timer);
+    stalls.set(e.toolId, { folder, timer: arm() });
+  }
+
+  private stopMacStall(t: Thread, folder: string): void {
+    this.clearMacStalls(t);
+    this.opts.log?.(`thread ${t.meta.id}: a tool call waited ${MAC_STALL_MS / 1000} s in ${folder}; stopping the turn`);
+    this.put(t, `error:${randomUUID()}`, {
+      case: "error",
+      value: {
+        message: `A tool call waited more than ${MAC_STALL_MS / 1000} s in ${folder}, a folder macOS protects that tunelo may not enter yet (macOS may be asking on the Mac's screen). tunelo stopped the turn so the session goes on.`,
+        macFolder: folder,
+      },
+    });
+    void this.interrupt(t.meta.id).catch((err: unknown) => this.opts.log?.(`thread ${t.meta.id}: could not stop the turn: ${(err as Error).message}`));
+  }
+
+  private clearMacStalls(t: Thread): void {
+    for (const watched of t.macStalls?.values() ?? []) clearTimeout(watched.timer);
+    t.macStalls?.clear();
+  }
+
   private endTurn(t: Thread, ended: TurnState, durationMs: number, stats?: TurnStats): void {
+    this.clearMacStalls(t);
     // An Advisor thread's turn stopped for running too long failed, whatever its AI says.
     const state = t.timedOut !== undefined && t.timedOut === t.turnItem ? TurnState.FAILED : ended;
     this.stopAdvisor(t);
@@ -2800,6 +2876,7 @@ export class AgentCore {
           reason: req.reason ?? "",
           state: PromptState.PENDING,
           secrets: req.secrets ?? [],
+          macFolder: req.macFolder ?? "",
         },
       });
     } else {
@@ -2813,7 +2890,8 @@ export class AgentCore {
     }
     return new Promise((resolveAnswer) => {
       const deny = req.kind === "approval" ? ({ decision: "deny" } as const) : ({ cancelled: true } as const);
-      t.pending.set(itemId, { itemId, kind: req.kind, sensitive: req.kind === "approval" && req.sensitive, resolve: resolveAnswer });
+      // A sensitive card, or one that asks macOS for a protected folder, is never allowed for the session.
+      t.pending.set(itemId, { itemId, kind: req.kind, sensitive: req.kind === "approval" && (req.sensitive || Boolean(req.macFolder)), resolve: resolveAnswer });
       this.markActivity(t);
       signal.addEventListener("abort", () => {
         if (!t.pending.has(itemId)) return;

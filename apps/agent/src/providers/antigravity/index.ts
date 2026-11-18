@@ -208,6 +208,7 @@ export function createAntigravityProvider(
               onRule: () => ref.session?.emit({ type: "session-rules", rules: [...rules] }),
               ...(policy.sessionMcp ? { sessionMcp: policy.sessionMcp } : {}),
               ...(policy.advisorSession ? { advisorSession: true } : {}),
+              ...(policy.macFolders ? { macFolders: policy.macFolders } : {}),
             },
             signal,
           ),

@@ -15,6 +15,7 @@
 import type { AcpPermissionOutcome, AcpPermissionParams } from "../acp/acp-session.ts";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
+import { type MacFolderGate, macFolderBeforeCall } from "../../safety/mac-folders.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import type { AskUser } from "../types.ts";
 import { describe, toolKind, toolPaths } from "./tool-map.ts";
@@ -85,6 +86,8 @@ export type PermissionContext = {
   sessionMcp?: Pick<SessionMcp, "approveWrite" | "describeWrite" | "advisorAllowed">;
   /** An Advisor thread's session: Advisor's read-only list answers every request, never the user (advisor-guard.ts). */
   advisorSession?: boolean;
+  /** macOS: a call naming a protected folder tunelo may not enter yet is asked about, and macOS asked once allowed. */
+  macFolders?: MacFolderGate;
 };
 
 export async function answerPermission(p: AcpPermissionParams, ctx: PermissionContext, signal: AbortSignal): Promise<AcpPermissionOutcome> {
@@ -111,7 +114,9 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
   // A write tool of tunelo's MCP is asked about every time: no rule for the session lets it through.
   const ownWrite = own !== "" && isWriteTool(own);
   const rule = ruleOf(p, ctx.dir);
-  if (!sensitive && !ownWrite && ctx.rules.has(rule)) return { outcome: { outcome: "selected", optionId: allow } };
+  // A folder macOS protects that tunelo may not enter yet: always a card, and allowing it asks macOS first.
+  const macFolder = ctx.macFolders?.ungrantedIn(`${JSON.stringify(call.rawInput ?? {})} ${toolPaths(call, ctx.dir).join(" ")}`, ctx.dir);
+  if (!sensitive && macFolder === undefined && !ownWrite && ctx.rules.has(rule)) return { outcome: { outcome: "selected", optionId: allow } };
   const shown = describe(call, ctx.dir);
   const summary = (write && (await write.describeWrite(own, args).catch(() => undefined))) || shown.summary;
   const cut = shown.input.length > CARD_INPUT_CHARS ? `The input shown is cut: ${shown.input.length} characters in all.` : "";
@@ -125,12 +130,17 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
       input: shown.input.slice(0, CARD_INPUT_CHARS),
       sensitive,
       ...(cut ? { reason: cut } : {}),
+      ...(macFolder !== undefined ? { macFolder } : {}),
     },
     signal,
   );
   if (answer.decision === "deny") return { outcome: { outcome: "selected", optionId: reject } };
+  // macOS refused, or nobody answered its prompt in time: the call is refused and agy goes on.
+  if (macFolder !== undefined && ctx.macFolders && (await macFolderBeforeCall(ctx.macFolders, macFolder)) !== undefined) {
+    return { outcome: { outcome: "selected", optionId: reject } };
+  }
   write?.approveWrite(own, args);
-  if (answer.decision === "allow-session" && !sensitive && !ownWrite) {
+  if (answer.decision === "allow-session" && !sensitive && macFolder === undefined && !ownWrite) {
     ctx.rules.add(rule);
     ctx.onRule(rule);
   }

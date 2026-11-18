@@ -234,6 +234,7 @@ export class Machine {
       audit: this.audit,
       isSensitive: this.isSensitive,
       assertMacFolder: (dir) => this.macFolders.assert(dir),
+      macFolders: this.macFolders,
       isTrusted: (dir) => this.config.isTrusted(dir),
       trust: (dir, device) => {
         const full = this.config.setTrusted(dir, true);
