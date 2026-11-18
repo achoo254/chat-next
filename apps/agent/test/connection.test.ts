@@ -225,8 +225,13 @@ describe("connection", () => {
     const oldTexts = m.core.snapshot(id).flatMap((i) => (i.body.case === "text" ? [i.body.value.text] : []));
     expect(oldTexts.some((text) => text.includes("/clear"))).toBe(false);
     expect(m.core.snapshot(freshThread?.id ?? "")).toEqual([]);
+    expect(m.core.list().filter((t) => t.id === id || t.id === freshThread?.id).map((t) => [t.id === id, t.archived])).toEqual(
+      expect.arrayContaining([[true, true], [false, false]]),
+    );
 
-    // Archive, then delete: every device hears the thread is gone.
+    // Archive, then delete: every device hears the thread is gone. The cleared thread is archived already: show it again first.
+    seal("11c", { body: { case: "threadSetArchived", value: { threadId: id, archived: false } } });
+    await frames(session, link.next, (f) => f.id === "11c");
     seal("12", { body: { case: "threadSetArchived", value: { threadId: id, archived: true } } });
     const archived = await frames(session, link.next, (f) => f.id === "12");
     expect(archived.some((f) => f.body.case === "threadStatus" && f.body.value.thread?.archived === true)).toBe(true);

@@ -1324,8 +1324,8 @@ export class AgentCore {
    * `/clear`: the AI forgets the conversation, so the thread must not keep
    * showing it as if it were still in context. Another thread opens in the
    * same folder on the same AI, model, effort, permission mode, automatic
-   * Advisor and project settings, with an empty journal; the old thread stays as history. Nothing
-   * is typed into the old session, and an idle one is parked.
+   * Advisor and project settings, with an empty journal; the old thread is archived and stays as
+   * history. Nothing is typed into the old session, and an idle one is parked.
    */
   async clear(threadId: string): Promise<ThreadSummary> {
     const old = this.thread(threadId);
@@ -1343,6 +1343,7 @@ export class AgentCore {
     this.saveMeta(next);
     if (!old.running) await this.park(old);
     this.touch(old);
+    this.setArchived(threadId, true);
     return this.summary(next);
   }
 
