@@ -609,7 +609,7 @@ export class Connection {
           return this.send(id, { case: "error", value: refusal("tunelo does not ask for Full Disk Access", ErrorReason.UNSUPPORTED_REQUEST) });
         case "macFolderAccessAsk": {
           const folders = this.ctx.macFolders;
-          if (!folders || process.platform !== "darwin") {
+          if (!folders?.applies) {
             return this.send(id, { case: "error", value: refusal("only a Mac protects folders", ErrorReason.UNSUPPORTED_REQUEST) });
           }
           if (!folders.ask(b.value.path)) {

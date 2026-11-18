@@ -149,7 +149,8 @@ export class MacFolders {
 
   constructor(private readonly opts: MacFoldersOptions) {}
 
-  private get applies(): boolean {
+  /** macOS protects folders; nothing to ask for elsewhere. */
+  get applies(): boolean {
     return this.opts.platform === "darwin";
   }
 
