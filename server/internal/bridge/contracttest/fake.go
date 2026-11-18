@@ -5,6 +5,7 @@
 package contracttest
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"context"
 	"fmt"
 	"slices"
@@ -39,6 +40,7 @@ type Fake struct {
 	nextID                                     int
 	topics                                     map[string][]bridge.Topic
 	pinned                                     map[string][]string // newest first
+	support                                    map[feature.Feature]feature.Support
 	pinCalls                                   []PinCall
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
@@ -52,7 +54,16 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), DedupeRandomID: true, EchoSent: true, nextID: 900000}
+}
+
+func defaultSupport() map[feature.Feature]feature.Support {
+	return map[feature.Feature]feature.Support{
+		feature.Messages: {In: true, Out: true},
+		feature.Pins:     {In: true, Out: true},
+		feature.Topics:   {In: true, Out: true},
+		feature.Read:     {In: true},
+	}
 }
 
 // AddConversation lists a conversation.
@@ -105,9 +116,54 @@ func (f *Fake) FailBackfill(errs ...error) {
 // Name implements bridge.Adapter.
 func (f *Fake) Name() string { return f.name }
 
-// Capabilities implements bridge.Adapter.
+// Capabilities implements bridge.Adapter. They follow the features the fake is
+// set to support, as a real adapter's do.
 func (f *Fake) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true, bridge.CapTopics: true, bridge.CapPins: true}
+	sup := f.Features()
+	caps := bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true}
+	if sup[feature.Messages].Out {
+		caps[bridge.CapSend], caps[bridge.CapEdits], caps[bridge.CapDeletes] = true, true, true
+	}
+	if sup[feature.Topics].In {
+		caps[bridge.CapTopics] = true
+	}
+	if sup[feature.Pins].In || sup[feature.Pins].Out {
+		caps[bridge.CapPins] = true
+	}
+	return caps
+}
+
+// Features implements bridge.Featured: by default everything the contract has
+// except what acts on people, which no adapter here does.
+func (f *Fake) Features() map[feature.Feature]feature.Support {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make(map[feature.Feature]feature.Support, len(f.support))
+	for k, v := range f.support {
+		out[k] = v
+	}
+	return out
+}
+
+// Support sets what the fake can do for a feature, to stand for an app with
+// another set of features (a read-only app, one without pins...). A feature
+// with neither direction is removed.
+func (f *Fake) Support(feat feature.Feature, s feature.Support) *Fake {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !s.In && !s.Out {
+		delete(f.support, feat)
+		return f
+	}
+	f.support[feat] = s
+	return f
+}
+
+// supports reports whether Chat may make changes of the feature in the fake.
+func (f *Fake) canWrite(feat feature.Feature) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.support[feat].Out
 }
 
 // Login implements bridge.Adapter: two input steps, then done.
@@ -401,6 +457,9 @@ func (f *Fake) nextPinFailure() error {
 // PinMessage implements bridge.Pinner; like the other app it tells the account
 // owner what changed (EchoSent).
 func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, pinned bool) error {
+	if !f.canWrite(feature.Pins) {
+		return fmt.Errorf("%w: this app does not take pins from Chat", bridge.ErrNotAllowed)
+	}
 	f.mu.Lock()
 	if err := f.nextPinFailure(); err != nil {
 		f.mu.Unlock()
@@ -422,6 +481,9 @@ func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, 
 
 // PinTopic implements bridge.Pinner.
 func (f *Fake) PinTopic(_ context.Context, _ bridge.Account, conv, topic string, pinned bool) error {
+	if !f.canWrite(feature.Topics) {
+		return fmt.Errorf("%w: this app does not take topic pins from Chat", bridge.ErrNotAllowed)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.nextPinFailure(); err != nil {
@@ -437,3 +499,4 @@ func (f *Fake) PinTopic(_ context.Context, _ bridge.Account, conv, topic string,
 }
 
 var _ bridge.Pinner = (*Fake)(nil)
+var _ bridge.Featured = (*Fake)(nil)

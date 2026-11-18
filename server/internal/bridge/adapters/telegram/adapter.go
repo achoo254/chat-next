@@ -9,6 +9,7 @@
 package telegram
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"context"
 	"sync"
 	"time"
@@ -53,6 +54,19 @@ func (a *Adapter) Name() string { return Name }
 func (a *Adapter) Capabilities() bridge.Capabilities {
 	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapMedia: true, bridge.CapSend: true, bridge.CapTopics: true, bridge.CapPins: true}
 }
+
+// Features implements bridge.Featured: what Telegram can do for each feature of
+// the bridge. Topics go out only as the pin of a topic; read marks only come in.
+func (a *Adapter) Features() map[feature.Feature]feature.Support {
+	return map[feature.Feature]feature.Support{
+		feature.Messages: {In: true, Out: true},
+		feature.Pins:     {In: true, Out: true},
+		feature.Topics:   {In: true, Out: true},
+		feature.Read:     {In: true},
+	}
+}
+
+var _ bridge.Featured = (*Adapter)(nil)
 
 // Close drops every connection and open login.
 func (a *Adapter) Close() {

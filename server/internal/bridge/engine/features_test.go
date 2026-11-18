@@ -167,3 +167,42 @@ func TestSetFeatureOnlyForAChatOfTheOwner(t *testing.T) {
 	_ = fmt.Sprint
 	_ = chat.DirectionBoth
 }
+
+// A platform other than Telegram: it reads messages and pins and takes nothing from
+// Chat. The engine and the features of its chats follow, with no change to either.
+func TestAPlatformWithAnotherSetOfFeaturesGetsItsOwnFeaturesAndBehaviour(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.fake.Support(feature.Messages, feature.Support{In: true}).Support(feature.Pins, feature.Support{In: true}).Support(feature.Topics, feature.Support{})
+	conv := e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "tin 1", 1), e.msg("m2", lan, "tin 2", 2))
+	e.fake.SetPinned("g1", "m2")
+	eng, chatID := e.enableWith(conv)
+	e.waitTexts(chatID, []string{"tin 1", "tin 2"})
+	e.waitPinned(chatID, []string{"tin 2"})
+	got := viewsByFeature(mustFeatures(t, eng, e))
+	if _, ok := got[feature.Topics]; ok {
+		t.Error("topics are listed for a platform without them")
+	}
+	if p := got[feature.Pins]; !p.Supported.In || p.Supported.Out {
+		t.Errorf("pins of a read-only platform: %+v", p.Supported)
+	}
+	if err := eng.SetFeature(ctx, e.owner, e.account, "g1", feature.Pins, feature.Both); !errors.Is(err, engine.ErrFeatureUnsupported) {
+		t.Errorf("pins both ways on a platform that only reads them = %v, want ErrFeatureUnsupported", err)
+	}
+	if err := eng.SetFeature(ctx, e.owner, e.account, "g1", feature.Pins, feature.Off); err != nil {
+		t.Errorf("switching a feature off is always possible: %v", err)
+	}
+	if err := eng.SetFeature(ctx, e.owner, e.account, "g1", feature.Messages, feature.Both); err == nil {
+		t.Error("sending to a platform that takes no messages was accepted")
+	}
+}
+
+func mustFeatures(t *testing.T, eng *engine.Engine, e *env) []engine.FeatureView {
+	t.Helper()
+	views, err := eng.Features(context.Background(), e.owner, e.account, "g1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return views
+}
