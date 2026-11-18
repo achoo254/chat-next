@@ -108,6 +108,14 @@ func declarationProblems(s Subject) []string {
 	if sup[feature.Members].Out && !memberWriter {
 		fail("members go out but the adapter is not a bridge.MemberWriter")
 	}
+	_, inviteMgr := a.(bridge.InviteManager)
+	_, lifecycle := a.(bridge.GroupLifecycle)
+	if (sup[feature.Invites].In || sup[feature.Invites].Out) && !inviteMgr {
+		fail("invites are supported but the adapter is not a bridge.InviteManager")
+	}
+	if sup[feature.Lifecycle].Out && !lifecycle {
+		fail("lifecycle goes out but the adapter is not a bridge.GroupLifecycle")
+	}
 	_, infoReader := a.(bridge.InfoReader)
 	_, infoWriter := a.(bridge.InfoWriter)
 	if sup[feature.Info].In && !infoReader {

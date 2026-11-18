@@ -33,9 +33,11 @@ const (
 	Invites Feature = "invites"
 	// Typing: "is typing" and presence.
 	Typing Feature = "typing"
+	// Lifecycle: leaving and deleting a group in the other app.
+	Lifecycle Feature = "lifecycle"
 )
 
-var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing}
+var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing, Lifecycle}
 
 // All lists every feature, in the order they are shown.
 func All() []Feature { return append([]Feature(nil), all...) }
@@ -70,7 +72,7 @@ func RiskOf(f Feature) Risk {
 	switch f {
 	case Messages, Topics, Info:
 		return R2
-	case Members, Invites:
+	case Members, Invites, Lifecycle:
 		return R3
 	case Typing:
 		return RE

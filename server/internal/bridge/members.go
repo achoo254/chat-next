@@ -6,6 +6,8 @@ import "context"
 type Member struct {
 	Participant Participant
 	Admin       bool
+	// Perms is the restriction the group put on them; nil when it did not.
+	Perms *Perms
 }
 
 // MemberReader is implemented by an adapter that supports "members" coming in. It

@@ -60,6 +60,30 @@ const (
 	// BridgeServiceSetBridgeFeatureProcedure is the fully-qualified name of the BridgeService's
 	// SetBridgeFeature RPC.
 	BridgeServiceSetBridgeFeatureProcedure = "/app.v1.BridgeService/SetBridgeFeature"
+	// BridgeServiceListBridgeInvitesProcedure is the fully-qualified name of the BridgeService's
+	// ListBridgeInvites RPC.
+	BridgeServiceListBridgeInvitesProcedure = "/app.v1.BridgeService/ListBridgeInvites"
+	// BridgeServiceCreateBridgeInviteProcedure is the fully-qualified name of the BridgeService's
+	// CreateBridgeInvite RPC.
+	BridgeServiceCreateBridgeInviteProcedure = "/app.v1.BridgeService/CreateBridgeInvite"
+	// BridgeServiceRevokeBridgeInviteProcedure is the fully-qualified name of the BridgeService's
+	// RevokeBridgeInvite RPC.
+	BridgeServiceRevokeBridgeInviteProcedure = "/app.v1.BridgeService/RevokeBridgeInvite"
+	// BridgeServiceListBridgeCandidatesProcedure is the fully-qualified name of the BridgeService's
+	// ListBridgeCandidates RPC.
+	BridgeServiceListBridgeCandidatesProcedure = "/app.v1.BridgeService/ListBridgeCandidates"
+	// BridgeServiceAddBridgeMemberProcedure is the fully-qualified name of the BridgeService's
+	// AddBridgeMember RPC.
+	BridgeServiceAddBridgeMemberProcedure = "/app.v1.BridgeService/AddBridgeMember"
+	// BridgeServiceLeaveBridgeGroupProcedure is the fully-qualified name of the BridgeService's
+	// LeaveBridgeGroup RPC.
+	BridgeServiceLeaveBridgeGroupProcedure = "/app.v1.BridgeService/LeaveBridgeGroup"
+	// BridgeServiceRequestBridgeGroupDeleteProcedure is the fully-qualified name of the BridgeService's
+	// RequestBridgeGroupDelete RPC.
+	BridgeServiceRequestBridgeGroupDeleteProcedure = "/app.v1.BridgeService/RequestBridgeGroupDelete"
+	// BridgeServiceDeleteBridgeGroupProcedure is the fully-qualified name of the BridgeService's
+	// DeleteBridgeGroup RPC.
+	BridgeServiceDeleteBridgeGroupProcedure = "/app.v1.BridgeService/DeleteBridgeGroup"
 	// BridgeServiceListBridgeOutboxProcedure is the fully-qualified name of the BridgeService's
 	// ListBridgeOutbox RPC.
 	BridgeServiceListBridgeOutboxProcedure = "/app.v1.BridgeService/ListBridgeOutbox"
@@ -107,6 +131,24 @@ type BridgeServiceClient interface {
 	// Sets the direction of one feature of a synced chat. Fails with
 	// failed_precondition (feature_unsupported) when the app cannot do it.
 	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
+	// The invite links the account made for a synced group in the app (not Chat's own links).
+	ListBridgeInvites(context.Context, *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error)
+	// Asks the app for a new invite link; it shows in the list once the app made it.
+	// failed_precondition feature_off when the invites feature does not send for the chat.
+	CreateBridgeInvite(context.Context, *connect.Request[v1.CreateBridgeInviteRequest]) (*connect.Response[v1.CreateBridgeInviteResponse], error)
+	RevokeBridgeInvite(context.Context, *connect.Request[v1.RevokeBridgeInviteRequest]) (*connect.Response[v1.RevokeBridgeInviteResponse], error)
+	// People of the account the app has shown, who are not members of the synced group.
+	ListBridgeCandidates(context.Context, *connect.Request[v1.ListBridgeCandidatesRequest]) (*connect.Response[v1.ListBridgeCandidatesResponse], error)
+	// Asks the app to add one of them to the group (members feature sending).
+	AddBridgeMember(context.Context, *connect.Request[v1.AddBridgeMemberRequest]) (*connect.Response[v1.AddBridgeMemberResponse], error)
+	// Leaves the group in the app. confirm_name must be the name of the chat
+	// (invalid_argument confirmation_wrong otherwise); the chat stays as a read-only copy.
+	LeaveBridgeGroup(context.Context, *connect.Request[v1.LeaveBridgeGroupRequest]) (*connect.Response[v1.LeaveBridgeGroupResponse], error)
+	// First step of deleting the group in the app for everybody: checks the name and gives a
+	// token that DeleteBridgeGroup accepts from usable_from_unix until expires_unix, once.
+	RequestBridgeGroupDelete(context.Context, *connect.Request[v1.RequestBridgeGroupDeleteRequest]) (*connect.Response[v1.RequestBridgeGroupDeleteResponse], error)
+	// Second step: deletes the group in the app, history included. Cannot be undone.
+	DeleteBridgeGroup(context.Context, *connect.Request[v1.DeleteBridgeGroupRequest]) (*connect.Response[v1.DeleteBridgeGroupResponse], error)
 	// What a chat has queued for the app and not finished: sending, waiting,
 	// failed or of unknown result. A message that is not listed was sent.
 	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
@@ -188,6 +230,54 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeature")),
 			connect.WithClientOptions(opts...),
 		),
+		listBridgeInvites: connect.NewClient[v1.ListBridgeInvitesRequest, v1.ListBridgeInvitesResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeInvitesProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeInvites")),
+			connect.WithClientOptions(opts...),
+		),
+		createBridgeInvite: connect.NewClient[v1.CreateBridgeInviteRequest, v1.CreateBridgeInviteResponse](
+			httpClient,
+			baseURL+BridgeServiceCreateBridgeInviteProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("CreateBridgeInvite")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeBridgeInvite: connect.NewClient[v1.RevokeBridgeInviteRequest, v1.RevokeBridgeInviteResponse](
+			httpClient,
+			baseURL+BridgeServiceRevokeBridgeInviteProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("RevokeBridgeInvite")),
+			connect.WithClientOptions(opts...),
+		),
+		listBridgeCandidates: connect.NewClient[v1.ListBridgeCandidatesRequest, v1.ListBridgeCandidatesResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeCandidatesProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeCandidates")),
+			connect.WithClientOptions(opts...),
+		),
+		addBridgeMember: connect.NewClient[v1.AddBridgeMemberRequest, v1.AddBridgeMemberResponse](
+			httpClient,
+			baseURL+BridgeServiceAddBridgeMemberProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("AddBridgeMember")),
+			connect.WithClientOptions(opts...),
+		),
+		leaveBridgeGroup: connect.NewClient[v1.LeaveBridgeGroupRequest, v1.LeaveBridgeGroupResponse](
+			httpClient,
+			baseURL+BridgeServiceLeaveBridgeGroupProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("LeaveBridgeGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		requestBridgeGroupDelete: connect.NewClient[v1.RequestBridgeGroupDeleteRequest, v1.RequestBridgeGroupDeleteResponse](
+			httpClient,
+			baseURL+BridgeServiceRequestBridgeGroupDeleteProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("RequestBridgeGroupDelete")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteBridgeGroup: connect.NewClient[v1.DeleteBridgeGroupRequest, v1.DeleteBridgeGroupResponse](
+			httpClient,
+			baseURL+BridgeServiceDeleteBridgeGroupProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("DeleteBridgeGroup")),
+			connect.WithClientOptions(opts...),
+		),
 		listBridgeOutbox: connect.NewClient[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse](
 			httpClient,
 			baseURL+BridgeServiceListBridgeOutboxProcedure,
@@ -217,19 +307,27 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // bridgeServiceClient implements BridgeServiceClient.
 type bridgeServiceClient struct {
-	getBridgeStatus         *connect.Client[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse]
-	startBridgeLogin        *connect.Client[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse]
-	continueBridgeLogin     *connect.Client[v1.ContinueBridgeLoginRequest, v1.ContinueBridgeLoginResponse]
-	listBridgeConversations *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
-	enableBridgeChat        *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
-	removeBridgeChat        *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
-	setBridgeChatDirection  *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
-	listBridgeFeatures      *connect.Client[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse]
-	setBridgeFeature        *connect.Client[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse]
-	listBridgeOutbox        *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
-	retryBridgeMessage      *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
-	dismissBridgeMessage    *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
-	disconnectBridgeAccount *connect.Client[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse]
+	getBridgeStatus          *connect.Client[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse]
+	startBridgeLogin         *connect.Client[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse]
+	continueBridgeLogin      *connect.Client[v1.ContinueBridgeLoginRequest, v1.ContinueBridgeLoginResponse]
+	listBridgeConversations  *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
+	enableBridgeChat         *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
+	removeBridgeChat         *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
+	setBridgeChatDirection   *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
+	listBridgeFeatures       *connect.Client[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse]
+	setBridgeFeature         *connect.Client[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse]
+	listBridgeInvites        *connect.Client[v1.ListBridgeInvitesRequest, v1.ListBridgeInvitesResponse]
+	createBridgeInvite       *connect.Client[v1.CreateBridgeInviteRequest, v1.CreateBridgeInviteResponse]
+	revokeBridgeInvite       *connect.Client[v1.RevokeBridgeInviteRequest, v1.RevokeBridgeInviteResponse]
+	listBridgeCandidates     *connect.Client[v1.ListBridgeCandidatesRequest, v1.ListBridgeCandidatesResponse]
+	addBridgeMember          *connect.Client[v1.AddBridgeMemberRequest, v1.AddBridgeMemberResponse]
+	leaveBridgeGroup         *connect.Client[v1.LeaveBridgeGroupRequest, v1.LeaveBridgeGroupResponse]
+	requestBridgeGroupDelete *connect.Client[v1.RequestBridgeGroupDeleteRequest, v1.RequestBridgeGroupDeleteResponse]
+	deleteBridgeGroup        *connect.Client[v1.DeleteBridgeGroupRequest, v1.DeleteBridgeGroupResponse]
+	listBridgeOutbox         *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
+	retryBridgeMessage       *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
+	dismissBridgeMessage     *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
+	disconnectBridgeAccount  *connect.Client[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse]
 }
 
 // GetBridgeStatus calls app.v1.BridgeService.GetBridgeStatus.
@@ -275,6 +373,46 @@ func (c *bridgeServiceClient) ListBridgeFeatures(ctx context.Context, req *conne
 // SetBridgeFeature calls app.v1.BridgeService.SetBridgeFeature.
 func (c *bridgeServiceClient) SetBridgeFeature(ctx context.Context, req *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error) {
 	return c.setBridgeFeature.CallUnary(ctx, req)
+}
+
+// ListBridgeInvites calls app.v1.BridgeService.ListBridgeInvites.
+func (c *bridgeServiceClient) ListBridgeInvites(ctx context.Context, req *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error) {
+	return c.listBridgeInvites.CallUnary(ctx, req)
+}
+
+// CreateBridgeInvite calls app.v1.BridgeService.CreateBridgeInvite.
+func (c *bridgeServiceClient) CreateBridgeInvite(ctx context.Context, req *connect.Request[v1.CreateBridgeInviteRequest]) (*connect.Response[v1.CreateBridgeInviteResponse], error) {
+	return c.createBridgeInvite.CallUnary(ctx, req)
+}
+
+// RevokeBridgeInvite calls app.v1.BridgeService.RevokeBridgeInvite.
+func (c *bridgeServiceClient) RevokeBridgeInvite(ctx context.Context, req *connect.Request[v1.RevokeBridgeInviteRequest]) (*connect.Response[v1.RevokeBridgeInviteResponse], error) {
+	return c.revokeBridgeInvite.CallUnary(ctx, req)
+}
+
+// ListBridgeCandidates calls app.v1.BridgeService.ListBridgeCandidates.
+func (c *bridgeServiceClient) ListBridgeCandidates(ctx context.Context, req *connect.Request[v1.ListBridgeCandidatesRequest]) (*connect.Response[v1.ListBridgeCandidatesResponse], error) {
+	return c.listBridgeCandidates.CallUnary(ctx, req)
+}
+
+// AddBridgeMember calls app.v1.BridgeService.AddBridgeMember.
+func (c *bridgeServiceClient) AddBridgeMember(ctx context.Context, req *connect.Request[v1.AddBridgeMemberRequest]) (*connect.Response[v1.AddBridgeMemberResponse], error) {
+	return c.addBridgeMember.CallUnary(ctx, req)
+}
+
+// LeaveBridgeGroup calls app.v1.BridgeService.LeaveBridgeGroup.
+func (c *bridgeServiceClient) LeaveBridgeGroup(ctx context.Context, req *connect.Request[v1.LeaveBridgeGroupRequest]) (*connect.Response[v1.LeaveBridgeGroupResponse], error) {
+	return c.leaveBridgeGroup.CallUnary(ctx, req)
+}
+
+// RequestBridgeGroupDelete calls app.v1.BridgeService.RequestBridgeGroupDelete.
+func (c *bridgeServiceClient) RequestBridgeGroupDelete(ctx context.Context, req *connect.Request[v1.RequestBridgeGroupDeleteRequest]) (*connect.Response[v1.RequestBridgeGroupDeleteResponse], error) {
+	return c.requestBridgeGroupDelete.CallUnary(ctx, req)
+}
+
+// DeleteBridgeGroup calls app.v1.BridgeService.DeleteBridgeGroup.
+func (c *bridgeServiceClient) DeleteBridgeGroup(ctx context.Context, req *connect.Request[v1.DeleteBridgeGroupRequest]) (*connect.Response[v1.DeleteBridgeGroupResponse], error) {
+	return c.deleteBridgeGroup.CallUnary(ctx, req)
 }
 
 // ListBridgeOutbox calls app.v1.BridgeService.ListBridgeOutbox.
@@ -330,6 +468,24 @@ type BridgeServiceHandler interface {
 	// Sets the direction of one feature of a synced chat. Fails with
 	// failed_precondition (feature_unsupported) when the app cannot do it.
 	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
+	// The invite links the account made for a synced group in the app (not Chat's own links).
+	ListBridgeInvites(context.Context, *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error)
+	// Asks the app for a new invite link; it shows in the list once the app made it.
+	// failed_precondition feature_off when the invites feature does not send for the chat.
+	CreateBridgeInvite(context.Context, *connect.Request[v1.CreateBridgeInviteRequest]) (*connect.Response[v1.CreateBridgeInviteResponse], error)
+	RevokeBridgeInvite(context.Context, *connect.Request[v1.RevokeBridgeInviteRequest]) (*connect.Response[v1.RevokeBridgeInviteResponse], error)
+	// People of the account the app has shown, who are not members of the synced group.
+	ListBridgeCandidates(context.Context, *connect.Request[v1.ListBridgeCandidatesRequest]) (*connect.Response[v1.ListBridgeCandidatesResponse], error)
+	// Asks the app to add one of them to the group (members feature sending).
+	AddBridgeMember(context.Context, *connect.Request[v1.AddBridgeMemberRequest]) (*connect.Response[v1.AddBridgeMemberResponse], error)
+	// Leaves the group in the app. confirm_name must be the name of the chat
+	// (invalid_argument confirmation_wrong otherwise); the chat stays as a read-only copy.
+	LeaveBridgeGroup(context.Context, *connect.Request[v1.LeaveBridgeGroupRequest]) (*connect.Response[v1.LeaveBridgeGroupResponse], error)
+	// First step of deleting the group in the app for everybody: checks the name and gives a
+	// token that DeleteBridgeGroup accepts from usable_from_unix until expires_unix, once.
+	RequestBridgeGroupDelete(context.Context, *connect.Request[v1.RequestBridgeGroupDeleteRequest]) (*connect.Response[v1.RequestBridgeGroupDeleteResponse], error)
+	// Second step: deletes the group in the app, history included. Cannot be undone.
+	DeleteBridgeGroup(context.Context, *connect.Request[v1.DeleteBridgeGroupRequest]) (*connect.Response[v1.DeleteBridgeGroupResponse], error)
 	// What a chat has queued for the app and not finished: sending, waiting,
 	// failed or of unknown result. A message that is not listed was sent.
 	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
@@ -407,6 +563,54 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeature")),
 		connect.WithHandlerOptions(opts...),
 	)
+	bridgeServiceListBridgeInvitesHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeInvitesProcedure,
+		svc.ListBridgeInvites,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeInvites")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceCreateBridgeInviteHandler := connect.NewUnaryHandler(
+		BridgeServiceCreateBridgeInviteProcedure,
+		svc.CreateBridgeInvite,
+		connect.WithSchema(bridgeServiceMethods.ByName("CreateBridgeInvite")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceRevokeBridgeInviteHandler := connect.NewUnaryHandler(
+		BridgeServiceRevokeBridgeInviteProcedure,
+		svc.RevokeBridgeInvite,
+		connect.WithSchema(bridgeServiceMethods.ByName("RevokeBridgeInvite")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceListBridgeCandidatesHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeCandidatesProcedure,
+		svc.ListBridgeCandidates,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeCandidates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceAddBridgeMemberHandler := connect.NewUnaryHandler(
+		BridgeServiceAddBridgeMemberProcedure,
+		svc.AddBridgeMember,
+		connect.WithSchema(bridgeServiceMethods.ByName("AddBridgeMember")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceLeaveBridgeGroupHandler := connect.NewUnaryHandler(
+		BridgeServiceLeaveBridgeGroupProcedure,
+		svc.LeaveBridgeGroup,
+		connect.WithSchema(bridgeServiceMethods.ByName("LeaveBridgeGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceRequestBridgeGroupDeleteHandler := connect.NewUnaryHandler(
+		BridgeServiceRequestBridgeGroupDeleteProcedure,
+		svc.RequestBridgeGroupDelete,
+		connect.WithSchema(bridgeServiceMethods.ByName("RequestBridgeGroupDelete")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceDeleteBridgeGroupHandler := connect.NewUnaryHandler(
+		BridgeServiceDeleteBridgeGroupProcedure,
+		svc.DeleteBridgeGroup,
+		connect.WithSchema(bridgeServiceMethods.ByName("DeleteBridgeGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
 	bridgeServiceListBridgeOutboxHandler := connect.NewUnaryHandler(
 		BridgeServiceListBridgeOutboxProcedure,
 		svc.ListBridgeOutbox,
@@ -451,6 +655,22 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 			bridgeServiceListBridgeFeaturesHandler.ServeHTTP(w, r)
 		case BridgeServiceSetBridgeFeatureProcedure:
 			bridgeServiceSetBridgeFeatureHandler.ServeHTTP(w, r)
+		case BridgeServiceListBridgeInvitesProcedure:
+			bridgeServiceListBridgeInvitesHandler.ServeHTTP(w, r)
+		case BridgeServiceCreateBridgeInviteProcedure:
+			bridgeServiceCreateBridgeInviteHandler.ServeHTTP(w, r)
+		case BridgeServiceRevokeBridgeInviteProcedure:
+			bridgeServiceRevokeBridgeInviteHandler.ServeHTTP(w, r)
+		case BridgeServiceListBridgeCandidatesProcedure:
+			bridgeServiceListBridgeCandidatesHandler.ServeHTTP(w, r)
+		case BridgeServiceAddBridgeMemberProcedure:
+			bridgeServiceAddBridgeMemberHandler.ServeHTTP(w, r)
+		case BridgeServiceLeaveBridgeGroupProcedure:
+			bridgeServiceLeaveBridgeGroupHandler.ServeHTTP(w, r)
+		case BridgeServiceRequestBridgeGroupDeleteProcedure:
+			bridgeServiceRequestBridgeGroupDeleteHandler.ServeHTTP(w, r)
+		case BridgeServiceDeleteBridgeGroupProcedure:
+			bridgeServiceDeleteBridgeGroupHandler.ServeHTTP(w, r)
 		case BridgeServiceListBridgeOutboxProcedure:
 			bridgeServiceListBridgeOutboxHandler.ServeHTTP(w, r)
 		case BridgeServiceRetryBridgeMessageProcedure:
@@ -502,6 +722,38 @@ func (UnimplementedBridgeServiceHandler) ListBridgeFeatures(context.Context, *co
 
 func (UnimplementedBridgeServiceHandler) SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeFeature is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeInvites(context.Context, *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeInvites is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) CreateBridgeInvite(context.Context, *connect.Request[v1.CreateBridgeInviteRequest]) (*connect.Response[v1.CreateBridgeInviteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.CreateBridgeInvite is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) RevokeBridgeInvite(context.Context, *connect.Request[v1.RevokeBridgeInviteRequest]) (*connect.Response[v1.RevokeBridgeInviteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.RevokeBridgeInvite is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeCandidates(context.Context, *connect.Request[v1.ListBridgeCandidatesRequest]) (*connect.Response[v1.ListBridgeCandidatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeCandidates is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) AddBridgeMember(context.Context, *connect.Request[v1.AddBridgeMemberRequest]) (*connect.Response[v1.AddBridgeMemberResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.AddBridgeMember is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) LeaveBridgeGroup(context.Context, *connect.Request[v1.LeaveBridgeGroupRequest]) (*connect.Response[v1.LeaveBridgeGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.LeaveBridgeGroup is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) RequestBridgeGroupDelete(context.Context, *connect.Request[v1.RequestBridgeGroupDeleteRequest]) (*connect.Response[v1.RequestBridgeGroupDeleteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.RequestBridgeGroupDelete is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) DeleteBridgeGroup(context.Context, *connect.Request[v1.DeleteBridgeGroupRequest]) (*connect.Response[v1.DeleteBridgeGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.DeleteBridgeGroup is not implemented"))
 }
 
 func (UnimplementedBridgeServiceHandler) ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error) {

@@ -59,14 +59,16 @@ func (a *Adapter) Capabilities() bridge.Capabilities {
 // the bridge. Topics go out only as the pin of a topic; read marks only come in.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
 	return map[feature.Feature]feature.Support{
-		feature.Messages: {In: true, Out: true},
-		feature.Pins:     {In: true, Out: true},
-		feature.Topics:   {In: true, Out: true},
-		feature.Read:     {In: true},
-		feature.Notify:   {In: true, Out: true},
-		feature.Dialog:   {In: true, Out: true},
-		feature.Info:     {In: true, Out: true},
-		feature.Members:  {In: true, Out: true},
+		feature.Messages:  {In: true, Out: true},
+		feature.Pins:      {In: true, Out: true},
+		feature.Topics:    {In: true, Out: true},
+		feature.Read:      {In: true},
+		feature.Notify:    {In: true, Out: true},
+		feature.Dialog:    {In: true, Out: true},
+		feature.Info:      {In: true, Out: true},
+		feature.Members:   {In: true, Out: true},
+		feature.Invites:   {In: true, Out: true},
+		feature.Lifecycle: {Out: true},
 	}
 }
 

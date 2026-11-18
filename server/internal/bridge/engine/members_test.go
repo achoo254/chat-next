@@ -54,7 +54,7 @@ func (e *env) memberUser(chatID int64, name string) int64 {
 
 func (e *env) auditRows(result string) int {
 	var n int
-	if err := e.st.Pool().QueryRow(context.Background(), `SELECT count(*) FROM external_audit WHERE feature = 'members' AND result = $1`, result).Scan(&n); err != nil {
+	if err := e.st.Pool().QueryRow(context.Background(), `SELECT count(*) FROM external_audit WHERE result = $1`, result).Scan(&n); err != nil {
 		e.t.Fatal(err)
 	}
 	return n

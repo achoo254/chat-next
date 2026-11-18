@@ -12,7 +12,7 @@ import (
 )
 
 // memberActionOps are the outbox ops that act on people in the other app.
-var memberActionOps = []string{"member_remove", "member_admin"}
+var memberActionOps = []string{"member_remove", "member_admin", "member_add", "member_perms"}
 
 // pendingAny says whether the chat has a row of one of ops waiting or on its way.
 func (d *db) pendingAny(ctx context.Context, chatID int64, ops []string) (bool, error) {
@@ -30,7 +30,7 @@ func (d *db) audit(ctx context.Context, h *outboxRow, accountID, actor int64, ac
 	}
 	if _, err := d.pool.Exec(ctx, `
 		INSERT INTO external_audit (account_id, external_chat_id, chat_id, feature, action, target, actor_id, result, detail)
-		VALUES ($1, $2, $3, 'members', $4, $5, $6, $7, $8)`, accountID, h.ExternalChat, h.ChatID, action, target, actor, result, detail); err != nil {
+		VALUES ($1, $2, $3, $9, $4, $5, $6, $7, $8)`, accountID, h.ExternalChat, h.ChatID, action, target, actor, result, detail, featureOfOp(h.Op)); err != nil {
 		return fmt.Errorf("bridge: audit: %w", err)
 	}
 	return nil
@@ -40,7 +40,7 @@ func (d *db) audit(ctx context.Context, h *outboxRow, accountID, actor int64, ac
 func (d *db) sentThisHour(ctx context.Context, accountID int64) (int, error) {
 	var n int
 	if err := d.pool.QueryRow(ctx, `
-		SELECT count(*) FROM external_audit WHERE account_id = $1 AND feature = 'members' AND result = 'sent' AND created_at > now() - interval '1 hour'`,
+		SELECT count(*) FROM external_audit WHERE account_id = $1 AND result = 'sent' AND created_at > now() - interval '1 hour'`,
 		accountID).Scan(&n); err != nil {
 		return 0, fmt.Errorf("bridge: count member actions: %w", err)
 	}
@@ -89,7 +89,12 @@ func (r *runner) pollMembers(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			members = append(members, chat.ImportedMember{UserID: id, Admin: m.Admin})
+			im := chat.ImportedMember{UserID: id, Admin: m.Admin}
+			if m.Perms != nil {
+				bits := bitsOfPerms(*m.Perms)
+				im.Perms = &bits
+			}
+			members = append(members, im)
 		}
 		if err := r.withLink(ctx, l, func(it *chat.ImportTx) error {
 			_, err := it.SyncMembers(ctx, members, complete)
@@ -101,45 +106,63 @@ func (r *runner) pollMembers(ctx context.Context) error {
 	return nil
 }
 
-// doMemberAction sends the removal of a person or a change of their admin role. It is
-// the only place Chat acts on people in the other app, so it checks the limit per
-// hour, writes the audit row whatever happens, and when the other app refuses has Chat
-// read the members again at once.
+// doMemberAction sends an action on a person: removing them, adding them, making them an
+// admin, restricting them.
 func (r *runner) doMemberAction(ctx context.Context, h *outboxRow) error {
-	db := r.e.db
 	writer, ok := r.adapter.(bridge.MemberWriter)
 	if !ok {
-		return db.setOutbox(ctx, []int64{h.ID}, "failed", "members_unsupported: this app cannot take this from Chat", time.Time{})
+		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "members_unsupported: this app cannot take this from Chat", time.Time{})
 	}
 	var p struct {
 		Participant string `json:"participant"`
 		Admin       bool   `json:"admin"`
+		Perms       uint32 `json:"perms"`
 	}
 	if err := json.Unmarshal(h.Payload, &p); err != nil || p.Participant == "" {
-		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
+		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
 	}
+	return r.guarded(ctx, h, p.Participant, func() error {
+		switch h.Op {
+		case "member_remove":
+			return writer.RemoveMember(ctx, r.acct, h.ExternalChat, p.Participant)
+		case "member_admin":
+			return writer.SetMemberAdmin(ctx, r.acct, h.ExternalChat, p.Participant, p.Admin)
+		case "member_add":
+			if adder, ok := r.adapter.(bridge.MemberAdder); ok {
+				return adder.AddMember(ctx, r.acct, h.ExternalChat, p.Participant)
+			}
+		case "member_perms":
+			if pw, ok := r.adapter.(bridge.PermWriter); ok {
+				return pw.SetMemberPerms(ctx, r.acct, h.ExternalChat, p.Participant, permsOfBits(p.Perms))
+			}
+		}
+		return fmt.Errorf("%w: this app cannot do that from Chat", bridge.ErrNotAllowed)
+	}, nil)
+}
+
+// guarded is the one place Chat acts on people and groups in the other app: it checks the
+// limit per hour, writes the audit row whatever happens, and when the other app refuses
+// has Chat read the members again at once. after runs once the call went through.
+func (r *runner) guarded(ctx context.Context, h *outboxRow, target string, call func() error, after func() error) error {
+	db := r.e.db
 	owner := r.account.OwnerID
 	if n, err := db.sentThisHour(ctx, r.account.ID); err != nil {
 		return err
 	} else if n >= r.e.cfg.MemberActionsPerHour {
-		if err := db.audit(ctx, h, r.account.ID, owner, h.Op, p.Participant, "limited", "hourly limit of actions on people reached"); err != nil {
+		if err := db.audit(ctx, h, r.account.ID, owner, h.Op, target, "limited", "hourly limit of actions on people reached"); err != nil {
 			return err
 		}
 		r.membersTick = 0
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "limit: too many actions on people in an hour", time.Time{})
 	}
+	if err := db.audit(ctx, h, r.account.ID, owner, h.Op, target, "started", ""); err != nil {
+		return err // logged before it is sent: no log, no action
+	}
 	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
 		return err
 	}
-	var err error
-	switch h.Op {
-	case "member_remove":
-		err = writer.RemoveMember(ctx, r.acct, h.ExternalChat, p.Participant)
-	case "member_admin":
-		err = writer.SetMemberAdmin(ctx, r.acct, h.ExternalChat, p.Participant, p.Admin)
-	}
-	if err != nil {
-		if aerr := db.audit(ctx, h, r.account.ID, owner, h.Op, p.Participant, "failed", err.Error()); aerr != nil {
+	if err := call(); err != nil {
+		if aerr := db.audit(ctx, h, r.account.ID, owner, h.Op, target, "failed", err.Error()); aerr != nil {
 			return aerr
 		}
 		if serr := r.settleCall(ctx, []*outboxRow{h}, err); serr != nil {
@@ -154,8 +177,13 @@ func (r *runner) doMemberAction(ctx context.Context, h *outboxRow) error {
 		}
 		return nil
 	}
-	if err := db.audit(ctx, h, r.account.ID, owner, h.Op, p.Participant, "sent", ""); err != nil {
+	if err := db.audit(ctx, h, r.account.ID, owner, h.Op, target, "sent", ""); err != nil {
 		return err
+	}
+	if after != nil {
+		if err := after(); err != nil {
+			return err
+		}
 	}
 	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
 }

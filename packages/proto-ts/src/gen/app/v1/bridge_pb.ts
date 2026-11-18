@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bridge.proto.
  */
 export const file_app_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSK8AQoQQnJpZGdlU3luY2VkQ2hhdBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSEwoHY2hhdF9pZBgCIAEoA0ICMAISEQoJY2F1Z2h0X3VwGAMgASgIEhYKDmhpc3Rvcnlfd2luZG93GAQgASgFEg0KBXRpdGxlGAUgASgJEioKCWRpcmVjdGlvbhgGIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24SFAoMdG9waWNzX3NwbGl0GAcgASgIIpkBCg1CcmlkZ2VBY2NvdW50Eg4KAmlkGAEgASgDQgIwAhIOCgZzb3VyY2UYAiABKAkSKwoGc3RhdHVzGAMgASgOMhsuYXBwLnYxLkJyaWRnZUFjY291bnRTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRInCgVjaGF0cxgFIAMoCzIYLmFwcC52MS5CcmlkZ2VTeW5jZWRDaGF0IhgKFkdldEJyaWRnZVN0YXR1c1JlcXVlc3QiYwoXR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USHwoEYXBwcxgBIAMoCzIRLmFwcC52MS5CcmlkZ2VBcHASJwoIYWNjb3VudHMYAiADKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCI/ChBCcmlkZ2VMb2dpbkZpZWxkEgwKBG5hbWUYASABKAkSDQoFbGFiZWwYAiABKAkSDgoGc2VjcmV0GAMgASgIIrABCg9CcmlkZ2VMb2dpblN0ZXASKQoEa2luZBgBIAEoDjIbLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXBLaW5kEhAKCGxvZ2luX2lkGAIgASgJEigKBmZpZWxkcxgDIAMoCzIYLmFwcC52MS5CcmlkZ2VMb2dpbkZpZWxkEg4KBnByb21wdBgEIAEoCRImCgdhY2NvdW50GAUgASgLMhUuYXBwLnYxLkJyaWRnZUFjY291bnQiKQoXU3RhcnRCcmlkZ2VMb2dpblJlcXVlc3QSDgoGc291cmNlGAEgASgJIkEKGFN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRIlCgRzdGVwGAEgASgLMhcuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcCKaAQoaQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QSEAoIbG9naW5faWQYASABKAkSPAoFaW5wdXQYAiADKAsyLS5hcHAudjEuQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QuSW5wdXRFbnRyeRosCgpJbnB1dEVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiRAobQ29udGludWVCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIjgKHkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiKXAQoSQnJpZGdlQ29udmVyc2F0aW9uEgoKAmlkGAEgASgJEiwKBGtpbmQYAiABKA4yHi5hcHAudjEuQnJpZGdlQ29udmVyc2F0aW9uS2luZBINCgV0aXRsZRgDIAEoCRITCgdjaGF0X2lkGAQgASgDQgIwAhINCgVmb3J1bRgFIAEoCBIUCgx0b3BpY3Nfc3BsaXQYBiABKAgiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiKOAQoXRW5hYmxlQnJpZGdlQ2hhdFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhYKDmhpc3Rvcnlfd2luZG93GAMgASgFEioKCWRpcmVjdGlvbhgEIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24iLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlInwKHVNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIqCglkaXJlY3Rpb24YAyABKA4yFy5hcHAudjEuQnJpZGdlRGlyZWN0aW9uIiAKHlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZSKBAQoQQnJpZGdlT3V0Ym94SXRlbRIPCgNzZXEYASABKANCAjACEgoKAm9wGAIgASgJEioKBnN0YXR1cxgDIAEoDjIaLmFwcC52MS5CcmlkZ2VPdXRib3hTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRIQCghhdHRlbXB0cxgFIAEoBSIuChdMaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJDChhMaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5hcHAudjEuQnJpZGdlT3V0Ym94SXRlbSJBChlSZXRyeUJyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHAoaUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2UiQwobRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHgocRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZSJMChlMaXN0QnJpZGdlRmVhdHVyZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJ8Cg1CcmlkZ2VGZWF0dXJlEg8KB2ZlYXR1cmUYASABKAkSDAoEcmlzaxgCIAEoCRIRCglkaXJlY3Rpb24YAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJFChpMaXN0QnJpZGdlRmVhdHVyZXNSZXNwb25zZRInCghmZWF0dXJlcxgBIAMoCzIVLmFwcC52MS5CcmlkZ2VGZWF0dXJlIm4KF1NldEJyaWRnZUZlYXR1cmVSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIPCgdmZWF0dXJlGAMgASgJEhEKCWRpcmVjdGlvbhgEIAEoCSIaChhTZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2UqqAEKE0JyaWRnZUFjY291bnRTdGF0dXMSJQohQlJJREdFX0FDQ09VTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX0FDQ09VTlRfU1RBVFVTX0FDVElWRRABEiUKIUJSSURHRV9BQ0NPVU5UX1NUQVRVU19ORUVEU19MT0dJThACEiEKHUJSSURHRV9BQ0NPVU5UX1NUQVRVU19TVE9QUEVEEAMqZwoPQnJpZGdlRGlyZWN0aW9uEiAKHEJSSURHRV9ESVJFQ1RJT05fVU5TUEVDSUZJRUQQABIXChNCUklER0VfRElSRUNUSU9OX0lOEAESGQoVQlJJREdFX0RJUkVDVElPTl9CT1RIEAIqwwEKE0JyaWRnZUxvZ2luU3RlcEtpbmQSJgoiQlJJREdFX0xPR0lOX1NURVBfS0lORF9VTlNQRUNJRklFRBAAEiAKHEJSSURHRV9MT0dJTl9TVEVQX0tJTkRfSU5QVVQQARIdChlCUklER0VfTE9HSU5fU1RFUF9LSU5EX1FSEAISIgoeQlJJREdFX0xPR0lOX1NURVBfS0lORF9DT05GSVJNEAMSHwobQlJJREdFX0xPR0lOX1NURVBfS0lORF9ET05FEAQq1AEKFkJyaWRnZUNvbnZlcnNhdGlvbktpbmQSKAokQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1VOU1BFQ0lGSUVEEAASJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1BSSVZBVEUQARIgChxCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfQk9UEAISIgoeQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0dST1VQEAMSJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0NIQU5ORUwQBCrBAQoSQnJpZGdlT3V0Ym94U3RhdHVzEiQKIEJSSURHRV9PVVRCT1hfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX09VVEJPWF9TVEFUVVNfUEVORElORxABEiAKHEJSSURHRV9PVVRCT1hfU1RBVFVTX1NFTkRJTkcQAhIfChtCUklER0VfT1VUQk9YX1NUQVRVU19GQUlMRUQQAxIgChxCUklER0VfT1VUQk9YX1NUQVRVU19VTktOT1dOEAQy1AkKDUJyaWRnZVNlcnZpY2USUgoPR2V0QnJpZGdlU3RhdHVzEh4uYXBwLnYxLkdldEJyaWRnZVN0YXR1c1JlcXVlc3QaHy5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USVQoQU3RhcnRCcmlkZ2VMb2dpbhIfLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVxdWVzdBogLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVzcG9uc2USXgoTQ29udGludWVCcmlkZ2VMb2dpbhIiLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBojLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USagoXTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnMSJi5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GicuYXBwLnYxLkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVzcG9uc2USVQoQRW5hYmxlQnJpZGdlQ2hhdBIfLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVzcG9uc2USVQoQUmVtb3ZlQnJpZGdlQ2hhdBIfLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2USZwoWU2V0QnJpZGdlQ2hhdERpcmVjdGlvbhIlLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVxdWVzdBomLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVzcG9uc2USWwoSTGlzdEJyaWRnZUZlYXR1cmVzEiEuYXBwLnYxLkxpc3RCcmlkZ2VGZWF0dXJlc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJyaWRnZUZlYXR1cmVzUmVzcG9uc2USVQoQU2V0QnJpZGdlRmVhdHVyZRIfLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVxdWVzdBogLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2USVQoQTGlzdEJyaWRnZU91dGJveBIfLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBogLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USWwoSUmV0cnlCcmlkZ2VNZXNzYWdlEiEuYXBwLnYxLlJldHJ5QnJpZGdlTWVzc2FnZVJlcXVlc3QaIi5hcHAudjEuUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2USYQoURGlzbWlzc0JyaWRnZU1lc3NhZ2USIy5hcHAudjEuRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0GiQuYXBwLnYxLkRpc21pc3NCcmlkZ2VNZXNzYWdlUmVzcG9uc2USagoXRGlzY29ubmVjdEJyaWRnZUFjY291bnQSJi5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0GicuYXBwLnYxLkRpc2Nvbm5lY3RCcmlkZ2VBY2NvdW50UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
+  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSK8AQoQQnJpZGdlU3luY2VkQ2hhdBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSEwoHY2hhdF9pZBgCIAEoA0ICMAISEQoJY2F1Z2h0X3VwGAMgASgIEhYKDmhpc3Rvcnlfd2luZG93GAQgASgFEg0KBXRpdGxlGAUgASgJEioKCWRpcmVjdGlvbhgGIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24SFAoMdG9waWNzX3NwbGl0GAcgASgIIpkBCg1CcmlkZ2VBY2NvdW50Eg4KAmlkGAEgASgDQgIwAhIOCgZzb3VyY2UYAiABKAkSKwoGc3RhdHVzGAMgASgOMhsuYXBwLnYxLkJyaWRnZUFjY291bnRTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRInCgVjaGF0cxgFIAMoCzIYLmFwcC52MS5CcmlkZ2VTeW5jZWRDaGF0IhgKFkdldEJyaWRnZVN0YXR1c1JlcXVlc3QiYwoXR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USHwoEYXBwcxgBIAMoCzIRLmFwcC52MS5CcmlkZ2VBcHASJwoIYWNjb3VudHMYAiADKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCI/ChBCcmlkZ2VMb2dpbkZpZWxkEgwKBG5hbWUYASABKAkSDQoFbGFiZWwYAiABKAkSDgoGc2VjcmV0GAMgASgIIrABCg9CcmlkZ2VMb2dpblN0ZXASKQoEa2luZBgBIAEoDjIbLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXBLaW5kEhAKCGxvZ2luX2lkGAIgASgJEigKBmZpZWxkcxgDIAMoCzIYLmFwcC52MS5CcmlkZ2VMb2dpbkZpZWxkEg4KBnByb21wdBgEIAEoCRImCgdhY2NvdW50GAUgASgLMhUuYXBwLnYxLkJyaWRnZUFjY291bnQiKQoXU3RhcnRCcmlkZ2VMb2dpblJlcXVlc3QSDgoGc291cmNlGAEgASgJIkEKGFN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRIlCgRzdGVwGAEgASgLMhcuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcCKaAQoaQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QSEAoIbG9naW5faWQYASABKAkSPAoFaW5wdXQYAiADKAsyLS5hcHAudjEuQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QuSW5wdXRFbnRyeRosCgpJbnB1dEVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiRAobQ29udGludWVCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIjgKHkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiKXAQoSQnJpZGdlQ29udmVyc2F0aW9uEgoKAmlkGAEgASgJEiwKBGtpbmQYAiABKA4yHi5hcHAudjEuQnJpZGdlQ29udmVyc2F0aW9uS2luZBINCgV0aXRsZRgDIAEoCRITCgdjaGF0X2lkGAQgASgDQgIwAhINCgVmb3J1bRgFIAEoCBIUCgx0b3BpY3Nfc3BsaXQYBiABKAgiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiKOAQoXRW5hYmxlQnJpZGdlQ2hhdFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhYKDmhpc3Rvcnlfd2luZG93GAMgASgFEioKCWRpcmVjdGlvbhgEIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24iLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlInwKHVNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIqCglkaXJlY3Rpb24YAyABKA4yFy5hcHAudjEuQnJpZGdlRGlyZWN0aW9uIiAKHlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZSKBAQoQQnJpZGdlT3V0Ym94SXRlbRIPCgNzZXEYASABKANCAjACEgoKAm9wGAIgASgJEioKBnN0YXR1cxgDIAEoDjIaLmFwcC52MS5CcmlkZ2VPdXRib3hTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRIQCghhdHRlbXB0cxgFIAEoBSIuChdMaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJDChhMaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5hcHAudjEuQnJpZGdlT3V0Ym94SXRlbSJBChlSZXRyeUJyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHAoaUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2UiQwobRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHgocRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZSJMChlMaXN0QnJpZGdlRmVhdHVyZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJ8Cg1CcmlkZ2VGZWF0dXJlEg8KB2ZlYXR1cmUYASABKAkSDAoEcmlzaxgCIAEoCRIRCglkaXJlY3Rpb24YAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJFChpMaXN0QnJpZGdlRmVhdHVyZXNSZXNwb25zZRInCghmZWF0dXJlcxgBIAMoCzIVLmFwcC52MS5CcmlkZ2VGZWF0dXJlIm4KF1NldEJyaWRnZUZlYXR1cmVSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIPCgdmZWF0dXJlGAMgASgJEhEKCWRpcmVjdGlvbhgEIAEoCSIaChhTZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2UiSwoYTGlzdEJyaWRnZUludml0ZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJLCgxCcmlkZ2VJbnZpdGUSDAoEbGluaxgBIAEoCRINCgV0aXRsZRgCIAEoCRIPCgdyZXZva2VkGAMgASgIEg0KBXVzYWdlGAQgASgFIkIKGUxpc3RCcmlkZ2VJbnZpdGVzUmVzcG9uc2USJQoHaW52aXRlcxgBIAMoCzIULmFwcC52MS5CcmlkZ2VJbnZpdGUiWwoZQ3JlYXRlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDQoFdGl0bGUYAyABKAkiHAoaQ3JlYXRlQnJpZGdlSW52aXRlUmVzcG9uc2UiWgoZUmV2b2tlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDAoEbGluaxgDIAEoCSIcChpSZXZva2VCcmlkZ2VJbnZpdGVSZXNwb25zZSJOChtMaXN0QnJpZGdlQ2FuZGlkYXRlc1JlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJIjcKD0JyaWRnZUNhbmRpZGF0ZRIWCg5wYXJ0aWNpcGFudF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIksKHExpc3RCcmlkZ2VDYW5kaWRhdGVzUmVzcG9uc2USKwoKY2FuZGlkYXRlcxgBIAMoCzIXLmFwcC52MS5CcmlkZ2VDYW5kaWRhdGUiYQoWQWRkQnJpZGdlTWVtYmVyUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFgoOcGFydGljaXBhbnRfaWQYAyABKAkiGQoXQWRkQnJpZGdlTWVtYmVyUmVzcG9uc2UiYAoXTGVhdmVCcmlkZ2VHcm91cFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhQKDGNvbmZpcm1fbmFtZRgDIAEoCSIaChhMZWF2ZUJyaWRnZUdyb3VwUmVzcG9uc2UiaAofUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFAoMY29uZmlybV9uYW1lGAMgASgJImkKIFJlcXVlc3RCcmlkZ2VHcm91cERlbGV0ZVJlc3BvbnNlEg0KBXRva2VuGAEgASgJEhwKEHVzYWJsZV9mcm9tX3VuaXgYAiABKANCAjACEhgKDGV4cGlyZXNfdW5peBgDIAEoA0ICMAIicAoYRGVsZXRlQnJpZGdlR3JvdXBSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIUCgxjb25maXJtX25hbWUYAyABKAkSDQoFdG9rZW4YBCABKAkiGwoZRGVsZXRlQnJpZGdlR3JvdXBSZXNwb25zZSqoAQoTQnJpZGdlQWNjb3VudFN0YXR1cxIlCiFCUklER0VfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxCUklER0VfQUNDT1VOVF9TVEFUVVNfQUNUSVZFEAESJQohQlJJREdFX0FDQ09VTlRfU1RBVFVTX05FRURTX0xPR0lOEAISIQodQlJJREdFX0FDQ09VTlRfU1RBVFVTX1NUT1BQRUQQAypnCg9CcmlkZ2VEaXJlY3Rpb24SIAocQlJJREdFX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEhcKE0JSSURHRV9ESVJFQ1RJT05fSU4QARIZChVCUklER0VfRElSRUNUSU9OX0JPVEgQAirDAQoTQnJpZGdlTG9naW5TdGVwS2luZBImCiJCUklER0VfTE9HSU5fU1RFUF9LSU5EX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX0xPR0lOX1NURVBfS0lORF9JTlBVVBABEh0KGUJSSURHRV9MT0dJTl9TVEVQX0tJTkRfUVIQAhIiCh5CUklER0VfTE9HSU5fU1RFUF9LSU5EX0NPTkZJUk0QAxIfChtCUklER0VfTE9HSU5fU1RFUF9LSU5EX0RPTkUQBCrUAQoWQnJpZGdlQ29udmVyc2F0aW9uS2luZBIoCiRCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfVU5TUEVDSUZJRUQQABIkCiBCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfUFJJVkFURRABEiAKHEJSSURHRV9DT05WRVJTQVRJT05fS0lORF9CT1QQAhIiCh5CUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfR1JPVVAQAxIkCiBCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfQ0hBTk5FTBAEKsEBChJCcmlkZ2VPdXRib3hTdGF0dXMSJAogQlJJREdFX09VVEJPWF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxCUklER0VfT1VUQk9YX1NUQVRVU19QRU5ESU5HEAESIAocQlJJREdFX09VVEJPWF9TVEFUVVNfU0VORElORxACEh8KG0JSSURHRV9PVVRCT1hfU1RBVFVTX0ZBSUxFRBADEiAKHEJSSURHRV9PVVRCT1hfU1RBVFVTX1VOS05PV04QBDK/DwoNQnJpZGdlU2VydmljZRJSCg9HZXRCcmlkZ2VTdGF0dXMSHi5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVxdWVzdBofLmFwcC52MS5HZXRCcmlkZ2VTdGF0dXNSZXNwb25zZRJVChBTdGFydEJyaWRnZUxvZ2luEh8uYXBwLnYxLlN0YXJ0QnJpZGdlTG9naW5SZXF1ZXN0GiAuYXBwLnYxLlN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRJeChNDb250aW51ZUJyaWRnZUxvZ2luEiIuYXBwLnYxLkNvbnRpbnVlQnJpZGdlTG9naW5SZXF1ZXN0GiMuYXBwLnYxLkNvbnRpbnVlQnJpZGdlTG9naW5SZXNwb25zZRJqChdMaXN0QnJpZGdlQ29udmVyc2F0aW9ucxImLmFwcC52MS5MaXN0QnJpZGdlQ29udmVyc2F0aW9uc1JlcXVlc3QaJy5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRJVChBFbmFibGVCcmlkZ2VDaGF0Eh8uYXBwLnYxLkVuYWJsZUJyaWRnZUNoYXRSZXF1ZXN0GiAuYXBwLnYxLkVuYWJsZUJyaWRnZUNoYXRSZXNwb25zZRJVChBSZW1vdmVCcmlkZ2VDaGF0Eh8uYXBwLnYxLlJlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0GiAuYXBwLnYxLlJlbW92ZUJyaWRnZUNoYXRSZXNwb25zZRJnChZTZXRCcmlkZ2VDaGF0RGlyZWN0aW9uEiUuYXBwLnYxLlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0GiYuYXBwLnYxLlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZRJbChJMaXN0QnJpZGdlRmVhdHVyZXMSIS5hcHAudjEuTGlzdEJyaWRnZUZlYXR1cmVzUmVxdWVzdBoiLmFwcC52MS5MaXN0QnJpZGdlRmVhdHVyZXNSZXNwb25zZRJVChBTZXRCcmlkZ2VGZWF0dXJlEh8uYXBwLnYxLlNldEJyaWRnZUZlYXR1cmVSZXF1ZXN0GiAuYXBwLnYxLlNldEJyaWRnZUZlYXR1cmVSZXNwb25zZRJYChFMaXN0QnJpZGdlSW52aXRlcxIgLmFwcC52MS5MaXN0QnJpZGdlSW52aXRlc1JlcXVlc3QaIS5hcHAudjEuTGlzdEJyaWRnZUludml0ZXNSZXNwb25zZRJbChJDcmVhdGVCcmlkZ2VJbnZpdGUSIS5hcHAudjEuQ3JlYXRlQnJpZGdlSW52aXRlUmVxdWVzdBoiLmFwcC52MS5DcmVhdGVCcmlkZ2VJbnZpdGVSZXNwb25zZRJbChJSZXZva2VCcmlkZ2VJbnZpdGUSIS5hcHAudjEuUmV2b2tlQnJpZGdlSW52aXRlUmVxdWVzdBoiLmFwcC52MS5SZXZva2VCcmlkZ2VJbnZpdGVSZXNwb25zZRJhChRMaXN0QnJpZGdlQ2FuZGlkYXRlcxIjLmFwcC52MS5MaXN0QnJpZGdlQ2FuZGlkYXRlc1JlcXVlc3QaJC5hcHAudjEuTGlzdEJyaWRnZUNhbmRpZGF0ZXNSZXNwb25zZRJSCg9BZGRCcmlkZ2VNZW1iZXISHi5hcHAudjEuQWRkQnJpZGdlTWVtYmVyUmVxdWVzdBofLmFwcC52MS5BZGRCcmlkZ2VNZW1iZXJSZXNwb25zZRJVChBMZWF2ZUJyaWRnZUdyb3VwEh8uYXBwLnYxLkxlYXZlQnJpZGdlR3JvdXBSZXF1ZXN0GiAuYXBwLnYxLkxlYXZlQnJpZGdlR3JvdXBSZXNwb25zZRJtChhSZXF1ZXN0QnJpZGdlR3JvdXBEZWxldGUSJy5hcHAudjEuUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVxdWVzdBooLmFwcC52MS5SZXF1ZXN0QnJpZGdlR3JvdXBEZWxldGVSZXNwb25zZRJYChFEZWxldGVCcmlkZ2VHcm91cBIgLmFwcC52MS5EZWxldGVCcmlkZ2VHcm91cFJlcXVlc3QaIS5hcHAudjEuRGVsZXRlQnJpZGdlR3JvdXBSZXNwb25zZRJVChBMaXN0QnJpZGdlT3V0Ym94Eh8uYXBwLnYxLkxpc3RCcmlkZ2VPdXRib3hSZXF1ZXN0GiAuYXBwLnYxLkxpc3RCcmlkZ2VPdXRib3hSZXNwb25zZRJbChJSZXRyeUJyaWRnZU1lc3NhZ2USIS5hcHAudjEuUmV0cnlCcmlkZ2VNZXNzYWdlUmVxdWVzdBoiLmFwcC52MS5SZXRyeUJyaWRnZU1lc3NhZ2VSZXNwb25zZRJhChREaXNtaXNzQnJpZGdlTWVzc2FnZRIjLmFwcC52MS5EaXNtaXNzQnJpZGdlTWVzc2FnZVJlcXVlc3QaJC5hcHAudjEuRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZRJqChdEaXNjb25uZWN0QnJpZGdlQWNjb3VudBImLmFwcC52MS5EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlcXVlc3QaJy5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.BridgeApp
@@ -838,6 +838,401 @@ export const SetBridgeFeatureResponseSchema: GenMessage<SetBridgeFeatureResponse
   messageDesc(file_app_v1_bridge, 33);
 
 /**
+ * @generated from message app.v1.ListBridgeInvitesRequest
+ */
+export type ListBridgeInvitesRequest = Message<"app.v1.ListBridgeInvitesRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+};
+
+/**
+ * Describes the message app.v1.ListBridgeInvitesRequest.
+ * Use `create(ListBridgeInvitesRequestSchema)` to create a new message.
+ */
+export const ListBridgeInvitesRequestSchema: GenMessage<ListBridgeInvitesRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 34);
+
+/**
+ * @generated from message app.v1.BridgeInvite
+ */
+export type BridgeInvite = Message<"app.v1.BridgeInvite"> & {
+  /**
+   * @generated from field: string link = 1;
+   */
+  link: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: bool revoked = 3;
+   */
+  revoked: boolean;
+
+  /**
+   * How many people joined with it.
+   *
+   * @generated from field: int32 usage = 4;
+   */
+  usage: number;
+};
+
+/**
+ * Describes the message app.v1.BridgeInvite.
+ * Use `create(BridgeInviteSchema)` to create a new message.
+ */
+export const BridgeInviteSchema: GenMessage<BridgeInvite> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 35);
+
+/**
+ * @generated from message app.v1.ListBridgeInvitesResponse
+ */
+export type ListBridgeInvitesResponse = Message<"app.v1.ListBridgeInvitesResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.BridgeInvite invites = 1;
+   */
+  invites: BridgeInvite[];
+};
+
+/**
+ * Describes the message app.v1.ListBridgeInvitesResponse.
+ * Use `create(ListBridgeInvitesResponseSchema)` to create a new message.
+ */
+export const ListBridgeInvitesResponseSchema: GenMessage<ListBridgeInvitesResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 36);
+
+/**
+ * @generated from message app.v1.CreateBridgeInviteRequest
+ */
+export type CreateBridgeInviteRequest = Message<"app.v1.CreateBridgeInviteRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+};
+
+/**
+ * Describes the message app.v1.CreateBridgeInviteRequest.
+ * Use `create(CreateBridgeInviteRequestSchema)` to create a new message.
+ */
+export const CreateBridgeInviteRequestSchema: GenMessage<CreateBridgeInviteRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 37);
+
+/**
+ * @generated from message app.v1.CreateBridgeInviteResponse
+ */
+export type CreateBridgeInviteResponse = Message<"app.v1.CreateBridgeInviteResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.CreateBridgeInviteResponse.
+ * Use `create(CreateBridgeInviteResponseSchema)` to create a new message.
+ */
+export const CreateBridgeInviteResponseSchema: GenMessage<CreateBridgeInviteResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 38);
+
+/**
+ * @generated from message app.v1.RevokeBridgeInviteRequest
+ */
+export type RevokeBridgeInviteRequest = Message<"app.v1.RevokeBridgeInviteRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string link = 3;
+   */
+  link: string;
+};
+
+/**
+ * Describes the message app.v1.RevokeBridgeInviteRequest.
+ * Use `create(RevokeBridgeInviteRequestSchema)` to create a new message.
+ */
+export const RevokeBridgeInviteRequestSchema: GenMessage<RevokeBridgeInviteRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 39);
+
+/**
+ * @generated from message app.v1.RevokeBridgeInviteResponse
+ */
+export type RevokeBridgeInviteResponse = Message<"app.v1.RevokeBridgeInviteResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.RevokeBridgeInviteResponse.
+ * Use `create(RevokeBridgeInviteResponseSchema)` to create a new message.
+ */
+export const RevokeBridgeInviteResponseSchema: GenMessage<RevokeBridgeInviteResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 40);
+
+/**
+ * @generated from message app.v1.ListBridgeCandidatesRequest
+ */
+export type ListBridgeCandidatesRequest = Message<"app.v1.ListBridgeCandidatesRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+};
+
+/**
+ * Describes the message app.v1.ListBridgeCandidatesRequest.
+ * Use `create(ListBridgeCandidatesRequestSchema)` to create a new message.
+ */
+export const ListBridgeCandidatesRequestSchema: GenMessage<ListBridgeCandidatesRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 41);
+
+/**
+ * @generated from message app.v1.BridgeCandidate
+ */
+export type BridgeCandidate = Message<"app.v1.BridgeCandidate"> & {
+  /**
+   * The id of the person in the app (opaque).
+   *
+   * @generated from field: string participant_id = 1;
+   */
+  participantId: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message app.v1.BridgeCandidate.
+ * Use `create(BridgeCandidateSchema)` to create a new message.
+ */
+export const BridgeCandidateSchema: GenMessage<BridgeCandidate> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 42);
+
+/**
+ * @generated from message app.v1.ListBridgeCandidatesResponse
+ */
+export type ListBridgeCandidatesResponse = Message<"app.v1.ListBridgeCandidatesResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.BridgeCandidate candidates = 1;
+   */
+  candidates: BridgeCandidate[];
+};
+
+/**
+ * Describes the message app.v1.ListBridgeCandidatesResponse.
+ * Use `create(ListBridgeCandidatesResponseSchema)` to create a new message.
+ */
+export const ListBridgeCandidatesResponseSchema: GenMessage<ListBridgeCandidatesResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 43);
+
+/**
+ * @generated from message app.v1.AddBridgeMemberRequest
+ */
+export type AddBridgeMemberRequest = Message<"app.v1.AddBridgeMemberRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string participant_id = 3;
+   */
+  participantId: string;
+};
+
+/**
+ * Describes the message app.v1.AddBridgeMemberRequest.
+ * Use `create(AddBridgeMemberRequestSchema)` to create a new message.
+ */
+export const AddBridgeMemberRequestSchema: GenMessage<AddBridgeMemberRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 44);
+
+/**
+ * @generated from message app.v1.AddBridgeMemberResponse
+ */
+export type AddBridgeMemberResponse = Message<"app.v1.AddBridgeMemberResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.AddBridgeMemberResponse.
+ * Use `create(AddBridgeMemberResponseSchema)` to create a new message.
+ */
+export const AddBridgeMemberResponseSchema: GenMessage<AddBridgeMemberResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 45);
+
+/**
+ * @generated from message app.v1.LeaveBridgeGroupRequest
+ */
+export type LeaveBridgeGroupRequest = Message<"app.v1.LeaveBridgeGroupRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string confirm_name = 3;
+   */
+  confirmName: string;
+};
+
+/**
+ * Describes the message app.v1.LeaveBridgeGroupRequest.
+ * Use `create(LeaveBridgeGroupRequestSchema)` to create a new message.
+ */
+export const LeaveBridgeGroupRequestSchema: GenMessage<LeaveBridgeGroupRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 46);
+
+/**
+ * @generated from message app.v1.LeaveBridgeGroupResponse
+ */
+export type LeaveBridgeGroupResponse = Message<"app.v1.LeaveBridgeGroupResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.LeaveBridgeGroupResponse.
+ * Use `create(LeaveBridgeGroupResponseSchema)` to create a new message.
+ */
+export const LeaveBridgeGroupResponseSchema: GenMessage<LeaveBridgeGroupResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 47);
+
+/**
+ * @generated from message app.v1.RequestBridgeGroupDeleteRequest
+ */
+export type RequestBridgeGroupDeleteRequest = Message<"app.v1.RequestBridgeGroupDeleteRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string confirm_name = 3;
+   */
+  confirmName: string;
+};
+
+/**
+ * Describes the message app.v1.RequestBridgeGroupDeleteRequest.
+ * Use `create(RequestBridgeGroupDeleteRequestSchema)` to create a new message.
+ */
+export const RequestBridgeGroupDeleteRequestSchema: GenMessage<RequestBridgeGroupDeleteRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 48);
+
+/**
+ * @generated from message app.v1.RequestBridgeGroupDeleteResponse
+ */
+export type RequestBridgeGroupDeleteResponse = Message<"app.v1.RequestBridgeGroupDeleteResponse"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+
+  /**
+   * @generated from field: int64 usable_from_unix = 2 [jstype = JS_NUMBER];
+   */
+  usableFromUnix: bigint;
+
+  /**
+   * @generated from field: int64 expires_unix = 3 [jstype = JS_NUMBER];
+   */
+  expiresUnix: bigint;
+};
+
+/**
+ * Describes the message app.v1.RequestBridgeGroupDeleteResponse.
+ * Use `create(RequestBridgeGroupDeleteResponseSchema)` to create a new message.
+ */
+export const RequestBridgeGroupDeleteResponseSchema: GenMessage<RequestBridgeGroupDeleteResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 49);
+
+/**
+ * @generated from message app.v1.DeleteBridgeGroupRequest
+ */
+export type DeleteBridgeGroupRequest = Message<"app.v1.DeleteBridgeGroupRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string confirm_name = 3;
+   */
+  confirmName: string;
+
+  /**
+   * @generated from field: string token = 4;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message app.v1.DeleteBridgeGroupRequest.
+ * Use `create(DeleteBridgeGroupRequestSchema)` to create a new message.
+ */
+export const DeleteBridgeGroupRequestSchema: GenMessage<DeleteBridgeGroupRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 50);
+
+/**
+ * @generated from message app.v1.DeleteBridgeGroupResponse
+ */
+export type DeleteBridgeGroupResponse = Message<"app.v1.DeleteBridgeGroupResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.DeleteBridgeGroupResponse.
+ * Use `create(DeleteBridgeGroupResponseSchema)` to create a new message.
+ */
+export const DeleteBridgeGroupResponseSchema: GenMessage<DeleteBridgeGroupResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 51);
+
+/**
  * @generated from enum app.v1.BridgeAccountStatus
  */
 export enum BridgeAccountStatus {
@@ -1144,6 +1539,87 @@ export const BridgeService: GenService<{
     methodKind: "unary";
     input: typeof SetBridgeFeatureRequestSchema;
     output: typeof SetBridgeFeatureResponseSchema;
+  },
+  /**
+   * The invite links the account made for a synced group in the app (not Chat's own links).
+   *
+   * @generated from rpc app.v1.BridgeService.ListBridgeInvites
+   */
+  listBridgeInvites: {
+    methodKind: "unary";
+    input: typeof ListBridgeInvitesRequestSchema;
+    output: typeof ListBridgeInvitesResponseSchema;
+  },
+  /**
+   * Asks the app for a new invite link; it shows in the list once the app made it.
+   * failed_precondition feature_off when the invites feature does not send for the chat.
+   *
+   * @generated from rpc app.v1.BridgeService.CreateBridgeInvite
+   */
+  createBridgeInvite: {
+    methodKind: "unary";
+    input: typeof CreateBridgeInviteRequestSchema;
+    output: typeof CreateBridgeInviteResponseSchema;
+  },
+  /**
+   * @generated from rpc app.v1.BridgeService.RevokeBridgeInvite
+   */
+  revokeBridgeInvite: {
+    methodKind: "unary";
+    input: typeof RevokeBridgeInviteRequestSchema;
+    output: typeof RevokeBridgeInviteResponseSchema;
+  },
+  /**
+   * People of the account the app has shown, who are not members of the synced group.
+   *
+   * @generated from rpc app.v1.BridgeService.ListBridgeCandidates
+   */
+  listBridgeCandidates: {
+    methodKind: "unary";
+    input: typeof ListBridgeCandidatesRequestSchema;
+    output: typeof ListBridgeCandidatesResponseSchema;
+  },
+  /**
+   * Asks the app to add one of them to the group (members feature sending).
+   *
+   * @generated from rpc app.v1.BridgeService.AddBridgeMember
+   */
+  addBridgeMember: {
+    methodKind: "unary";
+    input: typeof AddBridgeMemberRequestSchema;
+    output: typeof AddBridgeMemberResponseSchema;
+  },
+  /**
+   * Leaves the group in the app. confirm_name must be the name of the chat
+   * (invalid_argument confirmation_wrong otherwise); the chat stays as a read-only copy.
+   *
+   * @generated from rpc app.v1.BridgeService.LeaveBridgeGroup
+   */
+  leaveBridgeGroup: {
+    methodKind: "unary";
+    input: typeof LeaveBridgeGroupRequestSchema;
+    output: typeof LeaveBridgeGroupResponseSchema;
+  },
+  /**
+   * First step of deleting the group in the app for everybody: checks the name and gives a
+   * token that DeleteBridgeGroup accepts from usable_from_unix until expires_unix, once.
+   *
+   * @generated from rpc app.v1.BridgeService.RequestBridgeGroupDelete
+   */
+  requestBridgeGroupDelete: {
+    methodKind: "unary";
+    input: typeof RequestBridgeGroupDeleteRequestSchema;
+    output: typeof RequestBridgeGroupDeleteResponseSchema;
+  },
+  /**
+   * Second step: deletes the group in the app, history included. Cannot be undone.
+   *
+   * @generated from rpc app.v1.BridgeService.DeleteBridgeGroup
+   */
+  deleteBridgeGroup: {
+    methodKind: "unary";
+    input: typeof DeleteBridgeGroupRequestSchema;
+    output: typeof DeleteBridgeGroupResponseSchema;
   },
   /**
    * What a chat has queued for the app and not finished: sending, waiting,

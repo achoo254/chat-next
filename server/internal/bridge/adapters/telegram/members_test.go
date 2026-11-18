@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"app.local/server/internal/bridge"
 	"testing"
 
 	"github.com/gotd/td/tg"
@@ -37,5 +38,23 @@ func TestAMemberNeverSeenInTheGroupCannotBeActedOn(t *testing.T) {
 	}
 	if _, err := c.inputUser("x"); err == nil {
 		t.Fatal("a bad id was accepted")
+	}
+}
+
+func TestRightsOfAMemberAreTheirRestrictionAndBack(t *testing.T) {
+	if r := bannedRightsOf(bridge.FullPerms); r != (tg.ChatBannedRights{}) {
+		t.Fatalf("no restriction became %+v", r)
+	}
+	sendOnly := bridge.Perms{Send: true}
+	r := bannedRightsOf(sendOnly)
+	if r.SendMessages || !r.SendMedia || !r.SendPhotos || !r.PinMessages || !r.InviteUsers || !r.ChangeInfo || !r.ManageTopics {
+		t.Fatalf("send-only became %+v", r)
+	}
+	back := permsOfBanned(r)
+	if back == nil || *back != sendOnly {
+		t.Fatalf("the restriction came back as %+v, want send-only", back)
+	}
+	if permsOfBanned(tg.ChatBannedRights{}) != nil {
+		t.Fatal("a member with no restriction was given a restriction")
 	}
 }

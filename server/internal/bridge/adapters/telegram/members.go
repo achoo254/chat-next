@@ -69,6 +69,7 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 		in := &tg.InputChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash}
 		var users []tg.UserClass
 		admins := map[int64]bool{}
+		restricted := map[int64]bridge.Perms{}
 		var ids []int64
 		total := 0
 		for page := 0; page < memberPagesMax; page++ {
@@ -94,6 +95,15 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 					uid, admins[v.UserID] = v.UserID, true
 				case *tg.ChannelParticipantAdmin:
 					uid, admins[v.UserID] = v.UserID, true
+				case *tg.ChannelParticipantBanned:
+					peerUser, isUser := v.Peer.(*tg.PeerUser)
+					if v.Left || !isUser {
+						continue // out of the group, or not a person
+					}
+					uid = peerUser.UserID
+					if p := permsOfBanned(v.BannedRights); p != nil {
+						restricted[uid] = *p
+					}
 				default:
 					continue
 				}
@@ -104,7 +114,15 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 			}
 		}
 		c.rememberUsers(users)
-		return membersOf(users, admins, ids, self), len(ids) >= total, nil
+		members := membersOf(users, admins, ids, self)
+		for i := range members {
+			if id, err := strconv.ParseInt(members[i].Participant.ID, 10, 64); err == nil {
+				if p, ok := restricted[id]; ok {
+					members[i].Perms = &p
+				}
+			}
+		}
+		return members, len(ids) >= total, nil
 	case *tg.InputPeerChat:
 		full, err := c.live.api().MessagesGetFullChat(ctx, p.ChatID)
 		if err != nil {

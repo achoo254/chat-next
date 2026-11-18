@@ -63,6 +63,10 @@ func bridgeError(err error) error {
 		return connect.NewError(connect.CodeNotFound, errors.New("not found"))
 	case errors.Is(err, engine.ErrSendUnsupported):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("send_unsupported: this app cannot be written to from Chat, or the account is signed out"))
+	case errors.Is(err, engine.ErrFeatureOff):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("feature_off: this is not turned on to send for the chat"))
+	case errors.Is(err, engine.ErrConfirmation):
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("confirmation_wrong: the name or the confirmation is not right"))
 	case errors.Is(err, engine.ErrFeatureUnsupported):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("feature_unsupported: this app cannot do that"))
 	case errors.Is(err, engine.ErrRateLimited):
@@ -214,6 +218,89 @@ func (s *bridgeService) SetBridgeFeature(ctx context.Context, req *connect.Reque
 			return nil, err
 		}
 		return &appv1.SetBridgeFeatureResponse{}, nil
+	})
+}
+
+func (s *bridgeService) ListBridgeInvites(ctx context.Context, req *connect.Request[appv1.ListBridgeInvitesRequest]) (*connect.Response[appv1.ListBridgeInvitesResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeInvitesRequest) (*appv1.ListBridgeInvitesResponse, error) {
+		list, err := s.engine.Invites(ctx, me, m.GetAccountId(), m.GetConversationId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeInvitesResponse{}
+		for _, v := range list {
+			resp.Invites = append(resp.Invites, &appv1.BridgeInvite{Link: v.Link, Title: v.Title, Revoked: v.Revoked, Usage: int32(v.Usage)})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) CreateBridgeInvite(ctx context.Context, req *connect.Request[appv1.CreateBridgeInviteRequest]) (*connect.Response[appv1.CreateBridgeInviteResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.CreateBridgeInviteRequest) (*appv1.CreateBridgeInviteResponse, error) {
+		if err := s.engine.CreateInvite(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetTitle()); err != nil {
+			return nil, err
+		}
+		return &appv1.CreateBridgeInviteResponse{}, nil
+	})
+}
+
+func (s *bridgeService) RevokeBridgeInvite(ctx context.Context, req *connect.Request[appv1.RevokeBridgeInviteRequest]) (*connect.Response[appv1.RevokeBridgeInviteResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.RevokeBridgeInviteRequest) (*appv1.RevokeBridgeInviteResponse, error) {
+		if err := s.engine.RevokeInvite(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetLink()); err != nil {
+			return nil, err
+		}
+		return &appv1.RevokeBridgeInviteResponse{}, nil
+	})
+}
+
+func (s *bridgeService) ListBridgeCandidates(ctx context.Context, req *connect.Request[appv1.ListBridgeCandidatesRequest]) (*connect.Response[appv1.ListBridgeCandidatesResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeCandidatesRequest) (*appv1.ListBridgeCandidatesResponse, error) {
+		list, err := s.engine.Candidates(ctx, me, m.GetAccountId(), m.GetConversationId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeCandidatesResponse{}
+		for _, c := range list {
+			resp.Candidates = append(resp.Candidates, &appv1.BridgeCandidate{ParticipantId: c.ParticipantID, Name: c.Name})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) AddBridgeMember(ctx context.Context, req *connect.Request[appv1.AddBridgeMemberRequest]) (*connect.Response[appv1.AddBridgeMemberResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.AddBridgeMemberRequest) (*appv1.AddBridgeMemberResponse, error) {
+		if err := s.engine.AddMember(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetParticipantId()); err != nil {
+			return nil, err
+		}
+		return &appv1.AddBridgeMemberResponse{}, nil
+	})
+}
+
+func (s *bridgeService) LeaveBridgeGroup(ctx context.Context, req *connect.Request[appv1.LeaveBridgeGroupRequest]) (*connect.Response[appv1.LeaveBridgeGroupResponse], error) {
+	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.LeaveBridgeGroupRequest) (*appv1.LeaveBridgeGroupResponse, error) {
+		if err := s.engine.LeaveGroup(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetConfirmName()); err != nil {
+			return nil, err
+		}
+		return &appv1.LeaveBridgeGroupResponse{}, nil
+	})
+}
+
+func (s *bridgeService) RequestBridgeGroupDelete(ctx context.Context, req *connect.Request[appv1.RequestBridgeGroupDeleteRequest]) (*connect.Response[appv1.RequestBridgeGroupDeleteResponse], error) {
+	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.RequestBridgeGroupDeleteRequest) (*appv1.RequestBridgeGroupDeleteResponse, error) {
+		token, from, until, err := s.engine.RequestGroupDelete(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetConfirmName())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.RequestBridgeGroupDeleteResponse{Token: token, UsableFromUnix: from.Unix(), ExpiresUnix: until.Unix()}, nil
+	})
+}
+
+func (s *bridgeService) DeleteBridgeGroup(ctx context.Context, req *connect.Request[appv1.DeleteBridgeGroupRequest]) (*connect.Response[appv1.DeleteBridgeGroupResponse], error) {
+	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.DeleteBridgeGroupRequest) (*appv1.DeleteBridgeGroupResponse, error) {
+		if err := s.engine.DeleteGroup(ctx, me, m.GetAccountId(), m.GetConversationId(), m.GetConfirmName(), m.GetToken()); err != nil {
+			return nil, err
+		}
+		return &appv1.DeleteBridgeGroupResponse{}, nil
 	})
 }
 

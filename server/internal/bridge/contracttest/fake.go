@@ -49,6 +49,8 @@ type Fake struct {
 	members                                    map[string][]bridge.Member
 	partial                                    map[string]bool
 	memberCalls                                []string
+	invites                                    map[string][]bridge.InviteLink
+	lifecycle                                  []string
 	pinCalls                                   []PinCall
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
@@ -62,19 +64,21 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
 	return map[feature.Feature]feature.Support{
-		feature.Messages: {In: true, Out: true},
-		feature.Pins:     {In: true, Out: true},
-		feature.Topics:   {In: true, Out: true},
-		feature.Read:     {In: true},
-		feature.Notify:   {In: true, Out: true},
-		feature.Dialog:   {In: true, Out: true},
-		feature.Info:     {In: true, Out: true},
-		feature.Members:  {In: true, Out: true},
+		feature.Messages:  {In: true, Out: true},
+		feature.Pins:      {In: true, Out: true},
+		feature.Topics:    {In: true, Out: true},
+		feature.Read:      {In: true},
+		feature.Notify:    {In: true, Out: true},
+		feature.Dialog:    {In: true, Out: true},
+		feature.Info:      {In: true, Out: true},
+		feature.Members:   {In: true, Out: true},
+		feature.Invites:   {In: true, Out: true},
+		feature.Lifecycle: {Out: true},
 	}
 }
 
@@ -737,4 +741,112 @@ func (f *Fake) SetMemberAdmin(_ context.Context, _ bridge.Account, conv, partici
 var (
 	_ bridge.MemberReader = (*Fake)(nil)
 	_ bridge.MemberWriter = (*Fake)(nil)
+)
+
+// AddMember implements bridge.MemberAdder.
+func (f *Fake) AddMember(_ context.Context, _ bridge.Account, conv, participant string) error {
+	return f.writeMember("add:"+conv+":"+participant, func() {
+		f.members[conv] = append(f.members[conv], bridge.Member{Participant: bridge.Participant{ID: participant, Name: "Người " + participant}})
+	})
+}
+
+// SetMemberPerms implements bridge.PermWriter.
+func (f *Fake) SetMemberPerms(_ context.Context, _ bridge.Account, conv, participant string, perms bridge.Perms) error {
+	return f.writeMember(fmt.Sprintf("perms:%s:%s:%+v", conv, participant, perms), func() {
+		for i := range f.members[conv] {
+			if f.members[conv][i].Participant.ID == participant {
+				p := perms
+				f.members[conv][i].Perms = &p
+				if perms == bridge.FullPerms {
+					f.members[conv][i].Perms = nil
+				}
+			}
+		}
+	})
+}
+
+// SetInvites sets the invite links the account has for a group in the app.
+func (f *Fake) SetInvites(conv string, links ...bridge.InviteLink) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.invites[conv] = append([]bridge.InviteLink(nil), links...)
+}
+
+// Invites is the links the app has for a group now.
+func (f *Fake) Invites(conv string) []bridge.InviteLink {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.InviteLink(nil), f.invites[conv]...)
+}
+
+// ListInvites implements bridge.InviteManager.
+func (f *Fake) ListInvites(_ context.Context, _ bridge.Account, conv string) ([]bridge.InviteLink, error) {
+	return f.Invites(conv), nil
+}
+
+// CreateInvite implements bridge.InviteManager.
+func (f *Fake) CreateInvite(_ context.Context, _ bridge.Account, conv, title string) (bridge.InviteLink, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Invites].Out {
+		return bridge.InviteLink{}, fmt.Errorf("%w: this app does not make invite links from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return bridge.InviteLink{}, err
+	}
+	l := bridge.InviteLink{Link: fmt.Sprintf("https://fake.test/+%s%d", conv, len(f.invites[conv])+1), Title: title}
+	f.invites[conv] = append(f.invites[conv], l)
+	return l, nil
+}
+
+// RevokeInvite implements bridge.InviteManager.
+func (f *Fake) RevokeInvite(_ context.Context, _ bridge.Account, conv, link string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	for i := range f.invites[conv] {
+		if f.invites[conv][i].Link == link {
+			f.invites[conv][i].Revoked = true
+		}
+	}
+	return nil
+}
+
+// LifecycleCalls lists the leave and delete calls Chat made, as "leave:<conv>" and "delete:<conv>".
+func (f *Fake) LifecycleCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.lifecycle...)
+}
+
+func (f *Fake) lifecycleCall(call string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Lifecycle].Out {
+		return fmt.Errorf("%w: this app does not take that from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	f.lifecycle = append(f.lifecycle, call)
+	return nil
+}
+
+// LeaveGroup implements bridge.GroupLifecycle.
+func (f *Fake) LeaveGroup(_ context.Context, _ bridge.Account, conv string) error {
+	return f.lifecycleCall("leave:" + conv)
+}
+
+// DeleteGroup implements bridge.GroupLifecycle.
+func (f *Fake) DeleteGroup(_ context.Context, _ bridge.Account, conv string) error {
+	return f.lifecycleCall("delete:" + conv)
+}
+
+var (
+	_ bridge.MemberAdder    = (*Fake)(nil)
+	_ bridge.PermWriter     = (*Fake)(nil)
+	_ bridge.InviteManager  = (*Fake)(nil)
+	_ bridge.GroupLifecycle = (*Fake)(nil)
 )

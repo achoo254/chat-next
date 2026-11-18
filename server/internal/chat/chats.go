@@ -830,7 +830,10 @@ func (s *Service) SetMemberPermissions(ctx context.Context, me, chatID, userID i
 			return fmt.Errorf("chat: set permissions: %w", err)
 		}
 		target.Perms = &perms
-		return t.announceMember(ctx, c, me, target)
+		if err := t.announceMember(ctx, c, me, target); err != nil {
+			return err
+		}
+		return t.queueMemberAction(ctx, chatID, me, userID, "member_perms", map[string]any{"perms": perms})
 	})
 	if err != nil {
 		return nil, err

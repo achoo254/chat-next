@@ -47,6 +47,24 @@ service BridgeService {
   // Sets the direction of one feature of a synced chat. Fails with
   // failed_precondition (feature_unsupported) when the app cannot do it.
   rpc SetBridgeFeature(SetBridgeFeatureRequest) returns (SetBridgeFeatureResponse);
+  // The invite links the account made for a synced group in the app (not Chat's own links).
+  rpc ListBridgeInvites(ListBridgeInvitesRequest) returns (ListBridgeInvitesResponse);
+  // Asks the app for a new invite link; it shows in the list once the app made it.
+  // failed_precondition feature_off when the invites feature does not send for the chat.
+  rpc CreateBridgeInvite(CreateBridgeInviteRequest) returns (CreateBridgeInviteResponse);
+  rpc RevokeBridgeInvite(RevokeBridgeInviteRequest) returns (RevokeBridgeInviteResponse);
+  // People of the account the app has shown, who are not members of the synced group.
+  rpc ListBridgeCandidates(ListBridgeCandidatesRequest) returns (ListBridgeCandidatesResponse);
+  // Asks the app to add one of them to the group (members feature sending).
+  rpc AddBridgeMember(AddBridgeMemberRequest) returns (AddBridgeMemberResponse);
+  // Leaves the group in the app. confirm_name must be the name of the chat
+  // (invalid_argument confirmation_wrong otherwise); the chat stays as a read-only copy.
+  rpc LeaveBridgeGroup(LeaveBridgeGroupRequest) returns (LeaveBridgeGroupResponse);
+  // First step of deleting the group in the app for everybody: checks the name and gives a
+  // token that DeleteBridgeGroup accepts from usable_from_unix until expires_unix, once.
+  rpc RequestBridgeGroupDelete(RequestBridgeGroupDeleteRequest) returns (RequestBridgeGroupDeleteResponse);
+  // Second step: deletes the group in the app, history included. Cannot be undone.
+  rpc DeleteBridgeGroup(DeleteBridgeGroupRequest) returns (DeleteBridgeGroupResponse);
   // What a chat has queued for the app and not finished: sending, waiting,
   // failed or of unknown result. A message that is not listed was sent.
   rpc ListBridgeOutbox(ListBridgeOutboxRequest) returns (ListBridgeOutboxResponse);
@@ -307,3 +325,88 @@ message SetBridgeFeatureRequest {
 }
 
 message SetBridgeFeatureResponse {}
+
+message ListBridgeInvitesRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+}
+
+message BridgeInvite {
+  string link = 1;
+  string title = 2;
+  bool revoked = 3;
+  // How many people joined with it.
+  int32 usage = 4;
+}
+
+message ListBridgeInvitesResponse {
+  repeated BridgeInvite invites = 1;
+}
+
+message CreateBridgeInviteRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string title = 3;
+}
+
+message CreateBridgeInviteResponse {}
+
+message RevokeBridgeInviteRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string link = 3;
+}
+
+message RevokeBridgeInviteResponse {}
+
+message ListBridgeCandidatesRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+}
+
+message BridgeCandidate {
+  // The id of the person in the app (opaque).
+  string participant_id = 1;
+  string name = 2;
+}
+
+message ListBridgeCandidatesResponse {
+  repeated BridgeCandidate candidates = 1;
+}
+
+message AddBridgeMemberRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string participant_id = 3;
+}
+
+message AddBridgeMemberResponse {}
+
+message LeaveBridgeGroupRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string confirm_name = 3;
+}
+
+message LeaveBridgeGroupResponse {}
+
+message RequestBridgeGroupDeleteRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string confirm_name = 3;
+}
+
+message RequestBridgeGroupDeleteResponse {
+  string token = 1;
+  int64 usable_from_unix = 2 [jstype = JS_NUMBER];
+  int64 expires_unix = 3 [jstype = JS_NUMBER];
+}
+
+message DeleteBridgeGroupRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string confirm_name = 3;
+  string token = 4;
+}
+
+message DeleteBridgeGroupResponse {}

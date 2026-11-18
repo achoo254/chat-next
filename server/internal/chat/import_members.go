@@ -10,6 +10,8 @@ import (
 type ImportedMember struct {
 	UserID int64
 	Admin  bool
+	// Perms is the restriction of the member as ChatPermission bits; nil for none.
+	Perms *uint32
 }
 
 // SyncMembers makes the puppets that are members of the chat match who the other
@@ -48,6 +50,22 @@ func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, c
 		}
 		if tag.RowsAffected() > 0 {
 			changed = true
+		}
+		if !m.Admin {
+			var want any
+			if m.Perms != nil {
+				want = int32(*m.Perms & allPerms)
+			}
+			ptag, err := it.t.tx.Exec(ctx, `
+				UPDATE chat_members SET permissions = $3 WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL AND role = 'member'
+				AND permissions IS DISTINCT FROM $3::int
+				AND EXISTS (SELECT 1 FROM external_users x WHERE x.user_id = chat_members.user_id)`, it.c.ID, m.UserID, want)
+			if err != nil {
+				return false, fmt.Errorf("chat: sync imported member rights: %w", err)
+			}
+			if ptag.RowsAffected() > 0 {
+				changed = true
+			}
 		}
 	}
 	if complete {
