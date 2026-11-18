@@ -695,7 +695,7 @@ test("the inspector in 3D: a name or a body opens the panel, a pan, a turn and a
 	const tag = await tagCentre(page, "title:qaTester");
 	await page.mouse.click(tag.x, tag.y);
 	await poll("the panel of the QA tester", () => openPanel(page), (k) => k === "title:qaTester", 5_000);
-	assert.equal(await page.locator(`${PANEL} h3`).textContent(), "Kiểm thử viên");
+	assert.equal(await page.locator(`${PANEL} h3`).textContent(), "Kiểm thử phần mềm");
 	await poll("the ring", async () => (await readout(page))?.selectionRing, (r) => r === true, 5_000);
 	assert.equal(await page.locator("[data-id=office] .of-body").getAttribute("data-panel"), "open");
 	// The scene shrank to make room: the panel stands beside the canvas and the person is not behind it.

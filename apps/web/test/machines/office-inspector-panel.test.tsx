@@ -65,34 +65,34 @@ describe("the inspector panel in the office tab", () => {
 		const user = userEvent.setup();
 		await openOffice([director(), staff("s1", "tester", { activity: act("q1", OfficeRoom.QA, "Bash", OFFICE_HOURS) })]);
 		expect(panel()).toBeNull();
-		const button = nameButton("Kiểm thử viên");
+		const button = nameButton("Kiểm thử phần mềm");
 		expect(button.getAttribute("aria-pressed")).toBe("false");
 		await user.click(button);
 		const opened = await screen.findByRole("complementary", { name: "Thông tin nhân vật" });
-		expect(within(opened).getByRole("heading", { name: "Kiểm thử viên" })).toBeTruthy();
+		expect(within(opened).getByRole("heading", { name: "Kiểm thử phần mềm" })).toBeTruthy();
 		expect(within(opened).getByText("Việc đang làm")).toBeTruthy();
 		expect(opened.textContent).toContain("Bash");
-		expect(nameButton("Kiểm thử viên").getAttribute("aria-pressed")).toBe("true");
+		expect(nameButton("Kiểm thử phần mềm").getAttribute("aria-pressed")).toBe("true");
 		// The scene and the panel are beside each other in one body.
 		expect(document.querySelector('[data-id="office"] .of-body')?.getAttribute("data-panel")).toBe("open");
-		await user.click(nameButton("Kiểm thử viên"));
+		await user.click(nameButton("Kiểm thử phần mềm"));
 		expect(panel()).toBeNull();
 	});
 
 	it("closes on Esc and puts the focus back on the name", async () => {
 		const user = userEvent.setup();
 		await openOffice([director()]);
-		await user.click(nameButton("Giám đốc"));
+		await user.click(nameButton("Giám đốc điều hành"));
 		await screen.findByRole("complementary", { name: "Thông tin nhân vật" });
 		await user.keyboard("{Escape}");
 		expect(panel()).toBeNull();
-		expect(document.activeElement).toBe(nameButton("Giám đốc"));
+		expect(document.activeElement).toBe(nameButton("Giám đốc điều hành"));
 	});
 
 	it("closes with its own button", async () => {
 		const user = userEvent.setup();
 		await openOffice([director()]);
-		await user.click(nameButton("Giám đốc"));
+		await user.click(nameButton("Giám đốc điều hành"));
 		await user.click(await screen.findByRole("button", { name: "Đóng" }));
 		expect(panel()).toBeNull();
 	});
@@ -101,10 +101,10 @@ describe("the inspector panel in the office tab", () => {
 		const user = userEvent.setup();
 		vi.setSystemTime(new Date(2026, 10, 16, 23, 30).getTime());
 		await openOffice([director({ state: OfficeActorState.IDLE }), staff("s1", "tester", { state: OfficeActorState.DONE })], { session: session({ busy: false }) });
-		await user.click(nameButton("Giám đốc"));
-		expect(within(await screen.findByRole("complementary")).getByRole("heading", { name: "Giám đốc" })).toBeTruthy();
-		await user.click(nameButton("Kiểm thử viên"));
-		const second = await screen.findByRole("heading", { name: "Kiểm thử viên" });
+		await user.click(nameButton("Giám đốc điều hành"));
+		expect(within(await screen.findByRole("complementary")).getByRole("heading", { name: "Giám đốc điều hành" })).toBeTruthy();
+		await user.click(nameButton("Kiểm thử phần mềm"));
+		const second = await screen.findByRole("heading", { name: "Kiểm thử phần mềm" });
 		expect(second).toBeTruthy();
 		expect(screen.getByRole("complementary").textContent).toContain("mô phỏng");
 	});
@@ -133,7 +133,7 @@ describe("the inspector panel in the office tab", () => {
 		const { rerender } = wrap(<OfficeView link={fake.link} threadId="t1" info={info} online />);
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
 		await screen.findByRole("region", { name: "Điều hành" });
-		await user.click(nameButton("Giám đốc"));
+		await user.click(nameButton("Giám đốc điều hành"));
 		await screen.findByRole("complementary", { name: "Thông tin nhân vật" });
 		rerender(
 			<I18nProvider>
