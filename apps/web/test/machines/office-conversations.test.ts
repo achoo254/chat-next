@@ -6,6 +6,7 @@
 // talk.
 import { OfficeActorState, OfficeAnimGroup, OfficeRoom } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
+import { viMachines } from "../../src/machines/copy-vi.ts";
 import { lineOf, MAX_TALKS_PER_ZONE, neighbourRooms, officeTalks, TALK_COOLDOWN_WINDOWS, TALK_WINDOW_MS, talkWindowOf, LINE_MAX_MS, LINE_MIN_MS } from "../../src/machines/office/office-conversations.ts";
 import { DIALOGUE_SLOTS, DIALOGUE_VI, fillLine, QUIRKS, slotsOf, type DialogueSlot } from "../../src/machines/office/office-dialogue-vi.ts";
 import { zoneOfRoom } from "../../src/machines/office/office-geometry.ts";
@@ -51,6 +52,10 @@ const GUARANTEED: Readonly<Record<string, readonly DialogueSlot[]>> = {
 
 /** Words of the machine's internals that must never reach a bubble. */
 const FORBIDDEN = /\b(bash|read|edit|write|grep|glob|tool|subagent|agent|mcp|token|path|file|json|undefined|null|NaN)\b|\.ts\b|\/|\\|\{|\}/i;
+
+/** A job title said aloud ("Thiết kế UI/UX") is a name, not an internal word: it is taken out before a spoken line is checked. */
+const TITLES: readonly string[] = [...Object.values(viMachines.office.cast), viMachines.office.director, viMachines.office.advisor];
+const withoutTitles = (text: string): string => TITLES.reduce((rest, title) => rest.split(title).join(""), text);
 
 /** A session at rest at `now`'s day with the director and finished employees of `types`. */
 function resting(types: readonly string[]): { state: OfficeState; placements: readonly Placement[]; at: (now: number) => readonly Placement[] } {
@@ -141,7 +146,7 @@ describe("who talks", () => {
 					expect(line.speaker).toBe(i % 2 === 0 ? talk.visitor : talk.host);
 					expect(line.to - line.from).toBeGreaterThanOrEqual(LINE_MIN_MS);
 					expect(line.to - line.from).toBeLessThanOrEqual(LINE_MAX_MS);
-					expect(line.text).not.toMatch(FORBIDDEN);
+					expect(withoutTitles(line.text)).not.toMatch(FORBIDDEN);
 				});
 				const host = placements.find((p) => p.key === talk.host);
 				const visitor = placements.find((p) => p.key === talk.visitor);
