@@ -16,9 +16,12 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels the older run of a pull request, but never of main: the
+# deploy follows a finished green run, and a run cancelled by the next push
+# would leave main without a deploy for as long as pushes keep coming.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   typescript:
