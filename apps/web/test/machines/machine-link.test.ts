@@ -4,7 +4,7 @@
 // revoked, a machine key that changed, and asking the directory for a new
 // tunnel.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, HandshakeErrorCode, ItemSchema, Role, ThreadInfoSchema, type Item } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, HandshakeErrorCode, ItemSchema, Role, ThreadInfoSchema, type Item } from "@achoo254/chat-proto/remote/remote";
 import { encodeHandshakeError, generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DeviceRegistrationRefused } from "../../src/machines/link/device-registration.ts";
@@ -361,6 +361,22 @@ describe("MachineLink", () => {
 		await expect(l.send("t1", "hi")).rejects.toBeInstanceOf(RemoteError);
 		// A refused message does not stay on screen.
 		expect(l.snapshot().pending.get("t1")).toBeUndefined();
+		l.stop();
+	});
+
+	it("a folder macOS protects, refused by the machine, waits for the user's answer until dismissed", async () => {
+		machine.handler = (frame) =>
+			frame.body.case === "dirList"
+				? [{ case: "error", value: { code: ErrorCode.INVALID, message: "protected", reason: ErrorReason.MAC_FOLDER_ACCESS, subject: "/Users/u/Documents" } }]
+				: undefined;
+		const l = link();
+		l.start();
+		await until(() => l.snapshot().status.kind === "open", "open");
+		expect(l.snapshot().macFolderAsk).toBeNull();
+		await expect(l.request({ case: "dirList", value: { path: "/Users/u/Documents/app" } })).rejects.toMatchObject({ reason: ErrorReason.MAC_FOLDER_ACCESS });
+		expect(l.snapshot().macFolderAsk).toBe("/Users/u/Documents");
+		l.dismissMacFolderAsk();
+		expect(l.snapshot().macFolderAsk).toBeNull();
 		l.stop();
 	});
 

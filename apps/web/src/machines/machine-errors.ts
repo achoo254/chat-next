@@ -94,6 +94,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.pathOutsideFolder;
 		case ErrorReason.FULL_DISK_ACCESS_NEEDED:
 			return r.fullDiskAccessNeeded;
+		case ErrorReason.MAC_FOLDER_ACCESS:
+			return r.macFolderAccess(s);
 		case ErrorReason.SESSION_NOT_FOUND:
 			return r.sessionNotFound;
 		case ErrorReason.SESSION_OPEN_ELSEWHERE:

@@ -1,7 +1,7 @@
 // What "Phiên mới" offers before the user types anything: the folders the
 // machine's sessions ran in (newest first, then the machine's own recent
 // list), and ready first messages so "Bắt đầu" works straight away.
-import type { ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { type MacFolder, MacFolderAccess, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "./copy-vi.ts";
 
 export const PROMPT_HINTS = ["summary", "commit", "test", "resume"] as const;
@@ -26,15 +26,15 @@ export function hintPrompt(copy: MachinesCopy["newSession"], hint: PromptHint, p
 	return hint === "summary" ? copy.prompt.summary(folderName(path.trim())) : copy.prompt[hint];
 }
 
-/** Folders under home that macOS gives only to apps with Full Disk Access (or after a prompt). */
-const DISK_ACCESS_FOLDERS = ["Desktop", "Documents", "Downloads", "Library"];
-
-/** True for a folder a session on a Mac without Full Disk Access cannot use freely. */
-export function inDiskAccessFolder(dir: string, home: string): boolean {
-	if (dir === "" || home === "") return false;
+/**
+ * True for a folder inside one macOS protects that tunelo may not enter yet
+ * (MachineInfo.mac_folders, tunelo 3.17.0+): starting there asks the user first.
+ */
+export function inUngrantedMacFolder(dir: string, home: string, folders: readonly MacFolder[]): boolean {
+	if (dir === "") return false;
 	const h = home.replace(/\/+$/, "");
-	const d = dir.replace(/^~(?=\/|$)/, h).replace(/\/+$/, "");
-	return DISK_ACCESS_FOLDERS.some((name) => d === `${h}/${name}` || d.startsWith(`${h}/${name}/`));
+	const d = (h === "" ? dir : dir.replace(/^~(?=\/|$)/, h)).replace(/\/+$/, "");
+	return folders.some((f) => f.access !== MacFolderAccess.GRANTED && (d === f.path || d.startsWith(`${f.path}/`)));
 }
 
 export interface Crumb {

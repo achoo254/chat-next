@@ -1,6 +1,6 @@
 // "Add this machine": one fixed command per shell (no code, no key, no
 // language), the tab of the browser's system chosen first (Windows opens on
-// PowerShell), the Linux note and the macOS Full Disk Access step, and the
+// PowerShell), the Linux note (macOS asks for nothing more), and the
 // page turning to "connected" by itself once a new machine (or an offline
 // machine of the account) comes online in the directory.
 import { act, render, screen } from "@testing-library/react";
@@ -121,14 +121,15 @@ describe("the Add machine page", () => {
 		expect(screen.queryByText(/mã ghép|Tạo lệnh cài/)).toBeNull();
 	});
 
-	it("from a Linux browser: Linux chosen, the systemd note shown, no Full Disk Access step", async () => {
+	it("from a Linux browser: Linux chosen, the systemd note shown; macOS has no Full Disk Access step", async () => {
 		const { container } = renderPage(UA.ubuntuFirefox);
 		expect(screen.getByRole("button", { name: "Linux" }).getAttribute("aria-pressed")).toBe("true");
 		expect(screen.getByText(/sudo loginctl enable-linger/)).toBeTruthy();
 		expect(container.querySelector('[data-id="add-machine-disk-access"]')).toBeNull();
-		// macOS brings its Full Disk Access step back, and drops the Linux note.
+		// macOS drops the Linux note and asks for no Full Disk Access either.
 		await userEvent.click(screen.getByRole("button", { name: "macOS" }));
-		expect(container.querySelector('[data-id="add-machine-disk-access"]')).not.toBeNull();
+		expect(container.querySelector('[data-id="add-machine-disk-access"]')).toBeNull();
+		expect(screen.queryByText(/Full Disk Access|Truy cập toàn bộ ổ đĩa/)).toBeNull();
 		expect(screen.queryByText(/sudo loginctl enable-linger/)).toBeNull();
 	});
 

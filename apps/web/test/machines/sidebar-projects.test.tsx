@@ -331,16 +331,21 @@ describe("the project column", () => {
 		expect(screen.queryByText(/chưa là dự án/)).toBeNull();
 	});
 
-	it("the machine's settings: the Full Disk Access card sits in the page's column, and sessions are left to the column and the overview", async () => {
+	it("the machine's settings ask for nothing on macOS, and sessions are left to the column and the overview", async () => {
 		const base = machine.handler;
 		machine.handler = (frame, socket) =>
 			frame.body.case === "machineInfoRequest"
-				? [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "2.6.0", maxSessions: 3, needsFullDiskAccess: true, providers: [{ id: "claude", name: "Claude Code" }] } }]
+				? [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", agentVersion: "3.17.0", maxSessions: 3, providers: [{ id: "claude", name: "Claude Code" }] } }]
 				: base(frame, socket);
 		column([{ name: "Mac mini", online: true }], { page: "info", machine: "1" });
-		const card = await screen.findByRole("alert");
-		expect(card.closest(".mx-body")).toBeTruthy();
-		expect(card.closest(".mx-body")?.querySelector(".mx-session-row")).toBeNull();
+		const body = await waitFor(() => {
+			const found = document.querySelector(".mx-body");
+			expect(found).toBeTruthy();
+			return found;
+		});
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.queryByText(/Full Disk Access/)).toBeNull();
+		expect(body?.querySelector(".mx-session-row")).toBeNull();
 	});
 });
 

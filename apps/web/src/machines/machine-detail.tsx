@@ -16,7 +16,7 @@ import { Link, navigate, paths } from "../router.tsx";
 import { AuditEntryText } from "./audit-entry-text.tsx";
 import { LOCAL_REF, setLocalMachine } from "./link/link-hub.ts";
 import { cachedProviders } from "./link/provider-cache.ts";
-import { DiskAccessBanner } from "./disk-access-banner.tsx";
+import { MacFolderAccessDialog } from "./mac-folder-access.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
@@ -111,7 +111,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 			{/* Refreshing is the link banner's: it shows, with its button, only when the machine's state needs it. */}
 			<LinkBanner machine={machine} name={name} status={state.status} />
 			<div className="mx-body">
-				<DiskAccessBanner machine={machine} link={link} info={state.info} online={online} />
+				<MacFolderAccessDialog link={link} state={state} />
 				{terminalGate(state.info) === "available" && <MachineTerminalSessions machine={machine} link={link} online={online} threads={state.threads} />}
 				{hasAccounts && (
 					<section className="card pad mx-card" data-id="machine-ai-accounts">

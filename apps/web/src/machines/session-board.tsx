@@ -15,7 +15,7 @@ import { BoardShells, useBoardShells } from "./board-shells.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { QuestionCard } from "./cards/question.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
-import { DiskAccessBanner } from "./disk-access-banner.tsx";
+import { MacFolderAccessDialog } from "./mac-folder-access.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { locate } from "./project-tree.ts";
@@ -154,7 +154,7 @@ export function MachineBoard({ machine }: { machine: string }) {
 			</PageHead>
 			<LinkBanner machine={machine} name={entry.name} status={state.status} />
 			<div className="mx-body">
-				<DiskAccessBanner machine={machine} link={link} info={state.info} online={state.status.kind === "open"} />
+				<MacFolderAccessDialog link={link} state={state} />
 				{conn.kind === "offline" && <OfflineGuide />}
 				{conn.kind === "on" && state.listed && need.length === 0 && running.length === 0 && shellCount === 0 && (
 					// The same calm card as the board of every machine.

@@ -134,6 +134,12 @@ export interface LinkState {
 	readonly takeovers: ReadonlyMap<string, BrowserTakeover>;
 	/** Pages of the machine's browser that asked for a passkey nobody at the machine can give, newest last. */
 	readonly passkeyNotices: readonly PasskeyNotice[];
+	/**
+	 * A folder macOS protects that the machine just refused to work in
+	 * (ErrorReason.MAC_FOLDER_ACCESS, tunelo 3.17.0+): the user is asked
+	 * whether tunelo may ask macOS for it. Null when nothing waits.
+	 */
+	readonly macFolderAsk: string | null;
 }
 
 /** Passkey notices kept for showing. */
@@ -234,6 +240,7 @@ const INITIAL: LinkState = {
 	secretPrompts: new Map(),
 	takeovers: new Map(),
 	passkeyNotices: [],
+	macFolderAsk: null,
 };
 
 export class MachineLink {
@@ -887,13 +894,16 @@ export class MachineLink {
 		this.waiters.delete(frame.id);
 		this.timers.clearTimeout(waiter.timer);
 		if (b.case === "error") {
-			// The machine just found out it lacks Full Disk Access: its info says so now.
-			if (b.value.reason === ErrorReason.FULL_DISK_ACCESS_NEEDED && this.current.info?.needsFullDiskAccess !== true) {
-				this.request({ case: "machineInfoRequest", value: {} }).catch(() => undefined);
-			}
+			// A folder macOS protects: ask the user whether tunelo may ask macOS for it.
+			if (b.value.reason === ErrorReason.MAC_FOLDER_ACCESS && b.value.subject !== "") this.set({ macFolderAsk: b.value.subject });
 			waiter.reject(new RemoteError(b.value.code, b.value.message, b.value.reason, b.value.subject, b.value.failureId));
 		}
 		else waiter.resolve(frame);
+	}
+
+	/** The user closed the question about a folder macOS protects. */
+	dismissMacFolderAsk(): void {
+		if (this.current.macFolderAsk !== null) this.set({ macFolderAsk: null });
 	}
 
 	/** A prompt this device answered or the machine closed. */

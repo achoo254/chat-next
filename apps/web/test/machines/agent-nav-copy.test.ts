@@ -19,7 +19,7 @@ describe("AI Agent navigation copy", () => {
 	it("points to Machine settings, not to an old machine page", () => {
 		for (const c of [viMachines, enMachines, zhCNMachines]) {
 			expect(c.agent.account.manage).not.toMatch(/trang máy|machine's page|电脑页面/);
-			expect(c.diskAccess.sessionHint).not.toMatch(/trang máy|machine's page|电脑页面/);
+			expect(c.macFolder.sessionHint).not.toMatch(/trang máy|machine's page|电脑页面/);
 		}
 	});
 });

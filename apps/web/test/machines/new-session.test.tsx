@@ -3,14 +3,14 @@
 // the folder, and opens the session waiting when no message is given. Project settings
 // in a folder the machine does not trust yet ask to trust it right there.
 import { create } from "@bufbuild/protobuf";
-import { ErrorCode, ErrorReason, LoginState, ProjectSchema, ThreadSummarySchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
+import { ErrorCode, ErrorReason, LoginState, MacFolderAccess, MacFolderSchema, ProjectSchema, ThreadSummarySchema, type Project, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { isHome, NewSession } from "../../src/machines/new-session.tsx";
-import { folderName, inDiskAccessFolder, pathCrumbs, recentFolders } from "../../src/machines/new-session-hints.ts";
+import { folderName, inUngrantedMacFolder, pathCrumbs, recentFolders } from "../../src/machines/new-session-hints.ts";
 import { boxValue } from "../support/plain-text-box.ts";
 
 const HOME = "/Users/me";
@@ -277,25 +277,33 @@ describe("going to a typed folder", () => {
 	});
 });
 
-describe("folders that need Full Disk Access", () => {
-	it("are Desktop, Documents, Downloads and Library under home", () => {
-		expect(inDiskAccessFolder("/Users/me/Downloads", HOME)).toBe(true);
-		expect(inDiskAccessFolder("~/Documents/app", HOME)).toBe(true);
-		expect(inDiskAccessFolder("/Users/me/Library/Mobile Documents/x", HOME)).toBe(true);
-		expect(inDiskAccessFolder("/Users/me/code", HOME)).toBe(false);
-		expect(inDiskAccessFolder("/Users/me/DesktopApps", HOME)).toBe(false);
-		expect(inDiskAccessFolder("", HOME)).toBe(false);
+describe("folders macOS protects", () => {
+	const FOLDERS = [
+		{ path: "/Users/me/Downloads", access: MacFolderAccess.NOT_ASKED },
+		{ path: "/Users/me/Documents", access: MacFolderAccess.GRANTED },
+		{ path: "/Users/me/Library/Mobile Documents", access: MacFolderAccess.DENIED },
+	];
+
+	it("are the machine's protected folders tunelo may not enter yet", () => {
+		const folders = FOLDERS.map((f) => create(MacFolderSchema, f));
+		expect(inUngrantedMacFolder("/Users/me/Downloads", HOME, folders)).toBe(true);
+		expect(inUngrantedMacFolder("~/Downloads/app", HOME, folders)).toBe(true);
+		expect(inUngrantedMacFolder("/Users/me/Library/Mobile Documents/x", HOME, folders)).toBe(true);
+		expect(inUngrantedMacFolder("/Users/me/Documents/app", HOME, folders)).toBe(false);
+		expect(inUngrantedMacFolder("/Users/me/code", HOME, folders)).toBe(false);
+		expect(inUngrantedMacFolder("/Users/me/DownloadsApps", HOME, folders)).toBe(false);
+		expect(inUngrantedMacFolder("", HOME, folders)).toBe(false);
 	});
 
-	it("warn in the dialog only while the machine lacks it", async () => {
+	it("say in the dialog that Chat asks first, only for a folder not granted", async () => {
 		const { link } = fakeLink();
-		const info = { home: HOME, needsFullDiskAccess: true, providers: AIS, pinnedDirs: [], recentDirs: [] };
+		const info = { home: HOME, macFolders: FOLDERS, providers: AIS, pinnedDirs: [], recentDirs: [] };
 		const view = open(link, stateWith([thread("a", "/Users/me/Downloads/x", 1)], true, info));
 		await waitFor(() => expect(folderInput().value).toBe("/Users/me/Downloads/x"));
-		expect(screen.getByRole("note").textContent).toMatch(/Full Disk Access/);
+		expect(screen.getByRole("note").textContent).toMatch(/macOS bảo vệ thư mục này/);
 		view.unmount();
-		open(fakeLink().link, stateWith([thread("a", "/Users/me/Downloads/x", 1)], true, { ...info, needsFullDiskAccess: false }));
-		await waitFor(() => expect(folderInput().value).toBe("/Users/me/Downloads/x"));
+		open(fakeLink().link, stateWith([thread("a", "/Users/me/Documents/x", 1)], true, info));
+		await waitFor(() => expect(folderInput().value).toBe("/Users/me/Documents/x"));
 		expect(screen.queryByRole("note")).toBeNull();
 	});
 });

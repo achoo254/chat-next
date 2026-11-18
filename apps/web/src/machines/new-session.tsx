@@ -22,7 +22,7 @@ import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
 import { RemoteError, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
 import { AGENT_PARKED_SESSION, versionAtLeast } from "./agent-version.ts";
-import { PROMPT_HINTS, folderName, hintPrompt, inDiskAccessFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
+import { PROMPT_HINTS, folderName, hintPrompt, inUngrantedMacFolder, isHome, pathCrumbs, recentFolders, type PromptHint } from "./new-session-hints.ts";
 import { machineErrorText, needsProjectTrust } from "./machine-errors.ts";
 import { aiName, providerOf, sessionProvider } from "./use-machines.ts";
 import { modePath, projectMode, rememberMode, terminalOffered, type SessionMode } from "./session-mode.tsx";
@@ -146,7 +146,8 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 	const pinned = state.info?.pinnedDirs ?? [];
 	const suggestions = [...new Set([...recent, ...pinned])];
 	const matches = typing && typed !== "" ? folderMatches(typed, suggestions, listing) : [];
-	const diskAccessHint = state.info?.needsFullDiskAccess === true && inDiskAccessFolder(typed, state.info.home);
+	const macFolders = state.info?.macFolders;
+	const macFolderHint = macFolders !== undefined && macFolders.length > 0 && inUngrantedMacFolder(typed, state.info?.home ?? "", macFolders);
 	const noProject = sensitive || isHome(path, state.info?.home ?? "");
 	const loadProject = projectSettings && !noProject;
 	const message = hint !== null ? hintPrompt(t.newSession, hint, path) : text;
@@ -432,9 +433,9 @@ export function NewSession({ machine, name, link, state, onClose, project, onSta
 								{listError}
 							</p>
 						)}
-						{diskAccessHint && (
-							<p className="mx-warn" role="note" data-id="new-session-disk-access">
-								{t.diskAccess.sessionHint}
+						{macFolderHint && (
+							<p className="note" role="note" data-id="new-session-mac-folder">
+								{t.macFolder.sessionHint}
 							</p>
 						)}
 						{listing !== null && (
