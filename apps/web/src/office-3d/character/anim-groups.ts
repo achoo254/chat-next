@@ -71,6 +71,10 @@ export interface PoseInput {
 	readonly low?: boolean;
 	/** Seated at a desk with a keyboard: work there and time free at it both type. */
 	readonly keyboard?: boolean;
+	/** Seated at a work or meeting seat without a keyboard: work there and time free at it are a talk with the others. */
+	readonly talkSeat?: boolean;
+	/** At such a seat, their turn to speak (else they listen). */
+	readonly speaking?: boolean;
 }
 
 /** Work at a keyboard desk is typing, whatever the tool (a phone call or asking Advisor keeps its own pose). */
@@ -125,6 +129,7 @@ export function poseFor(input: PoseInput): Pose {
 	if (input.cheering) return "cheer";
 	if (input.group !== null) {
 		if (input.seated && input.keyboard === true && AT_KEYBOARD.has(input.group)) return "sit-type";
+		if (input.seated && input.talkSeat === true && AT_KEYBOARD.has(input.group)) return input.speaking === true ? "sit-talk" : "sit-idle";
 		return input.seated ? SEATED[input.group] : STANDING[input.group];
 	}
 	const talk = input.talk ?? null;
@@ -138,6 +143,8 @@ export function poseFor(input: PoseInput): Pose {
 	if (input.idle === "yawn") return "yawn";
 	// Free at a keyboard desk: the staff keep working at the computer rather than sitting still.
 	if (input.seated && input.keyboard === true) return "sit-type";
+	// Free at a seat without one (the reading table, the meeting table): talking with the others, in turns.
+	if (input.seated && input.talkSeat === true) return input.speaking === true ? "sit-talk" : "sit-idle";
 	return input.seated ? "sit-idle" : "stand-idle";
 }
 

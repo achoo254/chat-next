@@ -23,7 +23,12 @@ export interface PersonTarget {
 	readonly low: boolean;
 	/** Seated at a desk with a keyboard (types there). */
 	readonly keyboard: boolean;
+	/** Seated at a work or meeting seat without a keyboard (the meeting table, the reading table, Advisor's visitors' chairs): talks there. */
+	readonly talkSeat: boolean;
 }
+
+/** Seats where people talk instead of typing when they have no keyboard; the director's chair and the living rooms' are not. */
+const TALK_SEAT_KINDS: ReadonlySet<string> = new Set(["meeting", "work"]);
 
 const SEAT_KINDS: ReadonlySet<string> = new Set(["desk", "director", "meeting", "sofa"]);
 /** Sideways step between people sharing one anchor, metres. */
@@ -42,7 +47,7 @@ export function personTarget(layout: OfficeLayout, anchorId: string, share: numb
 	const rightX = Math.cos(a.face);
 	const rightZ = -Math.sin(a.face);
 	if (beside) {
-		return { anchorId, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: a.seat, low: false, keyboard: false };
+		return { anchorId, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: a.seat, low: false, keyboard: false, talkSeat: false };
 	}
 	const steps = share <= 0 ? 0 : Math.ceil(share / 2) * (share % 2 === 1 ? 1 : -1);
 	return {
@@ -57,6 +62,7 @@ export function personTarget(layout: OfficeLayout, anchorId: string, share: numb
 		seat: a.seat,
 		low: share <= 0 && a.low,
 		keyboard: share <= 0 && a.keyboard,
+		talkSeat: share <= 0 && a.sit && !a.keyboard && TALK_SEAT_KINDS.has(a.kind),
 	};
 }
 

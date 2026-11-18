@@ -91,6 +91,15 @@ describe("poses", () => {
 		expect(poseFor({ ...base, seated: true, group: "read" })).toBe("sit-read");
 	});
 
+	it("talks in turns at a seat without a keyboard, working or free; the director's chair has no talk seat", () => {
+		const atTable = { ...base, seated: true, talkSeat: true } as const;
+		expect(poseFor({ ...atTable, group: "read", speaking: true })).toBe("sit-talk");
+		expect(poseFor({ ...atTable, group: "read", speaking: false })).toBe("sit-idle");
+		expect(poseFor({ ...atTable, speaking: true }), "free at the reading table").toBe("sit-talk");
+		expect(poseFor({ ...atTable, group: "phone", speaking: true })).toBe("sit-phone");
+		expect(clipFor("sit-talk", new Set(["Sitting_Talking", "Sitting_Idle"]))).toBe("Sitting_Talking");
+	});
+
 	it("shakes the head when refused and cheers a pass, over the work pose", () => {
 		expect(poseFor({ ...base, group: "type", refused: true })).toBe("shake-head");
 		expect(poseFor({ ...base, group: "type", cheering: true })).toBe("cheer");

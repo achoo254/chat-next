@@ -31,6 +31,8 @@ import { nearestNode, personTarget, shareIndices, type PersonTarget } from "./pe
 /** A pass is cheered this long, a failure smokes this long (viewer ms). */
 export const CHEER_MS = 2_500;
 export const SMOKE_MS = 4_000;
+/** One turn of speaking or listening at a seat without a keyboard, scene seconds (each person starts at their own point). */
+const TALK_TURN_SECONDS = 4;
 /** Getting out of bed (LayToIdle) before walking off, scene seconds. */
 export const WAKE_SECONDS = 1.6;
 const ENTRANCE = "lobby-entry";
@@ -282,6 +284,8 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					waking,
 					low: p.target.low,
 					keyboard: p.target.keyboard,
+					talkSeat: p.target.talkSeat,
+					speaking: Math.floor((clock + p.index * 1.7) / TALK_TURN_SECONDS) % 2 === 0,
 				});
 				if (pose !== p.pose) {
 					if (p.pose === "walk" && group !== null) onEvent("start-work", p.inView);
