@@ -69,6 +69,8 @@ export interface OfficeTestReadout {
 	/** People on the canvas whose label shows as a dot now. */
 	readonly dots: number;
 	readonly drawCalls: number;
+	/** The ring under the person whose panel is open is drawn. */
+	readonly selectionRing: boolean;
 	/** Frames drawn since start (stops growing when the loop pauses). */
 	readonly frames: number;
 	readonly fps: number;

@@ -76,6 +76,7 @@ class Office {
 	actors: OfficeActor[];
 	session: OfficeSession;
 	gap = false;
+	private leaks = 0;
 
 	constructor(
 		readonly threadId: string,
@@ -156,6 +157,12 @@ class Office {
 		const d = this.actor("director") ?? create(OfficeActorSchema, { id: "director", role: DIRECTOR });
 		// Idle: the director drops whatever was still open (no activity_end of its own).
 		return update({ ...d, state, activity: state === IDLE ? undefined : d.activity });
+	}
+
+	/** A subagent's tool that carries a subject, as an agent that does not keep the contract would send it (the real one only does for the director's tools). */
+	leak(actorId: string, subject: string): void {
+		this.leaks += 1;
+		this.emit(start(actorId, activity(`leak-${this.leaks}`, "Bash", OfficeAnimGroup.MACHINE, OfficeRoom.QA, subject)));
 	}
 
 	/** Plays the next step of the script. */
@@ -343,6 +350,11 @@ export class FakeOffice {
 	/** Plays one step in every watched office. */
 	step(): void {
 		for (const { office } of this.offices.values()) office.next();
+	}
+
+	/** A subagent's tool with a subject in every watched office (see Office.leak). */
+	leakSubject(actorId: string, subject: string): void {
+		for (const { office } of this.offices.values()) office.leak(actorId, subject);
 	}
 
 	/** The next event of every watched office is lost on the way (a seq gap). */

@@ -19,7 +19,11 @@
 // token-only audit numbers; and the residents' day: on a page clock pinned to
 // office hours (Asia/Ho_Chi_Minh), everyone who worked stays after the session
 // ends, goes to bed in the living zone at 23:30 (the director too, lying in a
-// bed in 3D) and back to the work zones at 10:00. Starts its own Vite dev server of
+// bed in 3D) and back to the work zones at 10:00. The inspector panel: a press on a name or a body opens
+// the person's panel (a column beside the scene on a desktop window, a sheet under it on a phone, the scene
+// shrinking to make room), a pan, a turn, a wheel and a pinch never open or close it, a press on nothing, Esc
+// and its button close it, the ring under the chosen person is the only thing drawn more, a subagent's subject
+// shows the same in its bubble and its panel, and the 2D view works the same. Starts its own Vite dev server of
 // the harness (with the app's public/ for the baked office files), so it
 // needs no backend:
 //
@@ -105,7 +109,7 @@ const LIVING_ZONE = "d";
 
 /** What window.__office (declared by the scene) reads out. */
 type Readout = OfficeTestReadout;
-type FakeOfficeApi = { pause(): void; step(): void; gapNext(): void };
+type FakeOfficeApi = { pause(): void; step(): void; gapNext(): void; leakSubject(actorId: string, subject: string): void };
 type FakeMachineApi = { sockets: { url: string; closed: boolean; drop(): void }[]; unreachable: Set<string> };
 type TestWindow = Window & { __frameLog?: [number, number][]; __fakeOffice?: FakeOfficeApi; __fakeMachine?: FakeMachineApi };
 
@@ -209,8 +213,8 @@ async function step(page: Page): Promise<void> {
  * A page of the harness at `at` with the office tab open on the session, the fake office's script paused (steps
  * play only through step()), and `flags` for the 3D view.
  */
-async function openOffice(target: Browser, at: string, flags: string): Promise<{ context: BrowserContext; page: Page; errors: string[]; warnings: string[] }> {
-	const context = await target.newContext({ locale: "vi-VN", viewport: { width: 1280, height: 800 }, timezoneId: TIME_ZONE });
+async function openOffice(target: Browser, at: string, flags: string, screen: { width: number; height: number; touch?: boolean; frame?: number } = { width: 1280, height: 800 }): Promise<{ context: BrowserContext; page: Page; errors: string[]; warnings: string[] }> {
+	const context = await target.newContext({ locale: "vi-VN", viewport: { width: screen.width, height: screen.height }, hasTouch: screen.touch === true, timezoneId: TIME_ZONE });
 	// Office hours on the page's clock (time still flows): off-duty people stay in the work zones (office-life-schedule.ts).
 	await context.clock.install({ time: new Date(OFFICE_HOURS) });
 	await context.addInitScript(
@@ -234,6 +238,8 @@ async function openOffice(target: Browser, at: string, flags: string): Promise<{
 	const tab = page.locator("[data-id=session-mode-office]");
 	await tab.waitFor({ timeout: 30_000 });
 	await tab.click();
+	// A phone is the office's frame narrower than 640 px (office-view.tsx PHONE_WIDTH), not the window: the frame is narrowed here, and the window keeps the header's view switch in reach.
+	if (screen.frame !== undefined) await page.addStyleTag({ content: `[data-id=office] { width: 100%; max-width: ${screen.frame}px; margin-inline: auto; }` });
 	await page.locator("[data-id=office] [data-id=office-framing]").waitFor({ timeout: 30_000 });
 	await page.locator("[data-id=office] .of-stage").waitFor({ timeout: 30_000 });
 	return { context, page, errors, warnings };
@@ -628,4 +634,210 @@ test("the residents' day: after the session nobody goes home, at 23:30 everyone 
 	await poll("the staff back in the work zones", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.zone === LIVING_ZONE).length, (n) => n === 0);
 	assert.deepEqual(errors, []);
 	await context.close();
+});
+
+// --- The inspector panel. -------------------------------------------------------------------------------------------
+
+const PANEL = "[data-id=office] [data-id=office-inspector]";
+
+/** The key of the person whose panel is open, or null. */
+async function openPanel(page: Page): Promise<string | null> {
+	return page.locator(PANEL).first().getAttribute("data-key", { timeout: 500 }).catch(() => null);
+}
+
+/** The centre of a person's name tag on the page (3D: the button over the scene; 2D: the name in the picture). */
+async function tagCentre(page: Page, key: string): Promise<{ x: number; y: number }> {
+	const box = await page.locator(`[data-id='office-person-${key}'] .of3d-tag, [data-id='office-person-${key}'] .of-pick`).first().boundingBox();
+	if (box === null) assert.fail(`no name tag for ${key}`);
+	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** A point of the canvas where nobody is: its top left corner (the plan's backdrop). */
+async function emptySpot(page: Page): Promise<{ x: number; y: number }> {
+	const box = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
+	if (box === null) assert.fail("no canvas");
+	return { x: box.x + 12, y: box.y + 12 };
+}
+
+async function drawCallsMost(page: Page): Promise<number> {
+	let most = 0;
+	for (let i = 0; i < 10; i++) {
+		most = Math.max(most, (await readout(page))?.drawCalls ?? 0);
+		await page.waitForTimeout(100);
+	}
+	return most;
+}
+
+test("the inspector in 3D: a name or a body opens the panel, a pan, a turn and a wheel do not touch it, a press on nothing, Esc close it, the ring follows it, the subject shows the same in the bubble and the panel", async () => {
+	const { context, page, errors, warnings } = await openOffice(browser, "machine-chat", FLAGS_3D);
+	const webgl = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
+	if (!webgl) {
+		console.log("office e2e: no WebGL2, the 3D inspector checks are skipped");
+		await context.close();
+		return;
+	}
+	await page
+		.locator("[data-id=office] .of3d[data-ready='true']")
+		.waitFor({ timeout: 60_000 })
+		.catch(() => assert.fail(`the 3D scene did not start: ${warnings.join(" | ")}`));
+	await until(page, "window.__office", () => (window as TestWindow).__office !== undefined);
+	await step(page); // 0: a turn begins
+	await step(page); // 1: the director's Read is the research analyst's work; a scout comes in
+	await step(page); // 2
+	await step(page); // 3: a test command for the tester
+	await reaches(page, "the QA tester", person("qaTester"), "QA");
+	await reaches(page, "the research analyst", person("researchAnalyst"), "LIBRARY");
+	assert.equal(await openPanel(page), null, "no panel before anyone is chosen");
+	assert.equal((await readout(page))?.selectionRing, false, "no ring before anyone is chosen");
+	const before = await drawCallsMost(page);
+
+	// A press on a name tag: the tag takes no pointer, the canvas's tap finds it.
+	const tag = await tagCentre(page, "title:qaTester");
+	await page.mouse.click(tag.x, tag.y);
+	await poll("the panel of the QA tester", () => openPanel(page), (k) => k === "title:qaTester", 5_000);
+	assert.equal(await page.locator(`${PANEL} h3`).textContent(), "Kiểm thử viên");
+	await poll("the ring", async () => (await readout(page))?.selectionRing, (r) => r === true, 5_000);
+	assert.equal(await page.locator("[data-id=office] .of-body").getAttribute("data-panel"), "open");
+	// The scene shrank to make room: the panel stands beside the canvas and the person is not behind it.
+	const canvasBox = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
+	const panelBox = await page.locator(PANEL).boundingBox();
+	if (canvasBox === null || panelBox === null) assert.fail("no canvas or panel box");
+	assert.ok(canvasBox.x + canvasBox.width <= panelBox.x + 1, "the panel is beside the canvas, not over it");
+	const chosen = await tagCentre(page, "title:qaTester");
+	assert.ok(chosen.x < panelBox.x, "the chosen person's tag is not behind the panel");
+
+	// The draw calls with someone chosen: the ring is the only thing drawn more.
+	const after = await drawCallsMost(page);
+	console.log(`office e2e: draw calls without a ring ${before}, with a chosen person ${after}`);
+	assert.ok(after <= before + 1, `the ring adds at most one draw call (${before} -> ${after})`);
+	assert.ok(after < 140, `a chosen person: ${after} draw calls`);
+
+	// A pan (left drag), a turn (right drag and shift drag), a wheel and a pinch-less zoom: none opens or closes anything.
+	const empty = await emptySpot(page);
+	await page.mouse.move(empty.x, empty.y);
+	await page.mouse.down();
+	await page.mouse.move(empty.x + 60, empty.y + 20, { steps: 6 });
+	await page.mouse.up();
+	assert.equal(await openPanel(page), "title:qaTester", "a pan does not close the panel");
+	await page.mouse.move(empty.x, empty.y + 40);
+	await page.mouse.down({ button: "right" });
+	await page.mouse.move(empty.x + 50, empty.y + 40, { steps: 5 });
+	await page.mouse.up({ button: "right" });
+	assert.equal(await openPanel(page), "title:qaTester", "a right drag does not close the panel");
+	await page.keyboard.down("Shift");
+	await page.mouse.move(empty.x, empty.y + 60);
+	await page.mouse.down();
+	await page.mouse.move(empty.x + 50, empty.y + 60, { steps: 5 });
+	await page.mouse.up();
+	await page.keyboard.up("Shift");
+	assert.equal(await openPanel(page), "title:qaTester", "a shift drag does not close the panel");
+	await page.mouse.move(empty.x + 100, empty.y + 100);
+	await page.mouse.wheel(0, -240);
+	assert.equal(await openPanel(page), "title:qaTester", "the wheel does not close the panel");
+
+	// The subject a subagent's tool carries (as an agent that broke its contract would send it) is the same in the bubble and the panel.
+	await page.evaluate(() => (window as TestWindow).__fakeOffice?.leakSubject("s-tester", "secret.sh"));
+	await poll("the subject in the panel", async () => (await page.locator(`${PANEL} .of-panel-mono`).allTextContents()).join(" "), (t) => t.includes("secret.sh"), 5_000);
+	assert.match((await page.locator("[data-id='office-person-title:qaTester'] .of-bubble").textContent()) ?? "", /secret\.sh/);
+
+	// The director's git (step 3) is Backend & DevOps's work, as the bubble shows it: it is on that person's panel, with its subject, and not on the director's.
+	await page.mouse.click(empty.x + 200, empty.y + 200).catch(() => undefined);
+	await poll("no panel after a press on nothing", () => openPanel(page), (k) => k === null, 5_000);
+	assert.equal((await readout(page))?.selectionRing, false, "the ring goes with the choice");
+	const devops = page.locator("[data-id='office-person-title:backendDevops'] button.of3d-tag");
+	await devops.focus();
+	await page.keyboard.press("Enter");
+	await poll("the panel of Backend & DevOps by keyboard", () => openPanel(page), (k) => k === "title:backendDevops", 5_000);
+	const devopsText = (await page.locator(PANEL).textContent()) ?? "";
+	assert.ok(devopsText.includes("Bash") && devopsText.includes("git"), `the director's git on the department's panel: ${devopsText}`);
+	await page.keyboard.press("Escape");
+	await poll("closed by Esc", () => openPanel(page), (k) => k === null, 5_000);
+	assert.equal(await page.evaluate(() => document.activeElement?.closest("[data-id='office-person-title:backendDevops']") !== null), true, "the focus is back on the name");
+
+	// A press on a body (not its name): the director, a little below the label's anchor.
+	const director = (await readout(page))?.people.find((p) => p.key === "director")?.screen ?? null;
+	if (director === null) assert.fail("the director is not on screen");
+	const canvas = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
+	if (canvas === null) assert.fail("no canvas");
+	await page.mouse.click(canvas.x + director[0], canvas.y + director[1] + 18);
+	await poll("the panel of the director by a press on his body", () => openPanel(page), (k) => k === "director", 5_000);
+	await page.locator(`${PANEL} [data-id=office-inspector-close]`).click();
+	await poll("closed by its button", () => openPanel(page), (k) => k === null, 5_000);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("the inspector on a phone: a tap on a name opens a sheet under the scene, the scene shrinks, and the draw calls stay within the phone's 100", async () => {
+	const { context, page, errors, warnings } = await openOffice(browser, "machine-chat", FLAGS_3D, { width: 1280, height: 900, touch: true, frame: 390 });
+	const webgl = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
+	if (!webgl) {
+		console.log("office e2e: no WebGL2, the phone inspector check is skipped");
+		await context.close();
+		return;
+	}
+	await page
+		.locator("[data-id=office] .of3d[data-ready='true']")
+		.waitFor({ timeout: 60_000 })
+		.catch(() => assert.fail(`the 3D scene did not start: ${warnings.join(" | ")}`));
+	await until(page, "window.__office", () => (window as TestWindow).__office !== undefined);
+	assert.equal(await page.locator("[data-id=office]").getAttribute("data-size"), "phone");
+	await step(page); // 0
+	await step(page); // 1
+	await step(page); // 2
+	await step(page); // 3
+	await reaches(page, "the QA tester", person("qaTester"), "QA");
+	await page.waitForTimeout(2_500); // the camera's opening framing
+	const before = await drawCallsMost(page);
+	// The work framing of a phone shows the work zone: choose someone the scene has on screen.
+	const frameBox = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
+	if (frameBox === null) assert.fail("no canvas");
+	const onScreen = ((await readout(page))?.people ?? []).filter((p) => p.key !== "chairman" && p.screen !== null && p.screen[0] > 24 && p.screen[0] < frameBox.width - 24 && p.screen[1] > 40 && p.screen[1] < frameBox.height - 8);
+	console.log(`office e2e: on a phone's frame ${onScreen.length} people on screen: ${onScreen.map((p) => p.key).join(", ")}`);
+	const key = (onScreen.find((p) => p.key === "director") ?? onScreen[0])?.key;
+	if (key === undefined) assert.fail("nobody on the phone's frame");
+	const at = await tagCentre(page, key);
+	await page.touchscreen.tap(at.x, at.y);
+	await poll("the panel by a tap", () => openPanel(page), (k) => k === key, 5_000);
+	const canvasBox = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
+	const panelBox = await page.locator(PANEL).boundingBox();
+	if (canvasBox === null || panelBox === null) assert.fail("no canvas or panel box");
+	assert.ok(panelBox.y >= canvasBox.y + canvasBox.height - 1, `the sheet is under the scene (panel at ${panelBox.y}, canvas ends ${canvasBox.y + canvasBox.height})`);
+	await page.waitForTimeout(1_500);
+	const after = await drawCallsMost(page);
+	console.log(`office e2e: phone draw calls without a ring ${before}, with a chosen person ${after}`);
+	assert.ok(after <= 100, `the phone's budget with a chosen person: ${after} draw calls (100)`);
+	assert.ok(after <= before + 1, `the ring adds at most one draw call (${before} -> ${after})`);
+	assert.deepEqual(errors, []);
+	await context.close();
+});
+
+test("the inspector without WebGL: a name opens the panel, a press on the picture closes it, the same name again and Esc too", async () => {
+	const plain = await chromium.launch({ args: ["--disable-3d-apis"] });
+	try {
+		const { context, page, errors } = await openOffice(plain, "machine-chat", "office3d-test");
+		await page.locator("[data-id=office] .of-stage[data-renderer='2d'] [data-id=office-picture]").waitFor({ timeout: 30_000 });
+		for (let i = 0; i < 4; i++) await step(page);
+		await reaches(page, "the QA tester", person("qaTester"), "QA");
+		const name = page.locator("[data-id='office-person-title:qaTester'] .of-pick");
+		await name.click();
+		await poll("the panel", () => openPanel(page), (k) => k === "title:qaTester", 5_000);
+		assert.equal(await name.getAttribute("aria-pressed"), "true");
+		await name.click();
+		await poll("closed by the same name", () => openPanel(page), (k) => k === null, 5_000);
+		await name.click();
+		await poll("the panel again", () => openPanel(page), (k) => k === "title:qaTester", 5_000);
+		// A press on the picture where no name is.
+		const pic = await page.locator("[data-id=office-picture] .of-picture").boundingBox();
+		if (pic === null) assert.fail("no picture");
+		await page.mouse.click(pic.x + 4, pic.y + 4);
+		await poll("closed by a press on nothing", () => openPanel(page), (k) => k === null, 5_000);
+		await name.click();
+		await poll("the panel once more", () => openPanel(page), (k) => k === "title:qaTester", 5_000);
+		await page.keyboard.press("Escape");
+		await poll("closed by Esc", () => openPanel(page), (k) => k === null, 5_000);
+		assert.deepEqual(errors, []);
+		await context.close();
+	} finally {
+		await plain.close();
+	}
 });
