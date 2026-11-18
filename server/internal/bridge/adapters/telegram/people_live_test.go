@@ -111,8 +111,10 @@ func TestLiveTelegramPeople(t *testing.T) {
 		if herr == nil {
 			if m, ok := res.(interface{ GetMessages() []tg.MessageClass }); ok {
 				for _, raw := range m.GetMessages() {
-					if msg, ok := raw.(*tg.Message); ok {
-						step("mark read", a.MarkRead(ctx, acct, conv, strconv.Itoa(msg.ID)))
+					// any kind of message counts: after the member steps the newest one is a
+					// service message (removed, added), which a *tg.Message check would skip
+					if raw.TypeID() != tg.MessageEmptyTypeID {
+						step("mark read", a.MarkRead(ctx, acct, conv, strconv.Itoa(raw.GetID())))
 					}
 				}
 			}
