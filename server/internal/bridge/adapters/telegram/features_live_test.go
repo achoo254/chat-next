@@ -127,6 +127,23 @@ func TestLiveTelegramFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A group's about left changed by an earlier run is cleared by title.
+	if title := os.Getenv("BRIDGE_LIVE_FEATURES_CLEAR_ABOUT"); title != "" {
+		for _, x := range convs {
+			if x.Title != title {
+				continue
+			}
+			peer, err := c.inputPeer(ctx, x.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = api.MessagesEditChatAbout(ctx, &tg.MessagesEditChatAboutRequest{Peer: peer, About: ""})
+			step("about cleared", err)
+			return
+		}
+		t.Fatal("no conversation has the title given in BRIDGE_LIVE_FEATURES_CLEAR_ABOUT")
+	}
+
 	groupID := os.Getenv("BRIDGE_LIVE_FEATURES_GROUP")
 	for _, cv := range convs {
 		if groupID != "" && cv.ID != groupID {
@@ -266,6 +283,161 @@ func TestLiveTelegramFeatures(t *testing.T) {
 	if msgID != 0 {
 		_, err = api.MessagesDeleteMessages(ctx, &tg.MessagesDeleteMessagesRequest{ID: []int{msgID}, Revoke: true})
 		step("delete the spike message", err)
+	}
+
+	// ---- structure, only on a group made for the test, found by its title
+	if title := os.Getenv("BRIDGE_LIVE_FEATURES_TITLE"); title != "" {
+		var cv *struct{ id, kind string }
+		for _, x := range convs {
+			if x.Title == title {
+				cv = &struct{ id, kind string }{x.ID, string(x.Kind)}
+			}
+		}
+		if cv == nil {
+			t.Fatalf("no conversation has the title given in BRIDGE_LIVE_FEATURES_TITLE")
+		}
+		peer, err := c.inputPeer(ctx, cv.id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("--- test group %s kind=%s peer=%T", cv.id, cv.kind, peer)
+		var chatID int64
+		var in *tg.InputChannel
+		switch v := peer.(type) {
+		case *tg.InputPeerChannel:
+			in = &tg.InputChannel{ChannelID: v.ChannelID, AccessHash: v.AccessHash}
+		case *tg.InputPeerChat:
+			chatID = v.ChatID
+		}
+		// a message to react to and to anchor topics
+		sent, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{Peer: peer, Message: "bridge spike message", RandomID: time.Now().UnixNano()})
+		step("send to the test group", err)
+		gid := 0
+		if us, ok := sent.(*tg.Updates); ok {
+			for _, up := range us.Updates {
+				if m, ok := up.(*tg.UpdateMessageID); ok {
+					gid = m.ID
+				}
+			}
+		}
+		if gid != 0 {
+			_, err = api.MessagesSendReaction(ctx, &tg.MessagesSendReactionRequest{Peer: peer, MsgID: gid, Reaction: []tg.ReactionClass{&tg.ReactionEmoji{Emoticon: "👍"}}})
+			step("reaction set (group)", err)
+			mark("reaction set (group)")
+			list, err := api.MessagesGetMessageReactionsList(ctx, &tg.MessagesGetMessageReactionsListRequest{Peer: peer, ID: gid, Limit: 10})
+			if err == nil {
+				t.Logf("   reactions list: %d, total %d", len(list.Reactions), list.Count)
+			}
+			_, err = api.MessagesSendReaction(ctx, &tg.MessagesSendReactionRequest{Peer: peer, MsgID: gid})
+			step("reaction cleared (group)", err)
+			mark("reaction cleared (group)")
+			_, err = api.MessagesSendReaction(ctx, &tg.MessagesSendReactionRequest{Peer: peer, MsgID: gid, Reaction: []tg.ReactionClass{&tg.ReactionEmoji{Emoticon: "🔥"}}})
+			step("reaction replaced (set another)", err)
+			_, _ = api.MessagesSendReaction(ctx, &tg.MessagesSendReactionRequest{Peer: peer, MsgID: gid})
+		}
+		// title and about, put back
+		if in != nil {
+			full, err := api.ChannelsGetFullChannel(ctx, in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fc := full.FullChat.(*tg.ChannelFull)
+			var oldTitle string
+			for _, ch := range full.Chats {
+				if cc, ok := ch.(*tg.Channel); ok && cc.ID == in.ChannelID {
+					oldTitle = cc.Title
+				}
+			}
+			_, err = api.ChannelsEditTitle(ctx, &tg.ChannelsEditTitleRequest{Channel: in, Title: oldTitle + " 2"})
+			step("title changed (channel)", err)
+			mark("title")
+			_, err = api.ChannelsEditTitle(ctx, &tg.ChannelsEditTitleRequest{Channel: in, Title: oldTitle})
+			step("title put back (channel)", err)
+			mark("title back")
+			_, err = api.MessagesEditChatAbout(ctx, &tg.MessagesEditChatAboutRequest{Peer: peer, About: "bridge spike"})
+			step("about changed", err)
+			mark("about")
+			_, err = api.MessagesEditChatAbout(ctx, &tg.MessagesEditChatAboutRequest{Peer: peer, About: fc.About})
+			step("about put back", err)
+			mark("about back")
+			// own invite links
+			link, err := api.MessagesExportChatInvite(ctx, &tg.MessagesExportChatInviteRequest{Peer: peer, Title: "spike"})
+			step("invite link created", err)
+			if err == nil {
+				if inv, ok := link.(*tg.ChatInviteExported); ok {
+					mark("invite link created")
+					_, err = api.MessagesEditExportedChatInvite(ctx, &tg.MessagesEditExportedChatInviteRequest{Peer: peer, Link: inv.Link, Revoked: true})
+					step("invite link revoked", err)
+					mark("invite link revoked")
+				}
+			}
+			// forum topics, if the group has them
+			if cv.kind != "" {
+				topics, terr := a.ListTopics(ctx, acct, cv.id)
+				if terr == nil {
+					t.Logf("   topics: %d", len(topics))
+					rid := time.Now().UnixNano()
+					ct, err := api.MessagesCreateForumTopic(ctx, &tg.MessagesCreateForumTopicRequest{Peer: peer, Title: "spike topic", RandomID: rid})
+					step("topic created", err)
+					mark("topic created")
+					topicID := 0
+					if us, ok := ct.(*tg.Updates); ok {
+						for _, up := range us.Updates {
+							if m, ok := up.(*tg.UpdateMessageID); ok {
+								topicID = m.ID
+							}
+						}
+					}
+					if topicID != 0 {
+						title := "spike topic renamed"
+						_, err = api.MessagesEditForumTopic(ctx, &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: topicID, Title: title})
+						step("topic renamed", err)
+						mark("topic renamed")
+						_, err = api.MessagesEditForumTopic(ctx, &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: topicID, Closed: true})
+						step("topic closed", err)
+						mark("topic closed")
+						_, err = api.MessagesEditForumTopic(ctx, &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: topicID, Closed: false})
+						step("topic reopened", err)
+						mark("topic reopened")
+						_, err = api.MessagesDeleteTopicHistory(ctx, &tg.MessagesDeleteTopicHistoryRequest{Peer: peer, TopMsgID: topicID})
+						step("topic deleted", err)
+						mark("topic deleted")
+					}
+				} else {
+					t.Logf("   not a forum: %v", terr)
+				}
+			}
+		} else if chatID != 0 {
+			full, err := api.MessagesGetFullChat(ctx, chatID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var oldTitle string
+			for _, ch := range full.Chats {
+				if cc, ok := ch.(*tg.Chat); ok && cc.ID == chatID {
+					oldTitle = cc.Title
+				}
+			}
+			_, err = api.MessagesEditChatTitle(ctx, &tg.MessagesEditChatTitleRequest{ChatID: chatID, Title: oldTitle + " 2"})
+			step("title changed (basic group)", err)
+			mark("title")
+			_, err = api.MessagesEditChatTitle(ctx, &tg.MessagesEditChatTitleRequest{ChatID: chatID, Title: oldTitle})
+			step("title put back (basic group)", err)
+			mark("title back")
+			about := ""
+			if cf, ok := full.FullChat.(*tg.ChatFull); ok {
+				about = cf.About
+			}
+			_, err = api.MessagesEditChatAbout(ctx, &tg.MessagesEditChatAboutRequest{Peer: peer, About: "bridge spike"})
+			step("about changed", err)
+			mark("about")
+			_, err = api.MessagesEditChatAbout(ctx, &tg.MessagesEditChatAboutRequest{Peer: peer, About: about})
+			step("about put back", err)
+		}
+		if gid != 0 {
+			_, err = api.MessagesDeleteMessages(ctx, &tg.MessagesDeleteMessagesRequest{ID: []int{gid}, Revoke: true})
+			step("delete the spike message (group)", err)
+		}
 	}
 
 	// ---- structure and people, only on a group made for the test
