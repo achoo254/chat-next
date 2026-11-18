@@ -79,6 +79,11 @@ export interface LayoutAnchor {
 	readonly sit: boolean;
 	/** A low seat (a beanbag): sitting near the floor. */
 	readonly low: boolean;
+	/**
+	 * Where a sitter's seat rests over the floor, metres: the cushion's top less how deep one sinks into it (from the
+	 * furniture's socket, tools/office-art/furniture-sockets.json). The pelvis sits above it by the character's own seat contact.
+	 */
+	readonly seat: number;
 	/** A gym station's exercise; null elsewhere. */
 	readonly act: GymAct | null;
 	/** The staff key (tools/office-art/staff-cast.json), "director" or "advisor" whose seat this is; null for a seat anyone may take. */
@@ -224,6 +229,10 @@ function parseRooms(value: unknown, zones: readonly LayoutZone[], errors: string
 	return rooms;
 }
 
+/** A seat's height for a layout written before seats carried one: a chair, and a beanbag (the old pelvis heights less the staff's seat contact). */
+export const DEFAULT_SEAT = 0.465;
+export const DEFAULT_LOW_SEAT = 0.225;
+
 function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 	const anchors: LayoutAnchor[] = [];
 	const roomOrNull = (v: unknown): RoomCode | null => (isRoomCode(v) ? v : null);
@@ -238,6 +247,9 @@ function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 			continue;
 		}
 		const act = GYM_ACTS.find((g) => g === rec.act) ?? null;
+		const low = rec.low === true;
+		const seat = numberOf(rec.seat) ?? (low ? DEFAULT_LOW_SEAT : DEFAULT_SEAT);
+		if (seat <= 0 || seat > 1.2) errors.push(`anchor ${id} has a seat at ${seat} m, not a seat's height`);
 		if (kind === "gym" && act === null) errors.push(`gym anchor ${id} needs an act (${GYM_ACTS.join(", ")})`);
 		anchors.push({
 			id,
@@ -250,7 +262,8 @@ function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 			y: numberOf(rec.y) ?? 0,
 			lie: rec.lie === true,
 			sit: rec.sit === true,
-			low: rec.low === true,
+			low,
+			seat,
 			act,
 			home: stringOf(rec.home) || null,
 			greets: stringOf(rec.greets) || null,

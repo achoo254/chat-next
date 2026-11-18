@@ -22,6 +22,8 @@ export interface VisualProbe {
 	readonly head: ScenePoint | null;
 	readonly footL: ScenePoint | null;
 	readonly footR: ScenePoint | null;
+	/** The lowest point of the hips and thighs near the pelvis, metres over the floor: what rests on a seat (null without skin weights). */
+	readonly seatBottom: number | null;
 	readonly min: ScenePoint;
 	readonly max: ScenePoint;
 }
@@ -33,7 +35,7 @@ export interface CharacterVisual {
 	readonly meshes: () => readonly AbstractMesh[];
 	/** Where the name label sits over the feet, metres: just clear of the head. */
 	readonly labelHeight: number;
-	/** `seat`: where the pelvis rests over the person's root when the pose sits, metres (a chair's height by default). */
+	/** `seat`: where the sitter's seat rests over the person's root when the pose sits, metres (the anchor's seat height). */
 	setPose(pose: Pose, seat?: number): void;
 	/** Animation level of detail (0 stops the clip). */
 	setUpdateEvery(every: UpdateEvery): void;

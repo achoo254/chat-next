@@ -37,7 +37,7 @@ const name = (path: string): string => path.slice("/office/".length);
 function list(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return {
 		formatVersion: ASSETS_FORMAT_VERSION,
-		layoutSha256: HASH,
+		bakeSha256: HASH,
 		note: "made by tools/office-art; names carry a content hash",
 		zones: [
 			{
@@ -166,7 +166,7 @@ function setup(entries: Record<string, string>, over: Partial<AssetCacheDeps> = 
 				tasks = tasks.filter((t) => t !== task);
 			};
 		},
-		layoutHash: () => Promise.resolve(HASH),
+		bakeHash: () => Promise.resolve(HASH),
 		...over,
 	};
 	return {
@@ -208,7 +208,7 @@ describe("keeping the office cache", () => {
 
 	it("touches nothing when the cached list is for another layout or format", async () => {
 		const old = "/office/office-floor-1.5f2a8edb.glb";
-		for (const other of [list({ layoutSha256: "c".repeat(64) }), list({ formatVersion: 99 })]) {
+		for (const other of [list({ bakeSha256: "c".repeat(64) }), list({ formatVersion: 99 })]) {
 			const run = setup({ [OFFICE_MANIFEST]: JSON.stringify(other), [SHELL]: "shell", [old]: "old" });
 			keepOfficeAssetsCached(run.deps);
 			await run.idle();

@@ -1,6 +1,7 @@
 {
-	"formatVersion": 2,
-	"layoutSha256": "043038db71043c2e93eb07ae9b8cb1e33381becc8cb9394a061e61f1e341f621",
+	"formatVersion": 3,
+	"bakeSha256": "569e17d465b09cc983ac0b876e3344029eb9d959b37b34071d2eacea0864ea64",
+	"anchorsSha256": "37b0a0dd66af95beb2646dc0690e5bf2156c65dbb08edfe9c9fddcfe3f99d665",
 	"note": "Office assets for the 2D view (views, checked by parseOfficeAssets) and the 3D scene (zones[].scene, character, accessories, sfx). Made by tools/office-art in the workspace; file names carry a content hash.",
 	"views": {
 		"desktop": {
@@ -122,12 +123,12 @@
 					59.6
 				],
 				"sofa-0": [
-					51.13,
-					60.9
+					51.4,
+					60.97
 				],
 				"sofa-1": [
-					50.23,
-					59.47
+					50.3,
+					59.22
 				],
 				"lobby-entry": [
 					54.16,
@@ -358,24 +359,24 @@
 					32.39
 				],
 				"tv-0": [
-					65.21,
-					22.09
+					65.34,
+					22.3
 				],
 				"tv-1": [
-					66.17,
-					21.59
-				],
-				"tv-2": [
-					67.12,
-					21.08
-				],
-				"tv-3": [
-					61.66,
+					66.3,
 					21.8
 				],
+				"tv-2": [
+					67.25,
+					21.29
+				],
+				"tv-3": [
+					61.56,
+					21.86
+				],
 				"tv-4": [
-					68.62,
-					18.12
+					68.73,
+					18.06
 				],
 				"tv-5": [
 					61.98,
@@ -546,12 +547,12 @@
 					56
 				],
 				"sofa-0": [
-					51.13,
-					56.82
+					51.4,
+					56.86
 				],
 				"sofa-1": [
-					50.23,
-					55.92
+					50.3,
+					55.76
 				],
 				"lobby-entry": [
 					54.16,
@@ -782,24 +783,24 @@
 					38.99
 				],
 				"tv-0": [
-					65.21,
-					32.56
+					65.34,
+					32.69
 				],
 				"tv-1": [
-					66.17,
-					32.24
+					66.3,
+					32.37
 				],
 				"tv-2": [
-					67.12,
-					31.92
+					67.25,
+					32.05
 				],
 				"tv-3": [
-					61.66,
-					32.38
+					61.56,
+					32.41
 				],
 				"tv-4": [
-					68.62,
-					30.07
+					68.73,
+					30.04
 				],
 				"tv-5": [
 					61.98,

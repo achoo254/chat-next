@@ -40,7 +40,8 @@ const WATCHING: ReadonlySet<string> = new Set(["watch", "watch-low", "dance"]);
 
 export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): RoomFx {
 	const root = new TransformNode("room-fx", scene);
-	const screens = new Map<string, InstancedMesh>();
+	// A desk may carry two monitors: every screen of an anchor lights with it.
+	const screens = new Map<string, InstancedMesh[]>();
 	const lamps = new Map<string, InstancedMesh>();
 	const lampMaterial = new StandardMaterial("desk-lamp", scene);
 	lampMaterial.diffuseColor = Color3.Black();
@@ -61,7 +62,10 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 		if (p.name === "monitor" && p.anchor !== "") {
 			const screen = kit.block(root, `screen-${p.anchor}`, { x: p.x + Math.sin(p.rotY) * 0.05, y: p.y + 0.08, z: p.z + Math.cos(p.rotY) * 0.05, w: 0.48, h: 0.3, d: 0.01, rotY: p.rotY, color: "#ffffff", look: "screen" });
 			screen.setEnabled(false);
-			screens.set(p.anchor, screen);
+			const list = screens.get(p.anchor) ?? [];
+			list.push(screen);
+			screens.set(p.anchor, list);
+			if (lamps.has(p.anchor)) return;
 			const bulb = lamp.createInstance(`lamp-${p.anchor}`);
 			bulb.parent = root;
 			bulb.position.set(p.x + Math.cos(p.rotY) * LAMP_SIDE, p.y + LAMP_UP, p.z - Math.sin(p.rotY) * LAMP_SIDE);
@@ -113,7 +117,7 @@ export function createRoomFx(scene: Scene, kit: BlockKit, layout: SceneLayout): 
 		frame(seconds, people, screenGlow, lampGlow) {
 			now = seconds;
 			const working = new Set(people.filter((p) => p.working && p.deskAnchor !== null).map((p) => p.deskAnchor));
-			for (const [anchor, screen] of screens) screen.setEnabled(screenGlow > 0 && working.has(anchor));
+			for (const [anchor, list] of screens) for (const screen of list) screen.setEnabled(screenGlow > 0 && working.has(anchor));
 			for (const [anchor, bulb] of lamps) bulb.setEnabled(lampGlow > 0.05 && working.has(anchor));
 			lampMaterial.emissiveColor.copyFrom(LAMP_COLOR).scaleInPlace(Math.min(1, lampGlow) * 1.6);
 			kit.screenMaterial.emissiveColor.set(0.55 * (0.4 + screenGlow), 0.78 * (0.4 + screenGlow), 1 * (0.4 + screenGlow));

@@ -19,13 +19,13 @@
 //                   and antenna light.
 // Everything is optional and checked piece by piece: whatever is missing or
 // odd stays a placeholder (or a WebAudio tone); the whole file is ignored when
-// it was made for another layout (layoutSha256) or another format version.
+// it was baked from another layout (bakeSha256) or another format version.
 // office-assets.ts (shared with the 2D view) checks the 2D pictures.
-import { ASSETS_BASE, layoutHash } from "../../machines/office/office-assets.ts";
+import { ASSETS_BASE, bakeHash } from "../../machines/office/office-assets.ts";
 import { arrayOf, isRecord, numberOf, stringOf } from "../../machines/office/office-json.ts";
 import { isZoneId, ZONE_IDS, type ZoneId } from "../../machines/office/office-layout.ts";
 
-export const SCENE_ASSETS_FORMAT_VERSION = 2;
+export const SCENE_ASSETS_FORMAT_VERSION = 3;
 
 export type LightmapSize = 1024 | 2048;
 
@@ -230,7 +230,7 @@ function soundsOf(value: unknown): Map<string, SoundFile> {
 
 /** The 3D assets of a parsed asset file, or none when it is not for `hash` (the current layout's). */
 export function parseSceneAssets(json: unknown, hash: string): SceneAssets {
-	if (!isRecord(json) || json.formatVersion !== SCENE_ASSETS_FORMAT_VERSION || json.layoutSha256 !== hash) return NO_SCENE_ASSETS;
+	if (!isRecord(json) || json.formatVersion !== SCENE_ASSETS_FORMAT_VERSION || json.bakeSha256 !== hash) return NO_SCENE_ASSETS;
 	const zones = new Map<ZoneId, ZoneAssets>();
 	for (const entry of arrayOf(json.zones)) {
 		if (!isRecord(entry)) continue;
@@ -286,7 +286,7 @@ export async function loadSceneAssets(signal: AbortSignal): Promise<SceneAssets>
 		const response = await fetch(`${ASSETS_BASE}office-assets.json`, { cache: "no-cache", signal });
 		if (!response.ok) return NO_SCENE_ASSETS;
 		const json: unknown = await response.json();
-		return parseSceneAssets(json, await layoutHash());
+		return parseSceneAssets(json, await bakeHash());
 	} catch (error) {
 		if (!signal.aborted) console.info("office: no 3D assets, drawing placeholders", error);
 		return NO_SCENE_ASSETS;

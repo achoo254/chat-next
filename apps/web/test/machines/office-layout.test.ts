@@ -54,7 +54,7 @@ describe("the office's layout", () => {
 		for (const bed of beds) expect(bed).toMatchObject({ room: "DORM", lie: true, y: 0.5 });
 		const gym = living.filter((a) => a.kind === "gym");
 		expect(gym.map((a) => a.act).sort()).toEqual(["jacks", "punch", "pushup", "pushup", "run", "run"]);
-		for (const tread of gym.filter((a) => a.act === "run")) expect(tread.y).toBeCloseTo(0.18);
+		for (const tread of gym.filter((a) => a.act === "run")) expect(tread.y).toBeCloseTo(0.17);
 		expect(living.filter((a) => a.kind === "tv" && a.sit)).toHaveLength(8);
 		expect(living.filter((a) => a.kind === "tv" && a.low)).toHaveLength(3);
 		expect(living.filter((a) => a.kind === "dine" && a.sit)).toHaveLength(8);
@@ -207,6 +207,16 @@ describe("the office's layout", () => {
 		const errors = errorsOf(noDoor);
 		expect(errors).toContain("QA has no door");
 		expect(errors).toContain("AUDIT has no place to stand");
+	});
+
+	it("gives every seat its height from the furniture under it: the cushion less the sink, a beanbag near the floor", () => {
+		const seats = shipped().anchors.filter((a) => a.sit);
+		expect(seats.length).toBeGreaterThan(40);
+		for (const s of seats) expect(s.seat, s.id).toBeGreaterThan(s.low ? 0.15 : 0.3);
+		for (const s of seats) expect(s.seat, s.id).toBeLessThan(0.6);
+		const by = (id: string): number | undefined => shipped().anchors.find((a) => a.id === id)?.seat;
+		expect(by("director"), "the executive chair is higher than a desk chair").toBeGreaterThan(by("desk-0") ?? 1);
+		expect(by("tv-5"), "a beanbag").toBeLessThan(0.3);
 	});
 
 	it("has seats for the whole cast: the minimum places each room needs, and the advisor's room", () => {

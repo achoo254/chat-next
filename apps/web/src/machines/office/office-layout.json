@@ -728,8 +728,9 @@
 			"room": "WORK",
 			"x": -2.87,
 			"z": 3.36,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": -2.87,
 				"z": 2.56,
@@ -744,8 +745,9 @@
 			"room": "WORK",
 			"x": -1.43,
 			"z": 3.36,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": -1.43,
 				"z": 2.56,
@@ -760,8 +762,9 @@
 			"room": "WORK",
 			"x": 1.43,
 			"z": 3.36,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": 1.43,
 				"z": 2.56,
@@ -776,8 +779,9 @@
 			"room": "WORK",
 			"x": 2.87,
 			"z": 3.36,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": 2.87,
 				"z": 2.56,
@@ -793,6 +797,7 @@
 			"z": 1.04,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": -2.87,
 				"z": 1.84,
@@ -808,6 +813,7 @@
 			"z": 1.04,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": -1.43,
 				"z": 1.84,
@@ -824,6 +830,7 @@
 			"z": 1.04,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": 1.43,
 				"z": 1.84,
@@ -840,6 +847,7 @@
 			"z": 1.04,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"desk": {
 				"x": 2.87,
 				"z": 1.84,
@@ -880,8 +888,9 @@
 			"room": "DIRECTOR",
 			"x": -6.75,
 			"z": 3.75,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.547,
 			"home": "director",
 			"node": "director"
 		},
@@ -945,8 +954,9 @@
 			"room": "SERVER",
 			"x": -6.4,
 			"z": -3.55,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "backend-devops",
 			"node": "server"
 		},
@@ -958,6 +968,7 @@
 			"z": -2.5,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -966,8 +977,9 @@
 			"room": "MEETING",
 			"x": 5.85,
 			"z": -1.55,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -976,8 +988,9 @@
 			"room": "MEETING",
 			"x": 6.75,
 			"z": -1.55,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -986,8 +999,9 @@
 			"room": "MEETING",
 			"x": 7.65,
 			"z": -1.55,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -998,6 +1012,7 @@
 			"z": -2.5,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -1008,6 +1023,7 @@
 			"z": -3.45,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -1018,6 +1034,7 @@
 			"z": -3.45,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -1028,6 +1045,7 @@
 			"z": -3.45,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "meeting"
 		},
 		{
@@ -1043,20 +1061,22 @@
 			"id": "sofa-0",
 			"kind": "sofa",
 			"room": "PANTRY",
-			"x": 8.35,
-			"z": 1.95,
+			"x": 8.45,
+			"z": 1.85,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.41,
 			"node": "pantry"
 		},
 		{
 			"id": "sofa-1",
 			"kind": "sofa",
 			"room": "PANTRY",
-			"x": 8.35,
-			"z": 2.85,
+			"x": 8.45,
+			"z": 2.95,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.41,
 			"node": "pantry"
 		},
 		{
@@ -1148,8 +1168,9 @@
 			"room": "PLANNING",
 			"x": -8.0,
 			"z": 17.9,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "producer-pm",
 			"node": "planning"
 		},
@@ -1159,8 +1180,9 @@
 			"room": "PLANNING",
 			"x": -6.0,
 			"z": 17.9,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "game-designer",
 			"node": "planning"
 		},
@@ -1170,8 +1192,9 @@
 			"room": "PLANNING",
 			"x": -4.0,
 			"z": 17.9,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "content-marketing",
 			"node": "planning"
 		},
@@ -1208,8 +1231,9 @@
 			"room": "LIBRARY",
 			"x": 0.6,
 			"z": 16.45,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "research-analyst",
 			"node": "library"
 		},
@@ -1221,6 +1245,7 @@
 			"z": 14.75,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"home": "growth-analytics",
 			"node": "library"
 		},
@@ -1259,6 +1284,7 @@
 			"z": -2.6,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"greets": "code-security-reviewer",
 			"node": "security"
 		},
@@ -1270,6 +1296,7 @@
 			"z": -2.6,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "security"
 		},
 		{
@@ -1287,8 +1314,9 @@
 			"room": "ADVISOR",
 			"x": 14.1,
 			"z": 3.9,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "advisor",
 			"node": "advisor"
 		},
@@ -1300,6 +1328,7 @@
 			"z": 1.5,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "advisor"
 		},
 		{
@@ -1310,6 +1339,7 @@
 			"z": 1.5,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "advisor"
 		},
 		{
@@ -1320,6 +1350,7 @@
 			"z": 1.5,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.499,
 			"node": "advisor"
 		},
 		{
@@ -1338,8 +1369,9 @@
 			"room": "AUDIT",
 			"x": 18.3,
 			"z": 1.6,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "code-security-reviewer",
 			"node": "audit"
 		},
@@ -1349,8 +1381,9 @@
 			"room": "AUDIT",
 			"x": 20.7,
 			"z": 1.6,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"home": "ai-finance-controller",
 			"node": "audit"
 		},
@@ -1388,8 +1421,9 @@
 			"room": "QA",
 			"x": 26.5,
 			"z": 0.6,
-			"face": 3.1416,
+			"face": -3.1416,
 			"sit": true,
+			"seat": 0.499,
 			"node": "qa"
 		},
 		{
@@ -1584,7 +1618,7 @@
 			"x": 17.3,
 			"z": 18.75,
 			"face": 0.0,
-			"y": 0.18,
+			"y": 0.17,
 			"act": "run",
 			"node": "gym"
 		},
@@ -1595,7 +1629,7 @@
 			"x": 18.7,
 			"z": 18.75,
 			"face": 0.0,
-			"y": 0.18,
+			"y": 0.17,
 			"act": "run",
 			"node": "gym"
 		},
@@ -1644,9 +1678,10 @@
 			"kind": "tv",
 			"room": "LOUNGE",
 			"x": 24.95,
-			"z": 16.68,
+			"z": 16.55,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.41,
 			"node": "lounge"
 		},
 		{
@@ -1654,9 +1689,10 @@
 			"kind": "tv",
 			"room": "LOUNGE",
 			"x": 25.5,
-			"z": 16.68,
+			"z": 16.55,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.41,
 			"node": "lounge"
 		},
 		{
@@ -1664,29 +1700,32 @@
 			"kind": "tv",
 			"room": "LOUNGE",
 			"x": 26.05,
-			"z": 16.68,
+			"z": 16.55,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.41,
 			"node": "lounge"
 		},
 		{
 			"id": "tv-3",
 			"kind": "tv",
 			"room": "LOUNGE",
-			"x": 23.5,
+			"x": 23.44,
 			"z": 17.7,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.378,
 			"node": "lounge"
 		},
 		{
 			"id": "tv-4",
 			"kind": "tv",
 			"room": "LOUNGE",
-			"x": 27.5,
+			"x": 27.56,
 			"z": 17.7,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.378,
 			"node": "lounge"
 		},
 		{
@@ -1697,6 +1736,7 @@
 			"z": 18.6,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.225,
 			"low": true,
 			"node": "lounge"
 		},
@@ -1708,6 +1748,7 @@
 			"z": 18.6,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.225,
 			"low": true,
 			"node": "lounge"
 		},
@@ -1719,6 +1760,7 @@
 			"z": 18.6,
 			"face": 0.0,
 			"sit": true,
+			"seat": 0.225,
 			"low": true,
 			"node": "lounge"
 		},
@@ -1730,6 +1772,7 @@
 			"z": 11.95,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1740,6 +1783,7 @@
 			"z": 11.95,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1750,6 +1794,7 @@
 			"z": 12.45,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1760,6 +1805,7 @@
 			"z": 12.45,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1770,6 +1816,7 @@
 			"z": 12.95,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1780,6 +1827,7 @@
 			"z": 12.95,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1790,6 +1838,7 @@
 			"z": 13.45,
 			"face": 1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -1800,6 +1849,7 @@
 			"z": 13.45,
 			"face": -1.5708,
 			"sit": true,
+			"seat": 0.519,
 			"node": "lounge"
 		},
 		{
@@ -2799,7 +2849,8 @@
 			"name": "exec-chair",
 			"x": -6.75,
 			"z": 3.75,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "director"
 		},
 		{
 			"name": "monitor",
@@ -3017,7 +3068,12 @@
 			"name": "sofa",
 			"x": 8.5,
 			"z": 2.4,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": [
+				"sofa-0",
+				null,
+				"sofa-1"
+			]
 		},
 		{
 			"name": "coffee-table",
@@ -3450,60 +3506,69 @@
 			"name": "desk",
 			"x": 13.5,
 			"z": -1.8,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "chair",
 			"x": 13.5,
 			"z": -2.6,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "monitor",
 			"x": 13.78,
 			"z": -1.65,
 			"rotY": 3.1416,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "monitor",
 			"x": 13.22,
 			"z": -1.65,
 			"rotY": 3.1416,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "keyboard",
 			"x": 13.5,
 			"z": -1.92,
 			"rotY": 3.1416,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "desk",
 			"x": 11.8,
 			"z": -1.8,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "security-work-1"
 		},
 		{
 			"name": "chair",
 			"x": 11.8,
 			"z": -2.6,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "security-work-1"
 		},
 		{
 			"name": "monitor",
 			"x": 11.8,
 			"z": -1.65,
 			"rotY": 3.1416,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "security-work-1"
 		},
 		{
 			"name": "keyboard",
 			"x": 11.8,
 			"z": -1.92,
 			"rotY": 3.1416,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "security-work-1"
 		},
 		{
 			"name": "turnstile",
@@ -3634,60 +3699,69 @@
 			"name": "desk",
 			"x": 18.3,
 			"z": 0.8,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "chair",
 			"x": 18.3,
 			"z": 1.6,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "monitor",
 			"x": 18.3,
 			"z": 0.65,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "keyboard",
 			"x": 18.3,
 			"z": 0.92,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "desk-lamp",
 			"x": 18.85,
 			"z": 0.68,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "desk",
 			"x": 20.7,
 			"z": 0.8,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "chair",
 			"x": 20.7,
 			"z": 1.6,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "monitor",
 			"x": 20.7,
 			"z": 0.65,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "keyboard",
 			"x": 20.7,
 			"z": 0.92,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "cash-register",
@@ -3755,34 +3829,39 @@
 			"name": "desk",
 			"x": 26.5,
 			"z": -0.2,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "chair",
 			"x": 26.5,
 			"z": 0.6,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "monitor",
 			"x": 26.22,
 			"z": -0.35,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "monitor",
 			"x": 26.78,
 			"z": -0.35,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "keyboard",
 			"x": 26.5,
 			"z": -0.08,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "filing-cabinet",
@@ -3830,97 +3909,113 @@
 			"name": "bed",
 			"x": 11.55,
 			"z": 10.6,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-0"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 11.7,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-1"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 12.8,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-2"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 13.9,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-3"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 15.0,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-4"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 16.1,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-5"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 17.2,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-6"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 18.3,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-7"
 		},
 		{
 			"name": "bed",
 			"x": 11.55,
 			"z": 19.4,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "bed-8"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 12.1,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-9"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 13.2,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-10"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 14.3,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-11"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 15.4,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-12"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 16.5,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-13"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 17.6,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-14"
 		},
 		{
 			"name": "bed",
 			"x": 15.45,
 			"z": 18.7,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "bed-15"
 		},
 		{
 			"name": "nightstand",
@@ -3951,13 +4046,15 @@
 			"name": "treadmill",
 			"x": 17.3,
 			"z": 18.9,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "gym-run-0"
 		},
 		{
 			"name": "treadmill",
 			"x": 18.7,
 			"z": 18.9,
-			"rotY": 3.1416
+			"rotY": 3.1416,
+			"anchor": "gym-run-1"
 		},
 		{
 			"name": "gym-mat",
@@ -4017,37 +4114,47 @@
 			"name": "sofa",
 			"x": 25.5,
 			"z": 16.5,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": [
+				"tv-0",
+				"tv-1",
+				"tv-2"
+			]
 		},
 		{
 			"name": "armchair",
 			"x": 23.4,
 			"z": 17.7,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "tv-3"
 		},
 		{
 			"name": "armchair",
 			"x": 27.6,
 			"z": 17.7,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "tv-4"
 		},
 		{
 			"name": "beanbag",
 			"x": 24.2,
 			"z": 18.6,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "tv-5"
 		},
 		{
 			"name": "beanbag",
 			"x": 25.4,
 			"z": 18.6,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "tv-6"
 		},
 		{
 			"name": "beanbag",
 			"x": 26.6,
 			"z": 18.6,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "tv-7"
 		},
 		{
 			"name": "dining-table",
@@ -4059,49 +4166,57 @@
 			"name": "dining-chair",
 			"x": 23.55,
 			"z": 11.95,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "dine-0"
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
 			"z": 11.95,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "dine-4"
 		},
 		{
 			"name": "dining-chair",
 			"x": 23.55,
 			"z": 12.45,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "dine-1"
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
 			"z": 12.45,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "dine-5"
 		},
 		{
 			"name": "dining-chair",
 			"x": 23.55,
 			"z": 12.95,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "dine-2"
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
 			"z": 12.95,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "dine-6"
 		},
 		{
 			"name": "dining-chair",
 			"x": 23.55,
 			"z": 13.45,
-			"rotY": 1.5708
+			"rotY": 1.5708,
+			"anchor": "dine-3"
 		},
 		{
 			"name": "dining-chair",
 			"x": 24.85,
 			"z": 13.45,
-			"rotY": -1.5708
+			"rotY": -1.5708,
+			"anchor": "dine-7"
 		},
 		{
 			"name": "kitchen-counter",
@@ -4592,21 +4707,24 @@
 			"x": 14.0,
 			"z": -1.9,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "paper-stack",
 			"x": 13.08,
 			"z": -1.9,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "security-work-0"
 		},
 		{
 			"name": "mug",
 			"x": 12.3,
 			"z": -1.9,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "security-work-1"
 		},
 		{
 			"name": "mug",
@@ -4629,42 +4747,48 @@
 			"x": 17.8,
 			"z": 0.9,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "mug",
 			"x": 18.72,
 			"z": 0.9,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "audit-work-0"
 		},
 		{
 			"name": "paper-stack",
 			"x": 20.2,
 			"z": 0.9,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "sticky-notes",
 			"x": 21.12,
 			"z": 0.9,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "audit-work-1"
 		},
 		{
 			"name": "mug",
 			"x": 26.0,
 			"z": -0.1,
 			"y": 0.75,
-			"rotY": 0.0
+			"rotY": 0.0,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "sticky-notes",
 			"x": 26.92,
 			"z": -0.1,
 			"y": 0.75,
-			"rotY": 0.3
+			"rotY": 0.3,
+			"anchor": "qa-work-1"
 		},
 		{
 			"name": "mug",

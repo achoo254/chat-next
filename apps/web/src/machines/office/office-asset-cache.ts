@@ -13,7 +13,7 @@
 // worker (its cache would never be read) or with Data Saver on.
 import { isOfficeFile, OFFICE_CACHE, OFFICE_MANIFEST } from "../../sw/shell-routes.ts";
 import { isRecord } from "./office-json.ts";
-import { ASSETS_BASE, ASSETS_FORMAT_VERSION, layoutHash } from "./office-assets.ts";
+import { ASSETS_BASE, ASSETS_FORMAT_VERSION, bakeHash } from "./office-assets.ts";
 
 /** Waits this long after the list loaded before the first idle check, so the scene's own downloads go first. */
 export const PREFETCH_DELAY_MS = 8_000;
@@ -78,7 +78,7 @@ export function entriesToDelete(cached: Iterable<string>, listed: ReadonlySet<st
 
 /** Whether a cached list is one this build reads: its format and the layout it was baked from. */
 export function listMatchesBuild(json: unknown, hash: string): boolean {
-	return isRecord(json) && json.formatVersion === ASSETS_FORMAT_VERSION && json.layoutSha256 === hash;
+	return isRecord(json) && json.formatVersion === ASSETS_FORMAT_VERSION && json.bakeSha256 === hash;
 }
 
 export interface AssetCacheDeps {
@@ -90,8 +90,8 @@ export interface AssetCacheDeps {
 	readonly saveData: boolean;
 	/** Runs `task` once after `delayMs` at an idle moment; returns a cancel. */
 	readonly whenIdle: (task: () => void, delayMs: number) => () => void;
-	/** The SHA-256 of the layout this build draws (office-assets.ts layoutHash). */
-	readonly layoutHash: () => Promise<string>;
+	/** The SHA-256 of the baked parts of the layout this build draws (office-assets.ts bakeHash). */
+	readonly bakeHash: () => Promise<string>;
 }
 
 interface NetworkInformationLike {
@@ -118,7 +118,7 @@ export function browserAssetCacheDeps(): AssetCacheDeps {
 		controlled: navigator.serviceWorker?.controller != null,
 		saveData: connection?.saveData === true,
 		whenIdle: browserIdle,
-		layoutHash: () => layoutHash(),
+		bakeHash: () => bakeHash(),
 	};
 }
 
@@ -147,7 +147,7 @@ export function keepOfficeAssetsCached(deps: AssetCacheDeps = browserAssetCacheD
 		const list = await cache.match(OFFICE_MANIFEST);
 		if (list === undefined) return;
 		const json: unknown = await list.json();
-		if (!listMatchesBuild(json, await deps.layoutHash())) return;
+		if (!listMatchesBuild(json, await deps.bakeHash())) return;
 		const listed = manifestFiles(json);
 		const cached = new Set((await cache.keys()).map((request) => new URL(request.url).pathname));
 		await Promise.all(entriesToDelete(cached, listed).map((path) => cache.delete(path)));

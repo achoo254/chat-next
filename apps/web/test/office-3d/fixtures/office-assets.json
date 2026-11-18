@@ -1,6 +1,6 @@
 {
-	"formatVersion": 2,
-	"layoutSha256": "07e38c35bdf592966eacb88afcec346d82cbbc1251c3df1efc25d309155e2d5a",
+	"formatVersion": 3,
+	"bakeSha256": "07e38c35bdf592966eacb88afcec346d82cbbc1251c3df1efc25d309155e2d5a",
 	"note": "Office assets for the 3D scene (zones[].scene, character, accessories, sfx) and the 2D view (views, checked by parseOfficeAssets; left out of this sample). Made by tools/office-art in the workspace; file names carry a content hash.",
 	"zones": [
 		{

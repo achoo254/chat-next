@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { layoutHash } from "../../src/machines/office/office-assets.ts";
+import { bakeHash } from "../../src/machines/office/office-assets.ts";
 import { castOf } from "../../src/machines/office/office-cast.ts";
 import { eventSoundFiles, SOUND_FILES } from "../../src/office-3d/audio/office-sfx.ts";
 import { ACCESSORY_ITEMS, personLook, skinCellFor } from "../../src/office-3d/character/character-look.ts";
@@ -82,7 +82,7 @@ describe("scene assets: the delivered manifest", () => {
 describe("scene assets: the live manifest", () => {
 	it("is for the shipped layout, and every file it names exists", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		expect(assets).not.toBe(NO_SCENE_ASSETS);
 		const files = [
 			...[...assets.zones.values()].flatMap((z) => [z.shell, z.props, ...Object.values(z.lightmaps.day), ...Object.values(z.lightmaps.night)]),
@@ -97,7 +97,7 @@ describe("scene assets: the live manifest", () => {
 
 	it("has shells whose extras place props by the layout's own names", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		const layoutNames = new Set([...SCENE_LAYOUT.props, ...SCENE_LAYOUT.smallProps].map((p) => p.name));
 		for (const [id, zone] of assets.zones) {
 			if (zone.shell === null) continue;
@@ -110,7 +110,7 @@ describe("scene assets: the live manifest", () => {
 
 	it("has a props GLB node for every model the manifest lists", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		for (const zone of assets.zones.values()) {
 			if (zone.props === null || zone.models.length === 0) continue;
 			const json = glbJson(join(PUBLIC_OFFICE, zone.props)) as { nodes?: { name?: string }[] };
@@ -123,7 +123,7 @@ describe("scene assets: the live manifest", () => {
 describe("scene assets: the service robot", () => {
 	it("reads the live robot, and its GLB has every part it names", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const robot = parseSceneAssets(live, await layoutHash()).serviceRobot;
+		const robot = parseSceneAssets(live, await bakeHash()).serviceRobot;
 		expect(robot).not.toBeNull();
 		if (robot === null) return;
 		expect(robot.heightM).toBeGreaterThan(0);
@@ -155,7 +155,7 @@ describe("scene assets: the Director's model", () => {
 
 	it("is the live second model: same skeleton and every clip of the staff model, so poses and seats work unchanged", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		expect(assets.directorCharacter).not.toBeNull();
 		if (assets.directorCharacter === null || assets.character === null) return;
 		expect(assets.directorCharacter.file).not.toBe(assets.character.file);
@@ -167,7 +167,7 @@ describe("scene assets: the Director's model", () => {
 
 	it("has the lying-back clip on both models, so the rest after work looks the same for everyone", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		expect(assets.character?.clips).toContain("Lying_Lounge");
 		expect(assets.directorCharacter?.clips).toContain("Lying_Lounge");
 	});
@@ -191,7 +191,7 @@ describe("scene assets: the job titles' models", () => {
 
 	it("has a model for every title the cast names, and the Advisor's, on the staff skeleton with every staff clip", async () => {
 		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const assets = parseSceneAssets(live, await layoutHash());
+		const assets = parseSceneAssets(live, await bakeHash());
 		if (assets.character === null) throw new Error("the live file has no staff model");
 		const staff = jointNames(assets.character.file);
 		const wanted = new Set(["advisor", ...["planner", "scout", "general-purpose", "git-manager", "brainstormer", "ui-ux-designer", "tester", "code-reviewer", "content-creator", "analytics-analyst", "researcher", "finance"].map((type) => castOf(type).model)]);
@@ -216,7 +216,7 @@ describe("scene assets: broken input", () => {
 	it("uses nothing from a file for another layout or version, or not an object", () => {
 		expect(parseSceneAssets(fixture, "other")).toBe(NO_SCENE_ASSETS);
 		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 1 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
-		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 3 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
+		expect(parseSceneAssets({ ...(fixture as object), formatVersion: 4 }, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 		expect(parseSceneAssets("nope", FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 		expect(parseSceneAssets(null, FIXTURE_HASH)).toBe(NO_SCENE_ASSETS);
 	});
@@ -244,7 +244,7 @@ describe("scene assets: broken input", () => {
 	});
 
 	it("reads a manifest without the 3D parts as an empty scene that still has its plan's pictures elsewhere", () => {
-		const assets = parseSceneAssets({ formatVersion: 2, layoutSha256: "h", zones: [{ id: "a" }], views: {}, character: { file: 3 }, accessories: { file: "a.glb", items: {} } }, "h");
+		const assets = parseSceneAssets({ formatVersion: 3, bakeSha256: "h", zones: [{ id: "a" }], views: {}, character: { file: 3 }, accessories: { file: "a.glb", items: {} } }, "h");
 		expect(assets.zones.size).toBe(0);
 		expect(assets.character).toBeNull();
 		expect(assets.accessories).toBeNull();
@@ -253,7 +253,7 @@ describe("scene assets: broken input", () => {
 
 	it("caps the skin count at the grid and needs both times of day for a lightmap pair", () => {
 		const assets: SceneAssets = parseSceneAssets(
-			{ formatVersion: 2, layoutSha256: "h", zones: [{ id: "a", scene: { lightmaps: { day: { 1024: "d.webp" } } } }], character: { file: "c.glb", skins: { file: "s.webp", columns: 2, rows: 2, count: 9 } } },
+			{ formatVersion: 3, bakeSha256: "h", zones: [{ id: "a", scene: { lightmaps: { day: { 1024: "d.webp" } } } }], character: { file: "c.glb", skins: { file: "s.webp", columns: 2, rows: 2, count: 9 } } },
 			"h",
 		);
 		expect(assets.character?.skins?.count).toBe(4);

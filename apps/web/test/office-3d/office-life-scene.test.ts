@@ -9,7 +9,7 @@ import type { Placement } from "../../src/machines/office/office-placement.ts";
 import { lifeSoundsWanted } from "../../src/office-3d/audio/life-sounds.ts";
 import { clipFor, isLyingPose, isSeatedPose, poseFor, type PoseInput } from "../../src/office-3d/character/anim-groups.ts";
 import { personIntent } from "../../src/office-3d/character/person-intent.ts";
-import { LOW_SEAT_HEIGHT, personTarget, SEAT_HEIGHT } from "../../src/office-3d/character/person-target.ts";
+import { personTarget } from "../../src/office-3d/character/person-target.ts";
 
 function layout(): OfficeLayout {
 	if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("\n"));
@@ -102,9 +102,10 @@ describe("poses of life", () => {
 describe("places of the living rooms", () => {
 	it("lies on the bed's mattress, runs on the treadmill's belt, sits low on a beanbag", () => {
 		expect(personTarget(layout(), "bed-0", 0, false)).toMatchObject({ y: 0.5, seated: false });
-		expect(personTarget(layout(), "gym-run-0", 0, false)?.y).toBeCloseTo(0.18);
-		expect(personTarget(layout(), "tv-5", 0, false)).toMatchObject({ seated: true, low: true, seat: LOW_SEAT_HEIGHT });
-		expect(personTarget(layout(), "dine-2", 0, false)).toMatchObject({ seated: true, low: false, seat: SEAT_HEIGHT });
+		expect(personTarget(layout(), "gym-run-0", 0, false)?.y).toBeCloseTo(0.17);
+		// The seat's height is the anchor's, from the furniture under it: a beanbag near the floor, a hard dining chair at its top.
+		expect(personTarget(layout(), "tv-5", 0, false)).toMatchObject({ seated: true, low: true, seat: 0.225 });
+		expect(personTarget(layout(), "dine-2", 0, false)).toMatchObject({ seated: true, low: false, seat: 0.519 });
 		// A second person at a bed stands beside it on the floor.
 		expect(personTarget(layout(), "bed-0", 1, false)?.y).toBe(0);
 	});

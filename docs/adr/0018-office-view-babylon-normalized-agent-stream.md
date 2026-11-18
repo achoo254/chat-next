@@ -62,9 +62,14 @@ Antigravity) phải dùng chung một giao diện, và relay hay máy chủ chat
 
 - Một tệp `apps/web/src/machines/office/office-layout.json` mô tả tầng, phòng, điểm neo, đồ thị lối đi và camera; cảnh 3D, bước lắp và bake trong
   Blender, và bản 2D (ảnh dựng sẵn từ chính cảnh 3D cộng nhãn HTML tại điểm neo) cùng đọc nó. Bộ kiểm ở `office-layout.ts`.
-- Tệp tài sản `apps/web/public/office/office-assets.json` ghi `layoutSha256` của bố cục đã bake; web băm tệp bố cục đang chạy và bỏ tài sản lệch
-  (`apps/web/src/machines/office/office-assets.ts`, `apps/web/src/office-3d/scene/scene-assets.ts`): sửa bố cục mà chưa bake lại thì cảnh dùng
-  khối giữ chỗ đặt đúng bố cục mới, không bao giờ đặt đồ bake cũ sai chỗ.
+- Tệp tài sản `apps/web/public/office/office-assets.json` (định dạng 3) ghi hai mã băm của bố cục: `bakeSha256` của phần được bake (phòng, tường,
+  vách, cửa, đồ đạc không kể thẻ `anchor`, decor, camera) và `anchorsSha256` của vị trí neo (`[id, x, z]`). Web băm tệp bố cục đang chạy
+  (`apps/web/src/machines/office/office-assets.ts`, `apps/web/src/office-3d/scene/scene-assets.ts`): `bakeSha256` lệch thì bỏ tài sản, cảnh dùng
+  khối giữ chỗ đặt đúng bố cục mới, không bao giờ đặt đồ bake cũ sai chỗ; chỉ `anchorsSha256` lệch thì bản 2D giữ ảnh và ẩn chấm (chạy
+  `tools/office-art/project-anchors-2d.mjs` để chiếu lại neo bằng công thức camera, không cần bake).
+- Chỗ ngồi, nằm và chạy suy ra từ đồ đạc bên dưới (ổ cắm trong `tools/office-art/furniture-sockets.json`): neo mang `seat` (mặt đệm trừ độ lún)
+  hoặc `y` (mặt nệm, băng chạy). Lúc chạy, mỗi model đo một lần trên lớp da đã tạo dáng của từng clip ngồi điểm thấp nhất của hông và đùi
+  quanh xương chậu, rồi đặt điểm đó lên `seat` và xương chậu lên tâm ghế (`skinned-character.ts`); không còn độ cao ngồi cố định trong mã.
 
 ### Agent chuẩn hoá, web không đọc transcript
 
