@@ -176,12 +176,13 @@ export function menuPlacement(button: Box, view: Viewport, width: number): Place
 }
 
 /** The inline style of a placement (position: fixed in CSS). */
-export function placementStyle(p: Placement): { left: string; width: string; top?: string; bottom?: string; maxHeight: string } {
+export function placementStyle(p: Placement): { left: string; width: string; top: string; bottom: string; maxHeight: string } {
+	// The edge not used is "auto", or the stylesheet's own bottom would stretch a panel placed by its top down to it.
 	return {
 		left: `${p.left}px`,
 		width: `${p.width}px`,
-		...(p.top !== undefined ? { top: `${p.top}px` } : {}),
-		...(p.bottom !== undefined ? { bottom: `${p.bottom}px` } : {}),
+		top: p.top !== undefined ? `${p.top}px` : "auto",
+		bottom: p.bottom !== undefined ? `${p.bottom}px` : "auto",
 		maxHeight: `${p.maxHeight}px`,
 	};
 }

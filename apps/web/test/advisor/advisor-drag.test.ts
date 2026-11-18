@@ -11,6 +11,7 @@ import {
 	BUBBLE_MAX_HEIGHT,
 	BUBBLE_WIDTH,
 	bubblePlacement,
+	placementStyle,
 	dockFor,
 	isDrag,
 	MASCOT_SIZE,
@@ -190,5 +191,17 @@ describe("the bubble's menu", () => {
 		expect(p.left).toBe(VIEW_MARGIN);
 		const top = 844 - (p.bottom ?? 0) - Math.min(200, p.maxHeight);
 		expect(top).toBeGreaterThanOrEqual(VIEW_MARGIN);
+	});
+});
+
+describe("placementStyle", () => {
+	it("frees the edge it does not use, so a panel placed by its top is not stretched to the stylesheet's bottom", () => {
+		const view = { width: 1376, height: 900 };
+		const up = placementStyle(bubblePlacement({ left: 1300, top: 120, width: 56, height: 56 }, view, "right"));
+		expect(up.top).not.toBe("auto");
+		expect(up.bottom).toBe("auto");
+		const down = placementStyle(bubblePlacement({ left: 1300, top: 700, width: 56, height: 56 }, view, "right"));
+		expect(down.bottom).not.toBe("auto");
+		expect(down.top).toBe("auto");
 	});
 });
