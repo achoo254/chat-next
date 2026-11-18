@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/chat"
 	"app.local/server/internal/ratelimit"
 	"github.com/jackc/pgx/v5"
 )
@@ -19,6 +20,9 @@ var (
 	ErrNotFound     = errors.New("bridge: not found")
 	ErrRateLimited  = errors.New("bridge: too many sign-in attempts")
 	ErrAccountTaken = errors.New("bridge: that account is connected by another user")
+	// ErrSendUnsupported: the app cannot be written to from Chat, or the
+	// account is signed out.
+	ErrSendUnsupported = errors.New("bridge: this app cannot be written to from Chat")
 )
 
 // loginTTL is how long an unfinished login waits for the user's next answer.
@@ -183,6 +187,8 @@ type ChatView struct {
 	CaughtUp       bool
 	HistoryWindow  int
 	Title          string
+	// Direction is chat.DirectionIn or chat.DirectionBoth.
+	Direction string
 }
 
 // Accounts lists the accounts of owner.
@@ -205,7 +211,7 @@ func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, erro
 			return nil, err
 		}
 		for _, l := range links {
-			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title})
+			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title, Direction: l.Direction})
 		}
 	}
 	return accounts, nil
@@ -265,15 +271,20 @@ func (e *Engine) Conversations(ctx context.Context, owner, accountID int64) ([]C
 	return out, nil
 }
 
-// EnableConversation starts syncing one conversation of owner's account.
-func (e *Engine) EnableConversation(ctx context.Context, owner, accountID int64, conversationID string, history int) (int64, error) {
+// EnableConversation starts syncing one conversation of owner's account. An
+// empty direction takes chat.DirectionBoth, which EnableChatWith lowers to
+// chat.DirectionIn for an app that cannot be written to.
+func (e *Engine) EnableConversation(ctx context.Context, owner, accountID int64, conversationID string, history int, direction string) (int64, error) {
+	if direction == "" {
+		direction = chat.DirectionBoth
+	}
 	list, err := e.Conversations(ctx, owner, accountID)
 	if err != nil {
 		return 0, err
 	}
 	for _, c := range list {
 		if c.ID == conversationID {
-			return e.EnableChat(ctx, accountID, c.Conversation, history)
+			return e.EnableChatWith(ctx, accountID, c.Conversation, history, direction)
 		}
 	}
 	return 0, ErrNotFound
@@ -350,4 +361,104 @@ func (e *Engine) removeAccount(ctx context.Context, a *accountRow) error {
 		}
 		return nil
 	})
+}
+
+// canSend reports whether the adapter of source can be written to.
+func (e *Engine) canSend(source string) bool {
+	adapter := e.adapters[source]
+	if adapter == nil {
+		return false
+	}
+	_, ok := adapter.(bridge.Sender)
+	return ok && adapter.Capabilities().Has(bridge.CapSend)
+}
+
+// SetDirection switches a synced chat of owner's account between receiving
+// only and also sending on what owner writes in Chat.
+func (e *Engine) SetDirection(ctx context.Context, owner, accountID int64, conversationID, direction string) error {
+	a, err := e.ownedAccount(ctx, owner, accountID)
+	if err != nil {
+		return err
+	}
+	l, err := e.db.link(ctx, accountID, conversationID)
+	if err != nil {
+		return err
+	}
+	if l == nil {
+		return ErrNotFound
+	}
+	if direction == chat.DirectionBoth && (!e.canSend(a.Source) || a.Status == "stopped") {
+		return ErrSendUnsupported
+	}
+	return e.chat.SetImportedDirection(ctx, owner, l.ChatID, direction)
+}
+
+// OutboxItem is something a chat has queued for the app and not finished.
+type OutboxItem struct {
+	Seq       int64
+	Op        string
+	Status    string
+	LastError string
+	Attempts  int
+}
+
+// Outbox lists what the chat of owner has queued and not finished, oldest
+// first. A chat that is not linked to an account of owner is ErrNotFound.
+func (e *Engine) Outbox(ctx context.Context, owner, chatID int64) ([]OutboxItem, error) {
+	var linked bool
+	if err := e.db.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM external_chats x JOIN external_accounts a ON a.id = x.account_id WHERE x.chat_id = $1 AND a.owner_id = $2)`,
+		chatID, owner).Scan(&linked); err != nil {
+		return nil, fmt.Errorf("bridge: outbox owner: %w", err)
+	}
+	if !linked {
+		return nil, ErrNotFound
+	}
+	rows, err := e.db.pool.Query(ctx, `
+		SELECT seq, op, status, last_error, attempts FROM external_outbox
+		WHERE chat_id = $1 AND status IN ('pending', 'sending', 'failed', 'unknown') ORDER BY id`, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: list outbox: %w", err)
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (OutboxItem, error) {
+		var o OutboxItem
+		err := r.Scan(&o.Seq, &o.Op, &o.Status, &o.LastError, &o.Attempts)
+		return o, err
+	})
+}
+
+// RetryMessage tries again what failed (or has an unknown result) for one
+// message of a chat of owner. A send keeps its random id, so if the app did
+// take it the retry finds it instead of making a second one. ErrNotFound when
+// there is nothing to retry.
+func (e *Engine) RetryMessage(ctx context.Context, owner, chatID, seq int64) error {
+	tag, err := e.db.pool.Exec(ctx, `
+		UPDATE external_outbox o SET status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()
+		FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+		WHERE o.chat_id = $1 AND o.seq = $2 AND o.status IN ('failed', 'unknown')
+			AND x.chat_id = o.chat_id AND x.direction = 'both' AND a.owner_id = $3 AND a.status = 'active'`, chatID, seq, owner)
+	if err != nil {
+		return fmt.Errorf("bridge: retry message: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DismissMessage gives up the failed edit or delete of one message of a chat
+// of owner. A send is not dismissed: deleting the message gives it up.
+func (e *Engine) DismissMessage(ctx context.Context, owner, chatID, seq int64) error {
+	tag, err := e.db.pool.Exec(ctx, `
+		UPDATE external_outbox o SET status = 'cancelled', updated_at = now()
+		FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+		WHERE o.chat_id = $1 AND o.seq = $2 AND o.op IN ('edit', 'delete') AND o.status IN ('failed', 'unknown')
+			AND x.chat_id = o.chat_id AND a.owner_id = $3`, chatID, seq, owner)
+	if err != nil {
+		return fmt.Errorf("bridge: dismiss message: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

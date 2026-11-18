@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bridge.proto.
  */
 export const file_app_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSJ6ChBCcmlkZ2VTeW5jZWRDaGF0EhcKD2NvbnZlcnNhdGlvbl9pZBgBIAEoCRITCgdjaGF0X2lkGAIgASgDQgIwAhIRCgljYXVnaHRfdXAYAyABKAgSFgoOaGlzdG9yeV93aW5kb3cYBCABKAUSDQoFdGl0bGUYBSABKAkimQEKDUJyaWRnZUFjY291bnQSDgoCaWQYASABKANCAjACEg4KBnNvdXJjZRgCIAEoCRIrCgZzdGF0dXMYAyABKA4yGy5hcHAudjEuQnJpZGdlQWNjb3VudFN0YXR1cxISCgpsYXN0X2Vycm9yGAQgASgJEicKBWNoYXRzGAUgAygLMhguYXBwLnYxLkJyaWRnZVN5bmNlZENoYXQiGAoWR2V0QnJpZGdlU3RhdHVzUmVxdWVzdCJjChdHZXRCcmlkZ2VTdGF0dXNSZXNwb25zZRIfCgRhcHBzGAEgAygLMhEuYXBwLnYxLkJyaWRnZUFwcBInCghhY2NvdW50cxgCIAMoCzIVLmFwcC52MS5CcmlkZ2VBY2NvdW50Ij8KEEJyaWRnZUxvZ2luRmllbGQSDAoEbmFtZRgBIAEoCRINCgVsYWJlbBgCIAEoCRIOCgZzZWNyZXQYAyABKAgisAEKD0JyaWRnZUxvZ2luU3RlcBIpCgRraW5kGAEgASgOMhsuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcEtpbmQSEAoIbG9naW5faWQYAiABKAkSKAoGZmllbGRzGAMgAygLMhguYXBwLnYxLkJyaWRnZUxvZ2luRmllbGQSDgoGcHJvbXB0GAQgASgJEiYKB2FjY291bnQYBSABKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCIpChdTdGFydEJyaWRnZUxvZ2luUmVxdWVzdBIOCgZzb3VyY2UYASABKAkiQQoYU3RhcnRCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIpoBChpDb250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBIQCghsb2dpbl9pZBgBIAEoCRI8CgVpbnB1dBgCIAMoCzItLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdC5JbnB1dEVudHJ5GiwKCklucHV0RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJEChtDb250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USJQoEc3RlcBgBIAEoCzIXLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXAiOAoeTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACInIKEkJyaWRnZUNvbnZlcnNhdGlvbhIKCgJpZBgBIAEoCRIsCgRraW5kGAIgASgOMh4uYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbktpbmQSDQoFdGl0bGUYAyABKAkSEwoHY2hhdF9pZBgEIAEoA0ICMAIiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiJiChdFbmFibGVCcmlkZ2VDaGF0UmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFgoOaGlzdG9yeV93aW5kb3cYAyABKAUiLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlKqgBChNCcmlkZ2VBY2NvdW50U3RhdHVzEiUKIUJSSURHRV9BQ0NPVU5UX1NUQVRVU19VTlNQRUNJRklFRBAAEiAKHEJSSURHRV9BQ0NPVU5UX1NUQVRVU19BQ1RJVkUQARIlCiFCUklER0VfQUNDT1VOVF9TVEFUVVNfTkVFRFNfTE9HSU4QAhIhCh1CUklER0VfQUNDT1VOVF9TVEFUVVNfU1RPUFBFRBADKsMBChNCcmlkZ2VMb2dpblN0ZXBLaW5kEiYKIkJSSURHRV9MT0dJTl9TVEVQX0tJTkRfVU5TUEVDSUZJRUQQABIgChxCUklER0VfTE9HSU5fU1RFUF9LSU5EX0lOUFVUEAESHQoZQlJJREdFX0xPR0lOX1NURVBfS0lORF9RUhACEiIKHkJSSURHRV9MT0dJTl9TVEVQX0tJTkRfQ09ORklSTRADEh8KG0JSSURHRV9MT0dJTl9TVEVQX0tJTkRfRE9ORRAEKtQBChZCcmlkZ2VDb252ZXJzYXRpb25LaW5kEigKJEJSSURHRV9DT05WRVJTQVRJT05fS0lORF9VTlNQRUNJRklFRBAAEiQKIEJSSURHRV9DT05WRVJTQVRJT05fS0lORF9QUklWQVRFEAESIAocQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0JPVBACEiIKHkJSSURHRV9DT05WRVJTQVRJT05fS0lORF9HUk9VUBADEiQKIEJSSURHRV9DT05WRVJTQVRJT05fS0lORF9DSEFOTkVMEAQyoAUKDUJyaWRnZVNlcnZpY2USUgoPR2V0QnJpZGdlU3RhdHVzEh4uYXBwLnYxLkdldEJyaWRnZVN0YXR1c1JlcXVlc3QaHy5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USVQoQU3RhcnRCcmlkZ2VMb2dpbhIfLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVxdWVzdBogLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVzcG9uc2USXgoTQ29udGludWVCcmlkZ2VMb2dpbhIiLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBojLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USagoXTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnMSJi5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GicuYXBwLnYxLkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVzcG9uc2USVQoQRW5hYmxlQnJpZGdlQ2hhdBIfLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVzcG9uc2USVQoQUmVtb3ZlQnJpZGdlQ2hhdBIfLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2USagoXRGlzY29ubmVjdEJyaWRnZUFjY291bnQSJi5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0GicuYXBwLnYxLkRpc2Nvbm5lY3RCcmlkZ2VBY2NvdW50UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
+  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSKmAQoQQnJpZGdlU3luY2VkQ2hhdBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSEwoHY2hhdF9pZBgCIAEoA0ICMAISEQoJY2F1Z2h0X3VwGAMgASgIEhYKDmhpc3Rvcnlfd2luZG93GAQgASgFEg0KBXRpdGxlGAUgASgJEioKCWRpcmVjdGlvbhgGIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24imQEKDUJyaWRnZUFjY291bnQSDgoCaWQYASABKANCAjACEg4KBnNvdXJjZRgCIAEoCRIrCgZzdGF0dXMYAyABKA4yGy5hcHAudjEuQnJpZGdlQWNjb3VudFN0YXR1cxISCgpsYXN0X2Vycm9yGAQgASgJEicKBWNoYXRzGAUgAygLMhguYXBwLnYxLkJyaWRnZVN5bmNlZENoYXQiGAoWR2V0QnJpZGdlU3RhdHVzUmVxdWVzdCJjChdHZXRCcmlkZ2VTdGF0dXNSZXNwb25zZRIfCgRhcHBzGAEgAygLMhEuYXBwLnYxLkJyaWRnZUFwcBInCghhY2NvdW50cxgCIAMoCzIVLmFwcC52MS5CcmlkZ2VBY2NvdW50Ij8KEEJyaWRnZUxvZ2luRmllbGQSDAoEbmFtZRgBIAEoCRINCgVsYWJlbBgCIAEoCRIOCgZzZWNyZXQYAyABKAgisAEKD0JyaWRnZUxvZ2luU3RlcBIpCgRraW5kGAEgASgOMhsuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcEtpbmQSEAoIbG9naW5faWQYAiABKAkSKAoGZmllbGRzGAMgAygLMhguYXBwLnYxLkJyaWRnZUxvZ2luRmllbGQSDgoGcHJvbXB0GAQgASgJEiYKB2FjY291bnQYBSABKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCIpChdTdGFydEJyaWRnZUxvZ2luUmVxdWVzdBIOCgZzb3VyY2UYASABKAkiQQoYU3RhcnRCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIpoBChpDb250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBIQCghsb2dpbl9pZBgBIAEoCRI8CgVpbnB1dBgCIAMoCzItLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdC5JbnB1dEVudHJ5GiwKCklucHV0RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASJEChtDb250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USJQoEc3RlcBgBIAEoCzIXLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXAiOAoeTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACInIKEkJyaWRnZUNvbnZlcnNhdGlvbhIKCgJpZBgBIAEoCRIsCgRraW5kGAIgASgOMh4uYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbktpbmQSDQoFdGl0bGUYAyABKAkSEwoHY2hhdF9pZBgEIAEoA0ICMAIiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiKOAQoXRW5hYmxlQnJpZGdlQ2hhdFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhYKDmhpc3Rvcnlfd2luZG93GAMgASgFEioKCWRpcmVjdGlvbhgEIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24iLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlInwKHVNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIqCglkaXJlY3Rpb24YAyABKA4yFy5hcHAudjEuQnJpZGdlRGlyZWN0aW9uIiAKHlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZSKBAQoQQnJpZGdlT3V0Ym94SXRlbRIPCgNzZXEYASABKANCAjACEgoKAm9wGAIgASgJEioKBnN0YXR1cxgDIAEoDjIaLmFwcC52MS5CcmlkZ2VPdXRib3hTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRIQCghhdHRlbXB0cxgFIAEoBSIuChdMaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJDChhMaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5hcHAudjEuQnJpZGdlT3V0Ym94SXRlbSJBChlSZXRyeUJyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHAoaUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2UiQwobRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHgocRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZSqoAQoTQnJpZGdlQWNjb3VudFN0YXR1cxIlCiFCUklER0VfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxCUklER0VfQUNDT1VOVF9TVEFUVVNfQUNUSVZFEAESJQohQlJJREdFX0FDQ09VTlRfU1RBVFVTX05FRURTX0xPR0lOEAISIQodQlJJREdFX0FDQ09VTlRfU1RBVFVTX1NUT1BQRUQQAypnCg9CcmlkZ2VEaXJlY3Rpb24SIAocQlJJREdFX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEhcKE0JSSURHRV9ESVJFQ1RJT05fSU4QARIZChVCUklER0VfRElSRUNUSU9OX0JPVEgQAirDAQoTQnJpZGdlTG9naW5TdGVwS2luZBImCiJCUklER0VfTE9HSU5fU1RFUF9LSU5EX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX0xPR0lOX1NURVBfS0lORF9JTlBVVBABEh0KGUJSSURHRV9MT0dJTl9TVEVQX0tJTkRfUVIQAhIiCh5CUklER0VfTE9HSU5fU1RFUF9LSU5EX0NPTkZJUk0QAxIfChtCUklER0VfTE9HSU5fU1RFUF9LSU5EX0RPTkUQBCrUAQoWQnJpZGdlQ29udmVyc2F0aW9uS2luZBIoCiRCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfVU5TUEVDSUZJRUQQABIkCiBCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfUFJJVkFURRABEiAKHEJSSURHRV9DT05WRVJTQVRJT05fS0lORF9CT1QQAhIiCh5CUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfR1JPVVAQAxIkCiBCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfQ0hBTk5FTBAEKsEBChJCcmlkZ2VPdXRib3hTdGF0dXMSJAogQlJJREdFX09VVEJPWF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxCUklER0VfT1VUQk9YX1NUQVRVU19QRU5ESU5HEAESIAocQlJJREdFX09VVEJPWF9TVEFUVVNfU0VORElORxACEh8KG0JSSURHRV9PVVRCT1hfU1RBVFVTX0ZBSUxFRBADEiAKHEJSSURHRV9PVVRCT1hfU1RBVFVTX1VOS05PV04QBDKgCAoNQnJpZGdlU2VydmljZRJSCg9HZXRCcmlkZ2VTdGF0dXMSHi5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVxdWVzdBofLmFwcC52MS5HZXRCcmlkZ2VTdGF0dXNSZXNwb25zZRJVChBTdGFydEJyaWRnZUxvZ2luEh8uYXBwLnYxLlN0YXJ0QnJpZGdlTG9naW5SZXF1ZXN0GiAuYXBwLnYxLlN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRJeChNDb250aW51ZUJyaWRnZUxvZ2luEiIuYXBwLnYxLkNvbnRpbnVlQnJpZGdlTG9naW5SZXF1ZXN0GiMuYXBwLnYxLkNvbnRpbnVlQnJpZGdlTG9naW5SZXNwb25zZRJqChdMaXN0QnJpZGdlQ29udmVyc2F0aW9ucxImLmFwcC52MS5MaXN0QnJpZGdlQ29udmVyc2F0aW9uc1JlcXVlc3QaJy5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRJVChBFbmFibGVCcmlkZ2VDaGF0Eh8uYXBwLnYxLkVuYWJsZUJyaWRnZUNoYXRSZXF1ZXN0GiAuYXBwLnYxLkVuYWJsZUJyaWRnZUNoYXRSZXNwb25zZRJVChBSZW1vdmVCcmlkZ2VDaGF0Eh8uYXBwLnYxLlJlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0GiAuYXBwLnYxLlJlbW92ZUJyaWRnZUNoYXRSZXNwb25zZRJnChZTZXRCcmlkZ2VDaGF0RGlyZWN0aW9uEiUuYXBwLnYxLlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0GiYuYXBwLnYxLlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZRJVChBMaXN0QnJpZGdlT3V0Ym94Eh8uYXBwLnYxLkxpc3RCcmlkZ2VPdXRib3hSZXF1ZXN0GiAuYXBwLnYxLkxpc3RCcmlkZ2VPdXRib3hSZXNwb25zZRJbChJSZXRyeUJyaWRnZU1lc3NhZ2USIS5hcHAudjEuUmV0cnlCcmlkZ2VNZXNzYWdlUmVxdWVzdBoiLmFwcC52MS5SZXRyeUJyaWRnZU1lc3NhZ2VSZXNwb25zZRJhChREaXNtaXNzQnJpZGdlTWVzc2FnZRIjLmFwcC52MS5EaXNtaXNzQnJpZGdlTWVzc2FnZVJlcXVlc3QaJC5hcHAudjEuRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZRJqChdEaXNjb25uZWN0QnJpZGdlQWNjb3VudBImLmFwcC52MS5EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlcXVlc3QaJy5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXNwb25zZUIjWiFhcHAubG9jYWwvc2VydmVyL2dlbi9hcHAvdjE7YXBwdjFiBnByb3RvMw");
 
 /**
  * @generated from message app.v1.BridgeApp
@@ -65,6 +65,11 @@ export type BridgeSyncedChat = Message<"app.v1.BridgeSyncedChat"> & {
    * @generated from field: string title = 5;
    */
   title: string;
+
+  /**
+   * @generated from field: app.v1.BridgeDirection direction = 6;
+   */
+  direction: BridgeDirection;
 };
 
 /**
@@ -383,6 +388,11 @@ export type EnableBridgeChatRequest = Message<"app.v1.EnableBridgeChatRequest"> 
    * @generated from field: int32 history_window = 3;
    */
   historyWindow: number;
+
+  /**
+   * @generated from field: app.v1.BridgeDirection direction = 4;
+   */
+  direction: BridgeDirection;
 };
 
 /**
@@ -480,6 +490,191 @@ export const DisconnectBridgeAccountResponseSchema: GenMessage<DisconnectBridgeA
   messageDesc(file_app_v1_bridge, 19);
 
 /**
+ * @generated from message app.v1.SetBridgeChatDirectionRequest
+ */
+export type SetBridgeChatDirectionRequest = Message<"app.v1.SetBridgeChatDirectionRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: app.v1.BridgeDirection direction = 3;
+   */
+  direction: BridgeDirection;
+};
+
+/**
+ * Describes the message app.v1.SetBridgeChatDirectionRequest.
+ * Use `create(SetBridgeChatDirectionRequestSchema)` to create a new message.
+ */
+export const SetBridgeChatDirectionRequestSchema: GenMessage<SetBridgeChatDirectionRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 20);
+
+/**
+ * @generated from message app.v1.SetBridgeChatDirectionResponse
+ */
+export type SetBridgeChatDirectionResponse = Message<"app.v1.SetBridgeChatDirectionResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.SetBridgeChatDirectionResponse.
+ * Use `create(SetBridgeChatDirectionResponseSchema)` to create a new message.
+ */
+export const SetBridgeChatDirectionResponseSchema: GenMessage<SetBridgeChatDirectionResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 21);
+
+/**
+ * @generated from message app.v1.BridgeOutboxItem
+ */
+export type BridgeOutboxItem = Message<"app.v1.BridgeOutboxItem"> & {
+  /**
+   * @generated from field: int64 seq = 1 [jstype = JS_NUMBER];
+   */
+  seq: bigint;
+
+  /**
+   * "send", "edit" or "delete".
+   *
+   * @generated from field: string op = 2;
+   */
+  op: string;
+
+  /**
+   * @generated from field: app.v1.BridgeOutboxStatus status = 3;
+   */
+  status: BridgeOutboxStatus;
+
+  /**
+   * Why it failed or waits, a short text without a secret; may be empty.
+   *
+   * @generated from field: string last_error = 4;
+   */
+  lastError: string;
+
+  /**
+   * @generated from field: int32 attempts = 5;
+   */
+  attempts: number;
+};
+
+/**
+ * Describes the message app.v1.BridgeOutboxItem.
+ * Use `create(BridgeOutboxItemSchema)` to create a new message.
+ */
+export const BridgeOutboxItemSchema: GenMessage<BridgeOutboxItem> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 22);
+
+/**
+ * @generated from message app.v1.ListBridgeOutboxRequest
+ */
+export type ListBridgeOutboxRequest = Message<"app.v1.ListBridgeOutboxRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+};
+
+/**
+ * Describes the message app.v1.ListBridgeOutboxRequest.
+ * Use `create(ListBridgeOutboxRequestSchema)` to create a new message.
+ */
+export const ListBridgeOutboxRequestSchema: GenMessage<ListBridgeOutboxRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 23);
+
+/**
+ * @generated from message app.v1.ListBridgeOutboxResponse
+ */
+export type ListBridgeOutboxResponse = Message<"app.v1.ListBridgeOutboxResponse"> & {
+  /**
+   * @generated from field: repeated app.v1.BridgeOutboxItem items = 1;
+   */
+  items: BridgeOutboxItem[];
+};
+
+/**
+ * Describes the message app.v1.ListBridgeOutboxResponse.
+ * Use `create(ListBridgeOutboxResponseSchema)` to create a new message.
+ */
+export const ListBridgeOutboxResponseSchema: GenMessage<ListBridgeOutboxResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 24);
+
+/**
+ * @generated from message app.v1.RetryBridgeMessageRequest
+ */
+export type RetryBridgeMessageRequest = Message<"app.v1.RetryBridgeMessageRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * @generated from field: int64 seq = 2 [jstype = JS_NUMBER];
+   */
+  seq: bigint;
+};
+
+/**
+ * Describes the message app.v1.RetryBridgeMessageRequest.
+ * Use `create(RetryBridgeMessageRequestSchema)` to create a new message.
+ */
+export const RetryBridgeMessageRequestSchema: GenMessage<RetryBridgeMessageRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 25);
+
+/**
+ * @generated from message app.v1.RetryBridgeMessageResponse
+ */
+export type RetryBridgeMessageResponse = Message<"app.v1.RetryBridgeMessageResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.RetryBridgeMessageResponse.
+ * Use `create(RetryBridgeMessageResponseSchema)` to create a new message.
+ */
+export const RetryBridgeMessageResponseSchema: GenMessage<RetryBridgeMessageResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 26);
+
+/**
+ * @generated from message app.v1.DismissBridgeMessageRequest
+ */
+export type DismissBridgeMessageRequest = Message<"app.v1.DismissBridgeMessageRequest"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * @generated from field: int64 seq = 2 [jstype = JS_NUMBER];
+   */
+  seq: bigint;
+};
+
+/**
+ * Describes the message app.v1.DismissBridgeMessageRequest.
+ * Use `create(DismissBridgeMessageRequestSchema)` to create a new message.
+ */
+export const DismissBridgeMessageRequestSchema: GenMessage<DismissBridgeMessageRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 27);
+
+/**
+ * @generated from message app.v1.DismissBridgeMessageResponse
+ */
+export type DismissBridgeMessageResponse = Message<"app.v1.DismissBridgeMessageResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.DismissBridgeMessageResponse.
+ * Use `create(DismissBridgeMessageResponseSchema)` to create a new message.
+ */
+export const DismissBridgeMessageResponseSchema: GenMessage<DismissBridgeMessageResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 28);
+
+/**
  * @generated from enum app.v1.BridgeAccountStatus
  */
 export enum BridgeAccountStatus {
@@ -515,6 +710,36 @@ export enum BridgeAccountStatus {
  */
 export const BridgeAccountStatusSchema: GenEnum<BridgeAccountStatus> = /*@__PURE__*/
   enumDesc(file_app_v1_bridge, 0);
+
+/**
+ * @generated from enum app.v1.BridgeDirection
+ */
+export enum BridgeDirection {
+  /**
+   * @generated from enum value: BRIDGE_DIRECTION_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The app is the source; Chat sends nothing back.
+   *
+   * @generated from enum value: BRIDGE_DIRECTION_IN = 1;
+   */
+  IN = 1,
+
+  /**
+   * What the user writes in the chat is also sent on to the app.
+   *
+   * @generated from enum value: BRIDGE_DIRECTION_BOTH = 2;
+   */
+  BOTH = 2,
+}
+
+/**
+ * Describes the enum app.v1.BridgeDirection.
+ */
+export const BridgeDirectionSchema: GenEnum<BridgeDirection> = /*@__PURE__*/
+  enumDesc(file_app_v1_bridge, 1);
 
 /**
  * @generated from enum app.v1.BridgeLoginStepKind
@@ -558,7 +783,7 @@ export enum BridgeLoginStepKind {
  * Describes the enum app.v1.BridgeLoginStepKind.
  */
 export const BridgeLoginStepKindSchema: GenEnum<BridgeLoginStepKind> = /*@__PURE__*/
-  enumDesc(file_app_v1_bridge, 1);
+  enumDesc(file_app_v1_bridge, 2);
 
 /**
  * @generated from enum app.v1.BridgeConversationKind
@@ -594,16 +819,62 @@ export enum BridgeConversationKind {
  * Describes the enum app.v1.BridgeConversationKind.
  */
 export const BridgeConversationKindSchema: GenEnum<BridgeConversationKind> = /*@__PURE__*/
-  enumDesc(file_app_v1_bridge, 2);
+  enumDesc(file_app_v1_bridge, 3);
+
+/**
+ * @generated from enum app.v1.BridgeOutboxStatus
+ */
+export enum BridgeOutboxStatus {
+  /**
+   * @generated from enum value: BRIDGE_OUTBOX_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Waiting its turn or for a retry.
+   *
+   * @generated from enum value: BRIDGE_OUTBOX_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * On its way to the app now.
+   *
+   * @generated from enum value: BRIDGE_OUTBOX_STATUS_SENDING = 2;
+   */
+  SENDING = 2,
+
+  /**
+   * The app refused it, or it could not be sent after many tries.
+   *
+   * @generated from enum value: BRIDGE_OUTBOX_STATUS_FAILED = 3;
+   */
+  FAILED = 3,
+
+  /**
+   * It was on its way when the server stopped, too long ago to repeat on
+   * its own: it may or may not have arrived.
+   *
+   * @generated from enum value: BRIDGE_OUTBOX_STATUS_UNKNOWN = 4;
+   */
+  UNKNOWN = 4,
+}
+
+/**
+ * Describes the enum app.v1.BridgeOutboxStatus.
+ */
+export const BridgeOutboxStatusSchema: GenEnum<BridgeOutboxStatus> = /*@__PURE__*/
+  enumDesc(file_app_v1_bridge, 4);
 
 /**
  * The Chat Bridge (ADR 0022): the user connects an account of another app
  * (Telegram first) and chooses which of its conversations Chat copies in.
  * Everything runs on the server; nothing here carries a message. Served
- * under /rpc with the user's session like every user service. Every call
- * that changes something needs an IdP sign-in within the last 10 minutes
- * (failed_precondition reauth_required). When the server runs with the
- * bridge off, every call answers failed_precondition bridge_disabled.
+ * under /rpc with the user's session like every user service. Only the two
+ * login calls (the grant of access to a whole account) need an IdP sign-in
+ * within the last 10 minutes (failed_precondition reauth_required). When the
+ * server runs with the bridge off, every call answers failed_precondition
+ * bridge_disabled.
  *
  * @generated from service app.v1.BridgeService
  */
@@ -655,7 +926,9 @@ export const BridgeService: GenService<{
    * Starts copying a conversation into a new chat: its newest
    * history_window messages first (chosen here, once: older history cannot
    * be added later), then new messages as they arrive. The chat is
-   * read-only: sending into it is refused.
+   * read-only (sending into it is refused) or, with direction BOTH, also
+   * sends what the user writes in Chat on to the app; unspecified takes BOTH
+   * when the app can be written to, else IN.
    *
    * @generated from rpc app.v1.BridgeService.EnableBridgeChat
    */
@@ -673,6 +946,53 @@ export const BridgeService: GenService<{
     methodKind: "unary";
     input: typeof RemoveBridgeChatRequestSchema;
     output: typeof RemoveBridgeChatResponseSchema;
+  },
+  /**
+   * Switches a synced chat between receiving only (IN) and also sending on
+   * what the user writes (BOTH). Going back to IN drops what is queued and
+   * not yet sent. failed_precondition send_unsupported when the app cannot
+   * be written to.
+   *
+   * @generated from rpc app.v1.BridgeService.SetBridgeChatDirection
+   */
+  setBridgeChatDirection: {
+    methodKind: "unary";
+    input: typeof SetBridgeChatDirectionRequestSchema;
+    output: typeof SetBridgeChatDirectionResponseSchema;
+  },
+  /**
+   * What a chat has queued for the app and not finished: sending, waiting,
+   * failed or of unknown result. A message that is not listed was sent.
+   *
+   * @generated from rpc app.v1.BridgeService.ListBridgeOutbox
+   */
+  listBridgeOutbox: {
+    methodKind: "unary";
+    input: typeof ListBridgeOutboxRequestSchema;
+    output: typeof ListBridgeOutboxResponseSchema;
+  },
+  /**
+   * Tries a failed or unknown message again. A message deleted in Chat is
+   * never sent: deleting is how a failed message is given up.
+   *
+   * @generated from rpc app.v1.BridgeService.RetryBridgeMessage
+   */
+  retryBridgeMessage: {
+    methodKind: "unary";
+    input: typeof RetryBridgeMessageRequestSchema;
+    output: typeof RetryBridgeMessageResponseSchema;
+  },
+  /**
+   * Gives up a failed edit or delete: the message stays as it is in Chat and
+   * the app keeps its older version. (A failed send is given up by deleting
+   * the message.)
+   *
+   * @generated from rpc app.v1.BridgeService.DismissBridgeMessage
+   */
+  dismissBridgeMessage: {
+    methodKind: "unary";
+    input: typeof DismissBridgeMessageRequestSchema;
+    output: typeof DismissBridgeMessageResponseSchema;
   },
   /**
    * Signs out of the app (the session ends there too). With delete_chats

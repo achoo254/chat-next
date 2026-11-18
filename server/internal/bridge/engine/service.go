@@ -277,6 +277,13 @@ const (
 // because seq only grows at the end and older history cannot be added
 // later. Enabling a conversation again returns its chat.
 func (e *Engine) EnableChat(ctx context.Context, accountID int64, conv bridge.Conversation, history int) (int64, error) {
+	return e.EnableChatWith(ctx, accountID, conv, history, chat.DirectionIn)
+}
+
+// EnableChatWith is EnableChat with the direction of the new chat:
+// chat.DirectionBoth also sends what the owner writes in Chat on to the app,
+// and falls back to chat.DirectionIn for an app that cannot be written to.
+func (e *Engine) EnableChatWith(ctx context.Context, accountID int64, conv bridge.Conversation, history int, direction string) (int64, error) {
 	if history == 0 {
 		history = DefaultWindow
 	}
@@ -286,6 +293,9 @@ func (e *Engine) EnableChat(ctx context.Context, accountID int64, conv bridge.Co
 	a, err := e.db.loadAccount(ctx, accountID)
 	if err != nil {
 		return 0, err
+	}
+	if direction == chat.DirectionBoth && !e.canSend(a.Source) {
+		direction = chat.DirectionIn
 	}
 	if existing, err := e.db.link(ctx, accountID, conv.ID); err != nil || existing != nil {
 		if err != nil {
@@ -313,8 +323,8 @@ func (e *Engine) EnableChat(ctx context.Context, accountID int64, conv bridge.Co
 	}
 	chatID, err := e.chat.CreateImportedChat(ctx, a.OwnerID, ic, func(tx pgx.Tx, chatID int64) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO external_chats (account_id, external_chat_id, chat_id, history_window, title) VALUES ($1, $2, $3, $4, $5)`,
-			accountID, conv.ID, chatID, history, cleanTitle(conv.Title))
+			INSERT INTO external_chats (account_id, external_chat_id, chat_id, history_window, title, direction) VALUES ($1, $2, $3, $4, $5, $6)`,
+			accountID, conv.ID, chatID, history, cleanTitle(conv.Title), direction)
 		return err
 	})
 	if err != nil {

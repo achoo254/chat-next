@@ -51,6 +51,18 @@ const (
 	// BridgeServiceRemoveBridgeChatProcedure is the fully-qualified name of the BridgeService's
 	// RemoveBridgeChat RPC.
 	BridgeServiceRemoveBridgeChatProcedure = "/app.v1.BridgeService/RemoveBridgeChat"
+	// BridgeServiceSetBridgeChatDirectionProcedure is the fully-qualified name of the BridgeService's
+	// SetBridgeChatDirection RPC.
+	BridgeServiceSetBridgeChatDirectionProcedure = "/app.v1.BridgeService/SetBridgeChatDirection"
+	// BridgeServiceListBridgeOutboxProcedure is the fully-qualified name of the BridgeService's
+	// ListBridgeOutbox RPC.
+	BridgeServiceListBridgeOutboxProcedure = "/app.v1.BridgeService/ListBridgeOutbox"
+	// BridgeServiceRetryBridgeMessageProcedure is the fully-qualified name of the BridgeService's
+	// RetryBridgeMessage RPC.
+	BridgeServiceRetryBridgeMessageProcedure = "/app.v1.BridgeService/RetryBridgeMessage"
+	// BridgeServiceDismissBridgeMessageProcedure is the fully-qualified name of the BridgeService's
+	// DismissBridgeMessage RPC.
+	BridgeServiceDismissBridgeMessageProcedure = "/app.v1.BridgeService/DismissBridgeMessage"
 	// BridgeServiceDisconnectBridgeAccountProcedure is the fully-qualified name of the BridgeService's
 	// DisconnectBridgeAccount RPC.
 	BridgeServiceDisconnectBridgeAccountProcedure = "/app.v1.BridgeService/DisconnectBridgeAccount"
@@ -72,10 +84,27 @@ type BridgeServiceClient interface {
 	// Starts copying a conversation into a new chat: its newest
 	// history_window messages first (chosen here, once: older history cannot
 	// be added later), then new messages as they arrive. The chat is
-	// read-only: sending into it is refused.
+	// read-only (sending into it is refused) or, with direction BOTH, also
+	// sends what the user writes in Chat on to the app; unspecified takes BOTH
+	// when the app can be written to, else IN.
 	EnableBridgeChat(context.Context, *connect.Request[v1.EnableBridgeChatRequest]) (*connect.Response[v1.EnableBridgeChatResponse], error)
 	// Stops syncing a conversation and deletes its chat.
 	RemoveBridgeChat(context.Context, *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error)
+	// Switches a synced chat between receiving only (IN) and also sending on
+	// what the user writes (BOTH). Going back to IN drops what is queued and
+	// not yet sent. failed_precondition send_unsupported when the app cannot
+	// be written to.
+	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
+	// What a chat has queued for the app and not finished: sending, waiting,
+	// failed or of unknown result. A message that is not listed was sent.
+	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
+	// Tries a failed or unknown message again. A message deleted in Chat is
+	// never sent: deleting is how a failed message is given up.
+	RetryBridgeMessage(context.Context, *connect.Request[v1.RetryBridgeMessageRequest]) (*connect.Response[v1.RetryBridgeMessageResponse], error)
+	// Gives up a failed edit or delete: the message stays as it is in Chat and
+	// the app keeps its older version. (A failed send is given up by deleting
+	// the message.)
+	DismissBridgeMessage(context.Context, *connect.Request[v1.DismissBridgeMessageRequest]) (*connect.Response[v1.DismissBridgeMessageResponse], error)
 	// Signs out of the app (the session ends there too). With delete_chats
 	// the synced chats and the contacts imported with them are deleted;
 	// without it they stay as read-only copies.
@@ -129,6 +158,30 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(bridgeServiceMethods.ByName("RemoveBridgeChat")),
 			connect.WithClientOptions(opts...),
 		),
+		setBridgeChatDirection: connect.NewClient[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse](
+			httpClient,
+			baseURL+BridgeServiceSetBridgeChatDirectionProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeChatDirection")),
+			connect.WithClientOptions(opts...),
+		),
+		listBridgeOutbox: connect.NewClient[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeOutboxProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeOutbox")),
+			connect.WithClientOptions(opts...),
+		),
+		retryBridgeMessage: connect.NewClient[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse](
+			httpClient,
+			baseURL+BridgeServiceRetryBridgeMessageProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("RetryBridgeMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		dismissBridgeMessage: connect.NewClient[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse](
+			httpClient,
+			baseURL+BridgeServiceDismissBridgeMessageProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("DismissBridgeMessage")),
+			connect.WithClientOptions(opts...),
+		),
 		disconnectBridgeAccount: connect.NewClient[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse](
 			httpClient,
 			baseURL+BridgeServiceDisconnectBridgeAccountProcedure,
@@ -146,6 +199,10 @@ type bridgeServiceClient struct {
 	listBridgeConversations *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
 	enableBridgeChat        *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
 	removeBridgeChat        *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
+	setBridgeChatDirection  *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
+	listBridgeOutbox        *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
+	retryBridgeMessage      *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
+	dismissBridgeMessage    *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
 	disconnectBridgeAccount *connect.Client[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse]
 }
 
@@ -179,6 +236,26 @@ func (c *bridgeServiceClient) RemoveBridgeChat(ctx context.Context, req *connect
 	return c.removeBridgeChat.CallUnary(ctx, req)
 }
 
+// SetBridgeChatDirection calls app.v1.BridgeService.SetBridgeChatDirection.
+func (c *bridgeServiceClient) SetBridgeChatDirection(ctx context.Context, req *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error) {
+	return c.setBridgeChatDirection.CallUnary(ctx, req)
+}
+
+// ListBridgeOutbox calls app.v1.BridgeService.ListBridgeOutbox.
+func (c *bridgeServiceClient) ListBridgeOutbox(ctx context.Context, req *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error) {
+	return c.listBridgeOutbox.CallUnary(ctx, req)
+}
+
+// RetryBridgeMessage calls app.v1.BridgeService.RetryBridgeMessage.
+func (c *bridgeServiceClient) RetryBridgeMessage(ctx context.Context, req *connect.Request[v1.RetryBridgeMessageRequest]) (*connect.Response[v1.RetryBridgeMessageResponse], error) {
+	return c.retryBridgeMessage.CallUnary(ctx, req)
+}
+
+// DismissBridgeMessage calls app.v1.BridgeService.DismissBridgeMessage.
+func (c *bridgeServiceClient) DismissBridgeMessage(ctx context.Context, req *connect.Request[v1.DismissBridgeMessageRequest]) (*connect.Response[v1.DismissBridgeMessageResponse], error) {
+	return c.dismissBridgeMessage.CallUnary(ctx, req)
+}
+
 // DisconnectBridgeAccount calls app.v1.BridgeService.DisconnectBridgeAccount.
 func (c *bridgeServiceClient) DisconnectBridgeAccount(ctx context.Context, req *connect.Request[v1.DisconnectBridgeAccountRequest]) (*connect.Response[v1.DisconnectBridgeAccountResponse], error) {
 	return c.disconnectBridgeAccount.CallUnary(ctx, req)
@@ -200,10 +277,27 @@ type BridgeServiceHandler interface {
 	// Starts copying a conversation into a new chat: its newest
 	// history_window messages first (chosen here, once: older history cannot
 	// be added later), then new messages as they arrive. The chat is
-	// read-only: sending into it is refused.
+	// read-only (sending into it is refused) or, with direction BOTH, also
+	// sends what the user writes in Chat on to the app; unspecified takes BOTH
+	// when the app can be written to, else IN.
 	EnableBridgeChat(context.Context, *connect.Request[v1.EnableBridgeChatRequest]) (*connect.Response[v1.EnableBridgeChatResponse], error)
 	// Stops syncing a conversation and deletes its chat.
 	RemoveBridgeChat(context.Context, *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error)
+	// Switches a synced chat between receiving only (IN) and also sending on
+	// what the user writes (BOTH). Going back to IN drops what is queued and
+	// not yet sent. failed_precondition send_unsupported when the app cannot
+	// be written to.
+	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
+	// What a chat has queued for the app and not finished: sending, waiting,
+	// failed or of unknown result. A message that is not listed was sent.
+	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
+	// Tries a failed or unknown message again. A message deleted in Chat is
+	// never sent: deleting is how a failed message is given up.
+	RetryBridgeMessage(context.Context, *connect.Request[v1.RetryBridgeMessageRequest]) (*connect.Response[v1.RetryBridgeMessageResponse], error)
+	// Gives up a failed edit or delete: the message stays as it is in Chat and
+	// the app keeps its older version. (A failed send is given up by deleting
+	// the message.)
+	DismissBridgeMessage(context.Context, *connect.Request[v1.DismissBridgeMessageRequest]) (*connect.Response[v1.DismissBridgeMessageResponse], error)
 	// Signs out of the app (the session ends there too). With delete_chats
 	// the synced chats and the contacts imported with them are deleted;
 	// without it they stay as read-only copies.
@@ -253,6 +347,30 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(bridgeServiceMethods.ByName("RemoveBridgeChat")),
 		connect.WithHandlerOptions(opts...),
 	)
+	bridgeServiceSetBridgeChatDirectionHandler := connect.NewUnaryHandler(
+		BridgeServiceSetBridgeChatDirectionProcedure,
+		svc.SetBridgeChatDirection,
+		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeChatDirection")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceListBridgeOutboxHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeOutboxProcedure,
+		svc.ListBridgeOutbox,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeOutbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceRetryBridgeMessageHandler := connect.NewUnaryHandler(
+		BridgeServiceRetryBridgeMessageProcedure,
+		svc.RetryBridgeMessage,
+		connect.WithSchema(bridgeServiceMethods.ByName("RetryBridgeMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceDismissBridgeMessageHandler := connect.NewUnaryHandler(
+		BridgeServiceDismissBridgeMessageProcedure,
+		svc.DismissBridgeMessage,
+		connect.WithSchema(bridgeServiceMethods.ByName("DismissBridgeMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	bridgeServiceDisconnectBridgeAccountHandler := connect.NewUnaryHandler(
 		BridgeServiceDisconnectBridgeAccountProcedure,
 		svc.DisconnectBridgeAccount,
@@ -273,6 +391,14 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 			bridgeServiceEnableBridgeChatHandler.ServeHTTP(w, r)
 		case BridgeServiceRemoveBridgeChatProcedure:
 			bridgeServiceRemoveBridgeChatHandler.ServeHTTP(w, r)
+		case BridgeServiceSetBridgeChatDirectionProcedure:
+			bridgeServiceSetBridgeChatDirectionHandler.ServeHTTP(w, r)
+		case BridgeServiceListBridgeOutboxProcedure:
+			bridgeServiceListBridgeOutboxHandler.ServeHTTP(w, r)
+		case BridgeServiceRetryBridgeMessageProcedure:
+			bridgeServiceRetryBridgeMessageHandler.ServeHTTP(w, r)
+		case BridgeServiceDismissBridgeMessageProcedure:
+			bridgeServiceDismissBridgeMessageHandler.ServeHTTP(w, r)
 		case BridgeServiceDisconnectBridgeAccountProcedure:
 			bridgeServiceDisconnectBridgeAccountHandler.ServeHTTP(w, r)
 		default:
@@ -306,6 +432,22 @@ func (UnimplementedBridgeServiceHandler) EnableBridgeChat(context.Context, *conn
 
 func (UnimplementedBridgeServiceHandler) RemoveBridgeChat(context.Context, *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.RemoveBridgeChat is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeChatDirection is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeOutbox is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) RetryBridgeMessage(context.Context, *connect.Request[v1.RetryBridgeMessageRequest]) (*connect.Response[v1.RetryBridgeMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.RetryBridgeMessage is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) DismissBridgeMessage(context.Context, *connect.Request[v1.DismissBridgeMessageRequest]) (*connect.Response[v1.DismissBridgeMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.DismissBridgeMessage is not implemented"))
 }
 
 func (UnimplementedBridgeServiceHandler) DisconnectBridgeAccount(context.Context, *connect.Request[v1.DisconnectBridgeAccountRequest]) (*connect.Response[v1.DisconnectBridgeAccountResponse], error) {

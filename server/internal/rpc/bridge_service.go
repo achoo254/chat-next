@@ -11,6 +11,7 @@ import (
 	"app.local/server/internal/botadmin"
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/bridge/engine"
+	"app.local/server/internal/chat"
 	"connectrpc.com/connect"
 )
 
@@ -59,6 +60,8 @@ func bridgeError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown_app: this app cannot be connected"))
 	case errors.Is(err, engine.ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, errors.New("not found"))
+	case errors.Is(err, engine.ErrSendUnsupported):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("send_unsupported: this app cannot be written to from Chat, or the account is signed out"))
 	case errors.Is(err, engine.ErrRateLimited):
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many sign-in attempts; try again later"))
 	case errors.Is(err, engine.ErrAccountTaken):
@@ -139,7 +142,11 @@ func (s *bridgeService) EnableBridgeChat(ctx context.Context, req *connect.Reque
 		if window < 0 || window > engine.MaxWindow {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("history_window must be 0 or 1 to 100000"))
 		}
-		chatID, err := s.engine.EnableConversation(ctx, me, m.GetAccountId(), m.GetConversationId(), window)
+		direction, err := directionString(m.GetDirection(), true)
+		if err != nil {
+			return nil, err
+		}
+		chatID, err := s.engine.EnableConversation(ctx, me, m.GetAccountId(), m.GetConversationId(), window, direction)
 		if err != nil {
 			return nil, err
 		}
@@ -153,6 +160,53 @@ func (s *bridgeService) RemoveBridgeChat(ctx context.Context, req *connect.Reque
 			return nil, err
 		}
 		return &appv1.RemoveBridgeChatResponse{}, nil
+	})
+}
+
+func (s *bridgeService) SetBridgeChatDirection(ctx context.Context, req *connect.Request[appv1.SetBridgeChatDirectionRequest]) (*connect.Response[appv1.SetBridgeChatDirectionResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeChatDirectionRequest) (*appv1.SetBridgeChatDirectionResponse, error) {
+		direction, err := directionString(m.GetDirection(), false)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.engine.SetDirection(ctx, me, m.GetAccountId(), m.GetConversationId(), direction); err != nil {
+			return nil, err
+		}
+		return &appv1.SetBridgeChatDirectionResponse{}, nil
+	})
+}
+
+func (s *bridgeService) ListBridgeOutbox(ctx context.Context, req *connect.Request[appv1.ListBridgeOutboxRequest]) (*connect.Response[appv1.ListBridgeOutboxResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeOutboxRequest) (*appv1.ListBridgeOutboxResponse, error) {
+		items, err := s.engine.Outbox(ctx, me, m.GetChatId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeOutboxResponse{}
+		for _, it := range items {
+			resp.Items = append(resp.Items, &appv1.BridgeOutboxItem{
+				Seq: it.Seq, Op: it.Op, Status: outboxStatus(it.Status), LastError: it.LastError, Attempts: int32(it.Attempts),
+			})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) RetryBridgeMessage(ctx context.Context, req *connect.Request[appv1.RetryBridgeMessageRequest]) (*connect.Response[appv1.RetryBridgeMessageResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.RetryBridgeMessageRequest) (*appv1.RetryBridgeMessageResponse, error) {
+		if err := s.engine.RetryMessage(ctx, me, m.GetChatId(), m.GetSeq()); err != nil {
+			return nil, err
+		}
+		return &appv1.RetryBridgeMessageResponse{}, nil
+	})
+}
+
+func (s *bridgeService) DismissBridgeMessage(ctx context.Context, req *connect.Request[appv1.DismissBridgeMessageRequest]) (*connect.Response[appv1.DismissBridgeMessageResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.DismissBridgeMessageRequest) (*appv1.DismissBridgeMessageResponse, error) {
+		if err := s.engine.DismissMessage(ctx, me, m.GetChatId(), m.GetSeq()); err != nil {
+			return nil, err
+		}
+		return &appv1.DismissBridgeMessageResponse{}, nil
 	})
 }
 
@@ -178,9 +232,50 @@ func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
 	for _, c := range a.Chats {
 		out.Chats = append(out.Chats, &appv1.BridgeSyncedChat{
 			ConversationId: c.ConversationID, ChatId: c.ChatID, CaughtUp: c.CaughtUp, HistoryWindow: int32(c.HistoryWindow), Title: c.Title,
+			Direction: directionMessage(c.Direction),
 		})
 	}
 	return out
+}
+
+// directionString maps the wire direction to the engine's. Unspecified is ""
+// when allowed (the engine then picks its default).
+func directionString(d appv1.BridgeDirection, allowUnspecified bool) (string, error) {
+	switch d {
+	case appv1.BridgeDirection_BRIDGE_DIRECTION_IN:
+		return chat.DirectionIn, nil
+	case appv1.BridgeDirection_BRIDGE_DIRECTION_BOTH:
+		return chat.DirectionBoth, nil
+	case appv1.BridgeDirection_BRIDGE_DIRECTION_UNSPECIFIED:
+		if allowUnspecified {
+			return "", nil
+		}
+	}
+	return "", connect.NewError(connect.CodeInvalidArgument, errors.New("direction must be IN or BOTH"))
+}
+
+func directionMessage(d string) appv1.BridgeDirection {
+	switch d {
+	case chat.DirectionBoth:
+		return appv1.BridgeDirection_BRIDGE_DIRECTION_BOTH
+	case chat.DirectionIn:
+		return appv1.BridgeDirection_BRIDGE_DIRECTION_IN
+	}
+	return appv1.BridgeDirection_BRIDGE_DIRECTION_UNSPECIFIED
+}
+
+func outboxStatus(s string) appv1.BridgeOutboxStatus {
+	switch s {
+	case "pending":
+		return appv1.BridgeOutboxStatus_BRIDGE_OUTBOX_STATUS_PENDING
+	case "sending":
+		return appv1.BridgeOutboxStatus_BRIDGE_OUTBOX_STATUS_SENDING
+	case "failed":
+		return appv1.BridgeOutboxStatus_BRIDGE_OUTBOX_STATUS_FAILED
+	case "unknown":
+		return appv1.BridgeOutboxStatus_BRIDGE_OUTBOX_STATUS_UNKNOWN
+	}
+	return appv1.BridgeOutboxStatus_BRIDGE_OUTBOX_STATUS_UNSPECIFIED
 }
 
 func stepMessage(s engine.LoginStep) *appv1.BridgeLoginStep {

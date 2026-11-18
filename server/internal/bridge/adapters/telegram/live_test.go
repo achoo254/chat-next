@@ -149,7 +149,7 @@ func TestLiveTelegram(t *testing.T) {
 	if n, err := strconv.Atoi(os.Getenv("BRIDGE_LIVE_WINDOW")); err == nil && n > 0 {
 		window = n
 	}
-	chatID, err := eng.EnableConversation(ctx, owner.ID, account, pick.ID, window)
+	chatID, err := eng.EnableConversation(ctx, owner.ID, account, pick.ID, window, chat.DirectionIn)
 	if err != nil {
 		t.Fatal(err)
 	}

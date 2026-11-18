@@ -54,6 +54,8 @@ type env struct {
 	account int64
 	base    time.Time
 	media   *media.Service
+	// adapter, when set, stands in for the fake in the engine's adapter set.
+	adapter bridge.Adapter
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -119,10 +121,14 @@ func newEnvWithMedia(t *testing.T, withMedia bool) *env {
 
 func (e *env) engine() *engine.Engine {
 	box, _ := bridge.NewSecretBox(bytes.Repeat([]byte{3}, 32), nil)
+	var adapter bridge.Adapter = e.fake
+	if e.adapter != nil {
+		adapter = e.adapter
+	}
 	return engine.New(engine.Config{TenantID: "primary", PageSize: 7, PageDelay: time.Millisecond, BatchSize: 5, BackoffMin: 10 * time.Millisecond,
 		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test",
 		OutboxPoll: 10 * time.Millisecond, SendGap: time.Millisecond},
-		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": e.fake}, Logger: quiet})
+		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: quiet})
 }
 
 // start runs a new engine process (stopping the previous one first).
@@ -576,7 +582,7 @@ func TestConversationsMarkSyncedOnes(t *testing.T) {
 	g1, g2 := e.group("g1"), e.group("g2")
 	_ = g2
 	eng := e.start()
-	chatID, err := eng.EnableConversation(ctx, e.owner, e.account, g1.ID, 50)
+	chatID, err := eng.EnableConversation(ctx, e.owner, e.account, g1.ID, 50, chat.DirectionIn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -592,7 +598,7 @@ func TestConversationsMarkSyncedOnes(t *testing.T) {
 	if _, err := eng.Conversations(ctx, e.owner+1, e.account); !errors.Is(err, engine.ErrNotFound) {
 		t.Fatalf("conversations of another user's account = %v, want ErrNotFound", err)
 	}
-	if _, err := eng.EnableConversation(ctx, e.owner, e.account, g1.ID, engine.MaxWindow+1); err == nil {
+	if _, err := eng.EnableConversation(ctx, e.owner, e.account, g1.ID, engine.MaxWindow+1, chat.DirectionIn); err == nil {
 		t.Fatal("a window above the maximum was accepted")
 	}
 }

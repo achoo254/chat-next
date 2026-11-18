@@ -10,10 +10,11 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // The Chat Bridge (ADR 0022): the user connects an account of another app
 // (Telegram first) and chooses which of its conversations Chat copies in.
 // Everything runs on the server; nothing here carries a message. Served
-// under /rpc with the user's session like every user service. Every call
-// that changes something needs an IdP sign-in within the last 10 minutes
-// (failed_precondition reauth_required). When the server runs with the
-// bridge off, every call answers failed_precondition bridge_disabled.
+// under /rpc with the user's session like every user service. Only the two
+// login calls (the grant of access to a whole account) need an IdP sign-in
+// within the last 10 minutes (failed_precondition reauth_required). When the
+// server runs with the bridge off, every call answers failed_precondition
+// bridge_disabled.
 service BridgeService {
   // Which apps can be connected, the user's connected accounts and their
   // synced chats.
@@ -29,10 +30,27 @@ service BridgeService {
   // Starts copying a conversation into a new chat: its newest
   // history_window messages first (chosen here, once: older history cannot
   // be added later), then new messages as they arrive. The chat is
-  // read-only: sending into it is refused.
+  // read-only (sending into it is refused) or, with direction BOTH, also
+  // sends what the user writes in Chat on to the app; unspecified takes BOTH
+  // when the app can be written to, else IN.
   rpc EnableBridgeChat(EnableBridgeChatRequest) returns (EnableBridgeChatResponse);
   // Stops syncing a conversation and deletes its chat.
   rpc RemoveBridgeChat(RemoveBridgeChatRequest) returns (RemoveBridgeChatResponse);
+  // Switches a synced chat between receiving only (IN) and also sending on
+  // what the user writes (BOTH). Going back to IN drops what is queued and
+  // not yet sent. failed_precondition send_unsupported when the app cannot
+  // be written to.
+  rpc SetBridgeChatDirection(SetBridgeChatDirectionRequest) returns (SetBridgeChatDirectionResponse);
+  // What a chat has queued for the app and not finished: sending, waiting,
+  // failed or of unknown result. A message that is not listed was sent.
+  rpc ListBridgeOutbox(ListBridgeOutboxRequest) returns (ListBridgeOutboxResponse);
+  // Tries a failed or unknown message again. A message deleted in Chat is
+  // never sent: deleting is how a failed message is given up.
+  rpc RetryBridgeMessage(RetryBridgeMessageRequest) returns (RetryBridgeMessageResponse);
+  // Gives up a failed edit or delete: the message stays as it is in Chat and
+  // the app keeps its older version. (A failed send is given up by deleting
+  // the message.)
+  rpc DismissBridgeMessage(DismissBridgeMessageRequest) returns (DismissBridgeMessageResponse);
   // Signs out of the app (the session ends there too). With delete_chats
   // the synced chats and the contacts imported with them are deleted;
   // without it they stay as read-only copies.
@@ -54,6 +72,14 @@ enum BridgeAccountStatus {
   BRIDGE_ACCOUNT_STATUS_STOPPED = 3;
 }
 
+enum BridgeDirection {
+  BRIDGE_DIRECTION_UNSPECIFIED = 0;
+  // The app is the source; Chat sends nothing back.
+  BRIDGE_DIRECTION_IN = 1;
+  // What the user writes in the chat is also sent on to the app.
+  BRIDGE_DIRECTION_BOTH = 2;
+}
+
 message BridgeSyncedChat {
   // The conversation id in the app (opaque).
   string conversation_id = 1;
@@ -63,6 +89,7 @@ message BridgeSyncedChat {
   int32 history_window = 4;
   // The conversation's name in the app when it was enabled.
   string title = 5;
+  BridgeDirection direction = 6;
 }
 
 message BridgeAccount {
@@ -158,6 +185,7 @@ message EnableBridgeChatRequest {
   string conversation_id = 2;
   // How many of the newest messages to import, 1 to 100000; 0 takes 2000.
   int32 history_window = 3;
+  BridgeDirection direction = 4;
 }
 
 message EnableBridgeChatResponse {
@@ -177,3 +205,56 @@ message DisconnectBridgeAccountRequest {
 }
 
 message DisconnectBridgeAccountResponse {}
+
+message SetBridgeChatDirectionRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  BridgeDirection direction = 3;
+}
+
+message SetBridgeChatDirectionResponse {}
+
+enum BridgeOutboxStatus {
+  BRIDGE_OUTBOX_STATUS_UNSPECIFIED = 0;
+  // Waiting its turn or for a retry.
+  BRIDGE_OUTBOX_STATUS_PENDING = 1;
+  // On its way to the app now.
+  BRIDGE_OUTBOX_STATUS_SENDING = 2;
+  // The app refused it, or it could not be sent after many tries.
+  BRIDGE_OUTBOX_STATUS_FAILED = 3;
+  // It was on its way when the server stopped, too long ago to repeat on
+  // its own: it may or may not have arrived.
+  BRIDGE_OUTBOX_STATUS_UNKNOWN = 4;
+}
+
+message BridgeOutboxItem {
+  int64 seq = 1 [jstype = JS_NUMBER];
+  // "send", "edit" or "delete".
+  string op = 2;
+  BridgeOutboxStatus status = 3;
+  // Why it failed or waits, a short text without a secret; may be empty.
+  string last_error = 4;
+  int32 attempts = 5;
+}
+
+message ListBridgeOutboxRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+}
+
+message ListBridgeOutboxResponse {
+  repeated BridgeOutboxItem items = 1;
+}
+
+message RetryBridgeMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message RetryBridgeMessageResponse {}
+
+message DismissBridgeMessageRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message DismissBridgeMessageResponse {}

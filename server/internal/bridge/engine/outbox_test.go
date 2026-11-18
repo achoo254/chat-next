@@ -11,6 +11,8 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/contracttest"
+	"app.local/server/internal/bridge/engine"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/media"
 )
@@ -285,5 +287,170 @@ func TestAnAlbumGoesOutAsOneSendAndEachItemGetsItsKey(t *testing.T) {
 	var keys int
 	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_messages WHERE chat_id = $1 AND seq = ANY($2)`, chatID, seqs).Scan(&keys); err != nil || keys != 2 {
 		t.Fatalf("%d keys for the two items (%v), want 2", keys, err)
+	}
+}
+
+// readOnlyApp is an app that cannot be written to.
+type readOnlyApp struct{ *contracttest.Fake }
+
+func (readOnlyApp) Capabilities() bridge.Capabilities {
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true}
+}
+
+func (e *env) direction(chatID int64) string {
+	var d string
+	if err := e.st.Pool().QueryRow(context.Background(), `SELECT direction FROM external_chats WHERE chat_id = $1`, chatID).Scan(&d); err != nil {
+		e.t.Fatal(err)
+	}
+	return d
+}
+
+func TestANewChatSendsBothWaysWhenTheAppCanBeWrittenTo(t *testing.T) {
+	e := newEnv(t)
+	conv := e.group("g1")
+	eng := e.start()
+	chatID, err := eng.EnableConversation(context.Background(), e.owner, e.account, conv.ID, 100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.direction(chatID); got != chat.DirectionBoth {
+		t.Fatalf("direction of a new chat = %q, want both by default", got)
+	}
+	e2 := newEnv(t)
+	conv2 := e2.group("g1")
+	chat2, err := e2.start().EnableConversation(context.Background(), e2.owner, e2.account, conv2.ID, 100, chat.DirectionIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e2.direction(chat2); got != chat.DirectionIn {
+		t.Fatalf("direction asked for in = %q", got)
+	}
+}
+
+func TestAChatOfAnAppThatCannotBeWrittenToStaysReadOnly(t *testing.T) {
+	e := newEnv(t)
+	e.adapter = readOnlyApp{e.fake}
+	conv := e.group("g1")
+	eng := e.start()
+	ctx := context.Background()
+	chatID, err := eng.EnableConversation(ctx, e.owner, e.account, conv.ID, 100, chat.DirectionBoth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.direction(chatID); got != chat.DirectionIn {
+		t.Fatalf("direction = %q, want in: the app has no send", got)
+	}
+	if err := eng.SetDirection(ctx, e.owner, e.account, conv.ID, chat.DirectionBoth); !errors.Is(err, engine.ErrSendUnsupported) {
+		t.Fatalf("switching to both = %v, want ErrSendUnsupported", err)
+	}
+}
+
+func TestOnlyTheOwnerSwitchesTheDirectionAndGoingBackDropsTheQueue(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	ctx := context.Background()
+	eng := e.start()
+	if err := eng.SetDirection(ctx, e.owner+1, e.account, "g1", chat.DirectionIn); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("a stranger switching the direction = %v, want ErrNotFound", err)
+	}
+	if err := eng.SetDirection(ctx, e.owner, e.account, "nope", chat.DirectionIn); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("a conversation that is not synced = %v, want ErrNotFound", err)
+	}
+	e.stop() // so the message waits in the queue
+	seq := e.say(chatID, "will not go")
+	if err := e.engine().SetDirection(ctx, e.owner, e.account, "g1", chat.DirectionIn); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.outboxStatus(chatID, seq, "send"); got != "cancelled" {
+		t.Fatalf("queued message after going back to in = %q, want cancelled", got)
+	}
+	if err := e.engine().SetDirection(ctx, e.owner, e.account, "g1", chat.DirectionBoth); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.direction(chatID); got != chat.DirectionBoth {
+		t.Fatalf("direction = %q after switching on again", got)
+	}
+}
+
+func TestTheOutboxListsWhatFailedAndRetryingSendsIt(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	ctx := context.Background()
+	eng := e.start()
+	e.fake.FailSend(fmt.Errorf("channel: %w", bridge.ErrNotAllowed))
+	seq := e.say(chatID, "refused once")
+	e.waitOutbox(chatID, seq, "send", "failed")
+	items, err := eng.Outbox(ctx, e.owner, chatID)
+	if err != nil || len(items) != 1 || items[0].Seq != seq || items[0].Op != "send" || items[0].Status != "failed" || !strings.Contains(items[0].LastError, "not allowed") {
+		t.Fatalf("outbox = %+v, %v; want the failed send with its reason", items, err)
+	}
+	if _, err := eng.Outbox(ctx, e.owner+1, chatID); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("outbox of someone else's chat = %v, want ErrNotFound", err)
+	}
+	if err := eng.RetryMessage(ctx, e.owner+1, chatID, seq); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("a stranger retrying = %v, want ErrNotFound", err)
+	}
+	if err := eng.RetryMessage(ctx, e.owner, chatID, seq); err != nil {
+		t.Fatal(err)
+	}
+	e.waitOutbox(chatID, seq, "send", "sent")
+	if items, err := eng.Outbox(ctx, e.owner, chatID); err != nil || len(items) != 0 {
+		t.Fatalf("outbox after the retry went out = %+v, %v; want it empty", items, err)
+	}
+	if err := eng.RetryMessage(ctx, e.owner, chatID, seq); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("retrying what was sent = %v, want ErrNotFound", err)
+	}
+	if got := sentTexts(e.fake); fmt.Sprint(got) != "[refused once]" {
+		t.Fatalf("sent = %v, want the message once", got)
+	}
+}
+
+func TestDeletingAFailedMessageGivesItUp(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	e.fake.FailSend(fmt.Errorf("channel: %w", bridge.ErrNotAllowed))
+	seq := e.say(chatID, "give up")
+	e.waitOutbox(chatID, seq, "send", "failed")
+	if _, err := e.chat.DeleteMessages(context.Background(), e.owner, chatID, []int64{seq}, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.outboxStatus(chatID, seq, "send"); got != "cancelled" {
+		t.Fatalf("status after deleting the failed message = %q, want cancelled", got)
+	}
+	if items, err := e.engine().Outbox(context.Background(), e.owner, chatID); err != nil || len(items) != 0 {
+		t.Fatalf("outbox = %+v, %v; want nothing left to show", items, err)
+	}
+}
+
+func TestAFailedEditCanBeDismissedButASendCannot(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	ctx := context.Background()
+	eng := e.start()
+	seq := e.say(chatID, "sent")
+	e.waitOutbox(chatID, seq, "send", "sent")
+	if _, err := e.st.Pool().Exec(ctx, `
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, status, last_error)
+		SELECT account_id, external_chat_id, chat_id, seq, 'edit', 'failed', 'edit expired' FROM external_outbox WHERE chat_id = $1 AND seq = $2 AND op = 'send'`, chatID, seq); err != nil {
+		t.Fatal(err)
+	}
+	if err := eng.DismissMessage(ctx, e.owner+1, chatID, seq); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("a stranger dismissing = %v, want ErrNotFound", err)
+	}
+	if err := eng.DismissMessage(ctx, e.owner, chatID, seq); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.outboxStatus(chatID, seq, "edit"); got != "cancelled" {
+		t.Fatalf("edit status after dismissing = %q, want cancelled", got)
+	}
+	if err := eng.DismissMessage(ctx, e.owner, chatID, seq); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("dismissing again = %v, want ErrNotFound (nothing left)", err)
+	}
+	// A failed send is given up by deleting the message, not dismissed.
+	e.fake.FailSend(fmt.Errorf("x: %w", bridge.ErrNotAllowed))
+	bad := e.say(chatID, "refused")
+	e.waitOutbox(chatID, bad, "send", "failed")
+	if err := eng.DismissMessage(ctx, e.owner, chatID, bad); !errors.Is(err, engine.ErrNotFound) {
+		t.Fatalf("dismissing a failed send = %v, want ErrNotFound", err)
 	}
 }
