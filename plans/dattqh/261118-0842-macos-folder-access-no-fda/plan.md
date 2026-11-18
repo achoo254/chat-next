@@ -1,6 +1,6 @@
 # tunelo không xin Full Disk Access; quyền macOS theo từng thư mục, xác nhận trên web
 
-Trạng thái: đang làm · Tier: L (proto + agent + web + docs + phát hành tunelo)
+Trạng thái: xong, phát hành tunelo 3.17.1 (18/11/2026; tag 3.17.0 hỏng ở test Linux, không phát hành) · Tier: L
 
 ## Kết quả mong muốn
 - tunelo không bao giờ xin Full Disk Access (script cài, `tunelo login`, `tunelo status`, log, banner web đều bỏ).
