@@ -693,8 +693,9 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 
 /* The machine's Claude account in the status line, its menu, and the limit bar. */
 .mx-account { min-width: 0; flex: 0 1 auto; }
-/* The account is an icon in the composer's row (the AI-drawn mark is a span too, so it stays); its name and plan are in its menu and in "Chi tiết". */
-.mx-compose-box .mx-account .mx-st-btn > span:not(.ai-mark) { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The account is an icon in the composer's row (the AI-drawn mark is a span too, so it stays); with several accounts on the machine, the one in use is named beside it (cut when long). */
+.mx-compose-box .mx-account .mx-st-btn > span:not(.ai-mark) { display: none; }
+.mx-compose-box .mx-account[data-many] .mx-st-btn > span:not(.ai-mark) { display: inline; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-status-note { display: flex; align-items: center; gap: var(--space-1); max-width: var(--mx-col); margin: 0 auto var(--space-1); font-size: 0.75rem; color: var(--c-warning-text); }
 .mx-menu-hint { margin: 0 var(--space-2) var(--space-1); font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-profiles { max-height: min(480px, 70dvh); overflow-y: auto; }
@@ -724,7 +725,7 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 /* A narrow page column (tablets beside the sessions, phones): short labels in the header, the dock and the status line. */
 @container (max-width: 560px) {
 	.mx-head .mx-chip { padding: 0; width: 24px; justify-content: center; border: 0; }
-	.mx-account .mx-st-btn > span:not(.ai-mark), .mx-head .mx-chip > span, .mx-head .title .hide-narrow, .mx-details .mx-st-btn > span, .mx-kbd { display: none; }
+	.mx-account .mx-st-btn > span:not(.ai-mark), .mx-compose-box .mx-account[data-many] .mx-st-btn > span:not(.ai-mark), .mx-head .mx-chip > span, .mx-head .title .hide-narrow, .mx-details .mx-st-btn > span, .mx-kbd { display: none; }
 	.mx-usage .mx-bar, .mx-st-btn > span + .icon, .mx-mode > span + .icon { display: none; }
 	.mx-status-row .mx-mode .ai-mark:first-child { display: none; }
 	.mx-dock .acts { display: grid; grid-template-columns: 1fr 1fr; }

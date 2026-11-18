@@ -95,6 +95,19 @@ describe("machine profile", () => {
 		expect(screen.queryByRole("menu")).toBeNull();
 	});
 
+	it("names the account in use only when the machine has several of the AI's accounts", () => {
+		const { link } = fakeLink(() => list(""));
+		const one = create(MachineAccountsSchema, { accounts: { ...list(""), accounts: list("").accounts.slice(0, 1) } });
+		const { container, rerender } = wrap(<Harness link={link} announced={one} />);
+		expect(container.querySelector(".mx-account")?.hasAttribute("data-many")).toBe(false);
+		rerender(
+			<I18nProvider>
+				<Harness link={link} announced={announce("")} />
+			</I18nProvider>,
+		);
+		expect(container.querySelector(".mx-account")?.hasAttribute("data-many")).toBe(true);
+	});
+
 	it("follows what the machine announces without asking the list again", () => {
 		const { link, sent } = fakeLink(() => list(""));
 		function Live() {

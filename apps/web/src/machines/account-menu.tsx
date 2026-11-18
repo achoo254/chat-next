@@ -68,7 +68,8 @@ export function AccountMenu({ ai, machine, link, profiles, current, fallbackEmai
 		);
 	};
 	return (
-		<div className="mx-model mx-account" ref={ref}>
+		// With one account the composer row shows its icon only ("Chi tiết" names it); with several, which one is in use.
+		<div className="mx-model mx-account" ref={ref} data-many={(list?.accounts.length ?? 0) > 1 ? "" : undefined}>
 			<button
 				type="button"
 				className="mx-st-btn"
