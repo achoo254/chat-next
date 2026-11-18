@@ -279,6 +279,33 @@ describe("a question with something attached", () => {
 	});
 });
 
+describe("recent automatic answers", () => {
+	const entry = (id: string, threadId: string) => ({ id, machine: "1", threadId, title: "Sửa lỗi push", text: `${PICK} (82%)`, target: `/ai/1/s/${threadId}/terminal`, at: Date.now(), unavailable: "" as const });
+
+	it("lists them when the bubble opens and follows one back to its session that still exists", async () => {
+		const store = new AdvisorStore();
+		store.addHistory(entry("v1", "s1"));
+		store.setOpen(true);
+		open(store);
+		await userEvent.click(await screen.findByRole("button", { name: new RegExp(PICK) }, WAIT));
+		await waitFor(() => expect(window.location.pathname).toBe("/ai/1/s/s1/terminal"), WAIT);
+		expect(store.snapshot().open).toBe(false);
+	});
+
+	it("says so when the session is gone, stays where it is, and the answer can no longer be tapped", async () => {
+		const store = new AdvisorStore();
+		store.addHistory(entry("v2", "closed-long-ago"));
+		store.setOpen(true);
+		open(store);
+		const item = await screen.findByRole("button", { name: new RegExp(PICK) }, WAIT);
+		await userEvent.click(item);
+		expect((await screen.findAllByText(t.history.missing, undefined, WAIT)).length).toBeGreaterThan(0);
+		await waitFor(() => expect((screen.getByRole("button", { name: new RegExp(PICK) }) as HTMLButtonElement).disabled).toBe(true), WAIT);
+		expect(window.location.pathname).toBe("/");
+		expect(store.snapshot().history[0]?.unavailable).toBe("missing");
+	});
+});
+
 describe("the mascot's menu", () => {
 	it("leads to the settings and hides the mascot, with no per-session switch (automatic Advisor is one switch in the settings)", async () => {
 		const store = new AdvisorStore();

@@ -16,7 +16,7 @@ import { errorText, folderName, providerOf, useNow } from "../machines/use-machi
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { PercentBar } from "../machines/percent-bar.tsx";
 import { IGNORE_ATTR } from "./advisor-context.tsx";
-import { advisorStore, offerOf, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type Question } from "./advisor-store.ts";
+import { advisorStore, offerOf, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type HistoryEntry, type Question } from "./advisor-store.ts";
 import { pictureOf, type Look } from "./looks.ts";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
 import { surfaceLabel } from "./advisor-surfaces.ts";
@@ -266,6 +266,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 			<div className="adv-body">
 				{elsewhere && <p className="adv-note muted">{t.answer.elsewhere}</p>}
 				<NoteLine presence={presence} store={store} />
+				<RecentAnswers presence={presence} store={store} collapsed={attached.length > 0} />
 				{attached.length > 0 && (
 					<p className="adv-attach-title">
 						<Icon name="clip" small /> {t.ask.attachedTitle}
@@ -366,6 +367,60 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 				</div>
 			</div>
 		</form>
+	);
+}
+
+/**
+ * What Advisor answered on its own lately (it leaves from beside the mascot
+ * after a while): each one leads back to its session. A session that is gone
+ * or a machine that does not answer shows why when tapped, and the answer is
+ * no longer tappable.
+ */
+function RecentAnswers({ presence, store, collapsed }: { presence: Presence; store: AdvisorStore; collapsed: boolean }) {
+	const t = useAdvisorCopy();
+	const { history } = useAdvisorState(store);
+	const now = useNow();
+	const [checking, setChecking] = useState("");
+	const [notice, setNotice] = useState("");
+	if (history.length === 0) return null;
+	const go = async (entry: HistoryEntry) => {
+		setNotice("");
+		setChecking(entry.id);
+		const result = await presence.checkSession(entry.machine, entry.threadId);
+		setChecking("");
+		if (result === "ok") {
+			store.setOpen(false);
+			navigate(entry.target);
+			return;
+		}
+		store.markUnavailable(entry.id, result);
+		setNotice(t.history[result]);
+	};
+	return (
+		<details className="adv-recent adv-history" open={!collapsed}>
+			<summary>{t.history.title(history.length)}</summary>
+			<ul>
+				{history.map((entry) => {
+					const line = entry.text.startsWith("!") ? (t.answer.errors[entry.text.slice(1)] ?? t.answer.otherError) : entry.text;
+					const when = t.ask.ago(Math.max(0, Math.floor((now - entry.at) / 60_000)));
+					return (
+						<li key={entry.id}>
+							<button type="button" className="adv-recent-item" disabled={entry.unavailable !== "" || checking !== ""} aria-busy={checking === entry.id} onClick={() => void go(entry)}>
+								<span className="adv-hist-text">{line}</span>
+								<small className="adv-where">
+									{entry.unavailable !== "" ? t.history[entry.unavailable] : checking === entry.id ? t.history.checking : [entry.title, when].filter((part) => part !== "").join(" · ")}
+								</small>
+							</button>
+						</li>
+					);
+				})}
+			</ul>
+			{notice !== "" && (
+				<p className="adv-note mx-error" role="status">
+					{notice}
+				</p>
+			)}
+		</details>
 	);
 }
 

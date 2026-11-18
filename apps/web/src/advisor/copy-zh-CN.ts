@@ -43,6 +43,12 @@ export const zhCNAdvisor: AdvisorCopy = {
 		settings: "打开顾问设置",
 		failed: "问题未能发送。",
 	},
+	history: {
+		title: (count: number): string => `最近的回答（${count}）`,
+		checking: "正在检查会话…",
+		missing: "该会话已不存在，无法打开。",
+		unreachable: "无法打开该会话：机器没有响应。",
+	},
 	answer: {
 		yours: "你的问题",
 		waiting: "正在排队…",

@@ -17,14 +17,14 @@ import { shouldConnect } from "../machines/machine-status.ts";
 import type { MachineEntry } from "../machines/machines-client.ts";
 import { inFolder } from "../machines/projects-view.ts";
 import { EMPTY_JOURNAL, orderedItems, type Journal } from "../machines/transcript/reducer.ts";
-import { useDirectory, useHub, useNow } from "../machines/use-machines.ts";
+import { folderName, useDirectory, useHub, useNow } from "../machines/use-machines.ts";
 import { allowedFields } from "./advisor-surfaces.ts";
 import { advisorStore, lastAi, lastMachine, rememberAi, rememberMachine, useAdvisorState, type AdvisorStore, type CopyRecord, type Mood, type Note, type Question } from "./advisor-store.ts";
 
 /** How long asking waits for the machine's link to open. */
 const OPEN_WAIT_MS = 20_000;
 /** How long the short line of an automatic verdict stays beside the mascot. */
-export const FLASH_MS = 8_000;
+export const FLASH_MS = 20_000;
 /** Attachments one question takes (proto AdvisorAttachment). */
 const MAX_ATTACHMENTS = 5;
 /** Characters of one context field (proto AdvisorContext). */
@@ -162,6 +162,23 @@ export function attachmentsOf(
 }
 
 /** Resolves true once the link is open, false after `ms` without. */
+/** True once the machine's thread list has arrived on the link; false when it does not within `ms`. */
+function waitListed(link: MachineLink, ms: number): Promise<boolean> {
+	if (link.snapshot().listed) return Promise.resolve(true);
+	return new Promise((resolve) => {
+		const timer = window.setTimeout(() => {
+			off();
+			resolve(false);
+		}, ms);
+		const off = link.subscribe(() => {
+			if (!link.snapshot().listed) return;
+			window.clearTimeout(timer);
+			off();
+			resolve(true);
+		});
+	});
+}
+
 function waitOpen(link: MachineLink, ms: number): Promise<boolean> {
 	if (link.snapshot().status.kind === "open") return Promise.resolve(true);
 	return new Promise((resolve) => {
@@ -211,7 +228,11 @@ export interface Presence {
 	readonly stop: (question: Question) => Promise<void>;
 	/** Sessions of the question's machine working in its folder, for "Gửi sang phiên". */
 	readonly sessionsFor: (question: Question) => readonly ThreadSummary[];
+	/** Whether a session can still be opened: the machine answers and still lists it. */
+	readonly checkSession: (machine: string, threadId: string) => Promise<SessionCheck>;
 }
+
+export type SessionCheck = "ok" | "missing" | "unreachable";
 
 /** Every machine the directory lists (and the development machine). */
 function machinesOf(listed: readonly MachineEntry[], hub: LinkHub): MachineEntry[] {
@@ -420,6 +441,12 @@ export function useAdvisorPresence(attachedMachine: string, open: boolean, store
 		if (answers.get(question.id)?.state === "waiting") store.dropQuestion(question.id);
 	};
 
+	const checkSession = async (machine: string, threadId: string): Promise<SessionCheck> => {
+		const l = hub.link(machine);
+		l.start();
+		if (!(await waitOpen(l, OPEN_WAIT_MS)) || !(await waitListed(l, OPEN_WAIT_MS))) return "unreachable";
+		return l.snapshot().threads.some((t) => t.id === threadId && !t.archived) ? "ok" : "missing";
+	};
 	const sessionsFor = (question: Question): readonly ThreadSummary[] => {
 		const threads = (states.get(question.machine)?.threads ?? []).filter((t) => !t.archived && t.kind !== ThreadKind.ADVISOR);
 		const from = new Set(question.attached.map((c) => c.context.threadId).filter((id) => id !== ""));
@@ -447,6 +474,7 @@ export function useAdvisorPresence(attachedMachine: string, open: boolean, store
 		ask,
 		stop,
 		sessionsFor,
+		checkSession,
 	};
 }
 
@@ -528,10 +556,16 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			}
 			const fresh = verdicts.filter((i) => !seen?.has(i.id));
 			for (const i of fresh) seen.add(i.id);
+			const page = window.location.pathname + window.location.search;
+			const thread = link.snapshot().threads.find((x) => x.id === threadId);
+			for (const i of fresh) {
+				const text = i.body.case === "advisorVerdict" ? verdictLine(i.body.value) : "";
+				if (text !== "") store.addHistory({ id: i.id, machine, threadId, title: thread?.title || (thread === undefined ? "" : folderName(thread.dir)), text, target: page, at: Date.now(), unavailable: "" });
+			}
 			const last = fresh.at(-1)?.body;
 			if (last?.case !== "advisorVerdict" || store.snapshot().open) return;
 			// The page as it shows now (the session in its chat, terminal or office view): a tap on the line returns to it.
-				store.setFlash(verdictLine(last.value), window.location.pathname + window.location.search);
+			store.setFlash(verdictLine(last.value), page);
 			window.clearTimeout(timer);
 			timer = window.setTimeout(() => store.setFlash(""), FLASH_MS);
 		};

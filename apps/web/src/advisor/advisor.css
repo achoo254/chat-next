@@ -91,6 +91,9 @@
 }
 .adv-recent-item:hover { background: var(--c-hover); }
 .adv-recent-item:disabled { opacity: 0.55; cursor: default; }
+.adv-hist-text { overflow-wrap: anywhere; line-height: 1.4; }
+.adv-recent-item:disabled .adv-hist-text { text-decoration: line-through; }
+.adv-history .adv-note { margin-top: var(--space-2); }
 .adv-consent { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--c-warning); }
 .adv-consent p { margin: 0; font-size: 0.875rem; overflow-wrap: anywhere; }
 .adv-consent .adv-acts { justify-content: flex-end; }

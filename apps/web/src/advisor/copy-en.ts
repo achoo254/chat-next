@@ -43,6 +43,12 @@ export const enAdvisor: AdvisorCopy = {
 		settings: "Open Advisor settings",
 		failed: "The question could not be sent.",
 	},
+	history: {
+		title: (count: number): string => `Recent answers (${count})`,
+		checking: "Checking the session…",
+		missing: "This session is gone, so it cannot be opened.",
+		unreachable: "Cannot reach this session: the machine does not answer.",
+	},
 	answer: {
 		yours: "You asked",
 		waiting: "Waiting for its turn…",

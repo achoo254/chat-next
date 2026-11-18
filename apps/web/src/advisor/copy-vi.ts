@@ -42,6 +42,12 @@ export const viAdvisor = {
 		settings: "Mở cài đặt Cố vấn",
 		failed: "Không gửi được câu hỏi.",
 	},
+	history: {
+		title: (count: number): string => `Câu trả lời gần đây (${count})`,
+		checking: "Đang kiểm tra phiên…",
+		missing: "Phiên này không còn nữa, nên không mở được.",
+		unreachable: "Không dẫn tới được phiên này: máy không phản hồi.",
+	},
 	answer: {
 		yours: "Bạn hỏi",
 		waiting: "Đang chờ tới lượt…",

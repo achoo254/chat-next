@@ -56,6 +56,28 @@ export interface Question {
 	readonly error: string;
 }
 
+/**
+ * An answer Advisor gave on its own (automatic mode) while a session showed:
+ * kept for a while, so one that came and went from beside the mascot can still
+ * be found and followed back to its session. Memory only, never stored.
+ */
+export interface HistoryEntry {
+	/** The verdict's item id. */
+	readonly id: string;
+	readonly machine: string;
+	readonly threadId: string;
+	/** The session's title (or folder) when the answer came; "" when unknown. */
+	readonly title: string;
+	/** Option and its share ("Option (82%)"), or "!" and the error code, as the flash line has it. */
+	readonly text: string;
+	/** The page (path and query, mode and tab included) the answer came on. */
+	readonly target: string;
+	/** Unix milliseconds. */
+	readonly at: number;
+	/** Why the session cannot be opened any more, found when it was tapped; "" while it can. */
+	readonly unavailable: "" | "missing" | "unreachable";
+}
+
 export type Mood = "idle" | "connecting" | "thinking" | "answering" | "sleeping";
 
 /** Why the mascot sleeps or cannot ask, for the bubble to say. */
@@ -81,6 +103,8 @@ export interface AdvisorState {
 	readonly flash: string;
 	/** The page (path and query, the session's mode and tab included) the flash line came from; a tap on the line goes back there. "" when none. */
 	readonly flashTarget: string;
+	/** Answers Advisor gave on its own, newest first. */
+	readonly history: readonly HistoryEntry[];
 	/** An answer came that this device did not ask for (another device's question). */
 	readonly dot: boolean;
 	readonly dock: Dock;
@@ -99,6 +123,8 @@ export const MAX_COPIES = 5;
 export const OFFER_WINDOW_MS = 10 * 60_000;
 /** Characters of one attachment (proto AdvisorAttachment.text). */
 export const MAX_COPY_CHARS = 8000;
+/** Automatic answers kept for finding again; older ones drop. */
+export const MAX_HISTORY = 8;
 /** Questions kept for showing; older ones drop. */
 const MAX_QUESTIONS = 5;
 
@@ -181,6 +207,7 @@ export class AdvisorStore {
 			note: "",
 			flash: "",
 			flashTarget: "",
+			history: [],
 			dot: false,
 			dock: readDock(),
 			hidden: readJson(local, HIDDEN_KEY) === true,
@@ -249,7 +276,7 @@ export class AdvisorStore {
 
 	forgetAll(): void {
 		saveQuestions([]);
-		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", dot: false, mood: "idle", note: "" });
+		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", history: [], dot: false, mood: "idle", note: "" });
 	}
 
 	// --- questions -------------------------------------------------------------
@@ -289,6 +316,16 @@ export class AdvisorStore {
 	/** `target`: the page the line is about, so a tap on it brings the user back to that session and tab. */
 	setFlash(flash: string, target = ""): void {
 		if (flash !== this.state.flash || target !== this.state.flashTarget) this.set({ flash, flashTarget: flash === "" ? "" : target });
+	}
+
+	addHistory(entry: HistoryEntry): void {
+		if (this.state.history.some((h) => h.id === entry.id)) return;
+		this.set({ history: [entry, ...this.state.history].slice(0, MAX_HISTORY) });
+	}
+
+	/** The session of this answer cannot be opened: the answer stays listed, no longer tappable. */
+	markUnavailable(id: string, why: "missing" | "unreachable"): void {
+		this.set({ history: this.state.history.map((h) => (h.id === id ? { ...h, unavailable: why } : h)) });
 	}
 
 	setDot(dot: boolean): void {
