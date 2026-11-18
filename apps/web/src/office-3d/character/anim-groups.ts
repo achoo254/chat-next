@@ -69,7 +69,12 @@ export interface PoseInput {
 	readonly waking?: boolean;
 	/** Sitting low (a beanbag). */
 	readonly low?: boolean;
+	/** Seated at a desk with a keyboard: work there and time free at it both type. */
+	readonly keyboard?: boolean;
 }
+
+/** Work at a keyboard desk is typing, whatever the tool (a phone call or asking Advisor keeps its own pose). */
+const AT_KEYBOARD: ReadonlySet<AnimGroup> = new Set(["read", "type", "machine", "think", "hand-in", "arrive"]);
 
 const SEATED: Readonly<Record<AnimGroup, Pose>> = {
 	read: "sit-read",
@@ -118,7 +123,10 @@ export function poseFor(input: PoseInput): Pose {
 	if (input.moving) return "walk";
 	if (input.refused) return "shake-head";
 	if (input.cheering) return "cheer";
-	if (input.group !== null) return input.seated ? SEATED[input.group] : STANDING[input.group];
+	if (input.group !== null) {
+		if (input.seated && input.keyboard === true && AT_KEYBOARD.has(input.group)) return "sit-type";
+		return input.seated ? SEATED[input.group] : STANDING[input.group];
+	}
 	const talk = input.talk ?? null;
 	if (talk === "clap") return "clap";
 	if (talk === "speak") return input.seated ? "sit-talk" : "talk";
@@ -128,6 +136,8 @@ export function poseFor(input: PoseInput): Pose {
 	if (input.idle === "coffee") return "coffee";
 	if (input.idle === "chat") return "chat";
 	if (input.idle === "yawn") return "yawn";
+	// Free at a keyboard desk: the staff keep working at the computer rather than sitting still.
+	if (input.seated && input.keyboard === true) return "sit-type";
 	return input.seated ? "sit-idle" : "stand-idle";
 }
 

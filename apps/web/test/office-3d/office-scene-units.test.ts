@@ -78,6 +78,19 @@ describe("poses", () => {
 		expect(typesWith("stand-read")).toBe(false);
 	});
 
+	it("types at a keyboard desk, working or free; keeps the seat's own pose elsewhere and for a call or asking Advisor", () => {
+		const atDesk = { ...base, seated: true, keyboard: true } as const;
+		for (const group of ["read", "type", "machine", "think", "hand-in", "arrive"] as const) expect(poseFor({ ...atDesk, group }), group).toBe("sit-type");
+		expect(poseFor(atDesk), "free at the desk in office hours").toBe("sit-type");
+		expect(poseFor({ ...atDesk, group: "phone" })).toBe("sit-phone");
+		expect(poseFor({ ...atDesk, group: "consult" })).toBe("sit-talk");
+		expect(poseFor({ ...atDesk, talk: "speak" })).toBe("sit-talk");
+		expect(poseFor({ ...atDesk, life: "doze" }), "dozing off hours").toBe("sit-idle");
+		// No keyboard (the director's chair, the meeting table): no typing.
+		expect(poseFor({ ...base, seated: true, group: "think" })).toBe("sit-think");
+		expect(poseFor({ ...base, seated: true, group: "read" })).toBe("sit-read");
+	});
+
 	it("shakes the head when refused and cheers a pass, over the work pose", () => {
 		expect(poseFor({ ...base, group: "type", refused: true })).toBe("shake-head");
 		expect(poseFor({ ...base, group: "type", cheering: true })).toBe("cheer");

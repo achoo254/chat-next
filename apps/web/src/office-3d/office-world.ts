@@ -262,21 +262,23 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		opts.onLost();
 	});
 	const removeTestApi = opts.testApi
-		? exposeTestApi(() => {
-				const heads = people.headOffsets();
-				const probes = people.probes();
-				return {
-					backend,
-					quality: scaler.level.id,
-					zoom: camera.user.zoom,
-					pixelsPerMetre: pxPerMetre,
-					dots: overlay.dots,
-					drawCalls: instrumentation.drawCallsCounter.current,
-					frames,
-					fps: engine.getFps(),
-					stats: stats.summary(),
-					camera: { zoom: camera.user.zoom, yaw: camera.user.yaw },
-					people: people.views().map((p) => ({
+		? exposeTestApi(() => ({
+				backend,
+				quality: scaler.level.id,
+				zoom: camera.user.zoom,
+				pixelsPerMetre: pxPerMetre,
+				dots: overlay.dots,
+				drawCalls: instrumentation.drawCallsCounter.current,
+				frames,
+				fps: engine.getFps(),
+				stats: stats.summary(),
+				camera: { zoom: camera.user.zoom, yaw: camera.user.yaw },
+				// Only when read: measuring the bodies skins every person on the CPU, and a test polling the frame
+				// count every 50 ms must not pay for it.
+				get people() {
+					const heads = people.headOffsets();
+					const probes = people.probes();
+					return people.views().map((p) => ({
 						key: p.key,
 						x: p.x,
 						z: p.z,
@@ -289,10 +291,10 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 						head: heads.get(p.key) ?? null,
 						probe: probes.get(p.key) ?? null,
 						screen: overlay.screen.get(p.key) ?? null,
-					})),
-					resetStats: () => stats.reset(),
-				};
-			})
+					}));
+				},
+				resetStats: () => stats.reset(),
+			}))
 		: () => undefined;
 
 	let disposed = false;

@@ -209,6 +209,14 @@ describe("the office's layout", () => {
 		expect(errors).toContain("AUDIT has no place to stand");
 	});
 
+	it("marks the seats at a desk with a keyboard: every work desk, none at the director's chair or the meeting table", () => {
+		const anchors = shipped().anchors;
+		for (const a of anchors.filter((x) => x.kind === "desk")) expect(a.keyboard, a.id).toBe(true);
+		for (const id of ["server-desk", "planning-desk-0", "audit-work-1"]) expect(anchors.find((a) => a.id === id)?.keyboard, id).toBe(true);
+		expect(anchors.find((a) => a.id === "director")?.keyboard).toBe(false);
+		for (const a of anchors.filter((x) => x.kind === "meeting" && x.id.startsWith("meeting-"))) expect(a.keyboard, a.id).toBe(false);
+	});
+
 	it("gives every seat its height from the furniture under it: the cushion less the sink, a beanbag near the floor", () => {
 		const seats = shipped().anchors.filter((a) => a.sit);
 		expect(seats.length).toBeGreaterThan(40);

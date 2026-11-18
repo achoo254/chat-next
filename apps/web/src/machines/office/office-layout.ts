@@ -84,6 +84,8 @@ export interface LayoutAnchor {
 	 * furniture's socket, tools/office-art/furniture-sockets.json). The pelvis sits above it by the character's own seat contact.
 	 */
 	readonly seat: number;
+	/** A seat at a desk with a keyboard: the sitter types there. */
+	readonly keyboard: boolean;
 	/** A gym station's exercise; null elsewhere. */
 	readonly act: GymAct | null;
 	/** The staff key (tools/office-art/staff-cast.json), "director" or "advisor" whose seat this is; null for a seat anyone may take. */
@@ -264,6 +266,7 @@ function parseAnchors(value: unknown, errors: string[]): LayoutAnchor[] {
 			sit: rec.sit === true,
 			low,
 			seat,
+			keyboard: rec.keyboard === true,
 			act,
 			home: stringOf(rec.home) || null,
 			greets: stringOf(rec.greets) || null,

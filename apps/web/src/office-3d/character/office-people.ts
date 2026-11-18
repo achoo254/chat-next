@@ -281,6 +281,7 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					talk: arrived ? p.talk : null,
 					waking,
 					low: p.target.low,
+					keyboard: p.target.keyboard,
 				});
 				if (pose !== p.pose) {
 					if (p.pose === "walk" && group !== null) onEvent("start-work", p.inView);

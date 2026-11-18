@@ -21,6 +21,8 @@ export interface PersonTarget {
 	readonly seat: number;
 	/** A low seat (a beanbag). */
 	readonly low: boolean;
+	/** Seated at a desk with a keyboard (types there). */
+	readonly keyboard: boolean;
 }
 
 const SEAT_KINDS: ReadonlySet<string> = new Set(["desk", "director", "meeting", "sofa"]);
@@ -40,7 +42,7 @@ export function personTarget(layout: OfficeLayout, anchorId: string, share: numb
 	const rightX = Math.cos(a.face);
 	const rightZ = -Math.sin(a.face);
 	if (beside) {
-		return { anchorId, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: a.seat, low: false };
+		return { anchorId, x: a.x + rightX * BESIDE_STEP, z: a.z + rightZ * BESIDE_STEP, face: a.face - Math.PI / 2, node: a.node, seated: false, y: 0, seat: a.seat, low: false, keyboard: false };
 	}
 	const steps = share <= 0 ? 0 : Math.ceil(share / 2) * (share % 2 === 1 ? 1 : -1);
 	return {
@@ -54,6 +56,7 @@ export function personTarget(layout: OfficeLayout, anchorId: string, share: numb
 		y: share <= 0 ? a.y : 0,
 		seat: a.seat,
 		low: share <= 0 && a.low,
+		keyboard: share <= 0 && a.keyboard,
 	};
 }
 
