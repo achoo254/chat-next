@@ -143,6 +143,12 @@ export function aiTerminalsOf(core: AgentCore, programs: (pid: number) => Promis
 }
 
 export type TerminalServiceOptions = {
+  /**
+   * macOS: the sandbox profile every terminal process runs in (the shell, the
+   * AI's CLI), keeping it out of the folders tunelo may not enter so macOS
+   * never holds it on a prompt (safety/mac-sandbox.ts); undefined: none.
+   */
+  sandbox?: () => string | undefined;
   configDir: string;
   config: ConfigStore;
   audit: AuditLog;
@@ -322,6 +328,22 @@ export class TerminalService {
     };
   }
 
+  private sandboxParam(): { sandbox?: string } {
+    const profile = this.opts.sandbox?.();
+    return profile ? { sandbox: profile } : {};
+  }
+
+  /**
+   * The user let tunelo ask macOS for `folder`: the terminal process reads it
+   * once too, so macOS asks about that process now, while the user waits,
+   * never later in a shell. An older terminal process without it is left as is.
+   */
+  probeFolder(folder: string): void {
+    void this.ensure()
+      .then(() => this.call("probe", { path: folder }))
+      .catch(() => undefined);
+  }
+
   async open(cols: number, rows: number, cwd: string): Promise<number> {
     await this.ensure();
     let env: ShellEnv = {};
@@ -331,7 +353,7 @@ export class TerminalService {
       // The accounts cannot be read: the shell starts with the user's own environment.
       this.opts.log(`terminal: AI account not applied (${(err as Error).message})`);
     }
-    const r = await this.call("open", { cols, rows, cwd, ...(Object.keys(env).length > 0 ? { env } : {}) });
+    const r = await this.call("open", { cols, rows, cwd, ...(Object.keys(env).length > 0 ? { env } : {}), ...this.sandboxParam() });
     const session = (r as { session?: unknown }).session;
     if (typeof session !== "number") throw new Error("the terminal process did not name the session");
     this.cwds.set(session, cwd);
@@ -356,7 +378,7 @@ export class TerminalService {
       const withVars = Object.keys(vars).length > 0 ? { env: vars } : {};
       let session: unknown;
       try {
-        const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars });
+        const r = await this.call("open", { cols, rows, shell, args, cwd, ...withVars, ...this.sandboxParam() });
         session = (r as { session?: unknown }).session;
         if (typeof session !== "number") throw new Error("the terminal process did not name the session");
       } catch (err) {

@@ -20,6 +20,8 @@ pub const MINOR: u64 = 1;
 pub const DEFAULT_GRANT_MS: u64 = 60_000;
 pub const MAX_GRANT_MS: u64 = 600_000;
 const MAX_STRING: usize = 4096;
+/// Longest sandbox profile tunelo sends with `open` (safety/mac-sandbox.ts).
+const MAX_SANDBOX: usize = 64 * 1024;
 const MAX_ARGS: usize = 64;
 const MAX_SIGNAL_TEXT: usize = 64 * 1024;
 const MAX_REVOKED: usize = 10_000;
@@ -97,6 +99,12 @@ pub enum Command {
         up_to: u64,
     },
     Shutdown,
+    /// Read `path` once in a thread of its own, so macOS asks about this
+    /// process too while the user waits for it (tunelo's "ask macOS").
+    /// Answered at once; a prompt nobody answers holds only that thread.
+    Probe {
+        path: PathBuf,
+    },
     /// `hello` after the handshake.
     Hello,
 }
@@ -266,6 +274,14 @@ pub fn parse(body: &[u8]) -> (Value, Result<Command, CmdError>) {
         }),
         "ack_audit" => params::<AckP>(&v).map(|p| Command::AckAudit { up_to: p.up_to }),
         "shutdown" => Ok(Command::Shutdown),
+        "probe" => params::<ProbeP>(&v).and_then(|p| {
+            checked_text(&p.path, "path")?;
+            let path = PathBuf::from(p.path);
+            if !path.is_absolute() {
+                return Err(bad("path must be absolute"));
+            }
+            Ok(Command::Probe { path })
+        }),
         _ => Err(bad("unknown cmd")),
     };
     (id, result)
@@ -314,11 +330,20 @@ fn open_spec(p: OpenP) -> Result<OpenSpec, CmdError> {
             return Err(bad("arg too long or contains NUL"));
         }
     }
+    if let Some(profile) = &p.sandbox {
+        if profile.is_empty() || profile.len() > MAX_SANDBOX || profile.contains('\0') {
+            return Err(bad(format!(
+                "sandbox must be 1..={MAX_SANDBOX} bytes without NUL"
+            )));
+        }
+    }
     let cwd = match p.cwd {
         Some(c) => {
             checked_text(&c, "cwd")?;
             let path = PathBuf::from(c);
-            if !path.is_absolute() || !path.is_dir() {
+            // In a sandbox the folder is entered inside it (pty.rs): this
+            // process never looks into it, so macOS never asks about it here.
+            if !path.is_absolute() || (p.sandbox.is_none() && !path.is_dir()) {
                 return Err(bad("cwd must be an existing absolute directory"));
             }
             Some(path)
@@ -340,7 +365,13 @@ fn open_spec(p: OpenP) -> Result<OpenSpec, CmdError> {
         args,
         cwd,
         claude_config_dir,
+        sandbox: p.sandbox,
     })
+}
+
+#[derive(Deserialize)]
+struct ProbeP {
+    path: String,
 }
 
 #[derive(Deserialize)]
@@ -351,6 +382,8 @@ struct OpenP {
     args: Option<Vec<String>>,
     cwd: Option<String>,
     env: Option<BTreeMap<String, String>>,
+    /// macOS: a sandbox profile the process runs in (sandbox-exec -p).
+    sandbox: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -560,5 +593,26 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn open_with_a_sandbox_leaves_the_folder_to_the_sandbox_and_probe_takes_an_absolute_path() {
+        let (_, r) = p(
+            json!({"id": 1, "cmd": "open", "cols": 80, "rows": 24, "cwd": "/definitely/not/here", "sandbox": "(version 1)(allow default)"}),
+        );
+        assert!(matches!(
+            r,
+            Ok(Command::Open(OpenSpec {
+                sandbox: Some(_),
+                cwd: Some(_),
+                ..
+            }))
+        ));
+        let (_, r) = p(json!({"id": 1, "cmd": "open", "cols": 80, "rows": 24, "sandbox": ""}));
+        assert!(r.is_err());
+        let (_, r) = p(json!({"id": 1, "cmd": "probe", "path": "/Users/an/Documents"}));
+        assert!(matches!(r, Ok(Command::Probe { .. })));
+        let (_, r) = p(json!({"id": 1, "cmd": "probe", "path": "Documents"}));
+        assert!(r.is_err());
     }
 }

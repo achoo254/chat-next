@@ -26,6 +26,10 @@ pub struct OpenSpec {
     pub args: Vec<String>,
     pub cwd: Option<PathBuf>,
     pub claude_config_dir: Option<String>,
+    /// macOS: a sandbox profile the process runs in (`sandbox-exec -p`), so
+    /// it is refused at once in the folders tunelo may not enter instead of
+    /// waiting on a macOS prompt. The working folder is entered inside it.
+    pub sandbox: Option<String>,
 }
 
 /// How a session's process ended.
@@ -145,7 +149,56 @@ fn default_command() -> CommandBuilder {
     CommandBuilder::new(comspec)
 }
 
+/// The user's login shell, run explicitly (inside the sandbox).
+#[cfg(unix)]
+fn login_shell() -> (String, Vec<String>) {
+    let shell = std::env::var("SHELL")
+        .ok()
+        .filter(|s| s.starts_with('/'))
+        .unwrap_or_else(|| "/bin/zsh".to_string());
+    (shell, vec!["-l".to_string()])
+}
+
+/// `spec` run in its sandbox: sandbox-exec starts a plain sh that enters the
+/// working folder (inside the sandbox, so a refused folder fails at once and
+/// the shell starts in home instead) and execs the program.
+#[cfg(unix)]
+fn sandboxed(spec: &OpenSpec, profile: &str) -> CommandBuilder {
+    let (prog, args) = match &spec.shell {
+        Some(shell) => (shell.clone(), spec.args.clone()),
+        None => login_shell(),
+    };
+    let mut cmd = CommandBuilder::new("/usr/bin/sandbox-exec");
+    cmd.args(["-p", profile, "/bin/sh", "-c", ENTER_THEN_EXEC, "sh"]);
+    let cwd = spec
+        .cwd
+        .as_ref()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    cmd.arg(cwd);
+    cmd.arg(prog);
+    cmd.args(args);
+    if let Some(home) = std::env::var_os("HOME") {
+        cmd.cwd(home);
+    }
+    cmd
+}
+
+/// sh -c script: $1 the working folder ("" for none), then the program and its arguments.
+#[cfg(unix)]
+const ENTER_THEN_EXEC: &str = r#"if [ -n "$1" ]; then cd -- "$1" 2>/dev/null || echo "tunelo: macOS does not let this terminal into $1" >&2; fi; shift; exec "$@""#;
+
 fn command(spec: &OpenSpec) -> CommandBuilder {
+    #[cfg(unix)]
+    if let Some(profile) = &spec.sandbox {
+        let mut cmd = sandboxed(spec, profile);
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+        if let Some(dir) = &spec.claude_config_dir {
+            cmd.env("CLAUDE_CONFIG_DIR", dir);
+        }
+        return cmd;
+    }
     let mut cmd = match &spec.shell {
         Some(shell) => {
             let mut c = CommandBuilder::new(shell);
@@ -403,6 +456,64 @@ impl ProcessControl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_sandboxed_program_enters_its_folder_inside_the_sandbox() {
+        let spec = OpenSpec {
+            cols: 80,
+            rows: 24,
+            shell: Some("/usr/local/bin/claude".into()),
+            args: vec!["--resume".into(), "x".into()],
+            cwd: Some(PathBuf::from("/Users/an/Documents/app")),
+            sandbox: Some("(version 1)(allow default)".into()),
+            ..OpenSpec::default()
+        };
+        let argv: Vec<String> = command(&spec)
+            .get_argv()
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            argv,
+            [
+                "/usr/bin/sandbox-exec",
+                "-p",
+                "(version 1)(allow default)",
+                "/bin/sh",
+                "-c",
+                ENTER_THEN_EXEC,
+                "sh",
+                "/Users/an/Documents/app",
+                "/usr/local/bin/claude",
+                "--resume",
+                "x"
+            ]
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn on_this_mac_a_fenced_folder_is_refused_at_once() {
+        let root = std::env::temp_dir().join(format!("term-host-sb-{}", std::process::id()));
+        let kept = root.join("kept");
+        std::fs::create_dir_all(&kept).unwrap();
+        let profile = format!(
+            "(version 1)(allow default)(deny file-read* (subpath \"{}\"))",
+            kept.canonicalize().unwrap().display()
+        );
+        let started = std::time::Instant::now();
+        let out = std::process::Command::new("/usr/bin/sandbox-exec")
+            .args(["-p", &profile, "/bin/sh", "-c", ENTER_THEN_EXEC, "sh"])
+            .arg(kept.canonicalize().unwrap())
+            .args(["/bin/pwd"])
+            .output()
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        assert!(String::from_utf8_lossy(&out.stderr).contains("does not let this terminal into"));
+        assert!(!String::from_utf8_lossy(&out.stdout).contains("kept"));
+    }
 
     #[test]
     fn startup_dsr_is_removed_once() {

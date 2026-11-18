@@ -125,6 +125,13 @@ impl Hub {
                 Ok(json!({}))
             }
             Command::Shutdown => Ok(json!({})),
+            Command::Probe { path } => {
+                // A macOS prompt nobody answers holds this thread only, never the hub.
+                std::thread::spawn(move || {
+                    let _ = std::fs::read_dir(&path);
+                });
+                Ok(json!({}))
+            }
         }
     }
 

@@ -27,6 +27,8 @@ import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease, TicketScope } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
 import { type MacAccess, MacFolders, hasFullDiskAccess, probeInChild } from "./safety/mac-folders.ts";
+import { claudeSandboxOn, sandboxApplies, sandboxProfile } from "./safety/mac-sandbox.ts";
+import { defaultClaudeHome } from "./providers/claude/accounts/paths.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit } from "./service.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
 import { ControlError } from "./terminal/host-link.ts";
@@ -156,7 +158,11 @@ export class Machine {
       configDir: dir,
       fullDiskAccess: hasFullDiskAccess,
       // A new copy of tunelo tries the folder: a macOS prompt nobody answers holds that copy, never this one.
-      probe: (folder) => probeInChild(selfCommand("mac-folder-access"), folder, MAC_PROMPT_WAIT_MS),
+      probe: (folder) => {
+        // The terminal process is another program to macOS: it reads the folder now too, so macOS asks about both at once.
+        this.terminal.probeFolder(folder);
+        return probeInChild(selfCommand("mac-folder-access"), folder, MAC_PROMPT_WAIT_MS);
+      },
       onChange: () => void this.announceInfo(),
       log: (line) => this.log(line),
     });
@@ -287,6 +293,12 @@ export class Machine {
     }
     this.terminal = new TerminalService({
       configDir: dir,
+      sandbox: () => {
+        // Claude Code's own sandbox cannot run inside tunelo's: a terminal on such a machine runs as before.
+        if (claudeSandboxOn([join(defaultClaudeHome(), "settings.json")])) return undefined;
+        const fences = this.macFolders.aiFences();
+        return sandboxApplies(fences) ? sandboxProfile(fences) : undefined;
+      },
       config: this.config,
       audit: this.audit,
       unit: "termHostUnit" in opts ? opts.termHostUnit : termHostUnit(dir),

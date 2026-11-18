@@ -474,6 +474,11 @@ Disk Access (quyết định 18/11/2026). Mã: [`src/safety/mac-folders.ts`](src
   `claude -p` trong sandbox vẫn đăng nhập, gọi API, chạy Bash. Máy có Full Disk Access thì không sandbox. Cấp thêm một thư mục
   thì phiên khởi động lại (rảnh: ngay; đang chạy: hết lượt) và tiến trình agy dùng chung khởi động lại khi không còn phiên mở.
   Cài đặt Claude Code bật `sandbox.enabled` thì phiên đó không bọc (sandbox không lồng được).
+- Terminal (3.21.0): `tunelo-term-host` là chương trình riêng với macOS (LaunchAgent riêng, quyền riêng). Mọi tiến trình nó mở
+  (shell, CLI của AI trong tab terminal) chạy trong cùng sandbox: `open` mang `sandbox` (luật sandbox) và term-host chạy
+  `sandbox-exec -p … /bin/sh -c 'cd …; exec …'`, nên nó không tự nhìn vào thư mục làm việc (macOS không hỏi về term-host khi mở
+  tab). Khi người dùng bấm "Xin quyền", tunelo gửi `probe` cho term-host để nó đọc thư mục một lần trong luồng riêng: macOS hỏi
+  luôn cho term-host trong lúc người dùng đang chờ, không hỏi lén về sau. term-host cũ bỏ qua `sandbox` và `probe`.
 - Trong phiên AI (3.19.0), cuộc trò chuyện không bao giờ kẹt vì một hộp thoại của macOS không ai bấm:
   - Claude Code: hook `PreToolUse` (mọi tool, mọi chế độ) trả `ask` cho lời gọi nhắc tới thư mục chưa được cho, nên lời gọi đi qua
     thẻ duyệt (`canUseTool`). agy: thẻ của `session/request_permission` (lệnh shell, sửa file, MCP). Thẻ mang
