@@ -1018,6 +1018,53 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("an AI's pane that cannot open again says why, turns its button off and opens nothing else", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		host.exit(1, 0);
+		// An earlier test may have ended session 1 of this machine on purpose: either bar text means it ended.
+		await screen.findByText(/Tiến trình đã thoát|Phiên đã kết thúc/);
+		// The exited session still counts against the machine's limit, so the machine refuses the reopen.
+		host.maxSessions = 1;
+		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
+		expect(await screen.findByText(/Không mở lại được đúng phiên này/)).toBeTruthy();
+		expect((screen.getByRole("button", { name: "Mở lại trong terminal" }) as HTMLButtonElement).disabled).toBe(true);
+		expect(sent("termOpen")).toHaveLength(2);
+		expect(sent("termOpen").every((f) => (f.body.value as { aiSession?: unknown }).aiSession !== undefined)).toBe(true);
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("an AI's pane whose reopen failed for a reason that may pass turns its button on again after a few seconds", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1" }} store={refusing()} touch={false} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		host.exit(1, 0);
+		await screen.findByText(/Tiến trình đã thoát|Phiên đã kết thúc/);
+		// The machine's link drops for a moment: not an answer about the session, so the failure may pass.
+		parts.link.stop();
+		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
+		expect(await screen.findByText(/Thử lại được sau vài giây/)).toBeTruthy();
+		expect((screen.getByRole("button", { name: "Mở lại trong terminal" }) as HTMLButtonElement).disabled).toBe(true);
+		await waitFor(() => expect((screen.getByRole("button", { name: "Mở lại trong terminal" }) as HTMLButtonElement).disabled).toBe(false), { timeout: 7000 });
+		parts.terminal.stop();
+	}, 15000);
+
 	it("an AI's terminal that ended as chat took the session back says so, and keeps saying it after the chat turn", async () => {
 		// Session ids start again with each test's terminal: not one an earlier test ended on purpose.
 		forgetEnded("1", 1);

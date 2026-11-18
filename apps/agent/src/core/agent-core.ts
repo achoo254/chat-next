@@ -276,6 +276,12 @@ type Thread = {
    * to the machine's own session meanwhile, so two processes never write it.
    */
   launching?: boolean;
+  /**
+   * The conversation the thread's CLI in a terminal went on in (/clear, /resume) that has no transcript yet, so
+   * the thread cannot follow it: it stays on the earlier one. Once that terminal ends, opening it again would show
+   * the earlier conversation, not the one that was on screen; terminalLaunch says so once instead.
+   */
+  untranscribedHeld?: string;
   /** A message sent in chat is taking the thread back from its CLI in the terminal (takeFromTerminal): others wait for it. */
   takingFromTerminal?: Promise<void>;
   /**
@@ -1810,6 +1816,8 @@ export class AgentCore {
     t.turnItem = `turn:${t.turnCount}:${randomUUID().slice(0, 8)}`;
     this.put(t, t.turnItem, { case: "turn", value: { state: TurnState.RUNNING, clientMsgId } });
     t.running = true;
+    // Chat goes on in the thread's own conversation: what the CLI left unwritten no longer waits to be told.
+    delete t.untranscribedHeld;
     t.lastActive = this.now();
     if (t.meta.kind === "advisor") {
       const turnItem = t.turnItem;
@@ -3233,6 +3241,13 @@ export class AgentCore {
     }
     // A message from chat taking the thread back from the terminal is a turn about to run.
     if (this.turnHolds(t) || t.takingFromTerminal) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    // The conversation on screen when the CLI ended never got a transcript: it cannot be opened again, and opening
+    // the earlier one in its place unasked would be another session. Said once; the next open shows the earlier one.
+    if (t.untranscribedHeld !== undefined) {
+      const held = t.untranscribedHeld;
+      delete t.untranscribedHeld;
+      throw new AgentError(ErrorCode.NOT_FOUND, "the conversation the terminal ended in has nothing written to resume", { reason: ErrorReason.SESSION_NOT_FOUND, subject: held });
+    }
     if (this.busyElsewhere(t)) {
       throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
     }
@@ -3519,6 +3534,7 @@ export class AgentCore {
     this.pendingTerminalSession.delete(threadId);
     delete t.launching;
     delete t.lastTerminal;
+    delete t.untranscribedHeld;
     // The CLI that ran before in another terminal process (replaced) is gone: its ticket ends; this one's holds.
     this.releaseLease(t, "terminalLease");
     if (t.launchLease) t.terminalLease = t.launchLease;
@@ -3565,7 +3581,16 @@ export class AgentCore {
     let before: number | undefined;
     try {
       held = history.terminalHeldSession({ dir: t.meta.dir, startedAt: at.startedAt, ...(seg.sessionId ? { sessionId: seg.sessionId } : {}) })?.toLowerCase();
-      if (!held || held === seg.sessionId?.toLowerCase() || history.end(held) === undefined) return false;
+      // Nothing can be told: what was known stays.
+      if (!held) return false;
+      if (held === seg.sessionId?.toLowerCase()) {
+        delete t.untranscribedHeld;
+        return false;
+      }
+      if (history.end(held) === undefined) {
+        t.untranscribedHeld = held;
+        return false;
+      }
       before = seg.sessionId ? history.end(seg.sessionId) : undefined;
     } catch {
       return false;

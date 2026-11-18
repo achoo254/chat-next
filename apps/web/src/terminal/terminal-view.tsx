@@ -172,6 +172,9 @@ class OutputWriter {
 }
 
 
+/** DECTCEM off, written after the program's last output so nothing it printed shows the caret again. */
+const HIDE_CURSOR = new TextEncoder().encode("\x1b[?25l");
+
 const encoder = new TextEncoder();
 
 export function TerminalView({ link, session, focused, touch, label, latestLabel = "", openingLabel = "", syncingLabel = "", probe, onFocus, onTitle, onExit, onGone, onShortcut, register }: TerminalViewProps) {
@@ -365,6 +368,10 @@ export function TerminalView({ link, session, focused, touch, label, latestLabel
 				},
 				caughtUp: () => cover.caughtUp(),
 				exit: (code) => {
+					// The program is gone: no caret, blinking or still, however the pane was focused or touched.
+					term.options.cursorBlink = false;
+					term.options.cursorInactiveStyle = "none";
+					writer.write(HIDE_CURSOR, () => undefined);
 					gate.open();
 					exited(code);
 				},

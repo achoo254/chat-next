@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { ErrorCode, ErrorReason, TermOpenSchema, ThreadState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import { TURN_END_SETTINGS, terminalCommand } from "../src/providers/claude/index.ts";
-import type { AgentProvider, TerminalLaunch } from "../src/providers/types.ts";
+import type { AgentProvider, SessionHistory, TerminalLaunch } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { tempDir } from "./harness.ts";
 import { FakeTermHost, fakeUnit } from "./support/fake-term-host.ts";
@@ -94,6 +94,35 @@ describe("a thread's AI in the terminal", () => {
     // Nothing to resume (no transcript): the next open starts a new session again.
     await m.c.request("2", openAi(created.id));
     expect(m.host.commands.filter((x) => x.cmd === "open")[1]?.args).toEqual(["--session-id", "11111111-2222-4333-8444-555555555555"]);
+  });
+
+  it("a conversation the CLI went on in without writing to it is not silently swapped for the earlier one when the terminal opens again", async () => {
+    // The CLI holds a new conversation (/clear) that has no transcript, so the thread cannot follow it.
+    const live = { held: undefined as string | undefined };
+    const history: SessionHistory = {
+      list: () => ({ sessions: [], total: 0, dirs: [] }),
+      find: () => undefined,
+      end: (id) => (id === "fake-session-1" ? 1 : undefined),
+      read: () => undefined,
+      terminalHeldSession: () => live.held,
+    };
+    const m = await setup({ ...cliProvider(), history });
+    const created = await m.core.create({ provider: "fake", model: "", dir: m.work, text: "hi", consent, device: "test" });
+    await until(() => summaryOf(m, created.id)?.state === ThreadState.IDLE && summaryOf(m, created.id)?.open === true, "first turn");
+    await m.c.request("1", openAi(created.id));
+    live.held = "cleared-conversation";
+    await m.core.lookElsewhere();
+    m.host.exit(1);
+    await until(() => summaryOf(m, created.id)?.terminalSession === 0, "terminal ended");
+    // Opening again says so, and starts nothing.
+    const refused = await m.c.request("2", openAi(created.id));
+    expect(refused.body).toMatchObject({ case: "error", value: { code: ErrorCode.NOT_FOUND, reason: ErrorReason.SESSION_NOT_FOUND } });
+    expect(m.host.commands.filter((x) => x.cmd === "open")).toHaveLength(1);
+    // Said once: the next, deliberate open shows the thread's own conversation.
+    live.held = undefined;
+    const opened = await m.c.request("3", openAi(created.id));
+    expect(opened.body).toMatchObject({ case: "termOpened" });
+    expect(m.host.commands.filter((x) => x.cmd === "open")[1]?.args).toEqual(["--resume", "fake-session-1"]);
   });
 
   it("ending the terminal (TermClose) lets chat write again", async () => {

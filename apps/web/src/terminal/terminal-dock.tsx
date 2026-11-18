@@ -95,6 +95,15 @@ function isMac(): boolean {
 }
 
 /** Why a terminal could not open, in the user's language (a refusal names the terminal, not the AI). */
+/** How long a pane's reopen button stays off after a failure that may pass by itself. */
+const REOPEN_RETRY_MS = 5000;
+
+/** A reopen failure that may pass in seconds (the link, the terminal process starting, another process of the AI exiting). */
+function isTransient(err: unknown): boolean {
+	if (!(err instanceof RemoteError)) return true;
+	return err.reason === ErrorReason.TERMINAL_UNAVAILABLE || err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE || err.reason === ErrorReason.AI_START_FAILED;
+}
+
 function openErrorText(t: MachinesCopy, err: unknown): string {
 	if (err instanceof RemoteError && err.reason === ErrorReason.ACCESS_DENIED) return t.terminal.failed.refused;
 	// The session's AI: another process of it on the machine has the session open (a window of the owner's own).
@@ -275,6 +284,17 @@ export function TerminalDock({
 	const [lost, setLost] = useState<ReadonlySet<number>>(() => new Set());
 	/** AI panes whose terminal ended as chat took the session back (a turn runs in chat after it): they say so, not "exited". */
 	const [moved, setMoved] = useState<ReadonlySet<number>>(() => new Set());
+	/** AI panes that cannot be opened again, with why: the button is off and the reason shows in its place. */
+	const [blocked, setBlocked] = useState<ReadonlyMap<number, string>>(() => new Map());
+	/** The timers that turn a pane's button on again after a failure that may pass. */
+	const retryTimers = useRef(new Set<number>());
+	useEffect(() => {
+		const timers = retryTimers.current;
+		return () => {
+			for (const id of timers) window.clearTimeout(id);
+			timers.clear();
+		};
+	}, []);
 	const ime = useRef<HTMLTextAreaElement>(null);
 	const root = useRef<HTMLDivElement>(null);
 	const autoOpened = useRef(false);
@@ -343,7 +363,7 @@ export function TerminalDock({
 	}, [ready, layout, scope, store]);
 
 	/** A shell in `cwd`, or (`ai`) the session's AI: the machine picks what runs for it, this page names only the session. */
-	const openSession = async (cwd = shellDir, ai = false): Promise<number | null> => {
+	const openSession = async (cwd = shellDir, ai = false, onFail?: (why: string, kind: "busy" | "later" | "never") => void): Promise<number | null> => {
 		setBusy(true);
 		setNotice("");
 		setFolderGone(false);
@@ -356,9 +376,12 @@ export function TerminalDock({
 			// A turn still running in chat is not an error: the terminal opens once it ends.
 			if (ai && err instanceof RemoteError && err.reason === ErrorReason.THREAD_RUNNING) {
 				setWaitingTurn(true);
+				onFail?.(tt.waitTurn, "busy");
 				return null;
 			}
-			setNotice(openErrorText(t, err));
+			const why = openErrorText(t, err);
+			setNotice(why);
+			onFail?.(why, isTransient(err) ? "later" : "never");
 			setFolderGone(err instanceof RemoteError && err.reason === ErrorReason.FOLDER_NOT_FOUND);
 			return null;
 		} finally {
@@ -754,7 +777,34 @@ export function TerminalDock({
 	};
 	/** After its program ended: a new shell in the pane, or the session's AI again. */
 	const restart = async (pane: PaneNode) => {
-		const session = await openSession(shellDir, pane.ai === true);
+		const block = (why: string) => setBlocked((m) => new Map(m).set(pane.session, why));
+		// The AI's pane reopens the AI of its own session or nothing: never a plain shell, never another session.
+		if (pane.ai === true && threadId === undefined) {
+			block(tt.reopenUnavailable);
+			return;
+		}
+		const session = await openSession(shellDir, pane.ai === true, (why, kind) => {
+			if (pane.ai !== true) return;
+			if (kind === "busy") {
+				setNotice(why);
+				return;
+			}
+			if (kind === "never") {
+				block(why);
+				return;
+			}
+			block(tt.reopenLater(why));
+			// It may pass: the button is on again in a few seconds, the reason stays until then.
+			const timer = window.setTimeout(() => {
+				retryTimers.current.delete(timer);
+				setBlocked((m) => {
+					const next = new Map(m);
+					next.delete(pane.session);
+					return next;
+				});
+			}, REOPEN_RETRY_MS);
+			retryTimers.current.add(timer);
+		});
 		if (session === null) return;
 		// The machine may hand back the same id (the AI still listed as running there): never close what now shows.
 		if (session !== pane.session) closeSessionOnMachine(pane.session);
@@ -813,7 +863,7 @@ export function TerminalDock({
 				{code !== undefined && (
 					// Above xterm's layers; a tap here is for its buttons, not for focusing the pane.
 					<div className="tx-ended" role="status" onPointerUp={(event) => event.stopPropagation()}>
-						<span>{lost.has(pane.session) ? tt.lostAi : moved.has(pane.session) ? tt.movedToChat : endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
+						<span>{blocked.has(pane.session) ? tt.reopenBlocked(blocked.get(pane.session) ?? "") : lost.has(pane.session) ? tt.lostAi : moved.has(pane.session) ? tt.movedToChat : endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
 						<button type="button" className="btn btn-sm" onClick={() => closePanes([pane.id])}>
 							{tt.closePane}
 						</button>
@@ -827,7 +877,7 @@ export function TerminalDock({
 								{tt.backToChat}
 							</button>
 						) : (
-							<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void restart(pane)}>
+							<button type="button" className="btn btn-sm btn-primary" disabled={busy || blocked.has(pane.session)} onClick={() => void restart(pane)}>
 								{pane.ai === true ? tt.reopenAi : tt.newShell}
 							</button>
 						)}
