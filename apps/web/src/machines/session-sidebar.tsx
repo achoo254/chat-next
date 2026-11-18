@@ -3,8 +3,8 @@
 // to a git repository) > Workspace (a folder on one machine, with its own
 // state) > sessions (project-tree.ts, project-tree-view.tsx). On top:
 // "Quản lý máy" (machines, their state, pairing, overview, settings and
-// plain shells; a dot when one needs the user), then one row with "Làm mới
-// danh sách" and "+" for "Thêm dự án".
+// plain shells; a dot when one needs the user), beside "Làm mới danh sách"
+// and "+" for "Thêm dự án" in the column's head.
 // Folders whose sessions no workspace holds wait, folded, in "Chưa phân
 // loại" at the bottom; archived sessions show only behind their own link.
 // While it shows, the sync tidies the workspaces the user added (never adds
@@ -237,6 +237,8 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		<section className="mx-list" aria-label={t.agent.sessionsLabel}>
 			<header className="mx-list-head">
 				<h2>{t.agent.title}</h2>
+				<RefreshList machines={machines} refreshProjects={() => store.refresh()} />
+				<AddProject machines={machines} compact />
 				<Link to={aiPaths.manage} className="btn btn-sm mx-manage" title={hostNote === "" ? t.agent.machines : `${t.agent.machines}: ${hostNote}`} current={view.page === "machines" || view.page === "add"}>
 					<MachineIcon name="monitor" small />
 					<span>{t.agent.machines}</span>
@@ -247,10 +249,6 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 					)}
 				</Link>
 			</header>
-			<div className="mx-nav-top">
-				<RefreshList machines={machines} refreshProjects={() => store.refresh()} />
-				<AddProject machines={machines} compact />
-			</div>
 			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
 				{snapshot.status === "loading" && machines.length > 0 && (
 					<ul className="mx-rows skeleton" aria-hidden="true">

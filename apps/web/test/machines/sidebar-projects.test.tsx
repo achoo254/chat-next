@@ -7,7 +7,7 @@
 // each folder offering "Tạo dự án" and "Thêm vào dự án…" (another
 // repository's project refused); "Thêm dự án" takes a name and an optional
 // repository; an empty project offers "Thêm workspace"; "Làm mới danh sách"
-// lists again, with "+" on the same row.
+// lists again, with "+" beside it in the column's head.
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { create } from "@bufbuild/protobuf";
 import { ProjectSchema, TerminalAvailability, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
@@ -170,9 +170,9 @@ describe("the project column", () => {
 		// The session outside every workspace waits, folded, in "Chưa phân loại".
 		expect(within(list).getByRole("button", { name: "Chưa phân loại (1)" }).getAttribute("aria-expanded")).toBe("false");
 		expect(within(list).queryByText("t3")).toBeNull();
-		// The top row: "Làm mới danh sách", then "+" for a project; no filter switch.
-		const row = list.querySelector<HTMLElement>(".mx-nav-top");
-		if (row === null) throw new Error("no top row");
+		// The column's head: "Làm mới danh sách" and "+" for a project beside "Quản lý máy"; no filter switch.
+		const row = list.querySelector<HTMLElement>(".mx-list-head");
+		if (row === null) throw new Error("no head");
 		expect(within(row).getByRole("button", { name: "Làm mới danh sách" })).toBeTruthy();
 		expect(within(row).queryByRole("switch")).toBeNull();
 		expect(within(row).getByRole("button", { name: "Thêm dự án" })).toBeTruthy();

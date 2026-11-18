@@ -193,7 +193,7 @@ test("the column speaks of projects only: the folders added on the machine are p
 	const toggleBox = await chat.locator(".mx-project-toggle").boundingBox();
 	assert.ok((toggleBox?.height ?? 0) >= 44, `project row ${toggleBox?.height}`);
 	// "Thêm dự án": a name, an optional repository, or a folder on the machine.
-	await page.locator(".mx-nav-top [data-id=add-project]").click();
+	await page.locator(".mx-list-head [data-id=add-project]").click();
 	const dialog = page.getByRole("dialog");
 	await dialog.getByRole("textbox", { name: "Tên dự án" }).waitFor();
 	assert.equal(await dialog.getByRole("textbox", { name: "Repo git (tuỳ chọn)" }).count(), 1);
