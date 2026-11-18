@@ -12,7 +12,14 @@
 // the lowest point of the hips and thighs around it (the model's seat
 // contact); the model is lifted so that point lands on the seat's height
 // (the anchor's: a cushion less its sink, a beanbag) and slid so the pelvis is
-// over the seat's centre, the anchor, instead of behind the chair's back. A
+// over the seat's centre, the anchor, instead of behind the chair's back.
+// Walking keeps the feet on the floor: the clip's pelvis bobs as much as an
+// adult's over the chibi's short legs, which lifted both feet off the floor
+// mid-stride (the build grounds only the clip's lowest moment, a toe pointing
+// down). Each frame, once the animations posed the bones, the few hundred
+// vertices of the feet are skinned on the CPU and the model is lowered so the
+// lowest of them is on the floor (foot bones cannot tell: a heel strike and a
+// flat foot put the sole at different depths under the ankle). A
 // lying clip lies on the ground at the root, which the people coordinator
 // puts at the bed's height. Each copy wears its skin
 // cell (character-skins.ts) and its accessory on a bone; the pantry mug shows
@@ -81,6 +88,72 @@ interface ClipSeat {
 
 /** Where each sitting clip rests, shared by everyone on one model (same rig and skin): measured once per model. */
 const seatsByModel = new WeakMap<AssetContainer, Map<string, ClipSeat>>();
+
+/** The bones whose skin is the feet: the lowest point of a walking body is on one of them. */
+const FOOT_BONES: ReadonlySet<string> = new Set(["foot_l", "foot_r", "ball_l", "ball_r"]);
+/** Clips that walk, whose lowest foot is kept on the floor. */
+const PLANTED_CLIPS: ReadonlySet<string> = new Set(["Walk"]);
+
+/** One vertex of a foot as bound: its place in the mesh and the four bones (matrix slots) and weights that move it. */
+interface FootVertex {
+	readonly x: number;
+	readonly y: number;
+	readonly z: number;
+	readonly bones: readonly number[];
+	readonly weights: readonly number[];
+}
+
+/** The feet's vertices of each skinned mesh, read once from the bind pose. */
+function footVertices(meshes: readonly AbstractMesh[]): { mesh: AbstractMesh; vertices: FootVertex[] }[] {
+	const out: { mesh: AbstractMesh; vertices: FootVertex[] }[] = [];
+	for (const mesh of meshes) {
+		const skeleton = mesh.skeleton;
+		const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+		const indices = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
+		const weights = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
+		if (skeleton == null || positions == null || indices == null || weights == null) continue;
+		const bones = new Map(skeleton.bones.map((bone) => [bone.getIndex(), bone]));
+		const vertices: FootVertex[] = [];
+		for (let v = 0; v * 3 < positions.length; v += 1) {
+			const w = [0, 1, 2, 3].map((k) => weights[v * 4 + k] ?? 0);
+			const b = [0, 1, 2, 3].map((k) => indices[v * 4 + k] ?? 0);
+			const strongest = w.indexOf(Math.max(...w));
+			const name = bones.get(b[strongest] ?? -1)?.name ?? "";
+			if (![...FOOT_BONES].some((foot) => name === foot || name.startsWith(`${foot}-`))) continue;
+			vertices.push({ x: positions[v * 3] ?? 0, y: positions[v * 3 + 1] ?? 0, z: positions[v * 3 + 2] ?? 0, bones: b, weights: w });
+		}
+		if (vertices.length > 0) out.push({ mesh, vertices });
+	}
+	return out;
+}
+
+/** The lowest world height of the feet as posed now (their bones' matrices computed for this pose first); null without feet. */
+function lowestFoot(feet: readonly { mesh: AbstractMesh; vertices: readonly FootVertex[] }[]): number | null {
+	let lowest = Infinity;
+	for (const { mesh, vertices } of feet) {
+		const skeleton = mesh.skeleton;
+		if (skeleton == null) continue;
+		skeleton.prepare(true);
+		const m = skeleton.getTransformMatrices(mesh);
+		const world = mesh.computeWorldMatrix(true).m;
+		for (const v of vertices) {
+			// Skinned position in the mesh's frame: the weighted sum of each bone's matrix times the bound position.
+			let x = 0;
+			let y = 0;
+			let z = 0;
+			for (let k = 0; k < 4; k += 1) {
+				const w = v.weights[k] ?? 0;
+				if (w === 0) continue;
+				const o = (v.bones[k] ?? 0) * 16;
+				x += w * ((m[o] ?? 0) * v.x + (m[o + 4] ?? 0) * v.y + (m[o + 8] ?? 0) * v.z + (m[o + 12] ?? 0));
+				y += w * ((m[o + 1] ?? 0) * v.x + (m[o + 5] ?? 0) * v.y + (m[o + 9] ?? 0) * v.z + (m[o + 13] ?? 0));
+				z += w * ((m[o + 2] ?? 0) * v.x + (m[o + 6] ?? 0) * v.y + (m[o + 10] ?? 0) * v.z + (m[o + 14] ?? 0));
+			}
+			lowest = Math.min(lowest, (world[1] ?? 0) * x + (world[5] ?? 0) * y + (world[9] ?? 0) * z + (world[13] ?? 0));
+		}
+	}
+	return Number.isFinite(lowest) ? lowest : null;
+}
 
 /** How far the model moves for a sitting clip: up so the resting skin is on the seat, across so the pelvis is over the anchor. */
 export function seatedOffset(rest: ClipSeat, seatHeight: number, scale: number): { readonly x: number; readonly y: number; readonly z: number } {
@@ -192,6 +265,17 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		measure = next !== null && isSeatedPose(pose) && !seatOf.has(next);
 	};
 
+	// Right after the animations pose the bones and before the frame draws (a level of detail that runs the clip every
+	// n-th frame jumps the pose n frames at once, so measuring before the jump lowers the body for the wrong moment).
+	const feet = footVertices(meshes);
+	const plantFeet = scene.onAfterAnimationsObservable.add(() => {
+		if (clip === null || !PLANTED_CLIPS.has(clip) || !holder.isEnabled() || every === 0) return;
+		const lowest = lowestFoot(feet);
+		if (lowest === null) return;
+		const floor = holder.computeWorldMatrix(true).getTranslation().y;
+		model.position.y -= (lowest - floor) / CHARACTER_SCALE;
+	});
+
 	const head = nodes.get("head");
 	return {
 		model: "skinned",
@@ -291,6 +375,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			holder.setEnabled(visible);
 		},
 		dispose() {
+			plantFeet.remove();
 			for (const group of groups.values()) group.dispose();
 			for (const skeleton of entries.skeletons) skeleton.dispose();
 			holder.dispose(false, false);
