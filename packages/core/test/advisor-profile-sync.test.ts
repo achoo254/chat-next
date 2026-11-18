@@ -25,20 +25,24 @@ afterEach(() => {
 describe("Advisor profile mapping", () => {
 	it("maps the profile and its update; unknown tones and empty looks fall back to the defaults", () => {
 		const profile = create(AdvisorProfileSchema, { name: "Cú", lookId: "cat", tone: AdvisorTone.FUN });
-		expect(toAdvisorProfile(profile)).toEqual({ name: "Cú", lookId: "cat", tone: "fun", autoSession: false });
+		expect(toAdvisorProfile(profile)).toEqual({ name: "Cú", lookId: "cat", tone: "fun", autoSession: false, keyRemovedAt: 0 });
 		expect(toAdvisorProfile(create(AdvisorProfileSchema, { tone: 9 as AdvisorTone }))).toEqual(DEFAULT_ADVISOR_PROFILE);
 		expect(toWireAdvisorTone("serious")).toBe(AdvisorTone.SERIOUS);
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "advisorProfile", value: { profile } } })).body).toEqual({
 			kind: "advisor_profile",
-			profile: { name: "Cú", lookId: "cat", tone: "fun", autoSession: false },
+			profile: { name: "Cú", lookId: "cat", tone: "fun", autoSession: false, keyRemovedAt: 0 },
 		});
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "advisorProfile", value: {} } })).body).toEqual({ kind: "unknown" });
+		// The account key's removal time is a plain number of milliseconds.
+		expect(toAdvisorProfile(create(AdvisorProfileSchema, { keyRemovedAt: 1_800_000_000_000n })).keyRemovedAt).toBe(1_800_000_000_000);
 	});
 
 	it("reads a stored profile defensively", () => {
 		expect(parseAdvisorProfile(null)).toEqual(DEFAULT_ADVISOR_PROFILE);
 		expect(parseAdvisorProfile("not json")).toEqual(DEFAULT_ADVISOR_PROFILE);
-		expect(parseAdvisorProfile(JSON.stringify({ name: 7, lookId: "robot", tone: "loud" }))).toEqual({ name: "", lookId: "robot", tone: "short", autoSession: false });
+		expect(parseAdvisorProfile(JSON.stringify({ name: 7, lookId: "robot", tone: "loud" }))).toEqual({ name: "", lookId: "robot", tone: "short", autoSession: false, keyRemovedAt: 0 });
+		expect(parseAdvisorProfile(JSON.stringify({ keyRemovedAt: 42 })).keyRemovedAt).toBe(42);
+		for (const bad of [-1, 1.5, "42", 2 ** 53]) expect(parseAdvisorProfile(JSON.stringify({ keyRemovedAt: bad })).keyRemovedAt).toBe(0);
 	});
 
 	it("exposes the RPCs through createRemoteApi", () => {
@@ -62,14 +66,19 @@ describe("Advisor profile sync", () => {
 		core.events.subscribe(EventKeys.advisorProfile, () => changed.push("advisor"));
 		server.setAdvisor(self, { name: "Bác Cú", tone: AdvisorTone.SERIOUS });
 		await settle(core);
-		expect(await core.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious", autoSession: false });
+		expect(await core.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious", autoSession: false, keyRemovedAt: 0 });
 		expect(changed).toHaveLength(1);
 
 		const after = await core.setAdvisorProfile({ tone: "fun", lookId: "cat", autoSession: true });
-		expect(after).toEqual({ name: "Bác Cú", lookId: "cat", tone: "fun", autoSession: true });
+		expect(after).toEqual({ name: "Bác Cú", lookId: "cat", tone: "fun", autoSession: true, keyRemovedAt: 0 });
 		expect(await core.advisorProfile()).toEqual(after);
 		await settle(core);
 		expect(server.advisorProfile(self)).toMatchObject({ name: "Bác Cú", lookId: "cat", tone: AdvisorTone.FUN, autoSession: true });
+
+		// The account key's removal time is saved, and an earlier one never takes it back.
+		expect((await core.setAdvisorProfile({ keyRemovedAt: 1_800_000_000_000 })).keyRemovedAt).toBe(1_800_000_000_000);
+		expect((await core.setAdvisorProfile({ keyRemovedAt: 1_700_000_000_000 })).keyRemovedAt).toBe(1_800_000_000_000);
+		expect((await core.advisorProfile()).keyRemovedAt).toBe(1_800_000_000_000);
 		await core.close();
 	});
 });

@@ -8,8 +8,8 @@ import { type IncomingMessage, type Server, createServer } from "node:http";
 import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
-import { create } from "@bufbuild/protobuf";
-import { LoginState, MacFolderAccess, type MachineInfo, MachineInfoSchema, ThreadKind, ThreadState, type ThreadSummary, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { type MessageInitShape, create } from "@bufbuild/protobuf";
+import { AdvisorKeySource, type AdvisorStatusSchema, LoginState, MacFolderAccess, type MachineInfo, MachineInfoSchema, ThreadKind, ThreadState, type ThreadSummary, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { type KeyPair, PROTOCOL_VERSION, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
@@ -44,7 +44,7 @@ import { Projects } from "./projects/projects.ts";
 import { writeCommitMessage } from "./workspace/commit-message.ts";
 import { Workspaces } from "./workspace/workspaces.ts";
 import { SessionSecretEnv } from "./sign-in-secrets/secret-env.ts";
-import { AdvisorKeyStore } from "./advisor/advisor-key-store.ts";
+import { type AdvisorKeySourceName, AdvisorKeyStore } from "./advisor/advisor-key-store.ts";
 import { redact } from "./mcp/redact.ts";
 import { SecretService } from "./sign-in-secrets/secret-service.ts";
 import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
@@ -57,6 +57,13 @@ import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-lin
 const MAX_CONNECTIONS = 16;
 /** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
 const MAC_PROMPT_WAIT_MS = 5 * 60_000;
+/** Whose key the machine keeps, as devices read it (AdvisorStatus.key_source). */
+const ADVISOR_KEY_SOURCES: Record<AdvisorKeySourceName | "", AdvisorKeySource> = {
+  "": AdvisorKeySource.UNSPECIFIED,
+  own: AdvisorKeySource.OWN,
+  account: AdvisorKeySource.ACCOUNT,
+};
+
 const MAC_ACCESS: Record<MacAccess, MacFolderAccess> = {
   "not-asked": MacFolderAccess.NOT_ASKED,
   asking: MacFolderAccess.ASKING,
@@ -738,9 +745,18 @@ export class Machine {
     return this.opts.mcp !== undefined && this.config.get().sessionMcp !== false;
   }
 
-  private advisorStatus(): { keySet: boolean; keyFingerprint: string; setByDevice: string; setAt: bigint; auto: boolean } {
+  private advisorStatus(): MessageInitShape<typeof AdvisorStatusSchema> {
     const s = this.advisorKeys.status();
-    return { keySet: s.keySet, keyFingerprint: s.fingerprint, setByDevice: s.setByDevice, setAt: BigInt(s.setAt), auto: this.config.get().advisorAuto === true };
+    return {
+      keySet: s.keySet,
+      keyFingerprint: s.fingerprint,
+      setByDevice: s.setByDevice,
+      setAt: BigInt(s.setAt),
+      auto: this.config.get().advisorAuto === true,
+      keySource: ADVISOR_KEY_SOURCES[s.source],
+      // This tunelo takes the account's key (AdvisorKeyShareBegin and the requests beside it).
+      keyShare: true,
+    };
   }
 
   /**

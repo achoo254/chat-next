@@ -611,7 +611,14 @@ export class ChatStore {
 			this.emit("advisor");
 			return;
 		}
-		if (profile.name === a.name && profile.lookId === a.lookId && profile.tone === a.tone && profile.autoSession === a.autoSession) return;
+		if (
+			profile.name === a.name &&
+			profile.lookId === a.lookId &&
+			profile.tone === a.tone &&
+			profile.autoSession === a.autoSession &&
+			profile.keyRemovedAt === a.keyRemovedAt
+		)
+			return;
 		this.advisor = profile;
 		this.emit("advisor");
 	}

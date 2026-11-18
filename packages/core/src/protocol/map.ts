@@ -401,6 +401,7 @@ export function toAdvisorProfile(profile: WireAdvisorProfile): AdvisorProfile {
 		// A tone this client does not know words answers the default way.
 		tone: ADVISOR_TONES[profile.tone] ?? "short",
 		autoSession: profile.autoSession,
+		keyRemovedAt: Number(profile.keyRemovedAt),
 	};
 }
 

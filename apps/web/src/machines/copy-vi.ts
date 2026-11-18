@@ -14,6 +14,8 @@ export const viMachines = {
 	pickMachine: "Chọn một máy để xem các phiên",
 	notFound: "Không thấy máy này. Máy có thể đã bị xoá.",
 	sessionsCount: (n: number) => `${n} phiên`,
+	/** Toast: the account's Advisor key reached a machine (handed on by another machine). */
+	advisorKeySynced: (machine: string) => `Đã đồng bộ khoá Cố vấn cho ${machine}`,
 	/** "Hiệu quả": a machine's AI usage from its own ledger (machines/usage). */
 	usage: {
 		/** BCP 47 tag for numbers and times. */
@@ -498,6 +500,9 @@ export const viMachines = {
 			advisorUnavailable: "Cố vấn chưa dùng được cho phiên này: AI của phiên hoặc máy đang chạy phiên không có MCP của tunelo.",
 			advisorKeyInvalid: "Khoá không hợp lệ: khoá trống, quá dài, hoặc có dấu cách hay ký tự điều khiển.",
 			advisorKeyNotSaved: "Máy không lưu được khoá (kho khoá của máy đang khoá hoặc từ chối). Chưa có gì thay đổi.",
+			advisorNoKey: "Máy không còn giữ khoá cần dùng. Chưa có gì thay đổi.",
+			advisorKeyShareFailed: "Máy không mở được khoá được chuyển tới (phiên chuyển đã hết hạn hoặc dữ liệu không khớp). Chưa có gì thay đổi, thử lại.",
+			advisorOwnKey: "Máy đang dùng khoá riêng nên giữ nguyên khoá đó. Bỏ khoá riêng trước nếu muốn dùng khoá của tài khoản.",
 			sessionLimit: (n: string) => `Máy đã chạy đủ ${n} phiên và các phiên đều đang bận. Cố vấn không đóng phiên nào của bạn: thử lại sau.`,
 			sensitiveFileNotConfirmed: "Cần xác nhận trước khi đưa tệp bí mật vào git.",
 			// Usage statistics of the machine.

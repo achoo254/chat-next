@@ -28,6 +28,8 @@ export interface SavedSecretInfo {
 	savedBy?: string;
 	/** A short fingerprint of the value; kept only when the store's user gave it (never the value). */
 	fingerprint?: string;
+	/** Whose value it is, in the store user's own words (Advisor: "account"); kept only when given. */
+	scope?: string;
 }
 
 interface SavedEntry extends SavedSecretInfo {
@@ -70,7 +72,8 @@ function isEntry(value: unknown): value is SavedEntry {
 		typeof e.createdAt === "number" &&
 		typeof e.lastUsedAt === "number" &&
 		(e.savedBy === undefined || typeof e.savedBy === "string") &&
-		(e.fingerprint === undefined || typeof e.fingerprint === "string")
+		(e.fingerprint === undefined || typeof e.fingerprint === "string") &&
+		(e.scope === undefined || typeof e.scope === "string")
 	);
 }
 
@@ -101,6 +104,7 @@ const info = (e: SavedEntry): SavedSecretInfo => ({
 	lastUsedAt: e.lastUsedAt,
 	...(e.savedBy !== undefined ? { savedBy: e.savedBy } : {}),
 	...(e.fingerprint !== undefined ? { fingerprint: e.fingerprint } : {}),
+	...(e.scope !== undefined ? { scope: e.scope } : {}),
 });
 
 /** By site, then name. */
@@ -127,6 +131,9 @@ export function removeSavedSecret(configDir: string, id: string, fileName = SECR
 export interface SaveNote {
 	savedBy?: string;
 	fingerprint?: string;
+	scope?: string;
+	/** When it counts as saved (Unix ms); the store's clock when not given. */
+	createdAt?: number;
 }
 
 interface Once extends HeldSecret {
@@ -173,10 +180,11 @@ export class SecretStore {
 			name,
 			origin,
 			sealed,
-			createdAt: this.now(),
+			createdAt: note.createdAt ?? this.now(),
 			lastUsedAt: 0,
 			...(note.savedBy !== undefined ? { savedBy: note.savedBy } : {}),
 			...(note.fingerprint !== undefined ? { fingerprint: note.fingerprint } : {}),
+			...(note.scope !== undefined ? { scope: note.scope } : {}),
 		};
 		this.write([...all.filter((x) => x !== before), entry]);
 		return { id: entry.id, name, origin, saved: true };

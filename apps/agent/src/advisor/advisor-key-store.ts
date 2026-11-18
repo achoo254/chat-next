@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { redact, rememberSecret } from "../mcp/redact.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { MAX_SECRET_CHARS } from "../sign-in-secrets/secret-names.ts";
-import { SecretStore } from "../sign-in-secrets/secret-store.ts";
+import { type SavedSecretInfo, SecretStore } from "../sign-in-secrets/secret-store.ts";
 
 /** The file of Advisor's store in tunelo's config folder. */
 export const ADVISOR_SECRETS_FILE = "advisor-secrets.json";
@@ -34,6 +34,13 @@ const FINGERPRINT_CHARS = 6;
 // eslint-disable-next-line no-control-regex
 const KEY_SHAPE = /^[^\s\u0000-\u001f\u007f]+$/u;
 
+/**
+ * Whose key the machine keeps: its own (pasted for this machine, or set in
+ * its terminal; a key kept before the account's key existed is one too) or
+ * the account's (pasted once, handed from machine to machine).
+ */
+export type AdvisorKeySourceName = "own" | "account";
+
 /** What devices learn about the key: never the key itself. */
 export type AdvisorKeyStatus = {
   keySet: boolean;
@@ -43,16 +50,33 @@ export type AdvisorKeyStatus = {
   setByDevice: string;
   /** Unix milliseconds; 0 without a key. */
   setAt: number;
+  /** "" without a key. */
+  source: AdvisorKeySourceName | "";
 };
 
-const NO_KEY: AdvisorKeyStatus = { keySet: false, fingerprint: "", setByDevice: "", setAt: 0 };
+/** The account's key as one machine hands it to another (advisor-key-share.ts). */
+export type SharedAdvisorKey = { key: string; setAt: number; setByDevice: string };
+
+const NO_KEY: AdvisorKeyStatus = { keySet: false, fingerprint: "", setByDevice: "", setAt: 0, source: "" };
+/** SaveNote.scope of the account's key; an entry without one is the machine's own. */
+const ACCOUNT_SCOPE = "account";
+
+const ERROR_MESSAGES = {
+  invalid: "the key is too short, too long, or has spaces or control characters",
+  not_saved: "the key could not be sealed on this machine; nothing was saved",
+  own_key: "this machine keeps its own key; remove it first to use the account's key",
+  no_key: "this machine keeps no key of that kind",
+} as const;
 
 /** A key refused or not saved. The message is fixed: it never quotes the key. */
 export class AdvisorKeyError extends Error {
-  constructor(readonly kind: "invalid" | "not_saved") {
-    super(kind === "invalid" ? "the key is too short, too long, or has spaces or control characters" : "the key could not be sealed on this machine; nothing was saved");
+  constructor(readonly kind: keyof typeof ERROR_MESSAGES) {
+    super(ERROR_MESSAGES[kind]);
   }
 }
+
+/** How a key is set: the machine's own (default) or the account's, counted as set at `setAt` (0: now). */
+export type AdvisorKeySetOptions = { source?: AdvisorKeySourceName; setAt?: number };
 
 /**
  * Hides a key that arrived from every output of this process, as typed and
@@ -78,6 +102,22 @@ export type AdvisorKeyStoreOptions = {
   now?: () => number;
 };
 
+/** How save() keeps a key and what it logs. */
+type SaveHow = {
+  /** The device asking, for the consent log. */
+  device: string;
+  /** The device the key was first set from, shown to devices. */
+  savedBy: string;
+  source: AdvisorKeySourceName;
+  /** Unix milliseconds the account's key counts as set; 0 or out of range: now. */
+  setAt: number;
+  action: "advisor_key_set" | "advisor_key_share_received" | "advisor_key_promote";
+};
+
+function sourceOf(e: SavedSecretInfo): AdvisorKeySourceName {
+  return e.scope === ACCOUNT_SCOPE ? "account" : "own";
+}
+
 export class AdvisorKeyStore {
   private readonly store: SecretStore;
   private readonly log: (line: string) => void;
@@ -89,32 +129,77 @@ export class AdvisorKeyStore {
     this.log = opts.log ?? (() => undefined);
   }
 
-  /** Whether a key is kept, its fingerprint and who set it; no key when the store cannot be read (logged). */
+  /** Whether a key is kept, whose it is, its fingerprint and who set it; no key when the store cannot be read (logged). */
   status(): AdvisorKeyStatus {
-    let entries: ReturnType<SecretStore["list"]>;
+    let held: SavedSecretInfo | undefined;
     try {
-      entries = this.store.list();
+      held = this.held();
     } catch (err) {
       this.log(`advisor: the key store cannot be read (${redact((err as Error).message)})`);
       return NO_KEY;
     }
-    const e = entries.find((x) => x.origin === ADVISOR_KEY_ORIGIN && x.name === KEY_NAME);
-    if (!e) return NO_KEY;
-    return { keySet: true, fingerprint: e.fingerprint ?? "", setByDevice: e.savedBy ?? "", setAt: e.createdAt };
+    if (!held) return NO_KEY;
+    return { keySet: true, fingerprint: held.fingerprint ?? "", setByDevice: held.savedBy ?? "", setAt: held.createdAt, source: sourceOf(held) };
   }
 
   /**
-   * Seals and keeps `key`, replacing the one kept. The key is hidden from
-   * every output of this process before anything else happens to it.
+   * Seals and keeps `key`, replacing the one kept; the account's key never
+   * replaces the machine's own (AdvisorKeyError "own_key"). The key is hidden
+   * from every output of this process before anything else happens to it.
    */
-  set(rawKey: string, device: string): Promise<AdvisorKeyStatus> {
+  set(rawKey: string, device: string, opts: AdvisorKeySetOptions = {}): Promise<AdvisorKeyStatus> {
     rememberAdvisorKey(rawKey);
-    return this.serial(() => this.save(rawKey.trim(), device));
+    const source = opts.source ?? "own";
+    return this.serial(() => this.save(rawKey.trim(), { device, savedBy: device, source, setAt: opts.setAt ?? 0, action: "advisor_key_set" }));
   }
 
-  /** Forgets the key; nothing to do when none is kept. Runs after any change asked before it. */
-  remove(device: string): Promise<AdvisorKeyStatus> {
-    return this.serial(async () => this.forget(device));
+  /**
+   * Keeps the account's key handed on by another machine (opened by
+   * advisor-key-share.ts), with the time and device it was first set from.
+   */
+  receive(shared: SharedAdvisorKey, device: string): Promise<AdvisorKeyStatus> {
+    rememberAdvisorKey(shared.key);
+    return this.serial(() =>
+      this.save(shared.key.trim(), { device, savedBy: shared.setByDevice, source: "account", setAt: shared.setAt, action: "advisor_key_share_received" }),
+    );
+  }
+
+  /**
+   * Forgets the key; `only` keeps a key of the other kind. Nothing to do when
+   * none is kept. Runs after any change asked before it.
+   */
+  remove(device: string, only?: AdvisorKeySourceName): Promise<AdvisorKeyStatus> {
+    return this.serial(async () => this.forget(device, only));
+  }
+
+  /** The machine's own key becomes the account's, counted as set at `setAt` (0: now); AdvisorKeyError "no_key" without one. */
+  promote(device: string, setAt: number): Promise<AdvisorKeyStatus> {
+    return this.serial(async () => {
+      const held = this.held();
+      if (held === undefined || sourceOf(held) !== "own") throw new AdvisorKeyError("no_key");
+      const key = await this.store.reveal(held.id);
+      if (key === undefined) throw new AdvisorKeyError("no_key");
+      return this.save(key, { device, savedBy: held.savedBy ?? device, source: "account", setAt, action: "advisor_key_promote" });
+    });
+  }
+
+  /**
+   * The account's key, to seal for another machine; logs the hand-off with
+   * its fingerprint. AdvisorKeyError "no_key" when the machine keeps no
+   * account key (its own key is never handed on).
+   */
+  async shareAccountKey(device: string): Promise<SharedAdvisorKey> {
+    const held = this.held();
+    if (held === undefined || sourceOf(held) !== "account") throw new AdvisorKeyError("no_key");
+    const key = await this.store.reveal(held.id);
+    if (key === undefined) throw new AdvisorKeyError("no_key");
+    this.opts.audit.write({ device, action: "advisor_key_share_sent", path: ADVISOR_KEY_ORIGIN, detail: held.fingerprint ?? "" });
+    return { key, setAt: held.createdAt, setByDevice: held.savedBy ?? "" };
+  }
+
+  /** The kept entry, without its value; throws when the store cannot be read. */
+  private held(): SavedSecretInfo | undefined {
+    return this.store.list().find((x) => x.origin === ADVISOR_KEY_ORIGIN && x.name === KEY_NAME);
   }
 
   private serial<T>(run: () => Promise<T>): Promise<T> {
@@ -124,22 +209,31 @@ export class AdvisorKeyStore {
     return next;
   }
 
-  private async save(key: string, device: string): Promise<AdvisorKeyStatus> {
+  private async save(key: string, how: SaveHow): Promise<AdvisorKeyStatus> {
     if (key.length < MIN_KEY_CHARS || key.length > MAX_SECRET_CHARS || !KEY_SHAPE.test(key)) throw new AdvisorKeyError("invalid");
+    const account = how.source === "account";
+    // The account's key never replaces the machine's own (a promotion replaces it with itself).
+    if (account && how.action !== "advisor_key_promote" && this.status().source === "own") throw new AdvisorKeyError("own_key");
     const fingerprint = advisorKeyFingerprint(key);
+    const setAt = Number.isSafeInteger(how.setAt) && how.setAt > 0 ? how.setAt : undefined;
     try {
-      await this.store.save(ADVISOR_KEY_ORIGIN, KEY_NAME, key, { savedBy: device, fingerprint });
+      await this.store.save(ADVISOR_KEY_ORIGIN, KEY_NAME, key, {
+        savedBy: how.savedBy,
+        fingerprint,
+        ...(account ? { scope: ACCOUNT_SCOPE, ...(setAt !== undefined ? { createdAt: setAt } : {}) } : {}),
+      });
     } catch (err) {
       this.log(`advisor: the key was not saved (${redact((err as Error).message)})`);
       throw new AdvisorKeyError("not_saved");
     }
-    this.opts.audit.write({ device, action: "advisor_key_set", path: ADVISOR_KEY_ORIGIN, detail: fingerprint });
+    this.opts.audit.write({ device: how.device, action: how.action, path: ADVISOR_KEY_ORIGIN, detail: fingerprint });
     return this.status();
   }
 
-  private forget(device: string): AdvisorKeyStatus {
-    const held = this.store.findSaved(ADVISOR_KEY_ORIGIN, KEY_NAME);
+  private forget(device: string, only?: AdvisorKeySourceName): AdvisorKeyStatus {
+    const held = this.held();
     if (!held) return NO_KEY;
+    if (only !== undefined && sourceOf(held) !== only) return this.status();
     const gone = this.store.remove(held.id);
     if (gone) this.opts.audit.write({ device, action: "advisor_key_remove", path: ADVISOR_KEY_ORIGIN, detail: gone.fingerprint ?? "" });
     return this.status();

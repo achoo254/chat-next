@@ -17,6 +17,7 @@ import { isAdvisorThread, type LinkState, type MachineLink } from "./link/machin
 import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
 import { useAdvisorAutoSync } from "../advisor/use-advisor-auto-sync.ts";
+import { useAdvisorKeySync } from "../advisor/use-advisor-key-sync.ts";
 import { connOf, shouldConnect, type Conn } from "./machine-status.ts";
 import { createMachinesDirectory, type MachineEntry } from "./machines-client.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -164,8 +165,9 @@ export function useMachineViews(hub: LinkHub, now: number): MachineView[] {
 		const state = states[i] ?? link.snapshot();
 		return { entry, link, state, conn: connOf(entry, state, now) };
 	});
-	// A machine linked here takes the account's automatic Advisor switch.
+	// A machine linked here takes the account's automatic Advisor switch, and the account's key.
 	useAdvisorAutoSync(views);
+	useAdvisorKeySync(views);
 	return views;
 }
 

@@ -327,6 +327,20 @@ message Frame {
     AdvisorRemoveKey advisor_remove_key = 176;
     // A → B: the machine-wide automatic Advisor switch (see AdvisorSetAuto).
     AdvisorSetAuto advisor_set_auto = 178;
+    // The account's TypeSafe key handed from machine to machine (tunelo
+    // 3.22.0+, AdvisorStatus.key_share); see "the account's key" below.
+    // A → B (the machine that receives), answered with AdvisorKeyShareTicket
+    AdvisorKeyShareBegin advisor_key_share_begin = 179;
+    // B → A
+    AdvisorKeyShareTicket advisor_key_share_ticket = 180;
+    // A → B (the machine that holds the account's key), answered with AdvisorKeySealed
+    AdvisorKeySeal advisor_key_seal = 181;
+    // B → A
+    AdvisorKeySealed advisor_key_sealed = 182;
+    // A → B (the machine that receives), answered with Ack
+    AdvisorKeyShareOpen advisor_key_share_open = 183;
+    // A → B, answered with Ack
+    AdvisorKeyPromote advisor_key_promote = 184;
 
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
@@ -1611,6 +1625,17 @@ enum ErrorReason {
   // turn or waits on a prompt there (ProviderCapabilities.chat_takes_terminal):
   // send again once it is done, or answer it in the terminal.
   ERROR_REASON_TERMINAL_TURN_RUNNING = 87;
+  // AdvisorKeySeal or AdvisorKeyPromote to a machine that holds no key of
+  // that kind: no account key to seal, no own key to promote. Nothing changed.
+  ERROR_REASON_ADVISOR_NO_KEY = 88;
+  // AdvisorKeyShareOpen with a ticket the machine does not hold (unknown,
+  // used or expired) or a sealed key that does not open with it. Nothing was
+  // saved; start again with AdvisorKeyShareBegin.
+  ERROR_REASON_ADVISOR_KEY_SHARE_FAILED = 89;
+  // The account's key (AdvisorSetKey with source ACCOUNT, AdvisorKeyShareOpen)
+  // to a machine that keeps its own key: its own key stays. Remove it first
+  // (AdvisorRemoveKey with source OWN).
+  ERROR_REASON_ADVISOR_OWN_KEY = 90;
 }
 
 enum ErrorCode {
@@ -2292,8 +2317,10 @@ message AuditEntry {
   // unstage and discard, how many files ("restored N, trashed M" for
   // discard); never a file's content, a file's path, a branch or a commit
   // message),
-  // advisor_key_set, advisor_key_remove (detail: the key's fingerprint, never
-  // the key), advisor_on, advisor_off (path: the thread's folder; detail: the
+  // advisor_key_set, advisor_key_remove, advisor_key_promote (own key made
+  // the account's), advisor_key_share_sent (this machine sealed the
+  // account's key for another), advisor_key_share_received (detail: the
+  // key's fingerprint, never the key), advisor_on, advisor_off (path: the thread's folder; detail: the
   // thread id)
   string action = 3;
   string path = 4;
@@ -2346,6 +2373,24 @@ message AdvisorStatus {
   int64 set_at = 5;
   // Automatic Advisor is on for every session of the machine (AdvisorSetAuto).
   bool auto = 6;
+  // Whose key it is (tunelo 3.22.0+); UNSPECIFIED without a key or from an
+  // older tunelo. A key kept before tunelo 3.22.0 is OWN.
+  AdvisorKeySource key_source = 7;
+  // The machine takes the account's key (tunelo 3.22.0+): the source fields
+  // of AdvisorSetKey and AdvisorRemoveKey, AdvisorKeyShareBegin,
+  // AdvisorKeySeal, AdvisorKeyShareOpen and AdvisorKeyPromote. False: an
+  // older tunelo, which keeps one key of its own.
+  bool key_share = 8;
+}
+
+// Whose TypeSafe key a machine keeps.
+enum AdvisorKeySource {
+  ADVISOR_KEY_SOURCE_UNSPECIFIED = 0;
+  // The machine's own key: pasted for this machine only (or set in its
+  // terminal), it overrides the account's and is never handed on.
+  ADVISOR_KEY_SOURCE_OWN = 1;
+  // The account's key: pasted once, handed from machine to machine.
+  ADVISOR_KEY_SOURCE_ACCOUNT = 2;
 }
 
 // A → B: turns automatic Advisor on or off for every session of the machine
@@ -2367,11 +2412,93 @@ message AdvisorSetAuto {
 message AdvisorSetKey {
   // At most 4096 characters, no spaces or control characters.
   string key = 1;
+  // UNSPECIFIED (an older device) or OWN: the machine's own key. ACCOUNT:
+  // the account's key, refused with ERROR_REASON_ADVISOR_OWN_KEY while the
+  // machine keeps its own (tunelo 3.22.0+).
+  AdvisorKeySource source = 2;
+  // ACCOUNT only: Unix milliseconds the account's key counts as set, from
+  // the device (later than AdvisorProfile.key_removed_at, so the device's
+  // clock orders keys and removals alike). 0: the machine's clock.
+  int64 set_at = 3;
 }
 
 // A → B: forget the TypeSafe key. Answered with Ack; every connected device
 // then gets MachineInfo. Forgetting a key that is not kept is no error.
-message AdvisorRemoveKey {}
+message AdvisorRemoveKey {
+  // UNSPECIFIED (an older device): whatever key is kept. OWN or ACCOUNT
+  // (tunelo 3.22.0+): only a key of that kind; another kind stays.
+  AdvisorKeySource source = 1;
+}
+
+// --- the account's key (tunelo 3.22.0+) ---------------------------------------
+//
+// One TypeSafe key for the account, pasted once (AdvisorSetKey with source
+// ACCOUNT) on one machine and handed from machine to machine without the
+// device or the server ever holding it:
+//
+//   1. A → R (the machine that receives): AdvisorKeyShareBegin. R makes a
+//      fresh X25519 key pair for this hand-off only and answers its public
+//      half in AdvisorKeyShareTicket. The device learns it over its own
+//      end-to-end link to R, never from the server's directory.
+//   2. A → S (a machine with the account's key): AdvisorKeySeal with that
+//      public key. S seals the key for it and answers AdvisorKeySealed.
+//   3. A → R: AdvisorKeyShareOpen with the ticket and the sealed bytes. R
+//      opens them with the private half (then forgets it), keeps the key as
+//      the account's and answers Ack; every device then gets MachineInfo.
+//
+// The sealed bytes: version 1 (one byte), S's ephemeral X25519 public key
+// (32), a nonce (24), then XSalsa20-Poly1305 (secretbox) of the key, the
+// time it counts as set and the device that set it, under
+// HKDF-SHA256(X25519(S's ephemeral, R's ticket key), salt: both public
+// keys, info "tunelo advisor key share v1"). The device only relays them.
+// S logs advisor_key_share_sent, R advisor_key_share_received, both with the
+// key's fingerprint only. A device keeps the account's removal time in
+// AdvisorProfile.key_removed_at: a key set no later than that is removed
+// (AdvisorRemoveKey with source ACCOUNT) and never handed on.
+
+// A → B: a ticket for receiving the account's key. Answered with
+// AdvisorKeyShareTicket. A ticket lasts 2 minutes and opens one key; a link
+// holds at most 4 at once (the oldest is dropped).
+message AdvisorKeyShareBegin {}
+
+// B → A
+message AdvisorKeyShareTicket {
+  string ticket_id = 1;
+  // The ticket's X25519 public key (32 bytes).
+  bytes public_key = 2;
+}
+
+// A → B: seal the account's key for a ticket of another machine. Answered
+// with AdvisorKeySealed; refused with ERROR_REASON_ADVISOR_NO_KEY when B
+// keeps no account key, ERROR_CODE_INVALID for a public key that is not 32
+// bytes.
+message AdvisorKeySeal {
+  bytes recipient_public_key = 1;
+}
+
+// B → A
+message AdvisorKeySealed {
+  // See "the account's key" above; at most 8192 bytes.
+  bytes sealed = 1;
+  // The sealed key's fingerprint (as AdvisorStatus.key_fingerprint).
+  string fingerprint = 2;
+}
+
+// A → B: open the sealed key of a ticket and keep it as the account's.
+// Answered with Ack; refused with ERROR_REASON_ADVISOR_KEY_SHARE_FAILED,
+// ERROR_REASON_ADVISOR_OWN_KEY or ERROR_REASON_ADVISOR_KEY_INVALID.
+message AdvisorKeyShareOpen {
+  string ticket_id = 1;
+  bytes sealed = 2;
+}
+
+// A → B: the machine's own key becomes the account's (the user agreed once).
+// Answered with Ack; refused with ERROR_REASON_ADVISOR_NO_KEY without an own
+// key. Logged as advisor_key_promote.
+message AdvisorKeyPromote {
+  // Unix milliseconds the key counts as set from now on, as AdvisorSetKey.set_at.
+  int64 set_at = 1;
+}
 
 // --- sign-in secrets ----------------------------------------------------------
 //

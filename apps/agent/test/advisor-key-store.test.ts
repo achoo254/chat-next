@@ -43,10 +43,10 @@ function everyFile(dir: string): string {
 describe("Advisor's key store", () => {
   it("keeps the key sealed with its fingerprint, who set it and when; it is still there after a restart", async () => {
     const { dir, store } = setup();
-    expect(store.status()).toEqual({ keySet: false, fingerprint: "", setByDevice: "", setAt: 0 });
+    expect(store.status()).toEqual({ keySet: false, fingerprint: "", setByDevice: "", setAt: 0, source: "" });
 
     const status = await store.set(`  ${KEY}\n`, "phone");
-    expect(status).toEqual({ keySet: true, fingerprint: FINGERPRINT, setByDevice: "phone", setAt: 1_700_000_000_000 });
+    expect(status).toEqual({ keySet: true, fingerprint: FINGERPRINT, setByDevice: "phone", setAt: 1_700_000_000_000, source: "own" });
     expect(await store.key()).toBe(KEY);
 
     // A new process (the service restarted) reads the same file.
@@ -68,7 +68,7 @@ describe("Advisor's key store", () => {
     expect((await store.set(other, "laptop")).setByDevice).toBe("laptop");
     expect(await store.key()).toBe(other);
 
-    expect(await store.remove("laptop")).toEqual({ keySet: false, fingerprint: "", setByDevice: "", setAt: 0 });
+    expect(await store.remove("laptop")).toEqual({ keySet: false, fingerprint: "", setByDevice: "", setAt: 0, source: "" });
     expect(await store.key()).toBeUndefined();
     // Forgetting again is no error and logs nothing more.
     await store.remove("laptop");

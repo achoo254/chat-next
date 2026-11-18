@@ -654,6 +654,17 @@ const (
 	// turn or waits on a prompt there (ProviderCapabilities.chat_takes_terminal):
 	// send again once it is done, or answer it in the terminal.
 	ErrorReason_ERROR_REASON_TERMINAL_TURN_RUNNING ErrorReason = 87
+	// AdvisorKeySeal or AdvisorKeyPromote to a machine that holds no key of
+	// that kind: no account key to seal, no own key to promote. Nothing changed.
+	ErrorReason_ERROR_REASON_ADVISOR_NO_KEY ErrorReason = 88
+	// AdvisorKeyShareOpen with a ticket the machine does not hold (unknown,
+	// used or expired) or a sealed key that does not open with it. Nothing was
+	// saved; start again with AdvisorKeyShareBegin.
+	ErrorReason_ERROR_REASON_ADVISOR_KEY_SHARE_FAILED ErrorReason = 89
+	// The account's key (AdvisorSetKey with source ACCOUNT, AdvisorKeyShareOpen)
+	// to a machine that keeps its own key: its own key stays. Remove it first
+	// (AdvisorRemoveKey with source OWN).
+	ErrorReason_ERROR_REASON_ADVISOR_OWN_KEY ErrorReason = 90
 )
 
 // Enum value maps for ErrorReason.
@@ -746,6 +757,9 @@ var (
 		85: "ERROR_REASON_SESSION_LIMIT",
 		86: "ERROR_REASON_MAC_FOLDER_ACCESS",
 		87: "ERROR_REASON_TERMINAL_TURN_RUNNING",
+		88: "ERROR_REASON_ADVISOR_NO_KEY",
+		89: "ERROR_REASON_ADVISOR_KEY_SHARE_FAILED",
+		90: "ERROR_REASON_ADVISOR_OWN_KEY",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                   0,
@@ -835,6 +849,9 @@ var (
 		"ERROR_REASON_SESSION_LIMIT":                 85,
 		"ERROR_REASON_MAC_FOLDER_ACCESS":             86,
 		"ERROR_REASON_TERMINAL_TURN_RUNNING":         87,
+		"ERROR_REASON_ADVISOR_NO_KEY":                88,
+		"ERROR_REASON_ADVISOR_KEY_SHARE_FAILED":      89,
+		"ERROR_REASON_ADVISOR_OWN_KEY":               90,
 	}
 )
 
@@ -1505,6 +1522,59 @@ func (TerminalAvailability) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{18}
 }
 
+// Whose TypeSafe key a machine keeps.
+type AdvisorKeySource int32
+
+const (
+	AdvisorKeySource_ADVISOR_KEY_SOURCE_UNSPECIFIED AdvisorKeySource = 0
+	// The machine's own key: pasted for this machine only (or set in its
+	// terminal), it overrides the account's and is never handed on.
+	AdvisorKeySource_ADVISOR_KEY_SOURCE_OWN AdvisorKeySource = 1
+	// The account's key: pasted once, handed from machine to machine.
+	AdvisorKeySource_ADVISOR_KEY_SOURCE_ACCOUNT AdvisorKeySource = 2
+)
+
+// Enum value maps for AdvisorKeySource.
+var (
+	AdvisorKeySource_name = map[int32]string{
+		0: "ADVISOR_KEY_SOURCE_UNSPECIFIED",
+		1: "ADVISOR_KEY_SOURCE_OWN",
+		2: "ADVISOR_KEY_SOURCE_ACCOUNT",
+	}
+	AdvisorKeySource_value = map[string]int32{
+		"ADVISOR_KEY_SOURCE_UNSPECIFIED": 0,
+		"ADVISOR_KEY_SOURCE_OWN":         1,
+		"ADVISOR_KEY_SOURCE_ACCOUNT":     2,
+	}
+)
+
+func (x AdvisorKeySource) Enum() *AdvisorKeySource {
+	p := new(AdvisorKeySource)
+	*p = x
+	return p
+}
+
+func (x AdvisorKeySource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AdvisorKeySource) Descriptor() protoreflect.EnumDescriptor {
+	return file_remote_v1_remote_proto_enumTypes[19].Descriptor()
+}
+
+func (AdvisorKeySource) Type() protoreflect.EnumType {
+	return &file_remote_v1_remote_proto_enumTypes[19]
+}
+
+func (x AdvisorKeySource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AdvisorKeySource.Descriptor instead.
+func (AdvisorKeySource) EnumDescriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{19}
+}
+
 type GitFileState int32
 
 const (
@@ -1554,11 +1624,11 @@ func (x GitFileState) String() string {
 }
 
 func (GitFileState) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[19].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[20].Descriptor()
 }
 
 func (GitFileState) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[19]
+	return &file_remote_v1_remote_proto_enumTypes[20]
 }
 
 func (x GitFileState) Number() protoreflect.EnumNumber {
@@ -1567,7 +1637,7 @@ func (x GitFileState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GitFileState.Descriptor instead.
 func (GitFileState) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{19}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{20}
 }
 
 type BrowserMouseType int32
@@ -1609,11 +1679,11 @@ func (x BrowserMouseType) String() string {
 }
 
 func (BrowserMouseType) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[20].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[21].Descriptor()
 }
 
 func (BrowserMouseType) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[20]
+	return &file_remote_v1_remote_proto_enumTypes[21]
 }
 
 func (x BrowserMouseType) Number() protoreflect.EnumNumber {
@@ -1622,7 +1692,7 @@ func (x BrowserMouseType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BrowserMouseType.Descriptor instead.
 func (BrowserMouseType) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{20}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{21}
 }
 
 type ScreenShareEnd int32
@@ -1668,11 +1738,11 @@ func (x ScreenShareEnd) String() string {
 }
 
 func (ScreenShareEnd) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[21].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[22].Descriptor()
 }
 
 func (ScreenShareEnd) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[21]
+	return &file_remote_v1_remote_proto_enumTypes[22]
 }
 
 func (x ScreenShareEnd) Number() protoreflect.EnumNumber {
@@ -1681,7 +1751,7 @@ func (x ScreenShareEnd) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScreenShareEnd.Descriptor instead.
 func (ScreenShareEnd) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{21}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{22}
 }
 
 type AgentUpdatePhase int32
@@ -1732,11 +1802,11 @@ func (x AgentUpdatePhase) String() string {
 }
 
 func (AgentUpdatePhase) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[22].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[23].Descriptor()
 }
 
 func (AgentUpdatePhase) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[22]
+	return &file_remote_v1_remote_proto_enumTypes[23]
 }
 
 func (x AgentUpdatePhase) Number() protoreflect.EnumNumber {
@@ -1745,7 +1815,7 @@ func (x AgentUpdatePhase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AgentUpdatePhase.Descriptor instead.
 func (AgentUpdatePhase) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{22}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{23}
 }
 
 type TerminalUpdateHoldReason int32
@@ -1794,11 +1864,11 @@ func (x TerminalUpdateHoldReason) String() string {
 }
 
 func (TerminalUpdateHoldReason) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[23].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[24].Descriptor()
 }
 
 func (TerminalUpdateHoldReason) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[23]
+	return &file_remote_v1_remote_proto_enumTypes[24]
 }
 
 func (x TerminalUpdateHoldReason) Number() protoreflect.EnumNumber {
@@ -1807,7 +1877,7 @@ func (x TerminalUpdateHoldReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TerminalUpdateHoldReason.Descriptor instead.
 func (TerminalUpdateHoldReason) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{23}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{24}
 }
 
 type TermSignalKind int32
@@ -1854,11 +1924,11 @@ func (x TermSignalKind) String() string {
 }
 
 func (TermSignalKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[24].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[25].Descriptor()
 }
 
 func (TermSignalKind) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[24]
+	return &file_remote_v1_remote_proto_enumTypes[25]
 }
 
 func (x TermSignalKind) Number() protoreflect.EnumNumber {
@@ -1867,7 +1937,7 @@ func (x TermSignalKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TermSignalKind.Descriptor instead.
 func (TermSignalKind) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{24}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{25}
 }
 
 type TermPath int32
@@ -1913,11 +1983,11 @@ func (x TermPath) String() string {
 }
 
 func (TermPath) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[25].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[26].Descriptor()
 }
 
 func (TermPath) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[25]
+	return &file_remote_v1_remote_proto_enumTypes[26]
 }
 
 func (x TermPath) Number() protoreflect.EnumNumber {
@@ -1926,7 +1996,7 @@ func (x TermPath) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TermPath.Descriptor instead.
 func (TermPath) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{25}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{26}
 }
 
 type WsFileKind int32
@@ -1973,11 +2043,11 @@ func (x WsFileKind) String() string {
 }
 
 func (WsFileKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[26].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[27].Descriptor()
 }
 
 func (WsFileKind) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[26]
+	return &file_remote_v1_remote_proto_enumTypes[27]
 }
 
 func (x WsFileKind) Number() protoreflect.EnumNumber {
@@ -1986,7 +2056,7 @@ func (x WsFileKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WsFileKind.Descriptor instead.
 func (WsFileKind) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{26}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{27}
 }
 
 type WsGitArea int32
@@ -2028,11 +2098,11 @@ func (x WsGitArea) String() string {
 }
 
 func (WsGitArea) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[27].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[28].Descriptor()
 }
 
 func (WsGitArea) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[27]
+	return &file_remote_v1_remote_proto_enumTypes[28]
 }
 
 func (x WsGitArea) Number() protoreflect.EnumNumber {
@@ -2041,7 +2111,7 @@ func (x WsGitArea) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WsGitArea.Descriptor instead.
 func (WsGitArea) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{27}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{28}
 }
 
 type WsGitDiffSource int32
@@ -2087,11 +2157,11 @@ func (x WsGitDiffSource) String() string {
 }
 
 func (WsGitDiffSource) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[28].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[29].Descriptor()
 }
 
 func (WsGitDiffSource) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[28]
+	return &file_remote_v1_remote_proto_enumTypes[29]
 }
 
 func (x WsGitDiffSource) Number() protoreflect.EnumNumber {
@@ -2100,7 +2170,7 @@ func (x WsGitDiffSource) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WsGitDiffSource.Descriptor instead.
 func (WsGitDiffSource) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{28}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{29}
 }
 
 type UsageRule int32
@@ -2148,11 +2218,11 @@ func (x UsageRule) String() string {
 }
 
 func (UsageRule) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[29].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[30].Descriptor()
 }
 
 func (UsageRule) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[29]
+	return &file_remote_v1_remote_proto_enumTypes[30]
 }
 
 func (x UsageRule) Number() protoreflect.EnumNumber {
@@ -2161,7 +2231,7 @@ func (x UsageRule) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UsageRule.Descriptor instead.
 func (UsageRule) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{29}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{30}
 }
 
 type OfficeRole int32
@@ -2207,11 +2277,11 @@ func (x OfficeRole) String() string {
 }
 
 func (OfficeRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[30].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[31].Descriptor()
 }
 
 func (OfficeRole) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[30]
+	return &file_remote_v1_remote_proto_enumTypes[31]
 }
 
 func (x OfficeRole) Number() protoreflect.EnumNumber {
@@ -2220,7 +2290,7 @@ func (x OfficeRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeRole.Descriptor instead.
 func (OfficeRole) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{30}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{31}
 }
 
 type OfficeActorState int32
@@ -2263,11 +2333,11 @@ func (x OfficeActorState) String() string {
 }
 
 func (OfficeActorState) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[31].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[32].Descriptor()
 }
 
 func (OfficeActorState) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[31]
+	return &file_remote_v1_remote_proto_enumTypes[32]
 }
 
 func (x OfficeActorState) Number() protoreflect.EnumNumber {
@@ -2276,7 +2346,7 @@ func (x OfficeActorState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeActorState.Descriptor instead.
 func (OfficeActorState) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{31}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{32}
 }
 
 // How an activity is acted out.
@@ -2341,11 +2411,11 @@ func (x OfficeAnimGroup) String() string {
 }
 
 func (OfficeAnimGroup) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[32].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[33].Descriptor()
 }
 
 func (OfficeAnimGroup) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[32]
+	return &file_remote_v1_remote_proto_enumTypes[33]
 }
 
 func (x OfficeAnimGroup) Number() protoreflect.EnumNumber {
@@ -2354,7 +2424,7 @@ func (x OfficeAnimGroup) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeAnimGroup.Descriptor instead.
 func (OfficeAnimGroup) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{32}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{33}
 }
 
 // The building's rooms. A device reads an unknown or unset room as
@@ -2424,11 +2494,11 @@ func (x OfficeRoom) String() string {
 }
 
 func (OfficeRoom) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[33].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[34].Descriptor()
 }
 
 func (OfficeRoom) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[33]
+	return &file_remote_v1_remote_proto_enumTypes[34]
 }
 
 func (x OfficeRoom) Number() protoreflect.EnumNumber {
@@ -2437,7 +2507,7 @@ func (x OfficeRoom) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeRoom.Descriptor instead.
 func (OfficeRoom) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{33}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{34}
 }
 
 // The kind of a machine's background command (docs/office-wire.md, part 4).
@@ -2496,11 +2566,11 @@ func (x OfficeServiceKind) String() string {
 }
 
 func (OfficeServiceKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[34].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[35].Descriptor()
 }
 
 func (OfficeServiceKind) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[34]
+	return &file_remote_v1_remote_proto_enumTypes[35]
 }
 
 func (x OfficeServiceKind) Number() protoreflect.EnumNumber {
@@ -2509,7 +2579,7 @@ func (x OfficeServiceKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeServiceKind.Descriptor instead.
 func (OfficeServiceKind) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{34}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{35}
 }
 
 type OfficeApprovalState int32
@@ -2551,11 +2621,11 @@ func (x OfficeApprovalState) String() string {
 }
 
 func (OfficeApprovalState) Descriptor() protoreflect.EnumDescriptor {
-	return file_remote_v1_remote_proto_enumTypes[35].Descriptor()
+	return file_remote_v1_remote_proto_enumTypes[36].Descriptor()
 }
 
 func (OfficeApprovalState) Type() protoreflect.EnumType {
-	return &file_remote_v1_remote_proto_enumTypes[35]
+	return &file_remote_v1_remote_proto_enumTypes[36]
 }
 
 func (x OfficeApprovalState) Number() protoreflect.EnumNumber {
@@ -2564,7 +2634,7 @@ func (x OfficeApprovalState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OfficeApprovalState.Descriptor instead.
 func (OfficeApprovalState) EnumDescriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{35}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{36}
 }
 
 type Plain struct {
@@ -3063,6 +3133,12 @@ type Frame struct {
 	//	*Frame_AdvisorSetKey
 	//	*Frame_AdvisorRemoveKey
 	//	*Frame_AdvisorSetAuto
+	//	*Frame_AdvisorKeyShareBegin
+	//	*Frame_AdvisorKeyShareTicket
+	//	*Frame_AdvisorKeySeal
+	//	*Frame_AdvisorKeySealed
+	//	*Frame_AdvisorKeyShareOpen
+	//	*Frame_AdvisorKeyPromote
 	//	*Frame_MacFolderAccessAsk
 	Body          isFrame_Body `protobuf_oneof:"body"`
 	unknownFields protoimpl.UnknownFields
@@ -4598,6 +4674,60 @@ func (x *Frame) GetAdvisorSetAuto() *AdvisorSetAuto {
 	return nil
 }
 
+func (x *Frame) GetAdvisorKeyShareBegin() *AdvisorKeyShareBegin {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeyShareBegin); ok {
+			return x.AdvisorKeyShareBegin
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAdvisorKeyShareTicket() *AdvisorKeyShareTicket {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeyShareTicket); ok {
+			return x.AdvisorKeyShareTicket
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAdvisorKeySeal() *AdvisorKeySeal {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeySeal); ok {
+			return x.AdvisorKeySeal
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAdvisorKeySealed() *AdvisorKeySealed {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeySealed); ok {
+			return x.AdvisorKeySealed
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAdvisorKeyShareOpen() *AdvisorKeyShareOpen {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeyShareOpen); ok {
+			return x.AdvisorKeyShareOpen
+		}
+	}
+	return nil
+}
+
+func (x *Frame) GetAdvisorKeyPromote() *AdvisorKeyPromote {
+	if x != nil {
+		if x, ok := x.Body.(*Frame_AdvisorKeyPromote); ok {
+			return x.AdvisorKeyPromote
+		}
+	}
+	return nil
+}
+
 func (x *Frame) GetMacFolderAccessAsk() *MacFolderAccessAsk {
 	if x != nil {
 		if x, ok := x.Body.(*Frame_MacFolderAccessAsk); ok {
@@ -5324,6 +5454,38 @@ type Frame_AdvisorSetAuto struct {
 	AdvisorSetAuto *AdvisorSetAuto `protobuf:"bytes,178,opt,name=advisor_set_auto,json=advisorSetAuto,proto3,oneof"`
 }
 
+type Frame_AdvisorKeyShareBegin struct {
+	// The account's TypeSafe key handed from machine to machine (tunelo
+	// 3.22.0+, AdvisorStatus.key_share); see "the account's key" below.
+	// A → B (the machine that receives), answered with AdvisorKeyShareTicket
+	AdvisorKeyShareBegin *AdvisorKeyShareBegin `protobuf:"bytes,179,opt,name=advisor_key_share_begin,json=advisorKeyShareBegin,proto3,oneof"`
+}
+
+type Frame_AdvisorKeyShareTicket struct {
+	// B → A
+	AdvisorKeyShareTicket *AdvisorKeyShareTicket `protobuf:"bytes,180,opt,name=advisor_key_share_ticket,json=advisorKeyShareTicket,proto3,oneof"`
+}
+
+type Frame_AdvisorKeySeal struct {
+	// A → B (the machine that holds the account's key), answered with AdvisorKeySealed
+	AdvisorKeySeal *AdvisorKeySeal `protobuf:"bytes,181,opt,name=advisor_key_seal,json=advisorKeySeal,proto3,oneof"`
+}
+
+type Frame_AdvisorKeySealed struct {
+	// B → A
+	AdvisorKeySealed *AdvisorKeySealed `protobuf:"bytes,182,opt,name=advisor_key_sealed,json=advisorKeySealed,proto3,oneof"`
+}
+
+type Frame_AdvisorKeyShareOpen struct {
+	// A → B (the machine that receives), answered with Ack
+	AdvisorKeyShareOpen *AdvisorKeyShareOpen `protobuf:"bytes,183,opt,name=advisor_key_share_open,json=advisorKeyShareOpen,proto3,oneof"`
+}
+
+type Frame_AdvisorKeyPromote struct {
+	// A → B, answered with Ack
+	AdvisorKeyPromote *AdvisorKeyPromote `protobuf:"bytes,184,opt,name=advisor_key_promote,json=advisorKeyPromote,proto3,oneof"`
+}
+
 type Frame_MacFolderAccessAsk struct {
 	// A → B (tunelo 3.17.0+): see "macOS folder access" below.
 	MacFolderAccessAsk *MacFolderAccessAsk `protobuf:"bytes,177,opt,name=mac_folder_access_ask,json=macFolderAccessAsk,proto3,oneof"`
@@ -5658,6 +5820,18 @@ func (*Frame_AdvisorSetKey) isFrame_Body() {}
 func (*Frame_AdvisorRemoveKey) isFrame_Body() {}
 
 func (*Frame_AdvisorSetAuto) isFrame_Body() {}
+
+func (*Frame_AdvisorKeyShareBegin) isFrame_Body() {}
+
+func (*Frame_AdvisorKeyShareTicket) isFrame_Body() {}
+
+func (*Frame_AdvisorKeySeal) isFrame_Body() {}
+
+func (*Frame_AdvisorKeySealed) isFrame_Body() {}
+
+func (*Frame_AdvisorKeyShareOpen) isFrame_Body() {}
+
+func (*Frame_AdvisorKeyPromote) isFrame_Body() {}
 
 func (*Frame_MacFolderAccessAsk) isFrame_Body() {}
 
@@ -15089,8 +15263,10 @@ type AuditEntry struct {
 	// unstage and discard, how many files ("restored N, trashed M" for
 	// discard); never a file's content, a file's path, a branch or a commit
 	// message),
-	// advisor_key_set, advisor_key_remove (detail: the key's fingerprint, never
-	// the key), advisor_on, advisor_off (path: the thread's folder; detail: the
+	// advisor_key_set, advisor_key_remove, advisor_key_promote (own key made
+	// the account's), advisor_key_share_sent (this machine sealed the
+	// account's key for another), advisor_key_share_received (detail: the
+	// key's fingerprint, never the key), advisor_on, advisor_off (path: the thread's folder; detail: the
 	// thread id)
 	Action        string `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	Path          string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
@@ -15180,7 +15356,15 @@ type AdvisorStatus struct {
 	// Unix milliseconds when the key was set; 0 without a key.
 	SetAt int64 `protobuf:"varint,5,opt,name=set_at,json=setAt,proto3" json:"set_at,omitempty"`
 	// Automatic Advisor is on for every session of the machine (AdvisorSetAuto).
-	Auto          bool `protobuf:"varint,6,opt,name=auto,proto3" json:"auto,omitempty"`
+	Auto bool `protobuf:"varint,6,opt,name=auto,proto3" json:"auto,omitempty"`
+	// Whose key it is (tunelo 3.22.0+); UNSPECIFIED without a key or from an
+	// older tunelo. A key kept before tunelo 3.22.0 is OWN.
+	KeySource AdvisorKeySource `protobuf:"varint,7,opt,name=key_source,json=keySource,proto3,enum=remote.v1.AdvisorKeySource" json:"key_source,omitempty"`
+	// The machine takes the account's key (tunelo 3.22.0+): the source fields
+	// of AdvisorSetKey and AdvisorRemoveKey, AdvisorKeyShareBegin,
+	// AdvisorKeySeal, AdvisorKeyShareOpen and AdvisorKeyPromote. False: an
+	// older tunelo, which keeps one key of its own.
+	KeyShare      bool `protobuf:"varint,8,opt,name=key_share,json=keyShare,proto3" json:"key_share,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -15257,6 +15441,20 @@ func (x *AdvisorStatus) GetAuto() bool {
 	return false
 }
 
+func (x *AdvisorStatus) GetKeySource() AdvisorKeySource {
+	if x != nil {
+		return x.KeySource
+	}
+	return AdvisorKeySource_ADVISOR_KEY_SOURCE_UNSPECIFIED
+}
+
+func (x *AdvisorStatus) GetKeyShare() bool {
+	if x != nil {
+		return x.KeyShare
+	}
+	return false
+}
+
 // A → B: turns automatic Advisor on or off for every session of the machine
 // (the AI asks Advisor when it is unsure and before it ends each turn), the
 // open ones, the new ones and the ones a terminal runs. Kept by the machine
@@ -15316,7 +15514,15 @@ func (x *AdvisorSetAuto) GetOn() bool {
 type AdvisorSetKey struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// At most 4096 characters, no spaces or control characters.
-	Key           string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// UNSPECIFIED (an older device) or OWN: the machine's own key. ACCOUNT:
+	// the account's key, refused with ERROR_REASON_ADVISOR_OWN_KEY while the
+	// machine keeps its own (tunelo 3.22.0+).
+	Source AdvisorKeySource `protobuf:"varint,2,opt,name=source,proto3,enum=remote.v1.AdvisorKeySource" json:"source,omitempty"`
+	// ACCOUNT only: Unix milliseconds the account's key counts as set, from
+	// the device (later than AdvisorProfile.key_removed_at, so the device's
+	// clock orders keys and removals alike). 0: the machine's clock.
+	SetAt         int64 `protobuf:"varint,3,opt,name=set_at,json=setAt,proto3" json:"set_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -15358,10 +15564,27 @@ func (x *AdvisorSetKey) GetKey() string {
 	return ""
 }
 
+func (x *AdvisorSetKey) GetSource() AdvisorKeySource {
+	if x != nil {
+		return x.Source
+	}
+	return AdvisorKeySource_ADVISOR_KEY_SOURCE_UNSPECIFIED
+}
+
+func (x *AdvisorSetKey) GetSetAt() int64 {
+	if x != nil {
+		return x.SetAt
+	}
+	return 0
+}
+
 // A → B: forget the TypeSafe key. Answered with Ack; every connected device
 // then gets MachineInfo. Forgetting a key that is not kept is no error.
 type AdvisorRemoveKey struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// UNSPECIFIED (an older device): whatever key is kept. OWN or ACCOUNT
+	// (tunelo 3.22.0+): only a key of that kind; another kind stays.
+	Source        AdvisorKeySource `protobuf:"varint,1,opt,name=source,proto3,enum=remote.v1.AdvisorKeySource" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -15396,6 +15619,312 @@ func (*AdvisorRemoveKey) Descriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{139}
 }
 
+func (x *AdvisorRemoveKey) GetSource() AdvisorKeySource {
+	if x != nil {
+		return x.Source
+	}
+	return AdvisorKeySource_ADVISOR_KEY_SOURCE_UNSPECIFIED
+}
+
+// A → B: a ticket for receiving the account's key. Answered with
+// AdvisorKeyShareTicket. A ticket lasts 2 minutes and opens one key; a link
+// holds at most 4 at once (the oldest is dropped).
+type AdvisorKeyShareBegin struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisorKeyShareBegin) Reset() {
+	*x = AdvisorKeyShareBegin{}
+	mi := &file_remote_v1_remote_proto_msgTypes[140]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeyShareBegin) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeyShareBegin) ProtoMessage() {}
+
+func (x *AdvisorKeyShareBegin) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[140]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeyShareBegin.ProtoReflect.Descriptor instead.
+func (*AdvisorKeyShareBegin) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{140}
+}
+
+// B → A
+type AdvisorKeyShareTicket struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	TicketId string                 `protobuf:"bytes,1,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	// The ticket's X25519 public key (32 bytes).
+	PublicKey     []byte `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisorKeyShareTicket) Reset() {
+	*x = AdvisorKeyShareTicket{}
+	mi := &file_remote_v1_remote_proto_msgTypes[141]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeyShareTicket) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeyShareTicket) ProtoMessage() {}
+
+func (x *AdvisorKeyShareTicket) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[141]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeyShareTicket.ProtoReflect.Descriptor instead.
+func (*AdvisorKeyShareTicket) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{141}
+}
+
+func (x *AdvisorKeyShareTicket) GetTicketId() string {
+	if x != nil {
+		return x.TicketId
+	}
+	return ""
+}
+
+func (x *AdvisorKeyShareTicket) GetPublicKey() []byte {
+	if x != nil {
+		return x.PublicKey
+	}
+	return nil
+}
+
+// A → B: seal the account's key for a ticket of another machine. Answered
+// with AdvisorKeySealed; refused with ERROR_REASON_ADVISOR_NO_KEY when B
+// keeps no account key, ERROR_CODE_INVALID for a public key that is not 32
+// bytes.
+type AdvisorKeySeal struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	RecipientPublicKey []byte                 `protobuf:"bytes,1,opt,name=recipient_public_key,json=recipientPublicKey,proto3" json:"recipient_public_key,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AdvisorKeySeal) Reset() {
+	*x = AdvisorKeySeal{}
+	mi := &file_remote_v1_remote_proto_msgTypes[142]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeySeal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeySeal) ProtoMessage() {}
+
+func (x *AdvisorKeySeal) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[142]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeySeal.ProtoReflect.Descriptor instead.
+func (*AdvisorKeySeal) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{142}
+}
+
+func (x *AdvisorKeySeal) GetRecipientPublicKey() []byte {
+	if x != nil {
+		return x.RecipientPublicKey
+	}
+	return nil
+}
+
+// B → A
+type AdvisorKeySealed struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// See "the account's key" above; at most 8192 bytes.
+	Sealed []byte `protobuf:"bytes,1,opt,name=sealed,proto3" json:"sealed,omitempty"`
+	// The sealed key's fingerprint (as AdvisorStatus.key_fingerprint).
+	Fingerprint   string `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisorKeySealed) Reset() {
+	*x = AdvisorKeySealed{}
+	mi := &file_remote_v1_remote_proto_msgTypes[143]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeySealed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeySealed) ProtoMessage() {}
+
+func (x *AdvisorKeySealed) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[143]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeySealed.ProtoReflect.Descriptor instead.
+func (*AdvisorKeySealed) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{143}
+}
+
+func (x *AdvisorKeySealed) GetSealed() []byte {
+	if x != nil {
+		return x.Sealed
+	}
+	return nil
+}
+
+func (x *AdvisorKeySealed) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+// A → B: open the sealed key of a ticket and keep it as the account's.
+// Answered with Ack; refused with ERROR_REASON_ADVISOR_KEY_SHARE_FAILED,
+// ERROR_REASON_ADVISOR_OWN_KEY or ERROR_REASON_ADVISOR_KEY_INVALID.
+type AdvisorKeyShareOpen struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TicketId      string                 `protobuf:"bytes,1,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	Sealed        []byte                 `protobuf:"bytes,2,opt,name=sealed,proto3" json:"sealed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisorKeyShareOpen) Reset() {
+	*x = AdvisorKeyShareOpen{}
+	mi := &file_remote_v1_remote_proto_msgTypes[144]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeyShareOpen) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeyShareOpen) ProtoMessage() {}
+
+func (x *AdvisorKeyShareOpen) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[144]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeyShareOpen.ProtoReflect.Descriptor instead.
+func (*AdvisorKeyShareOpen) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{144}
+}
+
+func (x *AdvisorKeyShareOpen) GetTicketId() string {
+	if x != nil {
+		return x.TicketId
+	}
+	return ""
+}
+
+func (x *AdvisorKeyShareOpen) GetSealed() []byte {
+	if x != nil {
+		return x.Sealed
+	}
+	return nil
+}
+
+// A → B: the machine's own key becomes the account's (the user agreed once).
+// Answered with Ack; refused with ERROR_REASON_ADVISOR_NO_KEY without an own
+// key. Logged as advisor_key_promote.
+type AdvisorKeyPromote struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unix milliseconds the key counts as set from now on, as AdvisorSetKey.set_at.
+	SetAt         int64 `protobuf:"varint,1,opt,name=set_at,json=setAt,proto3" json:"set_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisorKeyPromote) Reset() {
+	*x = AdvisorKeyPromote{}
+	mi := &file_remote_v1_remote_proto_msgTypes[145]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisorKeyPromote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisorKeyPromote) ProtoMessage() {}
+
+func (x *AdvisorKeyPromote) ProtoReflect() protoreflect.Message {
+	mi := &file_remote_v1_remote_proto_msgTypes[145]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisorKeyPromote.ProtoReflect.Descriptor instead.
+func (*AdvisorKeyPromote) Descriptor() ([]byte, []int) {
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{145}
+}
+
+func (x *AdvisorKeyPromote) GetSetAt() int64 {
+	if x != nil {
+		return x.SetAt
+	}
+	return 0
+}
+
 // A → B: the value for an open prompt. Answered with Ack.
 type SecretProvide struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -15410,7 +15939,7 @@ type SecretProvide struct {
 
 func (x *SecretProvide) Reset() {
 	*x = SecretProvide{}
-	mi := &file_remote_v1_remote_proto_msgTypes[140]
+	mi := &file_remote_v1_remote_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15422,7 +15951,7 @@ func (x *SecretProvide) String() string {
 func (*SecretProvide) ProtoMessage() {}
 
 func (x *SecretProvide) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[140]
+	mi := &file_remote_v1_remote_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15435,7 +15964,7 @@ func (x *SecretProvide) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretProvide.ProtoReflect.Descriptor instead.
 func (*SecretProvide) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{140}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *SecretProvide) GetRequestId() string {
@@ -15469,7 +15998,7 @@ type SecretDecline struct {
 
 func (x *SecretDecline) Reset() {
 	*x = SecretDecline{}
-	mi := &file_remote_v1_remote_proto_msgTypes[141]
+	mi := &file_remote_v1_remote_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15481,7 +16010,7 @@ func (x *SecretDecline) String() string {
 func (*SecretDecline) ProtoMessage() {}
 
 func (x *SecretDecline) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[141]
+	mi := &file_remote_v1_remote_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15494,7 +16023,7 @@ func (x *SecretDecline) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretDecline.ProtoReflect.Descriptor instead.
 func (*SecretDecline) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{141}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *SecretDecline) GetRequestId() string {
@@ -15513,7 +16042,7 @@ type SecretList struct {
 
 func (x *SecretList) Reset() {
 	*x = SecretList{}
-	mi := &file_remote_v1_remote_proto_msgTypes[142]
+	mi := &file_remote_v1_remote_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15525,7 +16054,7 @@ func (x *SecretList) String() string {
 func (*SecretList) ProtoMessage() {}
 
 func (x *SecretList) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[142]
+	mi := &file_remote_v1_remote_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15538,7 +16067,7 @@ func (x *SecretList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretList.ProtoReflect.Descriptor instead.
 func (*SecretList) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{142}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{148}
 }
 
 // A → B: forget a saved secret. Answered with SecretListResult.
@@ -15551,7 +16080,7 @@ type SecretRemove struct {
 
 func (x *SecretRemove) Reset() {
 	*x = SecretRemove{}
-	mi := &file_remote_v1_remote_proto_msgTypes[143]
+	mi := &file_remote_v1_remote_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15563,7 +16092,7 @@ func (x *SecretRemove) String() string {
 func (*SecretRemove) ProtoMessage() {}
 
 func (x *SecretRemove) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[143]
+	mi := &file_remote_v1_remote_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15576,7 +16105,7 @@ func (x *SecretRemove) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretRemove.ProtoReflect.Descriptor instead.
 func (*SecretRemove) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{143}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *SecretRemove) GetId() string {
@@ -15606,7 +16135,7 @@ type SecretPrompt struct {
 
 func (x *SecretPrompt) Reset() {
 	*x = SecretPrompt{}
-	mi := &file_remote_v1_remote_proto_msgTypes[144]
+	mi := &file_remote_v1_remote_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15618,7 +16147,7 @@ func (x *SecretPrompt) String() string {
 func (*SecretPrompt) ProtoMessage() {}
 
 func (x *SecretPrompt) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[144]
+	mi := &file_remote_v1_remote_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15631,7 +16160,7 @@ func (x *SecretPrompt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretPrompt.ProtoReflect.Descriptor instead.
 func (*SecretPrompt) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{144}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *SecretPrompt) GetRequestId() string {
@@ -15687,7 +16216,7 @@ type SecretPromptEnded struct {
 
 func (x *SecretPromptEnded) Reset() {
 	*x = SecretPromptEnded{}
-	mi := &file_remote_v1_remote_proto_msgTypes[145]
+	mi := &file_remote_v1_remote_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15699,7 +16228,7 @@ func (x *SecretPromptEnded) String() string {
 func (*SecretPromptEnded) ProtoMessage() {}
 
 func (x *SecretPromptEnded) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[145]
+	mi := &file_remote_v1_remote_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15712,7 +16241,7 @@ func (x *SecretPromptEnded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretPromptEnded.ProtoReflect.Descriptor instead.
 func (*SecretPromptEnded) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{145}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *SecretPromptEnded) GetRequestId() string {
@@ -15732,7 +16261,7 @@ type SecretListResult struct {
 
 func (x *SecretListResult) Reset() {
 	*x = SecretListResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[146]
+	mi := &file_remote_v1_remote_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15744,7 +16273,7 @@ func (x *SecretListResult) String() string {
 func (*SecretListResult) ProtoMessage() {}
 
 func (x *SecretListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[146]
+	mi := &file_remote_v1_remote_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15757,7 +16286,7 @@ func (x *SecretListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecretListResult.ProtoReflect.Descriptor instead.
 func (*SecretListResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{146}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *SecretListResult) GetSecrets() []*SavedSecret {
@@ -15782,7 +16311,7 @@ type SavedSecret struct {
 
 func (x *SavedSecret) Reset() {
 	*x = SavedSecret{}
-	mi := &file_remote_v1_remote_proto_msgTypes[147]
+	mi := &file_remote_v1_remote_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15794,7 +16323,7 @@ func (x *SavedSecret) String() string {
 func (*SavedSecret) ProtoMessage() {}
 
 func (x *SavedSecret) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[147]
+	mi := &file_remote_v1_remote_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15807,7 +16336,7 @@ func (x *SavedSecret) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavedSecret.ProtoReflect.Descriptor instead.
 func (*SavedSecret) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{147}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *SavedSecret) GetId() string {
@@ -15864,7 +16393,7 @@ type GitChanges struct {
 
 func (x *GitChanges) Reset() {
 	*x = GitChanges{}
-	mi := &file_remote_v1_remote_proto_msgTypes[148]
+	mi := &file_remote_v1_remote_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15876,7 +16405,7 @@ func (x *GitChanges) String() string {
 func (*GitChanges) ProtoMessage() {}
 
 func (x *GitChanges) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[148]
+	mi := &file_remote_v1_remote_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15889,7 +16418,7 @@ func (x *GitChanges) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitChanges.ProtoReflect.Descriptor instead.
 func (*GitChanges) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{148}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *GitChanges) GetThreadId() string {
@@ -15946,7 +16475,7 @@ type GitFileChange struct {
 
 func (x *GitFileChange) Reset() {
 	*x = GitFileChange{}
-	mi := &file_remote_v1_remote_proto_msgTypes[149]
+	mi := &file_remote_v1_remote_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15958,7 +16487,7 @@ func (x *GitFileChange) String() string {
 func (*GitFileChange) ProtoMessage() {}
 
 func (x *GitFileChange) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[149]
+	mi := &file_remote_v1_remote_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15971,7 +16500,7 @@ func (x *GitFileChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitFileChange.ProtoReflect.Descriptor instead.
 func (*GitFileChange) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{149}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *GitFileChange) GetPath() string {
@@ -16040,7 +16569,7 @@ type GitFileDiffResult struct {
 
 func (x *GitFileDiffResult) Reset() {
 	*x = GitFileDiffResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[150]
+	mi := &file_remote_v1_remote_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16052,7 +16581,7 @@ func (x *GitFileDiffResult) String() string {
 func (*GitFileDiffResult) ProtoMessage() {}
 
 func (x *GitFileDiffResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[150]
+	mi := &file_remote_v1_remote_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16065,7 +16594,7 @@ func (x *GitFileDiffResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitFileDiffResult.ProtoReflect.Descriptor instead.
 func (*GitFileDiffResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{150}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *GitFileDiffResult) GetThreadId() string {
@@ -16092,7 +16621,7 @@ type BrowserControl struct {
 
 func (x *BrowserControl) Reset() {
 	*x = BrowserControl{}
-	mi := &file_remote_v1_remote_proto_msgTypes[151]
+	mi := &file_remote_v1_remote_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16104,7 +16633,7 @@ func (x *BrowserControl) String() string {
 func (*BrowserControl) ProtoMessage() {}
 
 func (x *BrowserControl) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[151]
+	mi := &file_remote_v1_remote_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16117,7 +16646,7 @@ func (x *BrowserControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserControl.ProtoReflect.Descriptor instead.
 func (*BrowserControl) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{151}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{157}
 }
 
 // A → B: show a takeover's tab on this device (on), or stop (off). B sends
@@ -16139,7 +16668,7 @@ type BrowserView struct {
 
 func (x *BrowserView) Reset() {
 	*x = BrowserView{}
-	mi := &file_remote_v1_remote_proto_msgTypes[152]
+	mi := &file_remote_v1_remote_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16151,7 +16680,7 @@ func (x *BrowserView) String() string {
 func (*BrowserView) ProtoMessage() {}
 
 func (x *BrowserView) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[152]
+	mi := &file_remote_v1_remote_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16164,7 +16693,7 @@ func (x *BrowserView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserView.ProtoReflect.Descriptor instead.
 func (*BrowserView) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{152}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *BrowserView) GetTakeoverId() string {
@@ -16220,7 +16749,7 @@ type BrowserInput struct {
 
 func (x *BrowserInput) Reset() {
 	*x = BrowserInput{}
-	mi := &file_remote_v1_remote_proto_msgTypes[153]
+	mi := &file_remote_v1_remote_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16232,7 +16761,7 @@ func (x *BrowserInput) String() string {
 func (*BrowserInput) ProtoMessage() {}
 
 func (x *BrowserInput) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[153]
+	mi := &file_remote_v1_remote_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16245,7 +16774,7 @@ func (x *BrowserInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserInput.ProtoReflect.Descriptor instead.
 func (*BrowserInput) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{153}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *BrowserInput) GetTakeoverId() string {
@@ -16339,7 +16868,7 @@ type BrowserMouse struct {
 
 func (x *BrowserMouse) Reset() {
 	*x = BrowserMouse{}
-	mi := &file_remote_v1_remote_proto_msgTypes[154]
+	mi := &file_remote_v1_remote_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16351,7 +16880,7 @@ func (x *BrowserMouse) String() string {
 func (*BrowserMouse) ProtoMessage() {}
 
 func (x *BrowserMouse) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[154]
+	mi := &file_remote_v1_remote_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16364,7 +16893,7 @@ func (x *BrowserMouse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserMouse.ProtoReflect.Descriptor instead.
 func (*BrowserMouse) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{154}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *BrowserMouse) GetType() BrowserMouseType {
@@ -16438,7 +16967,7 @@ type BrowserKey struct {
 
 func (x *BrowserKey) Reset() {
 	*x = BrowserKey{}
-	mi := &file_remote_v1_remote_proto_msgTypes[155]
+	mi := &file_remote_v1_remote_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16450,7 +16979,7 @@ func (x *BrowserKey) String() string {
 func (*BrowserKey) ProtoMessage() {}
 
 func (x *BrowserKey) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[155]
+	mi := &file_remote_v1_remote_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16463,7 +16992,7 @@ func (x *BrowserKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserKey.ProtoReflect.Descriptor instead.
 func (*BrowserKey) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{155}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *BrowserKey) GetKey() string {
@@ -16505,7 +17034,7 @@ type BrowserTakeoverEnd struct {
 
 func (x *BrowserTakeoverEnd) Reset() {
 	*x = BrowserTakeoverEnd{}
-	mi := &file_remote_v1_remote_proto_msgTypes[156]
+	mi := &file_remote_v1_remote_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16517,7 +17046,7 @@ func (x *BrowserTakeoverEnd) String() string {
 func (*BrowserTakeoverEnd) ProtoMessage() {}
 
 func (x *BrowserTakeoverEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[156]
+	mi := &file_remote_v1_remote_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16530,7 +17059,7 @@ func (x *BrowserTakeoverEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserTakeoverEnd.ProtoReflect.Descriptor instead.
 func (*BrowserTakeoverEnd) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{156}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *BrowserTakeoverEnd) GetTakeoverId() string {
@@ -16563,7 +17092,7 @@ type BrowserTakeover struct {
 
 func (x *BrowserTakeover) Reset() {
 	*x = BrowserTakeover{}
-	mi := &file_remote_v1_remote_proto_msgTypes[157]
+	mi := &file_remote_v1_remote_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16575,7 +17104,7 @@ func (x *BrowserTakeover) String() string {
 func (*BrowserTakeover) ProtoMessage() {}
 
 func (x *BrowserTakeover) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[157]
+	mi := &file_remote_v1_remote_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16588,7 +17117,7 @@ func (x *BrowserTakeover) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserTakeover.ProtoReflect.Descriptor instead.
 func (*BrowserTakeover) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{157}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *BrowserTakeover) GetTakeoverId() string {
@@ -16643,7 +17172,7 @@ type BrowserTakeoverEnded struct {
 
 func (x *BrowserTakeoverEnded) Reset() {
 	*x = BrowserTakeoverEnded{}
-	mi := &file_remote_v1_remote_proto_msgTypes[158]
+	mi := &file_remote_v1_remote_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16655,7 +17184,7 @@ func (x *BrowserTakeoverEnded) String() string {
 func (*BrowserTakeoverEnded) ProtoMessage() {}
 
 func (x *BrowserTakeoverEnded) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[158]
+	mi := &file_remote_v1_remote_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16668,7 +17197,7 @@ func (x *BrowserTakeoverEnded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserTakeoverEnded.ProtoReflect.Descriptor instead.
 func (*BrowserTakeoverEnded) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{158}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *BrowserTakeoverEnded) GetTakeoverId() string {
@@ -16694,7 +17223,7 @@ type BrowserFrame struct {
 
 func (x *BrowserFrame) Reset() {
 	*x = BrowserFrame{}
-	mi := &file_remote_v1_remote_proto_msgTypes[159]
+	mi := &file_remote_v1_remote_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16706,7 +17235,7 @@ func (x *BrowserFrame) String() string {
 func (*BrowserFrame) ProtoMessage() {}
 
 func (x *BrowserFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[159]
+	mi := &file_remote_v1_remote_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16719,7 +17248,7 @@ func (x *BrowserFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserFrame.ProtoReflect.Descriptor instead.
 func (*BrowserFrame) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{159}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *BrowserFrame) GetTakeoverId() string {
@@ -16772,7 +17301,7 @@ type BrowserState struct {
 
 func (x *BrowserState) Reset() {
 	*x = BrowserState{}
-	mi := &file_remote_v1_remote_proto_msgTypes[160]
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16784,7 +17313,7 @@ func (x *BrowserState) String() string {
 func (*BrowserState) ProtoMessage() {}
 
 func (x *BrowserState) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[160]
+	mi := &file_remote_v1_remote_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16797,7 +17326,7 @@ func (x *BrowserState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserState.ProtoReflect.Descriptor instead.
 func (*BrowserState) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{160}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{166}
 }
 
 func (x *BrowserState) GetTakeoverId() string {
@@ -16839,7 +17368,7 @@ type BrowserTab struct {
 
 func (x *BrowserTab) Reset() {
 	*x = BrowserTab{}
-	mi := &file_remote_v1_remote_proto_msgTypes[161]
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16851,7 +17380,7 @@ func (x *BrowserTab) String() string {
 func (*BrowserTab) ProtoMessage() {}
 
 func (x *BrowserTab) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[161]
+	mi := &file_remote_v1_remote_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16864,7 +17393,7 @@ func (x *BrowserTab) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserTab.ProtoReflect.Descriptor instead.
 func (*BrowserTab) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{161}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *BrowserTab) GetTargetId() string {
@@ -16907,7 +17436,7 @@ type PasskeyNotice struct {
 
 func (x *PasskeyNotice) Reset() {
 	*x = PasskeyNotice{}
-	mi := &file_remote_v1_remote_proto_msgTypes[162]
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16919,7 +17448,7 @@ func (x *PasskeyNotice) String() string {
 func (*PasskeyNotice) ProtoMessage() {}
 
 func (x *PasskeyNotice) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[162]
+	mi := &file_remote_v1_remote_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16932,7 +17461,7 @@ func (x *PasskeyNotice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasskeyNotice.ProtoReflect.Descriptor instead.
 func (*PasskeyNotice) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{162}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *PasskeyNotice) GetOrigin() string {
@@ -16973,7 +17502,7 @@ type ScreenShareStatusRequest struct {
 
 func (x *ScreenShareStatusRequest) Reset() {
 	*x = ScreenShareStatusRequest{}
-	mi := &file_remote_v1_remote_proto_msgTypes[163]
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16985,7 +17514,7 @@ func (x *ScreenShareStatusRequest) String() string {
 func (*ScreenShareStatusRequest) ProtoMessage() {}
 
 func (x *ScreenShareStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[163]
+	mi := &file_remote_v1_remote_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16998,7 +17527,7 @@ func (x *ScreenShareStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareStatusRequest.ProtoReflect.Descriptor instead.
 func (*ScreenShareStatusRequest) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{163}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{169}
 }
 
 type ScreenShareStatus struct {
@@ -17018,7 +17547,7 @@ type ScreenShareStatus struct {
 
 func (x *ScreenShareStatus) Reset() {
 	*x = ScreenShareStatus{}
-	mi := &file_remote_v1_remote_proto_msgTypes[164]
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17030,7 +17559,7 @@ func (x *ScreenShareStatus) String() string {
 func (*ScreenShareStatus) ProtoMessage() {}
 
 func (x *ScreenShareStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[164]
+	mi := &file_remote_v1_remote_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17043,7 +17572,7 @@ func (x *ScreenShareStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareStatus.ProtoReflect.Descriptor instead.
 func (*ScreenShareStatus) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{164}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *ScreenShareStatus) GetSupported() bool {
@@ -17084,7 +17613,7 @@ type ScreenShareOpen struct {
 
 func (x *ScreenShareOpen) Reset() {
 	*x = ScreenShareOpen{}
-	mi := &file_remote_v1_remote_proto_msgTypes[165]
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17096,7 +17625,7 @@ func (x *ScreenShareOpen) String() string {
 func (*ScreenShareOpen) ProtoMessage() {}
 
 func (x *ScreenShareOpen) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[165]
+	mi := &file_remote_v1_remote_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17109,7 +17638,7 @@ func (x *ScreenShareOpen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareOpen.ProtoReflect.Descriptor instead.
 func (*ScreenShareOpen) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{165}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{171}
 }
 
 type ScreenShareOpened struct {
@@ -17123,7 +17652,7 @@ type ScreenShareOpened struct {
 
 func (x *ScreenShareOpened) Reset() {
 	*x = ScreenShareOpened{}
-	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	mi := &file_remote_v1_remote_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17135,7 +17664,7 @@ func (x *ScreenShareOpened) String() string {
 func (*ScreenShareOpened) ProtoMessage() {}
 
 func (x *ScreenShareOpened) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[166]
+	mi := &file_remote_v1_remote_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17148,7 +17677,7 @@ func (x *ScreenShareOpened) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareOpened.ProtoReflect.Descriptor instead.
 func (*ScreenShareOpened) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{166}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{172}
 }
 
 func (x *ScreenShareOpened) GetStreamId() string {
@@ -17176,7 +17705,7 @@ type ScreenShareData struct {
 
 func (x *ScreenShareData) Reset() {
 	*x = ScreenShareData{}
-	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	mi := &file_remote_v1_remote_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17188,7 +17717,7 @@ func (x *ScreenShareData) String() string {
 func (*ScreenShareData) ProtoMessage() {}
 
 func (x *ScreenShareData) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[167]
+	mi := &file_remote_v1_remote_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17201,7 +17730,7 @@ func (x *ScreenShareData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareData.ProtoReflect.Descriptor instead.
 func (*ScreenShareData) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{167}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *ScreenShareData) GetStreamId() string {
@@ -17228,7 +17757,7 @@ type ScreenShareClose struct {
 
 func (x *ScreenShareClose) Reset() {
 	*x = ScreenShareClose{}
-	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	mi := &file_remote_v1_remote_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17240,7 +17769,7 @@ func (x *ScreenShareClose) String() string {
 func (*ScreenShareClose) ProtoMessage() {}
 
 func (x *ScreenShareClose) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[168]
+	mi := &file_remote_v1_remote_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17253,7 +17782,7 @@ func (x *ScreenShareClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareClose.ProtoReflect.Descriptor instead.
 func (*ScreenShareClose) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{168}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{174}
 }
 
 func (x *ScreenShareClose) GetStreamId() string {
@@ -17274,7 +17803,7 @@ type ScreenShareClosed struct {
 
 func (x *ScreenShareClosed) Reset() {
 	*x = ScreenShareClosed{}
-	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	mi := &file_remote_v1_remote_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17286,7 +17815,7 @@ func (x *ScreenShareClosed) String() string {
 func (*ScreenShareClosed) ProtoMessage() {}
 
 func (x *ScreenShareClosed) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[169]
+	mi := &file_remote_v1_remote_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17299,7 +17828,7 @@ func (x *ScreenShareClosed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenShareClosed.ProtoReflect.Descriptor instead.
 func (*ScreenShareClosed) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{169}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *ScreenShareClosed) GetStreamId() string {
@@ -17325,7 +17854,7 @@ type BrowserClear struct {
 
 func (x *BrowserClear) Reset() {
 	*x = BrowserClear{}
-	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	mi := &file_remote_v1_remote_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17337,7 +17866,7 @@ func (x *BrowserClear) String() string {
 func (*BrowserClear) ProtoMessage() {}
 
 func (x *BrowserClear) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[170]
+	mi := &file_remote_v1_remote_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17350,7 +17879,7 @@ func (x *BrowserClear) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserClear.ProtoReflect.Descriptor instead.
 func (*BrowserClear) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{170}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{176}
 }
 
 type AgentUpdateInfo struct {
@@ -17368,7 +17897,7 @@ type AgentUpdateInfo struct {
 
 func (x *AgentUpdateInfo) Reset() {
 	*x = AgentUpdateInfo{}
-	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	mi := &file_remote_v1_remote_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17380,7 +17909,7 @@ func (x *AgentUpdateInfo) String() string {
 func (*AgentUpdateInfo) ProtoMessage() {}
 
 func (x *AgentUpdateInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[171]
+	mi := &file_remote_v1_remote_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17393,7 +17922,7 @@ func (x *AgentUpdateInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateInfo.ProtoReflect.Descriptor instead.
 func (*AgentUpdateInfo) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{171}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{177}
 }
 
 func (x *AgentUpdateInfo) GetSupported() bool {
@@ -17427,7 +17956,7 @@ type AgentUpdateCheck struct {
 
 func (x *AgentUpdateCheck) Reset() {
 	*x = AgentUpdateCheck{}
-	mi := &file_remote_v1_remote_proto_msgTypes[172]
+	mi := &file_remote_v1_remote_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17439,7 +17968,7 @@ func (x *AgentUpdateCheck) String() string {
 func (*AgentUpdateCheck) ProtoMessage() {}
 
 func (x *AgentUpdateCheck) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[172]
+	mi := &file_remote_v1_remote_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17452,7 +17981,7 @@ func (x *AgentUpdateCheck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateCheck.ProtoReflect.Descriptor instead.
 func (*AgentUpdateCheck) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{172}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{178}
 }
 
 // A → B: update to the newest release. Answered with Ack at once;
@@ -17466,7 +17995,7 @@ type AgentUpdateStart struct {
 
 func (x *AgentUpdateStart) Reset() {
 	*x = AgentUpdateStart{}
-	mi := &file_remote_v1_remote_proto_msgTypes[173]
+	mi := &file_remote_v1_remote_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17478,7 +18007,7 @@ func (x *AgentUpdateStart) String() string {
 func (*AgentUpdateStart) ProtoMessage() {}
 
 func (x *AgentUpdateStart) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[173]
+	mi := &file_remote_v1_remote_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17491,7 +18020,7 @@ func (x *AgentUpdateStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateStart.ProtoReflect.Descriptor instead.
 func (*AgentUpdateStart) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{173}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{179}
 }
 
 // B → A, unasked, to every connected device.
@@ -17510,7 +18039,7 @@ type AgentUpdateProgress struct {
 
 func (x *AgentUpdateProgress) Reset() {
 	*x = AgentUpdateProgress{}
-	mi := &file_remote_v1_remote_proto_msgTypes[174]
+	mi := &file_remote_v1_remote_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17522,7 +18051,7 @@ func (x *AgentUpdateProgress) String() string {
 func (*AgentUpdateProgress) ProtoMessage() {}
 
 func (x *AgentUpdateProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[174]
+	mi := &file_remote_v1_remote_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17535,7 +18064,7 @@ func (x *AgentUpdateProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateProgress.ProtoReflect.Descriptor instead.
 func (*AgentUpdateProgress) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{174}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *AgentUpdateProgress) GetPhase() AgentUpdatePhase {
@@ -17582,7 +18111,7 @@ type TermListRequest struct {
 
 func (x *TermListRequest) Reset() {
 	*x = TermListRequest{}
-	mi := &file_remote_v1_remote_proto_msgTypes[175]
+	mi := &file_remote_v1_remote_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17594,7 +18123,7 @@ func (x *TermListRequest) String() string {
 func (*TermListRequest) ProtoMessage() {}
 
 func (x *TermListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[175]
+	mi := &file_remote_v1_remote_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17607,7 +18136,7 @@ func (x *TermListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermListRequest.ProtoReflect.Descriptor instead.
 func (*TermListRequest) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{175}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{181}
 }
 
 type TermSessionInfo struct {
@@ -17637,7 +18166,7 @@ type TermSessionInfo struct {
 
 func (x *TermSessionInfo) Reset() {
 	*x = TermSessionInfo{}
-	mi := &file_remote_v1_remote_proto_msgTypes[176]
+	mi := &file_remote_v1_remote_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17649,7 +18178,7 @@ func (x *TermSessionInfo) String() string {
 func (*TermSessionInfo) ProtoMessage() {}
 
 func (x *TermSessionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[176]
+	mi := &file_remote_v1_remote_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17662,7 +18191,7 @@ func (x *TermSessionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermSessionInfo.ProtoReflect.Descriptor instead.
 func (*TermSessionInfo) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{176}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{182}
 }
 
 func (x *TermSessionInfo) GetSession() uint32 {
@@ -17756,7 +18285,7 @@ type TermListResult struct {
 
 func (x *TermListResult) Reset() {
 	*x = TermListResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[177]
+	mi := &file_remote_v1_remote_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17768,7 +18297,7 @@ func (x *TermListResult) String() string {
 func (*TermListResult) ProtoMessage() {}
 
 func (x *TermListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[177]
+	mi := &file_remote_v1_remote_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17781,7 +18310,7 @@ func (x *TermListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermListResult.ProtoReflect.Descriptor instead.
 func (*TermListResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{177}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{183}
 }
 
 func (x *TermListResult) GetSessions() []*TermSessionInfo {
@@ -17822,7 +18351,7 @@ type TerminalUpdate struct {
 
 func (x *TerminalUpdate) Reset() {
 	*x = TerminalUpdate{}
-	mi := &file_remote_v1_remote_proto_msgTypes[178]
+	mi := &file_remote_v1_remote_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17834,7 +18363,7 @@ func (x *TerminalUpdate) String() string {
 func (*TerminalUpdate) ProtoMessage() {}
 
 func (x *TerminalUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[178]
+	mi := &file_remote_v1_remote_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17847,7 +18376,7 @@ func (x *TerminalUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalUpdate.ProtoReflect.Descriptor instead.
 func (*TerminalUpdate) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{178}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{184}
 }
 
 func (x *TerminalUpdate) GetStagedAt() int64 {
@@ -17874,7 +18403,7 @@ type TerminalUpdateHold struct {
 
 func (x *TerminalUpdateHold) Reset() {
 	*x = TerminalUpdateHold{}
-	mi := &file_remote_v1_remote_proto_msgTypes[179]
+	mi := &file_remote_v1_remote_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17886,7 +18415,7 @@ func (x *TerminalUpdateHold) String() string {
 func (*TerminalUpdateHold) ProtoMessage() {}
 
 func (x *TerminalUpdateHold) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[179]
+	mi := &file_remote_v1_remote_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17899,7 +18428,7 @@ func (x *TerminalUpdateHold) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalUpdateHold.ProtoReflect.Descriptor instead.
 func (*TerminalUpdateHold) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{179}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{185}
 }
 
 func (x *TerminalUpdateHold) GetSession() uint32 {
@@ -17930,7 +18459,7 @@ type TermUpdateNow struct {
 
 func (x *TermUpdateNow) Reset() {
 	*x = TermUpdateNow{}
-	mi := &file_remote_v1_remote_proto_msgTypes[180]
+	mi := &file_remote_v1_remote_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17942,7 +18471,7 @@ func (x *TermUpdateNow) String() string {
 func (*TermUpdateNow) ProtoMessage() {}
 
 func (x *TermUpdateNow) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[180]
+	mi := &file_remote_v1_remote_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17955,7 +18484,7 @@ func (x *TermUpdateNow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermUpdateNow.ProtoReflect.Descriptor instead.
 func (*TermUpdateNow) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{180}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{186}
 }
 
 // A → B: start a login shell in a new session. Answered with TermOpened, or
@@ -17986,7 +18515,7 @@ type TermOpen struct {
 
 func (x *TermOpen) Reset() {
 	*x = TermOpen{}
-	mi := &file_remote_v1_remote_proto_msgTypes[181]
+	mi := &file_remote_v1_remote_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17998,7 +18527,7 @@ func (x *TermOpen) String() string {
 func (*TermOpen) ProtoMessage() {}
 
 func (x *TermOpen) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[181]
+	mi := &file_remote_v1_remote_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18011,7 +18540,7 @@ func (x *TermOpen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermOpen.ProtoReflect.Descriptor instead.
 func (*TermOpen) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{181}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{187}
 }
 
 func (x *TermOpen) GetCols() uint32 {
@@ -18052,7 +18581,7 @@ type TermAiSession struct {
 
 func (x *TermAiSession) Reset() {
 	*x = TermAiSession{}
-	mi := &file_remote_v1_remote_proto_msgTypes[182]
+	mi := &file_remote_v1_remote_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18064,7 +18593,7 @@ func (x *TermAiSession) String() string {
 func (*TermAiSession) ProtoMessage() {}
 
 func (x *TermAiSession) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[182]
+	mi := &file_remote_v1_remote_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18077,7 +18606,7 @@ func (x *TermAiSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermAiSession.ProtoReflect.Descriptor instead.
 func (*TermAiSession) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{182}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{188}
 }
 
 func (x *TermAiSession) GetThreadId() string {
@@ -18096,7 +18625,7 @@ type TermOpened struct {
 
 func (x *TermOpened) Reset() {
 	*x = TermOpened{}
-	mi := &file_remote_v1_remote_proto_msgTypes[183]
+	mi := &file_remote_v1_remote_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18108,7 +18637,7 @@ func (x *TermOpened) String() string {
 func (*TermOpened) ProtoMessage() {}
 
 func (x *TermOpened) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[183]
+	mi := &file_remote_v1_remote_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18121,7 +18650,7 @@ func (x *TermOpened) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermOpened.ProtoReflect.Descriptor instead.
 func (*TermOpened) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{183}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{189}
 }
 
 func (x *TermOpened) GetSession() uint32 {
@@ -18142,7 +18671,7 @@ type TermClose struct {
 
 func (x *TermClose) Reset() {
 	*x = TermClose{}
-	mi := &file_remote_v1_remote_proto_msgTypes[184]
+	mi := &file_remote_v1_remote_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18154,7 +18683,7 @@ func (x *TermClose) String() string {
 func (*TermClose) ProtoMessage() {}
 
 func (x *TermClose) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[184]
+	mi := &file_remote_v1_remote_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18167,7 +18696,7 @@ func (x *TermClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermClose.ProtoReflect.Descriptor instead.
 func (*TermClose) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{184}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{190}
 }
 
 func (x *TermClose) GetSession() uint32 {
@@ -18186,7 +18715,7 @@ type TermClosed struct {
 
 func (x *TermClosed) Reset() {
 	*x = TermClosed{}
-	mi := &file_remote_v1_remote_proto_msgTypes[185]
+	mi := &file_remote_v1_remote_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18198,7 +18727,7 @@ func (x *TermClosed) String() string {
 func (*TermClosed) ProtoMessage() {}
 
 func (x *TermClosed) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[185]
+	mi := &file_remote_v1_remote_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18211,7 +18740,7 @@ func (x *TermClosed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermClosed.ProtoReflect.Descriptor instead.
 func (*TermClosed) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{185}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{191}
 }
 
 func (x *TermClosed) GetSession() uint32 {
@@ -18234,7 +18763,7 @@ type TermResize struct {
 
 func (x *TermResize) Reset() {
 	*x = TermResize{}
-	mi := &file_remote_v1_remote_proto_msgTypes[186]
+	mi := &file_remote_v1_remote_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18246,7 +18775,7 @@ func (x *TermResize) String() string {
 func (*TermResize) ProtoMessage() {}
 
 func (x *TermResize) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[186]
+	mi := &file_remote_v1_remote_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18259,7 +18788,7 @@ func (x *TermResize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermResize.ProtoReflect.Descriptor instead.
 func (*TermResize) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{186}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{192}
 }
 
 func (x *TermResize) GetSession() uint32 {
@@ -18302,7 +18831,7 @@ type TermSignal struct {
 
 func (x *TermSignal) Reset() {
 	*x = TermSignal{}
-	mi := &file_remote_v1_remote_proto_msgTypes[187]
+	mi := &file_remote_v1_remote_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18314,7 +18843,7 @@ func (x *TermSignal) String() string {
 func (*TermSignal) ProtoMessage() {}
 
 func (x *TermSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[187]
+	mi := &file_remote_v1_remote_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18327,7 +18856,7 @@ func (x *TermSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermSignal.ProtoReflect.Descriptor instead.
 func (*TermSignal) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{187}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{193}
 }
 
 func (x *TermSignal) GetLink() uint32 {
@@ -18379,7 +18908,7 @@ type TermData struct {
 
 func (x *TermData) Reset() {
 	*x = TermData{}
-	mi := &file_remote_v1_remote_proto_msgTypes[188]
+	mi := &file_remote_v1_remote_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18391,7 +18920,7 @@ func (x *TermData) String() string {
 func (*TermData) ProtoMessage() {}
 
 func (x *TermData) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[188]
+	mi := &file_remote_v1_remote_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18404,7 +18933,7 @@ func (x *TermData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermData.ProtoReflect.Descriptor instead.
 func (*TermData) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{188}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{194}
 }
 
 func (x *TermData) GetLink() uint32 {
@@ -18438,7 +18967,7 @@ type TermStatus struct {
 
 func (x *TermStatus) Reset() {
 	*x = TermStatus{}
-	mi := &file_remote_v1_remote_proto_msgTypes[189]
+	mi := &file_remote_v1_remote_proto_msgTypes[195]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18450,7 +18979,7 @@ func (x *TermStatus) String() string {
 func (*TermStatus) ProtoMessage() {}
 
 func (x *TermStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[189]
+	mi := &file_remote_v1_remote_proto_msgTypes[195]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18463,7 +18992,7 @@ func (x *TermStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermStatus.ProtoReflect.Descriptor instead.
 func (*TermStatus) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{189}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{195}
 }
 
 func (x *TermStatus) GetLink() uint32 {
@@ -18519,7 +19048,7 @@ type WsDirList struct {
 
 func (x *WsDirList) Reset() {
 	*x = WsDirList{}
-	mi := &file_remote_v1_remote_proto_msgTypes[190]
+	mi := &file_remote_v1_remote_proto_msgTypes[196]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18531,7 +19060,7 @@ func (x *WsDirList) String() string {
 func (*WsDirList) ProtoMessage() {}
 
 func (x *WsDirList) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[190]
+	mi := &file_remote_v1_remote_proto_msgTypes[196]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18544,7 +19073,7 @@ func (x *WsDirList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsDirList.ProtoReflect.Descriptor instead.
 func (*WsDirList) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{190}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{196}
 }
 
 func (x *WsDirList) GetWorkspaceId() string {
@@ -18620,7 +19149,7 @@ type WsEntry struct {
 
 func (x *WsEntry) Reset() {
 	*x = WsEntry{}
-	mi := &file_remote_v1_remote_proto_msgTypes[191]
+	mi := &file_remote_v1_remote_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18632,7 +19161,7 @@ func (x *WsEntry) String() string {
 func (*WsEntry) ProtoMessage() {}
 
 func (x *WsEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[191]
+	mi := &file_remote_v1_remote_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18645,7 +19174,7 @@ func (x *WsEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsEntry.ProtoReflect.Descriptor instead.
 func (*WsEntry) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{191}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{197}
 }
 
 func (x *WsEntry) GetName() string {
@@ -18718,7 +19247,7 @@ type WsDirListResult struct {
 
 func (x *WsDirListResult) Reset() {
 	*x = WsDirListResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[192]
+	mi := &file_remote_v1_remote_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18730,7 +19259,7 @@ func (x *WsDirListResult) String() string {
 func (*WsDirListResult) ProtoMessage() {}
 
 func (x *WsDirListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[192]
+	mi := &file_remote_v1_remote_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18743,7 +19272,7 @@ func (x *WsDirListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsDirListResult.ProtoReflect.Descriptor instead.
 func (*WsDirListResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{192}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{198}
 }
 
 func (x *WsDirListResult) GetWorkspaceId() string {
@@ -18793,7 +19322,7 @@ type WsFileRead struct {
 
 func (x *WsFileRead) Reset() {
 	*x = WsFileRead{}
-	mi := &file_remote_v1_remote_proto_msgTypes[193]
+	mi := &file_remote_v1_remote_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18805,7 +19334,7 @@ func (x *WsFileRead) String() string {
 func (*WsFileRead) ProtoMessage() {}
 
 func (x *WsFileRead) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[193]
+	mi := &file_remote_v1_remote_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18818,7 +19347,7 @@ func (x *WsFileRead) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFileRead.ProtoReflect.Descriptor instead.
 func (*WsFileRead) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{193}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{199}
 }
 
 func (x *WsFileRead) GetWorkspaceId() string {
@@ -18851,7 +19380,7 @@ type WsFileReadResult struct {
 
 func (x *WsFileReadResult) Reset() {
 	*x = WsFileReadResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[194]
+	mi := &file_remote_v1_remote_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18863,7 +19392,7 @@ func (x *WsFileReadResult) String() string {
 func (*WsFileReadResult) ProtoMessage() {}
 
 func (x *WsFileReadResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[194]
+	mi := &file_remote_v1_remote_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18876,7 +19405,7 @@ func (x *WsFileReadResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFileReadResult.ProtoReflect.Descriptor instead.
 func (*WsFileReadResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{194}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{200}
 }
 
 func (x *WsFileReadResult) GetWorkspaceId() string {
@@ -18953,7 +19482,7 @@ type WsFindNames struct {
 
 func (x *WsFindNames) Reset() {
 	*x = WsFindNames{}
-	mi := &file_remote_v1_remote_proto_msgTypes[195]
+	mi := &file_remote_v1_remote_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18965,7 +19494,7 @@ func (x *WsFindNames) String() string {
 func (*WsFindNames) ProtoMessage() {}
 
 func (x *WsFindNames) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[195]
+	mi := &file_remote_v1_remote_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18978,7 +19507,7 @@ func (x *WsFindNames) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFindNames.ProtoReflect.Descriptor instead.
 func (*WsFindNames) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{195}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{201}
 }
 
 func (x *WsFindNames) GetWorkspaceId() string {
@@ -19013,7 +19542,7 @@ type WsFindNamesResult struct {
 
 func (x *WsFindNamesResult) Reset() {
 	*x = WsFindNamesResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[196]
+	mi := &file_remote_v1_remote_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19025,7 +19554,7 @@ func (x *WsFindNamesResult) String() string {
 func (*WsFindNamesResult) ProtoMessage() {}
 
 func (x *WsFindNamesResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[196]
+	mi := &file_remote_v1_remote_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19038,7 +19567,7 @@ func (x *WsFindNamesResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFindNamesResult.ProtoReflect.Descriptor instead.
 func (*WsFindNamesResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{196}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{202}
 }
 
 func (x *WsFindNamesResult) GetWorkspaceId() string {
@@ -19082,7 +19611,7 @@ type WsFindContents struct {
 
 func (x *WsFindContents) Reset() {
 	*x = WsFindContents{}
-	mi := &file_remote_v1_remote_proto_msgTypes[197]
+	mi := &file_remote_v1_remote_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19094,7 +19623,7 @@ func (x *WsFindContents) String() string {
 func (*WsFindContents) ProtoMessage() {}
 
 func (x *WsFindContents) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[197]
+	mi := &file_remote_v1_remote_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19107,7 +19636,7 @@ func (x *WsFindContents) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFindContents.ProtoReflect.Descriptor instead.
 func (*WsFindContents) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{197}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{203}
 }
 
 func (x *WsFindContents) GetWorkspaceId() string {
@@ -19165,7 +19694,7 @@ type WsContentMatch struct {
 
 func (x *WsContentMatch) Reset() {
 	*x = WsContentMatch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[198]
+	mi := &file_remote_v1_remote_proto_msgTypes[204]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19177,7 +19706,7 @@ func (x *WsContentMatch) String() string {
 func (*WsContentMatch) ProtoMessage() {}
 
 func (x *WsContentMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[198]
+	mi := &file_remote_v1_remote_proto_msgTypes[204]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19190,7 +19719,7 @@ func (x *WsContentMatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsContentMatch.ProtoReflect.Descriptor instead.
 func (*WsContentMatch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{198}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{204}
 }
 
 func (x *WsContentMatch) GetLine() uint32 {
@@ -19224,7 +19753,7 @@ type WsContentFile struct {
 
 func (x *WsContentFile) Reset() {
 	*x = WsContentFile{}
-	mi := &file_remote_v1_remote_proto_msgTypes[199]
+	mi := &file_remote_v1_remote_proto_msgTypes[205]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19236,7 +19765,7 @@ func (x *WsContentFile) String() string {
 func (*WsContentFile) ProtoMessage() {}
 
 func (x *WsContentFile) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[199]
+	mi := &file_remote_v1_remote_proto_msgTypes[205]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19249,7 +19778,7 @@ func (x *WsContentFile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsContentFile.ProtoReflect.Descriptor instead.
 func (*WsContentFile) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{199}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{205}
 }
 
 func (x *WsContentFile) GetPath() string {
@@ -19281,7 +19810,7 @@ type WsFindContentsResult struct {
 
 func (x *WsFindContentsResult) Reset() {
 	*x = WsFindContentsResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[200]
+	mi := &file_remote_v1_remote_proto_msgTypes[206]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19293,7 +19822,7 @@ func (x *WsFindContentsResult) String() string {
 func (*WsFindContentsResult) ProtoMessage() {}
 
 func (x *WsFindContentsResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[200]
+	mi := &file_remote_v1_remote_proto_msgTypes[206]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19306,7 +19835,7 @@ func (x *WsFindContentsResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFindContentsResult.ProtoReflect.Descriptor instead.
 func (*WsFindContentsResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{200}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{206}
 }
 
 func (x *WsFindContentsResult) GetWorkspaceId() string {
@@ -19357,7 +19886,7 @@ type WsWatch struct {
 
 func (x *WsWatch) Reset() {
 	*x = WsWatch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[201]
+	mi := &file_remote_v1_remote_proto_msgTypes[207]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19369,7 +19898,7 @@ func (x *WsWatch) String() string {
 func (*WsWatch) ProtoMessage() {}
 
 func (x *WsWatch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[201]
+	mi := &file_remote_v1_remote_proto_msgTypes[207]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19382,7 +19911,7 @@ func (x *WsWatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsWatch.ProtoReflect.Descriptor instead.
 func (*WsWatch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{201}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{207}
 }
 
 func (x *WsWatch) GetWorkspaceId() string {
@@ -19422,7 +19951,7 @@ type WsChanged struct {
 
 func (x *WsChanged) Reset() {
 	*x = WsChanged{}
-	mi := &file_remote_v1_remote_proto_msgTypes[202]
+	mi := &file_remote_v1_remote_proto_msgTypes[208]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19434,7 +19963,7 @@ func (x *WsChanged) String() string {
 func (*WsChanged) ProtoMessage() {}
 
 func (x *WsChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[202]
+	mi := &file_remote_v1_remote_proto_msgTypes[208]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19447,7 +19976,7 @@ func (x *WsChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsChanged.ProtoReflect.Descriptor instead.
 func (*WsChanged) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{202}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{208}
 }
 
 func (x *WsChanged) GetWorkspaceId() string {
@@ -19495,7 +20024,7 @@ type WsGitStatus struct {
 
 func (x *WsGitStatus) Reset() {
 	*x = WsGitStatus{}
-	mi := &file_remote_v1_remote_proto_msgTypes[203]
+	mi := &file_remote_v1_remote_proto_msgTypes[209]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19507,7 +20036,7 @@ func (x *WsGitStatus) String() string {
 func (*WsGitStatus) ProtoMessage() {}
 
 func (x *WsGitStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[203]
+	mi := &file_remote_v1_remote_proto_msgTypes[209]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19520,7 +20049,7 @@ func (x *WsGitStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitStatus.ProtoReflect.Descriptor instead.
 func (*WsGitStatus) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{203}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{209}
 }
 
 func (x *WsGitStatus) GetWorkspaceId() string {
@@ -19549,7 +20078,7 @@ type WsGitEntry struct {
 
 func (x *WsGitEntry) Reset() {
 	*x = WsGitEntry{}
-	mi := &file_remote_v1_remote_proto_msgTypes[204]
+	mi := &file_remote_v1_remote_proto_msgTypes[210]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19561,7 +20090,7 @@ func (x *WsGitEntry) String() string {
 func (*WsGitEntry) ProtoMessage() {}
 
 func (x *WsGitEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[204]
+	mi := &file_remote_v1_remote_proto_msgTypes[210]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19574,7 +20103,7 @@ func (x *WsGitEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitEntry.ProtoReflect.Descriptor instead.
 func (*WsGitEntry) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{204}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{210}
 }
 
 func (x *WsGitEntry) GetPath() string {
@@ -19645,7 +20174,7 @@ type WsGitUpstream struct {
 
 func (x *WsGitUpstream) Reset() {
 	*x = WsGitUpstream{}
-	mi := &file_remote_v1_remote_proto_msgTypes[205]
+	mi := &file_remote_v1_remote_proto_msgTypes[211]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19657,7 +20186,7 @@ func (x *WsGitUpstream) String() string {
 func (*WsGitUpstream) ProtoMessage() {}
 
 func (x *WsGitUpstream) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[205]
+	mi := &file_remote_v1_remote_proto_msgTypes[211]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19670,7 +20199,7 @@ func (x *WsGitUpstream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitUpstream.ProtoReflect.Descriptor instead.
 func (*WsGitUpstream) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{205}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{211}
 }
 
 func (x *WsGitUpstream) GetName() string {
@@ -19715,7 +20244,7 @@ type WsGitStatusResult struct {
 
 func (x *WsGitStatusResult) Reset() {
 	*x = WsGitStatusResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[206]
+	mi := &file_remote_v1_remote_proto_msgTypes[212]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19727,7 +20256,7 @@ func (x *WsGitStatusResult) String() string {
 func (*WsGitStatusResult) ProtoMessage() {}
 
 func (x *WsGitStatusResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[206]
+	mi := &file_remote_v1_remote_proto_msgTypes[212]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19740,7 +20269,7 @@ func (x *WsGitStatusResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitStatusResult.ProtoReflect.Descriptor instead.
 func (*WsGitStatusResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{206}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{212}
 }
 
 func (x *WsGitStatusResult) GetWorkspaceId() string {
@@ -19811,7 +20340,7 @@ type WsGitDiff struct {
 
 func (x *WsGitDiff) Reset() {
 	*x = WsGitDiff{}
-	mi := &file_remote_v1_remote_proto_msgTypes[207]
+	mi := &file_remote_v1_remote_proto_msgTypes[213]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19823,7 +20352,7 @@ func (x *WsGitDiff) String() string {
 func (*WsGitDiff) ProtoMessage() {}
 
 func (x *WsGitDiff) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[207]
+	mi := &file_remote_v1_remote_proto_msgTypes[213]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19836,7 +20365,7 @@ func (x *WsGitDiff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitDiff.ProtoReflect.Descriptor instead.
 func (*WsGitDiff) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{207}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{213}
 }
 
 func (x *WsGitDiff) GetWorkspaceId() string {
@@ -19892,7 +20421,7 @@ type WsGitDiffResult struct {
 
 func (x *WsGitDiffResult) Reset() {
 	*x = WsGitDiffResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[208]
+	mi := &file_remote_v1_remote_proto_msgTypes[214]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19904,7 +20433,7 @@ func (x *WsGitDiffResult) String() string {
 func (*WsGitDiffResult) ProtoMessage() {}
 
 func (x *WsGitDiffResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[208]
+	mi := &file_remote_v1_remote_proto_msgTypes[214]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19917,7 +20446,7 @@ func (x *WsGitDiffResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitDiffResult.ProtoReflect.Descriptor instead.
 func (*WsGitDiffResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{208}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{214}
 }
 
 func (x *WsGitDiffResult) GetWorkspaceId() string {
@@ -19952,7 +20481,7 @@ type WsGitStage struct {
 
 func (x *WsGitStage) Reset() {
 	*x = WsGitStage{}
-	mi := &file_remote_v1_remote_proto_msgTypes[209]
+	mi := &file_remote_v1_remote_proto_msgTypes[215]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19964,7 +20493,7 @@ func (x *WsGitStage) String() string {
 func (*WsGitStage) ProtoMessage() {}
 
 func (x *WsGitStage) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[209]
+	mi := &file_remote_v1_remote_proto_msgTypes[215]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19977,7 +20506,7 @@ func (x *WsGitStage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitStage.ProtoReflect.Descriptor instead.
 func (*WsGitStage) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{209}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{215}
 }
 
 func (x *WsGitStage) GetWorkspaceId() string {
@@ -20020,7 +20549,7 @@ type WsGitUnstage struct {
 
 func (x *WsGitUnstage) Reset() {
 	*x = WsGitUnstage{}
-	mi := &file_remote_v1_remote_proto_msgTypes[210]
+	mi := &file_remote_v1_remote_proto_msgTypes[216]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20032,7 +20561,7 @@ func (x *WsGitUnstage) String() string {
 func (*WsGitUnstage) ProtoMessage() {}
 
 func (x *WsGitUnstage) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[210]
+	mi := &file_remote_v1_remote_proto_msgTypes[216]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20045,7 +20574,7 @@ func (x *WsGitUnstage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitUnstage.ProtoReflect.Descriptor instead.
 func (*WsGitUnstage) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{210}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{216}
 }
 
 func (x *WsGitUnstage) GetWorkspaceId() string {
@@ -20088,7 +20617,7 @@ type WsGitDiscard struct {
 
 func (x *WsGitDiscard) Reset() {
 	*x = WsGitDiscard{}
-	mi := &file_remote_v1_remote_proto_msgTypes[211]
+	mi := &file_remote_v1_remote_proto_msgTypes[217]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20100,7 +20629,7 @@ func (x *WsGitDiscard) String() string {
 func (*WsGitDiscard) ProtoMessage() {}
 
 func (x *WsGitDiscard) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[211]
+	mi := &file_remote_v1_remote_proto_msgTypes[217]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20113,7 +20642,7 @@ func (x *WsGitDiscard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitDiscard.ProtoReflect.Descriptor instead.
 func (*WsGitDiscard) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{211}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{217}
 }
 
 func (x *WsGitDiscard) GetWorkspaceId() string {
@@ -20159,7 +20688,7 @@ type WsGitCommit struct {
 
 func (x *WsGitCommit) Reset() {
 	*x = WsGitCommit{}
-	mi := &file_remote_v1_remote_proto_msgTypes[212]
+	mi := &file_remote_v1_remote_proto_msgTypes[218]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20171,7 +20700,7 @@ func (x *WsGitCommit) String() string {
 func (*WsGitCommit) ProtoMessage() {}
 
 func (x *WsGitCommit) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[212]
+	mi := &file_remote_v1_remote_proto_msgTypes[218]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20184,7 +20713,7 @@ func (x *WsGitCommit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitCommit.ProtoReflect.Descriptor instead.
 func (*WsGitCommit) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{212}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{218}
 }
 
 func (x *WsGitCommit) GetWorkspaceId() string {
@@ -20237,7 +20766,7 @@ type WsGitCommitMessage struct {
 
 func (x *WsGitCommitMessage) Reset() {
 	*x = WsGitCommitMessage{}
-	mi := &file_remote_v1_remote_proto_msgTypes[213]
+	mi := &file_remote_v1_remote_proto_msgTypes[219]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20249,7 +20778,7 @@ func (x *WsGitCommitMessage) String() string {
 func (*WsGitCommitMessage) ProtoMessage() {}
 
 func (x *WsGitCommitMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[213]
+	mi := &file_remote_v1_remote_proto_msgTypes[219]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20262,7 +20791,7 @@ func (x *WsGitCommitMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitCommitMessage.ProtoReflect.Descriptor instead.
 func (*WsGitCommitMessage) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{213}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{219}
 }
 
 func (x *WsGitCommitMessage) GetWorkspaceId() string {
@@ -20297,7 +20826,7 @@ type WsGitCommitMessageResult struct {
 
 func (x *WsGitCommitMessageResult) Reset() {
 	*x = WsGitCommitMessageResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[214]
+	mi := &file_remote_v1_remote_proto_msgTypes[220]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20309,7 +20838,7 @@ func (x *WsGitCommitMessageResult) String() string {
 func (*WsGitCommitMessageResult) ProtoMessage() {}
 
 func (x *WsGitCommitMessageResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[214]
+	mi := &file_remote_v1_remote_proto_msgTypes[220]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20322,7 +20851,7 @@ func (x *WsGitCommitMessageResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitCommitMessageResult.ProtoReflect.Descriptor instead.
 func (*WsGitCommitMessageResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{214}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{220}
 }
 
 func (x *WsGitCommitMessageResult) GetWorkspaceId() string {
@@ -20354,7 +20883,7 @@ type WsGitLogEntry struct {
 
 func (x *WsGitLogEntry) Reset() {
 	*x = WsGitLogEntry{}
-	mi := &file_remote_v1_remote_proto_msgTypes[215]
+	mi := &file_remote_v1_remote_proto_msgTypes[221]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20366,7 +20895,7 @@ func (x *WsGitLogEntry) String() string {
 func (*WsGitLogEntry) ProtoMessage() {}
 
 func (x *WsGitLogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[215]
+	mi := &file_remote_v1_remote_proto_msgTypes[221]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20379,7 +20908,7 @@ func (x *WsGitLogEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitLogEntry.ProtoReflect.Descriptor instead.
 func (*WsGitLogEntry) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{215}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{221}
 }
 
 func (x *WsGitLogEntry) GetOid() string {
@@ -20427,7 +20956,7 @@ type WsGitCommitResult struct {
 
 func (x *WsGitCommitResult) Reset() {
 	*x = WsGitCommitResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[216]
+	mi := &file_remote_v1_remote_proto_msgTypes[222]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20439,7 +20968,7 @@ func (x *WsGitCommitResult) String() string {
 func (*WsGitCommitResult) ProtoMessage() {}
 
 func (x *WsGitCommitResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[216]
+	mi := &file_remote_v1_remote_proto_msgTypes[222]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20452,7 +20981,7 @@ func (x *WsGitCommitResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitCommitResult.ProtoReflect.Descriptor instead.
 func (*WsGitCommitResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{216}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{222}
 }
 
 func (x *WsGitCommitResult) GetWorkspaceId() string {
@@ -20479,7 +21008,7 @@ type WsGitBranches struct {
 
 func (x *WsGitBranches) Reset() {
 	*x = WsGitBranches{}
-	mi := &file_remote_v1_remote_proto_msgTypes[217]
+	mi := &file_remote_v1_remote_proto_msgTypes[223]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20491,7 +21020,7 @@ func (x *WsGitBranches) String() string {
 func (*WsGitBranches) ProtoMessage() {}
 
 func (x *WsGitBranches) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[217]
+	mi := &file_remote_v1_remote_proto_msgTypes[223]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20504,7 +21033,7 @@ func (x *WsGitBranches) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranches.ProtoReflect.Descriptor instead.
 func (*WsGitBranches) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{217}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{223}
 }
 
 func (x *WsGitBranches) GetWorkspaceId() string {
@@ -20529,7 +21058,7 @@ type WsGitBranch struct {
 
 func (x *WsGitBranch) Reset() {
 	*x = WsGitBranch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[218]
+	mi := &file_remote_v1_remote_proto_msgTypes[224]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20541,7 +21070,7 @@ func (x *WsGitBranch) String() string {
 func (*WsGitBranch) ProtoMessage() {}
 
 func (x *WsGitBranch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[218]
+	mi := &file_remote_v1_remote_proto_msgTypes[224]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20554,7 +21083,7 @@ func (x *WsGitBranch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranch.ProtoReflect.Descriptor instead.
 func (*WsGitBranch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{218}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{224}
 }
 
 func (x *WsGitBranch) GetName() string {
@@ -20606,7 +21135,7 @@ type WsGitBranchesResult struct {
 
 func (x *WsGitBranchesResult) Reset() {
 	*x = WsGitBranchesResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[219]
+	mi := &file_remote_v1_remote_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20618,7 +21147,7 @@ func (x *WsGitBranchesResult) String() string {
 func (*WsGitBranchesResult) ProtoMessage() {}
 
 func (x *WsGitBranchesResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[219]
+	mi := &file_remote_v1_remote_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20631,7 +21160,7 @@ func (x *WsGitBranchesResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranchesResult.ProtoReflect.Descriptor instead.
 func (*WsGitBranchesResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{219}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *WsGitBranchesResult) GetWorkspaceId() string {
@@ -20677,7 +21206,7 @@ type WsGitCheckout struct {
 
 func (x *WsGitCheckout) Reset() {
 	*x = WsGitCheckout{}
-	mi := &file_remote_v1_remote_proto_msgTypes[220]
+	mi := &file_remote_v1_remote_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20689,7 +21218,7 @@ func (x *WsGitCheckout) String() string {
 func (*WsGitCheckout) ProtoMessage() {}
 
 func (x *WsGitCheckout) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[220]
+	mi := &file_remote_v1_remote_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20702,7 +21231,7 @@ func (x *WsGitCheckout) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitCheckout.ProtoReflect.Descriptor instead.
 func (*WsGitCheckout) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{220}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{226}
 }
 
 func (x *WsGitCheckout) GetWorkspaceId() string {
@@ -20734,7 +21263,7 @@ type WsGitBranchCreate struct {
 
 func (x *WsGitBranchCreate) Reset() {
 	*x = WsGitBranchCreate{}
-	mi := &file_remote_v1_remote_proto_msgTypes[221]
+	mi := &file_remote_v1_remote_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20746,7 +21275,7 @@ func (x *WsGitBranchCreate) String() string {
 func (*WsGitBranchCreate) ProtoMessage() {}
 
 func (x *WsGitBranchCreate) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[221]
+	mi := &file_remote_v1_remote_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20759,7 +21288,7 @@ func (x *WsGitBranchCreate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranchCreate.ProtoReflect.Descriptor instead.
 func (*WsGitBranchCreate) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{221}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{227}
 }
 
 func (x *WsGitBranchCreate) GetWorkspaceId() string {
@@ -20802,7 +21331,7 @@ type WsGitFetch struct {
 
 func (x *WsGitFetch) Reset() {
 	*x = WsGitFetch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[222]
+	mi := &file_remote_v1_remote_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20814,7 +21343,7 @@ func (x *WsGitFetch) String() string {
 func (*WsGitFetch) ProtoMessage() {}
 
 func (x *WsGitFetch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[222]
+	mi := &file_remote_v1_remote_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20827,7 +21356,7 @@ func (x *WsGitFetch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitFetch.ProtoReflect.Descriptor instead.
 func (*WsGitFetch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{222}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{228}
 }
 
 func (x *WsGitFetch) GetWorkspaceId() string {
@@ -20851,7 +21380,7 @@ type WsGitPull struct {
 
 func (x *WsGitPull) Reset() {
 	*x = WsGitPull{}
-	mi := &file_remote_v1_remote_proto_msgTypes[223]
+	mi := &file_remote_v1_remote_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20863,7 +21392,7 @@ func (x *WsGitPull) String() string {
 func (*WsGitPull) ProtoMessage() {}
 
 func (x *WsGitPull) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[223]
+	mi := &file_remote_v1_remote_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20876,7 +21405,7 @@ func (x *WsGitPull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitPull.ProtoReflect.Descriptor instead.
 func (*WsGitPull) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{223}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *WsGitPull) GetWorkspaceId() string {
@@ -20905,7 +21434,7 @@ type WsGitRebase struct {
 
 func (x *WsGitRebase) Reset() {
 	*x = WsGitRebase{}
-	mi := &file_remote_v1_remote_proto_msgTypes[224]
+	mi := &file_remote_v1_remote_proto_msgTypes[230]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20917,7 +21446,7 @@ func (x *WsGitRebase) String() string {
 func (*WsGitRebase) ProtoMessage() {}
 
 func (x *WsGitRebase) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[224]
+	mi := &file_remote_v1_remote_proto_msgTypes[230]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20930,7 +21459,7 @@ func (x *WsGitRebase) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitRebase.ProtoReflect.Descriptor instead.
 func (*WsGitRebase) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{224}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{230}
 }
 
 func (x *WsGitRebase) GetWorkspaceId() string {
@@ -20964,7 +21493,7 @@ type WsGitPush struct {
 
 func (x *WsGitPush) Reset() {
 	*x = WsGitPush{}
-	mi := &file_remote_v1_remote_proto_msgTypes[225]
+	mi := &file_remote_v1_remote_proto_msgTypes[231]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20976,7 +21505,7 @@ func (x *WsGitPush) String() string {
 func (*WsGitPush) ProtoMessage() {}
 
 func (x *WsGitPush) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[225]
+	mi := &file_remote_v1_remote_proto_msgTypes[231]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20989,7 +21518,7 @@ func (x *WsGitPush) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitPush.ProtoReflect.Descriptor instead.
 func (*WsGitPush) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{225}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{231}
 }
 
 func (x *WsGitPush) GetWorkspaceId() string {
@@ -21014,7 +21543,7 @@ type WsGitLog struct {
 
 func (x *WsGitLog) Reset() {
 	*x = WsGitLog{}
-	mi := &file_remote_v1_remote_proto_msgTypes[226]
+	mi := &file_remote_v1_remote_proto_msgTypes[232]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21026,7 +21555,7 @@ func (x *WsGitLog) String() string {
 func (*WsGitLog) ProtoMessage() {}
 
 func (x *WsGitLog) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[226]
+	mi := &file_remote_v1_remote_proto_msgTypes[232]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21039,7 +21568,7 @@ func (x *WsGitLog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitLog.ProtoReflect.Descriptor instead.
 func (*WsGitLog) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{226}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{232}
 }
 
 func (x *WsGitLog) GetWorkspaceId() string {
@@ -21081,7 +21610,7 @@ type WsGitLogResult struct {
 
 func (x *WsGitLogResult) Reset() {
 	*x = WsGitLogResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[227]
+	mi := &file_remote_v1_remote_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21093,7 +21622,7 @@ func (x *WsGitLogResult) String() string {
 func (*WsGitLogResult) ProtoMessage() {}
 
 func (x *WsGitLogResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[227]
+	mi := &file_remote_v1_remote_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21106,7 +21635,7 @@ func (x *WsGitLogResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitLogResult.ProtoReflect.Descriptor instead.
 func (*WsGitLogResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{227}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{233}
 }
 
 func (x *WsGitLogResult) GetWorkspaceId() string {
@@ -21144,7 +21673,7 @@ type WsGitBranchCompare struct {
 
 func (x *WsGitBranchCompare) Reset() {
 	*x = WsGitBranchCompare{}
-	mi := &file_remote_v1_remote_proto_msgTypes[228]
+	mi := &file_remote_v1_remote_proto_msgTypes[234]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21156,7 +21685,7 @@ func (x *WsGitBranchCompare) String() string {
 func (*WsGitBranchCompare) ProtoMessage() {}
 
 func (x *WsGitBranchCompare) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[228]
+	mi := &file_remote_v1_remote_proto_msgTypes[234]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21169,7 +21698,7 @@ func (x *WsGitBranchCompare) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranchCompare.ProtoReflect.Descriptor instead.
 func (*WsGitBranchCompare) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{228}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{234}
 }
 
 func (x *WsGitBranchCompare) GetWorkspaceId() string {
@@ -21204,7 +21733,7 @@ type WsGitBranchCompareResult struct {
 
 func (x *WsGitBranchCompareResult) Reset() {
 	*x = WsGitBranchCompareResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[229]
+	mi := &file_remote_v1_remote_proto_msgTypes[235]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21216,7 +21745,7 @@ func (x *WsGitBranchCompareResult) String() string {
 func (*WsGitBranchCompareResult) ProtoMessage() {}
 
 func (x *WsGitBranchCompareResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[229]
+	mi := &file_remote_v1_remote_proto_msgTypes[235]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21229,7 +21758,7 @@ func (x *WsGitBranchCompareResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitBranchCompareResult.ProtoReflect.Descriptor instead.
 func (*WsGitBranchCompareResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{229}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{235}
 }
 
 func (x *WsGitBranchCompareResult) GetWorkspaceId() string {
@@ -21295,7 +21824,7 @@ type WsGitPrUrl struct {
 
 func (x *WsGitPrUrl) Reset() {
 	*x = WsGitPrUrl{}
-	mi := &file_remote_v1_remote_proto_msgTypes[230]
+	mi := &file_remote_v1_remote_proto_msgTypes[236]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21307,7 +21836,7 @@ func (x *WsGitPrUrl) String() string {
 func (*WsGitPrUrl) ProtoMessage() {}
 
 func (x *WsGitPrUrl) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[230]
+	mi := &file_remote_v1_remote_proto_msgTypes[236]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21320,7 +21849,7 @@ func (x *WsGitPrUrl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitPrUrl.ProtoReflect.Descriptor instead.
 func (*WsGitPrUrl) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{230}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{236}
 }
 
 func (x *WsGitPrUrl) GetWorkspaceId() string {
@@ -21350,7 +21879,7 @@ type WsGitPrUrlResult struct {
 
 func (x *WsGitPrUrlResult) Reset() {
 	*x = WsGitPrUrlResult{}
-	mi := &file_remote_v1_remote_proto_msgTypes[231]
+	mi := &file_remote_v1_remote_proto_msgTypes[237]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21362,7 +21891,7 @@ func (x *WsGitPrUrlResult) String() string {
 func (*WsGitPrUrlResult) ProtoMessage() {}
 
 func (x *WsGitPrUrlResult) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[231]
+	mi := &file_remote_v1_remote_proto_msgTypes[237]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21375,7 +21904,7 @@ func (x *WsGitPrUrlResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsGitPrUrlResult.ProtoReflect.Descriptor instead.
 func (*WsGitPrUrlResult) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{231}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{237}
 }
 
 func (x *WsGitPrUrlResult) GetWorkspaceId() string {
@@ -21415,7 +21944,7 @@ type UsageReportRequest struct {
 
 func (x *UsageReportRequest) Reset() {
 	*x = UsageReportRequest{}
-	mi := &file_remote_v1_remote_proto_msgTypes[232]
+	mi := &file_remote_v1_remote_proto_msgTypes[238]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21427,7 +21956,7 @@ func (x *UsageReportRequest) String() string {
 func (*UsageReportRequest) ProtoMessage() {}
 
 func (x *UsageReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[232]
+	mi := &file_remote_v1_remote_proto_msgTypes[238]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21440,7 +21969,7 @@ func (x *UsageReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageReportRequest.ProtoReflect.Descriptor instead.
 func (*UsageReportRequest) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{232}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{238}
 }
 
 func (x *UsageReportRequest) GetFrom() string {
@@ -21485,7 +22014,7 @@ type UsageReport struct {
 
 func (x *UsageReport) Reset() {
 	*x = UsageReport{}
-	mi := &file_remote_v1_remote_proto_msgTypes[233]
+	mi := &file_remote_v1_remote_proto_msgTypes[239]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21497,7 +22026,7 @@ func (x *UsageReport) String() string {
 func (*UsageReport) ProtoMessage() {}
 
 func (x *UsageReport) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[233]
+	mi := &file_remote_v1_remote_proto_msgTypes[239]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21510,7 +22039,7 @@ func (x *UsageReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageReport.ProtoReflect.Descriptor instead.
 func (*UsageReport) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{233}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{239}
 }
 
 func (x *UsageReport) GetFrom() string {
@@ -21596,7 +22125,7 @@ type UsageDay struct {
 
 func (x *UsageDay) Reset() {
 	*x = UsageDay{}
-	mi := &file_remote_v1_remote_proto_msgTypes[234]
+	mi := &file_remote_v1_remote_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21608,7 +22137,7 @@ func (x *UsageDay) String() string {
 func (*UsageDay) ProtoMessage() {}
 
 func (x *UsageDay) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[234]
+	mi := &file_remote_v1_remote_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21621,7 +22150,7 @@ func (x *UsageDay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageDay.ProtoReflect.Descriptor instead.
 func (*UsageDay) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{234}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *UsageDay) GetRepoKey() string {
@@ -21734,7 +22263,7 @@ type UsageShape struct {
 
 func (x *UsageShape) Reset() {
 	*x = UsageShape{}
-	mi := &file_remote_v1_remote_proto_msgTypes[235]
+	mi := &file_remote_v1_remote_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21746,7 +22275,7 @@ func (x *UsageShape) String() string {
 func (*UsageShape) ProtoMessage() {}
 
 func (x *UsageShape) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[235]
+	mi := &file_remote_v1_remote_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21759,7 +22288,7 @@ func (x *UsageShape) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageShape.ProtoReflect.Descriptor instead.
 func (*UsageShape) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{235}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *UsageShape) GetUsageRatio() float64 {
@@ -21821,7 +22350,7 @@ type UsageSuggestion struct {
 
 func (x *UsageSuggestion) Reset() {
 	*x = UsageSuggestion{}
-	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	mi := &file_remote_v1_remote_proto_msgTypes[242]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21833,7 +22362,7 @@ func (x *UsageSuggestion) String() string {
 func (*UsageSuggestion) ProtoMessage() {}
 
 func (x *UsageSuggestion) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[236]
+	mi := &file_remote_v1_remote_proto_msgTypes[242]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21846,7 +22375,7 @@ func (x *UsageSuggestion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageSuggestion.ProtoReflect.Descriptor instead.
 func (*UsageSuggestion) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{236}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{242}
 }
 
 func (x *UsageSuggestion) GetRule() UsageRule {
@@ -21921,7 +22450,7 @@ type UsageQuotaPoint struct {
 
 func (x *UsageQuotaPoint) Reset() {
 	*x = UsageQuotaPoint{}
-	mi := &file_remote_v1_remote_proto_msgTypes[237]
+	mi := &file_remote_v1_remote_proto_msgTypes[243]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21933,7 +22462,7 @@ func (x *UsageQuotaPoint) String() string {
 func (*UsageQuotaPoint) ProtoMessage() {}
 
 func (x *UsageQuotaPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[237]
+	mi := &file_remote_v1_remote_proto_msgTypes[243]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21946,7 +22475,7 @@ func (x *UsageQuotaPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageQuotaPoint.ProtoReflect.Descriptor instead.
 func (*UsageQuotaPoint) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{237}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{243}
 }
 
 func (x *UsageQuotaPoint) GetProfileId() string {
@@ -21993,7 +22522,7 @@ type UsageSettingsGet struct {
 
 func (x *UsageSettingsGet) Reset() {
 	*x = UsageSettingsGet{}
-	mi := &file_remote_v1_remote_proto_msgTypes[238]
+	mi := &file_remote_v1_remote_proto_msgTypes[244]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22005,7 +22534,7 @@ func (x *UsageSettingsGet) String() string {
 func (*UsageSettingsGet) ProtoMessage() {}
 
 func (x *UsageSettingsGet) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[238]
+	mi := &file_remote_v1_remote_proto_msgTypes[244]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22018,7 +22547,7 @@ func (x *UsageSettingsGet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageSettingsGet.ProtoReflect.Descriptor instead.
 func (*UsageSettingsGet) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{238}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{244}
 }
 
 // A → B: switches rules on or off (rules not named stay as they are).
@@ -22032,7 +22561,7 @@ type UsageSettingsSet struct {
 
 func (x *UsageSettingsSet) Reset() {
 	*x = UsageSettingsSet{}
-	mi := &file_remote_v1_remote_proto_msgTypes[239]
+	mi := &file_remote_v1_remote_proto_msgTypes[245]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22044,7 +22573,7 @@ func (x *UsageSettingsSet) String() string {
 func (*UsageSettingsSet) ProtoMessage() {}
 
 func (x *UsageSettingsSet) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[239]
+	mi := &file_remote_v1_remote_proto_msgTypes[245]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22057,7 +22586,7 @@ func (x *UsageSettingsSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageSettingsSet.ProtoReflect.Descriptor instead.
 func (*UsageSettingsSet) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{239}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{245}
 }
 
 func (x *UsageSettingsSet) GetRules() []*UsageRuleSwitch {
@@ -22077,7 +22606,7 @@ type UsageSettings struct {
 
 func (x *UsageSettings) Reset() {
 	*x = UsageSettings{}
-	mi := &file_remote_v1_remote_proto_msgTypes[240]
+	mi := &file_remote_v1_remote_proto_msgTypes[246]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22089,7 +22618,7 @@ func (x *UsageSettings) String() string {
 func (*UsageSettings) ProtoMessage() {}
 
 func (x *UsageSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[240]
+	mi := &file_remote_v1_remote_proto_msgTypes[246]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22102,7 +22631,7 @@ func (x *UsageSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageSettings.ProtoReflect.Descriptor instead.
 func (*UsageSettings) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{240}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{246}
 }
 
 func (x *UsageSettings) GetRules() []*UsageRuleSwitch {
@@ -22124,7 +22653,7 @@ type UsageRuleSwitch struct {
 
 func (x *UsageRuleSwitch) Reset() {
 	*x = UsageRuleSwitch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[241]
+	mi := &file_remote_v1_remote_proto_msgTypes[247]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22136,7 +22665,7 @@ func (x *UsageRuleSwitch) String() string {
 func (*UsageRuleSwitch) ProtoMessage() {}
 
 func (x *UsageRuleSwitch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[241]
+	mi := &file_remote_v1_remote_proto_msgTypes[247]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22149,7 +22678,7 @@ func (x *UsageRuleSwitch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageRuleSwitch.ProtoReflect.Descriptor instead.
 func (*UsageRuleSwitch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{241}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{247}
 }
 
 func (x *UsageRuleSwitch) GetRule() UsageRule {
@@ -22184,7 +22713,7 @@ type UsageDelete struct {
 
 func (x *UsageDelete) Reset() {
 	*x = UsageDelete{}
-	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	mi := &file_remote_v1_remote_proto_msgTypes[248]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22196,7 +22725,7 @@ func (x *UsageDelete) String() string {
 func (*UsageDelete) ProtoMessage() {}
 
 func (x *UsageDelete) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[242]
+	mi := &file_remote_v1_remote_proto_msgTypes[248]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22209,7 +22738,7 @@ func (x *UsageDelete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageDelete.ProtoReflect.Descriptor instead.
 func (*UsageDelete) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{242}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{248}
 }
 
 // A → B: start (on) or stop watching the office of a thread for this
@@ -22233,7 +22762,7 @@ type OfficeWatch struct {
 
 func (x *OfficeWatch) Reset() {
 	*x = OfficeWatch{}
-	mi := &file_remote_v1_remote_proto_msgTypes[243]
+	mi := &file_remote_v1_remote_proto_msgTypes[249]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22245,7 +22774,7 @@ func (x *OfficeWatch) String() string {
 func (*OfficeWatch) ProtoMessage() {}
 
 func (x *OfficeWatch) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[243]
+	mi := &file_remote_v1_remote_proto_msgTypes[249]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22258,7 +22787,7 @@ func (x *OfficeWatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeWatch.ProtoReflect.Descriptor instead.
 func (*OfficeWatch) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{243}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{249}
 }
 
 func (x *OfficeWatch) GetThreadId() string {
@@ -22298,7 +22827,7 @@ type OfficeSnapshot struct {
 
 func (x *OfficeSnapshot) Reset() {
 	*x = OfficeSnapshot{}
-	mi := &file_remote_v1_remote_proto_msgTypes[244]
+	mi := &file_remote_v1_remote_proto_msgTypes[250]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22310,7 +22839,7 @@ func (x *OfficeSnapshot) String() string {
 func (*OfficeSnapshot) ProtoMessage() {}
 
 func (x *OfficeSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[244]
+	mi := &file_remote_v1_remote_proto_msgTypes[250]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22323,7 +22852,7 @@ func (x *OfficeSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeSnapshot.ProtoReflect.Descriptor instead.
 func (*OfficeSnapshot) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{244}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{250}
 }
 
 func (x *OfficeSnapshot) GetThreadId() string {
@@ -22368,7 +22897,7 @@ type OfficeEvents struct {
 
 func (x *OfficeEvents) Reset() {
 	*x = OfficeEvents{}
-	mi := &file_remote_v1_remote_proto_msgTypes[245]
+	mi := &file_remote_v1_remote_proto_msgTypes[251]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22380,7 +22909,7 @@ func (x *OfficeEvents) String() string {
 func (*OfficeEvents) ProtoMessage() {}
 
 func (x *OfficeEvents) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[245]
+	mi := &file_remote_v1_remote_proto_msgTypes[251]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22393,7 +22922,7 @@ func (x *OfficeEvents) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeEvents.ProtoReflect.Descriptor instead.
 func (*OfficeEvents) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{245}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{251}
 }
 
 func (x *OfficeEvents) GetThreadId() string {
@@ -22438,7 +22967,7 @@ type OfficeState struct {
 
 func (x *OfficeState) Reset() {
 	*x = OfficeState{}
-	mi := &file_remote_v1_remote_proto_msgTypes[246]
+	mi := &file_remote_v1_remote_proto_msgTypes[252]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22450,7 +22979,7 @@ func (x *OfficeState) String() string {
 func (*OfficeState) ProtoMessage() {}
 
 func (x *OfficeState) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[246]
+	mi := &file_remote_v1_remote_proto_msgTypes[252]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22463,7 +22992,7 @@ func (x *OfficeState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeState.ProtoReflect.Descriptor instead.
 func (*OfficeState) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{246}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{252}
 }
 
 func (x *OfficeState) GetActors() []*OfficeActor {
@@ -22515,7 +23044,7 @@ type OfficeResident struct {
 
 func (x *OfficeResident) Reset() {
 	*x = OfficeResident{}
-	mi := &file_remote_v1_remote_proto_msgTypes[247]
+	mi := &file_remote_v1_remote_proto_msgTypes[253]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22527,7 +23056,7 @@ func (x *OfficeResident) String() string {
 func (*OfficeResident) ProtoMessage() {}
 
 func (x *OfficeResident) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[247]
+	mi := &file_remote_v1_remote_proto_msgTypes[253]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22540,7 +23069,7 @@ func (x *OfficeResident) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeResident.ProtoReflect.Descriptor instead.
 func (*OfficeResident) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{247}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{253}
 }
 
 func (x *OfficeResident) GetId() string {
@@ -22618,7 +23147,7 @@ type OfficeSession struct {
 
 func (x *OfficeSession) Reset() {
 	*x = OfficeSession{}
-	mi := &file_remote_v1_remote_proto_msgTypes[248]
+	mi := &file_remote_v1_remote_proto_msgTypes[254]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22630,7 +23159,7 @@ func (x *OfficeSession) String() string {
 func (*OfficeSession) ProtoMessage() {}
 
 func (x *OfficeSession) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[248]
+	mi := &file_remote_v1_remote_proto_msgTypes[254]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22643,7 +23172,7 @@ func (x *OfficeSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeSession.ProtoReflect.Descriptor instead.
 func (*OfficeSession) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{248}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{254}
 }
 
 func (x *OfficeSession) GetBusy() bool {
@@ -22721,7 +23250,7 @@ type OfficeTodoCounts struct {
 
 func (x *OfficeTodoCounts) Reset() {
 	*x = OfficeTodoCounts{}
-	mi := &file_remote_v1_remote_proto_msgTypes[249]
+	mi := &file_remote_v1_remote_proto_msgTypes[255]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22733,7 +23262,7 @@ func (x *OfficeTodoCounts) String() string {
 func (*OfficeTodoCounts) ProtoMessage() {}
 
 func (x *OfficeTodoCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[249]
+	mi := &file_remote_v1_remote_proto_msgTypes[255]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22746,7 +23275,7 @@ func (x *OfficeTodoCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeTodoCounts.ProtoReflect.Descriptor instead.
 func (*OfficeTodoCounts) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{249}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{255}
 }
 
 func (x *OfficeTodoCounts) GetPending() uint32 {
@@ -22789,7 +23318,7 @@ type OfficeUsage struct {
 
 func (x *OfficeUsage) Reset() {
 	*x = OfficeUsage{}
-	mi := &file_remote_v1_remote_proto_msgTypes[250]
+	mi := &file_remote_v1_remote_proto_msgTypes[256]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22801,7 +23330,7 @@ func (x *OfficeUsage) String() string {
 func (*OfficeUsage) ProtoMessage() {}
 
 func (x *OfficeUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[250]
+	mi := &file_remote_v1_remote_proto_msgTypes[256]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22814,7 +23343,7 @@ func (x *OfficeUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeUsage.ProtoReflect.Descriptor instead.
 func (*OfficeUsage) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{250}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{256}
 }
 
 func (x *OfficeUsage) GetInputTokens() uint64 {
@@ -22866,7 +23395,7 @@ type OfficeChecks struct {
 
 func (x *OfficeChecks) Reset() {
 	*x = OfficeChecks{}
-	mi := &file_remote_v1_remote_proto_msgTypes[251]
+	mi := &file_remote_v1_remote_proto_msgTypes[257]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22878,7 +23407,7 @@ func (x *OfficeChecks) String() string {
 func (*OfficeChecks) ProtoMessage() {}
 
 func (x *OfficeChecks) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[251]
+	mi := &file_remote_v1_remote_proto_msgTypes[257]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22891,7 +23420,7 @@ func (x *OfficeChecks) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeChecks.ProtoReflect.Descriptor instead.
 func (*OfficeChecks) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{251}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{257}
 }
 
 func (x *OfficeChecks) GetPassed() uint32 {
@@ -22948,7 +23477,7 @@ type OfficeActor struct {
 
 func (x *OfficeActor) Reset() {
 	*x = OfficeActor{}
-	mi := &file_remote_v1_remote_proto_msgTypes[252]
+	mi := &file_remote_v1_remote_proto_msgTypes[258]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22960,7 +23489,7 @@ func (x *OfficeActor) String() string {
 func (*OfficeActor) ProtoMessage() {}
 
 func (x *OfficeActor) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[252]
+	mi := &file_remote_v1_remote_proto_msgTypes[258]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22973,7 +23502,7 @@ func (x *OfficeActor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActor.ProtoReflect.Descriptor instead.
 func (*OfficeActor) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{252}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{258}
 }
 
 func (x *OfficeActor) GetId() string {
@@ -23071,7 +23600,7 @@ type OfficeService struct {
 
 func (x *OfficeService) Reset() {
 	*x = OfficeService{}
-	mi := &file_remote_v1_remote_proto_msgTypes[253]
+	mi := &file_remote_v1_remote_proto_msgTypes[259]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23083,7 +23612,7 @@ func (x *OfficeService) String() string {
 func (*OfficeService) ProtoMessage() {}
 
 func (x *OfficeService) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[253]
+	mi := &file_remote_v1_remote_proto_msgTypes[259]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23096,7 +23625,7 @@ func (x *OfficeService) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeService.ProtoReflect.Descriptor instead.
 func (*OfficeService) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{253}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{259}
 }
 
 func (x *OfficeService) GetKind() OfficeServiceKind {
@@ -23140,7 +23669,7 @@ type OfficeActivity struct {
 
 func (x *OfficeActivity) Reset() {
 	*x = OfficeActivity{}
-	mi := &file_remote_v1_remote_proto_msgTypes[254]
+	mi := &file_remote_v1_remote_proto_msgTypes[260]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23152,7 +23681,7 @@ func (x *OfficeActivity) String() string {
 func (*OfficeActivity) ProtoMessage() {}
 
 func (x *OfficeActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[254]
+	mi := &file_remote_v1_remote_proto_msgTypes[260]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23165,7 +23694,7 @@ func (x *OfficeActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivity.ProtoReflect.Descriptor instead.
 func (*OfficeActivity) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{254}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{260}
 }
 
 func (x *OfficeActivity) GetId() string {
@@ -23232,7 +23761,7 @@ type OfficeEvent struct {
 
 func (x *OfficeEvent) Reset() {
 	*x = OfficeEvent{}
-	mi := &file_remote_v1_remote_proto_msgTypes[255]
+	mi := &file_remote_v1_remote_proto_msgTypes[261]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23244,7 +23773,7 @@ func (x *OfficeEvent) String() string {
 func (*OfficeEvent) ProtoMessage() {}
 
 func (x *OfficeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[255]
+	mi := &file_remote_v1_remote_proto_msgTypes[261]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23257,7 +23786,7 @@ func (x *OfficeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeEvent.ProtoReflect.Descriptor instead.
 func (*OfficeEvent) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{255}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{261}
 }
 
 func (x *OfficeEvent) GetSeq() uint64 {
@@ -23417,7 +23946,7 @@ type OfficeActorLeave struct {
 
 func (x *OfficeActorLeave) Reset() {
 	*x = OfficeActorLeave{}
-	mi := &file_remote_v1_remote_proto_msgTypes[256]
+	mi := &file_remote_v1_remote_proto_msgTypes[262]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23429,7 +23958,7 @@ func (x *OfficeActorLeave) String() string {
 func (*OfficeActorLeave) ProtoMessage() {}
 
 func (x *OfficeActorLeave) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[256]
+	mi := &file_remote_v1_remote_proto_msgTypes[262]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23442,7 +23971,7 @@ func (x *OfficeActorLeave) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActorLeave.ProtoReflect.Descriptor instead.
 func (*OfficeActorLeave) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{256}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{262}
 }
 
 func (x *OfficeActorLeave) GetActorId() string {
@@ -23463,7 +23992,7 @@ type OfficeActivityStart struct {
 
 func (x *OfficeActivityStart) Reset() {
 	*x = OfficeActivityStart{}
-	mi := &file_remote_v1_remote_proto_msgTypes[257]
+	mi := &file_remote_v1_remote_proto_msgTypes[263]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23475,7 +24004,7 @@ func (x *OfficeActivityStart) String() string {
 func (*OfficeActivityStart) ProtoMessage() {}
 
 func (x *OfficeActivityStart) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[257]
+	mi := &file_remote_v1_remote_proto_msgTypes[263]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23488,7 +24017,7 @@ func (x *OfficeActivityStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivityStart.ProtoReflect.Descriptor instead.
 func (*OfficeActivityStart) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{257}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{263}
 }
 
 func (x *OfficeActivityStart) GetActorId() string {
@@ -23518,7 +24047,7 @@ type OfficeActivityEnd struct {
 
 func (x *OfficeActivityEnd) Reset() {
 	*x = OfficeActivityEnd{}
-	mi := &file_remote_v1_remote_proto_msgTypes[258]
+	mi := &file_remote_v1_remote_proto_msgTypes[264]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23530,7 +24059,7 @@ func (x *OfficeActivityEnd) String() string {
 func (*OfficeActivityEnd) ProtoMessage() {}
 
 func (x *OfficeActivityEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[258]
+	mi := &file_remote_v1_remote_proto_msgTypes[264]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23543,7 +24072,7 @@ func (x *OfficeActivityEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeActivityEnd.ProtoReflect.Descriptor instead.
 func (*OfficeActivityEnd) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{258}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{264}
 }
 
 func (x *OfficeActivityEnd) GetActorId() string {
@@ -23575,7 +24104,7 @@ type OfficeTurnStart struct {
 
 func (x *OfficeTurnStart) Reset() {
 	*x = OfficeTurnStart{}
-	mi := &file_remote_v1_remote_proto_msgTypes[259]
+	mi := &file_remote_v1_remote_proto_msgTypes[265]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23587,7 +24116,7 @@ func (x *OfficeTurnStart) String() string {
 func (*OfficeTurnStart) ProtoMessage() {}
 
 func (x *OfficeTurnStart) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[259]
+	mi := &file_remote_v1_remote_proto_msgTypes[265]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23600,7 +24129,7 @@ func (x *OfficeTurnStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeTurnStart.ProtoReflect.Descriptor instead.
 func (*OfficeTurnStart) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{259}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{265}
 }
 
 // A permission prompt for the actor's tool: WAITING makes the actor
@@ -23616,7 +24145,7 @@ type OfficeApproval struct {
 
 func (x *OfficeApproval) Reset() {
 	*x = OfficeApproval{}
-	mi := &file_remote_v1_remote_proto_msgTypes[260]
+	mi := &file_remote_v1_remote_proto_msgTypes[266]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23628,7 +24157,7 @@ func (x *OfficeApproval) String() string {
 func (*OfficeApproval) ProtoMessage() {}
 
 func (x *OfficeApproval) ProtoReflect() protoreflect.Message {
-	mi := &file_remote_v1_remote_proto_msgTypes[260]
+	mi := &file_remote_v1_remote_proto_msgTypes[266]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23641,7 +24170,7 @@ func (x *OfficeApproval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeApproval.ProtoReflect.Descriptor instead.
 func (*OfficeApproval) Descriptor() ([]byte, []int) {
-	return file_remote_v1_remote_proto_rawDescGZIP(), []int{260}
+	return file_remote_v1_remote_proto_rawDescGZIP(), []int{266}
 }
 
 func (x *OfficeApproval) GetActorId() string {
@@ -23689,7 +24218,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x0eHandshakeError\x121\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x1d.remote.v1.HandshakeErrorCodeR\x04code\x12)\n" +
 	"\x10protocol_version\x18\x02 \x01(\rR\x0fprotocolVersion\x120\n" +
-	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xdb[\n" +
+	"\x14min_protocol_version\x18\x03 \x01(\rR\x12minProtocolVersion\"\xd3_\n" +
 	"\x05Frame\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
 	"\vthread_list\x18\n" +
@@ -23876,7 +24405,13 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x12thread_set_advisor\x18\xae\x01 \x01(\v2\x1b.remote.v1.ThreadSetAdvisorH\x00R\x10threadSetAdvisor\x12C\n" +
 	"\x0fadvisor_set_key\x18\xaf\x01 \x01(\v2\x18.remote.v1.AdvisorSetKeyH\x00R\radvisorSetKey\x12L\n" +
 	"\x12advisor_remove_key\x18\xb0\x01 \x01(\v2\x1b.remote.v1.AdvisorRemoveKeyH\x00R\x10advisorRemoveKey\x12F\n" +
-	"\x10advisor_set_auto\x18\xb2\x01 \x01(\v2\x19.remote.v1.AdvisorSetAutoH\x00R\x0eadvisorSetAuto\x12S\n" +
+	"\x10advisor_set_auto\x18\xb2\x01 \x01(\v2\x19.remote.v1.AdvisorSetAutoH\x00R\x0eadvisorSetAuto\x12Y\n" +
+	"\x17advisor_key_share_begin\x18\xb3\x01 \x01(\v2\x1f.remote.v1.AdvisorKeyShareBeginH\x00R\x14advisorKeyShareBegin\x12\\\n" +
+	"\x18advisor_key_share_ticket\x18\xb4\x01 \x01(\v2 .remote.v1.AdvisorKeyShareTicketH\x00R\x15advisorKeyShareTicket\x12F\n" +
+	"\x10advisor_key_seal\x18\xb5\x01 \x01(\v2\x19.remote.v1.AdvisorKeySealH\x00R\x0eadvisorKeySeal\x12L\n" +
+	"\x12advisor_key_sealed\x18\xb6\x01 \x01(\v2\x1b.remote.v1.AdvisorKeySealedH\x00R\x10advisorKeySealed\x12V\n" +
+	"\x16advisor_key_share_open\x18\xb7\x01 \x01(\v2\x1e.remote.v1.AdvisorKeyShareOpenH\x00R\x13advisorKeyShareOpen\x12O\n" +
+	"\x13advisor_key_promote\x18\xb8\x01 \x01(\v2\x1c.remote.v1.AdvisorKeyPromoteH\x00R\x11advisorKeyPromote\x12S\n" +
 	"\x15mac_folder_access_ask\x18\xb1\x01 \x01(\v2\x1d.remote.v1.MacFolderAccessAskH\x00R\x12macFolderAccessAskB\x06\n" +
 	"\x04bodyJ\x04\bf\x10gJ\x04\bg\x10hJ\x04\bh\x10iR\btotp_setR\x13totp_status_requestR\vtotp_status\"&\n" +
 	"\n" +
@@ -24588,19 +25123,40 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x06device\x18\x02 \x01(\tR\x06device\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\x12\x12\n" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12\x16\n" +
-	"\x06detail\x18\x05 \x01(\tR\x06detail\"\xbe\x01\n" +
+	"\x06detail\x18\x05 \x01(\tR\x06detail\"\x97\x02\n" +
 	"\rAdvisorStatus\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x17\n" +
 	"\akey_set\x18\x02 \x01(\bR\x06keySet\x12'\n" +
 	"\x0fkey_fingerprint\x18\x03 \x01(\tR\x0ekeyFingerprint\x12\"\n" +
 	"\rset_by_device\x18\x04 \x01(\tR\vsetByDevice\x12\x15\n" +
 	"\x06set_at\x18\x05 \x01(\x03R\x05setAt\x12\x12\n" +
-	"\x04auto\x18\x06 \x01(\bR\x04auto\" \n" +
+	"\x04auto\x18\x06 \x01(\bR\x04auto\x12:\n" +
+	"\n" +
+	"key_source\x18\a \x01(\x0e2\x1b.remote.v1.AdvisorKeySourceR\tkeySource\x12\x1b\n" +
+	"\tkey_share\x18\b \x01(\bR\bkeyShare\" \n" +
 	"\x0eAdvisorSetAuto\x12\x0e\n" +
-	"\x02on\x18\x01 \x01(\bR\x02on\"!\n" +
+	"\x02on\x18\x01 \x01(\bR\x02on\"m\n" +
 	"\rAdvisorSetKey\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\"\x12\n" +
-	"\x10AdvisorRemoveKey\"`\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x123\n" +
+	"\x06source\x18\x02 \x01(\x0e2\x1b.remote.v1.AdvisorKeySourceR\x06source\x12\x15\n" +
+	"\x06set_at\x18\x03 \x01(\x03R\x05setAt\"G\n" +
+	"\x10AdvisorRemoveKey\x123\n" +
+	"\x06source\x18\x01 \x01(\x0e2\x1b.remote.v1.AdvisorKeySourceR\x06source\"\x16\n" +
+	"\x14AdvisorKeyShareBegin\"S\n" +
+	"\x15AdvisorKeyShareTicket\x12\x1b\n" +
+	"\tticket_id\x18\x01 \x01(\tR\bticketId\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x02 \x01(\fR\tpublicKey\"B\n" +
+	"\x0eAdvisorKeySeal\x120\n" +
+	"\x14recipient_public_key\x18\x01 \x01(\fR\x12recipientPublicKey\"L\n" +
+	"\x10AdvisorKeySealed\x12\x16\n" +
+	"\x06sealed\x18\x01 \x01(\fR\x06sealed\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"J\n" +
+	"\x13AdvisorKeyShareOpen\x12\x1b\n" +
+	"\tticket_id\x18\x01 \x01(\tR\bticketId\x12\x16\n" +
+	"\x06sealed\x18\x02 \x01(\fR\x06sealed\"*\n" +
+	"\x11AdvisorKeyPromote\x12\x15\n" +
+	"\x06set_at\x18\x01 \x01(\x03R\x05setAt\"`\n" +
 	"\rSecretProvide\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
@@ -25252,7 +25808,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x11ACCOUNT_STATUS_OK\x10\x01\x12 \n" +
 	"\x1cACCOUNT_STATUS_NEEDS_SIGN_IN\x10\x02\x12\x18\n" +
 	"\x14ACCOUNT_STATUS_ERROR\x10\x03\x12\"\n" +
-	"\x1eACCOUNT_STATUS_ACCOUNT_CHANGED\x10\x04*\x89\x19\n" +
+	"\x1eACCOUNT_STATUS_ACCOUNT_CHANGED\x10\x04*\xf7\x19\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -25341,7 +25897,10 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\"ERROR_REASON_ADVISOR_KEY_NOT_SAVED\x10T\x12\x1e\n" +
 	"\x1aERROR_REASON_SESSION_LIMIT\x10U\x12\"\n" +
 	"\x1eERROR_REASON_MAC_FOLDER_ACCESS\x10V\x12&\n" +
-	"\"ERROR_REASON_TERMINAL_TURN_RUNNING\x10W\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
+	"\"ERROR_REASON_TERMINAL_TURN_RUNNING\x10W\x12\x1f\n" +
+	"\x1bERROR_REASON_ADVISOR_NO_KEY\x10X\x12)\n" +
+	"%ERROR_REASON_ADVISOR_KEY_SHARE_FAILED\x10Y\x12 \n" +
+	"\x1cERROR_REASON_ADVISOR_OWN_KEY\x10Z\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +
@@ -25415,7 +25974,11 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"!TERMINAL_AVAILABILITY_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fTERMINAL_AVAILABILITY_AVAILABLE\x10\x01\x12!\n" +
 	"\x1dTERMINAL_AVAILABILITY_MISSING\x10\x02\x12&\n" +
-	"\"TERMINAL_AVAILABILITY_INCOMPATIBLE\x10\x03*\xfb\x01\n" +
+	"\"TERMINAL_AVAILABILITY_INCOMPATIBLE\x10\x03*r\n" +
+	"\x10AdvisorKeySource\x12\"\n" +
+	"\x1eADVISOR_KEY_SOURCE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16ADVISOR_KEY_SOURCE_OWN\x10\x01\x12\x1e\n" +
+	"\x1aADVISOR_KEY_SOURCE_ACCOUNT\x10\x02*\xfb\x01\n" +
 	"\fGitFileState\x12\x1e\n" +
 	"\x1aGIT_FILE_STATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17GIT_FILE_STATE_MODIFIED\x10\x01\x12\x18\n" +
@@ -25555,8 +26118,8 @@ func file_remote_v1_remote_proto_rawDescGZIP() []byte {
 	return file_remote_v1_remote_proto_rawDescData
 }
 
-var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 36)
-var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 264)
+var file_remote_v1_remote_proto_enumTypes = make([]protoimpl.EnumInfo, 37)
+var file_remote_v1_remote_proto_msgTypes = make([]protoimpl.MessageInfo, 270)
 var file_remote_v1_remote_proto_goTypes = []any{
 	(HandshakeErrorCode)(0),          // 0: remote.v1.HandshakeErrorCode
 	(ThreadKind)(0),                  // 1: remote.v1.ThreadKind
@@ -25577,628 +26140,644 @@ var file_remote_v1_remote_proto_goTypes = []any{
 	(TurnState)(0),                   // 16: remote.v1.TurnState
 	(LoginState)(0),                  // 17: remote.v1.LoginState
 	(TerminalAvailability)(0),        // 18: remote.v1.TerminalAvailability
-	(GitFileState)(0),                // 19: remote.v1.GitFileState
-	(BrowserMouseType)(0),            // 20: remote.v1.BrowserMouseType
-	(ScreenShareEnd)(0),              // 21: remote.v1.ScreenShareEnd
-	(AgentUpdatePhase)(0),            // 22: remote.v1.AgentUpdatePhase
-	(TerminalUpdateHoldReason)(0),    // 23: remote.v1.TerminalUpdateHoldReason
-	(TermSignalKind)(0),              // 24: remote.v1.TermSignalKind
-	(TermPath)(0),                    // 25: remote.v1.TermPath
-	(WsFileKind)(0),                  // 26: remote.v1.WsFileKind
-	(WsGitArea)(0),                   // 27: remote.v1.WsGitArea
-	(WsGitDiffSource)(0),             // 28: remote.v1.WsGitDiffSource
-	(UsageRule)(0),                   // 29: remote.v1.UsageRule
-	(OfficeRole)(0),                  // 30: remote.v1.OfficeRole
-	(OfficeActorState)(0),            // 31: remote.v1.OfficeActorState
-	(OfficeAnimGroup)(0),             // 32: remote.v1.OfficeAnimGroup
-	(OfficeRoom)(0),                  // 33: remote.v1.OfficeRoom
-	(OfficeServiceKind)(0),           // 34: remote.v1.OfficeServiceKind
-	(OfficeApprovalState)(0),         // 35: remote.v1.OfficeApprovalState
-	(*Plain)(nil),                    // 36: remote.v1.Plain
-	(*Hello)(nil),                    // 37: remote.v1.Hello
-	(*Ready)(nil),                    // 38: remote.v1.Ready
-	(*HandshakeError)(nil),           // 39: remote.v1.HandshakeError
-	(*Frame)(nil),                    // 40: remote.v1.Frame
-	(*ThreadList)(nil),               // 41: remote.v1.ThreadList
-	(*ThreadCreate)(nil),             // 42: remote.v1.ThreadCreate
-	(*Consent)(nil),                  // 43: remote.v1.Consent
-	(*ThreadSend)(nil),               // 44: remote.v1.ThreadSend
-	(*AdvisorAttachment)(nil),        // 45: remote.v1.AdvisorAttachment
-	(*AdvisorContext)(nil),           // 46: remote.v1.AdvisorContext
-	(*ThreadSubscribe)(nil),          // 47: remote.v1.ThreadSubscribe
-	(*ThreadRespond)(nil),            // 48: remote.v1.ThreadRespond
-	(*Answers)(nil),                  // 49: remote.v1.Answers
-	(*Answer)(nil),                   // 50: remote.v1.Answer
-	(*ThreadInterrupt)(nil),          // 51: remote.v1.ThreadInterrupt
-	(*ThreadClose)(nil),              // 52: remote.v1.ThreadClose
-	(*ThreadDelete)(nil),             // 53: remote.v1.ThreadDelete
-	(*ThreadSetArchived)(nil),        // 54: remote.v1.ThreadSetArchived
-	(*ThreadSetModel)(nil),           // 55: remote.v1.ThreadSetModel
-	(*ThreadSetPermissionMode)(nil),  // 56: remote.v1.ThreadSetPermissionMode
-	(*ThreadSetEffort)(nil),          // 57: remote.v1.ThreadSetEffort
-	(*ThreadSetAdvisor)(nil),         // 58: remote.v1.ThreadSetAdvisor
-	(*ThreadSwitch)(nil),             // 59: remote.v1.ThreadSwitch
-	(*ThreadFetchFull)(nil),          // 60: remote.v1.ThreadFetchFull
-	(*ThreadEarlier)(nil),            // 61: remote.v1.ThreadEarlier
-	(*ThreadEarlierResult)(nil),      // 62: remote.v1.ThreadEarlierResult
-	(*ThreadGitChanges)(nil),         // 63: remote.v1.ThreadGitChanges
-	(*GitFileDiff)(nil),              // 64: remote.v1.GitFileDiff
-	(*MachineInfoRequest)(nil),       // 65: remote.v1.MachineInfoRequest
-	(*Ping)(nil),                     // 66: remote.v1.Ping
-	(*DirList)(nil),                  // 67: remote.v1.DirList
-	(*AuditList)(nil),                // 68: remote.v1.AuditList
-	(*FileList)(nil),                 // 69: remote.v1.FileList
-	(*SessionList)(nil),              // 70: remote.v1.SessionList
-	(*LocalSession)(nil),             // 71: remote.v1.LocalSession
-	(*SessionDir)(nil),               // 72: remote.v1.SessionDir
-	(*SessionListResult)(nil),        // 73: remote.v1.SessionListResult
-	(*SessionOpen)(nil),              // 74: remote.v1.SessionOpen
-	(*AttachmentUpload)(nil),         // 75: remote.v1.AttachmentUpload
-	(*AttachmentCancel)(nil),         // 76: remote.v1.AttachmentCancel
-	(*AttachmentFetch)(nil),          // 77: remote.v1.AttachmentFetch
-	(*AttachmentData)(nil),           // 78: remote.v1.AttachmentData
-	(*AttachmentSave)(nil),           // 79: remote.v1.AttachmentSave
-	(*AttachmentSaved)(nil),          // 80: remote.v1.AttachmentSaved
-	(*Attachment)(nil),               // 81: remote.v1.Attachment
-	(*AttachmentLimits)(nil),         // 82: remote.v1.AttachmentLimits
-	(*ProjectList)(nil),              // 83: remote.v1.ProjectList
-	(*ProjectAdd)(nil),               // 84: remote.v1.ProjectAdd
-	(*ProjectCreate)(nil),            // 85: remote.v1.ProjectCreate
-	(*ProjectClone)(nil),             // 86: remote.v1.ProjectClone
-	(*ProjectCloneCancel)(nil),       // 87: remote.v1.ProjectCloneCancel
-	(*ProjectCloneProgress)(nil),     // 88: remote.v1.ProjectCloneProgress
-	(*ProjectUpdate)(nil),            // 89: remote.v1.ProjectUpdate
-	(*ProjectReorder)(nil),           // 90: remote.v1.ProjectReorder
-	(*ProjectRemove)(nil),            // 91: remote.v1.ProjectRemove
-	(*ProjectDefaults)(nil),          // 92: remote.v1.ProjectDefaults
-	(*GitStatus)(nil),                // 93: remote.v1.GitStatus
-	(*Project)(nil),                  // 94: remote.v1.Project
-	(*ProjectConfigGet)(nil),         // 95: remote.v1.ProjectConfigGet
-	(*ProjectConfigSet)(nil),         // 96: remote.v1.ProjectConfigSet
-	(*ProjectConfig)(nil),            // 97: remote.v1.ProjectConfig
-	(*ProjectSuggestion)(nil),        // 98: remote.v1.ProjectSuggestion
-	(*ProjectListResult)(nil),        // 99: remote.v1.ProjectListResult
-	(*AccountList)(nil),              // 100: remote.v1.AccountList
-	(*AccountSelect)(nil),            // 101: remote.v1.AccountSelect
-	(*AccountSignInBegin)(nil),       // 102: remote.v1.AccountSignInBegin
-	(*AccountSignInCode)(nil),        // 103: remote.v1.AccountSignInCode
-	(*AccountSignInCancel)(nil),      // 104: remote.v1.AccountSignInCancel
-	(*AccountRemove)(nil),            // 105: remote.v1.AccountRemove
-	(*UsageRefresh)(nil),             // 106: remote.v1.UsageRefresh
-	(*AccountCaptureCurrent)(nil),    // 107: remote.v1.AccountCaptureCurrent
-	(*AccountAcceptCurrent)(nil),     // 108: remote.v1.AccountAcceptCurrent
-	(*MachineSettingsSet)(nil),       // 109: remote.v1.MachineSettingsSet
-	(*OpenDiskAccessSettings)(nil),   // 110: remote.v1.OpenDiskAccessSettings
-	(*MacFolderAccessAsk)(nil),       // 111: remote.v1.MacFolderAccessAsk
-	(*MacFolder)(nil),                // 112: remote.v1.MacFolder
-	(*Ack)(nil),                      // 113: remote.v1.Ack
-	(*ThreadInfo)(nil),               // 114: remote.v1.ThreadInfo
-	(*AccountSuggestion)(nil),        // 115: remote.v1.AccountSuggestion
-	(*AccountInfo)(nil),              // 116: remote.v1.AccountInfo
-	(*SlashCommand)(nil),             // 117: remote.v1.SlashCommand
-	(*RateLimits)(nil),               // 118: remote.v1.RateLimits
-	(*RateWindow)(nil),               // 119: remote.v1.RateWindow
-	(*AiAccount)(nil),                // 120: remote.v1.AiAccount
-	(*AccountActions)(nil),           // 121: remote.v1.AccountActions
-	(*AccountListResult)(nil),        // 122: remote.v1.AccountListResult
-	(*MachineAccounts)(nil),          // 123: remote.v1.MachineAccounts
-	(*SessionAccount)(nil),           // 124: remote.v1.SessionAccount
-	(*AccountSignInPrompt)(nil),      // 125: remote.v1.AccountSignInPrompt
-	(*AccountSignInResult)(nil),      // 126: remote.v1.AccountSignInResult
-	(*Pong)(nil),                     // 127: remote.v1.Pong
-	(*Error)(nil),                    // 128: remote.v1.Error
-	(*Cursor)(nil),                   // 129: remote.v1.Cursor
-	(*ThreadSummary)(nil),            // 130: remote.v1.ThreadSummary
-	(*ThreadActivity)(nil),           // 131: remote.v1.ThreadActivity
-	(*ThreadListResult)(nil),         // 132: remote.v1.ThreadListResult
-	(*ThreadCreated)(nil),            // 133: remote.v1.ThreadCreated
-	(*ThreadDeleted)(nil),            // 134: remote.v1.ThreadDeleted
-	(*ThreadStatus)(nil),             // 135: remote.v1.ThreadStatus
-	(*ThreadItems)(nil),              // 136: remote.v1.ThreadItems
-	(*ThreadReset)(nil),              // 137: remote.v1.ThreadReset
-	(*FullItem)(nil),                 // 138: remote.v1.FullItem
-	(*Item)(nil),                     // 139: remote.v1.Item
-	(*TextItem)(nil),                 // 140: remote.v1.TextItem
-	(*ToolCallItem)(nil),             // 141: remote.v1.ToolCallItem
-	(*ToolResultItem)(nil),           // 142: remote.v1.ToolResultItem
-	(*DiffItem)(nil),                 // 143: remote.v1.DiffItem
-	(*TodoItem)(nil),                 // 144: remote.v1.TodoItem
-	(*TodoEntry)(nil),                // 145: remote.v1.TodoEntry
-	(*ApprovalItem)(nil),             // 146: remote.v1.ApprovalItem
-	(*ApprovalSecret)(nil),           // 147: remote.v1.ApprovalSecret
-	(*QuestionItem)(nil),             // 148: remote.v1.QuestionItem
-	(*Question)(nil),                 // 149: remote.v1.Question
-	(*QuestionOption)(nil),           // 150: remote.v1.QuestionOption
-	(*StatusItem)(nil),               // 151: remote.v1.StatusItem
-	(*TurnItem)(nil),                 // 152: remote.v1.TurnItem
-	(*SubagentItem)(nil),             // 153: remote.v1.SubagentItem
-	(*CompactionItem)(nil),           // 154: remote.v1.CompactionItem
-	(*ErrorItem)(nil),                // 155: remote.v1.ErrorItem
-	(*ModelChangeItem)(nil),          // 156: remote.v1.ModelChangeItem
-	(*AgentHandoffItem)(nil),         // 157: remote.v1.AgentHandoffItem
-	(*AdvisorVerdictItem)(nil),       // 158: remote.v1.AdvisorVerdictItem
-	(*AdvisorOption)(nil),            // 159: remote.v1.AdvisorOption
-	(*ProviderCapabilities)(nil),     // 160: remote.v1.ProviderCapabilities
-	(*ModelOption)(nil),              // 161: remote.v1.ModelOption
-	(*ProviderInfo)(nil),             // 162: remote.v1.ProviderInfo
-	(*MachineInfo)(nil),              // 163: remote.v1.MachineInfo
-	(*RemoteBrowserInfo)(nil),        // 164: remote.v1.RemoteBrowserInfo
-	(*MachineSettings)(nil),          // 165: remote.v1.MachineSettings
-	(*DirListResult)(nil),            // 166: remote.v1.DirListResult
-	(*DirEntry)(nil),                 // 167: remote.v1.DirEntry
-	(*FileListResult)(nil),           // 168: remote.v1.FileListResult
-	(*FileEntry)(nil),                // 169: remote.v1.FileEntry
-	(*AuditListResult)(nil),          // 170: remote.v1.AuditListResult
-	(*AuditEntry)(nil),               // 171: remote.v1.AuditEntry
-	(*AdvisorStatus)(nil),            // 172: remote.v1.AdvisorStatus
-	(*AdvisorSetAuto)(nil),           // 173: remote.v1.AdvisorSetAuto
-	(*AdvisorSetKey)(nil),            // 174: remote.v1.AdvisorSetKey
-	(*AdvisorRemoveKey)(nil),         // 175: remote.v1.AdvisorRemoveKey
-	(*SecretProvide)(nil),            // 176: remote.v1.SecretProvide
-	(*SecretDecline)(nil),            // 177: remote.v1.SecretDecline
-	(*SecretList)(nil),               // 178: remote.v1.SecretList
-	(*SecretRemove)(nil),             // 179: remote.v1.SecretRemove
-	(*SecretPrompt)(nil),             // 180: remote.v1.SecretPrompt
-	(*SecretPromptEnded)(nil),        // 181: remote.v1.SecretPromptEnded
-	(*SecretListResult)(nil),         // 182: remote.v1.SecretListResult
-	(*SavedSecret)(nil),              // 183: remote.v1.SavedSecret
-	(*GitChanges)(nil),               // 184: remote.v1.GitChanges
-	(*GitFileChange)(nil),            // 185: remote.v1.GitFileChange
-	(*GitFileDiffResult)(nil),        // 186: remote.v1.GitFileDiffResult
-	(*BrowserControl)(nil),           // 187: remote.v1.BrowserControl
-	(*BrowserView)(nil),              // 188: remote.v1.BrowserView
-	(*BrowserInput)(nil),             // 189: remote.v1.BrowserInput
-	(*BrowserMouse)(nil),             // 190: remote.v1.BrowserMouse
-	(*BrowserKey)(nil),               // 191: remote.v1.BrowserKey
-	(*BrowserTakeoverEnd)(nil),       // 192: remote.v1.BrowserTakeoverEnd
-	(*BrowserTakeover)(nil),          // 193: remote.v1.BrowserTakeover
-	(*BrowserTakeoverEnded)(nil),     // 194: remote.v1.BrowserTakeoverEnded
-	(*BrowserFrame)(nil),             // 195: remote.v1.BrowserFrame
-	(*BrowserState)(nil),             // 196: remote.v1.BrowserState
-	(*BrowserTab)(nil),               // 197: remote.v1.BrowserTab
-	(*PasskeyNotice)(nil),            // 198: remote.v1.PasskeyNotice
-	(*ScreenShareStatusRequest)(nil), // 199: remote.v1.ScreenShareStatusRequest
-	(*ScreenShareStatus)(nil),        // 200: remote.v1.ScreenShareStatus
-	(*ScreenShareOpen)(nil),          // 201: remote.v1.ScreenShareOpen
-	(*ScreenShareOpened)(nil),        // 202: remote.v1.ScreenShareOpened
-	(*ScreenShareData)(nil),          // 203: remote.v1.ScreenShareData
-	(*ScreenShareClose)(nil),         // 204: remote.v1.ScreenShareClose
-	(*ScreenShareClosed)(nil),        // 205: remote.v1.ScreenShareClosed
-	(*BrowserClear)(nil),             // 206: remote.v1.BrowserClear
-	(*AgentUpdateInfo)(nil),          // 207: remote.v1.AgentUpdateInfo
-	(*AgentUpdateCheck)(nil),         // 208: remote.v1.AgentUpdateCheck
-	(*AgentUpdateStart)(nil),         // 209: remote.v1.AgentUpdateStart
-	(*AgentUpdateProgress)(nil),      // 210: remote.v1.AgentUpdateProgress
-	(*TermListRequest)(nil),          // 211: remote.v1.TermListRequest
-	(*TermSessionInfo)(nil),          // 212: remote.v1.TermSessionInfo
-	(*TermListResult)(nil),           // 213: remote.v1.TermListResult
-	(*TerminalUpdate)(nil),           // 214: remote.v1.TerminalUpdate
-	(*TerminalUpdateHold)(nil),       // 215: remote.v1.TerminalUpdateHold
-	(*TermUpdateNow)(nil),            // 216: remote.v1.TermUpdateNow
-	(*TermOpen)(nil),                 // 217: remote.v1.TermOpen
-	(*TermAiSession)(nil),            // 218: remote.v1.TermAiSession
-	(*TermOpened)(nil),               // 219: remote.v1.TermOpened
-	(*TermClose)(nil),                // 220: remote.v1.TermClose
-	(*TermClosed)(nil),               // 221: remote.v1.TermClosed
-	(*TermResize)(nil),               // 222: remote.v1.TermResize
-	(*TermSignal)(nil),               // 223: remote.v1.TermSignal
-	(*TermData)(nil),                 // 224: remote.v1.TermData
-	(*TermStatus)(nil),               // 225: remote.v1.TermStatus
-	(*WsDirList)(nil),                // 226: remote.v1.WsDirList
-	(*WsEntry)(nil),                  // 227: remote.v1.WsEntry
-	(*WsDirListResult)(nil),          // 228: remote.v1.WsDirListResult
-	(*WsFileRead)(nil),               // 229: remote.v1.WsFileRead
-	(*WsFileReadResult)(nil),         // 230: remote.v1.WsFileReadResult
-	(*WsFindNames)(nil),              // 231: remote.v1.WsFindNames
-	(*WsFindNamesResult)(nil),        // 232: remote.v1.WsFindNamesResult
-	(*WsFindContents)(nil),           // 233: remote.v1.WsFindContents
-	(*WsContentMatch)(nil),           // 234: remote.v1.WsContentMatch
-	(*WsContentFile)(nil),            // 235: remote.v1.WsContentFile
-	(*WsFindContentsResult)(nil),     // 236: remote.v1.WsFindContentsResult
-	(*WsWatch)(nil),                  // 237: remote.v1.WsWatch
-	(*WsChanged)(nil),                // 238: remote.v1.WsChanged
-	(*WsGitStatus)(nil),              // 239: remote.v1.WsGitStatus
-	(*WsGitEntry)(nil),               // 240: remote.v1.WsGitEntry
-	(*WsGitUpstream)(nil),            // 241: remote.v1.WsGitUpstream
-	(*WsGitStatusResult)(nil),        // 242: remote.v1.WsGitStatusResult
-	(*WsGitDiff)(nil),                // 243: remote.v1.WsGitDiff
-	(*WsGitDiffResult)(nil),          // 244: remote.v1.WsGitDiffResult
-	(*WsGitStage)(nil),               // 245: remote.v1.WsGitStage
-	(*WsGitUnstage)(nil),             // 246: remote.v1.WsGitUnstage
-	(*WsGitDiscard)(nil),             // 247: remote.v1.WsGitDiscard
-	(*WsGitCommit)(nil),              // 248: remote.v1.WsGitCommit
-	(*WsGitCommitMessage)(nil),       // 249: remote.v1.WsGitCommitMessage
-	(*WsGitCommitMessageResult)(nil), // 250: remote.v1.WsGitCommitMessageResult
-	(*WsGitLogEntry)(nil),            // 251: remote.v1.WsGitLogEntry
-	(*WsGitCommitResult)(nil),        // 252: remote.v1.WsGitCommitResult
-	(*WsGitBranches)(nil),            // 253: remote.v1.WsGitBranches
-	(*WsGitBranch)(nil),              // 254: remote.v1.WsGitBranch
-	(*WsGitBranchesResult)(nil),      // 255: remote.v1.WsGitBranchesResult
-	(*WsGitCheckout)(nil),            // 256: remote.v1.WsGitCheckout
-	(*WsGitBranchCreate)(nil),        // 257: remote.v1.WsGitBranchCreate
-	(*WsGitFetch)(nil),               // 258: remote.v1.WsGitFetch
-	(*WsGitPull)(nil),                // 259: remote.v1.WsGitPull
-	(*WsGitRebase)(nil),              // 260: remote.v1.WsGitRebase
-	(*WsGitPush)(nil),                // 261: remote.v1.WsGitPush
-	(*WsGitLog)(nil),                 // 262: remote.v1.WsGitLog
-	(*WsGitLogResult)(nil),           // 263: remote.v1.WsGitLogResult
-	(*WsGitBranchCompare)(nil),       // 264: remote.v1.WsGitBranchCompare
-	(*WsGitBranchCompareResult)(nil), // 265: remote.v1.WsGitBranchCompareResult
-	(*WsGitPrUrl)(nil),               // 266: remote.v1.WsGitPrUrl
-	(*WsGitPrUrlResult)(nil),         // 267: remote.v1.WsGitPrUrlResult
-	(*UsageReportRequest)(nil),       // 268: remote.v1.UsageReportRequest
-	(*UsageReport)(nil),              // 269: remote.v1.UsageReport
-	(*UsageDay)(nil),                 // 270: remote.v1.UsageDay
-	(*UsageShape)(nil),               // 271: remote.v1.UsageShape
-	(*UsageSuggestion)(nil),          // 272: remote.v1.UsageSuggestion
-	(*UsageQuotaPoint)(nil),          // 273: remote.v1.UsageQuotaPoint
-	(*UsageSettingsGet)(nil),         // 274: remote.v1.UsageSettingsGet
-	(*UsageSettingsSet)(nil),         // 275: remote.v1.UsageSettingsSet
-	(*UsageSettings)(nil),            // 276: remote.v1.UsageSettings
-	(*UsageRuleSwitch)(nil),          // 277: remote.v1.UsageRuleSwitch
-	(*UsageDelete)(nil),              // 278: remote.v1.UsageDelete
-	(*OfficeWatch)(nil),              // 279: remote.v1.OfficeWatch
-	(*OfficeSnapshot)(nil),           // 280: remote.v1.OfficeSnapshot
-	(*OfficeEvents)(nil),             // 281: remote.v1.OfficeEvents
-	(*OfficeState)(nil),              // 282: remote.v1.OfficeState
-	(*OfficeResident)(nil),           // 283: remote.v1.OfficeResident
-	(*OfficeSession)(nil),            // 284: remote.v1.OfficeSession
-	(*OfficeTodoCounts)(nil),         // 285: remote.v1.OfficeTodoCounts
-	(*OfficeUsage)(nil),              // 286: remote.v1.OfficeUsage
-	(*OfficeChecks)(nil),             // 287: remote.v1.OfficeChecks
-	(*OfficeActor)(nil),              // 288: remote.v1.OfficeActor
-	(*OfficeService)(nil),            // 289: remote.v1.OfficeService
-	(*OfficeActivity)(nil),           // 290: remote.v1.OfficeActivity
-	(*OfficeEvent)(nil),              // 291: remote.v1.OfficeEvent
-	(*OfficeActorLeave)(nil),         // 292: remote.v1.OfficeActorLeave
-	(*OfficeActivityStart)(nil),      // 293: remote.v1.OfficeActivityStart
-	(*OfficeActivityEnd)(nil),        // 294: remote.v1.OfficeActivityEnd
-	(*OfficeTurnStart)(nil),          // 295: remote.v1.OfficeTurnStart
-	(*OfficeApproval)(nil),           // 296: remote.v1.OfficeApproval
-	nil,                              // 297: remote.v1.AdvisorContext.FieldsEntry
-	nil,                              // 298: remote.v1.AccountListResult.SelectedByProviderEntry
-	nil,                              // 299: remote.v1.AccountListResult.DamagedEntry
+	(AdvisorKeySource)(0),            // 19: remote.v1.AdvisorKeySource
+	(GitFileState)(0),                // 20: remote.v1.GitFileState
+	(BrowserMouseType)(0),            // 21: remote.v1.BrowserMouseType
+	(ScreenShareEnd)(0),              // 22: remote.v1.ScreenShareEnd
+	(AgentUpdatePhase)(0),            // 23: remote.v1.AgentUpdatePhase
+	(TerminalUpdateHoldReason)(0),    // 24: remote.v1.TerminalUpdateHoldReason
+	(TermSignalKind)(0),              // 25: remote.v1.TermSignalKind
+	(TermPath)(0),                    // 26: remote.v1.TermPath
+	(WsFileKind)(0),                  // 27: remote.v1.WsFileKind
+	(WsGitArea)(0),                   // 28: remote.v1.WsGitArea
+	(WsGitDiffSource)(0),             // 29: remote.v1.WsGitDiffSource
+	(UsageRule)(0),                   // 30: remote.v1.UsageRule
+	(OfficeRole)(0),                  // 31: remote.v1.OfficeRole
+	(OfficeActorState)(0),            // 32: remote.v1.OfficeActorState
+	(OfficeAnimGroup)(0),             // 33: remote.v1.OfficeAnimGroup
+	(OfficeRoom)(0),                  // 34: remote.v1.OfficeRoom
+	(OfficeServiceKind)(0),           // 35: remote.v1.OfficeServiceKind
+	(OfficeApprovalState)(0),         // 36: remote.v1.OfficeApprovalState
+	(*Plain)(nil),                    // 37: remote.v1.Plain
+	(*Hello)(nil),                    // 38: remote.v1.Hello
+	(*Ready)(nil),                    // 39: remote.v1.Ready
+	(*HandshakeError)(nil),           // 40: remote.v1.HandshakeError
+	(*Frame)(nil),                    // 41: remote.v1.Frame
+	(*ThreadList)(nil),               // 42: remote.v1.ThreadList
+	(*ThreadCreate)(nil),             // 43: remote.v1.ThreadCreate
+	(*Consent)(nil),                  // 44: remote.v1.Consent
+	(*ThreadSend)(nil),               // 45: remote.v1.ThreadSend
+	(*AdvisorAttachment)(nil),        // 46: remote.v1.AdvisorAttachment
+	(*AdvisorContext)(nil),           // 47: remote.v1.AdvisorContext
+	(*ThreadSubscribe)(nil),          // 48: remote.v1.ThreadSubscribe
+	(*ThreadRespond)(nil),            // 49: remote.v1.ThreadRespond
+	(*Answers)(nil),                  // 50: remote.v1.Answers
+	(*Answer)(nil),                   // 51: remote.v1.Answer
+	(*ThreadInterrupt)(nil),          // 52: remote.v1.ThreadInterrupt
+	(*ThreadClose)(nil),              // 53: remote.v1.ThreadClose
+	(*ThreadDelete)(nil),             // 54: remote.v1.ThreadDelete
+	(*ThreadSetArchived)(nil),        // 55: remote.v1.ThreadSetArchived
+	(*ThreadSetModel)(nil),           // 56: remote.v1.ThreadSetModel
+	(*ThreadSetPermissionMode)(nil),  // 57: remote.v1.ThreadSetPermissionMode
+	(*ThreadSetEffort)(nil),          // 58: remote.v1.ThreadSetEffort
+	(*ThreadSetAdvisor)(nil),         // 59: remote.v1.ThreadSetAdvisor
+	(*ThreadSwitch)(nil),             // 60: remote.v1.ThreadSwitch
+	(*ThreadFetchFull)(nil),          // 61: remote.v1.ThreadFetchFull
+	(*ThreadEarlier)(nil),            // 62: remote.v1.ThreadEarlier
+	(*ThreadEarlierResult)(nil),      // 63: remote.v1.ThreadEarlierResult
+	(*ThreadGitChanges)(nil),         // 64: remote.v1.ThreadGitChanges
+	(*GitFileDiff)(nil),              // 65: remote.v1.GitFileDiff
+	(*MachineInfoRequest)(nil),       // 66: remote.v1.MachineInfoRequest
+	(*Ping)(nil),                     // 67: remote.v1.Ping
+	(*DirList)(nil),                  // 68: remote.v1.DirList
+	(*AuditList)(nil),                // 69: remote.v1.AuditList
+	(*FileList)(nil),                 // 70: remote.v1.FileList
+	(*SessionList)(nil),              // 71: remote.v1.SessionList
+	(*LocalSession)(nil),             // 72: remote.v1.LocalSession
+	(*SessionDir)(nil),               // 73: remote.v1.SessionDir
+	(*SessionListResult)(nil),        // 74: remote.v1.SessionListResult
+	(*SessionOpen)(nil),              // 75: remote.v1.SessionOpen
+	(*AttachmentUpload)(nil),         // 76: remote.v1.AttachmentUpload
+	(*AttachmentCancel)(nil),         // 77: remote.v1.AttachmentCancel
+	(*AttachmentFetch)(nil),          // 78: remote.v1.AttachmentFetch
+	(*AttachmentData)(nil),           // 79: remote.v1.AttachmentData
+	(*AttachmentSave)(nil),           // 80: remote.v1.AttachmentSave
+	(*AttachmentSaved)(nil),          // 81: remote.v1.AttachmentSaved
+	(*Attachment)(nil),               // 82: remote.v1.Attachment
+	(*AttachmentLimits)(nil),         // 83: remote.v1.AttachmentLimits
+	(*ProjectList)(nil),              // 84: remote.v1.ProjectList
+	(*ProjectAdd)(nil),               // 85: remote.v1.ProjectAdd
+	(*ProjectCreate)(nil),            // 86: remote.v1.ProjectCreate
+	(*ProjectClone)(nil),             // 87: remote.v1.ProjectClone
+	(*ProjectCloneCancel)(nil),       // 88: remote.v1.ProjectCloneCancel
+	(*ProjectCloneProgress)(nil),     // 89: remote.v1.ProjectCloneProgress
+	(*ProjectUpdate)(nil),            // 90: remote.v1.ProjectUpdate
+	(*ProjectReorder)(nil),           // 91: remote.v1.ProjectReorder
+	(*ProjectRemove)(nil),            // 92: remote.v1.ProjectRemove
+	(*ProjectDefaults)(nil),          // 93: remote.v1.ProjectDefaults
+	(*GitStatus)(nil),                // 94: remote.v1.GitStatus
+	(*Project)(nil),                  // 95: remote.v1.Project
+	(*ProjectConfigGet)(nil),         // 96: remote.v1.ProjectConfigGet
+	(*ProjectConfigSet)(nil),         // 97: remote.v1.ProjectConfigSet
+	(*ProjectConfig)(nil),            // 98: remote.v1.ProjectConfig
+	(*ProjectSuggestion)(nil),        // 99: remote.v1.ProjectSuggestion
+	(*ProjectListResult)(nil),        // 100: remote.v1.ProjectListResult
+	(*AccountList)(nil),              // 101: remote.v1.AccountList
+	(*AccountSelect)(nil),            // 102: remote.v1.AccountSelect
+	(*AccountSignInBegin)(nil),       // 103: remote.v1.AccountSignInBegin
+	(*AccountSignInCode)(nil),        // 104: remote.v1.AccountSignInCode
+	(*AccountSignInCancel)(nil),      // 105: remote.v1.AccountSignInCancel
+	(*AccountRemove)(nil),            // 106: remote.v1.AccountRemove
+	(*UsageRefresh)(nil),             // 107: remote.v1.UsageRefresh
+	(*AccountCaptureCurrent)(nil),    // 108: remote.v1.AccountCaptureCurrent
+	(*AccountAcceptCurrent)(nil),     // 109: remote.v1.AccountAcceptCurrent
+	(*MachineSettingsSet)(nil),       // 110: remote.v1.MachineSettingsSet
+	(*OpenDiskAccessSettings)(nil),   // 111: remote.v1.OpenDiskAccessSettings
+	(*MacFolderAccessAsk)(nil),       // 112: remote.v1.MacFolderAccessAsk
+	(*MacFolder)(nil),                // 113: remote.v1.MacFolder
+	(*Ack)(nil),                      // 114: remote.v1.Ack
+	(*ThreadInfo)(nil),               // 115: remote.v1.ThreadInfo
+	(*AccountSuggestion)(nil),        // 116: remote.v1.AccountSuggestion
+	(*AccountInfo)(nil),              // 117: remote.v1.AccountInfo
+	(*SlashCommand)(nil),             // 118: remote.v1.SlashCommand
+	(*RateLimits)(nil),               // 119: remote.v1.RateLimits
+	(*RateWindow)(nil),               // 120: remote.v1.RateWindow
+	(*AiAccount)(nil),                // 121: remote.v1.AiAccount
+	(*AccountActions)(nil),           // 122: remote.v1.AccountActions
+	(*AccountListResult)(nil),        // 123: remote.v1.AccountListResult
+	(*MachineAccounts)(nil),          // 124: remote.v1.MachineAccounts
+	(*SessionAccount)(nil),           // 125: remote.v1.SessionAccount
+	(*AccountSignInPrompt)(nil),      // 126: remote.v1.AccountSignInPrompt
+	(*AccountSignInResult)(nil),      // 127: remote.v1.AccountSignInResult
+	(*Pong)(nil),                     // 128: remote.v1.Pong
+	(*Error)(nil),                    // 129: remote.v1.Error
+	(*Cursor)(nil),                   // 130: remote.v1.Cursor
+	(*ThreadSummary)(nil),            // 131: remote.v1.ThreadSummary
+	(*ThreadActivity)(nil),           // 132: remote.v1.ThreadActivity
+	(*ThreadListResult)(nil),         // 133: remote.v1.ThreadListResult
+	(*ThreadCreated)(nil),            // 134: remote.v1.ThreadCreated
+	(*ThreadDeleted)(nil),            // 135: remote.v1.ThreadDeleted
+	(*ThreadStatus)(nil),             // 136: remote.v1.ThreadStatus
+	(*ThreadItems)(nil),              // 137: remote.v1.ThreadItems
+	(*ThreadReset)(nil),              // 138: remote.v1.ThreadReset
+	(*FullItem)(nil),                 // 139: remote.v1.FullItem
+	(*Item)(nil),                     // 140: remote.v1.Item
+	(*TextItem)(nil),                 // 141: remote.v1.TextItem
+	(*ToolCallItem)(nil),             // 142: remote.v1.ToolCallItem
+	(*ToolResultItem)(nil),           // 143: remote.v1.ToolResultItem
+	(*DiffItem)(nil),                 // 144: remote.v1.DiffItem
+	(*TodoItem)(nil),                 // 145: remote.v1.TodoItem
+	(*TodoEntry)(nil),                // 146: remote.v1.TodoEntry
+	(*ApprovalItem)(nil),             // 147: remote.v1.ApprovalItem
+	(*ApprovalSecret)(nil),           // 148: remote.v1.ApprovalSecret
+	(*QuestionItem)(nil),             // 149: remote.v1.QuestionItem
+	(*Question)(nil),                 // 150: remote.v1.Question
+	(*QuestionOption)(nil),           // 151: remote.v1.QuestionOption
+	(*StatusItem)(nil),               // 152: remote.v1.StatusItem
+	(*TurnItem)(nil),                 // 153: remote.v1.TurnItem
+	(*SubagentItem)(nil),             // 154: remote.v1.SubagentItem
+	(*CompactionItem)(nil),           // 155: remote.v1.CompactionItem
+	(*ErrorItem)(nil),                // 156: remote.v1.ErrorItem
+	(*ModelChangeItem)(nil),          // 157: remote.v1.ModelChangeItem
+	(*AgentHandoffItem)(nil),         // 158: remote.v1.AgentHandoffItem
+	(*AdvisorVerdictItem)(nil),       // 159: remote.v1.AdvisorVerdictItem
+	(*AdvisorOption)(nil),            // 160: remote.v1.AdvisorOption
+	(*ProviderCapabilities)(nil),     // 161: remote.v1.ProviderCapabilities
+	(*ModelOption)(nil),              // 162: remote.v1.ModelOption
+	(*ProviderInfo)(nil),             // 163: remote.v1.ProviderInfo
+	(*MachineInfo)(nil),              // 164: remote.v1.MachineInfo
+	(*RemoteBrowserInfo)(nil),        // 165: remote.v1.RemoteBrowserInfo
+	(*MachineSettings)(nil),          // 166: remote.v1.MachineSettings
+	(*DirListResult)(nil),            // 167: remote.v1.DirListResult
+	(*DirEntry)(nil),                 // 168: remote.v1.DirEntry
+	(*FileListResult)(nil),           // 169: remote.v1.FileListResult
+	(*FileEntry)(nil),                // 170: remote.v1.FileEntry
+	(*AuditListResult)(nil),          // 171: remote.v1.AuditListResult
+	(*AuditEntry)(nil),               // 172: remote.v1.AuditEntry
+	(*AdvisorStatus)(nil),            // 173: remote.v1.AdvisorStatus
+	(*AdvisorSetAuto)(nil),           // 174: remote.v1.AdvisorSetAuto
+	(*AdvisorSetKey)(nil),            // 175: remote.v1.AdvisorSetKey
+	(*AdvisorRemoveKey)(nil),         // 176: remote.v1.AdvisorRemoveKey
+	(*AdvisorKeyShareBegin)(nil),     // 177: remote.v1.AdvisorKeyShareBegin
+	(*AdvisorKeyShareTicket)(nil),    // 178: remote.v1.AdvisorKeyShareTicket
+	(*AdvisorKeySeal)(nil),           // 179: remote.v1.AdvisorKeySeal
+	(*AdvisorKeySealed)(nil),         // 180: remote.v1.AdvisorKeySealed
+	(*AdvisorKeyShareOpen)(nil),      // 181: remote.v1.AdvisorKeyShareOpen
+	(*AdvisorKeyPromote)(nil),        // 182: remote.v1.AdvisorKeyPromote
+	(*SecretProvide)(nil),            // 183: remote.v1.SecretProvide
+	(*SecretDecline)(nil),            // 184: remote.v1.SecretDecline
+	(*SecretList)(nil),               // 185: remote.v1.SecretList
+	(*SecretRemove)(nil),             // 186: remote.v1.SecretRemove
+	(*SecretPrompt)(nil),             // 187: remote.v1.SecretPrompt
+	(*SecretPromptEnded)(nil),        // 188: remote.v1.SecretPromptEnded
+	(*SecretListResult)(nil),         // 189: remote.v1.SecretListResult
+	(*SavedSecret)(nil),              // 190: remote.v1.SavedSecret
+	(*GitChanges)(nil),               // 191: remote.v1.GitChanges
+	(*GitFileChange)(nil),            // 192: remote.v1.GitFileChange
+	(*GitFileDiffResult)(nil),        // 193: remote.v1.GitFileDiffResult
+	(*BrowserControl)(nil),           // 194: remote.v1.BrowserControl
+	(*BrowserView)(nil),              // 195: remote.v1.BrowserView
+	(*BrowserInput)(nil),             // 196: remote.v1.BrowserInput
+	(*BrowserMouse)(nil),             // 197: remote.v1.BrowserMouse
+	(*BrowserKey)(nil),               // 198: remote.v1.BrowserKey
+	(*BrowserTakeoverEnd)(nil),       // 199: remote.v1.BrowserTakeoverEnd
+	(*BrowserTakeover)(nil),          // 200: remote.v1.BrowserTakeover
+	(*BrowserTakeoverEnded)(nil),     // 201: remote.v1.BrowserTakeoverEnded
+	(*BrowserFrame)(nil),             // 202: remote.v1.BrowserFrame
+	(*BrowserState)(nil),             // 203: remote.v1.BrowserState
+	(*BrowserTab)(nil),               // 204: remote.v1.BrowserTab
+	(*PasskeyNotice)(nil),            // 205: remote.v1.PasskeyNotice
+	(*ScreenShareStatusRequest)(nil), // 206: remote.v1.ScreenShareStatusRequest
+	(*ScreenShareStatus)(nil),        // 207: remote.v1.ScreenShareStatus
+	(*ScreenShareOpen)(nil),          // 208: remote.v1.ScreenShareOpen
+	(*ScreenShareOpened)(nil),        // 209: remote.v1.ScreenShareOpened
+	(*ScreenShareData)(nil),          // 210: remote.v1.ScreenShareData
+	(*ScreenShareClose)(nil),         // 211: remote.v1.ScreenShareClose
+	(*ScreenShareClosed)(nil),        // 212: remote.v1.ScreenShareClosed
+	(*BrowserClear)(nil),             // 213: remote.v1.BrowserClear
+	(*AgentUpdateInfo)(nil),          // 214: remote.v1.AgentUpdateInfo
+	(*AgentUpdateCheck)(nil),         // 215: remote.v1.AgentUpdateCheck
+	(*AgentUpdateStart)(nil),         // 216: remote.v1.AgentUpdateStart
+	(*AgentUpdateProgress)(nil),      // 217: remote.v1.AgentUpdateProgress
+	(*TermListRequest)(nil),          // 218: remote.v1.TermListRequest
+	(*TermSessionInfo)(nil),          // 219: remote.v1.TermSessionInfo
+	(*TermListResult)(nil),           // 220: remote.v1.TermListResult
+	(*TerminalUpdate)(nil),           // 221: remote.v1.TerminalUpdate
+	(*TerminalUpdateHold)(nil),       // 222: remote.v1.TerminalUpdateHold
+	(*TermUpdateNow)(nil),            // 223: remote.v1.TermUpdateNow
+	(*TermOpen)(nil),                 // 224: remote.v1.TermOpen
+	(*TermAiSession)(nil),            // 225: remote.v1.TermAiSession
+	(*TermOpened)(nil),               // 226: remote.v1.TermOpened
+	(*TermClose)(nil),                // 227: remote.v1.TermClose
+	(*TermClosed)(nil),               // 228: remote.v1.TermClosed
+	(*TermResize)(nil),               // 229: remote.v1.TermResize
+	(*TermSignal)(nil),               // 230: remote.v1.TermSignal
+	(*TermData)(nil),                 // 231: remote.v1.TermData
+	(*TermStatus)(nil),               // 232: remote.v1.TermStatus
+	(*WsDirList)(nil),                // 233: remote.v1.WsDirList
+	(*WsEntry)(nil),                  // 234: remote.v1.WsEntry
+	(*WsDirListResult)(nil),          // 235: remote.v1.WsDirListResult
+	(*WsFileRead)(nil),               // 236: remote.v1.WsFileRead
+	(*WsFileReadResult)(nil),         // 237: remote.v1.WsFileReadResult
+	(*WsFindNames)(nil),              // 238: remote.v1.WsFindNames
+	(*WsFindNamesResult)(nil),        // 239: remote.v1.WsFindNamesResult
+	(*WsFindContents)(nil),           // 240: remote.v1.WsFindContents
+	(*WsContentMatch)(nil),           // 241: remote.v1.WsContentMatch
+	(*WsContentFile)(nil),            // 242: remote.v1.WsContentFile
+	(*WsFindContentsResult)(nil),     // 243: remote.v1.WsFindContentsResult
+	(*WsWatch)(nil),                  // 244: remote.v1.WsWatch
+	(*WsChanged)(nil),                // 245: remote.v1.WsChanged
+	(*WsGitStatus)(nil),              // 246: remote.v1.WsGitStatus
+	(*WsGitEntry)(nil),               // 247: remote.v1.WsGitEntry
+	(*WsGitUpstream)(nil),            // 248: remote.v1.WsGitUpstream
+	(*WsGitStatusResult)(nil),        // 249: remote.v1.WsGitStatusResult
+	(*WsGitDiff)(nil),                // 250: remote.v1.WsGitDiff
+	(*WsGitDiffResult)(nil),          // 251: remote.v1.WsGitDiffResult
+	(*WsGitStage)(nil),               // 252: remote.v1.WsGitStage
+	(*WsGitUnstage)(nil),             // 253: remote.v1.WsGitUnstage
+	(*WsGitDiscard)(nil),             // 254: remote.v1.WsGitDiscard
+	(*WsGitCommit)(nil),              // 255: remote.v1.WsGitCommit
+	(*WsGitCommitMessage)(nil),       // 256: remote.v1.WsGitCommitMessage
+	(*WsGitCommitMessageResult)(nil), // 257: remote.v1.WsGitCommitMessageResult
+	(*WsGitLogEntry)(nil),            // 258: remote.v1.WsGitLogEntry
+	(*WsGitCommitResult)(nil),        // 259: remote.v1.WsGitCommitResult
+	(*WsGitBranches)(nil),            // 260: remote.v1.WsGitBranches
+	(*WsGitBranch)(nil),              // 261: remote.v1.WsGitBranch
+	(*WsGitBranchesResult)(nil),      // 262: remote.v1.WsGitBranchesResult
+	(*WsGitCheckout)(nil),            // 263: remote.v1.WsGitCheckout
+	(*WsGitBranchCreate)(nil),        // 264: remote.v1.WsGitBranchCreate
+	(*WsGitFetch)(nil),               // 265: remote.v1.WsGitFetch
+	(*WsGitPull)(nil),                // 266: remote.v1.WsGitPull
+	(*WsGitRebase)(nil),              // 267: remote.v1.WsGitRebase
+	(*WsGitPush)(nil),                // 268: remote.v1.WsGitPush
+	(*WsGitLog)(nil),                 // 269: remote.v1.WsGitLog
+	(*WsGitLogResult)(nil),           // 270: remote.v1.WsGitLogResult
+	(*WsGitBranchCompare)(nil),       // 271: remote.v1.WsGitBranchCompare
+	(*WsGitBranchCompareResult)(nil), // 272: remote.v1.WsGitBranchCompareResult
+	(*WsGitPrUrl)(nil),               // 273: remote.v1.WsGitPrUrl
+	(*WsGitPrUrlResult)(nil),         // 274: remote.v1.WsGitPrUrlResult
+	(*UsageReportRequest)(nil),       // 275: remote.v1.UsageReportRequest
+	(*UsageReport)(nil),              // 276: remote.v1.UsageReport
+	(*UsageDay)(nil),                 // 277: remote.v1.UsageDay
+	(*UsageShape)(nil),               // 278: remote.v1.UsageShape
+	(*UsageSuggestion)(nil),          // 279: remote.v1.UsageSuggestion
+	(*UsageQuotaPoint)(nil),          // 280: remote.v1.UsageQuotaPoint
+	(*UsageSettingsGet)(nil),         // 281: remote.v1.UsageSettingsGet
+	(*UsageSettingsSet)(nil),         // 282: remote.v1.UsageSettingsSet
+	(*UsageSettings)(nil),            // 283: remote.v1.UsageSettings
+	(*UsageRuleSwitch)(nil),          // 284: remote.v1.UsageRuleSwitch
+	(*UsageDelete)(nil),              // 285: remote.v1.UsageDelete
+	(*OfficeWatch)(nil),              // 286: remote.v1.OfficeWatch
+	(*OfficeSnapshot)(nil),           // 287: remote.v1.OfficeSnapshot
+	(*OfficeEvents)(nil),             // 288: remote.v1.OfficeEvents
+	(*OfficeState)(nil),              // 289: remote.v1.OfficeState
+	(*OfficeResident)(nil),           // 290: remote.v1.OfficeResident
+	(*OfficeSession)(nil),            // 291: remote.v1.OfficeSession
+	(*OfficeTodoCounts)(nil),         // 292: remote.v1.OfficeTodoCounts
+	(*OfficeUsage)(nil),              // 293: remote.v1.OfficeUsage
+	(*OfficeChecks)(nil),             // 294: remote.v1.OfficeChecks
+	(*OfficeActor)(nil),              // 295: remote.v1.OfficeActor
+	(*OfficeService)(nil),            // 296: remote.v1.OfficeService
+	(*OfficeActivity)(nil),           // 297: remote.v1.OfficeActivity
+	(*OfficeEvent)(nil),              // 298: remote.v1.OfficeEvent
+	(*OfficeActorLeave)(nil),         // 299: remote.v1.OfficeActorLeave
+	(*OfficeActivityStart)(nil),      // 300: remote.v1.OfficeActivityStart
+	(*OfficeActivityEnd)(nil),        // 301: remote.v1.OfficeActivityEnd
+	(*OfficeTurnStart)(nil),          // 302: remote.v1.OfficeTurnStart
+	(*OfficeApproval)(nil),           // 303: remote.v1.OfficeApproval
+	nil,                              // 304: remote.v1.AdvisorContext.FieldsEntry
+	nil,                              // 305: remote.v1.AccountListResult.SelectedByProviderEntry
+	nil,                              // 306: remote.v1.AccountListResult.DamagedEntry
 }
 var file_remote_v1_remote_proto_depIdxs = []int32{
-	37,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
-	38,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
-	39,  // 2: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
+	38,  // 0: remote.v1.Plain.hello:type_name -> remote.v1.Hello
+	39,  // 1: remote.v1.Plain.ready:type_name -> remote.v1.Ready
+	40,  // 2: remote.v1.Plain.error:type_name -> remote.v1.HandshakeError
 	0,   // 3: remote.v1.HandshakeError.code:type_name -> remote.v1.HandshakeErrorCode
-	41,  // 4: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
-	42,  // 5: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
-	44,  // 6: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
-	47,  // 7: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
-	48,  // 8: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
-	51,  // 9: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
-	55,  // 10: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
-	59,  // 11: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
-	60,  // 12: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
-	65,  // 13: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
-	66,  // 14: remote.v1.Frame.ping:type_name -> remote.v1.Ping
-	67,  // 15: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
-	68,  // 16: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
-	52,  // 17: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
-	56,  // 18: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
-	57,  // 19: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
-	100, // 20: remote.v1.Frame.account_list:type_name -> remote.v1.AccountList
-	101, // 21: remote.v1.Frame.account_select:type_name -> remote.v1.AccountSelect
-	102, // 22: remote.v1.Frame.account_sign_in_begin:type_name -> remote.v1.AccountSignInBegin
-	103, // 23: remote.v1.Frame.account_sign_in_code:type_name -> remote.v1.AccountSignInCode
-	104, // 24: remote.v1.Frame.account_sign_in_cancel:type_name -> remote.v1.AccountSignInCancel
-	105, // 25: remote.v1.Frame.account_remove:type_name -> remote.v1.AccountRemove
-	106, // 26: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
-	109, // 27: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
-	69,  // 28: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
-	110, // 29: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
-	70,  // 30: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
-	74,  // 31: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
-	75,  // 32: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
-	76,  // 33: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
-	132, // 34: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
-	133, // 35: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
-	136, // 36: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
-	135, // 37: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
-	137, // 38: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
-	138, // 39: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
-	163, // 40: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
-	127, // 41: remote.v1.Frame.pong:type_name -> remote.v1.Pong
-	166, // 42: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
-	170, // 43: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
-	113, // 44: remote.v1.Frame.ack:type_name -> remote.v1.Ack
-	128, // 45: remote.v1.Frame.error:type_name -> remote.v1.Error
-	114, // 46: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
-	122, // 47: remote.v1.Frame.account_list_result:type_name -> remote.v1.AccountListResult
-	125, // 48: remote.v1.Frame.account_sign_in_prompt:type_name -> remote.v1.AccountSignInPrompt
-	126, // 49: remote.v1.Frame.account_sign_in_result:type_name -> remote.v1.AccountSignInResult
-	168, // 50: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
-	123, // 51: remote.v1.Frame.machine_accounts:type_name -> remote.v1.MachineAccounts
-	73,  // 52: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
-	78,  // 53: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
-	134, // 54: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
-	99,  // 55: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
-	88,  // 56: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
-	77,  // 57: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
-	53,  // 58: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
-	54,  // 59: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
-	83,  // 60: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
-	84,  // 61: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
-	85,  // 62: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
-	86,  // 63: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
-	87,  // 64: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
-	89,  // 65: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
-	90,  // 66: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
-	91,  // 67: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
-	176, // 68: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
-	177, // 69: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
-	178, // 70: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
-	179, // 71: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
-	63,  // 72: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
-	64,  // 73: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
-	187, // 74: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
-	188, // 75: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
-	189, // 76: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
-	192, // 77: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
-	199, // 78: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
-	201, // 79: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
-	203, // 80: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
-	204, // 81: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
-	206, // 82: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
-	208, // 83: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
-	209, // 84: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
-	180, // 85: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
-	181, // 86: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
-	182, // 87: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
-	184, // 88: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
-	186, // 89: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
-	193, // 90: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
-	194, // 91: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
-	195, // 92: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
-	196, // 93: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
-	198, // 94: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
-	200, // 95: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
-	202, // 96: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
-	205, // 97: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
-	210, // 98: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
-	211, // 99: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
-	217, // 100: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
-	220, // 101: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
-	222, // 102: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
-	223, // 103: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
-	224, // 104: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
-	213, // 105: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
-	219, // 106: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
-	221, // 107: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
-	225, // 108: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
-	216, // 109: remote.v1.Frame.term_update_now:type_name -> remote.v1.TermUpdateNow
-	131, // 110: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
-	226, // 111: remote.v1.Frame.ws_dir_list:type_name -> remote.v1.WsDirList
-	229, // 112: remote.v1.Frame.ws_file_read:type_name -> remote.v1.WsFileRead
-	231, // 113: remote.v1.Frame.ws_find_names:type_name -> remote.v1.WsFindNames
-	233, // 114: remote.v1.Frame.ws_find_contents:type_name -> remote.v1.WsFindContents
-	237, // 115: remote.v1.Frame.ws_watch:type_name -> remote.v1.WsWatch
-	239, // 116: remote.v1.Frame.ws_git_status:type_name -> remote.v1.WsGitStatus
-	243, // 117: remote.v1.Frame.ws_git_diff:type_name -> remote.v1.WsGitDiff
-	245, // 118: remote.v1.Frame.ws_git_stage:type_name -> remote.v1.WsGitStage
-	246, // 119: remote.v1.Frame.ws_git_unstage:type_name -> remote.v1.WsGitUnstage
-	247, // 120: remote.v1.Frame.ws_git_discard:type_name -> remote.v1.WsGitDiscard
-	248, // 121: remote.v1.Frame.ws_git_commit:type_name -> remote.v1.WsGitCommit
-	253, // 122: remote.v1.Frame.ws_git_branches:type_name -> remote.v1.WsGitBranches
-	256, // 123: remote.v1.Frame.ws_git_checkout:type_name -> remote.v1.WsGitCheckout
-	257, // 124: remote.v1.Frame.ws_git_branch_create:type_name -> remote.v1.WsGitBranchCreate
-	258, // 125: remote.v1.Frame.ws_git_fetch:type_name -> remote.v1.WsGitFetch
-	259, // 126: remote.v1.Frame.ws_git_pull:type_name -> remote.v1.WsGitPull
-	261, // 127: remote.v1.Frame.ws_git_push:type_name -> remote.v1.WsGitPush
-	262, // 128: remote.v1.Frame.ws_git_log:type_name -> remote.v1.WsGitLog
-	264, // 129: remote.v1.Frame.ws_git_branch_compare:type_name -> remote.v1.WsGitBranchCompare
-	266, // 130: remote.v1.Frame.ws_git_pr_url:type_name -> remote.v1.WsGitPrUrl
-	228, // 131: remote.v1.Frame.ws_dir_list_result:type_name -> remote.v1.WsDirListResult
-	230, // 132: remote.v1.Frame.ws_file_read_result:type_name -> remote.v1.WsFileReadResult
-	232, // 133: remote.v1.Frame.ws_find_names_result:type_name -> remote.v1.WsFindNamesResult
-	236, // 134: remote.v1.Frame.ws_find_contents_result:type_name -> remote.v1.WsFindContentsResult
-	238, // 135: remote.v1.Frame.ws_changed:type_name -> remote.v1.WsChanged
-	242, // 136: remote.v1.Frame.ws_git_status_result:type_name -> remote.v1.WsGitStatusResult
-	244, // 137: remote.v1.Frame.ws_git_diff_result:type_name -> remote.v1.WsGitDiffResult
-	252, // 138: remote.v1.Frame.ws_git_commit_result:type_name -> remote.v1.WsGitCommitResult
-	255, // 139: remote.v1.Frame.ws_git_branches_result:type_name -> remote.v1.WsGitBranchesResult
-	263, // 140: remote.v1.Frame.ws_git_log_result:type_name -> remote.v1.WsGitLogResult
-	265, // 141: remote.v1.Frame.ws_git_branch_compare_result:type_name -> remote.v1.WsGitBranchCompareResult
-	267, // 142: remote.v1.Frame.ws_git_pr_url_result:type_name -> remote.v1.WsGitPrUrlResult
-	268, // 143: remote.v1.Frame.usage_report_request:type_name -> remote.v1.UsageReportRequest
-	274, // 144: remote.v1.Frame.usage_settings_get:type_name -> remote.v1.UsageSettingsGet
-	275, // 145: remote.v1.Frame.usage_settings_set:type_name -> remote.v1.UsageSettingsSet
-	278, // 146: remote.v1.Frame.usage_delete:type_name -> remote.v1.UsageDelete
-	269, // 147: remote.v1.Frame.usage_report:type_name -> remote.v1.UsageReport
-	276, // 148: remote.v1.Frame.usage_settings:type_name -> remote.v1.UsageSettings
-	272, // 149: remote.v1.Frame.usage_suggestion:type_name -> remote.v1.UsageSuggestion
-	95,  // 150: remote.v1.Frame.project_config_get:type_name -> remote.v1.ProjectConfigGet
-	96,  // 151: remote.v1.Frame.project_config_set:type_name -> remote.v1.ProjectConfigSet
-	97,  // 152: remote.v1.Frame.project_config:type_name -> remote.v1.ProjectConfig
-	79,  // 153: remote.v1.Frame.attachment_save:type_name -> remote.v1.AttachmentSave
-	80,  // 154: remote.v1.Frame.attachment_saved:type_name -> remote.v1.AttachmentSaved
-	249, // 155: remote.v1.Frame.ws_git_commit_message:type_name -> remote.v1.WsGitCommitMessage
-	250, // 156: remote.v1.Frame.ws_git_commit_message_result:type_name -> remote.v1.WsGitCommitMessageResult
-	107, // 157: remote.v1.Frame.account_capture_current:type_name -> remote.v1.AccountCaptureCurrent
-	61,  // 158: remote.v1.Frame.thread_earlier:type_name -> remote.v1.ThreadEarlier
-	62,  // 159: remote.v1.Frame.thread_earlier_result:type_name -> remote.v1.ThreadEarlierResult
-	279, // 160: remote.v1.Frame.office_watch:type_name -> remote.v1.OfficeWatch
-	280, // 161: remote.v1.Frame.office_snapshot:type_name -> remote.v1.OfficeSnapshot
-	281, // 162: remote.v1.Frame.office_events:type_name -> remote.v1.OfficeEvents
-	108, // 163: remote.v1.Frame.account_accept_current:type_name -> remote.v1.AccountAcceptCurrent
-	260, // 164: remote.v1.Frame.ws_git_rebase:type_name -> remote.v1.WsGitRebase
-	58,  // 165: remote.v1.Frame.thread_set_advisor:type_name -> remote.v1.ThreadSetAdvisor
-	174, // 166: remote.v1.Frame.advisor_set_key:type_name -> remote.v1.AdvisorSetKey
-	175, // 167: remote.v1.Frame.advisor_remove_key:type_name -> remote.v1.AdvisorRemoveKey
-	173, // 168: remote.v1.Frame.advisor_set_auto:type_name -> remote.v1.AdvisorSetAuto
-	111, // 169: remote.v1.Frame.mac_folder_access_ask:type_name -> remote.v1.MacFolderAccessAsk
-	43,  // 170: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
-	1,   // 171: remote.v1.ThreadCreate.kind:type_name -> remote.v1.ThreadKind
-	45,  // 172: remote.v1.ThreadSend.advisor_attachments:type_name -> remote.v1.AdvisorAttachment
-	2,   // 173: remote.v1.ThreadSend.advisor_tone:type_name -> remote.v1.AdvisorTone
-	46,  // 174: remote.v1.AdvisorAttachment.context:type_name -> remote.v1.AdvisorContext
-	297, // 175: remote.v1.AdvisorContext.fields:type_name -> remote.v1.AdvisorContext.FieldsEntry
-	129, // 176: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
-	3,   // 177: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
-	49,  // 178: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
-	50,  // 179: remote.v1.Answers.answers:type_name -> remote.v1.Answer
-	139, // 180: remote.v1.ThreadEarlierResult.items:type_name -> remote.v1.Item
-	71,  // 181: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
-	72,  // 182: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
-	43,  // 183: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
-	43,  // 184: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
-	7,   // 185: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
-	92,  // 186: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
-	92,  // 187: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
-	93,  // 188: remote.v1.Project.git:type_name -> remote.v1.GitStatus
-	4,   // 189: remote.v1.Project.project_config:type_name -> remote.v1.ProjectConfigLevel
-	4,   // 190: remote.v1.ProjectConfigSet.level:type_name -> remote.v1.ProjectConfigLevel
-	4,   // 191: remote.v1.ProjectConfig.level:type_name -> remote.v1.ProjectConfigLevel
-	94,  // 192: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
-	98,  // 193: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
-	5,   // 194: remote.v1.MacFolder.access:type_name -> remote.v1.MacFolderAccess
-	117, // 195: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
-	118, // 196: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
-	116, // 197: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
-	116, // 198: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
-	115, // 199: remote.v1.ThreadInfo.account_suggestion:type_name -> remote.v1.AccountSuggestion
-	119, // 200: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
-	119, // 201: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
-	6,   // 202: remote.v1.AiAccount.status:type_name -> remote.v1.AccountStatus
-	118, // 203: remote.v1.AiAccount.usage:type_name -> remote.v1.RateLimits
-	120, // 204: remote.v1.AccountListResult.accounts:type_name -> remote.v1.AiAccount
-	298, // 205: remote.v1.AccountListResult.selected_by_provider:type_name -> remote.v1.AccountListResult.SelectedByProviderEntry
-	121, // 206: remote.v1.AccountListResult.actions:type_name -> remote.v1.AccountActions
-	299, // 207: remote.v1.AccountListResult.damaged:type_name -> remote.v1.AccountListResult.DamagedEntry
-	122, // 208: remote.v1.MachineAccounts.accounts:type_name -> remote.v1.AccountListResult
-	124, // 209: remote.v1.MachineAccounts.sessions:type_name -> remote.v1.SessionAccount
-	8,   // 210: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
-	7,   // 211: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
-	10,  // 212: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
-	4,   // 213: remote.v1.ThreadSummary.project_config:type_name -> remote.v1.ProjectConfigLevel
-	1,   // 214: remote.v1.ThreadSummary.kind:type_name -> remote.v1.ThreadKind
-	9,   // 215: remote.v1.ThreadActivity.phase:type_name -> remote.v1.ActivityPhase
-	130, // 216: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
-	130, // 217: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
-	130, // 218: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
-	139, // 219: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
-	129, // 220: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
-	11,  // 221: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
-	139, // 222: remote.v1.FullItem.item:type_name -> remote.v1.Item
-	140, // 223: remote.v1.Item.text:type_name -> remote.v1.TextItem
-	141, // 224: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
-	142, // 225: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
-	143, // 226: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
-	144, // 227: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
-	148, // 228: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
-	146, // 229: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
-	151, // 230: remote.v1.Item.status:type_name -> remote.v1.StatusItem
-	152, // 231: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
-	153, // 232: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
-	154, // 233: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
-	155, // 234: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
-	156, // 235: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
-	157, // 236: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
-	158, // 237: remote.v1.Item.advisor_verdict:type_name -> remote.v1.AdvisorVerdictItem
-	12,  // 238: remote.v1.TextItem.role:type_name -> remote.v1.Role
-	81,  // 239: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
-	13,  // 240: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
-	145, // 241: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
-	14,  // 242: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
-	13,  // 243: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
-	15,  // 244: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
-	3,   // 245: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
-	147, // 246: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
-	149, // 247: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
-	15,  // 248: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
-	49,  // 249: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
-	150, // 250: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
-	16,  // 251: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
-	159, // 252: remote.v1.AdvisorVerdictItem.options:type_name -> remote.v1.AdvisorOption
-	161, // 253: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
-	17,  // 254: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
-	160, // 255: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
-	162, // 256: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
-	165, // 257: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
-	82,  // 258: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
-	164, // 259: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
-	207, // 260: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
-	18,  // 261: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
-	172, // 262: remote.v1.MachineInfo.advisor:type_name -> remote.v1.AdvisorStatus
-	112, // 263: remote.v1.MachineInfo.mac_folders:type_name -> remote.v1.MacFolder
-	167, // 264: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
-	169, // 265: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
-	171, // 266: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
-	183, // 267: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
-	185, // 268: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
-	19,  // 269: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
-	185, // 270: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
-	190, // 271: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
-	191, // 272: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
-	20,  // 273: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
-	197, // 274: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
-	21,  // 275: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
-	22,  // 276: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
-	212, // 277: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
-	214, // 278: remote.v1.TermListResult.update:type_name -> remote.v1.TerminalUpdate
-	215, // 279: remote.v1.TerminalUpdate.holds:type_name -> remote.v1.TerminalUpdateHold
-	23,  // 280: remote.v1.TerminalUpdateHold.reason:type_name -> remote.v1.TerminalUpdateHoldReason
-	218, // 281: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
-	24,  // 282: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
-	25,  // 283: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
-	19,  // 284: remote.v1.WsEntry.git:type_name -> remote.v1.GitFileState
-	227, // 285: remote.v1.WsDirListResult.entries:type_name -> remote.v1.WsEntry
-	26,  // 286: remote.v1.WsFileReadResult.kind:type_name -> remote.v1.WsFileKind
-	234, // 287: remote.v1.WsContentFile.matches:type_name -> remote.v1.WsContentMatch
-	235, // 288: remote.v1.WsFindContentsResult.files:type_name -> remote.v1.WsContentFile
-	27,  // 289: remote.v1.WsGitEntry.area:type_name -> remote.v1.WsGitArea
-	19,  // 290: remote.v1.WsGitEntry.state:type_name -> remote.v1.GitFileState
-	241, // 291: remote.v1.WsGitStatusResult.upstream:type_name -> remote.v1.WsGitUpstream
-	240, // 292: remote.v1.WsGitStatusResult.entries:type_name -> remote.v1.WsGitEntry
-	28,  // 293: remote.v1.WsGitDiff.source:type_name -> remote.v1.WsGitDiffSource
-	185, // 294: remote.v1.WsGitDiffResult.file:type_name -> remote.v1.GitFileChange
-	251, // 295: remote.v1.WsGitCommitResult.commit:type_name -> remote.v1.WsGitLogEntry
-	254, // 296: remote.v1.WsGitBranchesResult.local:type_name -> remote.v1.WsGitBranch
-	251, // 297: remote.v1.WsGitLogResult.commits:type_name -> remote.v1.WsGitLogEntry
-	240, // 298: remote.v1.WsGitBranchCompareResult.files:type_name -> remote.v1.WsGitEntry
-	271, // 299: remote.v1.UsageReport.shape:type_name -> remote.v1.UsageShape
-	270, // 300: remote.v1.UsageReport.days:type_name -> remote.v1.UsageDay
-	272, // 301: remote.v1.UsageReport.suggestions:type_name -> remote.v1.UsageSuggestion
-	273, // 302: remote.v1.UsageReport.quota:type_name -> remote.v1.UsageQuotaPoint
-	29,  // 303: remote.v1.UsageSuggestion.rule:type_name -> remote.v1.UsageRule
-	119, // 304: remote.v1.UsageQuotaPoint.five_hour:type_name -> remote.v1.RateWindow
-	119, // 305: remote.v1.UsageQuotaPoint.seven_day:type_name -> remote.v1.RateWindow
-	277, // 306: remote.v1.UsageSettingsSet.rules:type_name -> remote.v1.UsageRuleSwitch
-	277, // 307: remote.v1.UsageSettings.rules:type_name -> remote.v1.UsageRuleSwitch
-	29,  // 308: remote.v1.UsageRuleSwitch.rule:type_name -> remote.v1.UsageRule
-	282, // 309: remote.v1.OfficeSnapshot.state:type_name -> remote.v1.OfficeState
-	291, // 310: remote.v1.OfficeEvents.events:type_name -> remote.v1.OfficeEvent
-	288, // 311: remote.v1.OfficeState.actors:type_name -> remote.v1.OfficeActor
-	284, // 312: remote.v1.OfficeState.session:type_name -> remote.v1.OfficeSession
-	283, // 313: remote.v1.OfficeState.residents:type_name -> remote.v1.OfficeResident
-	285, // 314: remote.v1.OfficeSession.todo:type_name -> remote.v1.OfficeTodoCounts
-	286, // 315: remote.v1.OfficeSession.usage:type_name -> remote.v1.OfficeUsage
-	287, // 316: remote.v1.OfficeSession.checks:type_name -> remote.v1.OfficeChecks
-	30,  // 317: remote.v1.OfficeActor.role:type_name -> remote.v1.OfficeRole
-	31,  // 318: remote.v1.OfficeActor.state:type_name -> remote.v1.OfficeActorState
-	290, // 319: remote.v1.OfficeActor.activity:type_name -> remote.v1.OfficeActivity
-	289, // 320: remote.v1.OfficeActor.service:type_name -> remote.v1.OfficeService
-	34,  // 321: remote.v1.OfficeService.kind:type_name -> remote.v1.OfficeServiceKind
-	32,  // 322: remote.v1.OfficeActivity.group:type_name -> remote.v1.OfficeAnimGroup
-	33,  // 323: remote.v1.OfficeActivity.room:type_name -> remote.v1.OfficeRoom
-	288, // 324: remote.v1.OfficeEvent.actor_enter:type_name -> remote.v1.OfficeActor
-	288, // 325: remote.v1.OfficeEvent.actor_update:type_name -> remote.v1.OfficeActor
-	292, // 326: remote.v1.OfficeEvent.actor_leave:type_name -> remote.v1.OfficeActorLeave
-	293, // 327: remote.v1.OfficeEvent.activity_start:type_name -> remote.v1.OfficeActivityStart
-	294, // 328: remote.v1.OfficeEvent.activity_end:type_name -> remote.v1.OfficeActivityEnd
-	295, // 329: remote.v1.OfficeEvent.turn_start:type_name -> remote.v1.OfficeTurnStart
-	296, // 330: remote.v1.OfficeEvent.approval:type_name -> remote.v1.OfficeApproval
-	284, // 331: remote.v1.OfficeEvent.session:type_name -> remote.v1.OfficeSession
-	290, // 332: remote.v1.OfficeActivityStart.activity:type_name -> remote.v1.OfficeActivity
-	35,  // 333: remote.v1.OfficeApproval.state:type_name -> remote.v1.OfficeApprovalState
-	334, // [334:334] is the sub-list for method output_type
-	334, // [334:334] is the sub-list for method input_type
-	334, // [334:334] is the sub-list for extension type_name
-	334, // [334:334] is the sub-list for extension extendee
-	0,   // [0:334] is the sub-list for field type_name
+	42,  // 4: remote.v1.Frame.thread_list:type_name -> remote.v1.ThreadList
+	43,  // 5: remote.v1.Frame.thread_create:type_name -> remote.v1.ThreadCreate
+	45,  // 6: remote.v1.Frame.thread_send:type_name -> remote.v1.ThreadSend
+	48,  // 7: remote.v1.Frame.thread_subscribe:type_name -> remote.v1.ThreadSubscribe
+	49,  // 8: remote.v1.Frame.thread_respond:type_name -> remote.v1.ThreadRespond
+	52,  // 9: remote.v1.Frame.thread_interrupt:type_name -> remote.v1.ThreadInterrupt
+	56,  // 10: remote.v1.Frame.thread_set_model:type_name -> remote.v1.ThreadSetModel
+	60,  // 11: remote.v1.Frame.thread_switch:type_name -> remote.v1.ThreadSwitch
+	61,  // 12: remote.v1.Frame.thread_fetch_full:type_name -> remote.v1.ThreadFetchFull
+	66,  // 13: remote.v1.Frame.machine_info_request:type_name -> remote.v1.MachineInfoRequest
+	67,  // 14: remote.v1.Frame.ping:type_name -> remote.v1.Ping
+	68,  // 15: remote.v1.Frame.dir_list:type_name -> remote.v1.DirList
+	69,  // 16: remote.v1.Frame.audit_list:type_name -> remote.v1.AuditList
+	53,  // 17: remote.v1.Frame.thread_close:type_name -> remote.v1.ThreadClose
+	57,  // 18: remote.v1.Frame.thread_set_permission_mode:type_name -> remote.v1.ThreadSetPermissionMode
+	58,  // 19: remote.v1.Frame.thread_set_effort:type_name -> remote.v1.ThreadSetEffort
+	101, // 20: remote.v1.Frame.account_list:type_name -> remote.v1.AccountList
+	102, // 21: remote.v1.Frame.account_select:type_name -> remote.v1.AccountSelect
+	103, // 22: remote.v1.Frame.account_sign_in_begin:type_name -> remote.v1.AccountSignInBegin
+	104, // 23: remote.v1.Frame.account_sign_in_code:type_name -> remote.v1.AccountSignInCode
+	105, // 24: remote.v1.Frame.account_sign_in_cancel:type_name -> remote.v1.AccountSignInCancel
+	106, // 25: remote.v1.Frame.account_remove:type_name -> remote.v1.AccountRemove
+	107, // 26: remote.v1.Frame.usage_refresh:type_name -> remote.v1.UsageRefresh
+	110, // 27: remote.v1.Frame.machine_settings_set:type_name -> remote.v1.MachineSettingsSet
+	70,  // 28: remote.v1.Frame.file_list:type_name -> remote.v1.FileList
+	111, // 29: remote.v1.Frame.open_disk_access_settings:type_name -> remote.v1.OpenDiskAccessSettings
+	71,  // 30: remote.v1.Frame.session_list:type_name -> remote.v1.SessionList
+	75,  // 31: remote.v1.Frame.session_open:type_name -> remote.v1.SessionOpen
+	76,  // 32: remote.v1.Frame.attachment_upload:type_name -> remote.v1.AttachmentUpload
+	77,  // 33: remote.v1.Frame.attachment_cancel:type_name -> remote.v1.AttachmentCancel
+	133, // 34: remote.v1.Frame.thread_list_result:type_name -> remote.v1.ThreadListResult
+	134, // 35: remote.v1.Frame.thread_created:type_name -> remote.v1.ThreadCreated
+	137, // 36: remote.v1.Frame.thread_items:type_name -> remote.v1.ThreadItems
+	136, // 37: remote.v1.Frame.thread_status:type_name -> remote.v1.ThreadStatus
+	138, // 38: remote.v1.Frame.thread_reset:type_name -> remote.v1.ThreadReset
+	139, // 39: remote.v1.Frame.full_item:type_name -> remote.v1.FullItem
+	164, // 40: remote.v1.Frame.machine_info:type_name -> remote.v1.MachineInfo
+	128, // 41: remote.v1.Frame.pong:type_name -> remote.v1.Pong
+	167, // 42: remote.v1.Frame.dir_list_result:type_name -> remote.v1.DirListResult
+	171, // 43: remote.v1.Frame.audit_list_result:type_name -> remote.v1.AuditListResult
+	114, // 44: remote.v1.Frame.ack:type_name -> remote.v1.Ack
+	129, // 45: remote.v1.Frame.error:type_name -> remote.v1.Error
+	115, // 46: remote.v1.Frame.thread_info:type_name -> remote.v1.ThreadInfo
+	123, // 47: remote.v1.Frame.account_list_result:type_name -> remote.v1.AccountListResult
+	126, // 48: remote.v1.Frame.account_sign_in_prompt:type_name -> remote.v1.AccountSignInPrompt
+	127, // 49: remote.v1.Frame.account_sign_in_result:type_name -> remote.v1.AccountSignInResult
+	169, // 50: remote.v1.Frame.file_list_result:type_name -> remote.v1.FileListResult
+	124, // 51: remote.v1.Frame.machine_accounts:type_name -> remote.v1.MachineAccounts
+	74,  // 52: remote.v1.Frame.session_list_result:type_name -> remote.v1.SessionListResult
+	79,  // 53: remote.v1.Frame.attachment_data:type_name -> remote.v1.AttachmentData
+	135, // 54: remote.v1.Frame.thread_deleted:type_name -> remote.v1.ThreadDeleted
+	100, // 55: remote.v1.Frame.project_list_result:type_name -> remote.v1.ProjectListResult
+	89,  // 56: remote.v1.Frame.project_clone_progress:type_name -> remote.v1.ProjectCloneProgress
+	78,  // 57: remote.v1.Frame.attachment_fetch:type_name -> remote.v1.AttachmentFetch
+	54,  // 58: remote.v1.Frame.thread_delete:type_name -> remote.v1.ThreadDelete
+	55,  // 59: remote.v1.Frame.thread_set_archived:type_name -> remote.v1.ThreadSetArchived
+	84,  // 60: remote.v1.Frame.project_list:type_name -> remote.v1.ProjectList
+	85,  // 61: remote.v1.Frame.project_add:type_name -> remote.v1.ProjectAdd
+	86,  // 62: remote.v1.Frame.project_create:type_name -> remote.v1.ProjectCreate
+	87,  // 63: remote.v1.Frame.project_clone:type_name -> remote.v1.ProjectClone
+	88,  // 64: remote.v1.Frame.project_clone_cancel:type_name -> remote.v1.ProjectCloneCancel
+	90,  // 65: remote.v1.Frame.project_update:type_name -> remote.v1.ProjectUpdate
+	91,  // 66: remote.v1.Frame.project_reorder:type_name -> remote.v1.ProjectReorder
+	92,  // 67: remote.v1.Frame.project_remove:type_name -> remote.v1.ProjectRemove
+	183, // 68: remote.v1.Frame.secret_provide:type_name -> remote.v1.SecretProvide
+	184, // 69: remote.v1.Frame.secret_decline:type_name -> remote.v1.SecretDecline
+	185, // 70: remote.v1.Frame.secret_list:type_name -> remote.v1.SecretList
+	186, // 71: remote.v1.Frame.secret_remove:type_name -> remote.v1.SecretRemove
+	64,  // 72: remote.v1.Frame.thread_git_changes:type_name -> remote.v1.ThreadGitChanges
+	65,  // 73: remote.v1.Frame.git_file_diff:type_name -> remote.v1.GitFileDiff
+	194, // 74: remote.v1.Frame.browser_control:type_name -> remote.v1.BrowserControl
+	195, // 75: remote.v1.Frame.browser_view:type_name -> remote.v1.BrowserView
+	196, // 76: remote.v1.Frame.browser_input:type_name -> remote.v1.BrowserInput
+	199, // 77: remote.v1.Frame.browser_takeover_end:type_name -> remote.v1.BrowserTakeoverEnd
+	206, // 78: remote.v1.Frame.screen_share_status_request:type_name -> remote.v1.ScreenShareStatusRequest
+	208, // 79: remote.v1.Frame.screen_share_open:type_name -> remote.v1.ScreenShareOpen
+	210, // 80: remote.v1.Frame.screen_share_data:type_name -> remote.v1.ScreenShareData
+	211, // 81: remote.v1.Frame.screen_share_close:type_name -> remote.v1.ScreenShareClose
+	213, // 82: remote.v1.Frame.browser_clear:type_name -> remote.v1.BrowserClear
+	215, // 83: remote.v1.Frame.agent_update_check:type_name -> remote.v1.AgentUpdateCheck
+	216, // 84: remote.v1.Frame.agent_update_start:type_name -> remote.v1.AgentUpdateStart
+	187, // 85: remote.v1.Frame.secret_prompt:type_name -> remote.v1.SecretPrompt
+	188, // 86: remote.v1.Frame.secret_prompt_ended:type_name -> remote.v1.SecretPromptEnded
+	189, // 87: remote.v1.Frame.secret_list_result:type_name -> remote.v1.SecretListResult
+	191, // 88: remote.v1.Frame.git_changes:type_name -> remote.v1.GitChanges
+	193, // 89: remote.v1.Frame.git_file_diff_result:type_name -> remote.v1.GitFileDiffResult
+	200, // 90: remote.v1.Frame.browser_takeover:type_name -> remote.v1.BrowserTakeover
+	201, // 91: remote.v1.Frame.browser_takeover_ended:type_name -> remote.v1.BrowserTakeoverEnded
+	202, // 92: remote.v1.Frame.browser_frame:type_name -> remote.v1.BrowserFrame
+	203, // 93: remote.v1.Frame.browser_state:type_name -> remote.v1.BrowserState
+	205, // 94: remote.v1.Frame.passkey_notice:type_name -> remote.v1.PasskeyNotice
+	207, // 95: remote.v1.Frame.screen_share_status:type_name -> remote.v1.ScreenShareStatus
+	209, // 96: remote.v1.Frame.screen_share_opened:type_name -> remote.v1.ScreenShareOpened
+	212, // 97: remote.v1.Frame.screen_share_closed:type_name -> remote.v1.ScreenShareClosed
+	217, // 98: remote.v1.Frame.agent_update_progress:type_name -> remote.v1.AgentUpdateProgress
+	218, // 99: remote.v1.Frame.term_list_request:type_name -> remote.v1.TermListRequest
+	224, // 100: remote.v1.Frame.term_open:type_name -> remote.v1.TermOpen
+	227, // 101: remote.v1.Frame.term_close:type_name -> remote.v1.TermClose
+	229, // 102: remote.v1.Frame.term_resize:type_name -> remote.v1.TermResize
+	230, // 103: remote.v1.Frame.term_signal:type_name -> remote.v1.TermSignal
+	231, // 104: remote.v1.Frame.term_data:type_name -> remote.v1.TermData
+	220, // 105: remote.v1.Frame.term_list_result:type_name -> remote.v1.TermListResult
+	226, // 106: remote.v1.Frame.term_opened:type_name -> remote.v1.TermOpened
+	228, // 107: remote.v1.Frame.term_closed:type_name -> remote.v1.TermClosed
+	232, // 108: remote.v1.Frame.term_status:type_name -> remote.v1.TermStatus
+	223, // 109: remote.v1.Frame.term_update_now:type_name -> remote.v1.TermUpdateNow
+	132, // 110: remote.v1.Frame.thread_activity:type_name -> remote.v1.ThreadActivity
+	233, // 111: remote.v1.Frame.ws_dir_list:type_name -> remote.v1.WsDirList
+	236, // 112: remote.v1.Frame.ws_file_read:type_name -> remote.v1.WsFileRead
+	238, // 113: remote.v1.Frame.ws_find_names:type_name -> remote.v1.WsFindNames
+	240, // 114: remote.v1.Frame.ws_find_contents:type_name -> remote.v1.WsFindContents
+	244, // 115: remote.v1.Frame.ws_watch:type_name -> remote.v1.WsWatch
+	246, // 116: remote.v1.Frame.ws_git_status:type_name -> remote.v1.WsGitStatus
+	250, // 117: remote.v1.Frame.ws_git_diff:type_name -> remote.v1.WsGitDiff
+	252, // 118: remote.v1.Frame.ws_git_stage:type_name -> remote.v1.WsGitStage
+	253, // 119: remote.v1.Frame.ws_git_unstage:type_name -> remote.v1.WsGitUnstage
+	254, // 120: remote.v1.Frame.ws_git_discard:type_name -> remote.v1.WsGitDiscard
+	255, // 121: remote.v1.Frame.ws_git_commit:type_name -> remote.v1.WsGitCommit
+	260, // 122: remote.v1.Frame.ws_git_branches:type_name -> remote.v1.WsGitBranches
+	263, // 123: remote.v1.Frame.ws_git_checkout:type_name -> remote.v1.WsGitCheckout
+	264, // 124: remote.v1.Frame.ws_git_branch_create:type_name -> remote.v1.WsGitBranchCreate
+	265, // 125: remote.v1.Frame.ws_git_fetch:type_name -> remote.v1.WsGitFetch
+	266, // 126: remote.v1.Frame.ws_git_pull:type_name -> remote.v1.WsGitPull
+	268, // 127: remote.v1.Frame.ws_git_push:type_name -> remote.v1.WsGitPush
+	269, // 128: remote.v1.Frame.ws_git_log:type_name -> remote.v1.WsGitLog
+	271, // 129: remote.v1.Frame.ws_git_branch_compare:type_name -> remote.v1.WsGitBranchCompare
+	273, // 130: remote.v1.Frame.ws_git_pr_url:type_name -> remote.v1.WsGitPrUrl
+	235, // 131: remote.v1.Frame.ws_dir_list_result:type_name -> remote.v1.WsDirListResult
+	237, // 132: remote.v1.Frame.ws_file_read_result:type_name -> remote.v1.WsFileReadResult
+	239, // 133: remote.v1.Frame.ws_find_names_result:type_name -> remote.v1.WsFindNamesResult
+	243, // 134: remote.v1.Frame.ws_find_contents_result:type_name -> remote.v1.WsFindContentsResult
+	245, // 135: remote.v1.Frame.ws_changed:type_name -> remote.v1.WsChanged
+	249, // 136: remote.v1.Frame.ws_git_status_result:type_name -> remote.v1.WsGitStatusResult
+	251, // 137: remote.v1.Frame.ws_git_diff_result:type_name -> remote.v1.WsGitDiffResult
+	259, // 138: remote.v1.Frame.ws_git_commit_result:type_name -> remote.v1.WsGitCommitResult
+	262, // 139: remote.v1.Frame.ws_git_branches_result:type_name -> remote.v1.WsGitBranchesResult
+	270, // 140: remote.v1.Frame.ws_git_log_result:type_name -> remote.v1.WsGitLogResult
+	272, // 141: remote.v1.Frame.ws_git_branch_compare_result:type_name -> remote.v1.WsGitBranchCompareResult
+	274, // 142: remote.v1.Frame.ws_git_pr_url_result:type_name -> remote.v1.WsGitPrUrlResult
+	275, // 143: remote.v1.Frame.usage_report_request:type_name -> remote.v1.UsageReportRequest
+	281, // 144: remote.v1.Frame.usage_settings_get:type_name -> remote.v1.UsageSettingsGet
+	282, // 145: remote.v1.Frame.usage_settings_set:type_name -> remote.v1.UsageSettingsSet
+	285, // 146: remote.v1.Frame.usage_delete:type_name -> remote.v1.UsageDelete
+	276, // 147: remote.v1.Frame.usage_report:type_name -> remote.v1.UsageReport
+	283, // 148: remote.v1.Frame.usage_settings:type_name -> remote.v1.UsageSettings
+	279, // 149: remote.v1.Frame.usage_suggestion:type_name -> remote.v1.UsageSuggestion
+	96,  // 150: remote.v1.Frame.project_config_get:type_name -> remote.v1.ProjectConfigGet
+	97,  // 151: remote.v1.Frame.project_config_set:type_name -> remote.v1.ProjectConfigSet
+	98,  // 152: remote.v1.Frame.project_config:type_name -> remote.v1.ProjectConfig
+	80,  // 153: remote.v1.Frame.attachment_save:type_name -> remote.v1.AttachmentSave
+	81,  // 154: remote.v1.Frame.attachment_saved:type_name -> remote.v1.AttachmentSaved
+	256, // 155: remote.v1.Frame.ws_git_commit_message:type_name -> remote.v1.WsGitCommitMessage
+	257, // 156: remote.v1.Frame.ws_git_commit_message_result:type_name -> remote.v1.WsGitCommitMessageResult
+	108, // 157: remote.v1.Frame.account_capture_current:type_name -> remote.v1.AccountCaptureCurrent
+	62,  // 158: remote.v1.Frame.thread_earlier:type_name -> remote.v1.ThreadEarlier
+	63,  // 159: remote.v1.Frame.thread_earlier_result:type_name -> remote.v1.ThreadEarlierResult
+	286, // 160: remote.v1.Frame.office_watch:type_name -> remote.v1.OfficeWatch
+	287, // 161: remote.v1.Frame.office_snapshot:type_name -> remote.v1.OfficeSnapshot
+	288, // 162: remote.v1.Frame.office_events:type_name -> remote.v1.OfficeEvents
+	109, // 163: remote.v1.Frame.account_accept_current:type_name -> remote.v1.AccountAcceptCurrent
+	267, // 164: remote.v1.Frame.ws_git_rebase:type_name -> remote.v1.WsGitRebase
+	59,  // 165: remote.v1.Frame.thread_set_advisor:type_name -> remote.v1.ThreadSetAdvisor
+	175, // 166: remote.v1.Frame.advisor_set_key:type_name -> remote.v1.AdvisorSetKey
+	176, // 167: remote.v1.Frame.advisor_remove_key:type_name -> remote.v1.AdvisorRemoveKey
+	174, // 168: remote.v1.Frame.advisor_set_auto:type_name -> remote.v1.AdvisorSetAuto
+	177, // 169: remote.v1.Frame.advisor_key_share_begin:type_name -> remote.v1.AdvisorKeyShareBegin
+	178, // 170: remote.v1.Frame.advisor_key_share_ticket:type_name -> remote.v1.AdvisorKeyShareTicket
+	179, // 171: remote.v1.Frame.advisor_key_seal:type_name -> remote.v1.AdvisorKeySeal
+	180, // 172: remote.v1.Frame.advisor_key_sealed:type_name -> remote.v1.AdvisorKeySealed
+	181, // 173: remote.v1.Frame.advisor_key_share_open:type_name -> remote.v1.AdvisorKeyShareOpen
+	182, // 174: remote.v1.Frame.advisor_key_promote:type_name -> remote.v1.AdvisorKeyPromote
+	112, // 175: remote.v1.Frame.mac_folder_access_ask:type_name -> remote.v1.MacFolderAccessAsk
+	44,  // 176: remote.v1.ThreadCreate.consent:type_name -> remote.v1.Consent
+	1,   // 177: remote.v1.ThreadCreate.kind:type_name -> remote.v1.ThreadKind
+	46,  // 178: remote.v1.ThreadSend.advisor_attachments:type_name -> remote.v1.AdvisorAttachment
+	2,   // 179: remote.v1.ThreadSend.advisor_tone:type_name -> remote.v1.AdvisorTone
+	47,  // 180: remote.v1.AdvisorAttachment.context:type_name -> remote.v1.AdvisorContext
+	304, // 181: remote.v1.AdvisorContext.fields:type_name -> remote.v1.AdvisorContext.FieldsEntry
+	130, // 182: remote.v1.ThreadSubscribe.cursor:type_name -> remote.v1.Cursor
+	3,   // 183: remote.v1.ThreadRespond.decision:type_name -> remote.v1.Decision
+	50,  // 184: remote.v1.ThreadRespond.answers:type_name -> remote.v1.Answers
+	51,  // 185: remote.v1.Answers.answers:type_name -> remote.v1.Answer
+	140, // 186: remote.v1.ThreadEarlierResult.items:type_name -> remote.v1.Item
+	72,  // 187: remote.v1.SessionListResult.sessions:type_name -> remote.v1.LocalSession
+	73,  // 188: remote.v1.SessionListResult.dirs:type_name -> remote.v1.SessionDir
+	44,  // 189: remote.v1.SessionOpen.consent:type_name -> remote.v1.Consent
+	44,  // 190: remote.v1.ProjectAdd.consent:type_name -> remote.v1.Consent
+	7,   // 191: remote.v1.ProjectCloneProgress.reason:type_name -> remote.v1.ErrorReason
+	93,  // 192: remote.v1.ProjectUpdate.defaults:type_name -> remote.v1.ProjectDefaults
+	93,  // 193: remote.v1.Project.defaults:type_name -> remote.v1.ProjectDefaults
+	94,  // 194: remote.v1.Project.git:type_name -> remote.v1.GitStatus
+	4,   // 195: remote.v1.Project.project_config:type_name -> remote.v1.ProjectConfigLevel
+	4,   // 196: remote.v1.ProjectConfigSet.level:type_name -> remote.v1.ProjectConfigLevel
+	4,   // 197: remote.v1.ProjectConfig.level:type_name -> remote.v1.ProjectConfigLevel
+	95,  // 198: remote.v1.ProjectListResult.projects:type_name -> remote.v1.Project
+	99,  // 199: remote.v1.ProjectListResult.suggestions:type_name -> remote.v1.ProjectSuggestion
+	5,   // 200: remote.v1.MacFolder.access:type_name -> remote.v1.MacFolderAccess
+	118, // 201: remote.v1.ThreadInfo.commands:type_name -> remote.v1.SlashCommand
+	119, // 202: remote.v1.ThreadInfo.rate_limits:type_name -> remote.v1.RateLimits
+	117, // 203: remote.v1.ThreadInfo.account:type_name -> remote.v1.AccountInfo
+	117, // 204: remote.v1.ThreadInfo.next_account:type_name -> remote.v1.AccountInfo
+	116, // 205: remote.v1.ThreadInfo.account_suggestion:type_name -> remote.v1.AccountSuggestion
+	120, // 206: remote.v1.RateLimits.five_hour:type_name -> remote.v1.RateWindow
+	120, // 207: remote.v1.RateLimits.seven_day:type_name -> remote.v1.RateWindow
+	6,   // 208: remote.v1.AiAccount.status:type_name -> remote.v1.AccountStatus
+	119, // 209: remote.v1.AiAccount.usage:type_name -> remote.v1.RateLimits
+	121, // 210: remote.v1.AccountListResult.accounts:type_name -> remote.v1.AiAccount
+	305, // 211: remote.v1.AccountListResult.selected_by_provider:type_name -> remote.v1.AccountListResult.SelectedByProviderEntry
+	122, // 212: remote.v1.AccountListResult.actions:type_name -> remote.v1.AccountActions
+	306, // 213: remote.v1.AccountListResult.damaged:type_name -> remote.v1.AccountListResult.DamagedEntry
+	123, // 214: remote.v1.MachineAccounts.accounts:type_name -> remote.v1.AccountListResult
+	125, // 215: remote.v1.MachineAccounts.sessions:type_name -> remote.v1.SessionAccount
+	8,   // 216: remote.v1.Error.code:type_name -> remote.v1.ErrorCode
+	7,   // 217: remote.v1.Error.reason:type_name -> remote.v1.ErrorReason
+	10,  // 218: remote.v1.ThreadSummary.state:type_name -> remote.v1.ThreadState
+	4,   // 219: remote.v1.ThreadSummary.project_config:type_name -> remote.v1.ProjectConfigLevel
+	1,   // 220: remote.v1.ThreadSummary.kind:type_name -> remote.v1.ThreadKind
+	9,   // 221: remote.v1.ThreadActivity.phase:type_name -> remote.v1.ActivityPhase
+	131, // 222: remote.v1.ThreadListResult.threads:type_name -> remote.v1.ThreadSummary
+	131, // 223: remote.v1.ThreadCreated.thread:type_name -> remote.v1.ThreadSummary
+	131, // 224: remote.v1.ThreadStatus.thread:type_name -> remote.v1.ThreadSummary
+	140, // 225: remote.v1.ThreadItems.items:type_name -> remote.v1.Item
+	130, // 226: remote.v1.ThreadItems.cursor:type_name -> remote.v1.Cursor
+	11,  // 227: remote.v1.ThreadReset.reason:type_name -> remote.v1.ResetReason
+	140, // 228: remote.v1.FullItem.item:type_name -> remote.v1.Item
+	141, // 229: remote.v1.Item.text:type_name -> remote.v1.TextItem
+	142, // 230: remote.v1.Item.tool_call:type_name -> remote.v1.ToolCallItem
+	143, // 231: remote.v1.Item.tool_result:type_name -> remote.v1.ToolResultItem
+	144, // 232: remote.v1.Item.diff:type_name -> remote.v1.DiffItem
+	145, // 233: remote.v1.Item.todo:type_name -> remote.v1.TodoItem
+	149, // 234: remote.v1.Item.question:type_name -> remote.v1.QuestionItem
+	147, // 235: remote.v1.Item.approval:type_name -> remote.v1.ApprovalItem
+	152, // 236: remote.v1.Item.status:type_name -> remote.v1.StatusItem
+	153, // 237: remote.v1.Item.turn:type_name -> remote.v1.TurnItem
+	154, // 238: remote.v1.Item.subagent:type_name -> remote.v1.SubagentItem
+	155, // 239: remote.v1.Item.compaction:type_name -> remote.v1.CompactionItem
+	156, // 240: remote.v1.Item.error:type_name -> remote.v1.ErrorItem
+	157, // 241: remote.v1.Item.model_change:type_name -> remote.v1.ModelChangeItem
+	158, // 242: remote.v1.Item.agent_handoff:type_name -> remote.v1.AgentHandoffItem
+	159, // 243: remote.v1.Item.advisor_verdict:type_name -> remote.v1.AdvisorVerdictItem
+	12,  // 244: remote.v1.TextItem.role:type_name -> remote.v1.Role
+	82,  // 245: remote.v1.TextItem.attachments:type_name -> remote.v1.Attachment
+	13,  // 246: remote.v1.ToolCallItem.kind:type_name -> remote.v1.ToolKind
+	146, // 247: remote.v1.TodoItem.entries:type_name -> remote.v1.TodoEntry
+	14,  // 248: remote.v1.TodoEntry.state:type_name -> remote.v1.TodoState
+	13,  // 249: remote.v1.ApprovalItem.kind:type_name -> remote.v1.ToolKind
+	15,  // 250: remote.v1.ApprovalItem.state:type_name -> remote.v1.PromptState
+	3,   // 251: remote.v1.ApprovalItem.decision:type_name -> remote.v1.Decision
+	148, // 252: remote.v1.ApprovalItem.secrets:type_name -> remote.v1.ApprovalSecret
+	150, // 253: remote.v1.QuestionItem.questions:type_name -> remote.v1.Question
+	15,  // 254: remote.v1.QuestionItem.state:type_name -> remote.v1.PromptState
+	50,  // 255: remote.v1.QuestionItem.answers:type_name -> remote.v1.Answers
+	151, // 256: remote.v1.Question.options:type_name -> remote.v1.QuestionOption
+	16,  // 257: remote.v1.TurnItem.state:type_name -> remote.v1.TurnState
+	160, // 258: remote.v1.AdvisorVerdictItem.options:type_name -> remote.v1.AdvisorOption
+	162, // 259: remote.v1.ProviderCapabilities.models:type_name -> remote.v1.ModelOption
+	17,  // 260: remote.v1.ProviderInfo.login_state:type_name -> remote.v1.LoginState
+	161, // 261: remote.v1.ProviderInfo.capabilities:type_name -> remote.v1.ProviderCapabilities
+	163, // 262: remote.v1.MachineInfo.providers:type_name -> remote.v1.ProviderInfo
+	166, // 263: remote.v1.MachineInfo.settings:type_name -> remote.v1.MachineSettings
+	83,  // 264: remote.v1.MachineInfo.attachments:type_name -> remote.v1.AttachmentLimits
+	165, // 265: remote.v1.MachineInfo.browser:type_name -> remote.v1.RemoteBrowserInfo
+	214, // 266: remote.v1.MachineInfo.agent_update:type_name -> remote.v1.AgentUpdateInfo
+	18,  // 267: remote.v1.MachineInfo.terminal:type_name -> remote.v1.TerminalAvailability
+	173, // 268: remote.v1.MachineInfo.advisor:type_name -> remote.v1.AdvisorStatus
+	113, // 269: remote.v1.MachineInfo.mac_folders:type_name -> remote.v1.MacFolder
+	168, // 270: remote.v1.DirListResult.entries:type_name -> remote.v1.DirEntry
+	170, // 271: remote.v1.FileListResult.entries:type_name -> remote.v1.FileEntry
+	172, // 272: remote.v1.AuditListResult.entries:type_name -> remote.v1.AuditEntry
+	19,  // 273: remote.v1.AdvisorStatus.key_source:type_name -> remote.v1.AdvisorKeySource
+	19,  // 274: remote.v1.AdvisorSetKey.source:type_name -> remote.v1.AdvisorKeySource
+	19,  // 275: remote.v1.AdvisorRemoveKey.source:type_name -> remote.v1.AdvisorKeySource
+	190, // 276: remote.v1.SecretListResult.secrets:type_name -> remote.v1.SavedSecret
+	192, // 277: remote.v1.GitChanges.files:type_name -> remote.v1.GitFileChange
+	20,  // 278: remote.v1.GitFileChange.state:type_name -> remote.v1.GitFileState
+	192, // 279: remote.v1.GitFileDiffResult.file:type_name -> remote.v1.GitFileChange
+	197, // 280: remote.v1.BrowserInput.mouse:type_name -> remote.v1.BrowserMouse
+	198, // 281: remote.v1.BrowserInput.key:type_name -> remote.v1.BrowserKey
+	21,  // 282: remote.v1.BrowserMouse.type:type_name -> remote.v1.BrowserMouseType
+	204, // 283: remote.v1.BrowserState.tabs:type_name -> remote.v1.BrowserTab
+	22,  // 284: remote.v1.ScreenShareClosed.reason:type_name -> remote.v1.ScreenShareEnd
+	23,  // 285: remote.v1.AgentUpdateProgress.phase:type_name -> remote.v1.AgentUpdatePhase
+	219, // 286: remote.v1.TermListResult.sessions:type_name -> remote.v1.TermSessionInfo
+	221, // 287: remote.v1.TermListResult.update:type_name -> remote.v1.TerminalUpdate
+	222, // 288: remote.v1.TerminalUpdate.holds:type_name -> remote.v1.TerminalUpdateHold
+	24,  // 289: remote.v1.TerminalUpdateHold.reason:type_name -> remote.v1.TerminalUpdateHoldReason
+	225, // 290: remote.v1.TermOpen.ai_session:type_name -> remote.v1.TermAiSession
+	25,  // 291: remote.v1.TermSignal.kind:type_name -> remote.v1.TermSignalKind
+	26,  // 292: remote.v1.TermStatus.path:type_name -> remote.v1.TermPath
+	20,  // 293: remote.v1.WsEntry.git:type_name -> remote.v1.GitFileState
+	234, // 294: remote.v1.WsDirListResult.entries:type_name -> remote.v1.WsEntry
+	27,  // 295: remote.v1.WsFileReadResult.kind:type_name -> remote.v1.WsFileKind
+	241, // 296: remote.v1.WsContentFile.matches:type_name -> remote.v1.WsContentMatch
+	242, // 297: remote.v1.WsFindContentsResult.files:type_name -> remote.v1.WsContentFile
+	28,  // 298: remote.v1.WsGitEntry.area:type_name -> remote.v1.WsGitArea
+	20,  // 299: remote.v1.WsGitEntry.state:type_name -> remote.v1.GitFileState
+	248, // 300: remote.v1.WsGitStatusResult.upstream:type_name -> remote.v1.WsGitUpstream
+	247, // 301: remote.v1.WsGitStatusResult.entries:type_name -> remote.v1.WsGitEntry
+	29,  // 302: remote.v1.WsGitDiff.source:type_name -> remote.v1.WsGitDiffSource
+	192, // 303: remote.v1.WsGitDiffResult.file:type_name -> remote.v1.GitFileChange
+	258, // 304: remote.v1.WsGitCommitResult.commit:type_name -> remote.v1.WsGitLogEntry
+	261, // 305: remote.v1.WsGitBranchesResult.local:type_name -> remote.v1.WsGitBranch
+	258, // 306: remote.v1.WsGitLogResult.commits:type_name -> remote.v1.WsGitLogEntry
+	247, // 307: remote.v1.WsGitBranchCompareResult.files:type_name -> remote.v1.WsGitEntry
+	278, // 308: remote.v1.UsageReport.shape:type_name -> remote.v1.UsageShape
+	277, // 309: remote.v1.UsageReport.days:type_name -> remote.v1.UsageDay
+	279, // 310: remote.v1.UsageReport.suggestions:type_name -> remote.v1.UsageSuggestion
+	280, // 311: remote.v1.UsageReport.quota:type_name -> remote.v1.UsageQuotaPoint
+	30,  // 312: remote.v1.UsageSuggestion.rule:type_name -> remote.v1.UsageRule
+	120, // 313: remote.v1.UsageQuotaPoint.five_hour:type_name -> remote.v1.RateWindow
+	120, // 314: remote.v1.UsageQuotaPoint.seven_day:type_name -> remote.v1.RateWindow
+	284, // 315: remote.v1.UsageSettingsSet.rules:type_name -> remote.v1.UsageRuleSwitch
+	284, // 316: remote.v1.UsageSettings.rules:type_name -> remote.v1.UsageRuleSwitch
+	30,  // 317: remote.v1.UsageRuleSwitch.rule:type_name -> remote.v1.UsageRule
+	289, // 318: remote.v1.OfficeSnapshot.state:type_name -> remote.v1.OfficeState
+	298, // 319: remote.v1.OfficeEvents.events:type_name -> remote.v1.OfficeEvent
+	295, // 320: remote.v1.OfficeState.actors:type_name -> remote.v1.OfficeActor
+	291, // 321: remote.v1.OfficeState.session:type_name -> remote.v1.OfficeSession
+	290, // 322: remote.v1.OfficeState.residents:type_name -> remote.v1.OfficeResident
+	292, // 323: remote.v1.OfficeSession.todo:type_name -> remote.v1.OfficeTodoCounts
+	293, // 324: remote.v1.OfficeSession.usage:type_name -> remote.v1.OfficeUsage
+	294, // 325: remote.v1.OfficeSession.checks:type_name -> remote.v1.OfficeChecks
+	31,  // 326: remote.v1.OfficeActor.role:type_name -> remote.v1.OfficeRole
+	32,  // 327: remote.v1.OfficeActor.state:type_name -> remote.v1.OfficeActorState
+	297, // 328: remote.v1.OfficeActor.activity:type_name -> remote.v1.OfficeActivity
+	296, // 329: remote.v1.OfficeActor.service:type_name -> remote.v1.OfficeService
+	35,  // 330: remote.v1.OfficeService.kind:type_name -> remote.v1.OfficeServiceKind
+	33,  // 331: remote.v1.OfficeActivity.group:type_name -> remote.v1.OfficeAnimGroup
+	34,  // 332: remote.v1.OfficeActivity.room:type_name -> remote.v1.OfficeRoom
+	295, // 333: remote.v1.OfficeEvent.actor_enter:type_name -> remote.v1.OfficeActor
+	295, // 334: remote.v1.OfficeEvent.actor_update:type_name -> remote.v1.OfficeActor
+	299, // 335: remote.v1.OfficeEvent.actor_leave:type_name -> remote.v1.OfficeActorLeave
+	300, // 336: remote.v1.OfficeEvent.activity_start:type_name -> remote.v1.OfficeActivityStart
+	301, // 337: remote.v1.OfficeEvent.activity_end:type_name -> remote.v1.OfficeActivityEnd
+	302, // 338: remote.v1.OfficeEvent.turn_start:type_name -> remote.v1.OfficeTurnStart
+	303, // 339: remote.v1.OfficeEvent.approval:type_name -> remote.v1.OfficeApproval
+	291, // 340: remote.v1.OfficeEvent.session:type_name -> remote.v1.OfficeSession
+	297, // 341: remote.v1.OfficeActivityStart.activity:type_name -> remote.v1.OfficeActivity
+	36,  // 342: remote.v1.OfficeApproval.state:type_name -> remote.v1.OfficeApprovalState
+	343, // [343:343] is the sub-list for method output_type
+	343, // [343:343] is the sub-list for method input_type
+	343, // [343:343] is the sub-list for extension type_name
+	343, // [343:343] is the sub-list for extension extendee
+	0,   // [0:343] is the sub-list for field type_name
 }
 
 func init() { file_remote_v1_remote_proto_init() }
@@ -26377,6 +26956,12 @@ func file_remote_v1_remote_proto_init() {
 		(*Frame_AdvisorSetKey)(nil),
 		(*Frame_AdvisorRemoveKey)(nil),
 		(*Frame_AdvisorSetAuto)(nil),
+		(*Frame_AdvisorKeyShareBegin)(nil),
+		(*Frame_AdvisorKeyShareTicket)(nil),
+		(*Frame_AdvisorKeySeal)(nil),
+		(*Frame_AdvisorKeySealed)(nil),
+		(*Frame_AdvisorKeyShareOpen)(nil),
+		(*Frame_AdvisorKeyPromote)(nil),
 		(*Frame_MacFolderAccessAsk)(nil),
 	}
 	file_remote_v1_remote_proto_msgTypes[12].OneofWrappers = []any{
@@ -26403,12 +26988,12 @@ func file_remote_v1_remote_proto_init() {
 		(*Item_AgentHandoff)(nil),
 		(*Item_AdvisorVerdict)(nil),
 	}
-	file_remote_v1_remote_proto_msgTypes[153].OneofWrappers = []any{
+	file_remote_v1_remote_proto_msgTypes[159].OneofWrappers = []any{
 		(*BrowserInput_Mouse)(nil),
 		(*BrowserInput_Key)(nil),
 		(*BrowserInput_Text)(nil),
 	}
-	file_remote_v1_remote_proto_msgTypes[255].OneofWrappers = []any{
+	file_remote_v1_remote_proto_msgTypes[261].OneofWrappers = []any{
 		(*OfficeEvent_ActorEnter)(nil),
 		(*OfficeEvent_ActorUpdate)(nil),
 		(*OfficeEvent_ActorLeave)(nil),
@@ -26423,8 +27008,8 @@ func file_remote_v1_remote_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_v1_remote_proto_rawDesc), len(file_remote_v1_remote_proto_rawDesc)),
-			NumEnums:      36,
-			NumMessages:   264,
+			NumEnums:      37,
+			NumMessages:   270,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

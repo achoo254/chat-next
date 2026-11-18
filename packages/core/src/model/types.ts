@@ -215,10 +215,16 @@ export interface AdvisorProfile {
 	readonly tone: AdvisorTone;
 	/** Automatic Advisor in every session on every machine; each machine follows it (the device brings it in line on linking). */
 	readonly autoSession: boolean;
+	/**
+	 * Unix ms (a device's clock) when the user last removed the account's
+	 * TypeSafe key; 0 when never. An account key set no later than this is
+	 * removed from every machine and never handed on. Only moves forward.
+	 */
+	readonly keyRemovedAt: number;
 }
 
 /** The profile of a user who never changed it (the server's defaults). */
-export const DEFAULT_ADVISOR_PROFILE: AdvisorProfile = { name: "", lookId: "owl", tone: "short", autoSession: false };
+export const DEFAULT_ADVISOR_PROFILE: AdvisorProfile = { name: "", lookId: "owl", tone: "short", autoSession: false, keyRemovedAt: 0 };
 
 export type EntityType =
 	| "bold"

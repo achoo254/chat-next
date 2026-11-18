@@ -12,6 +12,7 @@ export const zhCNMachines: MachinesCopy = {
 	pickMachine: "选择一台电脑以查看其会话",
 	notFound: "找不到这台电脑，可能已被移除。",
 	sessionsCount: (n) => `${n} 个会话`,
+	advisorKeySynced: (machine) => `已为 ${machine} 同步顾问密钥`,
 	usage: {
 		locale: "zh-CN",
 		open: "效率",
@@ -482,6 +483,9 @@ export const zhCNMachines: MachinesCopy = {
 			advisorUnavailable: "此会话无法使用顾问：该会话的 AI 或这台机器运行会话时未启用 tunelo 的 MCP。",
 			advisorKeyInvalid: "密钥无效：为空、过长，或包含空格或控制字符。",
 			advisorKeyNotSaved: "机器无法保存密钥（密钥库已锁定或拒绝）。未做任何更改。",
+			advisorNoKey: "机器已不再保存所需的密钥。未做任何更改。",
+			advisorKeyShareFailed: "机器无法打开传来的密钥（传递已过期或不匹配）。未做任何更改，请重试。",
+			advisorOwnKey: "机器正在使用自己的密钥，将保持不变。如要使用账户密钥，请先移除它自己的密钥。",
 			sessionLimit: (n: string) => `机器已运行 ${n} 个会话且都在忙。顾问不会关闭你的任何会话：请稍后再试。`,
 			sensitiveFileNotConfirmed: "机密文件加入 git 前需要先确认。",
 			usageRangeInvalid: "时间范围无效（最多 92 天）。",

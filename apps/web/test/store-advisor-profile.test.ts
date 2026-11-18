@@ -27,7 +27,7 @@ describe("the chat store's Advisor profile", () => {
 		const f = seedDemo().fixture;
 		const core = await f.startCore(new MemorySqlFactory());
 		cleanup.push(() => void core.close());
-		let server: AdvisorProfile = { name: "", lookId: "robot", tone: "short", autoSession: false };
+		let server: AdvisorProfile = { name: "", lookId: "robot", tone: "short", autoSession: false, keyRemovedAt: 0 };
 		const saved: Partial<AdvisorProfile>[] = [];
 		const source = {
 			...toSource(core),
@@ -50,9 +50,9 @@ describe("the chat store's Advisor profile", () => {
 		server = { ...server, name: "Bác Cú", tone: "serious" };
 		source.events.emit(EventKeys.advisorProfile);
 		await until(() => store.advisorProfile().name === "Bác Cú");
-		expect(store.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious", autoSession: false });
+		expect(store.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious", autoSession: false, keyRemovedAt: 0 });
 
-		expect(await store.setAdvisorProfile({ tone: "fun" })).toEqual({ name: "Bác Cú", lookId: "robot", tone: "fun", autoSession: false });
+		expect(await store.setAdvisorProfile({ tone: "fun" })).toEqual({ name: "Bác Cú", lookId: "robot", tone: "fun", autoSession: false, keyRemovedAt: 0 });
 		expect(saved).toEqual([{ tone: "fun" }]);
 		expect(store.advisorProfile().tone).toBe("fun");
 		expect(heard).toHaveLength(3);
