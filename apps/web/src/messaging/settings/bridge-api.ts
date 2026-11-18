@@ -21,6 +21,8 @@ export interface BridgeChat {
 	/** The conversation's name in the other app. */
 	readonly title: string;
 	readonly direction: BridgeDirection;
+	/** The chat is split into topics like the conversation it copies. */
+	readonly topicsSplit: boolean;
 }
 
 export interface BridgeAccount {
@@ -59,6 +61,10 @@ export interface BridgeConversation {
 	readonly title: string;
 	/** The synced chat; 0 when not synced. */
 	readonly chatId: number;
+	/** The conversation is split into topics in the app (a forum). */
+	readonly forum: boolean;
+	/** Its synced chat is split into topics too; false for a forum copied before topics were read (remove it and enable it again to split it). */
+	readonly topicsSplit: boolean;
 }
 
 export type BridgeErrorKind =

@@ -90,6 +90,8 @@ message BridgeSyncedChat {
   // The conversation's name in the app when it was enabled.
   string title = 5;
   BridgeDirection direction = 6;
+  // The chat is split into topics like the conversation it copies (a forum).
+  bool topics_split = 7;
 }
 
 message BridgeAccount {
@@ -174,6 +176,12 @@ message BridgeConversation {
   string title = 3;
   // The synced chat; 0 when not synced.
   int64 chat_id = 4 [jstype = JS_NUMBER];
+  // The conversation is split into topics in the app (a forum).
+  bool forum = 5;
+  // The synced chat is split into topics too. A forum copied before topics were
+  // read, or by an app that does not read them, is not: its topics are mixed in
+  // one stream, and enabling it again (remove, then enable) splits them.
+  bool topics_split = 6;
 }
 
 message ListBridgeConversationsResponse {

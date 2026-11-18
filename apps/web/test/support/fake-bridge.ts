@@ -22,13 +22,16 @@ export class FakeBridge {
 	apps = ["telegram"];
 	accounts: BridgeAccount[] = [];
 	conversations: BridgeConversation[] = [
-		{ $typeName: "app.v1.BridgeConversation", id: "user:7", kind: BridgeConversationKind.PRIVATE, title: "Anh Đô CEO", chatId: 0n },
-		{ $typeName: "app.v1.BridgeConversation", id: "chat:3", kind: BridgeConversationKind.GROUP, title: "Nhóm dự án", chatId: 0n },
+		{ $typeName: "app.v1.BridgeConversation", id: "user:7", kind: BridgeConversationKind.PRIVATE, title: "Anh Đô CEO", chatId: 0n, forum: false, topicsSplit: false },
+		{ $typeName: "app.v1.BridgeConversation", id: "chat:3", kind: BridgeConversationKind.GROUP, title: "Nhóm dự án", chatId: 0n, forum: false, topicsSplit: false },
+		{ $typeName: "app.v1.BridgeConversation", id: "forum:1", kind: BridgeConversationKind.GROUP, title: "Diễn đàn nhóm", chatId: 0n, forum: true, topicsSplit: false },
 	];
 	/** What each chat has queued for the other app (by chat id). Tests set it; a retry or a dismiss removes what it handles. */
 	outbox = new Map<number, BridgeOutboxItem[]>();
 	/** How many times a chat's outbox was asked for. */
 	outboxLooks = 0;
+	/** The next enable call fails (after a remove, as when a forum is synced again). */
+	failEnable = false;
 	/** The next call that sends on (switching to both, retrying) fails with send_unsupported. */
 	sendUnsupported = false;
 	/** The calls, in order, with the arguments that matter. */
@@ -53,6 +56,7 @@ export class FakeBridge {
 						historyWindow: 2000,
 						title: "Anh Đô CEO",
 						direction: BridgeDirection.BOTH,
+						topicsSplit: false,
 					},
 				],
 			},
@@ -69,6 +73,7 @@ export class FakeBridge {
 			historyWindow: window,
 			title,
 			direction,
+			topicsSplit: false,
 		});
 		this.accounts = [
 			{
@@ -83,19 +88,21 @@ export class FakeBridge {
 				],
 			},
 		];
-		const conv = (id: string, kind: BridgeConversationKind, title: string, chatId = 0n): BridgeConversation => ({
+		const conv = (id: string, kind: BridgeConversationKind, title: string, chatId = 0n, forum = false, topicsSplit = false): BridgeConversation => ({
 			$typeName: "app.v1.BridgeConversation",
 			id,
 			kind,
 			title,
 			chatId,
+			forum,
+			topicsSplit,
 		});
 		this.conversations = [
 			conv("user:7", BridgeConversationKind.PRIVATE, "Anh Đô CEO", 900n),
-			conv("chat:9", BridgeConversationKind.GROUP, "Work - OneDash Audit Logs", 901n),
+			conv("chat:9", BridgeConversationKind.GROUP, "Work - OneDash Audit Logs", 901n, true, false),
 			conv("bot:1", BridgeConversationKind.BOT, "tg_cloudpanel_staging_bot"),
 			conv("chat:10", BridgeConversationKind.GROUP, "Anh em đoàn kết 🙈"),
-			conv("chat:11", BridgeConversationKind.GROUP, "Work - Onemail monitor logs"),
+			conv("chat:11", BridgeConversationKind.GROUP, "Work - Onemail monitor logs", 0n, true, false),
 			conv("bot:2", BridgeConversationKind.BOT, "cloudpanel_dev_bot"),
 			conv("user:8", BridgeConversationKind.PRIVATE, "Telegram"),
 			conv("bot:3", BridgeConversationKind.BOT, "Bot_OneMail"),
@@ -151,6 +158,10 @@ export class FakeBridge {
 			enableBridgeChat: (req) => {
 				this.guard(true);
 				this.calls.push(`enable:${req.conversationId}:${req.historyWindow}:${BridgeDirection[req.direction] ?? ""}`);
+				if (this.failEnable) {
+					this.failEnable = false;
+					throw new ConnectError("internal error", Code.Internal);
+				}
 				const conv = this.conversations.find((c) => c.id === req.conversationId);
 				if (conv === undefined) throw new ConnectError("not found", Code.NotFound);
 				const chatId = this.nextChat++;
@@ -163,7 +174,10 @@ export class FakeBridge {
 					historyWindow: req.historyWindow,
 					title: conv.title,
 					direction: req.direction === BridgeDirection.UNSPECIFIED ? BridgeDirection.BOTH : req.direction,
+					// A forum enabled now is split into topics.
+					topicsSplit: conv.forum,
 				});
+				conv.topicsSplit = conv.forum;
 				return { chatId };
 			},
 			removeBridgeChat: (req) => {
@@ -171,7 +185,11 @@ export class FakeBridge {
 				this.calls.push(`remove:${req.conversationId}`);
 				const account = this.accounts[0];
 				if (account !== undefined) account.chats = account.chats.filter((c) => c.conversationId !== req.conversationId);
-				for (const c of this.conversations) if (c.id === req.conversationId) c.chatId = 0n;
+				for (const c of this.conversations) {
+					if (c.id !== req.conversationId) continue;
+					c.chatId = 0n;
+					c.topicsSplit = false;
+				}
 				return {};
 			},
 			setBridgeChatDirection: (req) => {

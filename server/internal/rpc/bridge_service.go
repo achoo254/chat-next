@@ -129,7 +129,7 @@ func (s *bridgeService) ListBridgeConversations(ctx context.Context, req *connec
 		resp := &appv1.ListBridgeConversationsResponse{}
 		for _, c := range list {
 			resp.Conversations = append(resp.Conversations, &appv1.BridgeConversation{
-				Id: c.ID, Kind: conversationKind(c.Kind), Title: c.Title, ChatId: c.ChatID,
+				Id: c.ID, Kind: conversationKind(c.Kind), Title: c.Title, ChatId: c.ChatID, Forum: c.Forum, TopicsSplit: c.TopicsSplit,
 			})
 		}
 		return resp, nil
@@ -232,7 +232,7 @@ func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
 	for _, c := range a.Chats {
 		out.Chats = append(out.Chats, &appv1.BridgeSyncedChat{
 			ConversationId: c.ConversationID, ChatId: c.ChatID, CaughtUp: c.CaughtUp, HistoryWindow: int32(c.HistoryWindow), Title: c.Title,
-			Direction: directionMessage(c.Direction),
+			Direction: directionMessage(c.Direction), TopicsSplit: c.TopicsSplit,
 		})
 	}
 	return out

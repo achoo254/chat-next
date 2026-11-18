@@ -158,6 +158,107 @@ describe("choosing conversations", () => {
 	});
 });
 
+describe("turning sending on or off for every synced chat", () => {
+	it("asks once before turning it on for all, and turns it off for all without asking", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		await openPage(fixture);
+		const first = (await screen.findAllByRole("switch", { name: /Gửi tin từ Chat/ }, LONG)) as HTMLElement[];
+		// The demo has one chat that sends on and one that does not.
+		expect(first.map((el) => el.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+		await userEvent.click(screen.getByRole("button", { name: "Bật gửi cho tất cả (1)" }));
+		expect(await screen.findByText(/Bật “?"?Gửi tin từ Chat”?"? cho 1 chat\?/, {}, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("direction:"))).toEqual([]);
+		await userEvent.click(screen.getByRole("button", { name: "Bật cho tất cả" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("direction:chat:9:BOTH"), LONG);
+		await waitFor(() => expect(screen.getAllByRole("switch", { name: /Gửi tin từ Chat/ }).map((el) => el.getAttribute("aria-checked"))).toEqual(["true", "true"]), LONG);
+		// Everything sends on now: the only offer left is to turn it all off, and that asks nothing.
+		expect(screen.queryByRole("button", { name: /Bật gửi cho tất cả/ })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Tắt gửi cho tất cả" }));
+		await waitFor(() => expect(screen.getAllByRole("switch", { name: /Gửi tin từ Chat/ }).map((el) => el.getAttribute("aria-checked"))).toEqual(["false", "false"]), LONG);
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("direction:"))).toEqual(["direction:chat:9:BOTH", "direction:user:7:IN", "direction:chat:9:IN"]);
+	});
+
+	it("stops at the first chat the app cannot send into and says so", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		fixture.bridge.sendUnsupported = true;
+		await openPage(fixture);
+		await userEvent.click(await screen.findByRole("button", { name: "Bật gửi cho tất cả (1)" }, LONG));
+		await userEvent.click(screen.getByRole("button", { name: "Bật cho tất cả" }));
+		expect(await screen.findByText("Ứng dụng này chưa cho gửi tin từ Chat.", {}, LONG)).toBeTruthy();
+	});
+});
+
+describe("forums and their topics", () => {
+	async function openList(fixture: ChatFixture): Promise<HTMLElement> {
+		await openPage(fixture);
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		return (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+	}
+
+	function rowOf(picker: HTMLElement, title: string): HTMLElement {
+		return within(picker).getByText(title).closest("[data-id=bridge-conversation]") as HTMLElement;
+	}
+
+	it("tells which conversations have topics, and a forum enabled now is split into them", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		expect(within(rowOf(picker, "Diễn đàn nhóm")).getByText("Nhóm có chủ đề")).toBeTruthy();
+		expect(within(rowOf(picker, "Nhóm dự án")).queryByText("Nhóm có chủ đề")).toBeNull();
+		await userEvent.click(within(rowOf(picker, "Diễn đàn nhóm")).getByRole("checkbox"));
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
+		await waitFor(() => expect(fixture.bridge.calls.some((c) => c.startsWith("enable:forum:1"))).toBe(true));
+		await waitFor(() => expect(within(rowOf(picker, "Diễn đàn nhóm")).getByText("Đã tách theo chủ đề")).toBeTruthy());
+		const synced = await waitFor(() => {
+			const el = document.querySelector<HTMLElement>("[data-id=bridge-chat]");
+			if (el === null) throw new Error("no synced chat yet");
+			return el;
+		}, LONG);
+		expect(within(synced).getByText("Diễn đàn nhóm")).toBeTruthy();
+		expect(within(synced).getByText("Có chủ đề")).toBeTruthy();
+	});
+
+	it("offers to sync a forum copied flat again by topic, and asks first", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const picker = await openList(fixture);
+		const row = rowOf(picker, "Work - OneDash Audit Logs");
+		expect(within(row).getByText("Chưa tách theo chủ đề")).toBeTruthy();
+		// A conversation that is not a forum offers nothing of the kind.
+		expect(within(rowOf(picker, "Anh Đô CEO")).queryByRole("button", { name: "Đồng bộ lại theo chủ đề" })).toBeNull();
+		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ lại theo chủ đề" }));
+		expect(await screen.findByText(/Xoá bản sao này rồi đồng bộ lại để tin vào đúng chủ đề/, {}, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("remove:"))).toEqual([]);
+		await userEvent.click(screen.getByRole("button", { name: "Huỷ" }));
+		expect(screen.queryByText(/Xoá bản sao này rồi đồng bộ lại/)).toBeNull();
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("remove:"))).toEqual([]);
+
+		await userEvent.click(within(row).getByRole("button", { name: "Đồng bộ lại theo chủ đề" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Xoá và đồng bộ lại" }, LONG));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("enable:chat:9:500:IN"), LONG);
+		// Removed, then enabled again with the same window and direction.
+		const order = fixture.bridge.calls.filter((c) => c.startsWith("remove:") || c.startsWith("enable:"));
+		expect(order).toEqual(["remove:chat:9", "enable:chat:9:500:IN"]);
+		await waitFor(() => expect(within(rowOf(picker, "Work - OneDash Audit Logs")).getByText("Đã tách theo chủ đề")).toBeTruthy(), LONG);
+		expect(within(rowOf(picker, "Work - OneDash Audit Logs")).queryByRole("button", { name: "Đồng bộ lại theo chủ đề" })).toBeNull();
+	});
+
+	it("says so when the copy was deleted but could not be turned on again", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const picker = await openList(fixture);
+		await userEvent.click(within(rowOf(picker, "Work - OneDash Audit Logs")).getByRole("button", { name: "Đồng bộ lại theo chủ đề" }));
+		fixture.bridge.failEnable = true;
+		await userEvent.click(await screen.findByRole("button", { name: "Xoá và đồng bộ lại" }, LONG));
+		expect(await screen.findByText("Đã xoá bản sao nhưng chưa bật lại được. Bật lại từ danh sách chat.", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(within(rowOf(picker, "Work - OneDash Audit Logs")).queryByText("Đã đồng bộ")).toBeNull(), LONG);
+	});
+});
+
 describe("choosing several conversations at once", () => {
 	it("syncs every ticked chat with one history choice and one click; an old sign-in stops it and keeps the choice", async () => {
 		const fixture = new ChatFixture();
@@ -181,7 +282,8 @@ describe("choosing several conversations at once", () => {
 		await waitFor(() => expect(screen.queryByText("Đã chọn 2 chat")).toBeNull());
 		// The two are marked synced in the list now, and cannot be ticked again.
 		await waitFor(() => expect(within(picker).queryAllByText("Đã đồng bộ")).toHaveLength(2));
-		expect(within(picker).queryAllByRole("checkbox")).toHaveLength(0);
+		// Only the forum of the fake server is left to tick; the two synced chats have no checkbox.
+		expect(within(picker).queryAllByRole("checkbox")).toHaveLength(1);
 	});
 });
 

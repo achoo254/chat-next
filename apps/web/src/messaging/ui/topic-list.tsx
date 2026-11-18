@@ -12,6 +12,7 @@ import { useCopy } from "../copy/use-copy.ts";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { countLabel, listTime, shortDate } from "../data/format.ts";
 import type { Topic, TopicChange } from "../data/pending-backend.ts";
+import { Permission } from "../data/remote.ts";
 import { useBackendValue, useServices, useUser } from "../data/services.tsx";
 import { useNameOf } from "./chat-row.tsx";
 import { LabelledIcon } from "./chat-row.tsx";
@@ -105,6 +106,8 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 	const { backend, toasts } = useServices();
 	const [menuFor, setMenuFor] = useState(0);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
+	// A chat copied from another app has its topics managed there: the server takes the right away, so no menu opens here.
+	const canManage = admin && (chat.myPermissions & Permission.manageTopics) !== 0;
 	const sorted = sortTopics(topics);
 	const visible = sorted.filter((topic) => !topic.hidden);
 	const hidden = sorted.filter((topic) => topic.hidden);
@@ -118,7 +121,7 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 		);
 	};
 	const openMenu = (topic: Topic) => (event: MouseEvent | KeyboardEvent) => {
-		if (!admin) return;
+		if (!canManage) return;
 		if ("key" in event && event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
 		event.preventDefault();
 		setMenuFor(topic.id);

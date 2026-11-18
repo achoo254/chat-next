@@ -64,6 +64,7 @@ function toAccount(a: WireAccount): BridgeAccount {
 			historyWindow: c.historyWindow,
 			title: c.title,
 			direction: c.direction === WireDirection.BOTH ? "both" : "in",
+			topicsSplit: c.topicsSplit,
 		})),
 	};
 }
@@ -135,7 +136,7 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		conversations: (accountId) =>
 			call(async () => {
 				const r = await rpc.listBridgeConversations({ accountId: BigInt(accountId) });
-				return r.conversations.map((c) => ({ id: c.id, kind: KINDS[c.kind] ?? "group", title: c.title, chatId: assertSafeId(c.chatId) }));
+				return r.conversations.map((c) => ({ id: c.id, kind: KINDS[c.kind] ?? "group", title: c.title, chatId: assertSafeId(c.chatId), forum: c.forum, topicsSplit: c.topicsSplit }));
 			}),
 		enable: (accountId, conversationId, historyWindow, direction) =>
 			call(async () =>

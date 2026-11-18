@@ -113,7 +113,7 @@ export function seedDemo(): Demo {
 	f.send(lan, lanAnh, "Mình gửi file thiết kế rồi nhé");
 
 	// Group with topics (#topics, #topic-states).
-	const forum = f.createChat(ChatType.GROUP, "Dự án Hải Đăng", [me, ha, ngoc, ducAnh, minh, huy], { myRole: MemberRole.ADMIN, forum: true });
+	const forum = f.createChat(ChatType.GROUP, "Dự án Hải Đăng", [me, ha, ngoc, ducAnh, minh, huy], { myRole: MemberRole.ADMIN, forum: true, myPermissions: 0x3f });
 	f.setRole(forum, ngoc, MemberRole.OWNER);
 	const DESIGN = 12n;
 	f.send(huy, forum, "Lịch phát hành 1.3 đã chốt", { topicId: 2n });

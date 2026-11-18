@@ -189,6 +189,8 @@ type ChatView struct {
 	Title          string
 	// Direction is chat.DirectionIn or chat.DirectionBoth.
 	Direction string
+	// TopicsSplit is true when the chat is split into topics.
+	TopicsSplit bool
 }
 
 // Accounts lists the accounts of owner.
@@ -211,7 +213,7 @@ func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, erro
 			return nil, err
 		}
 		for _, l := range links {
-			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title, Direction: l.Direction})
+			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title, Direction: l.Direction, TopicsSplit: l.Forum})
 		}
 	}
 	return accounts, nil
@@ -236,6 +238,8 @@ func (e *Engine) ownedAccount(ctx context.Context, owner, id int64) (*accountRow
 type Conversation struct {
 	bridge.Conversation
 	ChatID int64
+	// TopicsSplit is true when the chat that copies it is split into topics.
+	TopicsSplit bool
 }
 
 // Conversations lists the conversations of an account.
@@ -260,13 +264,16 @@ func (e *Engine) Conversations(ctx context.Context, owner, accountID int64) ([]C
 	if err != nil {
 		return nil, err
 	}
-	linked := make(map[string]int64, len(links))
+	linked := make(map[string]*chatLink, len(links))
 	for _, l := range links {
-		linked[l.ExternalChat] = l.ChatID
+		linked[l.ExternalChat] = l
 	}
 	out := make([]Conversation, len(list))
 	for i, c := range list {
-		out[i] = Conversation{Conversation: c, ChatID: linked[c.ID]}
+		out[i] = Conversation{Conversation: c}
+		if l := linked[c.ID]; l != nil {
+			out[i].ChatID, out[i].TopicsSplit = l.ChatID, l.Forum
+		}
 	}
 	return out, nil
 }

@@ -355,8 +355,10 @@ type BridgeSyncedChat struct {
 	CaughtUp      bool  `protobuf:"varint,3,opt,name=caught_up,json=caughtUp,proto3" json:"caught_up,omitempty"`
 	HistoryWindow int32 `protobuf:"varint,4,opt,name=history_window,json=historyWindow,proto3" json:"history_window,omitempty"`
 	// The conversation's name in the app when it was enabled.
-	Title         string          `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
-	Direction     BridgeDirection `protobuf:"varint,6,opt,name=direction,proto3,enum=app.v1.BridgeDirection" json:"direction,omitempty"`
+	Title     string          `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
+	Direction BridgeDirection `protobuf:"varint,6,opt,name=direction,proto3,enum=app.v1.BridgeDirection" json:"direction,omitempty"`
+	// The chat is split into topics like the conversation it copies (a forum).
+	TopicsSplit   bool `protobuf:"varint,7,opt,name=topics_split,json=topicsSplit,proto3" json:"topics_split,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -431,6 +433,13 @@ func (x *BridgeSyncedChat) GetDirection() BridgeDirection {
 		return x.Direction
 	}
 	return BridgeDirection_BRIDGE_DIRECTION_UNSPECIFIED
+}
+
+func (x *BridgeSyncedChat) GetTopicsSplit() bool {
+	if x != nil {
+		return x.TopicsSplit
+	}
+	return false
 }
 
 type BridgeAccount struct {
@@ -973,7 +982,13 @@ type BridgeConversation struct {
 	Kind  BridgeConversationKind `protobuf:"varint,2,opt,name=kind,proto3,enum=app.v1.BridgeConversationKind" json:"kind,omitempty"`
 	Title string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	// The synced chat; 0 when not synced.
-	ChatId        int64 `protobuf:"varint,4,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	ChatId int64 `protobuf:"varint,4,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// The conversation is split into topics in the app (a forum).
+	Forum bool `protobuf:"varint,5,opt,name=forum,proto3" json:"forum,omitempty"`
+	// The synced chat is split into topics too. A forum copied before topics were
+	// read, or by an app that does not read them, is not: its topics are mixed in
+	// one stream, and enabling it again (remove, then enable) splits them.
+	TopicsSplit   bool `protobuf:"varint,6,opt,name=topics_split,json=topicsSplit,proto3" json:"topics_split,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1034,6 +1049,20 @@ func (x *BridgeConversation) GetChatId() int64 {
 		return x.ChatId
 	}
 	return 0
+}
+
+func (x *BridgeConversation) GetForum() bool {
+	if x != nil {
+		return x.Forum
+	}
+	return false
+}
+
+func (x *BridgeConversation) GetTopicsSplit() bool {
+	if x != nil {
+		return x.TopicsSplit
+	}
+	return false
 }
 
 type ListBridgeConversationsResponse struct {
@@ -1813,14 +1842,15 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\n" +
 	"\x13app/v1/bridge.proto\x12\x06app.v1\"#\n" +
 	"\tBridgeApp\x12\x16\n" +
-	"\x06source\x18\x01 \x01(\tR\x06source\"\xe9\x01\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\"\x8c\x02\n" +
 	"\x10BridgeSyncedChat\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x1b\n" +
 	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\tcaught_up\x18\x03 \x01(\bR\bcaughtUp\x12%\n" +
 	"\x0ehistory_window\x18\x04 \x01(\x05R\rhistoryWindow\x12\x14\n" +
 	"\x05title\x18\x05 \x01(\tR\x05title\x125\n" +
-	"\tdirection\x18\x06 \x01(\x0e2\x17.app.v1.BridgeDirectionR\tdirection\"\xbf\x01\n" +
+	"\tdirection\x18\x06 \x01(\x0e2\x17.app.v1.BridgeDirectionR\tdirection\x12!\n" +
+	"\ftopics_split\x18\a \x01(\bR\vtopicsSplit\"\xbf\x01\n" +
 	"\rBridgeAccount\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x123\n" +
@@ -1857,12 +1887,14 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x04step\x18\x01 \x01(\v2\x17.app.v1.BridgeLoginStepR\x04step\"C\n" +
 	"\x1eListBridgeConversationsRequest\x12!\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\"\x8b\x01\n" +
+	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\"\xc4\x01\n" +
 	"\x12BridgeConversation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x122\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1e.app.v1.BridgeConversationKindR\x04kind\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1b\n" +
-	"\achat_id\x18\x04 \x01(\x03B\x020\x02R\x06chatId\"c\n" +
+	"\achat_id\x18\x04 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
+	"\x05forum\x18\x05 \x01(\bR\x05forum\x12!\n" +
+	"\ftopics_split\x18\x06 \x01(\bR\vtopicsSplit\"c\n" +
 	"\x1fListBridgeConversationsResponse\x12@\n" +
 	"\rconversations\x18\x01 \x03(\v2\x1a.app.v1.BridgeConversationR\rconversations\"\xc3\x01\n" +
 	"\x17EnableBridgeChatRequest\x12!\n" +

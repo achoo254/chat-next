@@ -366,6 +366,7 @@ function AccountCard({
 				</div>
 			)}
 			<h3 className="br-title">{t.chats.title}</h3>
+			{account.status === "active" && <BulkSend account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
 			{account.chats.length === 0 ? (
 				<p className="note br-pad">{t.chats.none}</p>
 			) : (
@@ -379,6 +380,74 @@ function AccountCard({
 			)}
 			{account.status === "active" && <ChatPicker account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
 		</section>
+	);
+}
+
+/** Turns sending on (after one confirmation) or off for every synced chat of the account at once; one call per chat, as the switches make. */
+function BulkSend({
+	account,
+	api,
+	appName,
+	onChange,
+	onError,
+}: {
+	account: BridgeAccount;
+	api: BridgeApi;
+	appName: string;
+	onChange: () => void;
+	onError: (err: unknown) => BridgeError;
+}) {
+	const t = useBridgeCopy();
+	const { toasts } = useServices();
+	const [confirming, setConfirming] = useState(false);
+	const [busy, setBusy] = useState(false);
+	const off = account.chats.filter((c) => c.direction !== "both");
+	const on = account.chats.filter((c) => c.direction === "both");
+	if (off.length === 0 && on.length === 0) return null;
+	const run = async (chats: readonly BridgeChat[], direction: "both" | "in") => {
+		setBusy(true);
+		setConfirming(false);
+		for (const chat of chats) {
+			try {
+				await api.setDirection(account.id, chat.conversationId, direction);
+			} catch (err) {
+				const error = onError(err);
+				if (error.kind === "send_unsupported") toasts.show(t.chats.sendUnsupported);
+				else if (error.kind !== "reauth") toasts.show(t.failed);
+				break;
+			}
+		}
+		forgetBridgeStatus();
+		setBusy(false);
+		onChange();
+	};
+	return (
+		<div className="br-bulk" data-id="bridge-bulk">
+			{confirming ? (
+				<span className="br-actions">
+					<span className="note">{t.chats.bulkConfirm(off.length, appName)}</span>
+					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void run(off, "both")}>
+						{t.chats.bulkYes}
+					</button>
+					<button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>
+						{t.pick.cancel}
+					</button>
+				</span>
+			) : (
+				<span className="br-actions">
+					{off.length > 0 && (
+						<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setConfirming(true)}>
+							{t.chats.enableAll(off.length)}
+						</button>
+					)}
+					{on.length > 0 && (
+						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => void run(on, "in")}>
+							{t.chats.disableAll}
+						</button>
+					)}
+				</span>
+			)}
+		</div>
 	);
 }
 
@@ -434,7 +503,10 @@ function SyncedChat({
 				{titleInitials(chat.title)}
 			</span>
 			<span className="grow br-text">
-				<b>{chat.title}</b>
+				<b>
+					{chat.title}
+					{chat.topicsSplit && <span className="tag-neutral br-topics-tag">{t.chats.topics}</span>}
+				</b>
 				<small className="br-status" data-state={chat.caughtUp ? "active" : "importing"}>
 					<i aria-hidden="true" />
 					{chat.caughtUp ? t.chats.caughtUp : t.chats.importing}
@@ -497,6 +569,8 @@ function ChatPicker({
 	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
 	// New chats send both ways by default; the person can leave it off for the batch (and switch each chat later).
 	const [sendOn, setSendOn] = useState(true);
+	/** The forum whose copy is being offered a new sync by topic (waiting for the confirmation). */
+	const [resyncFor, setResyncFor] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	// How many chats wait for the sign-in to carry on by themselves.
 	const [waiting, setWaiting] = useState(0);
@@ -510,6 +584,32 @@ function ChatPicker({
 			setList(null);
 			fail(err);
 		});
+	};
+	// A forum copied before topics were read has all its topics mixed in one stream: removing the copy and enabling the
+	// conversation again, with the same window and direction, splits them. Remove and enable are the calls the page already makes.
+	const resync = async (conversation: BridgeConversation) => {
+		const copy = account.chats.find((c) => c.conversationId === conversation.id);
+		if (copy === undefined) return;
+		setBusy(true);
+		setResyncFor(null);
+		try {
+			await api.remove(account.id, conversation.id);
+		} catch (err) {
+			setBusy(false);
+			fail(err);
+			return;
+		}
+		forgetBridgeStatus();
+		try {
+			await api.enable(account.id, conversation.id, copy.historyWindow, copy.direction);
+			toasts.show(t.pick.started);
+		} catch (err) {
+			if (onError(err).kind !== "reauth") toasts.show(t.pick.resyncHalf);
+		}
+		forgetBridgeStatus();
+		api.conversations(account.id).then(setList, () => setList(null));
+		setBusy(false);
+		onChange();
 	};
 	// One sign-in covers the whole batch: the chats go one after another within seconds. A refusal for an old sign-in
 	// stops it, keeps what is not done selected and remembers it for this tab: after signing in again the page opens
@@ -647,8 +747,25 @@ function ChatPicker({
 									<b>{conversation.title}</b>
 									<small>{t.pick.kind[conversation.kind]}</small>
 								</span>
+								{conversation.forum && <span className="tag-neutral">{!synced ? t.pick.forum : conversation.topicsSplit ? t.pick.split : t.pick.flat}</span>}
 								{synced && <span className="tag-neutral">{t.pick.synced}</span>}
+								{synced && conversation.forum && !conversation.topicsSplit && (
+									<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setResyncFor(conversation.id)}>
+										{t.pick.resync}
+									</button>
+								)}
 							</Row>
+							{resyncFor === conversation.id && (
+								<div className="br-actions br-resync" role="group" aria-label={t.pick.resync}>
+									<span className="note">{t.pick.resyncConfirm}</span>
+									<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => void resync(conversation)}>
+										{t.pick.resyncYes}
+									</button>
+									<button type="button" className="btn btn-sm" onClick={() => setResyncFor(null)}>
+										{t.pick.cancel}
+									</button>
+								</div>
+							)}
 						</div>
 					);
 				})}
