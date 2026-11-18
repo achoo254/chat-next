@@ -1,12 +1,24 @@
 package telegram
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/gotd/td/tg"
 
 	"app.local/server/internal/bridge"
 )
+
+func TestAConversationThatDroppedOutOfTheDialogsIsToldApartFromOtherErrors(t *testing.T) {
+	err := notInDialogs("channel:7")
+	if !errors.Is(err, errNotInDialogs) || !strings.Contains(err.Error(), "channel:7") {
+		t.Errorf("notInDialogs = %v, want errNotInDialogs naming the conversation", err)
+	}
+	if errors.Is(errors.New("telegram: bad conversation id"), errNotInDialogs) {
+		t.Error("an unrelated error is taken for a conversation that dropped out of the dialogs")
+	}
+}
 
 func TestABasicGroupTheAccountLeftIsNotAConversation(t *testing.T) {
 	b := newPeerBook()

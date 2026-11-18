@@ -93,6 +93,32 @@ func TestLiveTelegramLeaveGroup(t *testing.T) {
 	t.Logf("leave again                    err=%v", a.LeaveGroup(ctx, acct, conv))
 }
 
+// TestLiveTelegramLeaveGone leaves a conversation that is no longer in the account's dialogs
+// (one it left or that was deleted) and wants that to be done, not an error. By hand:
+//
+//	BRIDGE_LIVE_GONE=<id of the conversation, e.g. channel:123> BRIDGE_LIVE_DIR=/some/dir … \
+//	  go test ./internal/bridge/adapters/telegram -run LiveTelegramLeaveGone -timeout 15m -v
+func TestLiveTelegramLeaveGone(t *testing.T) {
+	conv := os.Getenv("BRIDGE_LIVE_GONE")
+	if conv == "" {
+		t.Skip("set BRIDGE_LIVE_GONE to the id of a conversation the account is no longer in")
+	}
+	ctx, a, acct := liveSession(t, "live-gone", 14*time.Minute)
+	convs, err := a.ListConversations(ctx, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range convs {
+		if c.ID == conv {
+			t.Fatalf("%s (%q) is still in the dialogs; this test is only for one that is not", conv, c.Title)
+		}
+	}
+	if err := a.LeaveGroup(ctx, acct, conv); err != nil {
+		t.Fatalf("leaving a conversation that is gone = %v, want done", err)
+	}
+	t.Log("leave a conversation that is gone  ok")
+}
+
 // TestLiveTelegramGroupLifecycle deletes, then tries to leave, a basic group made only for
 // this test, through the adapter as the engine calls it. It cannot be undone: the group is
 // gone for everyone. By hand, never on its own:

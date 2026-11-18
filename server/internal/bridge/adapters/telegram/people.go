@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"app.local/server/internal/bridge"
@@ -186,6 +187,11 @@ func (a *Adapter) LeaveGroup(ctx context.Context, acct bridge.Account, conv stri
 	}
 	defer release()
 	peer, err := c.inputPeer(ctx, conv)
+	if errors.Is(err, errNotInDialogs) {
+		// Gone from the dialog list: the account has already left it (or it no longer
+		// exists), which is what leaving asks for, so asking again is done, not a failure.
+		return nil
+	}
 	if err != nil {
 		return err
 	}

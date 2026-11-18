@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -141,7 +142,15 @@ func (c *conn) inputPeer(ctx context.Context, conv string) (tg.InputPeerClass, e
 	p = c.peers[conv]
 	c.mu.Unlock()
 	if p == nil {
-		return nil, fmt.Errorf("telegram: conversation %s is not in the account's dialogs", conv)
+		return nil, notInDialogs(conv)
 	}
 	return p, nil
+}
+
+// errNotInDialogs is what a conversation that dropped out of the dialog list answers: the
+// account left it, was removed from it, or it was deleted.
+var errNotInDialogs = errors.New("telegram: the conversation is not in the account's dialogs")
+
+func notInDialogs(conv string) error {
+	return fmt.Errorf("%w: %s", errNotInDialogs, conv)
 }
