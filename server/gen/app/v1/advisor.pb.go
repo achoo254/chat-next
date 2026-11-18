@@ -90,7 +90,13 @@ type AdvisorProfile struct {
 	// asks Advisor when it is unsure and before it ends each turn. The profile
 	// holds the wish; each machine keeps its own copy (AdvisorSetAuto) that a
 	// device brings in line with this one when it links to the machine.
-	AutoSession   bool `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3" json:"auto_session,omitempty"`
+	AutoSession bool `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3" json:"auto_session,omitempty"`
+	// Unix milliseconds (a device's clock) when the user last removed the
+	// account's TypeSafe key; 0 when never. No secret: only a time. Every
+	// machine's account key set no later than this is removed when a device
+	// next links to it, and never handed on; a new account key counts as set
+	// after it. Only moves forward.
+	KeyRemovedAt  int64 `protobuf:"varint,5,opt,name=key_removed_at,json=keyRemovedAt,proto3" json:"key_removed_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,6 +157,13 @@ func (x *AdvisorProfile) GetAutoSession() bool {
 		return x.AutoSession
 	}
 	return false
+}
+
+func (x *AdvisorProfile) GetKeyRemovedAt() int64 {
+	if x != nil {
+		return x.KeyRemovedAt
+	}
+	return 0
 }
 
 type GetAdvisorProfileRequest struct {
@@ -243,8 +256,10 @@ type SetAdvisorProfileRequest struct {
 	// or "-".
 	LookId *string `protobuf:"bytes,2,opt,name=look_id,json=lookId,proto3,oneof" json:"look_id,omitempty"`
 	// Not ADVISOR_TONE_UNSPECIFIED.
-	Tone          *AdvisorTone `protobuf:"varint,3,opt,name=tone,proto3,enum=app.v1.AdvisorTone,oneof" json:"tone,omitempty"`
-	AutoSession   *bool        `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3,oneof" json:"auto_session,omitempty"`
+	Tone        *AdvisorTone `protobuf:"varint,3,opt,name=tone,proto3,enum=app.v1.AdvisorTone,oneof" json:"tone,omitempty"`
+	AutoSession *bool        `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3,oneof" json:"auto_session,omitempty"`
+	// 0 to 2^53 - 1; a value earlier than the kept one leaves it unchanged.
+	KeyRemovedAt  *int64 `protobuf:"varint,5,opt,name=key_removed_at,json=keyRemovedAt,proto3,oneof" json:"key_removed_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -307,6 +322,13 @@ func (x *SetAdvisorProfileRequest) GetAutoSession() bool {
 	return false
 }
 
+func (x *SetAdvisorProfileRequest) GetKeyRemovedAt() int64 {
+	if x != nil && x.KeyRemovedAt != nil {
+		return *x.KeyRemovedAt
+	}
+	return 0
+}
+
 type SetAdvisorProfileResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Profile       *AdvisorProfile        `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
@@ -363,25 +385,28 @@ var File_app_v1_advisor_proto protoreflect.FileDescriptor
 
 const file_app_v1_advisor_proto_rawDesc = "" +
 	"\n" +
-	"\x14app/v1/advisor.proto\x12\x06app.v1\x1a\x15app/v1/messages.proto\"\x89\x01\n" +
+	"\x14app/v1/advisor.proto\x12\x06app.v1\x1a\x15app/v1/messages.proto\"\xb3\x01\n" +
 	"\x0eAdvisorProfile\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
 	"\alook_id\x18\x02 \x01(\tR\x06lookId\x12'\n" +
 	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneR\x04tone\x12!\n" +
-	"\fauto_session\x18\x04 \x01(\bR\vautoSession\"\x1a\n" +
+	"\fauto_session\x18\x04 \x01(\bR\vautoSession\x12(\n" +
+	"\x0ekey_removed_at\x18\x05 \x01(\x03B\x020\x02R\fkeyRemovedAt\"\x1a\n" +
 	"\x18GetAdvisorProfileRequest\"M\n" +
 	"\x19GetAdvisorProfileResponse\x120\n" +
-	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\"\xd6\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\"\x98\x02\n" +
 	"\x18SetAdvisorProfileRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1c\n" +
 	"\alook_id\x18\x02 \x01(\tH\x01R\x06lookId\x88\x01\x01\x12,\n" +
 	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneH\x02R\x04tone\x88\x01\x01\x12&\n" +
-	"\fauto_session\x18\x04 \x01(\bH\x03R\vautoSession\x88\x01\x01B\a\n" +
+	"\fauto_session\x18\x04 \x01(\bH\x03R\vautoSession\x88\x01\x01\x12-\n" +
+	"\x0ekey_removed_at\x18\x05 \x01(\x03B\x020\x02H\x04R\fkeyRemovedAt\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_look_idB\a\n" +
 	"\x05_toneB\x0f\n" +
-	"\r_auto_session\"p\n" +
+	"\r_auto_sessionB\x11\n" +
+	"\x0f_key_removed_at\"p\n" +
 	"\x19SetAdvisorProfileResponse\x120\n" +
 	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\x12!\n" +
 	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack*s\n" +

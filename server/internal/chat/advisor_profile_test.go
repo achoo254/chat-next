@@ -113,6 +113,45 @@ func TestAdvisorProfileRefusesBadFields(t *testing.T) {
 	}
 }
 
+// The account key's removal time is kept with the profile, only moves forward
+// and survives later changes of other fields; it is no secret, only a time.
+func TestAdvisorProfileKeyRemovedAt(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	a := h.user("a")
+	at := int64(1_800_000_000_000)
+	resp, err := h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &at})
+	if err != nil || resp.GetProfile().GetKeyRemovedAt() != at || resp.GetAck().GetPts() == 0 {
+		t.Fatalf("set: %v, %v", resp, err)
+	}
+	// My sessions hear it like every other change of the profile.
+	tail := h.logOf(a)
+	if got := tail[len(tail)-1].GetAdvisorProfile().GetProfile().GetKeyRemovedAt(); got != at {
+		t.Fatalf("log tail key_removed_at = %d", got)
+	}
+	// An earlier time (another device's slower clock) changes nothing and writes nothing.
+	earlier := at - 1
+	before := len(h.logOf(a))
+	resp, err = h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &earlier})
+	if err != nil || resp.GetProfile().GetKeyRemovedAt() != at || len(h.logOf(a)) != before {
+		t.Fatalf("earlier: %v, %v", resp, err)
+	}
+	// Other fields leave it as it is.
+	look := "cat"
+	if resp, err = h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{LookId: &look}); err != nil || resp.GetProfile().GetKeyRemovedAt() != at {
+		t.Fatalf("kept by a later change: %v, %v", resp, err)
+	}
+	if got, _ := h.svc.GetAdvisorProfile(ctx, a); got.GetKeyRemovedAt() != at {
+		t.Fatalf("stored = %v", got)
+	}
+	// Out of range is refused.
+	for _, bad := range []int64{-1, 1 << 53} {
+		if _, err := h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &bad}); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%d: err = %v", bad, err)
+		}
+	}
+}
+
 // Erasing an account deletes its Advisor profile.
 func TestAdvisorProfileErasedWithAccount(t *testing.T) {
 	h := newHarness(t, nil)

@@ -23,6 +23,7 @@ import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { AdvisorKeyError, type AdvisorKeyStore, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
+import { AdvisorKeyShareError } from "../advisor/advisor-key-share.ts";
 import type { AdvisorAttachmentInput, AdvisorToneInput } from "../advisor/advisor-thread.ts";
 import { redactSecrets } from "../mcp/redact.ts";
 import { type ConfigStore, deviceLabel } from "../config.ts";
@@ -43,6 +44,7 @@ import { type SecretEvent, SecretNotFound, SecretPromptGone, type SecretService 
 import type { GitChangesResult } from "../threads/git-changes.ts";
 import { InputError } from "../remote-browser/browser-input.ts";
 import { BrowserNotRunning, BrowserToolError, BrowserUnavailable, type RemoteBrowser, TakeoverGone } from "../remote-browser/remote-browser.ts";
+import { type AdvisorKeyFrame, AdvisorKeyLink } from "./advisor-key-link.ts";
 import { type BrowserFrame, BrowserLink } from "./browser-link.ts";
 import { ScreenShareBusy, ScreenShareGone, type ScreenShare, ScreenSharingOff } from "../screen-share/screen-share.ts";
 import { ScreenShareLink } from "./screen-share-link.ts";
@@ -110,14 +112,23 @@ export type LinkContext = {
   advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
 };
 
+/** The class and reason of each refusal of Advisor's key store. */
+const ADVISOR_KEY_REFUSALS: Record<AdvisorKeyError["kind"], { code: ErrorCode; reason: ErrorReason }> = {
+  invalid: { code: ErrorCode.INVALID, reason: ErrorReason.ADVISOR_KEY_INVALID },
+  not_saved: { code: ErrorCode.INTERNAL, reason: ErrorReason.ADVISOR_KEY_NOT_SAVED },
+  own_key: { code: ErrorCode.INVALID, reason: ErrorReason.ADVISOR_OWN_KEY },
+  no_key: { code: ErrorCode.NOT_FOUND, reason: ErrorReason.ADVISOR_NO_KEY },
+};
+
 /** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
 export function errorBody(err: unknown): { code: ErrorCode; message: string; reason: ErrorReason; subject: string; failureId?: string } {
   // No secret this process holds (a sign-in secret, Advisor's key) ever leaves in an error, whatever it echoes.
   const message = redactSecrets(err instanceof Error ? err.message : String(err)).slice(0, 300);
-  if (err instanceof AdvisorKeyError) {
-    return err.kind === "invalid"
-      ? { code: ErrorCode.INVALID, message, reason: ErrorReason.ADVISOR_KEY_INVALID, subject: "" }
-      : { code: ErrorCode.INTERNAL, message, reason: ErrorReason.ADVISOR_KEY_NOT_SAVED, subject: "" };
+  if (err instanceof AdvisorKeyError) return { ...ADVISOR_KEY_REFUSALS[err.kind], message, subject: "" };
+  if (err instanceof AdvisorKeyShareError) {
+    return err.kind === "failed"
+      ? { code: ErrorCode.INVALID, message, reason: ErrorReason.ADVISOR_KEY_SHARE_FAILED, subject: "" }
+      : { code: ErrorCode.INVALID, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
   }
   if (err instanceof MacFolderRefused) return { code: ErrorCode.INVALID, message, reason: ErrorReason.MAC_FOLDER_ACCESS, subject: err.folder };
   if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject, ...(err.failureId ? { failureId: err.failureId } : {}) };
@@ -240,6 +251,8 @@ export class Connection {
   private unsubscribe: (() => void)[] = [];
   private queue: Promise<void> = Promise.resolve();
   private browserLink: BrowserLink | undefined;
+  /** Advisor's key requests, with this link's hand-off tickets; absent where the machine has no Advisor. */
+  private advisorKeyLink: AdvisorKeyLink | undefined;
   private screenShareLink: ScreenShareLink | undefined;
   private terminal: TerminalConnection | undefined;
   private workspaceLink: WorkspaceLink | undefined;
@@ -412,6 +425,15 @@ export class Connection {
         () => this.device,
       );
     }
+    const advisorKeys = this.ctx.advisorKeys;
+    if (advisorKeys) {
+      this.advisorKeyLink = new AdvisorKeyLink(
+        advisorKeys,
+        (id, body) => this.send(id, body),
+        () => this.device,
+        () => this.ctx.onAdvisorKey?.(),
+      );
+    }
     if (this.ctx.workspaces) this.workspaceLink = new WorkspaceLink(this.ctx.workspaces, (id, body) => this.send(id, body), () => this.device, this.ctx.commitMessage);
     if (this.ctx.terminal) {
       this.terminal = this.ctx.terminal.connection({
@@ -459,14 +481,11 @@ export class Connection {
     }
   }
 
-  /** Advisor's key: it arrives only here, sealed end to end, and goes straight to its own store; it is never logged or echoed. */
-  private async advisorFrame(id: string, b: AdvisorFrame): Promise<void> {
-    const keys = this.ctx.advisorKeys;
-    if (!keys) return this.send(id, { case: "error", value: refusal("this machine has no Advisor", ErrorReason.UNSUPPORTED_REQUEST) });
-    if (b.case === "advisorSetKey") await keys.set(b.value.key, this.device);
-    else await keys.remove(this.device);
-    this.send(id, { case: "ack", value: {} });
-    this.ctx.onAdvisorKey?.();
+  /** Advisor's key: it arrives only here, sealed end to end, and goes straight to its own store (advisor-key-link.ts); it is never logged or echoed. */
+  private async advisorFrame(id: string, b: AdvisorKeyFrame): Promise<void> {
+    const link = this.advisorKeyLink;
+    if (!link) return this.send(id, { case: "error", value: refusal("this machine has no Advisor", ErrorReason.UNSUPPORTED_REQUEST) });
+    await link.handle(id, b);
   }
 
   /** This device follows the thread now (it subscribed on this link). */
@@ -879,6 +898,10 @@ export class Connection {
         }
         case "advisorSetKey":
         case "advisorRemoveKey":
+        case "advisorKeyShareBegin":
+        case "advisorKeySeal":
+        case "advisorKeyShareOpen":
+        case "advisorKeyPromote":
           if (b.case === "advisorSetKey") rememberAdvisorKey(b.value.key);
           // Sealing waits on the key store: answered later, by id.
           void this.advisorFrame(id, b).catch((err: unknown) => this.sendError(id, err));
@@ -1021,7 +1044,6 @@ type ProjectFrame = Extract<
 
 type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
 
-type AdvisorFrame = Extract<Frame["body"], { case: "advisorSetKey" | "advisorRemoveKey" }>;
 
 type AccountFrame = Extract<
   Frame["body"],

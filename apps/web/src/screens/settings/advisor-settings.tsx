@@ -1,24 +1,18 @@
 // Settings › Cố vấn: the Advisor profile kept with the account (name, look,
 // tone: every device and the office follow it), whether the mascot shows on
-// this device, and the TypeSafe key of each machine (its state, fingerprint,
-// which device set it and when; paste a new one, remove it). The key goes to
-// the machine end-to-end encrypted (AdvisorSetKey) and never comes back;
-// the section is never offered to Advisor's copy chip (data-advisor-ignore).
-// The only place in the app that names Jev and TypeSafe.
-import { useEffect, useRef, useState, type FormEvent } from "react";
+// this device, and the TypeSafe key (advisor-key-section.tsx).
+import { useRef, useState, type FormEvent } from "react";
 import type { AdvisorTone } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
-import { useI18n } from "../../i18n/i18n.tsx";
 import { useAdvisorProfile, useServices } from "../../messaging/data/services.tsx";
 import { Choice, Switch } from "../../messaging/ui/parts.tsx";
-import { errorText, useHub, useMachineViews, useNow, type MachineView } from "../../machines/use-machines.ts";
-import { useMachinesCopy } from "../../machines/use-machines-copy.ts";
-import { IGNORE_ATTR } from "../../advisor/advisor-context.tsx";
+import { useHub, useMachineViews, useNow } from "../../machines/use-machines.ts";
 import { advisorStore, useAdvisorState } from "../../advisor/advisor-store.ts";
 import { LOOKS } from "../../advisor/looks.ts";
 import { autoStateOf } from "../../advisor/use-advisor-auto-sync.ts";
 import { useAdvisorCopy } from "../../advisor/use-advisor-copy.ts";
 import "../../advisor/advisor.css";
+import { KeySection } from "./advisor-key-section.tsx";
 
 /** Characters of the name (the server checks it too). */
 const NAME_MAX = 32;
@@ -129,129 +123,5 @@ function AutoRow({ value, save }: { value: boolean; save: (on: boolean) => void 
 			</div>
 			{value && behind.length > 0 && <p className="note pad-x">{t.settings.autoNotApplied(behind.map((view) => view.entry.name).join(", "))}</p>}
 		</>
-	);
-}
-
-/** Each machine's key, from its MachineInfo.advisor (links open only to machines online). */
-function KeySection() {
-	const t = useAdvisorCopy();
-	const hub = useHub();
-	const now = useNow();
-	const views = useMachineViews(hub, now);
-	useEffect(() => {
-		hub.device().catch(() => undefined);
-		if (hub.directory().status !== "ready") hub.refresh().catch(() => undefined);
-	}, [hub]);
-	return (
-		<div className="card" data-id="advisor-keys" {...{ [IGNORE_ATTR]: "" }}>
-			<h2 className="card-title">{t.key.title}</h2>
-			<p className="note pad-x">{t.key.model}</p>
-			{views.length === 0 ? <p className="note pad-x">{t.key.none}</p> : views.map((view) => <MachineKey key={view.entry.ref} view={view} />)}
-		</div>
-	);
-}
-
-function MachineKey({ view }: { view: MachineView }) {
-	const t = useAdvisorCopy();
-	const tm = useMachinesCopy();
-	const { locale } = useI18n();
-	const [mode, setMode] = useState<"view" | "paste" | "remove">("view");
-	const [key, setKey] = useState("");
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState("");
-	const info = view.state.info;
-	const open = view.state.status.kind === "open";
-	const advisor = info?.advisor;
-	let status: string;
-	if (!open) status = view.conn.kind === "offline" ? t.key.offline : t.ask.connecting;
-	else if (info === null) status = t.ask.connecting;
-	else if (advisor === undefined) status = t.key.update;
-	else if (!advisor.available) status = t.key.mcpOff;
-	else status = advisor.keySet ? t.key.keySet(advisor.keyFingerprint) : t.key.noKey;
-	const usable = open && advisor !== undefined;
-	const setBy =
-		advisor?.keySet === true && advisor.setByDevice !== ""
-			? t.key.setBy(advisor.setByDevice === "local" ? t.key.localDevice : advisor.setByDevice, new Date(Number(advisor.setAt)).toLocaleString(locale))
-			: "";
-	const run = (request: () => Promise<unknown>) => {
-		setBusy(true);
-		setError("");
-		request()
-			.then(() => {
-				setMode("view");
-				setKey("");
-			})
-			.catch((err: unknown) => setError(errorText(tm, err, "AI") || t.key.failed))
-			.finally(() => setBusy(false));
-	};
-	const paste = (event: FormEvent) => {
-		event.preventDefault();
-		const value = key.trim();
-		if (value === "") return;
-		run(() => view.link.request({ case: "advisorSetKey", value: { key: value } }));
-	};
-	return (
-		<div className="adv-machine-key pad-x" data-id={`advisor-key-${view.entry.ref}`}>
-			<div className="row">
-				<span className="grow">
-					{view.entry.name}
-					<small>{status}</small>
-					{setBy !== "" && <small>{setBy}</small>}
-				</span>
-				{usable && mode === "view" && (
-					<span className="adv-acts">
-						<button type="button" className="btn btn-sm" onClick={() => setMode("paste")}>
-							{t.key.paste}
-						</button>
-						{advisor.keySet && (
-							<button type="button" className="btn btn-sm" onClick={() => setMode("remove")}>
-								{t.key.remove}
-							</button>
-						)}
-					</span>
-				)}
-			</div>
-			{mode === "paste" && (
-				<form className="adv-key-form" onSubmit={paste}>
-					<input
-						className="input"
-						type="password"
-						autoComplete="off"
-						spellCheck={false}
-						aria-label={t.key.field}
-						placeholder={t.key.field}
-						maxLength={4096}
-						value={key}
-						onChange={(event) => setKey(event.target.value)}
-					/>
-					<span className="adv-acts">
-						<button type="button" className="btn btn-sm" onClick={() => setMode("view")}>
-							{t.key.cancel}
-						</button>
-						<button type="submit" className="btn btn-sm btn-primary" disabled={busy || key.trim() === ""}>
-							{t.key.save}
-						</button>
-					</span>
-				</form>
-			)}
-			{mode === "remove" && (
-				<div className="adv-key-form" role="alert">
-					<p>{t.key.confirmRemove}</p>
-					<span className="adv-acts">
-						<button type="button" className="btn btn-sm" onClick={() => setMode("view")}>
-							{t.key.cancel}
-						</button>
-						<button type="button" className="btn-danger-text" disabled={busy} onClick={() => run(() => view.link.request({ case: "advisorRemoveKey", value: {} }))}>
-							{t.key.remove}
-						</button>
-					</span>
-				</div>
-			)}
-			{error !== "" && (
-				<p className="note mx-error" role="alert">
-					{error}
-				</p>
-			)}
-		</div>
 	);
 }

@@ -12,6 +12,7 @@ export const enMachines: MachinesCopy = {
 	pickMachine: "Choose a machine to see its sessions",
 	notFound: "This machine was not found. It may have been removed.",
 	sessionsCount: (n) => (n === 1 ? "1 session" : `${n} sessions`),
+	advisorKeySynced: (machine) => `Advisor key synced for ${machine}`,
 	usage: {
 		locale: "en-US",
 		open: "Efficiency",
@@ -501,6 +502,9 @@ export const enMachines: MachinesCopy = {
 			advisorUnavailable: "Advisor is not available for this session: its AI or the machine runs sessions without tunelo's MCP.",
 			advisorKeyInvalid: "That key is not valid: it is empty, too long, or has spaces or control characters.",
 			advisorKeyNotSaved: "The machine could not save the key (its key store is locked or refused). Nothing changed.",
+			advisorNoKey: "The machine no longer keeps the key this needs. Nothing changed.",
+			advisorKeyShareFailed: "The machine could not open the key handed to it (the hand-off expired or did not match). Nothing changed; try again.",
+			advisorOwnKey: "The machine uses its own key and keeps it. Remove its own key first to use the account's key.",
 			sessionLimit: (n: string) => `The machine already runs its ${n} sessions and they are busy. Advisor closes none of yours: try again later.`,
 			sensitiveFileNotConfirmed: "Secret files need a confirmation before they go into git.",
 			usageRangeInvalid: "The time range is not valid (at most 92 days).",

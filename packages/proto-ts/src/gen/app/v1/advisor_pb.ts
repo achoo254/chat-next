@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/advisor.proto.
  */
 export const file_app_v1_advisor: GenFile = /*@__PURE__*/
-  fileDesc("ChRhcHAvdjEvYWR2aXNvci5wcm90bxIGYXBwLnYxImgKDkFkdmlzb3JQcm9maWxlEgwKBG5hbWUYASABKAkSDwoHbG9va19pZBgCIAEoCRIhCgR0b25lGAMgASgOMhMuYXBwLnYxLkFkdmlzb3JUb25lEhQKDGF1dG9fc2Vzc2lvbhgEIAEoCCIaChhHZXRBZHZpc29yUHJvZmlsZVJlcXVlc3QiRAoZR2V0QWR2aXNvclByb2ZpbGVSZXNwb25zZRInCgdwcm9maWxlGAEgASgLMhYuYXBwLnYxLkFkdmlzb3JQcm9maWxlIrUBChhTZXRBZHZpc29yUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhQKB2xvb2tfaWQYAiABKAlIAYgBARImCgR0b25lGAMgASgOMhMuYXBwLnYxLkFkdmlzb3JUb25lSAKIAQESGQoMYXV0b19zZXNzaW9uGAQgASgISAOIAQFCBwoFX25hbWVCCgoIX2xvb2tfaWRCBwoFX3RvbmVCDwoNX2F1dG9fc2Vzc2lvbiJiChlTZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2sqcwoLQWR2aXNvclRvbmUSHAoYQURWSVNPUl9UT05FX1VOU1BFQ0lGSUVEEAASFgoSQURWSVNPUl9UT05FX1NIT1JUEAESFAoQQURWSVNPUl9UT05FX0ZVThACEhgKFEFEVklTT1JfVE9ORV9TRVJJT1VTEAMyxAEKDkFkdmlzb3JTZXJ2aWNlElgKEUdldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLkdldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5HZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlElgKEVNldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLlNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5TZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_messages]);
+  fileDesc("ChRhcHAvdjEvYWR2aXNvci5wcm90bxIGYXBwLnYxIoQBCg5BZHZpc29yUHJvZmlsZRIMCgRuYW1lGAEgASgJEg8KB2xvb2tfaWQYAiABKAkSIQoEdG9uZRgDIAEoDjITLmFwcC52MS5BZHZpc29yVG9uZRIUCgxhdXRvX3Nlc3Npb24YBCABKAgSGgoOa2V5X3JlbW92ZWRfYXQYBSABKANCAjACIhoKGEdldEFkdmlzb3JQcm9maWxlUmVxdWVzdCJEChlHZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUi6QEKGFNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESFAoHbG9va19pZBgCIAEoCUgBiAEBEiYKBHRvbmUYAyABKA4yEy5hcHAudjEuQWR2aXNvclRvbmVIAogBARIZCgxhdXRvX3Nlc3Npb24YBCABKAhIA4gBARIfCg5rZXlfcmVtb3ZlZF9hdBgFIAEoA0ICMAJIBIgBAUIHCgVfbmFtZUIKCghfbG9va19pZEIHCgVfdG9uZUIPCg1fYXV0b19zZXNzaW9uQhEKD19rZXlfcmVtb3ZlZF9hdCJiChlTZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2sqcwoLQWR2aXNvclRvbmUSHAoYQURWSVNPUl9UT05FX1VOU1BFQ0lGSUVEEAASFgoSQURWSVNPUl9UT05FX1NIT1JUEAESFAoQQURWSVNPUl9UT05FX0ZVThACEhgKFEFEVklTT1JfVE9ORV9TRVJJT1VTEAMyxAEKDkFkdmlzb3JTZXJ2aWNlElgKEUdldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLkdldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5HZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlElgKEVNldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLlNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5TZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_messages]);
 
 /**
  * @generated from message app.v1.AdvisorProfile
@@ -48,6 +48,17 @@ export type AdvisorProfile = Message<"app.v1.AdvisorProfile"> & {
    * @generated from field: bool auto_session = 4;
    */
   autoSession: boolean;
+
+  /**
+   * Unix milliseconds (a device's clock) when the user last removed the
+   * account's TypeSafe key; 0 when never. No secret: only a time. Every
+   * machine's account key set no later than this is removed when a device
+   * next links to it, and never handed on; a new account key counts as set
+   * after it. Only moves forward.
+   *
+   * @generated from field: int64 key_removed_at = 5 [jstype = JS_NUMBER];
+   */
+  keyRemovedAt: bigint;
 };
 
 /**
@@ -119,6 +130,13 @@ export type SetAdvisorProfileRequest = Message<"app.v1.SetAdvisorProfileRequest"
    * @generated from field: optional bool auto_session = 4;
    */
   autoSession?: boolean | undefined;
+
+  /**
+   * 0 to 2^53 - 1; a value earlier than the kept one leaves it unchanged.
+   *
+   * @generated from field: optional int64 key_removed_at = 5 [jstype = JS_NUMBER];
+   */
+  keyRemovedAt?: bigint | undefined;
 };
 
 /**
@@ -193,7 +211,7 @@ export const AdvisorToneSchema: GenEnum<AdvisorTone> = /*@__PURE__*/
  * The Advisor profile (Cố vấn) of the AI Agent: how the user's Advisor mascot
  * is called, looks and words its answers, kept per user by the server and
  * synced to every session like the notification settings. It holds no
- * secret and no machine or AI: the TypeSafe key stays on each machine, and
+ * secret and no machine or AI: the TypeSafe key stays on the machines, and
  * the device remembers which machine and AI it asked last. `name` is shown
  * to the user only, never put into an AI's prompt; machines map `tone` to a
  * fixed wording of their own. Every change reaches the user's sessions as

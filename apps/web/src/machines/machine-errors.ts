@@ -202,6 +202,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.advisorKeyInvalid;
 		case ErrorReason.ADVISOR_KEY_NOT_SAVED:
 			return r.advisorKeyNotSaved;
+		case ErrorReason.ADVISOR_NO_KEY:
+			return r.advisorNoKey;
+		case ErrorReason.ADVISOR_KEY_SHARE_FAILED:
+			return r.advisorKeyShareFailed;
+		case ErrorReason.ADVISOR_OWN_KEY:
+			return r.advisorOwnKey;
 		case ErrorReason.SESSION_LIMIT:
 			return r.sessionLimit(s);
 		default:

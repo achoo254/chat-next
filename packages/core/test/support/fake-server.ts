@@ -1308,6 +1308,8 @@ export class FakeServer {
 						if (request.lookId !== undefined) change.lookId = request.lookId;
 						if (request.tone !== undefined) change.tone = request.tone;
 						if (request.autoSession !== undefined) change.autoSession = request.autoSession;
+						// Only moves forward, as on the server.
+						if (request.keyRemovedAt !== undefined && request.keyRemovedAt > this.user(userId).advisor.keyRemovedAt) change.keyRemovedAt = request.keyRemovedAt;
 						const profile = this.setAdvisor(userId, change);
 						return create(SetAdvisorProfileResponseSchema, {
 							profile,

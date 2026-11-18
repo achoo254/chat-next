@@ -16,6 +16,9 @@ const (
 	advisorNameMax = 32
 	// defaultAdvisorLook is the look of a user who never picked one.
 	defaultAdvisorLook = "owl"
+	// advisorKeyRemovedAtMax keeps key_removed_at a JavaScript-exact integer
+	// (the field is a JS number, ADR 0001).
+	advisorKeyRemovedAtMax = 1<<53 - 1
 )
 
 // advisorLookPattern is the shape of a look id; which looks exist is the
@@ -29,6 +32,9 @@ type advisorProfileRow struct {
 	Tone   int16
 	// AutoSession is the user's wish for automatic Advisor in every session.
 	AutoSession bool
+	// KeyRemovedAt is when the user last removed the account's TypeSafe key
+	// (Unix ms of a device's clock; 0 when never). No secret: only a time.
+	KeyRemovedAt int64
 }
 
 // defaultAdvisorProfile is the profile of a user without a row.
@@ -37,13 +43,14 @@ func defaultAdvisorProfile() advisorProfileRow {
 }
 
 func (a advisorProfileRow) render() *appv1.AdvisorProfile {
-	return &appv1.AdvisorProfile{Name: a.Name, LookId: a.LookID, Tone: appv1.AdvisorTone(a.Tone), AutoSession: a.AutoSession}
+	return &appv1.AdvisorProfile{Name: a.Name, LookId: a.LookID, Tone: appv1.AdvisorTone(a.Tone), AutoSession: a.AutoSession, KeyRemovedAt: a.KeyRemovedAt}
 }
 
 // loadAdvisorProfile reads a user's profile; the defaults without a row.
 func loadAdvisorProfile(ctx context.Context, q querier, me int64) (advisorProfileRow, error) {
 	a := defaultAdvisorProfile()
-	err := q.QueryRow(ctx, `SELECT name, look_id, tone, auto_session FROM advisor_profiles WHERE user_id = $1`, me).Scan(&a.Name, &a.LookID, &a.Tone, &a.AutoSession)
+	err := q.QueryRow(ctx, `SELECT name, look_id, tone, auto_session, key_removed_at FROM advisor_profiles WHERE user_id = $1`, me).
+		Scan(&a.Name, &a.LookID, &a.Tone, &a.AutoSession, &a.KeyRemovedAt)
 	if err != nil && !isNoRows(err) {
 		return a, fmt.Errorf("chat: load advisor profile: %w", err)
 	}
@@ -93,6 +100,11 @@ func (s *Service) SetAdvisorProfile(ctx context.Context, me int64, req *appv1.Se
 			return nil, errInvalid("unknown advisor tone")
 		}
 	}
+	if req.KeyRemovedAt != nil {
+		if v := req.GetKeyRemovedAt(); v < 0 || v > advisorKeyRemovedAtMax {
+			return nil, errInvalid("key_removed_at must be 0 to 2^53 - 1")
+		}
+	}
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
@@ -119,16 +131,22 @@ func (s *Service) SetAdvisorProfile(ctx context.Context, me int64, req *appv1.Se
 		if req.AutoSession != nil {
 			a.AutoSession = req.GetAutoSession()
 		}
+		// Only moves forward: a device with an older time (or a slower clock)
+		// never brings back a key removed later.
+		if req.KeyRemovedAt != nil && req.GetKeyRemovedAt() > a.KeyRemovedAt {
+			a.KeyRemovedAt = req.GetKeyRemovedAt()
+		}
 		out = a
 		if a == before {
 			return nil
 		}
 		if _, err := t.tx.Exec(ctx, `
-			INSERT INTO advisor_profiles (user_id, name, look_id, tone, auto_session, updated_at)
-			VALUES ($1, $2, $3, $4, $5, now())
+			INSERT INTO advisor_profiles (user_id, name, look_id, tone, auto_session, key_removed_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, now())
 			ON CONFLICT (user_id) DO UPDATE SET name = excluded.name, look_id = excluded.look_id,
-				tone = excluded.tone, auto_session = excluded.auto_session, updated_at = now()`,
-			me, a.Name, a.LookID, a.Tone, a.AutoSession); err != nil {
+				tone = excluded.tone, auto_session = excluded.auto_session,
+				key_removed_at = excluded.key_removed_at, updated_at = now()`,
+			me, a.Name, a.LookID, a.Tone, a.AutoSession, a.KeyRemovedAt); err != nil {
 			return fmt.Errorf("chat: set advisor profile: %w", err)
 		}
 		t.toUsers(t.event(kindAdvisorProfile, 0, me), []int64{me}, &appv1.Update{Kind: &appv1.Update_AdvisorProfile{

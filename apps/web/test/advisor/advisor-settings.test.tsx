@@ -1,7 +1,8 @@
 // Settings › Cố vấn: the profile saves through the store (look, tone, name),
-// the mascot shows or hides on this device, and each machine's key is set or
-// removed over the end-to-end link (AdvisorSetKey, AdvisorRemoveKey); an
-// outdated machine says it needs a newer tunelo.
+// the mascot shows or hides on this device, and a machine's own key is set or
+// removed over the end-to-end link (AdvisorSetKey, AdvisorRemoveKey), also on
+// a tunelo older than the account's key; an outdated machine says it needs a
+// newer tunelo. The account's key: advisor-account-key.test.tsx.
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { AdvisorProfile } from "@achoo254/chat-core";
 import { LoginState, type AdvisorSetKey, type Frame } from "@achoo254/chat-proto/remote/remote";
@@ -57,7 +58,7 @@ beforeEach(async () => {
 	known = true;
 	setKeys = [];
 	removed = 0;
-	profile = { name: "", lookId: "owl", tone: "short", autoSession: false };
+	profile = { name: "", lookId: "owl", tone: "short", autoSession: false, keyRemovedAt: 0 };
 	profileLoaded = true;
 	machineAuto = false;
 	setAutos = [];
@@ -163,12 +164,27 @@ describe("Settings › Cố vấn", () => {
 		expect(setAutos).toEqual([]);
 	});
 
-	it("sets a machine's key over the link, shows its fingerprint and where it came from, and removes it", async () => {
+	it("shows the TypeSafe key guide while no machine has a key and hides it once one does", async () => {
+		open();
+		await screen.findByText(t.key.noKey, undefined, WAIT);
+		expect(screen.getByText(t.key.guide.title)).toBeTruthy();
+		expect(screen.getByText(t.key.guide.notRunning)).toBeTruthy();
+		expect(screen.getByRole("link", { name: t.key.guide.open }).getAttribute("href")).toBe(t.key.guide.consoleUrl);
+	});
+
+	it("hides the key guide when a machine already has a key", async () => {
+		keySet = true;
+		open();
+		await screen.findByText(/a1b2c3/, undefined, WAIT);
+		expect(screen.queryByText(t.key.guide.title)).toBeNull();
+	});
+
+	it("sets an older machine's own key over the link, shows its fingerprint and where it came from, and removes it", async () => {
 		open();
 		const card = await screen.findByText(t.key.noKey, undefined, WAIT);
 		const row = card.closest(".adv-machine-key") as HTMLElement;
 		expect(row.closest("[data-advisor-ignore]")).not.toBeNull();
-		await userEvent.click(within(row).getByRole("button", { name: t.key.paste }));
+		await userEvent.click(within(row).getByRole("button", { name: t.key.pasteOwn }));
 		const field = within(row).getByLabelText(t.key.field) as HTMLInputElement;
 		expect(field.type).toBe("password");
 		await userEvent.type(field, "ts_live_0123456789abcdefghijklmnopqrstuvwxyz");
@@ -176,8 +192,9 @@ describe("Settings › Cố vấn", () => {
 		await waitFor(() => expect(setKeys.map((k) => k.key)).toEqual(["ts_live_0123456789abcdefghijklmnopqrstuvwxyz"]), WAIT);
 		expect(await within(row).findByText(t.key.keySet("a1b2c3"), undefined, WAIT)).toBeTruthy();
 		expect(within(row).getByText(new RegExp(t.key.localDevice))).toBeTruthy();
-		await userEvent.click(within(row).getByRole("button", { name: t.key.remove }));
-		await userEvent.click(within(row).getAllByRole("button", { name: t.key.remove }).at(-1) as HTMLElement);
+		expect(within(row).getByText(t.key.needsShare)).toBeTruthy();
+		await userEvent.click(within(row).getByRole("button", { name: t.key.removeOwn }));
+		await userEvent.click(within(row).getAllByRole("button", { name: t.key.removeOwn }).at(-1) as HTMLElement);
 		await waitFor(() => expect(removed).toBe(1), WAIT);
 		expect(await within(row).findByText(t.key.noKey, undefined, WAIT)).toBeTruthy();
 	});
@@ -186,6 +203,6 @@ describe("Settings › Cố vấn", () => {
 		known = false;
 		open();
 		expect(await screen.findByText(t.key.update, undefined, WAIT)).toBeTruthy();
-		expect(screen.queryByRole("button", { name: t.key.paste })).toBeNull();
+		expect(screen.queryByRole("button", { name: t.key.pasteOwn })).toBeNull();
 	});
 });

@@ -12,7 +12,7 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // The Advisor profile (Cố vấn) of the AI Agent: how the user's Advisor mascot
 // is called, looks and words its answers, kept per user by the server and
 // synced to every session like the notification settings. It holds no
-// secret and no machine or AI: the TypeSafe key stays on each machine, and
+// secret and no machine or AI: the TypeSafe key stays on the machines, and
 // the device remembers which machine and AI it asked last. `name` is shown
 // to the user only, never put into an AI's prompt; machines map `tone` to a
 // fixed wording of their own. Every change reaches the user's sessions as
@@ -51,6 +51,12 @@ message AdvisorProfile {
   // holds the wish; each machine keeps its own copy (AdvisorSetAuto) that a
   // device brings in line with this one when it links to the machine.
   bool auto_session = 4;
+  // Unix milliseconds (a device's clock) when the user last removed the
+  // account's TypeSafe key; 0 when never. No secret: only a time. Every
+  // machine's account key set no later than this is removed when a device
+  // next links to it, and never handed on; a new account key counts as set
+  // after it. Only moves forward.
+  int64 key_removed_at = 5 [jstype = JS_NUMBER];
 }
 
 message GetAdvisorProfileRequest {}
@@ -70,6 +76,8 @@ message SetAdvisorProfileRequest {
   // Not ADVISOR_TONE_UNSPECIFIED.
   optional AdvisorTone tone = 3;
   optional bool auto_session = 4;
+  // 0 to 2^53 - 1; a value earlier than the kept one leaves it unchanged.
+  optional int64 key_removed_at = 5 [jstype = JS_NUMBER];
 }
 
 message SetAdvisorProfileResponse {

@@ -53,7 +53,12 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
 - **Khoá TypeSafe BYOK trên máy B.** Kho riêng `advisor-secrets.json` (seal như bí mật đăng nhập, một `SecretStore` riêng) mà `request_secret` và
   env lệnh của phiên không đọc, nên AI không xin hay thấy được khoá. Khoá đặt từ thiết bị qua kênh mã hoá đầu cuối (`AdvisorSetKey`) hoặc
   `tunelo advisor set-key` (chỉ trong terminal thật, không qua pipe); khoá ngắn hơn 32 ký tự bị từ chối mà không được nhớ để che (che một chữ ngắn
-  như "test" sẽ xoá nó khỏi mọi đầu ra). Thiết bị chỉ thấy dấu vân tay, thiết bị đặt và thời điểm; đặt/xoá ghi audit trên máy. Lệnh đọc Keychain
+  như "test" sẽ xoá nó khỏi mọi đầu ra). Thiết bị chỉ thấy dấu vân tay, thiết bị đặt và thời điểm; đặt/xoá ghi audit trên máy. Từ 18/11/2026
+  (tunelo 3.23.0+) có thêm khoá chung của tài khoản: dán một lần, rồi máy niêm phong khoá cho khoá X25519 tạm của máy nhận (thiết bị lấy khoá
+  công khai đó qua chính kênh mã hoá đầu cuối tới máy nhận, không từ danh sách của server), trình duyệt và server chỉ chuyển khối đã niêm phong
+  (`AdvisorKeyShareBegin`, `AdvisorKeySeal`, `AdvisorKeyShareOpen`); khoá riêng của máy ghi đè khoá chung và không bao giờ được chuyển; khoá có
+  từ trước được nâng thành khoá chung khi người dùng đồng ý (`AdvisorKeyPromote`); xoá khoá chung ghi `key_removed_at` vào hồ sơ Cố vấn để máy
+  nối lại sau cũng bị xoá và khoá đó không bao giờ được chuyển tiếp. Lệnh đọc Keychain
   của tunelo và `tunelo advisor` bị coi là nhạy cảm. Giới hạn: AI chạy cùng user hệ điều hành với tunelo, nên khoá không cô lập tuyệt đối; lớp
   chặn còn lại là bộ lọc lệnh nhạy cảm (`apps/agent/src/safety/sensitive-paths.ts`) và thẻ duyệt Bash của phiên làm việc.
 - **Chế độ tự động theo phiên, kênh chỉ dẫn theo từng AI.** Một công tắc chung cho cả tài khoản (18/11/2026, thay công tắc theo phiên ở menu mascot): Cài đặt › Cố vấn › "Tự theo dõi mọi phiên" lưu ở hồ sơ Cố vấn (`auto_session`); mỗi máy giữ bản của mình (`AdvisorSetAuto`, `MachineInfo.advisor.auto`, trong config của tunelo) và áp cho mọi phiên của máy, kể cả phiên terminal và phiên mở từ trước; thiết bị đang nối tới máy đối chiếu bản của máy với hồ sơ (`useAdvisorAutoSync`), chỉ sau khi hồ sơ đã tải xong, nên máy đang tắt nhận giá trị khi nối lại. `ThreadSetAdvisor` còn đó cho thiết bị cũ (cờ theo phiên cộng với công tắc chung, bật một trong hai là bật). Chỉ khi AI có MCP phiên. Claude nhận

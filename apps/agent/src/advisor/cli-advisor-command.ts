@@ -57,7 +57,8 @@ function describe(status: AdvisorKeyStatus): string {
   if (!status.keySet) return "Advisor key: none on this machine.";
   const by = status.setByDevice ? ` by ${status.setByDevice}` : "";
   const at = status.setAt > 0 ? ` on ${new Date(status.setAt).toISOString()}` : "";
-  return `Advisor key: set (fingerprint ${status.fingerprint})${by}${at}.`;
+  const whose = status.source === "account" ? "the account's key" : "this machine's own key";
+  return `Advisor key: ${whose}, set (fingerprint ${status.fingerprint})${by}${at}.`;
 }
 
 export type AdvisorCommandDeps = {
