@@ -428,6 +428,11 @@ func (s *Service) DeleteImportedChat(ctx context.Context, owner, chatID int64) e
 				return err
 			}
 		}
+		// The keys of its messages go with it: left behind, they would make a later sync of the same
+		// conversation take every message for one it already has and import nothing.
+		if _, err := t.tx.Exec(ctx, `DELETE FROM external_messages WHERE chat_id = $1`, chatID); err != nil {
+			return fmt.Errorf("chat: forget the keys of an imported chat: %w", err)
+		}
 		_, err = t.tx.Exec(ctx, `DELETE FROM external_chats WHERE chat_id = $1`, chatID)
 		return err
 	})

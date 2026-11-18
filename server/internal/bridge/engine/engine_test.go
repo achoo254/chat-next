@@ -733,3 +733,34 @@ func TestSpansChatRefusesDegradeToPlainTextWithoutLosingTheMessage(t *testing.T)
 	chatID := e.enable(conv, 100)
 	e.waitTexts(chatID, []string{"mở https://example.com ra", "tin sau"})
 }
+
+func TestAConversationRemovedAndEnabledAgainIsImportedInFullAgain(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	conv := e.group("g1")
+	e.fake.AddHistory("g1", numbered(e, lan, 5)...)
+	eng := e.start()
+	first, err := eng.EnableChat(ctx, e.account, conv, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.waitTexts(first, []string{"tin 1", "tin 2", "tin 3", "tin 4", "tin 5"})
+	if err := eng.RemoveChat(ctx, e.owner, e.account, "g1"); err != nil {
+		t.Fatal(err)
+	}
+	var keys int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_messages WHERE chat_id = $1`, first).Scan(&keys); err != nil || keys != 0 {
+		t.Fatalf("%d keys of the removed chat are left (%v), want none", keys, err)
+	}
+	second, err := eng.EnableChat(ctx, e.account, conv, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second == first {
+		t.Fatal("the new copy reuses the removed chat")
+	}
+	e.waitTexts(second, []string{"tin 1", "tin 2", "tin 3", "tin 4", "tin 5"})
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_messages WHERE chat_id = $1`, second).Scan(&keys); err != nil || keys != 5 {
+		t.Fatalf("%d keys for the new copy (%v), want 5", keys, err)
+	}
+}

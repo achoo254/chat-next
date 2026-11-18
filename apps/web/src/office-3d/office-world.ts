@@ -9,6 +9,7 @@
 // with Babylon).
 import { SceneInstrumentation } from "@babylonjs/core/Instrumentation/sceneInstrumentation";
 import { SceneLoaderFlags } from "@babylonjs/core/Loading/sceneLoaderFlags";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { BOARD_ROOMS } from "../machines/office/office-boards.tsx";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
@@ -30,9 +31,11 @@ import { CAMERA_DISTANCE, pixelsPerMetre, screenOffset } from "./scene/fit-offic
 import { createOfficeCamera } from "./scene/office-camera.ts";
 import { officeLighting } from "./scene/office-lighting.ts";
 import { createOfficeLights } from "./scene/office-lights.ts";
+import { bodyAt, type ProjectedBody } from "./scene/person-hit.ts";
 import { createPostProcessing } from "./scene/post-processing.ts";
 import { createPropLibrary } from "./scene/prop-library.ts";
 import { createRoomFx } from "./scene/room-fx.ts";
+import { createSelectionRing } from "./scene/selection-ring.ts";
 import { assetUrl, loadSceneAssets, propSources } from "./scene/scene-assets.ts";
 import { SCENE_LAYOUT } from "./scene/scene-layout.ts";
 import { createZoneLibrary } from "./scene/zone-library.ts";
@@ -58,6 +61,8 @@ export interface WorldOptions {
 
 export interface OfficeWorld {
 	update(props: OfficeRendererProps, sound: boolean): void;
+	/** The person whose body is under this client point (a placement key), or null: for a tap on the canvas that missed every name. */
+	pickPerson(clientX: number, clientY: number): string | null;
 	bind(id: string, el: HTMLElement | null): void;
 	dispose(): void;
 }
@@ -104,6 +109,8 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	const camera = createOfficeCamera(scene, canvas, cameraPlan(layout, SCENE_LAYOUT.footprint), opts.props.framing, opts.reducedMotion, opts.onTap);
 	const post = createPostProcessing(scene, camera.camera, "neutral");
 	const pool = createCharacterPool(scene);
+	// The ring under the person whose panel is open: one mesh, made when someone is first chosen (selection-ring.ts).
+	const ring = createSelectionRing(scene);
 	let sfx: OfficeSfx = createOfficeSfx(new Map(), assetUrl);
 	let lifeSounds: LifeSounds = createLifeSounds(new Map(), assetUrl);
 	// What happens out of view stays quiet, but an approval waiting on the viewer always rings.
@@ -239,6 +246,10 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		};
 		people.frame(frozen ? 0 : dtMs / 1000, fullRate, inView, { x: frame.target.x, z: frame.target.z });
 		const views = people.views();
+		const chosen = latest.selectedKey ?? null;
+		const chosenView = chosen === null ? undefined : views.find((p) => p.key === chosen);
+		if (chosenView === undefined) ring.hide();
+		else ring.show(chosenView.x, chosenView.z);
 		const seen = views.filter((p) => p.visible).map((p) => p.key).join("|");
 		if (seen !== casterKeys) refreshCasters();
 		fx.frame(now / 1000, views, frozen ? 0 : light.screenGlow, frozen ? 0 : light.deskLamp);
@@ -271,6 +282,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				pixelsPerMetre: pxPerMetre,
 				dots: overlay.dots,
 				drawCalls: instrumentation.drawCallsCounter.current,
+				selectionRing: ring.visible,
 				frames,
 				fps: engine.getFps(),
 				stats: stats.summary(),
@@ -322,6 +334,27 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				people.update(next.placements, next.state, next.now, next.talks);
 				fx.update(next.state);
 			},
+			pickPerson(clientX, clientY) {
+				const box = canvas.getBoundingClientRect();
+				if (box.width <= 0 || box.height <= 0) return null;
+				const matrix = scene.getTransformMatrix();
+				const at = new Vector3();
+				const out = new Vector3();
+				const project = (x: number, y: number, z: number): readonly [number, number] => {
+					at.set(x, y, z);
+					Vector3.TransformCoordinatesToRef(at, matrix, out);
+					return [box.left + ((out.x + 1) / 2) * box.width, box.top + ((1 - out.y) / 2) * box.height];
+				};
+				const bodies: ProjectedBody[] = [];
+				for (const p of people.views()) {
+					// The chairman is the viewer: nobody to inspect.
+					if (p.key === "chairman") continue;
+					const feet = project(p.x, 0, p.z);
+					const head = project(p.x, p.labelHeight, p.z);
+					bodies.push({ key: p.key, footX: feet[0], footY: feet[1], headY: head[1] });
+				}
+				return bodyAt(bodies, clientX, clientY);
+			},
 			bind: overlay.bind,
 			dispose() {
 				if (disposed) return;
@@ -335,6 +368,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 				sfx.dispose();
 				lifeSounds.dispose();
 				people.dispose();
+				ring.dispose();
 				fx.dispose();
 				zones.dispose();
 				props.dispose();

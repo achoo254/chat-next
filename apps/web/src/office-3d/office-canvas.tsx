@@ -84,7 +84,7 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 	const host = useRef<HTMLDivElement>(null);
 	const worldRef = useRef<OfficeWorld | null>(null);
 	const pins = useRef(new Map<string, HTMLElement>());
-	// A tap on the canvas (not a drag of the camera): the name under it is chosen, a tap on nothing asks for none.
+	// A tap on the canvas (not a drag of the camera): the name under it is chosen, else the body, a tap on nothing asks for none.
 	const select = props.onSelect;
 	const onTap = useCallback(
 		(x: number, y: number): void => {
@@ -94,7 +94,8 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 				const rect = el.querySelector(".of3d-tag")?.getBoundingClientRect();
 				if (rect !== undefined) boxes.push({ key: id.slice("person:".length), left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
 			}
-			select?.(tagAt(boxes, x, y));
+			// A name first (it floats over the bodies), else the body under the tap, else nothing.
+			select?.(tagAt(boxes, x, y) ?? worldRef.current?.pickPerson(x, y) ?? null);
 		},
 		[select],
 	);
