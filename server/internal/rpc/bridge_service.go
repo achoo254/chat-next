@@ -23,10 +23,11 @@ type bridgeService struct {
 	logger *slog.Logger
 }
 
-// bridgeCall runs fn for the signed-in user. Calls that change something
-// pass recent: the session's IdP sign-in must be recent (the same rule as
-// resetting a bot token), because a connected account reads the user's
-// private conversations.
+// bridgeCall runs fn for the signed-in user. Only the calls that grant access
+// to a new external account (the login steps) pass recent: the session's IdP
+// sign-in must be recent (the same rule as resetting a bot token). Enabling or
+// removing a synced chat and disconnecting never widen access, so they do not
+// ask for a fresh sign-in.
 func bridgeCall[Req, Resp any](ctx context.Context, s *bridgeService, req *connect.Request[Req], recent bool,
 	fn func(me int64, msg *Req) (*Resp, error),
 ) (*connect.Response[Resp], error) {
@@ -133,7 +134,7 @@ func (s *bridgeService) ListBridgeConversations(ctx context.Context, req *connec
 }
 
 func (s *bridgeService) EnableBridgeChat(ctx context.Context, req *connect.Request[appv1.EnableBridgeChatRequest]) (*connect.Response[appv1.EnableBridgeChatResponse], error) {
-	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.EnableBridgeChatRequest) (*appv1.EnableBridgeChatResponse, error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.EnableBridgeChatRequest) (*appv1.EnableBridgeChatResponse, error) {
 		window := int(m.GetHistoryWindow())
 		if window < 0 || window > engine.MaxWindow {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("history_window must be 0 or 1 to 100000"))
@@ -147,7 +148,7 @@ func (s *bridgeService) EnableBridgeChat(ctx context.Context, req *connect.Reque
 }
 
 func (s *bridgeService) RemoveBridgeChat(ctx context.Context, req *connect.Request[appv1.RemoveBridgeChatRequest]) (*connect.Response[appv1.RemoveBridgeChatResponse], error) {
-	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.RemoveBridgeChatRequest) (*appv1.RemoveBridgeChatResponse, error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.RemoveBridgeChatRequest) (*appv1.RemoveBridgeChatResponse, error) {
 		if err := s.engine.RemoveChat(ctx, me, m.GetAccountId(), m.GetConversationId()); err != nil {
 			return nil, err
 		}
@@ -156,7 +157,7 @@ func (s *bridgeService) RemoveBridgeChat(ctx context.Context, req *connect.Reque
 }
 
 func (s *bridgeService) DisconnectBridgeAccount(ctx context.Context, req *connect.Request[appv1.DisconnectBridgeAccountRequest]) (*connect.Response[appv1.DisconnectBridgeAccountResponse], error) {
-	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.DisconnectBridgeAccountRequest) (*appv1.DisconnectBridgeAccountResponse, error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.DisconnectBridgeAccountRequest) (*appv1.DisconnectBridgeAccountResponse, error) {
 		if err := s.engine.Disconnect(ctx, me, m.GetAccountId(), m.GetDeleteChats()); err != nil {
 			return nil, err
 		}
