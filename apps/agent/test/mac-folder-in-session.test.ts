@@ -28,6 +28,8 @@ function gate(outcome: AskOutcome = "granted") {
       if (outcome === "granted") granted = true;
       return outcome;
     },
+    aiFences: () => ({ deny: [], allow: [] }),
+    sandboxDir: "/tmp",
   };
   return { g, asked, grant: () => (granted = true) };
 }

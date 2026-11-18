@@ -2,6 +2,7 @@
 // folder under providers/, after it passes the provider contract tests.
 import type { AccountsStore } from "../accounts/store.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
+import type { AiFences } from "../safety/mac-folders.ts";
 import { CLAUDE_PROVIDER_ID } from "./claude/accounts/paths.ts";
 import { ANTIGRAVITY_PROVIDER_ID } from "./antigravity/agy.ts";
 import { createAntigravityProvider } from "./antigravity/index.ts";
@@ -26,6 +27,8 @@ export type ProviderSources = {
   configDir: string;
   /** Several accounts of each AI that can keep them; without it, every AI uses its own sign-in only. */
   accounts?: AccountsHost;
+  /** macOS: what the AI's long-lived processes may not touch (MacFolders.aiFences); Claude reads it from each session's policy. */
+  fences?: () => AiFences;
 };
 
 export function builtinProviders(src: ProviderSources): AgentProvider[] {
@@ -44,9 +47,11 @@ export function builtinProviders(src: ProviderSources): AgentProvider[] {
         }
       : { homes: () => claudeHomesIn(src.configDir) },
   );
+  const fences = src.fences ? { fences: src.fences } : {};
   const antigravity = createAntigravityProvider(
     a
       ? {
+          ...fences,
           log: a.log,
           accounts: {
             configDir: src.configDir,
@@ -56,7 +61,7 @@ export function builtinProviders(src: ProviderSources): AgentProvider[] {
             onUsage: (id, usage) => a.onUsage(ANTIGRAVITY_PROVIDER_ID, id, usage),
           },
         }
-      : {},
+      : fences,
   );
   return [claude, antigravity];
 }

@@ -28,6 +28,10 @@ export type AskOutcome = "granted" | "denied" | "unanswered";
 export interface MacFolderGate {
   ungrantedIn(text: string, cwd: string): string | undefined;
   askAndWait(folder: string, waitMs: number): Promise<AskOutcome>;
+  /** What an AI process started now may not touch (MacFolders.aiFences). */
+  aiFences(): AiFences;
+  /** Where the sandbox's scripts go (safety/mac-sandbox.ts). */
+  readonly sandboxDir: string;
 }
 
 /** Work in a protected folder tunelo may not enter yet. `folder` is the protected folder itself. */
@@ -49,8 +53,37 @@ const CLOUD_STORAGE = ["Library", "CloudStorage"];
 
 /** The fixed protected folders under home, in the order devices show them. */
 function fixedFolders(home: string): string[] {
-  return [join(home, "Desktop"), join(home, "Documents"), join(home, "Downloads"), join(home, ...ICLOUD)];
+  return [
+    join(home, "Desktop"),
+    join(home, "Documents"),
+    join(home, "Downloads"),
+    join(home, ...ICLOUD),
+    // Media: macOS asks for Apple Music and the media library, or Photos, when a program reads in them.
+    join(home, "Music"),
+    join(home, "Movies"),
+    join(home, "Pictures"),
+  ];
 }
+
+/**
+ * Other apps' data that macOS asks about (or refuses) and the user never
+ * grants folder by folder: kept from tunelo's AI processes without Full Disk
+ * Access. Docker's own container stays open: its CLI reaches the engine
+ * through a socket in it.
+ */
+const APP_DATA = [
+  ["Library", "Containers"],
+  ["Library", "Group Containers"],
+  ["Library", "Application Support", "AddressBook"],
+  ["Library", "Calendars"],
+];
+const APP_DATA_OPEN = [
+  ["Library", "Containers", "com.docker.docker"],
+  ["Library", "Group Containers", "group.com.docker"],
+];
+
+/** What tunelo's AI processes may not touch (deny), with the openings inside it (allow); both empty: nothing to keep out. */
+export type AiFences = { deny: string[]; allow: string[] };
 
 /** `child` is `parent` or inside it. */
 function within(child: string, parent: string): boolean {
@@ -154,6 +187,8 @@ export interface MacFoldersOptions {
   log: (line: string) => void;
   /** Lists the protected folders (tests replace it). */
   folders?: (home: string) => string[];
+  /** tunelo's config folder: the sandbox's scripts go under it. */
+  configDir?: string;
   isStartupVolume?: (p: string) => boolean;
 }
 
@@ -162,6 +197,10 @@ export class MacFolders implements MacFolderGate {
   private readonly asking = new Map<string, Promise<ProbeAnswer | undefined>>();
 
   constructor(private readonly opts: MacFoldersOptions) {}
+
+  get sandboxDir(): string {
+    return this.opts.configDir ?? join(homedir(), ".config", "tunelo");
+  }
 
   /** macOS protects folders; nothing to ask for elsewhere. */
   get applies(): boolean {
@@ -230,6 +269,20 @@ export class MacFolders implements MacFolderGate {
     return "unanswered";
   }
 
+  /**
+   * What the AI's processes tunelo starts may not touch, enforced by macOS's
+   * sandbox (safety/mac-sandbox.ts): every protected folder not granted yet
+   * and other apps' data, so a command that wanders into one (`find /`) gets
+   * "Operation not permitted" at once instead of a macOS prompt nobody at
+   * the machine answers. Nothing with Full Disk Access or off macOS.
+   */
+  aiFences(): AiFences {
+    if (!this.applies || this.opts.fullDiskAccess()) return { deny: [], allow: [] };
+    const home = this.opts.home;
+    const folders = (this.opts.folders ?? protectedFolders)(home).filter((f) => this.access(f) !== "granted");
+    return { deny: [...folders, ...APP_DATA.map((p) => join(home, ...p))], allow: APP_DATA_OPEN.map((p) => join(home, ...p)) };
+  }
+
   /** The protected folders and the access to each, for MachineInfo; empty off macOS. */
   list(): MacFolderState[] {
     if (!this.applies) return [];
@@ -288,4 +341,9 @@ export async function macFolderBeforeCall(gate: MacFolderGate, folder: string): 
     return `macOS does not let tunelo into ${folder}, so this call did not run. The user can allow it on the Mac in System Settings > Privacy & Security > Files and Folders. Do not try it again now; go on without that folder.`;
   }
   return `tunelo asked macOS for ${folder}, but nobody answered macOS's prompt on the machine in time, so this call did not run. Do not try it again now; go on without that folder, or ask the user to allow it and say when.`;
+}
+
+/** What the AI reads when macOS allowed `folder` but its process started kept out of it: the session restarts after this turn. */
+export function macFolderAfterRestart(folder: string): string {
+  return `macOS now lets tunelo into ${folder}, but this session started before that and cannot reach it yet; tunelo restarts the session once this turn ends. Finish this turn without that folder and tell the user to send the request again.`;
 }

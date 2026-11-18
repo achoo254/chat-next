@@ -6,6 +6,8 @@
 import { homedir } from "node:os";
 import { AcpClient, type AcpProcess, type AcpLaunch } from "../acp/acp-client.ts";
 import { AcpRouter, type AcpSession } from "../acp/acp-session.ts";
+import type { AiFences } from "../../safety/mac-folders.ts";
+import { sandboxProfile, sandboxedLaunch } from "../../safety/mac-sandbox.ts";
 import { agyEnv } from "./agy.ts";
 
 /** Set in agy's environment for tunelo's own sessions: tunelo's liveness hook acts only on those. */
@@ -15,6 +17,8 @@ export type AgyProcessOptions = {
   findBinary: () => Promise<string | null>;
   log: (line: string) => void;
   spawnProcess?: (launch: AcpLaunch) => AcpProcess;
+  /** macOS: what agy may not touch; it runs in tunelo's sandbox (safety/mac-sandbox.ts). */
+  fences?: () => AiFences;
 };
 
 /** An Antigravity turn runs: agy may not stop now. */
@@ -24,7 +28,8 @@ export class AgyBusy extends Error {
   }
 }
 
-type Live = { client: AcpClient; router: AcpRouter; sessions: Set<AcpSession> };
+/** `fenced`: the sandbox profile agy started in ("" without one). */
+type Live = { client: AcpClient; router: AcpRouter; sessions: Set<AcpSession>; fenced: string };
 
 export class AgyAcp {
   private live: Promise<Live> | undefined;
@@ -38,7 +43,10 @@ export class AgyAcp {
   /** The running process, started (and initialized) when there is none. */
   get(): Promise<Live> {
     const cur = this.live;
-    if (cur) return cur;
+    // macOS let tunelo into another folder since agy started: with no session open on it, a new agy reaches it.
+    if (cur && this.current && this.current.sessions.size === 0 && this.current.fenced !== this.fencedNow()) {
+      void this.stop();
+    } else if (cur) return cur;
     const next = this.gate.then(() => this.start());
     this.live = next;
     next.catch(() => {
@@ -50,12 +58,14 @@ export class AgyAcp {
   private async start(): Promise<Live> {
     const bin = await this.opts.findBinary();
     if (!bin) throw new Error("agy is not installed");
+    const fences = this.opts.fences?.() ?? { deny: [], allow: [] };
+    const run = sandboxedLaunch(fences, bin, ["acp"]);
     const client = new AcpClient({
-      launch: { file: bin, args: ["acp"], env: agyEnv({ [TUNELO_AGY_ENV]: "1" }), cwd: homedir() },
+      launch: { ...run, env: agyEnv({ [TUNELO_AGY_ENV]: "1" }), cwd: homedir() },
       log: this.opts.log,
       ...(this.opts.spawnProcess ? { spawnProcess: this.opts.spawnProcess } : {}),
     });
-    const live: Live = { client, router: new AcpRouter(client, this.opts.log), sessions: new Set() };
+    const live: Live = { client, router: new AcpRouter(client, this.opts.log), sessions: new Set(), fenced: run.file === bin ? "" : sandboxProfile(fences) };
     void client.exited.then(() => {
       if (this.current === live) {
         this.current = undefined;
@@ -73,6 +83,12 @@ export class AgyAcp {
     }
     this.current = live;
     return live;
+  }
+
+  /** The sandbox profile a new agy would start in ("" without one). */
+  private fencedNow(): string {
+    const fences = this.opts.fences?.();
+    return fences && sandboxedLaunch(fences, "agy", []).file !== "agy" ? sandboxProfile(fences) : "";
   }
 
   /** Stops the process (an account switch, or the service stopping); sessions on it are lost. */

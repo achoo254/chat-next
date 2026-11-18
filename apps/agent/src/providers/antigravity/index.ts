@@ -15,6 +15,7 @@ import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import type { AgentProvider, Detected, ProviderCapabilities, ProviderSession, SessionPolicy, AskUser, TerminalCommand, TerminalLaunch } from "../types.ts";
 import { AgyAccounts, type AgyAccountsOptions } from "./accounts.ts";
+import type { AiFences } from "../../safety/mac-folders.ts";
 import { AgyAcp } from "./acp-process.ts";
 import { macKeychain } from "./keychain.ts";
 import { probeAgyUsage } from "./quota.ts";
@@ -78,11 +79,13 @@ export function createAntigravityProvider(
     /** The version of the agy found (`agy --version`). */
     version?: (bin: string) => Promise<string | undefined>;
     accounts?: AgyAccountsDeps;
+    /** macOS: what agy may not touch (MacFolders.aiFences). */
+    fences?: () => AiFences;
   } = {},
 ): AgentProvider {
   const findBinary = deps.findBinary ?? findAgy;
   const log = deps.log ?? (() => undefined);
-  const acp = deps.acp ?? new AgyAcp({ findBinary, log });
+  const acp = deps.acp ?? new AgyAcp({ findBinary, log, ...(deps.fences ? { fences: deps.fences } : {}) });
   const accounts =
     deps.accounts && process.platform === "darwin"
       ? new AgyAccounts({

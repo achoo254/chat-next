@@ -8,6 +8,7 @@ import type { HookCallbackMatcher, Options, PermissionUpdate, Query, SDKMessage,
 import { describe, expect, it } from "vitest";
 import type { AgentCore, CoreOptions } from "../../src/core/agent-core.ts";
 import { createClaudeProvider, writeApprovalHook } from "../../src/providers/claude/index.ts";
+import type { MacFolderGate } from "../../src/safety/mac-folders.ts";
 import { Channel } from "../../src/util/channel.ts";
 import { byCase, makeCore, until } from "../harness.ts";
 
@@ -236,13 +237,15 @@ describe("a call naming a folder macOS protects that tunelo may not enter yet", 
   function gate(outcome: "granted" | "denied" | "unanswered") {
     let granted = false;
     const asked: string[] = [];
-    const macFolders: CoreOptions["macFolders"] = {
+    const macFolders: MacFolderGate = {
       ungrantedIn: (text) => (!granted && text.includes(DOCS) ? DOCS : undefined),
       askAndWait: async (folder) => {
         asked.push(folder);
         if (outcome === "granted") granted = true;
         return outcome;
       },
+      aiFences: () => ({ deny: [], allow: [] }),
+      sandboxDir: "/tmp",
     };
     return { macFolders, asked };
   }

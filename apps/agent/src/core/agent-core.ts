@@ -229,6 +229,8 @@ type Thread = {
   flushTimer?: ReturnType<typeof setTimeout>;
   /** Running tool calls that name a folder macOS protects and tunelo may not enter yet, by tool id (watchMacStall). */
   macStalls?: Map<string, { folder: string; timer: ReturnType<typeof setTimeout> }>;
+  /** macOS let tunelo into another folder while a turn ran: the session restarts once the turn ends (macAccessGranted). */
+  reopenAfterTurn?: boolean;
   usage?: { tokens: number; window: number };
   info: Omit<ProviderInfo, "rateLimits" | "account">;
   clientMsgIds: Set<string>;
@@ -2810,6 +2812,20 @@ export class AgentCore {
     void this.interrupt(t.meta.id).catch((err: unknown) => this.opts.log?.(`thread ${t.meta.id}: could not stop the turn: ${(err as Error).message}`));
   }
 
+  /**
+   * macOS let tunelo into another protected folder. The AI's processes were
+   * started in a sandbox that keeps it out (safety/mac-sandbox.ts), so each
+   * session restarts: an idle one now, a busy one once its turn ends. The
+   * next message resumes the same conversation in a process that reaches it.
+   */
+  macAccessGranted(): void {
+    for (const t of this.threads.values()) {
+      if (!t.session) continue;
+      if (t.running || t.pending.size > 0) t.reopenAfterTurn = true;
+      else void this.park(t).catch((err: unknown) => this.opts.log?.(`thread ${t.meta.id}: could not restart the session: ${(err as Error).message}`));
+    }
+  }
+
   private clearMacStalls(t: Thread): void {
     for (const watched of t.macStalls?.values() ?? []) clearTimeout(watched.timer);
     t.macStalls?.clear();
@@ -2817,6 +2833,11 @@ export class AgentCore {
 
   private endTurn(t: Thread, ended: TurnState, durationMs: number, stats?: TurnStats): void {
     this.clearMacStalls(t);
+    if (t.reopenAfterTurn) {
+      delete t.reopenAfterTurn;
+      // After this turn's own bookkeeping: the session closes once the turn has ended.
+      setTimeout(() => void this.park(t).catch((err: unknown) => this.opts.log?.(`thread ${t.meta.id}: could not restart the session: ${(err as Error).message}`)), 0);
+    }
     // An Advisor thread's turn stopped for running too long failed, whatever its AI says.
     const state = t.timedOut !== undefined && t.timedOut === t.turnItem ? TurnState.FAILED : ended;
     this.stopAdvisor(t);

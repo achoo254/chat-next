@@ -467,6 +467,13 @@ Disk Access (quyết định 18/11/2026). Mã: [`src/safety/mac-folders.ts`](src
   thống › Quyền riêng tư & Bảo mật › Tệp và thư mục rồi bấm "Kiểm tra lại".
 - Máy đã cấp Full Disk Access cho tunelo trước 3.17.0 coi mọi thư mục là đã cho, không hỏi gì. `OpenDiskAccessSettings` bị từ chối
   (`UNSUPPORTED_REQUEST`); script cài, `tunelo login` và `tunelo status` không còn mở hay nhắc cài đặt nào.
+- Sandbox cho tiến trình AI (3.20.0, [`src/safety/mac-sandbox.ts`](src/safety/mac-sandbox.ts)): `claude` và `agy` chạy trong
+  `sandbox-exec` (allow default) cấm các thư mục được bảo vệ chưa được cho (thêm Music, Movies, Pictures) và dữ liệu của app khác
+  (`~/Library/Containers`, `Group Containers` trừ Docker, Danh bạ, Lịch). Lệnh nào đi vào đó (kể cả `find /`, `ls ~`) nhận
+  "Operation not permitted" ngay, không có hộp thoại macOS và không treo; mọi tiến trình con kế thừa sandbox. Kiểm 18/11/2026:
+  `claude -p` trong sandbox vẫn đăng nhập, gọi API, chạy Bash. Máy có Full Disk Access thì không sandbox. Cấp thêm một thư mục
+  thì phiên khởi động lại (rảnh: ngay; đang chạy: hết lượt) và tiến trình agy dùng chung khởi động lại khi không còn phiên mở.
+  Cài đặt Claude Code bật `sandbox.enabled` thì phiên đó không bọc (sandbox không lồng được).
 - Trong phiên AI (3.19.0), cuộc trò chuyện không bao giờ kẹt vì một hộp thoại của macOS không ai bấm:
   - Claude Code: hook `PreToolUse` (mọi tool, mọi chế độ) trả `ask` cho lời gọi nhắc tới thư mục chưa được cho, nên lời gọi đi qua
     thẻ duyệt (`canUseTool`). agy: thẻ của `session/request_permission` (lệnh shell, sửa file, MCP). Thẻ mang

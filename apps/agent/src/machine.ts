@@ -148,7 +148,12 @@ export class Machine {
       platform: process.platform,
       home: homedir(),
       saved: () => this.config.get().macFolders ?? {},
-      save: (folder, answer) => this.config.update((c) => (c.macFolders = { ...c.macFolders, [folder]: answer })),
+      save: (folder, answer) => {
+        this.config.update((c) => (c.macFolders = { ...c.macFolders, [folder]: answer }));
+        // The AI's processes run in a sandbox that keeps this folder out: they restart to reach it.
+        if (answer === "granted") this.core.macAccessGranted();
+      },
+      configDir: dir,
       fullDiskAccess: hasFullDiskAccess,
       // A new copy of tunelo tries the folder: a macOS prompt nobody answers holds that copy, never this one.
       probe: (folder) => probeInChild(selfCommand("mac-folder-access"), folder, MAC_PROMPT_WAIT_MS),
@@ -177,6 +182,7 @@ export class Machine {
       opts.providers ??
       builtinProviders({
         configDir: dir,
+        fences: () => this.macFolders.aiFences(),
         accounts: {
           store: new AccountsStore(dir),
           audit: this.audit,

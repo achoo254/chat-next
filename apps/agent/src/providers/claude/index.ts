@@ -38,7 +38,8 @@ import { claudeEnv, readAccount } from "./accounts/account.ts";
 import { CLAUDE_PROVIDER_ID, defaultClaudeHome, profilesRoot } from "./accounts/paths.ts";
 import { ClaudeProfiles } from "./accounts/service.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
-import { macFolderBeforeCall, macFolderRefusedByUser } from "../../safety/mac-folders.ts";
+import { macFolderAfterRestart, macFolderBeforeCall, macFolderRefusedByUser } from "../../safety/mac-folders.ts";
+import { claudeSandboxOn, sandboxedProgram } from "../../safety/mac-sandbox.ts";
 import { Channel } from "../../util/channel.ts";
 import type {
   AccountInfo,
@@ -245,6 +246,14 @@ export function createClaudeProvider(
       },
     },
   };
+}
+
+/** The settings files a session loads that may turn on Claude Code's own sandbox. */
+function claudeSettingsFiles(policy: SessionPolicy): string[] {
+  const home = policy.account?.dir ?? defaultClaudeHome();
+  const files = [join(home, "settings.json")];
+  if (policy.projectSettings) files.push(join(policy.dir, ".claude", "settings.json"), join(policy.dir, ".claude", "settings.local.json"));
+  return files;
 }
 
 /** Claude's session ids (UUIDs): nothing else becomes an argument. */
@@ -646,6 +655,9 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   let turnStart = 0;
   let turnOpen = false;
   let closed = false;
+  // macOS: claude runs in tunelo's sandbox, kept out of the protected folders not granted yet (safety/mac-sandbox.ts).
+  const fences = policy.macFolders && !claudeSandboxOn(claudeSettingsFiles(policy)) ? policy.macFolders.aiFences() : { deny: [], allow: [] };
+  const program = policy.macFolders ? sandboxedProgram(fences, bin, policy.macFolders.sandboxDir) : bin;
 
   const canUseTool: CanUseTool = async (toolName, input, opts): Promise<PermissionResult> => {
     // An Advisor session never asks the user: tunelo's read-only list answers.
@@ -700,6 +712,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     if (macFolder !== undefined && policy.macFolders) {
       const refused = await macFolderBeforeCall(policy.macFolders, macFolder);
       if (refused !== undefined) return { behavior: "deny", message: refused };
+      // Allowed now, but this claude started in a sandbox that keeps the folder out: the next session reaches it.
+      if (program !== bin && fences.deny.includes(macFolder)) return { behavior: "deny", message: macFolderAfterRestart(macFolder) };
     }
     const { decision } = answer;
     write?.approveWrite(ownTool, input);
@@ -724,7 +738,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
 
   const options: Options = advisorSession
     ? {
-        pathToClaudeCodeExecutable: bin,
+        pathToClaudeCodeExecutable: program,
         cwd: policy.dir,
         // None of the user's or the folder's settings, hooks, rules or MCP servers: tunelo's own only.
         settingSources: [],
@@ -742,7 +756,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         canUseTool,
       }
     : {
-        pathToClaudeCodeExecutable: bin,
+        pathToClaudeCodeExecutable: program,
         cwd: policy.dir,
         settingSources: policy.projectSettings ? ["user", "project", "local"] : ["user"],
         strictMcpConfig: true,
