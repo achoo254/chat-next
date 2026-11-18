@@ -9,6 +9,7 @@ import (
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/store"
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 )
 
 // puppet makes a puppet user (a contact of another app) and adds it to chatID.
@@ -358,5 +359,42 @@ func TestErasingTheOwnerRemovesImportedData(t *testing.T) {
 	}
 	if queued != 1 {
 		t.Fatalf("%d logouts queued, want 1", queued)
+	}
+}
+
+func TestAPrivateCopyCanBeEnabledAgainAfterItWasRemoved(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	other := h.group(owner)
+	pup := h.puppet(other, "bot")
+	var accountID int64
+	if err := h.st.Pool().QueryRow(ctx, `
+		INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, 'telegram', 'tg-again', '\\x00') RETURNING id`, owner).Scan(&accountID); err != nil {
+		t.Fatal(err)
+	}
+	enable := func() (int64, error) {
+		return h.svc.CreateImportedChat(ctx, owner, ImportedChat{Kind: "private", Peer: pup}, func(tx pgx.Tx, chatID int64) error {
+			_, err := tx.Exec(ctx, `INSERT INTO external_chats (account_id, external_chat_id, chat_id) VALUES ($1, 'user:1', $2)`, accountID, chatID)
+			return err
+		})
+	}
+	first, err := enable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.svc.DeleteImportedChat(ctx, owner, first); err != nil {
+		t.Fatal(err)
+	}
+	second, err := enable()
+	if err != nil {
+		t.Fatalf("enabling the same conversation again after removing it = %v, want a new chat", err)
+	}
+	if second == first {
+		t.Fatalf("the new copy reuses the removed chat %d", first)
+	}
+	// Two live chats of the same two people never exist at once.
+	if _, err := enable(); err == nil {
+		t.Fatal("a second live private chat of the same pair was created")
 	}
 }

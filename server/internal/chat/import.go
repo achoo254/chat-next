@@ -331,6 +331,14 @@ func (s *Service) CreateImportedChat(ctx context.Context, owner int64, ic Import
 		}
 		if typ == typePrivate {
 			low, high := min(owner, ic.Peer), max(owner, ic.Peer)
+			// A copy that was removed before is only marked deleted, and its pair row would stop the
+			// new chat of the same two people: the pair is free once its chat is gone.
+			if _, err := t.tx.Exec(ctx, `
+				DELETE FROM private_chats p USING chats c
+				WHERE p.chat_id = c.id AND c.deleted_at IS NOT NULL AND p.tenant_id = $1 AND p.user_low = $2 AND p.user_high = $3`,
+				s.cfg.TenantID, low, high); err != nil {
+				return fmt.Errorf("chat: free the private chat pair: %w", err)
+			}
 			if _, err := t.tx.Exec(ctx, `INSERT INTO private_chats (tenant_id, user_low, user_high, chat_id) VALUES ($1, $2, $3, $4)`,
 				s.cfg.TenantID, low, high, chatID); err != nil {
 				return fmt.Errorf("chat: create imported private chat: %w", err)
