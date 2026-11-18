@@ -373,6 +373,16 @@ func (e *Engine) canSend(source string) bool {
 	return ok && adapter.Capabilities().Has(bridge.CapSend)
 }
 
+// canTopics reports whether the adapter of source reads topics.
+func (e *Engine) canTopics(source string) bool {
+	adapter := e.adapters[source]
+	if adapter == nil {
+		return false
+	}
+	_, ok := adapter.(bridge.TopicReader)
+	return ok && adapter.Capabilities().Has(bridge.CapTopics)
+}
+
 // SetDirection switches a synced chat of owner's account between receiving
 // only and also sending on what owner writes in Chat.
 func (e *Engine) SetDirection(ctx context.Context, owner, accountID int64, conversationID, direction string) error {

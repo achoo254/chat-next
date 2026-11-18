@@ -59,6 +59,10 @@ type Config struct {
 	// SendAttempts is how many times a send is tried before it is given up
 	// as failed (a limit of the other app's answer, not of its being busy).
 	SendAttempts int
+	// TopicRefreshGap is the least time between two asks of the other app for
+	// the topics of a forum, when messages keep naming topics the chat does not
+	// have (default 5 s).
+	TopicRefreshGap time.Duration
 	// SendRetryWindow is how long a send in flight is repeated on its own
 	// after a restart; later it becomes 'unknown' and the user decides.
 	SendRetryWindow time.Duration
@@ -106,6 +110,9 @@ func (c Config) withDefaults() Config {
 	if c.SendAttempts <= 0 {
 		c.SendAttempts = 10
 	}
+	if c.TopicRefreshGap == 0 {
+		c.TopicRefreshGap = 5 * time.Second
+	}
 	if c.SendRetryWindow <= 0 {
 		c.SendRetryWindow = 10 * time.Minute
 	}
@@ -131,6 +138,8 @@ type runner struct {
 	cmds chan *chatLink
 	// puppets caches participant id to Chat user for mentions.
 	puppets map[string]int64
+	// topics is what is known of the topics of each forum conversation.
+	topics map[string]*convTopics
 	// pause holds every send until then (the other app asked to wait);
 	// nextSend spaces two sends by Config.SendGap.
 	pause, nextSend time.Time
@@ -259,6 +268,8 @@ func (r *runner) handle(ctx context.Context, ev bridge.Event) error {
 		saved, err = r.onEdit(ctx, ev, ev.Edit.Message)
 	case ev.Delete != nil:
 		saved, err = r.onDelete(ctx, ev, *ev.Delete)
+	case ev.Topic != nil:
+		saved, err = r.onTopic(ctx, ev, *ev.Topic)
 	}
 	if err != nil {
 		if isSkippable(err) {
@@ -364,6 +375,9 @@ func (r *runner) fetchWindow(ctx context.Context, l *chatLink) ([]bridge.Message
 // then marks the chat as caught up. A run that dies half way repeats it:
 // what is already imported is skipped.
 func (r *runner) backfill(ctx context.Context, l *chatLink) error {
+	if err := r.syncTopics(ctx, l); err != nil {
+		return err
+	}
 	msgs, err := r.fetchWindow(ctx, l)
 	if err != nil {
 		return err
@@ -404,6 +418,9 @@ func (r *runner) backfill(ctx context.Context, l *chatLink) error {
 // importBatch imports messages oldest first into the chat of l, skipping
 // the ones already there or deleted before they arrived.
 func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Message) error {
+	if err := r.prepareTopics(ctx, l, batch); err != nil {
+		return err
+	}
 	senders := make(map[string]int64, len(batch))
 	for _, m := range batch {
 		if _, ok := senders[m.From.ID]; ok {
@@ -453,6 +470,10 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 	if len(fresh) == 0 {
 		return nil
 	}
+	topicIDs, err := r.topicIDs(ctx, it, l, fresh)
+	if err != nil {
+		return err
+	}
 	imports := make([]chat.ImportMessage, len(fresh))
 	replyTo := make([]string, len(fresh))
 	for i, m := range fresh {
@@ -469,7 +490,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)
 		text, ents := mapContent(labelled, moved, r.e.chat.MessageLengthMax(), r.userOf)
-		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content}
+		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic]}
 		if m.ReplyTo != "" {
 			target, err := lookupMessage(ctx, it.Tx(), r.account.ID, l.ExternalChat, m.ReplyTo)
 			if err != nil {
@@ -535,6 +556,9 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 	l := r.links[m.Conversation]
 	if l == nil || !l.BackfillDone {
 		return false, nil
+	}
+	if err := r.prepareTopics(ctx, l, []bridge.Message{m}); err != nil {
+		return false, err
 	}
 	from, err := r.e.db.ensurePuppet(ctx, r.account, m.From)
 	if err != nil {

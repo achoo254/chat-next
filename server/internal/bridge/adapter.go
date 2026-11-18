@@ -171,6 +171,10 @@ type Topic struct {
 	Closed    bool
 	Pinned    bool
 	Hidden    bool
+	// General marks the conversation's default topic (the one messages
+	// outside any other topic belong to). Chat already has it, so the engine
+	// maps it to Chat's General topic instead of opening a new one.
+	General bool
 	// Created is when the topic was opened; zero when unknown.
 	Created time.Time
 }

@@ -215,6 +215,8 @@ type Outbound struct {
 	ReplyToSeq int64
 	// GroupedID is shared by the items of one album; 0 for none.
 	GroupedID int64
+	// TopicID is the topic of the message in a forum chat; 0 outside forums.
+	TopicID int64
 	// Deleted is true once the message was deleted for everyone.
 	Deleted bool
 }
@@ -228,8 +230,8 @@ func (s *Service) OutboundMessage(ctx context.Context, chatID, seq int64) (*Outb
 		content []byte
 	)
 	err := s.pool.QueryRow(ctx, `
-		SELECT from_id, text, content, reply_to_seq, grouped_id, deleted_at IS NOT NULL FROM messages WHERE chat_id = $1 AND seq = $2`,
-		chatID, seq).Scan(&o.FromID, &o.Text, &content, &o.ReplyToSeq, &o.GroupedID, &o.Deleted)
+		SELECT from_id, text, content, reply_to_seq, grouped_id, topic_id, deleted_at IS NOT NULL FROM messages WHERE chat_id = $1 AND seq = $2`,
+		chatID, seq).Scan(&o.FromID, &o.Text, &content, &o.ReplyToSeq, &o.GroupedID, &o.TopicID, &o.Deleted)
 	if isNoRows(err) {
 		return nil, nil
 	}

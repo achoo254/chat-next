@@ -333,6 +333,17 @@ func (r *runner) buildOut(ctx context.Context, h *outboxRow, outs []*chat.Outbou
 			msg.ReplyTo = k.msg
 		}
 	}
+	// In a forum the message goes into the topic it was written in.
+	if first.TopicID != 0 {
+		ext, ok, err := externalTopic(ctx, r.e.db.pool, r.account.ID, h.ExternalChat, first.TopicID)
+		if err != nil {
+			return msg, err
+		}
+		if !ok {
+			return msg, errors.New("topic_unmapped: the topic of this message is not known in the other app")
+		}
+		msg.Topic = ext
+	}
 	var fileIDs []string
 	for _, o := range outs {
 		if o.FileID != "" {

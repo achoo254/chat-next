@@ -49,6 +49,9 @@ type chatLink struct {
 	Title        string
 	// Direction is chat.DirectionIn or chat.DirectionBoth.
 	Direction string
+	// Forum is true when the Chat chat is split into topics (the copy of a
+	// forum conversation made with an adapter that reads topics).
+	Forum bool
 }
 
 // messageKey is what the other app calls a message.
@@ -136,14 +139,15 @@ func saveState(ctx context.Context, q querier, accountID int64, state []byte) er
 
 func (d *db) links(ctx context.Context, accountID int64) ([]*chatLink, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title, direction FROM external_chats
+		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title, direction,
+			coalesce((SELECT forum FROM chats WHERE id = external_chats.chat_id), false) FROM external_chats
 		WHERE account_id = $1 ORDER BY id`, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list synced chats: %w", err)
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (*chatLink, error) {
 		l := &chatLink{}
-		err := r.Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title, &l.Direction)
+		err := r.Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title, &l.Direction, &l.Forum)
 		return l, err
 	})
 }
@@ -151,9 +155,10 @@ func (d *db) links(ctx context.Context, accountID int64) ([]*chatLink, error) {
 func (d *db) link(ctx context.Context, accountID int64, externalChat string) (*chatLink, error) {
 	l := &chatLink{}
 	err := d.pool.QueryRow(ctx, `
-		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title, direction FROM external_chats
+		SELECT id, account_id, external_chat_id, chat_id, history_window, backfill_done, title, direction,
+			coalesce((SELECT forum FROM chats WHERE id = external_chats.chat_id), false) FROM external_chats
 		WHERE account_id = $1 AND external_chat_id = $2`, accountID, externalChat).
-		Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title, &l.Direction)
+		Scan(&l.ID, &l.AccountID, &l.ExternalChat, &l.ChatID, &l.HistoryMax, &l.BackfillDone, &l.Title, &l.Direction, &l.Forum)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -365,4 +370,66 @@ func cleanName(name string) string {
 		return "?"
 	}
 	return name
+}
+
+// lookupTopic finds the Chat topic that stands for a topic of the other app.
+func lookupTopic(ctx context.Context, q querier, account int64, chat, ext string) (int64, bool, error) {
+	var id int64
+	err := q.QueryRow(ctx, `SELECT topic_id FROM external_topics WHERE account_id = $1 AND external_chat_id = $2 AND external_topic_id = $3`,
+		account, chat, ext).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("bridge: look up topic: %w", err)
+	}
+	return id, true, nil
+}
+
+// externalTopic is the id the other app gives a Chat topic, if it has one.
+func externalTopic(ctx context.Context, q querier, account int64, chat string, topicID int64) (string, bool, error) {
+	var ext string
+	err := q.QueryRow(ctx, `SELECT external_topic_id FROM external_topics WHERE account_id = $1 AND external_chat_id = $2 AND topic_id = $3`,
+		account, chat, topicID).Scan(&ext)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("bridge: look up external topic: %w", err)
+	}
+	return ext, true, nil
+}
+
+func insertTopic(ctx context.Context, q querier, account int64, chat, ext string, topicID int64) error {
+	_, err := q.Exec(ctx, `
+		INSERT INTO external_topics (account_id, external_chat_id, external_topic_id, topic_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+		account, chat, ext, topicID)
+	if err != nil {
+		return fmt.Errorf("bridge: record topic: %w", err)
+	}
+	return nil
+}
+
+// unmappedTopics returns which of ids the chat does not have a topic for yet.
+func unmappedTopics(ctx context.Context, q querier, account int64, chat string, ids []string) ([]string, error) {
+	rows, err := q.Query(ctx, `SELECT external_topic_id FROM external_topics WHERE account_id = $1 AND external_chat_id = $2 AND external_topic_id = ANY($3)`,
+		account, chat, ids)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: known topics: %w", err)
+	}
+	known, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("bridge: known topics: %w", err)
+	}
+	have := make(map[string]bool, len(known))
+	for _, k := range known {
+		have[k] = true
+	}
+	var out []string
+	for _, id := range ids {
+		if !have[id] {
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }

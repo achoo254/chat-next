@@ -316,6 +316,7 @@ func (e *Engine) EnableChatWith(ctx context.Context, accountID int64, conv bridg
 		ic.Kind, ic.Peer = "private", peer
 	case bridge.ConvGroup:
 		ic.Kind = "group"
+		ic.Forum = conv.Forum && e.canTopics(a.Source)
 	case bridge.ConvChannel:
 		ic.Kind = "channel"
 	default:
