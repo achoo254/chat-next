@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/bridge/feature"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,17 +33,26 @@ type outboundLink struct {
 }
 
 // outboundLink returns the link of chatID if me owns an active external
-// account the chat is linked to with direction 'both'; nil otherwise.
-func (t *txn) outboundLink(ctx context.Context, chatID, me int64) (*outboundLink, error) {
+// account the chat is linked to and the feature goes out to it for this chat
+// (for messages: direction 'both'; for the others see FeatureDirection); nil
+// otherwise.
+func (t *txn) outboundLink(ctx context.Context, chatID, me int64, feat feature.Feature) (*outboundLink, error) {
 	var l outboundLink
+	var messages string
+	var override *string
 	err := t.tx.QueryRow(ctx, `
-		SELECT x.account_id, x.external_chat_id FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
-		WHERE x.chat_id = $1 AND x.direction = 'both' AND a.owner_id = $2 AND a.status <> 'stopped'`, chatID, me).Scan(&l.accountID, &l.externalID)
+		SELECT x.account_id, x.external_chat_id, x.direction, f.direction
+		FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+		LEFT JOIN external_chat_features f ON f.account_id = x.account_id AND f.external_chat_id = x.external_chat_id AND f.feature = $3
+		WHERE x.chat_id = $1 AND a.owner_id = $2 AND a.status <> 'stopped'`, chatID, me, string(feat)).Scan(&l.accountID, &l.externalID, &messages, &override)
 	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("chat: outbound link: %w", err)
+	}
+	if !FeatureDirection(feat, messages, override).Sends() {
+		return nil, nil
 	}
 	return &l, nil
 }
@@ -61,13 +71,13 @@ func randomSendID() int64 {
 
 // queueSend queues the message just posted by me, if it goes to another app.
 func (t *txn) queueSend(ctx context.Context, chatID, me, seq int64) error {
-	l, err := t.outboundLink(ctx, chatID, me)
+	l, err := t.outboundLink(ctx, chatID, me, feature.Messages)
 	if err != nil || l == nil {
 		return err
 	}
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, random_id)
-		VALUES ($1, $2, $3, $4, 'send', $5)`, l.accountID, l.externalID, chatID, seq, randomSendID()); err != nil {
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, random_id)
+		VALUES ($1, $2, $3, $4, 'send', 'messages', $5)`, l.accountID, l.externalID, chatID, seq, randomSendID()); err != nil {
 		return fmt.Errorf("chat: queue send: %w", err)
 	}
 	return nil
@@ -76,7 +86,7 @@ func (t *txn) queueSend(ctx context.Context, chatID, me, seq int64) error {
 // queueEdit queues the new text of a message of me. A message still waiting
 // to be sent needs no edit row: it is sent as it is now.
 func (t *txn) queueEdit(ctx context.Context, chatID, me, seq int64) error {
-	l, err := t.outboundLink(ctx, chatID, me)
+	l, err := t.outboundLink(ctx, chatID, me, feature.Messages)
 	if err != nil || l == nil {
 		return err
 	}
@@ -92,7 +102,7 @@ func (t *txn) queueEdit(ctx context.Context, chatID, me, seq int64) error {
 		return nil
 	}
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op) VALUES ($1, $2, $3, $4, 'edit')
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature) VALUES ($1, $2, $3, $4, 'edit', 'messages')
 		ON CONFLICT (chat_id, seq, op) DO UPDATE
 			SET status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()`,
 		l.accountID, l.externalID, chatID, seq); err != nil {
@@ -105,7 +115,7 @@ func (t *txn) queueEdit(ctx context.Context, chatID, me, seq int64) error {
 // has not gone out is cancelled (there is nothing to delete over there), and
 // one that has gone, or is going, gets a delete row.
 func (t *txn) queueDeletes(ctx context.Context, chatID, me int64, seqs []int64) error {
-	l, err := t.outboundLink(ctx, chatID, me)
+	l, err := t.outboundLink(ctx, chatID, me, feature.Messages)
 	if err != nil || l == nil {
 		return err
 	}
@@ -116,8 +126,8 @@ func (t *txn) queueDeletes(ctx context.Context, chatID, me int64, seqs []int64) 
 		return fmt.Errorf("chat: cancel queued: %w", err)
 	}
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op)
-		SELECT $1, $2, m.chat_id, m.seq, 'delete' FROM messages m
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature)
+		SELECT $1, $2, m.chat_id, m.seq, 'delete', 'messages' FROM messages m
 		WHERE m.chat_id = $3 AND m.seq = ANY($4) AND m.from_id = $5 AND m.deleted_at IS NOT NULL
 			AND (EXISTS (SELECT 1 FROM external_messages e WHERE e.chat_id = m.chat_id AND e.seq = m.seq)
 				OR EXISTS (SELECT 1 FROM external_outbox o WHERE o.chat_id = m.chat_id AND o.seq = m.seq

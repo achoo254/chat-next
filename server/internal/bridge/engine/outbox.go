@@ -216,23 +216,19 @@ func (r *runner) sendDue(ctx context.Context) error {
 // It returns an error only when the whole run must stop; a failure of one
 // message is recorded on its row.
 func (r *runner) sendRow(ctx context.Context, h *outboxRow) error {
-	sender, ok := r.adapter.(bridge.Sender)
-	if !ok || !r.adapter.Capabilities().Has(bridge.CapSend) {
-		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "send_unsupported: this app cannot be written to from Chat", time.Time{})
+	owner, run := opHandler(h.Op)
+	if owner == nil {
+		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "unknown operation", time.Time{})
 	}
-	switch h.Op {
-	case "send":
-		return r.doSend(ctx, sender, h)
-	case "edit":
-		return r.doEdit(ctx, sender, h)
-	case "delete":
-		return r.doDelete(ctx, sender, h)
-	case "pin_message":
-		return r.doPin(ctx, sender, h, false)
-	case "pin_topic":
-		return r.doPin(ctx, sender, h, true)
+	// A feature switched off for the chat after the row was queued: nothing goes.
+	dir, err := r.e.db.featureDirection(ctx, r.account.ID, h.ExternalChat, owner.feature)
+	if err != nil {
+		return err
 	}
-	return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "unknown operation", time.Time{})
+	if !dir.Sends() {
+		return r.e.db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
+	}
+	return run(r, ctx, h)
 }
 
 // settleCall records the outcome of a call to the other app on rows and

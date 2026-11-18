@@ -268,20 +268,7 @@ func (r *runner) keepLease(ctx context.Context, cancel context.CancelCauseFunc) 
 
 // handle applies one live event and keeps the adapter's state.
 func (r *runner) handle(ctx context.Context, ev bridge.Event) error {
-	var err error
-	saved := false
-	switch {
-	case ev.Message != nil:
-		saved, err = r.onMessage(ctx, ev, *ev.Message)
-	case ev.Edit != nil:
-		saved, err = r.onEdit(ctx, ev, ev.Edit.Message)
-	case ev.Delete != nil:
-		saved, err = r.onDelete(ctx, ev, *ev.Delete)
-	case ev.Topic != nil:
-		saved, err = r.onTopic(ctx, ev, *ev.Topic)
-	case ev.Pin != nil:
-		saved, err = r.onPin(ctx, ev, *ev.Pin)
-	}
+	saved, err := r.dispatch(ctx, ev)
 	if err != nil {
 		if isSkippable(err) {
 			// One event Chat will not take must not stop the account.
