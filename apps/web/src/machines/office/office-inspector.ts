@@ -3,8 +3,8 @@
 // it reads the person's placement (the same one the 3D and 2D views draw, so the
 // panel never disagrees with the scene), the office state and the viewer's
 // clock. Only what the office wire already carries: no model, no file names, no
-// token counts per person. A person who is gone (a machine whose command ended)
-// gives null; the view keeps the last record and says they left.
+// token counts per person. A person who is not placed gives null; the view
+// keeps the last record and says they left.
 import { STUDIO_TITLES, type CastKey } from "./office-cast.ts";
 import type { LifeAct, LifeSlot } from "./office-life-schedule.ts";
 import { markerStatus, workSubject, type MarkerStatus } from "./office-names.ts";
@@ -13,7 +13,7 @@ import type { RoomCode } from "./office-rooms.ts";
 import type { AnimGroup, OfficeState, ServiceKind } from "./office-state.ts";
 import type { TimelineResult } from "./office-timeline.ts";
 
-export type InspectorKind = "director" | "advisor" | "employee" | "machine";
+export type InspectorKind = "director" | "advisor" | "employee";
 
 /**
  * "work": at work now (real events say so); "life": off duty on the living floor,
@@ -53,12 +53,12 @@ export interface InspectorEntry {
 }
 
 export interface InspectorModel {
-	/** The placement key: "director", "advisor", "title:<castKey>" or "machine:<actor id>". */
+	/** The placement key: "director", "advisor" or "title:<castKey>". */
 	readonly key: string;
 	readonly kind: InspectorKind;
 	/** The job title of an employee. */
 	readonly title: CastKey | null;
-	/** The person's own room (their desk's); null for a machine. */
+	/** The person's own room (their desk's). */
 	readonly homeRoom: RoomCode | null;
 	/** The room they are in now. */
 	readonly room: RoomCode;
@@ -67,7 +67,7 @@ export interface InspectorModel {
 	/** Off duty on the living floor: the part of the day and what they do. */
 	readonly life: { readonly slot: LifeSlot; readonly act: LifeAct } | null;
 	readonly work: InspectorWork | null;
-	/** What a background machine runs. */
+	/** What the background service they run is (shown on its owner title's person); null when none. */
 	readonly service: InspectorService | null;
 	/** A subagent's one-line description; Advisor's latest answer; "" for anyone else. */
 	readonly description: string;
@@ -108,7 +108,7 @@ export function inspectorOf(placements: readonly Placement[], key: string, state
 	const person = state.timeline[p.key];
 	const entries: InspectorEntry[] = (person?.entries ?? []).map((e) => ({ group: e.group, room: e.room, result: e.result, ms: e.ms, agoMs: agoOf(e.at, state, now) }));
 	const known = (person?.entries ?? []).find((e) => e.result !== "unknown");
-	const working = p.activityRoom !== null && activity !== null && kind !== "machine";
+	const working = p.activityRoom !== null && activity !== null;
 	const mode: InspectorMode = p.activityRoom !== null ? "work" : p.life !== null ? "life" : "idle";
 	return {
 		key: p.key,
@@ -155,9 +155,8 @@ export interface HeldInspected {
 /**
  * The panel's content for the chosen person `key` (null: none chosen) at viewer
  * time `now`, and whether the panel should close. A person who is here shows as
- * they are. One who has gone (a machine whose command ended is dropped from the
- * state at once) keeps the record last seen with the time they left, until
- * LEFT_SHOWN_MS has passed; a key that was never shown closes at once. Pure:
+ * they are. One who has gone keeps the record last seen with the time they
+ * left, until LEFT_SHOWN_MS has passed; a key that was never shown closes at once. Pure:
  * `prev` is what this returned last.
  */
 export function holdInspected(prev: HeldInspected | null, key: string | null, placements: readonly Placement[], state: OfficeState, now: number): { readonly shown: HeldInspected | null; readonly close: boolean } {

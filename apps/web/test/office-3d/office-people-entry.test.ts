@@ -27,9 +27,9 @@ describe("who walks in", () => {
 		expect(cameInAfterOpening({ kind: "chairman", actor: null, member: null }, { clockOffset: 0 }, OPENED)).toBe(true);
 	});
 
-	it("the director and machines never walk in, nor an off-duty resident with no entry known", () => {
+	it("the director and Advisor never walk in, nor an off-duty resident with no entry known", () => {
 		expect(cameInAfterOpening({ kind: "director", actor: null, member: null }, { clockOffset: 0 }, OPENED)).toBe(false);
-		expect(cameInAfterOpening({ kind: "machine", actor: null, member: null }, { clockOffset: 0 }, OPENED)).toBe(false);
+		expect(cameInAfterOpening({ kind: "advisor", actor: null, member: null }, { clockOffset: 0 }, OPENED)).toBe(false);
 		expect(cameInAfterOpening({ kind: "employee", actor: null, member: null }, { clockOffset: 0 }, OPENED)).toBe(false);
 	});
 });

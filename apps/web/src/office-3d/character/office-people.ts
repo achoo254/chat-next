@@ -58,7 +58,7 @@ export interface PersonView {
 	readonly dozing: boolean;
 	/** Height of the name label over the feet, metres (the drawn character's). */
 	readonly labelHeight: number;
-	/** What draws them (a service's robot once its model is in). */
+	/** What draws them (blocks until the character model is in). */
 	readonly model: CharacterVisual["model"];
 	/** Babylon rotation.y drawn now (the target's facing once there). */
 	readonly heading: number;
@@ -292,7 +292,6 @@ export function createOfficePeople(layout: OfficeLayout, router: Router, pool: C
 					p.pose = pose;
 				}
 				p.visual.setPose(pose, p.target.seat);
-				p.visual.setDozing?.(arrived && busy && activity?.stuckMs != null);
 				lod.push({ key: p.key, onScreen: p.inView, active: s.moving || busy, distance: Math.hypot(s.x - focus.x, s.z - focus.z) });
 			}
 			const rates = animationRates(lod, fullRate);

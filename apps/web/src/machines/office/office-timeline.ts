@@ -5,10 +5,10 @@
 // built on this device from the events it received, so it starts when the
 // viewer opened the office and is empty again after a reload.
 //
-// Keyed by the inspector's person key ("director", "advisor", "title:<castKey>",
-// "machine:<actor id>"), not by the staff key the work log uses: several
-// subagents of one job title are one person, and the director's tool handed to a
-// department is credited to the person the bubble shows it on.
+// Keyed by the inspector's person key ("director", "advisor", "title:<castKey>"),
+// not by the staff key the work log uses: several subagents of one job title are
+// one person, and the director's tool handed to a department, like a background
+// service's run, is credited to the person the bubble shows it on.
 // Pure: the store calls these on its events.
 import type { AnimGroup } from "./office-state.ts";
 import type { RoomCode } from "./office-rooms.ts";

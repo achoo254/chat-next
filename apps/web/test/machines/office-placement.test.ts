@@ -76,7 +76,7 @@ const HOMES: Record<string, [string, string]> = {
 describe("office placement", () => {
 	it("always shows fifteen people (the director, the advisor and the 13 staff), each at their home seat in office hours, with no agent at work", () => {
 		const places = placer(fresh([quietDirector()], RESTING))(T0);
-		const people = places.filter((p) => p.kind !== "machine" && p.kind !== "chairman");
+		const people = places.filter((p) => p.kind !== "chairman");
 		expect(people).toHaveLength(15);
 		expect(find(places, "director")).toMatchObject({ room: "DIRECTOR", anchorId: "director", activityRoom: null, life: null });
 		expect(find(places, "advisor")).toMatchObject({ room: "ADVISOR", anchorId: "advisor-seat", activityRoom: null });
@@ -255,8 +255,6 @@ describe("office placement", () => {
 		const spots = places.map((p) => p.anchorId);
 		expect(spots.length).toBeGreaterThanOrEqual(4);
 		expect(new Set(spots).size).toBe(spots.length);
-		const machines = placer(fresh([director(), machine("m1"), machine("m2"), machine("m3")]))(T0).filter((p) => p.kind === "machine").map((p) => p.anchorId);
-		expect(new Set(machines).size).toBe(3);
 	});
 
 	it("freezes everyone while the power is out", () => {

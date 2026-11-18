@@ -1,14 +1,14 @@
 // What the office calls people and what their speech bubbles say, shared by
 // the 2D and 3D views. Bubbles show the real tool at once (the agent already
 // cut the subject down to a file name, a command's first word or a domain).
-// A background service from an agent that labels it is named by what it runs
-// ("Máy chủ dev") and says its port and how long it has run; an older agent's
-// machine stays "Máy Bash". Advisor goes by the name of the viewer's Advisor
+// A background service is the work of a job title's person (office-placement.ts):
+// while it runs, their bubble says what it runs ("Máy chủ dev"), its port and
+// how long it has run when the agent labels it, else its tool. Advisor goes by the name of the viewer's Advisor
 // profile, in its look's colour, and says its latest answer ("Rebase · 72%");
 // whoever asks it says so.
 import { lookOf } from "../../advisor/looks.ts";
 import type { MachinesCopy } from "../copy-vi.ts";
-import { castOf, nameFromType, ROLE_COLORS, SERVICE_COLORS } from "./office-cast.ts";
+import { castOf, nameFromType, ROLE_COLORS } from "./office-cast.ts";
 import type { Placement } from "./office-placement.ts";
 import type { ActivityView, ActorView } from "./office-store.ts";
 import type { AnimGroup, ServiceView } from "./office-state.ts";
@@ -25,10 +25,6 @@ export function personName(t: OfficeCopy, p: Pick<Placement, "kind" | "actor" | 
 		}
 		case "chairman":
 			return t.chairman;
-		case "machine": {
-			const service = p.actor?.service ?? null;
-			return service === null ? t.machine(p.actor?.agentType ?? "") : t.service.names[service.kind];
-		}
 		case "employee": {
 			const type = p.member?.agentType ?? p.actor?.agentType ?? "";
 			const key = castOf(type).key;
@@ -45,7 +41,6 @@ export function personColor(p: Pick<Placement, "kind" | "actor" | "member"> & Pa
 	if (p.kind === "director") return ROLE_COLORS.director;
 	if (p.kind === "advisor") return lookOf(p.advisor?.lookId ?? "").colors.body;
 	if (p.kind === "chairman") return ROLE_COLORS.chairman;
-	if (p.kind === "machine") return SERVICE_COLORS[p.actor?.service?.kind ?? "script"];
 	return castOf(p.member?.agentType ?? p.actor?.agentType ?? "").color;
 }
 

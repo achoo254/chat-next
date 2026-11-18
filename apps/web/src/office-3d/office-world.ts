@@ -174,15 +174,6 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		lifeSounds = createLifeSounds(assets.sounds, assetUrl);
 		lifeSounds.setEnabled(soundOn);
 		props.setSources(new Map([...propSources(assets)].map(([name, file]) => [name, assetUrl(file)])), opts.signal);
-		const robot = assets.serviceRobot;
-		// The services' robot loads beside the character (neither waits for the other); each rebuilds everyone when in.
-		if (robot !== null) {
-			void pool.loadRobot(assetUrl(robot.file), robot, opts.signal).then((ok) => {
-				if (!ok || opts.signal.aborted) return;
-				people.rebuild();
-				refreshCasters();
-			});
-		}
 		// A job title's model loads the first time someone of the title is drawn; several arriving together rebuild everyone once.
 		let staffRebuild: ReturnType<typeof setTimeout> | undefined;
 		pool.onStaffModel(() => {

@@ -139,7 +139,7 @@ describe("the timeline of a person", () => {
 		expect(store.state().timeline["director"]?.entries.map((e) => e.group)).toEqual(["consult"]);
 	});
 
-	it("records an Advisor consultation under Advisor and a machine's activity under that machine", () => {
+	it("records an Advisor consultation under Advisor and a background service's activity under the title that owns it", () => {
 		const { store } = fresh([director(), machine("m1")]);
 		seq += 1;
 		store.applyEvents(1n, [ev(seq, { case: "actorEnter", value: { id: "advisor", role: 4, state: OfficeActorState.IDLE, enteredAt: BigInt(T0) } })]);
@@ -147,7 +147,9 @@ describe("the timeline of a person", () => {
 		end(store, "advisor", "c9");
 		end(store, "m1", "m1");
 		expect(store.state().timeline["advisor"]?.done).toBe(1);
-		expect(store.state().timeline["machine:m1"]?.done).toBe(1);
+		// An unlabelled service (an older agent's) is the Gameplay Developer's.
+		expect(store.state().timeline["title:gameplayDeveloper"]?.done).toBe(1);
+		expect(store.state().timeline["machine:m1"]).toBeUndefined();
 	});
 
 	it("counts an activity that a hand-in replaced as finished with an unknown result, and the hand-in itself not at all", () => {
@@ -227,10 +229,12 @@ describe("the record of a person", () => {
 		expect(model?.status).toBe("stuck");
 	});
 
-	it("shows a labelled machine by what it runs and no tool of its own", () => {
+	it("shows a labelled background service on its owner's panel: at work at their desk, and what runs", () => {
 		const { store } = fresh([director(), machine("m1", OfficeRoom.SERVER, { kind: OfficeServiceKind.DEV_SERVER, port: 5173, startedAt: BigInt(T0 - 120_000) })]);
-		const model = inspect(store, "machine:m1");
-		expect(model).toMatchObject({ kind: "machine", homeRoom: null, work: null, service: { kind: "dev-server", port: 5173 } });
+		expect(inspect(store, "machine:m1")).toBeNull();
+		const model = inspect(store, "title:backendDevops");
+		expect(model).toMatchObject({ kind: "employee", title: "backendDevops", homeRoom: "SERVER", room: "SERVER", mode: "work", service: { kind: "dev-server", port: 5173 } });
+		expect(model?.work).toMatchObject({ tool: "Bash", group: "machine", subject: "" });
 		expect(model?.service?.uptimeMs).toBeGreaterThanOrEqual(119_000);
 	});
 
@@ -251,14 +255,16 @@ describe("the record of a person", () => {
 		expect(model?.timeline.length).toBe(1);
 	});
 
-	it("is null for someone who is not there (a machine that left), for a key nobody has, and for the chairman", () => {
+	it("is null for a key nobody has (a background service is no person of its own) and for the chairman", () => {
 		const { store } = fresh([director(), machine("m1")], { session: session({ waitingForUser: true }) });
 		expect(inspect(store, "chairman")).toBeNull();
 		expect(inspect(store, "title:nobody")).toBeNull();
-		expect(inspect(store, "machine:m1")).not.toBeNull();
+		expect(inspect(store, "machine:m1")).toBeNull();
+		// The service leaving takes the work off its owner, who stays.
+		expect(inspect(store, "title:gameplayDeveloper")?.mode).toBe("work");
 		seq += 1;
 		store.applyEvents(1n, [ev(seq, { case: "actorLeave", value: { actorId: "m1" } })]);
-		expect(inspect(store, "machine:m1")).toBeNull();
+		expect(inspect(store, "title:gameplayDeveloper")).toMatchObject({ mode: "idle", service: null, work: null });
 	});
 
 	it("marks what shows as out of date while a new snapshot is awaited", () => {

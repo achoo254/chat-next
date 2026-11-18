@@ -1312,7 +1312,6 @@ export const zhCNMachines: MachinesCopy = {
 		director: "总经理",
 		chairman: "董事长（你）",
 		advisor: "顾问",
-		machine: (tool: string) => (tool === "" ? "后台机器" : `${tool} 机器`),
 		service: {
 			names: {
 				"dev-server": "开发服务器",

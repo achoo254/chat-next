@@ -1,8 +1,8 @@
 // Which person's body a tap on the 3D canvas landed on. Every person is a
 // screen-space capsule from their feet up to the height of their name label: the
 // characters are skinned meshes (picked by their standing pose, wrong for
-// someone sitting or lying), none of them is pickable, and a robot is no
-// character at all, so the scene is not asked to pick. The camera looks from
+// someone sitting or lying) and none of them is pickable, so the scene is not
+// asked to pick. The camera looks from
 // the front over the plan, so the tall walls stand behind everyone and nothing
 // needs to block the pick. Pure: projected points in, a key out.
 

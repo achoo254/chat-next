@@ -1,20 +1,21 @@
 // After a reload the office knows everyone who worked in the session (the
 // snapshot's residents, hired back in the order they came in, so each keeps
 // their name and number); an older agent's snapshot without them works as
-// before. A background service an agent labelled is named by what it runs and
-// says its port and how long it has run; an older agent's machine keeps
-// "Máy Bash".
-import { OfficeServiceKind } from "@achoo254/chat-proto/remote/remote";
+// before. A background service is no person of its own: it is the work of the
+// job title that owns its kind, done at their desk, and their bubble says what
+// it runs, its port and how long it has run (an older agent's unlabelled one
+// shows its tool).
+import { OfficeActorState, OfficeRoom, OfficeServiceKind } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { enMachines } from "../../src/machines/copy-en.ts";
 import { zhCNMachines } from "../../src/machines/copy-zh-CN.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
-import { ROLE_COLORS, SERVICE_COLORS } from "../../src/machines/office/office-cast.ts";
+import { castOf, type CastKey } from "../../src/machines/office/office-cast.ts";
 import { markerView, personColor, personName } from "../../src/machines/office/office-names.ts";
 import { EMPTY_MEMORY, officePlacement, type Placement } from "../../src/machines/office/office-placement.ts";
 import { OFFICE_LAYOUT } from "../../src/machines/office/office-layout.ts";
 import { SLOW_TOOL_MS, STUCK_MS } from "../../src/machines/office/office-store.ts";
-import { director, ev, machine, resident, snapshot, staff, storeAt, T0 } from "./office-builders.ts";
+import { act, director, ev, localAt, machine, resident, session, snapshot, staff, storeAt, T0 } from "./office-builders.ts";
 
 const t = viMachines.office;
 const minute = 60_000;
@@ -76,54 +77,122 @@ describe("residents after a reload", () => {
 	});
 });
 
-describe("service labels", () => {
-	it("names a labelled machine by what it runs, with its port and minutes running, in its kind's colour", () => {
+describe("background services", () => {
+	const places = (store: ReturnType<typeof storeAt>["store"], now: number): readonly Placement[] => {
+		if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("\n"));
+		return officePlacement(store.state(), OFFICE_LAYOUT.value, now, EMPTY_MEMORY).placements;
+	};
+
+	it("are no people of their own: the fifteen stay fifteen, and none is placed by the machine's key", () => {
+		const { store } = storeAt();
+		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind: OfficeServiceKind.DEV_SERVER, startedAt: BigInt(T0) }), machine("m2")]));
+		const list = places(store, T0);
+		expect(list).toHaveLength(15);
+		expect(list.some((p) => p.key.startsWith("machine:"))).toBe(false);
+		expect(new Set(list.map((p) => p.kind))).toEqual(new Set(["director", "advisor", "employee"]));
+	});
+
+	it.each<[string, OfficeServiceKind | null, CastKey, string, string]>([
+		["the dev server is Backend & DevOps's", OfficeServiceKind.DEV_SERVER, "backendDevops", "SERVER", "backend-devops"],
+		["a build is Backend & DevOps's", OfficeServiceKind.BUILD, "backendDevops", "SERVER", "backend-devops"],
+		["a database is Backend & DevOps's", OfficeServiceKind.DATABASE, "backendDevops", "SERVER", "backend-devops"],
+		["a test watcher is QA's", OfficeServiceKind.TEST_WATCH, "qaTester", "WORK", "qa-tester"],
+		["CI watching is the Tech Lead's", OfficeServiceKind.CI_WATCH, "techLead", "WORK", "tech-lead"],
+		["git is the Gameplay Developer's", OfficeServiceKind.GIT, "gameplayDeveloper", "WORK", "gameplay-developer"],
+		["a script is the Gameplay Developer's", OfficeServiceKind.SCRIPT, "gameplayDeveloper", "WORK", "gameplay-developer"],
+		["an unknown kind (a newer agent's) is the Gameplay Developer's", 99 as OfficeServiceKind, "gameplayDeveloper", "WORK", "gameplay-developer"],
+		["an unlabelled one (an older agent's) is the Gameplay Developer's", null, "gameplayDeveloper", "WORK", "gameplay-developer"],
+	])("%s, at work at their own desk", (_name, kind, owner, room, home) => {
+		if (!OFFICE_LAYOUT.ok) throw new Error(OFFICE_LAYOUT.errors.join("\n"));
+		const { store } = storeAt();
+		// Started in the QA room: the work is still done at the owner's desk.
+		store.applySnapshot(snapshot([director(), machine("m1", OfficeRoom.QA, kind === null ? undefined : { kind, startedAt: BigInt(T0) })]));
+		const p = placed(store, `title:${owner}`, T0);
+		expect(p).toMatchObject({ kind: "employee", room, activityRoom: room, concurrent: 0 });
+		expect(p.actor?.id).toBe("m1");
+		expect(p.actor?.activity?.group).toBe("machine");
+		expect(OFFICE_LAYOUT.value.anchors.find((a) => a.id === p.anchorId)?.home).toBe(home);
+		// Their own name and colour, not the service's.
+		expect(personName(t, p)).toBe(t.cast[owner]);
+		expect(personColor(p)).toBe(castOf(p.actor?.agentType ?? "").color);
+		// Nobody else works on it.
+		for (const other of places(store, T0)) if (other.key !== p.key && other.kind === "employee") expect(other.activityRoom, other.key).toBeNull();
+	});
+
+	it("leave their owner free when they stop", () => {
+		const { store } = storeAt();
+		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind: OfficeServiceKind.TEST_WATCH, startedAt: BigInt(T0) })]));
+		expect(placed(store, "title:qaTester", T0).activityRoom).toBe("WORK");
+		store.applyEvents(1n, [ev(1, { case: "actorLeave", value: { actorId: "m1" } }, T0)]);
+		expect(placed(store, "title:qaTester", T0)).toMatchObject({ activityRoom: null, actor: null });
+	});
+
+	it("never count as an agent running: off hours with only a service at work, its owner works and the rest of the office rests", () => {
+		const night = localAt(23, 30);
+		const { store } = storeAt(night);
+		store.applySnapshot(
+			snapshot([director({ state: OfficeActorState.IDLE }), machine("m1", undefined, { kind: OfficeServiceKind.DEV_SERVER, startedAt: BigInt(night) })], { session: session({ busy: false }) }),
+		);
+		const list = places(store, night);
+		expect(list.find((p) => p.key === "title:backendDevops")?.activityRoom).toBe("SERVER");
+		expect(list.filter((p) => p.life !== null).length).toBeGreaterThan(0);
+	});
+
+	it("give way to a subagent of the title at work, who is shown over the service", () => {
+		const { store } = storeAt();
+		store.applySnapshot(
+			snapshot([director(), staff("s1", "tester", { activity: act("q1", OfficeRoom.QA, "Bash", T0 + 1_000) }), machine("m1", undefined, { kind: OfficeServiceKind.TEST_WATCH, startedAt: BigInt(T0) })]),
+		);
+		const p = placed(store, "title:qaTester", T0 + 1_000);
+		expect(p.actor?.id).toBe("s1");
+		expect(p.concurrent).toBe(1);
+	});
+
+	it("say what runs in the owner's bubble, with its port and minutes running", () => {
 		const { store, clock } = storeAt();
 		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind: OfficeServiceKind.DEV_SERVER, port: 5173, startedAt: BigInt(T0) })]));
 		clock.now = T0 + 12 * minute + 5_000;
 		store.tick(clock.now);
-		const p = placed(store, "machine:m1", clock.now);
-		expect(personName(t, p)).toBe("Máy chủ dev");
-		expect(personColor(p)).toBe(SERVICE_COLORS["dev-server"]);
+		const p = placed(store, "title:backendDevops", clock.now);
+		expect(p.actor?.service).toMatchObject({ kind: "dev-server", port: 5173 });
 		// A dev server runs on by design: no hourglass, no dozing, however long and silent.
-		expect(markerView(t, p, null)).toMatchObject({ status: "working", label: "Máy chủ dev", bubble: "Máy chủ dev · cổng 5173 · 12 phút" });
+		expect(markerView(t, p, null)).toMatchObject({ status: "working", label: "Backend & Hạ tầng", bubble: "Máy chủ dev · cổng 5173 · 12 phút" });
 	});
 
-	it.each([
-		[OfficeServiceKind.CI_WATCH, 0, 3, "Theo dõi CI · 3 phút"],
-		[OfficeServiceKind.TEST_WATCH, 0, 8, "Theo dõi test · 8 phút"],
-		[OfficeServiceKind.BUILD, 0, 1, "Build · 1 phút"],
-		[OfficeServiceKind.GIT, 0, 0, "Git · vừa chạy"],
-		[OfficeServiceKind.DATABASE, 5432, 75, "Cơ sở dữ liệu · cổng 5432 · 1 giờ 15 phút"],
-		[OfficeServiceKind.SCRIPT, 0, 2, "Script · 2 phút"],
+	it.each<[OfficeServiceKind, number, number, CastKey, string]>([
+		[OfficeServiceKind.CI_WATCH, 0, 3, "techLead", "Theo dõi CI · 3 phút"],
+		[OfficeServiceKind.TEST_WATCH, 0, 8, "qaTester", "Theo dõi test · 8 phút"],
+		[OfficeServiceKind.BUILD, 0, 1, "backendDevops", "Build · 1 phút"],
+		[OfficeServiceKind.GIT, 0, 0, "gameplayDeveloper", "Git · vừa chạy"],
+		[OfficeServiceKind.DATABASE, 5432, 75, "backendDevops", "Cơ sở dữ liệu · cổng 5432 · 1 giờ 15 phút"],
+		[OfficeServiceKind.SCRIPT, 0, 2, "gameplayDeveloper", "Script · 2 phút"],
 		// An unknown kind (a newer agent's) reads as a script.
-		[99 as OfficeServiceKind, 0, 2, "Script · 2 phút"],
-	])("kind %i, port %i, %i minutes → %s", (kind, port, minutes, bubble) => {
+		[99 as OfficeServiceKind, 0, 2, "gameplayDeveloper", "Script · 2 phút"],
+	])("kind %i, port %i, %i minutes: %s says %s", (kind, port, minutes, owner, bubble) => {
 		const { store, clock } = storeAt();
 		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind, port, startedAt: BigInt(T0) })]));
 		// One event ties the clocks (viewer time = machine time); none of these runs long enough to doze.
 		store.applyEvents(1n, [ev(1, { case: "turnStart", value: {} }, T0)]);
 		clock.now = T0 + minutes * minute;
 		store.tick(clock.now);
-		expect(markerView(t, placed(store, "machine:m1", clock.now), null).bubble).toBe(bubble);
+		expect(markerView(t, placed(store, `title:${owner}`, clock.now), null).bubble).toBe(bubble);
 	});
 
-	it("a build stuck long and silent dozes: Zzz instead of its label", () => {
+	it("a build stuck long and silent dozes its owner: Zzz instead of its label", () => {
 		const { store, clock } = storeAt();
 		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind: OfficeServiceKind.BUILD, startedAt: BigInt(T0) })]));
 		store.applyEvents(1n, [ev(1, { case: "turnStart", value: {} }, T0)]);
 		clock.now = T0 + SLOW_TOOL_MS + STUCK_MS;
 		store.tick(clock.now);
-		expect(markerView(t, placed(store, "machine:m1", clock.now), null)).toMatchObject({ status: "stuck", bubble: "Zzz", label: "Build · Kẹt 7 phút" });
+		expect(markerView(t, placed(store, "title:backendDevops", clock.now), null)).toMatchObject({ status: "stuck", bubble: "Zzz", label: "Backend & Hạ tầng · Kẹt 7 phút" });
 	});
 
-	it("an older agent's machine stays 'Máy Bash' with its tool bubble and the machines' grey", () => {
+	it("an older agent's unlabelled service shows its tool in the Gameplay Developer's bubble", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), machine("m1")]));
-		const p = placed(store, "machine:m1", T0);
+		const p = placed(store, "title:gameplayDeveloper", T0);
 		expect(p.actor?.service).toBeNull();
-		expect(personName(t, p)).toBe("Máy Bash");
-		expect(personColor(p)).toBe(ROLE_COLORS.machine);
+		expect(personName(t, p)).toBe("Lập trình viên");
 		expect(markerView(t, p, null).bubble).toBe("Bash");
 	});
 

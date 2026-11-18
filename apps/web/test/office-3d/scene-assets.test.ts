@@ -120,32 +120,6 @@ describe("scene assets: the live manifest", () => {
 	});
 });
 
-describe("scene assets: the service robot", () => {
-	it("reads the live robot, and its GLB has every part it names", async () => {
-		const live: unknown = JSON.parse(readFileSync(join(PUBLIC_OFFICE, "office-assets.json"), "utf8"));
-		const robot = parseSceneAssets(live, await bakeHash()).serviceRobot;
-		expect(robot).not.toBeNull();
-		if (robot === null) return;
-		expect(robot.heightM).toBeGreaterThan(0);
-		const json = glbJson(join(PUBLIC_OFFICE, robot.file)) as { nodes?: { name?: string }[] };
-		const nodes = new Set((json.nodes ?? []).map((n) => n.name));
-		for (const part of Object.values(robot.parts)) expect(nodes.has(part), part).toBe(true);
-	});
-
-	it("is optional, and left out whole when a piece is bad (services stay people)", () => {
-		const good = { file: "robot.glb", heightM: 0.62, parts: { body: "b", screen: "s", eyes: "e", light: "l" } };
-		const read = (serviceRobot: unknown) => parseSceneAssets({ ...(fixture as object), serviceRobot }, FIXTURE_HASH).serviceRobot;
-		expect(parseSceneAssets(fixture, FIXTURE_HASH).serviceRobot).toBeNull();
-		expect(read(good)).toEqual(good);
-		expect(read({ ...good, file: "../robot.glb" })).toBeNull();
-		expect(read({ ...good, heightM: 0 })).toBeNull();
-		expect(read({ ...good, heightM: 40 })).toBeNull();
-		expect(read({ ...good, parts: { ...good.parts, eyes: "bad name" } })).toBeNull();
-		expect(read({ ...good, parts: { body: "b" } })).toBeNull();
-		expect(read("robot")).toBeNull();
-	});
-});
-
 describe("scene assets: the Director's model", () => {
 	const jointNames = (file: string): Set<string> => {
 		const json = glbJson(join(PUBLIC_OFFICE, file)) as { nodes?: { name?: string }[]; skins?: { joints?: number[] }[] };

@@ -63,7 +63,6 @@ function fakePool(scene: Scene): CharacterPool & { readonly drawn: { key: string
 		},
 		blob: (key) => blob.createInstance(`blob-${key}`),
 		load: async () => true,
-		loadRobot: async () => true,
 		dispose: () => undefined,
 	};
 }
