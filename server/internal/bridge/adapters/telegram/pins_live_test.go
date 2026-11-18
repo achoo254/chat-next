@@ -25,8 +25,9 @@ import (
 // pinned (by the pinned filter and by the Pinned flag of the history), and which
 // topics are pinned. Optional, for the parts that need a person:
 //
-//	BRIDGE_LIVE_PINS_WATCH=5m          log, for that long, the kind of every pin update
-//	                                   (pin and unpin by hand in Telegram meanwhile)
+//	BRIDGE_LIVE_PINS_WATCH=5m          log the kind of every pin update from the start until
+//	                                   that long after the sends below (pin and unpin by hand
+//	                                   in Telegram meanwhile; the sends show their own echo)
 //	BRIDGE_LIVE_PINS_SEND=<conv>/<id>  pin the message, check it, unpin it
 //	BRIDGE_LIVE_PINS_TOPIC=<conv>/<id> pin the topic, check it, unpin it
 //
@@ -160,6 +161,7 @@ func TestLiveTelegramPins(t *testing.T) {
 		}
 	}
 
+	var watchFor time.Duration
 	if d := os.Getenv("BRIDGE_LIVE_PINS_WATCH"); d != "" {
 		wait, err := time.ParseDuration(d)
 		if err != nil {
@@ -197,12 +199,7 @@ func TestLiveTelegramPins(t *testing.T) {
 			}
 			return nil
 		}))
-		t.Logf("watching pin updates for %s: pin and unpin messages and topics in Telegram now", wait)
-		select {
-		case <-time.After(wait):
-		case <-ctx.Done():
-		}
-		c.setManager(nil)
+		watchFor = wait
 	}
 
 	if target := os.Getenv("BRIDGE_LIVE_PINS_SEND"); target != "" {
@@ -252,6 +249,15 @@ func TestLiveTelegramPins(t *testing.T) {
 		_, err = api.MessagesUpdatePinnedForumTopic(ctx, &tg.MessagesUpdatePinnedForumTopicRequest{Peer: peer, TopicID: id, Pinned: false})
 		t.Logf("unpin topic %d: err=%v", id, translate(err))
 		order("after unpin")
+	}
+
+	if watchFor > 0 {
+		t.Logf("watching pin updates for %s more: pin and unpin messages and topics in Telegram now", watchFor)
+		select {
+		case <-time.After(watchFor):
+		case <-ctx.Done():
+		}
+		c.setManager(nil)
 	}
 }
 

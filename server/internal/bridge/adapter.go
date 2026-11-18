@@ -29,6 +29,11 @@ const (
 	// CapTopics means the adapter also implements TopicReader and tells the
 	// topic of each message of a conversation that has topics (a forum).
 	CapTopics Capability = "topics"
+	// CapPins means the adapter also implements PinReader: it lists the
+	// pinned messages of a conversation and tells when one is pinned or
+	// unpinned. Pinned topics need no capability of their own: Topic.Pinned
+	// and TopicChange carry them. With CapSend it may also implement Pinner.
+	CapPins Capability = "pins"
 )
 
 // Capabilities is the set an adapter declares.
@@ -197,6 +202,15 @@ type TopicChange struct {
 	Topic        Topic
 }
 
+// PinChange tells that messages of a conversation were pinned or unpinned in
+// the other app. A message the engine has not imported (it is older than the
+// history window) is skipped.
+type PinChange struct {
+	Conversation string
+	IDs          []string // Message.ID
+	Pinned       bool
+}
+
 // Edit replaces the content of an already-seen message.
 type Edit struct {
 	Message Message
@@ -220,6 +234,8 @@ type Event struct {
 	Delete       *Delete
 	Conversation *Conversation
 	Topic        *TopicChange
+	Pin          *PinChange
+	Read         *Read
 	Participant  *Participant
 	State        []byte
 }
@@ -349,6 +365,24 @@ type TopicReader interface {
 	// A large forum is read page by page inside the call; a throttle comes
 	// back as *RateLimitError like any other call.
 	ListTopics(ctx context.Context, acct Account, conv string) ([]Topic, error)
+}
+
+// PinReader is implemented by an adapter that declares CapPins.
+type PinReader interface {
+	// ListPinned returns the ids of the pinned messages of a conversation,
+	// newest first. The list belongs to the whole conversation, a forum
+	// included. A long list is read page by page inside the call.
+	ListPinned(ctx context.Context, acct Account, conv string) ([]string, error)
+}
+
+// Pinner is implemented by an adapter that declares both CapSend and CapPins.
+// Without the right to pin the call returns ErrNotAllowed; pinning what is
+// already pinned, or unpinning what is not, succeeds without effect.
+type Pinner interface {
+	// PinMessage pins or unpins one message, without notifying the members.
+	PinMessage(ctx context.Context, acct Account, conv, id string, pinned bool) error
+	// PinTopic pins or unpins a topic of a forum conversation.
+	PinTopic(ctx context.Context, acct Account, conv, topic string, pinned bool) error
 }
 
 // Sender is implemented by an adapter that declares CapSend. Calls follow
