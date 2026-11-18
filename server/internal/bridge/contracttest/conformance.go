@@ -254,7 +254,7 @@ func checkPins(t *testing.T, s Subject) {
 // kind twice to a state and back: setting what already is must succeed.
 func checkDialogs(t *testing.T, s Subject) {
 	sup := bridge.FeaturesOf(s.Adapter)
-	if !(sup[feature.Notify].In || sup[feature.Notify].Out || sup[feature.Dialog].In || sup[feature.Dialog].Out) {
+	if !sup[feature.Notify].In && !sup[feature.Notify].Out && !sup[feature.Dialog].In && !sup[feature.Dialog].Out {
 		t.Skip("the adapter has no dialog state")
 	}
 	if !s.ready() {
