@@ -36,7 +36,7 @@ function TopicPreview({ topic }: { topic: Topic }) {
 
 interface TopicMenuProps {
 	topic: Topic;
-	/** A chat that sends on to another app lets only the pin of a topic change here; the rest is managed there. */
+	/** A chat that sends on to another app lets the pin and the closing of a topic change here; hiding is managed there. */
 	pinOnly: boolean;
 	onAction: (change: TopicChange, done: string) => void;
 	onClose: () => void;
@@ -66,7 +66,7 @@ function TopicMenu({ topic, pinOnly, onAction, onClose }: TopicMenuProps) {
 				<Icon name="pin" />
 				{topic.pinned ? copy.topics.unpin : copy.topics.pin}
 			</button>
-			{!topic.general && !pinOnly && (
+			{!topic.general && (
 				<button
 					type="button"
 					role="menuitem"

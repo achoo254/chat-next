@@ -100,6 +100,14 @@ func declarationProblems(s Subject) []string {
 			fail("%s goes out but the adapter is not a bridge.DialogWriter", f)
 		}
 	}
+	_, infoReader := a.(bridge.InfoReader)
+	_, infoWriter := a.(bridge.InfoWriter)
+	if sup[feature.Info].In && !infoReader {
+		fail("info comes in but the adapter is not a bridge.InfoReader")
+	}
+	if sup[feature.Info].Out && !infoWriter {
+		fail("info goes out but the adapter is not a bridge.InfoWriter")
+	}
 	for f, v := range sup {
 		if !v.In && !v.Out {
 			fail("feature %q is listed with neither direction: leave it out", f)

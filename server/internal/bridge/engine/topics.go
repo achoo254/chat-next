@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -217,4 +218,45 @@ func (r *runner) onTopic(ctx context.Context, ev bridge.Event, tc bridge.TopicCh
 		return saveState(ctx, it.Tx(), r.account.ID, ev.State)
 	})
 	return true, err
+}
+
+// doTopicEdit sends the name and the closed state wanted for a topic, and when the
+// other app refuses puts the topic back to what it has there.
+func (r *runner) doTopicEdit(ctx context.Context, h *outboxRow) error {
+	db := r.e.db
+	writer, ok := r.adapter.(bridge.TopicWriter)
+	if !ok {
+		return db.setOutbox(ctx, []int64{h.ID}, "failed", "topic_unsupported: this app cannot change topics from Chat", time.Time{})
+	}
+	ext, found, err := externalTopic(ctx, db.pool, r.account.ID, h.ExternalChat, h.Seq)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
+	}
+	var p struct {
+		Title  string `json:"title"`
+		Closed bool   `json:"closed"`
+	}
+	if err := json.Unmarshal(h.Payload, &p); err != nil {
+		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
+	}
+	if err := db.startSending(ctx, []int64{h.ID}); err != nil {
+		return err
+	}
+	if err := writer.EditTopic(ctx, r.acct, h.ExternalChat, ext, bridge.TopicEdit{Title: &p.Title, Closed: &p.Closed}); err != nil {
+		if serr := r.settleCall(ctx, []*outboxRow{h}, err); serr != nil {
+			return serr
+		}
+		var status string
+		if qerr := db.pool.QueryRow(ctx, `SELECT status FROM external_outbox WHERE id = $1`, h.ID).Scan(&status); qerr != nil {
+			return qerr
+		}
+		if l := r.links[h.ExternalChat]; status == "failed" && l != nil {
+			return r.syncTopics(ctx, l) // the other app is the source: Chat shows its topics again
+		}
+		return nil
+	}
+	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
 }

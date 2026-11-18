@@ -112,6 +112,7 @@ export const viBridge = {
 		unknown: (app: string): string => `Chưa rõ đã gửi sang ${app} chưa`,
 		editFailed: (app: string): string => `Bản sửa chưa sang ${app}`,
 		pinRefused: (app: string, topic: boolean): string => `${app} không cho ghim ${topic ? "chủ đề" : "tin nhắn"} này; đã trả về như cũ.`,
+		changeRefused: (app: string, feature: string): string => `${app} không nhận thay đổi “${feature}”; đã trả về như cũ.`,
 		resend: "Gửi lại",
 		discard: "Xoá tin",
 		dismiss: "Bỏ qua",

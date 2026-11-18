@@ -128,8 +128,10 @@ func translatePin(err error) error {
 	}
 	if rpc, ok := tgerr.As(err); ok {
 		switch rpc.Type {
-		case "CHAT_NOT_MODIFIED", "PINNED_TOPIC_NOT_MODIFIED":
+		case "CHAT_NOT_MODIFIED", "CHAT_ABOUT_NOT_MODIFIED", "CHAT_TITLE_NOT_MODIFIED", "PINNED_TOPIC_NOT_MODIFIED", "TOPIC_NOT_MODIFIED":
 			return nil
+		case "CHAT_ABOUT_TOO_LONG", "CHAT_TITLE_EMPTY":
+			return fmt.Errorf("%w: %s", bridge.ErrTooLarge, rpc.Type)
 		case "PIN_RESTRICTED", "PINNED_TOO_MUCH", "MESSAGE_ID_INVALID", "TOPIC_CLOSED":
 			return fmt.Errorf("%w: %s", bridge.ErrNotAllowed, rpc.Type)
 		}

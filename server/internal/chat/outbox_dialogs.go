@@ -13,9 +13,16 @@ import (
 // per kind of state per chat, so the next change replaces the one not yet sent; the
 // row has no message, so its seq is 0.
 
-// queueDialogState queues the state wanted of a chat of me for the feature (notify
+// queueState queues the state wanted of a chat of me for the feature (notify, dialog, info
 // or dialog) as op, with its payload, if the chat goes to another app for me.
-func (t *txn) queueDialogState(ctx context.Context, chatID, me int64, feat feature.Feature, op string, payload map[string]any) error {
+//
+// seq names the object the state is of when it is not the chat itself (a topic's id);
+// without it the row is the chat's.
+func (t *txn) queueState(ctx context.Context, chatID, me int64, feat feature.Feature, op string, payload map[string]any, seq ...int64) error {
+	object := int64(0)
+	if len(seq) > 0 {
+		object = seq[0]
+	}
 	l, err := t.outboundLink(ctx, chatID, me, feat)
 	if err != nil || l == nil {
 		return err
@@ -25,10 +32,10 @@ func (t *txn) queueDialogState(ctx context.Context, chatID, me int64, feat featu
 		return fmt.Errorf("chat: queue %s: %w", op, err)
 	}
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, payload) VALUES ($1, $2, $3, 0, $4, $5, $6)
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, payload) VALUES ($1, $2, $3, $7, $4, $5, $6)
 		ON CONFLICT (chat_id, seq, op) DO UPDATE
 			SET payload = EXCLUDED.payload, status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()`,
-		l.accountID, l.externalID, chatID, op, string(feat), body); err != nil {
+		l.accountID, l.externalID, chatID, op, string(feat), body, object); err != nil {
 		return fmt.Errorf("chat: queue %s: %w", op, err)
 	}
 	return nil

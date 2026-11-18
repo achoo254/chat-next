@@ -15,6 +15,15 @@ export { watchDelivery } from "./bridge-delivery-watch.ts";
 
 type Copy = ReturnType<typeof useBridgeCopy>["delivery"];
 
+/** The feature a refused change belongs to, for the notice. */
+const STATE_OP_FEATURE: Partial<Record<BridgeOutboxItem["op"], string>> = {
+	set_topic: "topics",
+	set_info: "info",
+	set_mute: "notify",
+	set_dialog_pin: "dialog",
+	set_unread_mark: "dialog",
+};
+
 const unfinished = (item: BridgeOutboxItem): boolean => item.status === "failed" || item.status === "unknown";
 
 /** What a message that did not go out says, for the time line and the row under it. */
@@ -72,11 +81,16 @@ export function BridgeFailedRow({ chatId, seq }: { chatId: number; seq: number }
 /** The line above the composer of a chat that sends on; it also tells, once, a pin the app refused. */
 export function BridgeNote({ app, refused }: { app: string; refused: readonly BridgeOutboxItem[] }) {
 	"use no memo";
-	const t = useBridgeCopy().delivery;
+	const copy = useBridgeCopy();
+	const t = copy.delivery;
 	const { toasts } = useServices();
 	useEffect(() => {
-		for (const item of refused) toasts.show(t.pinRefused(bridgeAppName(app), item.op === "pin_topic"));
-	}, [refused, toasts, t, app]);
+		for (const item of refused) {
+			const app_ = bridgeAppName(app);
+			if (item.op === "pin_message" || item.op === "pin_topic") toasts.show(t.pinRefused(app_, item.op === "pin_topic"));
+			else toasts.show(t.changeRefused(app_, copy.features.name[STATE_OP_FEATURE[item.op] ?? ""] ?? STATE_OP_FEATURE[item.op] ?? ""));
+		}
+	}, [refused, toasts, t, copy, app]);
 	return (
 		<p className="bridge-note" role="note">
 			<Icon name="info" small />

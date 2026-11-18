@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -352,10 +353,10 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 // (admins; the topic's creator with MANAGE_TOPICS unless adminOnly), lets
 // edit change it and announces the result.
 //
-// pinOnly marks a change that only pins or unpins the topic: in a chat that
-// sends to another app for me it is allowed and goes to that app too; any
-// other change of such a chat's topics is refused.
-func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, adminOnly, pinOnly bool,
+// outward marks a change the other app takes (pin, name, closed): in a chat that
+// sends its topics to another app for me it is allowed and goes to that app too;
+// any other change of such a chat's topics is refused.
+func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, adminOnly, outward bool,
 	edit func(t *topicRow) (changed bool, err error),
 ) (*appv1.ForumTopic, *appv1.SyncAck, error) {
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
@@ -372,7 +373,7 @@ func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, ad
 			if sendsOut, err = t.mayPinTopicOutward(ctx, chatID, me); err != nil {
 				return err
 			}
-			if !pinOnly || !sendsOut {
+			if !outward || !sendsOut {
 				return errDenied(errTopicsManagedElsewhere)
 			}
 		}
@@ -388,13 +389,18 @@ func (s *Service) changeTopic(ctx context.Context, me, chatID, topicID int64, ad
 		if !m.isAdmin() && !creatorMay {
 			return errDenied("you cannot change this topic")
 		}
-		pinnedBefore := topic.Pinned
+		before := *topic
 		changed, err := edit(topic)
 		if err != nil || !changed {
 			return err
 		}
-		if sendsOut && topic.Pinned != pinnedBefore {
+		if sendsOut && topic.Pinned != before.Pinned {
 			if err := t.queueTopicPin(ctx, chatID, me, topicID, topic.Pinned); err != nil {
+				return err
+			}
+		}
+		if sendsOut && (topic.Title != before.Title || topic.Closed != before.Closed) {
+			if err := t.queueState(ctx, chatID, me, feature.Topics, "set_topic", map[string]any{"topic": topicID, "title": topic.Title, "closed": topic.Closed}, topicID); err != nil {
 				return err
 			}
 		}
@@ -433,8 +439,9 @@ func (s *Service) EditForumTopic(ctx context.Context, me int64, req *appv1.EditF
 			return nil, nil, err
 		}
 	}
-	pinOnly := req.Pinned != nil && req.Title == nil && req.IconColor == nil && req.Icon == nil
-	return s.changeTopic(ctx, me, req.GetChatId(), req.GetTopicId(), req.Pinned != nil, pinOnly, func(t *topicRow) (bool, error) {
+	// The other app takes the name and the pin; the colour and the icon it fixes when the topic is made.
+	outward := req.IconColor == nil && req.Icon == nil
+	return s.changeTopic(ctx, me, req.GetChatId(), req.GetTopicId(), req.Pinned != nil, outward, func(t *topicRow) (bool, error) {
 		before := *t
 		if req.Title != nil {
 			t.Title = title
@@ -454,7 +461,7 @@ func (s *Service) EditForumTopic(ctx context.Context, me int64, req *appv1.EditF
 
 // CloseForumTopic closes or reopens a topic.
 func (s *Service) CloseForumTopic(ctx context.Context, me, chatID, topicID int64, closed bool) (*appv1.ForumTopic, *appv1.SyncAck, error) {
-	return s.changeTopic(ctx, me, chatID, topicID, false, false, func(t *topicRow) (bool, error) {
+	return s.changeTopic(ctx, me, chatID, topicID, false, true, func(t *topicRow) (bool, error) {
 		if t.Closed == closed {
 			return false, nil
 		}

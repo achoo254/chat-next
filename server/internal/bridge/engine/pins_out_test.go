@@ -141,7 +141,7 @@ func TestAChatThatOnlyReadsKeepsItsPinsToItself(t *testing.T) {
 	}
 }
 
-func TestPinningATopicInChatPinsItInTheOtherAppAndOtherTopicChangesStayRefused(t *testing.T) {
+func TestPinningATopicInChatPinsItInTheOtherAppAndWhatTheAppFixesStaysRefused(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	conv := e.forumConv()
@@ -164,12 +164,13 @@ func TestPinningATopicInChatPinsItInTheOtherAppAndOtherTopicChangesStayRefused(t
 	if !e.topicPinned(chatID, "Hạ tầng") {
 		t.Fatal("the topic is not pinned in Chat")
 	}
-	title := "Tên khác"
-	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title}); err == nil {
-		t.Fatal("renaming a topic of a linked chat was allowed")
+	// the colour and the icon are fixed when the other app makes the topic: not changed from Chat
+	color := int32(0x6FB9F0)
+	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, IconColor: &color}); err == nil {
+		t.Fatal("changing the colour of a topic of a linked chat was allowed")
 	}
-	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title, Pinned: &pinned}); err == nil {
-		t.Fatal("renaming together with pinning was allowed")
+	if _, _, err := e.chat.HideForumTopic(ctx, e.owner, chatID, topic, true); err == nil {
+		t.Fatal("hiding a topic of a linked chat was allowed")
 	}
 }
 

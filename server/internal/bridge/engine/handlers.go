@@ -34,6 +34,14 @@ func noEvents(bridge.Event) (string, bool) { return "", false }
 
 var handlers = []handler{
 	{
+		feature: feature.Info,
+		match:   noEvents,
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"set_info": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doInfo(ctx, h) },
+		},
+		poll: func(r *runner, ctx context.Context) error { return r.pollInfo(ctx) },
+	},
+	{
 		feature: feature.Notify,
 		match:   noEvents,
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
@@ -82,6 +90,7 @@ var handlers = []handler{
 			return r.onTopic(ctx, ev, *ev.Topic)
 		},
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"set_topic": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doTopicEdit(ctx, h) },
 			"pin_topic": func(r *runner, ctx context.Context, h *outboxRow) error {
 				return r.withSender(ctx, h, func(ctx context.Context, s bridge.Sender, h *outboxRow) error { return r.doPin(ctx, s, h, true) })
 			},

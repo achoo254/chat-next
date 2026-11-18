@@ -41,17 +41,18 @@ describe("topics of a copied forum", () => {
 		expect(await screen.findByRole("menu", {}, LONG)).toBeTruthy();
 	});
 
-	it("lets an owner pin a topic of a copy that sends on to the other app, and nothing else", async () => {
+	it("lets an owner pin or close a topic of a copy that sends on to the other app, and not hide it", async () => {
 		const { fixture, chatId } = forum(WITHOUT_MANAGE_TOPICS);
 		fixture.bridge.seedTwoWay(chatId);
+		fixture.topics.set(chatId, [...(fixture.topics.get(chatId) ?? []), { id: 2, title: "Hạ tầng", iconColor: 0x6fb9f0, creatorId: fixture.selfId, pinned: false, closed: false, hidden: false, unreadCount: 0 }]);
 		renderMessaging(fixture, `/c/${chatId}`);
 		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
-		const row = within(topics).getAllByRole("button")[0] as HTMLElement;
+		const row = within(topics).getAllByRole("button")[1] as HTMLElement;
 		await waitFor(() => {
 			fireEvent.contextMenu(row);
 			expect(screen.queryByRole("menu")).not.toBeNull();
 		}, LONG);
 		const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
-		expect(items.map((item) => item.textContent)).toEqual(["Ghim chủ đề"]);
+		expect(items.map((item) => item.textContent)).toEqual(["Ghim chủ đề", "Đóng chủ đề"]);
 	});
 });

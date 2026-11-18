@@ -90,11 +90,15 @@ export class BridgeError extends Error {
 	}
 }
 
+/** A change of state the other app refused (already put back in Chat), told once: a pin, a topic, the info of the group, the state of the chat in the list. */
+export type StateOp = "pin_message" | "pin_topic" | "set_topic" | "set_info" | "set_mute" | "set_dialog_pin" | "set_unread_mark";
+export const STATE_OPS: readonly StateOp[] = ["pin_message", "pin_topic", "set_topic", "set_info", "set_mute", "set_dialog_pin", "set_unread_mark"];
+
 /** What a chat has queued for the other app and not finished (a message that is not listed was sent). */
 export interface BridgeOutboxItem {
 	readonly seq: number;
 	/** `pin_message` and `pin_topic` are a pin the app refused (already put back in Chat), told once; for a topic `seq` is its id in the chat. */
-	readonly op: "send" | "edit" | "delete" | "pin_message" | "pin_topic";
+	readonly op: "send" | "edit" | "delete" | StateOp;
 	/** `pending`: waiting; `sending`: on its way; `failed`: refused or given up; `unknown`: may or may not have arrived. */
 	readonly status: "pending" | "sending" | "failed" | "unknown";
 	/** Why it failed or waits; a short machine-ish text, shown only as a detail. */

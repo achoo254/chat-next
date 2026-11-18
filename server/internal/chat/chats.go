@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"cmp"
 	"context"
 	"encoding/base64"
@@ -1031,6 +1032,11 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 			UPDATE chats SET title = $2, about = $3, default_permissions = $4, forum = $5, updated_at = now() WHERE id = $1`,
 			chatID, c.Title, c.About, int32(c.DefaultPerms), c.Forum); err != nil {
 			return fmt.Errorf("chat: update chat info: %w", err)
+		}
+		if req.Title != nil || req.About != nil {
+			if err := t.queueState(ctx, chatID, me, feature.Info, "set_info", map[string]any{"title": c.Title, "about": c.About}); err != nil {
+				return err
+			}
 		}
 		return t.chatChanged(ctx, c, me, actions...)
 	})

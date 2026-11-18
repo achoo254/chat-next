@@ -43,6 +43,9 @@ type Fake struct {
 	support                                    map[feature.Feature]feature.Support
 	dialogs                                    map[string]bridge.DialogState
 	dialogCalls                                []string
+	infos                                      map[string]bridge.GroupInfo
+	infoCalls                                  []string
+	topicEdits                                 []string
 	pinCalls                                   []PinCall
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
@@ -56,7 +59,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -67,6 +70,7 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Read:     {In: true},
 		feature.Notify:   {In: true, Out: true},
 		feature.Dialog:   {In: true, Out: true},
+		feature.Info:     {In: true, Out: true},
 	}
 }
 
@@ -572,3 +576,94 @@ var (
 	_ bridge.DialogReader = (*Fake)(nil)
 	_ bridge.DialogWriter = (*Fake)(nil)
 )
+
+// SetGroupInfoRemotely sets the title and description of a group in the app, as if
+// somebody there had changed them; GroupInfos answers it.
+func (f *Fake) SetGroupInfoRemotely(conv string, info bridge.GroupInfo) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.infos[conv] = info
+}
+
+// GroupInfo is what the app has now for a group.
+func (f *Fake) GroupInfo(conv string) bridge.GroupInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.infos[conv]
+}
+
+// InfoCalls lists the calls Chat made to change the info of a group, as "<conv>:<title>:<about>".
+func (f *Fake) InfoCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.infoCalls...)
+}
+
+// GroupInfos implements bridge.InfoReader.
+func (f *Fake) GroupInfos(_ context.Context, _ bridge.Account, convs []string) (map[string]bridge.GroupInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[string]bridge.GroupInfo{}
+	for _, c := range convs {
+		if info, ok := f.infos[c]; ok {
+			out[c] = info
+		}
+	}
+	return out, nil
+}
+
+// SetGroupInfo implements bridge.InfoWriter.
+func (f *Fake) SetGroupInfo(_ context.Context, _ bridge.Account, conv string, info bridge.GroupInfo) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Info].Out {
+		return fmt.Errorf("%w: this app does not take the info of a group from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	f.infoCalls = append(f.infoCalls, conv+":"+info.Title+":"+info.About)
+	f.infos[conv] = info
+	return nil
+}
+
+var (
+	_ bridge.InfoReader = (*Fake)(nil)
+	_ bridge.InfoWriter = (*Fake)(nil)
+)
+
+// TopicEdits lists the calls Chat made to rename, close or reopen a topic, as
+// "<conv>:<topic>:<title>:<closed>".
+func (f *Fake) TopicEdits() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.topicEdits...)
+}
+
+// EditTopic implements bridge.TopicWriter.
+func (f *Fake) EditTopic(_ context.Context, _ bridge.Account, conv, topic string, edit bridge.TopicEdit) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Topics].Out {
+		return fmt.Errorf("%w: this app does not take topic changes from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	for i := range f.topics[conv] {
+		t := &f.topics[conv][i]
+		if t.ID != topic {
+			continue
+		}
+		if edit.Title != nil {
+			t.Title = *edit.Title
+		}
+		if edit.Closed != nil {
+			t.Closed = *edit.Closed
+		}
+		f.topicEdits = append(f.topicEdits, fmt.Sprintf("%s:%s:%s:%v", conv, topic, t.Title, t.Closed))
+	}
+	return nil
+}
+
+var _ bridge.TopicWriter = (*Fake)(nil)

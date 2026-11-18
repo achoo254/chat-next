@@ -55,6 +55,8 @@ func TestTranslatePin(t *testing.T) {
 	}{
 		{rpc: "CHAT_NOT_MODIFIED"},
 		{rpc: "PINNED_TOPIC_NOT_MODIFIED"},
+		{rpc: "CHAT_ABOUT_NOT_MODIFIED"},
+		{rpc: "CHAT_TITLE_NOT_MODIFIED"},
 		{rpc: "CHAT_ADMIN_REQUIRED", not: true},
 		{rpc: "PIN_RESTRICTED", not: true},
 		{rpc: "PINNED_TOO_MUCH", not: true},

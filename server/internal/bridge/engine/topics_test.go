@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/feature"
 	"app.local/server/internal/chat"
 )
 
@@ -247,5 +249,74 @@ func TestTheConversationListSaysWhichForumsAreSplitIntoTopics(t *testing.T) {
 	list, err = engFlat.Conversations(ctx, flat.owner, flat.account)
 	if err != nil || len(list) != 1 || !list[0].Forum || list[0].TopicsSplit {
 		t.Fatalf("list = %+v, %v; want a forum whose copy is flat (the app does not read topics)", list, err)
+	}
+}
+
+func (e *env) topicState(chatID int64, topic int64) (title string, closed bool) {
+	e.t.Helper()
+	if err := e.st.Pool().QueryRow(context.Background(), `SELECT title, closed FROM forum_topics WHERE chat_id = $1 AND id = $2`, chatID, topic).Scan(&title, &closed); err != nil {
+		e.t.Fatal(err)
+	}
+	return
+}
+
+func (e *env) twoWayForum() (int64, int64) {
+	e.t.Helper()
+	conv := e.forumConv()
+	e.fake.AddHistory("g1", e.inTopic("m1", lan, "tin 1", "7", 1))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"tin 1"})
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "backfill not done" })
+	if err := e.chat.SetImportedDirection(context.Background(), e.owner, chatID, chat.DirectionBoth); err != nil {
+		e.t.Fatal(err)
+	}
+	return chatID, e.topicIDByTitle(chatID, "Hạ tầng")
+}
+
+func TestRenamingAndClosingATopicInChatReachTheOtherAppAndStayThere(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	chatID, topic := e.twoWayForum()
+	title := "Hạ tầng mới"
+	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.chat.CloseForumTopic(ctx, e.owner, chatID, topic, true); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return len(e.fake.TopicEdits()) >= 1 }, func() string { return "nothing reached the other app" })
+	e.waitOutbox(chatID, topic, "set_topic", "sent")
+	if got := e.fake.TopicEdits(); got[len(got)-1] != "g1:7:Hạ tầng mới:true" {
+		t.Fatalf("the other app's last edit = %v, want the new name and closed", got)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if got, closed := e.topicState(chatID, topic); got != "Hạ tầng mới" || !closed {
+		t.Fatalf("Chat has %q closed=%v after the other app took it", got, closed)
+	}
+}
+
+func TestATopicChangeTheOtherAppRefusesIsPutBackToWhatItHas(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	chatID, topic := e.twoWayForum()
+	e.fake.FailPin(fmt.Errorf("%w: CHAT_ADMIN_REQUIRED", bridge.ErrNotAllowed))
+	title := "Không được đổi"
+	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitOutbox(chatID, topic, "set_topic", "failed")
+	e.eventually(func() bool { got, _ := e.topicState(chatID, topic); return got == "Hạ tầng" }, func() string { got, _ := e.topicState(chatID, topic); return "topic is " + got })
+}
+
+func TestARenameOfATopicWithTopicsSwitchedOffStaysInChatOnly(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	chatID, topic := e.twoWayForum()
+	if err := e.engine().SetFeature(ctx, e.owner, e.account, "g1", feature.Topics, feature.In); err != nil {
+		t.Fatal(err)
+	}
+	title := "Chỉ ở Chat"
+	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title}); err == nil {
+		t.Fatal("a topic of a chat that only receives its topics was renamed from Chat")
 	}
 }

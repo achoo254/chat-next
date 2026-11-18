@@ -38,7 +38,7 @@ export async function watchDelivery(transport: Transport, chatId: number, onStat
 				const items = new Map<number, BridgeOutboxItem[]>();
 				const refused: BridgeOutboxItem[] = [];
 				for (const item of list) {
-					if (item.op === "pin_message" || item.op === "pin_topic") refused.push(item);
+					if (item.op !== "send" && item.op !== "edit" && item.op !== "delete") refused.push(item);
 					else items.set(item.seq, [...(items.get(item.seq) ?? []), item]);
 				}
 				onState({ app, items, refused });

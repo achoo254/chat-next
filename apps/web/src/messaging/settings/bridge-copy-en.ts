@@ -110,6 +110,7 @@ export const enBridge: BridgeCopy = {
 		unknown: (app) => `Unclear whether it reached ${app}`,
 		editFailed: (app) => `Edit did not reach ${app}`,
 		pinRefused: (app, topic) => `${app} did not let you ${topic ? "pin that topic" : "pin that message"}; it is back as it was.`,
+		changeRefused: (app, feature) => `${app} did not take the change to “${feature}”; it is back as it was.`,
 		resend: "Resend",
 		discard: "Delete message",
 		dismiss: "Dismiss",

@@ -58,6 +58,14 @@ describe("a chat that sends on to another app", () => {
 		expect(within(bubble).queryByRole("button", { name: "Gửi lại" })).toBeNull();
 	});
 
+	it("tells that the app refused any other change of state too, once, by what it was", async () => {
+		const { fixture, chatId } = twoWay(() => [item(0, "set_info", BridgeOutboxStatus.FAILED, "not allowed: CHAT_ADMIN_REQUIRED")]);
+		renderMessaging(fixture, `/c/${chatId}`);
+		await waitFor(() => expect(document.querySelector(".toast")?.textContent ?? "").toContain("Telegram không nhận thay đổi “Tên, mô tả và ảnh nhóm”"), LONG);
+		const bubble = await myBubble();
+		expect(within(bubble).queryByRole("button", { name: "Gửi lại" })).toBeNull();
+	});
+
 	it("offers to resend a message the app refused, and goes back to sending when asked", async () => {
 		const { fixture, chatId, seq } = twoWay((s) => [item(s, "send", BridgeOutboxStatus.FAILED, "not allowed: CHAT_WRITE_FORBIDDEN")]);
 		renderMessaging(fixture, `/c/${chatId}`);

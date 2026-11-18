@@ -24,6 +24,15 @@ Mỗi tin gửi đi có trạng thái ngay trên tin: đồng hồ là đang g�
 - **Từ Chat sang Telegram (chat hai chiều):** ghim, bỏ ghim tin và **ghim topic** (menu chuột phải của topic chỉ còn mục Ghim) đổi theo ở Telegram, im lặng (không báo thành viên). Cần quyền ghim ở nhóm Telegram. Nếu Telegram từ chối (không phải quản trị viên, ghim quá nhiều) thì Chat trả ghim về như cũ và báo "Telegram không cho ghim…". Chat chỉ đọc giữ ghim riêng trong Chat, không gửi gì ra ngoài. Tên, màu, đóng và ẩn topic vẫn chỉ đổi ở Telegram.
 - Sau khi ghim tin từ Chat, Telegram đăng một dòng "đã ghim tin nhắn" trong nhóm cho mọi người thấy; bỏ ghim thì không có dòng nào.
 
+## Tính năng của từng chat
+
+Mỗi chat đã đồng bộ có nút **Tính năng** (Cài đặt › Kết nối ứng dụng): mỗi tính năng nền tảng hỗ trợ chọn Tắt, Chỉ nhận, Chỉ gửi hoặc Hai chiều, và có mức nhanh Chỉ đọc, Cá nhân, Đầy đủ. Hướng mặc định của tính năng theo hướng của tin nhắn (chat gửi tin thì ghim, tắt tiếng, tên nhóm cũng đi hai chiều). Tính năng tác động lên người và nhóm (thành viên, link mời) tắt mặc định và hỏi xác nhận khi bật. Thêm nền tảng: [Thêm một nền tảng chat](adding-a-platform.md).
+
+- **Trạng thái chat trong danh sách của bạn** (tắt tiếng, ghim chat, đánh dấu chưa đọc): Chat đọc từ Telegram mỗi 2 phút và làm Chat khớp với Telegram; đổi trong Chat thì gửi sang Telegram (chỉ trạng thái cuối). Ghim chat quá 5 của Chat bị bỏ qua.
+- **Tên và mô tả nhóm:** đọc mỗi khoảng 10 phút; đổi trong Chat gửi sang Telegram (cần quyền đổi thông tin nhóm). Chat không đăng dòng "đã đổi tên" cho thay đổi đến từ Telegram vì không biết ai đổi. Ảnh nhóm chưa đồng bộ.
+- **Topic từ Chat:** đổi tên, đóng và mở lại, ghim đi sang Telegram khi tính năng Chủ đề gửi ra; tạo topic mới, đổi màu, biểu tượng và ẩn vẫn chỉ làm ở Telegram.
+- **Telegram từ chối** (không đủ quyền…): Chat trả về như Telegram đang có và báo một thông báo.
+
 Chat đã đồng bộ hiện nhãn nhỏ tên ứng dụng ở danh sách. Người gửi hiện bằng tên của họ ở Telegram; tin của chính bạn bên Telegram hiện là tin của bạn.
 
 ## Nhóm có chủ đề (forum)

@@ -22,6 +22,7 @@ import {
 	type BridgeOutboxItem,
 	type ConversationKind,
 	type LoginStep,
+	STATE_OPS,
 } from "./bridge-api.ts";
 import type { BridgeFeatureView, FeatureDirection, FeatureRisk } from "./bridge-features-model.ts";
 
@@ -48,7 +49,7 @@ const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status
 const DIRECTIONS: readonly FeatureDirection[] = ["off", "in", "out", "both"];
 const RISKS: readonly FeatureRisk[] = ["r1", "r2", "r3", "re"];
 
-const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", "pin_message", "pin_topic"];
+const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", ...STATE_OPS];
 
 function toWireDirection(direction: BridgeDirection | undefined): WireDirection {
 	if (direction === undefined) return WireDirection.UNSPECIFIED;

@@ -149,6 +149,8 @@ type runner struct {
 	// pause holds every send until then (the other app asked to wait);
 	// nextSend spaces two sends by Config.SendGap.
 	pause, nextSend time.Time
+	// infoTick counts the looks at the state of the chats, to read the info of groups once in a while.
+	infoTick int
 }
 
 // run connects the account and syncs until ctx ends or something fails.
