@@ -265,6 +265,20 @@ describe("attached and recent copies", () => {
 	});
 });
 
+describe("a question with something attached", () => {
+	it("can be asked without typing: the Ask button is enabled and the box stays optional", async () => {
+		const store = new AdvisorStore();
+		store.remember("lỗi một", scmCopy);
+		store.setOpen(true);
+		open(store);
+		expect(await screen.findByText(t.ask.attachedTitle, undefined, WAIT)).toBeTruthy();
+		const send = screen.getByRole("button", { name: t.ask.send }) as HTMLButtonElement;
+		await waitFor(() => expect(send.disabled).toBe(false), WAIT);
+		await userEvent.click(send);
+		expect(await screen.findByText(t.ask.defaultQuestion, undefined, WAIT)).toBeTruthy();
+	});
+});
+
 describe("the mascot's menu", () => {
 	it("leads to the settings and hides the mascot, with no per-session switch (automatic Advisor is one switch in the settings)", async () => {
 		const store = new AdvisorStore();

@@ -234,12 +234,15 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 		setAttached([offered, ...attached].slice(0, 5));
 		store.markUsed([offered.id]);
 	}, [offered, attached, setAttached, store]);
-	const canAsk = presence.note === "" && presence.ai !== "" && text.trim() !== "" && !busy;
+	// With something attached the question is optional: Advisor is asked what to do about it.
+	const hasInput = text.trim() !== "" || attached.length > 0;
+	const canAsk = presence.note === "" && presence.ai !== "" && hasInput && !busy;
 	const submit = async (sensitive: boolean) => {
-		if (presence.note !== "" || text.trim() === "") return;
+		if (presence.note !== "" || !hasInput) return;
 		setBusy(true);
 		setError("");
-		const result = await presence.ask({ text: text.trim(), attached, tone, sensitive });
+		const question = text.trim() !== "" ? text.trim() : t.ask.defaultQuestion;
+		const result = await presence.ask({ text: question, attached, tone, sensitive });
 		setBusy(false);
 		if (result.kind === "consent") return setConsent(result.dir);
 		if (result.kind === "error") return setError(errorText(tm, result.error, providerOf(presence.state?.info ?? null, presence.ai)?.name ?? "AI") || t.ask.failed);
@@ -263,19 +266,23 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 			<div className="adv-body">
 				{elsewhere && <p className="adv-note muted">{t.answer.elsewhere}</p>}
 				<NoteLine presence={presence} store={store} />
-				{attached.length > 0 && <p className="adv-attach-title">{t.ask.attachedTitle}</p>}
+				{attached.length > 0 && (
+					<p className="adv-attach-title">
+						<Icon name="clip" small /> {t.ask.attachedTitle}
+					</p>
+				)}
 				{attached.map((copy) => (
 					<div key={copy.id} className="adv-attached">
 						<span className="grow">
-							<small className="muted">{whereOf(locale, copy.context)}</small>
+							<small className="adv-where">{whereOf(locale, copy.context)}</small>
 							<span className="adv-clip mono">{copy.text}</span>
 						</span>
-						<button type="button" className="icon-btn" aria-label={t.ask.remove} onClick={() => setAttached(attached.filter((c) => c.id !== copy.id))}>
+						<button type="button" className="icon-btn icon-btn-sm" aria-label={t.ask.remove} onClick={() => setAttached(attached.filter((c) => c.id !== copy.id))}>
 							<Icon name="x" small />
 						</button>
 					</div>
 				))}
-				{attached.length > 0 && <p className="adv-note muted">{t.ask.attachedHint}</p>}
+				{attached.length > 0 && <p className="adv-note adv-hint">{t.ask.attachedHint}</p>}
 				{choices.length > 0 && (
 					<details className="adv-recent" open={showRecent} onToggle={(event) => setShowRecent(event.currentTarget.open)}>
 						<summary>{t.ask.recent(choices.length)}</summary>
@@ -430,22 +437,35 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 			? (presence.stateOf(question.machine)?.threads.find((x) => x.id === open.threadId && !x.archived && x.kind !== ThreadKind.ADVISOR)?.id ?? "")
 			: "";
 	const sessions = picking ? presence.sessionsFor(question) : [];
+	// Copies from the same place are one chip with a count, not the same line again and again.
+	const places = [...question.attached.reduce((map, copy) => map.set(whereOf(locale, copy.context), (map.get(whereOf(locale, copy.context)) ?? 0) + 1), new Map<string, number>())];
 	return (
 		<>
 			<div className="adv-body" aria-live="polite">
 				<p className="adv-asked">
-					<small className="muted">{t.answer.yours}</small>
+					<small className="adv-label">{t.answer.yours}</small>
 					<span>{asked}</span>
 				</p>
-				{question.attached.map((copy) => (
-					<p key={copy.id} className="adv-attached-line muted">
-						<Icon name="clip" small /> {whereOf(locale, copy.context)}
-					</p>
-				))}
+				{places.length > 0 && (
+					<ul className="adv-chips">
+						{places.map(([place, count]) => (
+							<li key={place} className="adv-chip">
+								<Icon name="clip" small />
+								<span>{place}</span>
+								{count > 1 && <b>×{count}</b>}
+							</li>
+						))}
+					</ul>
+				)}
 				{question.error !== "" && <p className="adv-note mx-error">{t.ask.failed}</p>}
 				{lost && question.error === "" && <p className="adv-note mx-error">{t.answer.lost}</p>}
 				{running && (
-					<p className="adv-note muted" role="status">
+					<p className="adv-working" role="status">
+						<span className="adv-dots" aria-hidden="true">
+							<i />
+							<i />
+							<i />
+						</span>
 						{state === "waiting" ? t.answer.waiting : t.answer.thinking}
 					</p>
 				)}
@@ -455,14 +475,16 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 				{verdict !== null && verdict.error !== "" && <p className="adv-note mx-error">{t.answer.errors[verdict.error] ?? t.answer.otherError}</p>}
 				{top !== undefined && verdict !== null && (
 					<div className="adv-best">
-						<small className="muted">
+						<small className="adv-label">
 							{t.answer.top} · {verdict.verdict === "confident" ? t.answer.confident : t.answer.unsure} · {t.answer.confidence(Math.round(verdict.confidence * 100))}
 						</small>
 						<div className="adv-option">
-							<span className="grow">{top.text}</span>
-							<CopyOption text={top.text} />
-							<PercentBar pct={Math.round(top.probability * 100)} />
-							<b>{Math.round(top.probability * 100)}%</b>
+							<span className="adv-option-text">{top.text}</span>
+							<span className="adv-option-meter">
+								<PercentBar pct={Math.round(top.probability * 100)} />
+								<b>{Math.round(top.probability * 100)}%</b>
+								<CopyOption text={top.text} />
+							</span>
 						</div>
 					</div>
 				)}
@@ -470,10 +492,12 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 					<div className="adv-all">
 						{ranked.slice(1).map((option) => (
 							<div key={option.text} className="adv-option">
-								<span className="grow">{option.text}</span>
-								<CopyOption text={option.text} />
-								<PercentBar pct={Math.round(option.probability * 100)} />
-								<span>{Math.round(option.probability * 100)}%</span>
+								<span className="adv-option-text">{option.text}</span>
+								<span className="adv-option-meter">
+									<PercentBar pct={Math.round(option.probability * 100)} />
+									<span>{Math.round(option.probability * 100)}%</span>
+									<CopyOption text={option.text} />
+								</span>
 							</div>
 						))}
 						<p>
@@ -511,19 +535,8 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 					</p>
 				)}
 			</div>
-			<div className="adv-foot adv-acts">
-				{running && (
-					<button
-						type="button"
-						className="btn btn-sm"
-						onClick={() => {
-							setError("");
-							presence.stop(question).catch((err: unknown) => setError(errorText(tm, err, "AI")));
-						}}
-					>
-						{t.answer.stop}
-					</button>
-				)}
+			<div className="adv-foot">
+				<div className="adv-acts adv-acts-more">
 				{!running && verdict !== null && ranked.length > 0 && (
 					<button type="button" className="btn btn-sm" aria-expanded={all} onClick={() => setAll(!all)}>
 						{all ? t.answer.less : t.answer.all}
@@ -551,6 +564,20 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 						{t.answer.view}
 					</button>
 				)}
+				</div>
+				<div className="adv-acts adv-acts-main">
+				{running && (
+					<button
+						type="button"
+						className="btn btn-sm"
+						onClick={() => {
+							setError("");
+							presence.stop(question).catch((err: unknown) => setError(errorText(tm, err, "AI")));
+						}}
+					>
+						{t.answer.stop}
+					</button>
+				)}
 				{!running && (
 					<button type="button" className="btn btn-sm btn-primary" onClick={() => onAgain(lost ? asked : "")}>
 						{lost ? t.answer.askAgain : t.answer.again}
@@ -567,6 +594,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 				>
 					{t.answer.close}
 				</button>
+				</div>
 			</div>
 		</>
 	);
