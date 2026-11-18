@@ -16,6 +16,17 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 // server runs with the bridge off, every call answers failed_precondition
 // bridge_disabled.
 service BridgeService {
+  // What a new synced chat of the account starts with, by feature (acting on people and
+  // groups and messages are not part of it).
+  rpc ListBridgeFeatureDefaults(ListBridgeFeatureDefaultsRequest) returns (ListBridgeFeatureDefaultsResponse);
+  // Sets one default; with apply_to_all it is also written to every chat already synced.
+  rpc SetBridgeFeatureDefault(SetBridgeFeatureDefaultRequest) returns (SetBridgeFeatureDefaultResponse);
+  // Everything Chat queued for the app that did not go through, of any feature.
+  rpc ListBridgeProblems(ListBridgeProblemsRequest) returns (ListBridgeProblemsResponse);
+  // Queues a problem again.
+  rpc RetryBridgeProblem(RetryBridgeProblemRequest) returns (RetryBridgeProblemResponse);
+  // Gives up a problem that is not a send.
+  rpc DismissBridgeProblem(DismissBridgeProblemRequest) returns (DismissBridgeProblemResponse);
   // Which apps can be connected, the user's connected accounts and their
   // synced chats.
   rpc GetBridgeStatus(GetBridgeStatusRequest) returns (GetBridgeStatusResponse);
@@ -410,3 +421,71 @@ message DeleteBridgeGroupRequest {
 }
 
 message DeleteBridgeGroupResponse {}
+
+message ListBridgeFeatureDefaultsRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+}
+
+message BridgeFeatureDefault {
+  string feature = 1;
+  string risk = 2;
+  // "off", "in", "out" or "both".
+  string direction = 3;
+  // The owner chose it; otherwise it is the built-in default.
+  bool is_set = 4;
+  bool can_receive = 5;
+  bool can_send = 6;
+}
+
+message ListBridgeFeatureDefaultsResponse {
+  repeated BridgeFeatureDefault defaults = 1;
+}
+
+message SetBridgeFeatureDefaultRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string feature = 2;
+  string direction = 3;
+  bool apply_to_all = 4;
+}
+
+message SetBridgeFeatureDefaultResponse {
+  // How many synced chats were changed (0 without apply_to_all).
+  int32 applied = 1;
+}
+
+message BridgeProblem {
+  int64 id = 1 [jstype = JS_NUMBER];
+  int64 chat_id = 2 [jstype = JS_NUMBER];
+  string chat_title = 3;
+  string feature = 4;
+  string op = 5;
+  int64 seq = 6 [jstype = JS_NUMBER];
+  // "failed" or "unknown".
+  string status = 7;
+  // A short text without a secret; may be empty.
+  string last_error = 8;
+  int32 attempts = 9;
+  int64 at_unix = 10 [jstype = JS_NUMBER];
+}
+
+message ListBridgeProblemsRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+}
+
+message ListBridgeProblemsResponse {
+  repeated BridgeProblem problems = 1;
+}
+
+message RetryBridgeProblemRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  int64 id = 2 [jstype = JS_NUMBER];
+}
+
+message RetryBridgeProblemResponse {}
+
+message DismissBridgeProblemRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  int64 id = 2 [jstype = JS_NUMBER];
+}
+
+message DismissBridgeProblemResponse {}

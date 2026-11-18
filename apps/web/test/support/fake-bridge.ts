@@ -10,6 +10,8 @@ import {
 	BridgeService,
 	type BridgeAccount,
 	type BridgeCandidate,
+	type BridgeFeatureDefault,
+	type BridgeProblem,
 	type BridgeConversation,
 	type BridgeFeature,
 	type BridgeInvite,
@@ -45,6 +47,12 @@ export class FakeBridge {
 		{ $typeName: "app.v1.BridgeFeature", feature: "invites", risk: "r3", direction: "off", isDefault: true, canReceive: true, canSend: true },
 		{ $typeName: "app.v1.BridgeFeature", feature: "lifecycle", risk: "r3", direction: "off", isDefault: true, canReceive: false, canSend: true },
 	];
+	/** What new chats start with, the problems listed, and what was applied to all chats. */
+	defaults: BridgeFeatureDefault[] = [
+		{ $typeName: "app.v1.BridgeFeatureDefault", feature: "pins", risk: "r1", direction: "in", isSet: false, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeatureDefault", feature: "alerts", risk: "r1", direction: "off", isSet: false, canReceive: true, canSend: false },
+	];
+	problems: BridgeProblem[] = [];
 	/** The links of the other app for the first synced chat, and who could be added. */
 	invites: BridgeInvite[] = [];
 	candidates: BridgeCandidate[] = [{ $typeName: "app.v1.BridgeCandidate", participantId: "88", name: "Giang" }];
@@ -210,6 +218,32 @@ export class FakeBridge {
 					c.chatId = 0n;
 					c.topicsSplit = false;
 				}
+				return {};
+			},
+			listBridgeFeatureDefaults: () => {
+				this.guard(false);
+				return { defaults: this.defaults.map((d) => ({ ...d })) };
+			},
+			setBridgeFeatureDefault: (req) => {
+				this.guard(false);
+				this.calls.push(`default:${req.feature}:${req.direction}:${req.applyToAll}`);
+				this.defaults = this.defaults.map((d) => (d.feature === req.feature ? { ...d, direction: req.direction, isSet: true } : d));
+				return { applied: req.applyToAll ? 2 : 0 };
+			},
+			listBridgeProblems: () => {
+				this.guard(false);
+				return { problems: this.problems.map((p) => ({ ...p })) };
+			},
+			retryBridgeProblem: (req) => {
+				this.guard(false);
+				this.calls.push(`problem:retry:${req.id}`);
+				this.problems = this.problems.filter((p) => p.id !== req.id);
+				return {};
+			},
+			dismissBridgeProblem: (req) => {
+				this.guard(false);
+				this.calls.push(`problem:dismiss:${req.id}`);
+				this.problems = this.problems.filter((p) => p.id !== req.id);
 				return {};
 			},
 			listBridgeInvites: () => {

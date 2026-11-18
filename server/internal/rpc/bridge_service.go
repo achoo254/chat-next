@@ -437,3 +437,65 @@ func conversationKind(k bridge.ConvKind) appv1.BridgeConversationKind {
 	}
 	return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_UNSPECIFIED
 }
+
+func (s *bridgeService) ListBridgeFeatureDefaults(ctx context.Context, req *connect.Request[appv1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[appv1.ListBridgeFeatureDefaultsResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeFeatureDefaultsRequest) (*appv1.ListBridgeFeatureDefaultsResponse, error) {
+		list, err := s.engine.FeatureDefaults(ctx, me, m.GetAccountId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeFeatureDefaultsResponse{}
+		for _, v := range list {
+			resp.Defaults = append(resp.Defaults, &appv1.BridgeFeatureDefault{
+				Feature: string(v.Feature), Risk: riskName(v.Risk), Direction: string(v.Direction), IsSet: v.Set,
+				CanReceive: v.Supported.In, CanSend: v.Supported.Out,
+			})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) SetBridgeFeatureDefault(ctx context.Context, req *connect.Request[appv1.SetBridgeFeatureDefaultRequest]) (*connect.Response[appv1.SetBridgeFeatureDefaultResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeFeatureDefaultRequest) (*appv1.SetBridgeFeatureDefaultResponse, error) {
+		n, err := s.engine.SetFeatureDefault(ctx, me, m.GetAccountId(), feature.Feature(m.GetFeature()), feature.Direction(m.GetDirection()), m.GetApplyToAll())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SetBridgeFeatureDefaultResponse{Applied: int32(n)}, nil
+	})
+}
+
+func (s *bridgeService) ListBridgeProblems(ctx context.Context, req *connect.Request[appv1.ListBridgeProblemsRequest]) (*connect.Response[appv1.ListBridgeProblemsResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeProblemsRequest) (*appv1.ListBridgeProblemsResponse, error) {
+		list, err := s.engine.Problems(ctx, me, m.GetAccountId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeProblemsResponse{}
+		for _, v := range list {
+			resp.Problems = append(resp.Problems, &appv1.BridgeProblem{
+				Id: v.ID, ChatId: v.ChatID, ChatTitle: v.ChatTitle, Feature: v.Feature, Op: v.Op, Seq: v.Seq,
+				Status: v.Status, LastError: v.LastError, Attempts: int32(v.Attempts), AtUnix: v.At.Unix(),
+			})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) RetryBridgeProblem(ctx context.Context, req *connect.Request[appv1.RetryBridgeProblemRequest]) (*connect.Response[appv1.RetryBridgeProblemResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.RetryBridgeProblemRequest) (*appv1.RetryBridgeProblemResponse, error) {
+		if err := s.engine.RetryProblem(ctx, me, m.GetAccountId(), m.GetId()); err != nil {
+			return nil, err
+		}
+		return &appv1.RetryBridgeProblemResponse{}, nil
+	})
+}
+
+func (s *bridgeService) DismissBridgeProblem(ctx context.Context, req *connect.Request[appv1.DismissBridgeProblemRequest]) (*connect.Response[appv1.DismissBridgeProblemResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.DismissBridgeProblemRequest) (*appv1.DismissBridgeProblemResponse, error) {
+		if err := s.engine.DismissProblem(ctx, me, m.GetAccountId(), m.GetId()); err != nil {
+			return nil, err
+		}
+		return &appv1.DismissBridgeProblemResponse{}, nil
+	})
+}

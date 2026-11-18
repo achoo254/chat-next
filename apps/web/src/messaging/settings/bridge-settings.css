@@ -87,3 +87,10 @@ label.br-conv-main:hover { background: var(--c-hover); }
 .br-inline { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .br-inline .input { flex: 1 1 200px; min-width: 0; }
 .br-danger { padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--c-error) 40%, transparent); border-radius: var(--radius-md); }
+/* Account tools: defaults for new chats and the list of sync problems. */
+.br-tools { display: grid; gap: var(--space-2); padding: 0 var(--space-3) var(--space-3); }
+.br-tool > summary { cursor: pointer; font-weight: 600; padding: var(--space-2) 0; }
+.br-problem-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.br-problem { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }
+.br-problem small { overflow-wrap: anywhere; }
+.br-check { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }

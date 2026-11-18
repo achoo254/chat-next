@@ -460,4 +460,35 @@ describe("what is synced for one chat, feature by feature", () => {
 		await userEvent.click(within(panel).getByRole("button", { name: "Xoá vĩnh viễn" }));
 		await waitFor(() => expect(fixture.bridge.calls).toContain("group:delete"), LONG);
 	});
+
+	it("chooses what new chats start with, and applies it to every chat only when asked", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		await openPage(fixture);
+		const summary = await screen.findByText("Mặc định cho chat mới", {}, LONG);
+		await userEvent.click(summary);
+		const group = await screen.findByRole("group", { name: /Mặc định cho chat mới: Thông báo tin mới/ }, LONG);
+		await userEvent.click(within(group).getByRole("button", { name: "Chỉ nhận" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("default:alerts:in:false"), LONG);
+		await userEvent.click(screen.getByRole("checkbox", { name: /Áp luôn cho tất cả chat/ }));
+		await userEvent.click(within(await screen.findByRole("group", { name: /Mặc định cho chat mới: Ghim tin nhắn/ }, LONG)).getByRole("button", { name: "Hai chiều" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("default:pins:both:true"), LONG);
+		expect(await screen.findByText("Đã áp cho 2 chat.", {}, LONG)).toBeTruthy();
+	});
+
+	it("lists what did not go through for any feature, and retries or gives it up", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		fixture.bridge.problems = [
+			{ $typeName: "app.v1.BridgeProblem", id: 5n, chatId: 9n, chatTitle: "Work", feature: "pins", op: "pin_message", seq: 3n, status: "failed", lastError: "not_allowed", attempts: 3, atUnix: 1n },
+			{ $typeName: "app.v1.BridgeProblem", id: 6n, chatId: 9n, chatTitle: "Work", feature: "messages", op: "send", seq: 4n, status: "unknown", lastError: "", attempts: 1, atUnix: 2n },
+		];
+		await openPage(fixture);
+		expect(await screen.findByText("Lỗi đồng bộ (2)", {}, LONG)).toBeTruthy();
+		expect(screen.getAllByRole("button", { name: "Bỏ qua" })).toHaveLength(1); // a send is given up by deleting the message
+		await userEvent.click(screen.getByRole("button", { name: "Bỏ qua" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("problem:dismiss:5"), LONG);
+		await userEvent.click(await screen.findByRole("button", { name: "Thử lại" }, LONG));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("problem:retry:6"), LONG);
+	});
 });

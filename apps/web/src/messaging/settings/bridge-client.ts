@@ -47,6 +47,7 @@ const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status
 };
 
 const DIRECTIONS: readonly FeatureDirection[] = ["off", "in", "out", "both"];
+const toDirection = (s: string): FeatureDirection => DIRECTIONS.find((d) => d === s) ?? "off";
 const RISKS: readonly FeatureRisk[] = ["r1", "r2", "r3", "re"];
 
 const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", ...STATE_OPS];
@@ -155,6 +156,43 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		setDirection: (accountId, conversationId, direction) =>
 			call(async () => {
 				await rpc.setBridgeChatDirection({ accountId: BigInt(accountId), conversationId, direction: toWireDirection(direction) });
+			}),
+		featureDefaults: (accountId) =>
+			call(async () => {
+				const r = await rpc.listBridgeFeatureDefaults({ accountId: BigInt(accountId) });
+				return r.defaults.map((d) => ({
+					feature: d.feature,
+					risk: d.risk,
+					direction: toDirection(d.direction),
+					isSet: d.isSet,
+					canReceive: d.canReceive,
+					canSend: d.canSend,
+				}));
+			}),
+		setFeatureDefault: (accountId, feature, direction, applyToAll) =>
+			call(async () => (await rpc.setBridgeFeatureDefault({ accountId: BigInt(accountId), feature, direction, applyToAll })).applied),
+		problems: (accountId) =>
+			call(async () => {
+				const r = await rpc.listBridgeProblems({ accountId: BigInt(accountId) });
+				return r.problems.map((p) => ({
+					id: Number(p.id),
+					chatId: Number(p.chatId),
+					chatTitle: p.chatTitle,
+					feature: p.feature,
+					op: p.op,
+					status: p.status === "unknown" ? ("unknown" as const) : ("failed" as const),
+					lastError: p.lastError,
+					attempts: p.attempts,
+					at: Number(p.atUnix),
+				}));
+			}),
+		retryProblem: (accountId, id) =>
+			call(async () => {
+				await rpc.retryBridgeProblem({ accountId: BigInt(accountId), id: BigInt(id) });
+			}),
+		dismissProblem: (accountId, id) =>
+			call(async () => {
+				await rpc.dismissBridgeProblem({ accountId: BigInt(accountId), id: BigInt(id) });
 			}),
 		invites: (accountId, conversationId) =>
 			call(async () => {

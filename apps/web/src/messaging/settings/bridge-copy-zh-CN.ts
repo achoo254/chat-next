@@ -185,6 +185,23 @@ export const zhCNBridge: BridgeCopy = {
 			expired: "确认已过期，请重新开始。",
 		},
 	},
+	defaults: {
+		title: "新聊天的默认设置",
+		hint: (app) => `从 ${app} 新同步的聊天按此开始。退出和解散群、成员、邀请链接和消息需逐个聊天设置。`,
+		chosen: "已选择",
+		builtIn: "内置默认",
+		saved: "已保存；已同步的聊天保持不变。",
+		applyAll: (n) => `同时应用到所有已同步的聊天（${n}）`,
+		applied: (n) => `已应用到 ${n} 个聊天。`,
+	},
+	problems: {
+		title: (n) => (n === 0 ? "同步问题" : `同步问题（${n}）`),
+		none: "没有出错的内容。",
+		failed: "无法发送",
+		unknown: "不确定是否已发送",
+		retry: "重试",
+		dismiss: "放弃",
+	},
 	disconnect: {
 		button: "断开连接",
 		title: "断开此账号？",

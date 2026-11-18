@@ -326,6 +326,13 @@ func (e *Engine) EnableChatWith(ctx context.Context, accountID int64, conv bridg
 		_, err := tx.Exec(ctx, `
 			INSERT INTO external_chats (account_id, external_chat_id, chat_id, history_window, title, direction) VALUES ($1, $2, $3, $4, $5, $6)`,
 			accountID, conv.ID, chatID, history, cleanTitle(conv.Title), direction)
+		if err != nil {
+			return err
+		}
+		// The chat starts with what the owner chose for the account.
+		_, err = tx.Exec(ctx, `
+			INSERT INTO external_chat_features (account_id, external_chat_id, feature, direction)
+			SELECT account_id, $2, feature, direction FROM external_feature_defaults WHERE account_id = $1`, accountID, conv.ID)
 		return err
 	})
 	if err != nil {

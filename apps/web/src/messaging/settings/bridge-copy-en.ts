@@ -185,6 +185,23 @@ export const enBridge: BridgeCopy = {
 			expired: "The confirmation expired, start again.",
 		},
 	},
+	defaults: {
+		title: "Defaults for new chats",
+		hint: (app) => `Chats newly synced from ${app} start with these. Leaving and deleting groups, members, invite links and messages are set chat by chat.`,
+		chosen: "Chosen",
+		builtIn: "Built-in default",
+		saved: "Saved; chats already synced stay as they are.",
+		applyAll: (n) => `Also apply to every chat already synced (${n})`,
+		applied: (n) => `Applied to ${n} chats.`,
+	},
+	problems: {
+		title: (n) => (n === 0 ? "Sync problems" : `Sync problems (${n})`),
+		none: "Nothing went wrong.",
+		failed: "Could not be sent",
+		unknown: "Not known whether it was sent",
+		retry: "Try again",
+		dismiss: "Give up",
+	},
 	disconnect: {
 		button: "Disconnect",
 		title: "Disconnect this account?",

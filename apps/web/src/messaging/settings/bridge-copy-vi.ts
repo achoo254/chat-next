@@ -194,6 +194,23 @@ export const viBridge = {
 			expired: "Hết hạn xác nhận, làm lại từ đầu.",
 		},
 	},
+	defaults: {
+		title: "Mặc định cho chat mới",
+		hint: (app: string): string => `Chat mới đồng bộ từ ${app} bắt đầu với các lựa chọn này. Rời và xoá nhóm, thành viên, link mời và tin nhắn chọn riêng từng chat.`,
+		chosen: "Đã chọn",
+		builtIn: "Mặc định có sẵn",
+		saved: "Đã lưu; chat đã đồng bộ giữ nguyên.",
+		applyAll: (n: number): string => `Áp luôn cho tất cả chat đã đồng bộ (${n})`,
+		applied: (n: number): string => `Đã áp cho ${n} chat.`,
+	},
+	problems: {
+		title: (n: number): string => (n === 0 ? "Lỗi đồng bộ" : `Lỗi đồng bộ (${n})`),
+		none: "Không có gì bị lỗi.",
+		failed: "Không gửi được",
+		unknown: "Chưa rõ đã gửi chưa",
+		retry: "Thử lại",
+		dismiss: "Bỏ qua",
+	},
 	disconnect: {
 		button: "Ngắt kết nối",
 		title: "Ngắt kết nối tài khoản?",

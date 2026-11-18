@@ -22,7 +22,7 @@ export const FEATURE_LEVELS: readonly FeatureLevel[] = ["readonly", "personal", 
 const ORDER: readonly FeatureDirection[] = ["off", "in", "out", "both"];
 
 /** The directions the app can do for a feature, in display order. */
-export function allowedDirections(f: BridgeFeatureView): readonly FeatureDirection[] {
+export function allowedDirections(f: Pick<BridgeFeatureView, "canReceive" | "canSend">): readonly FeatureDirection[] {
 	return ORDER.filter((d) => d === "off" || (d === "in" && f.canReceive) || (d === "out" && f.canSend) || (d === "both" && f.canReceive && f.canSend));
 }
 

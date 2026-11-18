@@ -33,6 +33,21 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// BridgeServiceListBridgeFeatureDefaultsProcedure is the fully-qualified name of the
+	// BridgeService's ListBridgeFeatureDefaults RPC.
+	BridgeServiceListBridgeFeatureDefaultsProcedure = "/app.v1.BridgeService/ListBridgeFeatureDefaults"
+	// BridgeServiceSetBridgeFeatureDefaultProcedure is the fully-qualified name of the BridgeService's
+	// SetBridgeFeatureDefault RPC.
+	BridgeServiceSetBridgeFeatureDefaultProcedure = "/app.v1.BridgeService/SetBridgeFeatureDefault"
+	// BridgeServiceListBridgeProblemsProcedure is the fully-qualified name of the BridgeService's
+	// ListBridgeProblems RPC.
+	BridgeServiceListBridgeProblemsProcedure = "/app.v1.BridgeService/ListBridgeProblems"
+	// BridgeServiceRetryBridgeProblemProcedure is the fully-qualified name of the BridgeService's
+	// RetryBridgeProblem RPC.
+	BridgeServiceRetryBridgeProblemProcedure = "/app.v1.BridgeService/RetryBridgeProblem"
+	// BridgeServiceDismissBridgeProblemProcedure is the fully-qualified name of the BridgeService's
+	// DismissBridgeProblem RPC.
+	BridgeServiceDismissBridgeProblemProcedure = "/app.v1.BridgeService/DismissBridgeProblem"
 	// BridgeServiceGetBridgeStatusProcedure is the fully-qualified name of the BridgeService's
 	// GetBridgeStatus RPC.
 	BridgeServiceGetBridgeStatusProcedure = "/app.v1.BridgeService/GetBridgeStatus"
@@ -100,6 +115,17 @@ const (
 
 // BridgeServiceClient is a client for the app.v1.BridgeService service.
 type BridgeServiceClient interface {
+	// What a new synced chat of the account starts with, by feature (acting on people and
+	// groups and messages are not part of it).
+	ListBridgeFeatureDefaults(context.Context, *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error)
+	// Sets one default; with apply_to_all it is also written to every chat already synced.
+	SetBridgeFeatureDefault(context.Context, *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error)
+	// Everything Chat queued for the app that did not go through, of any feature.
+	ListBridgeProblems(context.Context, *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error)
+	// Queues a problem again.
+	RetryBridgeProblem(context.Context, *connect.Request[v1.RetryBridgeProblemRequest]) (*connect.Response[v1.RetryBridgeProblemResponse], error)
+	// Gives up a problem that is not a send.
+	DismissBridgeProblem(context.Context, *connect.Request[v1.DismissBridgeProblemRequest]) (*connect.Response[v1.DismissBridgeProblemResponse], error)
 	// Which apps can be connected, the user's connected accounts and their
 	// synced chats.
 	GetBridgeStatus(context.Context, *connect.Request[v1.GetBridgeStatusRequest]) (*connect.Response[v1.GetBridgeStatusResponse], error)
@@ -176,6 +202,36 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 	baseURL = strings.TrimRight(baseURL, "/")
 	bridgeServiceMethods := v1.File_app_v1_bridge_proto.Services().ByName("BridgeService").Methods()
 	return &bridgeServiceClient{
+		listBridgeFeatureDefaults: connect.NewClient[v1.ListBridgeFeatureDefaultsRequest, v1.ListBridgeFeatureDefaultsResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeFeatureDefaultsProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeFeatureDefaults")),
+			connect.WithClientOptions(opts...),
+		),
+		setBridgeFeatureDefault: connect.NewClient[v1.SetBridgeFeatureDefaultRequest, v1.SetBridgeFeatureDefaultResponse](
+			httpClient,
+			baseURL+BridgeServiceSetBridgeFeatureDefaultProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeatureDefault")),
+			connect.WithClientOptions(opts...),
+		),
+		listBridgeProblems: connect.NewClient[v1.ListBridgeProblemsRequest, v1.ListBridgeProblemsResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeProblemsProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeProblems")),
+			connect.WithClientOptions(opts...),
+		),
+		retryBridgeProblem: connect.NewClient[v1.RetryBridgeProblemRequest, v1.RetryBridgeProblemResponse](
+			httpClient,
+			baseURL+BridgeServiceRetryBridgeProblemProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("RetryBridgeProblem")),
+			connect.WithClientOptions(opts...),
+		),
+		dismissBridgeProblem: connect.NewClient[v1.DismissBridgeProblemRequest, v1.DismissBridgeProblemResponse](
+			httpClient,
+			baseURL+BridgeServiceDismissBridgeProblemProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("DismissBridgeProblem")),
+			connect.WithClientOptions(opts...),
+		),
 		getBridgeStatus: connect.NewClient[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse](
 			httpClient,
 			baseURL+BridgeServiceGetBridgeStatusProcedure,
@@ -307,27 +363,57 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // bridgeServiceClient implements BridgeServiceClient.
 type bridgeServiceClient struct {
-	getBridgeStatus          *connect.Client[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse]
-	startBridgeLogin         *connect.Client[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse]
-	continueBridgeLogin      *connect.Client[v1.ContinueBridgeLoginRequest, v1.ContinueBridgeLoginResponse]
-	listBridgeConversations  *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
-	enableBridgeChat         *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
-	removeBridgeChat         *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
-	setBridgeChatDirection   *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
-	listBridgeFeatures       *connect.Client[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse]
-	setBridgeFeature         *connect.Client[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse]
-	listBridgeInvites        *connect.Client[v1.ListBridgeInvitesRequest, v1.ListBridgeInvitesResponse]
-	createBridgeInvite       *connect.Client[v1.CreateBridgeInviteRequest, v1.CreateBridgeInviteResponse]
-	revokeBridgeInvite       *connect.Client[v1.RevokeBridgeInviteRequest, v1.RevokeBridgeInviteResponse]
-	listBridgeCandidates     *connect.Client[v1.ListBridgeCandidatesRequest, v1.ListBridgeCandidatesResponse]
-	addBridgeMember          *connect.Client[v1.AddBridgeMemberRequest, v1.AddBridgeMemberResponse]
-	leaveBridgeGroup         *connect.Client[v1.LeaveBridgeGroupRequest, v1.LeaveBridgeGroupResponse]
-	requestBridgeGroupDelete *connect.Client[v1.RequestBridgeGroupDeleteRequest, v1.RequestBridgeGroupDeleteResponse]
-	deleteBridgeGroup        *connect.Client[v1.DeleteBridgeGroupRequest, v1.DeleteBridgeGroupResponse]
-	listBridgeOutbox         *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
-	retryBridgeMessage       *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
-	dismissBridgeMessage     *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
-	disconnectBridgeAccount  *connect.Client[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse]
+	listBridgeFeatureDefaults *connect.Client[v1.ListBridgeFeatureDefaultsRequest, v1.ListBridgeFeatureDefaultsResponse]
+	setBridgeFeatureDefault   *connect.Client[v1.SetBridgeFeatureDefaultRequest, v1.SetBridgeFeatureDefaultResponse]
+	listBridgeProblems        *connect.Client[v1.ListBridgeProblemsRequest, v1.ListBridgeProblemsResponse]
+	retryBridgeProblem        *connect.Client[v1.RetryBridgeProblemRequest, v1.RetryBridgeProblemResponse]
+	dismissBridgeProblem      *connect.Client[v1.DismissBridgeProblemRequest, v1.DismissBridgeProblemResponse]
+	getBridgeStatus           *connect.Client[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse]
+	startBridgeLogin          *connect.Client[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse]
+	continueBridgeLogin       *connect.Client[v1.ContinueBridgeLoginRequest, v1.ContinueBridgeLoginResponse]
+	listBridgeConversations   *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
+	enableBridgeChat          *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
+	removeBridgeChat          *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
+	setBridgeChatDirection    *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
+	listBridgeFeatures        *connect.Client[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse]
+	setBridgeFeature          *connect.Client[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse]
+	listBridgeInvites         *connect.Client[v1.ListBridgeInvitesRequest, v1.ListBridgeInvitesResponse]
+	createBridgeInvite        *connect.Client[v1.CreateBridgeInviteRequest, v1.CreateBridgeInviteResponse]
+	revokeBridgeInvite        *connect.Client[v1.RevokeBridgeInviteRequest, v1.RevokeBridgeInviteResponse]
+	listBridgeCandidates      *connect.Client[v1.ListBridgeCandidatesRequest, v1.ListBridgeCandidatesResponse]
+	addBridgeMember           *connect.Client[v1.AddBridgeMemberRequest, v1.AddBridgeMemberResponse]
+	leaveBridgeGroup          *connect.Client[v1.LeaveBridgeGroupRequest, v1.LeaveBridgeGroupResponse]
+	requestBridgeGroupDelete  *connect.Client[v1.RequestBridgeGroupDeleteRequest, v1.RequestBridgeGroupDeleteResponse]
+	deleteBridgeGroup         *connect.Client[v1.DeleteBridgeGroupRequest, v1.DeleteBridgeGroupResponse]
+	listBridgeOutbox          *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
+	retryBridgeMessage        *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
+	dismissBridgeMessage      *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
+	disconnectBridgeAccount   *connect.Client[v1.DisconnectBridgeAccountRequest, v1.DisconnectBridgeAccountResponse]
+}
+
+// ListBridgeFeatureDefaults calls app.v1.BridgeService.ListBridgeFeatureDefaults.
+func (c *bridgeServiceClient) ListBridgeFeatureDefaults(ctx context.Context, req *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error) {
+	return c.listBridgeFeatureDefaults.CallUnary(ctx, req)
+}
+
+// SetBridgeFeatureDefault calls app.v1.BridgeService.SetBridgeFeatureDefault.
+func (c *bridgeServiceClient) SetBridgeFeatureDefault(ctx context.Context, req *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error) {
+	return c.setBridgeFeatureDefault.CallUnary(ctx, req)
+}
+
+// ListBridgeProblems calls app.v1.BridgeService.ListBridgeProblems.
+func (c *bridgeServiceClient) ListBridgeProblems(ctx context.Context, req *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error) {
+	return c.listBridgeProblems.CallUnary(ctx, req)
+}
+
+// RetryBridgeProblem calls app.v1.BridgeService.RetryBridgeProblem.
+func (c *bridgeServiceClient) RetryBridgeProblem(ctx context.Context, req *connect.Request[v1.RetryBridgeProblemRequest]) (*connect.Response[v1.RetryBridgeProblemResponse], error) {
+	return c.retryBridgeProblem.CallUnary(ctx, req)
+}
+
+// DismissBridgeProblem calls app.v1.BridgeService.DismissBridgeProblem.
+func (c *bridgeServiceClient) DismissBridgeProblem(ctx context.Context, req *connect.Request[v1.DismissBridgeProblemRequest]) (*connect.Response[v1.DismissBridgeProblemResponse], error) {
+	return c.dismissBridgeProblem.CallUnary(ctx, req)
 }
 
 // GetBridgeStatus calls app.v1.BridgeService.GetBridgeStatus.
@@ -437,6 +523,17 @@ func (c *bridgeServiceClient) DisconnectBridgeAccount(ctx context.Context, req *
 
 // BridgeServiceHandler is an implementation of the app.v1.BridgeService service.
 type BridgeServiceHandler interface {
+	// What a new synced chat of the account starts with, by feature (acting on people and
+	// groups and messages are not part of it).
+	ListBridgeFeatureDefaults(context.Context, *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error)
+	// Sets one default; with apply_to_all it is also written to every chat already synced.
+	SetBridgeFeatureDefault(context.Context, *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error)
+	// Everything Chat queued for the app that did not go through, of any feature.
+	ListBridgeProblems(context.Context, *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error)
+	// Queues a problem again.
+	RetryBridgeProblem(context.Context, *connect.Request[v1.RetryBridgeProblemRequest]) (*connect.Response[v1.RetryBridgeProblemResponse], error)
+	// Gives up a problem that is not a send.
+	DismissBridgeProblem(context.Context, *connect.Request[v1.DismissBridgeProblemRequest]) (*connect.Response[v1.DismissBridgeProblemResponse], error)
 	// Which apps can be connected, the user's connected accounts and their
 	// synced chats.
 	GetBridgeStatus(context.Context, *connect.Request[v1.GetBridgeStatusRequest]) (*connect.Response[v1.GetBridgeStatusResponse], error)
@@ -509,6 +606,36 @@ type BridgeServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	bridgeServiceMethods := v1.File_app_v1_bridge_proto.Services().ByName("BridgeService").Methods()
+	bridgeServiceListBridgeFeatureDefaultsHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeFeatureDefaultsProcedure,
+		svc.ListBridgeFeatureDefaults,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeFeatureDefaults")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceSetBridgeFeatureDefaultHandler := connect.NewUnaryHandler(
+		BridgeServiceSetBridgeFeatureDefaultProcedure,
+		svc.SetBridgeFeatureDefault,
+		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeatureDefault")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceListBridgeProblemsHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeProblemsProcedure,
+		svc.ListBridgeProblems,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeProblems")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceRetryBridgeProblemHandler := connect.NewUnaryHandler(
+		BridgeServiceRetryBridgeProblemProcedure,
+		svc.RetryBridgeProblem,
+		connect.WithSchema(bridgeServiceMethods.ByName("RetryBridgeProblem")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceDismissBridgeProblemHandler := connect.NewUnaryHandler(
+		BridgeServiceDismissBridgeProblemProcedure,
+		svc.DismissBridgeProblem,
+		connect.WithSchema(bridgeServiceMethods.ByName("DismissBridgeProblem")),
+		connect.WithHandlerOptions(opts...),
+	)
 	bridgeServiceGetBridgeStatusHandler := connect.NewUnaryHandler(
 		BridgeServiceGetBridgeStatusProcedure,
 		svc.GetBridgeStatus,
@@ -637,6 +764,16 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 	)
 	return "/app.v1.BridgeService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case BridgeServiceListBridgeFeatureDefaultsProcedure:
+			bridgeServiceListBridgeFeatureDefaultsHandler.ServeHTTP(w, r)
+		case BridgeServiceSetBridgeFeatureDefaultProcedure:
+			bridgeServiceSetBridgeFeatureDefaultHandler.ServeHTTP(w, r)
+		case BridgeServiceListBridgeProblemsProcedure:
+			bridgeServiceListBridgeProblemsHandler.ServeHTTP(w, r)
+		case BridgeServiceRetryBridgeProblemProcedure:
+			bridgeServiceRetryBridgeProblemHandler.ServeHTTP(w, r)
+		case BridgeServiceDismissBridgeProblemProcedure:
+			bridgeServiceDismissBridgeProblemHandler.ServeHTTP(w, r)
 		case BridgeServiceGetBridgeStatusProcedure:
 			bridgeServiceGetBridgeStatusHandler.ServeHTTP(w, r)
 		case BridgeServiceStartBridgeLoginProcedure:
@@ -687,6 +824,26 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 
 // UnimplementedBridgeServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedBridgeServiceHandler struct{}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeFeatureDefaults(context.Context, *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeFeatureDefaults is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) SetBridgeFeatureDefault(context.Context, *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeFeatureDefault is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeProblems(context.Context, *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeProblems is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) RetryBridgeProblem(context.Context, *connect.Request[v1.RetryBridgeProblemRequest]) (*connect.Response[v1.RetryBridgeProblemResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.RetryBridgeProblem is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) DismissBridgeProblem(context.Context, *connect.Request[v1.DismissBridgeProblemRequest]) (*connect.Response[v1.DismissBridgeProblemResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.DismissBridgeProblem is not implemented"))
+}
 
 func (UnimplementedBridgeServiceHandler) GetBridgeStatus(context.Context, *connect.Request[v1.GetBridgeStatusRequest]) (*connect.Response[v1.GetBridgeStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.GetBridgeStatus is not implemented"))

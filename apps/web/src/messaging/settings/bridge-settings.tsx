@@ -30,6 +30,7 @@ import { savePending, takePending } from "./bridge-pending.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
+const BridgeAccountTools = lazy(() => import("./bridge-account-tools.tsx").then((m) => ({ default: m.BridgeAccountTools })));
 const BridgeFeatures = lazy(() => import("./bridge-features.tsx").then((m) => ({ default: m.BridgeFeatures })));
 
 /** Initials for an avatar from a title that may carry emoji or symbols. */
@@ -369,6 +370,9 @@ function AccountCard({
 			)}
 			<h3 className="br-title">{t.chats.title}</h3>
 			{account.status === "active" && <BulkSend account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
+			<Suspense fallback={null}>
+				<BridgeAccountTools accountId={account.id} api={api} appName={appName} chatCount={account.chats.length} onChange={onChange} onError={onError} />
+			</Suspense>
 			{account.chats.length === 0 ? (
 				<p className="note br-pad">{t.chats.none}</p>
 			) : (

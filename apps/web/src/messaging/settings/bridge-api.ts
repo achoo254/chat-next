@@ -129,8 +129,40 @@ export interface GroupDeleteToken {
 	readonly expires: number;
 }
 
+/** What a new synced chat of the account starts with for one feature. */
+export interface BridgeFeatureDefaultView {
+	readonly feature: string;
+	readonly risk: string;
+	readonly direction: FeatureDirection;
+	/** The owner chose it; otherwise it is the built-in default. */
+	readonly isSet: boolean;
+	readonly canReceive: boolean;
+	readonly canSend: boolean;
+}
+
+/** Something Chat queued for the other app that did not go through, of any feature. */
+export interface BridgeProblem {
+	readonly id: number;
+	readonly chatId: number;
+	readonly chatTitle: string;
+	readonly feature: string;
+	readonly op: string;
+	readonly status: "failed" | "unknown";
+	readonly lastError: string;
+	readonly attempts: number;
+	/** Unix seconds. */
+	readonly at: number;
+}
+
 export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
+	featureDefaults(accountId: number): Promise<readonly BridgeFeatureDefaultView[]>;
+	/** Sets a default; with `applyToAll` also writes it to every synced chat. Returns how many chats changed. */
+	setFeatureDefault(accountId: number, feature: string, direction: string, applyToAll: boolean): Promise<number>;
+	problems(accountId: number): Promise<readonly BridgeProblem[]>;
+	retryProblem(accountId: number, id: number): Promise<void>;
+	/** Gives up a problem that is not a send. */
+	dismissProblem(accountId: number, id: number): Promise<void>;
 	/** The invite links the account made for the group in the other app. */
 	invites(accountId: number, conversationId: string): Promise<readonly BridgeInviteView[]>;
 	createInvite(accountId: number, conversationId: string, title: string): Promise<void>;
