@@ -33,6 +33,7 @@ func (a *Adapter) ListConversations(ctx context.Context, acct bridge.Account) ([
 func (c *conn) loadDialogs(ctx context.Context) ([]bridge.Conversation, error) {
 	var out []bridge.Conversation
 	peers := map[string]tg.InputPeerClass{}
+	hashes := map[int64]int64{}
 	seen := 0
 	err := dialogs.NewQueryBuilder(c.live.api()).GetDialogs().BatchSize(100).ForEach(ctx, func(_ context.Context, e dialogs.Elem) error {
 		seen++
@@ -46,6 +47,7 @@ func (c *conn) loadDialogs(ctx context.Context) ([]bridge.Conversation, error) {
 		book := newPeerBook()
 		for id, u := range e.Entities.Users() {
 			book.users[id] = u
+			hashes[id] = u.AccessHash
 		}
 		for id, ch := range e.Entities.Chats() {
 			book.chats[id] = ch
@@ -65,7 +67,7 @@ func (c *conn) loadDialogs(ctx context.Context) ([]bridge.Conversation, error) {
 		return nil, translate(err)
 	}
 	c.mu.Lock()
-	c.peers, c.convs = peers, out
+	c.peers, c.convs, c.hashes = peers, out, hashes
 	c.mu.Unlock()
 	return out, nil
 }

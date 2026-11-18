@@ -23,8 +23,11 @@ type conn struct {
 	// peers caches the addressable peer of each conversation, learned from
 	// the dialog list (Telegram needs an access hash for users and channels).
 	peers map[string]tg.InputPeerClass
-	convs []bridge.Conversation
-	book  *peerBook
+	// hashes holds the access hash of each person seen in the dialog list,
+	// which a mention in a message sent from Chat needs.
+	hashes map[int64]int64
+	convs  []bridge.Conversation
+	book   *peerBook
 }
 
 // handle gives live updates to the subscription, if there is one.

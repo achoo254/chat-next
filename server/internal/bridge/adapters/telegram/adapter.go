@@ -1,6 +1,7 @@
 // Package telegram is the Chat Bridge adapter for Telegram, on MTProto with
 // the account of the user (not a bot): the official way to read a user's own
-// conversations (ADR 0022). It reads only; it never sends.
+// conversations (ADR 0022). It also sends what the owner writes in Chat
+// (send.go), only for chats the engine has linked in both directions.
 //
 // The adapter keeps one connection per account, shared by history reads,
 // conversation listing and the live subscription, so Telegram sees one
@@ -48,9 +49,9 @@ func New(cfg Config) *Adapter {
 func (a *Adapter) Name() string { return Name }
 
 // Capabilities implements bridge.Adapter: history, live updates, edits,
-// deletes and media are all available.
+// deletes, media and sending are all available.
 func (a *Adapter) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapMedia: true}
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapMedia: true, bridge.CapSend: true}
 }
 
 // Close drops every connection and open login.
