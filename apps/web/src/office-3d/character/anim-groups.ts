@@ -168,7 +168,8 @@ export const POSE_CLIPS: Readonly<Record<Pose, readonly string[]>> = {
 	coffee: ["Consume"],
 	chat: ["Sitting_Talking", "Sitting_Idle"],
 	yawn: ["Idle_A", "Idle", "Sitting_Idle"],
-	sleep: ["Sleeping", "Sitting_Idle"],
+	// A person curled up on their side (make-sleep-clip.py); the library's stiff "Sleeping" is the fallback for a model without it.
+	sleep: ["Sleeping_Side", "Sleeping", "Sitting_Idle"],
 	lounge: ["Lying_Lounge", "Sleeping", "Sitting_Idle"],
 	wake: ["LayToIdle", "Idle_A"],
 	run: ["Jog", "Run", "Walk"],

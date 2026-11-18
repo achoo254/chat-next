@@ -1,8 +1,9 @@
 // Where everyone is: fifteen people always in the building (the director, the
 // advisor and the 13 staff of the studio), each job title at its home seat; real
 // work takes a title's person to the room of the tool and back; rest, play and
-// sleep only off office hours while no agent runs; Backend & DevOps never leaves
-// the server room; the director only directs (his tools belong to a department,
+// sleep only off office hours while no agent runs (nobody is exempt, Advisor and
+// Backend & DevOps included); Backend & DevOps stays in the server room while it
+// works; the director only directs (his tools belong to a department,
 // a subagent starting shows the hand-over); approvals go to Security and the
 // reviewer greets there; asking Advisor takes the asker to its room; no two on a
 // spot; the same input gives the same places.
@@ -109,10 +110,14 @@ describe("office placement", () => {
 		expect(find(places, "title:qaTester").concurrent).toBe(1);
 	});
 
-	it("keeps Backend & DevOps in the server room: on duty day and night, at work or not, whatever room the tool is in", () => {
+	it("keeps Backend & DevOps in the server room while it works, whatever room the tool is in; free off hours it goes to bed like the others", () => {
 		const night = localAt(23, 30);
 		const rest = fresh([quietDirector()], RESTING);
-		expect(find(placer(rest)(night), "title:backendDevops")).toMatchObject({ room: "SERVER", anchorId: "server-desk", life: null });
+		const asleep = find(placer(rest)(night), "title:backendDevops");
+		expect(asleep.life).toMatchObject({ act: "sleep" });
+		expect(anchorById(layout(), asleep.anchorId)?.kind).toBe("bed");
+		// In office hours with nothing to do it sits at the server desk.
+		expect(find(placer(rest)(T0), "title:backendDevops")).toMatchObject({ room: "SERVER", anchorId: "server-desk", life: null });
 		const busy = fresh([director(), staff("g", "git-manager", { activity: act("g1", OfficeRoom.LIBRARY, "Bash") })]);
 		expect(find(placer(busy)(T0), "title:backendDevops")).toMatchObject({ room: "SERVER", anchorId: "server-desk", activityRoom: "SERVER" });
 		// Nobody else stands in the server room regularly.
@@ -125,13 +130,13 @@ describe("office placement", () => {
 		// Office hours: nobody leaves their seat.
 		const day = placer(resting)(T0);
 		expect(day.filter((p) => p.life !== null)).toHaveLength(0);
-		// Evening, no agent running: everyone but Backend & DevOps and Advisor lives by the schedule.
+		// Evening, no agent running: all fifteen live by the schedule, Backend & DevOps and Advisor too.
 		const night = placer(fresh([quietDirector()], RESTING))(localAt(23, 30));
 		const living = night.filter((p) => p.life !== null).map((p) => p.key);
 		expect(living).toContain("director");
-		expect(living).not.toContain("title:backendDevops");
-		expect(living).not.toContain("advisor");
-		expect(living).toHaveLength(13);
+		expect(living).toContain("title:backendDevops");
+		expect(living).toContain("advisor");
+		expect(living).toHaveLength(15);
 		expect(night.filter((p) => p.life?.act === "sleep").every((p) => anchorById(layout(), p.anchorId)?.kind === "bed")).toBe(true);
 		// The same evening with an agent running: everyone is back at their seat.
 		const running = placer(fresh([director(), staff("a1", "planner", { activity: act("e", OfficeRoom.PLANNING, "Edit") })]))(localAt(23, 30));
@@ -159,9 +164,12 @@ describe("office placement", () => {
 		expect(find(places, "chairman")).toMatchObject({ room: "LOBBY", anchorId: "chairman", activityRoom: null });
 	});
 
-	it("sends whoever asks Advisor to its room; Advisor sits in it always and counts as busy only while asked", () => {
+	it("sends whoever asks Advisor to its room; Advisor sits in it in office hours, counts as busy only while asked and rests off hours", () => {
 		const alone = placer(fresh([quietDirector()], RESTING))(T0);
 		expect(find(alone, "advisor")).toMatchObject({ room: "ADVISOR", anchorId: "advisor-seat", activityRoom: null });
+		const night = find(placer(fresh([quietDirector()], RESTING))(localAt(23, 30)), "advisor");
+		expect(night.life).toMatchObject({ act: "sleep" });
+		expect(anchorById(layout(), night.anchorId)?.kind).toBe("bed");
 		const store = fresh([director(), staff("a1", "planner", { activity: act("c", OfficeRoom.MEETING, "mcp", T0, OfficeAnimGroup.CONSULT) })]);
 		const places = placer(store)(T0);
 		expect(find(places, "title:producerPm")).toMatchObject({ room: "ADVISOR", activityRoom: "ADVISOR" });

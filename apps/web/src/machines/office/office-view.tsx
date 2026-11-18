@@ -2,11 +2,13 @@
 // machine (office-client.ts), keeps it in an OfficeStore, places everyone
 // (office-placement.ts) on the one floor plan, and hands all of that to a
 // renderer with the framing the viewer asked for (the work zone or the
-// whole plan; a phone opens on the first, a wide screen on the other). View only: the one thing a viewer can do is open a
-// person's inspector panel (office-inspector-panel.tsx); the chat is untouched. A machine whose tunelo predates the office
+// whole plan; a phone opens on the first, a wide screen on the other). Beside the scene a panel is open from the start: the
+// office's overview (office-overview-panel.tsx: who works on what, who rests, the to-do, checks and cost the wall boards used to
+// show), which gives way to a person's inspector panel (office-inspector-panel.tsx) when one is opened. View only: the one thing
+// a viewer can do is open a person's panel; the chat is untouched. A machine whose tunelo predates the office
 // gets a note to update and no frame.
 // Loaded on demand with the rest of machines/office/ (and its styles).
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type RefObject } from "react";
 import { ErrorReason, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { AGENT_OFFICE, versionAtLeast } from "../agent-version.ts";
 import type { MachinesCopy } from "../copy-vi.ts";
@@ -27,11 +29,15 @@ import { EMPTY_MEMORY, officePlacement, type OfficeAdvisor, type Placement, type
 import type { OfficeFraming, OfficeRendererProps } from "./office-renderer.ts";
 import { holdInspected, LEFT_SHOWN_MS, type HeldInspected } from "./office-inspector.ts";
 import { InspectorPanel } from "./office-inspector-panel.tsx";
+import { OverviewPanel } from "./office-overview-panel.tsx";
+import { officeOverview } from "./office-overview.ts";
 import { createOfficeStore, type OfficeState } from "./office-store.ts";
 import "./office.css";
 
 /** The office's frame below this width uses the phone framing and six desks. */
 export const PHONE_WIDTH = 640;
+/** Below this width the overview panel folds under the scene instead of standing beside it: beside it the scene would turn portrait and show only part of the plan. */
+export const COLUMN_WIDTH = 1000;
 /** How often placement looks at the clock. */
 const FRAME_TICK_MS = 1_000;
 const SOUND_KEY = "ai:office:sound";
@@ -83,19 +89,23 @@ function rememberSound(on: boolean): void {
 }
 
 /** The frame's size class, from its width (the phone framing below PHONE_WIDTH). */
-function useScreenSize(ref: RefObject<HTMLDivElement | null>): ScreenSize {
+function useScreenSize(ref: RefObject<HTMLDivElement | null>): { size: ScreenSize; column: boolean } {
 	const [size, setSize] = useState<ScreenSize>(() => (isPhone() ? "phone" : "desktop"));
+	const [column, setColumn] = useState(() => !isPhone());
 	useEffect(() => {
 		const el = ref.current;
 		if (el === null || typeof ResizeObserver !== "function") return;
 		const observer = new ResizeObserver((entries) => {
 			const width = entries[0]?.contentRect.width ?? 0;
-			if (width > 0) setSize(width < PHONE_WIDTH ? "phone" : "desktop");
+			if (width > 0) {
+				setSize(width < PHONE_WIDTH ? "phone" : "desktop");
+				setColumn(width >= COLUMN_WIDTH);
+			}
 		});
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, [ref]);
-	return size;
+	return { size, column };
 }
 
 /** What the office shows at one moment: everyone's place (with the memory that keeps people from running about) and the talks among them. */
@@ -156,7 +166,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	const failed = refusal !== null;
 	const state = useSyncExternalStore(store.subscribe, store.state);
 	const box = useRef<HTMLDivElement>(null);
-	const size = useScreenSize(box);
+	const { size, column } = useScreenSize(box);
 	// The phone uses six of the eight desks: people keep theirs when it stays offered.
 	useEffect(() => store.setDesks(deskOrder(layout, size)), [store, layout, size]);
 	// Until the viewer presses the framing button, the framing follows the frame's size.
@@ -210,6 +220,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 		selectedNow.current = selected;
 	}, [selected]);
 	const shown = selected !== null && frame.held?.key === selected ? frame.held : null;
+	const overview = useMemo(() => officeOverview(frame.placements, t), [frame.placements, t]);
 	// A person who has gone says so for a while, then the panel closes; a key never shown closes at once.
 	const closeIn = selected === null ? null : shown === null ? 0 : shown.leftAt === null ? null : Math.max(0, LEFT_SHOWN_MS - (frame.now - shown.leftAt));
 	useEffect(() => {
@@ -256,7 +267,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	else if (state.status === "live" && state.awaitingSnapshot) notes.push({ key: "sync", text: t.catchingUp });
 	if (state.session.hiddenActors > 0) notes.push({ key: "hidden", text: t.hidden(state.session.hiddenActors) });
 	return (
-		<div className="of" ref={box} data-id="office" data-size={size}>
+		<div className="of" ref={box} data-id="office" data-size={size} data-column={column}>
 			<div className="of-bar">
 				<FramingButton framing={framing} onChange={setFraming} />
 				<button
@@ -311,7 +322,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 						selectedKey={shown?.key ?? null}
 						onSelect={choose}
 					/>
-					{shown !== null && <InspectorPanel held={shown} onClose={closePanel} />}
+					{shown !== null ? <InspectorPanel held={shown} onClose={closePanel} /> : <OverviewPanel overview={overview} state={state} now={frame.now} compact={!column} onSelect={choose} />}
 				</div>
 			)}
 		</div>

@@ -12,7 +12,6 @@
 import { useLayoutEffect, useRef, type CSSProperties } from "react";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { ASSETS_BASE, type AssetView } from "./office-assets.ts";
-import { BOARD_ROOMS, OfficeBoard } from "./office-boards.tsx";
 import { lineOf, talkOf } from "./office-conversations.ts";
 import { projectPoint, type ScreenSize } from "./office-geometry.ts";
 import type { OfficeLayout, ZoneId } from "./office-layout.ts";
@@ -132,8 +131,8 @@ function pickOf(props: OfficeRendererProps, key: string): Pick | undefined {
 	return onSelect === undefined ? undefined : { selected: props.selectedKey === key, onPick: onSelect };
 }
 
-function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRendererProps; t: OfficeCopy; locale: string }) {
-	const { placements, talks, daypart, state, layout, now, size, framing } = props;
+function Picture({ view, props, t }: { view: AssetView; props: OfficeRendererProps; t: OfficeCopy }) {
+	const { placements, talks, daypart, layout, now, size, framing } = props;
 	const file = daypart.phase === "day" ? view.day : view.night;
 	const stacks = new Map<string, number>();
 	const meeting = layout.anchors.find((a) => a.room === "MEETING" && a.kind === "meeting");
@@ -169,17 +168,6 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 		<div className="of-scroll" ref={frameRef} data-id="office-picture">
 			<div className="of-picture" ref={pictureRef} style={style}>
 				<img src={`${ASSETS_BASE}${file}`} alt="" draggable={false} />
-				{layout.anchors
-					.filter((a) => a.kind === "board" && a.room !== null && BOARD_ROOMS.includes(a.room))
-					.map((a) => {
-						const at = view.anchors.get(a.id);
-						if (at === undefined || a.room === null) return null;
-						return (
-							<div key={a.id} className="of-board-pin" style={{ left: `clamp(var(--of-board-half), ${at[0]}%, calc(100% - var(--of-board-half)))`, top: `${at[1]}%` }}>
-								<OfficeBoard room={a.room} state={state} now={now} t={t} locale={locale} />
-							</div>
-						);
-					})}
 				{placements.map((p) => {
 					// The visitor of a talk stands at the host's place.
 					const talk = talkOf(talks, p.key);
@@ -196,8 +184,8 @@ function Picture({ view, props, t, locale }: { view: AssetView; props: OfficeRen
 	);
 }
 
-function RoomCards({ props, t, locale }: { props: OfficeRendererProps; t: OfficeCopy; locale: string }) {
-	const { placements, talks, layout, state, now } = props;
+function RoomCards({ props, t }: { props: OfficeRendererProps; t: OfficeCopy }) {
+	const { placements, talks, layout, now } = props;
 	return (
 		<div className="of-zones" data-id="office-rooms">
 			{layout.zones.map((zone) => (
@@ -223,7 +211,6 @@ function RoomCards({ props, t, locale }: { props: OfficeRendererProps; t: Office
 											))}
 										</ul>
 									)}
-									{BOARD_ROOMS.includes(room) && <OfficeBoard room={room} state={state} now={now} t={t} locale={locale} />}
 								</section>
 							);
 						})}
@@ -252,7 +239,7 @@ export function Office2D(props: OfficeRendererProps) {
 			data-view={view === undefined ? "rooms" : "picture"}
 			data-framing={props.framing}
 		>
-			{view === undefined ? <RoomCards props={props} t={t} locale={copy.usage.locale} /> : <Picture view={view} props={props} t={t} locale={copy.usage.locale} />}
+			{view === undefined ? <RoomCards props={props} t={t} /> : <Picture view={view} props={props} t={t} />}
 		</div>
 	);
 }

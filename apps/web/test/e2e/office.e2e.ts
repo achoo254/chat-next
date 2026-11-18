@@ -478,9 +478,9 @@ test("without WebGL (--disable-3d-apis): the 2D view shows the plan's picture wi
 		const desks = [...SPOTS].filter(([, s]) => s.kind === "desk").map(([id]) => id);
 		assert.ok(desks.length > 0, "the plan has desks");
 		for (const id of desks) assert.ok(anchors.has(id), `desk ${id} on the plan's picture`);
-		// Boards: the lobby's, Planning's, Audit's and QA's, all on the one picture.
-		const boards = await page.locator("[data-id=office-picture] .of-board-pin").count();
-		assert.equal(boards, 4, `${boards} boards`);
+		// No boards on the picture: their counts are in the overview panel beside it, open from the start.
+		assert.equal(await page.locator("[data-id=office-picture] .of-board-pin").count(), 0, "no board on the picture");
+		await page.locator("[data-id=office] [data-id=office-overview]").waitFor({ timeout: 10_000 });
 		const zones = new Set<string>();
 		for (const framing of ["work", "overview"]) {
 			if ((await framingOf(page)) !== framing) await page.locator("[data-id=office] [data-id=office-framing]").click();
@@ -532,8 +532,8 @@ test("an AI that does not report its staff (Antigravity): the director directs w
 	const people = await seen(page);
 	// The fifteen are always in the building, whatever the AI reports.
 	assert.equal(people.filter((p) => p.kind === "director" || p.kind === "employee" || p.kind === "advisor").length, 15, "the fifteen of the office");
-	// Audit's board (in the control zone, beside QA where the director works now): tokens, no cost.
-	const audit = page.locator("[data-id=office-board-audit]").first();
+	// The overview panel's cost section (beside the scene, open from the start): tokens, no cost.
+	const audit = page.locator("[data-id=office-overview-cost]").first();
 	await audit.waitFor({ state: "attached" });
 	const text = (await audit.textContent()) ?? "";
 	assert.ok(text.includes("Token vào") && text.includes("Token ra"), `audit: ${text}`);
@@ -596,12 +596,12 @@ test("the residents' day: after the session nobody goes home, at 23:30 everyone 
 	await poll("the director in the office (idle, office hours)", async () => roomOf((await seen(page)).find((s) => isDirector(s.key)))?.room ?? null, (room) => room === "DIRECTOR");
 	await context.clock.setSystemTime(new Date(BEDTIME));
 	await reaches(page, "the director at bedtime", isDirector, "DORM");
-	await poll("the off-duty staff in the living zone", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.zone === LIVING_ZONE).length, (n) => n === staffKeys.length - 1);
-	// Backend & DevOps stays on duty in the server room.
-	await reaches(page, "Backend & DevOps on duty at night", person("backendDevops"), "SERVER");
+	await poll("the off-duty staff in the living zone", async () => (await seen(page)).filter((s) => staffKeys.includes(s.key) && roomOf(s)?.zone === LIVING_ZONE).length, (n) => n === staffKeys.length);
+	// Nobody is exempt: Backend & DevOps leaves the server room for bed too.
+	await reaches(page, "Backend & DevOps in bed at night", person("backendDevops"), "DORM");
 	const anchors = (await seen(page)).filter((s) => s.kind === "director" || s.kind === "employee").map((s) => s.anchor);
 	assert.equal(new Set(anchors).size, anchors.length, `one person per place: ${anchors.join(", ")}`);
-	assert.ok(anchors.filter((a) => a.startsWith("bed-")).length === 13, `thirteen of the sixteen beds taken: ${anchors.join(", ")}`);
+	assert.ok(anchors.filter((a) => a.startsWith("bed-")).length === 14, `fourteen beds taken by the director and the 13 staff (Advisor's is the fifteenth): ${anchors.join(", ")}`);
 	if (await has3D(page)) {
 		await poll(
 			"the director lying in bed",
@@ -702,9 +702,12 @@ test("the inspector in 3D: a name or a body opens the panel, a pan, a turn and a
 	const canvasBox = await page.locator("[data-id=office] canvas.of3d-canvas").boundingBox();
 	const panelBox = await page.locator(PANEL).boundingBox();
 	if (canvasBox === null || panelBox === null) assert.fail("no canvas or panel box");
-	assert.ok(canvasBox.x + canvasBox.width <= panelBox.x + 1, "the panel is beside the canvas, not over it");
+	// Beside the canvas on a wide frame, under it on a narrower one (the overview column folds below 1000 px): never over it.
+	const beside = canvasBox.x + canvasBox.width <= panelBox.x + 1;
+	const under = canvasBox.y + canvasBox.height <= panelBox.y + 1;
+	assert.ok(beside || under, "the panel is beside or under the canvas, not over it");
 	const chosen = await tagCentre(page, "title:qaTester");
-	assert.ok(chosen.x < panelBox.x, "the chosen person's tag is not behind the panel");
+	assert.ok(beside ? chosen.x < panelBox.x : chosen.y < panelBox.y, "the chosen person's tag is not behind the panel");
 
 	// The draw calls with someone chosen: the ring is the only thing drawn more.
 	const after = await drawCallsMost(page);
@@ -741,7 +744,7 @@ test("the inspector in 3D: a name or a body opens the panel, a pan, a turn and a
 	assert.match((await page.locator("[data-id='office-person-title:qaTester'] .of-bubble").textContent()) ?? "", /secret\.sh/);
 
 	// The director's git (step 3) is Backend & DevOps's work, as the bubble shows it: it is on that person's panel, with its subject, and not on the director's.
-	await page.mouse.click(empty.x + 200, empty.y + 200).catch(() => undefined);
+	await page.mouse.click(empty.x + 60, empty.y + 60).catch(() => undefined);
 	await poll("no panel after a press on nothing", () => openPanel(page), (k) => k === null, 5_000);
 	assert.equal((await readout(page))?.selectionRing, false, "the ring goes with the choice");
 	const devops = page.locator("[data-id='office-person-title:backendDevops'] button.of3d-tag");

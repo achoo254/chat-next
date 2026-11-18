@@ -1394,8 +1394,6 @@ export const enMachines: MachinesCopy = {
 		overflowLabel: (n: number) => `${n} waiting for a desk in the meeting room`,
 		empty: "Empty",
 		board: {
-			lobby: "Notice board",
-			staffToday: "Staff today",
 			tasksDone: "Tasks done",
 			sessionTime: "Session time",
 			planning: "To do",
@@ -1410,6 +1408,27 @@ export const enMachines: MachinesCopy = {
 			qa: "Checks",
 			passed: "Passed",
 			failed: "Failed",
+		},
+		/** The panel beside the scene, from the start: who works on what, who rests, the counts the wall boards used to show. */
+		summary: {
+			label: "Office overview",
+			title: "Happening now",
+			headline: (working: number, resting: number) => {
+				const parts: string[] = [];
+				if (working > 0) parts.push(`${working} at work`);
+				if (resting > 0) parts.push(`${resting} resting`);
+				return parts.length > 0 ? parts.join(" · ") : "The whole office is free";
+			},
+			working: "At work",
+			workingNone: "Nobody has taken a job yet.",
+			resting: "Resting",
+			restingNone: "Nobody is resting: it is office hours or work is still running.",
+			atSeat: (n: number) => `${n} waiting at their seats`,
+			background: (n: number) => `${n} running in the background`,
+			progress: "Progress",
+			progressNone: "No to-do list yet.",
+			progressOf: (done: number, total: number) => `${done}/${total} done`,
+			session: "This session",
 		},
 	},
 };

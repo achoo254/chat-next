@@ -119,8 +119,8 @@ export function titleKeyOf(agentType: string): CastKey {
 	return titleOf(agentType.trim().toLowerCase())?.key ?? "gameplayDeveloper";
 }
 
-/** Backend & DevOps is always on duty in the server room: never at rest, never away. */
-export const ALWAYS_ON_DUTY: CastKey = "backendDevops";
+/** Backend & DevOps stays at the server room while it works (whatever tool it runs); off duty it rests like everyone else. */
+export const STATIONED_TITLE: CastKey = "backendDevops";
 
 /** The model of unknown types: the hands-on Gameplay Developer's. */
 const FALLBACK_MODEL = "fullstack-developer";

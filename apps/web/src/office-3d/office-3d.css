@@ -1,4 +1,4 @@
-/* The 3D office (office-3d/): the canvas fills the stage, the HTML over it (names, speech bubbles, boards, "+N") is moved by the scene with transforms. Loaded with the 3D view's lazy chunk; .of-stage, .of-marker, .of-board come from machines/office/office.css. */
+/* The 3D office (office-3d/): the canvas fills the stage, the HTML over it (names, speech bubbles, "+N") is moved by the scene with transforms. Loaded with the 3D view's lazy chunk; .of-stage, .of-marker, .of-marker come from machines/office/office.css. */
 .of-stage.of3d { flex: 1 1 auto; min-height: min(72vh, 680px); touch-action: none; user-select: none; -webkit-user-select: none; }
 .of3d-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
 .of3d-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
@@ -11,13 +11,11 @@
 /* Zoomed far out, an idle person's label is only its status dot (office-overlay.ts sets data-dot). */
 .of3d-layer .of-marker[data-dot] .of-name, .of3d-layer .of-marker[data-dot] .of-bubble { display: none; }
 .of3d-layer .of-marker[data-dot] .of3d-tag { padding: 2px; }
-/* A board hangs from its anchor at its bottom centre; zoomed far out office-overlay.ts adds a scale to its transform (data-compact), shrinking it about that point. */
-.of3d-board { width: 150px; translate: -50% -100%; transform-origin: bottom center; }
+/* The meeting room's "+N" is centred on its anchor. */
 .of3d-overflow { translate: -50% -50%; }
 .of3d-loading { position: absolute; left: var(--space-3); bottom: var(--space-3); margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 @container (max-width: 640px) {
 	.of-stage.of3d { min-height: min(64vh, 560px); }
-	.of3d-board { width: 128px; font-size: 0.75rem; }
 	.of3d-layer .of-bubble { max-width: 150px; }
 }
 /* The name tag is a real button (keyboard and screen readers) but takes no pointer: a press on the scene reaches the canvas, which tells a tap from a drag of the camera and finds the tag under it (office-camera.ts, pick-tag.ts). */
@@ -25,3 +23,10 @@ button.of3d-tag { border: 0; color: inherit; font: inherit; text-align: left; }
 button.of3d-tag:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
 .of3d-layer .of-marker[data-selected] { outline: none; }
 .of3d-layer .of-marker[data-selected] .of3d-tag { outline: 2px solid var(--c-primary); outline-offset: 1px; }
+
+/* Someone asleep in bed: two little z's drift up over their tag (decoration only, the state is also said in words). */
+.of3d-zzz { position: absolute; left: 50%; bottom: calc(100% + 2px); display: flex; gap: 2px; pointer-events: none; font-family: var(--font-mono); font-weight: 700; color: var(--c-primary); }
+.of3d-zzz i { font-style: normal; font-size: 0.75rem; opacity: 0; animation: of3d-zzz 3s ease-in-out infinite; }
+.of3d-zzz i:last-child { font-size: 1rem; animation-delay: 1.2s; }
+@keyframes of3d-zzz { 0% { opacity: 0; transform: translateY(6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+@media (prefers-reduced-motion: reduce) { .of3d-zzz i { animation: none; opacity: 0.8; } }

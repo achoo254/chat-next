@@ -1,33 +1,27 @@
 // Keeps the HTML over the canvas on the 3D points it belongs to: each
-// person's name, status dot and speech bubble over their head, and the room
-// boards at their board anchors. React renders the elements
+// person's name, status dot and speech bubble over their head, and the meeting
+// room's "+N" over its table. React renders the elements
 // (office-canvas.tsx) and binds them here by key; every frame this moves
 // them with a transform (no React render per frame) and hides those off the
 // canvas. Zoomed far out (`far`), the label of an idle person (its element
 // carries `data-idle`) shrinks to its status dot (`data-dot`, office-3d.css);
-// people at work keep their name and speech bubble, and the boards shrink to
-// BOARD_FAR_SCALE about their anchor (their numbers still readable) so four of
-// them do not cover the whole plan and the labels in it.
+// people at work keep their name and speech bubble.
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PersonView } from "./character/office-people.ts";
 
-export interface BoardPin {
+/** A pin over a point of the plan (the meeting room's "+N"), bound as `board:<id>`. */
+export interface OverlayPin {
 	readonly id: string;
 	readonly x: number;
 	readonly y: number;
 	readonly z: number;
-	/** Shrinks when the view is far (a room board; not the meeting room's small "+N"). */
-	readonly shrinksWhenFar: boolean;
 }
-
-/** A board's size when the view is far, of its full size (office-3d.css anchors it at its bottom centre). */
-export const BOARD_FAR_SCALE = 0.6;
 
 export interface OfficeOverlay {
 	bind(id: string, el: HTMLElement | null): void;
-	/** Positions every bound element; `width`/`height`: the canvas in CSS pixels; `far`: idle people show as dots, boards compact. */
-	update(scene: Scene, width: number, height: number, people: readonly PersonView[], boards: readonly BoardPin[], far: boolean): void;
+	/** Positions every bound element; `width`/`height`: the canvas in CSS pixels; `far`: idle people show as dots. */
+	update(scene: Scene, width: number, height: number, people: readonly PersonView[], pins: readonly OverlayPin[], far: boolean): void;
 	/** Screen position (CSS px) of each person shown, for tests. */
 	readonly screen: ReadonlyMap<string, readonly [number, number]>;
 	/** How many people on the canvas show as a dot now, for tests. */
@@ -134,7 +128,7 @@ export function createOfficeOverlay(): OfficeOverlay {
 				if (id.startsWith("person:")) sizer?.observe(el);
 			}
 		},
-		update(scene, width, height, people, boards, far) {
+		update(scene, width, height, people, pins, far) {
 			matrix.copyFrom(scene.getTransformMatrix());
 			const project = (x: number, y: number, z: number): readonly [number, number] | null => {
 				point.set(x, y, z);
@@ -163,14 +157,11 @@ export function createOfficeOverlay(): OfficeOverlay {
 			for (const label of stackLabels(labels)) {
 				if (label.el !== undefined) place(`person:${label.key}`, label.el, true, label.x, label.y);
 			}
-			for (const b of boards) {
+			for (const b of pins) {
 				const el = elements.get(`board:${b.id}`);
 				if (el === undefined) continue;
 				const at = project(b.x, b.y, b.z);
-				const compact = far && b.shrinksWhenFar;
-				// The element's own transform-origin (bottom centre) keeps the anchor in place while it scales.
-				place(`board:${b.id}`, el, at !== null, at?.[0] ?? 0, at?.[1] ?? 0, compact ? BOARD_FAR_SCALE : 1);
-				if (el.hasAttribute("data-compact") !== compact) el.toggleAttribute("data-compact", compact);
+				place(`board:${b.id}`, el, at !== null, at?.[0] ?? 0, at?.[1] ?? 0);
 			}
 		},
 		dispose() {

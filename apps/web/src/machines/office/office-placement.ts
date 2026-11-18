@@ -12,8 +12,9 @@
 // the Code & Security Reviewer greets at its door; asking Advisor takes the
 // asker to Advisor's room. Rest, play and sleep (office-life-schedule.ts)
 // happen only outside office hours and only while no agent runs; as soon as
-// one runs everyone is at their seat again. Backend & DevOps never leaves the
-// server room. The director sits at one seat, goes to a meeting, walks the
+// one runs everyone is at their seat again. Nobody is exempt: Advisor and Backend
+// & DevOps rest, eat, train and sleep like the rest (Backend & DevOps stays in
+// the server room while it works). The director sits at one seat, goes to a meeting, walks the
 // desks to check (3D idle show), rests like the others, and only directs:
 // the work of a tool belongs to its department; a subagent starting shows the
 // director handing the job over. A background service the agent runs (a
@@ -22,8 +23,8 @@
 // chairman waits in the lobby.
 // Pure: the memory of the last call goes in, the new one comes out.
 import {
-	ALWAYS_ON_DUTY,
 	serviceOwnerOf,
+	STATIONED_TITLE,
 	STUDIO_TITLES,
 	titleKeyOf,
 	type CastKey,
@@ -253,13 +254,13 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 	const actor = person.actor;
 	if (person.kind === "chairman") return { room: "LOBBY", working: false, own: anchorOfKind(layout, "LOBBY", "chairman")?.id ?? null, life: null };
 	const advisorSeat = anchorOfKind(layout, ADVISOR_ROOM, "meeting")?.id ?? null;
-	// Advisor never leaves its seat day or night; it counts as busy only while someone really asks it.
-	if (person.kind === "advisor") {
-		const asked = state.actors.some((a) => a.role !== "advisor" && a.state !== "done" && a.activity?.group === "consult");
-		return { room: ADVISOR_ROOM, working: asked, own: advisorSeat, life: null };
-	}
 	// Rest, play and sleep only off office hours and only while no agent runs: otherwise everyone is at their seat.
 	const rests = (): LifePlan | null => (running ? null : livingPlan(person.key, now));
+	// Advisor sits at its seat and counts as busy only while someone really asks it; free, it rests like everyone else.
+	if (person.kind === "advisor") {
+		const asked = state.actors.some((a) => a.role !== "advisor" && a.state !== "done" && a.activity?.group === "consult");
+		return { room: ADVISOR_ROOM, working: asked, own: advisorSeat, life: asked ? null : rests() };
+	}
 	const activity = actor === null ? null : currentActivity(actor, now, state.clockOffset);
 	if (person.kind === "director") {
 		const chair = anchorOfKind(layout, "DIRECTOR", "director")?.id ?? null;
@@ -271,8 +272,8 @@ function wish(person: Person, layout: OfficeLayout, state: OfficeState, now: num
 	const title = person.title;
 	if (title === null) return { room: "WORK", working: false, own: null, life: null };
 	const seat = homeSeat(layout, title.homeKey);
-	// Backend & DevOps is always on duty in the server room.
-	if (title.key === ALWAYS_ON_DUTY) return { room: "SERVER", working: activity !== null, own: seat, life: null };
+	// Backend & DevOps works in the server room whatever the tool; with nothing to do it rests like the others.
+	if (title.key === STATIONED_TITLE) return { room: "SERVER", working: activity !== null, own: seat, life: activity === null ? rests() : null };
 	// Someone waits for an approval: the reviewer greets at the door of Security (the anchor that greets for their title).
 	if (title.key === "codeSecurityReviewer" && state.actors.some((a) => a.state === "awaiting" && a.role !== "machine")) {
 		return { room: "SECURITY", working: true, own: layout.anchors.find((a) => a.greets === title.homeKey)?.id ?? null, life: null };

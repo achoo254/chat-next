@@ -1,4 +1,4 @@
-/* The office tab of a session (machines/office): the framing and sound buttons, notes, the 2D view (a baked picture with HTML markers, or room cards on a plain background), boards. Loaded with the office's lazy chunk. Character colours come from office-cast.ts through --of-color; everything else uses the app's tokens. */
+/* The office tab of a session (machines/office): the framing and sound buttons, notes, the 2D view (a baked picture with HTML markers, or room cards on a plain background), the overview panel. Loaded with the office's lazy chunk. Character colours come from office-cast.ts through --of-color; everything else uses the app's tokens. */
 .of { display: flex; flex-direction: column; flex: 1; gap: var(--space-2); min-width: 0; min-height: 0; padding: var(--space-2) var(--space-3) var(--space-3); overflow-y: auto; container-type: inline-size; }
 .of-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .of-toggle { min-height: 44px; padding: 0 var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface); color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; }
@@ -43,17 +43,8 @@
 @keyframes of-pulse { 50% { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 6px color-mix(in srgb, var(--of-ring) 40%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .of-marker .of-dot, .of-marker[data-group="consult"] .of-dot { animation: none; } .of-stage { transition: none; } }
 
-.of-board { display: grid; gap: var(--space-1); padding-top: var(--space-2); border-top: 1px dashed var(--c-border-subtle); }
-.of-board h4 { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); }
-.of-board dl { display: grid; gap: 2px; margin: 0; }
-.of-board-row { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem; }
-.of-board-row dt { color: var(--c-text-muted); }
-.of-board-row dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.of-board-row[data-tone="good"] dd { color: var(--c-success-text); }
-.of-board-row[data-tone="bad"] dd { color: var(--c-error-text); }
-.of-board-note { margin: 0; font-size: 0.75rem; color: var(--c-text-muted); }
 
-/* With the baked picture: a frame that scrolls both ways, the picture at least fitting it whole and, in the work framing, zoomed until the work zone fills it (--of-zoom-x/-y, from office-2d.tsx); markers and boards at the projected anchors. */
+/* With the baked picture: a frame that scrolls both ways, the picture at least fitting it whole and, in the work framing, zoomed until the work zone fills it (--of-zoom-x/-y, from office-2d.tsx); markers at the projected anchors. */
 .of-stage[data-view="picture"] { display: flex; flex: 1 1 auto; min-height: min(72vh, 680px); }
 .of-scroll { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; container-type: size; }
 .of-picture { position: relative; flex: none; margin: auto; width: max(min(100cqw, 100cqh * var(--of-aspect)), min(100cqw * var(--of-zoom-x), 100cqh * var(--of-aspect) * var(--of-zoom-y))); }
@@ -61,9 +52,6 @@
 .of-picture .of-marker { position: absolute; max-width: 180px; padding: 2px 8px 2px 2px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); transform: translate(-8px, calc(-50% - var(--of-stack, 0) * 26px)); }
 .of-picture .of-bubble { position: absolute; left: 0; bottom: calc(100% + 4px); max-width: 200px; }
 .of-picture .of-overflow { position: absolute; transform: translate(-50%, -50%); }
-/* Kept inside the picture across: a board near a side edge slides in instead of widening the scroll area. */
-.of-board-pin { --of-board-half: 75px; position: absolute; width: calc(var(--of-board-half) * 2); padding: var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 92%, transparent); box-shadow: var(--shadow-sm); transform: translate(-50%, -100%); }
-.of-board-pin .of-board { padding-top: 0; border-top: 0; }
 @container (max-width: 640px) {
 	.of-stage[data-view="picture"] { min-height: min(64vh, 560px); }
 	.of { padding: var(--space-2); }
@@ -72,10 +60,10 @@
 /* The scene and, when a person is opened, their inspector panel (office-inspector-panel.tsx): a column beside the scene on a wide screen, a sheet under it on a phone; the scene shrinks to make room, so the person chosen is never behind the panel. */
 .of-body { display: flex; flex: 1 0 auto; gap: var(--space-2); min-width: 0; min-height: 0; outline: none; }
 .of .of-body > .of-stage { flex: 1 1 0; min-width: 0; }
-.of[data-size="phone"] .of-body { flex-direction: column; }
-.of[data-size="phone"] .of-body > .of-stage { flex: 1 1 auto; }
+.of[data-size="phone"] .of-body, .of[data-column="false"] .of-body { flex-direction: column; }
+.of[data-size="phone"] .of-body > .of-stage, .of[data-column="false"] .of-body > .of-stage { flex: 1 1 auto; }
 .of-panel { display: grid; align-content: start; gap: var(--space-2); flex: 0 0 300px; box-sizing: border-box; align-self: flex-start; max-height: min(72vh, 680px); padding: var(--space-3); overflow-y: auto; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); animation: of-panel-in 0.18s ease-out; }
-.of[data-size="phone"] .of-panel { flex: 0 0 auto; align-self: stretch; max-height: 42vh; padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); }
+.of[data-size="phone"] .of-panel, .of[data-column="false"] .of-panel { flex: 0 0 auto; align-self: stretch; max-height: 42vh; padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); }
 /* The scene gives way to the sheet: with the sheet open the scene is about a third of the screen, so the whole sheet is on screen without scrolling the frame (the scene alone is up to 64vh, the sheet up to 42vh). */
 .of[data-size="phone"] .of-body[data-panel="open"] > .of-stage { flex: 1 1 0; min-height: min(34vh, 300px); }
 .of-panel[data-left] { opacity: 0.7; }
@@ -106,3 +94,47 @@
 .of-pick { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .of-pick:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-full); }
 .of-marker[data-selected] { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-full); }
+
+/* The overview panel (office-overview-panel.tsx): the column beside the scene when nobody is opened. Same card as the inspector; its lines are what the wall boards used to carry, said where they can be read. */
+.of-overview { gap: var(--space-3); }
+/* On a wide screen the column runs the height of the scene, so every section is in reach without scrolling the panel. */
+.of[data-column="true"] .of-body > .of-overview { align-self: stretch; max-height: none; }
+.of-ov-head h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.of-ov-head p { margin: 0; }
+.of-ov-section { display: grid; gap: var(--space-1); }
+.of-ov-section h4 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c-text-muted); }
+.of-ov-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-text); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.of-ov-workers, .of-ov-rest { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.of-ov-worker { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.of-ov-worker:hover { background: var(--c-hover); }
+.of-ov-worker:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.of-ov-worker[data-status="working"] .of-dot { --of-ring: var(--c-primary); }
+.of-ov-worker[data-status="awaiting"] .of-dot, .of-ov-worker[data-status="slow"] .of-dot, .of-ov-worker[data-status="stuck"] .of-dot { --of-ring: var(--c-warning); }
+.of-ov-worker[data-status="denied"] .of-dot { --of-ring: var(--c-error); }
+.of-ov-worker-text { display: grid; min-width: 0; }
+.of-ov-worker-name { font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.of-ov-worker-state { font-weight: 500; color: var(--c-warning-text); }
+.of-ov-worker-doing { font-family: var(--font-mono); font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.of-ov-worker-doing .of-panel-muted { font-family: inherit; font-size: inherit; }
+.of-ov-extra { padding-inline: var(--space-2); }
+.of-ov-rest li { display: flex; justify-content: space-between; gap: var(--space-2); padding: 2px var(--space-2); font-size: 0.8125rem; }
+.of-ov-rest b { font-variant-numeric: tabular-nums; }
+.of-ov-progress { display: flex; height: 8px; overflow: hidden; border-radius: var(--radius-full); background: var(--c-surface-subtle); }
+.of-ov-progress span { min-width: 4px; }
+.of-ov-progress [data-part="done"] { background: var(--c-success); }
+.of-ov-progress [data-part="doing"] { background: var(--c-primary); }
+.of-ov-progress [data-part="pending"] { background: var(--c-border-strong); }
+.of-ov-stats { display: grid; gap: 2px; margin: 0; }
+.of-stat { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem; }
+.of-stat dt { color: var(--c-text-muted); }
+.of-stat dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.of-stat[data-tone="good"] dd { color: var(--c-success-text); }
+.of-stat[data-tone="bad"] dd { color: var(--c-error-text); }
+.of-ov-foot { display: grid; gap: 2px; margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--c-border-subtle); }
+/* A phone: one folded line under the scene that opens to the same content. */
+.of[data-column="false"] .of-overview { padding: 0; max-height: 46vh; }
+.of-overview > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-3); cursor: pointer; font-size: 0.875rem; }
+.of-overview > summary:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; border-radius: var(--radius-md); }
+.of-ov-title { font-weight: 600; }
+.of-overview[open] > :not(summary) { margin-inline: var(--space-3); }
+.of-overview[open] { padding-bottom: var(--space-3); }

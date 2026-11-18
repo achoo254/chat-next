@@ -1413,8 +1413,6 @@ export const viMachines = {
 		overflowLabel: (n: number) => `${n} người chờ bàn trong phòng họp`,
 		empty: "Trống",
 		board: {
-			lobby: "Bảng tin",
-			staffToday: "Nhân viên hôm nay",
 			tasksDone: "Việc xong",
 			sessionTime: "Thời gian phiên",
 			planning: "Việc cần làm",
@@ -1429,6 +1427,27 @@ export const viMachines = {
 			qa: "Kiểm thử",
 			passed: "Qua",
 			failed: "Trượt",
+		},
+		/** The panel beside the scene, from the start: who works on what, who rests, the counts the wall boards used to show. */
+		summary: {
+			label: "Tổng quan văn phòng",
+			title: "Đang diễn ra",
+			headline: (working: number, resting: number) => {
+				const parts: string[] = [];
+				if (working > 0) parts.push(`${working} đang làm`);
+				if (resting > 0) parts.push(`${resting} nghỉ ngơi`);
+				return parts.length > 0 ? parts.join(" · ") : "Cả văn phòng đang rảnh";
+			},
+			working: "Đang làm",
+			workingNone: "Chưa ai nhận việc.",
+			resting: "Nghỉ ngơi",
+			restingNone: "Chưa ai nghỉ: đang trong giờ làm hoặc còn việc chạy.",
+			atSeat: (n: number) => `${n} người ngồi chờ việc`,
+			background: (n: number) => `${n} việc chạy nền`,
+			progress: "Tiến độ việc",
+			progressNone: "Chưa có danh sách việc.",
+			progressOf: (done: number, total: number) => `${done}/${total} việc xong`,
+			session: "Phiên này",
 		},
 	},
 };

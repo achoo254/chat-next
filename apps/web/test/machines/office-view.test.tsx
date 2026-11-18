@@ -99,7 +99,7 @@ describe("the office tab", () => {
 		expect(fake.sent).toEqual([]);
 	});
 
-	it("shows every room of the plan at once, grouped by zone, with their people, the meeting room's +N and the boards", async () => {
+	it("shows every room of the plan at once, grouped by zone, with their people and the meeting room's +N, and opens with the overview panel beside them", async () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
@@ -117,8 +117,12 @@ describe("the office tab", () => {
 		// Everyone has a seat of their own: nobody waits for a desk in the meeting room.
 		const meeting = within(management).getByRole("region", { name: "Phòng họp" });
 		expect(within(meeting).queryByLabelText(/người chờ bàn trong phòng họp/)).toBeNull();
-		const lobby = within(management).getByRole("region", { name: "Sảnh" });
-		expect(within(lobby).getByRole("region", { name: "Bảng tin" }).textContent).toContain("7");
+		// The wall boards are gone from the rooms: their counts and the news are in the panel beside the plan, open from the start.
+		expect(document.querySelector(".of-board")).toBeNull();
+		const overview = screen.getByRole("complementary", { name: "Tổng quan văn phòng" });
+		const working = within(overview).getByRole("region", { name: /Đang làm/ });
+		expect(working.textContent).toContain("Kỹ sư R&D");
+		expect(within(overview).getByText("Việc xong").nextElementSibling?.textContent).toBe("7");
 		// No floor tabs and no follow switch any more.
 		expect(document.querySelector('[data-id="office-floors"]')).toBeNull();
 		expect(document.querySelector('[data-id="office-follow"]')).toBeNull();
@@ -147,9 +151,9 @@ describe("the office tab", () => {
 		const dorm = within(living).getByRole("region", { name: "Ký túc" });
 		expect(within(dorm).getByText("Giám đốc điều hành")).toBeTruthy();
 		expect(within(dorm).getByText("Giám đốc Công nghệ")).toBeTruthy();
-		// The director and the 12 staff off duty sleep; Backend & DevOps stays in the server room, Advisor in its room.
-		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(13);
-		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(13);
+		// Everyone sleeps: the director, the 13 staff and Advisor, Backend & DevOps included.
+		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(15);
+		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(15);
 	});
 
 	it("says when the AI does not report its staff, with the lobby and the QA room both in view", async () => {

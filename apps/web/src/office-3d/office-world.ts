@@ -11,7 +11,6 @@ import { SceneInstrumentation } from "@babylonjs/core/Instrumentation/sceneInstr
 import { SceneLoaderFlags } from "@babylonjs/core/Loading/sceneLoaderFlags";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
-import { BOARD_ROOMS } from "../machines/office/office-boards.tsx";
 import type { OfficeRendererProps } from "../machines/office/office-renderer.ts";
 import type { OfficeSfx } from "./audio/office-sfx.ts";
 import { createOfficeSfx, eventSoundFiles } from "./audio/office-sfx.ts";
@@ -24,7 +23,7 @@ import { FrameStats } from "./engine/frame-stats.ts";
 import { qualityLevelAt, startingQualityLevel } from "./engine/quality-levels.ts";
 import { createQualityScaler } from "./engine/quality-scaler.ts";
 import { configureSelfHostedDecoders } from "./engine/self-hosted-decoders.ts";
-import { createOfficeOverlay, type BoardPin } from "./office-overlay.ts";
+import { createOfficeOverlay, type OverlayPin } from "./office-overlay.ts";
 import { createRenderGate } from "./render-gate.ts";
 import { createBlockKit } from "./scene/block-kit.ts";
 import { CAMERA_DISTANCE, pixelsPerMetre, screenOffset } from "./scene/fit-office-camera.ts";
@@ -73,10 +72,6 @@ export type BootResult = { readonly kind: "ready"; readonly world: OfficeWorld }
 const WARM_UP_FRAMES = 3;
 /** Light flicker when the power goes out. */
 const FLICKER_MS = 1_200;
-/** A board's HTML pin sits this far over its anchor's height (the board's top), and at least this high. */
-const BOARD_PIN_RISE = 0.55;
-const BOARD_PIN_MIN_Y = 2.15;
-
 export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	const host = opts.host;
 	const layout = opts.props.layout;
@@ -119,13 +114,8 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	});
 	const fx = createRoomFx(scene, kit, SCENE_LAYOUT);
 	const overlay = createOfficeOverlay();
-	const boards: BoardPin[] = [
-		...layout.anchors
-			.filter((a) => a.kind === "board" && a.room !== null && BOARD_ROOMS.includes(a.room))
-			.map((a) => ({ id: a.id, x: a.x, y: Math.max(BOARD_PIN_MIN_Y, a.y + BOARD_PIN_RISE), z: a.z, shrinksWhenFar: true })),
-		// The meeting room's "+N" over its table.
-		...layout.anchors.filter((a) => a.kind === "meeting").slice(0, 1).map((a) => ({ id: "overflow", x: a.x, y: 1.6, z: a.z, shrinksWhenFar: false })),
-	];
+	// The meeting room's "+N" over its table.
+	const pins: OverlayPin[] = layout.anchors.filter((a) => a.kind === "meeting").slice(0, 1).map((a) => ({ id: "overflow", x: a.x, y: 1.6, z: a.z }));
 	/** The people the shadow light draws: those in view, re-listed when that set changes. */
 	let casterKeys = "";
 	const refreshCasters = (): void => {
@@ -245,7 +235,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		if (seen !== casterKeys) refreshCasters();
 		fx.frame(now / 1000, views, frozen ? 0 : light.screenGlow, frozen ? 0 : light.deskLamp);
 		lifeSounds.frame(now / 1000, frozen ? [] : views);
-		overlay.update(scene, width, height, views, boards, far);
+		overlay.update(scene, width, height, views, pins, far);
 		if (now < flickerUntil) post.applyLight(Math.sin(now / 37) > 0.2 ? 0.25 : light.exposure, light.bloomWeight);
 		scene.render();
 		frames += 1;
