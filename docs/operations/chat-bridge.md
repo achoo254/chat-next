@@ -70,6 +70,12 @@ SELECT created_at, chat_id, action, target, result, detail FROM external_audit O
 
 Tính năng tắt mặc định cho từng chat; bật ở bảng tính năng của chat (hỏi xác nhận). Tắt lại thì hàng chưa gửi bị huỷ.
 
+Migration `0050_external_invites_confirmations.sql` thêm bảng `external_invites` (link mời của app kia đọc về để hiển thị, làm mới mỗi khoảng 10 phút), bảng `external_confirmations` (mã xác nhận lần hai của việc xoá nhóm: hợp lệ từ 10 giây đến 5 phút sau khi tạo, dùng một lần) và thêm kết quả `started` vào `external_audit` (ghi trước khi gửi việc không hoàn tác). Xoá nhóm bị giới hạn một lần mỗi giờ mỗi tài khoản; rời nhóm và mọi hành động khác theo `MemberActionsPerHour`.
+
+```sql
+SELECT created_at, action, target, result, detail FROM external_audit WHERE action IN ('group_leave', 'group_delete') ORDER BY id DESC;
+```
+
 ## Khoá
 
 Phiên Telegram niêm phong bằng `SESSION_KEY` (nhãn riêng, AAD gắn id tài khoản, chủ và ứng dụng). Xoay khoá theo [`key-rotation.md`](./key-rotation.md): `reseal` in dòng `resealed bridge account secrets`; secret không mở được (`unreadable`) thì tài khoản đó phải đăng nhập lại.
