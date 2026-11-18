@@ -42,7 +42,7 @@ describe("dozing off over a stuck tool", () => {
 		expect(activity?.stuckMs).toBeNull();
 		const view = markerView(t, tester(store, later), null);
 		expect(view.status).toBe("slow");
-		expect(view.label).toBe("Kiểm thử viên · Chạy lâu");
+		expect(view.label).toBe("Kiểm thử phần mềm · Chạy lâu");
 	});
 
 	it("dozes after five silent minutes of a slow tool, where they work, with Zzz and the minutes stuck", () => {
@@ -54,7 +54,7 @@ describe("dozing off over a stuck tool", () => {
 		const p = tester(store, clock.now);
 		expect(p.room).toBe("QA");
 		const view = markerView(t, p, null);
-		expect(view).toMatchObject({ status: "stuck", bubble: "Zzz", label: "Kiểm thử viên · Kẹt 6 phút" });
+		expect(view).toMatchObject({ status: "stuck", bubble: "Zzz", label: "Kiểm thử phần mềm · Kẹt 6 phút" });
 	});
 
 	it("wakes at the next event about them", () => {
