@@ -79,8 +79,6 @@ function fakeSetup(over: Partial<MachineSetupDeps> = {}) {
 		},
 		machineName: async () => "mac-mini",
 		keepRunningLoggedOut: async () => null,
-		serviceDiskAccess: async () => "not-applicable",
-		openDiskAccessSettings: () => undefined,
 		sleep: async (ms) => {
 			now += ms;
 		},

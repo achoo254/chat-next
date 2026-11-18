@@ -62,6 +62,11 @@ export type AgentConfig = {
   projects?: ProjectRecord[];
   /** The usage rules switched on or off by the user (usage/rules.ts), by rule code; unset rules keep their default. */
   usageRules?: Record<string, boolean>;
+  /**
+   * macOS: what macOS answered when tunelo asked for a protected folder
+   * (safety/mac-folders.ts), by the folder's path. Unset: never asked.
+   */
+  macFolders?: Record<string, "granted" | "denied">;
 };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */

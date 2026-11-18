@@ -4,19 +4,17 @@
 // listed the account's devices, and the tunnels running here. Exits 1 when
 // the background service does not answer (the Windows restart loop and the
 // install scripts rely on it). With `--json`, or when the output goes to a
-// program, the service's status as JSON (the install scripts read
-// `fullDiskAccess` from it) with the account and the apps added.
+// program, the service's status as JSON with the account and the apps added.
 import { ConfigStore, configDir } from "../config.ts";
 import { callControl, controlPid } from "../control-socket.ts";
 import { AGENT_CLIENT_ID, accountLabel, identitySession } from "../identity/session.ts";
 import { type AppsReport, describeApps, storedReport } from "../registration-status.ts";
-import { diskAccessSteps } from "../safety/disk-access.ts";
 import { tunnelRunLines } from "../tunnels/cli-status-commands.ts";
 import { printServerMigration, resolveServerUrl } from "../tunnels/server-url.ts";
 import { describeWhoAmI, whoAmI } from "../tunnels/whoami.ts";
 import { AGENT_VERSION } from "../version.ts";
 
-type ServiceStatus = Record<string, unknown> & { fullDiskAccess?: unknown; registered?: unknown; trustSyncedAt?: unknown; trustedDevices?: unknown };
+type ServiceStatus = Record<string, unknown> & { registered?: unknown; trustSyncedAt?: unknown; trustedDevices?: unknown };
 
 /** "3 min ago", for when Chat last listed the devices. */
 export function ago(at: number, now = Date.now()): string {
@@ -88,10 +86,6 @@ export async function status(options: { json?: boolean }): Promise<number> {
   if (service) {
     const held = (await callControl(dir, "GET", "/tunnels").catch(() => ({ mcp: [] }))) as { mcp?: { id: string; protocol: string; url: string; localPort: number }[] };
     for (const t of held.mcp ?? []) console.log(`MCP ${t.id}  [${t.protocol}]  ${t.url} → :${t.localPort}`);
-    if (service.fullDiskAccess === "needed") {
-      console.log("");
-      for (const line of diskAccessSteps(process.execPath, false)) console.log(line);
-    }
   }
   return service ? 0 : 1;
 }

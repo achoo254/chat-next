@@ -380,6 +380,11 @@ export type CoreOptions = {
   providers: AgentProvider[];
   audit: AuditLog;
   isSensitive: (path: string) => boolean;
+  /**
+   * macOS: throws (MacFolderRefused) for a folder macOS protects that the user
+   * has not let tunelo into yet; checked before anything touches the folder.
+   */
+  assertMacFolder?: (path: string) => void;
   /** Project settings load only in folders the owner trusted (on the machine, or from a device with consent). */
   isTrusted?: (dir: string) => boolean;
   /** Trusts a folder for a device that asked with consent; writes the consent log. */
@@ -1194,6 +1199,7 @@ export class AgentCore {
   }): Promise<ThreadSummary> {
     const provider = this.namedProvider(req.provider);
     const dir = resolve(req.dir);
+    this.opts.assertMacFolder?.(dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     const mode = req.permissionMode ?? "";
     if (mode !== "" && !provider.capabilities.permissionModes.includes(mode)) {
@@ -1241,6 +1247,7 @@ export class AgentCore {
       });
     }
     const dir = req.dir.trim() === "" ? (this.opts.advisorScratch ?? (() => advisorScratchDir(this.opts.isSensitive)))() : resolve(req.dir);
+    this.opts.assertMacFolder?.(dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     if (req.dir.trim() !== "" && !this.knownFolder(dir)) {
       throw new AgentError(ErrorCode.INVALID, "Advisor opens only in a project of the machine or the folder of one of its sessions", {
@@ -1403,6 +1410,7 @@ export class AgentCore {
     if (!provider.history || !found) {
       throw new AgentError(ErrorCode.NOT_FOUND, "no such session on this machine", { reason: ErrorReason.SESSION_NOT_FOUND, subject: req.sessionId });
     }
+    this.opts.assertMacFolder?.(resolve(found.dir));
     const view = this.localView(found);
     if (view.busyElsewhere && !req.openAnyway) {
       throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: found.dir });

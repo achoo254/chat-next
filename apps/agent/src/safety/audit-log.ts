@@ -8,7 +8,8 @@
 // write to a workspace: what and how many files, never a path, a file's
 // content or a commit message; the usage rules switched, the usage ledger
 // deleted; Advisor's key set or removed (its fingerprint, never the key), and
-// a session's automatic Advisor turned on or off).
+// a session's automatic Advisor turned on or off; a folder macOS protects the
+// user let tunelo ask macOS for).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -48,7 +49,8 @@ export type AuditAction =
   | "advisor_key_set"
   | "advisor_key_remove"
   | "advisor_on"
-  | "advisor_off";
+  | "advisor_off"
+  | "mac_folder_access";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

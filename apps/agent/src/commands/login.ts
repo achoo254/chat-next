@@ -11,7 +11,6 @@ import { ConfigStore } from "../config.ts";
 import { CHAT_SERVER } from "../machine-api.ts";
 import { callControl } from "../control-socket.ts";
 import type { AppsReport } from "../registration-status.ts";
-import { type DiskAccess, diskAccessSteps, openDiskAccessSettings } from "../safety/disk-access.ts";
 import { checkServiceSupport, installService, keepRunningLoggedOut } from "../service.ts";
 
 /** How long `tunelo login` waits for Chat to list the machine. */
@@ -35,28 +34,12 @@ export interface MachineSetupDeps {
   machineName: (dir: string) => Promise<string>;
   /** Linux: the command still needed so the service runs while nobody is logged in, or null. */
   keepRunningLoggedOut: () => Promise<string | null>;
-  /** What macOS lets the started service open; "not-applicable" off macOS or when it does not answer. */
-  serviceDiskAccess: (dir: string) => Promise<DiskAccess>;
-  openDiskAccessSettings: (binary: string) => void;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
   log: (line: string) => void;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/** Asks the service just started, for up to 15 s, whether it has Full Disk Access. */
-async function askServiceDiskAccess(dir: string): Promise<DiskAccess> {
-  if (process.platform !== "darwin") return "not-applicable";
-  for (const end = Date.now() + 15_000; Date.now() < end; ) {
-    const status = (await callControl(dir, "GET", "/status").catch(() => undefined)) as { fullDiskAccess?: unknown } | undefined;
-    const access = status?.fullDiskAccess;
-    if (access === "granted" || access === "needed" || access === "not-applicable") return access;
-    await sleep(500);
-  }
-  // A service still starting: show the steps anyway.
-  return "needed";
-}
 
 export const defaultMachineSetupDeps: MachineSetupDeps = {
   checkService: checkServiceSupport,
@@ -79,8 +62,6 @@ export const defaultMachineSetupDeps: MachineSetupDeps = {
       () => "",
     ),
   keepRunningLoggedOut,
-  serviceDiskAccess: askServiceDiskAccess,
-  openDiskAccessSettings,
   sleep,
   now: Date.now,
   log: (line) => console.log(line),
@@ -126,7 +107,7 @@ export async function connectMachine(dir: string, opts: { signedInNow: boolean }
   await deps.retryRegistration(dir, opts.signedInNow).catch(() => undefined);
 
   const chat = await waitForChat(dir, deps);
-  await hints(dir, deps);
+  await hints(deps);
   if (chat?.status === "ok") {
     const name = await deps.machineName(dir);
     deps.log(`  ✓ Connected this machine${name ? ` (${name})` : ""}. Open ${chatAgentUrl()} to use it.`);
@@ -150,16 +131,17 @@ async function waitForChat(dir: string, deps: MachineSetupDeps): Promise<AppsRep
   }
 }
 
-/** Running while logged out (Linux linger) and Full Disk Access (macOS) are the owner's to grant: shown, not forced. */
-async function hints(dir: string, deps: MachineSetupDeps): Promise<void> {
+/**
+ * Running while logged out (Linux linger) is the owner's to grant: shown, not
+ * forced. On macOS nothing is asked for here: tunelo keeps the permissions
+ * macOS gives any program, and a device asks before it opens a protected
+ * folder (safety/mac-folders.ts).
+ */
+async function hints(deps: MachineSetupDeps): Promise<void> {
   const lingerCommand = await deps.keepRunningLoggedOut().catch(() => null);
-  // The install script shows these steps itself, in the page's language.
-  if (process.env.TUNELO_DISK_ACCESS_HINT === "script") return;
+  // The install script shows this step itself, in the page's language.
+  if (process.env.TUNELO_HINTS === "script") return;
   if (lingerCommand !== null) {
     deps.log(`  tunelo runs while you are logged in. To keep it running after you log out or the machine restarts, run once: ${lingerCommand}`);
-  }
-  if ((await deps.serviceDiskAccess(dir)) === "needed") {
-    deps.openDiskAccessSettings(process.execPath);
-    for (const line of diskAccessSteps(process.execPath, true)) deps.log(`  ${line}`);
   }
 }

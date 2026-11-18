@@ -20,7 +20,6 @@ import type { Machine } from "./machine.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
 import { redactMessage } from "./mcp/redact.ts";
 import type { AppsReport, Registration } from "./registration-status.ts";
-import { diskAccess } from "./safety/disk-access.ts";
 import { type TunnelEvent, tunnelSpecSchema } from "./tunnels/tunnel-host.ts";
 import { isAlive } from "./tunnels/run-registry.js";
 import type { TunnelService } from "./tunnels/tunnel-service.ts";
@@ -133,8 +132,6 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
       trustSyncedAt: c.trustedDevices?.syncedAt ?? 0,
       memoryMb: info.memoryMb,
       tunnels,
-      // What macOS lets the service itself (not the terminal asking) open.
-      fullDiskAccess: diskAccess(),
     };
   },
   /** Where the machine stands with each app; states and reasons, never a token. */

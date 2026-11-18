@@ -3,7 +3,7 @@
 // once per key every 30 s; refused when the list is over 24 hours old), then
 // a thread, Claude sessions, an unknown device, a revoked device, updates.
 import { randomUUID } from "node:crypto";
-import { utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type MessageInitShape, create, toBinary } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, type Frame, FrameSchema, HandshakeErrorCode, MachineInfoSchema, ThreadState } from "@achoo254/chat-proto/remote/remote";
@@ -11,9 +11,11 @@ import { HandshakeFailure, type KeyPair, type Session, generateKeyPair, startHan
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfigStore, TRUST_MAX_AGE_MS } from "../src/config.ts";
 import { AgentUpdater } from "../src/agent-updater.ts";
+import type { CoreOptions } from "../src/core/agent-core.ts";
 import { DeviceTrust, UNKNOWN_KEY_RETRY_MS } from "../src/device-trust.ts";
 import { Connection, type LinkContext } from "../src/link/connection.ts";
 import { LocalSessions } from "../src/providers/claude/local-sessions.ts";
+import { MacFolders } from "../src/safety/mac-folders.ts";
 import type { AgentProvider } from "../src/providers/types.ts";
 import { fakeProvider } from "./fake-provider.ts";
 import { Transcript } from "./support/claude-transcript.ts";
@@ -22,8 +24,8 @@ import { makeCore, tempDir } from "./harness.ts";
 
 process.env.TUNELO_KEYSTORE = "file";
 
-async function machine(providers: AgentProvider[] = [fakeProvider()], extra: Partial<LinkContext> = {}) {
-  const { core, audit, work, home } = makeCore(providers);
+async function machine(providers: AgentProvider[] = [fakeProvider()], extra: Partial<LinkContext> = {}, coreOptions: Partial<CoreOptions> = {}) {
+  const { core, audit, work, home } = makeCore(providers, { more: coreOptions });
   const config = new ConfigStore(join(tempDir(), "cfg"));
   const key = await generateKeyPair(true);
   let now = Date.now();
@@ -172,10 +174,13 @@ describe("connection", () => {
     const outside = (await frames(session, link.next, (f) => f.id === "4")).at(-1)?.body;
     expect(outside?.case === "error" && [outside.value.code, outside.value.reason]).toEqual([ErrorCode.INVALID, ErrorReason.PATH_OUTSIDE_FOLDER]);
 
-    // A machine without Full Disk Access to open (not a Mac) says it does not know the request.
+    // tunelo no longer opens Full Disk Access; a machine without protected folders refuses asking for one.
     link.conn.receive(session.seal(create(FrameSchema, { id: "4b", body: { case: "openDiskAccessSettings", value: {} } })));
     const settings = (await frames(session, link.next, (f) => f.id === "4b")).at(-1)?.body;
     expect(settings?.case === "error" && settings.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
+    link.conn.receive(session.seal(create(FrameSchema, { id: "4c", body: { case: "macFolderAccessAsk", value: { path: join(m.work) } } })));
+    const ask = (await frames(session, link.next, (f) => f.id === "4c")).at(-1)?.body;
+    expect(ask?.case === "error" && ask.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
 
     // A denial with words reaches the core and lands on the card.
     link.conn.receive(
@@ -439,5 +444,53 @@ describe("updates", () => {
     const l2 = await link(none, phone);
     const refused = await l2.request("1", { case: "agentUpdateStart", value: {} });
     expect(refused?.case === "error" && refused.value.reason).toBe(ErrorReason.UPDATE_UNAVAILABLE);
+  });
+});
+
+describe("folders macOS protects", () => {
+  it("refuses them until the user agrees, lists home without looking inside, then asks macOS once agreed", async () => {
+    const root = tempDir();
+    const documents = join(root, "Documents");
+    const GIT = ".git";
+    mkdirSync(join(documents, "repo", GIT), { recursive: true });
+    mkdirSync(join(root, "plain", GIT), { recursive: true });
+    const saved: Record<string, "granted" | "denied"> = {};
+    let answer: (a: "granted") => void = () => undefined;
+    const changes: string[] = [];
+    const folders = new MacFolders({
+      platform: "darwin",
+      home: root,
+      saved: () => saved,
+      save: (folder, a) => (saved[folder] = a),
+      fullDiskAccess: () => false,
+      probe: () => new Promise((r) => (answer = r)),
+      onChange: () => changes.push(folders.access(documents)),
+      log: () => undefined,
+      folders: () => [documents],
+    });
+    const m = await machine(undefined, { macFolders: folders }, { assertMacFolder: (dir) => folders.assert(dir) });
+    const phone = await generateKeyPair();
+    trustDevice(m.config, phone.publicKey, "phone");
+    const l = await link(m, phone);
+
+    const refused = await l.request("1", { case: "dirList", value: { path: join(documents, "repo"), showHidden: false } });
+    expect(refused?.case === "error" && [refused.value.reason, refused.value.subject]).toEqual([ErrorReason.MAC_FOLDER_ACCESS, documents]);
+    const home = await l.request("2", { case: "dirList", value: { path: root, showHidden: false } });
+    expect(home?.case === "dirListResult" && home.value.entries.map((e) => [e.name, e.git])).toEqual([
+      ["Documents", false],
+      ["plain", true],
+    ]);
+    const session = await l.request("3", { case: "threadCreate", value: { provider: "fake", dir: join(documents, "repo"), text: "hi" } });
+    expect(session?.case === "error" && session.value.reason).toBe(ErrorReason.MAC_FOLDER_ACCESS);
+
+    expect(await l.request("4", { case: "macFolderAccessAsk", value: { path: join(documents, "repo") } })).toMatchObject({ case: "error" });
+    expect(await l.request("5", { case: "macFolderAccessAsk", value: { path: documents } })).toMatchObject({ case: "ack" });
+    expect(changes).toEqual(["asking"]);
+    answer("granted");
+    await vi.waitFor(() => expect(changes).toEqual(["asking", "granted"]));
+    expect(saved).toEqual({ [documents]: "granted" });
+    const listed = await l.request("6", { case: "dirList", value: { path: join(documents, "repo"), showHidden: false } });
+    expect(listed?.case).toBe("dirListResult");
+    expect(m.audit.list(10).map((e) => [e.action, e.path])).toContainEqual(["mac_folder_access", documents]);
   });
 });

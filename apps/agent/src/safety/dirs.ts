@@ -40,7 +40,12 @@ export function gitRoot(dir: string): string {
   }
 }
 
-export function listDir(path: string, opts: { showHidden: boolean; isSensitive: (p: string) => boolean }): DirListing {
+/**
+ * `mayEnter`: false for a folder whose inside must not be touched (a folder
+ * macOS protects that the user has not let tunelo into): it is listed by name
+ * only, never looked into for git.
+ */
+export function listDir(path: string, opts: { showHidden: boolean; isSensitive: (p: string) => boolean; mayEnter?: (p: string) => boolean }): DirListing {
   const dir = resolve(path || homedir());
   const st = statSync(dir);
   if (!st.isDirectory()) throw Object.assign(new Error("not a directory"), { code: "ENOTDIR" });
@@ -57,7 +62,8 @@ export function listDir(path: string, opts: { showHidden: boolean; isSensitive: 
     }
     if (!isDir) continue;
     const full = join(dir, e.name);
-    entries.push({ name: e.name, ...gitBranch(full), sensitive: opts.isSensitive(full) });
+    const git = opts.mayEnter?.(full) === false ? { git: false, branch: "" } : gitBranch(full);
+    entries.push({ name: e.name, ...git, sensitive: opts.isSensitive(full) });
     if (entries.length >= 2000) break;
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));

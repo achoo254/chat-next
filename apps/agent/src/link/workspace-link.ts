@@ -10,7 +10,6 @@ import type { DiffSource, LogEntry } from "../workspace/git-ops.ts";
 import type { Area, FileState, StatusEntry, WorkspaceStatus } from "../workspace/git-status.ts";
 import type { CommitMessageRequest } from "../workspace/commit-message.ts";
 import type { Workspaces } from "../workspace/workspaces.ts";
-import { isDiskAccessDenial } from "../safety/disk-access.ts";
 import { OutsideFolderError } from "../safety/session-files.ts";
 import type { GitFileChange } from "../threads/git-changes.ts";
 
@@ -268,7 +267,6 @@ export function publicError(err: unknown, rel: string): unknown {
   if (typeof code !== "string") return new AgentError(ErrorCode.INTERNAL, "the workspace request failed", { reason: ErrorReason.UNSPECIFIED });
   if (code === "ENOENT") return new AgentError(ErrorCode.INVALID, "no such file or folder", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: rel });
   if (code === "ENOTDIR") return new AgentError(ErrorCode.INVALID, "not a folder", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: rel });
-  if (isDiskAccessDenial(err)) return new AgentError(ErrorCode.INVALID, "the system refused access", { reason: ErrorReason.FULL_DISK_ACCESS_NEEDED, subject: rel });
   if (code === "EACCES" || code === "EPERM") return new AgentError(ErrorCode.INVALID, "the system refused access", { reason: ErrorReason.ACCESS_DENIED, subject: rel });
   if (code === "ELOOP") return new AgentError(ErrorCode.INVALID, "too many links", { reason: ErrorReason.UNSPECIFIED, subject: rel });
   return new AgentError(ErrorCode.INVALID, `the file system refused (${code.slice(0, 20)})`, { reason: ErrorReason.UNSPECIFIED, subject: rel });

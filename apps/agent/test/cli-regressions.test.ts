@@ -88,8 +88,9 @@ describe("tunelo CLI", () => {
 			expect(code).toBe(0);
 			expect(stdout).toContain(`Usage: tunelo ${hidden.join(" ")}`);
 		}
-		expect(["granted", "needed", "not-applicable"]).toContain((await tunelo(["disk-access"])).stdout.trim());
-		for (const gone of ["install", "whoami", "version", "devices", "authenticator", "link"]) {
+		expect((await tunelo(["mac-folder-access", tmpdir()])).stdout.trim()).toBe("granted");
+		expect((await tunelo(["mac-folder-access", join(tmpdir(), "tunelo-no-such-folder")])).stdout.trim()).toBe("missing");
+		for (const gone of ["install", "whoami", "version", "devices", "authenticator", "link", "disk-access"]) {
 			expect((await tunelo([gone])).code).not.toBe(0);
 		}
 	});

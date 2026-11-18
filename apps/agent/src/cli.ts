@@ -21,7 +21,7 @@ import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
 import { goOnline } from "./online.ts";
 import { startService, stopService } from "./service.ts";
-import { diskAccess } from "./safety/disk-access.ts";
+import { probeHere } from "./safety/mac-folders.ts";
 import { dropInheritedMarkers } from "./startup-env.ts";
 import { registerConfigCommand } from "./tunnels/cli-config-command.ts";
 import { registerHttpCommand } from "./tunnels/cli-http-command.js";
@@ -274,11 +274,12 @@ export function buildProgram(): Command {
     .description("stop loading that folder's .claude settings")
     .action(exits((dir: string | undefined) => setTrust(dir, false)));
   program.command("trusted", { hidden: true }).description("list trusted folders").action(exits(() => printJson("/trust")));
-  // The running service asks a new copy of itself whether macOS granted Full Disk Access.
+  // The running service tries a folder macOS protects in a new copy of itself, so a macOS prompt
+  // nobody answers holds that copy, never the service (safety/mac-folders.ts).
   program
-    .command("disk-access", { hidden: true })
-    .description("print whether this process has Full Disk Access (granted, needed, not-applicable)")
-    .action(() => console.log(diskAccess()));
+    .command("mac-folder-access <path>", { hidden: true })
+    .description("try a folder macOS protects and print granted, denied or missing")
+    .action((path: string) => console.log(probeHere(path)));
   registerMcpCommand(program);
   registerAdvisorCommand(program, exits);
 

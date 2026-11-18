@@ -18,7 +18,7 @@ localman-next: tunnel, inspector, portal, MCP). Mỗi cái đăng nhập riêng.
 - Tiến trình nền của Máy của tôi là `tunelo` 2.0.0 (`apps/agent`). Nó nhận toàn bộ CLI Tunelo 1.11: `http`, `tcp`, `kill`, `watch`, `link`/`links`,
   `mcp`, `config`, `login`/`logout`/`whoami`. Bun single-file, ký minisign, phát hành qua GitHub Releases (không npm).
 - Từ 3.0.0 help chỉ còn hai nhóm, lệnh máy và lệnh tunnel ([`cli-help.ts`](../../apps/agent/src/cli-help.ts)). Lệnh dịch vụ
-  (`start`, `stop`, `run`, `mcp`, `disk-access`) và lệnh chỉ người ngồi trước máy được đổi (`trust`, `untrust`, `trusted`,
+  (`start`, `stop`, `run`, `mcp`, `disk-access`; 3.17.0 thay `disk-access` bằng `mac-folder-access`) và lệnh chỉ người ngồi trước máy được đổi (`trust`, `untrust`, `trusted`,
   `config mcp-local-writes`, `config local-forward`) vẫn chạy nhưng ẩn khỏi help, và không đưa lên web để AI không tự bật. Các lệnh
   còn lại của 2.x (`install`, `devices`, `audit`, `authenticator`, `claude profiles`, `secrets`, `browser`, `usage`, `link`/`links`,
   `whoami`, `version`) đã bỏ; việc của chúng làm trên trang máy trong Chat, `whoami` và phiên bản gộp vào `status`.

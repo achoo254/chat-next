@@ -9,7 +9,7 @@ import type { Duplex } from "node:stream";
 import { arch, homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
-import { LoginState, type MachineInfo, MachineInfoSchema, ThreadKind, ThreadState, type ThreadSummary, TurnState } from "@achoo254/chat-proto/remote/remote";
+import { LoginState, MacFolderAccess, type MachineInfo, MachineInfoSchema, ThreadKind, ThreadState, type ThreadSummary, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { type KeyPair, PROTOCOL_VERSION, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
@@ -26,8 +26,8 @@ import { startLogRotation } from "./log-rotate.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
 import type { SessionMcpLease, TicketScope } from "./mcp/session-tickets.ts";
 import { AuditLog } from "./safety/audit-log.ts";
-import { DiskAccessWatch, diskAccess, diskAccessSteps, freshDiskAccess, openDiskAccessSettings } from "./safety/disk-access.ts";
-import { isCompiled, selfCommand, supervised, termHostUnit, underLaunchAgent } from "./service.ts";
+import { type MacAccess, MacFolders, hasFullDiskAccess, probeInChild } from "./safety/mac-folders.ts";
+import { isCompiled, selfCommand, supervised, termHostUnit } from "./service.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
 import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
 import { AgentUpdater } from "./agent-updater.ts";
@@ -52,6 +52,14 @@ import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
 import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
 
 const MAX_CONNECTIONS = 16;
+/** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
+const MAC_PROMPT_WAIT_MS = 5 * 60_000;
+const MAC_ACCESS: Record<MacAccess, MacFolderAccess> = {
+  "not-asked": MacFolderAccess.NOT_ASKED,
+  asking: MacFolderAccess.ASKING,
+  granted: MacFolderAccess.GRANTED,
+  denied: MacFolderAccess.DENIED,
+};
 const MAX_HANDSHAKING = 8;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 /** Devices ping every 10 s; a silent connection is dropped. */
@@ -96,6 +104,8 @@ export class Machine {
   readonly core: AgentCore;
   readonly audit: AuditLog;
   readonly isSensitive: (p: string) => boolean;
+  /** macOS: the folders macOS protects, entered only once the user agreed on a device. */
+  readonly macFolders: MacFolders;
   readonly projects: Projects;
   readonly secrets: SecretService;
   /** Advisor's TypeSafe key, apart from the sign-in secrets (no session reaches it). */
@@ -133,6 +143,17 @@ export class Machine {
     this.log = opts.log ?? ((l) => console.log(l));
     const dir = this.config.dir;
     this.isSensitive = createSensitiveCheck({ configDir: dir });
+    this.macFolders = new MacFolders({
+      platform: process.platform,
+      home: homedir(),
+      saved: () => this.config.get().macFolders ?? {},
+      save: (folder, answer) => this.config.update((c) => (c.macFolders = { ...c.macFolders, [folder]: answer })),
+      fullDiskAccess: hasFullDiskAccess,
+      // A new copy of tunelo tries the folder: a macOS prompt nobody answers holds that copy, never this one.
+      probe: (folder) => probeInChild(selfCommand("mac-folder-access"), folder, MAC_PROMPT_WAIT_MS),
+      onChange: () => void this.announceInfo(),
+      log: (line) => this.log(line),
+    });
     this.audit = new AuditLog(join(dir, "audit.jsonl"));
     this.secrets = opts.secrets ?? new SecretService({ configDir: dir, audit: this.audit });
     this.advisorKeys = new AdvisorKeyStore({ configDir: dir, audit: this.audit, log: this.log });
@@ -211,6 +232,7 @@ export class Machine {
       providers: this.providers,
       audit: this.audit,
       isSensitive: this.isSensitive,
+      assertMacFolder: (dir) => this.macFolders.assert(dir),
       isTrusted: (dir) => this.config.isTrusted(dir),
       trust: (dir, device) => {
         const full = this.config.setTrusted(dir, true);
@@ -389,7 +411,6 @@ export class Machine {
     for (const s of this.core.sessionIds()) this.usage.launched.add(s.provider, s.sessionId);
     this.usage.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
-    if (this.diskWatch.start()) for (const line of diskAccessSteps(process.execPath, false)) this.log(line);
     return actual;
   }
 
@@ -397,7 +418,6 @@ export class Machine {
     this.secrets.close();
     await this.browser.close();
     this.screenShare.stop();
-    this.diskWatch.stop();
     this.updater.stop();
     // The terminal process and its shells keep running (they outlive the agent).
     this.terminal.stop();
@@ -578,7 +598,7 @@ export class Machine {
         usage: this.usageApi,
         advisorKeys: this.advisorKeys,
         onAdvisorKey: () => this.advisorKeyChanged(),
-        openDiskAccessSettings: () => this.openDiskAccessSettings(),
+        macFolders: this.macFolders,
         onPing: () => (this.lastPing = Date.now()),
       },
     );
@@ -656,7 +676,6 @@ export class Machine {
         defaultModel: d.defaultModel ?? "",
       });
     }
-    const needsDiskAccess = diskAccess() === "needed";
     return create(MachineInfoSchema, {
       name: c.machineName || hostname(),
       os: platform(),
@@ -671,9 +690,7 @@ export class Machine {
       maxSessions: this.core.limit,
       memoryMb: Math.round(process.memoryUsage().rss / 1e6),
       settings: { localForward: forward.enabled, localForwardAvailable: forward.available },
-      needsFullDiskAccess: needsDiskAccess,
-      // The program to add to the list; a development run (bun, node) has none to give.
-      ...(needsDiskAccess && isCompiled() ? { agentBinary: process.execPath } : {}),
+      macFolders: this.macFolders.list().map((f) => ({ path: f.path, access: MAC_ACCESS[f.access] })),
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
       gitChanges: true,
@@ -703,35 +720,6 @@ export class Machine {
   advisorKeyChanged(): void {
     void this.advisorKeys.loadForRedaction().catch((err: unknown) => this.log(`advisor: ${redact((err as Error).message)}`));
     void this.announceInfo();
-  }
-
-  /** Watches for the owner granting Full Disk Access while it is missing. */
-  private readonly diskWatch = new DiskAccessWatch({
-    check: () => diskAccess(),
-    // Only the installed binary can ask a new copy of itself (not tests, not `bun src/cli.ts`).
-    checkFresh: () => (isCompiled() ? freshDiskAccess(selfCommand("disk-access")) : Promise.resolve("not-applicable")),
-    onGranted: () => {
-      this.log("Full Disk Access granted");
-      void this.announceInfo();
-    },
-    onGrantedAfterRestart: () => {
-      if (!underLaunchAgent()) {
-        this.log("Full Disk Access granted; restart tunelo to use it");
-        return;
-      }
-      // launchd starts the agent again (KeepAlive); devices reconnect and see it.
-      this.log("Full Disk Access granted; restarting to use it");
-      process.kill(process.pid, "SIGTERM");
-    },
-  });
-
-  /** macOS: opens Full Disk Access and the binary in Finder on the machine's screen; false elsewhere. */
-  openDiskAccessSettings(): boolean {
-    if (process.platform !== "darwin") return false;
-    openDiskAccessSettings(process.execPath);
-    // Asked from a device, maybe after the access was taken away again.
-    this.diskWatch.start();
-    return true;
   }
 
   /** Sends the machine's info to every connected device, unasked. */

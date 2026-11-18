@@ -86,7 +86,7 @@ chết hoặc bị thu hồi thì ngừng, ghi log và tunnel hiện `sign-in`: 
 Lệnh ẩn khỏi help nhưng vẫn chạy:
 
 - Của dịch vụ: `start`, `stop` (bật, tắt bản chạy nền; nó tự chạy lúc đăng nhập máy), `run` (chạy trong terminal để gỡ lỗi; từ chối
-  khi đã có bản chạy nền), `mcp` (server MCP stdio, xem ADR 0013), `disk-access`.
+  khi đã có bản chạy nền), `mcp` (server MCP stdio, xem ADR 0013), `mac-folder-access` (3.17.0, thay `disk-access`).
 - Chỉ người ngồi trước máy được đổi, cố ý không có trên web để AI không tự bật: `trust [thư mục]` / `untrust` / `trusted` (thư mục
   được nạp cấu hình `.claude` của dự án; thư mục thường cũng bật được từ web, có ghi nhật ký), `config local-forward
   [on|off|block|unblock] [cổng…]` (cho Localman gửi request tới `localhost` của máy, mặc định bật), `config mcp-local-writes
@@ -163,8 +163,8 @@ Có gì ở 2.6.0:
   Claude mở từ terminal của app chạy kèm một hook Stop rỗng (`--settings`, cộng thêm vào cài đặt và hook của người dùng):
   Claude ghi dấu kết thúc lượt vào transcript nên phiên hết "đang chạy" ngay khi lượt xong. Lượt bị ngắt, hook bị tắt, hay
   phiên mở ngoài app vẫn đoán theo transcript (ghi trong một phút gần nhất).
-- **Đường dẫn cho quyền Full Disk Access**: khi còn thiếu quyền, máy gửi kèm đường dẫn tệp chạy của tunelo
-  (`MachineInfo.agent_binary`) để banner trên web chỉ đúng tệp cần kéo vào danh sách.
+- **Đường dẫn cho quyền Full Disk Access** (tới 3.16.x): khi còn thiếu quyền, máy gửi kèm đường dẫn tệp chạy của tunelo
+  (`MachineInfo.agent_binary`). Từ 3.17.0 tunelo không xin quyền này nữa (xem "macOS: quyền vào thư mục được bảo vệ").
 
 Script cài thấy gói npm `tunelo` 1.x thì nhắc `npm uninstall -g tunelo` (không tự gỡ).
 
@@ -449,18 +449,27 @@ Bản chạy nền là LaunchAgent `com.hoandat.tunelo` trong phiên GUI của n
 đăng nhập (headless, tắt tự đăng nhập) không chạy được tiến trình nền, và qua SSH thì Keychain bị khoá. Bật tự đăng nhập, hoặc đăng
 nhập GUI một lần sau mỗi lần khởi động máy.
 
-## macOS: quyền Truy cập toàn bộ ổ đĩa (Full Disk Access)
+## macOS: quyền vào thư mục được bảo vệ (3.17.0, không còn Full Disk Access)
 
-Phiên làm trong Desktop, Documents, Downloads hoặc iCloud Drive cần tunelo có Full Disk Access; thiếu thì macOS chặn, hoặc hỏi bằng
-hộp thoại trên máy mà không ai bấm nên phiên treo. Chỉ chủ máy cấp được: kéo `~/.local/bin/tunelo` vào danh sách ở Cài đặt hệ thống
-› Quyền riêng tư & Bảo mật › Truy cập toàn bộ ổ đĩa, rồi bật công tắc.
+tunelo chỉ dùng các quyền mặc định macOS cho mọi chương trình, giống Claude Code chạy trong Terminal, và không bao giờ xin Full
+Disk Access (quyết định 18/11/2026). Mã: [`src/safety/mac-folders.ts`](src/safety/mac-folders.ts).
 
-- Script cài và `tunelo login` mở sẵn trang đó và một cửa sổ Finder chọn sẵn tunelo. `tunelo status` và log của dịch vụ in các
-  bước khi còn thiếu (không mở gì, nên cũng không nói là đã mở).
-- Dịch vụ dò quyền mà không gây hộp thoại, báo cho thiết bị (`MachineInfo.needs_full_disk_access`; web hiện banner có nút mở lại
-  trang cài đặt trên máy). Khi còn thiếu, nó kiểm lại vài giây một lần và báo ngay khi được cấp, không cần khởi động lại.
-- Nhờ chữ ký Developer ID, quyền đã cấp giữ qua các lần `tunelo update`. Bản 2.0.2 trở về trước ký ad-hoc nên phải cấp lại một lần
-  sau khi lên 2.0.3.
+- macOS bảo vệ Desktop, Documents, Downloads, iCloud Drive (`~/Library/Mobile Documents`), từng thư mục của nhà cung cấp đám mây
+  trong `~/Library/CloudStorage` và từng ổ trong `/Volumes` (trừ ổ khởi động). Máy gửi danh sách này kèm trạng thái
+  (`MachineInfo.mac_folders`: chưa hỏi, đang hỏi, đã cho, bị từ chối).
+- tunelo không chạm vào bên trong thư mục nào chưa được cho: mở phiên (kể cả Cố vấn và mở lại phiên có sẵn), duyệt thư mục, thêm,
+  tạo hay clone dự án, mở terminal ở đó đều bị từ chối với `ERROR_REASON_MAC_FOLDER_ACCESS` (subject là thư mục được bảo vệ). Liệt
+  kê thư mục home chỉ đọc tên, không nhìn vào trong để tìm git.
+- Web hiện hộp thoại hỏi người dùng. Bấm "Xin quyền" thì thiết bị gửi `MacFolderAccessAsk`; máy ghi vào nhật ký đồng ý
+  (`mac_folder_access`) rồi thử thư mục trong một tiến trình con (`tunelo mac-folder-access <đường dẫn>`, lệnh ẩn), nên hộp thoại
+  của macOS mà không ai bấm chỉ giữ tiến trình con đó (tối đa 5 phút), không bao giờ treo tunelo. Hộp thoại web cho mở màn hình máy
+  để bấm Cho phép từ xa. Câu trả lời của macOS lưu ở `config.json` (`macFolders`); bị từ chối thì chủ máy bật lại ở Cài đặt hệ
+  thống › Quyền riêng tư & Bảo mật › Tệp và thư mục rồi bấm "Kiểm tra lại".
+- Máy đã cấp Full Disk Access cho tunelo trước 3.17.0 coi mọi thư mục là đã cho, không hỏi gì. `OpenDiskAccessSettings` bị từ chối
+  (`UNSUPPORTED_REQUEST`); script cài, `tunelo login` và `tunelo status` không còn mở hay nhắc cài đặt nào.
+- Giới hạn: hộp thoại của macOS chỉ bấm được trên Mac (hoặc qua màn hình máy). `tunelo-term-host` chạy dưới launchd riêng nên
+  macOS hỏi quyền cho terminal riêng; lệnh do AI hoặc terminal tự chạy vào một thư mục được bảo vệ khác giữa phiên vẫn có thể gặp
+  hộp thoại của macOS mà web không biết trước. Đường dẫn qua symlink trỏ vào thư mục được bảo vệ không bị cổng nhận ra.
 
 ## Linux: dịch vụ systemd của người dùng (2.2.0)
 
@@ -482,7 +491,7 @@ Cần Linux dùng glibc (Ubuntu, Debian, Fedora…; Alpine/musl chưa hỗ trợ
   root (link `/usr/local/bin/claude` trỏ vào `/root/.local`) thì người dùng khác không chạy được, tunelo không thấy provider.
 - Kho khoá: Linux không có Keychain/DPAPI, nên khoá máy và khoá niêm phong là tệp 0600 trong thư mục cấu hình (không dùng
   libsecret/secret-service). Giới hạn: ai đọc được thư mục cấu hình là đọc được khoá máy, mở được token và bí mật đã lưu.
-- Khác macOS: không có Chia sẻ màn hình của máy, không có Full Disk Access (trạng thái dịch vụ ghi `fullDiskAccess: not-applicable`).
+- Khác macOS: không có Chia sẻ màn hình của máy, không có thư mục được macOS bảo vệ (`MachineInfo.mac_folders` rỗng).
   Trình duyệt của máy tìm Chrome/Chromium như hệ khác. Thùng rác dùng `gio trash`. Cổng đang nghe (cho chuyển tiếp `localhost` của
   Localman) đọc bằng `lsof`, máy thiếu `lsof` thì dùng `ss -Hltnp`.
 

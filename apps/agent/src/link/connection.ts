@@ -33,7 +33,8 @@ import { ACCOUNT_REASONS, accountListBody, accountsOf, readAccounts } from "./ac
 import type { AuditLog } from "../safety/audit-log.ts";
 import type { LocalForward } from "../tunnels/forward.ts";
 import { listDir } from "../safety/dirs.ts";
-import { isDiskAccessDenial } from "../safety/disk-access.ts";
+import { homedir } from "node:os";
+import { MacFolderRefused, type MacFolders } from "../safety/mac-folders.ts";
 import { OutsideFolderError, listSessionFiles } from "../safety/session-files.ts";
 import type { ProjectList, Projects } from "../projects/projects.ts";
 import { SecretInputError } from "../sign-in-secrets/secret-names.ts";
@@ -89,8 +90,8 @@ export type LinkContext = {
   browser?: RemoteBrowser;
   /** The machine's own Screen Sharing (macOS); absent where the machine has none (tests). */
   screenShare?: ScreenShare;
-  /** macOS: shows Full Disk Access and the binary on the machine's screen; false or absent elsewhere. */
-  openDiskAccessSettings?: () => boolean;
+  /** macOS: the folders macOS protects (safety/mac-folders.ts); absent where the machine has none (tests). */
+  macFolders?: MacFolders;
   /** Updates tunelo for a device; absent where the machine has none (tests). */
   updater?: AgentUpdater;
   /** The machine's terminal; absent where the machine has none (tests). */
@@ -116,6 +117,7 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
       ? { code: ErrorCode.INVALID, message, reason: ErrorReason.ADVISOR_KEY_INVALID, subject: "" }
       : { code: ErrorCode.INTERNAL, message, reason: ErrorReason.ADVISOR_KEY_NOT_SAVED, subject: "" };
   }
+  if (err instanceof MacFolderRefused) return { code: ErrorCode.INVALID, message, reason: ErrorReason.MAC_FOLDER_ACCESS, subject: err.folder };
   if (err instanceof AgentError) return { code: err.code, message, reason: err.reason, subject: err.subject, ...(err.failureId ? { failureId: err.failureId } : {}) };
   if (err instanceof AccountError) return { code: ErrorCode.INVALID, message, reason: ACCOUNT_REASONS[err.kind], subject: err.subject };
   if (err instanceof AttachmentError) return { code: ErrorCode.INVALID, message, reason: err.reason, subject: err.subject };
@@ -139,11 +141,9 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
     const reason =
       fsCode === "ENOENT" || fsCode === "ENOTDIR"
         ? ErrorReason.FOLDER_NOT_FOUND
-        : isDiskAccessDenial(err)
-          ? ErrorReason.FULL_DISK_ACCESS_NEEDED
-          : fsCode === "EACCES" || fsCode === "EPERM"
-            ? ErrorReason.ACCESS_DENIED
-            : ErrorReason.UNSPECIFIED;
+        : fsCode === "EACCES" || fsCode === "EPERM"
+          ? ErrorReason.ACCESS_DENIED
+          : ErrorReason.UNSPECIFIED;
     return { code: ErrorCode.INVALID, message, reason, subject: "" };
   }
   return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
@@ -552,12 +552,15 @@ export class Connection {
       case "projectList":
         return sendList();
       case "projectAdd":
+        this.ctx.macFolders?.assert(b.value.dir);
         projects.add({ dir: b.value.dir, name: b.value.name, sensitive: Boolean(b.value.consent?.sensitive), device: this.device });
         return sendList();
       case "projectCreate":
+        this.ctx.macFolders?.assert(b.value.parent);
         await projects.create({ parent: b.value.parent, name: b.value.name, gitInit: b.value.gitInit });
         return sendList();
       case "projectClone":
+        this.ctx.macFolders?.assert(b.value.parent);
         projects.clone({ url: b.value.url, parent: b.value.parent, name: b.value.name, cloneId: b.value.cloneId }, (p) =>
           this.send("", { case: "projectCloneProgress", value: p }),
         );
@@ -602,10 +605,19 @@ export class Connection {
         case "machineInfoRequest":
           return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
         case "openDiskAccessSettings":
-          if (!this.ctx.openDiskAccessSettings?.()) {
-            return this.send(id, { case: "error", value: refusal("only a Mac has Full Disk Access", ErrorReason.UNSUPPORTED_REQUEST) });
+          // tunelo no longer asks for Full Disk Access: a device asks for each protected folder (macFolderAccessAsk).
+          return this.send(id, { case: "error", value: refusal("tunelo does not ask for Full Disk Access", ErrorReason.UNSUPPORTED_REQUEST) });
+        case "macFolderAccessAsk": {
+          const folders = this.ctx.macFolders;
+          if (!folders || process.platform !== "darwin") {
+            return this.send(id, { case: "error", value: refusal("only a Mac protects folders", ErrorReason.UNSUPPORTED_REQUEST) });
           }
+          if (!folders.ask(b.value.path)) {
+            return this.send(id, { case: "error", value: { ...refusal("not a folder macOS protects", ErrorReason.FOLDER_NOT_FOUND), subject: b.value.path } });
+          }
+          this.ctx.audit.write({ device: this.device, action: "mac_folder_access", path: b.value.path, detail: "ask" });
           return ack();
+        }
         case "machineSettingsSet": {
           const forward = this.ctx.localForward;
           if (b.value.localForward !== undefined) {
@@ -788,7 +800,13 @@ export class Connection {
           return this.send(id, { case: "gitFileDiffResult", value: { threadId: b.value.threadId, file: gitFileBody(file) } });
         }
         case "dirList": {
-          const l = listDir(b.value.path, { showHidden: b.value.showHidden, isSensitive: this.ctx.isSensitive });
+          const folders = this.ctx.macFolders;
+          folders?.assert(b.value.path || homedir());
+          const l = listDir(b.value.path, {
+            showHidden: b.value.showHidden,
+            isSensitive: this.ctx.isSensitive,
+            ...(folders ? { mayEnter: (p: string) => folders.allows(p) } : {}),
+          });
           return this.send(id, { case: "dirListResult", value: l });
         }
         case "fileList": {
@@ -869,6 +887,7 @@ export class Connection {
         case "termUpdateNow":
           // Answered later, by id: starting the terminal process may take a moment.
           if (!this.terminal) return this.send(id, { case: "error", value: refusal("this machine has no terminal", ErrorReason.UNSUPPORTED_REQUEST) });
+          if (b.case === "termOpen" && b.value.cwd !== "") this.ctx.macFolders?.assert(b.value.cwd);
           return this.terminal.handle(id, b);
         case "termData":
           // Only a frame queued before the link opened comes this way.

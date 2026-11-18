@@ -222,15 +222,17 @@ main() {
 	# the background and adds the machine. A failed or skipped sign-in leaves
 	# tunelo installed. Sign-in needs no typing (device code), so without a
 	# terminal (`curl … | sh` over a pipe, CI) it gets an empty stdin. The
-	# script shows the last macOS and Linux steps itself, in the system's
-	# language.
+	# script shows the last Linux step itself, in the system's language. On
+	# macOS tunelo asks for nothing here: it keeps the permissions macOS gives
+	# any program, and a device asks the user before it opens a folder macOS
+	# protects.
 	say "Đăng nhập tài khoản cho tunelo (tunnel, Chat, Localman)…" \
 		"Signing tunelo in with your account (tunnel, Chat, Localman)…" "正在用你的账号登录 tunelo（隧道、Chat、Localman）…"
 	signed_in=0
 	if (: </dev/tty) 2>/dev/null; then
-		TUNELO_DISK_ACCESS_HINT=script "$bin" login </dev/tty || signed_in=$?
+		TUNELO_HINTS=script "$bin" login </dev/tty || signed_in=$?
 	else
-		TUNELO_DISK_ACCESS_HINT=script "$bin" login </dev/null || signed_in=$?
+		TUNELO_HINTS=script "$bin" login </dev/null || signed_in=$?
 	fi
 	if [ "$signed_in" -ne 0 ]; then
 		say "Chưa kết nối xong máy này; xem lý do ở trên, hoặc chạy tunelo status." \
@@ -238,7 +240,6 @@ main() {
 		return 0
 	fi
 	linger_hint
-	disk_access_hint
 }
 
 # Linux: the systemd user service runs while the owner is logged in. `tunelo
@@ -254,34 +255,6 @@ linger_hint() {
 		"Note: tunelo runs while you are logged in. To keep it running after you log out or the machine restarts, run once:" \
 		"注意：tunelo 在你登录期间运行。若要在注销或重启后也保持运行，请运行一次："
 	printf '  sudo loginctl enable-linger %s\n' "$user"
-}
-
-# The background service lacks Full Disk Access: its sessions cannot work in
-# Desktop, Documents, Downloads or iCloud Drive, and may hang on a macOS prompt
-# nobody answers. Only the owner can grant it: open the setting and a Finder
-# window with tunelo selected, and say what to do; tunelo notices by itself.
-# `tunelo login` leaves it to this script (TUNELO_DISK_ACCESS_HINT=script).
-disk_access_hint() {
-	[ "$os" = "Darwin" ] || return 0
-	# The service may still be starting: give it a few seconds to answer.
-	tries=0
-	until status="$("$bin" status --json 2>/dev/null)"; do
-		tries=$((tries + 1))
-		[ "$tries" -lt 15 ] || return 0
-		sleep 1
-	done
-	printf '%s' "$status" | grep -q '"fullDiskAccess": "needed"' || return 0
-	open "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles" >/dev/null 2>&1 || true
-	open -R "$bin" >/dev/null 2>&1 || true
-	say "Việc cuối: cho tunelo quyền Truy cập toàn bộ ổ đĩa (cần khi làm trong Desktop, Documents, Downloads, iCloud Drive)." \
-		"Last step: give tunelo Full Disk Access (needed to work in Desktop, Documents, Downloads, iCloud Drive)." \
-		"最后一步：给 tunelo「完全磁盘访问权限」（在桌面、文稿、下载、iCloud 云盘中工作时需要）。"
-	say "  1. Kéo tunelo từ cửa sổ Finder vừa mở thả vào danh sách trong Cài đặt hệ thống." \
-		"  1. Drag tunelo from the Finder window that just opened into the list in System Settings." \
-		"  1. 将刚打开的访达窗口中的 tunelo 拖到系统设置的列表里。"
-	say "  2. Bật công tắc cạnh tunelo. tunelo tự nhận ra, không cần khởi động lại." \
-		"  2. Turn on the switch next to tunelo. tunelo notices by itself; nothing to restart." \
-		"  2. 打开 tunelo 旁边的开关。tunelo 会自动发现，无需重启。"
 }
 
 # Arguments are ignored: commands copied from an older page still install.
