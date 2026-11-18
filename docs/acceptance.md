@@ -141,7 +141,7 @@ Cần tài khoản Telegram thật (mã đăng nhập gửi tới app của ngư
 | G7 | Gửi tin vào chat đã đồng bộ (web, MCP, Bot API) | Bị từ chối (`PermissionDenied`); ô soạn tin khoá | Đạt bằng test tự động (`TestLinkedChatRefusesSending`); chưa thử trong giao diện thật |
 | G8 | Ngắt kết nối, chọn giữ chat; rồi ngắt kết nối kèm xoá | Giữ: chat chỉ đọc, phiên Chat biến khỏi Cài đặt › Thiết bị của Telegram; xoá: chat, liên hệ và dữ liệu `external_*` biến mất | Đã kiểm đăng xuất và xoá ở bài thử trực tiếp; chưa kiểm trong giao diện thật |
 | G9 | Xoá tài khoản hoandat.com thử (tài khoản phụ có kết nối) | Phiên Telegram bị đăng xuất, `external_*` rỗng, người dùng ảo mất tên | Đạt bằng test tự động (`TestErasingTheOwnerRemovesImportedData`, `TestErasedAccountIsLoggedOutOfTheOtherApp`); chưa thử thật |
-| G10 | Xoay `SESSION_KEY` theo [`key-rotation.md`](operations/key-rotation.md) khi có tài khoản Telegram kết nối | `reseal` in `resealed bridge account secrets` với `unreadable: 0`; chat vẫn nhận tin sau xoay | Chưa chạy (chỉ có test tự động của `reseal`); cần duyệt riêng vì đổi khoá dùng chung |
+| G10 | Xoay `SESSION_KEY` theo [`key-rotation.md`](operations/key-rotation.md) khi có tài khoản Telegram kết nối | `reseal` in `resealed bridge account secrets` với `unreadable: 0`; chat vẫn nhận tin sau xoay | Bỏ qua theo quyết định của chủ sản phẩm 18/11/2026 (không xoay khoá); chỉ có test tự động của `reseal` |
 
 ## Giới hạn đã biết
 
