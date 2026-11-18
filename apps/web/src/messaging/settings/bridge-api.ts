@@ -78,6 +78,8 @@ export type BridgeErrorKind =
 	| "not_found"
 	| "send_unsupported"
 	| "feature_unsupported"
+	| "feature_off"
+	| "confirmation_wrong"
 	| "other";
 
 /** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…). */
@@ -106,8 +108,42 @@ export interface BridgeOutboxItem {
 	readonly attempts: number;
 }
 
+/** An invite link of a group in the other app (not a Chat invite link). */
+export interface BridgeInviteView {
+	readonly link: string;
+	readonly title: string;
+	readonly revoked: boolean;
+	readonly usage: number;
+}
+
+/** A person of the other app who is not in the group yet. */
+export interface BridgeCandidate {
+	readonly participantId: string;
+	readonly name: string;
+}
+
+/** The second step of deleting a group: a token good from `usableFrom` until `expires` (Unix seconds). */
+export interface GroupDeleteToken {
+	readonly token: string;
+	readonly usableFrom: number;
+	readonly expires: number;
+}
+
 export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
+	/** The invite links the account made for the group in the other app. */
+	invites(accountId: number, conversationId: string): Promise<readonly BridgeInviteView[]>;
+	createInvite(accountId: number, conversationId: string, title: string): Promise<void>;
+	revokeInvite(accountId: number, conversationId: string, link: string): Promise<void>;
+	/** People of the account who are not in the group. */
+	candidates(accountId: number, conversationId: string): Promise<readonly BridgeCandidate[]>;
+	addMember(accountId: number, conversationId: string, participantId: string): Promise<void>;
+	/** Leaves the group in the other app; `confirmName` must be the name of the chat. */
+	leaveGroup(accountId: number, conversationId: string, confirmName: string): Promise<void>;
+	/** First step of deleting the group for everybody in the other app. */
+	requestGroupDelete(accountId: number, conversationId: string, confirmName: string): Promise<GroupDeleteToken>;
+	/** Second step: deletes the group, history included. Cannot be undone. */
+	deleteGroup(accountId: number, conversationId: string, confirmName: string, token: string): Promise<void>;
 	/** What a synced chat can sync, feature by feature: only what the app supports, with the direction now in effect. */
 	features(accountId: number, conversationId: string): Promise<readonly BridgeFeatureView[]>;
 	/** Sets the direction of one feature of a synced chat (`feature_unsupported` when the app cannot do it). */

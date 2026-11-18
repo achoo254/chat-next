@@ -364,7 +364,7 @@ describe("what is synced for one chat, feature by feature", () => {
 		fixture.bridge.seedDemo();
 		const panel = await openFeatures(fixture);
 		expect(within(panel).getByText("Ghim tin nhắn")).toBeTruthy();
-		expect(within(panel).queryByText("Link mời")).toBeNull();
+		expect(within(panel).queryByText("Thông báo và tắt tiếng")).toBeNull();
 		const pins = within(panel).getByRole("group", { name: /Ghim tin nhắn/ });
 		expect(within(pins).getByRole("button", { name: "Chỉ nhận" }).getAttribute("aria-pressed")).toBe("true");
 		// read marks only come in: no "both ways" for them
@@ -403,5 +403,61 @@ describe("what is synced for one chat, feature by feature", () => {
 		await userEvent.click(within(within(panel).getByRole("group", { name: /Ghim tin nhắn/ })).getByRole("button", { name: "Hai chiều" }));
 		expect(await within(panel).findByText("Ứng dụng này chưa làm được thao tác đó.", {}, LONG)).toBeTruthy();
 	});
-});
 
+	async function turnOn(panel: HTMLElement, group: RegExp, button: string): Promise<void> {
+		await userEvent.click(within(within(panel).getByRole("group", { name: group })).getByRole("button", { name: button }));
+		const confirm = await within(panel).findByRole("button", { name: "Bật" }, LONG);
+		await userEvent.click(confirm);
+	}
+
+	it("lists the links of the other app, and makes and revokes them only once the feature sends", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		fixture.bridge.invites = [{ $typeName: "app.v1.BridgeInvite", link: "https://t.me/+abc", title: "Nhóm dự án", revoked: false, usage: 4 }];
+		const panel = await openFeatures(fixture);
+		expect(await within(panel).findByText(/https:\/\/t\.me\/\+abc/, {}, LONG)).toBeTruthy();
+		expect((within(panel).getByRole("button", { name: "Tạo link" }) as HTMLButtonElement).disabled).toBe(true);
+		await turnOn(panel, /Link mời/, "Hai chiều");
+		await waitFor(() => expect((within(panel).getByRole("button", { name: "Tạo link" }) as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.type(within(panel).getByLabelText("Tên link (không bắt buộc)"), "mới");
+		await userEvent.click(within(panel).getByRole("button", { name: "Tạo link" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("invite:create:mới"), LONG);
+		await userEvent.click((await within(panel).findAllByRole("button", { name: "Thu hồi" }, LONG))[0] as HTMLElement);
+		await waitFor(() => expect(fixture.bridge.calls).toContain("invite:revoke:https://t.me/+abc"), LONG);
+	});
+
+	it("adds a person the other app has shown, once members send", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const panel = await openFeatures(fixture);
+		expect(await within(panel).findByText("Giang", { selector: "option" }, LONG)).toBeTruthy();
+		await turnOn(panel, /Thành viên và vai trò/, "Hai chiều");
+		await userEvent.selectOptions(within(panel).getByLabelText("Chọn người"), "88");
+		await waitFor(() => expect((within(panel).getByRole("button", { name: "Thêm" }) as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.click(within(panel).getByRole("button", { name: "Thêm" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("member:add:88"), LONG);
+	});
+
+	it("leaves a group only with the name typed again, and deletes it only after a second confirmation that waits", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		fixture.bridge.chatName = "Anh Đô CEO";
+		const panel = await openFeatures(fixture);
+		await turnOn(panel, /Rời và xoá nhóm/, "Chỉ gửi");
+		const leave = within(panel).getByRole("button", { name: "Rời nhóm" }) as HTMLButtonElement;
+		await waitFor(() => expect(leave.disabled).toBe(true));
+		await userEvent.type(within(panel).getByLabelText("Gõ lại tên nhóm"), "sai tên");
+		await userEvent.click(within(panel).getByRole("button", { name: "Rời nhóm" }));
+		expect(await within(panel).findByText("Tên chưa đúng.", {}, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls).not.toContain("group:leave");
+		await userEvent.clear(within(panel).getByLabelText("Gõ lại tên nhóm"));
+		await userEvent.type(within(panel).getByLabelText("Gõ lại tên nhóm"), "Anh Đô CEO");
+		await userEvent.click(within(panel).getByRole("button", { name: "Xoá nhóm cho mọi người…" }));
+		const confirm = await within(panel).findByRole("button", { name: /Chờ|Xoá vĩnh viễn/ }, LONG);
+		expect((confirm as HTMLButtonElement).disabled).toBe(true);
+		expect(fixture.bridge.calls).not.toContain("group:delete");
+		await waitFor(() => expect((within(panel).getByRole("button", { name: "Xoá vĩnh viễn" }) as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.click(within(panel).getByRole("button", { name: "Xoá vĩnh viễn" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("group:delete"), LONG);
+	});
+});

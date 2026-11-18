@@ -13,6 +13,7 @@ import {
 	type FeatureDirection,
 	type FeatureLevel,
 } from "./bridge-features-model.ts";
+import { BridgePeople } from "./bridge-people.tsx";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 
 interface Props {
@@ -136,6 +137,17 @@ export function BridgeFeatures({ accountId, conversationId, chatTitle, appName, 
 					{message}
 				</p>
 			)}
+			<BridgePeople
+				accountId={accountId}
+				conversationId={conversationId}
+				chatTitle={chatTitle}
+				appName={appName}
+				api={api}
+				features={list}
+				disabled={disabled || busy}
+				onChanged={onChanged}
+				onError={onError}
+			/>
 		</section>
 	);
 }

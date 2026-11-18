@@ -76,3 +76,14 @@ label.br-conv-main:hover { background: var(--c-hover); }
 @media (max-width: 720px) {
 	.br-features { padding-left: 0; }
 }
+/* People and groups in the other app: invite links, adding people, leaving and deleting a group. */
+.br-people { display: grid; gap: var(--space-4); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.br-people-part { display: grid; gap: var(--space-2); }
+.br-people-part h4 { margin: 0; font-size: 0.9375rem; }
+.br-invite-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.br-invite { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }
+.br-invite[data-revoked="true"] { opacity: 0.6; }
+.br-invite small { overflow-wrap: anywhere; }
+.br-inline { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.br-inline .input { flex: 1 1 200px; min-width: 0; }
+.br-danger { padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--c-error) 40%, transparent); border-radius: var(--radius-md); }

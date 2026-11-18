@@ -9,8 +9,10 @@ import {
 	BridgeOutboxStatus,
 	BridgeService,
 	type BridgeAccount,
+	type BridgeCandidate,
 	type BridgeConversation,
 	type BridgeFeature,
+	type BridgeInvite,
 	type BridgeLoginStep,
 	type BridgeOutboxItem,
 } from "@achoo254/chat-proto/bridge";
@@ -40,7 +42,16 @@ export class FakeBridge {
 		{ $typeName: "app.v1.BridgeFeature", feature: "topics", risk: "r2", direction: "in", isDefault: true, canReceive: true, canSend: true },
 		{ $typeName: "app.v1.BridgeFeature", feature: "read", risk: "r1", direction: "in", isDefault: true, canReceive: true, canSend: false },
 		{ $typeName: "app.v1.BridgeFeature", feature: "members", risk: "r3", direction: "off", isDefault: true, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeature", feature: "invites", risk: "r3", direction: "off", isDefault: true, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeature", feature: "lifecycle", risk: "r3", direction: "off", isDefault: true, canReceive: false, canSend: true },
 	];
+	/** The links of the other app for the first synced chat, and who could be added. */
+	invites: BridgeInvite[] = [];
+	candidates: BridgeCandidate[] = [{ $typeName: "app.v1.BridgeCandidate", participantId: "88", name: "Giang" }];
+	/** The name the chat must be confirmed with, and how long the second confirmation of a delete waits (seconds). */
+	chatName = "Anh Đô CEO";
+	deleteWait = 1;
+	private tokens = new Set<string>();
 	/** The next call that sends on (switching to both, retrying) fails with send_unsupported. */
 	sendUnsupported = false;
 	/** The calls, in order, with the arguments that matter. */
@@ -199,6 +210,52 @@ export class FakeBridge {
 					c.chatId = 0n;
 					c.topicsSplit = false;
 				}
+				return {};
+			},
+			listBridgeInvites: () => {
+				this.guard(false);
+				return { invites: this.invites.map((i) => ({ ...i })) };
+			},
+			createBridgeInvite: (req) => {
+				this.guard(false);
+				this.calls.push(`invite:create:${req.title}`);
+				this.invites.push({ $typeName: "app.v1.BridgeInvite", link: `https://t.me/+new${this.invites.length}`, title: req.title, revoked: false, usage: 0 });
+				return {};
+			},
+			revokeBridgeInvite: (req) => {
+				this.guard(false);
+				this.calls.push(`invite:revoke:${req.link}`);
+				this.invites = this.invites.map((i) => (i.link === req.link ? { ...i, revoked: true } : i));
+				return {};
+			},
+			listBridgeCandidates: () => {
+				this.guard(false);
+				return { candidates: this.candidates.map((c) => ({ ...c })) };
+			},
+			addBridgeMember: (req) => {
+				this.guard(false);
+				this.calls.push(`member:add:${req.participantId}`);
+				this.candidates = this.candidates.filter((c) => c.participantId !== req.participantId);
+				return {};
+			},
+			leaveBridgeGroup: (req) => {
+				this.guard(true);
+				if (req.confirmName !== this.chatName) throw new ConnectError("confirmation_wrong: the name is not right", Code.InvalidArgument);
+				this.calls.push("group:leave");
+				return {};
+			},
+			requestBridgeGroupDelete: (req) => {
+				this.guard(true);
+				if (req.confirmName !== this.chatName) throw new ConnectError("confirmation_wrong: the name is not right", Code.InvalidArgument);
+				const token = `tok${this.tokens.size}`;
+				this.tokens.add(token);
+				const now = Math.floor(Date.now() / 1000);
+				return { token, usableFromUnix: BigInt(now + this.deleteWait), expiresUnix: BigInt(now + 300) };
+			},
+			deleteBridgeGroup: (req) => {
+				this.guard(true);
+				if (req.confirmName !== this.chatName || !this.tokens.delete(req.token)) throw new ConnectError("confirmation_wrong: not right", Code.InvalidArgument);
+				this.calls.push("group:delete");
 				return {};
 			},
 			listBridgeFeatures: (req) => {

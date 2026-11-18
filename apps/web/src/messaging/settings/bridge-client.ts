@@ -101,6 +101,8 @@ export function bridgeError(err: unknown): BridgeError {
 	else if (e.code === Code.FailedPrecondition && message.startsWith("reauth_required")) kind = "reauth";
 	else if (e.code === Code.FailedPrecondition && message.startsWith("send_unsupported")) kind = "send_unsupported";
 	else if (e.code === Code.FailedPrecondition && message.startsWith("feature_unsupported")) kind = "feature_unsupported";
+	else if (e.code === Code.FailedPrecondition && message.startsWith("feature_off")) kind = "feature_off";
+	else if (e.code === Code.InvalidArgument && message.startsWith("confirmation_wrong")) kind = "confirmation_wrong";
 	else if (e.code === Code.InvalidArgument && message.startsWith("wrong_input:")) {
 		kind = "wrong_input";
 		detail = message.slice("wrong_input:".length).trim().split(":")[0]?.trim() ?? "";
@@ -153,6 +155,41 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		setDirection: (accountId, conversationId, direction) =>
 			call(async () => {
 				await rpc.setBridgeChatDirection({ accountId: BigInt(accountId), conversationId, direction: toWireDirection(direction) });
+			}),
+		invites: (accountId, conversationId) =>
+			call(async () => {
+				const r = await rpc.listBridgeInvites({ accountId: BigInt(accountId), conversationId });
+				return r.invites.map((i) => ({ link: i.link, title: i.title, revoked: i.revoked, usage: i.usage }));
+			}),
+		createInvite: (accountId, conversationId, title) =>
+			call(async () => {
+				await rpc.createBridgeInvite({ accountId: BigInt(accountId), conversationId, title });
+			}),
+		revokeInvite: (accountId, conversationId, link) =>
+			call(async () => {
+				await rpc.revokeBridgeInvite({ accountId: BigInt(accountId), conversationId, link });
+			}),
+		candidates: (accountId, conversationId) =>
+			call(async () => {
+				const r = await rpc.listBridgeCandidates({ accountId: BigInt(accountId), conversationId });
+				return r.candidates.map((c) => ({ participantId: c.participantId, name: c.name }));
+			}),
+		addMember: (accountId, conversationId, participantId) =>
+			call(async () => {
+				await rpc.addBridgeMember({ accountId: BigInt(accountId), conversationId, participantId });
+			}),
+		leaveGroup: (accountId, conversationId, confirmName) =>
+			call(async () => {
+				await rpc.leaveBridgeGroup({ accountId: BigInt(accountId), conversationId, confirmName });
+			}),
+		requestGroupDelete: (accountId, conversationId, confirmName) =>
+			call(async () => {
+				const r = await rpc.requestBridgeGroupDelete({ accountId: BigInt(accountId), conversationId, confirmName });
+				return { token: r.token, usableFrom: Number(r.usableFromUnix), expires: Number(r.expiresUnix) };
+			}),
+		deleteGroup: (accountId, conversationId, confirmName, token) =>
+			call(async () => {
+				await rpc.deleteBridgeGroup({ accountId: BigInt(accountId), conversationId, confirmName, token });
 			}),
 		features: (accountId, conversationId) =>
 			call(async () => {
