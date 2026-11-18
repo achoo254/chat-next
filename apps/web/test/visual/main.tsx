@@ -8,6 +8,7 @@
 // vite.config.ts), so render checks capture the finished state. Every page
 // then audits horizontal overflow (auditOverflow) and logs offenders as errors.
 import { Code } from "@connectrpc/connect";
+import { BridgeOutboxStatus, type BridgeOutboxItem } from "@achoo254/chat-proto/bridge";
 import { ChatType, MemberRole } from "@achoo254/chat-proto/chats";
 import { IncomingHookAuditAction, IncomingHookFormat } from "@achoo254/chat-proto/integrations";
 import { EntityType, IncomingHookStopReason } from "@achoo254/chat-proto/messages";
@@ -300,6 +301,8 @@ const SCREENS: Record<string, string> = {
 	"settings-mcp": "/settings/mcp",
 	// Settings › Kết nối ứng dụng with a connected Telegram account (test/support/fake-bridge.ts seedDemo).
 	"settings-bridge": "/settings/bridge",
+	// A chat that sends on to Telegram: the note above the composer, a message that failed and one still waiting.
+	"bridge-chat": `/c/${demo.ids.lanAnh}`,
 	// AI Agent with a paired demo machine, an unpaired and an offline one (test/support/remote-machine-demo.ts):
 	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
@@ -338,6 +341,20 @@ const SCREENS: Record<string, string> = {
 };
 const at = params.get("at");
 if (at === "settings-bridge") f.bridge.seedDemo();
+if (at === "bridge-chat") {
+	f.bridge.seedTwoWay(demo.ids.lanAnh);
+	const failed = f.send(f.selfId, demo.ids.lanAnh, "Tin này chưa sang Telegram được");
+	const waiting = f.send(f.selfId, demo.ids.lanAnh, "Tin này đang chờ gửi");
+	const item = (seq: number, status: BridgeOutboxStatus, lastError: string): BridgeOutboxItem => ({
+		$typeName: "app.v1.BridgeOutboxItem",
+		seq: BigInt(seq),
+		op: "send",
+		status,
+		lastError,
+		attempts: 1,
+	});
+	f.bridge.outbox.set(demo.ids.lanAnh, [item(failed, BridgeOutboxStatus.FAILED, "not allowed"), item(waiting, BridgeOutboxStatus.PENDING, "")]);
+}
 if (at === "settings-app") {
 	// The browser offers to install (beforeinstallprompt); the harness has no manifest to make it do so.
 	captureInstallPrompt();

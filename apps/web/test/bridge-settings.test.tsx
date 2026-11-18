@@ -93,7 +93,7 @@ describe("connecting an app", () => {
 });
 
 describe("choosing conversations", () => {
-	it("syncs one with a chosen history window, says it is read-only, and removes it", async () => {
+	it("syncs one with a chosen history window, sending both ways by default, and removes it", async () => {
 		const fixture = new ChatFixture();
 		await openPage(fixture);
 		await signIn();
@@ -102,15 +102,59 @@ describe("choosing conversations", () => {
 		const row = within(picker).getByText("Anh Đô CEO").closest("[data-id=bridge-conversation]") as HTMLElement;
 		await userEvent.click(within(row).getByRole("checkbox"));
 		expect(screen.getByText(/không đổi được: Chat không tải thêm được lịch sử cũ hơn/)).toBeTruthy();
+		// Sending from Chat is on for a new chat, and says what it means.
+		expect((screen.getByRole("checkbox", { name: "Gửi tin từ Chat sang Telegram" }) as HTMLInputElement).checked).toBe(true);
+		expect(screen.getByText(/Tin bạn gõ trong các chat này cũng được gửi sang ứng dụng kia/)).toBeTruthy();
 		await userEvent.click(screen.getByRole("button", { name: "500" }));
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
-		await waitFor(() => expect(fixture.bridge.calls).toContain("enable:user:7:500"));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("enable:user:7:500:BOTH"));
 		const synced = (await screen.findByText("500 tin gần nhất", { exact: false }, LONG)).closest("[data-id=bridge-chat]") as HTMLElement;
 		expect(within(synced).getByText("Anh Đô CEO")).toBeTruthy();
-		expect(screen.getByText(/chỉ để đọc: bạn không gửi tin vào đó được/)).toBeTruthy();
+		expect(within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ }).getAttribute("aria-checked")).toBe("true");
+		// Every chat sends on, so there is nothing to warn about being read-only.
+		expect(screen.queryByText(/chỉ để đọc: bạn không gửi tin vào đó được/)).toBeNull();
 		await userEvent.click(within(synced).getByRole("button", { name: "Xoá bản sao" }));
 		await userEvent.click(within(synced).getByRole("button", { name: "Xoá" }));
 		await waitFor(() => expect(fixture.bridge.calls).toContain("remove:user:7"));
+	});
+
+	it("leaves a chat read-only when sending from Chat is unticked, and switches it on later", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Anh Đô CEO/ }));
+		await userEvent.click(screen.getByRole("checkbox", { name: "Gửi tin từ Chat sang Telegram" }));
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("enable:user:7:2000:IN"));
+		const synced = (await screen.findByText("2.000 tin gần nhất", { exact: false }, LONG)).closest("[data-id=bridge-chat]") as HTMLElement;
+		const toggle = within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ });
+		expect(toggle.getAttribute("aria-checked")).toBe("false");
+		expect(screen.getByText(/chỉ để đọc: bạn không gửi tin vào đó được/)).toBeTruthy();
+		await userEvent.click(toggle);
+		await waitFor(() => expect(fixture.bridge.calls).toContain("direction:user:7:BOTH"));
+		await waitFor(() => expect(within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ }).getAttribute("aria-checked")).toBe("true"));
+		expect(screen.queryByText(/chỉ để đọc: bạn không gửi tin vào đó được/)).toBeNull();
+		await userEvent.click(within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("direction:user:7:IN"));
+	});
+
+	it("says so, without asking to sign in again, when the app cannot be written to", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		await userEvent.click(within(picker).getByRole("checkbox", { name: /Anh Đô CEO/ }));
+		await userEvent.click(screen.getByRole("checkbox", { name: "Gửi tin từ Chat sang Telegram" }));
+		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ" }));
+		const synced = (await screen.findByText("2.000 tin gần nhất", { exact: false }, LONG)).closest("[data-id=bridge-chat]") as HTMLElement;
+		fixture.bridge.sendUnsupported = true;
+		await userEvent.click(within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ }));
+		expect(await screen.findByText("Ứng dụng này chưa cho gửi tin từ Chat.", {}, LONG)).toBeTruthy();
+		expect(screen.queryByRole("link", { name: "Đăng nhập lại" })).toBeNull();
+		expect(within(synced).getByRole("switch", { name: /Gửi tin từ Chat/ }).getAttribute("aria-checked")).toBe("false");
 	});
 });
 
@@ -133,11 +177,27 @@ describe("choosing several conversations at once", () => {
 		expect(screen.getByText("Đã chọn 2 chat")).toBeTruthy();
 		fixture.bridge.reauth = false;
 		await userEvent.click(screen.getByRole("button", { name: "Bắt đầu đồng bộ 2 chat" }));
-		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500", "enable:chat:3:500"]));
+		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500:BOTH", "enable:chat:3:500:BOTH"]));
 		await waitFor(() => expect(screen.queryByText("Đã chọn 2 chat")).toBeNull());
 		// The two are marked synced in the list now, and cannot be ticked again.
 		await waitFor(() => expect(within(picker).queryAllByText("Đã đồng bộ")).toHaveLength(2));
 		expect(within(picker).queryAllByRole("checkbox")).toHaveLength(0);
+	});
+});
+
+describe("selecting what the list shows", () => {
+	it("ticks every chat the search shows in one click, and unticks them in another", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await userEvent.click(await screen.findByRole("button", { name: "Hiện danh sách chat" }, LONG));
+		const picker = (await screen.findByRole("heading", { name: "Chọn chat để đồng bộ" }, LONG)).parentElement as HTMLElement;
+		const total = within(picker).getAllByRole("checkbox").length;
+		await userEvent.click(within(picker).getByRole("button", { name: `Chọn tất cả ${total} chat đang hiện` }));
+		expect(screen.getByText(`Đã chọn ${total} chat`)).toBeTruthy();
+		expect(within(picker).getAllByRole("checkbox").every((box) => (box as HTMLInputElement).checked)).toBe(true);
+		await userEvent.click(within(picker).getByRole("button", { name: "Bỏ chọn các chat đang hiện" }));
+		expect(screen.queryByText(`Đã chọn ${total} chat`)).toBeNull();
 	});
 });
 
@@ -159,7 +219,7 @@ describe("a batch stopped by an old sign-in", () => {
 		cleanup();
 		fixture.bridge.reauth = false;
 		await openPage(fixture);
-		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500", "enable:chat:3:500"]), LONG);
+		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("enable:"))).toEqual(["enable:user:7:500:BOTH", "enable:chat:3:500:BOTH"]), LONG);
 		// It ran once: nothing is left waiting, and a new visit does not start anything again.
 		expect(window.sessionStorage.getItem("chat.bridge.pending")).toBeNull();
 	});

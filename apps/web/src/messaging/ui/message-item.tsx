@@ -12,6 +12,7 @@
 import { Suspense, lazy, memo, useContext, useState, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import type { LinkPreview } from "../data/pending-backend.ts";
+import type { BridgeOutboxItem } from "../settings/bridge-api.ts";
 import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -23,6 +24,7 @@ import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
+import { bridgeAppName, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
@@ -499,10 +501,13 @@ export function MessageBubble({
 	runNext = false,
 }: BubbleProps) {
 	const copy = useCopy();
-	const { store, self, backend } = useServices();
+	const { store, self, backend, source, toasts } = useServices();
 	const ui = useUi();
 	const ctx = useRichContext(message.fromId);
 	const intent = useIntent(chatId);
+	// A chat that sends on to another app (Chat Bridge): where this message is on its way.
+	const delivery = useDeliveryContext();
+	const onItsWay = itemOf(delivery, message.seq);
 	const preview = backend.features.has("linkPreview") ? backend.linkPreview(message) : null;
 	const integration = message.integrationLabel !== "";
 	const alert = integration ? splitAlert(message.text, message.entities) : null;
@@ -547,11 +552,23 @@ export function MessageBubble({
 			silent={message.silent && !recalled ? copy.message.silent : ""}
 		>
 			{mine && !recalled && !isSavedChat(chat, null) && (
-				<LabelledIcon
-					name={read ? "checks" : "check"}
-					label={read ? copy.message.read : copy.message.sentTick}
-					className={read ? "read" : undefined}
-				/>
+				onItsWay !== null && delivery !== null ? (
+					<LabelledIcon
+						name={onItsWay.status === "pending" || onItsWay.status === "sending" ? "clock" : "alert"}
+						label={
+							onItsWay.status === "failed" || onItsWay.status === "unknown"
+								? deliveryNote(copy, onItsWay, bridgeAppName(delivery.app))
+								: copy.message.bridgeSending(bridgeAppName(delivery.app))
+						}
+						className={onItsWay.status === "failed" || onItsWay.status === "unknown" ? "fail" : undefined}
+					/>
+				) : (
+					<LabelledIcon
+						name={read ? "checks" : "check"}
+						label={read ? copy.message.read : copy.message.sentTick}
+						className={read ? "read" : undefined}
+					/>
+				)
 			)}
 		</Stamp>
 	);
@@ -681,10 +698,39 @@ export function MessageBubble({
 						/>
 					)}
 					<Reactions message={message} chat={chat} />
+					{mine && !inert && delivery !== null && onItsWay !== null && (onItsWay.status === "failed" || onItsWay.status === "unknown") && (
+						<div className="failed-row" role="status">
+							{deliveryNote(copy, onItsWay, bridgeAppName(delivery.app))}
+							<button type="button" className="btn btn-sm" onClick={() => delivery.retry(message.seq)}>
+								{copy.message.resend}
+							</button>
+							{onItsWay.op === "send" ? (
+								<button
+									type="button"
+									className="btn btn-sm btn-quiet"
+									onClick={() => {
+										source.deleteMessages(chatId, [message.seq], true).catch(() => toasts.show(copy.common.failed));
+									}}
+								>
+									{copy.message.bridgeDiscard}
+								</button>
+							) : (
+								<button type="button" className="btn btn-sm btn-quiet" onClick={() => delivery.dismiss(message.seq)}>
+									{copy.message.bridgeDismiss}
+								</button>
+							)}
+						</div>
+					)}
 				</div>
 			)}
 		</div>
 	);
+}
+
+/** What a message that did not go out says, for the time line and the row under it. */
+function deliveryNote(copy: ReturnType<typeof useCopy>, item: BridgeOutboxItem, app: string): string {
+	if (item.status === "unknown") return copy.message.bridgeUnknown(app);
+	return item.op === "send" ? copy.message.bridgeFailed(app) : copy.message.bridgeEditFailed(app);
 }
 
 interface PendingProps {

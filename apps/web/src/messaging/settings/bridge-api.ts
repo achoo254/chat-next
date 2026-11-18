@@ -7,6 +7,9 @@
 
 export type BridgeAccountStatus = "active" | "needs_login" | "stopped";
 
+/** `in`: the other app is the source and Chat sends nothing back. `both`: what is written in the chat is sent on too. */
+export type BridgeDirection = "in" | "both";
+
 /** A conversation of the other app that Chat copies. */
 export interface BridgeChat {
 	/** The conversation's id in the other app (opaque). */
@@ -17,6 +20,7 @@ export interface BridgeChat {
 	readonly historyWindow: number;
 	/** The conversation's name in the other app. */
 	readonly title: string;
+	readonly direction: BridgeDirection;
 }
 
 export interface BridgeAccount {
@@ -64,6 +68,7 @@ export type BridgeErrorKind =
 	| "rate_limited"
 	| "account_taken"
 	| "not_found"
+	| "send_unsupported"
 	| "other";
 
 /** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…). */
@@ -76,13 +81,32 @@ export class BridgeError extends Error {
 	}
 }
 
+/** What a chat has queued for the other app and not finished (a message that is not listed was sent). */
+export interface BridgeOutboxItem {
+	readonly seq: number;
+	readonly op: "send" | "edit" | "delete";
+	/** `pending`: waiting; `sending`: on its way; `failed`: refused or given up; `unknown`: may or may not have arrived. */
+	readonly status: "pending" | "sending" | "failed" | "unknown";
+	/** Why it failed or waits; a short machine-ish text, shown only as a detail. */
+	readonly lastError: string;
+	readonly attempts: number;
+}
+
 export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
 	startLogin(source: string): Promise<LoginStep>;
 	continueLogin(loginId: string, input: Readonly<Record<string, string>>): Promise<LoginStep>;
 	conversations(accountId: number): Promise<readonly BridgeConversation[]>;
-	/** Starts copying; returns the chat. `historyWindow` is how many of the newest messages to import. */
-	enable(accountId: number, conversationId: string, historyWindow: number): Promise<number>;
+	/** Starts copying; returns the chat. `historyWindow` is how many of the newest messages to import. The chat sends both ways unless `direction` says `in` (an app that cannot be written to is always `in`). */
+	enable(accountId: number, conversationId: string, historyWindow: number, direction?: BridgeDirection): Promise<number>;
+	/** Switches a copy between receiving only and also sending on what is written in Chat. */
+	setDirection(accountId: number, conversationId: string, direction: BridgeDirection): Promise<void>;
+	/** What the chat has queued and not finished. */
+	outbox(chatId: number): Promise<readonly BridgeOutboxItem[]>;
+	/** Tries a failed or unknown message again. */
+	retry(chatId: number, seq: number): Promise<void>;
+	/** Gives up a failed edit or delete (a failed send is given up by deleting the message). */
+	dismiss(chatId: number, seq: number): Promise<void>;
 	/** Stops syncing and deletes the copy. */
 	remove(accountId: number, conversationId: string): Promise<void>;
 	/** Signs out of the app; with `deleteChats` the copies go too, otherwise they stay read-only. */

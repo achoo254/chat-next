@@ -4,11 +4,14 @@ import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import {
 	BridgeAccountStatus,
 	BridgeConversationKind,
+	BridgeDirection,
 	BridgeLoginStepKind,
+	BridgeOutboxStatus,
 	BridgeService,
 	type BridgeAccount,
 	type BridgeConversation,
 	type BridgeLoginStep,
+	type BridgeOutboxItem,
 } from "@achoo254/chat-proto/bridge";
 
 export class FakeBridge {
@@ -22,19 +25,50 @@ export class FakeBridge {
 		{ $typeName: "app.v1.BridgeConversation", id: "user:7", kind: BridgeConversationKind.PRIVATE, title: "Anh Đô CEO", chatId: 0n },
 		{ $typeName: "app.v1.BridgeConversation", id: "chat:3", kind: BridgeConversationKind.GROUP, title: "Nhóm dự án", chatId: 0n },
 	];
+	/** What each chat has queued for the other app (by chat id). Tests set it; a retry or a dismiss removes what it handles. */
+	outbox = new Map<number, BridgeOutboxItem[]>();
+	/** How many times a chat's outbox was asked for. */
+	outboxLooks = 0;
+	/** The next call that sends on (switching to both, retrying) fails with send_unsupported. */
+	sendUnsupported = false;
 	/** The calls, in order, with the arguments that matter. */
 	readonly calls: string[] = [];
 	private nextChat = 900n;
 
+	/** A connected account whose chat `chatId` sends on to the app (two-way), for the conversation tests. */
+	seedTwoWay(chatId: number): void {
+		this.accounts = [
+			{
+				$typeName: "app.v1.BridgeAccount",
+				id: 1n,
+				source: "telegram",
+				status: BridgeAccountStatus.ACTIVE,
+				lastError: "",
+				chats: [
+					{
+						$typeName: "app.v1.BridgeSyncedChat",
+						conversationId: "user:7",
+						chatId: BigInt(chatId),
+						caughtUp: true,
+						historyWindow: 2000,
+						title: "Anh Đô CEO",
+						direction: BridgeDirection.BOTH,
+					},
+				],
+			},
+		];
+	}
+
 	/** A connected account with two synced chats (one still importing) and a long list to pick from: the visual harness. */
 	seedDemo(): void {
-		const synced = (conversationId: string, chatId: bigint, title: string, window: number, caughtUp: boolean) => ({
+		const synced = (conversationId: string, chatId: bigint, title: string, window: number, caughtUp: boolean, direction = BridgeDirection.IN) => ({
 			$typeName: "app.v1.BridgeSyncedChat" as const,
 			conversationId,
 			chatId,
 			caughtUp,
 			historyWindow: window,
 			title,
+			direction,
 		});
 		this.accounts = [
 			{
@@ -43,7 +77,10 @@ export class FakeBridge {
 				source: "telegram",
 				status: BridgeAccountStatus.ACTIVE,
 				lastError: "",
-				chats: [synced("user:7", 900n, "Anh Đô CEO", 2000, true), synced("chat:9", 901n, "Work - OneDash Audit Logs", 500, false)],
+				chats: [
+					synced("user:7", 900n, "Anh Đô CEO", 2000, true, BridgeDirection.BOTH),
+					synced("chat:9", 901n, "Work - OneDash Audit Logs", 500, false),
+				],
 			},
 		];
 		const conv = (id: string, kind: BridgeConversationKind, title: string, chatId = 0n): BridgeConversation => ({
@@ -113,7 +150,7 @@ export class FakeBridge {
 			},
 			enableBridgeChat: (req) => {
 				this.guard(true);
-				this.calls.push(`enable:${req.conversationId}:${req.historyWindow}`);
+				this.calls.push(`enable:${req.conversationId}:${req.historyWindow}:${BridgeDirection[req.direction] ?? ""}`);
 				const conv = this.conversations.find((c) => c.id === req.conversationId);
 				if (conv === undefined) throw new ConnectError("not found", Code.NotFound);
 				const chatId = this.nextChat++;
@@ -125,6 +162,7 @@ export class FakeBridge {
 					caughtUp: true,
 					historyWindow: req.historyWindow,
 					title: conv.title,
+					direction: req.direction === BridgeDirection.UNSPECIFIED ? BridgeDirection.BOTH : req.direction,
 				});
 				return { chatId };
 			},
@@ -134,6 +172,43 @@ export class FakeBridge {
 				const account = this.accounts[0];
 				if (account !== undefined) account.chats = account.chats.filter((c) => c.conversationId !== req.conversationId);
 				for (const c of this.conversations) if (c.id === req.conversationId) c.chatId = 0n;
+				return {};
+			},
+			setBridgeChatDirection: (req) => {
+				this.guard(false);
+				this.calls.push(`direction:${req.conversationId}:${BridgeDirection[req.direction] ?? ""}`);
+				if (req.direction === BridgeDirection.BOTH && this.sendUnsupported) {
+					throw new ConnectError("send_unsupported: this app cannot be written to", Code.FailedPrecondition);
+				}
+				const chat = this.accounts[0]?.chats.find((c) => c.conversationId === req.conversationId);
+				if (chat === undefined) throw new ConnectError("not found", Code.NotFound);
+				chat.direction = req.direction;
+				return {};
+			},
+			listBridgeOutbox: (req) => {
+				this.guard(false);
+				this.outboxLooks++;
+				return { items: this.outbox.get(Number(req.chatId)) ?? [] };
+			},
+			retryBridgeMessage: (req) => {
+				this.guard(false);
+				this.calls.push(`retry:${String(req.chatId)}:${String(req.seq)}`);
+				const chatId = Number(req.chatId);
+				this.outbox.set(
+					chatId,
+					(this.outbox.get(chatId) ?? []).map((item) =>
+						item.seq === req.seq && (item.status === BridgeOutboxStatus.FAILED || item.status === BridgeOutboxStatus.UNKNOWN)
+							? { ...item, status: BridgeOutboxStatus.PENDING, lastError: "", attempts: 0 }
+							: item,
+					),
+				);
+				return {};
+			},
+			dismissBridgeMessage: (req) => {
+				this.guard(false);
+				this.calls.push(`dismiss:${String(req.chatId)}:${String(req.seq)}`);
+				const chatId = Number(req.chatId);
+				this.outbox.set(chatId, (this.outbox.get(chatId) ?? []).filter((item) => item.seq !== req.seq));
 				return {};
 			},
 			disconnectBridgeAccount: (req) => {

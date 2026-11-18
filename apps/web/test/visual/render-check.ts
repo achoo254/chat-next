@@ -60,6 +60,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"settings-appearance": "?at=settings-appearance",
 	"settings-mcp": "?at=settings-mcp",
 	"settings-bridge": "?at=settings-bridge",
+	"bridge-chat": "?at=bridge-chat",
 	"settings-bridge-list": "?at=settings-bridge&open=bridge-list",
 	"settings-bridge-pick": "?at=settings-bridge&open=bridge-pick",
 	// AI Agent: the sessions of every machine, the "Cần bạn" board, an unpaired machine, the machines page;

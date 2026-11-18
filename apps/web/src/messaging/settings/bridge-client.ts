@@ -5,7 +5,9 @@ import { assertSafeId } from "@achoo254/chat-core";
 import {
 	BridgeAccountStatus as WireStatus,
 	BridgeConversationKind,
+	BridgeDirection as WireDirection,
 	BridgeLoginStepKind,
+	BridgeOutboxStatus as WireOutboxStatus,
 	BridgeService,
 	type BridgeAccount as WireAccount,
 	type BridgeLoginStep as WireStep,
@@ -15,7 +17,9 @@ import {
 	type BridgeAccount,
 	type BridgeAccountStatus,
 	type BridgeApi,
+	type BridgeDirection,
 	type BridgeErrorKind,
+	type BridgeOutboxItem,
 	type ConversationKind,
 	type LoginStep,
 } from "./bridge-api.ts";
@@ -33,6 +37,20 @@ const KINDS: Partial<Record<BridgeConversationKind, ConversationKind>> = {
 	[BridgeConversationKind.CHANNEL]: "channel",
 };
 
+const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status"]>> = {
+	[WireOutboxStatus.PENDING]: "pending",
+	[WireOutboxStatus.SENDING]: "sending",
+	[WireOutboxStatus.FAILED]: "failed",
+	[WireOutboxStatus.UNKNOWN]: "unknown",
+};
+
+const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete"];
+
+function toWireDirection(direction: BridgeDirection | undefined): WireDirection {
+	if (direction === undefined) return WireDirection.UNSPECIFIED;
+	return direction === "both" ? WireDirection.BOTH : WireDirection.IN;
+}
+
 function toAccount(a: WireAccount): BridgeAccount {
 	return {
 		id: assertSafeId(a.id),
@@ -45,6 +63,7 @@ function toAccount(a: WireAccount): BridgeAccount {
 			caughtUp: c.caughtUp,
 			historyWindow: c.historyWindow,
 			title: c.title,
+			direction: c.direction === WireDirection.BOTH ? "both" : "in",
 		})),
 	};
 }
@@ -74,6 +93,7 @@ export function bridgeError(err: unknown): BridgeError {
 	let detail = "";
 	if (e.code === Code.FailedPrecondition && message.startsWith("bridge_disabled")) kind = "disabled";
 	else if (e.code === Code.FailedPrecondition && message.startsWith("reauth_required")) kind = "reauth";
+	else if (e.code === Code.FailedPrecondition && message.startsWith("send_unsupported")) kind = "send_unsupported";
 	else if (e.code === Code.InvalidArgument && message.startsWith("wrong_input:")) {
 		kind = "wrong_input";
 		detail = message.slice("wrong_input:".length).trim().split(":")[0]?.trim() ?? "";
@@ -117,8 +137,35 @@ function createBridgeClient(transport: Transport): BridgeApi {
 				const r = await rpc.listBridgeConversations({ accountId: BigInt(accountId) });
 				return r.conversations.map((c) => ({ id: c.id, kind: KINDS[c.kind] ?? "group", title: c.title, chatId: assertSafeId(c.chatId) }));
 			}),
-		enable: (accountId, conversationId, historyWindow) =>
-			call(async () => assertSafeId((await rpc.enableBridgeChat({ accountId: BigInt(accountId), conversationId, historyWindow })).chatId)),
+		enable: (accountId, conversationId, historyWindow, direction) =>
+			call(async () =>
+				assertSafeId(
+					(await rpc.enableBridgeChat({ accountId: BigInt(accountId), conversationId, historyWindow, direction: toWireDirection(direction) })).chatId,
+				),
+			),
+		setDirection: (accountId, conversationId, direction) =>
+			call(async () => {
+				await rpc.setBridgeChatDirection({ accountId: BigInt(accountId), conversationId, direction: toWireDirection(direction) });
+			}),
+		outbox: (chatId) =>
+			call(async () => {
+				const r = await rpc.listBridgeOutbox({ chatId: BigInt(chatId) });
+				return r.items.flatMap((item): BridgeOutboxItem[] => {
+					const status = OUTBOX_STATUSES[item.status];
+					const op = OPS.find((candidate) => candidate === item.op);
+					return status === undefined || op === undefined
+						? []
+						: [{ seq: assertSafeId(item.seq), op, status, lastError: item.lastError, attempts: item.attempts }];
+				});
+			}),
+		retry: (chatId, seq) =>
+			call(async () => {
+				await rpc.retryBridgeMessage({ chatId: BigInt(chatId), seq: BigInt(seq) });
+			}),
+		dismiss: (chatId, seq) =>
+			call(async () => {
+				await rpc.dismissBridgeMessage({ chatId: BigInt(chatId), seq: BigInt(seq) });
+			}),
 		remove: (accountId, conversationId) =>
 			call(async () => {
 				await rpc.removeBridgeChat({ accountId: BigInt(accountId), conversationId });

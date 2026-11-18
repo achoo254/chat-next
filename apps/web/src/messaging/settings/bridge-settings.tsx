@@ -11,7 +11,7 @@ import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
-import { Choice } from "../ui/parts.tsx";
+import { Choice, Switch } from "../ui/parts.tsx";
 import {
 	BridgeError,
 	DEFAULT_HISTORY_WINDOW,
@@ -24,6 +24,7 @@ import {
 	type ConversationKind,
 	type LoginStep,
 } from "./bridge-api.ts";
+import { forgetBridgeStatus } from "./bridge-delivery.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
 import { savePending, takePending } from "./bridge-pending.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
@@ -136,19 +137,29 @@ export default function BridgeSettings() {
 				/>
 			)}
 			{signingIn === null && (
-				<div className="card" data-id="bridge-apps">
-					<h2 className="card-title">{t.sources.title}</h2>
+				<section className="card br-account" data-id="bridge-apps">
+					<h2 className="br-title br-title-first">{t.sources.title}</h2>
 					{apps.length === 0 && <p className="note pad-x">{t.sources.none}</p>}
 					{apps.map((source) => (
-						<div className="row pad-x" key={source}>
-							<span className="grow">{appName(source)}</span>
-							<button type="button" className="btn btn-sm" onClick={() => setSigningIn(source)}>
+						<div className="br-chat br-source" key={source}>
+							<span className="avatar av-blue" aria-hidden="true">
+								{initials(appName(source))}
+							</span>
+							<span className="grow br-text">
+								<b>{appName(source)}</b>
+							</span>
+							<button type="button" className="btn btn-sm btn-primary" onClick={() => setSigningIn(source)}>
 								{t.sources.connect}
 							</button>
 						</div>
 					))}
-					{apps.length > 0 && <p className="note pad-x">{t.sources.note}</p>}
-				</div>
+					{apps.length > 0 && (
+						<p className="br-readonly">
+							<Icon name="lock" small />
+							<small className="muted">{t.sources.note}</small>
+						</p>
+					)}
+				</section>
 			)}
 		</div>
 	);
@@ -358,15 +369,15 @@ function AccountCard({
 			{account.chats.length === 0 ? (
 				<p className="note br-pad">{t.chats.none}</p>
 			) : (
-				account.chats.map((chat) => <SyncedChat key={chat.conversationId} account={account} chat={chat} api={api} onChange={onChange} onError={onError} />)
+				account.chats.map((chat) => <SyncedChat key={chat.conversationId} account={account} chat={chat} api={api} appName={appName} onChange={onChange} onError={onError} />)
 			)}
-			{account.chats.length > 0 && (
+			{account.chats.some((c) => c.direction !== "both") && (
 				<p className="note br-readonly">
 					<Icon name="lock" small />
 					{t.chats.readOnly}
 				</p>
 			)}
-			{account.status === "active" && <ChatPicker account={account} api={api} onChange={onChange} onError={onError} />}
+			{account.status === "active" && <ChatPicker account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
 		</section>
 	);
 }
@@ -375,12 +386,14 @@ function SyncedChat({
 	account,
 	chat,
 	api,
+	appName,
 	onChange,
 	onError,
 }: {
 	account: BridgeAccount;
 	chat: BridgeChat;
 	api: BridgeApi;
+	appName: string;
 	onChange: () => void;
 	onError: (err: unknown) => BridgeError;
 }) {
@@ -388,9 +401,29 @@ function SyncedChat({
 	const { toasts } = useServices();
 	const [confirming, setConfirming] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const both = chat.direction === "both";
+	const setSendOn = (on: boolean) => {
+		setBusy(true);
+		api.setDirection(account.id, chat.conversationId, on ? "both" : "in").then(
+			() => {
+				forgetBridgeStatus();
+				setBusy(false);
+				onChange();
+			},
+			(err: unknown) => {
+				setBusy(false);
+				const error = onError(err);
+				if (error.kind === "send_unsupported") toasts.show(t.chats.sendUnsupported);
+				else if (error.kind !== "reauth") toasts.show(t.failed);
+			},
+		);
+	};
 	const remove = () => {
 		setBusy(true);
-		api.remove(account.id, chat.conversationId).then(onChange, (err: unknown) => {
+		api.remove(account.id, chat.conversationId).then(() => {
+			forgetBridgeStatus();
+			onChange();
+		}, (err: unknown) => {
 			setBusy(false);
 			if (onError(err).kind !== "reauth") toasts.show(t.failed);
 		});
@@ -423,6 +456,12 @@ function SyncedChat({
 				</span>
 			) : (
 				<span className="br-actions">
+					<span className="br-send" title={t.chats.sendOnHint(appName)}>
+						<span className="br-send-label" aria-hidden="true">
+							{t.chats.sendOn}
+						</span>
+						<Switch checked={both} label={`${t.chats.sendOn}: ${chat.title}`} disabled={busy || account.status !== "active"} onChange={setSendOn} />
+					</span>
 					<Link to={paths.chat(chat.chatId)} className="btn btn-sm">
 						{t.chats.open}
 					</Link>
@@ -439,11 +478,13 @@ function SyncedChat({
 function ChatPicker({
 	account,
 	api,
+	appName,
 	onChange,
 	onError,
 }: {
 	account: BridgeAccount;
 	api: BridgeApi;
+	appName: string;
 	onChange: () => void;
 	onError: (err: unknown) => BridgeError;
 }) {
@@ -454,6 +495,8 @@ function ChatPicker({
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [kind, setKind] = useState<ConversationKind | "all">("all");
 	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
+	// New chats send both ways by default; the person can leave it off for the batch (and switch each chat later).
+	const [sendOn, setSendOn] = useState(true);
 	const [busy, setBusy] = useState(false);
 	// How many chats wait for the sign-in to carry on by themselves.
 	const [waiting, setWaiting] = useState(0);
@@ -480,7 +523,7 @@ function ChatPicker({
 		let stopped = false;
 		for (const conversation of todo) {
 			try {
-				await api.enable(account.id, conversation.id, howMany);
+				await api.enable(account.id, conversation.id, howMany, sendOn ? "both" : "in");
 				left.delete(conversation.id);
 				started++;
 			} catch (err) {
@@ -540,6 +583,19 @@ function ChatPicker({
 	const shown = byName.filter((c) => kind === "all" || c.kind === kind);
 	const kinds = KIND_ORDER.filter((k) => byName.some((c) => c.kind === k));
 	const chosen = list.filter((c) => selected.has(c.id) && c.chatId === 0);
+	// "Select all" acts on what the filter and search show, so a filter is also the quick way to pick one kind of chat.
+	const selectable = shown.filter((c) => c.chatId === 0);
+	const pickedShown = selectable.filter((c) => selected.has(c.id)).length;
+	const allShownPicked = selectable.length > 0 && pickedShown === selectable.length;
+	const toggleShown = () =>
+		setSelected((now) => {
+			const next = new Set(now);
+			for (const c of selectable) {
+				if (allShownPicked) next.delete(c.id);
+				else next.add(c.id);
+			}
+			return next;
+		});
 	const toggle = (id: string) =>
 		setSelected((now) => {
 			const next = new Set(now);
@@ -562,6 +618,14 @@ function ChatPicker({
 					</button>
 				))}
 			</div>
+			{selectable.length > 0 && (
+				<div className="br-selectbar">
+					<button type="button" className="btn btn-sm" disabled={busy} onClick={toggleShown} data-id="bridge-select-shown">
+						{allShownPicked ? t.pick.unselectShown : t.pick.selectShown(selectable.length)}
+					</button>
+					<small className="muted">{t.pick.shownCount(pickedShown, selectable.length)}</small>
+				</div>
+			)}
 			{shown.length === 0 && <p className="note br-pad">{t.pick.empty}</p>}
 			<div className="br-list" role="list">
 				{shown.map((conversation) => {
@@ -611,6 +675,11 @@ function ChatPicker({
 						/>
 					</div>
 					<p className="note">{t.pick.windowNote}</p>
+					<label className="br-sendon">
+						<input type="checkbox" className="br-check" checked={sendOn} disabled={busy} onChange={() => setSendOn((on) => !on)} />
+						<span>{t.pick.sendOn(appName)}</span>
+					</label>
+					{sendOn && <p className="note">{t.pick.sendNote}</p>}
 					{waiting > 0 && (
 						<p className="note br-resume" role="status">
 							{t.pick.resume(waiting)}

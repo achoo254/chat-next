@@ -24,6 +24,7 @@ import { ChatAvatar, chatPhoto } from "./parts.tsx";
 import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useSurface } from "./surface.ts";
+import { BridgeDeliveryContext, bridgeAppName, useBridgeDelivery } from "./bridge-delivery.tsx";
 import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
@@ -316,6 +317,8 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 	// `query` fills it (a tapped #hashtag), `opened` tells each opening apart.
 	const [searchIn, setSearchIn] = useState<{ chatId: number; topicId: number; query: string; opened: number } | null>(null);
 	const searching = searchIn !== null && searchIn.chatId === chatId && searchIn.topicId === effectiveTopic;
+	// A chat that sends on to another app (Chat Bridge) shows where each message is on its way.
+	const delivery = useBridgeDelivery(chatId);
 	const openSearch = (query: string) => setSearchIn((open) => ({ chatId, topicId: effectiveTopic, query, opened: (open?.opened ?? 0) + 1 }));
 	useIncomingSound(chatId);
 	// Shares one loader timing with the message list (LoaderScope in chat-screen.tsx).
@@ -475,6 +478,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				</Suspense>
 			)}
 			<MiniAppChipSlot place="top" />
+			<BridgeDeliveryContext value={delivery}>
 			<ChatSearchContext value={openSearch}>
 				<MessageList
 					// One list per chat and topic: its scroll position and what it
@@ -494,6 +498,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					}
 				/>
 			</ChatSearchContext>
+			</BridgeDeliveryContext>
 			<MiniAppChipSlot place="bar" />
 			{chat.left ? (
 				<LeftBar chat={chat} />
@@ -509,6 +514,13 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					<BotStartBar botId={botId} />
 				</Suspense>
 			) : sendable ? (
+				<>
+					{delivery !== null && (
+						<p className="bridge-note" role="note">
+							<Icon name="info" small />
+							{copy.message.bridgeNote(bridgeAppName(delivery.app))}
+						</p>
+					)}
 				<ChatComposer
 					key={`${chatId}:${effectiveTopic}`}
 					chatId={chatId}
@@ -520,6 +532,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					botId={botId}
 					group={chat.type === "group"}
 				/>
+				</>
 			) : (
 				<div className="closed-bar" role="status">
 					<Icon name="lock" small />
