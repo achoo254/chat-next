@@ -39,3 +39,4 @@ Người dùng muốn thấy hội thoại Telegram của chính mình trong Cha
 - Thư viện MTProto (`gotd`) là phụ thuộc mới của `server/go.mod`, thêm ở phase adapter.
 - Xoá tài khoản Chat phải đăng xuất session Telegram và xoá secret, chat đồng bộ và puppet (nối vào ADR 0016).
 - Adapter thứ hai (Zalo) chỉ thêm gói adapter, mô tả bước đăng nhập và ánh xạ định dạng chữ; Zalo không có API chính thức cho tài khoản cá nhân nên cần phân tích riêng và xem xét điều khoản trước.
+- **Cập nhật 18/11/2026:** hướng đi theo từng tính năng chứ không chỉ theo chat, hàng đợi gửi tổng quát và các tính năng thêm sau này nằm ở [ADR 0023](./0023-chat-bridge-feature-model.md); `direction` của chat là hướng của `messages`.

@@ -15,7 +15,13 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 | `messages` | `Backfill`, `Subscribe` (sự kiện `Message`, `Edit`, `Delete`) | `bridge.Sender` (`SendMessage` idempotent theo `RandomID`, `EditMessage`, `DeleteMessages`) và `CapSend` |
 | `pins` | `bridge.PinReader.ListPinned`, sự kiện `Pin` | `bridge.Pinner.PinMessage` và `bridge.Sender` |
 | `topics` | `bridge.TopicReader.ListTopics`, sự kiện `Topic`, `Conversation.Forum`, `Message.Topic` | `bridge.Pinner.PinTopic` (hiện chỉ ghim topic) |
-| `read` | sự kiện `Read` | chưa có |
+| `read` | sự kiện `Read` (người kia đã đọc) và `Seen` (chủ đọc ở thiết bị khác) | `bridge.ReadWriter.MarkRead` |
+| `dialog` | `bridge.DialogReader`, sự kiện trạng thái hội thoại | `bridge.DialogWriter` (tắt tiếng, ghim hội thoại, đánh dấu chưa đọc) |
+| `info` | `bridge.InfoReader` | `bridge.InfoWriter` (tên, mô tả) và `bridge.TopicWriter` cho sửa topic |
+| `members` | `bridge.MemberReader` (cả quyền riêng từng người) | `bridge.MemberWriter` (xoá, admin), `bridge.MemberAdder`, `bridge.PermWriter` |
+| `invites` | `bridge.InviteManager.ListInvites` | `CreateInvite`, `RevokeInvite` |
+| `lifecycle` | không có | `bridge.GroupLifecycle` (`LeaveGroup`, `DeleteGroup`) |
+| `alerts` | không cần interface: Chat báo cho tin mới của `messages` khi tính năng này nhận | không có |
 
 `Capabilities` phải khớp: `CapSend` đúng khi `messages.Out`, `CapPins` đúng khi có ghim, `CapTopics` đúng khi `topics.In`. Bộ kiểm hợp đồng bắt chỗ lệch.
 
@@ -26,7 +32,7 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 - **Id ngoài là chuỗi mờ.** Lõi không phân tích id tin, hội thoại hay topic.
 - **Mọi thay đổi vào Chat là đặt trạng thái**, nên sự kiện vọng lại từ chính thay đổi Chat vừa gửi không tạo thay đổi thứ hai. Nếu nền tảng đẩy lại cả sự kiện do bạn gửi, bình thường; nếu không đẩy, cũng bình thường.
 - **Không in nội dung tin, tên người hay token vào log.**
-- **Tính năng R3 (thành viên, link mời) không khai báo `Out` nếu chưa làm đủ xác nhận, nhật ký và hạn mức** (xem kế hoạch phase 6).
+- **Tính năng R3 (thành viên, link mời, rời và xoá nhóm):** engine lo xác nhận, nhật ký, hạn mức và đọc lại để trả về khi bị từ chối; adapter chỉ làm việc và phân loại lỗi (`ErrNotAllowed` cho thiếu quyền, người không cho thêm, v.v.).
 
 ## Chạy bộ kiểm hợp đồng
 

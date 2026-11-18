@@ -40,6 +40,10 @@ Mỗi chat đã đồng bộ có nút **Tính năng** (Cài đặt › Kết n�
 
 Chat đã đồng bộ hiện nhãn nhỏ tên ứng dụng ở danh sách. Người gửi hiện bằng tên của họ ở Telegram; tin của chính bạn bên Telegram hiện là tin của bạn.
 
+- **Thông báo tin mới** (tắt mặc định): khi bật cho một chat, tin mới của người khác ở Telegram báo trong Chat như tin thường (đẩy thông báo và số chưa đọc), theo đúng cài đặt tắt tiếng, loại chat, xem trước và người bị chặn. Lịch sử nhập lúc đầu và tin do chính bạn gửi từ Telegram không bao giờ báo.
+- **Đã đọc hai chiều:** đọc ở Chat thì Telegram đánh dấu đã đọc; đọc ở thiết bị khác của Telegram thì vị trí đã đọc trong Chat dời theo; ở chat riêng thấy người kia đã đọc. Chủ đề diễn đàn chưa đọc theo từng chủ đề.
+- **Mặc định cho chat mới và «Lỗi đồng bộ»:** ở trang tài khoản chọn mặc định theo tính năng cho chat sẽ đồng bộ (tích «áp luôn cho tất cả chat» để đổi cả chat đã đồng bộ; tin nhắn và nhóm tác động lên người không có mặc định). «Lỗi đồng bộ» gom mọi thao tác Chat gửi sang Telegram mà không thành công, có lý do, thử lại và bỏ qua.
+
 ## Nhóm có chủ đề (forum)
 
 Nhóm Telegram bật chủ đề đồng bộ thành **nhóm dạng forum** trong Chat: mỗi topic của Telegram là một topic của Chat (topic mặc định là General), tin về đúng topic, topic mới, đổi tên, đổi màu, đóng và ghim ở Telegram phản ánh sang Chat. Ở danh sách chọn chat, nhóm như vậy có nhãn **Nhóm có chủ đề**; chat đã đồng bộ có nhãn **Có chủ đề**.
