@@ -1,0 +1,16 @@
+/* Rules that only emoji-picker.tsx uses; the stylesheet loads with it, not at startup. */
+
+/* Emoji panel: one panel for reactions (under the message) and the composer (above it). */
+.emoji-pop { display: grid; gap: var(--space-1); width: min(352px, calc(100vw - 2 * var(--space-4))); padding: var(--space-3) 0 var(--space-2); border-radius: var(--radius-md); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-lg); }
+.composer .emoji-pop { position: absolute; right: 0; bottom: calc(100% + var(--space-2)); z-index: 10; }
+.emoji-pop .search-field { margin: 0 var(--space-3); }
+.emoji-cats { display: flex; gap: 2px; padding: 0 var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
+.emoji-cats button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-bottom: 2px solid transparent; background: none; font-size: 1.125rem; color: var(--c-icon-muted); }
+.emoji-cats button[aria-selected="true"] { border-bottom-color: var(--c-primary-solid); color: var(--c-primary); }
+.emoji-scroll { position: relative; max-height: 264px; overflow-y: auto; overscroll-behavior: contain; }
+.emoji-sec { padding: var(--space-1) var(--space-3); }
+.emoji-sec h4 { margin: 0 0 var(--space-1); font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
+.emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 2px; }
+.emoji-grid button { width: 44px; height: 44px; border: 0; border-radius: var(--radius-sm); background: none; font-size: 1.375rem; line-height: 1; }
+.emoji-grid button:hover, .emoji-grid button:focus-visible { background: var(--c-hover); }
+.emoji-none { margin: 0; padding: var(--space-2) 0; font-size: 0.875rem; color: var(--c-text-muted); }

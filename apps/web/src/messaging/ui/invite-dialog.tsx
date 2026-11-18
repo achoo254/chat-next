@@ -10,6 +10,7 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { InvitePreview } from "../data/pending-backend.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, Modal, useDomId } from "./parts.tsx";
+import "../../styles/invite-dialog.css";
 
 const GONE = new Set<Code>([Code.NotFound, Code.InvalidArgument, Code.FailedPrecondition]);
 

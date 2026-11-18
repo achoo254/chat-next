@@ -7,6 +7,7 @@ import { fold } from "@achoo254/chat-core";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import "../../styles/emoji-picker.css";
 
 type Category = "smileys" | "gestures" | "objects" | "symbols";
 

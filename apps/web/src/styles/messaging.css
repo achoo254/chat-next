@@ -495,21 +495,6 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .compose-bar .cb-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }
 .compose-bar + .composer-error + .composer, .compose-bar + .composer { padding-top: var(--space-2); }
 .msg.editing .bubble { box-shadow: 0 0 0 2px var(--c-primary-solid); }
-
-/* Emoji panel: one panel for reactions (under the message) and the composer (above it). */
-.emoji-pop { display: grid; gap: var(--space-1); width: min(352px, calc(100vw - 2 * var(--space-4))); padding: var(--space-3) 0 var(--space-2); border-radius: var(--radius-md); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-lg); }
-.composer .emoji-pop { position: absolute; right: 0; bottom: calc(100% + var(--space-2)); z-index: 10; }
-.emoji-pop .search-field { margin: 0 var(--space-3); }
-.emoji-cats { display: flex; gap: 2px; padding: 0 var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
-.emoji-cats button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-bottom: 2px solid transparent; background: none; font-size: 1.125rem; color: var(--c-icon-muted); }
-.emoji-cats button[aria-selected="true"] { border-bottom-color: var(--c-primary-solid); color: var(--c-primary); }
-.emoji-scroll { position: relative; max-height: 264px; overflow-y: auto; overscroll-behavior: contain; }
-.emoji-sec { padding: var(--space-1) var(--space-3); }
-.emoji-sec h4 { margin: 0 0 var(--space-1); font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
-.emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 2px; }
-.emoji-grid button { width: 44px; height: 44px; border: 0; border-radius: var(--radius-sm); background: none; font-size: 1.375rem; line-height: 1; }
-.emoji-grid button:hover, .emoji-grid button:focus-visible { background: var(--c-hover); }
-.emoji-none { margin: 0; padding: var(--space-2) 0; font-size: 0.875rem; color: var(--c-text-muted); }
 .sub-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--c-surface); border-top: 1px solid var(--c-border-subtle); }
 .sub-bar .btn { min-width: 220px; }
 .closed-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-3); min-height: 68px; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text-muted); font-size: 0.875rem; text-align: center; }
@@ -625,11 +610,6 @@ aside.info { display: flex; flex-direction: column; min-width: 0; overflow-y: au
 .install-card .grow p { margin-top: var(--space-1); }
 .install-steps { display: grid; gap: var(--space-3); }
 .steps { display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); }
-.contacts-def { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-3); font-size: 0.875rem; }
-.contacts-def > .icon { margin-top: 2px; color: var(--c-primary); }
-.contacts-def p { flex: 1 1 260px; margin: 0; color: var(--c-text-muted); }
-.contacts-def p b { color: var(--c-text); font-weight: 600; }
-.contacts-def .btn { margin-left: auto; text-decoration: none; color: var(--c-text); }
 .empty .btn { margin-top: var(--space-2); }
 /* First run (#first-run): the lone "Cloud của tôi" row keeps its height, the team invite fills the column. */
 .chats.alone { display: flex; flex-direction: column; }
@@ -700,9 +680,6 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 /* L without body padding: a side panel (avatar, actions) and the details, split by a line. */
 .dlg-split { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: start; }
 .dlg-split > .dlg-pane + .dlg-pane { border-left: 1px solid var(--c-border-subtle); }
-/* Ways side by side when there is room, stacked on a phone. */
-.way-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
-.way-pair > .remove-way { padding: var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); }
 .dlg-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--c-border-subtle); }
 .dlg-head h2 { flex: 1; margin: 0; font-size: 1.125rem; font-weight: 600; }
 .dlg-head .step { font-size: 0.8125rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
@@ -721,10 +698,6 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 .effects { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; font-size: 0.875rem; }
 .effects li { display: flex; gap: var(--space-2); align-items: flex-start; }
 .effects .icon { width: 16px; height: 16px; margin-top: 2px; flex: none; color: var(--c-icon-muted); }
-.remove-way h3 { margin-top: 0; }
-.remove-way + .remove-way { padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
-.member-list { display: grid; margin: 0; padding: 0; list-style: none; }
-.member-menu { margin: 0 0 var(--space-1) auto; width: min(260px, 100%); }
 /* Add-members result: one entry per person with the ways round the refusal. */
 .fail-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .fail-list li + li { border-top: 1px solid var(--c-border-subtle); }
@@ -732,10 +705,6 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 .pick-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0 0 var(--space-2) calc(var(--avatar) + var(--space-3)); }
 .why { display: flex; gap: var(--space-1); align-items: flex-start; margin: 0; padding: 0 0 var(--space-2) calc(var(--avatar) + var(--space-3)); font-size: 0.8125rem; color: var(--c-text-muted); }
 .why .icon { width: 14px; height: 14px; margin-top: 3px; flex: none; color: var(--c-icon-muted); }
-/* Refusal for a banned invitee: an avatar with a ban mark. */
-.ban-av { position: relative; display: inline-grid; }
-.ban-badge { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--c-error); color: var(--c-on-tone); border: 2px solid var(--c-surface); }
-.ban-badge .icon { width: 16px; height: 16px; }
 .quote { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--c-surface-subtle); border-left: 3px solid var(--c-border-strong); font-size: 0.875rem; overflow-wrap: anywhere; }
 .quote b { display: block; font-size: 0.8125rem; }
 .quote.report-quote { border-left-color: var(--c-error); }
@@ -768,13 +737,8 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 .hero { display: grid; justify-items: center; gap: var(--space-1); padding: var(--space-5) var(--space-5) var(--space-3); text-align: center; }
 .hero h2 { margin: var(--space-2) 0 0; font-size: 1.25rem; font-weight: 600; overflow-wrap: anywhere; }
 .hero p { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; }
-.hero-actions { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-5); }
 .big-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: var(--radius-full); background: var(--c-surface-subtle); border: 1px solid var(--c-border-subtle); color: var(--c-icon-muted); }
 .big-icon .icon { width: 28px; height: 28px; }
-.av-stack { display: flex; align-items: center; margin-top: var(--space-2); }
-.av-stack .avatar { border: 2px solid var(--c-surface); }
-.av-stack .avatar + .avatar { margin-left: -8px; }
-.av-stack .more { margin-left: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }
 .modal .info-sec:last-child { border-bottom: 0; }
 .modal .profile-actions { padding: 0 var(--space-5) var(--space-4); }
 
@@ -802,8 +766,6 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 /* ---------- Settings tabs added with messaging ---------- */
 .set-main > .banner { border-radius: 0; border-bottom: 1px solid var(--c-border-subtle); padding-left: var(--space-6); padding-right: var(--space-6); }
 .lede { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.875rem; color: var(--c-text-muted); }
-.opt-row { flex-wrap: wrap; padding-left: var(--space-4); padding-right: var(--space-4); }
-.opt-row .grow { min-width: 220px; }
 .set-nav button { font: inherit; }
 
 /* ---------- Moderation ---------- */
@@ -994,24 +956,9 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .hit-sub { font-size: 0.8125rem; color: var(--c-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hit-text { font-size: 0.875rem; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .hit-text b { font-weight: 600; }
-
-/* Settings › Phím tắt and Giao diện. */
-.set-tools { display: flex; justify-content: flex-end; }
 .keys { margin: 0; }
-.key-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-height: 48px; padding: var(--space-2) var(--space-4); border-top: 1px solid var(--c-border-subtle); }
-.key-row dt { flex: 1 1 220px; min-width: 0; font-weight: 500; }
-.key-row dt small { display: block; font-weight: 400; font-size: 0.8125rem; color: var(--c-text-muted); }
-.key-row dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: 0.8125rem; color: var(--c-text-muted); }
 kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-2); border: 1px solid var(--c-border); border-bottom-width: 2px; border-radius: var(--radius-xs); background: var(--c-surface); color: var(--c-text); font-family: var(--font-mono); font-size: 0.8125rem; }
 .lede kbd { margin: 0 2px; }
-/* The shared language and theme switches (@achoo254/app-shell) side by side, as in the footers. */
-.shared-switches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
-.size-head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 500; }
-.size-row { display: flex; align-items: center; gap: var(--space-3); }
-.size-row input { flex: 1; min-width: 0; height: 44px; accent-color: var(--c-primary-solid); }
-.a-small { font-size: 0.8125rem; color: var(--c-text-muted); }
-.a-big { font-size: 1.25rem; color: var(--c-text-muted); }
-.size-preview { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--c-bg); border: 1px solid var(--c-border-subtle); }
 .resolution { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
 .resolution p { margin: 0; }
 
@@ -1124,10 +1071,6 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 .pin-row { display: grid; min-width: 0; min-height: 44px; align-content: center; padding: 0; border: 0; background: none; text-align: left; color: var(--c-text); font: inherit; }
 .pin-row:hover .pin-text { color: var(--c-primary); }
 .pin-text { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-/* Notification settings: the preview switch under each chat type (#notifications). */
-.card .row.sub-row { padding-left: calc(var(--space-4) + 40px + var(--space-3)); }
-.card .row + .row.sub-row { border-top: 0; padding-top: 0; }
 /* A profile photo covers the avatar's initials or icon once it loaded. */
 .avatar:has(> .avatar-photo) { position: relative; }
 .avatar-photo { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
@@ -1135,12 +1078,6 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 /* Choosing a photo: bots, the user's own, groups and channels (console.html#bot-photo, chat.html#edit-chat). */
 .photo-actions { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; min-width: 0; }
 .photo-actions > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.crop-stage { position: relative; width: min(320px, 100%); aspect-ratio: 1; margin-inline: auto; border-radius: var(--radius-md); overflow: hidden; background: var(--c-surface-subtle); touch-action: none; cursor: grab; }
-.crop-stage:focus-visible { outline: 2px solid var(--c-focus, var(--c-primary)); outline-offset: 2px; }
-.crop-stage img { position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; pointer-events: none; }
-.crop-stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.55); outline: 2px solid rgb(255 255 255 / 0.9); pointer-events: none; }
-.crop-zoom { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
-.crop-zoom input { flex: 1; min-width: 0; }
 .name-row { display: flex; align-items: center; gap: var(--space-4); }
 .name-row > .field { flex: 1; min-width: 0; }
 .photo-pick { position: relative; display: grid; place-items: center; width: 72px; height: 72px; flex: none; padding: 0; border-radius: var(--radius-full); border: 1.5px dashed var(--c-border-strong); background: var(--c-surface-subtle); color: var(--c-icon-muted); cursor: pointer; }

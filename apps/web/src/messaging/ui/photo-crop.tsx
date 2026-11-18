@@ -7,6 +7,7 @@ import { useCopy } from "../copy/use-copy.ts";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "./parts.tsx";
+import "../../styles/photo-crop.css";
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;

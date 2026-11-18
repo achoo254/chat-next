@@ -1,0 +1,10 @@
+/* Rules that only invite-dialog.tsx uses; the stylesheet loads with it, not at startup. */
+/* Refusal for a banned invitee: an avatar with a ban mark. */
+.ban-av { position: relative; display: inline-grid; }
+.ban-badge { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--c-error); color: var(--c-on-tone); border: 2px solid var(--c-surface); }
+.ban-badge .icon { width: 16px; height: 16px; }
+.hero-actions { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-5); }
+.av-stack { display: flex; align-items: center; margin-top: var(--space-2); }
+.av-stack .avatar { border: 2px solid var(--c-surface); }
+.av-stack .avatar + .avatar { margin-left: -8px; }
+.av-stack .more { margin-left: var(--space-2); font-size: 0.8125rem; color: var(--c-text-muted); }

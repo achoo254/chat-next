@@ -29,6 +29,7 @@ import { McpSettings } from "./mcp-settings.tsx";
 import ProfilePhotoField from "./profile-photo.tsx";
 import type { SelfUser } from "../../api/adapters.ts";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
+import "../../styles/settings-extra.css";
 
 /** Advisor's settings load with the machines' link code (each machine's key), only when opened. */
 const AdvisorSettings = lazy(() => import("../../screens/settings/advisor-settings.tsx"));

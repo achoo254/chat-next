@@ -1,0 +1,8 @@
+/* Rules that only member-dialogs.tsx uses; the stylesheet loads with it, not at startup. */
+/* Ways side by side when there is room, stacked on a phone. */
+.way-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.way-pair > .remove-way { padding: var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); }
+.remove-way h3 { margin-top: 0; }
+.remove-way + .remove-way { padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.member-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.member-menu { margin: 0 0 var(--space-1) auto; width: min(260px, 100%); }

@@ -17,6 +17,7 @@ import { PopupMenu } from "./popup-menu.tsx";
 import { presenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
 import { usePrivateChatFailure } from "./private-chat-failure.ts";
+import "../../styles/member-dialogs.css";
 
 interface CloseProps {
 	onClose: () => void;
