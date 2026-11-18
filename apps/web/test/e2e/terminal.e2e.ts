@@ -144,9 +144,9 @@ test("a session in its terminal: the switch, the pill in the header, a close but
 	await page.getByRole("button", { name: "Đóng ô" }).click();
 	await until(page, "the pane closed", () => document.querySelectorAll(".tx-ended").length === 0);
 
-	// No Terminal entry in the column; the one toggle is there.
+	// No Terminal entry in the column; its refresh button is there.
 	assert.equal(await page.locator(".mx-list a", { hasText: /^Terminal$/ }).count(), 0);
-	assert.equal(await page.locator("[data-id=sidebar-attention]").count(), 1);
+	assert.equal(await page.locator("[data-id=sidebar-refresh]").count(), 1);
 	assert.deepEqual(errors, []);
 	await context.close();
 });

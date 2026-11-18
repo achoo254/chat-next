@@ -139,7 +139,7 @@ export const zhCNMachines: MachinesCopy = {
 		sessionHint: "这台电脑还没有完全磁盘访问权限：此文件夹中的会话可能被 macOS 拦截。请换一个文件夹，或先开启权限（见设备设置）。",
 	},
 	sessions: {
-		attentionOnly: "只显示需要你 / 运行中",
+		refresh: "刷新列表",
 		showArchived: (n: number) => `已归档（${n}）`,
 		hideArchived: "隐藏已归档会话",
 		label: (machine) => `${machine} 上的会话`,
@@ -754,7 +754,6 @@ export const zhCNMachines: MachinesCopy = {
 		screenLabel: (title: string) => (title === "" ? "终端" : `终端：${title}`),
 		typeHere: "在终端中输入",
 		mode: { label: "打开会话方式", chat: "聊天", terminal: "终端", office: "办公室" },
-		openInTerminal: "在终端中打开",
 		scrollLatest: "回到最新一行",
 		syncing: "正在同步会话…可以直接输入",
 		history: {
@@ -1119,7 +1118,6 @@ export const zhCNMachines: MachinesCopy = {
 			unlinked: "已取消关联 Git 仓库。",
 			split: "拆分为独立项目",
 			primary: "main",
-			showAttention: (n: number) => `只显示需要你或运行中的 ${n} 项`,
 			remoteExists: "已有项目关联此仓库。",
 			tooMany: "已达到项目或工作区的数量上限。",
 			saveFailed: "无法保存，请稍后再试。",

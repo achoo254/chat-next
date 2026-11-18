@@ -139,7 +139,7 @@ export const enMachines: MachinesCopy = {
 		sessionHint: "The machine has no Full Disk Access yet: macOS may block a session in this folder. Pick another folder, or grant it first (see Machine settings).",
 	},
 	sessions: {
-		attentionOnly: "Only needs you / running",
+		refresh: "Refresh the list",
 		showArchived: (n: number) => `Archived (${n})`,
 		hideArchived: "Hide archived sessions",
 		label: (machine) => `Sessions on ${machine}`,
@@ -761,7 +761,6 @@ export const enMachines: MachinesCopy = {
 		screenLabel: (title: string) => (title === "" ? "Terminal" : `Terminal: ${title}`),
 		typeHere: "Type into the terminal",
 		mode: { label: "Open the session in", chat: "Conversation", terminal: "Terminal", office: "Office" },
-		openInTerminal: "Open in terminal",
 		scrollLatest: "Back to the newest line",
 		syncing: "Syncing the session… you can type",
 		history: {
@@ -1127,7 +1126,6 @@ export const enMachines: MachinesCopy = {
 			unlinked: "The git repository is unlinked.",
 			split: "Move to a project of its own",
 			primary: "main",
-			showAttention: (n: number) => `Show only the ${n} that need you or run`,
 			remoteExists: "A project already links this repository.",
 			tooMany: "The limit of projects or workspaces is reached.",
 			saveFailed: "Could not save; try again later.",

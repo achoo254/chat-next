@@ -3,8 +3,8 @@
 // to a git repository) > Workspace (a folder on one machine, with its own
 // state) > sessions (project-tree.ts, project-tree-view.tsx). On top:
 // "Quản lý máy" (machines, their state, pairing, overview, settings and
-// plain shells; a dot when one needs the user), then one row with the switch
-// that keeps only what needs the user or runs and "+" for "Thêm dự án".
+// plain shells; a dot when one needs the user), then one row with "Làm mới
+// danh sách" and "+" for "Thêm dự án".
 // Folders whose sessions no workspace holds wait, folded, in "Chưa phân
 // loại" at the bottom; archived sessions show only behind their own link.
 // While it shows, the sync tidies the workspaces the user added (never adds
@@ -18,7 +18,7 @@ import { FirstMachine } from "./first-machine.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { isBlocked, type Conn } from "./machine-status.ts";
 import { useProjectSync, type SyncHost } from "./project-actions.ts";
-import { buildTree, locate, matches, type Filter } from "./project-tree.ts";
+import { buildTree, locate, type Filter } from "./project-tree.ts";
 import { movedTo, useProjectDrag } from "./project-drag.ts";
 import { LooseGroup, ProjectItem, type ProjectPlace, type TreeContext } from "./project-tree-view.tsx";
 import { projectsSupported } from "./projects-view.ts";
@@ -56,7 +56,8 @@ function writeSession(key: string, value: unknown): void {
 /** Links asked for their projects and not answered yet. */
 const asked = new WeakSet<MachineView["link"]>();
 
-const asFilter = (raw: unknown): Filter => (raw === "attention" || raw === "archived" ? raw : "all");
+// Only the archived view is kept between pages ("attention" from an older build reads as all).
+const asFilter = (raw: unknown): Filter => (raw === "archived" ? raw : "all");
 
 /** The dot beside a machine: on, waiting, off, or a problem to fix. */
 export function connDot(conn: Conn): "on" | "wait" | "off" | "warn" {
@@ -186,7 +187,6 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 
 	const threads = machines.flatMap((m) => m.state.threads);
 	const archived = threads.filter((x) => x.archived).length;
-	const attention = threads.filter((x) => matches("attention", x)).length;
 	const tree = buildTree(snapshot.projects, machines, filter, seen);
 	// The open session's project stays open.
 	const currentMachine = current === null ? undefined : machines.find((m) => m.entry.ref === current.machine);
@@ -248,23 +248,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				</Link>
 			</header>
 			<div className="mx-nav-top">
-				<button
-					type="button"
-					role="switch"
-					className="mx-attn"
-					aria-checked={filter === "attention"}
-					onClick={() => setFilter(filter === "attention" ? "all" : "attention")}
-					data-id="sidebar-attention"
-				>
-					<span className="track" aria-hidden="true" />
-					<span className="grow">{t.sessions.attentionOnly}</span>
-				</button>
-				{attention > 0 && (
-					// The count turns the filter on (never off): it names what it shows.
-					<button type="button" className="badge mx-attn-count" aria-label={t.agent.projects.showAttention(attention)} title={t.agent.projects.showAttention(attention)} onClick={() => setFilter("attention")}>
-						{attention}
-					</button>
-				)}
+				<RefreshList machines={machines} refreshProjects={() => store.refresh()} />
 				<AddProject machines={machines} compact />
 			</div>
 			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
@@ -293,6 +277,32 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				)}
 			</div>
 		</section>
+	);
+}
+
+/**
+ * "Làm mới danh sách": lists the machines, the projects and each reachable
+ * machine's sessions and folders again, for a column that looks stale
+ * without reloading the app.
+ */
+function RefreshList({ machines, refreshProjects }: { machines: readonly MachineView[]; refreshProjects: () => Promise<void> }) {
+	const t = useMachinesCopy();
+	const hub = useHub();
+	const [busy, setBusy] = useState(false);
+	const refresh = () => {
+		setBusy(true);
+		const online = machines.filter((m) => m.conn.kind === "on");
+		Promise.allSettled([
+			hub.refresh(),
+			refreshProjects(),
+			...online.map((m) => m.link.request({ case: "threadList", value: { advisor: true } })),
+			...online.filter((m) => projectsSupported(m.state.info?.agentVersion)).map((m) => m.link.request({ case: "projectList", value: {} })),
+		]).finally(() => setBusy(false));
+	};
+	return (
+		<button type="button" className="icon-btn" data-id="sidebar-refresh" aria-label={t.sessions.refresh} title={t.sessions.refresh} disabled={busy} onClick={refresh}>
+			{busy ? <span className="spin" aria-hidden="true" /> : <Icon name="refresh" small />}
+		</button>
 	);
 }
 

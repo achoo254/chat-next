@@ -6,8 +6,8 @@
 // two machines; sessions in no workspace wait, folded, in "Chưa phân loại",
 // each folder offering "Tạo dự án" and "Thêm vào dự án…" (another
 // repository's project refused); "Thêm dự án" takes a name and an optional
-// repository; an empty project offers "Thêm workspace"; one switch for what
-// needs the user or runs, with "+" on the same row.
+// repository; an empty project offers "Thêm workspace"; "Làm mới danh sách"
+// lists again, with "+" on the same row.
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { create } from "@bufbuild/protobuf";
 import { ProjectSchema, TerminalAvailability, type Frame, type Project } from "@achoo254/chat-proto/remote/remote";
@@ -170,10 +170,11 @@ describe("the project column", () => {
 		// The session outside every workspace waits, folded, in "Chưa phân loại".
 		expect(within(list).getByRole("button", { name: "Chưa phân loại (1)" }).getAttribute("aria-expanded")).toBe("false");
 		expect(within(list).queryByText("t3")).toBeNull();
-		// The top row: the switch, then "+" for a project.
+		// The top row: "Làm mới danh sách", then "+" for a project; no filter switch.
 		const row = list.querySelector<HTMLElement>(".mx-nav-top");
 		if (row === null) throw new Error("no top row");
-		expect(within(row).getByRole("switch", { name: /Chỉ hiện cần bạn \/ đang chạy/ })).toBeTruthy();
+		expect(within(row).getByRole("button", { name: "Làm mới danh sách" })).toBeTruthy();
+		expect(within(row).queryByRole("switch")).toBeNull();
 		expect(within(row).getByRole("button", { name: "Thêm dự án" })).toBeTruthy();
 		expect(within(list).getByRole("link", { name: /Quản lý máy/ })).toBeTruthy();
 	});
@@ -275,25 +276,13 @@ describe("the project column", () => {
 		expect(await screen.findByRole("dialog", { name: "Thêm workspace vào Kế hoạch" })).toBeTruthy();
 	});
 
-	it("the switch keeps only what needs the user or runs", async () => {
+	it("the refresh button lists the machine's sessions again", async () => {
 		const { list } = column([{ name: "Mac mini", online: true }]);
-		await within(list).findByText("t2", undefined, WAIT);
-		const toggle = within(list).getByRole("switch", { name: /Chỉ hiện cần bạn \/ đang chạy/ });
-		await userEvent.click(toggle);
-		expect(toggle.getAttribute("aria-checked")).toBe("true");
-		await waitFor(() => expect(within(list).queryByText("t2")).toBeNull());
-		expect(within(list).getByText("t1")).toBeTruthy();
-		expect(within(list).queryByText("docs")).toBeNull();
-	});
-
-	it("the count on the switch turns the filter on; it never turns it off", async () => {
-		const { list } = column([{ name: "Mac mini", online: true }]);
-		await within(list).findByText("t2", undefined, WAIT);
-		const count = within(list).getByRole("button", { name: "Chỉ hiện 1 mục cần bạn hoặc đang chạy" });
-		await userEvent.click(count);
-		expect(within(list).getByRole("switch").getAttribute("aria-checked")).toBe("true");
-		await userEvent.click(within(list).getByRole("button", { name: "Chỉ hiện 1 mục cần bạn hoặc đang chạy" }));
-		expect(within(list).getByRole("switch").getAttribute("aria-checked")).toBe("true");
+		await within(list).findByText("t1", undefined, WAIT);
+		threads = [...threads, thread("t4", "/w/app", 3)];
+		expect(within(list).queryByText("t4")).toBeNull();
+		await userEvent.click(within(list).getByRole("button", { name: "Làm mới danh sách" }));
+		expect(await within(list).findByText("t4", undefined, WAIT)).toBeTruthy();
 	});
 
 	it("the keyboard: one row in the tab order, arrows move, Left and Right fold and open a project, Enter opens", async () => {
@@ -450,16 +439,5 @@ describe("the projects' order", () => {
 		if (moved == null) throw new Error("no row");
 		await userEvent.click(moved);
 		expect(moved.getAttribute("aria-expanded")).not.toBe(before);
-	});
-
-	it("only with every project shown: the switch for what needs the user turns ordering off", async () => {
-		const { list, server } = column([{ name: "Mac mini", online: true }]);
-		await waitFor(() => expect(server.projects).toHaveLength(2), WAIT);
-		await within(list).findByText("t1", undefined, WAIT);
-		await userEvent.click(within(list).getByRole("switch", { name: /Chỉ hiện cần bạn/ }));
-		const [only] = names(list);
-		await userEvent.click(within(list).getByRole("button", { name: `Tuỳ chọn cho dự án ${only ?? ""}` }));
-		expect(within(list).queryByRole("menuitem", { name: "Lên trên" })).toBeNull();
-		expect(within(list).queryByRole("menuitem", { name: "Xuống dưới" })).toBeNull();
 	});
 });

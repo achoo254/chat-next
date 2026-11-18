@@ -143,7 +143,7 @@ export const viMachines = {
 		sessionHint: "Máy chưa có Full Disk Access: phiên trong thư mục này có thể bị macOS chặn. Chọn thư mục khác, hoặc cấp quyền trước (xem Cài đặt máy).",
 	},
 	sessions: {
-		attentionOnly: "Chỉ hiện cần bạn / đang chạy",
+		refresh: "Làm mới danh sách",
 		showArchived: (n: number) => `Đã lưu trữ (${n})`,
 		hideArchived: "Ẩn phiên đã lưu trữ",
 		label: (machine: string) => `Phiên trên ${machine}`,
@@ -773,7 +773,6 @@ export const viMachines = {
 		screenLabel: (title: string) => (title === "" ? "Terminal" : `Terminal: ${title}`),
 		typeHere: "Gõ vào terminal",
 		mode: { label: "Mở phiên bằng", chat: "Trò chuyện", terminal: "Terminal", office: "Văn phòng" },
-		openInTerminal: "Mở bằng terminal",
 		scrollLatest: "Về dòng mới nhất",
 		syncing: "Đang đồng bộ phiên… gõ được ngay",
 		/** The history above the live terminal, loaded as the user scrolls up. */
@@ -1143,7 +1142,6 @@ export const viMachines = {
 			unlinked: "Đã bỏ liên kết kho git.",
 			split: "Tách thành dự án riêng",
 			primary: "main",
-			showAttention: (n: number) => `Chỉ hiện ${n} mục cần bạn hoặc đang chạy`,
 			remoteExists: "Đã có dự án liên kết repo này.",
 			tooMany: "Đã tới giới hạn số dự án hoặc workspace.",
 			saveFailed: "Không lưu được, thử lại sau.",

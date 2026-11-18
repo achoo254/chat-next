@@ -1,8 +1,8 @@
 // One session in the AI Agent column: a dot when it needs the user (amber),
 // runs (accent) or finished since the user last opened it, its name and a
 // second line ("state · time"). Its menu (hover, or a long press on a phone)
-// opens it in the terminal, archives or deletes it on machines that can
-// (tunelo 2.0.6+). Disabled while its machine cannot be reached.
+// archives or deletes it on machines that can (tunelo 2.0.6+); chat and
+// terminal are equal ways in, picked inside the session, not from the row. Disabled while its machine cannot be reached.
 import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import type { MachineInfo, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
@@ -15,7 +15,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { ModeIcon, officeOffered, openSessionIn, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { ModeIcon, officeOffered, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { endOnPurpose, forgetEnded } from "../terminal/ended-sessions.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
@@ -165,19 +165,6 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 			</button>
 			{open && (
 				<div className="mx-menu" role="menu" aria-label={t.agent.thread.rowMenu(thread.title)}>
-					{inTerminal && (
-						<button
-							type="button"
-							role="menuitem"
-							onClick={() => {
-								setOpen(false);
-								openSessionIn(ref_, thread.id, "terminal");
-							}}
-						>
-							<MachineIcon name="terminal" small />
-							<span>{t.terminal.openInTerminal}</span>
-						</button>
-					)}
 					{thread.terminalSession > 0 && machine.conn.kind === "on" && (
 						// Its AI runs in the machine's terminal and keeps its memory until stopped: stopped from the row too.
 						<button
