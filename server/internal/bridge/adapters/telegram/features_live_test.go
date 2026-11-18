@@ -287,20 +287,20 @@ func TestLiveTelegramFeatures(t *testing.T) {
 
 	// ---- structure, only on a group made for the test, found by its title
 	if title := os.Getenv("BRIDGE_LIVE_FEATURES_TITLE"); title != "" {
-		var cv *struct{ id, kind string }
+		var groupConv, groupKind string
 		for _, x := range convs {
 			if x.Title == title {
-				cv = &struct{ id, kind string }{x.ID, string(x.Kind)}
+				groupConv, groupKind = x.ID, string(x.Kind)
 			}
 		}
-		if cv == nil {
+		if groupConv == "" {
 			t.Fatalf("no conversation has the title given in BRIDGE_LIVE_FEATURES_TITLE")
 		}
-		peer, err := c.inputPeer(ctx, cv.id)
+		peer, err := c.inputPeer(ctx, groupConv)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("--- test group %s kind=%s peer=%T", cv.id, cv.kind, peer)
+		t.Logf("--- test group %s kind=%s peer=%T", groupConv, groupKind, peer)
 		var chatID int64
 		var in *tg.InputChannel
 		switch v := peer.(type) {
@@ -372,8 +372,8 @@ func TestLiveTelegramFeatures(t *testing.T) {
 				}
 			}
 			// forum topics, if the group has them
-			if cv.kind != "" {
-				topics, terr := a.ListTopics(ctx, acct, cv.id)
+			if groupKind != "" {
+				topics, terr := a.ListTopics(ctx, acct, groupConv)
 				if terr == nil {
 					t.Logf("   topics: %d", len(topics))
 					rid := time.Now().UnixNano()
