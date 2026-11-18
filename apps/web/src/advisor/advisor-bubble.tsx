@@ -1,11 +1,11 @@
 // Advisor's bubble, loaded with the link code the first time it opens: the
-// question box (with the chip offering what was just copied, the machine
+// question box (with what was just copied already attached, the machine
 // and the AI when there is a choice), then the answer of the question this
 // tab asked: Advisor's pick with its probability, "Xem tất cả" (every option
 // and exactly what was sent to be weighed), "Gửi sang phiên" (fills a session's
 // composer; the user sends it), "Hỏi tiếp", the Advisor session, and Stop
-// while it thinks. Its menu turns the shown session's automatic Advisor on
-// or off. On a phone it is a bottom sheet (docs modal-popup-design.md).
+// while it thinks. Its menu leads to the settings, where automatic Advisor is
+// switched for every session. On a phone it is a bottom sheet (docs modal-popup-design.md).
 // Nothing copied inside it is kept for Advisor.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import type { AdvisorTone } from "@achoo254/chat-core";
@@ -15,11 +15,11 @@ import { navigate, paths } from "../router.tsx";
 import { errorText, folderName, providerOf, useNow } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { PercentBar } from "../machines/percent-bar.tsx";
-import { Switch } from "../messaging/ui/parts.tsx";
 import { IGNORE_ATTR } from "./advisor-context.tsx";
 import { advisorStore, offerOf, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type Question } from "./advisor-store.ts";
 import { pictureOf, type Look } from "./looks.ts";
-import type { AdvisorCopy } from "./copy-vi.ts";
+import { useI18n, type Locale } from "../i18n/i18n.tsx";
+import { surfaceLabel } from "./advisor-surfaces.ts";
 import { useAdvisorCopy } from "./use-advisor-copy.ts";
 import { isCommand, rankedOptions, useAdvisorPresence, type Answer, type Presence } from "./use-advisor-presence.ts";
 import { hasFinePointer } from "../components/fine-pointer.ts";
@@ -71,8 +71,8 @@ export interface AdvisorLiveProps {
 }
 
 /** Where a copy was made, for its chip: "Quản lý mã nguồn · chat-next · main"; a chat message says only that. */
-export function whereOf(t: AdvisorCopy, context: CopyContext): string {
-	const place = t.ask.where[context.panel] ?? t.ask.where[context.screen] ?? t.ask.where.other ?? "";
+export function whereOf(locale: Locale, context: CopyContext): string {
+	const place = surfaceLabel(context.panel, context.screen, locale) || surfaceLabel("", "other", locale);
 	if (context.screen === "chat") return place;
 	return [place, context.dir === "" ? "" : folderName(context.dir), context.branch].filter((part) => part !== "").join(" · ");
 }
@@ -128,7 +128,7 @@ function Bubble({ name, look, tone, store, presence, attached, setAttached, offe
 			<header className="adv-head">
 				<img src={pictureOf(look, state.mood)} alt="" className="adv-head-pic" />
 				<b className="grow">{name}</b>
-				<Menu presence={presence} store={store} />
+				<Menu store={store} />
 				<button type="button" className="icon-btn" aria-label={t.mascot.close} onClick={close}>
 					<Icon name="x" small />
 				</button>
@@ -212,6 +212,7 @@ interface AskFormProps {
 
 function AskForm({ presence, tone, store, attached, setAttached, offer, elsewhere, initial, onAsked }: AskFormProps) {
 	const t = useAdvisorCopy();
+	const { locale } = useI18n();
 	const tm = useMachinesCopy();
 	const { copies } = useAdvisorState(store);
 	const [text, setText] = useState(initial);
@@ -226,6 +227,13 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 		if (hasFinePointer()) field.current?.focus();
 	}, []);
 	const offered = offer !== null && !attached.some((c) => c.id === offer.id) ? offer : null;
+	// A copy just made goes in with the question: the user types the question and sends (no chip to press first).
+	// It is attached once (markUsed): removing it with ✕ leaves it in the recent copies, it does not come back.
+	useEffect(() => {
+		if (offered === null) return;
+		setAttached([offered, ...attached].slice(0, 5));
+		store.markUsed([offered.id]);
+	}, [offered, attached, setAttached, store]);
 	const canAsk = presence.note === "" && presence.ai !== "" && text.trim() !== "" && !busy;
 	const submit = async (sensitive: boolean) => {
 		if (presence.note !== "" || text.trim() === "") return;
@@ -259,7 +267,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 				{attached.map((copy) => (
 					<div key={copy.id} className="adv-attached">
 						<span className="grow">
-							<small className="muted">{whereOf(t, copy.context)}</small>
+							<small className="muted">{whereOf(locale, copy.context)}</small>
 							<span className="adv-clip mono">{copy.text}</span>
 						</span>
 						<button type="button" className="icon-btn" aria-label={t.ask.remove} onClick={() => setAttached(attached.filter((c) => c.id !== copy.id))}>
@@ -268,19 +276,6 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 					</div>
 				))}
 				{attached.length > 0 && <p className="adv-note muted">{t.ask.attachedHint}</p>}
-				{offered !== null && (
-					<div className="adv-chip-row">
-						<button type="button" className="adv-chip" onClick={() => attach(offered)}>
-							<Icon name="clip" small />
-							<span>
-								{t.ask.attach} ({whereOf(t, offered.context)})
-							</span>
-						</button>
-						<button type="button" className="icon-btn" aria-label={t.ask.dismiss} onClick={() => store.markUsed([offered.id])}>
-							<Icon name="x" small />
-						</button>
-					</div>
-				)}
 				{choices.length > 0 && (
 					<details className="adv-recent" open={showRecent} onToggle={(event) => setShowRecent(event.currentTarget.open)}>
 						<summary>{t.ask.recent(choices.length)}</summary>
@@ -290,7 +285,7 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 								<li key={copy.id}>
 									<button type="button" className="adv-recent-item" onClick={() => attach(copy)}>
 										<small className="muted">
-											{whereOf(t, copy.context)} · {t.ask.ago(Math.max(0, Math.floor((now - copy.at) / 60_000)))}
+											{whereOf(locale, copy.context)} · {t.ask.ago(Math.max(0, Math.floor((now - copy.at) / 60_000)))}
 										</small>
 										<span className="adv-clip mono">{copy.text}</span>
 									</button>
@@ -403,6 +398,7 @@ interface AnswerViewProps {
 
 function AnswerView({ question, answer, presence, store, lost, onAgain }: AnswerViewProps) {
 	const t = useAdvisorCopy();
+	const { locale } = useI18n();
 	const tm = useMachinesCopy();
 	const [all, setAll] = useState(false);
 	const [picking, setPicking] = useState(false);
@@ -435,7 +431,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 				</p>
 				{question.attached.map((copy) => (
 					<p key={copy.id} className="adv-attached-line muted">
-						<Icon name="clip" small /> {whereOf(t, copy.context)}
+						<Icon name="clip" small /> {whereOf(locale, copy.context)}
 					</p>
 				))}
 				{question.error !== "" && <p className="adv-note mx-error">{t.ask.failed}</p>}
@@ -563,33 +559,11 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 	);
 }
 
-/** The mascot's menu: the shown session's automatic Advisor, hiding the mascot. */
-function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) {
+/** The mascot's menu: Advisor's settings (where automatic Advisor is switched for every session) and hiding the mascot. */
+function Menu({ store }: { store: AdvisorStore }) {
 	const t = useAdvisorCopy();
-	const tm = useMachinesCopy();
-	const { session } = useAdvisorState(store);
 	// Closes on a click outside it (or Esc, below).
 	const { open, setOpen, ref } = usePopover();
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState("");
-	const link = session === null ? null : presence.hub.link(session.machine);
-	const linkState = session === null ? null : presence.stateOf(session.machine);
-	const thread = session === null ? undefined : linkState?.threads.find((x) => x.id === session.threadId && x.kind !== ThreadKind.ADVISOR);
-	const caps = providerOf(linkState?.info ?? null, thread?.provider ?? "")?.capabilities;
-	// A session held by a terminal runs the AI's own CLI: automatic Advisor works there only when the machine gives that CLI
-	// tunelo's MCP and Advisor's note (terminal_advisor); an older machine or another AI does not.
-	const inTerminal = thread !== undefined && thread.terminalSession !== 0 && caps?.terminalAdvisor !== true;
-	const available = linkState?.status.kind === "open" && caps?.sessionMcp === true && linkState.info?.advisor?.available === true && !inTerminal;
-	const on = session === null ? false : (linkState?.threadInfo.get(session.threadId)?.advisor ?? false);
-	const toggle = (next: boolean) => {
-		if (link === null || session === null) return;
-		setBusy(true);
-		setError("");
-		link
-			.request({ case: "threadSetAdvisor", value: { threadId: session.threadId, on: next } })
-			.catch((err: unknown) => setError(errorText(tm, err, providerOf(linkState?.info ?? null, thread?.provider ?? "")?.name ?? "AI")))
-			.finally(() => setBusy(false));
-	};
 	const button = useRef<HTMLButtonElement>(null);
 	const readButton = useCallback((): Box | null => {
 		const r = button.current?.getBoundingClientRect();
@@ -616,16 +590,6 @@ function Menu({ presence, store }: { presence: Presence; store: AdvisorStore }) 
 			</button>
 			{open && (
 				<div className="adv-menu" role="group" aria-label={t.menu.label} style={place}>
-					{thread !== undefined && (
-						<div className="adv-menu-row">
-							<span className="grow">
-								<span>{t.menu.auto}</span>
-								<small className="muted">{inTerminal ? t.menu.autoTerminal : available ? t.menu.autoHint : t.menu.autoUnavailable}</small>
-							</span>
-							<Switch checked={on} label={t.menu.auto} disabled={!available || busy} onChange={toggle} />
-						</div>
-					)}
-					{error !== "" && <p className="adv-note mx-error">{error}</p>}
 					<button type="button" className="adv-menu-item" onClick={() => openSettings(store)}>
 						{t.ask.settings}
 					</button>

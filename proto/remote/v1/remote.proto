@@ -325,6 +325,8 @@ message Frame {
     ThreadSetAdvisor thread_set_advisor = 174;
     AdvisorSetKey advisor_set_key = 175;
     AdvisorRemoveKey advisor_remove_key = 176;
+    // A → B: the machine-wide automatic Advisor switch (see AdvisorSetAuto).
+    AdvisorSetAuto advisor_set_auto = 178;
 
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
@@ -452,6 +454,13 @@ message AdvisorContext {
   // Error.failure_id of the failure the copy shows: B adds git's whole
   // output of it, cleaned, when it still keeps it (10 minutes).
   string failure_id = 8;
+  // What a screen that is not a session or a folder says about where the copy
+  // was made (the surface that owns it names the keys): at most 8 entries,
+  // each key 1 to 32 characters (a lowercase letter, then lowercase letters,
+  // digits or "_"), each value on one line of at most 200 characters. B treats
+  // them as untrusted text, like the copy itself, and refuses a question with
+  // more or longer ones. Never an id, a name or a secret of the screen.
+  map<string, string> fields = 9;
 }
 
 message ThreadSubscribe {
@@ -2335,6 +2344,21 @@ message AdvisorStatus {
   string set_by_device = 4;
   // Unix milliseconds when the key was set; 0 without a key.
   int64 set_at = 5;
+  // Automatic Advisor is on for every session of the machine (AdvisorSetAuto).
+  bool auto = 6;
+}
+
+// A → B: turns automatic Advisor on or off for every session of the machine
+// (the AI asks Advisor when it is unsure and before it ends each turn), the
+// open ones, the new ones and the ones a terminal runs. Kept by the machine
+// across restarts. Replaces the per-session ThreadSetAdvisor, which a machine
+// still accepts from an older device: it only turns the one session on or off
+// as before. Answered with Ack; every connected device then gets MachineInfo.
+// Turning it on is refused with ERROR_REASON_ADVISOR_UNAVAILABLE when
+// AdvisorStatus.available is false; a session whose AI takes no session MCP
+// is left out (ThreadInfo.advisor stays false).
+message AdvisorSetAuto {
+  bool on = 1;
 }
 
 // A → B: keep this TypeSafe key for Advisor, replacing the one kept. Answered

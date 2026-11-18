@@ -16,6 +16,7 @@ import { LinkHub, LOCAL_REF, localMachine, type DirectoryState } from "./link/li
 import { isAdvisorThread, type LinkState, type MachineLink } from "./link/machine-link.ts";
 import { machineErrorText } from "./machine-errors.ts";
 import { browserSocket } from "./link/socket.ts";
+import { useAdvisorAutoSync } from "../advisor/use-advisor-auto-sync.ts";
 import { connOf, shouldConnect, type Conn } from "./machine-status.ts";
 import { createMachinesDirectory, type MachineEntry } from "./machines-client.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -158,11 +159,14 @@ export function useMachineViews(hub: LinkHub, now: number): MachineView[] {
 			if (shouldConnect(entry, now)) hub.link(entry.ref).start();
 		}
 	});
-	return entries.map((entry, i) => {
+	const views = entries.map((entry, i) => {
 		const link = links[i] ?? hub.link(entry.ref);
 		const state = states[i] ?? link.snapshot();
 		return { entry, link, state, conn: connOf(entry, state, now) };
 	});
+	// A machine linked here takes the account's automatic Advisor switch.
+	useAdvisorAutoSync(views);
+	return views;
 }
 
 /** Watches a thread while the component shows it. */

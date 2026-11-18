@@ -400,6 +400,7 @@ export function toAdvisorProfile(profile: WireAdvisorProfile): AdvisorProfile {
 		lookId: profile.lookId || "owl",
 		// A tone this client does not know words answers the default way.
 		tone: ADVISOR_TONES[profile.tone] ?? "short",
+		autoSession: profile.autoSession,
 	};
 }
 

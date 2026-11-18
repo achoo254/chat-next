@@ -84,8 +84,13 @@ type AdvisorProfile struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// One of the looks the client offers ("owl", "robot", "suit", "cat"); a
 	// client that does not know it shows its first look.
-	LookId        string      `protobuf:"bytes,2,opt,name=look_id,json=lookId,proto3" json:"look_id,omitempty"`
-	Tone          AdvisorTone `protobuf:"varint,3,opt,name=tone,proto3,enum=app.v1.AdvisorTone" json:"tone,omitempty"`
+	LookId string      `protobuf:"bytes,2,opt,name=look_id,json=lookId,proto3" json:"look_id,omitempty"`
+	Tone   AdvisorTone `protobuf:"varint,3,opt,name=tone,proto3,enum=app.v1.AdvisorTone" json:"tone,omitempty"`
+	// Automatic Advisor in every session on every machine of the user: the AI
+	// asks Advisor when it is unsure and before it ends each turn. The profile
+	// holds the wish; each machine keeps its own copy (AdvisorSetAuto) that a
+	// device brings in line with this one when it links to the machine.
+	AutoSession   bool `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3" json:"auto_session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -139,6 +144,13 @@ func (x *AdvisorProfile) GetTone() AdvisorTone {
 		return x.Tone
 	}
 	return AdvisorTone_ADVISOR_TONE_UNSPECIFIED
+}
+
+func (x *AdvisorProfile) GetAutoSession() bool {
+	if x != nil {
+		return x.AutoSession
+	}
+	return false
 }
 
 type GetAdvisorProfileRequest struct {
@@ -232,6 +244,7 @@ type SetAdvisorProfileRequest struct {
 	LookId *string `protobuf:"bytes,2,opt,name=look_id,json=lookId,proto3,oneof" json:"look_id,omitempty"`
 	// Not ADVISOR_TONE_UNSPECIFIED.
 	Tone          *AdvisorTone `protobuf:"varint,3,opt,name=tone,proto3,enum=app.v1.AdvisorTone,oneof" json:"tone,omitempty"`
+	AutoSession   *bool        `protobuf:"varint,4,opt,name=auto_session,json=autoSession,proto3,oneof" json:"auto_session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -285,6 +298,13 @@ func (x *SetAdvisorProfileRequest) GetTone() AdvisorTone {
 		return *x.Tone
 	}
 	return AdvisorTone_ADVISOR_TONE_UNSPECIFIED
+}
+
+func (x *SetAdvisorProfileRequest) GetAutoSession() bool {
+	if x != nil && x.AutoSession != nil {
+		return *x.AutoSession
+	}
+	return false
 }
 
 type SetAdvisorProfileResponse struct {
@@ -343,22 +363,25 @@ var File_app_v1_advisor_proto protoreflect.FileDescriptor
 
 const file_app_v1_advisor_proto_rawDesc = "" +
 	"\n" +
-	"\x14app/v1/advisor.proto\x12\x06app.v1\x1a\x15app/v1/messages.proto\"f\n" +
+	"\x14app/v1/advisor.proto\x12\x06app.v1\x1a\x15app/v1/messages.proto\"\x89\x01\n" +
 	"\x0eAdvisorProfile\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
 	"\alook_id\x18\x02 \x01(\tR\x06lookId\x12'\n" +
-	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneR\x04tone\"\x1a\n" +
+	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneR\x04tone\x12!\n" +
+	"\fauto_session\x18\x04 \x01(\bR\vautoSession\"\x1a\n" +
 	"\x18GetAdvisorProfileRequest\"M\n" +
 	"\x19GetAdvisorProfileResponse\x120\n" +
-	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\"\x9d\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\"\xd6\x01\n" +
 	"\x18SetAdvisorProfileRequest\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1c\n" +
 	"\alook_id\x18\x02 \x01(\tH\x01R\x06lookId\x88\x01\x01\x12,\n" +
-	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneH\x02R\x04tone\x88\x01\x01B\a\n" +
+	"\x04tone\x18\x03 \x01(\x0e2\x13.app.v1.AdvisorToneH\x02R\x04tone\x88\x01\x01\x12&\n" +
+	"\fauto_session\x18\x04 \x01(\bH\x03R\vautoSession\x88\x01\x01B\a\n" +
 	"\x05_nameB\n" +
 	"\n" +
 	"\b_look_idB\a\n" +
-	"\x05_tone\"p\n" +
+	"\x05_toneB\x0f\n" +
+	"\r_auto_session\"p\n" +
 	"\x19SetAdvisorProfileResponse\x120\n" +
 	"\aprofile\x18\x01 \x01(\v2\x16.app.v1.AdvisorProfileR\aprofile\x12!\n" +
 	"\x03ack\x18\x02 \x01(\v2\x0f.app.v1.SyncAckR\x03ack*s\n" +

@@ -28,6 +28,10 @@ let known: boolean;
 let setKeys: AdvisorSetKey[];
 let removed: number;
 let profile: AdvisorProfile;
+let profileLoaded: boolean;
+/** The machine's own automatic Advisor switch, and the values it was asked to take. */
+let machineAuto: boolean;
+let setAutos: boolean[];
 
 vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	deviceKeyStore: () => ({
@@ -41,7 +45,7 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 
 vi.mock("../../src/messaging/data/services.tsx", async (importOriginal) => {
 	const real = await importOriginal<typeof import("../../src/messaging/data/services.tsx")>();
-	return { ...real, useAdvisorProfile: () => profile };
+	return { ...real, useAdvisorProfile: () => profile, useAdvisorProfileLoaded: () => profileLoaded };
 });
 
 const NativeWebSocket = window.WebSocket;
@@ -53,7 +57,10 @@ beforeEach(async () => {
 	known = true;
 	setKeys = [];
 	removed = 0;
-	profile = { name: "", lookId: "owl", tone: "short" };
+	profile = { name: "", lookId: "owl", tone: "short", autoSession: false };
+	profileLoaded = true;
+	machineAuto = false;
+	setAutos = [];
 	machine = await FakeMachine.create();
 	device = await generateKeyPair();
 	machine.trusted = [device.publicKey];
@@ -66,7 +73,7 @@ beforeEach(async () => {
 				os: "darwin",
 				agentVersion: "3.13.0",
 				providers: [{ id: "claude", name: "Claude Code", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession: true } }],
-				...(known ? { advisor: { available: true, keySet, keyFingerprint: keySet ? "a1b2c3" : "", setByDevice: keySet ? "local" : "", setAt: keySet ? 1_800_000_000_000n : 0n } } : {}),
+				...(known ? { advisor: { available: true, keySet, keyFingerprint: keySet ? "a1b2c3" : "", setByDevice: keySet ? "local" : "", setAt: keySet ? 1_800_000_000_000n : 0n, auto: machineAuto } } : {}),
 			},
 		});
 		switch (b.case) {
@@ -75,6 +82,11 @@ beforeEach(async () => {
 			case "advisorSetKey":
 				setKeys.push(b.value);
 				keySet = true;
+				setTimeout(() => machine.send(socket, info()), 0);
+				return [{ case: "ack", value: {} }];
+			case "advisorSetAuto":
+				setAutos.push(b.value.on);
+				machineAuto = b.value.on;
 				setTimeout(() => machine.send(socket, info()), 0);
 				return [{ case: "ack", value: {} }];
 			case "advisorRemoveKey":
@@ -124,6 +136,31 @@ describe("Settings › Cố vấn", () => {
 		await userEvent.click(screen.getByRole("switch", { name: t.settings.show }));
 		expect(advisorStore.snapshot().hidden).toBe(true);
 		expect(save).toHaveBeenCalledTimes(3);
+	});
+
+	it("saves the account's automatic Advisor switch, not a per-session one", async () => {
+		const save = open();
+		await userEvent.click(screen.getByRole("switch", { name: t.settings.auto }));
+		expect(save).toHaveBeenLastCalledWith({ autoSession: true });
+	});
+
+	it("brings a linked machine in line with the account's switch, once", async () => {
+		profile = { ...profile, autoSession: true };
+		open();
+		await waitFor(() => expect(setAutos).toEqual([true]), WAIT);
+		// The machine's next info says it follows: nothing more is sent, nothing is reported as behind.
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(setAutos).toEqual([true]);
+		expect(screen.queryByText(/Chưa áp dụng được trên/)).toBeNull();
+	});
+
+	it("never switches a machine before the profile is the user's own", async () => {
+		machineAuto = true;
+		profileLoaded = false;
+		open();
+		await screen.findByText(t.key.noKey, undefined, WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(setAutos).toEqual([]);
 	});
 
 	it("sets a machine's key over the link, shows its fingerprint and where it came from, and removes it", async () => {

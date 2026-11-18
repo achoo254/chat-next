@@ -1307,6 +1307,7 @@ export class FakeServer {
 						if (request.name !== undefined) change.name = request.name;
 						if (request.lookId !== undefined) change.lookId = request.lookId;
 						if (request.tone !== undefined) change.tone = request.tone;
+						if (request.autoSession !== undefined) change.autoSession = request.autoSession;
 						const profile = this.setAdvisor(userId, change);
 						return create(SetAdvisorProfileResponseSchema, {
 							profile,

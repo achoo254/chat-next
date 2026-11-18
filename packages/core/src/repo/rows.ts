@@ -373,6 +373,7 @@ export function parseAdvisorProfile(json: string | null): AdvisorProfile {
 		name: typeof value.name === "string" ? value.name : d.name,
 		lookId: typeof value.lookId === "string" && value.lookId !== "" ? value.lookId : d.lookId,
 		tone: tone === "short" || tone === "fun" || tone === "serious" ? tone : d.tone,
+		autoSession: typeof value.autoSession === "boolean" ? value.autoSession : d.autoSession,
 	};
 }
 

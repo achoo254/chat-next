@@ -68,6 +68,15 @@ func TestAdvisorProfile(t *testing.T) {
 	if err != nil || resp.GetAck().GetPts() != 0 || len(h.logOf(a)) != before {
 		t.Fatalf("unchanged set: %v, %v, log %d → %d", resp, err, before, len(h.logOf(a)))
 	}
+	// The automatic Advisor wish is kept with the profile, and changes only when given.
+	on := true
+	want.AutoSession = true
+	if resp, err = h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{AutoSession: &on}); err != nil || !proto.Equal(resp.GetProfile(), want) {
+		t.Fatalf("auto_session set: %v, %v", resp, err)
+	}
+	if resp, err = h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{Tone: &serious}); err != nil || !resp.GetProfile().GetAutoSession() {
+		t.Fatalf("auto_session kept by a later change: %v, %v", resp, err)
+	}
 	// An empty name goes back to the default name.
 	empty := ""
 	if resp, err = h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{Name: &empty}); err != nil || resp.GetProfile().GetName() != "" {

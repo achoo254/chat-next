@@ -17,11 +17,12 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   `apps/web/src/advisor/advisor-loader.tsx` để không làm nặng bundle khởi động. Kéo được, hít mép, vị trí nhớ theo thiết bị. Kết nối tới máy
   đích chỉ mở khi mở bong bóng hoặc còn câu hỏi đang chờ. Người dùng tuỳ chỉnh tên, 4 ngoại hình mẫu và giọng văn; hồ sơ lưu theo tài khoản trên
   server chat (`AdvisorService`, bảng `advisor_profiles`), không chứa bí mật, máy hay AI. Chữ "Jev"/"TypeSafe" chỉ xuất hiện ở mục nhập khoá.
-- **Ngữ cảnh copy do màn khai báo, chỉ trong bộ nhớ, chỉ gửi khi người dùng đính.** Mỗi màn gắn ngữ cảnh có cấu trúc lên phần tử gốc của nó
+- **Ngữ cảnh copy do màn khai báo, chỉ trong bộ nhớ, chỉ gửi khi người dùng gửi câu hỏi; đoạn vừa copy tự nằm trong ô hỏi (18/11/2026: bỏ bước bấm "Đính kèm", đỡ một thao tác).** Mỗi màn gắn ngữ cảnh có cấu trúc lên phần tử gốc của nó
   (`useAdvisorScope`, `apps/web/src/advisor/advisor-context.tsx`): máy, thư mục, nhánh, phiên, khung, thao tác, mã lỗi, `failure_id`. Bộ nghe copy
-  giữ 5 lần copy gần nhất trong bộ nhớ của trang (`advisor-store.ts`), gợi ý lần mới nhất trong 10 phút, không giữ gì ở vùng
+  giữ 5 lần copy gần nhất trong bộ nhớ của trang (`advisor-store.ts`), đính sẵn lần copy mới nhất (trong 10 phút) vào câu hỏi khi mở bong bóng, người dùng bấm ✕ để bỏ, không giữ gì ở vùng
   `data-advisor-ignore` (token bot, webhook, bí mật đăng nhập, khoá Cố vấn), ô mật khẩu hay chuỗi khớp bộ mẫu bí mật dùng chung. Màn chat thường
   chỉ ghi "một tin nhắn chat", không id hay tên. Không có chế độ trỏ chọn phần tử hay chụp màn hình: copy là cử chỉ người dùng đã chủ ý làm.
+- **Bề mặt cắm được (18/11/2026).** Một service muốn dùng Cố vấn gọi một lần `registerAdvisorSurface` (`apps/web/src/advisor/advisor-surfaces.ts`: id, tên chỗ đó theo từng ngôn ngữ, khoá các trường phụ được gửi) rồi khai báo ngữ cảnh bằng `useAdvisorScope`; không sửa bong bóng, store hay máy B. Trường phụ đi trong `AdvisorContext.fields` (tối đa 8, khoá là tên, giá trị một dòng ≤200 ký tự): trang chỉ gửi trường mà bề mặt đã liệt kê và bỏ trường trông như bí mật; máy B coi chúng là chữ không tin cậy (YAML trong phần mô tả đính kèm, khoá bị chặn nếu không phải tên) và từ chối câu hỏi có nhiều hoặc dài hơn mức. Không bao giờ đặt id, tên hay bí mật của màn vào trường. Danh bạ và bot nay có bề mặt riêng (chỉ nêu chỗ, không id, không tên); phiên gửi thêm `ai`. Chưa làm: đích nhận câu trả lời ngoài phiên AI Agent ("Gửi sang…" vào ô soạn tin), và hỏi khi người dùng không có máy B.
 - **Phiên Cố vấn riêng, chỉ đọc, theo (máy, thư mục, AI).** Câu hỏi đi bằng RPC thread sẵn có: `ThreadCreate{kind: ADVISOR}` rồi `ThreadSend`
   với `client_msg_id` làm id câu hỏi, Dừng bằng `ThreadInterrupt{client_msg_id}`; không thêm bộ RPC hỏi/đáp riêng. Câu hỏi xếp hàng FIFO, mỗi câu
   một lượt có hạn; câu trả lời nằm trong journal nên thiết bị ngủ hay mất kết nối vẫn đọc lại được, kèm Web Push "Cố vấn đã trả lời" khi không
@@ -55,7 +56,7 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   như "test" sẽ xoá nó khỏi mọi đầu ra). Thiết bị chỉ thấy dấu vân tay, thiết bị đặt và thời điểm; đặt/xoá ghi audit trên máy. Lệnh đọc Keychain
   của tunelo và `tunelo advisor` bị coi là nhạy cảm. Giới hạn: AI chạy cùng user hệ điều hành với tunelo, nên khoá không cô lập tuyệt đối; lớp
   chặn còn lại là bộ lọc lệnh nhạy cảm (`apps/agent/src/safety/sensitive-paths.ts`) và thẻ duyệt Bash của phiên làm việc.
-- **Chế độ tự động theo phiên, kênh chỉ dẫn theo từng AI.** Bật/tắt từ menu mascot (`ThreadSetAdvisor`), chỉ khi AI có MCP phiên. Claude nhận
+- **Chế độ tự động theo phiên, kênh chỉ dẫn theo từng AI.** Một công tắc chung cho cả tài khoản (18/11/2026, thay công tắc theo phiên ở menu mascot): Cài đặt › Cố vấn › "Tự theo dõi mọi phiên" lưu ở hồ sơ Cố vấn (`auto_session`); mỗi máy giữ bản của mình (`AdvisorSetAuto`, `MachineInfo.advisor.auto`, trong config của tunelo) và áp cho mọi phiên của máy, kể cả phiên terminal và phiên mở từ trước; thiết bị đang nối tới máy đối chiếu bản của máy với hồ sơ (`useAdvisorAutoSync`), chỉ sau khi hồ sơ đã tải xong, nên máy đang tắt nhận giá trị khi nối lại. `ThreadSetAdvisor` còn đó cho thiết bị cũ (cờ theo phiên cộng với công tắc chung, bật một trong hai là bật). Chỉ khi AI có MCP phiên. Claude nhận
   chỉ dẫn qua hook `UserPromptSubmit` (`additionalContext`): phiên được resume dùng lại system prompt đã ghi, nên đổi system prompt không có tác
   dụng giữa phiên, còn hook thì có tác dụng từ lượt sau mà không mở lại phiên. AI không có kênh ghi chú (Antigravity) nhận chỉ dẫn sau dấu ngăn
   cố định trong tin. Cả hai kênh không vào journal, lịch sử CLI hay `/compact`; tin bắt đầu bằng `/` không bị chèn.

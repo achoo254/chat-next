@@ -34,7 +34,13 @@ export const ADVISOR_TITLE = "Advisor";
 /** The fields of AdvisorContext, in the order the AI reads them. */
 export const CONTEXT_FIELDS = ["screen", "dir", "branch", "threadId", "panel", "action", "errorCode", "failureId"] as const;
 export type ContextField = (typeof CONTEXT_FIELDS)[number];
-export type AdvisorContextInput = Partial<Record<ContextField, string>>;
+export type AdvisorContextInput = Partial<Record<ContextField, string>> & {
+  /** What a surface other than the session says about itself (AdvisorContext.fields). */
+  fields?: Readonly<Record<string, string>>;
+};
+export const FIELDS_MAX = 8;
+/** A key of AdvisorContext.fields: becomes a YAML key, so nothing else is accepted. */
+export const FIELD_KEY = /^[a-z][a-z0-9_]{0,31}$/;
 export type AdvisorAttachmentInput = { text: string; context?: AdvisorContextInput };
 
 /** The answer styles of the user's Advisor profile; "" when the device named none (or one this machine does not know). */
@@ -100,6 +106,16 @@ export function questionRefusal(question: string, attachments: readonly AdvisorA
   if (attachments.length > ATTACHMENTS_MAX) return `more than ${ATTACHMENTS_MAX} attachments`;
   if (attachments.some((a) => a.text.length > ATTACHMENT_MAX_CHARS)) return `an attachment longer than ${ATTACHMENT_MAX_CHARS} characters`;
   if (attachments.some((a) => CONTEXT_FIELDS.some((f) => (a.context?.[f] ?? "").length > CONTEXT_FIELD_MAX))) return `a context field longer than ${CONTEXT_FIELD_MAX} characters`;
+  const wrongFields = attachments.map((a) => fieldsRefusal(a.context?.fields)).find((r) => r !== undefined);
+  if (wrongFields) return wrongFields;
+  return undefined;
+}
+
+function fieldsRefusal(fields: Readonly<Record<string, string>> | undefined): string | undefined {
+  const entries = Object.entries(fields ?? {});
+  if (entries.length > FIELDS_MAX) return `more than ${FIELDS_MAX} context fields`;
+  if (entries.some(([key]) => !FIELD_KEY.test(key))) return "a context field with a key that is not a name";
+  if (entries.some(([, value]) => value.length > CONTEXT_FIELD_MAX)) return `a context field longer than ${CONTEXT_FIELD_MAX} characters`;
   return undefined;
 }
 
@@ -121,6 +137,12 @@ export function contextYaml(ctx: AdvisorContextInput | undefined): string {
     const v = oneLine(ctx?.[f] ?? "", CONTEXT_FIELD_MAX);
     if (v !== "") lines.push(`  ${YAML_KEYS[f]}: ${JSON.stringify(v)}`);
   }
+  // The keys are names (FIELD_KEY, checked before a question is accepted); the values are one quoted line each, like the fixed fields.
+  const extra = Object.entries(ctx?.fields ?? {}).flatMap(([key, value]) => {
+    const v = oneLine(value, CONTEXT_FIELD_MAX);
+    return FIELD_KEY.test(key) && v !== "" ? [`    ${key}: ${JSON.stringify(v)}`] : [];
+  });
+  if (extra.length > 0) lines.push("  fields:", ...extra);
   return lines.length ? `copied_from:\n${lines.join("\n")}` : "";
 }
 

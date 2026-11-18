@@ -44,6 +44,7 @@ export async function pairedDevice(ctx: {
   usage?: UsageApi;
   advisorKeys?: AdvisorKeyStore;
   onAdvisorKey?: () => void;
+  advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
   machineInfo?: () => Promise<MachineInfo>;
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
@@ -72,6 +73,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.usage ? { usage: ctx.usage } : {}),
       ...(ctx.advisorKeys ? { advisorKeys: ctx.advisorKeys } : {}),
       ...(ctx.onAdvisorKey ? { onAdvisorKey: ctx.onAdvisorKey } : {}),
+      ...(ctx.advisorAuto ? { advisorAuto: ctx.advisorAuto } : {}),
       machineKey: () => machineKey,
       trust: new DeviceTrust({ config: ctx.config }),
       machineInfo:

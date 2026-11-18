@@ -19,6 +19,7 @@ import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { projectUsagePath, usagePath } from "../../src/machines/usage/usage-paths.ts";
 import { dayOf, reportRange, shiftDay, summarize, usageKeyOf } from "../../src/machines/usage/usage-summary.ts";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
+import { machinesServices } from "../support/machines-services.ts";
 import { matchRoute, type MachinesView } from "../../src/router.tsx";
 import { FakeMachines } from "../support/fake-machines.ts";
 import { routerFetch } from "../support/router-fetch.ts";
@@ -141,7 +142,7 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	}),
 }));
 
-const services = { toasts: { show: () => undefined } } as unknown as Services;
+const services = machinesServices;
 const NativeWebSocket = window.WebSocket;
 const WAIT = { timeout: 4000 };
 const refusal = (reason: ErrorReason): Body[] => [{ case: "error", value: { code: ErrorCode.INVALID, message: "refused", reason, subject: "" } }];

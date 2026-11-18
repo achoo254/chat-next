@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/advisor.proto.
  */
 export const file_app_v1_advisor: GenFile = /*@__PURE__*/
-  fileDesc("ChRhcHAvdjEvYWR2aXNvci5wcm90bxIGYXBwLnYxIlIKDkFkdmlzb3JQcm9maWxlEgwKBG5hbWUYASABKAkSDwoHbG9va19pZBgCIAEoCRIhCgR0b25lGAMgASgOMhMuYXBwLnYxLkFkdmlzb3JUb25lIhoKGEdldEFkdmlzb3JQcm9maWxlUmVxdWVzdCJEChlHZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUiiQEKGFNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESFAoHbG9va19pZBgCIAEoCUgBiAEBEiYKBHRvbmUYAyABKA4yEy5hcHAudjEuQWR2aXNvclRvbmVIAogBAUIHCgVfbmFtZUIKCghfbG9va19pZEIHCgVfdG9uZSJiChlTZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2sqcwoLQWR2aXNvclRvbmUSHAoYQURWSVNPUl9UT05FX1VOU1BFQ0lGSUVEEAASFgoSQURWSVNPUl9UT05FX1NIT1JUEAESFAoQQURWSVNPUl9UT05FX0ZVThACEhgKFEFEVklTT1JfVE9ORV9TRVJJT1VTEAMyxAEKDkFkdmlzb3JTZXJ2aWNlElgKEUdldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLkdldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5HZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlElgKEVNldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLlNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5TZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_messages]);
+  fileDesc("ChRhcHAvdjEvYWR2aXNvci5wcm90bxIGYXBwLnYxImgKDkFkdmlzb3JQcm9maWxlEgwKBG5hbWUYASABKAkSDwoHbG9va19pZBgCIAEoCRIhCgR0b25lGAMgASgOMhMuYXBwLnYxLkFkdmlzb3JUb25lEhQKDGF1dG9fc2Vzc2lvbhgEIAEoCCIaChhHZXRBZHZpc29yUHJvZmlsZVJlcXVlc3QiRAoZR2V0QWR2aXNvclByb2ZpbGVSZXNwb25zZRInCgdwcm9maWxlGAEgASgLMhYuYXBwLnYxLkFkdmlzb3JQcm9maWxlIrUBChhTZXRBZHZpc29yUHJvZmlsZVJlcXVlc3QSEQoEbmFtZRgBIAEoCUgAiAEBEhQKB2xvb2tfaWQYAiABKAlIAYgBARImCgR0b25lGAMgASgOMhMuYXBwLnYxLkFkdmlzb3JUb25lSAKIAQESGQoMYXV0b19zZXNzaW9uGAQgASgISAOIAQFCBwoFX25hbWVCCgoIX2xvb2tfaWRCBwoFX3RvbmVCDwoNX2F1dG9fc2Vzc2lvbiJiChlTZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUSHAoDYWNrGAIgASgLMg8uYXBwLnYxLlN5bmNBY2sqcwoLQWR2aXNvclRvbmUSHAoYQURWSVNPUl9UT05FX1VOU1BFQ0lGSUVEEAASFgoSQURWSVNPUl9UT05FX1NIT1JUEAESFAoQQURWSVNPUl9UT05FX0ZVThACEhgKFEFEVklTT1JfVE9ORV9TRVJJT1VTEAMyxAEKDkFkdmlzb3JTZXJ2aWNlElgKEUdldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLkdldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5HZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlElgKEVNldEFkdmlzb3JQcm9maWxlEiAuYXBwLnYxLlNldEFkdmlzb3JQcm9maWxlUmVxdWVzdBohLmFwcC52MS5TZXRBZHZpc29yUHJvZmlsZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_messages]);
 
 /**
  * @generated from message app.v1.AdvisorProfile
@@ -38,6 +38,16 @@ export type AdvisorProfile = Message<"app.v1.AdvisorProfile"> & {
    * @generated from field: app.v1.AdvisorTone tone = 3;
    */
   tone: AdvisorTone;
+
+  /**
+   * Automatic Advisor in every session on every machine of the user: the AI
+   * asks Advisor when it is unsure and before it ends each turn. The profile
+   * holds the wish; each machine keeps its own copy (AdvisorSetAuto) that a
+   * device brings in line with this one when it links to the machine.
+   *
+   * @generated from field: bool auto_session = 4;
+   */
+  autoSession: boolean;
 };
 
 /**
@@ -104,6 +114,11 @@ export type SetAdvisorProfileRequest = Message<"app.v1.SetAdvisorProfileRequest"
    * @generated from field: optional app.v1.AdvisorTone tone = 3;
    */
   tone?: AdvisorTone | undefined;
+
+  /**
+   * @generated from field: optional bool auto_session = 4;
+   */
+  autoSession?: boolean | undefined;
 };
 
 /**

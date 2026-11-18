@@ -18,6 +18,7 @@ import { MachineLinksProvider } from "../../src/machines/link/connection-provide
 import { MachineLink } from "../../src/machines/link/machine-link.ts";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
+import { machinesServices } from "../support/machines-services.ts";
 import { afterSentinel, ImeInput, inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
 import { endOnPurpose, forgetEnded } from "../../src/terminal/ended-sessions.ts";
 import { NO_AUTOFILL, noAutofill } from "../../src/terminal/no-autofill.ts";
@@ -101,7 +102,7 @@ vi.mock("../../src/machines/link/device-keys.ts", () => ({
 	}),
 }));
 
-const services = { toasts: { show: () => undefined } } as unknown as Services;
+const services = machinesServices;
 const NativeWebSocket = window.WebSocket;
 
 beforeEach(async () => {

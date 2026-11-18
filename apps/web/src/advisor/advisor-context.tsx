@@ -77,9 +77,11 @@ export function contextAt(node: Node | null): CopyContext | null {
 	let context: CopyContext = { ...EMPTY_CONTEXT };
 	// Outermost first, so the innermost declaration of a field wins.
 	for (const layer of [routeContext, ...layers.reverse()]) {
-		for (const [key, value] of Object.entries(layer) as [keyof CopyContext, string | undefined][]) {
+		const { fields, ...own } = layer;
+		for (const [key, value] of Object.entries(own) as [Exclude<keyof CopyContext, "fields">, string | undefined][]) {
 			if (value !== undefined) context = { ...context, [key]: value };
 		}
+		if (fields !== undefined) context = { ...context, fields: { ...context.fields, ...fields } };
 	}
 	return context;
 }
@@ -93,7 +95,9 @@ export function rememberCopy(text: string, at: Node | null, store: AdvisorStore 
 	if (trimmed === "") return false;
 	const context = contextAt(at);
 	if (context === null || secretShapeIn(trimmed) !== undefined) return false;
-	store.remember(trimmed.slice(0, MAX_COPY_CHARS), context);
+	// A field that looks like a secret is dropped, not the copy.
+	const fields = Object.fromEntries(Object.entries(context.fields).filter(([, value]) => secretShapeIn(value) === undefined));
+	store.remember(trimmed.slice(0, MAX_COPY_CHARS), { ...context, fields });
 	return true;
 }
 

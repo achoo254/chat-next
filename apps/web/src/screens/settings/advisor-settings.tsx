@@ -16,6 +16,7 @@ import { useMachinesCopy } from "../../machines/use-machines-copy.ts";
 import { IGNORE_ATTR } from "../../advisor/advisor-context.tsx";
 import { advisorStore, useAdvisorState } from "../../advisor/advisor-store.ts";
 import { LOOKS } from "../../advisor/looks.ts";
+import { autoStateOf } from "../../advisor/use-advisor-auto-sync.ts";
 import { useAdvisorCopy } from "../../advisor/use-advisor-copy.ts";
 import "../../advisor/advisor.css";
 
@@ -96,6 +97,7 @@ export default function AdvisorSettings() {
 					<span className="grow">{t.settings.tone}</span>
 					<Choice<AdvisorTone> label={t.settings.tone} value={profile.tone} options={tones} onChange={(tone) => save({ tone })} />
 				</div>
+				<AutoRow value={profile.autoSession} save={(on) => save({ autoSession: on })} />
 				<div className="row pad-x">
 					<span className="grow">{t.settings.show}</span>
 					<Switch checked={!hidden} label={t.settings.show} onChange={(on) => advisorStore.setHidden(!on)} />
@@ -103,6 +105,30 @@ export default function AdvisorSettings() {
 			</div>
 			<KeySection />
 		</div>
+	);
+}
+
+/** The account's automatic Advisor switch, and the machines that do not follow it yet (every linked machine is brought in line, see useAdvisorAutoSync). */
+function AutoRow({ value, save }: { value: boolean; save: (on: boolean) => void }) {
+	const t = useAdvisorCopy();
+	const hub = useHub();
+	const now = useNow();
+	const views = useMachineViews(hub, now);
+	const behind = views.filter((view) => {
+		const { reachable, auto } = autoStateOf(view);
+		return !reachable || auto !== value;
+	});
+	return (
+		<>
+			<div className="row pad-x" data-id="advisor-auto">
+				<span className="grow">
+					<span>{t.settings.auto}</span>
+					<small className="muted">{t.settings.autoHint}</small>
+				</span>
+				<Switch checked={value} label={t.settings.auto} onChange={save} />
+			</div>
+			{value && behind.length > 0 && <p className="note pad-x">{t.settings.autoNotApplied(behind.map((view) => view.entry.name).join(", "))}</p>}
+		</>
 	);
 }
 

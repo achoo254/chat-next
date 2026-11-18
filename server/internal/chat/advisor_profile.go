@@ -27,6 +27,8 @@ type advisorProfileRow struct {
 	Name   string
 	LookID string
 	Tone   int16
+	// AutoSession is the user's wish for automatic Advisor in every session.
+	AutoSession bool
 }
 
 // defaultAdvisorProfile is the profile of a user without a row.
@@ -35,13 +37,13 @@ func defaultAdvisorProfile() advisorProfileRow {
 }
 
 func (a advisorProfileRow) render() *appv1.AdvisorProfile {
-	return &appv1.AdvisorProfile{Name: a.Name, LookId: a.LookID, Tone: appv1.AdvisorTone(a.Tone)}
+	return &appv1.AdvisorProfile{Name: a.Name, LookId: a.LookID, Tone: appv1.AdvisorTone(a.Tone), AutoSession: a.AutoSession}
 }
 
 // loadAdvisorProfile reads a user's profile; the defaults without a row.
 func loadAdvisorProfile(ctx context.Context, q querier, me int64) (advisorProfileRow, error) {
 	a := defaultAdvisorProfile()
-	err := q.QueryRow(ctx, `SELECT name, look_id, tone FROM advisor_profiles WHERE user_id = $1`, me).Scan(&a.Name, &a.LookID, &a.Tone)
+	err := q.QueryRow(ctx, `SELECT name, look_id, tone, auto_session FROM advisor_profiles WHERE user_id = $1`, me).Scan(&a.Name, &a.LookID, &a.Tone, &a.AutoSession)
 	if err != nil && !isNoRows(err) {
 		return a, fmt.Errorf("chat: load advisor profile: %w", err)
 	}
@@ -114,16 +116,19 @@ func (s *Service) SetAdvisorProfile(ctx context.Context, me int64, req *appv1.Se
 		if req.Tone != nil {
 			a.Tone = int16(req.GetTone())
 		}
+		if req.AutoSession != nil {
+			a.AutoSession = req.GetAutoSession()
+		}
 		out = a
 		if a == before {
 			return nil
 		}
 		if _, err := t.tx.Exec(ctx, `
-			INSERT INTO advisor_profiles (user_id, name, look_id, tone, updated_at)
-			VALUES ($1, $2, $3, $4, now())
+			INSERT INTO advisor_profiles (user_id, name, look_id, tone, auto_session, updated_at)
+			VALUES ($1, $2, $3, $4, $5, now())
 			ON CONFLICT (user_id) DO UPDATE SET name = excluded.name, look_id = excluded.look_id,
-				tone = excluded.tone, updated_at = now()`,
-			me, a.Name, a.LookID, a.Tone); err != nil {
+				tone = excluded.tone, auto_session = excluded.auto_session, updated_at = now()`,
+			me, a.Name, a.LookID, a.Tone, a.AutoSession); err != nil {
 			return fmt.Errorf("chat: set advisor profile: %w", err)
 		}
 		t.toUsers(t.event(kindAdvisorProfile, 0, me), []int64{me}, &appv1.Update{Kind: &appv1.Update_AdvisorProfile{

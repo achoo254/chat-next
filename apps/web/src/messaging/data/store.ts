@@ -223,6 +223,8 @@ export class ChatStore {
 	private totals: UnreadTotals = { messages: 0, chats: 0 };
 	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
 	private advisor: AdvisorProfile = DEFAULT_ADVISOR_PROFILE;
+	/** The profile came from the server (or the device's copy of it): until then `advisor` holds only defaults. */
+	private advisorLoaded = false;
 	private readonly advisorRefresh = new Coalescer(() => this.loadAdvisor());
 	private muteTimer: ReturnType<typeof setTimeout> | undefined;
 	private listStatus: ListStatus = "loading";
@@ -575,6 +577,11 @@ export class ChatStore {
 
 	// ------------------------------------------------------------- Advisor profile
 
+	/** The Advisor profile is the user's own, not the defaults before it arrived (a machine is never changed by the defaults). */
+	advisorProfileLoaded(): boolean {
+		return this.advisorLoaded;
+	}
+
 	/** The user's Advisor profile (the defaults until it loads). */
 	advisorProfile(): AdvisorProfile {
 		return this.advisor;
@@ -598,7 +605,13 @@ export class ChatStore {
 
 	private applyAdvisor(profile: AdvisorProfile): void {
 		const a = this.advisor;
-		if (profile.name === a.name && profile.lookId === a.lookId && profile.tone === a.tone) return;
+		if (!this.advisorLoaded) {
+			this.advisorLoaded = true;
+			this.advisor = profile;
+			this.emit("advisor");
+			return;
+		}
+		if (profile.name === a.name && profile.lookId === a.lookId && profile.tone === a.tone && profile.autoSession === a.autoSession) return;
 		this.advisor = profile;
 		this.emit("advisor");
 	}

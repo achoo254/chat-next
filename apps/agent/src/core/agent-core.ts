@@ -438,6 +438,8 @@ export type CoreOptions = {
   sessionMcp?: (threadId: string, scope?: TicketScope) => SessionMcpLease | undefined;
   /** The machine keeps a key for Advisor (a turn that never asked it is flagged only then). */
   advisorKeySet?: () => boolean;
+  /** Automatic Advisor is on for every session of the machine (AdvisorSetAuto), besides the sessions turned on one by one. */
+  advisorAuto?: () => boolean;
   /** A folder the machine knows (one of its projects): an Advisor thread opens only in such a folder or one of a session. */
   isKnownFolder?: (dir: string) => boolean;
   /** A git failure of a workspace the machine keeps, for Advisor (workspace/workspaces.ts). */
@@ -739,7 +741,7 @@ export class AgentCore {
       commands: t.info.commands?.length ? t.info.commands : this.commandsFor(t),
       effort: t.info.effort ?? "",
       // On only where the session can reach Advisor now (its AI, the machine's MCP); the wish is kept either way.
-      advisor: t.meta.advisor === true && this.advisorAvailable(t.meta.provider),
+      advisor: this.wantsAdvisor(t) && t.meta.kind !== "advisor" && this.advisorAvailable(t.meta.provider),
       permissionModes: this.permissionModes(t),
       accountId,
       machineAccountId: machineAccountId ?? "",
@@ -2100,7 +2102,24 @@ export class AgentCore {
 
   /** The thread's automatic Advisor is on; false for an unknown thread. */
   advisorOn(threadId: string): boolean {
-    return this.threads.get(threadId)?.meta.advisor === true;
+    const t = this.threads.get(threadId);
+    return t !== undefined && this.wantsAdvisor(t);
+  }
+
+  /** The machine-wide switch or the session's own is on (the session's own comes from an older device). */
+  private wantsAdvisor(t: Thread): boolean {
+    return t.meta.advisor === true || (this.opts.advisorAuto?.() ?? false);
+  }
+
+  /** The machine-wide switch changed: every session's info and note state follow it. */
+  advisorAutoChanged(): void {
+    for (const t of this.threads.values()) {
+      if (t.meta.kind === "advisor" || t.meta.advisor === true) continue;
+      t.advisorNote = noteStateAfterToggle(this.wantsAdvisor(t), t.advisorNote ?? "none");
+      t.advisorGen = (t.advisorGen ?? 0) + 1;
+      if (!this.wantsAdvisor(t) && t.advisorTurn) t.advisorTurn.onAllAlong = false;
+      for (const fn of this.infoListeners) fn(t.meta.id);
+    }
   }
 
   /**
@@ -2109,12 +2128,12 @@ export class AgentCore {
    */
   advisorAllowed(threadId: string): boolean {
     const t = this.threads.get(threadId);
-    return t !== undefined && (t.meta.kind === "advisor" || t.meta.advisor === true) && this.advisorAvailable(t.meta.provider);
+    return t !== undefined && (t.meta.kind === "advisor" || this.wantsAdvisor(t)) && this.advisorAvailable(t.meta.provider);
   }
 
   /** The thread's automatic Advisor runs now (never on an Advisor thread, which is asked directly). */
   private autoAdvisor(t: Thread): boolean {
-    return t.meta.kind !== "advisor" && t.meta.advisor === true && this.advisorAvailable(t.meta.provider);
+    return t.meta.kind !== "advisor" && this.wantsAdvisor(t) && this.advisorAvailable(t.meta.provider);
   }
 
   /**

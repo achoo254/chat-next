@@ -8,7 +8,7 @@
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AdvisorTone, ErrorCode, ErrorReason, LoginState, Role, ThreadKind, ThreadState, TurnState, type Frame, type ThreadCreate, type ThreadSend } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdvisorLive from "../../src/advisor/advisor-bubble.tsx";
@@ -246,15 +246,15 @@ async function ask(question: string) {
 }
 
 describe("attached and recent copies", () => {
-	it("says what an attached copy is for, and lists only the copies not attached yet (none: no list)", async () => {
+	it("attaches the copy just made, says what it is for, and lists only the copies not attached yet (none: no list)", async () => {
 		const store = new AdvisorStore();
 		store.remember("lỗi một", scmCopy);
 		store.remember("lỗi hai", { ...scmCopy, failureId: "fail-43" });
 		store.setOpen(true);
 		open(store);
-		// The newest is offered as a chip; the other waits in the list of recent copies.
-		await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${t.ask.attach}`) }, WAIT));
+		// The newest goes in with the question at once (no chip to press); the other waits in the list of recent copies.
 		expect(await screen.findByText(t.ask.attachedTitle, undefined, WAIT)).toBeTruthy();
+		expect(screen.getByText("lỗi hai", { selector: ".adv-attached .adv-clip" })).toBeTruthy();
 		expect(screen.getByText(t.ask.attachedHint)).toBeTruthy();
 		expect(screen.getByPlaceholderText(t.ask.placeholderAttached)).toBeTruthy();
 		expect(screen.getByText(t.ask.recent(1))).toBeTruthy();
@@ -265,51 +265,16 @@ describe("attached and recent copies", () => {
 	});
 });
 
-describe("automatic Advisor in the menu", () => {
-	it("is switchable for a session in Chat mode and says why it is not for one held by a terminal", async () => {
+describe("the mascot's menu", () => {
+	it("leads to the settings and hides the mascot, with no per-session switch (automatic Advisor is one switch in the settings)", async () => {
 		const store = new AdvisorStore();
 		store.setSession({ machine: "1", threadId: "s1" });
 		store.setOpen(true);
 		open(store);
 		await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
-		const toggle = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
-		await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), WAIT);
-		expect(screen.getByText(t.menu.autoHint)).toBeTruthy();
-		await userEvent.keyboard("{Escape}");
-		cleanup();
-
-		// The same session, now run by the terminal's own claude.
-		SESSION.terminalSession = 2;
-		try {
-			const held = new AdvisorStore();
-			held.setSession({ machine: "1", threadId: "s1" });
-			held.setOpen(true);
-			open(held);
-			await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
-			await screen.findByText(t.menu.autoTerminal, undefined, WAIT);
-			const off = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
-			expect((off as HTMLButtonElement).disabled).toBe(true);
-		} finally {
-			SESSION.terminalSession = 0;
-		}
-	});
-
-	it("is switchable for a session held by a terminal when the machine gives the terminal's CLI Advisor", async () => {
-		terminalAdvisor = true;
-		SESSION.terminalSession = 2;
-		try {
-			const store = new AdvisorStore();
-			store.setSession({ machine: "1", threadId: "s1" });
-			store.setOpen(true);
-			open(store);
-			await userEvent.click(await screen.findByRole("button", { name: t.menu.label }, WAIT));
-			const toggle = await screen.findByRole("switch", { name: t.menu.auto }, WAIT);
-			await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), WAIT);
-			expect(screen.getByText(t.menu.autoHint)).toBeTruthy();
-			expect(screen.queryByText(t.menu.autoTerminal)).toBeNull();
-		} finally {
-			SESSION.terminalSession = 0;
-		}
+		expect(screen.getByRole("button", { name: t.ask.settings })).toBeTruthy();
+		expect(screen.getByRole("button", { name: t.menu.hide })).toBeTruthy();
+		expect(screen.queryByRole("switch")).toBeNull();
 	});
 });
 
@@ -336,7 +301,7 @@ describe("asking", () => {
 		store.remember("! [rejected] main -> main (non-fast-forward)", scmCopy);
 		store.setOpen(true);
 		open(store);
-		await userEvent.click(await screen.findByRole("button", { name: `${t.ask.attach} (Quản lý mã nguồn · app · main)` }, WAIT));
+		await screen.findByText(t.ask.attachedTitle, undefined, WAIT);
 		await ask("Vì sao push hỏng?");
 		await waitFor(() => expect(sends).toHaveLength(1), WAIT);
 		expect(created[0]).toMatchObject({ kind: ThreadKind.ADVISOR, dir: "/w/app", provider: "claude", text: "" });
@@ -366,9 +331,9 @@ describe("asking", () => {
 		const store = new AdvisorStore();
 		store.setOpen(true);
 		open(store);
-		// Copied while the bubble shows: the chip appears.
+		// Copied while the bubble shows: it is attached to the question at once.
 		act(() => store.remember("error", scmCopy));
-		await userEvent.click(await screen.findByRole("button", { name: /Đính kèm đoạn vừa copy/ }, WAIT));
+		await screen.findByText(t.ask.attachedTitle, undefined, WAIT);
 		await ask("Sửa sao?");
 		await userEvent.click(await screen.findByRole("button", { name: t.answer.toSession }, WAIT));
 		await userEvent.click(screen.getByRole("button", { name: /Sửa lỗi push/ }));
@@ -400,7 +365,7 @@ describe("asking", () => {
 		store.setOpen(true);
 		open(store);
 		act(() => store.remember("error", scmCopy));
-		await userEvent.click(await screen.findByRole("button", { name: /Đính kèm đoạn vừa copy/ }, WAIT));
+		await screen.findByText(t.ask.attachedTitle, undefined, WAIT);
 		await ask("Sửa sao?");
 		act(() => store.setSession({ machine: "1", threadId: "s1" }));
 		await userEvent.click(await screen.findByRole("button", { name: t.answer.toSession }, WAIT));
@@ -415,7 +380,7 @@ describe("asking", () => {
 		store.remember("error", { ...scmCopy, dir: "/Users/me" });
 		store.setOpen(true);
 		open(store);
-		await userEvent.click(await screen.findByRole("button", { name: /Đính kèm đoạn vừa copy/ }, WAIT));
+		await screen.findByText(t.ask.attachedTitle, undefined, WAIT);
 		await ask("Có gì ở đây?");
 		expect(await screen.findByText(t.ask.consent("/Users/me"), undefined, WAIT)).toBeTruthy();
 		expect(sends).toHaveLength(0);

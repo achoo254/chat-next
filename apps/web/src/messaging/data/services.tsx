@@ -116,6 +116,12 @@ export function useAdvisorProfile(): AdvisorProfile {
 	return useStoreKey("advisor", () => store.advisorProfile());
 }
 
+/** The Advisor profile is the user's own (loaded), not the defaults shown before it arrived. */
+export function useAdvisorProfileLoaded(): boolean {
+	const { store } = useServices();
+	return useStoreKey("advisor", () => store.advisorProfileLoaded());
+}
+
 /** Unread messages and chats of the app badge. */
 export function useUnreadTotals(): UnreadTotals {
 	const { store } = useServices();

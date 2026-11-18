@@ -238,7 +238,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const branch = own?.git?.git === true ? own.git.branch : (placed?.workspace.branch ?? "");
 	const workspace = placed === null ? folderName(dir) : folderName(placed.workspace.dir);
 	// Copies made in the session (its transcript, terminal, Source Control) tell Advisor where; the mascot's menu follows it.
-	useAdvisorScope(chatRef, { screen: "session", machine, threadId, dir, branch });
+	useAdvisorScope(chatRef, { screen: "session", machine, threadId, dir, branch, fields: provider === "" ? {} : { ai: provider } });
 	useAdvisorSession(machine, threadId);
 	// "Gửi sang phiên": Advisor's pick waits in the composer for the user to send.
 	const fill = useSessionFill(machine, threadId);

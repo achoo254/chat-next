@@ -46,6 +46,8 @@ function machine(opts: Options = {}) {
   const control = { deliver: true, failStart: false, startGate: undefined as Promise<void> | undefined };
   const jevBodies: string[] = [];
   let hang = false;
+  /** The machine-wide automatic Advisor switch (AdvisorSetAuto). */
+  const auto = { on: false };
   let openGate: () => void = () => undefined;
   const gate = () => new Promise<void>((r) => (openGate = r));
   const fetchFake = (async (_url: string | URL | Request, init?: RequestInit) => {
@@ -134,6 +136,7 @@ function machine(opts: Options = {}) {
       return { ticket, configDir: "/cfg", approveWrite: () => undefined, describeWrite: async () => undefined, release: () => h.release(ticket) };
     },
     advisorKeySet: () => opts.key !== false,
+    more: { advisorAuto: () => auto.on },
   });
   const hooks: AdvisorHooks = {
     allowed: (id) => core.advisorAllowed(id),
@@ -154,7 +157,12 @@ function machine(opts: Options = {}) {
   const turns = (id: string) => byCase(core.snapshot(id), "turn").map((x) => x.body.value);
   const settled = (id: string, count: number) =>
     until(core, id, (i) => byCase(i, "turn").filter((x) => x.body.value.state !== TurnState.RUNNING).length === count);
-  return { core, sent, jevBodies, thread, turns, settled, control, open: () => openGate() };
+  /** Flips the machine-wide switch the way the machine does. */
+  const setAuto = (on: boolean) => {
+    auto.on = on;
+    core.advisorAutoChanged();
+  };
+  return { core, sent, jevBodies, thread, turns, settled, control, setAuto, open: () => openGate() };
 }
 
 const verdicts = (items: Item[]) => byCase(items, "advisorVerdict").map((x) => x.body.value);
@@ -260,6 +268,34 @@ describe("advisor_missed", () => {
     toggled.open();
     await toggled.settled(d, 2);
     expect(toggled.turns(d)[1]?.advisorMissed).toBe(false);
+  });
+});
+
+describe("the machine-wide automatic Advisor switch", () => {
+  it("turns every session on and off at once, with no per-session switch, and tells the AI as it does for one session", async () => {
+    const m = machine();
+    const id = await m.thread("hello", false);
+    expect(m.core.advisorOn(id)).toBe(false);
+    m.setAuto(true);
+    expect(m.core.advisorOn(id)).toBe(true);
+    expect(m.core.advisorAllowed(id)).toBe(true);
+    await m.core.send(id, "first", "c1");
+    await m.settled(id, 2);
+    m.setAuto(false);
+    expect(m.core.advisorOn(id)).toBe(false);
+    await m.core.send(id, "second", "c2");
+    await m.settled(id, 3);
+    await m.core.send(id, "third", "c3");
+    await m.settled(id, 4);
+    expect(m.sent.map((s) => s.text)).toEqual(["hello", withNote("first", AUTO_INSTRUCTIONS), withNote("second", ADVISOR_OFF), "third"]);
+  });
+
+  it("leaves a session turned on by an older device on when the machine-wide switch goes off", async () => {
+    const m = machine();
+    const id = await m.thread("hello", true);
+    m.setAuto(true);
+    m.setAuto(false);
+    expect(m.core.advisorOn(id)).toBe(true);
   });
 });
 

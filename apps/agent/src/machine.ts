@@ -258,6 +258,7 @@ export class Machine {
       ...(opts.mcp ? { sessionMcp: sessionMcpFor(opts.mcp, this.config, this.secrets, this.browser) } : {}),
       sessionMcpEnabled: () => this.sessionMcpEnabled(),
       advisorKeySet: () => this.advisorKeys.status().keySet,
+      advisorAuto: () => this.config.get().advisorAuto === true,
       // Read when an Advisor thread opens or is asked, long after both are built.
       isKnownFolder: (dir) => this.projects.projectOf(dir) !== undefined,
       gitFailure: (failureId) => this.workspaces.failures.get(failureId),
@@ -609,6 +610,7 @@ export class Machine {
         usage: this.usageApi,
         advisorKeys: this.advisorKeys,
         onAdvisorKey: () => this.advisorKeyChanged(),
+        advisorAuto: { available: () => this.sessionMcpEnabled(), set: (on, device) => this.setAdvisorAuto(on, device) },
         macFolders: this.macFolders,
         onPing: () => (this.lastPing = Date.now()),
       },
@@ -718,9 +720,25 @@ export class Machine {
     return this.opts.mcp !== undefined && this.config.get().sessionMcp !== false;
   }
 
-  private advisorStatus(): { keySet: boolean; keyFingerprint: string; setByDevice: string; setAt: bigint } {
+  private advisorStatus(): { keySet: boolean; keyFingerprint: string; setByDevice: string; setAt: bigint; auto: boolean } {
     const s = this.advisorKeys.status();
-    return { keySet: s.keySet, keyFingerprint: s.fingerprint, setByDevice: s.setByDevice, setAt: BigInt(s.setAt) };
+    return { keySet: s.keySet, keyFingerprint: s.fingerprint, setByDevice: s.setByDevice, setAt: BigInt(s.setAt), auto: this.config.get().advisorAuto === true };
+  }
+
+  /**
+   * Automatic Advisor for every session of the machine (AdvisorSetAuto): kept
+   * in the config, every session follows at once, every device hears the
+   * machine's info again. Nothing happens when it already is so.
+   */
+  setAdvisorAuto(on: boolean, device: string): void {
+    if ((this.config.get().advisorAuto === true) === on) return;
+    this.config.update((c) => {
+      if (on) c.advisorAuto = true;
+      else delete c.advisorAuto;
+    });
+    this.core.advisorAutoChanged();
+    this.audit.write({ device, action: on ? "advisor_auto_on" : "advisor_auto_off", path: "", detail: "" });
+    void this.announceInfo();
   }
 
   /**

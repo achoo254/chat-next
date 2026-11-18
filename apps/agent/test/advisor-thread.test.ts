@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { AdvisorTone, ErrorCode, ErrorReason, type Item, Role, ThreadKind, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { ADVISOR_SESSION_INSTRUCTIONS, ADVISOR_SESSION_REMINDER, ADVISOR_TONE_LINES, AdvisorQueue, advisorScratchDir, contextYaml, toneLine } from "../src/advisor/advisor-thread.ts";
+import { questionRefusal, ADVISOR_SESSION_INSTRUCTIONS, ADVISOR_SESSION_REMINDER, ADVISOR_TONE_LINES, AdvisorQueue, advisorScratchDir, contextYaml, toneLine } from "../src/advisor/advisor-thread.ts";
 import { advisorToneOf } from "../src/link/connection.ts";
 import type { GitFailure } from "../src/advisor/git-failure-memory.ts";
 import { AgentError, type CoreOptions } from "../src/core/agent-core.ts";
@@ -456,5 +456,18 @@ describe("the scratch folder and the queue", () => {
     expect(q.shift()?.clientMsgId).toBe("b");
     expect(contextYaml({ screen: "scm", branch: 'main"\nnext: x' })).toBe('copied_from:\n  screen: "scm"\n  branch: "main\\" next: x"');
     expect(contextYaml({})).toBe("");
+  });
+
+  it("reads a surface's extra fields as quoted one-line values under their names, and refuses more, longer or badly named ones", () => {
+    expect(contextYaml({ screen: "wiki", fields: { space: "docs", page_kind: 'draft"\nnext: x' } })).toBe(
+      'copied_from:\n  screen: "wiki"\n  fields:\n    space: "docs"\n    page_kind: "draft\\" next: x"',
+    );
+    // A key that is not a name never becomes YAML, even if the check was skipped.
+    expect(contextYaml({ fields: { "a: b\nc": "x" } })).toBe("");
+    const withFields = (fields: Record<string, string>) => [{ text: "t", context: { fields } }];
+    expect(questionRefusal("q", withFields({ space: "docs" }))).toBeUndefined();
+    expect(questionRefusal("q", withFields(Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`f${i}`, "x"]))))).toMatch(/more than 8 context fields/);
+    expect(questionRefusal("q", withFields({ "Bad Key": "x" }))).toMatch(/not a name/);
+    expect(questionRefusal("q", withFields({ space: "x".repeat(201) }))).toMatch(/longer than 200/);
   });
 });

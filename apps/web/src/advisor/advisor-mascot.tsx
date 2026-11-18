@@ -28,6 +28,8 @@ const CHAT_ROUTES: ReadonlySet<Route["name"]> = new Set(["home", "chat", "invite
  * "chat" (no chat id, no name); the machines screens name the machine.
  */
 export function routeContextOf(route: Route): ScopeContext {
+	// Contacts and bots name their place only: no user id, no bot name.
+	if (route.name === "contacts" || route.name === "bot") return { screen: route.name };
 	if (CHAT_ROUTES.has(route.name)) return { screen: "chat" };
 	if (route.name === "machines") {
 		const view = route.view;

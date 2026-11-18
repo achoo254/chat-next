@@ -18,6 +18,7 @@ import type { MachineEntry } from "../machines/machines-client.ts";
 import { inFolder } from "../machines/projects-view.ts";
 import { EMPTY_JOURNAL, orderedItems, type Journal } from "../machines/transcript/reducer.ts";
 import { useDirectory, useHub, useNow } from "../machines/use-machines.ts";
+import { allowedFields } from "./advisor-surfaces.ts";
 import { advisorStore, lastAi, lastMachine, rememberAi, rememberMachine, useAdvisorState, type AdvisorStore, type CopyRecord, type Mood, type Note, type Question } from "./advisor-store.ts";
 
 /** How long asking waits for the machine's link to open. */
@@ -140,7 +141,9 @@ function oneLine(value: string): string {
 }
 
 /** What goes to the machine for the copies attached: never the machine's own ref (the link names it). */
-export function attachmentsOf(copies: readonly CopyRecord[]): { text: string; context: { screen: string; dir: string; branch: string; threadId: string; panel: string; action: string; errorCode: string; failureId: string } }[] {
+export function attachmentsOf(
+	copies: readonly CopyRecord[],
+): { text: string; context: { screen: string; dir: string; branch: string; threadId: string; panel: string; action: string; errorCode: string; failureId: string; fields: Record<string, string> } }[] {
 	return copies.slice(0, MAX_ATTACHMENTS).map(({ text, context: c }) => ({
 		text,
 		context: {
@@ -152,6 +155,8 @@ export function attachmentsOf(copies: readonly CopyRecord[]): { text: string; co
 			action: oneLine(c.action),
 			errorCode: oneLine(c.errorCode),
 			failureId: oneLine(c.failureId),
+			// Only what the surface lists, one line each; the rest never leaves the page.
+			fields: Object.fromEntries(Object.entries(allowedFields(c.panel, c.screen, c.fields)).map(([key, value]) => [key, oneLine(value)])),
 		},
 	}));
 }

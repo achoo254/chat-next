@@ -22,9 +22,11 @@ export interface CopyContext {
 	readonly action: string;
 	readonly errorCode: string;
 	readonly failureId: string;
+	/** What the screen's surface lists beyond these (advisor-surfaces.ts); inner scopes add to the ones around them. */
+	readonly fields: Readonly<Record<string, string>>;
 }
 
-export const EMPTY_CONTEXT: CopyContext = { screen: "", machine: "", dir: "", branch: "", threadId: "", panel: "", action: "", errorCode: "", failureId: "" };
+export const EMPTY_CONTEXT: CopyContext = { screen: "", machine: "", dir: "", branch: "", threadId: "", panel: "", action: "", errorCode: "", failureId: "", fields: {} };
 
 export interface CopyRecord {
 	readonly id: string;

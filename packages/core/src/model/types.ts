@@ -213,10 +213,12 @@ export interface AdvisorProfile {
 	/** One of the looks the client offers; an unknown one shows the first look. */
 	readonly lookId: string;
 	readonly tone: AdvisorTone;
+	/** Automatic Advisor in every session on every machine; each machine follows it (the device brings it in line on linking). */
+	readonly autoSession: boolean;
 }
 
 /** The profile of a user who never changed it (the server's defaults). */
-export const DEFAULT_ADVISOR_PROFILE: AdvisorProfile = { name: "", lookId: "owl", tone: "short" };
+export const DEFAULT_ADVISOR_PROFILE: AdvisorProfile = { name: "", lookId: "owl", tone: "short", autoSession: false };
 
 export type EntityType =
 	| "bold"

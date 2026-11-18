@@ -89,6 +89,38 @@ describe("Advisor's key over the link", () => {
   });
 });
 
+describe("the machine-wide automatic Advisor switch over the link", () => {
+  it("is taken from a device, and refused when the machine runs sessions without tunelo's MCP, off always working", async () => {
+    const dir = tempDir("advisor-link-");
+    const audit = new AuditLog(join(dir, "audit.jsonl"));
+    const { core } = makeCore([ai(true)]);
+    const held = { on: false, mcp: true };
+    const device = await pairedDevice({
+      core,
+      config: new ConfigStore(dir),
+      audit,
+      advisorAuto: { available: () => held.mcp, set: (on) => (held.on = on) },
+    });
+
+    expect((await device.request("a1", { case: "advisorSetAuto", value: { on: true } })).body.case).toBe("ack");
+    expect(held.on).toBe(true);
+
+    held.mcp = false;
+    const refused = await device.request("a2", { case: "advisorSetAuto", value: { on: true } });
+    expect(refused.body.case === "error" && refused.body.value.reason).toBe(ErrorReason.ADVISOR_UNAVAILABLE);
+    expect((await device.request("a3", { case: "advisorSetAuto", value: { on: false } })).body.case).toBe("ack");
+    expect(held.on).toBe(false);
+  });
+
+  it("a machine without Advisor refuses it as unsupported", async () => {
+    const dir = tempDir("advisor-link-");
+    const { core } = makeCore([ai(true)]);
+    const device = await pairedDevice({ core, config: new ConfigStore(dir), audit: new AuditLog(join(dir, "audit.jsonl")) });
+    const answer = await device.request("a1", { case: "advisorSetAuto", value: { on: true } });
+    expect(answer.body.case === "error" && answer.body.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
+  });
+});
+
 describe("a session's automatic Advisor", () => {
   it("turns on and off, is shown in ThreadInfo, logged with the device, and kept across a restart and /clear", async () => {
     const dir = tempDir("advisor-link-");

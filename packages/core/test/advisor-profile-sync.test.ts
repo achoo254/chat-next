@@ -25,12 +25,12 @@ afterEach(() => {
 describe("Advisor profile mapping", () => {
 	it("maps the profile and its update; unknown tones and empty looks fall back to the defaults", () => {
 		const profile = create(AdvisorProfileSchema, { name: "Cú", lookId: "cat", tone: AdvisorTone.FUN });
-		expect(toAdvisorProfile(profile)).toEqual({ name: "Cú", lookId: "cat", tone: "fun" });
+		expect(toAdvisorProfile(profile)).toEqual({ name: "Cú", lookId: "cat", tone: "fun", autoSession: false });
 		expect(toAdvisorProfile(create(AdvisorProfileSchema, { tone: 9 as AdvisorTone }))).toEqual(DEFAULT_ADVISOR_PROFILE);
 		expect(toWireAdvisorTone("serious")).toBe(AdvisorTone.SERIOUS);
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "advisorProfile", value: { profile } } })).body).toEqual({
 			kind: "advisor_profile",
-			profile: { name: "Cú", lookId: "cat", tone: "fun" },
+			profile: { name: "Cú", lookId: "cat", tone: "fun", autoSession: false },
 		});
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "advisorProfile", value: {} } })).body).toEqual({ kind: "unknown" });
 	});
@@ -38,7 +38,7 @@ describe("Advisor profile mapping", () => {
 	it("reads a stored profile defensively", () => {
 		expect(parseAdvisorProfile(null)).toEqual(DEFAULT_ADVISOR_PROFILE);
 		expect(parseAdvisorProfile("not json")).toEqual(DEFAULT_ADVISOR_PROFILE);
-		expect(parseAdvisorProfile(JSON.stringify({ name: 7, lookId: "robot", tone: "loud" }))).toEqual({ name: "", lookId: "robot", tone: "short" });
+		expect(parseAdvisorProfile(JSON.stringify({ name: 7, lookId: "robot", tone: "loud" }))).toEqual({ name: "", lookId: "robot", tone: "short", autoSession: false });
 	});
 
 	it("exposes the RPCs through createRemoteApi", () => {
@@ -62,14 +62,14 @@ describe("Advisor profile sync", () => {
 		core.events.subscribe(EventKeys.advisorProfile, () => changed.push("advisor"));
 		server.setAdvisor(self, { name: "Bác Cú", tone: AdvisorTone.SERIOUS });
 		await settle(core);
-		expect(await core.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious" });
+		expect(await core.advisorProfile()).toEqual({ name: "Bác Cú", lookId: "robot", tone: "serious", autoSession: false });
 		expect(changed).toHaveLength(1);
 
-		const after = await core.setAdvisorProfile({ tone: "fun", lookId: "cat" });
-		expect(after).toEqual({ name: "Bác Cú", lookId: "cat", tone: "fun" });
+		const after = await core.setAdvisorProfile({ tone: "fun", lookId: "cat", autoSession: true });
+		expect(after).toEqual({ name: "Bác Cú", lookId: "cat", tone: "fun", autoSession: true });
 		expect(await core.advisorProfile()).toEqual(after);
 		await settle(core);
-		expect(server.advisorProfile(self)).toMatchObject({ name: "Bác Cú", lookId: "cat", tone: AdvisorTone.FUN });
+		expect(server.advisorProfile(self)).toMatchObject({ name: "Bác Cú", lookId: "cat", tone: AdvisorTone.FUN, autoSession: true });
 		await core.close();
 	});
 });

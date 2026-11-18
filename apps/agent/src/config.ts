@@ -56,6 +56,8 @@ export type AgentConfig = {
    * Chat and Localman tools). Unset is on.
    */
   sessionMcp?: boolean;
+  /** Automatic Advisor for every session of this machine (AdvisorSetAuto); unset is off. */
+  advisorAuto?: boolean;
   /** The MCP tool groups served on this machine (mcp/groups.ts); unset is all of them. */
   mcpGroups?: ("tunnel" | "chat" | "localman")[];
   /** The user's projects on this machine (projects/projects.ts), in their order. */

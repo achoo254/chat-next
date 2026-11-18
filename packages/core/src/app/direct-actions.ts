@@ -116,6 +116,7 @@ export class DirectActions {
 			...(change.name === undefined ? {} : { name: change.name }),
 			...(change.lookId === undefined ? {} : { lookId: change.lookId }),
 			...(change.tone === undefined ? {} : { tone: toWireAdvisorTone(change.tone) }),
+			...(change.autoSession === undefined ? {} : { autoSession: change.autoSession }),
 		});
 		if (response.profile === undefined) throw new Error("SetAdvisorProfile returned no profile");
 		const profile = toAdvisorProfile(response.profile);

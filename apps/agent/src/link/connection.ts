@@ -106,6 +106,8 @@ export type LinkContext = {
   advisorKeys?: AdvisorKeyStore;
   /** Advisor's key was set or removed: every device hears the machine's info again. */
   onAdvisorKey?: () => void;
+  /** Automatic Advisor for the whole machine (AdvisorSetAuto); absent where the machine has no Advisor (tests). */
+  advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
 };
 
 /** What a device gets for a failed request: a class, a stable reason to word it, and English for the rest. */
@@ -211,7 +213,7 @@ function advisorAttachment(a: AdvisorAttachment): AdvisorAttachmentInput {
   return {
     text: a.text,
     ...(c
-      ? { context: { screen: c.screen, dir: c.dir, branch: c.branch, threadId: c.threadId, panel: c.panel, action: c.action, errorCode: c.errorCode, failureId: c.failureId } }
+      ? { context: { screen: c.screen, dir: c.dir, branch: c.branch, threadId: c.threadId, panel: c.panel, action: c.action, errorCode: c.errorCode, failureId: c.failureId, fields: { ...c.fields } } }
       : {}),
   };
 }
@@ -851,6 +853,15 @@ export class Connection {
           // Sealing waits on the key store: answered later, by id.
           void this.secretFrame(id, b).catch((err: unknown) => this.sendError(id, err));
           return;
+        case "advisorSetAuto": {
+          const auto = this.ctx.advisorAuto;
+          if (!auto) return this.send(id, { case: "error", value: refusal("this machine has no Advisor", ErrorReason.UNSUPPORTED_REQUEST) });
+          if (b.value.on && !auto.available()) {
+            return this.send(id, { case: "error", value: refusal("Advisor needs tunelo's MCP in sessions on this machine", ErrorReason.ADVISOR_UNAVAILABLE) });
+          }
+          auto.set(b.value.on, this.device);
+          return this.send(id, { case: "ack", value: {} });
+        }
         case "advisorSetKey":
         case "advisorRemoveKey":
           if (b.case === "advisorSetKey") rememberAdvisorKey(b.value.key);

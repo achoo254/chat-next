@@ -50,6 +50,8 @@ export type AuditAction =
   | "advisor_key_remove"
   | "advisor_on"
   | "advisor_off"
+  | "advisor_auto_on"
+  | "advisor_auto_off"
   | "mac_folder_access";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
