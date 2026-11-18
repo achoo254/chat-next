@@ -235,7 +235,6 @@ type Event struct {
 	Conversation *Conversation
 	Topic        *TopicChange
 	Pin          *PinChange
-	Read         *Read
 	Participant  *Participant
 	State        []byte
 }

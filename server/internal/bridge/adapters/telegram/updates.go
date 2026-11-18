@@ -72,6 +72,7 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 	d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateEditChannelMessage) error {
 		return message(ctx, e, u.Message, true)
 	})
+	registerPins(d, c, emit)
 	d.OnDeleteMessages(func(ctx context.Context, _ tg.Entities, u *tg.UpdateDeleteMessages) error {
 		// A delete in a private chat or basic group names no chat: the core
 		// finds the message by its id (ids are unique per account there).

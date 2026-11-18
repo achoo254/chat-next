@@ -175,11 +175,20 @@ func (r *runner) run(ctx context.Context) error {
 	subDone := make(chan error, 1)
 	go func() { subDone <- r.adapter.Subscribe(runCtx, r.acct, events) }()
 
+	var caughtUp []*chatLink
 	for _, l := range links {
 		if l.BackfillDone {
+			caughtUp = append(caughtUp, l)
 			continue
 		}
 		if err := r.backfill(runCtx, l); err != nil {
+			return r.settle(runCtx, err)
+		}
+	}
+	// A chat synced before pins were read gets them now; a chat that was just
+	// imported got them at the end of its backfill.
+	for _, l := range caughtUp {
+		if err := r.syncPins(runCtx, l); err != nil {
 			return r.settle(runCtx, err)
 		}
 	}
@@ -270,6 +279,8 @@ func (r *runner) handle(ctx context.Context, ev bridge.Event) error {
 		saved, err = r.onDelete(ctx, ev, *ev.Delete)
 	case ev.Topic != nil:
 		saved, err = r.onTopic(ctx, ev, *ev.Topic)
+	case ev.Pin != nil:
+		saved, err = r.onPin(ctx, ev, *ev.Pin)
 	}
 	if err != nil {
 		if isSkippable(err) {
@@ -403,6 +414,9 @@ func (r *runner) backfill(ctx context.Context, l *chatLink) error {
 		if _, ok := r.links[l.ExternalChat]; !ok {
 			return nil // the chat is gone
 		}
+	}
+	if err := r.syncPins(ctx, l); err != nil {
+		return err
 	}
 	cursor := ""
 	if n := len(msgs); n > 0 {

@@ -261,26 +261,6 @@ func TestLiveTelegramPins(t *testing.T) {
 	}
 }
 
-// messagesOf lists the messages of a search or history result.
-func messagesOf(res tg.MessagesMessagesClass) []*tg.Message {
-	var raw []tg.MessageClass
-	switch v := res.(type) {
-	case *tg.MessagesMessages:
-		raw = v.Messages
-	case *tg.MessagesMessagesSlice:
-		raw = v.Messages
-	case *tg.MessagesChannelMessages:
-		raw = v.Messages
-	}
-	var out []*tg.Message
-	for _, m := range raw {
-		if mm, ok := m.(*tg.Message); ok {
-			out = append(out, mm)
-		}
-	}
-	return out
-}
-
 func messageOf(u tg.UpdateClass) (tg.MessageClass, bool) {
 	switch v := u.(type) {
 	case *tg.UpdateNewChannelMessage:

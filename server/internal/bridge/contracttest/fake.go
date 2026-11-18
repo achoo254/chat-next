@@ -37,6 +37,7 @@ type Fake struct {
 	deletes                                    []bridge.Delete
 	nextID                                     int
 	topics                                     map[string][]bridge.Topic
+	pinned                                     map[string][]string // newest first
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
 	DedupeRandomID bool
@@ -48,7 +49,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 // AddConversation lists a conversation.
@@ -103,7 +104,7 @@ func (f *Fake) Name() string { return f.name }
 
 // Capabilities implements bridge.Adapter.
 func (f *Fake) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true, bridge.CapTopics: true}
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true, bridge.CapTopics: true, bridge.CapPins: true}
 }
 
 // Login implements bridge.Adapter: two input steps, then done.
@@ -345,3 +346,20 @@ func (f *Fake) ListTopics(_ context.Context, _ bridge.Account, conv string) ([]b
 }
 
 var _ bridge.TopicReader = (*Fake)(nil)
+
+// SetPinned sets the ids a conversation has pinned (newest first), as
+// ListPinned answers them.
+func (f *Fake) SetPinned(conv string, ids ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pinned[conv] = append([]string(nil), ids...)
+}
+
+// ListPinned implements bridge.PinReader.
+func (f *Fake) ListPinned(_ context.Context, _ bridge.Account, conv string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.pinned[conv]...), nil
+}
+
+var _ bridge.PinReader = (*Fake)(nil)
