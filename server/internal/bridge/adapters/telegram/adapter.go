@@ -49,9 +49,9 @@ func New(cfg Config) *Adapter {
 func (a *Adapter) Name() string { return Name }
 
 // Capabilities implements bridge.Adapter: history, live updates, edits,
-// deletes, media and sending are all available.
+// deletes, media, sending and forum topics are all available.
 func (a *Adapter) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapMedia: true, bridge.CapSend: true}
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapMedia: true, bridge.CapSend: true, bridge.CapTopics: true}
 }
 
 // Close drops every connection and open login.

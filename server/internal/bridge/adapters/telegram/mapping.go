@@ -251,9 +251,12 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 		out.Media[i].Ref = fmt.Sprintf("%s/%d", conv, msg.ID)
 	}
 	if h, ok := msg.GetReplyTo(); ok {
-		if rh, ok := h.(*tg.MessageReplyHeader); ok && rh.ReplyToMsgID != 0 && rh.ReplyToPeerID == nil {
+		if rh, ok := h.(*tg.MessageReplyHeader); ok && rh.ReplyToMsgID != 0 && rh.ReplyToPeerID == nil && !startsTopic(rh) {
 			out.ReplyTo = strconv.Itoa(rh.ReplyToMsgID)
 		}
+	}
+	if b.isForum(msg.PeerID) {
+		out.Topic = topicOf(msg)
 	}
 	return out, true
 }

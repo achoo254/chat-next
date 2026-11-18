@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"time"
 
 	"app.local/server/internal/bridge"
 	"github.com/gotd/td/telegram/updates"
@@ -42,7 +43,14 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 		}
 	}
 	message := func(ctx context.Context, e tg.Entities, raw tg.MessageClass, edit bool) error {
-		m, ok := fromEntities(e).mapMessage(raw, self)
+		book := fromEntities(e)
+		if conv, topic, created, ok := book.topicAction(raw); ok {
+			if edit {
+				return nil
+			}
+			return emitTopic(ctx, c, emit, raw, conv, topic, created)
+		}
+		m, ok := book.mapMessage(raw, self)
 		if !ok {
 			return nil
 		}
@@ -98,4 +106,30 @@ func idStrings(ids []int) []string {
 		out[i] = strconv.Itoa(id)
 	}
 	return out
+}
+
+// emitTopic turns the service message of a topic that was opened or changed
+// into a topic event. It asks Telegram what the topic is now (the message names
+// only what changed). If that fails for a new topic, the event is made from the
+// service message itself; a change that cannot be read is dropped, and the
+// engine learns the topic from the next listing.
+func emitTopic(ctx context.Context, c *conn, emit func(context.Context, bridge.Event) error, raw tg.MessageClass, conv, topic string, created bool) error {
+	t, err := c.topicNow(ctx, conv, topic)
+	if err != nil {
+		s, ok := raw.(*tg.MessageService)
+		action, isCreate := tg.MessageActionClass(nil), false
+		if ok {
+			action = s.Action
+		}
+		var title string
+		var color int
+		if a, is := action.(*tg.MessageActionTopicCreate); is {
+			isCreate, title, color = true, a.Title, a.IconColor
+		}
+		if !created || !isCreate {
+			return nil
+		}
+		t = bridge.Topic{ID: topic, Title: title, IconColor: color, Created: time.Unix(int64(s.Date), 0)}
+	}
+	return emit(ctx, bridge.Event{Topic: &bridge.TopicChange{Conversation: conv, Topic: t}})
 }

@@ -43,7 +43,7 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 		return bridge.SentRef{}, err
 	}
 	ents := c.outEntities(m.Entities)
-	reply, err := replyTo(m.ReplyTo)
+	reply, err := topicReplyTo(m.ReplyTo, m.Topic)
 	if err != nil {
 		return bridge.SentRef{}, err
 	}
@@ -56,28 +56,20 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 		return u, []int64{m.RandomID}, err
 	}
 	u, randoms, err := send(reply)
-	if tgerr.Is(err, "REPLY_MESSAGE_ID_INVALID", "MESSAGE_ID_INVALID") && reply != nil {
+	if tgerr.Is(err, "REPLY_MESSAGE_ID_INVALID", "MESSAGE_ID_INVALID") && m.ReplyTo != "" {
 		// The message answered is gone over there: the answer is sent as a
-		// plain message rather than not at all.
-		u, randoms, err = send(nil)
+		// plain message (still in its topic) rather than not at all.
+		plain, perr := topicReplyTo("", m.Topic)
+		if perr != nil {
+			return bridge.SentRef{}, perr
+		}
+		u, randoms, err = send(plain)
 	}
 	if err != nil {
 		return bridge.SentRef{}, translateSend(err)
 	}
 	c.apply(ctx, u)
 	return sentRef(u, randoms)
-}
-
-// replyTo is the reply header for the id of the message answered.
-func replyTo(id string) (tg.InputReplyToClass, error) {
-	if id == "" {
-		return nil, nil
-	}
-	n, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, fmt.Errorf("telegram: bad reply id %q", id)
-	}
-	return &tg.InputReplyToMessage{ReplyToMsgID: n}, nil
 }
 
 // EditMessage implements bridge.Sender. Sending the text a message already
@@ -216,7 +208,8 @@ func translateSend(err error) error {
 		"CHAT_SEND_PHOTOS_FORBIDDEN", "CHAT_SEND_DOCS_FORBIDDEN", "CHAT_SEND_AUDIOS_FORBIDDEN", "CHAT_SEND_VIDEOS_FORBIDDEN",
 		"CHAT_SEND_VOICES_FORBIDDEN", "CHAT_RESTRICTED", "USER_BANNED_IN_CHANNEL", "USER_IS_BLOCKED", "USER_PRIVACY_RESTRICTED",
 		"USER_BOT_BLOCKED", "CHANNEL_PRIVATE", "CHANNEL_INVALID", "PEER_ID_INVALID", "INPUT_USER_DEACTIVATED",
-		"MESSAGE_AUTHOR_REQUIRED", "MESSAGE_DELETE_FORBIDDEN", "EDIT_MESSAGE_FORBIDDEN", "CHAT_ID_INVALID":
+		"MESSAGE_AUTHOR_REQUIRED", "MESSAGE_DELETE_FORBIDDEN", "EDIT_MESSAGE_FORBIDDEN", "CHAT_ID_INVALID",
+		"TOPIC_CLOSED", "TOPIC_DELETED", "TOPIC_ID_INVALID", "TOPIC_NOT_MODIFIED":
 		return fmt.Errorf("%w: %s", bridge.ErrNotAllowed, rpc.Type)
 	case "MESSAGE_EDIT_TIME_EXPIRED":
 		return fmt.Errorf("%w: %s", bridge.ErrEditExpired, rpc.Type)

@@ -105,7 +105,7 @@ func (b *peerBook) conversationOf(p tg.PeerClass, self int64) (bridge.Conversati
 		if ch.Broadcast {
 			kind = bridge.ConvChannel
 		}
-		return bridge.Conversation{ID: id, Kind: kind, Title: ch.Title}, true
+		return bridge.Conversation{ID: id, Kind: kind, Title: ch.Title, Forum: ch.Forum && !ch.Broadcast}, true
 	}
 	return bridge.Conversation{}, false
 }
