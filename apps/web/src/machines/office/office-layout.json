@@ -899,6 +899,7 @@
 			"face": -3.1416,
 			"sit": true,
 			"seat": 0.547,
+			"keyboard": true,
 			"home": "director",
 			"node": "director"
 		},
@@ -2882,7 +2883,8 @@
 			"x": -6.75,
 			"z": 3.08,
 			"rotY": 0.0,
-			"y": 0.75
+			"y": 0.75,
+			"anchor": "director"
 		},
 		{
 			"name": "desk-lamp",
