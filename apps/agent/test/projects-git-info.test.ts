@@ -13,6 +13,8 @@ import { Projects } from "../src/projects/projects.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
 import { tempDir } from "./harness.ts";
 
+const posix = process.platform !== "win32"; // Windows rejects some characters these tests use in file and folder names.
+
 const git = (dir: string, ...args: string[]) => execFileSync("git", ["-C", dir, ...args], { stdio: "pipe" });
 
 /** A repository on branch `main` whose origin is `remote`. */
@@ -59,7 +61,7 @@ describe("reading a folder's remote and branch", () => {
     expect(await gitOriginUrl(repo(join(plain, "no-remote")))).toBeUndefined();
   });
 
-  it("runs nothing for a hostile folder name, remote value or repository config", async () => {
+  it.skipIf(!posix)("runs nothing for a hostile folder name, remote value or repository config", async () => {
     const root = tempDir("git-hostile-");
     const marker = join(root, "pwned");
     const names = [`-C ${root}`, `$(touch ${marker})`, `\`touch ${marker}\``, `a; touch ${marker}`, `'"| touch ${marker} &`];

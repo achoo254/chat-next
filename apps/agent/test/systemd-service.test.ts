@@ -18,6 +18,9 @@ import {
   unitPath,
 } from "../src/systemd-service.ts";
 
+// Unit text is built from POSIX paths.
+const posix = process.platform !== "win32";
+
 /** An execFile-like failure: missing program (ENOENT) or a non-zero exit with stderr. */
 const failed = (stderr: string, code: string | number = 1) => Object.assign(new Error(`Command failed: ${stderr}`), { code, stderr });
 
@@ -52,7 +55,7 @@ const placeUnit = () => {
 };
 
 describe("systemd unit", () => {
-  it("runs the agent, restarts it forever and appends its output to agent.log", () => {
+  it.skipIf(!posix)("runs the agent, restarts it forever and appends its output to agent.log", () => {
     const unit = systemdUnit({ command: ["/home/dat/.local/bin/tunelo", "run"], configDir: "/home/dat/.config/tunelo", home: "/home/dat", path: undefined });
     expect(unit).toContain('ExecStart="/home/dat/.local/bin/tunelo" "run"');
     expect(unit).toContain('Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"');
@@ -65,7 +68,7 @@ describe("systemd unit", () => {
     expect(unit).toMatch(/\[Install\]\nWantedBy=default\.target/);
   });
 
-  it("keeps the installing shell's folders on PATH, so the service finds the same claude", () => {
+  it.skipIf(!posix)("keeps the installing shell's folders on PATH, so the service finds the same claude", () => {
     expect(servicePath("/home/dat", "/home/dat/.local/bin:/home/dat/.nvm/versions/node/v24/bin:/usr/bin:relative:/opt/50%/bin")).toBe(
       "%h/.local/bin:/usr/local/bin:/usr/bin:/bin:/home/dat/.nvm/versions/node/v24/bin:/opt/50%%/bin",
     );

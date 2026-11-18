@@ -27,6 +27,9 @@ import { Channel } from "../src/util/channel.ts";
 import { tempDir } from "./harness.ts";
 import { pairedDevice } from "./support/device-link.ts";
 
+// The test's fake files are keyed by POSIX paths, but join() builds backslash paths.
+const posix = process.platform !== "win32";
+
 process.env.TUNELO_KEYSTORE = "file";
 
 const VALUE = "Pa$$w0rd 'quoted' & más";
@@ -99,7 +102,7 @@ describe("names and sites", () => {
 		expect(envNamesIn("echo $tunelo_secret_x")).toEqual([]);
 	});
 
-	it("reads a browser's debugging port from its command line or its DevToolsActivePort", () => {
+	it.skipIf(!posix)("reads a browser's debugging port from its command line or its DevToolsActivePort", () => {
 		const files: Record<string, string> = { "/p/DevToolsActivePort": "53001\n/devtools/browser/x" };
 		const ports = portsFromCommandLines(
 			["chrome --remote-debugging-port=9222 --user-data-dir=/a", "chrome --remote-debugging-port=0 --user-data-dir=/p", "chrome --remote-debugging-pipe", "node app.js"],

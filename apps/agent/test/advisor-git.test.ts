@@ -18,6 +18,8 @@ import { gitRunner } from "../src/workspace/git-run.ts";
 import { tempDir } from "./harness.ts";
 import { TEST_GIT_CONFIG, commitAll, git, repo, workspaces } from "./support/workspace-fixture.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 const textOf = (r: { content: { type: string; text?: string }[] }): string => r.content.map((c) => c.text ?? "").join("");
 
 /** A workspace with a remote, and another clone that pushed first: the workspace's own commit cannot be pushed. */
@@ -156,7 +158,7 @@ describe("advisor_git", () => {
     ]);
   });
 
-  it("advisor_grep: matching lines of the folder, never a secret file, a file in a sensitive folder or a link out of the folder", async () => {
+  it.skipIf(!posix)("advisor_grep: matching lines of the folder, never a secret file, a file in a sensitive folder or a link out of the folder", async () => {
     const outside = tempDir("adv-outside-");
     writeFileSync(join(outside, ".env"), "NEEDLE_PASSWORD=hunter2\n");
     writeFileSync(join(outside, "notes.txt"), "NEEDLE outside\n");

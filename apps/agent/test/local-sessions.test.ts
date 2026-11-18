@@ -10,6 +10,8 @@ import { cleanPrompt } from "../src/providers/claude/transcript.ts";
 import { tempDir } from "./harness.ts";
 import { Transcript } from "./support/claude-transcript.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 const NOW = Date.parse("2026-11-09T05:00:00.000Z");
 const HOUR = 3_600_000;
 
@@ -130,7 +132,7 @@ describe("listing", () => {
     expect(sessions([home]).list(all).sessions.map((s) => s.sessionId)).toEqual([id]);
   });
 
-  test("a profile's projects folder linked to the machine's lists each session once", () => {
+  test.skipIf(!posix)("a profile's projects folder linked to the machine's lists each session once", () => {
     const home = tempDir("claude-home-");
     const t = new Transcript(randomUUID(), "/w/x").opening();
     t.user("one");

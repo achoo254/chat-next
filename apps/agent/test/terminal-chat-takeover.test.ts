@@ -15,6 +15,8 @@ import { tempDir } from "./harness.ts";
 import { FakeTermHost, fakeUnit } from "./support/fake-term-host.ts";
 import { terminalMachine } from "./support/terminal-device.ts";
 
+// The fake terminal host listens on a unix socket at a file path, which Windows does not support.
+const posix = process.platform !== "win32";
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
   for (const c of cleanup.splice(0).reverse()) await c();
@@ -82,7 +84,7 @@ async function until(check: () => boolean, what: string, ms = 3000): Promise<voi
   }
 }
 
-describe("chat taking a thread back from its terminal", () => {
+describe.skipIf(!posix)("chat taking a thread back from its terminal", () => {
   it("hangs up the idle CLI's terminal and runs the message in the machine's own session", async () => {
     const { m, host, threadId } = await setup();
     await m.core.send(threadId, "from chat", "c1");

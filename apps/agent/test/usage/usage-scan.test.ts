@@ -9,6 +9,8 @@ import type { UsageFile, UsageLineStats } from "../../src/providers/types.ts";
 import { tempDir } from "../harness.ts";
 import { MARKER, appendLines, mainFile, minute, replyRecord, subagentFile, toolResultRecord, userRecord, writeLines } from "./usage-fixture.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 const SID = "11111111-1111-4111-8111-111111111111";
 const stats = (): UsageLineStats => ({ records: 0, withUsage: 0, parseErrors: 0, overCap: 0, unknownTypes: {} });
 
@@ -18,7 +20,7 @@ function fileOf(path: string): UsageFile {
 }
 
 describe("listing transcripts", () => {
-  it("lists main sessions and subagents (nested too), skips links, and reads a projects folder linked from two homes once", async () => {
+  it.skipIf(!posix)("lists main sessions and subagents (nested too), skips links, and reads a projects folder linked from two homes once", async () => {
     const root = tempDir("usage-list-");
     const home = join(root, "claude");
     const main = mainFile(home, "-work-example", SID);

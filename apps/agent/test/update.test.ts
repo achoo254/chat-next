@@ -6,6 +6,9 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { archiveName, assetName, newestRelease, signedComment, termHostAssetName, trustedComment, unpackArchive, verifyMinisign } from "../src/update.ts";
 
+// The release script needs sh, tar and zip, which Windows lacks.
+const posix = process.platform !== "win32";
+
 const dir = join(import.meta.dirname, "fixtures");
 const file = new Uint8Array(readFileSync(join(dir, "payload.bin")));
 const pub = readFileSync(join(dir, "test.pub"), "utf8").split(/\r?\n/)[1] ?? "";
@@ -57,7 +60,7 @@ describe("release archives", () => {
     ["win32", "x64"],
   ] as const;
 
-  it("unpacks every archive the release script packs, with the executable files and their signatures", () => {
+  it.skipIf(!posix)("unpacks every archive the release script packs, with the executable files and their signatures", () => {
     const root = mkdtempSync(join(tmpdir(), "tunelo-package-"));
     try {
       const dist = join(root, "dist");

@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { OutsideFolderError, listSessionFiles } from "../src/safety/session-files.ts";
 import { tempDir } from "./harness.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 function project() {
   const root = tempDir();
   const outside = tempDir();
@@ -21,7 +23,7 @@ function project() {
 const open = { isSensitive: () => false };
 const paths = (l: { entries: { path: string }[] }) => l.entries.map((e) => e.path);
 
-describe("session files", () => {
+describe.skipIf(!posix)("session files", () => {
   it("lists shallow paths first and skips .git and node_modules", () => {
     const { root } = project();
     const all = paths(listSessionFiles(root, "", open));

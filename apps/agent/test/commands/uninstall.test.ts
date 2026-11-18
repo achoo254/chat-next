@@ -9,6 +9,9 @@ import { join, win32 } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { PATH_LINE, type UninstallDeps, type UninstallEnvironment, uninstall, uninstallTargets, withoutPathLine } from "../../src/commands/uninstall.ts";
 
+// Expected paths are POSIX paths.
+const posix = process.platform !== "win32";
+
 let home = "";
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "tunelo-uninstall-"));
@@ -44,7 +47,7 @@ function deps(environment: UninstallEnvironment, over: Partial<UninstallDeps> = 
 const profile = (text: string) => `# mine\nalias ll='ls -l'\n${text}`;
 
 describe("uninstall targets", () => {
-  test("macOS: the config folder in use and Application Support, the binaries in ~/.local/bin, the shell profiles", () => {
+  test.skipIf(!posix)("macOS: the config folder in use and Application Support, the binaries in ~/.local/bin, the shell profiles", () => {
     const t = uninstallTargets({ platform: "darwin", home: "/Users/u", env: {}, configDir: "/Users/u/.config/tunelo", binary: "/Users/u/.local/bin/tunelo" });
     expect(t).toEqual({
       dirs: ["/Users/u/.config/tunelo", "/Users/u/Library/Application Support/tunelo"],

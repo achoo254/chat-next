@@ -14,6 +14,8 @@ import { fakeQuery } from "./fake-sdk.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
 import { Transcript } from "./support/claude-transcript.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode, and a test compares POSIX path separators.
+
 const none = { sensitive: false, projectSettings: false };
 const cores: AgentCore[] = [];
 afterEach(async () => {
@@ -45,7 +47,7 @@ function transcriptOf(claudeHome: string, sessionId: string, cwd: string, ago = 
 }
 
 describe("deleting a thread", () => {
-  test("moves only the session's transcript, its folder and the files its messages saved to the trash, and tells every device", async () => {
+  test.skipIf(!posix)("moves only the session's transcript, its folder and the files its messages saved to the trash, and tells every device", async () => {
     const { core, work, sessionId, claudeHome, trashed, audit } = setup();
     const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: none, device: "phone" });
     await until(core, thread.id, turnsDone(1));
@@ -115,7 +117,7 @@ describe("deleting a thread", () => {
     expect(core.list()).toHaveLength(0);
   });
 
-  test("a saved path that leaves the attachments folder, or a link in it, is never trashed", async () => {
+  test.skipIf(!posix)("a saved path that leaves the attachments folder, or a link in it, is never trashed", async () => {
     const { core, work, trashed, dataDir } = setup();
     const thread = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent: none, device: "phone" });
     await until(core, thread.id, turnsDone(1));

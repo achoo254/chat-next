@@ -14,6 +14,8 @@ import { fakeProvider } from "./fake-provider.ts";
 import { fakeQuery } from "./fake-sdk.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 1, 2, 3]);
 const consent = { sensitive: false, projectSettings: false };
 const never = () => false;
@@ -164,7 +166,7 @@ describe("files saved in the session's folder", () => {
     expect(readFileSync(join(common, "info", "exclude"), "utf8")).toContain(`${ATTACHMENTS_FOLDER}/`);
   });
 
-  it("refuses an attachments folder that links out of the session's folder", () => {
+  it.skipIf(!posix)("refuses an attachments folder that links out of the session's folder", () => {
     const root = tempDir();
     const cwd = join(root, "proj");
     const outside = join(root, "outside");

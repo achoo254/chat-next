@@ -19,6 +19,8 @@ import type { AgentProvider, HistoryEntry, SessionHistory, TerminalCommand, Term
 import { fakeProvider } from "./fake-provider.ts";
 import { byCase, makeCore, tempDir } from "./harness.ts";
 
+// The test runs a script through /bin/sh, which Windows does not have.
+const posix = process.platform !== "win32";
 const consent = { sensitive: false, projectSettings: false };
 const cores: AgentCore[] = [];
 afterEach(async () => {
@@ -64,7 +66,7 @@ describe("claude in the terminal with Advisor", () => {
     expect(out.env).toEqual({});
   });
 
-  it("each part of the note command, and tunelo's folder, reach the program as they are, through the shell the CLI runs hooks in", () => {
+  it.skipIf(!posix)("each part of the note command, and tunelo's folder, reach the program as they are, through the shell the CLI runs hooks in", () => {
     const dir = tempDir("adv-term-quote-");
     const program = join(dir, "it's a tunelo $HOME");
     writeFileSync(program, '#!/bin/sh\nprintf "<%s>" "$TUNELO_HOME"; for a in "$@"; do printf "[%s]" "$a"; done\n');

@@ -20,6 +20,8 @@ import { type DeviceConnection, termDatas, termSignals, termStatuses, terminalMa
 import { T, attachFrame, helloFrame, inputFrame, readServerFrame } from "./support/terminal-frames.ts";
 
 // Any existing file stands for the binary: the fake unit starts the stand-in instead.
+// The fake terminal host listens on a unix socket at a file path, which Windows does not support.
+const posix = process.platform !== "win32";
 const env = { TUNELO_TERM_HOST_BIN: "/bin/sh" };
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -60,7 +62,7 @@ describe("terminal permission", () => {
     expect(m.host.commands).toEqual([]);
   });
 
-  it("refuses a device revoked while its connection is open, and writes the refusal to the consent log", async () => {
+  it.skipIf(!posix)("refuses a device revoked while its connection is open, and writes the refusal to the consent log", async () => {
     const m = await setup();
     const device = await m.pair();
     const c = await m.connect(device);
@@ -78,7 +80,7 @@ describe("terminal permission", () => {
   });
 });
 
-describe("terminal signaling", () => {
+describe.skipIf(!posix)("terminal signaling", () => {
   it("grants a link to the paired device under its whole key and relays offer, answer and candidates both ways", async () => {
     const m = await setup();
     const device = await m.pair();
@@ -126,7 +128,7 @@ describe("terminal signaling", () => {
 });
 
 describe("terminal relay path", () => {
-  it("carries terminal frames byte for byte: Hello is answered and a keystroke comes back", async () => {
+  it.skipIf(!posix)("carries terminal frames byte for byte: Hello is answered and a keystroke comes back", async () => {
     const m = await setup();
     const c = await m.connect(await m.pair());
     c.send({ case: "termData", value: { link: 2, data: helloFrame() } });
@@ -142,7 +144,7 @@ describe("terminal relay path", () => {
     expect(statuses(c, 2).map((s) => s.path)).toEqual([TermPath.RELAY]);
   });
 
-  it("a slow chat request on the same connection does not hold a keystroke's echo back", async () => {
+  it.skipIf(!posix)("a slow chat request on the same connection does not hold a keystroke's echo back", async () => {
     const m = await setup();
     const c = await m.connect(await m.pair());
     c.send({ case: "termData", value: { link: 1, data: helloFrame() } });
@@ -170,7 +172,7 @@ describe("terminal relay path", () => {
     expect((await ping).body.case).toBe("pong");
   });
 
-  it("a broken terminal frame ends only its link; a forged message ends only its connection, chat goes on", async () => {
+  it.skipIf(!posix)("a broken terminal frame ends only its link; a forged message ends only its connection, chat goes on", async () => {
     const m = await setup();
     const device = await m.pair();
     const chat = await m.connect(device);
@@ -190,7 +192,7 @@ describe("terminal relay path", () => {
     expect((await chat.request("p2", { case: "ping", value: {} })).body.case).toBe("pong");
   });
 
-  it("holds output while the device's socket is full and sends it in order once it drains", async () => {
+  it.skipIf(!posix)("holds output while the device's socket is full and sends it in order once it drains", async () => {
     const m = await setup();
     let full = true;
     const c = await m.connect(await m.pair(), () => (full ? 10 * 1024 * 1024 : 0));
@@ -223,7 +225,7 @@ describe("terminal relay path", () => {
 });
 
 describe("terminal sessions", () => {
-  it("lists, opens, resizes and closes sessions; limits and gone sessions get their reasons", async () => {
+  it.skipIf(!posix)("lists, opens, resizes and closes sessions; limits and gone sessions get their reasons", async () => {
     const m = await setup();
     const c = await m.connect(await m.pair());
     const opened = await c.request("1", { case: "termOpen", value: { cols: 80, rows: 24, cwd: "" } });
@@ -247,7 +249,7 @@ describe("terminal sessions", () => {
     expect(full.body).toMatchObject({ case: "error", value: { reason: ErrorReason.TERMINAL_SESSION_LIMIT } });
   });
 
-  it("gives a shell the selected Claude profile's folder only when it is not the default one", async () => {
+  it.skipIf(!posix)("gives a shell the selected Claude profile's folder only when it is not the default one", async () => {
     const m = await setup({ shellEnv: () => ({ CLAUDE_CONFIG_DIR: "/Users/someone/.config/tunelo/claude/p1" }) });
     const c = await m.connect(await m.pair());
     await c.request("1", { case: "termOpen", value: { cols: 80, rows: 24, cwd: "" } });
@@ -270,7 +272,7 @@ describe("terminal sessions", () => {
   });
 });
 
-describe("terminal revocation and reconnects", () => {
+describe.skipIf(!posix)("terminal revocation and reconnects", () => {
   it("revoking a device closes its links at once; set_revoked always goes before any grant after a reconnect", async () => {
     const m = await setup();
     const device = await m.pair();
@@ -353,7 +355,7 @@ describe("terminal revocation and reconnects", () => {
   });
 });
 
-describe("connections left by an earlier agent run", () => {
+describe.skipIf(!posix)("connections left by an earlier agent run", () => {
   const closes = (host: FakeTermHost) => host.commands.filter((x) => x.cmd === "conn_close").map((x) => x.conn);
 
   it("closes the ones this run does not hold after the grace, keeps its own across reconnects, and never touches sessions", async () => {
@@ -415,7 +417,7 @@ describe("connections left by an earlier agent run", () => {
   });
 });
 
-describe("terminal availability", () => {
+describe.skipIf(!posix)("terminal availability", () => {
   it("is missing without a binary, incompatible without a supervisor or for another major, available once connected", async () => {
     const missing = await terminalMachine({ unit: fakeUnit(new FakeTermHost(tempDir())), env: { TUNELO_TERM_HOST_BIN: "/no/such/binary" } });
     expect(missing.terminal.availability()).toBe(TerminalAvailability.MISSING);

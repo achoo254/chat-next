@@ -14,6 +14,9 @@ import { MAC_ASK_IN_TURN_MS, type AskOutcome, type MacFolderGate, macFolderBefor
 import { fakeProvider } from "./fake-provider.ts";
 import { makeCore, until } from "./harness.ts";
 
+// macOS folder logic is built on POSIX paths (/Users/...).
+const posix = process.platform !== "win32";
+
 const HOME = "/Users/an";
 const DOCS = `${HOME}/Documents`;
 
@@ -108,7 +111,7 @@ describe("agy's permission request", () => {
 });
 
 describe("a tool call held in a folder not granted", () => {
-  it("stops the turn after MAC_STALL_MS with an error naming the folder, and the session takes the next message", async () => {
+  it.skipIf(!posix)("stops the turn after MAC_STALL_MS with an error naming the folder, and the session takes the next message", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { g } = gate("unanswered");
     const { core, work } = makeCore([fakeProvider()], { more: { macFolders: g } });

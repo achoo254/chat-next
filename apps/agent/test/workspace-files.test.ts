@@ -13,7 +13,7 @@ import { tempDir } from "./harness.ts";
 import { commitAll, git, reasonOf, repo, workspaces } from "./support/workspace-fixture.ts";
 
 const PAGE = { afterName: "", afterDir: false, limit: 0, showHidden: false, hideIgnored: false };
-const posix = process.platform !== "win32";
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode, and rejects some characters in file names.
 
 /** A workspace "w" in a fresh repository, beside a folder outside it with a file the tests must never reach. */
 function setup() {
@@ -50,7 +50,7 @@ describe("paths a device names", () => {
 });
 
 describe("escaping the workspace", () => {
-  it("refuses .., absolute paths and links that end outside, and reads nothing there", async () => {
+  it.skipIf(!posix)("refuses .., absolute paths and links that end outside, and reads nothing there", async () => {
     const { ws, dir, outside } = setup();
     symlinkSync(outside, join(dir, "out-dir"));
     symlinkSync(join(outside, "secret.txt"), join(dir, "out-file"));
@@ -64,7 +64,7 @@ describe("escaping the workspace", () => {
     expect(page.entries.find((e) => e.name === "out-file")).toMatchObject({ symlink: true, outside: true });
   });
 
-  it("follows a link that stays inside, and survives a link loop", async () => {
+  it.skipIf(!posix)("follows a link that stays inside, and survives a link loop", async () => {
     const { ws, dir } = setup();
     mkdirSync(join(dir, "real"));
     writeFileSync(join(dir, "real", "a.txt"), "inside");
@@ -117,7 +117,7 @@ describe("escaping the workspace", () => {
 });
 
 describe("secret files", () => {
-  it("are never listed, read or found, even with hidden files shown", async () => {
+  it.skipIf(!posix)("are never listed, read or found, even with hidden files shown", async () => {
     const { ws, dir } = setup();
     const secrets = [".env", ".env.local", "id_rsa", "server.pem", ".npmrc", "credentials"];
     for (const name of secrets) writeFileSync(join(dir, name), "TOKEN=SECRET-VALUE-123");
@@ -331,7 +331,7 @@ describe("finding files", () => {
 });
 
 describe("hostile file names", () => {
-  it("are only characters: listed, read and found, running nothing", async () => {
+  it.skipIf(!posix)("are only characters: listed, read and found, running nothing", async () => {
     const { ws, dir, base } = setup();
     // A shell would make "pwned" in its working folder: the workspace, its parent or the test's.
     const markers = [join(dir, "pwned"), join(base, "pwned"), join(process.cwd(), "pwned")];

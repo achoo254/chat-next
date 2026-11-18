@@ -14,6 +14,8 @@ import { tempDir } from "./harness.ts";
 import { FakeTermHost, fakeUnit } from "./support/fake-term-host.ts";
 import { terminalMachine } from "./support/terminal-device.ts";
 
+// The fake terminal host listens on a unix socket at a file path, which Windows does not support.
+const posix = process.platform !== "win32";
 const env = { TUNELO_TERM_HOST_BIN: "/bin/sh" };
 /** The pid the stand-in terminal process reports. */
 const HOST_PID = 999_999;
@@ -59,7 +61,7 @@ async function until(check: () => boolean, what: string, ms = 3000): Promise<voi
   }
 }
 
-describe("a thread's AI in the terminal", () => {
+describe.skipIf(!posix)("a thread's AI in the terminal", () => {
   it("the device names only the thread: the agent runs the AI's CLI in the thread's folder, resuming its session", async () => {
     const provider = cliProvider();
     const m = await setup(provider);

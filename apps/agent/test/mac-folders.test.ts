@@ -6,18 +6,21 @@ import { describe, expect, test, vi } from "vitest";
 import { MacFolderRefused, MacFolders, type MacFoldersOptions, type ProbeAnswer, probeHere, protectedFolderOf } from "../src/safety/mac-folders.ts";
 import { tempDir } from "./harness.ts";
 
+// macOS folder logic is built on POSIX paths (/Users/...).
+const posix = process.platform !== "win32";
+
 const HOME = "/Users/an";
 const notStartup = () => false;
 
 describe("protectedFolderOf", () => {
-  test("Desktop, Documents, Downloads and iCloud Drive, at any depth", () => {
+  test.skipIf(!posix)("Desktop, Documents, Downloads and iCloud Drive, at any depth", () => {
     expect(protectedFolderOf(`${HOME}/Documents`, HOME, notStartup)).toBe(`${HOME}/Documents`);
     expect(protectedFolderOf(`${HOME}/Desktop/a/b`, HOME, notStartup)).toBe(`${HOME}/Desktop`);
     expect(protectedFolderOf(`${HOME}/Downloads/x`, HOME, notStartup)).toBe(`${HOME}/Downloads`);
     expect(protectedFolderOf(`${HOME}/Library/Mobile Documents/com~apple~CloudDocs/p`, HOME, notStartup)).toBe(`${HOME}/Library/Mobile Documents`);
   });
 
-  test("each cloud provider's folder and each other volume is its own", () => {
+  test.skipIf(!posix)("each cloud provider's folder and each other volume is its own", () => {
     expect(protectedFolderOf(`${HOME}/Library/CloudStorage/GoogleDrive-an/My Drive`, HOME, notStartup)).toBe(`${HOME}/Library/CloudStorage/GoogleDrive-an`);
     expect(protectedFolderOf("/Volumes/USB/work", HOME, notStartup)).toBe("/Volumes/USB");
     expect(protectedFolderOf("/Volumes/Macintosh HD/Users", HOME, (v) => v === "/Volumes/Macintosh HD")).toBeUndefined();
@@ -55,7 +58,7 @@ function folders(over: Partial<MacFoldersOptions> = {}) {
 }
 
 describe("MacFolders", () => {
-  test("a folder never asked for is refused, with the folder it falls in", () => {
+  test.skipIf(!posix)("a folder never asked for is refused, with the folder it falls in", () => {
     const { f } = folders();
     expect(f.allows(`${HOME}/work`)).toBe(true);
     expect(f.allows(`${HOME}/Documents/p`)).toBe(false);
@@ -78,7 +81,7 @@ describe("MacFolders", () => {
     ]);
   });
 
-  test("asks macOS only for a protected folder itself, once at a time, and keeps its answer", async () => {
+  test.skipIf(!posix)("asks macOS only for a protected folder itself, once at a time, and keeps its answer", async () => {
     const { f, saved, changes, probes, finish } = folders();
     expect(f.ask(`${HOME}/Documents/p`)).toBe(false);
     expect(f.ask(`${HOME}/work`)).toBe(false);
@@ -93,7 +96,7 @@ describe("MacFolders", () => {
     expect(f.allows(`${HOME}/Documents/p`)).toBe(true);
   });
 
-  test("a prompt nobody answered, or a folder that is gone, leaves it not asked", async () => {
+  test.skipIf(!posix)("a prompt nobody answered, or a folder that is gone, leaves it not asked", async () => {
     for (const answer of [undefined, "missing"] as const) {
       const { f, saved, changes, finish } = folders();
       f.ask(`${HOME}/Desktop`);

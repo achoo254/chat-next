@@ -28,6 +28,9 @@ import {
 	waitFor,
 } from "../support/mcp-harness.ts";
 
+// Stopping a process by SIGTERM kills it outright on Windows, so it never removes its record.
+const posix = process.platform !== "win32";
+
 const BIG_BODY = "x".repeat(MCP_BODY_LIMIT + 100);
 
 let bundle: string;
@@ -155,7 +158,7 @@ describe("tunelo mcp: requests and tunnel processes", () => {
 		await call("close_tunnel", { id: tunnel.id });
 	});
 
-	test("reads and stops a `tunelo http` running in another process", async () => {
+	test.skipIf(!posix)("reads and stops a `tunelo http` running in another process", async () => {
 		const child: ChildProcess = spawn(
 			process.execPath,
 			[bundle, "http", String(appPort), "-s", "watched", "--server"].concat([

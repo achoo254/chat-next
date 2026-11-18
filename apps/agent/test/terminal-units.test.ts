@@ -12,10 +12,13 @@ import { termHostSystemdUnit } from "../src/systemd-service.ts";
 import { TERM_HOST_BINARY, locateTermHost, restorePreviousTermHost, switchStagedTermHost } from "../src/terminal/host-supervisor.ts";
 import { tempDir } from "./harness.ts";
 
+// Unit text is built from POSIX paths.
+const posix = process.platform !== "win32";
+
 const run = promisify(execFile);
 
 describe("the terminal process's units", () => {
-  it("launchd: its own label, restarted only after a crash, interactive, the config folder passed on", () => {
+  it.skipIf(!posix)("launchd: its own label, restarted only after a crash, interactive, the config folder passed on", () => {
     const plist = termHostPlist({ label: "com.hoandat.tunelo.term-host", bin: "/opt/t&t/tunelo-term-host", configDir: "/tmp/cfg" });
     expect(plist).toContain("<key>Label</key><string>com.hoandat.tunelo.term-host</string>");
     expect(plist).toContain("<array><string>/opt/t&amp;t/tunelo-term-host</string></array>");
@@ -29,7 +32,7 @@ describe("the terminal process's units", () => {
     expect(termHostPlist({ label: "x", bin: "/b", configDir: defaultConfigDir() })).not.toContain("TUNELO_HOME");
   });
 
-  it("systemd: a unit of its own, restarted on failure but not for exit code 3, started on demand", () => {
+  it.skipIf(!posix)("systemd: a unit of its own, restarted on failure but not for exit code 3, started on demand", () => {
     const unit = termHostSystemdUnit({ bin: "/home/u/.config/tunelo/term-host/bin/current/tunelo-term-host", configDir: "/home/u/.config/tunelo", home: "/home/u", path: "/usr/bin:/snap/bin" });
     expect(unit).toContain('ExecStart="/home/u/.config/tunelo/term-host/bin/current/tunelo-term-host"');
     expect(unit).toContain("Restart=on-failure");

@@ -6,6 +6,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { rotateLog } from "../src/log-rotate.ts";
 
+// POSIX file modes are not enforced on Windows.
+const posix = process.platform !== "win32";
+
 let dir = "";
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "tunelo-log-"));
@@ -13,7 +16,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("agent.log rotation", () => {
-  test("leaves a small log alone; rotates a big one keeping three copies", () => {
+  test.skipIf(!posix)("leaves a small log alone; rotates a big one keeping three copies", () => {
     const log = join(dir, "agent.log");
     expect(rotateLog(log, 100)).toBe(false);
     writeFileSync(log, "small\n");

@@ -22,7 +22,7 @@ import { makeCore, tempDir } from "./harness.ts";
 import { pairedDevice } from "./support/device-link.ts";
 import { TEST_GIT_CONFIG, commitAll, git, reasonOf, repo, workspaces } from "./support/workspace-fixture.ts";
 
-const posix = process.platform !== "win32";
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
 const PAGE = { afterName: "", afterDir: false, limit: 0, showHidden: true, hideIgnored: false };
 
 function setup(extra: Parameters<typeof workspaces>[1] = {}) {
@@ -222,7 +222,7 @@ describe("a stuck git", () => {
 });
 
 describe("the machine's sensitive folders", () => {
-  it("hold for every read inside a workspace", async () => {
+  it.skipIf(!posix)("hold for every read inside a workspace", async () => {
     const base = tempDir("ws-sens-");
     const dir = repo(join(base, "work"));
     mkdirSync(join(dir, "private"));

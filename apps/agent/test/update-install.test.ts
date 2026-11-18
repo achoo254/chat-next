@@ -13,6 +13,9 @@ import { TERM_HOST_BINARY, switchStagedTermHost } from "../src/terminal/host-sup
 import { type UpdateEnv, archiveName, assetName, rollback, signedComment, termHostAssetName, update } from "../src/update.ts";
 import { type TestSigner, testSigner } from "./support/minisign-sign.ts";
 
+// Packing the zip needs the zip tool, which Windows lacks.
+const posix = process.platform !== "win32";
+
 const RELEASES_URL = "https://api.github.com/repos/achoo254/chat-next/releases?per_page=100";
 
 type Platform = { os: NodeJS.Platform; cpu: NodeJS.Architecture; agent: string; host: string; archive: string };
@@ -189,7 +192,7 @@ describe("tunelo update", () => {
     expect(progress.at(-1)).toEqual([size, size]);
   });
 
-  it("unpacks the Windows zip the same way", async () => {
+  it.skipIf(!posix)("unpacks the Windows zip the same way", async () => {
     const installed = await update(quiet, undefined, undefined, env([release(signer, "3.0.1", { platform: WINDOWS })], { os: "win32", cpu: "x64" }));
     expect(installed).toBe("3.0.1");
     expect(text(exe())).toBe("tunelo agent 3.0.1");

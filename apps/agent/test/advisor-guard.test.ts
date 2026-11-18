@@ -17,6 +17,8 @@ import { createSensitiveCheck } from "../src/safety/sensitive-paths.ts";
 import { fakeQuery } from "./fake-sdk.ts";
 import { byCase, makeCore, tempDir, until } from "./harness.ts";
 
+const posix = process.platform !== "win32"; // Windows cannot create symlinks without Developer Mode.
+
 const signal = new AbortController().signal;
 const home = tempDir("advisor-guard-home-");
 const dir = join(home, "work");
@@ -47,7 +49,7 @@ describe("the guard", () => {
     expect(advisorGuard({ kind: "read", own: "", paths: [join(home, ".ssh", "config")] }, ctx)).toBe(REFUSED_PATH);
   });
 
-  it("follows links: one to a secret file or out of the folder is refused, one inside is read", () => {
+  it.skipIf(!posix)("follows links: one to a secret file or out of the folder is refused, one inside is read", () => {
     const outside = join(home, "other");
     mkdirSync(outside, { recursive: true });
     mkdirSync(dir, { recursive: true });

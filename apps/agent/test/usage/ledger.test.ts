@@ -24,6 +24,9 @@ import {
 } from "../../src/usage/ledger.ts";
 import { tempDir } from "../harness.ts";
 
+// POSIX file modes are not enforced on Windows.
+const posix = process.platform !== "win32";
+
 const FILE: UsageFile = { path: "/fake/a.jsonl", dev: 1, ino: 10, size: 100, mtimeMs: 1 };
 const T0 = Date.parse("2026-11-01T08:00:00.000Z");
 /** Middle of two months, far from any time zone's month boundary. */
@@ -135,7 +138,7 @@ describe("where a file is read from", () => {
 });
 
 describe("writing the ledger", () => {
-  it("writes each month's shard and the index 0600 through a temp file, a copy of each kept before it is written again", async () => {
+  it.skipIf(!posix)("writes each month's shard and the index 0600 through a temp file, a copy of each kept before it is written again", async () => {
     const ledger = newLedger();
     await apply(ledger, FILE, [turn("m1|r", NOV, { tools: ["Skill:example"] })]);
     await ledger.save();

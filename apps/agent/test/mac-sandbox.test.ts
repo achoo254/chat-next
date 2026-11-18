@@ -11,6 +11,9 @@ import { SANDBOX_EXEC, claudeSandboxOn, sandboxApplies, sandboxProfile, sandboxe
 import { fakeProvider, type FakeLog } from "./fake-provider.ts";
 import { makeCore, tempDir, until } from "./harness.ts";
 
+// macOS sandbox rules are built on POSIX paths (/Users/...).
+const posix = process.platform !== "win32";
+
 const run = promisify(execFile);
 const HOME = "/Users/an";
 
@@ -29,7 +32,7 @@ function folders(over: { fda?: boolean; saved?: Record<string, "granted" | "deni
 }
 
 describe("what the AI's processes are kept out of", () => {
-  it("is every protected folder not granted and other apps' data, with Docker's container open", () => {
+  it.skipIf(!posix)("is every protected folder not granted and other apps' data, with Docker's container open", () => {
     const fences = folders({ saved: { [`${HOME}/Documents`]: "granted" } }).aiFences();
     expect(fences.deny).toEqual([
       `${HOME}/Desktop`,

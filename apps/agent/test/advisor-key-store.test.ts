@@ -14,6 +14,9 @@ import { SecretService } from "../src/sign-in-secrets/secret-service.ts";
 import { SECRETS_FILE } from "../src/sign-in-secrets/secret-store.ts";
 import { tempDir } from "./harness.ts";
 
+// A read-only folder via chmod is not enforced on Windows.
+const posix = process.platform !== "win32";
+
 process.env.TUNELO_KEYSTORE = "file";
 
 const KEY = "ts_live_4f9c2a7e1b8d4c6f9a0e3b5d7c1f2a8e";
@@ -103,7 +106,7 @@ describe("Advisor's key store", () => {
     expect(await store.key()).toBeUndefined();
   });
 
-  it("a key store that cannot seal: a fixed refusal, the log line without the key, nothing saved", async () => {
+  it.skipIf(!posix)("a key store that cannot seal: a fixed refusal, the log line without the key, nothing saved", async () => {
     const { dir, store, logs } = setup();
     chmodSync(dir, 0o500);
     try {

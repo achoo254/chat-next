@@ -19,6 +19,9 @@ import { signInDefault } from "./support/fake-claude.ts";
 import { type Device, connectDevice, waitFor } from "./support/machine-device.ts";
 import { profilesFixture } from "./support/profiles-fixture.ts";
 
+// Profile homes are linked with symlinks and the usage probe splits POSIX paths.
+const posix = process.platform !== "win32";
+
 const savedConfigDir = process.env.CLAUDE_CONFIG_DIR;
 const cleanup: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
@@ -43,7 +46,7 @@ function addProfile(f: Fixture, id: string, email: string): void {
 const announced = (d: Device): MachineAccounts[] => d.frames.flatMap((f) => (f.body.case === "machineAccounts" && f.id === "" ? [f.body.value] : []));
 
 describe("the machine's Claude account on every device", () => {
-  it("announces a pick from a device or from the machine to every device, then each session moved and the new usage", async () => {
+  it.skipIf(!posix)("announces a pick from a device or from the machine to every device, then each session moved and the new usage", async () => {
     const f = profilesFixture({ defaultEmail: "team@example.com" });
     addProfile(f, "p2", "max@example.com");
     await f.profiles.list();
@@ -137,7 +140,7 @@ describe("the machine's settings on every account", () => {
 });
 
 describe("the account offered when a session runs out", () => {
-  it("is the signed-in account with the most usage left, read again first", async () => {
+  it.skipIf(!posix)("is the signed-in account with the most usage left, read again first", async () => {
     const now = Date.now();
     const usage: Record<string, number> = { default: 97, p2: 30, p3: 10 };
     const f = profilesFixture({

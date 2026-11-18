@@ -11,6 +11,9 @@ import { UsageScheduler } from "../../src/usage/scheduler.ts";
 import { tempDir } from "../harness.ts";
 import { MARKER, appendLines, mainFile, minute, replyRecord, subagentFile, userRecord, writeLines } from "./usage-fixture.ts";
 
+// POSIX file modes are not enforced on Windows.
+const posix = process.platform !== "win32";
+
 const S1 = "11111111-1111-4111-8111-111111111111";
 const S2 = "22222222-2222-4222-8222-222222222222";
 /** The month of the fixture's calls, in this machine's time zone. */
@@ -235,7 +238,7 @@ describe("scanning transcripts", () => {
     expect(s.launched.has("claude", S2)).toBe(false);
   });
 
-  it("keeps no message, tool input or tool result in the ledger file", async () => {
+  it.skipIf(!posix)("keeps no message, tool input or tool result in the ledger file", async () => {
     const { home, configDir, make } = setup();
     writeLines(mainFile(home, "-work-example", S1), [userRecord(S1, minute(0)), reply(S1, 1, { tools: [{ name: "Skill", skill: "example-skill" }, { name: "Bash" }] })]);
     writeLines(subagentFile(home, "-work-example", S1, "a1"), [reply(S1, 2, { agentId: "a1", tools: [{ name: "Read" }] })]);
