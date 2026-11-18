@@ -1158,8 +1158,6 @@ export const enMachines: MachinesCopy = {
 			unarchive: "Unarchive",
 			close: "Close session",
 			closeHint: "Stops the session's AI on the machine and keeps its history. Send a message to open it again.",
-			stopTerminal: "Stop in terminal",
-			stopTerminalHint: "Ends the AI running in the machine's terminal to free memory. Its history is kept; open it again to carry on.",
 			delete: "Delete session",
 			deleting: "Deleting…",
 			deleteTitle: "Delete this session?",

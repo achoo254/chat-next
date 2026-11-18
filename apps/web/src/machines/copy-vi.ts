@@ -1174,8 +1174,6 @@ export const viMachines = {
 			unarchive: "Bỏ lưu trữ",
 			close: "Đóng phiên",
 			closeHint: "Tắt AI của phiên trên máy, giữ nguyên lịch sử. Nhắn tiếp là phiên mở lại.",
-			stopTerminal: "Dừng trong terminal",
-			stopTerminalHint: "Tắt AI đang chạy trong terminal của máy để nhả bộ nhớ. Lịch sử giữ nguyên, mở lại là tiếp tục.",
 			delete: "Xoá phiên",
 			deleting: "Đang xoá…",
 			deleteTitle: "Xoá phiên này?",

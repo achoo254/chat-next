@@ -1150,8 +1150,6 @@ export const zhCNMachines: MachinesCopy = {
 			unarchive: "取消归档",
 			close: "关闭会话",
 			closeHint: "停止机器上该会话的 AI，保留历史记录。再发送消息即可重新打开。",
-			stopTerminal: "在终端中停止",
-			stopTerminalHint: "结束机器终端中运行的 AI 以释放内存。历史记录保留，再次打开即可继续。",
 			delete: "删除会话",
 			deleting: "正在删除…",
 			deleteTitle: "删除此会话？",
