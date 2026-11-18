@@ -16,7 +16,7 @@ import { errorText, folderName, providerOf, useNow } from "../machines/use-machi
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
 import { PercentBar } from "../machines/percent-bar.tsx";
 import { IGNORE_ATTR } from "./advisor-context.tsx";
-import { advisorStore, offerOf, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type HistoryEntry, type Question } from "./advisor-store.ts";
+import { advisorStore, offerOf, sameCopy, useAdvisorState, type AdvisorStore, type CopyContext, type CopyRecord, type HistoryEntry, type Question } from "./advisor-store.ts";
 import { pictureOf, type Look } from "./looks.ts";
 import { useI18n, type Locale } from "../i18n/i18n.tsx";
 import { surfaceLabel } from "./advisor-surfaces.ts";
@@ -231,7 +231,8 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 	// It is attached once (markUsed): removing it with ✕ leaves it in the recent copies, it does not come back.
 	useEffect(() => {
 		if (offered === null) return;
-		setAttached([offered, ...attached].slice(0, 5));
+		// Copying what is already attached from the same place again attaches nothing more.
+		if (!attached.some((c) => sameCopy(c, offered))) setAttached([offered, ...attached].slice(0, 5));
 		store.markUsed([offered.id]);
 	}, [offered, attached, setAttached, store]);
 	// With something attached the question is optional: Advisor is asked what to do about it.
@@ -256,9 +257,9 @@ function AskForm({ presence, tone, store, attached, setAttached, offer, elsewher
 		void submit(false);
 	};
 	/** The recent copies still to pick: the ones already attached are above. */
-	const choices = copies.filter((copy) => !attached.some((c) => c.id === copy.id));
+	const choices = copies.filter((copy) => !attached.some((c) => c.id === copy.id || sameCopy(c, copy)));
 	const attach = (copy: CopyRecord) => {
-		if (attached.some((c) => c.id === copy.id)) return;
+		if (attached.some((c) => c.id === copy.id || sameCopy(c, copy))) return;
 		setAttached([copy, ...attached].slice(0, 5));
 	};
 	return (

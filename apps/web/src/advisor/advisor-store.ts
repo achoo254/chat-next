@@ -28,6 +28,23 @@ export interface CopyContext {
 
 export const EMPTY_CONTEXT: CopyContext = { screen: "", machine: "", dir: "", branch: "", threadId: "", panel: "", action: "", errorCode: "", failureId: "", fields: {} };
 
+/**
+ * The same text copied in the same place (the same session, folder and panel;
+ * a chat message names only "chat"): one piece of information however often it
+ * is copied. The same text from another place is another copy.
+ */
+export function sameCopy(a: Pick<CopyRecord, "text" | "context">, b: Pick<CopyRecord, "text" | "context">): boolean {
+	if (a.text !== b.text) return false;
+	const x = a.context;
+	const y = b.context;
+	const keys = Object.keys(x.fields);
+	return (
+		x.screen === y.screen && x.machine === y.machine && x.dir === y.dir && x.branch === y.branch && x.threadId === y.threadId && x.panel === y.panel &&
+		x.action === y.action && x.errorCode === y.errorCode && x.failureId === y.failureId &&
+		keys.length === Object.keys(y.fields).length && keys.every((k) => x.fields[k] === y.fields[k])
+	);
+}
+
 export interface CopyRecord {
 	readonly id: string;
 	readonly text: string;

@@ -265,6 +265,26 @@ describe("attached and recent copies", () => {
 	});
 });
 
+describe("the same text copied again", () => {
+	it("is attached once when it comes from the same place, and again when it comes from another", async () => {
+		const store = new AdvisorStore();
+		store.remember("lỗi một", scmCopy);
+		store.setOpen(true);
+		const view = open(store);
+		expect(await screen.findByText(t.ask.attachedTitle, undefined, WAIT)).toBeTruthy();
+		const attached = () => view.container.querySelectorAll(".adv-attached").length;
+		expect(attached()).toBe(1);
+		// Copied again in the same session, twice: still one.
+		act(() => store.remember("lỗi một", scmCopy));
+		act(() => store.remember("lỗi một", scmCopy));
+		await waitFor(() => expect(store.snapshot().used.size).toBe(3), WAIT);
+		expect(attached()).toBe(1);
+		// The same text in another folder is another piece of information.
+		act(() => store.remember("lỗi một", { ...scmCopy, dir: "/w/other", threadId: "s2" }));
+		await waitFor(() => expect(attached()).toBe(2), WAIT);
+	});
+});
+
 describe("a question with something attached", () => {
 	it("can be asked without typing: the Ask button is enabled and the box stays optional", async () => {
 		const store = new AdvisorStore();
