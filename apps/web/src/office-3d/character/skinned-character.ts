@@ -24,7 +24,9 @@
 // puts at the bed's height. Each copy wears its skin
 // cell (character-skins.ts) and its accessory on a bone; the pantry mug shows
 // in the hand only while drinking. A model's own typing clip replaces the
-// coded typing swing.
+// coded typing swing. A sleeper's head, neck and upper arms are turned part of the
+// way back to rest after the clip (sleep-softening.ts), since the skin tears where
+// the clip turns them far.
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
@@ -41,6 +43,7 @@ import type { CharacterAccessories, WornAccessory } from "./character-accessorie
 import { COFFEE_ITEM, skinCellFor, type PersonLook } from "./character-look.ts";
 import type { CharacterSkins } from "./character-skins.ts";
 import type { CharacterVisual, ScenePoint } from "./character-visual.ts";
+import { SLEEP_KEEP, SLEEP_SOFTENED_BONES, softenTowardRest } from "./sleep-softening.ts";
 import { typingOffsets } from "./typing-motion.ts";
 
 /** The bones whose skin rests on a seat: the hips and the thighs. */
@@ -222,6 +225,12 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		(["lowerarm", "hand"] as const).map((bone) => ({ side, bone, node: nodes.get(`${bone}_${side}`), base: new Quaternion(), written: null as Quaternion | null })),
 	);
 	const swing = new Quaternion();
+	// The bones softened while asleep (sleep-softening.ts), each with its rest rotation as loaded, before any clip plays.
+	const softened = SLEEP_SOFTENED_BONES.flatMap((name) => {
+		const node = nodes.get(name);
+		return node?.rotationQuaternion == null ? [] : [{ node, rest: node.rotationQuaternion.clone(), written: null as Quaternion | null }];
+	});
+	const softScratch = new Quaternion();
 	const meshes: AbstractMesh[] = model.getChildMeshes(false);
 	if (dress.skins !== null) dress.skins.apply(meshes, skinCellFor(look, dress.skins.count, dress.skins.names));
 	const worn = (name: string | null, scale = 1): WornAccessory | null =>
@@ -274,6 +283,19 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		if (lowest === null) return;
 		const floor = holder.computeWorldMatrix(true).getTranslation().y;
 		model.position.y -= (lowest - floor) / CHARACTER_SCALE;
+	});
+
+	// Right after the animations pose the bones: a sleeper's head, neck and upper arms turn part of the way back to rest.
+	const softenSleep = scene.onAfterAnimationsObservable.add(() => {
+		if (pose !== "sleep" || every === 0 || !holder.isEnabled()) return;
+		for (const entry of softened) {
+			const q = entry.node.rotationQuaternion;
+			if (q === null) continue;
+			// A level of detail that pauses the clip leaves the bone as softened last time: do not soften it twice.
+			if (entry.written !== null && q.equalsWithEpsilon(entry.written, 1e-6)) continue;
+			q.copyFrom(softenTowardRest(entry.rest, q, SLEEP_KEEP, softScratch));
+			entry.written = q.clone();
+		}
 	});
 
 	const head = nodes.get("head");
@@ -376,6 +398,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		},
 		dispose() {
 			plantFeet.remove();
+			softenSleep.remove();
 			for (const group of groups.values()) group.dispose();
 			for (const skeleton of entries.skeletons) skeleton.dispose();
 			holder.dispose(false, false);
