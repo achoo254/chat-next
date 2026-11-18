@@ -1598,6 +1598,10 @@ enum ErrorReason {
   // the user has not let tunelo ask for it yet, or macOS refused it (tunelo
   // 3.17.0+; see "macOS folder access").
   ERROR_REASON_MAC_FOLDER_ACCESS = 86;
+  // ThreadSend to a thread whose AI, in the machine's terminal, is running a
+  // turn or waits on a prompt there (ProviderCapabilities.chat_takes_terminal):
+  // send again once it is done, or answer it in the terminal.
+  ERROR_REASON_TERMINAL_TURN_RUNNING = 87;
 }
 
 enum ErrorCode {
@@ -2084,6 +2088,13 @@ message ProviderCapabilities {
   // message. Unset (an older machine, or an AI whose CLI cannot): automatic
   // Advisor works only in the chat view while the terminal holds the session.
   bool terminal_advisor = 19;
+  // ThreadSend to a thread whose AI runs in the machine's terminal takes the
+  // session back to chat: while that CLI is idle the machine ends it and runs
+  // the message in its own session of the thread (resumed, nothing lost); while
+  // it runs a turn or waits on a prompt the send is refused with
+  // ERROR_REASON_TERMINAL_TURN_RUNNING. Unset (an older machine): such a send
+  // is refused with SESSION_OPEN_ELSEWHERE and chat only shows the session.
+  bool chat_takes_terminal = 20;
 }
 
 message ModelOption {

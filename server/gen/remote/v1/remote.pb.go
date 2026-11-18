@@ -650,6 +650,10 @@ const (
 	// the user has not let tunelo ask for it yet, or macOS refused it (tunelo
 	// 3.17.0+; see "macOS folder access").
 	ErrorReason_ERROR_REASON_MAC_FOLDER_ACCESS ErrorReason = 86
+	// ThreadSend to a thread whose AI, in the machine's terminal, is running a
+	// turn or waits on a prompt there (ProviderCapabilities.chat_takes_terminal):
+	// send again once it is done, or answer it in the terminal.
+	ErrorReason_ERROR_REASON_TERMINAL_TURN_RUNNING ErrorReason = 87
 )
 
 // Enum value maps for ErrorReason.
@@ -741,6 +745,7 @@ var (
 		84: "ERROR_REASON_ADVISOR_KEY_NOT_SAVED",
 		85: "ERROR_REASON_SESSION_LIMIT",
 		86: "ERROR_REASON_MAC_FOLDER_ACCESS",
+		87: "ERROR_REASON_TERMINAL_TURN_RUNNING",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":                   0,
@@ -829,6 +834,7 @@ var (
 		"ERROR_REASON_ADVISOR_KEY_NOT_SAVED":         84,
 		"ERROR_REASON_SESSION_LIMIT":                 85,
 		"ERROR_REASON_MAC_FOLDER_ACCESS":             86,
+		"ERROR_REASON_TERMINAL_TURN_RUNNING":         87,
 	}
 )
 
@@ -13997,8 +14003,15 @@ type ProviderCapabilities struct {
 	// message. Unset (an older machine, or an AI whose CLI cannot): automatic
 	// Advisor works only in the chat view while the terminal holds the session.
 	TerminalAdvisor bool `protobuf:"varint,19,opt,name=terminal_advisor,json=terminalAdvisor,proto3" json:"terminal_advisor,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// ThreadSend to a thread whose AI runs in the machine's terminal takes the
+	// session back to chat: while that CLI is idle the machine ends it and runs
+	// the message in its own session of the thread (resumed, nothing lost); while
+	// it runs a turn or waits on a prompt the send is refused with
+	// ERROR_REASON_TERMINAL_TURN_RUNNING. Unset (an older machine): such a send
+	// is refused with SESSION_OPEN_ELSEWHERE and chat only shows the session.
+	ChatTakesTerminal bool `protobuf:"varint,20,opt,name=chat_takes_terminal,json=chatTakesTerminal,proto3" json:"chat_takes_terminal,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ProviderCapabilities) Reset() {
@@ -14160,6 +14173,13 @@ func (x *ProviderCapabilities) GetAdvisorSession() bool {
 func (x *ProviderCapabilities) GetTerminalAdvisor() bool {
 	if x != nil {
 		return x.TerminalAdvisor
+	}
+	return false
+}
+
+func (x *ProviderCapabilities) GetChatTakesTerminal() bool {
+	if x != nil {
+		return x.ChatTakesTerminal
 	}
 	return false
 }
@@ -24340,7 +24360,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x05error\x18\t \x01(\tR\x05error\"E\n" +
 	"\rAdvisorOption\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
-	"\vprobability\x18\x02 \x01(\x02R\vprobability\"\x8e\x05\n" +
+	"\vprobability\x18\x02 \x01(\x02R\vprobability\"\xbe\x05\n" +
 	"\x14ProviderCapabilities\x12\x1c\n" +
 	"\tinterrupt\x18\x01 \x01(\bR\tinterrupt\x12\x16\n" +
 	"\x06resume\x18\x02 \x01(\bR\x06resume\x12#\n" +
@@ -24364,7 +24384,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"sessionMcp\x12\x1a\n" +
 	"\baccounts\x18\x11 \x01(\bR\baccounts\x12'\n" +
 	"\x0fadvisor_session\x18\x12 \x01(\bR\x0eadvisorSession\x12)\n" +
-	"\x10terminal_advisor\x18\x13 \x01(\bR\x0fterminalAdvisor\"1\n" +
+	"\x10terminal_advisor\x18\x13 \x01(\bR\x0fterminalAdvisor\x12.\n" +
+	"\x13chat_takes_terminal\x18\x14 \x01(\bR\x11chatTakesTerminal\"1\n" +
 	"\vModelOption\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x99\x02\n" +
@@ -25100,7 +25121,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\x11ACCOUNT_STATUS_OK\x10\x01\x12 \n" +
 	"\x1cACCOUNT_STATUS_NEEDS_SIGN_IN\x10\x02\x12\x18\n" +
 	"\x14ACCOUNT_STATUS_ERROR\x10\x03\x12\"\n" +
-	"\x1eACCOUNT_STATUS_ACCOUNT_CHANGED\x10\x04*\xe1\x18\n" +
+	"\x1eACCOUNT_STATUS_ACCOUNT_CHANGED\x10\x04*\x89\x19\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dERROR_REASON_FOLDER_NOT_FOUND\x10\x01\x12\x1e\n" +
@@ -25188,7 +25209,8 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	" ERROR_REASON_ADVISOR_KEY_INVALID\x10S\x12&\n" +
 	"\"ERROR_REASON_ADVISOR_KEY_NOT_SAVED\x10T\x12\x1e\n" +
 	"\x1aERROR_REASON_SESSION_LIMIT\x10U\x12\"\n" +
-	"\x1eERROR_REASON_MAC_FOLDER_ACCESS\x10V\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
+	"\x1eERROR_REASON_MAC_FOLDER_ACCESS\x10V\x12&\n" +
+	"\"ERROR_REASON_TERMINAL_TURN_RUNNING\x10W\"\x04\b4\x104* ERROR_REASON_TOTP_SECRET_INVALID*\xfe\x01\n" +
 	"\tErrorCode\x12\x1a\n" +
 	"\x16ERROR_CODE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ERROR_CODE_INVALID\x10\x01\x12\x18\n" +
