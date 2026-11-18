@@ -36,6 +36,7 @@ type Fake struct {
 	edits                                      []bridge.EditRequest
 	deletes                                    []bridge.Delete
 	nextID                                     int
+	topics                                     map[string][]bridge.Topic
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
 	DedupeRandomID bool
@@ -47,7 +48,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 // AddConversation lists a conversation.
@@ -102,7 +103,7 @@ func (f *Fake) Name() string { return f.name }
 
 // Capabilities implements bridge.Adapter.
 func (f *Fake) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true}
+	return bridge.Capabilities{bridge.CapHistory: true, bridge.CapLive: true, bridge.CapEdits: true, bridge.CapDeletes: true, bridge.CapSend: true, bridge.CapTopics: true}
 }
 
 // Login implements bridge.Adapter: two input steps, then done.
@@ -328,3 +329,19 @@ func (f *Fake) Deletes() []bridge.Delete {
 }
 
 var _ bridge.Sender = (*Fake)(nil)
+
+// AddTopic makes a topic of a forum conversation known to ListTopics.
+func (f *Fake) AddTopic(conv string, t bridge.Topic) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.topics[conv] = append(f.topics[conv], t)
+}
+
+// ListTopics implements bridge.TopicReader.
+func (f *Fake) ListTopics(_ context.Context, _ bridge.Account, conv string) ([]bridge.Topic, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.Topic(nil), f.topics[conv]...), nil
+}
+
+var _ bridge.TopicReader = (*Fake)(nil)

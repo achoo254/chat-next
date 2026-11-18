@@ -30,3 +30,24 @@ func TestAlbumGivesOneIDPerItem(t *testing.T) {
 		t.Fatalf("want 3 ids, got %v err %v", ref.IDs, err)
 	}
 }
+
+func TestTopicsAreListedPerConversationAndTravelOnMessages(t *testing.T) {
+	f := NewFake("fake")
+	f.AddTopic("g1", bridge.Topic{ID: "1", Title: "General"})
+	f.AddTopic("g1", bridge.Topic{ID: "7", Title: "Hạ tầng", IconColor: 0x6FB9F0, Closed: true})
+	got, err := f.ListTopics(context.Background(), bridge.Account{}, "g1")
+	if err != nil || len(got) != 2 || got[1].Title != "Hạ tầng" || !got[1].Closed {
+		t.Fatalf("topics = %+v, %v", got, err)
+	}
+	if other, _ := f.ListTopics(context.Background(), bridge.Account{}, "g2"); len(other) != 0 {
+		t.Fatalf("another conversation has topics: %+v", other)
+	}
+	f.AddHistory("g1", bridge.Message{ID: "m1", Topic: "7"})
+	page, err := f.Backfill(context.Background(), bridge.Account{}, "g1", bridge.Cursor{}, 10)
+	if err != nil || len(page.Messages) != 1 || page.Messages[0].Topic != "7" {
+		t.Fatalf("history = %+v, %v; want the message to keep its topic", page, err)
+	}
+	if !f.Capabilities().Has(bridge.CapTopics) {
+		t.Fatal("the fake implements TopicReader and must declare CapTopics")
+	}
+}

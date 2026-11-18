@@ -54,3 +54,24 @@ func TestSendIsACapabilityNotARequirement(t *testing.T) {
 		t.Fatal("a Sender declares CapSend")
 	}
 }
+
+// topicReader proves topics are a capability, not a requirement of Adapter.
+type topicReader struct{ stub }
+
+func (topicReader) Capabilities() Capabilities {
+	return Capabilities{CapHistory: true, CapTopics: true}
+}
+func (topicReader) ListTopics(context.Context, Account, string) ([]Topic, error) {
+	return nil, nil
+}
+
+var _ TopicReader = topicReader{}
+
+func TestTopicsAreACapabilityNotARequirement(t *testing.T) {
+	if (stub{}).Capabilities().Has(CapTopics) {
+		t.Fatal("an adapter without TopicReader must not declare CapTopics")
+	}
+	if !(topicReader{}).Capabilities().Has(CapTopics) {
+		t.Fatal("a TopicReader declares CapTopics")
+	}
+}

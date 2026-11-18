@@ -26,6 +26,9 @@ const (
 	// CapSend means the adapter also implements Sender: Chat can send,
 	// edit and delete messages in the other app.
 	CapSend Capability = "send"
+	// CapTopics means the adapter also implements TopicReader and tells the
+	// topic of each message of a conversation that has topics (a forum).
+	CapTopics Capability = "topics"
 )
 
 // Capabilities is the set an adapter declares.
@@ -102,6 +105,9 @@ type Conversation struct {
 	Peer *Participant
 	// PhotoRef is an opaque handle for FetchMedia; empty when there is none.
 	PhotoRef string
+	// Forum is true for a group split into topics (a Telegram forum). Its
+	// messages carry Message.Topic and the list of topics is ListTopics.
+	Forum bool
 }
 
 // Participant is a person in the other app, mapped to a puppet user.
@@ -150,7 +156,31 @@ type Message struct {
 	Entities     []Entity
 	Media        []Media
 	ReplyTo      string // Message.ID in the same conversation
-	Version      int64
+	// Topic is the topic the message is in, an opaque id; empty outside a
+	// forum. A message of a forum that belongs to no topic is in the general
+	// topic, which the adapter names like any other.
+	Topic   string
+	Version int64
+}
+
+// Topic is a topic of a forum conversation.
+type Topic struct {
+	ID        string
+	Title     string
+	IconColor int // 0xRRGGBB, 0 for none
+	Closed    bool
+	Pinned    bool
+	Hidden    bool
+	// Created is when the topic was opened; zero when unknown.
+	Created time.Time
+}
+
+// TopicChange tells that a topic of a conversation was opened or changed
+// (renamed, closed, reopened, pinned). The engine creates the topic if it does
+// not know it yet.
+type TopicChange struct {
+	Conversation string
+	Topic        Topic
 }
 
 // Edit replaces the content of an already-seen message.
@@ -166,8 +196,8 @@ type Delete struct {
 	IDs          []string
 }
 
-// Event is one normalised update. Exactly one of Message, Edit, Delete or
-// Conversation is set. State is the account state after this event; the
+// Event is one normalised update. Exactly one of Message, Edit, Delete,
+// Conversation or Topic is set. State is the account state after this event; the
 // engine stores it in the same transaction as the write, so a crash between
 // the two is replayed, not lost.
 type Event struct {
@@ -175,6 +205,7 @@ type Event struct {
 	Edit         *Edit
 	Delete       *Delete
 	Conversation *Conversation
+	Topic        *TopicChange
 	Participant  *Participant
 	State        []byte
 }
@@ -256,6 +287,9 @@ type OutMessage struct {
 	// ReplyTo is the Message.ID of the message answered, in the same
 	// conversation; empty for a plain message.
 	ReplyTo string
+	// Topic is the topic to post in (a Topic.ID of a forum conversation);
+	// empty for a conversation without topics.
+	Topic string
 	// Media is empty for a text message, one item for a photo or file, and
 	// several for an album. Text then is the caption of the first item.
 	Media []OutMedia
@@ -293,6 +327,14 @@ type EditRequest struct {
 	ID           string
 	Text         string
 	Entities     []Entity
+}
+
+// TopicReader is implemented by an adapter that declares CapTopics.
+type TopicReader interface {
+	// ListTopics returns the topics of a forum conversation, in any order.
+	// A large forum is read page by page inside the call; a throttle comes
+	// back as *RateLimitError like any other call.
+	ListTopics(ctx context.Context, acct Account, conv string) ([]Topic, error)
 }
 
 // Sender is implemented by an adapter that declares CapSend. Calls follow
