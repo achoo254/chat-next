@@ -20,6 +20,8 @@ import type { ShownAttachment } from "./transcript/tool-fold.ts";
 import type { Attachments } from "./use-attachments.ts";
 import { filterCommands, flatCommands, leadingCommand } from "./slash-commands.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+import { terminalBusy } from "./machine-errors.ts";
+import { errorText } from "./use-machines.ts";
 
 /** Files of the session's folder matching a prefix; null when the machine cannot list them. */
 export interface FileListing {
@@ -195,11 +197,12 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		setError("");
 		onSend(message, files).then(
 			() => attach?.sent(files),
-			() => {
+			(err: unknown) => {
 				// Put the text and the files back so nothing is lost.
 				setText((current) => (current === "" ? message : current));
 				attach?.putBack(files);
-				setError(t.chat.sendFailed);
+				// The session's AI busy in the machine's terminal: say so, not "check your connection".
+				setError(terminalBusy(err) ? errorText(t, err, ai) : t.chat.sendFailed);
 			},
 		);
 		field.current?.focus();

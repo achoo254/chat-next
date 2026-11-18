@@ -522,6 +522,7 @@ export async function installRemoteMachineDemo(machines: FakeMachines): Promise<
 										sessionAllow: true,
 										images: true,
 										terminal: true,
+										chatTakesTerminal: true,
 										accounts: true,
 										sessionMcp: true,
 										advisorSession: true,

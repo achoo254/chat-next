@@ -100,6 +100,8 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.sessionNotFound;
 		case ErrorReason.SESSION_OPEN_ELSEWHERE:
 			return r.sessionOpenElsewhere;
+		case ErrorReason.TERMINAL_TURN_RUNNING:
+			return r.terminalTurnRunning(ai);
 		case ErrorReason.ATTACHMENT_TOO_LARGE:
 			return r.attachmentTooLarge(s);
 		case ErrorReason.TOO_MANY_ATTACHMENTS:
@@ -244,4 +246,9 @@ export function unsupportedByMachine(err: unknown): boolean {
 /** The machine thinks the session is open elsewhere on it; asking the user first, then opening anyway, is fine. */
 export function openElsewhere(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.SESSION_OPEN_ELSEWHERE;
+}
+
+/** The session's AI is answering or waits on a prompt in the machine's terminal: a message from chat waits until it is done. */
+export function terminalBusy(err: unknown): boolean {
+	return err instanceof RemoteError && err.reason === ErrorReason.TERMINAL_TURN_RUNNING;
 }

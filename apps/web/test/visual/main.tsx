@@ -303,6 +303,8 @@ const SCREENS: Record<string, string> = {
 	// AI Agent with a paired demo machine, an unpaired and an offline one (test/support/remote-machine-demo.ts):
 	// a session, the "Cần bạn" home, an unpaired machine's board, the machines page, a machine's board, "Thêm máy này".
 	"machine-chat": paths.machineSession("1", DEMO_THREAD),
+	// A session its terminal holds: chat still writes (sending moves it back), the bar above the composer says so.
+	"machine-held": paths.machineSession("1", "demo-held"),
 	"machine-limit": paths.machineSession("1", "demo-running"),
 	// Claude asks for a sign-in secret: the card above the composer, outside the transcript.
 	"machine-secret": paths.machineSession("1", "demo-idle"),

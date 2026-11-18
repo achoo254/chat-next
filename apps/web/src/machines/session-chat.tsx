@@ -224,7 +224,9 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useEffect(() => rememberSessionMode(machine, threadId, mode), [machine, threadId, mode]);
 	// The session's AI runs in the machine's terminal: only the terminal writes to it.
 	const held = thread !== null && thread.terminalSession > 0;
-	const canSend = online && !missing && !held;
+	// A machine that lets chat take the session back from its terminal (tunelo with chat_takes_terminal) keeps the composer open.
+	const takesBack = caps?.chatTakesTerminal === true;
+	const canSend = online && !missing && (!held || takesBack);
 	const send = async (text: string, files: readonly ShownAttachment[]): Promise<void> => {
 		// `/clear` opens a new, empty session in this folder: go to it.
 		const opened = await link.send(threadId, text, files);
@@ -386,7 +388,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 					{prompts.length > 0 && (
 						<Dock prompts={prompts} ai={ai} sessionAllow={caps?.sessionAllow ?? false} decide={decide} answer={answer} />
 					)}
-					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} />}
+					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} takesBack={takesBack} />}
 					<div className="mx-compose-box">
 					{!missing && !advisorThread && (
 						<StatusBar

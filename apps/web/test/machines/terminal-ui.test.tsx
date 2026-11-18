@@ -19,7 +19,7 @@ import { MachineLink } from "../../src/machines/link/machine-link.ts";
 import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 import { afterSentinel, ImeInput, inputDelta, keyOf } from "../../src/terminal/ime-input.tsx";
-import { endOnPurpose } from "../../src/terminal/ended-sessions.ts";
+import { endOnPurpose, forgetEnded } from "../../src/terminal/ended-sessions.ts";
 import { NO_AUTOFILL, noAutofill } from "../../src/terminal/no-autofill.ts";
 import { keySequence, withModifiers } from "../../src/terminal/mobile-key-bar.tsx";
 import { TerminalDock, type DockAgents } from "../../src/terminal/terminal-dock.tsx";
@@ -264,16 +264,25 @@ describe("a session in chat or in its terminal", () => {
 	/** The held session runs a turn there (busy elsewhere), not just waits at its prompt. */
 	let heldBusy = false;
 	let terminalCli = true;
+	/** The machine lets chat take the session back from its terminal (tunelo with chat_takes_terminal). */
+	let takesBack = false;
+	/** What the machine answers a message with; accepted when unset. */
+	let sendRefusal: ErrorReason | undefined;
 
 	beforeEach(() => {
 		held = 0;
 		heldBusy = false;
 		terminalCli = true;
+		takesBack = false;
+		sendRefusal = undefined;
 		window.localStorage.clear();
 		const terminalHandler = machine.handler;
 		machine.handler = (frame, socket) => {
 			if (frame.body.case === "machineInfoRequest") {
-				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", maxSessions: 3, terminal, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: terminalCli } }] } }];
+				return [{ case: "machineInfo", value: { name: "Mac mini", os: "darwin", maxSessions: 3, terminal, providers: [{ id: "claude", name: "Claude Code", capabilities: { terminal: terminalCli, chatTakesTerminal: takesBack } }] } }];
+			}
+			if (frame.body.case === "threadSend" && sendRefusal !== undefined) {
+				return [{ case: "error", value: { code: ErrorCode.INVALID, message: "busy in the terminal", reason: sendRefusal, subject: "" } }];
 			}
 			if (frame.body.case === "threadList") return [{ case: "threadListResult", value: { threads: [{ ...THREAD, terminalSession: held, busyElsewhere: heldBusy }], openSessions: 0, maxSessions: 3 } }];
 			return terminalHandler(frame, socket);
@@ -384,6 +393,34 @@ describe("a session in chat or in its terminal", () => {
 		await userEvent.click(within(section as HTMLElement).getByRole("button", { name: "Mở terminal" }));
 		expect(window.location.pathname).toBe("/ai/1/s/t1/terminal");
 		expect(window.localStorage.getItem("ai:mode:1")).toBeNull();
+	});
+
+	it("on a machine that lets chat take the session back, the composer stays open and says sending moves it to chat", async () => {
+		held = 7;
+		takesBack = true;
+		sessionAt({ page: "session", machine: "1", threadId: "t1" });
+		const bar = await screen.findByText("Phiên đang mở bằng Claude Code trong terminal. Gửi tin ở đây sẽ chuyển phiên sang Trò chuyện.");
+		const section = bar.closest("section") as HTMLElement;
+		expect(within(section).queryByRole("button", { name: "Kết thúc" })).toBeNull();
+		expect(within(section).getByRole("button", { name: "Mở terminal" })).toBeTruthy();
+		await until(() => document.querySelector(".mx-composer.disabled") === null, "the composer open");
+		const field = screen.getByRole("textbox", { name: "Tin nhắn" });
+		await userEvent.type(field, "tiếp tục ở đây{Enter}");
+		await until(() => sent("threadSend").length === 1, "the message");
+		expect(sent("threadSend")[0]?.body.value).toMatchObject({ threadId: "t1", text: "tiếp tục ở đây" });
+	});
+
+	it("a message refused while the AI answers in the terminal says why and keeps the text", async () => {
+		held = 7;
+		heldBusy = true;
+		takesBack = true;
+		sendRefusal = ErrorReason.TERMINAL_TURN_RUNNING;
+		sessionAt({ page: "session", machine: "1", threadId: "t1" });
+		expect(await screen.findByText("Claude Code đang chạy một lượt trong terminal. Gửi tin ở đây được khi lượt xong.")).toBeTruthy();
+		const field = screen.getByRole("textbox", { name: "Tin nhắn" });
+		await userEvent.type(field, "đợi nhé{Enter}");
+		expect(await screen.findByText("Claude Code đang trả lời hoặc chờ duyệt trong terminal. Đợi xong rồi gửi lại, hoặc mở terminal.")).toBeTruthy();
+		await until(() => (field.textContent ?? "").includes("đợi nhé"), "the text back in the box");
 	});
 });
 
@@ -976,6 +1013,32 @@ describe("the dock", () => {
 		await userEvent.click(screen.getByRole("button", { name: "Mở lại trong terminal" }));
 		await until(() => sent("termOpen").length === 2, "the AI again");
 		expect(sent("termOpen")[1]?.body.value).toMatchObject({ aiSession: { threadId: "t1" } });
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
+	it("an AI's terminal that ended as chat took the session back says so, and keeps saying it after the chat turn", async () => {
+		// Session ids start again with each test's terminal: not one an earlier test ended on purpose.
+		forgetEnded("1", 1);
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const at = (thread: { running: boolean; inTerminal: boolean }) => (
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", ...thread }} store={refusing()} touch={false} />
+			</I18nProvider>
+		);
+		const view = render(at({ running: false, inTerminal: true }));
+		await until(() => sent("termOpen").length === 1, "the AI");
+		await waitFor(() => expect(screen.getByTestId("screen-1")).toBeTruthy());
+		await until(() => host.frames.some((f) => f.frame.type === "attach"), "attached");
+		// The machine hangs up the CLI (a message sent in chat), then runs the turn in chat.
+		host.exit(1, 129);
+		await waitFor(() => expect(document.querySelector(".tx-ended")).not.toBeNull());
+		view.rerender(at({ running: true, inTerminal: false }));
+		expect(await screen.findByText("Phiên đã chuyển sang Trò chuyện.")).toBeTruthy();
+		view.rerender(at({ running: false, inTerminal: false }));
+		expect(screen.getByText("Phiên đã chuyển sang Trò chuyện.")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Về Trò chuyện" })).toBeTruthy();
 		parts.terminal.stop();
 		parts.link.stop();
 	});

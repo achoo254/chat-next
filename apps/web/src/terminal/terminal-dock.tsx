@@ -273,6 +273,8 @@ export function TerminalDock({
 	const handles = useRef(new Map<string, PaneHandle>());
 	/** AI panes whose session the machine's AI no longer has: opening it again would fail the same way. */
 	const [lost, setLost] = useState<ReadonlySet<number>>(() => new Set());
+	/** AI panes whose terminal ended as chat took the session back (a turn runs in chat after it): they say so, not "exited". */
+	const [moved, setMoved] = useState<ReadonlySet<number>>(() => new Set());
 	const ime = useRef<HTMLTextAreaElement>(null);
 	const root = useRef<HTMLDivElement>(null);
 	const autoOpened = useRef(false);
@@ -764,6 +766,15 @@ export function TerminalDock({
 		setLayout((l) => setPaneSession(l, pane.id, session));
 	};
 
+	// Kept once seen (adjusted while rendering): the chat turn ends, the pane still says where the session went.
+	if (thread?.running === true && thread.inTerminal !== true) {
+		const fresh = layout.tabs
+			.flatMap((x) => panesOf(x.root))
+			.filter((p) => p.ai === true && ended.has(p.session) && !moved.has(p.session) && !endedOnPurpose(machine, p.session))
+			.map((p) => p.session);
+		if (fresh.length > 0) setMoved(new Set([...moved, ...fresh]));
+	}
+
 	const renderPane = (pane: PaneNode): ReactNode => {
 		const isFocused = focused?.id === pane.id;
 		const code = ended.get(pane.session);
@@ -802,12 +813,12 @@ export function TerminalDock({
 				{code !== undefined && (
 					// Above xterm's layers; a tap here is for its buttons, not for focusing the pane.
 					<div className="tx-ended" role="status" onPointerUp={(event) => event.stopPropagation()}>
-						<span>{lost.has(pane.session) ? tt.lostAi : endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
+						<span>{lost.has(pane.session) ? tt.lostAi : moved.has(pane.session) ? tt.movedToChat : endedOnPurpose(machine, pane.session) ? tt.endedByUser : tt.exited(code)}</span>
 						<button type="button" className="btn btn-sm" onClick={() => closePanes([pane.id])}>
 							{tt.closePane}
 						</button>
-						{lost.has(pane.session) && thread !== undefined ? (
-							// Opening it again would print the same error: the conversation is still readable in chat.
+						{(lost.has(pane.session) || moved.has(pane.session)) && thread !== undefined ? (
+							// Opening it again would print the same error (or take the session back from chat mid-turn): the conversation goes on in chat.
 							<button
 								type="button"
 								className="btn btn-sm btn-primary"

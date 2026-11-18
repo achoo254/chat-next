@@ -198,8 +198,13 @@ export function ModeSwitch({ machine, threadId, mode, modes }: { machine: string
 	);
 }
 
-/** Above the composer while the session's AI runs in the terminal: the terminal, or ending it there. */
-export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string; link: MachineLink; thread: ThreadSummary; ai: string }) {
+/**
+ * Above the composer while the session's AI runs in the terminal: the
+ * terminal, or ending it there. With `takesBack` (the machine lets chat take
+ * the session back) it only says that sending here moves the session to chat,
+ * or that a turn runs there first; the composer stays open.
+ */
+export function TerminalHeldBar({ machine, link, thread, ai, takesBack = false }: { machine: string; link: MachineLink; thread: ThreadSummary; ai: string; takesBack?: boolean }) {
 	const t = useMachinesCopy();
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
@@ -215,20 +220,20 @@ export function TerminalHeldBar({ machine, link, thread, ai }: { machine: string
 			},
 		);
 	};
+	const running = isRunning(thread);
+	const text = takesBack ? (running ? t.terminal.heldBusy(ai) : t.terminal.takesBack(ai)) : running ? t.terminal.held(ai) : t.terminal.heldOpen(ai);
 	return (
-		<section className="mx-limit mx-held" role="status" data-id="session-terminal-held">
+		<section className="mx-limit mx-held" role="status" data-id="session-terminal-held" data-takes-back={takesBack ? "" : undefined}>
 			<div className="mx-limit-inner">
 				<MachineIcon name="terminal" />
-				<p>{isRunning(thread) ? t.terminal.held(ai) : t.terminal.heldOpen(ai)}</p>
+				<p>{text}</p>
 				<div className="mx-limit-acts">
-					<button type="button" className="btn btn-sm mx-btn-ghost" disabled={busy} onClick={end} title={t.terminal.endHint}>
-						{t.terminal.end}
-					</button>
-					<button
-						type="button"
-						className="btn btn-sm btn-primary"
-						onClick={() => openSessionIn(machine, thread.id, "terminal")}
-					>
+					{!takesBack && (
+						<button type="button" className="btn btn-sm mx-btn-ghost" disabled={busy} onClick={end} title={t.terminal.endHint}>
+							{t.terminal.end}
+						</button>
+					)}
+					<button type="button" className={takesBack ? "btn btn-sm mx-btn-ghost" : "btn btn-sm btn-primary"} onClick={() => openSessionIn(machine, thread.id, "terminal")}>
 						{t.terminal.showTerminal}
 					</button>
 				</div>
