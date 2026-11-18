@@ -18,6 +18,7 @@ import type { MachineEntry } from "../machines/machines-client.ts";
 import { inFolder } from "../machines/projects-view.ts";
 import { EMPTY_JOURNAL, orderedItems, type Journal } from "../machines/transcript/reducer.ts";
 import { folderName, useDirectory, useHub, useNow } from "../machines/use-machines.ts";
+import { paths } from "../router.tsx";
 import { allowedFields } from "./advisor-surfaces.ts";
 import { advisorStore, lastAi, lastMachine, rememberAi, rememberMachine, useAdvisorState, type AdvisorStore, type CopyRecord, type Mood, type Note, type Question } from "./advisor-store.ts";
 
@@ -558,7 +559,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			}
 			const fresh = verdicts.filter((i) => !seen?.has(i.id));
 			for (const i of fresh) seen.add(i.id);
-			const page = window.location.pathname + window.location.search;
+			const page = pageOfSession(machine, threadId, window.location.pathname, window.location.search);
 			const thread = link.snapshot().threads.find((x) => x.id === threadId);
 			for (const i of fresh) {
 				const text = i.body.case === "advisorVerdict" ? verdictLine(i.body.value) : "";
@@ -578,6 +579,18 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			window.clearTimeout(timer);
 		};
 	}, [hub, machine, threadId, store]);
+}
+
+/**
+ * The page a verdict of a session leads back to: the page as it shows now (the
+ * session's chat, terminal or office tab, kept with its query) when it is that
+ * session's, else the session itself. Another session or screen may be showing
+ * when the verdict is noticed (panes and tabs side by side), and a tap must
+ * not go there.
+ */
+export function pageOfSession(machine: string, threadId: string, pathname: string, search: string): string {
+	const own = paths.machineSession(machine, threadId);
+	return pathname === own || pathname.startsWith(`${own}/`) ? pathname + search : own;
 }
 
 /** "Option (82%)" for a verdict; its error code when Advisor did not answer (worded by the mascot). */
