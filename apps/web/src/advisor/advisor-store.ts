@@ -116,6 +116,8 @@ export interface AdvisorState {
 	readonly open: boolean;
 	readonly mood: Mood;
 	readonly note: Note;
+	/** A question of this tab waits for its answer: Advisor takes one question at a time, so nothing new is offered to it until it ends. */
+	readonly busy: boolean;
 	/** A short line beside the mascot (an automatic verdict, an answer ready); "" when none. */
 	readonly flash: string;
 	/** The page (path and query, the session's mode and tab included) the flash line came from; a tap on the line goes back there. "" when none. */
@@ -222,6 +224,7 @@ export class AdvisorStore {
 			open: false,
 			mood: "idle",
 			note: "",
+			busy: false,
 			flash: "",
 			flashTarget: "",
 			history: [],
@@ -248,8 +251,9 @@ export class AdvisorStore {
 
 	// --- copies ----------------------------------------------------------------
 
-	/** Keeps a copy (already checked: no secret, not from a sensitive screen). */
+	/** Keeps a copy (already checked: no secret, not from a sensitive screen). While a question waits, nothing is kept for the next one. */
 	remember(text: string, context: CopyContext): void {
+		if (this.state.busy) return;
 		const record: CopyRecord = { id: `c${++nextId}`, text, context, at: this.now() };
 		// The same text copied again moves up instead of filling the list.
 		const others = this.state.copies.filter((c) => c.text !== text);
@@ -293,7 +297,7 @@ export class AdvisorStore {
 
 	forgetAll(): void {
 		saveQuestions([]);
-		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", history: [], dot: false, mood: "idle", note: "" });
+		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", history: [], dot: false, mood: "idle", note: "", busy: false });
 	}
 
 	// --- questions -------------------------------------------------------------
@@ -323,6 +327,11 @@ export class AdvisorStore {
 		if (open === this.state.open) return;
 		// The dot (another device's answer) stays while the bubble says so; closing it is reading it.
 		this.set(open ? { open, flash: "", flashTarget: "" } : { open, dot: false });
+	}
+
+	/** Whether a question of this tab waits for its answer (presence works it out). */
+	setBusy(busy: boolean): void {
+		if (busy !== this.state.busy) this.set({ busy });
 	}
 
 	setMood(mood: Mood, note: Note): void {

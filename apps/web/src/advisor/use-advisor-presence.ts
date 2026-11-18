@@ -387,6 +387,8 @@ export function useAdvisorPresence(attachedMachine: string, open: boolean, store
 	if (open && unseen) setSeen(new Set(answered));
 	const mood = moodOf(note, waiting.length > 0, unseen && !open);
 	useEffect(() => store.setMood(mood, note ?? ""), [store, mood, note]);
+	const busy = waiting.length > 0;
+	useEffect(() => store.setBusy(busy), [store, busy]);
 
 	useVerdictFlash(hub, store);
 	const waitingThreads = useMemo(() => new Set(waitingKey === "" ? [] : waitingKey.split("\n\n").map((pair) => pair.split("\n")[1] ?? "")), [waitingKey]);
@@ -563,7 +565,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 				if (text !== "") store.addHistory({ id: i.id, machine, threadId, title: thread?.title || (thread === undefined ? "" : folderName(thread.dir)), text, target: page, at: Date.now(), unavailable: "" });
 			}
 			const last = fresh.at(-1)?.body;
-			if (last?.case !== "advisorVerdict" || store.snapshot().open) return;
+			if (last?.case !== "advisorVerdict" || store.snapshot().open || store.snapshot().busy) return;
 			// The page as it shows now (the session in its chat, terminal or office view): a tap on the line returns to it.
 			store.setFlash(verdictLine(last.value), page);
 			window.clearTimeout(timer);
@@ -601,7 +603,7 @@ function useOtherAnswers(hub: LinkHub, refs: string, mine: ReadonlySet<string>, 
 					const before = previous.current.get(thread.id);
 					previous.current.set(thread.id, thread.state);
 					const ended = before === ThreadState.RUNNING && thread.state !== ThreadState.RUNNING && thread.state !== ThreadState.QUEUED;
-					if (ended && !mine.has(thread.id) && !store.snapshot().open) store.setDot(true);
+					if (ended && !mine.has(thread.id) && !store.snapshot().open && !store.snapshot().busy) store.setDot(true);
 				}
 			}
 		};
