@@ -32,6 +32,7 @@ Mỗi chat đã đồng bộ có nút **Tính năng** (Cài đặt › Kết n�
 - **Tên và mô tả nhóm:** đọc mỗi khoảng 10 phút; đổi trong Chat gửi sang Telegram (cần quyền đổi thông tin nhóm). Chat không đăng dòng "đã đổi tên" cho thay đổi đến từ Telegram vì không biết ai đổi. Ảnh nhóm chưa đồng bộ.
 - **Topic từ Chat:** đổi tên, đóng và mở lại, ghim đi sang Telegram khi tính năng Chủ đề gửi ra; tạo topic mới, đổi màu, biểu tượng và ẩn vẫn chỉ làm ở Telegram.
 - **Telegram từ chối** (không đủ quyền…): Chat trả về như Telegram đang có và báo một thông báo.
+- **Thành viên (tính năng tác động lên người, tắt mặc định):** khi bật «chỉ nhận», người vào, ra và được phong admin ở Telegram hiện thành thành viên của nhóm trong Chat (mỗi khoảng 10 phút; nhóm quá 1.000 người chỉ thêm, không bớt). Khi bật «hai chiều», hai thao tác của chủ trong Chat tới được Telegram: **xoá một người khỏi nhóm** (họ vào lại được) và **phong hay gỡ admin**, chỉ với người của Telegram (thành viên chỉ có ở Chat không bao giờ bị gửi đi). Mỗi lần gửi được ghi vào nhật ký, giới hạn 10 lần mỗi giờ cho mỗi tài khoản, và nếu Telegram từ chối thì người đó hiện lại. Thêm người, đổi quyền từng người, rời nhóm, xoá nhóm và **link mời** không đồng bộ: link mời của Chat mở Chat chứ không phải Telegram, và rời hay xoá nhóm không hoàn tác được.
 
 Chat đã đồng bộ hiện nhãn nhỏ tên ứng dụng ở danh sách. Người gửi hiện bằng tên của họ ở Telegram; tin của chính bạn bên Telegram hiện là tin của bạn.
 

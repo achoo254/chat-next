@@ -66,6 +66,7 @@ func (a *Adapter) Features() map[feature.Feature]feature.Support {
 		feature.Notify:   {In: true, Out: true},
 		feature.Dialog:   {In: true, Out: true},
 		feature.Info:     {In: true, Out: true},
+		feature.Members:  {In: true, Out: true},
 	}
 }
 

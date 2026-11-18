@@ -100,6 +100,14 @@ func declarationProblems(s Subject) []string {
 			fail("%s goes out but the adapter is not a bridge.DialogWriter", f)
 		}
 	}
+	_, memberReader := a.(bridge.MemberReader)
+	_, memberWriter := a.(bridge.MemberWriter)
+	if sup[feature.Members].In && !memberReader {
+		fail("members come in but the adapter is not a bridge.MemberReader")
+	}
+	if sup[feature.Members].Out && !memberWriter {
+		fail("members go out but the adapter is not a bridge.MemberWriter")
+	}
 	_, infoReader := a.(bridge.InfoReader)
 	_, infoWriter := a.(bridge.InfoWriter)
 	if sup[feature.Info].In && !infoReader {

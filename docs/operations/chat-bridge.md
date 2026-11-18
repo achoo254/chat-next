@@ -60,6 +60,16 @@ WHERE op IN ('pin_message', 'pin_topic') ORDER BY id DESC LIMIT 20;
 - Log `chat-api`: dòng "pinned messages outside the imported history are not pinned in Chat" kèm số tin bị bỏ qua vì cũ hơn cửa sổ lịch sử.
 - Hoàn tác: bản server trước bỏ qua các hàng ghim (kiểu việc lạ làm hàng thất bại, không ảnh hưởng gửi tin); không có việc chạy tay trong DB.
 
+## Hành động lên người (nhật ký và giới hạn)
+
+Migration `0049_external_audit.sql` thêm bảng `external_audit`: mỗi hành động Chat làm lên người ở app khác (tính năng `members`: xoá khỏi nhóm, phong hay gỡ admin) được ghi một dòng (tài khoản, hội thoại, hành động, id người, ai yêu cầu, kết quả `sent`, `failed` hoặc `limited`, lý do ngắn). Bảng chỉ thêm, không chứa tên hay nội dung tin. Giới hạn mỗi tài khoản là `MemberActionsPerHour` (mặc định 10) trong một giờ; vượt thì hàng đợi báo `failed` và người đó hiện lại.
+
+```sql
+SELECT created_at, chat_id, action, target, result, detail FROM external_audit ORDER BY id DESC LIMIT 30;
+```
+
+Tính năng tắt mặc định cho từng chat; bật ở bảng tính năng của chat (hỏi xác nhận). Tắt lại thì hàng chưa gửi bị huỷ.
+
 ## Khoá
 
 Phiên Telegram niêm phong bằng `SESSION_KEY` (nhãn riêng, AAD gắn id tài khoản, chủ và ứng dụng). Xoay khoá theo [`key-rotation.md`](./key-rotation.md): `reseal` in dòng `resealed bridge account secrets`; secret không mở được (`unreadable`) thì tài khoản đó phải đăng nhập lại.

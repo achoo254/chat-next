@@ -50,6 +50,9 @@ type Config struct {
 	MediaMaxBytes int64
 	// OutboxPoll is how often the outbox of a connected account is looked at.
 	OutboxPoll time.Duration
+	// MemberActionsPerHour is the most actions on people in the other app (removing
+	// them, making them admins) one account sends in an hour (default 10).
+	MemberActionsPerHour int
 	// StatePoll is how often the state of the synced chats that the other app
 	// does not announce (mute, pinned, marked unread) is read from it (default 2 min).
 	StatePoll time.Duration
@@ -101,6 +104,9 @@ func (c Config) withDefaults() Config {
 	if c.ReconcileEvery <= 0 {
 		c.ReconcileEvery = 10 * time.Second
 	}
+	if c.MemberActionsPerHour <= 0 {
+		c.MemberActionsPerHour = 10
+	}
 	if c.StatePoll <= 0 {
 		c.StatePoll = 2 * time.Minute
 	}
@@ -149,6 +155,8 @@ type runner struct {
 	// pause holds every send until then (the other app asked to wait);
 	// nextSend spaces two sends by Config.SendGap.
 	pause, nextSend time.Time
+	// membersTick counts the looks at the state of the chats, to read the members of groups once in a while.
+	membersTick int
 	// infoTick counts the looks at the state of the chats, to read the info of groups once in a while.
 	infoTick int
 }

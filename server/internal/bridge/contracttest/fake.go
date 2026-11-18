@@ -46,6 +46,9 @@ type Fake struct {
 	infos                                      map[string]bridge.GroupInfo
 	infoCalls                                  []string
 	topicEdits                                 []string
+	members                                    map[string][]bridge.Member
+	partial                                    map[string]bool
+	memberCalls                                []string
 	pinCalls                                   []PinCall
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
@@ -59,7 +62,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -71,6 +74,7 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Notify:   {In: true, Out: true},
 		feature.Dialog:   {In: true, Out: true},
 		feature.Info:     {In: true, Out: true},
+		feature.Members:  {In: true, Out: true},
 	}
 }
 
@@ -667,3 +671,70 @@ func (f *Fake) EditTopic(_ context.Context, _ bridge.Account, conv, topic string
 }
 
 var _ bridge.TopicWriter = (*Fake)(nil)
+
+// SetMembers sets who is in a group of the app, as if people there had joined and left;
+// partial says the group is too big to be listed in full.
+func (f *Fake) SetMembers(conv string, partial bool, members ...bridge.Member) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.members[conv] = append([]bridge.Member(nil), members...)
+	f.partial[conv] = partial
+}
+
+// Members is who the app has in a group now.
+func (f *Fake) Members(conv string) []bridge.Member {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.Member(nil), f.members[conv]...)
+}
+
+// MemberCalls lists the calls Chat made to act on people, as "remove:<conv>:<id>" and "admin:<conv>:<id>:<bool>".
+func (f *Fake) MemberCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.memberCalls...)
+}
+
+// ListMembers implements bridge.MemberReader.
+func (f *Fake) ListMembers(_ context.Context, _ bridge.Account, conv string) ([]bridge.Member, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]bridge.Member(nil), f.members[conv]...), !f.partial[conv], nil
+}
+
+func (f *Fake) writeMember(call string, change func()) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Members].Out {
+		return fmt.Errorf("%w: this app does not take that from Chat", bridge.ErrNotAllowed)
+	}
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
+	f.memberCalls = append(f.memberCalls, call)
+	change()
+	return nil
+}
+
+// RemoveMember implements bridge.MemberWriter.
+func (f *Fake) RemoveMember(_ context.Context, _ bridge.Account, conv, participant string) error {
+	return f.writeMember("remove:"+conv+":"+participant, func() {
+		f.members[conv] = slices.DeleteFunc(f.members[conv], func(m bridge.Member) bool { return m.Participant.ID == participant })
+	})
+}
+
+// SetMemberAdmin implements bridge.MemberWriter.
+func (f *Fake) SetMemberAdmin(_ context.Context, _ bridge.Account, conv, participant string, admin bool) error {
+	return f.writeMember(fmt.Sprintf("admin:%s:%s:%v", conv, participant, admin), func() {
+		for i := range f.members[conv] {
+			if f.members[conv][i].Participant.ID == participant {
+				f.members[conv][i].Admin = admin
+			}
+		}
+	})
+}
+
+var (
+	_ bridge.MemberReader = (*Fake)(nil)
+	_ bridge.MemberWriter = (*Fake)(nil)
+)

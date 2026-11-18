@@ -668,7 +668,10 @@ func (s *Service) RemoveMember(ctx context.Context, me, chatID, userID int64, ba
 				return fmt.Errorf("chat: revoke the member's invite links: %w", err)
 			}
 		}
-		return t.removeMember(ctx, c, me, userID, ban)
+		if err := t.removeMember(ctx, c, me, userID, ban); err != nil {
+			return err
+		}
+		return t.queueMemberAction(ctx, chatID, me, userID, "member_remove", map[string]any{})
 	})
 	if err != nil {
 		return nil, err
@@ -855,7 +858,10 @@ func (s *Service) SetAdmin(ctx context.Context, me, chatID, userID int64, admin 
 		if admin {
 			role = roleAdmin
 		}
-		return t.setRole(ctx, c, me, userID, role)
+		if err := t.setRole(ctx, c, me, userID, role); err != nil {
+			return err
+		}
+		return t.queueMemberAction(ctx, chatID, me, userID, "member_admin", map[string]any{"admin": admin})
 	})
 	if err != nil {
 		return nil, err

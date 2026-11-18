@@ -55,8 +55,8 @@ func TestTheFeaturesOfAChatAreThoseTheAppSupportsWithTheirDirection(t *testing.T
 			t.Errorf("%s is not listed for an app that supports it", f)
 		}
 	}
-	if _, ok := got[feature.Members]; ok {
-		t.Error("members are listed but the app does not do them")
+	if m, ok := got[feature.Members]; !ok || m.Direction != feature.Off || m.Risk != feature.R3 {
+		t.Errorf("members view = %+v: an app that does them lists them, off by default, as acting on people", m)
 	}
 	if p := got[feature.Pins]; p.Direction != feature.Both && p.Direction != feature.In || !p.Default || p.Risk != feature.R1 {
 		t.Errorf("pins view = %+v", p)

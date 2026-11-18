@@ -34,6 +34,15 @@ func noEvents(bridge.Event) (string, bool) { return "", false }
 
 var handlers = []handler{
 	{
+		feature: feature.Members,
+		match:   noEvents,
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"member_remove": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doMemberAction(ctx, h) },
+			"member_admin":  func(r *runner, ctx context.Context, h *outboxRow) error { return r.doMemberAction(ctx, h) },
+		},
+		poll: func(r *runner, ctx context.Context) error { return r.pollMembers(ctx) },
+	},
+	{
 		feature: feature.Info,
 		match:   noEvents,
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
