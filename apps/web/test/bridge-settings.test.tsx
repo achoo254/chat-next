@@ -350,3 +350,58 @@ describe("disconnecting", () => {
 		expect(await screen.findByRole("heading", { name: "Ứng dụng có thể kết nối" }, LONG)).toBeTruthy();
 	});
 });
+
+describe("what is synced for one chat, feature by feature", () => {
+	async function openFeatures(fixture: ChatFixture): Promise<HTMLElement> {
+		await openPage(fixture);
+		const buttons = await screen.findAllByRole("button", { name: "Tính năng" }, LONG);
+		await userEvent.click(buttons[0] as HTMLElement);
+		return (await screen.findByRole("region", { name: /Đồng bộ gì cho/ }, LONG)) as HTMLElement;
+	}
+
+	it("lists what the app supports with the direction in effect, and sets one", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const panel = await openFeatures(fixture);
+		expect(within(panel).getByText("Ghim tin nhắn")).toBeTruthy();
+		expect(within(panel).queryByText("Link mời")).toBeNull();
+		const pins = within(panel).getByRole("group", { name: /Ghim tin nhắn/ });
+		expect(within(pins).getByRole("button", { name: "Chỉ nhận" }).getAttribute("aria-pressed")).toBe("true");
+		// read marks only come in: no "both ways" for them
+		expect(within(within(panel).getByRole("group", { name: /Đã đọc/ })).queryByRole("button", { name: "Hai chiều" })).toBeNull();
+		await userEvent.click(within(pins).getByRole("button", { name: "Hai chiều" }));
+		await waitFor(() => expect(fixture.bridge.calls.some((c) => c.endsWith(":pins:both"))).toBe(true), LONG);
+		await waitFor(() => expect(within(within(panel).getByRole("group", { name: /Ghim tin nhắn/ })).getByRole("button", { name: "Hai chiều" }).getAttribute("aria-pressed")).toBe("true"), LONG);
+	});
+
+	it("applies a quick level and never touches what acts on people", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const panel = await openFeatures(fixture);
+		await userEvent.click(within(panel).getByRole("button", { name: "Đầy đủ" }));
+		await waitFor(() => expect(fixture.bridge.calls.filter((c) => c.startsWith("feature:"))).toHaveLength(3), LONG);
+		expect(fixture.bridge.calls.filter((c) => c.startsWith("feature:")).some((c) => c.includes(":members:"))).toBe(false);
+	});
+
+	it("asks before a feature that acts on people starts to send", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const panel = await openFeatures(fixture);
+		const members = within(panel).getByRole("group", { name: /Thành viên và vai trò/ });
+		await userEvent.click(within(members).getByRole("button", { name: "Hai chiều" }));
+		expect(await within(panel).findByText(/tác động trực tiếp lên người và nhóm/, {}, LONG)).toBeTruthy();
+		expect(fixture.bridge.calls.some((c) => c.includes(":members:"))).toBe(false);
+		await userEvent.click(within(panel).getByRole("button", { name: "Bật" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("feature:user:7:members:both"), LONG);
+	});
+
+	it("says so when the app cannot do the change", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		const panel = await openFeatures(fixture);
+		fixture.bridge.features = fixture.bridge.features.filter((x) => x.feature !== "pins");
+		await userEvent.click(within(within(panel).getByRole("group", { name: /Ghim tin nhắn/ })).getByRole("button", { name: "Hai chiều" }));
+		expect(await within(panel).findByText("Ứng dụng này chưa làm được thao tác đó.", {}, LONG)).toBeTruthy();
+	});
+});
+

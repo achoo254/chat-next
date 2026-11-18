@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"app.local/server/internal/bridge/feature"
 	"context"
 	"errors"
 	"log/slog"
@@ -62,6 +63,8 @@ func bridgeError(err error) error {
 		return connect.NewError(connect.CodeNotFound, errors.New("not found"))
 	case errors.Is(err, engine.ErrSendUnsupported):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("send_unsupported: this app cannot be written to from Chat, or the account is signed out"))
+	case errors.Is(err, engine.ErrFeatureUnsupported):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("feature_unsupported: this app cannot do that"))
 	case errors.Is(err, engine.ErrRateLimited):
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many sign-in attempts; try again later"))
 	case errors.Is(err, engine.ErrAccountTaken):
@@ -173,6 +176,44 @@ func (s *bridgeService) SetBridgeChatDirection(ctx context.Context, req *connect
 			return nil, err
 		}
 		return &appv1.SetBridgeChatDirectionResponse{}, nil
+	})
+}
+
+func riskName(r feature.Risk) string {
+	switch r {
+	case feature.R2:
+		return "r2"
+	case feature.R3:
+		return "r3"
+	case feature.RE:
+		return "re"
+	}
+	return "r1"
+}
+
+func (s *bridgeService) ListBridgeFeatures(ctx context.Context, req *connect.Request[appv1.ListBridgeFeaturesRequest]) (*connect.Response[appv1.ListBridgeFeaturesResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeFeaturesRequest) (*appv1.ListBridgeFeaturesResponse, error) {
+		views, err := s.engine.Features(ctx, me, m.GetAccountId(), m.GetConversationId())
+		if err != nil {
+			return nil, err
+		}
+		resp := &appv1.ListBridgeFeaturesResponse{}
+		for _, v := range views {
+			resp.Features = append(resp.Features, &appv1.BridgeFeature{
+				Feature: string(v.Feature), Risk: riskName(v.Risk), Direction: string(v.Direction), IsDefault: v.Default,
+				CanReceive: v.Supported.In, CanSend: v.Supported.Out,
+			})
+		}
+		return resp, nil
+	})
+}
+
+func (s *bridgeService) SetBridgeFeature(ctx context.Context, req *connect.Request[appv1.SetBridgeFeatureRequest]) (*connect.Response[appv1.SetBridgeFeatureResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeFeatureRequest) (*appv1.SetBridgeFeatureResponse, error) {
+		if err := s.engine.SetFeature(ctx, me, m.GetAccountId(), m.GetConversationId(), feature.Feature(m.GetFeature()), feature.Direction(m.GetDirection())); err != nil {
+			return nil, err
+		}
+		return &appv1.SetBridgeFeatureResponse{}, nil
 	})
 }
 

@@ -54,6 +54,12 @@ const (
 	// BridgeServiceSetBridgeChatDirectionProcedure is the fully-qualified name of the BridgeService's
 	// SetBridgeChatDirection RPC.
 	BridgeServiceSetBridgeChatDirectionProcedure = "/app.v1.BridgeService/SetBridgeChatDirection"
+	// BridgeServiceListBridgeFeaturesProcedure is the fully-qualified name of the BridgeService's
+	// ListBridgeFeatures RPC.
+	BridgeServiceListBridgeFeaturesProcedure = "/app.v1.BridgeService/ListBridgeFeatures"
+	// BridgeServiceSetBridgeFeatureProcedure is the fully-qualified name of the BridgeService's
+	// SetBridgeFeature RPC.
+	BridgeServiceSetBridgeFeatureProcedure = "/app.v1.BridgeService/SetBridgeFeature"
 	// BridgeServiceListBridgeOutboxProcedure is the fully-qualified name of the BridgeService's
 	// ListBridgeOutbox RPC.
 	BridgeServiceListBridgeOutboxProcedure = "/app.v1.BridgeService/ListBridgeOutbox"
@@ -95,6 +101,12 @@ type BridgeServiceClient interface {
 	// not yet sent. failed_precondition send_unsupported when the app cannot
 	// be written to.
 	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
+	// What can be synced for a synced chat, feature by feature: only what the
+	// app supports is listed, with the direction now in effect.
+	ListBridgeFeatures(context.Context, *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error)
+	// Sets the direction of one feature of a synced chat. Fails with
+	// failed_precondition (feature_unsupported) when the app cannot do it.
+	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
 	// What a chat has queued for the app and not finished: sending, waiting,
 	// failed or of unknown result. A message that is not listed was sent.
 	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
@@ -164,6 +176,18 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeChatDirection")),
 			connect.WithClientOptions(opts...),
 		),
+		listBridgeFeatures: connect.NewClient[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse](
+			httpClient,
+			baseURL+BridgeServiceListBridgeFeaturesProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeFeatures")),
+			connect.WithClientOptions(opts...),
+		),
+		setBridgeFeature: connect.NewClient[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse](
+			httpClient,
+			baseURL+BridgeServiceSetBridgeFeatureProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeature")),
+			connect.WithClientOptions(opts...),
+		),
 		listBridgeOutbox: connect.NewClient[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse](
 			httpClient,
 			baseURL+BridgeServiceListBridgeOutboxProcedure,
@@ -200,6 +224,8 @@ type bridgeServiceClient struct {
 	enableBridgeChat        *connect.Client[v1.EnableBridgeChatRequest, v1.EnableBridgeChatResponse]
 	removeBridgeChat        *connect.Client[v1.RemoveBridgeChatRequest, v1.RemoveBridgeChatResponse]
 	setBridgeChatDirection  *connect.Client[v1.SetBridgeChatDirectionRequest, v1.SetBridgeChatDirectionResponse]
+	listBridgeFeatures      *connect.Client[v1.ListBridgeFeaturesRequest, v1.ListBridgeFeaturesResponse]
+	setBridgeFeature        *connect.Client[v1.SetBridgeFeatureRequest, v1.SetBridgeFeatureResponse]
 	listBridgeOutbox        *connect.Client[v1.ListBridgeOutboxRequest, v1.ListBridgeOutboxResponse]
 	retryBridgeMessage      *connect.Client[v1.RetryBridgeMessageRequest, v1.RetryBridgeMessageResponse]
 	dismissBridgeMessage    *connect.Client[v1.DismissBridgeMessageRequest, v1.DismissBridgeMessageResponse]
@@ -239,6 +265,16 @@ func (c *bridgeServiceClient) RemoveBridgeChat(ctx context.Context, req *connect
 // SetBridgeChatDirection calls app.v1.BridgeService.SetBridgeChatDirection.
 func (c *bridgeServiceClient) SetBridgeChatDirection(ctx context.Context, req *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error) {
 	return c.setBridgeChatDirection.CallUnary(ctx, req)
+}
+
+// ListBridgeFeatures calls app.v1.BridgeService.ListBridgeFeatures.
+func (c *bridgeServiceClient) ListBridgeFeatures(ctx context.Context, req *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error) {
+	return c.listBridgeFeatures.CallUnary(ctx, req)
+}
+
+// SetBridgeFeature calls app.v1.BridgeService.SetBridgeFeature.
+func (c *bridgeServiceClient) SetBridgeFeature(ctx context.Context, req *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error) {
+	return c.setBridgeFeature.CallUnary(ctx, req)
 }
 
 // ListBridgeOutbox calls app.v1.BridgeService.ListBridgeOutbox.
@@ -288,6 +324,12 @@ type BridgeServiceHandler interface {
 	// not yet sent. failed_precondition send_unsupported when the app cannot
 	// be written to.
 	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
+	// What can be synced for a synced chat, feature by feature: only what the
+	// app supports is listed, with the direction now in effect.
+	ListBridgeFeatures(context.Context, *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error)
+	// Sets the direction of one feature of a synced chat. Fails with
+	// failed_precondition (feature_unsupported) when the app cannot do it.
+	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
 	// What a chat has queued for the app and not finished: sending, waiting,
 	// failed or of unknown result. A message that is not listed was sent.
 	ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error)
@@ -353,6 +395,18 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeChatDirection")),
 		connect.WithHandlerOptions(opts...),
 	)
+	bridgeServiceListBridgeFeaturesHandler := connect.NewUnaryHandler(
+		BridgeServiceListBridgeFeaturesProcedure,
+		svc.ListBridgeFeatures,
+		connect.WithSchema(bridgeServiceMethods.ByName("ListBridgeFeatures")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceSetBridgeFeatureHandler := connect.NewUnaryHandler(
+		BridgeServiceSetBridgeFeatureProcedure,
+		svc.SetBridgeFeature,
+		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeFeature")),
+		connect.WithHandlerOptions(opts...),
+	)
 	bridgeServiceListBridgeOutboxHandler := connect.NewUnaryHandler(
 		BridgeServiceListBridgeOutboxProcedure,
 		svc.ListBridgeOutbox,
@@ -393,6 +447,10 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 			bridgeServiceRemoveBridgeChatHandler.ServeHTTP(w, r)
 		case BridgeServiceSetBridgeChatDirectionProcedure:
 			bridgeServiceSetBridgeChatDirectionHandler.ServeHTTP(w, r)
+		case BridgeServiceListBridgeFeaturesProcedure:
+			bridgeServiceListBridgeFeaturesHandler.ServeHTTP(w, r)
+		case BridgeServiceSetBridgeFeatureProcedure:
+			bridgeServiceSetBridgeFeatureHandler.ServeHTTP(w, r)
 		case BridgeServiceListBridgeOutboxProcedure:
 			bridgeServiceListBridgeOutboxHandler.ServeHTTP(w, r)
 		case BridgeServiceRetryBridgeMessageProcedure:
@@ -436,6 +494,14 @@ func (UnimplementedBridgeServiceHandler) RemoveBridgeChat(context.Context, *conn
 
 func (UnimplementedBridgeServiceHandler) SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeChatDirection is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) ListBridgeFeatures(context.Context, *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.ListBridgeFeatures is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeFeature is not implemented"))
 }
 
 func (UnimplementedBridgeServiceHandler) ListBridgeOutbox(context.Context, *connect.Request[v1.ListBridgeOutboxRequest]) (*connect.Response[v1.ListBridgeOutboxResponse], error) {

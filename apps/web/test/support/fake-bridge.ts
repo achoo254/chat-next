@@ -10,6 +10,7 @@ import {
 	BridgeService,
 	type BridgeAccount,
 	type BridgeConversation,
+	type BridgeFeature,
 	type BridgeLoginStep,
 	type BridgeOutboxItem,
 } from "@achoo254/chat-proto/bridge";
@@ -32,6 +33,14 @@ export class FakeBridge {
 	outboxLooks = 0;
 	/** The next enable call fails (after a remove, as when a forum is synced again). */
 	failEnable = false;
+	/** What the app can sync for a chat, by feature (a Telegram-like set); tests edit it. */
+	features: BridgeFeature[] = [
+		{ $typeName: "app.v1.BridgeFeature", feature: "messages", risk: "r2", direction: "in", isDefault: true, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeature", feature: "pins", risk: "r1", direction: "in", isDefault: true, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeature", feature: "topics", risk: "r2", direction: "in", isDefault: true, canReceive: true, canSend: true },
+		{ $typeName: "app.v1.BridgeFeature", feature: "read", risk: "r1", direction: "in", isDefault: true, canReceive: true, canSend: false },
+		{ $typeName: "app.v1.BridgeFeature", feature: "members", risk: "r3", direction: "off", isDefault: true, canReceive: true, canSend: true },
+	];
 	/** The next call that sends on (switching to both, retrying) fails with send_unsupported. */
 	sendUnsupported = false;
 	/** The calls, in order, with the arguments that matter. */
@@ -190,6 +199,23 @@ export class FakeBridge {
 					c.chatId = 0n;
 					c.topicsSplit = false;
 				}
+				return {};
+			},
+			listBridgeFeatures: (req) => {
+				this.guard(false);
+				this.calls.push(`features:${req.conversationId}`);
+				if (this.accounts[0]?.chats.find((c) => c.conversationId === req.conversationId) === undefined) throw new ConnectError("not found", Code.NotFound);
+				return { features: this.features.map((x) => ({ ...x })) };
+			},
+			setBridgeFeature: (req) => {
+				this.guard(false);
+				this.calls.push(`feature:${req.conversationId}:${req.feature}:${req.direction}`);
+				const row = this.features.find((x) => x.feature === req.feature);
+				if (row === undefined) throw new ConnectError("feature_unsupported: this app cannot do that", Code.FailedPrecondition);
+				const ok = req.direction === "off" || (req.direction === "in" && row.canReceive) || (req.direction === "out" && row.canSend) || (req.direction === "both" && row.canReceive && row.canSend);
+				if (!ok) throw new ConnectError("feature_unsupported: this app cannot do that", Code.FailedPrecondition);
+				row.direction = req.direction;
+				row.isDefault = false;
 				return {};
 			},
 			setBridgeChatDirection: (req) => {

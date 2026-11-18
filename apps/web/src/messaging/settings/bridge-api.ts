@@ -5,6 +5,8 @@
 // messaging chunk. Nothing here carries a message, a phone number or a code
 // past the call that needs it.
 
+import type { BridgeFeatureView, FeatureDirection } from "./bridge-features-model.ts";
+
 export type BridgeAccountStatus = "active" | "needs_login" | "stopped";
 
 /** `in`: the other app is the source and Chat sends nothing back. `both`: what is written in the chat is sent on too. */
@@ -75,6 +77,7 @@ export type BridgeErrorKind =
 	| "account_taken"
 	| "not_found"
 	| "send_unsupported"
+	| "feature_unsupported"
 	| "other";
 
 /** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…). */
@@ -101,6 +104,10 @@ export interface BridgeOutboxItem {
 
 export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
+	/** What a synced chat can sync, feature by feature: only what the app supports, with the direction now in effect. */
+	features(accountId: number, conversationId: string): Promise<readonly BridgeFeatureView[]>;
+	/** Sets the direction of one feature of a synced chat (`feature_unsupported` when the app cannot do it). */
+	setFeature(accountId: number, conversationId: string, feature: string, direction: FeatureDirection): Promise<void>;
 	startLogin(source: string): Promise<LoginStep>;
 	continueLogin(loginId: string, input: Readonly<Record<string, string>>): Promise<LoginStep>;
 	conversations(accountId: number): Promise<readonly BridgeConversation[]>;

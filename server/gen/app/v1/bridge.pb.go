@@ -1836,6 +1836,298 @@ func (*DismissBridgeMessageResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_bridge_proto_rawDescGZIP(), []int{28}
 }
 
+type ListBridgeFeaturesRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListBridgeFeaturesRequest) Reset() {
+	*x = ListBridgeFeaturesRequest{}
+	mi := &file_app_v1_bridge_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBridgeFeaturesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBridgeFeaturesRequest) ProtoMessage() {}
+
+func (x *ListBridgeFeaturesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBridgeFeaturesRequest.ProtoReflect.Descriptor instead.
+func (*ListBridgeFeaturesRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListBridgeFeaturesRequest) GetAccountId() int64 {
+	if x != nil {
+		return x.AccountId
+	}
+	return 0
+}
+
+func (x *ListBridgeFeaturesRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+// One feature of a synced chat. Names are strings so a new feature or app adds
+// values, not schema.
+type BridgeFeature struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// "messages", "pins", "topics", ... (the list grows).
+	Feature string `protobuf:"bytes,1,opt,name=feature,proto3" json:"feature,omitempty"`
+	// "r1" the owner's own state, "r2" what other people see, "r3" acts on people
+	// and groups, "re" ephemeral.
+	Risk string `protobuf:"bytes,2,opt,name=risk,proto3" json:"risk,omitempty"`
+	// "off", "in", "out" or "both".
+	Direction string `protobuf:"bytes,3,opt,name=direction,proto3" json:"direction,omitempty"`
+	// The owner never set it: it follows the messages of the chat.
+	IsDefault bool `protobuf:"varint,4,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	// What the app can do: read its changes, and make changes from Chat.
+	CanReceive    bool `protobuf:"varint,5,opt,name=can_receive,json=canReceive,proto3" json:"can_receive,omitempty"`
+	CanSend       bool `protobuf:"varint,6,opt,name=can_send,json=canSend,proto3" json:"can_send,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BridgeFeature) Reset() {
+	*x = BridgeFeature{}
+	mi := &file_app_v1_bridge_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BridgeFeature) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BridgeFeature) ProtoMessage() {}
+
+func (x *BridgeFeature) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BridgeFeature.ProtoReflect.Descriptor instead.
+func (*BridgeFeature) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *BridgeFeature) GetFeature() string {
+	if x != nil {
+		return x.Feature
+	}
+	return ""
+}
+
+func (x *BridgeFeature) GetRisk() string {
+	if x != nil {
+		return x.Risk
+	}
+	return ""
+}
+
+func (x *BridgeFeature) GetDirection() string {
+	if x != nil {
+		return x.Direction
+	}
+	return ""
+}
+
+func (x *BridgeFeature) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+func (x *BridgeFeature) GetCanReceive() bool {
+	if x != nil {
+		return x.CanReceive
+	}
+	return false
+}
+
+func (x *BridgeFeature) GetCanSend() bool {
+	if x != nil {
+		return x.CanSend
+	}
+	return false
+}
+
+type ListBridgeFeaturesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Features      []*BridgeFeature       `protobuf:"bytes,1,rep,name=features,proto3" json:"features,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBridgeFeaturesResponse) Reset() {
+	*x = ListBridgeFeaturesResponse{}
+	mi := &file_app_v1_bridge_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBridgeFeaturesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBridgeFeaturesResponse) ProtoMessage() {}
+
+func (x *ListBridgeFeaturesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBridgeFeaturesResponse.ProtoReflect.Descriptor instead.
+func (*ListBridgeFeaturesResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListBridgeFeaturesResponse) GetFeatures() []*BridgeFeature {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
+type SetBridgeFeatureRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Feature        string                 `protobuf:"bytes,3,opt,name=feature,proto3" json:"feature,omitempty"`
+	Direction      string                 `protobuf:"bytes,4,opt,name=direction,proto3" json:"direction,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetBridgeFeatureRequest) Reset() {
+	*x = SetBridgeFeatureRequest{}
+	mi := &file_app_v1_bridge_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBridgeFeatureRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBridgeFeatureRequest) ProtoMessage() {}
+
+func (x *SetBridgeFeatureRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBridgeFeatureRequest.ProtoReflect.Descriptor instead.
+func (*SetBridgeFeatureRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SetBridgeFeatureRequest) GetAccountId() int64 {
+	if x != nil {
+		return x.AccountId
+	}
+	return 0
+}
+
+func (x *SetBridgeFeatureRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SetBridgeFeatureRequest) GetFeature() string {
+	if x != nil {
+		return x.Feature
+	}
+	return ""
+}
+
+func (x *SetBridgeFeatureRequest) GetDirection() string {
+	if x != nil {
+		return x.Direction
+	}
+	return ""
+}
+
+type SetBridgeFeatureResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBridgeFeatureResponse) Reset() {
+	*x = SetBridgeFeatureResponse{}
+	mi := &file_app_v1_bridge_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBridgeFeatureResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBridgeFeatureResponse) ProtoMessage() {}
+
+func (x *SetBridgeFeatureResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBridgeFeatureResponse.ProtoReflect.Descriptor instead.
+func (*SetBridgeFeatureResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{33}
+}
+
 var File_app_v1_bridge_proto protoreflect.FileDescriptor
 
 const file_app_v1_bridge_proto_rawDesc = "" +
@@ -1939,7 +2231,29 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x1bDismissBridgeMessageRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\"\x1e\n" +
-	"\x1cDismissBridgeMessageResponse*\xa8\x01\n" +
+	"\x1cDismissBridgeMessageResponse\"g\n" +
+	"\x19ListBridgeFeaturesRequest\x12!\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\xb6\x01\n" +
+	"\rBridgeFeature\x12\x18\n" +
+	"\afeature\x18\x01 \x01(\tR\afeature\x12\x12\n" +
+	"\x04risk\x18\x02 \x01(\tR\x04risk\x12\x1c\n" +
+	"\tdirection\x18\x03 \x01(\tR\tdirection\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\x04 \x01(\bR\tisDefault\x12\x1f\n" +
+	"\vcan_receive\x18\x05 \x01(\bR\n" +
+	"canReceive\x12\x19\n" +
+	"\bcan_send\x18\x06 \x01(\bR\acanSend\"O\n" +
+	"\x1aListBridgeFeaturesResponse\x121\n" +
+	"\bfeatures\x18\x01 \x03(\v2\x15.app.v1.BridgeFeatureR\bfeatures\"\x9d\x01\n" +
+	"\x17SetBridgeFeatureRequest\x12!\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x18\n" +
+	"\afeature\x18\x03 \x01(\tR\afeature\x12\x1c\n" +
+	"\tdirection\x18\x04 \x01(\tR\tdirection\"\x1a\n" +
+	"\x18SetBridgeFeatureResponse*\xa8\x01\n" +
 	"\x13BridgeAccountStatus\x12%\n" +
 	"!BRIDGE_ACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cBRIDGE_ACCOUNT_STATUS_ACTIVE\x10\x01\x12%\n" +
@@ -1966,7 +2280,7 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x1cBRIDGE_OUTBOX_STATUS_PENDING\x10\x01\x12 \n" +
 	"\x1cBRIDGE_OUTBOX_STATUS_SENDING\x10\x02\x12\x1f\n" +
 	"\x1bBRIDGE_OUTBOX_STATUS_FAILED\x10\x03\x12 \n" +
-	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\xa0\b\n" +
+	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\xd4\t\n" +
 	"\rBridgeService\x12R\n" +
 	"\x0fGetBridgeStatus\x12\x1e.app.v1.GetBridgeStatusRequest\x1a\x1f.app.v1.GetBridgeStatusResponse\x12U\n" +
 	"\x10StartBridgeLogin\x12\x1f.app.v1.StartBridgeLoginRequest\x1a .app.v1.StartBridgeLoginResponse\x12^\n" +
@@ -1974,7 +2288,9 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x17ListBridgeConversations\x12&.app.v1.ListBridgeConversationsRequest\x1a'.app.v1.ListBridgeConversationsResponse\x12U\n" +
 	"\x10EnableBridgeChat\x12\x1f.app.v1.EnableBridgeChatRequest\x1a .app.v1.EnableBridgeChatResponse\x12U\n" +
 	"\x10RemoveBridgeChat\x12\x1f.app.v1.RemoveBridgeChatRequest\x1a .app.v1.RemoveBridgeChatResponse\x12g\n" +
-	"\x16SetBridgeChatDirection\x12%.app.v1.SetBridgeChatDirectionRequest\x1a&.app.v1.SetBridgeChatDirectionResponse\x12U\n" +
+	"\x16SetBridgeChatDirection\x12%.app.v1.SetBridgeChatDirectionRequest\x1a&.app.v1.SetBridgeChatDirectionResponse\x12[\n" +
+	"\x12ListBridgeFeatures\x12!.app.v1.ListBridgeFeaturesRequest\x1a\".app.v1.ListBridgeFeaturesResponse\x12U\n" +
+	"\x10SetBridgeFeature\x12\x1f.app.v1.SetBridgeFeatureRequest\x1a .app.v1.SetBridgeFeatureResponse\x12U\n" +
 	"\x10ListBridgeOutbox\x12\x1f.app.v1.ListBridgeOutboxRequest\x1a .app.v1.ListBridgeOutboxResponse\x12[\n" +
 	"\x12RetryBridgeMessage\x12!.app.v1.RetryBridgeMessageRequest\x1a\".app.v1.RetryBridgeMessageResponse\x12a\n" +
 	"\x14DismissBridgeMessage\x12#.app.v1.DismissBridgeMessageRequest\x1a$.app.v1.DismissBridgeMessageResponse\x12j\n" +
@@ -1993,7 +2309,7 @@ func file_app_v1_bridge_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bridge_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_app_v1_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_app_v1_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_app_v1_bridge_proto_goTypes = []any{
 	(BridgeAccountStatus)(0),                // 0: app.v1.BridgeAccountStatus
 	(BridgeDirection)(0),                    // 1: app.v1.BridgeDirection
@@ -2029,7 +2345,12 @@ var file_app_v1_bridge_proto_goTypes = []any{
 	(*RetryBridgeMessageResponse)(nil),      // 31: app.v1.RetryBridgeMessageResponse
 	(*DismissBridgeMessageRequest)(nil),     // 32: app.v1.DismissBridgeMessageRequest
 	(*DismissBridgeMessageResponse)(nil),    // 33: app.v1.DismissBridgeMessageResponse
-	nil,                                     // 34: app.v1.ContinueBridgeLoginRequest.InputEntry
+	(*ListBridgeFeaturesRequest)(nil),       // 34: app.v1.ListBridgeFeaturesRequest
+	(*BridgeFeature)(nil),                   // 35: app.v1.BridgeFeature
+	(*ListBridgeFeaturesResponse)(nil),      // 36: app.v1.ListBridgeFeaturesResponse
+	(*SetBridgeFeatureRequest)(nil),         // 37: app.v1.SetBridgeFeatureRequest
+	(*SetBridgeFeatureResponse)(nil),        // 38: app.v1.SetBridgeFeatureResponse
+	nil,                                     // 39: app.v1.ContinueBridgeLoginRequest.InputEntry
 }
 var file_app_v1_bridge_proto_depIdxs = []int32{
 	1,  // 0: app.v1.BridgeSyncedChat.direction:type_name -> app.v1.BridgeDirection
@@ -2041,7 +2362,7 @@ var file_app_v1_bridge_proto_depIdxs = []int32{
 	10, // 6: app.v1.BridgeLoginStep.fields:type_name -> app.v1.BridgeLoginField
 	7,  // 7: app.v1.BridgeLoginStep.account:type_name -> app.v1.BridgeAccount
 	11, // 8: app.v1.StartBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
-	34, // 9: app.v1.ContinueBridgeLoginRequest.input:type_name -> app.v1.ContinueBridgeLoginRequest.InputEntry
+	39, // 9: app.v1.ContinueBridgeLoginRequest.input:type_name -> app.v1.ContinueBridgeLoginRequest.InputEntry
 	11, // 10: app.v1.ContinueBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
 	3,  // 11: app.v1.BridgeConversation.kind:type_name -> app.v1.BridgeConversationKind
 	17, // 12: app.v1.ListBridgeConversationsResponse.conversations:type_name -> app.v1.BridgeConversation
@@ -2049,33 +2370,38 @@ var file_app_v1_bridge_proto_depIdxs = []int32{
 	1,  // 14: app.v1.SetBridgeChatDirectionRequest.direction:type_name -> app.v1.BridgeDirection
 	4,  // 15: app.v1.BridgeOutboxItem.status:type_name -> app.v1.BridgeOutboxStatus
 	27, // 16: app.v1.ListBridgeOutboxResponse.items:type_name -> app.v1.BridgeOutboxItem
-	8,  // 17: app.v1.BridgeService.GetBridgeStatus:input_type -> app.v1.GetBridgeStatusRequest
-	12, // 18: app.v1.BridgeService.StartBridgeLogin:input_type -> app.v1.StartBridgeLoginRequest
-	14, // 19: app.v1.BridgeService.ContinueBridgeLogin:input_type -> app.v1.ContinueBridgeLoginRequest
-	16, // 20: app.v1.BridgeService.ListBridgeConversations:input_type -> app.v1.ListBridgeConversationsRequest
-	19, // 21: app.v1.BridgeService.EnableBridgeChat:input_type -> app.v1.EnableBridgeChatRequest
-	21, // 22: app.v1.BridgeService.RemoveBridgeChat:input_type -> app.v1.RemoveBridgeChatRequest
-	25, // 23: app.v1.BridgeService.SetBridgeChatDirection:input_type -> app.v1.SetBridgeChatDirectionRequest
-	28, // 24: app.v1.BridgeService.ListBridgeOutbox:input_type -> app.v1.ListBridgeOutboxRequest
-	30, // 25: app.v1.BridgeService.RetryBridgeMessage:input_type -> app.v1.RetryBridgeMessageRequest
-	32, // 26: app.v1.BridgeService.DismissBridgeMessage:input_type -> app.v1.DismissBridgeMessageRequest
-	23, // 27: app.v1.BridgeService.DisconnectBridgeAccount:input_type -> app.v1.DisconnectBridgeAccountRequest
-	9,  // 28: app.v1.BridgeService.GetBridgeStatus:output_type -> app.v1.GetBridgeStatusResponse
-	13, // 29: app.v1.BridgeService.StartBridgeLogin:output_type -> app.v1.StartBridgeLoginResponse
-	15, // 30: app.v1.BridgeService.ContinueBridgeLogin:output_type -> app.v1.ContinueBridgeLoginResponse
-	18, // 31: app.v1.BridgeService.ListBridgeConversations:output_type -> app.v1.ListBridgeConversationsResponse
-	20, // 32: app.v1.BridgeService.EnableBridgeChat:output_type -> app.v1.EnableBridgeChatResponse
-	22, // 33: app.v1.BridgeService.RemoveBridgeChat:output_type -> app.v1.RemoveBridgeChatResponse
-	26, // 34: app.v1.BridgeService.SetBridgeChatDirection:output_type -> app.v1.SetBridgeChatDirectionResponse
-	29, // 35: app.v1.BridgeService.ListBridgeOutbox:output_type -> app.v1.ListBridgeOutboxResponse
-	31, // 36: app.v1.BridgeService.RetryBridgeMessage:output_type -> app.v1.RetryBridgeMessageResponse
-	33, // 37: app.v1.BridgeService.DismissBridgeMessage:output_type -> app.v1.DismissBridgeMessageResponse
-	24, // 38: app.v1.BridgeService.DisconnectBridgeAccount:output_type -> app.v1.DisconnectBridgeAccountResponse
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	35, // 17: app.v1.ListBridgeFeaturesResponse.features:type_name -> app.v1.BridgeFeature
+	8,  // 18: app.v1.BridgeService.GetBridgeStatus:input_type -> app.v1.GetBridgeStatusRequest
+	12, // 19: app.v1.BridgeService.StartBridgeLogin:input_type -> app.v1.StartBridgeLoginRequest
+	14, // 20: app.v1.BridgeService.ContinueBridgeLogin:input_type -> app.v1.ContinueBridgeLoginRequest
+	16, // 21: app.v1.BridgeService.ListBridgeConversations:input_type -> app.v1.ListBridgeConversationsRequest
+	19, // 22: app.v1.BridgeService.EnableBridgeChat:input_type -> app.v1.EnableBridgeChatRequest
+	21, // 23: app.v1.BridgeService.RemoveBridgeChat:input_type -> app.v1.RemoveBridgeChatRequest
+	25, // 24: app.v1.BridgeService.SetBridgeChatDirection:input_type -> app.v1.SetBridgeChatDirectionRequest
+	34, // 25: app.v1.BridgeService.ListBridgeFeatures:input_type -> app.v1.ListBridgeFeaturesRequest
+	37, // 26: app.v1.BridgeService.SetBridgeFeature:input_type -> app.v1.SetBridgeFeatureRequest
+	28, // 27: app.v1.BridgeService.ListBridgeOutbox:input_type -> app.v1.ListBridgeOutboxRequest
+	30, // 28: app.v1.BridgeService.RetryBridgeMessage:input_type -> app.v1.RetryBridgeMessageRequest
+	32, // 29: app.v1.BridgeService.DismissBridgeMessage:input_type -> app.v1.DismissBridgeMessageRequest
+	23, // 30: app.v1.BridgeService.DisconnectBridgeAccount:input_type -> app.v1.DisconnectBridgeAccountRequest
+	9,  // 31: app.v1.BridgeService.GetBridgeStatus:output_type -> app.v1.GetBridgeStatusResponse
+	13, // 32: app.v1.BridgeService.StartBridgeLogin:output_type -> app.v1.StartBridgeLoginResponse
+	15, // 33: app.v1.BridgeService.ContinueBridgeLogin:output_type -> app.v1.ContinueBridgeLoginResponse
+	18, // 34: app.v1.BridgeService.ListBridgeConversations:output_type -> app.v1.ListBridgeConversationsResponse
+	20, // 35: app.v1.BridgeService.EnableBridgeChat:output_type -> app.v1.EnableBridgeChatResponse
+	22, // 36: app.v1.BridgeService.RemoveBridgeChat:output_type -> app.v1.RemoveBridgeChatResponse
+	26, // 37: app.v1.BridgeService.SetBridgeChatDirection:output_type -> app.v1.SetBridgeChatDirectionResponse
+	36, // 38: app.v1.BridgeService.ListBridgeFeatures:output_type -> app.v1.ListBridgeFeaturesResponse
+	38, // 39: app.v1.BridgeService.SetBridgeFeature:output_type -> app.v1.SetBridgeFeatureResponse
+	29, // 40: app.v1.BridgeService.ListBridgeOutbox:output_type -> app.v1.ListBridgeOutboxResponse
+	31, // 41: app.v1.BridgeService.RetryBridgeMessage:output_type -> app.v1.RetryBridgeMessageResponse
+	33, // 42: app.v1.BridgeService.DismissBridgeMessage:output_type -> app.v1.DismissBridgeMessageResponse
+	24, // 43: app.v1.BridgeService.DisconnectBridgeAccount:output_type -> app.v1.DisconnectBridgeAccountResponse
+	31, // [31:44] is the sub-list for method output_type
+	18, // [18:31] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bridge_proto_init() }
@@ -2089,7 +2415,7 @@ func file_app_v1_bridge_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bridge_proto_rawDesc), len(file_app_v1_bridge_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   30,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

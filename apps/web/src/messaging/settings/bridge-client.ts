@@ -23,6 +23,7 @@ import {
 	type ConversationKind,
 	type LoginStep,
 } from "./bridge-api.ts";
+import type { BridgeFeatureView, FeatureDirection, FeatureRisk } from "./bridge-features-model.ts";
 
 const STATUSES: Partial<Record<WireStatus, BridgeAccountStatus>> = {
 	[WireStatus.ACTIVE]: "active",
@@ -43,6 +44,9 @@ const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status
 	[WireOutboxStatus.FAILED]: "failed",
 	[WireOutboxStatus.UNKNOWN]: "unknown",
 };
+
+const DIRECTIONS: readonly FeatureDirection[] = ["off", "in", "out", "both"];
+const RISKS: readonly FeatureRisk[] = ["r1", "r2", "r3", "re"];
 
 const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", "pin_message", "pin_topic"];
 
@@ -95,6 +99,7 @@ export function bridgeError(err: unknown): BridgeError {
 	if (e.code === Code.FailedPrecondition && message.startsWith("bridge_disabled")) kind = "disabled";
 	else if (e.code === Code.FailedPrecondition && message.startsWith("reauth_required")) kind = "reauth";
 	else if (e.code === Code.FailedPrecondition && message.startsWith("send_unsupported")) kind = "send_unsupported";
+	else if (e.code === Code.FailedPrecondition && message.startsWith("feature_unsupported")) kind = "feature_unsupported";
 	else if (e.code === Code.InvalidArgument && message.startsWith("wrong_input:")) {
 		kind = "wrong_input";
 		detail = message.slice("wrong_input:".length).trim().split(":")[0]?.trim() ?? "";
@@ -147,6 +152,21 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		setDirection: (accountId, conversationId, direction) =>
 			call(async () => {
 				await rpc.setBridgeChatDirection({ accountId: BigInt(accountId), conversationId, direction: toWireDirection(direction) });
+			}),
+		features: (accountId, conversationId) =>
+			call(async () => {
+				const r = await rpc.listBridgeFeatures({ accountId: BigInt(accountId), conversationId });
+				return r.features.flatMap((f): BridgeFeatureView[] => {
+					const direction = DIRECTIONS.find((d) => d === f.direction);
+					const risk = RISKS.find((x) => x === f.risk);
+					return direction === undefined || risk === undefined
+						? []
+						: [{ feature: f.feature, risk, direction, isDefault: f.isDefault, canReceive: f.canReceive, canSend: f.canSend }];
+				});
+			}),
+		setFeature: (accountId, conversationId, feature, direction) =>
+			call(async () => {
+				await rpc.setBridgeFeature({ accountId: BigInt(accountId), conversationId, feature, direction });
 			}),
 		outbox: (chatId) =>
 			call(async () => {

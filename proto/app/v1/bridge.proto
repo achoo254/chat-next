@@ -41,6 +41,12 @@ service BridgeService {
   // not yet sent. failed_precondition send_unsupported when the app cannot
   // be written to.
   rpc SetBridgeChatDirection(SetBridgeChatDirectionRequest) returns (SetBridgeChatDirectionResponse);
+  // What can be synced for a synced chat, feature by feature: only what the
+  // app supports is listed, with the direction now in effect.
+  rpc ListBridgeFeatures(ListBridgeFeaturesRequest) returns (ListBridgeFeaturesResponse);
+  // Sets the direction of one feature of a synced chat. Fails with
+  // failed_precondition (feature_unsupported) when the app cannot do it.
+  rpc SetBridgeFeature(SetBridgeFeatureRequest) returns (SetBridgeFeatureResponse);
   // What a chat has queued for the app and not finished: sending, waiting,
   // failed or of unknown result. A message that is not listed was sent.
   rpc ListBridgeOutbox(ListBridgeOutboxRequest) returns (ListBridgeOutboxResponse);
@@ -266,3 +272,38 @@ message DismissBridgeMessageRequest {
 }
 
 message DismissBridgeMessageResponse {}
+
+message ListBridgeFeaturesRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+}
+
+// One feature of a synced chat. Names are strings so a new feature or app adds
+// values, not schema.
+message BridgeFeature {
+  // "messages", "pins", "topics", ... (the list grows).
+  string feature = 1;
+  // "r1" the owner's own state, "r2" what other people see, "r3" acts on people
+  // and groups, "re" ephemeral.
+  string risk = 2;
+  // "off", "in", "out" or "both".
+  string direction = 3;
+  // The owner never set it: it follows the messages of the chat.
+  bool is_default = 4;
+  // What the app can do: read its changes, and make changes from Chat.
+  bool can_receive = 5;
+  bool can_send = 6;
+}
+
+message ListBridgeFeaturesResponse {
+  repeated BridgeFeature features = 1;
+}
+
+message SetBridgeFeatureRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+  string conversation_id = 2;
+  string feature = 3;
+  string direction = 4;
+}
+
+message SetBridgeFeatureResponse {}

@@ -4,7 +4,7 @@
 // the settings frame (docs/settings-menu.md); a confirmation is inline, never a
 // dialog standing in for the page. The phone number, code and password go to
 // the server in the call that needs them and are never kept here.
-import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
 import { signInUrl } from "@achoo254/chat-core";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
@@ -29,6 +29,8 @@ import { bridgeClient, bridgeError } from "./bridge-client.ts";
 import { savePending, takePending } from "./bridge-pending.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
+
+const BridgeFeatures = lazy(() => import("./bridge-features.tsx").then((m) => ({ default: m.BridgeFeatures })));
 
 /** Initials for an avatar from a title that may carry emoji or symbols. */
 function titleInitials(title: string): string {
@@ -470,6 +472,7 @@ function SyncedChat({
 	const { toasts } = useServices();
 	const [confirming, setConfirming] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const [featuresOpen, setFeaturesOpen] = useState(false);
 	const both = chat.direction === "both";
 	const setSendOn = (on: boolean) => {
 		setBusy(true);
@@ -534,6 +537,9 @@ function SyncedChat({
 						</span>
 						<Switch checked={both} label={`${t.chats.sendOn}: ${chat.title}`} disabled={busy || account.status !== "active"} onChange={setSendOn} />
 					</span>
+					<button type="button" className="btn btn-sm" aria-expanded={featuresOpen} onClick={() => setFeaturesOpen(!featuresOpen)}>
+						{t.features.open}
+					</button>
 					<Link to={paths.chat(chat.chatId)} className="btn btn-sm">
 						{t.chats.open}
 					</Link>
@@ -541,6 +547,23 @@ function SyncedChat({
 						{t.chats.remove}
 					</button>
 				</span>
+			)}
+			{featuresOpen && !confirming && (
+				<Suspense fallback={null}>
+					<BridgeFeatures
+						accountId={account.id}
+						conversationId={chat.conversationId}
+						chatTitle={chat.title}
+						appName={appName}
+						api={api}
+						disabled={busy || account.status !== "active"}
+						onChanged={() => {
+							forgetBridgeStatus();
+							onChange();
+						}}
+						onError={onError}
+					/>
+				</Suspense>
 			)}
 		</div>
 	);
