@@ -106,11 +106,11 @@ describe("places of the living rooms", () => {
 		// The seat's height is the anchor's, from the furniture under it: a beanbag near the floor, a hard dining chair at its top.
 		expect(personTarget(layout(), "tv-5", 0, false)).toMatchObject({ seated: true, low: true, seat: 0.225 });
 		expect(personTarget(layout(), "dine-2", 0, false)).toMatchObject({ seated: true, low: false, seat: 0.519 });
-		// The reading table and the meeting table have no keyboard: those seats talk; the work desks type; the director's chair does neither.
+		// The reading table and the meeting table have no keyboard: those seats talk; the work desks and the director's chair type.
 		expect(personTarget(layout(), "library-seat-0", 0, false)).toMatchObject({ talkSeat: true, keyboard: false });
 		expect(personTarget(layout(), "meeting-0", 0, false)).toMatchObject({ talkSeat: true, keyboard: false });
 		expect(personTarget(layout(), "desk-0", 0, false)).toMatchObject({ talkSeat: false, keyboard: true });
-		expect(personTarget(layout(), "director", 0, false)).toMatchObject({ talkSeat: false, keyboard: false });
+		expect(personTarget(layout(), "director", 0, false)).toMatchObject({ talkSeat: false, keyboard: true });
 		expect(personTarget(layout(), "dine-2", 0, false)?.talkSeat).toBe(false);
 		// A second person at a bed stands beside it on the floor.
 		expect(personTarget(layout(), "bed-0", 1, false)?.y).toBe(0);
