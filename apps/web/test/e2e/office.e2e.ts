@@ -767,8 +767,8 @@ test("the inspector in 3D: a name or a body opens the panel, a pan, a turn and a
 	await context.close();
 });
 
-test("the inspector on a phone: a tap on a name opens a sheet under the scene, the scene shrinks, and the draw calls stay within the phone's 100", async () => {
-	const { context, page, errors, warnings } = await openOffice(browser, "machine-chat", FLAGS_3D, { width: 1280, height: 900, touch: true, frame: 390 });
+test("the inspector on a phone: a tap on a name opens a sheet under the scene, the scene shrinks until the whole sheet is on screen, and the draw calls stay within the phone's 100", async () => {
+	const { context, page, errors, warnings } = await openOffice(browser, "machine-chat", FLAGS_3D, { width: 1280, height: 760, touch: true, frame: 390 });
 	const webgl = await page.evaluate(() => document.createElement("canvas").getContext("webgl2") !== null);
 	if (!webgl) {
 		console.log("office e2e: no WebGL2, the phone inspector check is skipped");
@@ -802,11 +802,14 @@ test("the inspector on a phone: a tap on a name opens a sheet under the scene, t
 	const panelBox = await page.locator(PANEL).boundingBox();
 	if (canvasBox === null || panelBox === null) assert.fail("no canvas or panel box");
 	assert.ok(panelBox.y >= canvasBox.y + canvasBox.height - 1, `the sheet is under the scene (panel at ${panelBox.y}, canvas ends ${canvasBox.y + canvasBox.height})`);
+	// The scene gives way so the whole sheet is on screen without scrolling the frame (a phone's height is 760 px here).
+	assert.ok(panelBox.y + panelBox.height <= 760, `the whole sheet is on screen (it ends at ${Math.round(panelBox.y + panelBox.height)} of 760)`);
 	await page.waitForTimeout(1_500);
 	const after = await drawCallsMost(page);
 	console.log(`office e2e: phone draw calls without a ring ${before}, with a chosen person ${after}`);
+	// Only the budget here: the scene gives way to the sheet, so the camera frames more of the plan and more furniture is drawn,
+	// which is not the ring's cost (the desktop test above holds the ring to one draw call with the frame unchanged).
 	assert.ok(after <= 100, `the phone's budget with a chosen person: ${after} draw calls (100)`);
-	assert.ok(after <= before + 1, `the ring adds at most one draw call (${before} -> ${after})`);
 	assert.deepEqual(errors, []);
 	await context.close();
 });

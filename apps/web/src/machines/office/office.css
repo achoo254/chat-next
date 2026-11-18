@@ -79,6 +79,8 @@
 .of[data-size="phone"] .of-body > .of-stage { flex: 1 1 auto; }
 .of-panel { display: grid; align-content: start; gap: var(--space-2); flex: 0 0 300px; box-sizing: border-box; align-self: flex-start; max-height: min(72vh, 680px); padding: var(--space-3); overflow-y: auto; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); animation: of-panel-in 0.18s ease-out; }
 .of[data-size="phone"] .of-panel { flex: 0 0 auto; align-self: stretch; max-height: 42vh; padding-bottom: max(var(--space-3), env(safe-area-inset-bottom)); }
+/* The scene gives way to the sheet: with the sheet open the scene is about a third of the screen, so the whole sheet is on screen without scrolling the frame (the scene alone is up to 64vh, the sheet up to 42vh). */
+.of[data-size="phone"] .of-body[data-panel="open"] > .of-stage { flex: 1 1 0; min-height: min(34vh, 300px); }
 .of-panel[data-left] { opacity: 0.7; }
 .of-panel-head { display: flex; align-items: center; gap: var(--space-2); }
 .of-panel-dot { margin: 0 var(--space-1); }
