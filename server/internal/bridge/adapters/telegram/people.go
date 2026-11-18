@@ -31,7 +31,7 @@ func bannedRightsOf(p bridge.Perms) tg.ChatBannedRights {
 // that Chat has a name for.
 func permsOfBanned(r tg.ChatBannedRights) *bridge.Perms {
 	p := bridge.Perms{
-		Send: !r.SendMessages, Media: !(r.SendMedia || r.SendPhotos), AddMembers: !r.InviteUsers,
+		Send: !r.SendMessages, Media: !r.SendMedia && !r.SendPhotos, AddMembers: !r.InviteUsers,
 		Pin: !r.PinMessages, ChangeInfo: !r.ChangeInfo, ManageTopics: !r.ManageTopics,
 	}
 	if p == bridge.FullPerms {
