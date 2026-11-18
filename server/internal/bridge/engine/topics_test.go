@@ -55,25 +55,6 @@ func (e *env) topicOfText(chatID int64, text string) int64 {
 	return id
 }
 
-func (e *env) waitTopic(chatID int64, text string, want int64) {
-	e.t.Helper()
-	e.eventually(func() bool {
-		var id int64
-		err := e.st.Pool().QueryRow(context.Background(), `SELECT topic_id FROM messages WHERE chat_id = $1 AND text = $2`, chatID, text).Scan(&id)
-		return err == nil && id == want
-	}, func() string {
-		return fmt.Sprintf("message %q is in topic %d, want %d", text, e.topicOfTextOr(chatID, text), want)
-	})
-}
-
-func (e *env) topicOfTextOr(chatID int64, text string) int64 {
-	var id int64
-	if err := e.st.Pool().QueryRow(context.Background(), `SELECT topic_id FROM messages WHERE chat_id = $1 AND text = $2`, chatID, text).Scan(&id); err != nil {
-		return -1
-	}
-	return id
-}
-
 func TestAForumConversationBecomesAForumChatWithItsTopicsAndMessagesInThem(t *testing.T) {
 	e := newEnv(t)
 	conv := e.forumConv()
@@ -236,5 +217,35 @@ func TestAMessageWrittenInATopicGoesIntoThatTopicOfTheOtherApp(t *testing.T) {
 	}
 	if last := e.fake.Sent(); last[len(last)-1].Topic != "9" {
 		t.Fatalf("the message after the refused one went into topic %q, want 9", last[len(last)-1].Topic)
+	}
+}
+
+func TestTheConversationListSaysWhichForumsAreSplitIntoTopics(t *testing.T) {
+	ctx := context.Background()
+	split := newEnv(t)
+	conv := split.forumConv()
+	eng := split.start()
+	if _, err := eng.EnableChat(ctx, split.account, conv, 100); err != nil {
+		t.Fatal(err)
+	}
+	list, err := eng.Conversations(ctx, split.owner, split.account)
+	if err != nil || len(list) != 1 || !list[0].Forum || !list[0].TopicsSplit || list[0].ChatID == 0 {
+		t.Fatalf("list = %+v, %v; want a forum whose copy is split into topics", list, err)
+	}
+	accounts, err := eng.Accounts(ctx, split.owner)
+	if err != nil || len(accounts) != 1 || len(accounts[0].Chats) != 1 || !accounts[0].Chats[0].TopicsSplit {
+		t.Fatalf("accounts = %+v, %v; want the synced chat to say it is split", accounts, err)
+	}
+
+	flat := newEnv(t)
+	flat.adapter = readOnlyApp{flat.fake}
+	conv = flat.forumConv()
+	engFlat := flat.start()
+	if _, err := engFlat.EnableChat(ctx, flat.account, conv, 100); err != nil {
+		t.Fatal(err)
+	}
+	list, err = engFlat.Conversations(ctx, flat.owner, flat.account)
+	if err != nil || len(list) != 1 || !list[0].Forum || list[0].TopicsSplit {
+		t.Fatalf("list = %+v, %v; want a forum whose copy is flat (the app does not read topics)", list, err)
 	}
 }
