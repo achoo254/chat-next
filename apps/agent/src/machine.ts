@@ -29,6 +29,7 @@ import { AuditLog } from "./safety/audit-log.ts";
 import { type MacAccess, MacFolders, hasFullDiskAccess, probeInChild } from "./safety/mac-folders.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit } from "./service.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
+import { ControlError } from "./terminal/host-link.ts";
 import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
 import { AgentUpdater } from "./agent-updater.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
@@ -259,6 +260,15 @@ export class Machine {
       // Read when an Advisor thread opens or is asked, long after both are built.
       isKnownFolder: (dir) => this.projects.projectOf(dir) !== undefined,
       gitFailure: (failureId) => this.workspaces.failures.get(failureId),
+      // Built after the core; read only when chat takes a thread back from its terminal.
+      closeTerminal: async (session) => {
+        try {
+          await this.terminal.close(session);
+        } catch (err) {
+          // Gone already (its CLI exited): the core lets the thread go itself.
+          if (!(err instanceof ControlError && err.code === "no_such_session")) throw err;
+        }
+      },
     });
     // Only an answer: a question that failed, ran out of time or was stopped is not worth a push.
     this.core.onAdvisorAnswer((threadId, _clientMsgId, state) => {
@@ -671,7 +681,7 @@ export class Machine {
         version: d.version ?? "",
         loginState: d.loginState === "ok" ? LoginState.OK : d.loginState === "needs-login" ? LoginState.NEEDS_LOGIN : LoginState.UNKNOWN,
         // Devices also check MachineInfo.terminal before offering it. What the facets give is said from the facets.
-        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, commitMessage: p.writer !== undefined, accounts: p.accounts !== undefined },
+        capabilities: { ...p.capabilities, terminal: p.terminal !== undefined, chatTakesTerminal: p.terminal !== undefined, commitMessage: p.writer !== undefined, accounts: p.accounts !== undefined },
         untestedVersion: Boolean(d.untestedVersion),
         defaultModel: d.defaultModel ?? "",
       });

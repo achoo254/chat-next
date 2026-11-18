@@ -273,6 +273,8 @@ type Thread = {
    * to the machine's own session meanwhile, so two processes never write it.
    */
   launching?: boolean;
+  /** A message sent in chat is taking the thread back from its CLI in the terminal (takeFromTerminal): others wait for it. */
+  takingFromTerminal?: Promise<void>;
   /**
    * Automatic Advisor of the thread's CLI in a terminal (TerminalAdvisor):
    * the one it runs with, from terminalStarted until that terminal ends or
@@ -364,6 +366,15 @@ const PARKED_EXIT_POLL_MS = 250;
 /** How long after its terminal ended the thread's own CLI may still be exiting, still holding its session. */
 const OWN_CLI_EXIT_MS = 15_000;
 
+/**
+ * A message sent in chat takes the thread back from its CLI in the terminal
+ * only when nothing was written to the session for this long (the CLI is
+ * idle, not between two steps of a turn); and waits this long at most for
+ * that CLI to exit once its terminal is hung up (SIGHUP, SIGKILL after 2 s).
+ */
+const TAKE_FROM_TERMINAL_QUIET_MS = 1_500;
+const TAKE_FROM_TERMINAL_EXIT_MS = 5_000;
+
 /** How long a thread's git changes are reused before git runs again. */
 const GIT_CHANGES_TTL_MS = 2_000;
 
@@ -423,6 +434,12 @@ export type CoreOptions = {
   isKnownFolder?: (dir: string) => boolean;
   /** A git failure of a workspace the machine keeps, for Advisor (workspace/workspaces.ts). */
   gitFailure?: (failureId: string) => GitFailure | undefined;
+  /**
+   * Ends a session of the machine's terminal (TerminalService.close, which
+   * reports it ended): a message sent in chat takes the thread back from its
+   * CLI there. Unset: such a message is refused as before.
+   */
+  closeTerminal?: (session: number) => Promise<void>;
   /** Where an Advisor thread opened without a folder works; advisorScratchDir when unset (tests). */
   advisorScratch?: () => string;
   /** How long an Advisor turn may run, and how long its AI may take to end it once stopped; ADVISOR_TURN_MS and ADVISOR_STOP_GRACE_MS when unset (tests). */
@@ -1611,8 +1628,9 @@ export class AgentCore {
     if (t.meta.kind === "advisor") return this.askAdvisor(t, { text, clientMsgId, attachmentIds, ...advisor });
     if (advisor.attachments.length > 0) throw new AgentError(ErrorCode.INVALID, "attachments for Advisor go to an Advisor thread only", { reason: ErrorReason.UNSPECIFIED });
     if (!text.trim() && attachmentIds.length === 0) throw new AgentError(ErrorCode.INVALID, "empty message", { reason: ErrorReason.EMPTY_MESSAGE });
-    // No two views write to one session: while its AI runs in a terminal, that is where to type.
-    if (t.meta.terminal || t.launching) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+    // No two processes write to one session: a CLI being started in the terminal keeps it; one running there gives it back.
+    if (t.launching) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+    if (t.meta.terminal || t.takingFromTerminal) await this.takeFromTerminal(t);
     if (clientMsgId && t.clientMsgIds.has(clientMsgId)) return;
     // Placed before anything else changes: a refused file refuses the whole message.
     const taken = this.uploads.take(threadId, attachmentIds);
@@ -3116,7 +3134,8 @@ export class AgentCore {
     if (!provider.terminal) {
       throw new AgentError(ErrorCode.INVALID, `${provider.name} does not open in a terminal`, { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: provider.name });
     }
-    if (this.turnHolds(t)) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
+    // A message from chat taking the thread back from the terminal is a turn about to run.
+    if (this.turnHolds(t) || t.takingFromTerminal) throw new AgentError(ErrorCode.INVALID, "the thread is running a turn", { reason: ErrorReason.THREAD_RUNNING });
     if (this.busyElsewhere(t)) {
       throw new AgentError(ErrorCode.INVALID, "this session seems open elsewhere on the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
     }
@@ -3279,6 +3298,48 @@ export class AgentCore {
     const last = t.lastTerminal && this.now() - t.lastTerminal.endedAt < OWN_CLI_EXIT_MS ? t.lastTerminal.startedAt : undefined;
     const startedAt = t.meta.terminal?.startedAt ?? last;
     return startedAt === undefined ? undefined : { dir: t.meta.dir, startedAt };
+  }
+
+  /**
+   * Chat takes the thread back from its CLI in the terminal, as opening the
+   * terminal takes it from chat: only while that CLI is idle (no turn, no
+   * prompt, quiet), its terminal is hung up and the message waits until no
+   * process of the AI has the session open any more. A CLI answering or
+   * waiting on a prompt keeps it: TERMINAL_TURN_RUNNING. Messages arriving
+   * meanwhile wait for the same hand-over.
+   */
+  private takeFromTerminal(t: Thread): Promise<void> {
+    t.takingFromTerminal ??= (async () => {
+      const at = t.meta.terminal;
+      if (!at) return;
+      const close = this.opts.closeTerminal;
+      if (!close) throw new AgentError(ErrorCode.INVALID, "this session runs in a terminal of the machine", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+      if (!(await this.terminalIdle(t.meta.id, TAKE_FROM_TERMINAL_QUIET_MS))) {
+        throw new AgentError(ErrorCode.INVALID, "the session's AI is busy in the machine's terminal", { reason: ErrorReason.TERMINAL_TURN_RUNNING });
+      }
+      await close(at.session);
+      // TerminalService.close reports the end; a closer that did not still lets the thread go here.
+      if (t.meta.terminal?.session === at.session) this.endTerminal(t);
+      await this.waitTerminalCliGone(t);
+    })().finally(() => {
+      delete t.takingFromTerminal;
+    });
+    return t.takingFromTerminal;
+  }
+
+  /** Waits until no process of the AI has the thread's session open (its CLI from the terminal exiting); refuses after TAKE_FROM_TERMINAL_EXIT_MS. */
+  private async waitTerminalCliGone(t: Thread): Promise<void> {
+    const sessionId = t.meta.segments.at(-1)?.sessionId;
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (!sessionId || !history?.openInOtherProcess) return;
+    for (let waited = 0; ; waited += PARKED_EXIT_POLL_MS) {
+      await history.prime?.();
+      if (!(await history.openInOtherProcess(sessionId))) return;
+      if (waited >= TAKE_FROM_TERMINAL_EXIT_MS) {
+        throw new AgentError(ErrorCode.INVALID, "the session's CLI in the terminal did not exit", { reason: ErrorReason.SESSION_OPEN_ELSEWHERE, subject: t.meta.dir });
+      }
+      await new Promise((resolve) => setTimeout(resolve, PARKED_EXIT_POLL_MS));
+    }
   }
 
   /** Starting the thread's CLI in a terminal did not go through: chat may write to the thread again. */

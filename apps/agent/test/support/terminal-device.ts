@@ -49,8 +49,12 @@ export async function terminalMachine(opts: {
   replaceQuietMs?: number;
   /** The programs the terminal process runs, as the system lists them (the machine's own by default). */
   programs?: (pid: number) => Promise<ChildProcess[] | undefined>;
+  /** A message sent in chat takes a thread back from its CLI in the terminal, as the machine wires it. */
+  chatTakesTerminal?: boolean;
 }) {
-  const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()]);
+  // The terminal is built after the core; the core calls it only when chat takes a thread back.
+  const closeTerminal = (session: number): Promise<void> => terminal.close(session);
+  const { core, audit, work } = makeCore(opts.providers ?? [fakeProvider()], opts.chatTakesTerminal ? { more: { closeTerminal } } : {});
   const config = new ConfigStore(opts.configDir ?? join(tempDir("term-"), "cfg"));
   const machineKey = await generateKeyPair(true);
   const trust = new DeviceTrust({ config });
