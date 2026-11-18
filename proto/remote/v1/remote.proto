@@ -325,6 +325,9 @@ message Frame {
     ThreadSetAdvisor thread_set_advisor = 174;
     AdvisorSetKey advisor_set_key = 175;
     AdvisorRemoveKey advisor_remove_key = 176;
+
+    // A → B (tunelo 3.17.0+): see "macOS folder access" below.
+    MacFolderAccessAsk mac_folder_access_ask = 177;
   }
 }
 
@@ -1115,10 +1118,52 @@ message MachineSettingsSet {
   optional bool local_forward = 1;
 }
 
-// macOS only: B opens System Settings at Full Disk Access and a Finder window
-// with its own binary selected, on the machine's screen, for the owner sitting
-// there. Answered with Ack; UNSUPPORTED_REQUEST elsewhere.
+// Before tunelo 3.17.0, macOS only: B opened System Settings at Full Disk
+// Access and a Finder window with its own binary selected. tunelo 3.17.0+
+// never asks for Full Disk Access and refuses it with UNSUPPORTED_REQUEST
+// (see "macOS folder access").
 message OpenDiskAccessSettings {}
+
+// --- macOS folder access ----------------------------------------------------
+//
+// tunelo 3.17.0+ runs with the permissions macOS gives any program by default,
+// as Claude Code in a terminal does; it never asks for Full Disk Access. macOS
+// protects some folders (MachineInfo.mac_folders) and lets a program into each
+// only once allowed. B touches none of them before the user agreed on a device:
+// work in one not yet granted is refused with ERROR_REASON_MAC_FOLDER_ACCESS
+// (subject: that folder). Once the user agrees, the device sends
+// MacFolderAccessAsk; B tries the folder in a separate process, so macOS may
+// show its own prompt on the machine's screen (the owner answers it there, or
+// through the machine's screen from a device). B sends MachineInfo unasked to
+// every connected device as the folder's access changes. A machine that has
+// Full Disk Access already reports every folder granted.
+
+// Answered with Ack at once; the outcome arrives in MachineInfo.mac_folders.
+// A path that is not one of MachineInfo.mac_folders is refused with
+// ERROR_REASON_FOLDER_NOT_FOUND; UNSUPPORTED_REQUEST off macOS.
+message MacFolderAccessAsk {
+  string path = 1;
+}
+
+message MacFolder {
+  // Absolute path: ~/Desktop, ~/Documents, ~/Downloads, iCloud Drive
+  // (~/Library/Mobile Documents/com~apple~CloudDocs), a cloud provider's
+  // folder under ~/Library/CloudStorage, or a volume under /Volumes.
+  string path = 1;
+  MacFolderAccess access = 2;
+}
+
+enum MacFolderAccess {
+  MAC_FOLDER_ACCESS_UNSPECIFIED = 0;
+  // Not asked yet: B stays out of it until the user agrees.
+  MAC_FOLDER_ACCESS_NOT_ASKED = 1;
+  // B is waiting for macOS; its prompt is on the machine's screen.
+  MAC_FOLDER_ACCESS_ASKING = 2;
+  MAC_FOLDER_ACCESS_GRANTED = 3;
+  // macOS refused; the owner allows tunelo again in System Settings, Privacy &
+  // Security, Files and Folders, then the device asks again.
+  MAC_FOLDER_ACCESS_DENIED = 4;
+}
 
 // --- answers and events (B → A) --------------------------------------------
 
@@ -1549,6 +1594,10 @@ enum ErrorReason {
   // ordinary session that is busy (subject: the limit). No session is
   // closed for Advisor; ask again later.
   ERROR_REASON_SESSION_LIMIT = 85;
+  // macOS protects the folder in subject (one of MachineInfo.mac_folders) and
+  // the user has not let tunelo ask for it yet, or macOS refused it (tunelo
+  // 3.17.0+; see "macOS folder access").
+  ERROR_REASON_MAC_FOLDER_ACCESS = 86;
 }
 
 enum ErrorCode {
@@ -2082,6 +2131,7 @@ message MachineInfo {
   uint32 memory_mb = 12;
   // Unset on machines that have no settings to change from a device.
   MachineSettings settings = 14;
+  // Before tunelo 3.17.0 (never set since; see mac_folders):
   // macOS only: tunelo lacks Full Disk Access, so its sessions cannot read
   // Desktop, Documents, Downloads, iCloud Drive and other protected folders,
   // and macOS may stop them on a prompt nobody at the machine answers. The
@@ -2115,6 +2165,9 @@ message MachineInfo {
   // Advisor on this machine; unset on machines that have none, which get no
   // Advisor request.
   AdvisorStatus advisor = 25;
+  // macOS only (tunelo 3.17.0+): the folders macOS protects and tunelo's
+  // access to each; see "macOS folder access".
+  repeated MacFolder mac_folders = 26;
 }
 
 enum TerminalAvailability {
