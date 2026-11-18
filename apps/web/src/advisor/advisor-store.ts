@@ -87,7 +87,9 @@ export interface AdvisorState {
 	readonly hidden: boolean;
 	/** The session shown now (session screen), for the automatic mode switch. */
 	readonly session: { readonly machine: string; readonly threadId: string } | null;
-	/** Text for a session's composer, by `${machine}\n${threadId}`. */
+	/** The chat open now (its composer is showing), for "Điền vào ô soạn tin"; never leaves the page. */
+	readonly chat: { readonly chatId: number; readonly topicId: number } | null;
+	/** Text for a composer, by `${machine}\n${threadId}` (a session) or `chat\n${chatId}\n${topicId}` (a chat). */
 	readonly fills: ReadonlyMap<string, { readonly text: string; readonly id: number }>;
 }
 
@@ -183,6 +185,7 @@ export class AdvisorStore {
 			dock: readDock(),
 			hidden: readJson(local, HIDDEN_KEY) === true,
 			session: null,
+			chat: null,
 			fills: new Map(),
 		};
 	}
@@ -246,7 +249,7 @@ export class AdvisorStore {
 
 	forgetAll(): void {
 		saveQuestions([]);
-		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, open: false, flash: "", flashTarget: "", dot: false, mood: "idle", note: "" });
+		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", dot: false, mood: "idle", note: "" });
 	}
 
 	// --- questions -------------------------------------------------------------
@@ -308,6 +311,13 @@ export class AdvisorStore {
 		this.set({ session });
 	}
 
+	/** The chat whose composer shows now; null when it goes. */
+	setChat(chat: AdvisorState["chat"]): void {
+		const c = this.state.chat;
+		if (c?.chatId === chat?.chatId && c?.topicId === chat?.topicId) return;
+		this.set({ chat });
+	}
+
 	// --- "Gửi sang phiên" ------------------------------------------------------
 
 	/** Puts `text` in the composer of a session (it fills when the session shows). */
@@ -317,9 +327,24 @@ export class AdvisorStore {
 		this.set({ fills });
 	}
 
+	/** Puts `text` in the composer of a chat (the user sends it). */
+	fillChat(chatId: number, topicId: number, text: string): void {
+		const fills = new Map(this.state.fills);
+		fills.set(chatFillKey(chatId, topicId), { text, id: ++this.nextFill });
+		this.set({ fills });
+	}
+
+	/** The chat's composer took its text. */
+	takeChatFill(chatId: number, topicId: number, id: number): void {
+		this.takeKey(chatFillKey(chatId, topicId), id);
+	}
+
 	/** The session's composer took its text. */
 	takeFill(machine: string, threadId: string, id: number): void {
-		const key = fillKey(machine, threadId);
+		this.takeKey(fillKey(machine, threadId), id);
+	}
+
+	private takeKey(key: string, id: number): void {
 		if (this.state.fills.get(key)?.id !== id) return;
 		const fills = new Map(this.state.fills);
 		fills.delete(key);
@@ -336,6 +361,10 @@ export function offerOf(state: Pick<AdvisorState, "copies" | "used">, now: numbe
 
 function fillKey(machine: string, threadId: string): string {
 	return `${machine}\n${threadId}`;
+}
+
+function chatFillKey(chatId: number, topicId: number): string {
+	return `chat\n${chatId}\n${topicId}`;
 }
 
 /** The machine picked last for asking (per device); "" before any. */
@@ -365,4 +394,9 @@ export function useAdvisorState(store: AdvisorStore = advisorStore): AdvisorStat
 /** Text Advisor put in this session's composer, until the composer takes it (session-chat.tsx). */
 export function useSessionFill(machine: string, threadId: string): { readonly text: string; readonly id: number } | undefined {
 	return useAdvisorState().fills.get(fillKey(machine, threadId));
+}
+
+/** Text Advisor put in this chat's composer, until the composer takes it (messaging/ui/composer.tsx). */
+export function useChatFill(chatId: number, topicId: number): { readonly text: string; readonly id: number } | undefined {
+	return useAdvisorState().fills.get(chatFillKey(chatId, topicId));
 }

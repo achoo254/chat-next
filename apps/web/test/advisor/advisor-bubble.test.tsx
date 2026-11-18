@@ -360,6 +360,22 @@ describe("asking", () => {
 		expect(isCommand(PICK)).toBe(false);
 	});
 
+	it("an answer about a chat message goes into the open chat's box, not to a session, and nothing is sent", async () => {
+		const store = new AdvisorStore();
+		store.setChat({ chatId: 7, topicId: 0 });
+		store.setOpen(true);
+		open(store);
+		act(() => store.remember("Anh nhắn: mai họp lúc mấy giờ?", { ...EMPTY_CONTEXT, screen: "chat" }));
+		await screen.findByText(t.ask.attachedTitle, undefined, WAIT);
+		await ask("Trả lời sao?");
+		const before = window.location.pathname;
+		await userEvent.click(await screen.findByRole("button", { name: t.answer.toChat }, WAIT));
+		expect(screen.queryByRole("button", { name: t.answer.toSession })).toBeNull();
+		expect(store.snapshot().fills.get("chat\n7\n0")?.text).toBe(PICK);
+		expect(store.snapshot().open).toBe(false);
+		expect(window.location.pathname).toBe(before);
+	});
+
 	it("'Gửi sang phiên' goes straight to the session the user has open, without the list", async () => {
 		const store = new AdvisorStore();
 		store.setOpen(true);

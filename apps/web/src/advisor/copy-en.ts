@@ -52,6 +52,7 @@ export const enAdvisor: AdvisorCopy = {
 		question: "Question sent",
 		context: "Context sent",
 		toSession: "Send to session",
+		toChat: "Put in the message box",
 		copy: "Copy",
 		copied: "Copied",
 		pickSession: "Fill the composer of:",

@@ -1,6 +1,6 @@
 # Cố vấn: tự theo dõi cấp global và bề mặt cắm được cho mọi service
 
-Tier: L (đổi proto + agent + web, một hợp đồng mới cho các màn). Trạng thái: việc 2 đã làm xong (18/11/2026, chọn công tắc theo tài khoản); việc 3 đã làm các bước 2-3 và bề mặt danh bạ/bot (18/11/2026); còn đích "Gửi sang…" ngoài phiên và hỏi khi không có máy B.
+Tier: L (đổi proto + agent + web, một hợp đồng mới cho các màn). Trạng thái: việc 2 đã làm xong (18/11/2026, chọn công tắc theo tài khoản); việc 3 đã làm các bước 2-3 và bề mặt danh bạ/bot (18/11/2026); đích "Điền vào ô soạn tin" của chat đã làm; còn hỏi khi không có máy B.
 
 ## Hiện trạng (đã đọc code, 18/11/2026)
 

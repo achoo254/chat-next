@@ -15,12 +15,13 @@
 // command menu of the group's bots. A draft "@bot_username query" is inline
 // mode: the box finds it (bots/inline-token.ts) and the bot's results show as
 // a list attached to the box (bots/inline-results.tsx).
-import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { AiMark } from "../../machines/ai-mark.tsx";
 import { hasFinePointer } from "../../components/fine-pointer.ts";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger } from "../../components/plain-text-box.tsx";
+import { advisorStore, useChatFill } from "../../advisor/advisor-store.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineToken } from "../bots/inline-token.ts";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -189,6 +190,25 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		// Channels post without "đang gõ…"; clearing the draft ends it at once.
 		if (!channel) void source.sendTyping(chatId, topicId, value.trim() === "" ? "cancel" : "typing").catch(() => undefined);
 	};
+
+	// The chat open here is where Advisor's answer can be put (nothing of it leaves the page).
+	useEffect(() => {
+		if (disabled) return;
+		advisorStore.setChat({ chatId, topicId });
+		return () => advisorStore.setChat(null);
+	}, [chatId, topicId, disabled]);
+	// Advisor's answer goes in after what is typed, for the user to read and send; the box takes the caret.
+	const advisorFill = useChatFill(chatId, topicId);
+	const takeAdvisorFill = useEffectEvent((fill: { readonly text: string; readonly id: number }) => {
+		update(text.trim() === "" ? fill.text : `${text}\n${fill.text}`);
+		advisorStore.takeChatFill(chatId, topicId, fill.id);
+		area.current?.focus();
+	});
+	useEffect(() => {
+		// Advisor's store is an external system: its text is taken into the box once, when it arrives.
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		if (advisorFill !== undefined && !disabled) takeAdvisorFill(advisorFill);
+	}, [advisorFill, disabled]);
 
 	const cancelIntent = () => {
 		ui.intents.cell(chatId).set(null);

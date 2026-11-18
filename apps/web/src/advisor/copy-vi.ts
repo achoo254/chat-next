@@ -51,6 +51,7 @@ export const viAdvisor = {
 		question: "Câu hỏi đã gửi",
 		context: "Bối cảnh đã gửi",
 		toSession: "Gửi sang phiên",
+		toChat: "Điền vào ô soạn tin",
 		copy: "Sao chép",
 		copied: "Đã chép",
 		pickSession: "Điền vào ô nhập của phiên:",

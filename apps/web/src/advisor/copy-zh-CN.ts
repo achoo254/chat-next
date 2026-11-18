@@ -52,6 +52,7 @@ export const zhCNAdvisor: AdvisorCopy = {
 		question: "已发送的问题",
 		context: "已发送的背景",
 		toSession: "发送到会话",
+		toChat: "填入输入框",
 		copy: "复制",
 		copied: "已复制",
 		pickSession: "填入以下会话的输入框：",

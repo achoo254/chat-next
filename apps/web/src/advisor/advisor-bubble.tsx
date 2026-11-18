@@ -415,6 +415,14 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 		store.setOpen(false);
 		navigate(paths.machineSession(question.machine, threadId));
 	};
+	// A question about a chat message is answered into that chat's box when it is still open: nothing is sent, the user reads it first.
+	const chat = useAdvisorState(store).chat;
+	const fromChat = question.attached.length > 0 && question.attached.every((c) => c.context.screen === "chat");
+	const toChat = () => {
+		if (top === undefined || chat === null) return;
+		store.fillChat(chat.chatId, chat.topicId, top.text);
+		store.setOpen(false);
+	};
 	// The session the user has open right now (on the machine that answered, not Advisor's own thread) gets it at once; the list is for when none is.
 	const open = useAdvisorState(store).session;
 	const active =
@@ -521,7 +529,12 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 						{all ? t.answer.less : t.answer.all}
 					</button>
 				)}
-				{!running && top !== undefined && !isCommand(top.text) && (
+				{!running && top !== undefined && !isCommand(top.text) && fromChat && chat !== null && (
+					<button type="button" className="btn btn-sm" onClick={toChat}>
+						{t.answer.toChat}
+					</button>
+				)}
+				{!running && top !== undefined && !isCommand(top.text) && !(fromChat && chat !== null) && (
 					<button type="button" className="btn btn-sm" aria-expanded={active === "" && picking} onClick={() => (active !== "" ? toSession(active) : setPicking(!picking))}>
 						{t.answer.toSession}
 					</button>
