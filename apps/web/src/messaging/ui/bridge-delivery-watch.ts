@@ -12,6 +12,8 @@ const POLL_MS = 2500;
 export interface DeliveryState {
 	readonly app: string;
 	readonly items: ReadonlyMap<number, readonly BridgeOutboxItem[]>;
+	/** The pins the app refused since the last look (each is told once): a message or a topic that Chat has put back. */
+	readonly refused: readonly BridgeOutboxItem[];
 }
 
 export interface DeliveryWatch {
@@ -34,8 +36,12 @@ export async function watchDelivery(transport: Transport, chatId: number, onStat
 				const list = await api.outbox(chatId);
 				if (!alive) return;
 				const items = new Map<number, BridgeOutboxItem[]>();
-				for (const item of list) items.set(item.seq, [...(items.get(item.seq) ?? []), item]);
-				onState({ app, items });
+				const refused: BridgeOutboxItem[] = [];
+				for (const item of list) {
+					if (item.op === "pin_message" || item.op === "pin_topic") refused.push(item);
+					else items.set(item.seq, [...(items.get(item.seq) ?? []), item]);
+				}
+				onState({ app, items, refused });
 			} catch {
 				// The next look tries again; a server that cannot answer shows no state, never a wrong one.
 			}

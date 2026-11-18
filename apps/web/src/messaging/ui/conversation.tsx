@@ -518,7 +518,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				<>
 					{delivery !== null && (
 						<Suspense fallback={null}>
-							<BridgeNote app={delivery.app} />
+							<BridgeNote app={delivery.app} refused={delivery.refused} />
 						</Suspense>
 					)}
 				<ChatComposer

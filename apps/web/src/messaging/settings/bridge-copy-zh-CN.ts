@@ -109,6 +109,7 @@ export const zhCNBridge: BridgeCopy = {
 		failed: (app) => `未发送到 ${app}`,
 		unknown: (app) => `不确定是否已到达 ${app}`,
 		editFailed: (app) => `修改未同步到 ${app}`,
+		pinRefused: (app, topic) => `${app} 不允许置顶该${topic ? "话题" : "消息"}，已恢复原状。`,
 		resend: "重新发送",
 		discard: "删除消息",
 		dismiss: "忽略",

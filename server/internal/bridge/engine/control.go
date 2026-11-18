@@ -420,7 +420,7 @@ type OutboxItem struct {
 }
 
 // Outbox lists what the chat of owner has queued and not finished, oldest
-// first. A chat that is not linked to an account of owner is ErrNotFound.
+// first, then the pins the other app refused (each listed only once). A chat that is not linked to an account of owner is ErrNotFound.
 func (e *Engine) Outbox(ctx context.Context, owner, chatID int64) ([]OutboxItem, error) {
 	var linked bool
 	if err := e.db.pool.QueryRow(ctx, `
@@ -437,11 +437,30 @@ func (e *Engine) Outbox(ctx context.Context, owner, chatID int64) ([]OutboxItem,
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list outbox: %w", err)
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (OutboxItem, error) {
+	scan := func(r pgx.CollectableRow) (OutboxItem, error) {
 		var o OutboxItem
 		err := r.Scan(&o.Seq, &o.Op, &o.Status, &o.LastError, &o.Attempts)
 		return o, err
-	})
+	}
+	items, err := pgx.CollectRows(rows, scan)
+	if err != nil {
+		return nil, err
+	}
+	// A pin the other app refused was already put back in Chat; the owner is told
+	// once (the row is closed as it is listed), with op pin_message or pin_topic.
+	// For a topic, seq is the topic's id in the chat.
+	refused, err := e.db.pool.Query(ctx, `
+		UPDATE external_outbox SET status = 'cancelled', updated_at = now()
+		WHERE chat_id = $1 AND op IN ('pin_message', 'pin_topic') AND status = 'failed'
+		RETURNING seq, op, 'failed', last_error, attempts`, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: list refused pins: %w", err)
+	}
+	pins, err := pgx.CollectRows(refused, scan)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: list refused pins: %w", err)
+	}
+	return append(items, pins...), nil
 }
 
 // RetryMessage tries again what failed (or has an unknown result) for one

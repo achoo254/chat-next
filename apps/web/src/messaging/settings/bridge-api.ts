@@ -90,7 +90,8 @@ export class BridgeError extends Error {
 /** What a chat has queued for the other app and not finished (a message that is not listed was sent). */
 export interface BridgeOutboxItem {
 	readonly seq: number;
-	readonly op: "send" | "edit" | "delete";
+	/** `pin_message` and `pin_topic` are a pin the app refused (already put back in Chat), told once; for a topic `seq` is its id in the chat. */
+	readonly op: "send" | "edit" | "delete" | "pin_message" | "pin_topic";
 	/** `pending`: waiting; `sending`: on its way; `failed`: refused or given up; `unknown`: may or may not have arrived. */
 	readonly status: "pending" | "sending" | "failed" | "unknown";
 	/** Why it failed or waits; a short machine-ish text, shown only as a detail. */

@@ -2,6 +2,7 @@
 // says about its way there: the mark on its time line, the row under a failed one,
 // and the note above the composer. Loaded on demand (only a connected chat needs
 // it), with its own copy, so none of it weighs on the startup chunk.
+import { useEffect } from "react";
 import type { BridgeOutboxItem } from "../settings/bridge-api.ts";
 import { useBridgeCopy } from "../settings/use-bridge-copy.ts";
 import { useCopy } from "../copy/use-copy.ts";
@@ -68,10 +69,14 @@ export function BridgeFailedRow({ chatId, seq }: { chatId: number; seq: number }
 	);
 }
 
-/** The line above the composer of a chat that sends on. */
-export function BridgeNote({ app }: { app: string }) {
+/** The line above the composer of a chat that sends on; it also tells, once, a pin the app refused. */
+export function BridgeNote({ app, refused }: { app: string; refused: readonly BridgeOutboxItem[] }) {
 	"use no memo";
 	const t = useBridgeCopy().delivery;
+	const { toasts } = useServices();
+	useEffect(() => {
+		for (const item of refused) toasts.show(t.pinRefused(bridgeAppName(app), item.op === "pin_topic"));
+	}, [refused, toasts, t, app]);
 	return (
 		<p className="bridge-note" role="note">
 			<Icon name="info" small />

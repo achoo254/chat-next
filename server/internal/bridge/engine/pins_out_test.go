@@ -114,10 +114,14 @@ func TestAPinTheOtherAppRefusesIsPutBackInChat(t *testing.T) {
 	if n := len(e.fake.Pins()); n != 0 {
 		t.Fatalf("%d pins reached the other app, want none", n)
 	}
-	// What failed is not shown as a failed message.
-	items, err := e.engine().Outbox(ctx, e.owner, chatID)
-	if err != nil || len(items) != 0 {
-		t.Fatalf("outbox items = %v (%v), want none: a pin is not a message", items, err)
+	// The owner is told once, as a pin and not as a failed message.
+	eng := e.engine()
+	items, err := eng.Outbox(ctx, e.owner, chatID)
+	if err != nil || len(items) != 1 || items[0].Op != "pin_message" || items[0].Seq != seq || items[0].Status != "failed" || items[0].LastError == "" {
+		t.Fatalf("outbox items = %+v (%v), want the one refused pin with its reason", items, err)
+	}
+	if items, err = eng.Outbox(ctx, e.owner, chatID); err != nil || len(items) != 0 {
+		t.Fatalf("outbox items = %+v (%v), want none the second time", items, err)
 	}
 }
 

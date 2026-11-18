@@ -44,7 +44,7 @@ const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status
 	[WireOutboxStatus.UNKNOWN]: "unknown",
 };
 
-const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete"];
+const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", "pin_message", "pin_topic"];
 
 function toWireDirection(direction: BridgeDirection | undefined): WireDirection {
 	if (direction === undefined) return WireDirection.UNSPECIFIED;
