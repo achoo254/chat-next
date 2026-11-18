@@ -32,6 +32,11 @@ export function terminalOffered(info: MachineInfo | null, provider: string): boo
 	return terminalGate(info) === "available" && providerOf(info, provider)?.capabilities?.terminal === true;
 }
 
+/** Chat may write to a session of this AI that a terminal holds (tunelo takes it back on the first message). */
+export function chatTakesTerminal(info: MachineInfo | null, provider: string): boolean {
+	return providerOf(info, provider)?.capabilities?.chatTakesTerminal === true;
+}
+
 /** The machine's tunelo keeps the office of a session. */
 export function officeOffered(info: Pick<MachineInfo, "agentVersion"> | null): boolean {
 	return info !== null && versionAtLeast(info.agentVersion, AGENT_OFFICE);
@@ -120,6 +125,15 @@ export function sessionModeOf(machine: string, threadId: string): SessionMode {
 	}
 }
 
+/** Whether this device left the session in chat on purpose (a mode kept for it, unlike `sessionModeOf`'s chat for a session never opened). */
+function keptChat(machine: string, threadId: string): boolean {
+	try {
+		return window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId)) === "chat";
+	} catch {
+		return false;
+	}
+}
+
 /** The session was just opened in `mode` (each visit records it). */
 export function rememberSessionMode(machine: string, threadId: string, mode: SessionMode): void {
 	try {
@@ -132,10 +146,11 @@ export function rememberSessionMode(machine: string, threadId: string, mode: Ses
 /**
  * The view a session row names: a live hold wins (held by a terminal: the
  * terminal; open as a chat in this app: the chat), else the mode it was last
- * opened in.
+ * opened in. A terminal hold yields to the chat the session was left in when
+ * `takesBack` (chat can write to it: its first message takes the session back).
  */
-export function rowMode(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">): SessionMode {
-	if (thread.terminalSession > 0) return "terminal";
+export function rowMode(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, takesBack = false): SessionMode {
+	if (thread.terminalSession > 0) return takesBack && keptChat(machine, thread.id) ? "chat" : "terminal";
 	if (thread.open) return "chat";
 	return sessionModeOf(machine, thread.id);
 }
@@ -158,12 +173,13 @@ export function openSessionIn(machine: string, threadId: string, mode: SessionMo
  * (the terminal when `offered`, the office when the machine keeps one,
  * `office`); else the view its row names, the terminal only when offered. An
  * office it was left in opens there (only a machine that keeps offices let it
- * be picked; an older one says to update).
+ * be picked; an older one says to update). A session a terminal holds opens in
+ * the chat it was left in when `takesBack`.
  */
-export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, office = true): string {
+export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, office = true, takesBack = false): string {
 	const picked = thread.terminalSession > 0 ? null : pickedMode();
 	const usable = picked === "chat" || (picked === "terminal" && offered) || (picked === "office" && office);
-	const mode = usable && picked !== null ? picked : rowMode(machine, thread);
+	const mode = usable && picked !== null ? picked : rowMode(machine, thread, takesBack);
 	return modePath(machine, thread.id, mode === "terminal" && !offered ? "chat" : mode);
 }
 

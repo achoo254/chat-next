@@ -14,7 +14,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { ModeIcon, officeOffered, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { chatTakesTerminal, ModeIcon, officeOffered, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -80,8 +80,8 @@ function RowActivity({ machine, thread, fallback, now: listNow }: { machine: Mac
 	// A turn running in the terminal, or its AI only waiting there at its prompt.
 	const held = isRunning(thread) ? t.agent.sub.inTerminal : t.agent.sub.openInTerminal;
 	// Which view the session lives in: a terminal hold says how, otherwise "Trò chuyện" or "Terminal".
-	const mode = rowMode(machine.entry.ref, thread);
-	const modeLabel = thread.terminalSession > 0 ? held : t.terminal.mode[mode];
+	const mode = rowMode(machine.entry.ref, thread, chatTakesTerminal(machine.state.info, thread.provider));
+	const modeLabel = thread.terminalSession > 0 && mode === "terminal" ? held : t.terminal.mode[mode];
 	let text = fallback;
 	if (live) {
 		const parts = [phaseText(t, latest), clockText(now - Number(latest.turnStartedAt), t, locale)];
@@ -109,7 +109,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const ref_ = machine.entry.ref;
 	const inTerminal = terminalOffered(machine.state.info, thread.provider);
 	const status = threadStatus(thread, done);
-	const path = sessionPath(ref_, thread, inTerminal, officeOffered(machine.state.info));
+	const path = sessionPath(ref_, thread, inTerminal, officeOffered(machine.state.info), chatTakesTerminal(machine.state.info, thread.provider));
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>

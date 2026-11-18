@@ -193,6 +193,17 @@ describe("a session row's mode icon", () => {
 		expect(rowMode("1", base)).toBe("chat");
 		// A live hold still wins over what was remembered.
 		expect(rowMode("1", { ...base, terminalSession: 5 })).toBe("terminal");
+		// A terminal hold yields to the chat the session was left in, only where chat can take the session back.
+		const held = { ...base, terminalSession: 5 };
+		rememberSessionMode("1", "s1", "chat");
+		expect(rowMode("1", held, true)).toBe("chat");
+		expect(sessionPath("1", held, true, true, true)).toBe("/ai/1/s/s1");
+		expect(rowMode("1", held, false)).toBe("terminal");
+		expect(sessionPath("1", held, true, true, false)).toBe("/ai/1/s/s1/terminal");
+		// Never opened here (no mode kept) or last left in the terminal: the hold still opens the terminal.
+		expect(rowMode("1", { ...held, id: "s7" }, true)).toBe("terminal");
+		rememberSessionMode("1", "s1", "terminal");
+		expect(rowMode("1", held, true)).toBe("terminal");
 		// A row opens where it says, and only in chat when the terminal is not offered.
 		rememberSessionMode("1", "s1", "terminal");
 		expect(sessionPath("1", base, true)).toBe("/ai/1/s/s1/terminal");
