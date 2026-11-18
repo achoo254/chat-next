@@ -19,7 +19,7 @@ describe("the office's cast", () => {
 		expect(castOf("docs-manager").key).toBe("contentMarketing");
 		expect(castOf("analytics-analyst").key).toBe("growthAnalytics");
 		expect(castOf("brainstormer").key).toBe("gameDesigner");
-		expect(viMachines.office.cast[castOf("planner").key ?? "producerPm"]).toBe("Quản lý sản xuất");
+		expect(viMachines.office.cast[castOf("planner").key ?? "producerPm"]).toBe("Quản lý dự án");
 	});
 
 	it("sends every security type to the Code & Security Reviewer", () => {
@@ -63,11 +63,11 @@ describe("the office's cast", () => {
 	it("names employees with a number from the second of a type, and an unnamed type as a new hire", () => {
 		const t = viMachines.office;
 		const member = (agentType: string, ordinal: number) => ({ key: `${agentType}#${ordinal}`, agentType, ordinal, actorId: "x", desk: null, nested: false, firstEnteredAt: 0 });
-		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 1) })).toBe("Trưởng kỹ thuật");
-		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 2) })).toBe("Trưởng kỹ thuật 2");
+		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 1) })).toBe("Giám đốc Công nghệ");
+		expect(personName(t, { kind: "employee", actor: null, member: member("scout", 2) })).toBe("Giám đốc Công nghệ 2");
 		expect(personName(t, { kind: "employee", actor: null, member: member("zebra-wrangler", 1) })).toBe("Zebra Wrangler");
 		expect(personName(t, { kind: "employee", actor: null, member: member("", 1) })).toBe("Nhân viên mới");
-		expect(personName(t, { kind: "director", actor: null, member: null })).toBe("Giám đốc");
+		expect(personName(t, { kind: "director", actor: null, member: null })).toBe("Giám đốc điều hành");
 	});
 
 	it("gives each title its home room: planning, library, audit, server; the rest work in WORK", () => {

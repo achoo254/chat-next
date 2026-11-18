@@ -110,10 +110,10 @@ describe("the office tab", () => {
 		// The research analyst works in the post room of the records zone, shown beside the work zone without any pick.
 		const records = await screen.findByRole("region", { name: "Hồ sơ" });
 		const post = within(records).getByRole("region", { name: "Bưu phòng" });
-				expect(within(post).getByText("Chuyên viên nghiên cứu")).toBeTruthy();
+				expect(within(post).getByText("Kỹ sư R&D")).toBeTruthy();
 		const management = screen.getByRole("region", { name: "Điều hành" });
 		const work = within(management).getByRole("region", { name: "Phòng làm việc chung" });
-		expect(within(work).getByText("Trưởng kỹ thuật")).toBeTruthy();
+		expect(within(work).getByText("Giám đốc Công nghệ")).toBeTruthy();
 		// Everyone has a seat of their own: nobody waits for a desk in the meeting room.
 		const meeting = within(management).getByRole("region", { name: "Phòng họp" });
 		expect(within(meeting).queryByLabelText(/người chờ bàn trong phòng họp/)).toBeNull();
@@ -145,8 +145,8 @@ describe("the office tab", () => {
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ state: OfficeActorState.IDLE }), staff("s1", "scout", { state: OfficeActorState.DONE })], { session: session({ busy: false }) }) });
 		const living = await screen.findByRole("region", { name: "Sinh hoạt" });
 		const dorm = within(living).getByRole("region", { name: "Ký túc" });
-		expect(within(dorm).getByText("Giám đốc")).toBeTruthy();
-		expect(within(dorm).getByText("Trưởng kỹ thuật")).toBeTruthy();
+		expect(within(dorm).getByText("Giám đốc điều hành")).toBeTruthy();
+		expect(within(dorm).getByText("Giám đốc Công nghệ")).toBeTruthy();
 		// The director and the 12 staff off duty sleep; Backend & DevOps stays in the server room, Advisor in its room.
 		expect(within(dorm).getAllByTitle(/· Đang ngủ$/)).toHaveLength(13);
 		expect(document.querySelectorAll('[data-anchor^="bed-"]')).toHaveLength(13);
@@ -160,7 +160,7 @@ describe("the office tab", () => {
 		expect(screen.getByRole("region", { name: "Sảnh" })).toBeTruthy();
 		const control = screen.getByRole("region", { name: "Kiểm soát" });
 		// The director's tool in the QA room is the QA tester's work.
-		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Kiểm thử viên")).toBeTruthy();
+		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Kiểm thử phần mềm")).toBeTruthy();
 	});
 
 	it("opens a phone on the work zone and a wide screen on the whole plan", () => {
