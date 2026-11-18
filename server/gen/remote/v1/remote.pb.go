@@ -12961,7 +12961,14 @@ type ApprovalItem struct {
 	// The sign-in secrets a command reads ($TUNELO_SECRET_<NAME>), each with
 	// the site it belongs to; empty before tunelo 2.0.11, where devices take
 	// the names from the input.
-	Secrets       []*ApprovalSecret `protobuf:"bytes,11,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	Secrets []*ApprovalSecret `protobuf:"bytes,11,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	// tunelo 3.19.0+: the call names a folder macOS protects that tunelo may
+	// not enter yet (one of MachineInfo.mac_folders; see "macOS folder
+	// access"). Allowing also lets tunelo ask macOS for it (macOS may prompt on
+	// the machine's screen); the call runs once macOS allows it, and is refused
+	// to the AI, which goes on, when macOS refuses or nobody answers in time.
+	// Never offered "allow for the session".
+	MacFolder     string `protobuf:"bytes,12,opt,name=mac_folder,json=macFolder,proto3" json:"mac_folder,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -13071,6 +13078,13 @@ func (x *ApprovalItem) GetSecrets() []*ApprovalSecret {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *ApprovalItem) GetMacFolder() string {
+	if x != nil {
+		return x.MacFolder
+	}
+	return ""
 }
 
 type ApprovalSecret struct {
@@ -13619,8 +13633,13 @@ func (x *CompactionItem) GetTokensBefore() uint64 {
 }
 
 type ErrorItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Message string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// tunelo 3.19.0+: the turn was stopped because a tool call waited too long
+	// in this folder macOS protects and tunelo may not enter yet (macOS may be
+	// asking on the machine's screen); the session goes on with the next
+	// message. Devices offer asking macOS for the folder (MacFolderAccessAsk).
+	MacFolder     string `protobuf:"bytes,2,opt,name=mac_folder,json=macFolder,proto3" json:"mac_folder,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -13658,6 +13677,13 @@ func (*ErrorItem) Descriptor() ([]byte, []int) {
 func (x *ErrorItem) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *ErrorItem) GetMacFolder() string {
+	if x != nil {
+		return x.MacFolder
 	}
 	return ""
 }
@@ -24281,7 +24307,7 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\aentries\x18\x01 \x03(\v2\x14.remote.v1.TodoEntryR\aentries\"K\n" +
 	"\tTodoEntry\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12*\n" +
-	"\x05state\x18\x02 \x01(\x0e2\x14.remote.v1.TodoStateR\x05state\"\x81\x03\n" +
+	"\x05state\x18\x02 \x01(\x0e2\x14.remote.v1.TodoStateR\x05state\"\xa0\x03\n" +
 	"\fApprovalItem\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\tR\x06toolId\x12'\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x13.remote.v1.ToolKindR\x04kind\x12\x12\n" +
@@ -24294,7 +24320,9 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\bdecision\x18\t \x01(\x0e2\x13.remote.v1.DecisionR\bdecision\x12!\n" +
 	"\fdeny_message\x18\n" +
 	" \x01(\tR\vdenyMessage\x123\n" +
-	"\asecrets\x18\v \x03(\v2\x19.remote.v1.ApprovalSecretR\asecrets\"<\n" +
+	"\asecrets\x18\v \x03(\v2\x19.remote.v1.ApprovalSecretR\asecrets\x12\x1d\n" +
+	"\n" +
+	"mac_folder\x18\f \x01(\tR\tmacFolder\"<\n" +
 	"\x0eApprovalSecret\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06origin\x18\x02 \x01(\tR\x06origin\"\x9d\x01\n" +
@@ -24335,9 +24363,11 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x12\n" +
 	"\x04done\x18\x03 \x01(\bR\x04done\"5\n" +
 	"\x0eCompactionItem\x12#\n" +
-	"\rtokens_before\x18\x01 \x01(\x04R\ftokensBefore\"%\n" +
+	"\rtokens_before\x18\x01 \x01(\x04R\ftokensBefore\"D\n" +
 	"\tErrorItem\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"5\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1d\n" +
+	"\n" +
+	"mac_folder\x18\x02 \x01(\tR\tmacFolder\"5\n" +
 	"\x0fModelChangeItem\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\"u\n" +

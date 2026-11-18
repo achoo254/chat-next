@@ -1914,6 +1914,13 @@ message ApprovalItem {
   // the site it belongs to; empty before tunelo 2.0.11, where devices take
   // the names from the input.
   repeated ApprovalSecret secrets = 11;
+  // tunelo 3.19.0+: the call names a folder macOS protects that tunelo may
+  // not enter yet (one of MachineInfo.mac_folders; see "macOS folder
+  // access"). Allowing also lets tunelo ask macOS for it (macOS may prompt on
+  // the machine's screen); the call runs once macOS allows it, and is refused
+  // to the AI, which goes on, when macOS refuses or nobody answers in time.
+  // Never offered "allow for the session".
+  string mac_folder = 12;
 }
 
 message ApprovalSecret {
@@ -1997,6 +2004,11 @@ message CompactionItem {
 
 message ErrorItem {
   string message = 1;
+  // tunelo 3.19.0+: the turn was stopped because a tool call waited too long
+  // in this folder macOS protects and tunelo may not enter yet (macOS may be
+  // asking on the machine's screen); the session goes on with the next
+  // message. Devices offer asking macOS for the folder (MacFolderAccessAsk).
+  string mac_folder = 2;
 }
 
 message ModelChangeItem {
