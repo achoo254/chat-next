@@ -26,13 +26,30 @@ func (a *Adapter) EditTopic(ctx context.Context, acct bridge.Account, conv, topi
 	if err != nil {
 		return err
 	}
-	req := &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: id}
+	for _, req := range topicEditRequests(peer, id, edit) {
+		if _, err := c.live.api().MessagesEditForumTopic(ctx, req); err != nil {
+			if err := translatePin(err); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// topicEditRequests splits an edit into the calls Telegram takes: the closed flag
+// cannot go with any other field (TOPIC_CLOSE_SEPARATELY), so the title goes first
+// and the closed state in a call of its own.
+func topicEditRequests(peer tg.InputPeerClass, id int, edit bridge.TopicEdit) []*tg.MessagesEditForumTopicRequest {
+	var out []*tg.MessagesEditForumTopicRequest
 	if edit.Title != nil {
+		req := &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: id}
 		req.SetTitle(*edit.Title)
+		out = append(out, req)
 	}
 	if edit.Closed != nil {
+		req := &tg.MessagesEditForumTopicRequest{Peer: peer, TopicID: id}
 		req.SetClosed(*edit.Closed)
+		out = append(out, req)
 	}
-	_, err = c.live.api().MessagesEditForumTopic(ctx, req)
-	return translatePin(err)
+	return out
 }
