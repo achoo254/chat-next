@@ -17,6 +17,7 @@ import { LooseGroup, setFoldersArchived, UNDO_MS, type TreeContext } from "../..
 import type { MachineView } from "../../src/machines/use-machines.ts";
 import { rememberMode, rememberSessionMode, rowMode, sessionModeOf, sessionPath } from "../../src/machines/session-mode.tsx";
 import {
+	FONT,
 	FONT_SAMPLE,
 	FONT_SIZE_DEFAULT,
 	FONT_SIZE_MAX,
@@ -55,8 +56,8 @@ function contrast(a: string, b: string): number {
 
 describe("the terminal's text", () => {
 	it("is set for legibility: 14 px, room for stacked tone marks, regular and semi-bold, a contrast floor", () => {
-		expect(textOptions(FONT_SIZE_DEFAULT)).toMatchObject({ fontSize: 14, lineHeight: 1.35, letterSpacing: 0, fontWeight: 600, fontWeightBold: 800, minimumContrastRatio: 4.5 });
-		expect(textOptions(16).fontFamily).toMatch(/^"JetBrains Mono", .*Menlo.*monospace$/);
+		expect(textOptions(FONT_SIZE_DEFAULT)).toMatchObject({ fontSize: 14, lineHeight: 1.35, letterSpacing: 0, fontWeight: 500, fontWeightBold: 700, minimumContrastRatio: 4.5 });
+		expect(textOptions(16).fontFamily).toMatch(/^ui-monospace, .*Menlo.*monospace$/);
 		expect(MIN_CONTRAST).toBe(4.5);
 	});
 
@@ -79,8 +80,8 @@ describe("the terminal's text", () => {
 		Object.defineProperty(document, "fonts", { configurable: true, value: { load } });
 		await waitForFont(15, 1_000);
 		expect(asked).toEqual([
-			['600 15px "JetBrains Mono"', FONT_SAMPLE],
-			['800 15px "JetBrains Mono"', FONT_SAMPLE],
+			[`500 15px ${FONT}`, FONT_SAMPLE],
+			[`700 15px ${FONT}`, FONT_SAMPLE],
 		]);
 		for (const letter of ["Ể", "Ộ", "Ữ", "đ", "Đ", "ư", "ơ"]) expect(FONT_SAMPLE).toContain(letter);
 	});

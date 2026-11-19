@@ -1,15 +1,15 @@
-// The terminal's text: the font (JetBrains Mono, self-hosted with its
-// Vietnamese subset; fallbacks that also cover Vietnamese), the size the
+// The terminal's text: the font (the machine's own monospace, the one its
+// native terminal draws with: SF Mono or Menlo, Consolas, DejaVu, all with
+// Vietnamese), the size the
 // user picked (Ctrl/⌘ + − 0 in a terminal, A−/A+ in the dock; kept in this
 // browser), and a calm palette whose every colour reads on the dark surface.
 
-export const FONT = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", "Noto Sans Mono", monospace';
+export const FONT = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Noto Sans Mono", monospace';
 
 /**
- * Letters that live in the Vietnamese face of the font (fonts.css splits it
- * by unicode-range): loading with them fetches that face too, before xterm
- * draws its first glyph. A glyph drawn earlier would stay in the fallback
- * font for good (xterm caches glyphs).
+ * Vietnamese letters, so that loading the font with them settles the face that
+ * will draw them before xterm draws its first glyph (xterm caches glyphs: one
+ * drawn earlier in a fallback font would stay there).
  */
 export const FONT_SAMPLE = "AaĐđƠơƯưẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰựỲỳỴỵỶỷỸỹ";
 
@@ -64,8 +64,8 @@ export function textOptions(size: number) {
 		fontSize: size,
 		lineHeight: LINE_HEIGHT,
 		letterSpacing: 0,
-		fontWeight: 600,
-		fontWeightBold: 800,
+		fontWeight: 500,
+		fontWeightBold: 700,
 		minimumContrastRatio: MIN_CONTRAST,
 		theme: THEME,
 	} as const;
@@ -116,10 +116,10 @@ export function fontKeyOf(event: Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "al
 	return null;
 }
 
-/** Waits for both faces of the font (latin and Vietnamese, regular and bold) at `size`, at most `ms`. */
+/** Waits for the font in use (medium and bold, with the Vietnamese letters) at `size`, at most `ms`. */
 export function waitForFont(size: number, ms: number): Promise<void> {
 	const fonts = typeof document === "undefined" ? undefined : document.fonts;
 	if (fonts === undefined || typeof fonts.load !== "function") return Promise.resolve();
-	const loads = ["600", "800"].map((weight) => fonts.load(`${weight} ${size}px "JetBrains Mono"`, FONT_SAMPLE).then(() => undefined, () => undefined));
+	const loads = ["500", "700"].map((weight) => fonts.load(`${weight} ${size}px ${FONT}`, FONT_SAMPLE).then(() => undefined, () => undefined));
 	return Promise.race([Promise.all(loads).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, ms))]);
 }
