@@ -44,6 +44,7 @@ func Run(t *testing.T, newSubject func(t *testing.T) Subject) {
 	t.Run("messages", func(t *testing.T) { checkMessages(t, newSubject(t)) })
 	t.Run("pins", func(t *testing.T) { checkPins(t, newSubject(t)) })
 	t.Run("dialogs", func(t *testing.T) { checkDialogs(t, newSubject(t)) })
+	t.Run("reactions", func(t *testing.T) { checkReactions(t, newSubject(t)) })
 }
 
 // declarationProblems needs no app: what an adapter says it can do must match what
@@ -123,6 +124,14 @@ func declarationProblems(s Subject) []string {
 	}
 	if sup[feature.Info].Out && !infoWriter {
 		fail("info goes out but the adapter is not a bridge.InfoWriter")
+	}
+	_, reactionReader := a.(bridge.ReactionReader)
+	_, reactionWriter := a.(bridge.ReactionWriter)
+	if sup[feature.Reactions].In && !reactionReader {
+		fail("reactions come in but the adapter is not a bridge.ReactionReader")
+	}
+	if sup[feature.Reactions].Out && !reactionWriter {
+		fail("reactions go out but the adapter is not a bridge.ReactionWriter")
 	}
 	for f, v := range sup {
 		if !v.In && !v.Out {
@@ -316,6 +325,67 @@ func checkDialogs(t *testing.T, s Subject) {
 		}
 		if sup[feature.Notify].Out && now.MuteUntil == before.MuteUntil && before.MuteUntil != 2147483647 {
 			t.Errorf("the mute read back is %d after muting", now.MuteUntil)
+		}
+	}
+}
+
+// checkReactions reads the reactions of the newest message and, if the app takes them,
+// sets the owner's reaction twice and removes it twice: repeating either must succeed,
+// and what is read back must follow.
+func checkReactions(t *testing.T, s Subject) {
+	sup := bridge.FeaturesOf(s.Adapter)
+	if !sup[feature.Reactions].In && !sup[feature.Reactions].Out {
+		t.Skip("the adapter has no reactions")
+	}
+	if !s.ready() {
+		t.Skip("no conversation given")
+	}
+	ctx := context.Background()
+	id := s.MessageIDs[0]
+	reader, canRead := s.Adapter.(bridge.ReactionReader)
+	owner := func() (string, bool) {
+		got, err := reader.MessageReactions(ctx, s.Account, s.Conversation, []string{id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, rs := range got {
+			if rs.ID != id {
+				continue
+			}
+			if !rs.OwnerKnown {
+				return "", false
+			}
+			for _, r := range rs.List {
+				if r.From.IsSelf {
+					return r.Emoji, true
+				}
+			}
+			return "", true
+		}
+		t.Fatalf("MessageReactions does not answer for message %s", id)
+		return "", false
+	}
+	before, known := "", false
+	if canRead {
+		before, known = owner()
+	}
+	w, ok := s.Adapter.(bridge.ReactionWriter)
+	if !ok {
+		return
+	}
+	defer func() { _ = w.SetReaction(ctx, s.Account, s.Conversation, id, before) }() // leave it as it was
+	for _, emoji := range []string{"👍", "👍", "", ""} {
+		if err := w.SetReaction(ctx, s.Account, s.Conversation, id, emoji); err != nil {
+			if errors.Is(err, bridge.ErrNotAllowed) {
+				t.Skipf("the test account may not react here: %v", err)
+			}
+			t.Fatalf("SetReaction %q: %v", emoji, err)
+		}
+		if !canRead || !known {
+			continue
+		}
+		if got, _ := owner(); got != emoji {
+			t.Errorf("the owner's reaction read back is %q after setting %q", got, emoji)
 		}
 	}
 }

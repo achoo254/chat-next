@@ -140,6 +140,22 @@ var handlers = []handler{
 		},
 	},
 	{
+		feature: feature.Reactions,
+		match: func(ev bridge.Event) (string, bool) {
+			if ev.Reactions == nil {
+				return "", false
+			}
+			return ev.Reactions.Conversation, true
+		},
+		apply: func(r *runner, ctx context.Context, ev bridge.Event) (bool, error) {
+			return r.onReactions(ctx, ev, *ev.Reactions)
+		},
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"set_reaction": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doReaction(ctx, h) },
+		},
+		poll: func(r *runner, ctx context.Context) error { return r.pollReactions(ctx) },
+	},
+	{
 		feature: feature.Read,
 		match: func(ev bridge.Event) (string, bool) {
 			if ev.Seen != nil {

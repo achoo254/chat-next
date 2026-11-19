@@ -53,6 +53,8 @@ type Fake struct {
 	reads                                      []string
 	lifecycle                                  []string
 	pinCalls                                   []PinCall
+	reactions                                  map[string]map[string]string // conv/msg -> participant -> emoji
+	reactionCalls                              []string
 	failPin                                    []error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
@@ -65,7 +67,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -74,6 +76,7 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Pins:      {In: true, Out: true},
 		feature.Topics:    {In: true, Out: true},
 		feature.Read:      {In: true, Out: true},
+		feature.Reactions: {In: true, Out: true},
 		feature.Alerts:    {In: true},
 		feature.Notify:    {In: true, Out: true},
 		feature.Dialog:    {In: true, Out: true},

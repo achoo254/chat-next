@@ -238,7 +238,7 @@ type Read struct {
 }
 
 // Event is one normalised update. Exactly one of Message, Edit, Delete,
-// Conversation, Topic, Pin or Read is set. State is the account state after this event; the
+// Conversation, Topic, Pin, Seen, Read, Reactions or Participant is set. State is the account state after this event; the
 // engine stores it in the same transaction as the write, so a crash between
 // the two is replayed, not lost.
 type Event struct {
@@ -250,6 +250,7 @@ type Event struct {
 	Pin          *PinChange
 	Seen         *Seen
 	Read         *Read
+	Reactions    *Reactions
 	Participant  *Participant
 	State        []byte
 }

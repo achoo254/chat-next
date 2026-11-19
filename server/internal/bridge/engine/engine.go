@@ -168,6 +168,8 @@ type runner struct {
 	membersTick int
 	// infoTick counts the looks at the state of the chats, to read the info of groups once in a while.
 	infoTick int
+	// reactionsTick counts the same looks, to read the reactions of the newest messages once in a while.
+	reactionsTick int
 }
 
 // run connects the account and syncs until ctx ends or something fails.

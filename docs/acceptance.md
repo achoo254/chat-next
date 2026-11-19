@@ -174,6 +174,7 @@ Cần tài khoản Telegram thật (mã đăng nhập gửi tới app của ngư
 | G39 | Bật «Thông báo tin mới» cho một chat có người khác gửi tin; thử với chat tắt tiếng | Có thông báo đẩy và số chưa đọc khi bật, không báo khi tắt hay tắt tiếng; tin của chính chủ gửi từ Telegram và lịch sử không bao giờ báo | **Chưa kiểm thật.** Đạt bằng test (`alerts_test.go`, push của Chat) |
 | G40 | Bật «Đã đọc» hai chiều: đọc ở Chat, rồi đọc ở thiết bị khác của Telegram | Telegram đánh dấu đã đọc theo Chat; đọc ở Telegram dời vị trí đã đọc trong Chat; chat riêng hiện người kia đã đọc | **Chưa kiểm thật.** Đạt bằng test engine (`alerts_test.go`, `engine_test.go`) |
 | G41 | Chọn mặc định cho chat mới ở trang tài khoản, tích «áp luôn cho tất cả chat»; làm một thao tác bị Telegram từ chối rồi mở «Lỗi đồng bộ» | Chat đồng bộ sau đó bắt đầu với mặc định; áp cho tất cả đổi mọi chat; lỗi hiện đủ lý do, thử lại và bỏ qua được (tin gửi chỉ thử lại) | **Chưa kiểm trên production.** Đạt bằng test engine (`defaults_test.go`) và giao diện |
+| G42 | Ở supergroup thử, chat hai chiều: người khác thả, đổi, bỏ reaction ở Telegram; bạn thả và bỏ reaction trong Chat; thả một emoji nhóm không cho phép | Reaction của người khác hiện và đổi theo trong Chat; của bạn sang Telegram và không bị đọc đè; emoji bị từ chối được trả về như Telegram | **Chưa kiểm thật.** Đạt bằng test engine (`reactions_test.go`), test lõi (`import_reactions_test.go`), test ánh xạ Telegram |
 
 ## Giới hạn đã biết
 

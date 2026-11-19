@@ -56,7 +56,18 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 			return nil
 		}
 		if edit {
-			return emit(ctx, bridge.Event{Edit: &bridge.Edit{Message: m}})
+			if err := emit(ctx, bridge.Event{Edit: &bridge.Edit{Message: m}}); err != nil {
+				return err
+			}
+			// In a private chat or a basic group a change of reactions comes as an
+			// edit of the message that carries them, with nothing else new.
+			if tm, ok := raw.(*tg.Message); ok {
+				if mr, has := tm.GetReactions(); has {
+					rs := book.mapReactions(m.Conversation, tm.ID, &mr, self)
+					return emit(ctx, bridge.Event{Reactions: &rs})
+				}
+			}
+			return nil
 		}
 		return emit(ctx, bridge.Event{Message: &m})
 	}
@@ -75,6 +86,7 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 	})
 	registerPins(d, c, emit)
 	registerSeen(d, emit)
+	registerReactions(d, self, emit)
 	d.OnReadHistoryOutbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadHistoryOutbox) error {
 		// Only a private chat tells that the other person read: a group
 		// does not say who did.

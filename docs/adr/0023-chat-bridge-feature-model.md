@@ -8,7 +8,7 @@ ADR 0022 và các bước sau đó đã đưa vào hai chiều cho tin nhắn, g
 
 ## Quyết định
 
-- **Tính năng là đơn vị** (`messages`, `pins`, `topics`, `read`, `notify`, `dialog`, `info`, `members`, `invites`, `lifecycle`, `alerts`; còn `reactions`, `typing` đã đặt tên nhưng chưa có adapter nào làm). Mỗi tính năng có mức rủi ro cố định (R1 trạng thái cá nhân, R2 nội dung người khác thấy, R3 hành động lên người và nhóm) quyết định mặc định và điều kiện bật.
+- **Tính năng là đơn vị** (`messages`, `pins`, `topics`, `read`, `notify`, `dialog`, `info`, `members`, `invites`, `lifecycle`, `alerts`; `reactions` từ 19/11/2026; còn `typing` đã đặt tên nhưng chưa có adapter nào làm). Mỗi tính năng có mức rủi ro cố định (R1 trạng thái cá nhân, R2 nội dung người khác thấy, R3 hành động lên người và nhóm) quyết định mặc định và điều kiện bật.
 - **Hướng theo từng tính năng và từng chat** (`external_chat_features`: tắt, chỉ nhận, hai chiều); `direction` hiện có vẫn là hướng của `messages`.
 - **Adapter khai báo `Features()`** (tính năng và hướng hỗ trợ); các `Cap*` hiện có suy ra từ đó. Giao diện và engine chỉ hiện và chạy những gì có.
 - **`FeatureHandler` đăng ký tĩnh** trong engine; `messages`, `pins`, `topics` chuyển vào khung mà không đổi hành vi.
@@ -31,4 +31,5 @@ ADR 0022 và các bước sau đó đã đưa vào hai chiều cho tin nhắn, g
 - Telegram khai báo: `messages`, `pins`, `topics`, `read` (vào và ra), `notify`, `dialog`, `info`, `members`, `invites` (vào và ra), `lifecycle` (ra), `alerts` (vào). Mọi thứ tác động lên người và nhóm mới được kiểm bằng test và adapter giả, **chưa kiểm trên Telegram thật** (xem G33–G41 ở `docs/acceptance.md`).
 - Migration 0047–0051 chỉ mở rộng; hoàn tác là tắt tính năng ở bảng tính năng.
 - Bộ kiểm hợp đồng (`contracttest.Run`) bắt adapter khai báo tính năng mà không cài interface.
-- Còn lại, chưa làm: reaction hai chiều, tin đang gõ, đọc theo chủ đề diễn đàn, chuyển tiếp và bản nháp.
+- Reaction hai chiều làm ngày 19/11/2026: vào bằng sự kiện cộng đọc định kỳ 50 tin mới nhất (vì chưa chứng minh Telegram đẩy sự kiện ở mọi loại chat), ra là hàng trạng thái theo từng tin. Danh sách của Telegram có thể thiếu (nhóm lớn, emoji tuỳ chỉnh): khi thiếu thì chỉ thêm, không xoá; khi Telegram không nói reaction của chủ thì giữ nguyên của chủ.
+- Còn lại, chưa làm: tin đang gõ, đọc theo chủ đề diễn đàn, chuyển tiếp và bản nháp.

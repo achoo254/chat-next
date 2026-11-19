@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/bridge/feature"
 	"app.local/server/internal/entities"
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
@@ -1800,6 +1801,9 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 		}
 		if tag.RowsAffected() == 0 {
 			return nil
+		}
+		if err := t.queueState(ctx, chatID, me, feature.Reactions, "set_reaction", map[string]any{"emoji": emoji}, seq); err != nil {
+			return err
 		}
 		members, err := t.fanoutSeeing(ctx, c, seq)
 		if err != nil {
