@@ -321,16 +321,18 @@ func (it *ImportTx) Edit(ctx context.Context, seq int64, msg ImportMessage) (boo
 	if err != nil {
 		return false, err
 	}
-	// An edit changes the text; the file the message carries stays.
+	// An edit changes the text; the file the message carries stays, and so does
+	// whether it arrived silently: that is how it came, not part of what it says.
+	var old appv1.Message
 	if len(m.Content) > 0 {
-		var old appv1.Message
 		if err := proto.Unmarshal(m.Content, &old); err != nil {
 			return false, fmt.Errorf("chat: decode message: %w", err)
 		}
-		if content.Media == nil {
-			content.Media = old.GetMedia()
-		}
 	}
+	if content.Media == nil {
+		content.Media = old.GetMedia()
+	}
+	content.Silent = old.GetSilent()
 	if m.Text == text && sameContent(m.Content, content) {
 		return false, nil
 	}

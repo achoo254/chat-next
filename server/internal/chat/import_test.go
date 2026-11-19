@@ -398,3 +398,38 @@ func TestAPrivateCopyCanBeEnabledAgainAfterItWasRemoved(t *testing.T) {
 		t.Fatal("a second live private chat of the same pair was created")
 	}
 }
+
+func TestAnImportedEditThatChangesNothingDoesNotMarkAMessageEdited(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	chatID := h.group(owner)
+	pup := h.puppet(chatID, "lan")
+	sent, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "gửi từ Chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seqs []int64
+	if err := h.importInto(chatID, owner, func(it *ImportTx) error {
+		seqs, err = it.Append(ctx, []ImportMessage{{FromID: pup, Date: time.Now(), Text: "báo tin", Notify: true}})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The other app reports an edit of each with the same text (a reaction changed).
+	for _, c := range []struct {
+		seq  int64
+		text string
+	}{{sent.GetMessage().GetSeq(), "gửi từ Chat"}, {seqs[0], "báo tin"}} {
+		var changed bool
+		if err := h.importInto(chatID, owner, func(it *ImportTx) error {
+			changed, err = it.Edit(ctx, c.seq, ImportMessage{Text: c.text})
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if changed {
+			t.Fatalf("an edit with the same text changed message %d", c.seq)
+		}
+	}
+}
