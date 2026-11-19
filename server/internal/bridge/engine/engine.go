@@ -562,7 +562,17 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 		}
 		content := files[m.ID]
 		label := labelFor(m, content != nil)
-		if label == "" && m.Text == "" && content == nil {
+		if m.Forward != nil {
+			header, err := r.forwardHeader(ctx, m.Forward)
+			if err != nil {
+				return err
+			}
+			if content == nil {
+				content = &appv1.Message{}
+			}
+			content.ForwardFrom = header
+		}
+		if label == "" && m.Text == "" && files[m.ID] == nil {
 			label = "[Tin nhắn không hỗ trợ]" // an empty message cannot be stored
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)

@@ -109,7 +109,7 @@ func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *ap
 	}
 	content := &appv1.Message{}
 	if msg.Content != nil {
-		content = &appv1.Message{Media: msg.Content.GetMedia()}
+		content = &appv1.Message{Media: msg.Content.GetMedia(), ForwardFrom: msg.Content.GetForwardFrom()}
 	}
 	hasMedia := len(media.MessageFiles(content)) > 0
 	text, ents, err := it.t.s.validateEntities(msg.Text, msg.Entities, hasMedia)
@@ -336,6 +336,9 @@ func (it *ImportTx) Edit(ctx context.Context, seq int64, msg ImportMessage) (boo
 	}
 	if content.Media == nil {
 		content.Media = old.GetMedia()
+	}
+	if content.ForwardFrom == nil {
+		content.ForwardFrom = old.GetForwardFrom()
 	}
 	content.Silent = old.GetSilent()
 	if m.Text == text && sameContent(m.Content, content) {

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -349,6 +350,26 @@ func (r *runner) doSend(ctx context.Context, sender bridge.Sender, h *outboxRow)
 	for i, row := range rows {
 		ids[i] = row.ID
 	}
+	var ref bridge.SentRef
+	if fwd, ok := r.adapter.(bridge.Forwarder); ok {
+		fromConv, fromIDs, native, err := r.forwardSource(ctx, rows)
+		if err != nil {
+			return err
+		}
+		if native {
+			topic, err := r.outTopic(ctx, h, first.TopicID)
+			if err != nil {
+				return db.setOutbox(ctx, ids, "failed", err.Error(), time.Time{})
+			}
+			if err := db.startSending(ctx, ids); err != nil {
+				return err
+			}
+			if ref, err = fwd.ForwardMessages(ctx, r.acct, fromConv, fromIDs, h.ExternalChat, topic, h.RandomID); err != nil {
+				return r.settleCall(ctx, rows, err)
+			}
+			return r.recordSent(ctx, h, rows, ids, ref)
+		}
+	}
 	msg, err := r.buildOut(ctx, h, outs)
 	if err != nil {
 		return db.setOutbox(ctx, ids, "failed", err.Error(), time.Time{})
@@ -356,10 +377,15 @@ func (r *runner) doSend(ctx context.Context, sender bridge.Sender, h *outboxRow)
 	if err := db.startSending(ctx, ids); err != nil {
 		return err
 	}
-	ref, err := sender.SendMessage(ctx, r.acct, msg)
-	if err != nil {
+	if ref, err = sender.SendMessage(ctx, r.acct, msg); err != nil {
 		return r.settleCall(ctx, rows, err)
 	}
+	return r.recordSent(ctx, h, rows, ids, ref)
+}
+
+// recordSent keys the messages Chat sent with the ids the other app gave them.
+func (r *runner) recordSent(ctx context.Context, h *outboxRow, rows []*outboxRow, ids []int64, ref bridge.SentRef) error {
+	db := r.e.db
 	if len(ref.IDs) != len(rows) {
 		r.logger.Warn("the other app answered with another number of messages than were sent", "sent", len(rows), "answered", len(ref.IDs))
 	}
@@ -393,16 +419,11 @@ func (r *runner) buildOut(ctx context.Context, h *outboxRow, outs []*chat.Outbou
 		}
 	}
 	// In a forum the message goes into the topic it was written in.
-	if first.TopicID != 0 {
-		ext, ok, err := externalTopic(ctx, r.e.db.pool, r.account.ID, h.ExternalChat, first.TopicID)
-		if err != nil {
-			return msg, err
-		}
-		if !ok {
-			return msg, errors.New("topic_unmapped: the topic of this message is not known in the other app")
-		}
-		msg.Topic = ext
+	topic, err := r.outTopic(ctx, h, first.TopicID)
+	if err != nil {
+		return msg, err
 	}
+	msg.Topic = topic
 	var fileIDs []string
 	for _, o := range outs {
 		if o.FileID != "" {
@@ -490,4 +511,47 @@ func (r *runner) doDelete(ctx context.Context, sender bridge.Sender, h *outboxRo
 		return r.settleCall(ctx, []*outboxRow{h}, err)
 	}
 	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
+}
+
+// outTopic is the topic of the other app a message of Chat's topic goes into; empty
+// outside a forum.
+func (r *runner) outTopic(ctx context.Context, h *outboxRow, topicID int64) (string, error) {
+	if topicID == 0 {
+		return "", nil
+	}
+	ext, ok, err := externalTopic(ctx, r.e.db.pool, r.account.ID, h.ExternalChat, topicID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", errors.New("topic_unmapped: the topic of this message is not known in the other app")
+	}
+	return ext, nil
+}
+
+// forwardSource tells whether rows are a forward the other app can make natively:
+// every row names the message it forwards, and all of them are messages the account
+// has in one conversation of the app. It returns that conversation and the ids.
+func (r *runner) forwardSource(ctx context.Context, rows []*outboxRow) (string, []string, bool, error) {
+	var conv string
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		var p struct {
+			FromChat int64 `json:"from_chat"`
+			FromSeq  int64 `json:"from_seq"`
+		}
+		if len(row.Payload) == 0 || json.Unmarshal(row.Payload, &p) != nil || p.FromChat == 0 {
+			return "", nil, false, nil
+		}
+		k, err := externalOf(ctx, r.e.db.pool, p.FromChat, p.FromSeq)
+		if err != nil {
+			return "", nil, false, err
+		}
+		if k == nil || k.account != r.account.ID || (conv != "" && k.chat != conv) {
+			return "", nil, false, nil
+		}
+		conv = k.chat
+		ids = append(ids, k.msg)
+	}
+	return conv, ids, conv != "", nil
 }

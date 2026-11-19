@@ -83,3 +83,17 @@ func (r *runner) serviceAction(ctx context.Context, it *chat.ImportTx, l *chatLi
 	}
 	return nil, false, nil
 }
+
+// forwardHeader is Chat's "forwarded from" for a message the other app shows as
+// forwarded: the author's puppet when the app names a person, else only the name.
+func (r *runner) forwardHeader(ctx context.Context, f *bridge.ForwardInfo) (*appv1.ForwardHeader, error) {
+	h := &appv1.ForwardHeader{FromName: f.Name, Date: f.Date.Unix()}
+	if f.From != nil {
+		id, err := r.e.db.ensurePuppet(ctx, r.account, *f.From)
+		if err != nil {
+			return nil, err
+		}
+		h.FromUserId = id
+	}
+	return h, nil
+}

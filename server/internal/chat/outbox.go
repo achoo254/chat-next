@@ -83,6 +83,25 @@ func (t *txn) queueSend(ctx context.Context, chatID, me, seq int64) error {
 	return nil
 }
 
+// queueForward queues a message me forwarded or copied into chatID, if it goes to
+// another app. A forward records the message it came from (fromChat, fromSeq).
+func (t *txn) queueForward(ctx context.Context, chatID, me, seq, fromChat, fromSeq int64, forward bool) error {
+	if !forward {
+		return t.queueSend(ctx, chatID, me, seq)
+	}
+	l, err := t.outboundLink(ctx, chatID, me, feature.Messages)
+	if err != nil || l == nil {
+		return err
+	}
+	if _, err := t.tx.Exec(ctx, `
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, random_id, payload)
+		VALUES ($1, $2, $3, $4, 'send', 'messages', $5, jsonb_build_object('from_chat', $6::bigint, 'from_seq', $7::bigint))`,
+		l.accountID, l.externalID, chatID, seq, randomSendID(), fromChat, fromSeq); err != nil {
+		return fmt.Errorf("chat: queue forward: %w", err)
+	}
+	return nil
+}
+
 // queueEdit queues the new text of a message of me. A message still waiting
 // to be sent needs no edit row: it is sent as it is now.
 func (t *txn) queueEdit(ctx context.Context, chatID, me, seq int64) error {
@@ -141,8 +160,8 @@ func (t *txn) queueDeletes(ctx context.Context, chatID, me int64, seqs []int64) 
 }
 
 // linkedSendRule is the gate of a chat linked to another app. plain is a
-// text or media message from its own user (not a bot's, not a forward, not an
-// inline result, not a service message): the only kind that can be sent on.
+// text or media message, a forward or a copy from its own user (not a bot's, not
+// an inline result, not a service message): the only kind that can be sent on.
 func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool) error {
 	var direction string
 	var owner int64

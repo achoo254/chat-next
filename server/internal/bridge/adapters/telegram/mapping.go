@@ -287,5 +287,8 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 	if b.isForum(msg.PeerID) {
 		out.Topic = topicOf(msg)
 	}
+	if h, ok := msg.GetFwdFrom(); ok {
+		out.Forward = b.forwardInfo(h, self)
+	}
 	return out, true
 }

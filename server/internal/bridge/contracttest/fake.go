@@ -63,6 +63,7 @@ type Fake struct {
 	photoBytes                                 map[string][]byte
 	photoCalls                                 []string
 	photoFetches                               int
+	forwards                                   []string
 	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.

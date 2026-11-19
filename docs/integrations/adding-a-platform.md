@@ -22,6 +22,7 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 | `members` | `bridge.MemberReader` (cả quyền riêng từng người) | `bridge.MemberWriter` (xoá, admin), `bridge.MemberAdder`, `bridge.PermWriter` |
 | `invites` | `bridge.InviteManager.ListInvites` | `CreateInvite`, `RevokeInvite` |
 | `lifecycle` | không có | `bridge.GroupLifecycle` (`LeaveGroup`, `DeleteGroup`) |
+| `messages` (chuyển tiếp) | `Message.Forward` (`bridge.ForwardInfo`) | `bridge.Forwarder.ForwardMessages` khi tin gốc là tin của app (không có thì gửi bản sao) |
 | `service` | sự kiện `Message` có `Service` (`bridge.ServiceAction`: vào, rời, bị xoá, vào bằng link, tạo nhóm, đổi tên, đổi ảnh, ghim tin) | không có |
 | `alerts` | không cần interface: Chat báo cho tin mới của `messages` khi tính năng này nhận | không có |
 

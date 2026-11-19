@@ -335,7 +335,7 @@ func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, 
 }
 
 // postable checks that me may post in the chat (and topic). plain says the
-// message is me's own text or file (not a bot message, a forward, an inline
+// message is me's own text, file, forward or copy (not a bot message, an inline
 // result or a service message): only that kind may go into a chat linked to
 // another app, and only when the link sends on (see linkedSendRule).
 func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64, plain bool) (int64, error) {
@@ -1095,7 +1095,9 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 		if err != nil {
 			return err
 		}
-		topicID, err := s.postable(ctx, t.tx, c, m, me, toTopic, false)
+		// The owner's forward or copy goes on to a linked chat's app: natively when the
+		// app has the original, else as a copy (see queueForward).
+		topicID, err := s.postable(ctx, t.tx, c, m, me, toTopic, true)
 		if err != nil {
 			return err
 		}
@@ -1159,6 +1161,11 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 				groupedID: albums[src0.GroupedID],
 			})
 			if err != nil {
+				return err
+			}
+			// A chat linked to another app sends it on; a forward names the message it
+			// forwards, so the app can forward it natively when it has that message too.
+			if err := t.queueForward(ctx, toChat, me, p.Seq, src.ID, src0.Seq, forward); err != nil {
 				return err
 			}
 			t.recordRandomID(me, randomID, p.Seq, toChat)

@@ -127,15 +127,29 @@ func TestTwoWayChatRefusesWhatCannotBeSentOn(t *testing.T) {
 	if _, err := h.svc.SendMessage(ctx, other, &appv1.SendMessageRequest{ChatId: chatID, Text: "from someone else"}); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("another member sending = %v, want PermissionDenied", err)
 	}
-	src := h.group(owner)
-	msg := h.send(owner, src, "to forward")
-	_, err := h.svc.ForwardMessages(ctx, owner, &appv1.ForwardMessagesRequest{FromChatId: src, Seqs: []int64{msg.GetMessage().GetSeq()}, ToChatId: chatID, RandomIds: []int64{5}})
-	if codeOf(err) != connect.CodePermissionDenied {
-		t.Fatalf("forwarding into a two-way chat = %v, want PermissionDenied", err)
-	}
 	var n int
 	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_outbox`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("queue has %d rows (err %v), want none", n, err)
+	}
+}
+
+func TestTheOwnersForwardIntoATwoWayChatIsQueuedWithItsOriginal(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	chatID := h.group(owner)
+	h.linkChat(owner, chatID, DirectionBoth)
+	src := h.group(owner)
+	msg := h.send(owner, src, "to forward")
+	if _, err := h.svc.ForwardMessages(ctx, owner, &appv1.ForwardMessagesRequest{FromChatId: src, Seqs: []int64{msg.GetMessage().GetSeq()}, ToChatId: chatID, RandomIds: []int64{5}}); err != nil {
+		t.Fatalf("forwarding into a two-way chat: %v", err)
+	}
+	var fromChat, fromSeq int64
+	if err := h.st.Pool().QueryRow(ctx, `SELECT (payload->>'from_chat')::bigint, (payload->>'from_seq')::bigint FROM external_outbox WHERE op = 'send'`).Scan(&fromChat, &fromSeq); err != nil {
+		t.Fatal(err)
+	}
+	if fromChat != src || fromSeq != msg.GetMessage().GetSeq() {
+		t.Fatalf("queued forward names %d/%d, want %d/%d", fromChat, fromSeq, src, msg.GetMessage().GetSeq())
 	}
 }
 

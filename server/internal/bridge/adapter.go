@@ -183,6 +183,27 @@ type Message struct {
 	// Service is set for a system line of the other app instead of content: Text,
 	// Entities and Media are then empty.
 	Service *ServiceAction
+	// Forward is set for a message forwarded from elsewhere.
+	Forward *ForwardInfo
+}
+
+// ForwardInfo says where a forwarded message came from.
+type ForwardInfo struct {
+	// From is the original author when the app names them; nil when hidden.
+	From *Participant
+	// Name is the author's or channel's name as the app shows it.
+	Name string
+	// Date is when the original was sent.
+	Date time.Time
+}
+
+// Forwarder is implemented by an adapter that can forward messages it has from one
+// conversation to another natively, keeping the "forwarded from" mark.
+type Forwarder interface {
+	// ForwardMessages forwards the messages ids of fromConv (an album as one call)
+	// into toConv, in topic when toConv is a forum. Item i takes randomID+i, the
+	// same on every retry, so a repeat forwards nothing twice.
+	ForwardMessages(ctx context.Context, acct Account, fromConv string, ids []string, toConv, topic string, randomID int64) (SentRef, error)
 }
 
 // ServiceAction is a system line of a conversation: who did what, From being the
