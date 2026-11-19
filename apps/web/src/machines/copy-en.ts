@@ -126,7 +126,8 @@ export const enMachines: MachinesCopy = {
 		later: "Not now",
 		asking: "Waiting for macOS: if a prompt is on the Mac's screen, click Allow.",
 		openScreen: "Open the machine's screen",
-		granted: (folder: string) => `tunelo can use ${folder} now. Do what you were doing again.`,
+		granted: (folder: string) =>
+			`macOS let tunelo into ${folder}. Chat sessions reopen on their own to use it. End an open terminal and open it again. Anything that was just blocked in this folder can be done again now.`,
 		denied: (folder: string) =>
 			`macOS keeps tunelo out of ${folder}. On the Mac, open System Settings > Privacy & Security > Files and Folders, turn this folder on for tunelo, then tap Check again.`,
 		retry: "Check again",

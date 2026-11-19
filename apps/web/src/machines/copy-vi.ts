@@ -130,7 +130,8 @@ export const viMachines = {
 		later: "Để sau",
 		asking: "Đang chờ macOS: nếu có hộp thoại trên màn hình Mac, bấm Cho phép.",
 		openScreen: "Mở màn hình máy",
-		granted: (folder: string) => `tunelo đã vào được ${folder}. Làm lại thao tác vừa rồi.`,
+		granted: (folder: string) =>
+			`macOS đã cho tunelo vào ${folder}. Phiên Trò chuyện tự mở lại để dùng quyền này. Terminal đang mở thì kết thúc rồi mở lại. Việc nào vừa bị chặn vì thư mục này, bạn làm lại là được.`,
 		denied: (folder: string) =>
 			`macOS đang chặn tunelo vào ${folder}. Trên Mac, mở Cài đặt hệ thống > Quyền riêng tư & Bảo mật > Tệp và thư mục, bật thư mục này cho tunelo, rồi bấm Kiểm tra lại.`,
 		retry: "Kiểm tra lại",

@@ -41,6 +41,16 @@ const show = (link: ReturnType<typeof fakeLink>["link"], state: LinkState) =>
 	);
 
 describe("MacFolderAccessDialog", () => {
+	it("once allowed, says what to do next in plain words: chat reopens itself, a terminal is reopened, a blocked task is done again", () => {
+		const { link } = fakeLink();
+		show(link, stateFor(MacFolderAccess.GRANTED));
+		const text = document.querySelector('[data-id="mac-folder-granted"]')?.textContent ?? "";
+		expect(text).toContain("macOS đã cho tunelo vào ~/Documents");
+		expect(text).toContain("Phiên Trò chuyện tự mở lại");
+		expect(text).toContain("Terminal đang mở thì kết thúc rồi mở lại");
+		expect(text).not.toContain("thao tác vừa rồi");
+	});
+
 	it("names iCloud Drive by its name in the question", () => {
 		const { link } = fakeLink();
 		const icloud = `${HOME}/Library/Mobile Documents`;
@@ -78,7 +88,7 @@ describe("MacFolderAccessDialog", () => {
 				<MacFolderAccessDialog link={link as never} state={stateFor(MacFolderAccess.GRANTED)} />
 			</I18nProvider>,
 		);
-		expect(screen.getByText(/tunelo đã vào được ~\/Documents/)).toBeTruthy();
+		expect(screen.getByText(/macOS đã cho tunelo vào ~\/Documents/)).toBeTruthy();
 		fireEvent.click(screen.getByText("Đóng"));
 		expect(link.dismissMacFolderAsk).toHaveBeenCalled();
 	});

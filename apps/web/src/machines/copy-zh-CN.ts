@@ -126,7 +126,8 @@ export const zhCNMachines: MachinesCopy = {
 		later: "以后再说",
 		asking: "正在等待 macOS：如果 Mac 屏幕上有对话框，请点按“允许”。",
 		openScreen: "打开电脑屏幕",
-		granted: (folder: string) => `tunelo 现在可以使用 ${folder}。请重新执行刚才的操作。`,
+		granted: (folder: string) =>
+			`macOS 已允许 tunelo 进入 ${folder}。聊天会话会自动重新打开以使用此权限。已打开的终端请结束后重新打开。刚才因此文件夹被阻止的操作，现在可以重新执行。`,
 		denied: (folder: string) =>
 			`macOS 不允许 tunelo 进入 ${folder}。请在 Mac 上打开“系统设置 > 隐私与安全性 > 文件和文件夹”，为 tunelo 打开此文件夹，然后点按“再次检查”。`,
 		retry: "再次检查",
