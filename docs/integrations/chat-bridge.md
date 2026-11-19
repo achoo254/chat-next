@@ -30,7 +30,7 @@ Mỗi chat đã đồng bộ có nút **Tính năng** (Cài đặt › Kết n�
 
 - **Trạng thái chat trong danh sách của bạn** (tắt tiếng, ghim chat, đánh dấu chưa đọc): Chat đọc từ Telegram mỗi 2 phút và làm Chat khớp với Telegram; đổi trong Chat thì gửi sang Telegram (chỉ trạng thái cuối). Ghim chat quá 5 của Chat bị bỏ qua.
 - **Tên và mô tả nhóm:** đọc mỗi khoảng 10 phút; đổi trong Chat gửi sang Telegram (cần quyền đổi thông tin nhóm). Chat không đăng dòng "đã đổi tên" cho thay đổi đến từ Telegram vì không biết ai đổi. Ảnh nhóm chưa đồng bộ.
-- **Topic từ Chat:** đổi tên, đóng và mở lại, ghim đi sang Telegram khi tính năng Chủ đề gửi ra; tạo topic mới, đổi màu, biểu tượng và ẩn vẫn chỉ làm ở Telegram.
+- **Topic từ Chat:** tạo topic mới (tên và màu), đổi tên, đóng và mở lại, ghim đi sang Telegram khi tính năng Chủ đề gửi ra; tin gõ vào topic vừa tạo chờ topic có ở Telegram rồi mới đi. Biểu tượng tuỳ chỉnh, đổi màu sau khi tạo và ẩn vẫn chỉ làm ở Telegram.
 - **Telegram từ chối** (không đủ quyền…): Chat trả về như Telegram đang có và báo một thông báo.
 - **Thành viên, link mời, rời và xoá nhóm (tính năng tác động lên người, tắt mặc định, bật riêng từng chat ở bảng tính năng và hỏi xác nhận):**
   - **Chiều vào** (chỉ nhận): người vào, ra, được phong admin và bị hạn chế quyền ở Telegram hiện thành thành viên và quyền trong Chat (mỗi khoảng 10 phút; nhóm quá 1.000 người chỉ thêm, không bớt); danh sách link mời của Telegram hiện ngay trong bảng.

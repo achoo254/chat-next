@@ -57,6 +57,8 @@ type Fake struct {
 	reactionCalls                              []string
 	failPin                                    []error
 	failTopicEdit                              error
+	topicCreates                               []string
+	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
 	DedupeRandomID bool
@@ -68,7 +70,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -886,3 +888,41 @@ var (
 	_ bridge.InviteManager  = (*Fake)(nil)
 	_ bridge.GroupLifecycle = (*Fake)(nil)
 )
+
+// CreatedTopics lists the topics Chat opened, as "<conv>:<title>".
+func (f *Fake) CreatedTopics() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.topicCreates...)
+}
+
+// CreateTopic implements bridge.TopicCreator. A repeated randomID answers the topic
+// already opened. Like the other app it tells of the new topic (EchoSent).
+func (f *Fake) CreateTopic(_ context.Context, _ bridge.Account, conv, title string, iconColor int, randomID int64) (string, error) {
+	f.mu.Lock()
+	if !f.support[feature.Topics].Out {
+		f.mu.Unlock()
+		return "", fmt.Errorf("%w: this app does not take topic changes from Chat", bridge.ErrNotAllowed)
+	}
+	if id, ok := f.topicByRandom[randomID]; ok {
+		f.mu.Unlock()
+		return id, nil
+	}
+	if err := f.nextPinFailure(); err != nil {
+		f.mu.Unlock()
+		return "", err
+	}
+	f.nextID++
+	t := bridge.Topic{ID: strconv.Itoa(f.nextID), Title: title, IconColor: iconColor}
+	f.topics[conv] = append(f.topics[conv], t)
+	f.topicByRandom[randomID] = t.ID
+	f.topicCreates = append(f.topicCreates, conv+":"+title)
+	echo := f.EchoSent
+	f.mu.Unlock()
+	if echo {
+		f.Push(bridge.Event{Topic: &bridge.TopicChange{Conversation: conv, Topic: t}})
+	}
+	return t.ID, nil
+}
+
+var _ bridge.TopicCreator = (*Fake)(nil)

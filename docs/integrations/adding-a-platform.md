@@ -14,7 +14,7 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 |---|---|---|
 | `messages` | `Backfill`, `Subscribe` (sự kiện `Message`, `Edit`, `Delete`) | `bridge.Sender` (`SendMessage` idempotent theo `RandomID`, `EditMessage`, `DeleteMessages`) và `CapSend` |
 | `pins` | `bridge.PinReader.ListPinned`, sự kiện `Pin` | `bridge.Pinner.PinMessage` và `bridge.Sender` |
-| `topics` | `bridge.TopicReader.ListTopics`, sự kiện `Topic`, `Conversation.Forum`, `Message.Topic` | `bridge.Pinner.PinTopic` (hiện chỉ ghim topic) |
+| `topics` | `bridge.TopicReader.ListTopics`, sự kiện `Topic`, `Conversation.Forum`, `Message.Topic` | `bridge.Pinner.PinTopic`, `bridge.TopicWriter` (đổi tên, đóng), `bridge.TopicCreator` (tạo topic, idempotent theo `randomID`) |
 | `read` | sự kiện `Read` (người kia đã đọc) và `Seen` (chủ đọc ở thiết bị khác) | `bridge.ReadWriter.MarkRead` |
 | `reactions` | `bridge.ReactionReader.MessageReactions` (đọc định kỳ các tin mới nhất), sự kiện `Reactions` (`Complete` khi danh sách đủ mọi người, `OwnerKnown` khi biết reaction của chủ) | `bridge.ReactionWriter.SetReaction` (chuỗi rỗng là bỏ) |
 | `dialog` | `bridge.DialogReader`, sự kiện trạng thái hội thoại | `bridge.DialogWriter` (tắt tiếng, ghim hội thoại, đánh dấu chưa đọc) |

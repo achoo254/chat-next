@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -259,4 +260,55 @@ func (r *runner) doTopicEdit(ctx context.Context, h *outboxRow) error {
 		return nil
 	}
 	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
+}
+
+// doTopicCreate opens in the other app a topic the owner opened in Chat, and records
+// which topic of the other app it is before anything else runs: the other app tells
+// of the new topic too, and that event must find it known rather than open a second
+// topic in Chat. The row's id makes the call idempotent.
+func (r *runner) doTopicCreate(ctx context.Context, h *outboxRow) error {
+	db := r.e.db
+	creator, ok := r.adapter.(bridge.TopicCreator)
+	if !ok {
+		return db.setOutbox(ctx, []int64{h.ID}, "failed", "topic_unsupported: this app cannot open topics from Chat", time.Time{})
+	}
+	if _, found, err := externalTopic(ctx, db.pool, r.account.ID, h.ExternalChat, h.Seq); err != nil || found {
+		if err != nil {
+			return err
+		}
+		return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
+	}
+	if err := db.startSendingState(ctx, h); err != nil {
+		return err
+	}
+	var p struct {
+		Title     string `json:"title"`
+		IconColor int    `json:"icon_color"`
+	}
+	if err := json.Unmarshal(h.Payload, &p); err != nil {
+		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
+	}
+	ext, err := creator.CreateTopic(ctx, r.acct, h.ExternalChat, p.Title, p.IconColor, h.ID)
+	if err != nil {
+		return r.settleCall(ctx, []*outboxRow{h}, err)
+	}
+	if err := insertTopic(ctx, db.pool, r.account.ID, h.ExternalChat, ext, h.Seq); err != nil {
+		return err
+	}
+	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
+}
+
+// waitForTopic leaves a send pending while the topic it goes into is still being
+// opened in the other app. It reports whether it did.
+func (r *runner) waitForTopic(ctx context.Context, h *outboxRow, topicID int64) (bool, error) {
+	var queued bool
+	if err := r.e.db.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM external_outbox WHERE chat_id = $1 AND seq = $2 AND op = 'create_topic' AND status IN ('pending', 'sending'))`,
+		h.ChatID, topicID).Scan(&queued); err != nil {
+		return false, fmt.Errorf("bridge: topic queued: %w", err)
+	}
+	if !queued {
+		return false, nil
+	}
+	return true, r.e.db.setOutbox(ctx, []int64{h.ID}, "pending", "", time.Now().Add(r.e.cfg.BackoffMin))
 }

@@ -54,13 +54,14 @@ type outboxRow struct {
 var orderedFeatures = []string{string(feature.Messages), string(feature.Members), string(feature.Invites), string(feature.Lifecycle)}
 
 // outboxHeads returns the oldest queued row of each lane of each synced chat of the
-// account, oldest first. A lane is an ordered feature of the chat, or one object of
-// any other feature (its op and seq).
+// account, oldest first. A lane is an ordered feature of the chat, one topic (its
+// creation, then its changes and pin, in order), or one object of any other feature
+// (its op and seq).
 func (d *db) outboxHeads(ctx context.Context, accountID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
 		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM (
 			SELECT DISTINCT ON (external_chat_id, lane) * FROM (
-				SELECT o.*, CASE WHEN o.feature = ANY($2) THEN o.feature ELSE o.op || ':' || o.seq END AS lane
+				SELECT o.*, CASE WHEN o.feature = ANY($2) THEN o.feature WHEN o.op IN ('create_topic', 'set_topic', 'pin_topic') THEN 'topic:' || o.seq ELSE o.op || ':' || o.seq END AS lane
 				FROM external_outbox o WHERE o.account_id = $1 AND o.status IN ('pending', 'sending')
 			) q ORDER BY external_chat_id, lane, id
 		) h ORDER BY id`, accountID, orderedFeatures)
@@ -321,6 +322,11 @@ func (r *runner) doSend(ctx context.Context, sender bridge.Sender, h *outboxRow)
 	}
 	if first == nil || first.Deleted {
 		return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
+	}
+	if first.TopicID != 0 {
+		if waiting, err := r.waitForTopic(ctx, h, first.TopicID); err != nil || waiting {
+			return err
+		}
 	}
 	rows, outs := []*outboxRow{h}, []*chat.Outbound{first}
 	if first.GroupedID != 0 {

@@ -53,3 +53,57 @@ func topicEditRequests(peer tg.InputPeerClass, id int, edit bridge.TopicEdit) []
 	}
 	return out
 }
+
+var _ bridge.TopicCreator = (*Adapter)(nil)
+
+// CreateTopic implements bridge.TopicCreator. Telegram answers with the system line
+// that opened the topic; its id is the topic's id.
+func (a *Adapter) CreateTopic(ctx context.Context, acct bridge.Account, conv, title string, iconColor int, randomID int64) (string, error) {
+	c, release, err := a.acquire(ctx, acct)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	peer, err := c.inputPeer(ctx, conv)
+	if err != nil {
+		return "", err
+	}
+	req := &tg.MessagesCreateForumTopicRequest{Peer: peer, Title: title, RandomID: randomID}
+	if iconColor != 0 {
+		req.SetIconColor(iconColor)
+	}
+	u, err := c.live.api().MessagesCreateForumTopic(ctx, req)
+	if err != nil {
+		return "", translatePin(err)
+	}
+	if id, ok := createdTopicID(u); ok {
+		return id, nil
+	}
+	return "", fmt.Errorf("telegram: created topic not found in the answer")
+}
+
+// createdTopicID finds the id of the topic a create answer opened.
+func createdTopicID(u tg.UpdatesClass) (string, bool) {
+	var list []tg.UpdateClass
+	switch v := u.(type) {
+	case *tg.Updates:
+		list = v.Updates
+	case *tg.UpdatesCombined:
+		list = v.Updates
+	}
+	for _, x := range list {
+		var m tg.MessageClass
+		switch v := x.(type) {
+		case *tg.UpdateNewChannelMessage:
+			m = v.Message
+		case *tg.UpdateNewMessage:
+			m = v.Message
+		}
+		if s, ok := m.(*tg.MessageService); ok {
+			if _, ok := s.Action.(*tg.MessageActionTopicCreate); ok {
+				return strconv.Itoa(s.ID), true
+			}
+		}
+	}
+	return "", false
+}

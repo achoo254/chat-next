@@ -118,7 +118,8 @@ var handlers = []handler{
 			return r.onTopic(ctx, ev, *ev.Topic)
 		},
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
-			"set_topic": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doTopicEdit(ctx, h) },
+			"set_topic":    func(r *runner, ctx context.Context, h *outboxRow) error { return r.doTopicEdit(ctx, h) },
+			"create_topic": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doTopicCreate(ctx, h) },
 			"pin_topic": func(r *runner, ctx context.Context, h *outboxRow) error {
 				return r.withSender(ctx, h, func(ctx context.Context, s bridge.Sender, h *outboxRow) error { return r.doPin(ctx, s, h, true) })
 			},

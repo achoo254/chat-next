@@ -321,10 +321,22 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 		if err != nil {
 			return err
 		}
+		// A chat linked to another app opens its topics there too, when it sends
+		// its topics to that app for me; otherwise the other app manages them.
+		outward := false
 		if c.ExternalLinked {
-			return errDenied(errTopicsManagedElsewhere)
+			l, err := t.outboundLink(ctx, chatID, me, feature.Topics)
+			if err != nil {
+				return err
+			}
+			if l == nil {
+				return errDenied(errTopicsManagedElsewhere)
+			}
+			outward = true
 		}
-		if !c.can(m, permManageTopics) {
+		// In a linked chat the other app holds the real right and refuses without it;
+		// an admin of the copy may ask, as for renaming a topic.
+		if !c.can(m, permManageTopics) && !(outward && m.isAdmin()) {
 			return errDenied("you cannot create topics in this chat")
 		}
 		if c.LastTopicID >= topicsPerChatMax {
@@ -340,6 +352,11 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 			RETURNING `+topicColumns, chatID, id, title, iconColor, icon, me))
 		if err != nil {
 			return fmt.Errorf("chat: create topic: %w", err)
+		}
+		if outward {
+			if err := t.queueState(ctx, chatID, me, feature.Topics, "create_topic", map[string]any{"title": topic.Title, "icon_color": topic.IconColor}, id); err != nil {
+				return err
+			}
 		}
 		return t.topicChanged(ctx, c, me, topic)
 	})

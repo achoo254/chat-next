@@ -14,3 +14,10 @@ type TopicEdit struct {
 type TopicWriter interface {
 	EditTopic(ctx context.Context, acct Account, conv, topic string, edit TopicEdit) error
 }
+
+// TopicCreator is implemented by an adapter that lets Chat open a topic in a forum.
+type TopicCreator interface {
+	// CreateTopic opens a topic and returns its id. A repeated randomID must not open
+	// a second topic. Without the right the call returns ErrNotAllowed.
+	CreateTopic(ctx context.Context, acct Account, conv, title string, iconColor int, randomID int64) (string, error)
+}
