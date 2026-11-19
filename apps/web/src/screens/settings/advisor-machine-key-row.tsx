@@ -2,7 +2,8 @@
 // account's, its own, none), its fingerprint, which device set it and when,
 // and its own key, pasted or removed for this machine only (AdvisorSetKey and
 // AdvisorRemoveKey with source OWN). A machine on an older tunelo keeps the
-// one key it knows and says it needs a newer tunelo for the account's key.
+// one key it knows and says it needs a newer tunelo for the account's key. A
+// key kept from before the account's key can be made the account's from here.
 import { useState } from "react";
 import { AdvisorKeySource } from "@achoo254/chat-proto/remote/remote";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -25,7 +26,8 @@ function statusOf(t: AdvisorCopy, view: MachineView, key: MachineKeyState): stri
 	return key.source === "account" ? t.key.usingAccount(key.fingerprint) : t.key.own(key.fingerprint);
 }
 
-export function MachineKeyRow({ view }: { view: MachineView }) {
+/** `promote`: makes this machine's own key the account's; given only while that is offered. */
+export function MachineKeyRow({ view, promote }: { view: MachineView; promote?: (() => Promise<unknown>) | undefined }) {
 	const t = useAdvisorCopy();
 	const { locale } = useI18n();
 	const [mode, setMode] = useState<"view" | "paste" | "remove">("view");
@@ -55,6 +57,11 @@ export function MachineKeyRow({ view }: { view: MachineView }) {
 						{hasOwn && (
 							<button type="button" className="btn btn-sm" onClick={() => setMode("remove")}>
 								{t.key.removeOwn}
+							</button>
+						)}
+						{promote !== undefined && (
+							<button type="button" className="btn btn-sm" disabled={busy} onClick={() => run(promote, () => undefined)}>
+								{t.key.account.promoteYes}
 							</button>
 						)}
 					</span>

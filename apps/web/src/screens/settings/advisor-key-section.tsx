@@ -41,7 +41,18 @@ export function KeySection() {
 			{views.every((view) => view.state.info?.advisor?.keySet !== true) && <KeyGuide />}
 			<AccountKeyRow machines={machines} account={account} removedAt={removedAt} loaded={loaded} />
 			{legacy !== undefined && <PromoteBar key={laterKey(legacy)} machine={legacy} machines={machines} removedAt={removedAt} />}
-			{views.length === 0 ? <p className="note pad-x">{t.key.none}</p> : views.map((view) => <MachineKeyRow key={view.entry.ref} view={view} />)}
+			{views.length === 0 ? (
+				<p className="note pad-x">{t.key.none}</p>
+			) : (
+				views.map((view) => (
+					<MachineKeyRow
+						key={view.entry.ref}
+						view={view}
+						// Offered on the row too, so putting the bar off never takes the choice away.
+						promote={legacy !== undefined && legacy.view === view ? () => promoteToAccount(legacy, machines, removedAt) : undefined}
+					/>
+				))
+			)}
 		</div>
 	);
 }
@@ -123,6 +134,11 @@ function AccountKeyRow({ machines, account, removedAt, loaded }: { machines: rea
 	);
 }
 
+/** The machine's own key becomes the account's (AdvisorKeyPromote), counted as set after every account key in reach. */
+function promoteToAccount(machine: KeyMachine, machines: readonly KeyMachine[], removedAt: number): Promise<unknown> {
+	return machine.view.link.request({ case: "advisorKeyPromote", value: { setAt: BigInt(nextSetAt(Date.now(), removedAt, machines)) } });
+}
+
 /** Where "later" is remembered for one machine's key, on this browser only. */
 function laterKey(machine: KeyMachine): string {
 	return `advisor-key-promote-later:${machine.view.entry.ref}:${machine.key.fingerprint}`;
@@ -152,7 +168,7 @@ function PromoteBar({ machine, machines, removedAt }: { machine: KeyMachine; mac
 	if (later) return null;
 	const promote = () =>
 		run(
-			() => machine.view.link.request({ case: "advisorKeyPromote", value: { setAt: BigInt(nextSetAt(Date.now(), removedAt, machines)) } }),
+			() => promoteToAccount(machine, machines, removedAt),
 			() => undefined,
 		);
 	return (

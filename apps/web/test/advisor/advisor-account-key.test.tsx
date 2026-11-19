@@ -255,8 +255,9 @@ describe("the account's TypeSafe key", () => {
 		expect(a.machine.sent("advisorKeySeal")).toHaveLength(0);
 	});
 
-	it("putting off the offer to use a machine's key as the account's lasts past a reload", async () => {
+	it("putting off the offer to use a machine's key as the account's lasts past a reload, and the machine's row still offers it", async () => {
 		const a = await addMachine("Mac A");
+		const b = await addMachine("Mac B");
 		a.key = { value: KEY, source: "own", setAt: T0, setBy: "local" };
 		open();
 		const bar = await screen.findByText(t.key.account.promote("Mac A"), undefined, WAIT);
@@ -268,6 +269,12 @@ describe("the account's TypeSafe key", () => {
 		await new Promise((resolve) => setTimeout(resolve, 300));
 		expect(screen.queryByText(t.key.account.promote("Mac A"))).toBeNull();
 		expect(a.machine.sent("advisorKeyPromote")).toHaveLength(0);
+		// Only the machine with the key offers it; agreeing there promotes it and hands it on.
+		expect(within(row("Mac B")).queryByRole("button", { name: t.key.account.promoteYes })).toBeNull();
+		await userEvent.click(within(row("Mac A")).getByRole("button", { name: t.key.account.promoteYes }));
+		await waitFor(() => expect(b.key).toMatchObject({ value: KEY, source: "account" }), WAIT);
+		expect(a.machine.sent("advisorKeyPromote")).toHaveLength(1);
+		await waitFor(() => expect(within(row("Mac A")).queryByRole("button", { name: t.key.account.promoteYes })).toBeNull(), WAIT);
 	});
 
 	it("a machine on an older tunelo keeps its one key, says it needs a newer tunelo and is never asked to share", async () => {
