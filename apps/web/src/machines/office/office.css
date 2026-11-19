@@ -39,7 +39,6 @@
 @keyframes of-consult { 50% { transform: translateY(-3px); } }
 .of-name { min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-bubble { min-width: 0; max-width: 60%; padding: 0 6px; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-text-muted); font-family: var(--font-mono); font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.of-overflow { display: inline-grid; place-items: center; min-width: 24px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--c-warning) 55%, transparent); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 @keyframes of-pulse { 50% { box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 6px color-mix(in srgb, var(--of-ring) 40%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .of-marker .of-dot, .of-marker[data-group="consult"] .of-dot { animation: none; } .of-stage { transition: none; } }
 
@@ -51,7 +50,6 @@
 .of-picture img { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; }
 .of-picture .of-marker { position: absolute; max-width: 180px; padding: 2px 8px 2px 2px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); transform: translate(-8px, calc(-50% - var(--of-stack, 0) * 26px)); }
 .of-picture .of-bubble { position: absolute; left: 0; bottom: calc(100% + 4px); max-width: 200px; }
-.of-picture .of-overflow { position: absolute; transform: translate(-50%, -50%); }
 @container (max-width: 640px) {
 	.of-stage[data-view="picture"] { min-height: min(64vh, 560px); }
 	.of { padding: var(--space-2); }

@@ -23,7 +23,7 @@ import { FrameStats } from "./engine/frame-stats.ts";
 import { qualityLevelAt, startingQualityLevel } from "./engine/quality-levels.ts";
 import { createQualityScaler } from "./engine/quality-scaler.ts";
 import { configureSelfHostedDecoders } from "./engine/self-hosted-decoders.ts";
-import { createOfficeOverlay, type OverlayPin } from "./office-overlay.ts";
+import { createOfficeOverlay } from "./office-overlay.ts";
 import { createRenderGate } from "./render-gate.ts";
 import { createBlockKit } from "./scene/block-kit.ts";
 import { CAMERA_DISTANCE, pixelsPerMetre, screenOffset } from "./scene/fit-office-camera.ts";
@@ -114,8 +114,6 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 	});
 	const fx = createRoomFx(scene, kit, SCENE_LAYOUT);
 	const overlay = createOfficeOverlay();
-	// The meeting room's "+N" over its table.
-	const pins: OverlayPin[] = layout.anchors.filter((a) => a.kind === "meeting").slice(0, 1).map((a) => ({ id: "overflow", x: a.x, y: 1.6, z: a.z }));
 	/** The people the shadow light draws: those in view, re-listed when that set changes. */
 	let casterKeys = "";
 	const refreshCasters = (): void => {
@@ -235,7 +233,7 @@ export async function bootOfficeWorld(opts: WorldOptions): Promise<BootResult> {
 		if (seen !== casterKeys) refreshCasters();
 		fx.frame(now / 1000, views, frozen ? 0 : light.screenGlow, frozen ? 0 : light.deskLamp);
 		lifeSounds.frame(now / 1000, frozen ? [] : views);
-		overlay.update(scene, width, height, views, pins, far);
+		overlay.update(scene, width, height, views, [], far);
 		if (now < flickerUntil) post.applyLight(Math.sin(now / 37) > 0.2 ? 0.25 : light.exposure, light.bloomWeight);
 		scene.render();
 		frames += 1;

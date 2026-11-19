@@ -1400,8 +1400,6 @@ export const zhCNMachines: MachinesCopy = {
 				return minutes < 60 ? `${minutes}分钟` : `${Math.floor(minutes / 60)}小时${minutes % 60}分钟`;
 			},
 		},
-		overflow: (n: number) => `+${n}`,
-		overflowLabel: (n: number) => `${n} 人在会议室等工位`,
 		empty: "空",
 		board: {
 			tasksDone: "已完成任务",

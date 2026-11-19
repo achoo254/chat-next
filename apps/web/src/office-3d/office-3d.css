@@ -11,8 +11,6 @@
 /* Zoomed far out, an idle person's label is only its status dot (office-overlay.ts sets data-dot). */
 .of3d-layer .of-marker[data-dot] .of-name, .of3d-layer .of-marker[data-dot] .of-bubble { display: none; }
 .of3d-layer .of-marker[data-dot] .of3d-tag { padding: 2px; }
-/* The meeting room's "+N" is centred on its anchor. */
-.of3d-overflow { translate: -50% -50%; }
 .of3d-loading { position: absolute; left: var(--space-3); bottom: var(--space-3); margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 @container (max-width: 640px) {
 	.of-stage.of3d { min-height: min(64vh, 560px); }

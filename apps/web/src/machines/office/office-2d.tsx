@@ -58,11 +58,6 @@ export function pictureFraming(layout: OfficeLayout, size: ScreenSize, framing: 
 	return { zoomX: 100 / (box.right - box.left), zoomY: 100 / (box.bottom - box.top), focus: [(box.left + box.right) / 2, (box.top + box.bottom) / 2] };
 }
 
-/** "+N" of the meeting room: employees sitting there for want of a desk (the store's overflow, once they got there). */
-function waitingForDesks(placements: readonly Placement[]): number {
-	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
-}
-
 /** What a marker needs to open its person's panel: whether it is the chosen one and what a press does (the chairman is nobody to inspect). */
 interface Pick {
 	readonly selected: boolean;
@@ -115,16 +110,6 @@ function Marker({ p, t, line, placed, pick }: { p: Placement; t: OfficeCopy; lin
 	);
 }
 
-function Overflow({ n, t, at }: { n: number; t: OfficeCopy; at?: { x: number; y: number } }) {
-	if (n <= 0) return null;
-	const style: CSSProperties | undefined = at === undefined ? undefined : { left: `${at.x}%`, top: `${at.y}%` };
-	return (
-		<span className="of-overflow" style={style} aria-label={t.overflowLabel(n)} title={t.overflowLabel(n)} data-id="office-overflow">
-			{t.overflow(n)}
-		</span>
-	);
-}
-
 /** The pick of a person from the renderer's props: none without a view that listens (the tests of the plain drawing). */
 function pickOf(props: OfficeRendererProps, key: string): Pick | undefined {
 	const onSelect = props.onSelect;
@@ -135,8 +120,6 @@ function Picture({ view, props, t }: { view: AssetView; props: OfficeRendererPro
 	const { placements, talks, daypart, layout, now, size, framing } = props;
 	const file = daypart.phase === "day" ? view.day : view.night;
 	const stacks = new Map<string, number>();
-	const meeting = layout.anchors.find((a) => a.room === "MEETING" && a.kind === "meeting");
-	const meetingAt = meeting === undefined ? undefined : view.anchors.get(meeting.id);
 	const { zoomX, zoomY, focus } = pictureFraming(layout, size, framing);
 	const [focusX, focusY] = focus;
 	const frameRef = useRef<HTMLDivElement>(null);
@@ -178,7 +161,6 @@ function Picture({ view, props, t }: { view: AssetView; props: OfficeRendererPro
 					stacks.set(anchorId, stack + 1);
 					return <Marker key={p.key} p={p} t={t} line={lineOf(talks, p.key, now)} placed={{ x: at[0], y: at[1], stack, anchor: anchorId }} pick={pickOf(props, p.key)} />;
 				})}
-				{meetingAt !== undefined && <Overflow n={waitingForDesks(placements)} t={t} at={{ x: meetingAt[0], y: meetingAt[1] }} />}
 			</div>
 		</div>
 	);
@@ -198,7 +180,6 @@ function RoomCards({ props, t }: { props: OfficeRendererProps; t: OfficeCopy }) 
 								<section key={room} className="of-room" data-room={room} data-id={`office-room-${room.toLowerCase()}`} aria-label={t.rooms[room]}>
 									<h4 className="of-room-name">
 										<span>{t.rooms[room]}</span>
-										{room === "MEETING" && <Overflow n={waitingForDesks(placements)} t={t} />}
 									</h4>
 									{here.length === 0 ? (
 										<p className="of-room-empty">{t.empty}</p>

@@ -1428,8 +1428,6 @@ export const viMachines = {
 				return minutes < 60 ? `${minutes} phút` : `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`;
 			},
 		},
-		overflow: (n: number) => `+${n}`,
-		overflowLabel: (n: number) => `${n} người chờ bàn trong phòng họp`,
 		empty: "Trống",
 		board: {
 			tasksDone: "Việc xong",

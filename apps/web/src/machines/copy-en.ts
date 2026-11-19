@@ -1408,8 +1408,6 @@ export const enMachines: MachinesCopy = {
 				return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 			},
 		},
-		overflow: (n: number) => `+${n}`,
-		overflowLabel: (n: number) => `${n} waiting for a desk in the meeting room`,
 		empty: "Empty",
 		board: {
 			tasksDone: "Tasks done",

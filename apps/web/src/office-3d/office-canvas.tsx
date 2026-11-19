@@ -22,11 +22,6 @@ import "./office-3d.css";
 
 type ColorStyle = CSSProperties & { "--of-color": string };
 
-/** "+N" of the meeting room: employees sitting there for want of a desk. */
-function waitingForDesks(placements: readonly Placement[]): number {
-	return placements.filter((p) => p.room === "MEETING" && p.member !== null && !p.member.nested && p.member.desk === null).length;
-}
-
 function Person({ p, t, line, selected, onPick, bind }: { p: Placement; t: OfficeCopy; line: string | null; selected: boolean; onPick: (key: string) => void; bind: (id: string, el: HTMLElement | null) => void }) {
 	const { status, name, label, bubble, talking } = markerView(t, p, line);
 	const id = `person:${p.key}`;
@@ -121,25 +116,9 @@ function Office3D({ props, flags, onFail }: { props: OfficeRendererProps; flags:
 		else pins.current.set(id, el);
 		worldRef.current?.bind(id, el);
 	};
-	const overflow = waitingForDesks(props.placements);
 	return (
 		<div className="of-stage of3d" ref={host} data-power={props.state.power} data-daypart={props.daypart.phase} data-renderer="3d" data-ready={status === "ready"}>
 			<div className="of3d-layer">
-				{overflow > 0 && (
-					<span
-						className="of-overflow of3d-pin of3d-overflow"
-						aria-label={t.overflowLabel(overflow)}
-						title={t.overflowLabel(overflow)}
-						data-id="office-overflow"
-						hidden
-						ref={(el) => {
-							bind("board:overflow", el);
-							return () => bind("board:overflow", null);
-						}}
-					>
-						{t.overflow(overflow)}
-					</span>
-				)}
 				{props.placements.map((p) => (
 					<Person key={p.key} p={p} t={t} line={lineOf(props.talks, p.key, props.now)} selected={props.selectedKey === p.key} onPick={(key) => select?.(key)} bind={bind} />
 				))}
