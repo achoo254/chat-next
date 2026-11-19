@@ -336,7 +336,8 @@ func (s *Service) CreateForumTopic(ctx context.Context, me int64, req *appv1.Cre
 		}
 		// In a linked chat the other app holds the real right and refuses without it;
 		// an admin of the copy may ask, as for renaming a topic.
-		if !c.can(m, permManageTopics) && !(outward && m.isAdmin()) {
+		mayCreate := c.can(m, permManageTopics) || (outward && m.isAdmin())
+		if !mayCreate {
 			return errDenied("you cannot create topics in this chat")
 		}
 		if c.LastTopicID >= topicsPerChatMax {
