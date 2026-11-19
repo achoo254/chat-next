@@ -1047,6 +1047,11 @@ func (s *Service) UpdateChatInfo(ctx context.Context, me int64, req *appv1.Updat
 				return err
 			}
 		}
+		if req.PhotoFileId != nil {
+			if err := t.queueState(ctx, chatID, me, feature.Info, "set_photo", map[string]any{"file_id": c.PhotoID}); err != nil {
+				return err
+			}
+		}
 		return t.chatChanged(ctx, c, me, actions...)
 	})
 	if err != nil {

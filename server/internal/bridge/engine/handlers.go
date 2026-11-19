@@ -65,7 +65,8 @@ var handlers = []handler{
 		feature: feature.Info,
 		match:   noEvents,
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
-			"set_info": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doInfo(ctx, h) },
+			"set_info":  func(r *runner, ctx context.Context, h *outboxRow) error { return r.doInfo(ctx, h) },
+			"set_photo": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doPhoto(ctx, h) },
 		},
 		poll: func(r *runner, ctx context.Context) error { return r.pollInfo(ctx) },
 	},

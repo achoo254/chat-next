@@ -5,15 +5,17 @@
 package contracttest
 
 import (
-	"app.local/server/internal/bridge/feature"
+	"bytes"
 	"context"
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/feature"
 )
 
 // Fake is a scriptable app. Methods are safe to call from the test while
@@ -58,6 +60,9 @@ type Fake struct {
 	failPin                                    []error
 	failTopicEdit                              error
 	topicCreates                               []string
+	photoBytes                                 map[string][]byte
+	photoCalls                                 []string
+	photoFetches                               int
 	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
@@ -70,7 +75,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -311,7 +316,16 @@ func (f *Fake) Subscribe(ctx context.Context, acct bridge.Account, out chan<- br
 }
 
 // FetchMedia implements bridge.Adapter: the fake has no media.
-func (f *Fake) FetchMedia(context.Context, bridge.Account, string) (bridge.MediaStream, error) {
+func (f *Fake) FetchMedia(_ context.Context, _ bridge.Account, ref string) (bridge.MediaStream, error) {
+	if conv, ok := strings.CutPrefix(ref, fakePhotoRef); ok {
+		f.mu.Lock()
+		data := f.photoBytes[conv]
+		f.photoFetches++
+		f.mu.Unlock()
+		if data != nil {
+			return &fakeStream{Reader: bytes.NewReader(data), size: int64(len(data))}, nil
+		}
+	}
 	return nil, fmt.Errorf("fake adapter has no media")
 }
 

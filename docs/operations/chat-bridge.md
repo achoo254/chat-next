@@ -72,7 +72,7 @@ Tính năng tắt mặc định cho từng chat; bật ở bảng tính năng c�
 
 Migration `0050_external_invites_confirmations.sql` thêm bảng `external_invites` (link mời của app kia đọc về để hiển thị, làm mới mỗi khoảng 10 phút), bảng `external_confirmations` (mã xác nhận lần hai của việc xoá nhóm: hợp lệ từ 10 giây đến 5 phút sau khi tạo, dùng một lần) và thêm kết quả `started` vào `external_audit` (ghi trước khi gửi việc không hoàn tác). Xoá nhóm bị giới hạn một lần mỗi giờ mỗi tài khoản; rời nhóm và mọi hành động khác theo `MemberActionsPerHour`.
 
-Migration `0051_external_feature_defaults.sql` thêm bảng `external_feature_defaults` (mặc định theo tài khoản; chat mới chép lúc tạo, «áp cho tất cả» ghi vào `external_chat_features`). Tính năng `alerts` làm tin mới của app kia không còn `silent` (đi qua chính sách đẩy thông báo của Chat); hàng `mark_read` trong outbox gửi vị trí đã đọc, mỗi chat một hàng có số cao nhất. Việc không thành công của mọi tính năng:
+Migration `0053_external_chats_photo_id.sql` thêm `external_chats.photo_id`: mã ảnh nhóm của app kia mà Chat đã chép hoặc gửi lần cuối (rỗng là không có ảnh, `NULL` là chưa đồng bộ lần nào), để chỉ chép khi ảnh đổi. Hàng `set_photo` trong outbox gửi ảnh nhóm của Chat. Migration `0051_external_feature_defaults.sql` thêm bảng `external_feature_defaults` (mặc định theo tài khoản; chat mới chép lúc tạo, «áp cho tất cả» ghi vào `external_chat_features`). Tính năng `alerts` làm tin mới của app kia không còn `silent` (đi qua chính sách đẩy thông báo của Chat); hàng `mark_read` trong outbox gửi vị trí đã đọc, mỗi chat một hàng có số cao nhất. Việc không thành công của mọi tính năng:
 
 ```sql
 SELECT o.id, x.title, o.feature, o.op, o.status, o.attempts, o.last_error FROM external_outbox o

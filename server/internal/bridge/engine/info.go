@@ -61,6 +61,9 @@ func (r *runner) pollInfo(ctx context.Context) error {
 			}); err != nil {
 				return err
 			}
+			if err := r.takePhoto(ctx, l, info); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

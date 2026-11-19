@@ -18,7 +18,7 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 | `read` | sự kiện `Read` (người kia đã đọc) và `Seen` (chủ đọc ở thiết bị khác) | `bridge.ReadWriter.MarkRead` |
 | `reactions` | `bridge.ReactionReader.MessageReactions` (đọc định kỳ các tin mới nhất), sự kiện `Reactions` (`Complete` khi danh sách đủ mọi người, `OwnerKnown` khi biết reaction của chủ) | `bridge.ReactionWriter.SetReaction` (chuỗi rỗng là bỏ) |
 | `dialog` | `bridge.DialogReader`, sự kiện trạng thái hội thoại | `bridge.DialogWriter` (tắt tiếng, ghim hội thoại, đánh dấu chưa đọc) |
-| `info` | `bridge.InfoReader` | `bridge.InfoWriter` (tên, mô tả) và `bridge.TopicWriter` cho sửa topic |
+| `info` | `bridge.InfoReader` | `bridge.InfoWriter` (tên, mô tả), `bridge.PhotoWriter` (ảnh nhóm; `GroupInfo.PhotoID` đổi khi ảnh đổi, `PhotoRef` là ref của `FetchMedia`) và `bridge.TopicWriter` cho sửa topic |
 | `members` | `bridge.MemberReader` (cả quyền riêng từng người) | `bridge.MemberWriter` (xoá, admin), `bridge.MemberAdder`, `bridge.PermWriter` |
 | `invites` | `bridge.InviteManager.ListInvites` | `CreateInvite`, `RevokeInvite` |
 | `lifecycle` | không có | `bridge.GroupLifecycle` (`LeaveGroup`, `DeleteGroup`) |

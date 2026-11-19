@@ -25,7 +25,7 @@ func (c *conn) groupInfo(ctx context.Context, peer tg.InputPeerClass) (bridge.Gr
 		if !ok {
 			return bridge.GroupInfo{}, false, nil
 		}
-		info := bridge.GroupInfo{About: cf.About}
+		info := bridge.GroupInfo{About: cf.About, PhotoID: photoID(cf.ChatPhoto)}
 		for _, ch := range full.Chats {
 			if cc, ok := ch.(*tg.Channel); ok && cc.ID == p.ChannelID {
 				info.Title = cc.Title
@@ -42,6 +42,9 @@ func (c *conn) groupInfo(ctx context.Context, peer tg.InputPeerClass) (bridge.Gr
 			return bridge.GroupInfo{}, false, nil
 		}
 		info := bridge.GroupInfo{About: cf.About}
+		if p, ok := cf.GetChatPhoto(); ok {
+			info.PhotoID = photoID(p)
+		}
 		for _, ch := range full.Chats {
 			if cc, ok := ch.(*tg.Chat); ok && cc.ID == p.ChatID {
 				info.Title = cc.Title
@@ -70,6 +73,9 @@ func (a *Adapter) GroupInfos(ctx context.Context, acct bridge.Account, convs []s
 			return nil, err
 		}
 		if ok {
+			if info.PhotoID != "" {
+				info.PhotoRef = groupPhotoRef + conv
+			}
 			out[conv] = info
 		}
 	}

@@ -34,3 +34,24 @@ func (it *ImportTx) SetInfo(ctx context.Context, title, about string) (bool, err
 	}
 	return true, nil
 }
+
+// SetPhoto makes fileID, a photo the owner uploaded (the copy of the other app's
+// photo), the chat's photo; "" removes it. Like SetInfo it posts no system line: the
+// other app's own line says who changed it. It reports whether anything changed.
+func (it *ImportTx) SetPhoto(ctx context.Context, fileID string) (bool, error) {
+	if it.c.Type == typePrivate || fileID == it.c.PhotoID {
+		return false, nil
+	}
+	photo, err := ownPhoto(ctx, it.t.tx, it.t.s.cfg.TenantID, it.owner, fileID)
+	if err != nil {
+		return false, err
+	}
+	if _, err := it.t.tx.Exec(ctx, `UPDATE chats SET photo_file_id = $2, updated_at = now() WHERE id = $1`, it.c.ID, photo); err != nil {
+		return false, fmt.Errorf("chat: set imported photo: %w", err)
+	}
+	it.c.PhotoID = fileID
+	if err := it.t.chatChanged(ctx, it.c, it.owner); err != nil {
+		return false, err
+	}
+	return true, nil
+}

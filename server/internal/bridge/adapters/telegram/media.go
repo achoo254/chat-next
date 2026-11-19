@@ -17,6 +17,9 @@ import (
 // of a message. ref is "<conversation>/<message id>": the message is read
 // again so the file reference is fresh (Telegram's expire).
 func (a *Adapter) FetchMedia(ctx context.Context, acct bridge.Account, ref string) (bridge.MediaStream, error) {
+	if conv, ok := strings.CutPrefix(ref, groupPhotoRef); ok {
+		return a.fetchGroupPhoto(ctx, acct, conv)
+	}
 	conv, rawID, ok := strings.Cut(ref, "/")
 	id, err := strconv.Atoi(rawID)
 	if !ok || err != nil {
