@@ -16,14 +16,61 @@ var (
 // muteForever is the mute_until Telegram uses for "until unmuted".
 const muteForever = 2147483647
 
+// notifyKind is which of Telegram's defaults a dialog without its own mute follows.
+type notifyKind int
+
+const (
+	notifyUsers notifyKind = iota
+	notifyGroups
+	notifyChannels
+)
+
 // dialogState is how the owner has a dialog set up: muted (until when), pinned in
-// the list, marked unread.
-func dialogState(d *tg.Dialog) bridge.DialogState {
+// the list, marked unread. A dialog that has no mute of its own follows the default
+// of its kind (Settings › Notifications: private chats, groups, channels), given
+// in defaults as a mute_until.
+func dialogState(d *tg.Dialog, kind notifyKind, defaults map[notifyKind]int64) bridge.DialogState {
 	st := bridge.DialogState{Pinned: d.Pinned, UnreadMark: d.UnreadMark}
 	if until, ok := d.NotifySettings.GetMuteUntil(); ok {
 		st.MuteUntil = int64(until)
+	} else {
+		st.MuteUntil = defaults[kind]
 	}
 	return st
+}
+
+// kindOf tells which default a peer follows; a supergroup is a group, a broadcast
+// channel a channel.
+func kindOf(p tg.PeerClass, chats []tg.ChatClass) notifyKind {
+	switch v := p.(type) {
+	case *tg.PeerChat:
+		return notifyGroups
+	case *tg.PeerChannel:
+		for _, c := range chats {
+			if ch, ok := c.(*tg.Channel); ok && ch.ID == v.ChannelID && ch.Broadcast {
+				return notifyChannels
+			}
+		}
+		return notifyGroups
+	}
+	return notifyUsers
+}
+
+// notifyDefaults reads the mute_until of each of Telegram's three defaults.
+func notifyDefaults(ctx context.Context, api *tg.Client) (map[notifyKind]int64, error) {
+	out := map[notifyKind]int64{}
+	for kind, peer := range map[notifyKind]tg.InputNotifyPeerClass{
+		notifyUsers: &tg.InputNotifyUsers{}, notifyGroups: &tg.InputNotifyChats{}, notifyChannels: &tg.InputNotifyBroadcasts{},
+	} {
+		s, err := api.AccountGetNotifySettings(ctx, peer)
+		if err != nil {
+			return nil, err
+		}
+		if until, ok := s.GetMuteUntil(); ok {
+			out[kind] = int64(until)
+		}
+	}
+	return out, nil
 }
 
 // DialogStates implements bridge.DialogReader with one call for the dialogs
@@ -50,10 +97,14 @@ func (a *Adapter) DialogStates(ctx context.Context, acct bridge.Account, convs [
 	if err != nil {
 		return nil, translate(err)
 	}
+	defaults, err := notifyDefaults(ctx, c.live.api())
+	if err != nil {
+		return nil, translate(err)
+	}
 	for _, raw := range res.Dialogs {
 		if d, ok := raw.(*tg.Dialog); ok {
 			if conv := convID(d.Peer); conv != "" {
-				out[conv] = dialogState(d)
+				out[conv] = dialogState(d, kindOf(d.Peer, res.Chats), defaults)
 			}
 		}
 	}
