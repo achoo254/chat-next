@@ -136,6 +136,13 @@ export const enMachines: MachinesCopy = {
 		macFolderStopped: (folder: string) =>
 			`A tool waited too long in ${folder} (a folder macOS protects; macOS may be asking on the Mac's screen). tunelo stopped the turn so you can go on; send a message for the AI to continue.`,
 		macFolderAsk: "Ask for this folder",
+		listTitle: "Folders macOS protects",
+		listNote: "tunelo and the AI reach these folders only after you ask here and macOS allows it. Chat sessions reopen on their own to use it; an open terminal needs to be ended and opened again.",
+		icloud: "iCloud Drive",
+		access: { notAsked: "Not asked", asking: "Waiting for macOS", granted: "Allowed", denied: "Blocked by macOS" },
+		terminalReopen: (folder: string) => `tunelo may now enter ${folder}. This terminal was opened before, so it is still kept out: end it and open the session's terminal again to use it.`,
+		manage: "Folder access",
+		dismiss: "Hide",
 	},
 	sessions: {
 		refresh: "Refresh the list",

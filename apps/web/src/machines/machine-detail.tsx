@@ -16,7 +16,7 @@ import { Link, navigate, paths } from "../router.tsx";
 import { AuditEntryText } from "./audit-entry-text.tsx";
 import { LOCAL_REF, setLocalMachine } from "./link/link-hub.ts";
 import { cachedProviders } from "./link/provider-cache.ts";
-import { MacFolderAccessDialog } from "./mac-folder-access.tsx";
+import { MacFolderAccessDialog, MacFoldersCard } from "./mac-folder-access.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
@@ -113,6 +113,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 			<div className="mx-body">
 				<MacFolderAccessDialog link={link} state={state} />
 				{terminalGate(state.info) === "available" && <MachineTerminalSessions machine={machine} link={link} online={online} threads={state.threads} />}
+				<MacFoldersCard link={link} state={state} />
 				{hasAccounts && (
 					<section className="card pad mx-card" data-id="machine-ai-accounts">
 						<h3>{t.aiAccounts.title}</h3>

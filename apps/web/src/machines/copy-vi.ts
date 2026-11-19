@@ -140,6 +140,13 @@ export const viMachines = {
 		macFolderStopped: (folder: string) =>
 			`Một công cụ chờ quá lâu trong ${folder} (thư mục macOS bảo vệ, có thể macOS đang hỏi trên màn hình Mac). tunelo đã dừng lượt để bạn dùng tiếp; gửi tin nhắn để AI làm tiếp.`,
 		macFolderAsk: "Xin quyền vào thư mục",
+		listTitle: "Thư mục macOS bảo vệ",
+		listNote: "tunelo và AI chỉ vào được các thư mục này sau khi bạn xin quyền ở đây và macOS cho phép. Phiên Trò chuyện tự mở lại để dùng quyền mới; terminal đang mở cần kết thúc rồi mở lại.",
+		icloud: "iCloud Drive",
+		access: { notAsked: "Chưa xin", asking: "Đang chờ macOS", granted: "Đã cho", denied: "macOS chặn" },
+		terminalReopen: (folder: string) => `Đã cho tunelo vào ${folder}. Terminal này mở trước đó nên vẫn bị chặn: kết thúc rồi mở lại terminal của phiên để dùng.`,
+		manage: "Quyền thư mục",
+		dismiss: "Ẩn",
 	},
 	sessions: {
 		refresh: "Làm mới danh sách",

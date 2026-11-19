@@ -31,7 +31,7 @@ import { Composer, type FileListing, type ListFiles } from "./composer.tsx";
 import type { MachinesCopy } from "./copy-vi.ts";
 import type { LinkState, MachineLink } from "./link/machine-link.ts";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
-import { MacFolderAccessDialog } from "./mac-folder-access.tsx";
+import { MacFolderAccessDialog, TerminalFolderNotice } from "./mac-folder-access.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
@@ -321,6 +321,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			</PageHead>
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<MacFolderAccessDialog link={link} state={state} />
+			{mode === "terminal" && <TerminalFolderNotice machine={machine} state={state} />}
 			{mode === "office" ? (
 				<div className="mx-chat-body">
 					<Suspense fallback={<p className="mx-group-note muted">{t.office.loading}</p>}>

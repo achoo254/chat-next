@@ -136,6 +136,13 @@ export const zhCNMachines: MachinesCopy = {
 		macFolderStopped: (folder: string) =>
 			`有工具在 ${folder} 中等待过久（macOS 保护的文件夹，macOS 可能正在 Mac 屏幕上询问）。tunelo 已停止本轮以便你继续；发送消息即可让 AI 继续。`,
 		macFolderAsk: "请求进入此文件夹",
+		listTitle: "macOS 保护的文件夹",
+		listNote: "只有在此处请求并经 macOS 允许后，tunelo 和 AI 才能进入这些文件夹。聊天会话会自动重新打开以使用新权限；已打开的终端需要结束后重新打开。",
+		icloud: "iCloud 云盘",
+		access: { notAsked: "未请求", asking: "等待 macOS", granted: "已允许", denied: "被 macOS 阻止" },
+		terminalReopen: (folder: string) => `已允许 tunelo 进入 ${folder}。此终端在此之前打开，仍被阻止：请结束并重新打开会话的终端。`,
+		manage: "文件夹权限",
+		dismiss: "隐藏",
 	},
 	sessions: {
 		refresh: "刷新列表",
