@@ -97,7 +97,7 @@ describe("folders as the machine names them", () => {
 async function oneProject(server: FakeAgentProjects, views: MachineView[]) {
 	const store = new AgentProjectsStore(server.api());
 	await store.refresh();
-	const ctx: TreeContext = { store, projects: store.snapshot().projects, machines: views, now: Date.now(), seen: new Map(), current: null, shells: new Map(), terminals: new Map(), layouts: new Map() };
+	const ctx: TreeContext = { store, projects: store.snapshot().projects, machines: views, now: Date.now(), seen: new Map(), current: null, shells: new Map(), terminals: new Map(), layouts: new Map(), folded: new Set(), toggleFold: () => undefined };
 	const node = buildTree(store.snapshot().projects, views, "all", new Map()).projects[0];
 	if (node === undefined) throw new Error("no project");
 	return { store, ctx, node };

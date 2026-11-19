@@ -1160,6 +1160,7 @@ export const viMachines = {
 			addAnyway: "Vẫn thêm",
 			missing: "Thư mục không còn trên máy",
 			newHere: (name: string) => `Phiên mới trong ${name}`,
+			foldWorkspace: (name: string, open: boolean) => `${open ? "Thu gọn" : "Mở"} các phiên của ${name}`,
 			menu: (name: string) => `Tuỳ chọn cho dự án ${name}`,
 			workspaceMenu: (name: string) => `Tuỳ chọn cho workspace ${name}`,
 			newCustom: "Phiên mới (tuỳ chỉnh)",

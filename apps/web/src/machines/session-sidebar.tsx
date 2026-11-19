@@ -36,6 +36,7 @@ const AddAgentProjectDialog = lazy(() => import("./agent-project-dialogs.tsx").t
 
 const FILTER_KEY = "ai:filter";
 const OPEN_KEY = "ai:open-projects";
+const FOLDED_KEY = "ai:folded-workspaces";
 
 function readSession<T>(key: string, parse: (raw: unknown) => T, fallback: T): T {
 	try {
@@ -159,6 +160,13 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 		writeSession(FILTER_KEY, next);
 	};
 	const [opened, setOpened] = useState<Record<string, boolean>>(() => readSession(OPEN_KEY, (raw) => (typeof raw === "object" && raw !== null ? (raw as Record<string, boolean>) : {}), {}));
+	const [folded, setFolded] = useState<ReadonlySet<number>>(() => readSession(FOLDED_KEY, (raw) => new Set(Array.isArray(raw) ? raw.filter((x): x is number => typeof x === "number") : []), new Set<number>()));
+	const toggleFold = (id: number) => {
+		const next = new Set(folded);
+		if (!next.delete(id)) next.add(id);
+		setFolded(next);
+		writeSession(FOLDED_KEY, [...next]);
+	};
 	const [looseOpen, setLooseOpen] = useState(false);
 	const groups = useRowKeys();
 	const current = view.page === "session" || view.page === "session-terminal" ? { machine: view.machine, thread: view.threadId } : null;
@@ -203,7 +211,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	};
 	const layouts = useDockLayouts();
 	const { shells, lists: terminals } = useSidebarShells(machines, snapshot.projects, layouts);
-	const ctx: TreeContext = { store, projects: snapshot.projects, machines, now, seen, current, shells, terminals, layouts };
+	const ctx: TreeContext = { store, projects: snapshot.projects, machines, now, seen, current, shells, terminals, layouts, folded, toggleFold };
 	// The user's order of the projects: dragged, or one place from a project's menu; only with every project shown.
 	const order = tree.projects.map((n) => n.project.id);
 	const reorderable = filter === "all" && snapshot.status === "ready";

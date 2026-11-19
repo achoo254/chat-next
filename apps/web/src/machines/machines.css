@@ -111,6 +111,7 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-ws-title b { min-width: 0; font-weight: 500; }
 .mx-ws-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-ws-sub.mx-ws-missing { color: var(--c-error-text); }
+.mx-ws-count { flex: none; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--c-surface-muted, color-mix(in srgb, var(--c-text-muted) 14%, transparent)); color: var(--c-text-muted); font-size: 0.6875rem; line-height: 18px; text-align: center; }
 .mx-ws-primary { flex: none; padding: 0 5px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-primary) 16%, transparent); color: var(--c-primary); font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1.5; }
 /* The machine's chip: always there, at the end of the title line, cut before the title is. */
 .mx-ws-host { flex: 0 1 auto; min-width: 2.5rem; max-width: 7rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }

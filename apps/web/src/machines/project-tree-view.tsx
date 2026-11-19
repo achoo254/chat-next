@@ -64,7 +64,10 @@ export interface TreeContext {
 	readonly terminals: ReadonlyMap<string, readonly TermSessionInfo[]>;
 	/** The terminal docks' tabs on this device, by scope. */
 	readonly layouts: ReadonlyMap<string, DockLayout>;
-}
+		/** Workspaces (by id) the user folded: their sessions stay hidden unless one of them is open. */
+		readonly folded: ReadonlySet<number>;
+		readonly toggleFold: (workspaceId: number) => void;
+	}
 
 type MenuItem = { label: string; icon: Parameters<typeof Icon>[0]["name"]; run: () => void; danger?: boolean } | null;
 
@@ -229,17 +232,28 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 	const settings = useWorkspaceSettings(machine, workspace.dir, name, local, () => setDialog("settings"));
 	const { archive, bar } = useArchiveWithUndo();
 	const liveHere = machine === null ? [] : archivable([{ machine, threads: node.threads }]);
+	// Only a workspace with sessions folds; the one holding the open session stays open.
+	const foldable = node.threads.length > 0;
+	const current = ctx.current;
+	const holdsCurrent = current !== null && machine?.entry.ref === current.machine && node.threads.some((x) => x.id === current.thread);
+	const open = !foldable || holdsCurrent || !ctx.folded.has(workspace.id);
 	return (
 		<div className="mx-ws" data-offline={node.offline ? "" : undefined}>
 			<div className="mx-ws-head" title={`${machineName} · ${workspace.dir}`}>
 				<span className="mx-ws-name">
 					<span className="mx-ws-title">
-						{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
+						{foldable && (
+							<button type="button" className="mx-ws-toggle" aria-expanded={open} aria-label={p.foldWorkspace(name, open)} title={p.foldWorkspace(name, open)} onClick={() => ctx.toggleFold(workspace.id)}>
+								<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
+							</button>
+						)}
+					{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
 						<StatusGlyph status={node.status} icon={workspaceIcon(node)} ai={node.ai} offline={node.offline} />
 						<b>{label.title}</b>
 						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
 						<HostChip name={machineName} offline={!online} />
-					</span>
+							{!open && <span className="mx-ws-count" aria-label={p.sessions(node.threads.length)}>{node.threads.length}</span>}
+						</span>
 					{(missing || label.sub !== "") && <small className={missing ? "mx-ws-sub mx-ws-missing" : "mx-ws-sub"}>{missing ? p.missing : label.sub}</small>}
 				</span>
 				<span className="mx-ws-acts">
@@ -266,8 +280,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 				/>
 				</span>
 			</div>
-			{machine !== null && <Sessions machine={machine} threads={node.threads} ctx={ctx} />}
-			{machine !== null && <ShellRows machine={machine} dir={workspace.dir} shells={ctx.shells.get(workspace.id) ?? []} now={ctx.now} />}
+			{open && machine !== null && <Sessions machine={machine} threads={node.threads} ctx={ctx} />}
+			{open && machine !== null && <ShellRows machine={machine} dir={workspace.dir} shells={ctx.shells.get(workspace.id) ?? []} now={ctx.now} />}
 			{bar}
 			{dialog === "custom" && machine !== null && (
 				<NewSession

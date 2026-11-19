@@ -1143,6 +1143,7 @@ export const enMachines: MachinesCopy = {
 			addAnyway: "Add anyway",
 			missing: "The folder is gone from the machine",
 			newHere: (name: string) => `New session in ${name}`,
+			foldWorkspace: (name: string, open: boolean) => `${open ? "Collapse" : "Expand"} sessions of ${name}`,
 			menu: (name: string) => `Options for project ${name}`,
 			workspaceMenu: (name: string) => `Options for workspace ${name}`,
 			newCustom: "New session (custom)",

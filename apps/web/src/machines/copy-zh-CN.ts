@@ -1135,6 +1135,7 @@ export const zhCNMachines: MachinesCopy = {
 			addAnyway: "仍然添加",
 			missing: "设备上已没有这个文件夹",
 			newHere: (name: string) => `在 ${name} 中新建会话`,
+			foldWorkspace: (name: string, open: boolean) => `${open ? "折叠" : "展开"} ${name} 的会话`,
 			menu: (name: string) => `项目 ${name} 的选项`,
 			workspaceMenu: (name: string) => `工作区 ${name} 的选项`,
 			newCustom: "新建会话（自定义）",
