@@ -9,6 +9,7 @@ import {
 	BridgeLoginStepKind,
 	BridgeOutboxStatus as WireOutboxStatus,
 	BridgeService,
+	BridgeSyncState as WireSyncState,
 	type BridgeAccount as WireAccount,
 	type BridgeLoginStep as WireStep,
 } from "@achoo254/chat-proto/bridge";
@@ -63,6 +64,13 @@ function toAccount(a: WireAccount): BridgeAccount {
 		source: a.source,
 		status: STATUSES[a.status] ?? "stopped",
 		lastError: a.lastError,
+		syncState: a.syncState === WireSyncState.LIVE ? "live" : a.syncState === WireSyncState.SYNCING ? "syncing" : "off",
+		progress: {
+			conversations: a.progress?.conversations ?? 0,
+			conversationsDone: a.progress?.conversationsDone ?? 0,
+			messages: Number(a.progress?.messages ?? 0n),
+			messagesExpected: Number(a.progress?.messagesExpected ?? 0n),
+		},
 		chats: a.chats.map((c) => ({
 			conversationId: c.conversationId,
 			chatId: assertSafeId(c.chatId),
@@ -266,6 +274,10 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		remove: (accountId, conversationId) =>
 			call(async () => {
 				await rpc.removeBridgeChat({ accountId: BigInt(accountId), conversationId });
+			}),
+		startSync: (accountId) =>
+			call(async () => {
+				await rpc.startBridgeSync({ accountId: BigInt(accountId) });
 			}),
 		disconnect: (accountId, deleteChats) =>
 			call(async () => {

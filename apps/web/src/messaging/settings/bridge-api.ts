@@ -27,6 +27,17 @@ export interface BridgeChat {
 	readonly topicsSplit: boolean;
 }
 
+/** The account's one switch (ADR 0024): not synced yet, first import running, everything live. */
+export type BridgeSyncState = "off" | "syncing" | "live";
+
+/** How far the first import went. */
+export interface BridgeSyncProgress {
+	readonly conversations: number;
+	readonly conversationsDone: number;
+	readonly messages: number;
+	readonly messagesExpected: number;
+}
+
 export interface BridgeAccount {
 	readonly id: number;
 	readonly source: string;
@@ -34,6 +45,8 @@ export interface BridgeAccount {
 	/** Why the connection last failed; "" when fine. */
 	readonly lastError: string;
 	readonly chats: readonly BridgeChat[];
+	readonly syncState: BridgeSyncState;
+	readonly progress: BridgeSyncProgress;
 }
 
 export interface BridgeStatus {
@@ -156,6 +169,8 @@ export interface BridgeProblem {
 
 export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
+	/** Turns the account's one switch on: every conversation syncs, both ways, live. */
+	startSync(accountId: number): Promise<void>;
 	featureDefaults(accountId: number): Promise<readonly BridgeFeatureDefaultView[]>;
 	/** Sets a default; with `applyToAll` also writes it to every synced chat. Returns how many chats changed. */
 	setFeatureDefault(accountId: number, feature: string, direction: string, applyToAll: boolean): Promise<number>;

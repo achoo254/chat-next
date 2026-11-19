@@ -34,6 +34,7 @@ const SharedMediaSection = lazy(() => sharedChunk().then((m) => ({ default: m.Sh
 const SharedMediaView = lazy(() => sharedChunk().then((m) => ({ default: m.SharedMediaView })));
 // "Quản lý bot" for the bot's owner comes with the bot chat's code.
 const BotManageRow = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotManageRow })));
+const BridgeChatTools = lazy(() => import("../settings/bridge-chat-tools.tsx").then((m) => ({ default: m.BridgeChatTools })));
 
 /** Members shown in the column; "Xem tất cả" opens the rest. */
 const MEMBERS_SHOWN = 5;
@@ -403,6 +404,11 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 			)}
 			{!chat.left && <SharedRows chatId={chat.id} onShared={onShared} />}
 			{!chat.left && <PinnedBarRow chat={chat} />}
+			{chat.externalSource !== undefined && !chat.left && (
+				<Suspense fallback={null}>
+					<BridgeChatTools chatId={chat.id} title={chat.title} />
+				</Suspense>
+			)}
 			{admin && (
 				<div className="info-sec">
 					<Link to={paths.chatAdmin(chat.id)} className="row link-row">

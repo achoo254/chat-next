@@ -4,7 +4,7 @@ import type { ConversationKind } from "./bridge-api.ts";
 
 export const viBridge = {
 	title: "Kết nối ứng dụng",
-	lede: "Đồng bộ các cuộc trò chuyện của bạn ở ứng dụng khác vào Chat để đọc và tìm kiếm ở đây. Với chat bật “Gửi tin từ Chat”, tin bạn gõ trong Chat cũng được gửi sang ứng dụng đó.",
+	lede: "Đồng bộ các cuộc trò chuyện của bạn ở ứng dụng khác vào Chat. Sau khi đồng bộ, mọi cuộc trò chuyện luôn đi hai chiều theo thời gian thực.",
 	disabled: "Máy chủ này chưa bật tính năng kết nối ứng dụng.",
 	loadFailed: "Chưa tải được. Thử lại.",
 	retry: "Thử lại",
@@ -43,6 +43,17 @@ export const viBridge = {
 		} as Record<string, string>,
 		rateLimited: "Thử đăng nhập quá nhiều lần. Đợi vài phút rồi thử lại.",
 		accountTaken: "Tài khoản này đang được người dùng khác kết nối.",
+	},
+	sync: {
+		ask: (app: string): string => `Đồng bộ toàn bộ tin nhắn ${app} vào Chat?`,
+		askBody: "Mọi cuộc trò chuyện (chat riêng, nhóm, kênh, bot) vào Chat với 2.000 tin gần nhất mỗi cuộc, rồi luôn đồng bộ hai chiều theo thời gian thực, kể cả cuộc trò chuyện mới sau này.",
+		start: "Đồng bộ",
+		later: "Để sau",
+		startLater: (app: string): string => `Đồng bộ tin nhắn ${app}`,
+		syncing: "Đang đồng bộ",
+		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} cuộc trò chuyện · ${messages}/${expected} tin`,
+		live: "Đang đồng bộ trực tiếp",
+		liveBody: (count: number): string => `${count} cuộc trò chuyện, mọi thay đổi đi hai chiều.`,
 	},
 	account: {
 		status: {
@@ -158,7 +169,7 @@ export const viBridge = {
 	/** People and groups in the other app: invite links, adding people, leaving and deleting a group (feature panel). */
 	people: {
 		title: "Người và nhóm ở ứng dụng kia",
-		off: (feature: string): string => `Bật “${feature}” ở bảng trên (Chỉ gửi hoặc Hai chiều) để dùng phần này.`,
+		off: (feature: string): string => `Chưa dùng được “${feature}”: chat này đang chỉ đọc (tài khoản đã ngắt kết nối).`,
 		invites: {
 			title: "Link mời của ứng dụng kia",
 			hint: "Đây là link của ứng dụng kia, không phải link mời vào Chat.",

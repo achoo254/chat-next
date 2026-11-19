@@ -3,7 +3,7 @@ import type { BridgeCopy } from "./bridge-copy-vi.ts";
 
 export const enBridge: BridgeCopy = {
 	title: "Connected apps",
-	lede: "Sync your conversations from another app into Chat to read and search them here. For chats with “Send from Chat” on, what you type in Chat is also sent to that app.",
+	lede: "Sync your conversations from other apps into Chat. Once synced, every conversation goes both ways in real time.",
 	disabled: "This server has not turned on connected apps.",
 	loadFailed: "Could not load. Try again.",
 	retry: "Try again",
@@ -42,6 +42,17 @@ export const enBridge: BridgeCopy = {
 		},
 		rateLimited: "Too many sign-in attempts. Wait a few minutes and try again.",
 		accountTaken: "Another user has connected this account.",
+	},
+	sync: {
+		ask: (app: string): string => `Sync all your ${app} messages into Chat?`,
+		askBody: "Every conversation (private chats, groups, channels, bots) comes into Chat with its newest 2,000 messages, then stays in sync both ways in real time, new conversations included.",
+		start: "Sync",
+		later: "Later",
+		startLater: (app: string): string => `Sync ${app} messages`,
+		syncing: "Syncing",
+		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} conversations · ${messages}/${expected} messages`,
+		live: "Syncing live",
+		liveBody: (count: number): string => `${count} conversations, every change goes both ways.`,
 	},
 	account: {
 		status: {
@@ -149,7 +160,7 @@ export const enBridge: BridgeCopy = {
 	},
 	people: {
 		title: "People and groups in the other app",
-		off: (feature) => `Turn on “${feature}” in the table above (Send only or Both ways) to use this.`,
+		off: (feature) => `“${feature}” is not available: this chat is read-only (the account is disconnected).`,
 		invites: {
 			title: "Invite links of the other app",
 			hint: "These are the other app's links, not invite links into Chat.",

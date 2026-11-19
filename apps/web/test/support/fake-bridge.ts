@@ -166,6 +166,17 @@ export class FakeBridge {
 				this.guard(false);
 				return { apps: this.apps.map((source) => ({ $typeName: "app.v1.BridgeApp" as const, source })), accounts: this.accounts };
 			},
+			startBridgeSync: (req) => {
+				this.guard(true);
+				this.calls.push(`sync:${req.accountId}`);
+				const account = this.accounts.find((a) => a.id === req.accountId);
+				if (account === undefined) throw new ConnectError("not found", Code.NotFound);
+				if (account.syncState === BridgeSyncState.OFF) {
+					account.syncState = BridgeSyncState.SYNCING;
+					account.progress = { $typeName: "app.v1.BridgeSyncProgress", conversations: 3, conversationsDone: 1, messages: 500n, messagesExpected: 4000n };
+				}
+				return {};
+			},
 			startBridgeLogin: (req) => {
 				this.guard(true);
 				this.calls.push(`start:${req.source}`);

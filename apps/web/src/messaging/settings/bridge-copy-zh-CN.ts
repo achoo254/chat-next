@@ -3,7 +3,7 @@ import type { BridgeCopy } from "./bridge-copy-vi.ts";
 
 export const zhCNBridge: BridgeCopy = {
 	title: "连接应用",
-	lede: "把你在其他应用中的对话同步到 Chat，在这里阅读和搜索。对开启“从 Chat 发送”的聊天，你在 Chat 中输入的内容也会发送到那个应用。",
+	lede: "将你在其他应用中的会话同步到 Chat。同步后，所有会话双向实时同步。",
 	disabled: "此服务器尚未开启应用连接功能。",
 	loadFailed: "加载失败，请重试。",
 	retry: "重试",
@@ -42,6 +42,17 @@ export const zhCNBridge: BridgeCopy = {
 		},
 		rateLimited: "登录尝试过多，请等几分钟再试。",
 		accountTaken: "此账号已被其他用户连接。",
+	},
+	sync: {
+		ask: (app: string): string => `将 ${app} 的全部消息同步到 Chat？`,
+		askBody: "所有会话（私聊、群组、频道、机器人）以最近 2,000 条消息进入 Chat，之后双向实时同步，包括以后新出现的会话。",
+		start: "同步",
+		later: "稍后",
+		startLater: (app: string): string => `同步 ${app} 消息`,
+		syncing: "正在同步",
+		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} 个会话 · ${messages}/${expected} 条消息`,
+		live: "实时同步中",
+		liveBody: (count: number): string => `${count} 个会话，所有更改双向同步。`,
 	},
 	account: {
 		status: {
@@ -149,7 +160,7 @@ export const zhCNBridge: BridgeCopy = {
 	},
 	people: {
 		title: "对方应用中的人员和群",
-		off: (feature) => `请在上表中为“${feature}”选择“仅发送”或“双向”后再使用。`,
+		off: (feature) => `“${feature}”暂不可用：此聊天为只读（账户已断开连接）。`,
 		invites: {
 			title: "对方应用的邀请链接",
 			hint: "这是对方应用的链接，不是加入 Chat 的邀请链接。",

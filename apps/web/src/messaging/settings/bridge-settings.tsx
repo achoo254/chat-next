@@ -9,38 +9,20 @@ import { signInUrl } from "@achoo254/chat-core";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { Link, paths } from "../../router.tsx";
+import { paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
-import { Choice, Switch } from "../ui/parts.tsx";
 import {
 	BridgeError,
-	DEFAULT_HISTORY_WINDOW,
-	HISTORY_WINDOWS,
 	type BridgeAccount,
 	type BridgeApi,
-	type BridgeChat,
-	type BridgeConversation,
 	type BridgeStatus,
-	type ConversationKind,
 	type LoginStep,
 } from "./bridge-api.ts";
-import { forgetBridgeStatus } from "./bridge-delivery.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
-import { savePending, takePending } from "./bridge-pending.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
 const BridgeAccountTools = lazy(() => import("./bridge-account-tools.tsx").then((m) => ({ default: m.BridgeAccountTools })));
-const BridgeFeatures = lazy(() => import("./bridge-features.tsx").then((m) => ({ default: m.BridgeFeatures })));
-
-/** Initials for an avatar from a title that may carry emoji or symbols. */
-function titleInitials(title: string): string {
-	return initials(title.replace(/[^\p{L}\p{N}\s]/gu, ""));
-}
-
-/** The kinds of conversation in the order the filter lists them, and the avatar tone of each. */
-const KIND_ORDER: readonly ConversationKind[] = ["private", "group", "bot", "channel"];
-const KIND_TONE: Record<ConversationKind, string> = { private: "av-blue", group: "av-violet", bot: "av-amber", channel: "av-green" };
 
 /** How often the progress of an import is read while one runs. */
 const PROGRESS_POLL_MS = 3000;
@@ -68,7 +50,7 @@ export default function BridgeSettings() {
 	useEffect(() => {
 		poll();
 	}, []);
-	const importing = load.status === "ready" && load.value.accounts.some((a) => a.chats.some((c) => !c.caughtUp));
+	const importing = load.status === "ready" && load.value.accounts.some((a) => a.syncState === "syncing" || a.chats.some((c) => !c.caughtUp));
 	useEffect(() => {
 		if (!importing) return;
 		const timer = setInterval(poll, PROGRESS_POLL_MS);
@@ -368,29 +350,19 @@ function AccountCard({
 					</div>
 				</div>
 			)}
-			<h3 className="br-title">{t.chats.title}</h3>
-			{account.status === "active" && <BulkSend account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
+			<SyncPanel account={account} api={api} appName={appName} onChange={onChange} onError={onError} />
 			<Suspense fallback={null}>
-				<BridgeAccountTools accountId={account.id} api={api} appName={appName} chatCount={account.chats.length} onChange={onChange} onError={onError} />
+				<BridgeAccountTools accountId={account.id} api={api} onChange={onChange} onError={onError} />
 			</Suspense>
-			{account.chats.length === 0 ? (
-				<p className="note br-pad">{t.chats.none}</p>
-			) : (
-				account.chats.map((chat) => <SyncedChat key={chat.conversationId} account={account} chat={chat} api={api} appName={appName} onChange={onChange} onError={onError} />)
-			)}
-			{account.chats.some((c) => c.direction !== "both") && (
-				<p className="note br-readonly">
-					<Icon name="lock" small />
-					{t.chats.readOnly}
-				</p>
-			)}
-			{account.status === "active" && <ChatPicker account={account} api={api} appName={appName} onChange={onChange} onError={onError} />}
 		</section>
 	);
 }
 
-/** Turns sending on (after one confirmation) or off for every synced chat of the account at once; one call per chat, as the switches make. */
-function BulkSend({
+/**
+ * The account's one switch (ADR 0024): asked once after the sign-in, then a progress bar
+ * over every conversation while the first import runs, then the live state.
+ */
+function SyncPanel({
 	account,
 	api,
 	appName,
@@ -405,437 +377,71 @@ function BulkSend({
 }) {
 	const t = useBridgeCopy();
 	const { toasts } = useServices();
-	const [confirming, setConfirming] = useState(false);
+	const { locale } = useI18n();
+	const [later, setLater] = useState(false);
 	const [busy, setBusy] = useState(false);
-	const off = account.chats.filter((c) => c.direction !== "both");
-	const on = account.chats.filter((c) => c.direction === "both");
-	if (off.length === 0 && on.length === 0) return null;
-	const run = async (chats: readonly BridgeChat[], direction: "both" | "in") => {
+	const count = (n: number) => n.toLocaleString(locale);
+	const start = () => {
 		setBusy(true);
-		setConfirming(false);
-		for (const chat of chats) {
-			try {
-				await api.setDirection(account.id, chat.conversationId, direction);
-			} catch (err) {
-				const error = onError(err);
-				if (error.kind === "send_unsupported") toasts.show(t.chats.sendUnsupported);
-				else if (error.kind !== "reauth") toasts.show(t.failed);
-				break;
-			}
-		}
-		forgetBridgeStatus();
-		setBusy(false);
-		onChange();
-	};
-	return (
-		<div className="br-bulk" data-id="bridge-bulk">
-			{confirming ? (
-				<span className="br-actions">
-					<span className="note">{t.chats.bulkConfirm(off.length, appName)}</span>
-					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void run(off, "both")}>
-						{t.chats.bulkYes}
-					</button>
-					<button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>
-						{t.pick.cancel}
-					</button>
-				</span>
-			) : (
-				<span className="br-actions">
-					{off.length > 0 && (
-						<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setConfirming(true)}>
-							{t.chats.enableAll(off.length)}
-						</button>
-					)}
-					{on.length > 0 && (
-						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => void run(on, "in")}>
-							{t.chats.disableAll}
-						</button>
-					)}
-				</span>
-			)}
-		</div>
-	);
-}
-
-function SyncedChat({
-	account,
-	chat,
-	api,
-	appName,
-	onChange,
-	onError,
-}: {
-	account: BridgeAccount;
-	chat: BridgeChat;
-	api: BridgeApi;
-	appName: string;
-	onChange: () => void;
-	onError: (err: unknown) => BridgeError;
-}) {
-	const t = useBridgeCopy();
-	const { toasts } = useServices();
-	const [confirming, setConfirming] = useState(false);
-	const [busy, setBusy] = useState(false);
-	const [featuresOpen, setFeaturesOpen] = useState(false);
-	const both = chat.direction === "both";
-	const setSendOn = (on: boolean) => {
-		setBusy(true);
-		api.setDirection(account.id, chat.conversationId, on ? "both" : "in").then(
+		api.startSync(account.id).then(
 			() => {
-				forgetBridgeStatus();
 				setBusy(false);
 				onChange();
 			},
 			(err: unknown) => {
 				setBusy(false);
-				const error = onError(err);
-				if (error.kind === "send_unsupported") toasts.show(t.chats.sendUnsupported);
-				else if (error.kind !== "reauth") toasts.show(t.failed);
+				if (onError(err).kind !== "reauth") toasts.show(t.failed);
 			},
 		);
 	};
-	const remove = () => {
-		setBusy(true);
-		api.remove(account.id, chat.conversationId).then(() => {
-			forgetBridgeStatus();
-			onChange();
-		}, (err: unknown) => {
-			setBusy(false);
-			if (onError(err).kind !== "reauth") toasts.show(t.failed);
-		});
-	};
-	return (
-		<div className="br-chat" data-id="bridge-chat">
-			<span className="avatar sm av-violet" aria-hidden="true">
-				{titleInitials(chat.title)}
-			</span>
-			<span className="grow br-text">
-				<b>
-					{chat.title}
-					{chat.topicsSplit && <span className="tag-neutral br-topics-tag">{t.chats.topics}</span>}
-				</b>
-				<small className="br-status" data-state={chat.caughtUp ? "active" : "importing"}>
-					<i aria-hidden="true" />
-					{chat.caughtUp ? t.chats.caughtUp : t.chats.importing}
-					<span className="br-sep" aria-hidden="true">
-						·
-					</span>
-					{t.chats.window(chat.historyWindow)}
-				</small>
-			</span>
-			{confirming ? (
-				<span className="br-actions">
-					<span className="note">{t.chats.removeConfirm}</span>
-					<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={remove}>
-						{t.chats.removeYes}
+	if (account.status !== "active" && account.syncState === "off") return null;
+	if (account.syncState === "off") {
+		if (later) {
+			return (
+				<div className="br-sync" data-state="later">
+					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={start}>
+						{t.sync.startLater(appName)}
 					</button>
-					<button type="button" className="btn btn-sm" onClick={() => setConfirming(false)}>
-						{t.pick.cancel}
-					</button>
-				</span>
-			) : (
-				<span className="br-actions">
-					<span className="br-send" title={t.chats.sendOnHint(appName)}>
-						<span className="br-send-label" aria-hidden="true">
-							{t.chats.sendOn}
-						</span>
-						<Switch checked={both} label={`${t.chats.sendOn}: ${chat.title}`} disabled={busy || account.status !== "active"} onChange={setSendOn} />
-					</span>
-					<button type="button" className="btn btn-sm" aria-expanded={featuresOpen} onClick={() => setFeaturesOpen(!featuresOpen)}>
-						{t.features.open}
-					</button>
-					<Link to={paths.chat(chat.chatId)} className="btn btn-sm">
-						{t.chats.open}
-					</Link>
-					<button type="button" className="btn btn-sm btn-quiet" onClick={() => setConfirming(true)}>
-						{t.chats.remove}
-					</button>
-				</span>
-			)}
-			{featuresOpen && !confirming && (
-				<Suspense fallback={null}>
-					<BridgeFeatures
-						accountId={account.id}
-						conversationId={chat.conversationId}
-						chatTitle={chat.title}
-						appName={appName}
-						api={api}
-						disabled={busy || account.status !== "active"}
-						onChanged={() => {
-							forgetBridgeStatus();
-							onChange();
-						}}
-						onError={onError}
-					/>
-				</Suspense>
-			)}
-		</div>
-	);
-}
-
-/** The conversations of the account, to pick the ones to copy (several at once, one history choice for all) and how much history of each. */
-function ChatPicker({
-	account,
-	api,
-	appName,
-	onChange,
-	onError,
-}: {
-	account: BridgeAccount;
-	api: BridgeApi;
-	appName: string;
-	onChange: () => void;
-	onError: (err: unknown) => BridgeError;
-}) {
-	const t = useBridgeCopy();
-	const { toasts } = useServices();
-	const [list, setList] = useState<readonly BridgeConversation[] | "loading" | null>(null);
-	const [query, setQuery] = useState("");
-	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-	const [kind, setKind] = useState<ConversationKind | "all">("all");
-	const [window, setWindow] = useState(DEFAULT_HISTORY_WINDOW);
-	// New chats send both ways by default; the person can leave it off for the batch (and switch each chat later).
-	const [sendOn, setSendOn] = useState(true);
-	/** The forum whose copy is being offered a new sync by topic (waiting for the confirmation). */
-	const [resyncFor, setResyncFor] = useState<string | null>(null);
-	const [busy, setBusy] = useState(false);
-	// How many chats wait for the sign-in to carry on by themselves.
-	const [waiting, setWaiting] = useState(0);
-	const fail = (err: unknown) => {
-		setBusy(false);
-		if (onError(err).kind !== "reauth") toasts.show(t.failed);
-	};
-	const load = () => {
-		setList("loading");
-		api.conversations(account.id).then(setList, (err: unknown) => {
-			setList(null);
-			fail(err);
-		});
-	};
-	// A forum copied before topics were read has all its topics mixed in one stream: removing the copy and enabling the
-	// conversation again, with the same window and direction, splits them. Remove and enable are the calls the page already makes.
-	const resync = async (conversation: BridgeConversation) => {
-		const copy = account.chats.find((c) => c.conversationId === conversation.id);
-		if (copy === undefined) return;
-		setBusy(true);
-		setResyncFor(null);
-		try {
-			await api.remove(account.id, conversation.id);
-		} catch (err) {
-			setBusy(false);
-			fail(err);
-			return;
+				</div>
+			);
 		}
-		forgetBridgeStatus();
-		try {
-			await api.enable(account.id, conversation.id, copy.historyWindow, copy.direction);
-			toasts.show(t.pick.started);
-		} catch (err) {
-			if (onError(err).kind !== "reauth") toasts.show(t.pick.resyncHalf);
-		}
-		forgetBridgeStatus();
-		api.conversations(account.id).then(setList, () => setList(null));
-		setBusy(false);
-		onChange();
-	};
-	// One sign-in covers the whole batch: the chats go one after another within seconds. A refusal for an old sign-in
-	// stops it, keeps what is not done selected and remembers it for this tab: after signing in again the page opens
-	// anew and the batch carries on by itself (resume below).
-	const runBatch = async (conversations: readonly BridgeConversation[], ids: readonly string[], howMany: number) => {
-		setBusy(true);
-		setWaiting(0);
-		const todo = conversations.filter((c) => ids.includes(c.id) && c.chatId === 0);
-		const left = new Set(todo.map((c) => c.id));
-		let started = 0;
-		let stopped = false;
-		for (const conversation of todo) {
-			try {
-				await api.enable(account.id, conversation.id, howMany, sendOn ? "both" : "in");
-				left.delete(conversation.id);
-				started++;
-			} catch (err) {
-				fail(err);
-				if (bridgeError(err).kind === "reauth") {
-					stopped = true;
-					break;
-				}
-			}
-		}
-		setBusy(false);
-		setSelected(left);
-		savePending({ account: account.id, ids: stopped ? [...left] : [], window: howMany });
-		setWaiting(stopped ? left.size : 0);
-		if (started > 0) {
-			toasts.show(t.pick.started);
-			api.conversations(account.id).then(setList, () => setList(null));
-			onChange();
-		}
-	};
-	const resume = useEffectEvent(() => {
-		const pending = takePending(account.id);
-		if (pending === null || pending.ids.length === 0) return;
-		// The list shows the batch as chosen and busy right away (set from a callback, not from the effect itself).
-		queueMicrotask(() => {
-			setBusy(true);
-			setList("loading");
-			setWindow(pending.window);
-			setSelected(new Set(pending.ids));
-		});
-		api.conversations(account.id).then(
-			(all) => {
-				setList(all);
-				return runBatch(all, pending.ids, pending.window);
-			},
-			(err: unknown) => {
-				setList(null);
-				fail(err);
-			},
-		);
-	});
-	useEffect(() => {
-		resume();
-	}, []);
-	if (list === null) {
 		return (
-			<div className="br-pad">
-				<button type="button" className="btn" onClick={load}>
-					{t.pick.load}
-				</button>
+			<div className="callout br-sync" data-state="off" role="group" aria-label={t.sync.ask(appName)}>
+				<p>
+					<b>{t.sync.ask(appName)}</b>
+				</p>
+				<p className="muted">{t.sync.askBody}</p>
+				<div className="row">
+					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={start}>
+						{t.sync.start}
+					</button>
+					<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setLater(true)}>
+						{t.sync.later}
+					</button>
+				</div>
 			</div>
 		);
 	}
-	if (list === "loading") return <p className="note br-pad">{t.pick.loading}</p>;
-	const needle = query.trim().toLocaleLowerCase();
-	const byName = list.filter((c) => needle === "" || c.title.toLocaleLowerCase().includes(needle));
-	const shown = byName.filter((c) => kind === "all" || c.kind === kind);
-	const kinds = KIND_ORDER.filter((k) => byName.some((c) => c.kind === k));
-	const chosen = list.filter((c) => selected.has(c.id) && c.chatId === 0);
-	// "Select all" acts on what the filter and search show, so a filter is also the quick way to pick one kind of chat.
-	const selectable = shown.filter((c) => c.chatId === 0);
-	const pickedShown = selectable.filter((c) => selected.has(c.id)).length;
-	const allShownPicked = selectable.length > 0 && pickedShown === selectable.length;
-	const toggleShown = () =>
-		setSelected((now) => {
-			const next = new Set(now);
-			for (const c of selectable) {
-				if (allShownPicked) next.delete(c.id);
-				else next.add(c.id);
-			}
-			return next;
-		});
-	const toggle = (id: string) =>
-		setSelected((now) => {
-			const next = new Set(now);
-			if (!next.delete(id)) next.add(id);
-			return next;
-		});
+	const p = account.progress;
+	if (account.syncState === "syncing") {
+		const share = p.messagesExpected > 0 ? Math.min(1, p.messages / p.messagesExpected) : 0;
+		return (
+			<div className="br-sync" data-state="syncing">
+				<p>
+					<b>{t.sync.syncing}</b>
+				</p>
+				<progress className="br-progress" max={1} value={share} aria-label={t.sync.syncing} />
+				<small className="muted">{t.sync.progress(p.conversationsDone, p.conversations, count(p.messages), count(p.messagesExpected))}</small>
+			</div>
+		);
+	}
 	return (
-		<div className="br-picker" data-id="bridge-picker">
-			<h3 className="br-title">{t.pick.title}</h3>
-			<div className="br-pad">
-				<input className="input" type="search" aria-label={t.pick.search} placeholder={t.pick.search} value={query} onChange={(event) => setQuery(event.target.value)} />
-			</div>
-			<div className="br-filters" role="group" aria-label={t.pick.title}>
-				<button type="button" className="btn btn-sm br-chip" aria-pressed={kind === "all"} onClick={() => setKind("all")}>
-					{t.pick.all} <span>{byName.length}</span>
-				</button>
-				{kinds.map((k) => (
-					<button key={k} type="button" className="btn btn-sm br-chip" aria-pressed={kind === k} onClick={() => setKind(kind === k ? "all" : k)}>
-						{t.pick.kind[k]} <span>{byName.filter((c) => c.kind === k).length}</span>
-					</button>
-				))}
-			</div>
-			{selectable.length > 0 && (
-				<div className="br-selectbar">
-					<button type="button" className="btn btn-sm" disabled={busy} onClick={toggleShown} data-id="bridge-select-shown">
-						{allShownPicked ? t.pick.unselectShown : t.pick.selectShown(selectable.length)}
-					</button>
-					<small className="muted">{t.pick.shownCount(pickedShown, selectable.length)}</small>
-				</div>
-			)}
-			{shown.length === 0 && <p className="note br-pad">{t.pick.empty}</p>}
-			<div className="br-list" role="list">
-				{shown.map((conversation) => {
-					const synced = conversation.chatId !== 0;
-					const checked = selected.has(conversation.id);
-					const Row = synced ? "div" : "label";
-					return (
-						<div key={conversation.id} className="br-conv" data-selected={checked && !synced} data-id="bridge-conversation" role="listitem">
-							<Row className="br-conv-main">
-								{synced ? (
-									<span className="br-check-gap" aria-hidden="true" />
-								) : (
-									<input type="checkbox" className="br-check" checked={checked} disabled={busy} onChange={() => toggle(conversation.id)} />
-								)}
-								<span className={`avatar sm ${KIND_TONE[conversation.kind]}`} aria-hidden="true">
-									{titleInitials(conversation.title)}
-								</span>
-								<span className="grow br-text">
-									<b>{conversation.title}</b>
-									<small>{t.pick.kind[conversation.kind]}</small>
-								</span>
-								{conversation.forum && <span className="tag-neutral">{!synced ? t.pick.forum : conversation.topicsSplit ? t.pick.split : t.pick.flat}</span>}
-								{synced && <span className="tag-neutral">{t.pick.synced}</span>}
-								{synced && conversation.forum && !conversation.topicsSplit && (
-									<button type="button" className="btn btn-sm" disabled={busy} onClick={() => setResyncFor(conversation.id)}>
-										{t.pick.resync}
-									</button>
-								)}
-							</Row>
-							{resyncFor === conversation.id && (
-								<div className="br-actions br-resync" role="group" aria-label={t.pick.resync}>
-									<span className="note">{t.pick.resyncConfirm}</span>
-									<button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => void resync(conversation)}>
-										{t.pick.resyncYes}
-									</button>
-									<button type="button" className="btn btn-sm" onClick={() => setResyncFor(null)}>
-										{t.pick.cancel}
-									</button>
-								</div>
-							)}
-						</div>
-					);
-				})}
-			</div>
-			{chosen.length > 0 && (
-				<div className="br-bar" data-id="bridge-start" role="group" aria-label={t.pick.selected(chosen.length)}>
-					<div className="br-bar-top">
-						<b>{t.pick.selected(chosen.length)}</b>
-						<button type="button" className="btn btn-sm btn-quiet" disabled={busy} onClick={() => {
-								setSelected(new Set());
-								setWaiting(0);
-							}}>
-							{t.pick.clear}
-						</button>
-					</div>
-					<div className="br-window">
-						<span className="label">{t.pick.window}</span>
-						<Choice<string>
-							label={t.pick.window}
-							value={String(window)}
-							disabled={busy}
-							options={HISTORY_WINDOWS.map((n) => ({ value: String(n), label: t.pick.windowOption(n) }))}
-							onChange={(value) => setWindow(Number(value))}
-						/>
-					</div>
-					<p className="note">{t.pick.windowNote}</p>
-					<label className="br-sendon">
-						<input type="checkbox" className="br-check" checked={sendOn} disabled={busy} onChange={() => setSendOn((on) => !on)} />
-						<span>{t.pick.sendOn(appName)}</span>
-					</label>
-					{sendOn && <p className="note">{t.pick.sendNote}</p>}
-					{waiting > 0 && (
-						<p className="note br-resume" role="status">
-							{t.pick.resume(waiting)}
-						</p>
-					)}
-					<div className="br-actions end">
-						<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void runBatch(list, [...selected], window)}>
-							{t.pick.start(chosen.length)}
-						</button>
-					</div>
-				</div>
-			)}
+		<div className="br-sync" data-state="live">
+			<small className="br-status" data-state="active">
+				<i aria-hidden="true" />
+				{t.sync.live}
+			</small>
+			<small className="muted">{t.sync.liveBody(p.conversations)}</small>
 		</div>
 	);
 }
