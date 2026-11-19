@@ -18,7 +18,7 @@ export const FONT_SIZE_TOUCH = 13;
 export const FONT_SIZE_MIN = 11;
 export const FONT_SIZE_MAX = 20;
 /** Tall enough that capitals with two stacked marks (Ể Ộ Ữ) never touch the line above. */
-export const LINE_HEIGHT = 1.35;
+export const LINE_HEIGHT = 1.5;
 /** WCAG AA for body text: xterm lifts any colour (dim text too) that reads worse on its background. */
 export const MIN_CONTRAST = 4.5;
 

@@ -55,7 +55,7 @@ function contrast(a: string, b: string): number {
 
 describe("the terminal's text", () => {
 	it("is set for legibility: 14 px, room for stacked tone marks, regular and semi-bold, a contrast floor", () => {
-		expect(textOptions(FONT_SIZE_DEFAULT)).toMatchObject({ fontSize: 14, lineHeight: 1.35, letterSpacing: 0, fontWeight: 600, fontWeightBold: 800, minimumContrastRatio: 4.5 });
+		expect(textOptions(FONT_SIZE_DEFAULT)).toMatchObject({ fontSize: 14, lineHeight: 1.5, letterSpacing: 0, fontWeight: 600, fontWeightBold: 800, minimumContrastRatio: 4.5 });
 		expect(textOptions(16).fontFamily).toMatch(/^"JetBrains Mono", .*Menlo.*monospace$/);
 		expect(MIN_CONTRAST).toBe(4.5);
 	});
