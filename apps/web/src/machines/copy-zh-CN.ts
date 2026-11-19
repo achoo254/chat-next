@@ -144,6 +144,12 @@ export const zhCNMachines: MachinesCopy = {
 		terminalReopen: (folder: string) => `已允许 tunelo 进入 ${folder}。此终端在此之前打开，仍被阻止：请结束并重新打开会话的终端。`,
 		manage: "文件夹权限",
 		dismiss: "隐藏",
+		revoke: "收回",
+		revokeTitle: (folder: string) => `收回对 ${folder} 的访问权限？`,
+		revokeBody: (folder: string) =>
+			`tunelo 和 AI 将不再进入 ${folder}；如需再次使用，请重新请求。聊天会话会自动重新打开以生效（正在运行的会话在本轮结束后）；已打开的终端在结束并重新打开前仍可进入。macOS 已授予的权限仍保留在系统设置中。`,
+		revoking: "正在收回…",
+		revokeFailed: "无法收回。若此电脑开启了完全磁盘访问权限，所有文件夹都是打开的：请先在系统设置中关闭。",
 	},
 	sessions: {
 		refresh: "刷新列表",

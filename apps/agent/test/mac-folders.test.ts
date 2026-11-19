@@ -43,6 +43,7 @@ function folders(over: Partial<MacFoldersOptions> = {}) {
     home: HOME,
     saved: () => saved,
     save: (folder, a) => (saved[folder] = a),
+    forget: (folder) => Reflect.deleteProperty(saved, folder),
     fullDiskAccess: () => false,
     probe: (folder) => {
       probes.push(folder);
@@ -58,6 +59,24 @@ function folders(over: Partial<MacFoldersOptions> = {}) {
 }
 
 describe("MacFolders", () => {
+  test.skipIf(!posix)("taking a folder back forgets macOS's answer, fences the AI out again and says so; nothing to take back with Full Disk Access", () => {
+    const { f, saved, changes } = folders();
+    saved[`${HOME}/Documents`] = "granted";
+    expect(f.allows(`${HOME}/Documents/p`)).toBe(true);
+    expect(f.aiFences().deny).not.toContain(`${HOME}/Documents`);
+    expect(f.revoke(`${HOME}/Documents`)).toBe("revoked");
+    expect(saved[`${HOME}/Documents`]).toBeUndefined();
+    expect(f.access(`${HOME}/Documents`)).toBe("not-asked");
+    expect(f.aiFences().deny).toContain(`${HOME}/Documents`);
+    expect(changes.length).toBeGreaterThan(0);
+    // Not one of the protected folders: nothing happens.
+    expect(f.revoke(`${HOME}/work`)).toBe("not-protected");
+    expect(f.revoke(`${HOME}/Documents/p`)).toBe("not-protected");
+    const fda = folders({ fullDiskAccess: () => true });
+    expect(fda.f.revoke(`${HOME}/Documents`)).toBe("full-disk-access");
+  });
+
+
   test.skipIf(!posix)("a folder never asked for is refused, with the folder it falls in", () => {
     const { f } = folders();
     expect(f.allows(`${HOME}/work`)).toBe(true);

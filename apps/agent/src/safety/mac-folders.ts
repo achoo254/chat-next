@@ -178,6 +178,8 @@ export interface MacFoldersOptions {
   /** What macOS answered before, kept in the machine's config. */
   saved: () => Readonly<Record<string, "granted" | "denied">>;
   save: (folder: string, answer: "granted" | "denied") => void;
+  /** The user took tunelo's access to the folder back: nothing is kept for it any more. */
+  forget: (folder: string) => void;
   /** Full Disk Access (given before tunelo stopped asking for it) opens every folder. */
   fullDiskAccess: () => boolean;
   /** One try at the folder in another process; undefined when nobody answered macOS in time. */
@@ -319,7 +321,28 @@ export class MacFolders implements MacFolderGate {
     this.opts.log(`asking macOS for ${key}`);
     return true;
   }
+
+  /**
+   * The user takes tunelo's access to `folder` back: tunelo forgets the
+   * answer, so the folder is asked for again like one never asked, and the AI's
+   * processes started from now on are kept out of it again (aiFences). macOS
+   * itself is not told: what it allowed stays in System Settings, where only
+   * the owner changes it. Nothing to take back while Full Disk Access opens
+   * every folder.
+   */
+  revoke(folder: string): RevokeOutcome {
+    if (!this.applies || this.folderOf(folder) !== resolve(folder)) return "not-protected";
+    if (this.opts.fullDiskAccess()) return "full-disk-access";
+    const key = resolve(folder);
+    this.opts.forget(key);
+    this.opts.log(`tunelo stopped entering ${key}`);
+    this.opts.onChange();
+    return "revoked";
+  }
 }
+
+/** What taking a folder back did: done, not a protected folder of this Mac, or nothing to take back while Full Disk Access opens every folder. */
+export type RevokeOutcome = "revoked" | "not-protected" | "full-disk-access";
 
 /** How long an AI's call waits for macOS's answer once the user allowed asking: the turn goes on after that either way. */
 export const MAC_ASK_IN_TURN_MS = 45_000;

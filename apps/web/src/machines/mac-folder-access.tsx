@@ -9,7 +9,9 @@
 // where to allow it again).
 import { MacFolderAccess, type MacFolder } from "@achoo254/chat-proto/remote/remote";
 import { useState } from "react";
+import { ConfirmDialog } from "../messaging/bots/dialogs.tsx";
 import { DialogHead, Modal, useDomId } from "../messaging/ui/parts.tsx";
+import { AGENT_MAC_FOLDER_REVOKE, versionAtLeast } from "./agent-version.ts";
 import { Link, paths } from "../router.tsx";
 import { ScreenViewHost } from "./browser/takeover-card.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -129,12 +131,32 @@ export function folderName(folder: string, home: string, icloud: string): string
  * path a command reads from a variable, are never stopped to ask). Asking
  * opens the same question as a refused task (MacFolderAccessDialog).
  */
-export function MacFoldersCard({ link, state }: { link: Pick<MachineLink, "showMacFolderAsk">; state: LinkState }) {
+export function MacFoldersCard({ link, state }: { link: Pick<MachineLink, "showMacFolderAsk" | "request">; state: LinkState }) {
 	const c = useMachinesCopy().macFolder;
+	// The folder whose taking back waits for the user's confirmation, and whether the request is on its way.
+	const [confirm, setConfirm] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const [failed, setFailed] = useState<string | null>(null);
 	const folders = state.info?.macFolders ?? [];
 	if (folders.length === 0) return null;
 	const home = state.info?.home ?? "";
 	const online = state.status.kind === "open";
+	const canRevoke = versionAtLeast(state.info?.agentVersion ?? "", AGENT_MAC_FOLDER_REVOKE);
+	const revoke = (folder: string) => {
+		setBusy(true);
+		setFailed(null);
+		link.request({ case: "macFolderAccessRevoke", value: { path: folder } }).then(
+			() => {
+				setBusy(false);
+				setConfirm(null);
+			},
+			() => {
+				setBusy(false);
+				setConfirm(null);
+				setFailed(folder);
+			},
+		);
+	};
 	const label = (access: MacFolderAccess): string => {
 		if (access === MacFolderAccess.GRANTED) return c.access.granted;
 		if (access === MacFolderAccess.ASKING) return c.access.asking;
@@ -158,9 +180,31 @@ export function MacFoldersCard({ link, state }: { link: Pick<MachineLink, "showM
 								{f.access === MacFolderAccess.DENIED ? c.retry : c.ask}
 							</button>
 						)}
+						{f.access === MacFolderAccess.GRANTED && canRevoke && (
+							<button type="button" className="btn btn-sm mx-btn-ghost" disabled={!online} onClick={() => setConfirm(f.path)} data-id="mac-folder-row-revoke">
+								{c.revoke}
+							</button>
+						)}
 					</li>
 				))}
 			</ul>
+			{failed !== null && (
+				<p className="mx-error" role="alert" data-id="mac-folder-revoke-failed">
+					{c.revokeFailed}
+				</p>
+			)}
+			{confirm !== null && (
+				<ConfirmDialog
+					title={c.revokeTitle(folderName(confirm, home, c.icloud))}
+					body={<p>{c.revokeBody(folderName(confirm, home, c.icloud))}</p>}
+					action={c.revoke}
+					busyLabel={c.revoking}
+					busy={busy}
+					danger
+					onConfirm={() => revoke(confirm)}
+					onClose={() => setConfirm(null)}
+				/>
+			)}
 		</section>
 	);
 }

@@ -23,6 +23,7 @@ function folders(over: { fda?: boolean; saved?: Record<string, "granted" | "deni
     home: HOME,
     saved: () => over.saved ?? {},
     save: () => undefined,
+    forget: () => undefined,
     fullDiskAccess: () => over.fda ?? false,
     probe: async () => "granted",
     onChange: () => undefined,
@@ -104,7 +105,7 @@ describe("a folder granted while sessions are open", () => {
     await until(core, idle.id, (items) => items.some((i) => i.body.case === "text" && i.body.value.text === "echo: hi"));
     const busy = await core.create({ provider: "fake", model: "", dir: work, text: "slow", consent, device: "test" });
     await vi.waitFor(() => expect(core.snapshot(busy.id).some((i) => i.body.case === "text")).toBe(true));
-    core.macAccessGranted();
+    core.macAccessChanged();
     await vi.waitFor(() => expect(log.closed).toBe(1));
     await core.interrupt(busy.id);
     await vi.waitFor(() => expect(log.closed).toBe(2));

@@ -229,7 +229,7 @@ type Thread = {
   flushTimer?: ReturnType<typeof setTimeout>;
   /** Running tool calls that name a folder macOS protects and tunelo may not enter yet, by tool id (watchMacStall). */
   macStalls?: Map<string, { folder: string; timer: ReturnType<typeof setTimeout> }>;
-  /** macOS let tunelo into another folder while a turn ran: the session restarts once the turn ends (macAccessGranted). */
+  /** tunelo's access to a folder changed while a turn ran: the session restarts once the turn ends (macAccessChanged). */
   reopenAfterTurn?: boolean;
   usage?: { tokens: number; window: number };
   info: Omit<ProviderInfo, "rateLimits" | "account">;
@@ -2814,12 +2814,13 @@ export class AgentCore {
   }
 
   /**
-   * macOS let tunelo into another protected folder. The AI's processes were
-   * started in a sandbox that keeps it out (safety/mac-sandbox.ts), so each
-   * session restarts: an idle one now, a busy one once its turn ends. The
-   * next message resumes the same conversation in a process that reaches it.
+   * tunelo's access to a protected folder changed: macOS let it into one, or
+   * the user took one back. The AI's processes were started in a sandbox set
+   * for the access before (safety/mac-sandbox.ts), so each session restarts:
+   * an idle one now, a busy one once its turn ends. The next message resumes
+   * the same conversation in a process with the new access.
    */
-  macAccessGranted(): void {
+  macAccessChanged(): void {
     for (const t of this.threads.values()) {
       if (!t.session) continue;
       if (t.running || t.pending.size > 0) t.reopenAfterTurn = true;

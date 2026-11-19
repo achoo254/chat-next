@@ -145,12 +145,12 @@ describe("an approval card for a call naming a folder macOS protects", () => {
 
 describe("the machine's list of folders macOS protects", () => {
 	const ICLOUD = `${HOME}/Library/Mobile Documents`;
-	const listState = (folders: { path: string; access: MacFolderAccess }[], online = true): LinkState =>
-		({ status: { kind: online ? "open" : "closed" }, info: create(MachineInfoSchema, { home: HOME, macFolders: folders }), macFolderAsk: null }) as unknown as LinkState;
-	const showList = (state: LinkState, showMacFolderAsk = vi.fn()) =>
+	const listState = (folders: { path: string; access: MacFolderAccess }[], online = true, agentVersion = "3.21.0"): LinkState =>
+		({ status: { kind: online ? "open" : "closed" }, info: create(MachineInfoSchema, { home: HOME, agentVersion, macFolders: folders }), macFolderAsk: null }) as unknown as LinkState;
+	const showList = (state: LinkState, showMacFolderAsk = vi.fn(), request = fakeLink().link.request) =>
 		render(
 			<I18nProvider>
-				<MacFoldersCard link={{ showMacFolderAsk }} state={state} />
+				<MacFoldersCard link={{ showMacFolderAsk, request: request as never }} state={state} />
 			</I18nProvider>,
 		);
 
@@ -182,6 +182,30 @@ describe("the machine's list of folders macOS protects", () => {
 	it("shows nothing for a machine that reports no protected folders (not a Mac, or an older tunelo)", () => {
 		showList(listState([]));
 		expect(document.querySelector('[data-id="machine-mac-folders"]')).toBeNull();
+	});
+
+	it("takes an allowed folder back only after the user confirms, on a tunelo that can (3.22.0+)", async () => {
+		const { link, sent } = fakeLink();
+		const folders = [{ path: ICLOUD, access: MacFolderAccess.GRANTED }];
+		const older = showList(listState(folders, true, "3.21.0"), vi.fn(), link.request);
+		expect(document.querySelector('[data-id="mac-folder-row-revoke"]')).toBeNull();
+		older.unmount();
+		showList(listState(folders, true, "3.22.0"), vi.fn(), link.request);
+		fireEvent.click(document.querySelector('[data-id="mac-folder-row-revoke"]') as Element);
+		expect(screen.getByText("Thu hồi quyền vào iCloud Drive?")).toBeTruthy();
+		expect(screen.getByText(/terminal đang mở vẫn vào được/)).toBeTruthy();
+		expect(sent).toEqual([]);
+		fireEvent.click(screen.getAllByRole("button", { name: "Thu hồi" }).at(-1) as Element);
+		expect(sent).toEqual([{ case: "macFolderAccessRevoke", value: { path: ICLOUD } }]);
+		await waitFor(() => expect(screen.queryByText("Thu hồi quyền vào iCloud Drive?")).toBeNull());
+	});
+
+	it("says why when the machine refuses to take a folder back", async () => {
+		const request = vi.fn(() => Promise.reject(new Error("full disk access")));
+		showList(listState([{ path: DOCS, access: MacFolderAccess.GRANTED }], true, "3.22.0"), vi.fn(), request);
+		fireEvent.click(document.querySelector('[data-id="mac-folder-row-revoke"]') as Element);
+		fireEvent.click(screen.getAllByRole("button", { name: "Thu hồi" }).at(-1) as Element);
+		expect((await screen.findByRole("alert")).textContent).toContain("Full Disk Access");
 	});
 
 	it("cannot ask while the machine is offline", () => {

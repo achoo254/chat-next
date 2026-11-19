@@ -148,6 +148,12 @@ export const viMachines = {
 		terminalReopen: (folder: string) => `Đã cho tunelo vào ${folder}. Terminal này mở trước đó nên vẫn bị chặn: kết thúc rồi mở lại terminal của phiên để dùng.`,
 		manage: "Quyền thư mục",
 		dismiss: "Ẩn",
+		revoke: "Thu hồi",
+		revokeTitle: (folder: string) => `Thu hồi quyền vào ${folder}?`,
+		revokeBody: (folder: string) =>
+			`tunelo và AI sẽ không vào ${folder} nữa; muốn dùng lại thì bấm Xin quyền. Các phiên Trò chuyện tự mở lại để áp dụng (phiên đang chạy đợi xong lượt); terminal đang mở vẫn vào được cho tới khi bạn kết thúc rồi mở lại. Quyền macOS đã cho vẫn nằm trong Cài đặt hệ thống.`,
+		revoking: "Đang thu hồi…",
+		revokeFailed: "Không thu hồi được. Nếu máy đang có Full Disk Access thì mọi thư mục đều mở: tắt nó trong Cài đặt hệ thống trước.",
 	},
 	sessions: {
 		refresh: "Làm mới danh sách",

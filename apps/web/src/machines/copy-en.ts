@@ -144,6 +144,12 @@ export const enMachines: MachinesCopy = {
 		terminalReopen: (folder: string) => `tunelo may now enter ${folder}. This terminal was opened before, so it is still kept out: end it and open the session's terminal again to use it.`,
 		manage: "Folder access",
 		dismiss: "Hide",
+		revoke: "Take back",
+		revokeTitle: (folder: string) => `Take back access to ${folder}?`,
+		revokeBody: (folder: string) =>
+			`tunelo and the AI stop entering ${folder}; ask again to use it. Chat sessions reopen on their own to apply it (a running one after its turn); an open terminal can still enter it until you end it and open it again. What macOS allowed stays in System Settings.`,
+		revoking: "Taking back…",
+		revokeFailed: "Could not take it back. With Full Disk Access every folder is open: turn it off in System Settings first.",
 	},
 	sessions: {
 		refresh: "Refresh the list",

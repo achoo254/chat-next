@@ -330,6 +330,7 @@ message Frame {
 
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
+    MacFolderAccessRevoke mac_folder_access_revoke = 179;
   }
 }
 
@@ -1151,6 +1152,18 @@ message OpenDiskAccessSettings {}
 // A path that is not one of MachineInfo.mac_folders is refused with
 // ERROR_REASON_FOLDER_NOT_FOUND; UNSUPPORTED_REQUEST off macOS.
 message MacFolderAccessAsk {
+  string path = 1;
+}
+
+// The user takes tunelo's access to a folder back (B 3.22.0+): B forgets
+// macOS's answer for it, so the folder is asked for again like one never
+// asked, and the AI's processes restart to be kept out of it. macOS is not
+// told; what it allowed stays in System Settings. Answered with Ack, then
+// MachineInfo with the folder NOT_ASKED. A path that is not one of
+// MachineInfo.mac_folders is refused with ERROR_REASON_FOLDER_NOT_FOUND; a
+// machine with Full Disk Access (every folder open) with
+// ERROR_REASON_UNSUPPORTED_REQUEST; UNSUPPORTED_REQUEST off macOS too.
+message MacFolderAccessRevoke {
   string path = 1;
 }
 

@@ -467,6 +467,7 @@ describe("folders macOS protects", () => {
       home: root,
       saved: () => saved,
       save: (folder, a) => (saved[folder] = a),
+      forget: (folder) => Reflect.deleteProperty(saved, folder),
       fullDiskAccess: () => false,
       probe: () => new Promise((r) => (answer = r)),
       onChange: () => changes.push(folders.access(documents)),
@@ -497,5 +498,13 @@ describe("folders macOS protects", () => {
     const listed = await l.request("6", { case: "dirList", value: { path: join(documents, "repo"), showHidden: false } });
     expect(listed?.case).toBe("dirListResult");
     expect(m.audit.list(10).map((e) => [e.action, e.path])).toContainEqual(["mac_folder_access", documents]);
+
+    // Taken back from the device: refused again like a folder never asked for, and written in the log.
+    expect(await l.request("7", { case: "macFolderAccessRevoke", value: { path: join(documents, "repo") } })).toMatchObject({ case: "error" });
+    expect(await l.request("8", { case: "macFolderAccessRevoke", value: { path: documents } })).toMatchObject({ case: "ack" });
+    expect(saved).toEqual({});
+    const again = await l.request("9", { case: "dirList", value: { path: join(documents, "repo"), showHidden: false } });
+    expect(again?.case === "error" && again.value.reason).toBe(ErrorReason.MAC_FOLDER_ACCESS);
+    expect(m.audit.list(10).map((e) => [e.action, e.detail])).toContainEqual(["mac_folder_access", "revoke"]);
   });
 });

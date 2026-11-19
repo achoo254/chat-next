@@ -153,7 +153,15 @@ export class Machine {
       save: (folder, answer) => {
         this.config.update((c) => (c.macFolders = { ...c.macFolders, [folder]: answer }));
         // The AI's processes run in a sandbox that keeps this folder out: they restart to reach it.
-        if (answer === "granted") this.core.macAccessGranted();
+        if (answer === "granted") this.core.macAccessChanged();
+      },
+      forget: (folder) => {
+        this.config.update((c) => {
+          const { [folder]: _taken, ...rest } = c.macFolders ?? {};
+          c.macFolders = rest;
+        });
+        // The AI's processes may reach the folder now: they restart in a sandbox that keeps it out again.
+        this.core.macAccessChanged();
       },
       configDir: dir,
       fullDiskAccess: hasFullDiskAccess,

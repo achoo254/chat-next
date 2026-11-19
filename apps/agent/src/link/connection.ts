@@ -620,6 +620,21 @@ export class Connection {
           this.ctx.audit.write({ device: this.device, action: "mac_folder_access", path: b.value.path, detail: "ask" });
           return ack();
         }
+        case "macFolderAccessRevoke": {
+          const folders = this.ctx.macFolders;
+          if (!folders?.applies) {
+            return this.send(id, { case: "error", value: refusal("only a Mac protects folders", ErrorReason.UNSUPPORTED_REQUEST) });
+          }
+          const outcome = folders.revoke(b.value.path);
+          if (outcome === "not-protected") {
+            return this.send(id, { case: "error", value: { ...refusal("not a folder macOS protects", ErrorReason.FOLDER_NOT_FOUND), subject: b.value.path } });
+          }
+          if (outcome === "full-disk-access") {
+            return this.send(id, { case: "error", value: refusal("Full Disk Access opens every folder; turn it off in System Settings first", ErrorReason.UNSUPPORTED_REQUEST) });
+          }
+          this.ctx.audit.write({ device: this.device, action: "mac_folder_access", path: b.value.path, detail: "revoke" });
+          return ack();
+        }
         case "machineSettingsSet": {
           const forward = this.ctx.localForward;
           if (b.value.localForward !== undefined) {

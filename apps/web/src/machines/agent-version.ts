@@ -34,6 +34,9 @@ export const AGENT_TERMINAL_IMAGES = [2, 7, 1] as const;
 /** The first tunelo that keeps the office of a session (OfficeWatch, docs/office-wire.md). */
 export const AGENT_OFFICE = [3, 6, 0] as const;
 
+/** The first tunelo that takes a folder macOS protects back (MacFolderAccessRevoke), so the machine's folder list offers it. */
+export const AGENT_MAC_FOLDER_REVOKE = [3, 22, 0] as const;
+
 /** The first tunelo that refuses ThreadClose while anything goes on in the session, so a device may offer "close session". */
 export const AGENT_SAFE_CLOSE = [3, 3, 5] as const;
 
