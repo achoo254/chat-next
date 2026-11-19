@@ -17,10 +17,12 @@ const dialogBatch = 50
 
 // pendingOp says whether a row of op for the chat still waits to be sent (or is on
 // its way): the state in Chat is then newer than the one the other app has, and
-// reading the other app must not put it back.
-func (d *db) pendingOp(ctx context.Context, chatID int64, op string) (bool, error) {
+// reading the other app must not put it back. q is the transaction that writes what
+// was read, after it holds the locks Chat changes that state under: checked any
+// earlier, Chat could queue a change between the check and the write.
+func pendingOp(ctx context.Context, q querier, chatID int64, op string) (bool, error) {
 	var n int
-	if err := d.pool.QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1 AND op = $2 AND status IN ('pending', 'sending')`, chatID, op).Scan(&n); err != nil {
+	if err := q.QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1 AND op = $2 AND status IN ('pending', 'sending')`, chatID, op).Scan(&n); err != nil {
 		return false, fmt.Errorf("bridge: pending op: %w", err)
 	}
 	return n > 0, nil
@@ -118,16 +120,19 @@ func (r *runner) applyDialogState(ctx context.Context, l *chatLink, st bridge.Di
 		if !dir.Receives() {
 			continue
 		}
-		if pending, err := r.e.db.pendingOp(ctx, l.ChatID, f.op); err != nil {
-			return err
-		} else if pending {
-			continue
-		}
 		todo = append(todo, f)
 	}
 	if len(todo) > 0 {
 		if err := r.withLink(ctx, l, func(it *chat.ImportTx) error {
+			if err := it.HoldOwnerPins(ctx); err != nil {
+				return err
+			}
 			for _, f := range todo {
+				if pending, err := pendingOp(ctx, it.Tx(), l.ChatID, f.op); err != nil {
+					return err
+				} else if pending {
+					continue
+				}
 				if err := f.apply(it); err != nil {
 					return err
 				}

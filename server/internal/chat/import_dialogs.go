@@ -57,6 +57,15 @@ func (it *ImportTx) SetOwnerUnreadMark(ctx context.Context, unread bool) (bool, 
 	return true, nil
 }
 
+// HoldOwnerPins makes the owner's own pin and unpin in Chat wait until this transaction
+// ends. Chat changes mute, unread mark and info under the lock of the chat, which this
+// transaction already holds, but pins under the owner's pin lock only: once that is held
+// too, a check of what Chat queued sees every change it made before, and none comes in
+// between the check and what this transaction writes.
+func (it *ImportTx) HoldOwnerPins(ctx context.Context) error {
+	return lockPins(ctx, it.t, it.owner)
+}
+
 // SetOwnerDialogPinned pins or unpins the chat in the owner's list. Pinning past
 // the limit of pinned chats is refused with a precondition error the caller logs
 // and goes on from: the other app may allow more than Chat does.

@@ -51,12 +51,11 @@ func (r *runner) pollInfo(ctx context.Context) error {
 			if !ok || l == nil {
 				continue
 			}
-			if pending, err := r.e.db.pendingOp(ctx, l.ChatID, "set_info"); err != nil {
-				return err
-			} else if pending {
-				continue
-			}
 			if err := r.withLink(ctx, l, func(it *chat.ImportTx) error {
+				// Chat changes the info under the lock of the chat, held here: checked now, nothing it queues slips in before the write.
+				if pending, err := pendingOp(ctx, it.Tx(), l.ChatID, "set_info"); err != nil || pending {
+					return err
+				}
 				_, err := it.SetInfo(ctx, info.Title, info.About)
 				return err
 			}); err != nil {
