@@ -41,6 +41,14 @@ const show = (link: ReturnType<typeof fakeLink>["link"], state: LinkState) =>
 	);
 
 describe("MacFolderAccessDialog", () => {
+	it("names iCloud Drive by its name in the question", () => {
+		const { link } = fakeLink();
+		const icloud = `${HOME}/Library/Mobile Documents`;
+		const info = create(MachineInfoSchema, { home: HOME, macFolders: [{ path: icloud, access: MacFolderAccess.NOT_ASKED }] });
+		show(link, { status: { kind: "open" }, info, macFolderAsk: icloud } as unknown as LinkState);
+		expect(screen.getByText("Cho tunelo vào iCloud Drive?")).toBeTruthy();
+	});
+
 	it("shows nothing while no folder waits", () => {
 		const { link } = fakeLink();
 		show(link, stateFor(undefined, { macFolderAsk: null }));
@@ -149,6 +157,8 @@ describe("the machine's list of folders macOS protects", () => {
 		const rows = [...document.querySelectorAll('[data-id="mac-folder-row"]')];
 		expect(rows.map((r) => r.getAttribute("data-access"))).toEqual(["GRANTED", "NOT_ASKED", "DENIED"]);
 		expect(rows[0]?.textContent).toContain("Đã cho");
+		// A folder named by its path shows it once; iCloud Drive shows its path under its name.
+		expect(rows[0]?.querySelectorAll(".mono")).toHaveLength(0);
 		expect(rows[0]?.querySelector('[data-id="mac-folder-row-ask"]')).toBeNull();
 		expect(rows[1]?.textContent).toContain("iCloud Drive");
 		expect(rows[1]?.textContent).toContain("~/Library/Mobile Documents");

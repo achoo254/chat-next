@@ -40,7 +40,7 @@ export function MacFolderAccessDialog({ link, state }: { link: Pick<MachineLink,
 	const folder = state.macFolderAsk;
 	if (folder === null) return null;
 	const online = state.status.kind === "open";
-	const name = folderLabel(folder, state.info?.home ?? "");
+	const name = folderName(folder, state.info?.home ?? "", c.icloud);
 	const access = folderAccess(state, folder);
 	const close = () => {
 		setFailed(false);
@@ -150,7 +150,7 @@ export function MacFoldersCard({ link, state }: { link: Pick<MachineLink, "showM
 					<li key={f.path} data-id="mac-folder-row" data-access={MacFolderAccess[f.access]}>
 						<span className="mx-mac-folder-name">
 							<span>{folderName(f.path, home, c.icloud)}</span>
-							<span className="mono muted">{folderLabel(f.path, home)}</span>
+							{folderName(f.path, home, c.icloud) !== folderLabel(f.path, home) && <span className="mono muted">{folderLabel(f.path, home)}</span>}
 						</span>
 						<span className={`chip mx-chip ${f.access === MacFolderAccess.GRANTED ? "ok" : f.access === MacFolderAccess.DENIED ? "warn" : ""}`}>{label(f.access)}</span>
 						{f.access !== MacFolderAccess.GRANTED && (
