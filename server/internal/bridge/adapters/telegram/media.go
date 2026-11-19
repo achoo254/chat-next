@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 
 	"app.local/server/internal/bridge"
 	"github.com/gotd/td/telegram/downloader"
@@ -116,17 +117,20 @@ func photoLocation(p *tg.Photo) (tg.InputFileLocationClass, string, int64, error
 
 // mediaStream is a download in progress.
 type mediaStream struct {
-	r    *io.PipeReader
-	mime string
-	size int64
-	stop func()
+	r     *io.PipeReader
+	mime  string
+	size  int64
+	stop  func()
+	close sync.Once
 }
 
 func (m *mediaStream) Read(p []byte) (int, error) { return m.r.Read(p) }
 func (m *mediaStream) MimeType() string           { return m.mime }
 func (m *mediaStream) Size() int64                { return m.size }
 
+// Close stops the download and gives the connection back, once: a reader that gave
+// up on a stalled download closes it while the caller still holds a deferred Close.
 func (m *mediaStream) Close() error {
-	m.stop()
+	m.close.Do(m.stop)
 	return m.r.Close()
 }

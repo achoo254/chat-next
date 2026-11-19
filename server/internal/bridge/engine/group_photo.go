@@ -60,7 +60,9 @@ func (r *runner) takePhoto(ctx context.Context, l *chatLink, info bridge.GroupIn
 			r.logger.Warn("copying a group photo failed", "chat_id", l.ChatID, "reason", err.Error())
 			return nil
 		}
-		file, err := r.uploadPaced(ctx, media.StreamUpload{Kind: appv1.MediaKind_MEDIA_KIND_PHOTO, FileName: "photo.jpg", Body: io.LimitReader(stream, photoLimit+1), MaxBytes: photoLimit})
+		body, unwatch := watched(ctx, stream)
+		file, err := r.uploadPaced(ctx, media.StreamUpload{Kind: appv1.MediaKind_MEDIA_KIND_PHOTO, FileName: "photo.jpg", Body: io.LimitReader(body, photoLimit+1), MaxBytes: photoLimit})
+		unwatch()
 		_ = stream.Close()
 		if err != nil {
 			r.logger.Warn("storing a group photo failed", "chat_id", l.ChatID, "reason", err.Error())

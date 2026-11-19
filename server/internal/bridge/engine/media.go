@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 
@@ -108,8 +109,10 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message 
 	if size := stream.Size(); size > limit {
 		return nil
 	}
+	body, unwatch := watched(ctx, stream)
+	defer unwatch()
 	file, err := r.uploadPaced(ctx, media.StreamUpload{
-		Kind: kind, FileName: fileNameOf(med), Body: io.LimitReader(stream, limit+1), MaxBytes: limit,
+		Kind: kind, FileName: fileNameOf(med), Body: io.LimitReader(body, limit+1), MaxBytes: limit,
 	})
 	if err != nil {
 		r.logger.Warn("storing a file failed; the message is imported with a label", "kind", med.Kind, "reason", err.Error())
@@ -160,3 +163,44 @@ func fileNameOf(m bridge.Media) string {
 	}
 	return fmt.Sprintf("%s%s", m.Kind, ext)
 }
+
+// fileIdle is how long a download from the other app may go without a byte before it
+// is given up: a stalled download (seen in production) otherwise holds the whole run.
+var fileIdle = 60 * time.Second
+
+// watched closes stream when no byte came for fileIdle, or when ctx ends, so a Read
+// stuck on a stalled download returns. The returned stop ends the watch.
+func watched(ctx context.Context, stream bridge.MediaStream) (io.Reader, func()) {
+	var last atomic.Int64
+	last.Store(time.Now().UnixNano())
+	done := make(chan struct{})
+	go func() {
+		tick := time.NewTicker(fileIdle / 6)
+		defer tick.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				_ = stream.Close()
+				return
+			case <-tick.C:
+				if time.Since(time.Unix(0, last.Load())) > fileIdle {
+					_ = stream.Close()
+					return
+				}
+			}
+		}
+	}()
+	return readerFunc(func(p []byte) (int, error) {
+		n, err := stream.Read(p)
+		if n > 0 {
+			last.Store(time.Now().UnixNano())
+		}
+		return n, err
+	}), func() { close(done) }
+}
+
+type readerFunc func([]byte) (int, error)
+
+func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
