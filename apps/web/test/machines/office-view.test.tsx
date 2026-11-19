@@ -160,7 +160,7 @@ describe("the office tab", () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director({ activity: act("t1", OfficeRoom.QA, "run_command") })], { reportsStaff: false }) });
-		expect(await screen.findByText("AI này chưa báo cáo nhân viên: chỉ có Giám đốc.")).toBeTruthy();
+		expect(await screen.findByText("AI này không báo cáo nhân viên: việc của công cụ do các phòng ban làm.")).toBeTruthy();
 		expect(screen.getByRole("region", { name: "Sảnh" })).toBeTruthy();
 		const control = screen.getByRole("region", { name: "Kiểm soát" });
 		// The director's tool in the QA room is the QA tester's work.

@@ -66,8 +66,8 @@ const HOMES: Record<string, [string, string]> = {
 	gameDesigner: ["PLANNING", "planning-desk-1"],
 	uiUxDesigner: ["WORK", "desk-5"],
 	artist: ["WORK", "desk-6"],
-	qaTester: ["WORK", "desk-0"],
-	codeSecurityReviewer: ["AUDIT", "audit-work-0"],
+	qaTester: ["QA", "qa-work-1"],
+	codeSecurityReviewer: ["SECURITY", "security-work-0"],
 	contentMarketing: ["PLANNING", "planning-desk-2"],
 	growthAnalytics: ["LIBRARY", "library-seat-1"],
 	researchAnalyst: ["LIBRARY", "library-seat-0"],
@@ -99,7 +99,7 @@ describe("office placement", () => {
 		const odd = fresh([director(), staff("a1", "mystery-bot", { activity: act("e", OfficeRoom.WORK, "Edit") }), staff("a2", "security", { activity: act("s", OfficeRoom.AUDIT, "Bash") })]);
 		const oddPlaces = placer(odd)(T0);
 		expect(find(oddPlaces, "title:gameplayDeveloper")).toMatchObject({ room: "WORK", anchorId: "desk-2", activityRoom: "WORK" });
-		expect(find(oddPlaces, "title:codeSecurityReviewer")).toMatchObject({ room: "AUDIT", anchorId: "audit-work-0" });
+		expect(find(oddPlaces, "title:codeSecurityReviewer")).toMatchObject({ room: "AUDIT", activityRoom: "AUDIT" });
 	});
 
 	it("makes several subagents of one title the same person, with their count", () => {
@@ -151,7 +151,7 @@ describe("office placement", () => {
 		expect(find(places, "title:contentMarketing")).toMatchObject({ room: "PLANNING", anchorId: "planning-desk-2" });
 		expect(find(places, "title:growthAnalytics")).toMatchObject({ room: "LIBRARY", anchorId: "library-seat-1" });
 		expect(find(places, "title:financeController")).toMatchObject({ room: "AUDIT", anchorId: "audit-work-1" });
-		expect(find(places, "title:codeSecurityReviewer")).toMatchObject({ room: "AUDIT", anchorId: "audit-work-0" });
+		expect(find(places, "title:codeSecurityReviewer")).toMatchObject({ room: "SECURITY", anchorId: "security-work-0" });
 		expect(anchorById(layout(), "audit-work-1")?.room).toBe("AUDIT");
 	});
 

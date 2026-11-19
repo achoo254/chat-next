@@ -1306,7 +1306,7 @@ export const enMachines: MachinesCopy = {
 		offline: "The machine is not connected. The office opens once it is online.",
 		failed: "The machine could not open this session's office.",
 		layoutBroken: "The building's plan is broken, so the office cannot show.",
-		noStaff: "This AI does not report its staff: only the director is here.",
+		noStaff: "This AI does not report its staff: the departments do the work of its tools.",
 		powerOut: "Power cut: no word from the machine for over 30 seconds. The lights come back when it reconnects.",
 		catchingUp: "Updating the office…",
 		hidden: (n: number) => `${n} more people are not shown.`,

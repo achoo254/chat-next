@@ -54,8 +54,8 @@ interface Title {
  * the words: the first title with a matching word claims an unknown type, so "security" is the reviewer's before anything else.
  */
 const TITLES: readonly Title[] = [
-	{ key: "codeSecurityReviewer", model: "code-reviewer", color: "#6b6f78", homeRoom: "AUDIT", types: ["code-reviewer", "content-reviewer", "security", "cti-expert"], words: ["security", "review", "audit", "cti", "vuln"] },
-	{ key: "qaTester", model: "tester", color: "#5cc3a0", homeRoom: "WORK", types: ["tester"], words: ["test", "qa"] },
+	{ key: "codeSecurityReviewer", model: "code-reviewer", color: "#6b6f78", homeRoom: "SECURITY", types: ["code-reviewer", "content-reviewer", "security", "cti-expert"], words: ["security", "review", "audit", "cti", "vuln"] },
+	{ key: "qaTester", model: "tester", color: "#5cc3a0", homeRoom: "QA", types: ["tester"], words: ["test", "qa"] },
 	{ key: "backendDevops", model: "it-operator", color: "#f08a24", homeRoom: "SERVER", types: ["git-manager", "database-admin", "devops", "deploy"], words: ["git", "deploy", "devops", "database", "backend", "server", "infra", "release"] },
 	{ key: "uiUxDesigner", model: "ui-ux-designer", color: "#d9a520", homeRoom: "WORK", types: ["ui-ux-designer"], words: ["ui", "ux", "interface"] },
 	{ key: "artist", model: "artist", color: "#c9b27a", homeRoom: "WORK", types: [], words: ["artist", "illustrat", "image", "3d", "texture"] },

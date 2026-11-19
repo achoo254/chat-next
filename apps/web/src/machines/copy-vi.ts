@@ -1324,7 +1324,7 @@ export const viMachines = {
 		offline: "Máy chưa kết nối. Văn phòng mở khi máy trực tuyến.",
 		failed: "Máy chưa mở được văn phòng của phiên này.",
 		layoutBroken: "Bản vẽ toà nhà bị lỗi nên chưa hiện được văn phòng.",
-		noStaff: "AI này chưa báo cáo nhân viên: chỉ có Giám đốc.",
+		noStaff: "AI này không báo cáo nhân viên: việc của công cụ do các phòng ban làm.",
 		powerOut: "Mất điện: chưa nghe tin từ máy hơn 30 giây. Đèn sáng lại khi máy nối lại.",
 		catchingUp: "Đang cập nhật văn phòng…",
 		hidden: (n: number) => `Còn ${n} người nữa không hiện.`,

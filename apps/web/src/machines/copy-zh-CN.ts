@@ -1298,7 +1298,7 @@ export const zhCNMachines: MachinesCopy = {
 		offline: "机器尚未连接。机器上线后办公室即可打开。",
 		failed: "机器无法打开此会话的办公室。",
 		layoutBroken: "楼层图有误，暂时无法显示办公室。",
-		noStaff: "此 AI 不汇报员工：这里只有总经理。",
+		noStaff: "此 AI 不汇报员工：工具的工作由各部门完成。",
 		powerOut: "停电：超过 30 秒没有收到机器的消息。机器重新连接后恢复照明。",
 		catchingUp: "正在更新办公室…",
 		hidden: (n: number) => `还有 ${n} 人未显示。`,

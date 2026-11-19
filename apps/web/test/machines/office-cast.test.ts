@@ -26,7 +26,7 @@ describe("the office's cast", () => {
 		for (const type of ["security", "security-auditor", "app-security", "cti-expert", "code-reviewer", "content-reviewer"]) {
 			const cast = castOf(type);
 			expect(cast.key, type).toBe("codeSecurityReviewer");
-			expect(cast.homeRoom, type).toBe("AUDIT");
+			expect(cast.homeRoom, type).toBe("SECURITY");
 			expect(cast.model, type).toBe("code-reviewer");
 		}
 	});
@@ -70,16 +70,16 @@ describe("the office's cast", () => {
 		expect(personName(t, { kind: "director", actor: null, member: null })).toBe("Giám đốc điều hành");
 	});
 
-	it("gives each title its home room: planning, library, audit, server; the rest work in WORK", () => {
+	it("gives each title its home room: planning, library, audit (accountant), security (reviewer), server, QA; the rest work in WORK", () => {
 		expect(homeRoomOf("planner")).toBe("PLANNING");
 		expect(homeRoomOf("brainstormer")).toBe("PLANNING");
 		expect(homeRoomOf("content-creator")).toBe("PLANNING");
 		expect(homeRoomOf("researcher")).toBe("LIBRARY");
 		expect(homeRoomOf("analytics-analyst")).toBe("LIBRARY");
-		expect(homeRoomOf("code-reviewer")).toBe("AUDIT");
-		expect(homeRoomOf("security-auditor")).toBe("AUDIT");
+		expect(homeRoomOf("code-reviewer")).toBe("SECURITY");
+		expect(homeRoomOf("security-auditor")).toBe("SECURITY");
 		expect(homeRoomOf("git-manager")).toBe("SERVER");
-		expect(homeRoomOf("tester")).toBe("WORK");
+		expect(homeRoomOf("tester")).toBe("QA");
 		expect(homeRoomOf("scout")).toBe("WORK");
 		expect(homeRoomOf("")).toBe("WORK");
 	});

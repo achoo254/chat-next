@@ -321,7 +321,7 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 	assert.equal(await devopsPin.getAttribute("data-service"), "dev-server");
 	await step(page); // 5: the director edits; a code reviewer and a researcher come in
 	await step(page); // 6: the reviewer edits (their home room replaces WORK)
-	await reaches(page, "the code reviewer (edit, home room)", person("codeSecurityReviewer"), "AUDIT");
+	await reaches(page, "the code reviewer (edit, home room)", person("codeSecurityReviewer"), "SECURITY");
 	await step(page); // 7
 	await step(page); // 8
 	await step(page); // 9: a nested subagent comes in; a general-purpose employee writes at their desk
@@ -523,7 +523,7 @@ test("without WebGL (--disable-3d-apis): the 2D view shows the plan's picture wi
 
 test("an AI that does not report its staff (Antigravity): the director directs while the departments do the work of its tools, a notice, token-only audit numbers", async () => {
 	const { context, page, errors } = await openOffice(browser, "machine-secret", FLAGS_3D);
-	await page.getByText("AI này chưa báo cáo nhân viên: chỉ có Giám đốc.").waitFor({ timeout: 30_000 });
+	await page.getByText("AI này không báo cáo nhân viên: việc của công cụ do các phòng ban làm.").waitFor({ timeout: 30_000 });
 	await step(page); // 0: a turn begins
 	await step(page); // 1: view_file: the library
 	await reaches(page, "the research analyst (the director's view_file)", person("researchAnalyst"), "LIBRARY");

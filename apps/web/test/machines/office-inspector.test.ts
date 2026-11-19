@@ -204,7 +204,7 @@ describe("the record of a person", () => {
 		expect(model).toMatchObject({ kind: "employee", title: "qaTester", mode: "work", work: { tool: "Bash", group: "type", room: "QA", slow: false, stuckMs: null } });
 		expect(model?.work?.runningMs).toBeGreaterThanOrEqual(29_000);
 		expect(model?.work?.runningMs).toBeLessThan(40_000);
-		expect(model?.homeRoom).toBe("WORK");
+		expect(model?.homeRoom).toBe("QA");
 	});
 
 	it("shows the director's tool on the department's person and not on the director, with the subject the bubble shows", () => {

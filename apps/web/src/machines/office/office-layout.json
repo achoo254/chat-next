@@ -737,7 +737,6 @@
 				"z": 2.56,
 				"rotY": 0.0
 			},
-			"home": "qa-tester",
 			"node": "work-north-west"
 		},
 		{
@@ -1299,6 +1298,7 @@
 			"sit": true,
 			"seat": 0.499,
 			"keyboard": true,
+			"home": "code-security-reviewer",
 			"greets": "code-security-reviewer",
 			"node": "security"
 		},
@@ -1389,7 +1389,6 @@
 			"sit": true,
 			"seat": 0.499,
 			"keyboard": true,
-			"home": "code-security-reviewer",
 			"node": "audit"
 		},
 		{
@@ -1443,6 +1442,7 @@
 			"sit": true,
 			"seat": 0.499,
 			"keyboard": true,
+			"home": "qa-tester",
 			"node": "qa"
 		},
 		{

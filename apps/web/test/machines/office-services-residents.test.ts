@@ -96,7 +96,7 @@ describe("background services", () => {
 		["the dev server is Backend & DevOps's", OfficeServiceKind.DEV_SERVER, "backendDevops", "SERVER", "backend-devops"],
 		["a build is Backend & DevOps's", OfficeServiceKind.BUILD, "backendDevops", "SERVER", "backend-devops"],
 		["a database is Backend & DevOps's", OfficeServiceKind.DATABASE, "backendDevops", "SERVER", "backend-devops"],
-		["a test watcher is QA's", OfficeServiceKind.TEST_WATCH, "qaTester", "WORK", "qa-tester"],
+		["a test watcher is QA's", OfficeServiceKind.TEST_WATCH, "qaTester", "QA", "qa-tester"],
 		["CI watching is the Tech Lead's", OfficeServiceKind.CI_WATCH, "techLead", "WORK", "tech-lead"],
 		["git is the Gameplay Developer's", OfficeServiceKind.GIT, "gameplayDeveloper", "WORK", "gameplay-developer"],
 		["a script is the Gameplay Developer's", OfficeServiceKind.SCRIPT, "gameplayDeveloper", "WORK", "gameplay-developer"],
@@ -122,7 +122,7 @@ describe("background services", () => {
 	it("leave their owner free when they stop", () => {
 		const { store } = storeAt();
 		store.applySnapshot(snapshot([director(), machine("m1", undefined, { kind: OfficeServiceKind.TEST_WATCH, startedAt: BigInt(T0) })]));
-		expect(placed(store, "title:qaTester", T0).activityRoom).toBe("WORK");
+		expect(placed(store, "title:qaTester", T0).activityRoom).toBe("QA");
 		store.applyEvents(1n, [ev(1, { case: "actorLeave", value: { actorId: "m1" } }, T0)]);
 		expect(placed(store, "title:qaTester", T0)).toMatchObject({ activityRoom: null, actor: null });
 	});

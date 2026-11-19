@@ -249,6 +249,8 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 	let every = 1;
 	let frame = 0;
 	let measure = false;
+	/** A sleeper whose body has not yet been set on the mattress: the curled clip's lowest point differs per model. */
+	let settleSleep = false;
 	const active = (): AnimationGroup | undefined => (clip === null ? undefined : groups.get(clip));
 	/** Moves the model for the clip playing: resting on the seat with the pelvis over the anchor when sitting, else back to the root. */
 	const placeModel = (): void => {
@@ -272,6 +274,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		}
 		placeModel();
 		measure = next !== null && isSeatedPose(pose) && !seatOf.has(next);
+		settleSleep = next !== null && pose === "sleep";
 	};
 
 	// Right after the animations pose the bones and before the frame draws (a level of detail that runs the clip every
@@ -296,6 +299,24 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 			q.copyFrom(softenTowardRest(entry.rest, q, SLEEP_KEEP, softScratch));
 			entry.written = q.clone();
 		}
+	});
+
+	// Once, after a frame drew the softened sleeping pose (the skin's matrices are current only then): the skin's lowest point goes to the mattress, whichever model sleeps
+	// (the curled clip leaves it 9 cm over or under the bed, depending on the model's head, hair and build).
+	const settleOnMattress = scene.onAfterRenderObservable.add(() => {
+		if (!settleSleep || pose !== "sleep" || every === 0 || !holder.isEnabled()) return;
+		settleSleep = false;
+		holder.computeWorldMatrix(true);
+		model.computeWorldMatrix(true);
+		let lowest = Infinity;
+		for (const mesh of meshes) {
+			mesh.computeWorldMatrix(true);
+			mesh.refreshBoundingInfo({ applySkeleton: true });
+			lowest = Math.min(lowest, mesh.getBoundingInfo().boundingBox.minimumWorld.y);
+		}
+		if (!Number.isFinite(lowest)) return;
+		const floor = holder.getAbsolutePosition().y;
+		model.position.y -= (lowest - floor) / CHARACTER_SCALE;
 	});
 
 	const head = nodes.get("head");
@@ -399,6 +420,7 @@ export function createSkinnedCharacter(scene: Scene, container: AssetContainer, 
 		dispose() {
 			plantFeet.remove();
 			softenSleep.remove();
+			settleOnMattress.remove();
 			for (const group of groups.values()) group.dispose();
 			for (const skeleton of entries.skeletons) skeleton.dispose();
 			holder.dispose(false, false);
