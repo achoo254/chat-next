@@ -277,6 +277,22 @@ describe("the account's TypeSafe key", () => {
 		await waitFor(() => expect(within(row("Mac A")).queryByRole("button", { name: t.key.account.promoteYes })).toBeNull(), WAIT);
 	});
 
+	it("with a profile from an older core (no removal time) nothing about the account's key is offered or synced, and the page says to reopen Chat", async () => {
+		const a = await addMachine("Mac A");
+		const b = await addMachine("Mac B");
+		a.key = { value: KEY, source: "account", setAt: T0, setBy: "Chrome" };
+		const { keyRemovedAt: _dropped, ...older } = profile;
+		profile = older as AdvisorProfile;
+		open();
+		expect(await screen.findByText(t.key.account.staleTab, undefined, WAIT)).toBeTruthy();
+		await waitFor(() => row("Mac B"), WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(within(accountRow()).queryByRole("button", { name: t.key.paste })).toBeNull();
+		expect(within(accountRow()).queryByRole("button", { name: t.key.remove })).toBeNull();
+		expect(b.machine.sent("advisorKeyShareBegin")).toHaveLength(0);
+		expect(a.machine.sent("advisorKeySeal")).toHaveLength(0);
+	});
+
 	it("a machine on an older tunelo keeps its one key, says it needs a newer tunelo and is never asked to share", async () => {
 		const a = await addMachine("Mac A");
 		const old = await addMachine("Mac Old");

@@ -35,6 +35,16 @@ function compareKeys(a: MachineKeyState, b: MachineKeyState): number {
 	return a.setAt - b.setAt || (a.fingerprint < b.fingerprint ? -1 : a.fingerprint > b.fingerprint ? 1 : 0);
 }
 
+/**
+ * The account's removal time is known: the profile is the user's own and
+ * holds one. A tab whose core comes from an older build (another tab of the
+ * same browser opened before an update leads the core) answers a profile
+ * without it; nothing about the account's key is done on such a guess.
+ */
+export function removedAtKnown(loaded: boolean, removedAt: number): boolean {
+	return loaded && Number.isSafeInteger(removedAt) && removedAt >= 0;
+}
+
 /** A machine as the sync sees it. */
 export interface KeyMachine {
 	readonly view: MachineView;

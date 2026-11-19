@@ -4,14 +4,15 @@
 // (advisor-account-key.ts), and a machine holding an account key set no later
 // than its removal (AdvisorProfile.key_removed_at) has it removed. Nothing
 // runs before the profile is the user's own (the default removal time 0 would
-// let a removed key spread), and nothing is asked twice in a row.
+// let a removed key spread, nor a profile from an older core without a
+// removal time), and nothing is asked twice in a row.
 import { useEffect } from "react";
 import { AdvisorKeySource } from "@achoo254/chat-proto/remote/remote";
 import { useAdvisorProfile, useAdvisorProfileLoaded, useServices } from "../messaging/data/services.tsx";
 import type { MachineLink } from "../machines/link/machine-link.ts";
 import type { MachineView } from "../machines/use-machines.ts";
 import { useMachinesCopy } from "../machines/use-machines-copy.ts";
-import { handOffAccountKey, planKeySync } from "./advisor-account-key.ts";
+import { handOffAccountKey, planKeySync, removedAtKnown } from "./advisor-account-key.ts";
 
 /** The same request to the same machine waits this long before it is asked again (its answer is the machine's next info). */
 const RETRY_MS = 15_000;
@@ -37,7 +38,7 @@ export function useAdvisorKeySync(views: readonly MachineView[]): void {
 	const { toasts } = useServices();
 	const t = useMachinesCopy();
 	useEffect(() => {
-		if (!loaded) return;
+		if (!removedAtKnown(loaded, removedAt)) return;
 		const now = Date.now();
 		const plan = planKeySync(views, removedAt);
 		for (const { view, key } of plan.stale) {

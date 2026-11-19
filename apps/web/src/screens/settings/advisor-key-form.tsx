@@ -20,7 +20,9 @@ export function useKeyRequest(): {
 	const run = (request: () => Promise<unknown>, done: () => void) => {
 		setBusy(true);
 		setError("");
-		request()
+		// A request that throws before it is sent shows as a refusal too, never as nothing happening.
+		Promise.resolve()
+			.then(request)
 			.then(done)
 			.catch((err: unknown) => setError(errorText(tm, err, "AI") || t.key.failed))
 			.finally(() => setBusy(false));

@@ -144,6 +144,7 @@ export const viAdvisor = {
 			none: "Tài khoản chưa có khoá chung",
 			set: (fingerprint: string) => `Khoá của tài khoản · ${fingerprint}`,
 			noMachine: "Chưa có máy nào nhận được khoá lúc này: cần một máy đang bật, có tunelo mới và không dùng khoá riêng.",
+			staleTab: "Một tab Chat khác đang chạy bản cũ nên chưa quản lý được khoá chung. Đóng mọi tab và cửa sổ Chat rồi mở lại.",
 			promote: (machine: string) => `Máy ${machine} đang có khoá. Dùng khoá này làm khoá chung cho mọi máy?`,
 			promoteYes: "Dùng làm khoá chung",
 			later: "Để sau",

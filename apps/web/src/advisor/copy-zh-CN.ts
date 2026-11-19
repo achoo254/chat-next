@@ -145,6 +145,7 @@ export const zhCNAdvisor: AdvisorCopy = {
 			none: "账号还没有共用密钥",
 			set: (fingerprint) => `账号密钥 · ${fingerprint}`,
 			noMachine: "现在没有设备能接收密钥：需要一台已开机、tunelo 较新且没有自有密钥的设备。",
+			staleTab: "另一个 Chat 标签页运行的是旧版本，暂时无法管理账号密钥。请关闭所有 Chat 标签页和窗口后重新打开。",
 			promote: (machine) => `${machine} 已有密钥。把它用作所有设备的密钥？`,
 			promoteYes: "用于所有设备",
 			later: "以后再说",

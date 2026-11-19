@@ -145,6 +145,7 @@ export const enAdvisor: AdvisorCopy = {
 			none: "No account key yet",
 			set: (fingerprint) => `Account key · ${fingerprint}`,
 			noMachine: "No machine can take the key now: it needs one that is on, runs a newer tunelo and has no own key.",
+			staleTab: "Another Chat tab runs an older version, so the account's key cannot be managed yet. Close every Chat tab and window, then open Chat again.",
 			promote: (machine) => `${machine} already has a key. Use it as the key of every machine?`,
 			promoteYes: "Use for every machine",
 			later: "Not now",

@@ -13,7 +13,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { useAdvisorProfile, useAdvisorProfileLoaded, useServices } from "../../messaging/data/services.tsx";
 import { useHub, useMachineViews, useNow } from "../../machines/use-machines.ts";
 import { IGNORE_ATTR } from "../../advisor/advisor-context.tsx";
-import { nextSetAt, planKeySync, removalTime, shareMachines, type KeyMachine } from "../../advisor/advisor-account-key.ts";
+import { nextSetAt, planKeySync, removalTime, removedAtKnown, shareMachines, type KeyMachine } from "../../advisor/advisor-account-key.ts";
 import { useAdvisorCopy } from "../../advisor/use-advisor-copy.ts";
 import { ConfirmRemove, KeyError, KeyForm, useKeyRequest } from "./advisor-key-form.tsx";
 import { MachineKeyRow } from "./advisor-machine-key-row.tsx";
@@ -24,8 +24,10 @@ export function KeySection() {
 	const hub = useHub();
 	const now = useNow();
 	const views = useMachineViews(hub, now);
-	const loaded = useAdvisorProfileLoaded();
+	const profileLoaded = useAdvisorProfileLoaded();
 	const removedAt = useAdvisorProfile().keyRemovedAt;
+	// Nothing about the account's key is offered until its removal time is known.
+	const loaded = removedAtKnown(profileLoaded, removedAt);
 	useEffect(() => {
 		hub.device().catch(() => undefined);
 		if (hub.directory().status !== "ready") hub.refresh().catch(() => undefined);
@@ -40,6 +42,7 @@ export function KeySection() {
 			<p className="note pad-x">{t.key.model}</p>
 			{views.every((view) => view.state.info?.advisor?.keySet !== true) && <KeyGuide />}
 			<AccountKeyRow machines={machines} account={account} removedAt={removedAt} loaded={loaded} />
+			{profileLoaded && !loaded && <p className="note pad-x">{t.key.account.staleTab}</p>}
 			{legacy !== undefined && <PromoteBar key={laterKey(legacy)} machine={legacy} machines={machines} removedAt={removedAt} />}
 			{views.length === 0 ? (
 				<p className="note pad-x">{t.key.none}</p>
