@@ -242,6 +242,11 @@ func (r *runner) run(ctx context.Context) error {
 			}
 			return r.settle(runCtx, err)
 		case l := <-r.cmds:
+			// A nudge for the very link this run already imported (sent while it loaded the link at the start) is stale: importing it
+			// again would put the other app's topic list back over changes made since, on either side.
+			if have := r.links[l.ExternalChat]; have != nil && have.ID == l.ID && have.BackfillDone {
+				continue
+			}
 			r.links[l.ExternalChat] = l
 			if err := r.backfill(runCtx, l); err != nil {
 				return r.settle(runCtx, err)
