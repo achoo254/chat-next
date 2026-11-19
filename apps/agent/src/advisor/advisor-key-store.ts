@@ -8,7 +8,9 @@
 //
 // The key never leaves in clear: it is hidden from every output of this
 // process from the moment it arrives (rememberSecret), every refusal is a
-// fixed message, and devices only ever get its fingerprint.
+// fixed message, and devices only ever get its fingerprint (the account's key
+// handed to another machine leaves sealed; see advisor-key-share.ts for what
+// that does not stop).
 import { createHash } from "node:crypto";
 import { redact, rememberSecret } from "../mcp/redact.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
@@ -30,6 +32,11 @@ const KEY_NAME = "TYPESAFE_API_KEY";
 export const MIN_KEY_CHARS = 32;
 /** Characters of the SHA-256 (hex) shown for a key. */
 const FINGERPRINT_CHARS = 6;
+/**
+ * How far past this machine's clock the account's key may count as set: a
+ * device whose clock runs fast cannot date a key past a later removal.
+ */
+export const MAX_SET_AHEAD_MS = 5 * 60_000;
 /** No whitespace or control characters anywhere in a key. */
 // eslint-disable-next-line no-control-regex
 const KEY_SHAPE = /^[^\s\u0000-\u001f\u007f]+$/u;
@@ -112,10 +119,22 @@ type SaveHow = {
   /** Unix milliseconds the account's key counts as set; 0 or out of range: now. */
   setAt: number;
   action: "advisor_key_set" | "advisor_key_share_received" | "advisor_key_promote";
+  /** The hand-off's ticket tag (advisor-key-share.ts ticketTag), logged with the fingerprint. */
+  ticket?: string;
 };
+
+/** The audit detail of a key: its fingerprint, and the hand-off's ticket tag. */
+function auditDetail(fingerprint: string, ticket?: string): string {
+  return ticket === undefined ? fingerprint : `${fingerprint} ticket ${ticket}`;
+}
 
 function sourceOf(e: SavedSecretInfo): AdvisorKeySourceName {
   return e.scope === ACCOUNT_SCOPE ? "account" : "own";
+}
+
+/** Whether the kept key orders after one set at `setAt` with `fingerprint`, as devices order them (later time, then fingerprint). */
+function isNewer(held: SavedSecretInfo, setAt: number, fingerprint: string): boolean {
+  return held.createdAt > setAt || (held.createdAt === setAt && (held.fingerprint ?? "") > fingerprint);
 }
 
 export class AdvisorKeyStore {
@@ -155,12 +174,20 @@ export class AdvisorKeyStore {
 
   /**
    * Keeps the account's key handed on by another machine (opened by
-   * advisor-key-share.ts), with the time and device it was first set from.
+   * advisor-key-share.ts with the ticket tagged `ticket`), with the time and
+   * device it was first set from.
    */
-  receive(shared: SharedAdvisorKey, device: string): Promise<AdvisorKeyStatus> {
+  receive(shared: SharedAdvisorKey, device: string, ticket: string): Promise<AdvisorKeyStatus> {
     rememberAdvisorKey(shared.key);
     return this.serial(() =>
-      this.save(shared.key.trim(), { device, savedBy: shared.setByDevice, source: "account", setAt: shared.setAt, action: "advisor_key_share_received" }),
+      this.save(shared.key.trim(), {
+        device,
+        savedBy: shared.setByDevice,
+        source: "account",
+        setAt: shared.setAt,
+        action: "advisor_key_share_received",
+        ticket,
+      }),
     );
   }
 
@@ -184,17 +211,21 @@ export class AdvisorKeyStore {
   }
 
   /**
-   * The account's key, to seal for another machine; logs the hand-off with
-   * its fingerprint. AdvisorKeyError "no_key" when the machine keeps no
-   * account key (its own key is never handed on).
+   * The account's key, to seal for the ticket tagged `ticket` of another
+   * machine; logs the hand-off with its fingerprint and that tag. Runs in turn
+   * with every change, so a key set or removed meanwhile is never undone.
+   * AdvisorKeyError "no_key" when the machine keeps no account key (its own
+   * key is never handed on).
    */
-  async shareAccountKey(device: string): Promise<SharedAdvisorKey> {
-    const held = this.held();
-    if (held === undefined || sourceOf(held) !== "account") throw new AdvisorKeyError("no_key");
-    const key = await this.store.reveal(held.id);
-    if (key === undefined) throw new AdvisorKeyError("no_key");
-    this.opts.audit.write({ device, action: "advisor_key_share_sent", path: ADVISOR_KEY_ORIGIN, detail: held.fingerprint ?? "" });
-    return { key, setAt: held.createdAt, setByDevice: held.savedBy ?? "" };
+  shareAccountKey(device: string, ticket: string): Promise<SharedAdvisorKey> {
+    return this.serial(async () => {
+      const held = this.held();
+      if (held === undefined || sourceOf(held) !== "account") throw new AdvisorKeyError("no_key");
+      const key = await this.store.reveal(held.id);
+      if (key === undefined) throw new AdvisorKeyError("no_key");
+      this.opts.audit.write({ device, action: "advisor_key_share_sent", path: ADVISOR_KEY_ORIGIN, detail: auditDetail(held.fingerprint ?? "", ticket) });
+      return { key, setAt: held.createdAt, setByDevice: held.savedBy ?? "" };
+    });
   }
 
   /** The kept entry, without its value; throws when the store cannot be read. */
@@ -212,10 +243,14 @@ export class AdvisorKeyStore {
   private async save(key: string, how: SaveHow): Promise<AdvisorKeyStatus> {
     if (key.length < MIN_KEY_CHARS || key.length > MAX_SECRET_CHARS || !KEY_SHAPE.test(key)) throw new AdvisorKeyError("invalid");
     const account = how.source === "account";
+    const held = account && how.action !== "advisor_key_promote" ? this.held() : undefined;
     // The account's key never replaces the machine's own (a promotion replaces it with itself).
-    if (account && how.action !== "advisor_key_promote" && this.status().source === "own") throw new AdvisorKeyError("own_key");
+    if (held !== undefined && sourceOf(held) === "own") throw new AdvisorKeyError("own_key");
     const fingerprint = advisorKeyFingerprint(key);
-    const setAt = Number.isSafeInteger(how.setAt) && how.setAt > 0 ? how.setAt : undefined;
+    const now = (this.opts.now ?? Date.now)();
+    const setAt = Number.isSafeInteger(how.setAt) && how.setAt > 0 ? Math.min(how.setAt, now + MAX_SET_AHEAD_MS) : undefined;
+    // An older account key (a device with a stale view) never replaces a newer one: kept as it is.
+    if (held !== undefined && isNewer(held, setAt ?? now, fingerprint)) return this.status();
     try {
       await this.store.save(ADVISOR_KEY_ORIGIN, KEY_NAME, key, {
         savedBy: how.savedBy,
@@ -226,7 +261,7 @@ export class AdvisorKeyStore {
       this.log(`advisor: the key was not saved (${redact((err as Error).message)})`);
       throw new AdvisorKeyError("not_saved");
     }
-    this.opts.audit.write({ device: how.device, action: how.action, path: ADVISOR_KEY_ORIGIN, detail: fingerprint });
+    this.opts.audit.write({ device: how.device, action: how.action, path: ADVISOR_KEY_ORIGIN, detail: auditDetail(fingerprint, how.ticket) });
     return this.status();
   }
 

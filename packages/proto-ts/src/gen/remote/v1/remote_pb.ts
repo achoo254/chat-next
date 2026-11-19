@@ -6533,8 +6533,10 @@ export const AdvisorSetKeySchema: GenMessage<AdvisorSetKey> = /*@__PURE__*/
  */
 export type AdvisorRemoveKey = Message<"remote.v1.AdvisorRemoveKey"> & {
   /**
-   * UNSPECIFIED (an older device): whatever key is kept. OWN or ACCOUNT
-   * (tunelo 3.23.0+): only a key of that kind; another kind stays.
+   * UNSPECIFIED (an older device): whatever key is kept, the account's too,
+   * so an app not reloaded since removes the account's key from that
+   * machine and the next sync hands it back. OWN or ACCOUNT (tunelo
+   * 3.23.0+): only a key of that kind; another kind stays.
    *
    * @generated from field: remote.v1.AdvisorKeySource source = 1;
    */

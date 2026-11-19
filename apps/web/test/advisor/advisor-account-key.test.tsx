@@ -7,7 +7,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import type { AdvisorProfile } from "@achoo254/chat-core";
 import { AdvisorKeySource } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, utf8, type KeyPair } from "@achoo254/chat-remote-protocol";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { viAdvisor } from "../../src/advisor/copy-vi.ts";
@@ -70,14 +70,18 @@ async function addMachine(name: string): Promise<KeyMachine> {
 	return m;
 }
 
-function open() {
+/** Renders Settings › Cố vấn over the machines; `save` stands for the server's profile write. */
+function open(save?: (change: Partial<AdvisorProfile>) => Promise<AdvisorProfile>) {
 	const directory = new FakeMachines();
 	for (const m of machines) directory.add({ name: m.name, tunnelUrl: m.url, lastSeenAt: BigInt(Math.floor(Date.now() / 1000)), publicKey: m.machine.keys.publicKey });
 	const transport = createConnectTransport({ baseUrl: "http://localhost/rpc", useBinaryFormat: true, fetch: routerFetch((r) => directory.routes(r)) });
-	const setAdvisorProfile = vi.fn(async (change: Partial<AdvisorProfile>) => {
-		profile = { ...profile, ...change };
-		return profile;
-	});
+	const setAdvisorProfile = vi.fn(
+		save ??
+			(async (change: Partial<AdvisorProfile>) => {
+				profile = { ...profile, ...change };
+				return profile;
+			}),
+	);
 	const services = { toasts: { show: (text: string) => toasts.push(text) }, transport, store: { setAdvisorProfile } } as unknown as Services;
 	render(
 		<I18nProvider>
@@ -208,6 +212,62 @@ describe("the account's TypeSafe key", () => {
 		expect(fresh.key).toBeNull();
 		// The removed key is not offered for promotion either.
 		expect(screen.queryByText(t.key.account.promote("Mac Old"))).toBeNull();
+	});
+
+	it("removes the account's key while every machine holding it is off: the removal time is kept for when they come back", async () => {
+		const b = await addMachine("Mac B");
+		const save = open();
+		await within(document.body).findByText(t.key.account.none, undefined, WAIT);
+		await waitFor(() => row("Mac B"), WAIT);
+		const before = Date.now();
+		await userEvent.click(within(accountRow()).getByRole("button", { name: t.key.remove }));
+		await userEvent.click(within(accountRow()).getAllByRole("button", { name: t.key.remove }).at(-1) as HTMLElement);
+		await waitFor(() => expect(save).toHaveBeenCalledTimes(1), WAIT);
+		expect(save.mock.calls[0]?.[0].keyRemovedAt).toBeGreaterThanOrEqual(before);
+		expect(b.machine.sent("advisorRemoveKey")).toHaveLength(0);
+	});
+
+	it("asks no machine to remove the key when the removal time could not be saved", async () => {
+		const a = await addMachine("Mac A");
+		a.key = { value: KEY, source: "account", setAt: T0, setBy: "Chrome" };
+		const save = open(async () => {
+			throw new Error("offline");
+		});
+		await within(document.body).findByText(t.key.account.set(fingerprintOf(KEY)), undefined, WAIT);
+		await userEvent.click(within(accountRow()).getByRole("button", { name: t.key.remove }));
+		await userEvent.click(within(accountRow()).getAllByRole("button", { name: t.key.remove }).at(-1) as HTMLElement);
+		await waitFor(() => expect(save).toHaveBeenCalledTimes(1), WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(a.machine.sent("advisorRemoveKey")).toHaveLength(0);
+		expect(a.key).toMatchObject({ value: KEY, source: "account" });
+	});
+
+	it("a machine holding the same account key, counted as set a little earlier, is not handed it again", async () => {
+		const a = await addMachine("Mac A");
+		const b = await addMachine("Mac B");
+		a.key = { value: KEY, source: "account", setAt: T0 + 5, setBy: "Chrome" };
+		b.key = { value: KEY, source: "account", setAt: T0, setBy: "Chrome" };
+		open();
+		await waitFor(() => row("Mac B"), WAIT);
+		await within(document.body).findByText(t.key.account.set(fingerprintOf(KEY)), undefined, WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(b.machine.sent("advisorKeyShareBegin")).toHaveLength(0);
+		expect(a.machine.sent("advisorKeySeal")).toHaveLength(0);
+	});
+
+	it("putting off the offer to use a machine's key as the account's lasts past a reload", async () => {
+		const a = await addMachine("Mac A");
+		a.key = { value: KEY, source: "own", setAt: T0, setBy: "local" };
+		open();
+		const bar = await screen.findByText(t.key.account.promote("Mac A"), undefined, WAIT);
+		await userEvent.click(within(bar.closest(".adv-machine-key") as HTMLElement).getByRole("button", { name: t.key.account.later }));
+		expect(screen.queryByText(t.key.account.promote("Mac A"))).toBeNull();
+		cleanup();
+		open();
+		await waitFor(() => row("Mac A"), WAIT);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(screen.queryByText(t.key.account.promote("Mac A"))).toBeNull();
+		expect(a.machine.sent("advisorKeyPromote")).toHaveLength(0);
 	});
 
 	it("a machine on an older tunelo keeps its one key, says it needs a newer tunelo and is never asked to share", async () => {

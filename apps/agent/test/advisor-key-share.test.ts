@@ -2,15 +2,18 @@
 // the receiving machine for a ticket, the holding machine seals the key for
 // the ticket's public key, and the receiver opens it. No frame either device
 // gets carries the key; both machines log the hand-off with the fingerprint
-// only; a ticket opens one key, for its own machine only.
+// and the same ticket tag; a ticket opens one key, for its own machine only.
+// A device that seals for a public key of its own does get the key: the
+// holder cannot tell, and only the unmatched "sent" line shows it.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toBinary } from "@bufbuild/protobuf";
+import { generateKeyPair } from "@achoo254/chat-remote-protocol";
 import { AdvisorKeySource, ErrorReason, type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
 import { AdvisorKeyStore } from "../src/advisor/advisor-key-store.ts";
-import { AdvisorKeyTickets, MAX_TICKETS, TICKET_TTL_MS } from "../src/advisor/advisor-key-share.ts";
+import { AdvisorKeyTickets, MAX_TICKETS, TICKET_TTL_MS, openAdvisorKey } from "../src/advisor/advisor-key-share.ts";
 import { ConfigStore } from "../src/config.ts";
 import { forgetSecrets, secretVariants } from "../src/mcp/redact.ts";
 import { AuditLog } from "../src/safety/audit-log.ts";
@@ -23,7 +26,8 @@ process.env.TUNELO_KEYSTORE = "file";
 const KEY = "ts_live_6b2d8f0a4c1e3b5d7f9a2c4e6b8d0f1a";
 const OWN = "ts_live_0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 const FINGERPRINT = createHash("sha256").update(KEY).digest("hex").slice(0, 6);
-const SET_AT = 1_800_000_000_000n;
+// A minute ago: a set time past the machine's clock is brought back to it.
+const SET_AT = BigInt(Date.now() - 60_000);
 
 afterEach(() => forgetSecrets());
 
@@ -72,6 +76,12 @@ function auditOf(m: Machine): string {
   return readFileSync(join(m.dir, "audit.jsonl"), "utf8");
 }
 
+/** The ticket tags of one action in a machine's audit log, in order. */
+function ticketTags(m: Machine, action: string): string[] {
+  const line = new RegExp(`"action":"${action}","path":"[^"]+","detail":"${FINGERPRINT} ticket ([0-9a-f]{12})"`, "g");
+  return [...auditOf(m).matchAll(line)].map((x) => x[1] ?? "");
+}
+
 describe("the account's key from machine to machine", () => {
   it("hands the key on sealed: the receiver keeps it as the account's with the same set time; nothing a device got carries it", async () => {
     const source = await machine();
@@ -99,9 +109,10 @@ describe("the account's key from machine to machine", () => {
       expect(sentBytes(source.device.received)).not.toContain(form);
       expect(sentBytes(target.device.received)).not.toContain(form);
     }
-    // Both machines log the hand-off, with the fingerprint only.
-    expect(auditOf(source)).toMatch(new RegExp(`"action":"advisor_key_share_sent","path":"[^"]+","detail":"${FINGERPRINT}"`));
-    expect(auditOf(target)).toMatch(new RegExp(`"action":"advisor_key_share_received","path":"[^"]+","detail":"${FINGERPRINT}"`));
+    // Both machines log the hand-off with the fingerprint and the same ticket tag.
+    const sent = ticketTags(source, "advisor_key_share_sent");
+    expect(sent).toHaveLength(1);
+    expect(ticketTags(target, "advisor_key_share_received")).toEqual(sent);
     expect(auditOf(source)).not.toContain(KEY);
     expect(auditOf(target)).not.toContain(KEY);
   });
@@ -185,6 +196,24 @@ describe("the account's key from machine to machine", () => {
     expect(reasonOf(await ask(source, { case: "advisorKeyPromote", value: { setAt: SET_AT } }))).toBe(ErrorReason.ADVISOR_NO_KEY);
     expect((await handOff(source, target)).answer.body.case).toBe("ack");
     expect(target.keys.status()).toMatchObject({ source: "account", setByDevice: "local" });
+  });
+});
+
+describe("what the hand-off does not stop", () => {
+  it("a device the holder trusts can have the key sealed for itself; the holder logs a tag no machine received", async () => {
+    const source = await machine();
+    const receiver = await machine();
+    await ask(source, { case: "advisorSetKey", value: { key: KEY, source: AdvisorKeySource.ACCOUNT, setAt: SET_AT } });
+    await handOff(source, receiver);
+
+    const own = await generateKeyPair();
+    const sealed = await ask(source, { case: "advisorKeySeal", value: { recipientPublicKey: own.publicKey } });
+    if (sealed.body.case !== "advisorKeySealed") throw new Error("not sealed");
+    expect((await openAdvisorKey(own, sealed.body.value.sealed)).key).toBe(KEY);
+
+    const received = new Set(ticketTags(receiver, "advisor_key_share_received"));
+    const unmatched = ticketTags(source, "advisor_key_share_sent").filter((tag) => !received.has(tag));
+    expect(unmatched).toEqual([createHash("sha256").update(own.publicKey).digest("hex").slice(0, 12)]);
   });
 });
 

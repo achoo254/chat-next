@@ -8,7 +8,7 @@
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { AdvisorKeySource, type Frame, type FrameSchema } from "@achoo254/chat-proto/remote/remote";
 import { type AdvisorKeySourceName, type AdvisorKeyStore, advisorKeyFingerprint, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
-import { AdvisorKeyShareError, AdvisorKeyTickets, MAX_SEALED_BYTES, openAdvisorKey, sealAdvisorKey } from "../advisor/advisor-key-share.ts";
+import { AdvisorKeyShareError, AdvisorKeyTickets, openAdvisorKey, sealAdvisorKey, ticketTag } from "../advisor/advisor-key-share.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
 
@@ -63,17 +63,19 @@ export class AdvisorKeyLink {
         return this.send(id, { case: "advisorKeyShareTicket", value: ticket });
       }
       case "advisorKeySeal": {
-        const shared = await this.keys.shareAccountKey(this.device());
+        // Checked before the key is opened: a public key that is not 32 bytes is refused first.
+        const tag = ticketTag(b.value.recipientPublicKey);
+        const shared = await this.keys.shareAccountKey(this.device(), tag);
         const sealed = await sealAdvisorKey(b.value.recipientPublicKey, shared);
         return this.send(id, { case: "advisorKeySealed", value: { sealed, fingerprint: advisorKeyFingerprint(shared.key) } });
       }
       case "advisorKeyShareOpen": {
         const ticket = this.tickets.take(b.value.ticketId);
-        if (ticket === undefined || b.value.sealed.length > MAX_SEALED_BYTES) throw new AdvisorKeyShareError("failed");
+        if (ticket === undefined) throw new AdvisorKeyShareError("failed");
         const shared = await openAdvisorKey(ticket, b.value.sealed);
         // Hidden from every output of this process before anything else happens to it.
         rememberAdvisorKey(shared.key);
-        await this.keys.receive(shared, this.device());
+        await this.keys.receive(shared, this.device(), ticketTag(ticket.publicKey));
         return this.done(id);
       }
     }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	appv1 "app.local/server/gen/app/v1"
 	"connectrpc.com/connect"
@@ -113,13 +114,15 @@ func TestAdvisorProfileRefusesBadFields(t *testing.T) {
 	}
 }
 
-// The account key's removal time is kept with the profile, only moves forward
-// and survives later changes of other fields; it is no secret, only a time.
+// The account key's removal time is kept with the profile, only moves forward,
+// is never before the server's clock and survives later changes of other
+// fields; it is no secret, only a time.
 func TestAdvisorProfileKeyRemovedAt(t *testing.T) {
 	h := newHarness(t, nil)
 	ctx := context.Background()
 	a := h.user("a")
-	at := int64(1_800_000_000_000)
+	// A device whose clock runs a few minutes fast: its time is kept.
+	at := time.Now().Add(5 * time.Minute).UnixMilli()
 	resp, err := h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &at})
 	if err != nil || resp.GetProfile().GetKeyRemovedAt() != at || resp.GetAck().GetPts() == 0 {
 		t.Fatalf("set: %v, %v", resp, err)
@@ -144,11 +147,28 @@ func TestAdvisorProfileKeyRemovedAt(t *testing.T) {
 	if got, _ := h.svc.GetAdvisorProfile(ctx, a); got.GetKeyRemovedAt() != at {
 		t.Fatalf("stored = %v", got)
 	}
-	// Out of range is refused.
-	for _, bad := range []int64{-1, 1 << 53} {
+	// Out of range is refused: before 1970, or more than a day past the server's clock.
+	for _, bad := range []int64{-1, time.Now().Add(25 * time.Hour).UnixMilli(), 1<<53 - 1} {
 		if _, err := h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &bad}); connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%d: err = %v", bad, err)
 		}
+	}
+}
+
+// A removal from a device whose clock runs slow lands at the server's clock,
+// so a key set meanwhile by a device with a right clock is removed too.
+func TestAdvisorProfileKeyRemovedAtServerClock(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	a := h.user("a")
+	slow := time.Now().Add(-time.Hour).UnixMilli()
+	start := time.Now().UnixMilli()
+	resp, err := h.svc.SetAdvisorProfile(ctx, a, &appv1.SetAdvisorProfileRequest{KeyRemovedAt: &slow})
+	if err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if got := resp.GetProfile().GetKeyRemovedAt(); got < start || got > time.Now().UnixMilli() {
+		t.Fatalf("key_removed_at = %d, want the server's clock (%d or later)", got, start)
 	}
 }
 

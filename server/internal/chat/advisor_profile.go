@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -16,9 +17,10 @@ const (
 	advisorNameMax = 32
 	// defaultAdvisorLook is the look of a user who never picked one.
 	defaultAdvisorLook = "owl"
-	// advisorKeyRemovedAtMax keeps key_removed_at a JavaScript-exact integer
-	// (the field is a JS number, ADR 0001).
-	advisorKeyRemovedAtMax = 1<<53 - 1
+	// advisorKeyRemovedAtAhead is how far past the server's clock a removal
+	// time may be: a device's clock running a little fast is fine, a time
+	// that would make every later key look removed is not.
+	advisorKeyRemovedAtAhead = 24 * time.Hour
 )
 
 // advisorLookPattern is the shape of a look id; which looks exist is the
@@ -33,7 +35,8 @@ type advisorProfileRow struct {
 	// AutoSession is the user's wish for automatic Advisor in every session.
 	AutoSession bool
 	// KeyRemovedAt is when the user last removed the account's TypeSafe key
-	// (Unix ms of a device's clock; 0 when never). No secret: only a time.
+	// (Unix ms, never before the server's clock at that moment; 0 when
+	// never). No secret: only a time.
 	KeyRemovedAt int64
 }
 
@@ -100,9 +103,10 @@ func (s *Service) SetAdvisorProfile(ctx context.Context, me int64, req *appv1.Se
 			return nil, errInvalid("unknown advisor tone")
 		}
 	}
+	now := time.Now().UnixMilli()
 	if req.KeyRemovedAt != nil {
-		if v := req.GetKeyRemovedAt(); v < 0 || v > advisorKeyRemovedAtMax {
-			return nil, errInvalid("key_removed_at must be 0 to 2^53 - 1")
+		if v := req.GetKeyRemovedAt(); v < 0 || v > now+advisorKeyRemovedAtAhead.Milliseconds() {
+			return nil, errInvalid("key_removed_at must be 0 to one day past now")
 		}
 	}
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
@@ -132,9 +136,11 @@ func (s *Service) SetAdvisorProfile(ctx context.Context, me int64, req *appv1.Se
 			a.AutoSession = req.GetAutoSession()
 		}
 		// Only moves forward: a device with an older time (or a slower clock)
-		// never brings back a key removed later.
+		// never brings back a key removed later. A removal is never before the
+		// server's clock, so a key a device with a slow clock removes stays
+		// removed.
 		if req.KeyRemovedAt != nil && req.GetKeyRemovedAt() > a.KeyRemovedAt {
-			a.KeyRemovedAt = req.GetKeyRemovedAt()
+			a.KeyRemovedAt = max(req.GetKeyRemovedAt(), now)
 		}
 		out = a
 		if a == before {

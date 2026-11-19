@@ -2438,16 +2438,18 @@ message AdvisorSetKey {
 // A → B: forget the TypeSafe key. Answered with Ack; every connected device
 // then gets MachineInfo. Forgetting a key that is not kept is no error.
 message AdvisorRemoveKey {
-  // UNSPECIFIED (an older device): whatever key is kept. OWN or ACCOUNT
-  // (tunelo 3.23.0+): only a key of that kind; another kind stays.
+  // UNSPECIFIED (an older device): whatever key is kept, the account's too,
+  // so an app not reloaded since removes the account's key from that
+  // machine and the next sync hands it back. OWN or ACCOUNT (tunelo
+  // 3.23.0+): only a key of that kind; another kind stays.
   AdvisorKeySource source = 1;
 }
 
 // --- the account's key (tunelo 3.23.0+) ---------------------------------------
 //
 // One TypeSafe key for the account, pasted once (AdvisorSetKey with source
-// ACCOUNT) on one machine and handed from machine to machine without the
-// device or the server ever holding it:
+// ACCOUNT) on one machine and handed from machine to machine; the device and
+// the server under it only relay sealed bytes:
 //
 //   1. A → R (the machine that receives): AdvisorKeyShareBegin. R makes a
 //      fresh X25519 key pair for this hand-off only and answers its public
@@ -2465,7 +2467,14 @@ message AdvisorRemoveKey {
 // HKDF-SHA256(X25519(S's ephemeral, R's ticket key), salt: both public
 // keys, info "tunelo advisor key share v1"). The device only relays them.
 // S logs advisor_key_share_sent, R advisor_key_share_received, both with the
-// key's fingerprint only. A device keeps the account's removal time in
+// key's fingerprint and the ticket's tag (the first 12 hex characters of the
+// SHA-256 of the ticket's public key), never the key.
+//
+// S cannot tell a ticket's public key from one the device made itself: a
+// device S trusts (a stolen one, a page running someone else's script, a
+// device key slipped into the trusted list by whoever runs the server) can
+// have the key sealed for itself and open it. A "sent" line with no
+// "received" line of the same tag on any machine is such a hand-off. A device keeps the account's removal time in
 // AdvisorProfile.key_removed_at: a key set no later than that is removed
 // (AdvisorRemoveKey with source ACCOUNT) and never handed on.
 

@@ -40,7 +40,7 @@ export function KeySection() {
 			<p className="note pad-x">{t.key.model}</p>
 			{views.every((view) => view.state.info?.advisor?.keySet !== true) && <KeyGuide />}
 			<AccountKeyRow machines={machines} account={account} removedAt={removedAt} loaded={loaded} />
-			{legacy !== undefined && <PromoteBar machine={legacy} machines={machines} removedAt={removedAt} />}
+			{legacy !== undefined && <PromoteBar key={laterKey(legacy)} machine={legacy} machines={machines} removedAt={removedAt} />}
 			{views.length === 0 ? <p className="note pad-x">{t.key.none}</p> : views.map((view) => <MachineKeyRow key={view.entry.ref} view={view} />)}
 		</div>
 	);
@@ -66,7 +66,12 @@ function KeyGuide() {
 	);
 }
 
-/** The account's key: its fingerprint, paste a new one, remove it from every machine. */
+/**
+ * The account's key: its fingerprint, paste a new one, remove it from every
+ * machine. Removing is offered even when no machine holding it is in reach (a
+ * leaked key on a machine that sleeps): the removal time is what keeps it
+ * from coming back.
+ */
 function AccountKeyRow({ machines, account, removedAt, loaded }: { machines: readonly KeyMachine[]; account: KeyMachine | null; removedAt: number; loaded: boolean }) {
 	const t = useAdvisorCopy();
 	const { locale } = useI18n();
@@ -105,11 +110,9 @@ function AccountKeyRow({ machines, account, removedAt, loaded }: { machines: rea
 						<button type="button" className="btn btn-sm" onClick={() => setMode("paste")}>
 							{t.key.paste}
 						</button>
-						{key !== undefined && (
-							<button type="button" className="btn btn-sm" onClick={() => setMode("remove")}>
-								{t.key.remove}
-							</button>
-						)}
+						<button type="button" className="btn btn-sm" onClick={() => setMode("remove")}>
+							{t.key.remove}
+						</button>
 					</span>
 				)}
 			</div>
@@ -120,10 +123,31 @@ function AccountKeyRow({ machines, account, removedAt, loaded }: { machines: rea
 	);
 }
 
-/** Offers a machine's key kept from before as the account's; the user agrees once (AdvisorKeyPromote) or puts it off. */
+/** Where "later" is remembered for one machine's key, on this browser only. */
+function laterKey(machine: KeyMachine): string {
+	return `advisor-key-promote-later:${machine.view.entry.ref}:${machine.key.fingerprint}`;
+}
+
+function putOff(machine: KeyMachine): void {
+	try {
+		window.localStorage.setItem(laterKey(machine), "1");
+	} catch {
+		// Private mode or storage full: put off for this page only.
+	}
+}
+
+function putOffBefore(machine: KeyMachine): boolean {
+	try {
+		return window.localStorage.getItem(laterKey(machine)) === "1";
+	} catch {
+		return false;
+	}
+}
+
+/** Offers a machine's key kept from before as the account's; the user agrees once (AdvisorKeyPromote) or puts it off for that key. */
 function PromoteBar({ machine, machines, removedAt }: { machine: KeyMachine; machines: readonly KeyMachine[]; removedAt: number }) {
 	const t = useAdvisorCopy();
-	const [later, setLater] = useState(false);
+	const [later, setLater] = useState(() => putOffBefore(machine));
 	const { busy, error, run } = useKeyRequest();
 	if (later) return null;
 	const promote = () =>
@@ -136,7 +160,14 @@ function PromoteBar({ machine, machines, removedAt }: { machine: KeyMachine; mac
 			<div className="row">
 				<span className="grow">{t.key.account.promote(machine.view.entry.name)}</span>
 				<span className="adv-acts">
-					<button type="button" className="btn btn-sm" onClick={() => setLater(true)}>
+					<button
+							type="button"
+							className="btn btn-sm"
+							onClick={() => {
+								putOff(machine);
+								setLater(true);
+							}}
+						>
 						{t.key.account.later}
 					</button>
 					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={promote}>

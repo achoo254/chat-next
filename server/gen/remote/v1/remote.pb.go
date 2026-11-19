@@ -15650,8 +15650,10 @@ func (x *AdvisorSetKey) GetSetAt() int64 {
 // then gets MachineInfo. Forgetting a key that is not kept is no error.
 type AdvisorRemoveKey struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// UNSPECIFIED (an older device): whatever key is kept. OWN or ACCOUNT
-	// (tunelo 3.23.0+): only a key of that kind; another kind stays.
+	// UNSPECIFIED (an older device): whatever key is kept, the account's too,
+	// so an app not reloaded since removes the account's key from that
+	// machine and the next sync hands it back. OWN or ACCOUNT (tunelo
+	// 3.23.0+): only a key of that kind; another kind stays.
 	Source        AdvisorKeySource `protobuf:"varint,1,opt,name=source,proto3,enum=remote.v1.AdvisorKeySource" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -154,7 +154,7 @@ export const enAdvisor: AdvisorCopy = {
 			steps: [
 				"Sign in to the TypeSafe console. No account yet? Contact TypeSafe, they may be issuing access in batches.",
 				"Open Keys and create a new key.",
-				"Come back here and press \"Paste key\" on the machine you want Advisor on.",
+				"Come back here and press \"Paste key\" on the account's key; your machines take it on their own.",
 			],
 			open: "Open the TypeSafe console",
 			consoleUrl: "https://console.typesafe.ai/keys",

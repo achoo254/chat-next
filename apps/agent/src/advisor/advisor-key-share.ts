@@ -1,5 +1,6 @@
-// The account's TypeSafe key handed from one machine to another without the
-// device that relays it, or the server under that device, ever holding it.
+// The account's TypeSafe key handed from one machine to another: the device
+// that relays it, and the server under that device, only ever carry sealed
+// bytes.
 //
 // The machine that receives makes a fresh X25519 key pair for one hand-off (a
 // ticket) and gives its public half to the device over that device's own
@@ -11,9 +12,18 @@
 //             || ticket public, info: "tunelo advisor key share v1")
 //
 // The payload is the key, the time it counts as set and the device that set
-// it, so every machine orders the account's keys the same way. The device only
-// relays the sealed bytes; the receiver opens them with the ticket's private
-// half, which never leaves this process and is used once.
+// it, so every machine orders the account's keys the same way. The receiver
+// opens it with the ticket's private half, which never leaves this process and
+// is used once.
+//
+// What this does not stop: the holder cannot tell a ticket's public key from
+// one the device made itself, so a device the machine trusts (a stolen one, a
+// web page running someone else's script, a device key slipped into the
+// trusted list by whoever runs the server) can have the key sealed for itself
+// and open it. Both machines log every hand-off with the ticket's tag
+// (ticketTag): a "sent" line on the holder with no "received" line of the same
+// tag on any machine is a key that went somewhere else.
+import { createHash } from "node:crypto";
 import {
   type KeyPair,
   concat,
@@ -40,6 +50,8 @@ export const TICKET_TTL_MS = 120_000;
 export const MAX_TICKETS = 4;
 /** The longest device label kept from a payload. */
 const MAX_DEVICE_CHARS = 200;
+/** Hex characters of a ticket public key's SHA-256 written to the audit log. */
+const TICKET_TAG_CHARS = 12;
 
 /** A hand-off that cannot go on. The message is fixed: it never quotes a key. */
 export class AdvisorKeyShareError extends Error {
@@ -51,6 +63,16 @@ export class AdvisorKeyShareError extends Error {
 async function boxKey(privateKey: CryptoKey, peerPublic: Uint8Array, senderPublic: Uint8Array, recipientPublic: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
   const shared = await dh(privateKey, peerPublic);
   return hkdf(shared, concat(senderPublic, recipientPublic), INFO, BOX_KEY_BYTES);
+}
+
+/**
+ * The tag both machines log for one hand-off: the start of the SHA-256 of
+ * the ticket's public key. AdvisorKeyShareError "bad_public_key" for a key
+ * that is not 32 bytes.
+ */
+export function ticketTag(publicKey: Uint8Array): string {
+  if (publicKey.length !== PUBLIC_KEY_BYTES) throw new AdvisorKeyShareError("bad_public_key");
+  return createHash("sha256").update(publicKey).digest("hex").slice(0, TICKET_TAG_CHARS);
 }
 
 /** Seals the account's key for a ticket's public key of another machine. */

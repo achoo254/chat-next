@@ -45,7 +45,7 @@ export interface KeyMachine {
 export interface KeySyncPlan {
 	/** The machine whose account key the others take; null without a live one in reach. */
 	readonly source: KeyMachine | null;
-	/** Machines without a key, or with an older account key, that take the source's. */
+	/** Machines without a key, or with an older and different account key, that take the source's. */
 	readonly targets: readonly KeyMachine[];
 	/** Machines holding an account key set no later than its removal: it is removed and never handed on. */
 	readonly stale: readonly KeyMachine[];
@@ -63,7 +63,11 @@ export function planKeySync(views: readonly MachineView[], removedAt: number): K
 	const source = live.reduce<KeyMachine | null>((best, m) => (best === null || compareKeys(m.key, best.key) > 0 ? m : best), null);
 	if (source === null) return { source, targets: [], stale };
 	const targets = machines.filter(
-		(m) => m !== source && (m.key.source === "none" || (m.key.source === "account" && m.key.setAt > removedAt && compareKeys(m.key, source.key) < 0)),
+		(m) =>
+			m !== source &&
+			(m.key.source === "none" ||
+				// The same key counted as set a little earlier (a machine whose clock runs behind keeps it so) needs nothing.
+				(m.key.source === "account" && m.key.setAt > removedAt && m.key.fingerprint !== source.key.fingerprint && compareKeys(m.key, source.key) < 0)),
 	);
 	return { source, targets, stale };
 }

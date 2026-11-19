@@ -153,7 +153,7 @@ export const viAdvisor = {
 			steps: [
 				"Đăng nhập console TypeSafe. Chưa có tài khoản thì liên hệ TypeSafe, họ có thể đang cấp theo đợt.",
 				"Vào mục Keys và tạo một khoá mới.",
-				"Quay lại đây, bấm \"Dán khoá\" ở máy bạn muốn dùng Cố vấn.",
+				"Quay lại đây, bấm \"Dán khoá\" ở khoá của tài khoản; các máy sẽ tự nhận.",
 			],
 			open: "Mở console TypeSafe",
 			consoleUrl: "https://console.typesafe.ai/keys",

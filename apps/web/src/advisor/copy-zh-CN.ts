@@ -154,7 +154,7 @@ export const zhCNAdvisor: AdvisorCopy = {
 			steps: [
 				"登录 TypeSafe 控制台。还没有账号请联系 TypeSafe，他们可能分批开放。",
 				"进入 Keys 并创建新密钥。",
-				"回到这里，在要使用顾问的设备上点“粘贴密钥”。",
+				"回到这里，在账号密钥处点“粘贴密钥”，各设备会自动获取。",
 			],
 			open: "打开 TypeSafe 控制台",
 			consoleUrl: "https://console.typesafe.ai/keys",

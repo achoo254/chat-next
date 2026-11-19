@@ -215,15 +215,18 @@ export class SecretStore {
 	async reveal(id: string): Promise<string | undefined> {
 		const o = this.once.get(id);
 		if (o) return o.value;
-		const all = this.read();
-		const e = all.find((x) => x.id === id);
+		const e = this.read().find((x) => x.id === id);
 		if (!e) return undefined;
 		const opened = JSON.parse(await unseal(this.configDir, e.sealed)) as { origin?: unknown; name?: unknown; value?: unknown };
 		if (opened.origin !== e.origin || opened.name !== e.name || typeof opened.value !== "string") {
 			throw new Error(`the saved secret ${e.name} does not belong to ${e.origin}; remove it and enter it again`);
 		}
 		rememberSecret(opened.value);
-		this.write(all.map((x) => (x.id === id ? { ...x, lastUsedAt: this.now() } : x)));
+		// Read again after the wait: a save or removal that landed meanwhile stays.
+		const latest = this.read();
+		if (latest.some((x) => x.id === id && x.sealed === e.sealed)) {
+			this.write(latest.map((x) => (x.id === id && x.sealed === e.sealed ? { ...x, lastUsedAt: this.now() } : x)));
+		}
 		return opened.value;
 	}
 
