@@ -120,8 +120,14 @@ const (
 type BridgeServiceClient interface {
 	// What a new synced chat of the account starts with, by feature (acting on people and
 	// groups and messages are not part of it).
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	ListBridgeFeatureDefaults(context.Context, *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error)
 	// Sets one default; with apply_to_all it is also written to every chat already synced.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeFeatureDefault(context.Context, *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error)
 	// Everything Chat queued for the app that did not go through, of any feature.
 	ListBridgeProblems(context.Context, *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error)
@@ -144,6 +150,9 @@ type BridgeServiceClient interface {
 	// invalid_argument when an answer is wrong (the step stays open).
 	ContinueBridgeLogin(context.Context, *connect.Request[v1.ContinueBridgeLoginRequest]) (*connect.Response[v1.ContinueBridgeLoginResponse], error)
 	// The conversations of a connected account, with which are synced.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	ListBridgeConversations(context.Context, *connect.Request[v1.ListBridgeConversationsRequest]) (*connect.Response[v1.ListBridgeConversationsResponse], error)
 	// Starts copying a conversation into a new chat: its newest
 	// history_window messages first (chosen here, once: older history cannot
@@ -151,19 +160,31 @@ type BridgeServiceClient interface {
 	// read-only (sending into it is refused) or, with direction BOTH, also
 	// sends what the user writes in Chat on to the app; unspecified takes BOTH
 	// when the app can be written to, else IN.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	EnableBridgeChat(context.Context, *connect.Request[v1.EnableBridgeChatRequest]) (*connect.Response[v1.EnableBridgeChatResponse], error)
 	// Stops syncing a conversation and deletes its chat.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	RemoveBridgeChat(context.Context, *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error)
 	// Switches a synced chat between receiving only (IN) and also sending on
 	// what the user writes (BOTH). Going back to IN drops what is queued and
 	// not yet sent. failed_precondition send_unsupported when the app cannot
 	// be written to.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
 	// What can be synced for a synced chat, feature by feature: only what the
 	// app supports is listed, with the direction now in effect.
 	ListBridgeFeatures(context.Context, *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error)
 	// Sets the direction of one feature of a synced chat. Fails with
 	// failed_precondition (feature_unsupported) when the app cannot do it.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
 	// The invite links the account made for a synced group in the app (not Chat's own links).
 	ListBridgeInvites(context.Context, *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error)
@@ -407,11 +428,15 @@ type bridgeServiceClient struct {
 }
 
 // ListBridgeFeatureDefaults calls app.v1.BridgeService.ListBridgeFeatureDefaults.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) ListBridgeFeatureDefaults(ctx context.Context, req *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error) {
 	return c.listBridgeFeatureDefaults.CallUnary(ctx, req)
 }
 
 // SetBridgeFeatureDefault calls app.v1.BridgeService.SetBridgeFeatureDefault.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) SetBridgeFeatureDefault(ctx context.Context, req *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error) {
 	return c.setBridgeFeatureDefault.CallUnary(ctx, req)
 }
@@ -452,21 +477,29 @@ func (c *bridgeServiceClient) ContinueBridgeLogin(ctx context.Context, req *conn
 }
 
 // ListBridgeConversations calls app.v1.BridgeService.ListBridgeConversations.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) ListBridgeConversations(ctx context.Context, req *connect.Request[v1.ListBridgeConversationsRequest]) (*connect.Response[v1.ListBridgeConversationsResponse], error) {
 	return c.listBridgeConversations.CallUnary(ctx, req)
 }
 
 // EnableBridgeChat calls app.v1.BridgeService.EnableBridgeChat.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) EnableBridgeChat(ctx context.Context, req *connect.Request[v1.EnableBridgeChatRequest]) (*connect.Response[v1.EnableBridgeChatResponse], error) {
 	return c.enableBridgeChat.CallUnary(ctx, req)
 }
 
 // RemoveBridgeChat calls app.v1.BridgeService.RemoveBridgeChat.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) RemoveBridgeChat(ctx context.Context, req *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error) {
 	return c.removeBridgeChat.CallUnary(ctx, req)
 }
 
 // SetBridgeChatDirection calls app.v1.BridgeService.SetBridgeChatDirection.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) SetBridgeChatDirection(ctx context.Context, req *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error) {
 	return c.setBridgeChatDirection.CallUnary(ctx, req)
 }
@@ -477,6 +510,8 @@ func (c *bridgeServiceClient) ListBridgeFeatures(ctx context.Context, req *conne
 }
 
 // SetBridgeFeature calls app.v1.BridgeService.SetBridgeFeature.
+//
+// Deprecated: do not use.
 func (c *bridgeServiceClient) SetBridgeFeature(ctx context.Context, req *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error) {
 	return c.setBridgeFeature.CallUnary(ctx, req)
 }
@@ -545,8 +580,14 @@ func (c *bridgeServiceClient) DisconnectBridgeAccount(ctx context.Context, req *
 type BridgeServiceHandler interface {
 	// What a new synced chat of the account starts with, by feature (acting on people and
 	// groups and messages are not part of it).
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	ListBridgeFeatureDefaults(context.Context, *connect.Request[v1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[v1.ListBridgeFeatureDefaultsResponse], error)
 	// Sets one default; with apply_to_all it is also written to every chat already synced.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeFeatureDefault(context.Context, *connect.Request[v1.SetBridgeFeatureDefaultRequest]) (*connect.Response[v1.SetBridgeFeatureDefaultResponse], error)
 	// Everything Chat queued for the app that did not go through, of any feature.
 	ListBridgeProblems(context.Context, *connect.Request[v1.ListBridgeProblemsRequest]) (*connect.Response[v1.ListBridgeProblemsResponse], error)
@@ -569,6 +610,9 @@ type BridgeServiceHandler interface {
 	// invalid_argument when an answer is wrong (the step stays open).
 	ContinueBridgeLogin(context.Context, *connect.Request[v1.ContinueBridgeLoginRequest]) (*connect.Response[v1.ContinueBridgeLoginResponse], error)
 	// The conversations of a connected account, with which are synced.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	ListBridgeConversations(context.Context, *connect.Request[v1.ListBridgeConversationsRequest]) (*connect.Response[v1.ListBridgeConversationsResponse], error)
 	// Starts copying a conversation into a new chat: its newest
 	// history_window messages first (chosen here, once: older history cannot
@@ -576,19 +620,31 @@ type BridgeServiceHandler interface {
 	// read-only (sending into it is refused) or, with direction BOTH, also
 	// sends what the user writes in Chat on to the app; unspecified takes BOTH
 	// when the app can be written to, else IN.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	EnableBridgeChat(context.Context, *connect.Request[v1.EnableBridgeChatRequest]) (*connect.Response[v1.EnableBridgeChatResponse], error)
 	// Stops syncing a conversation and deletes its chat.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	RemoveBridgeChat(context.Context, *connect.Request[v1.RemoveBridgeChatRequest]) (*connect.Response[v1.RemoveBridgeChatResponse], error)
 	// Switches a synced chat between receiving only (IN) and also sending on
 	// what the user writes (BOTH). Going back to IN drops what is queued and
 	// not yet sent. failed_precondition send_unsupported when the app cannot
 	// be written to.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeChatDirection(context.Context, *connect.Request[v1.SetBridgeChatDirectionRequest]) (*connect.Response[v1.SetBridgeChatDirectionResponse], error)
 	// What can be synced for a synced chat, feature by feature: only what the
 	// app supports is listed, with the direction now in effect.
 	ListBridgeFeatures(context.Context, *connect.Request[v1.ListBridgeFeaturesRequest]) (*connect.Response[v1.ListBridgeFeaturesResponse], error)
 	// Sets the direction of one feature of a synced chat. Fails with
 	// failed_precondition (feature_unsupported) when the app cannot do it.
+	// Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+	//
+	// Deprecated: do not use.
 	SetBridgeFeature(context.Context, *connect.Request[v1.SetBridgeFeatureRequest]) (*connect.Response[v1.SetBridgeFeatureResponse], error)
 	// The invite links the account made for a synced group in the app (not Chat's own links).
 	ListBridgeInvites(context.Context, *connect.Request[v1.ListBridgeInvitesRequest]) (*connect.Response[v1.ListBridgeInvitesResponse], error)

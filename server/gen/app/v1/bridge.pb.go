@@ -4223,23 +4223,23 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x1cBRIDGE_OUTBOX_STATUS_PENDING\x10\x01\x12 \n" +
 	"\x1cBRIDGE_OUTBOX_STATUS_SENDING\x10\x02\x12\x1f\n" +
 	"\x1bBRIDGE_OUTBOX_STATUS_FAILED\x10\x03\x12 \n" +
-	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\x8e\x14\n" +
-	"\rBridgeService\x12p\n" +
-	"\x19ListBridgeFeatureDefaults\x12(.app.v1.ListBridgeFeatureDefaultsRequest\x1a).app.v1.ListBridgeFeatureDefaultsResponse\x12j\n" +
-	"\x17SetBridgeFeatureDefault\x12&.app.v1.SetBridgeFeatureDefaultRequest\x1a'.app.v1.SetBridgeFeatureDefaultResponse\x12[\n" +
+	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\xb1\x14\n" +
+	"\rBridgeService\x12u\n" +
+	"\x19ListBridgeFeatureDefaults\x12(.app.v1.ListBridgeFeatureDefaultsRequest\x1a).app.v1.ListBridgeFeatureDefaultsResponse\"\x03\x88\x02\x01\x12o\n" +
+	"\x17SetBridgeFeatureDefault\x12&.app.v1.SetBridgeFeatureDefaultRequest\x1a'.app.v1.SetBridgeFeatureDefaultResponse\"\x03\x88\x02\x01\x12[\n" +
 	"\x12ListBridgeProblems\x12!.app.v1.ListBridgeProblemsRequest\x1a\".app.v1.ListBridgeProblemsResponse\x12[\n" +
 	"\x12RetryBridgeProblem\x12!.app.v1.RetryBridgeProblemRequest\x1a\".app.v1.RetryBridgeProblemResponse\x12a\n" +
 	"\x14DismissBridgeProblem\x12#.app.v1.DismissBridgeProblemRequest\x1a$.app.v1.DismissBridgeProblemResponse\x12R\n" +
 	"\x0fGetBridgeStatus\x12\x1e.app.v1.GetBridgeStatusRequest\x1a\x1f.app.v1.GetBridgeStatusResponse\x12R\n" +
 	"\x0fStartBridgeSync\x12\x1e.app.v1.StartBridgeSyncRequest\x1a\x1f.app.v1.StartBridgeSyncResponse\x12U\n" +
 	"\x10StartBridgeLogin\x12\x1f.app.v1.StartBridgeLoginRequest\x1a .app.v1.StartBridgeLoginResponse\x12^\n" +
-	"\x13ContinueBridgeLogin\x12\".app.v1.ContinueBridgeLoginRequest\x1a#.app.v1.ContinueBridgeLoginResponse\x12j\n" +
-	"\x17ListBridgeConversations\x12&.app.v1.ListBridgeConversationsRequest\x1a'.app.v1.ListBridgeConversationsResponse\x12U\n" +
-	"\x10EnableBridgeChat\x12\x1f.app.v1.EnableBridgeChatRequest\x1a .app.v1.EnableBridgeChatResponse\x12U\n" +
-	"\x10RemoveBridgeChat\x12\x1f.app.v1.RemoveBridgeChatRequest\x1a .app.v1.RemoveBridgeChatResponse\x12g\n" +
-	"\x16SetBridgeChatDirection\x12%.app.v1.SetBridgeChatDirectionRequest\x1a&.app.v1.SetBridgeChatDirectionResponse\x12[\n" +
-	"\x12ListBridgeFeatures\x12!.app.v1.ListBridgeFeaturesRequest\x1a\".app.v1.ListBridgeFeaturesResponse\x12U\n" +
-	"\x10SetBridgeFeature\x12\x1f.app.v1.SetBridgeFeatureRequest\x1a .app.v1.SetBridgeFeatureResponse\x12X\n" +
+	"\x13ContinueBridgeLogin\x12\".app.v1.ContinueBridgeLoginRequest\x1a#.app.v1.ContinueBridgeLoginResponse\x12o\n" +
+	"\x17ListBridgeConversations\x12&.app.v1.ListBridgeConversationsRequest\x1a'.app.v1.ListBridgeConversationsResponse\"\x03\x88\x02\x01\x12Z\n" +
+	"\x10EnableBridgeChat\x12\x1f.app.v1.EnableBridgeChatRequest\x1a .app.v1.EnableBridgeChatResponse\"\x03\x88\x02\x01\x12Z\n" +
+	"\x10RemoveBridgeChat\x12\x1f.app.v1.RemoveBridgeChatRequest\x1a .app.v1.RemoveBridgeChatResponse\"\x03\x88\x02\x01\x12l\n" +
+	"\x16SetBridgeChatDirection\x12%.app.v1.SetBridgeChatDirectionRequest\x1a&.app.v1.SetBridgeChatDirectionResponse\"\x03\x88\x02\x01\x12[\n" +
+	"\x12ListBridgeFeatures\x12!.app.v1.ListBridgeFeaturesRequest\x1a\".app.v1.ListBridgeFeaturesResponse\x12Z\n" +
+	"\x10SetBridgeFeature\x12\x1f.app.v1.SetBridgeFeatureRequest\x1a .app.v1.SetBridgeFeatureResponse\"\x03\x88\x02\x01\x12X\n" +
 	"\x11ListBridgeInvites\x12 .app.v1.ListBridgeInvitesRequest\x1a!.app.v1.ListBridgeInvitesResponse\x12[\n" +
 	"\x12CreateBridgeInvite\x12!.app.v1.CreateBridgeInviteRequest\x1a\".app.v1.CreateBridgeInviteResponse\x12[\n" +
 	"\x12RevokeBridgeInvite\x12!.app.v1.RevokeBridgeInviteRequest\x1a\".app.v1.RevokeBridgeInviteResponse\x12a\n" +

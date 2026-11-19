@@ -1,6 +1,6 @@
 # ADR 0023: Chat Bridge: mô hình tính năng cho đồng bộ hai chiều và nhiều nền tảng
 
-Trạng thái: **đã chấp nhận** (18/11/2026), đã cài đặt qua các phase của [plan](../../../plans/dattqh/261118-1800-chat-bridge-full-sync/plan.md). Bổ sung [ADR 0022](./0022-chat-bridge.md).
+Trạng thái: **đã chấp nhận** (18/11/2026), đã cài đặt qua các phase của [plan](../../../plans/dattqh/261118-1800-chat-bridge-full-sync/plan.md). Bổ sung [ADR 0022](./0022-chat-bridge.md). Phần tuỳ chọn (hướng theo chat và tính năng, mặc định, mức nhanh) được thay bởi [ADR 0024](./0024-chat-bridge-one-switch-sync.md); mô hình tính năng vẫn là cách viết adapter.
 
 ## Bối cảnh
 

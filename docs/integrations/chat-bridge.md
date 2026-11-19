@@ -1,16 +1,17 @@
 # Chat Bridge: đưa chat của ứng dụng khác vào Chat
 
-Chat Bridge đồng bộ các cuộc trò chuyện của chính bạn ở một ứng dụng khác vào Chat để đọc, tìm kiếm và nhận tin mới theo thời gian thực, và (tuỳ từng chat) gửi tin bạn gõ trong Chat sang ứng dụng đó. Telegram là ứng dụng đầu tiên. Quyết định và lý do: [ADR 0022](../adr/0022-chat-bridge.md). Vận hành: [`operations/chat-bridge.md`](../operations/chat-bridge.md).
+Chat Bridge đồng bộ mọi cuộc trò chuyện của chính bạn ở một ứng dụng khác vào Chat, hai chiều và theo thời gian thực. Telegram là ứng dụng đầu tiên. Quyết định và lý do: [ADR 0022](../adr/0022-chat-bridge.md), mô hình tính năng [ADR 0023](../adr/0023-chat-bridge-feature-model.md), một nút đồng bộ [ADR 0024](../adr/0024-chat-bridge-one-switch-sync.md). Vận hành: [`operations/chat-bridge.md`](../operations/chat-bridge.md).
 
-**Hai chiều, bật từng chat.** Tin luôn đi từ ứng dụng kia sang Chat. Chat bật **Gửi tin từ Chat** thì tin bạn gõ ở đó cũng được gửi sang ứng dụng kia như tin do chính bạn gửi; chat tắt thì bị khoá ô soạn tin (server bỏ quyền gửi, nên cả Bot API và MCP cũng không gửi vào được).
+**Một nút, không tuỳ chọn.** Không chọn chat, số tin, hướng hay tính năng: đồng bộ thì mọi cuộc trò chuyện đi hai chiều, mọi tính năng ứng dụng hỗ trợ đều chạy. Hành động lên người và nhóm (thêm người, link mời, rời và xoá nhóm) vẫn hỏi xác nhận ở từng lần làm.
 
 ## Dùng
 
 1. Người vận hành bật tính năng và cấp `api_id`, `api_hash` ([Cấp api_id](#cấp-api_id-và-api_hash)).
-2. Cài đặt › **Kết nối ứng dụng** › Telegram › Kết nối. Nhập số điện thoại kèm mã quốc gia, mã đăng nhập Telegram gửi tới app trên thiết bị khác của bạn (hoặc SMS), và mật khẩu hai bước nếu tài khoản có. Chỉ bước đăng nhập này đòi đăng nhập Chat trong 10 phút gần đây (nó cấp quyền đọc cả tài khoản); nếu không trang đưa sang đăng nhập lại. Bật chat, bật hay tắt gửi tin, xoá bản sao và ngắt kết nối không đòi.
-3. **Hiện danh sách chat**, bấm **Đồng bộ** ở chat muốn lấy, chọn số tin gần nhất cần tải (200, 500, 2.000 hoặc 10.000; mặc định 2.000) rồi **Bắt đầu đồng bộ**.
-4. Lịch sử nhập dần, đúng thứ tự thời gian gốc, không báo thông báo đẩy và không tính tin chưa đọc. Tin mới, tin sửa và tin xoá bên Telegram về sau vài giây.
-5. Ô **Gửi tin từ Chat sang Telegram** ở bước chọn mặc định bật: chat mới gửi được hai chiều. Bỏ tích để chat chỉ đọc. Chat đã đồng bộ từ trước giữ nguyên cách cũ; bật hoặc tắt từng chat bằng công tắc **Gửi tin từ Chat** cạnh chat đó.
+2. Cài đặt › **Kết nối ứng dụng** › Telegram › Kết nối. Nhập số điện thoại kèm mã quốc gia, mã đăng nhập Telegram gửi tới app trên thiết bị khác của bạn (hoặc SMS), và mật khẩu hai bước nếu tài khoản có. Chỉ bước đăng nhập này đòi đăng nhập Chat trong 10 phút gần đây (nó cấp quyền đọc cả tài khoản); nếu không trang đưa sang đăng nhập lại.
+3. Đăng nhập xong, trang hỏi **Đồng bộ toàn bộ tin nhắn Telegram vào Chat?** Bấm **Đồng bộ** (hoặc **Để sau**, rồi bấm nút đồng bộ ở thẻ tài khoản khi muốn).
+4. Mọi cuộc trò chuyện (chat riêng, nhóm, kênh, bot) có một chat trong Chat với 2.000 tin gần nhất, cuộc có tin mới nhất trước. Thẻ tài khoản hiện một thanh tiến trình tổng: số cuộc đã xong và số tin đã nhập trên tổng. Tin mới đến trong lúc nhập vẫn vào. Lịch sử nhập không báo thông báo đẩy và không tính tin chưa đọc.
+5. Nhập xong, thẻ hiện **Đang đồng bộ trực tiếp**. Cuộc trò chuyện mới xuất hiện ở Telegram sau đó tự có chat trong Chat. Ngắt kết nối thì các chat còn lại ở chế độ chỉ đọc (hoặc xoá hết, tuỳ chọn khi ngắt).
+6. Thêm người, link mời của Telegram, rời và xoá nhóm: ở khung thông tin của chính nhóm đó trong Chat.
 
 ## Gửi từ Chat sang Telegram
 
@@ -26,7 +27,7 @@ Mỗi tin gửi đi có trạng thái ngay trên tin: đồng hồ là đang g�
 
 ## Tính năng của từng chat
 
-Mỗi chat đã đồng bộ có nút **Tính năng** (Cài đặt › Kết nối ứng dụng): mỗi tính năng nền tảng hỗ trợ chọn Tắt, Chỉ nhận, Chỉ gửi hoặc Hai chiều, và có mức nhanh Chỉ đọc, Cá nhân, Đầy đủ. Hướng mặc định của tính năng theo hướng của tin nhắn (chat gửi tin thì ghim, tắt tiếng, tên nhóm cũng đi hai chiều). Tính năng tác động lên người và nhóm (thành viên, link mời) tắt mặc định và hỏi xác nhận khi bật. Thêm nền tảng: [Thêm một nền tảng chat](adding-a-platform.md).
+Mọi tính năng ứng dụng hỗ trợ chạy cho mọi chat, theo hướng của chat (hai chiều khi tài khoản đang kết nối, chỉ nhận sau khi ngắt). Không còn bảng chọn theo chat hay mặc định theo tài khoản (ADR 0024). Thêm nền tảng: [Thêm một nền tảng chat](adding-a-platform.md).
 
 - **Trạng thái chat trong danh sách của bạn** (tắt tiếng, ghim chat, đánh dấu chưa đọc): Chat đọc từ Telegram mỗi 2 phút và làm Chat khớp với Telegram; đổi trong Chat thì gửi sang Telegram (chỉ trạng thái cuối). Ghim chat quá 5 của Chat bị bỏ qua.
 - **Tên, mô tả và ảnh nhóm:** đọc mỗi khoảng 10 phút; đổi trong Chat gửi sang Telegram (cần quyền đổi thông tin nhóm). Ảnh chỉ được chép khi Telegram đổi sang ảnh khác, và ảnh Chat vừa gửi không bị chép ngược lại. Dòng «đã đổi tên», «đã đổi ảnh» đến từ dòng hệ thống của Telegram (biết ai đổi), Chat không tự đăng.

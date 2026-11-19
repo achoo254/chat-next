@@ -4,6 +4,7 @@ import (
 	"app.local/server/internal/bridge/feature"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -136,60 +137,20 @@ func (s *bridgeService) ContinueBridgeLogin(ctx context.Context, req *connect.Re
 	})
 }
 
-func (s *bridgeService) ListBridgeConversations(ctx context.Context, req *connect.Request[appv1.ListBridgeConversationsRequest]) (*connect.Response[appv1.ListBridgeConversationsResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeConversationsRequest) (*appv1.ListBridgeConversationsResponse, error) {
-		list, err := s.engine.Conversations(ctx, me, m.GetAccountId())
-		if err != nil {
-			return nil, err
-		}
-		resp := &appv1.ListBridgeConversationsResponse{}
-		for _, c := range list {
-			resp.Conversations = append(resp.Conversations, &appv1.BridgeConversation{
-				Id: c.ID, Kind: conversationKind(c.Kind), Title: c.Title, ChatId: c.ChatID, Forum: c.Forum, TopicsSplit: c.TopicsSplit,
-			})
-		}
-		return resp, nil
-	})
+func (s *bridgeService) ListBridgeConversations(_ context.Context, _ *connect.Request[appv1.ListBridgeConversationsRequest]) (*connect.Response[appv1.ListBridgeConversationsResponse], error) {
+	return nil, errRetired("ListBridgeConversations")
 }
 
-func (s *bridgeService) EnableBridgeChat(ctx context.Context, req *connect.Request[appv1.EnableBridgeChatRequest]) (*connect.Response[appv1.EnableBridgeChatResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.EnableBridgeChatRequest) (*appv1.EnableBridgeChatResponse, error) {
-		window := int(m.GetHistoryWindow())
-		if window < 0 || window > engine.MaxWindow {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("history_window must be 0 or 1 to 100000"))
-		}
-		direction, err := directionString(m.GetDirection(), true)
-		if err != nil {
-			return nil, err
-		}
-		chatID, err := s.engine.EnableConversation(ctx, me, m.GetAccountId(), m.GetConversationId(), window, direction)
-		if err != nil {
-			return nil, err
-		}
-		return &appv1.EnableBridgeChatResponse{ChatId: chatID}, nil
-	})
+func (s *bridgeService) EnableBridgeChat(_ context.Context, _ *connect.Request[appv1.EnableBridgeChatRequest]) (*connect.Response[appv1.EnableBridgeChatResponse], error) {
+	return nil, errRetired("EnableBridgeChat")
 }
 
-func (s *bridgeService) RemoveBridgeChat(ctx context.Context, req *connect.Request[appv1.RemoveBridgeChatRequest]) (*connect.Response[appv1.RemoveBridgeChatResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.RemoveBridgeChatRequest) (*appv1.RemoveBridgeChatResponse, error) {
-		if err := s.engine.RemoveChat(ctx, me, m.GetAccountId(), m.GetConversationId()); err != nil {
-			return nil, err
-		}
-		return &appv1.RemoveBridgeChatResponse{}, nil
-	})
+func (s *bridgeService) RemoveBridgeChat(_ context.Context, _ *connect.Request[appv1.RemoveBridgeChatRequest]) (*connect.Response[appv1.RemoveBridgeChatResponse], error) {
+	return nil, errRetired("RemoveBridgeChat")
 }
 
-func (s *bridgeService) SetBridgeChatDirection(ctx context.Context, req *connect.Request[appv1.SetBridgeChatDirectionRequest]) (*connect.Response[appv1.SetBridgeChatDirectionResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeChatDirectionRequest) (*appv1.SetBridgeChatDirectionResponse, error) {
-		direction, err := directionString(m.GetDirection(), false)
-		if err != nil {
-			return nil, err
-		}
-		if err := s.engine.SetDirection(ctx, me, m.GetAccountId(), m.GetConversationId(), direction); err != nil {
-			return nil, err
-		}
-		return &appv1.SetBridgeChatDirectionResponse{}, nil
-	})
+func (s *bridgeService) SetBridgeChatDirection(_ context.Context, _ *connect.Request[appv1.SetBridgeChatDirectionRequest]) (*connect.Response[appv1.SetBridgeChatDirectionResponse], error) {
+	return nil, errRetired("SetBridgeChatDirection")
 }
 
 func riskName(r feature.Risk) string {
@@ -221,13 +182,8 @@ func (s *bridgeService) ListBridgeFeatures(ctx context.Context, req *connect.Req
 	})
 }
 
-func (s *bridgeService) SetBridgeFeature(ctx context.Context, req *connect.Request[appv1.SetBridgeFeatureRequest]) (*connect.Response[appv1.SetBridgeFeatureResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeFeatureRequest) (*appv1.SetBridgeFeatureResponse, error) {
-		if err := s.engine.SetFeature(ctx, me, m.GetAccountId(), m.GetConversationId(), feature.Feature(m.GetFeature()), feature.Direction(m.GetDirection())); err != nil {
-			return nil, err
-		}
-		return &appv1.SetBridgeFeatureResponse{}, nil
-	})
+func (s *bridgeService) SetBridgeFeature(_ context.Context, _ *connect.Request[appv1.SetBridgeFeatureRequest]) (*connect.Response[appv1.SetBridgeFeatureResponse], error) {
+	return nil, errRetired("SetBridgeFeature")
 }
 
 func (s *bridgeService) ListBridgeInvites(ctx context.Context, req *connect.Request[appv1.ListBridgeInvitesRequest]) (*connect.Response[appv1.ListBridgeInvitesResponse], error) {
@@ -386,22 +342,6 @@ func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
 	return out
 }
 
-// directionString maps the wire direction to the engine's. Unspecified is ""
-// when allowed (the engine then picks its default).
-func directionString(d appv1.BridgeDirection, allowUnspecified bool) (string, error) {
-	switch d {
-	case appv1.BridgeDirection_BRIDGE_DIRECTION_IN:
-		return chat.DirectionIn, nil
-	case appv1.BridgeDirection_BRIDGE_DIRECTION_BOTH:
-		return chat.DirectionBoth, nil
-	case appv1.BridgeDirection_BRIDGE_DIRECTION_UNSPECIFIED:
-		if allowUnspecified {
-			return "", nil
-		}
-	}
-	return "", connect.NewError(connect.CodeInvalidArgument, errors.New("direction must be IN or BOTH"))
-}
-
 func directionMessage(d string) appv1.BridgeDirection {
 	switch d {
 	case chat.DirectionBoth:
@@ -444,45 +384,12 @@ func stepMessage(s engine.LoginStep) *appv1.BridgeLoginStep {
 	return out
 }
 
-func conversationKind(k bridge.ConvKind) appv1.BridgeConversationKind {
-	switch k {
-	case bridge.ConvPrivate:
-		return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_PRIVATE
-	case bridge.ConvBot:
-		return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_BOT
-	case bridge.ConvGroup:
-		return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_GROUP
-	case bridge.ConvChannel:
-		return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_CHANNEL
-	}
-	return appv1.BridgeConversationKind_BRIDGE_CONVERSATION_KIND_UNSPECIFIED
+func (s *bridgeService) ListBridgeFeatureDefaults(_ context.Context, _ *connect.Request[appv1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[appv1.ListBridgeFeatureDefaultsResponse], error) {
+	return nil, errRetired("ListBridgeFeatureDefaults")
 }
 
-func (s *bridgeService) ListBridgeFeatureDefaults(ctx context.Context, req *connect.Request[appv1.ListBridgeFeatureDefaultsRequest]) (*connect.Response[appv1.ListBridgeFeatureDefaultsResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ListBridgeFeatureDefaultsRequest) (*appv1.ListBridgeFeatureDefaultsResponse, error) {
-		list, err := s.engine.FeatureDefaults(ctx, me, m.GetAccountId())
-		if err != nil {
-			return nil, err
-		}
-		resp := &appv1.ListBridgeFeatureDefaultsResponse{}
-		for _, v := range list {
-			resp.Defaults = append(resp.Defaults, &appv1.BridgeFeatureDefault{
-				Feature: string(v.Feature), Risk: riskName(v.Risk), Direction: string(v.Direction), IsSet: v.Set,
-				CanReceive: v.Supported.In, CanSend: v.Supported.Out,
-			})
-		}
-		return resp, nil
-	})
-}
-
-func (s *bridgeService) SetBridgeFeatureDefault(ctx context.Context, req *connect.Request[appv1.SetBridgeFeatureDefaultRequest]) (*connect.Response[appv1.SetBridgeFeatureDefaultResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeFeatureDefaultRequest) (*appv1.SetBridgeFeatureDefaultResponse, error) {
-		n, err := s.engine.SetFeatureDefault(ctx, me, m.GetAccountId(), feature.Feature(m.GetFeature()), feature.Direction(m.GetDirection()), m.GetApplyToAll())
-		if err != nil {
-			return nil, err
-		}
-		return &appv1.SetBridgeFeatureDefaultResponse{Applied: int32(n)}, nil
-	})
+func (s *bridgeService) SetBridgeFeatureDefault(_ context.Context, _ *connect.Request[appv1.SetBridgeFeatureDefaultRequest]) (*connect.Response[appv1.SetBridgeFeatureDefaultResponse], error) {
+	return nil, errRetired("SetBridgeFeatureDefault")
 }
 
 func (s *bridgeService) ListBridgeProblems(ctx context.Context, req *connect.Request[appv1.ListBridgeProblemsRequest]) (*connect.Response[appv1.ListBridgeProblemsResponse], error) {
@@ -518,4 +425,10 @@ func (s *bridgeService) DismissBridgeProblem(ctx context.Context, req *connect.R
 		}
 		return &appv1.DismissBridgeProblemResponse{}, nil
 	})
+}
+
+// errRetired answers a call the one-switch sync retired (ADR 0024): choosing chats,
+// history sizes, directions and features is gone; StartBridgeSync does all of it.
+func errRetired(name string) error {
+	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("removed: %s was retired by the one-switch sync (ADR 0024)", name))
 }

@@ -5,7 +5,7 @@
 // messaging chunk. Nothing here carries a message, a phone number or a code
 // past the call that needs it.
 
-import type { BridgeFeatureView, FeatureDirection } from "./bridge-features-model.ts";
+import type { BridgeFeatureView } from "./bridge-features-model.ts";
 
 export type BridgeAccountStatus = "active" | "needs_login" | "stopped";
 
@@ -68,19 +68,7 @@ export type LoginStep =
 	| { readonly kind: "qr" | "confirm"; readonly loginId: string; readonly prompt: string }
 	| { readonly kind: "done"; readonly account: BridgeAccount | null };
 
-export type ConversationKind = "private" | "bot" | "group" | "channel";
 
-export interface BridgeConversation {
-	readonly id: string;
-	readonly kind: ConversationKind;
-	readonly title: string;
-	/** The synced chat; 0 when not synced. */
-	readonly chatId: number;
-	/** The conversation is split into topics in the app (a forum). */
-	readonly forum: boolean;
-	/** Its synced chat is split into topics too; false for a forum copied before topics were read (remove it and enable it again to split it). */
-	readonly topicsSplit: boolean;
-}
 
 export type BridgeErrorKind =
 	| "disabled"
@@ -142,16 +130,6 @@ export interface GroupDeleteToken {
 	readonly expires: number;
 }
 
-/** What a new synced chat of the account starts with for one feature. */
-export interface BridgeFeatureDefaultView {
-	readonly feature: string;
-	readonly risk: string;
-	readonly direction: FeatureDirection;
-	/** The owner chose it; otherwise it is the built-in default. */
-	readonly isSet: boolean;
-	readonly canReceive: boolean;
-	readonly canSend: boolean;
-}
 
 /** Something Chat queued for the other app that did not go through, of any feature. */
 export interface BridgeProblem {
@@ -171,9 +149,6 @@ export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
 	/** Turns the account's one switch on: every conversation syncs, both ways, live. */
 	startSync(accountId: number): Promise<void>;
-	featureDefaults(accountId: number): Promise<readonly BridgeFeatureDefaultView[]>;
-	/** Sets a default; with `applyToAll` also writes it to every synced chat. Returns how many chats changed. */
-	setFeatureDefault(accountId: number, feature: string, direction: string, applyToAll: boolean): Promise<number>;
 	problems(accountId: number): Promise<readonly BridgeProblem[]>;
 	retryProblem(accountId: number, id: number): Promise<void>;
 	/** Gives up a problem that is not a send. */
@@ -193,27 +168,15 @@ export interface BridgeApi {
 	deleteGroup(accountId: number, conversationId: string, confirmName: string, token: string): Promise<void>;
 	/** What a synced chat can sync, feature by feature: only what the app supports, with the direction now in effect. */
 	features(accountId: number, conversationId: string): Promise<readonly BridgeFeatureView[]>;
-	/** Sets the direction of one feature of a synced chat (`feature_unsupported` when the app cannot do it). */
-	setFeature(accountId: number, conversationId: string, feature: string, direction: FeatureDirection): Promise<void>;
 	startLogin(source: string): Promise<LoginStep>;
 	continueLogin(loginId: string, input: Readonly<Record<string, string>>): Promise<LoginStep>;
-	conversations(accountId: number): Promise<readonly BridgeConversation[]>;
-	/** Starts copying; returns the chat. `historyWindow` is how many of the newest messages to import. The chat sends both ways unless `direction` says `in` (an app that cannot be written to is always `in`). */
-	enable(accountId: number, conversationId: string, historyWindow: number, direction?: BridgeDirection): Promise<number>;
-	/** Switches a copy between receiving only and also sending on what is written in Chat. */
-	setDirection(accountId: number, conversationId: string, direction: BridgeDirection): Promise<void>;
 	/** What the chat has queued and not finished. */
 	outbox(chatId: number): Promise<readonly BridgeOutboxItem[]>;
 	/** Tries a failed or unknown message again. */
 	retry(chatId: number, seq: number): Promise<void>;
 	/** Gives up a failed edit or delete (a failed send is given up by deleting the message). */
 	dismiss(chatId: number, seq: number): Promise<void>;
-	/** Stops syncing and deletes the copy. */
-	remove(accountId: number, conversationId: string): Promise<void>;
 	/** Signs out of the app; with `deleteChats` the copies go too, otherwise they stay read-only. */
 	disconnect(accountId: number, deleteChats: boolean): Promise<void>;
 }
 
-/** The sizes of history offered when a chat is enabled; it cannot be extended later (seq only grows at the end). */
-export const HISTORY_WINDOWS: readonly number[] = [200, 500, 2000, 10000];
-export const DEFAULT_HISTORY_WINDOW = 2000;

@@ -4,7 +4,6 @@ import { Code, ConnectError, createClient, type Transport } from "@connectrpc/co
 import { assertSafeId } from "@achoo254/chat-core";
 import {
 	BridgeAccountStatus as WireStatus,
-	BridgeConversationKind,
 	BridgeDirection as WireDirection,
 	BridgeLoginStepKind,
 	BridgeOutboxStatus as WireOutboxStatus,
@@ -18,10 +17,8 @@ import {
 	type BridgeAccount,
 	type BridgeAccountStatus,
 	type BridgeApi,
-	type BridgeDirection,
 	type BridgeErrorKind,
 	type BridgeOutboxItem,
-	type ConversationKind,
 	type LoginStep,
 	STATE_OPS,
 } from "./bridge-api.ts";
@@ -33,12 +30,6 @@ const STATUSES: Partial<Record<WireStatus, BridgeAccountStatus>> = {
 	[WireStatus.STOPPED]: "stopped",
 };
 
-const KINDS: Partial<Record<BridgeConversationKind, ConversationKind>> = {
-	[BridgeConversationKind.PRIVATE]: "private",
-	[BridgeConversationKind.BOT]: "bot",
-	[BridgeConversationKind.GROUP]: "group",
-	[BridgeConversationKind.CHANNEL]: "channel",
-};
 
 const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status"]>> = {
 	[WireOutboxStatus.PENDING]: "pending",
@@ -48,15 +39,10 @@ const OUTBOX_STATUSES: Partial<Record<WireOutboxStatus, BridgeOutboxItem["status
 };
 
 const DIRECTIONS: readonly FeatureDirection[] = ["off", "in", "out", "both"];
-const toDirection = (s: string): FeatureDirection => DIRECTIONS.find((d) => d === s) ?? "off";
 const RISKS: readonly FeatureRisk[] = ["r1", "r2", "r3", "re"];
 
 const OPS: readonly BridgeOutboxItem["op"][] = ["send", "edit", "delete", ...STATE_OPS];
 
-function toWireDirection(direction: BridgeDirection | undefined): WireDirection {
-	if (direction === undefined) return WireDirection.UNSPECIFIED;
-	return direction === "both" ? WireDirection.BOTH : WireDirection.IN;
-}
 
 function toAccount(a: WireAccount): BridgeAccount {
 	return {
@@ -150,35 +136,6 @@ function createBridgeClient(transport: Transport): BridgeApi {
 			}),
 		startLogin: (source) => call(async () => toStep((await rpc.startBridgeLogin({ source })).step)),
 		continueLogin: (loginId, input) => call(async () => toStep((await rpc.continueBridgeLogin({ loginId, input: { ...input } })).step)),
-		conversations: (accountId) =>
-			call(async () => {
-				const r = await rpc.listBridgeConversations({ accountId: BigInt(accountId) });
-				return r.conversations.map((c) => ({ id: c.id, kind: KINDS[c.kind] ?? "group", title: c.title, chatId: assertSafeId(c.chatId), forum: c.forum, topicsSplit: c.topicsSplit }));
-			}),
-		enable: (accountId, conversationId, historyWindow, direction) =>
-			call(async () =>
-				assertSafeId(
-					(await rpc.enableBridgeChat({ accountId: BigInt(accountId), conversationId, historyWindow, direction: toWireDirection(direction) })).chatId,
-				),
-			),
-		setDirection: (accountId, conversationId, direction) =>
-			call(async () => {
-				await rpc.setBridgeChatDirection({ accountId: BigInt(accountId), conversationId, direction: toWireDirection(direction) });
-			}),
-		featureDefaults: (accountId) =>
-			call(async () => {
-				const r = await rpc.listBridgeFeatureDefaults({ accountId: BigInt(accountId) });
-				return r.defaults.map((d) => ({
-					feature: d.feature,
-					risk: d.risk,
-					direction: toDirection(d.direction),
-					isSet: d.isSet,
-					canReceive: d.canReceive,
-					canSend: d.canSend,
-				}));
-			}),
-		setFeatureDefault: (accountId, feature, direction, applyToAll) =>
-			call(async () => (await rpc.setBridgeFeatureDefault({ accountId: BigInt(accountId), feature, direction, applyToAll })).applied),
 		problems: (accountId) =>
 			call(async () => {
 				const r = await rpc.listBridgeProblems({ accountId: BigInt(accountId) });
@@ -248,10 +205,6 @@ function createBridgeClient(transport: Transport): BridgeApi {
 						: [{ feature: f.feature, risk, direction, isDefault: f.isDefault, canReceive: f.canReceive, canSend: f.canSend }];
 				});
 			}),
-		setFeature: (accountId, conversationId, feature, direction) =>
-			call(async () => {
-				await rpc.setBridgeFeature({ accountId: BigInt(accountId), conversationId, feature, direction });
-			}),
 		outbox: (chatId) =>
 			call(async () => {
 				const r = await rpc.listBridgeOutbox({ chatId: BigInt(chatId) });
@@ -270,10 +223,6 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		dismiss: (chatId, seq) =>
 			call(async () => {
 				await rpc.dismissBridgeMessage({ chatId: BigInt(chatId), seq: BigInt(seq) });
-			}),
-		remove: (accountId, conversationId) =>
-			call(async () => {
-				await rpc.removeBridgeChat({ accountId: BigInt(accountId), conversationId });
 			}),
 		startSync: (accountId) =>
 			call(async () => {

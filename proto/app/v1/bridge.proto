@@ -18,9 +18,15 @@ option go_package = "app.local/server/gen/app/v1;appv1";
 service BridgeService {
   // What a new synced chat of the account starts with, by feature (acting on people and
   // groups and messages are not part of it).
-  rpc ListBridgeFeatureDefaults(ListBridgeFeatureDefaultsRequest) returns (ListBridgeFeatureDefaultsResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc ListBridgeFeatureDefaults(ListBridgeFeatureDefaultsRequest) returns (ListBridgeFeatureDefaultsResponse) {
+    option deprecated = true;
+  }
   // Sets one default; with apply_to_all it is also written to every chat already synced.
-  rpc SetBridgeFeatureDefault(SetBridgeFeatureDefaultRequest) returns (SetBridgeFeatureDefaultResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc SetBridgeFeatureDefault(SetBridgeFeatureDefaultRequest) returns (SetBridgeFeatureDefaultResponse) {
+    option deprecated = true;
+  }
   // Everything Chat queued for the app that did not go through, of any feature.
   rpc ListBridgeProblems(ListBridgeProblemsRequest) returns (ListBridgeProblemsResponse);
   // Queues a problem again.
@@ -42,27 +48,42 @@ service BridgeService {
   // invalid_argument when an answer is wrong (the step stays open).
   rpc ContinueBridgeLogin(ContinueBridgeLoginRequest) returns (ContinueBridgeLoginResponse);
   // The conversations of a connected account, with which are synced.
-  rpc ListBridgeConversations(ListBridgeConversationsRequest) returns (ListBridgeConversationsResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc ListBridgeConversations(ListBridgeConversationsRequest) returns (ListBridgeConversationsResponse) {
+    option deprecated = true;
+  }
   // Starts copying a conversation into a new chat: its newest
   // history_window messages first (chosen here, once: older history cannot
   // be added later), then new messages as they arrive. The chat is
   // read-only (sending into it is refused) or, with direction BOTH, also
   // sends what the user writes in Chat on to the app; unspecified takes BOTH
   // when the app can be written to, else IN.
-  rpc EnableBridgeChat(EnableBridgeChatRequest) returns (EnableBridgeChatResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc EnableBridgeChat(EnableBridgeChatRequest) returns (EnableBridgeChatResponse) {
+    option deprecated = true;
+  }
   // Stops syncing a conversation and deletes its chat.
-  rpc RemoveBridgeChat(RemoveBridgeChatRequest) returns (RemoveBridgeChatResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc RemoveBridgeChat(RemoveBridgeChatRequest) returns (RemoveBridgeChatResponse) {
+    option deprecated = true;
+  }
   // Switches a synced chat between receiving only (IN) and also sending on
   // what the user writes (BOTH). Going back to IN drops what is queued and
   // not yet sent. failed_precondition send_unsupported when the app cannot
   // be written to.
-  rpc SetBridgeChatDirection(SetBridgeChatDirectionRequest) returns (SetBridgeChatDirectionResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc SetBridgeChatDirection(SetBridgeChatDirectionRequest) returns (SetBridgeChatDirectionResponse) {
+    option deprecated = true;
+  }
   // What can be synced for a synced chat, feature by feature: only what the
   // app supports is listed, with the direction now in effect.
   rpc ListBridgeFeatures(ListBridgeFeaturesRequest) returns (ListBridgeFeaturesResponse);
   // Sets the direction of one feature of a synced chat. Fails with
   // failed_precondition (feature_unsupported) when the app cannot do it.
-  rpc SetBridgeFeature(SetBridgeFeatureRequest) returns (SetBridgeFeatureResponse);
+  // Retired by the one-switch sync (ADR 0024): answers failed_precondition removed.
+  rpc SetBridgeFeature(SetBridgeFeatureRequest) returns (SetBridgeFeatureResponse) {
+    option deprecated = true;
+  }
   // The invite links the account made for a synced group in the app (not Chat's own links).
   rpc ListBridgeInvites(ListBridgeInvitesRequest) returns (ListBridgeInvitesResponse);
   // Asks the app for a new invite link; it shows in the list once the app made it.

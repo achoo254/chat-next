@@ -1,6 +1,6 @@
 # ADR 0022: Chat Bridge: đồng bộ hội thoại của app khác vào Chat
 
-- Trạng thái: Đã chấp nhận
+- Trạng thái: Đã chấp nhận; phần chọn chat, số tin và hướng được thay bởi [ADR 0024](./0024-chat-bridge-one-switch-sync.md)
 - Ngày: 2026-11-17
 - Bổ sung [ADR 0001](./0001-id-scheme.md), [ADR 0003](./0003-outbox.md) và [ADR 0016](./0016-account-deletion-at-idp.md).
 

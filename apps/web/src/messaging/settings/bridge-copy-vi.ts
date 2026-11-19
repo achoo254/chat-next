@@ -1,6 +1,5 @@
 // Vietnamese copy of Settings › Kết nối ứng dụng (Chat Bridge). The other
 // languages (bridge-copy-en.ts, bridge-copy-zh-CN.ts) must give the same keys.
-import type { ConversationKind } from "./bridge-api.ts";
 
 export const viBridge = {
 	title: "Kết nối ứng dụng",
@@ -64,57 +63,6 @@ export const viBridge = {
 		lastError: (text: string): string => `Lỗi gần nhất: ${text}`,
 		reconnect: "Đăng nhập lại",
 	},
-	chats: {
-		title: "Chat đã đồng bộ",
-		none: "Chưa chọn chat nào để đồng bộ.",
-		importing: "Đang nhập lịch sử…",
-		caughtUp: "Đã nhập xong, tin mới về trực tiếp",
-		window: (n: number): string => `${n.toLocaleString("vi")} tin gần nhất`,
-		open: "Mở chat",
-		topics: "Có chủ đề",
-		remove: "Xoá bản sao",
-		removeConfirm: "Xoá chat này khỏi Chat? Bản gốc ở ứng dụng kia không bị ảnh hưởng.",
-		removeYes: "Xoá",
-		readOnly: "Chat tắt \"Gửi tin từ Chat\" chỉ để đọc: bạn không gửi tin vào đó được.",
-		sendOn: "Gửi tin từ Chat",
-		enableAll: (n: number): string => `Bật gửi cho tất cả (${n})`,
-		disableAll: "Tắt gửi cho tất cả",
-		bulkConfirm: (n: number, app: string): string => `Bật "Gửi tin từ Chat" cho ${n} chat? Tin bạn gõ trong các chat đó sẽ được gửi sang ${app}, kể cả nhóm đông người.`,
-		bulkYes: "Bật cho tất cả",
-		sendOnHint: (app: string): string => `Tin bạn gõ trong chat này cũng được gửi sang ${app}.`,
-		sendUnsupported: "Ứng dụng này chưa cho gửi tin từ Chat.",
-	},
-	pick: {
-		all: "Tất cả",
-		title: "Chọn chat để đồng bộ",
-		load: "Hiện danh sách chat",
-		loading: "Đang tải danh sách…",
-		search: "Tìm theo tên",
-		empty: "Không có chat nào khớp.",
-		synced: "Đã đồng bộ",
-		forum: "Nhóm có chủ đề",
-		flat: "Chưa tách theo chủ đề",
-		split: "Đã tách theo chủ đề",
-		resync: "Đồng bộ lại theo chủ đề",
-		resyncConfirm: "Xoá bản sao này rồi đồng bộ lại để tin vào đúng chủ đề? Chat nhập lại số tin gần nhất như cũ từ ứng dụng gốc; những gì chỉ có trong Chat (tin chưa gửi sang, tin đã xoá ở Chat) sẽ mất.",
-		resyncYes: "Xoá và đồng bộ lại",
-		resyncHalf: "Đã xoá bản sao nhưng chưa bật lại được. Bật lại từ danh sách chat.",
-		window: "Số tin gần nhất cần tải",
-		windowOption: (n: number): string => n.toLocaleString("vi"),
-		windowNote: "Chọn một lần, không đổi được: Chat không tải thêm được lịch sử cũ hơn về sau.",
-		sendOn: (app: string): string => `Gửi tin từ Chat sang ${app}`,
-		sendNote: "Tin bạn gõ trong các chat này cũng được gửi sang ứng dụng kia. Tắt được cho từng chat sau.",
-		start: (n: number): string => (n === 1 ? "Bắt đầu đồng bộ" : `Bắt đầu đồng bộ ${n} chat`),
-		selected: (n: number): string => `Đã chọn ${n} chat`,
-		clear: "Bỏ chọn",
-		selectShown: (n: number): string => `Chọn tất cả ${n} chat đang hiện`,
-		unselectShown: "Bỏ chọn các chat đang hiện",
-		shownCount: (picked: number, total: number): string => `${picked}/${total} đã chọn`,
-		resume: (n: number): string => `Đăng nhập lại xong, ${n} chat sẽ tự đồng bộ tiếp.`,
-		cancel: "Huỷ",
-		started: "Đang nhập lịch sử, tin sẽ hiện dần trong Chat.",
-		kind: { private: "Chat riêng", bot: "Bot", group: "Nhóm", channel: "Kênh" } as Record<ConversationKind, string>,
-	},
 	/** Messages of a chat that sends on to the app: where each is on its way (shown in the conversation). */
 	delivery: {
 		note: (app: string): string => `Tin bạn gõ ở đây cũng được gửi sang ${app}.`,
@@ -130,13 +78,6 @@ export const viBridge = {
 	},
 	/** What is synced for one chat, feature by feature (ADR 0023). A feature the app has and this list does not name shows by its id. */
 	features: {
-		open: "Tính năng",
-		close: "Đóng",
-		title: (chat: string): string => `Đồng bộ gì cho “${chat}”`,
-		loading: "Đang tải…",
-		levels: "Mức nhanh",
-		level: { readonly: "Chỉ đọc", personal: "Cá nhân", full: "Đầy đủ" } as Record<string, string>,
-		levelHint: "Chỉ đọc: mọi thứ chỉ về Chat. Cá nhân: trạng thái của bạn (ghim, đã đọc…) đi hai chiều. Đầy đủ: thêm tin nhắn và cấu trúc nhóm. Hành động lên người và nhóm không nằm trong mức nhanh.",
 		name: {
 			messages: "Tin nhắn",
 			pins: "Ghim tin nhắn",
@@ -153,18 +94,6 @@ export const viBridge = {
 			alerts: "Thông báo tin mới",
 			service: "Dòng hệ thống (vào, rời nhóm, đổi tên…)",
 		} as Record<string, string>,
-		direction: { off: "Tắt", in: "Chỉ nhận", out: "Chỉ gửi", both: "Hai chiều" } as Record<string, string>,
-		risk: {
-			r1: "Trạng thái của bạn",
-			r2: "Người khác thấy",
-			r3: "Tác động lên người và nhóm",
-			re: "Tạm thời",
-		} as Record<string, string>,
-		followsMessages: "theo tin nhắn",
-		confirm: (feature: string, app: string): string => `Bật “${feature}” gửi sang ${app}? Việc này tác động trực tiếp lên người và nhóm ở ${app}.`,
-		confirmYes: "Bật",
-		unsupported: "Ứng dụng này chưa làm được thao tác đó.",
-		none: "Ứng dụng này chưa có tính năng nào để chỉnh.",
 	},
 	/** People and groups in the other app: invite links, adding people, leaving and deleting a group (feature panel). */
 	people: {
@@ -205,15 +134,6 @@ export const viBridge = {
 			wrongName: "Tên chưa đúng.",
 			expired: "Hết hạn xác nhận, làm lại từ đầu.",
 		},
-	},
-	defaults: {
-		title: "Mặc định cho chat mới",
-		hint: (app: string): string => `Chat mới đồng bộ từ ${app} bắt đầu với các lựa chọn này. Rời và xoá nhóm, thành viên, link mời và tin nhắn chọn riêng từng chat.`,
-		chosen: "Đã chọn",
-		builtIn: "Mặc định có sẵn",
-		saved: "Đã lưu; chat đã đồng bộ giữ nguyên.",
-		applyAll: (n: number): string => `Áp luôn cho tất cả chat đã đồng bộ (${n})`,
-		applied: (n: number): string => `Đã áp cho ${n} chat.`,
 	},
 	problems: {
 		title: (n: number): string => (n === 0 ? "Lỗi đồng bộ" : `Lỗi đồng bộ (${n})`),
