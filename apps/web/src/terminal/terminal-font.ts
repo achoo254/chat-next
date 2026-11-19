@@ -64,8 +64,8 @@ export function textOptions(size: number) {
 		fontSize: size,
 		lineHeight: LINE_HEIGHT,
 		letterSpacing: 0,
-		fontWeight: 500,
-		fontWeightBold: 700,
+		fontWeight: 600,
+		fontWeightBold: 800,
 		minimumContrastRatio: MIN_CONTRAST,
 		theme: THEME,
 	} as const;
@@ -120,6 +120,6 @@ export function fontKeyOf(event: Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "al
 export function waitForFont(size: number, ms: number): Promise<void> {
 	const fonts = typeof document === "undefined" ? undefined : document.fonts;
 	if (fonts === undefined || typeof fonts.load !== "function") return Promise.resolve();
-	const loads = ["500", "700"].map((weight) => fonts.load(`${weight} ${size}px "JetBrains Mono"`, FONT_SAMPLE).then(() => undefined, () => undefined));
+	const loads = ["600", "800"].map((weight) => fonts.load(`${weight} ${size}px "JetBrains Mono"`, FONT_SAMPLE).then(() => undefined, () => undefined));
 	return Promise.race([Promise.all(loads).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, ms))]);
 }
