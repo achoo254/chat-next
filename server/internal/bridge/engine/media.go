@@ -171,11 +171,12 @@ var fileIdle = 60 * time.Second
 // watched closes stream when no byte came for fileIdle, or when ctx ends, so a Read
 // stuck on a stalled download returns. The returned stop ends the watch.
 func watched(ctx context.Context, stream bridge.MediaStream) (io.Reader, func()) {
+	idle := fileIdle // read once: the watch goroutine must not race a change of it
 	var last atomic.Int64
 	last.Store(time.Now().UnixNano())
 	done := make(chan struct{})
 	go func() {
-		tick := time.NewTicker(fileIdle / 6)
+		tick := time.NewTicker(idle / 6)
 		defer tick.Stop()
 		for {
 			select {
@@ -185,7 +186,7 @@ func watched(ctx context.Context, stream bridge.MediaStream) (io.Reader, func())
 				_ = stream.Close()
 				return
 			case <-tick.C:
-				if time.Since(time.Unix(0, last.Load())) > fileIdle {
+				if time.Since(time.Unix(0, last.Load())) > idle {
 					_ = stream.Close()
 					return
 				}
