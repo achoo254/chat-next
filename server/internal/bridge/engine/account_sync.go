@@ -102,7 +102,16 @@ func (r *runner) importNext(ctx context.Context) error {
 			continue
 		}
 		if err := r.backfill(ctx, l); err != nil {
-			return err
+			if !refused(err) {
+				return err
+			}
+			// The other app will not give this conversation's history (a peer it no longer
+			// knows, no right to read): it keeps what it has and stops being waited for.
+			r.logger.Warn("the first import of a conversation was refused; it is left as it is", "conversation", l.ExternalChat, "reason", err.Error())
+			if err := r.e.db.finishBackfill(ctx, l.ID, ""); err != nil {
+				return err
+			}
+			l.BackfillDone = true
 		}
 		break
 	}

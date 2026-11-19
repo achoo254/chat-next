@@ -64,6 +64,7 @@ type Fake struct {
 	photoCalls                                 []string
 	photoFetches                               int
 	forwards                                   []string
+	refuse                                     map[string]bool
 	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
@@ -76,7 +77,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -233,6 +234,10 @@ func (f *Fake) ListConversations(context.Context, bridge.Account) ([]bridge.Conv
 // Backfill implements bridge.Adapter: pages of history, newest first.
 func (f *Fake) Backfill(_ context.Context, _ bridge.Account, conv string, cur bridge.Cursor, limit int) (bridge.Page, error) {
 	f.mu.Lock()
+	if f.refuse[conv] {
+		f.mu.Unlock()
+		return bridge.Page{}, refusedErr(conv)
+	}
 	f.backfillCalls++
 	f.pages[conv]++
 	pageNo := f.pages[conv]
@@ -575,6 +580,9 @@ func (f *Fake) DialogCalls() []string {
 func (f *Fake) DialogStates(_ context.Context, _ bridge.Account, convs []string) (map[string]bridge.DialogState, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if err := f.refusedOne(convs); err != nil {
+		return nil, err
+	}
 	out := map[string]bridge.DialogState{}
 	for _, c := range convs {
 		out[c] = f.dialogs[c]
@@ -642,6 +650,9 @@ func (f *Fake) InfoCalls() []string {
 func (f *Fake) GroupInfos(_ context.Context, _ bridge.Account, convs []string) (map[string]bridge.GroupInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if err := f.refusedOne(convs); err != nil {
+		return nil, err
+	}
 	out := map[string]bridge.GroupInfo{}
 	for _, c := range convs {
 		if info, ok := f.infos[c]; ok {
@@ -815,7 +826,36 @@ func (f *Fake) Invites(conv string) []bridge.InviteLink {
 
 // ListInvites implements bridge.InviteManager.
 func (f *Fake) ListInvites(_ context.Context, _ bridge.Account, conv string) ([]bridge.InviteLink, error) {
+	f.mu.Lock()
+	refused := f.refuse[conv]
+	f.mu.Unlock()
+	if refused {
+		return nil, refusedErr(conv)
+	}
 	return f.Invites(conv), nil
+}
+
+// Refuse makes the app refuse every read about a conversation (history, state, info,
+// invite links), as Telegram does for a peer it no longer knows; a batch naming it is
+// refused whole.
+func (f *Fake) Refuse(conv string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.refuse[conv] = true
+}
+
+func refusedErr(conv string) error {
+	return fmt.Errorf("%w: PEER_ID_INVALID (%s)", bridge.ErrNotAllowed, conv)
+}
+
+// refusedOne is the refusal of a batch that names a refused conversation; f.mu is held.
+func (f *Fake) refusedOne(convs []string) error {
+	for _, c := range convs {
+		if f.refuse[c] {
+			return refusedErr(c)
+		}
+	}
+	return nil
 }
 
 // CreateInvite implements bridge.InviteManager.

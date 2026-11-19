@@ -77,7 +77,10 @@ func (r *runner) pollInvites(ctx context.Context) error {
 		}
 		links, err := retryRateLimit(ctx, func() ([]bridge.InviteLink, error) { return mgr.ListInvites(ctx, r.acct, conv) })
 		if err != nil {
-			return err
+			if err := r.skipRefused(err, "invites", conv); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := r.storeInvites(ctx, l.ExternalChat, links); err != nil {
 			return err

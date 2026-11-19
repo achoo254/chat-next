@@ -361,6 +361,40 @@ func (r *runner) handle(ctx context.Context, ev bridge.Event) error {
 	return nil
 }
 
+// refused reports that the other app refused a call about one conversation (no right
+// there, a peer it no longer knows): retrying cannot help, and it must not stop the sync
+// of the account's other conversations.
+func refused(err error) bool { return errors.Is(err, bridge.ErrNotAllowed) }
+
+// skipRefused logs a refusal about one conversation and lets the caller go on to the
+// next; any other error comes back unchanged.
+func (r *runner) skipRefused(err error, what, conv string) error {
+	if !refused(err) {
+		return err
+	}
+	r.logger.Warn("the other app refused this for one conversation; it is skipped", "what", what, "conversation", conv, "reason", err.Error())
+	return nil
+}
+
+// eachAlone asks again for each conversation of a batch on its own, after the other app
+// refused the batch for one of them, and leaves out only the ones it refuses alone.
+func eachAlone[T any](ctx context.Context, r *runner, what string, batch []string, call func([]string) (map[string]T, error)) (map[string]T, error) {
+	out := map[string]T{}
+	for _, conv := range batch {
+		got, err := retryRateLimit(ctx, func() (map[string]T, error) { return call([]string{conv}) })
+		if err != nil {
+			if err := r.skipRefused(err, what, conv); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		for k, v := range got {
+			out[k] = v
+		}
+	}
+	return out, nil
+}
+
 // isSkippable reports an error that retrying cannot fix and that concerns
 // only the one event: Chat refused its content.
 func isSkippable(err error) bool {

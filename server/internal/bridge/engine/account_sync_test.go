@@ -78,3 +78,31 @@ func TestAConversationThatAppearsLaterJoinsOnItsOwnWithItsMessage(t *testing.T) 
 	e.eventually(func() bool { return e.chatOf("g3") != 0 }, func() string { return "the new conversation got no chat" })
 	e.waitTexts(e.chatOf("g3"), []string{"nhóm mới"})
 }
+
+func TestAConversationTheOtherAppRefusesDoesNotStopTheSyncOfTheOthers(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "nhóm một", 1))
+	e.group("bad")
+	e.fake.AddHistory("bad", e.msg("b1", lan, "không đọc được", 1))
+	e.group("g2")
+	e.fake.AddHistory("g2", e.msg("n1", minh, "nhóm hai", 2))
+	e.fake.SetGroupInfoRemotely("g2", bridge.GroupInfo{Title: "Nhóm hai đổi tên", About: ""})
+	e.fake.SetDialogState("g2", bridge.DialogState{Pinned: true})
+	e.fake.Refuse("bad")
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	e.waitTexts(e.chatOf("g1"), []string{"nhóm một"})
+	e.waitTexts(e.chatOf("g2"), []string{"nhóm hai"})
+	// the looks at the state go on past the refused conversation
+	e.eventually(func() bool { t2, _ := e.chatInfo(e.chatOf("g2")); return t2 == "Nhóm hai đổi tên" }, func() string { return "the info of g2 did not come in" })
+	e.waitOwner(e.chatOf("g2"), func(s ownerState) bool { return s.pinned }, "the state of g2 did not come in")
+	// and the account was never reconnected for it
+	if n := e.fake.SubscribeCalls(); n != 1 {
+		t.Fatalf("the account connected %d times: a refusal stopped its sync", n)
+	}
+}

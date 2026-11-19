@@ -61,7 +61,13 @@ func (r *runner) pollDialogs(ctx context.Context) error {
 	}
 	for start := 0; start < len(convs); start += dialogBatch {
 		batch := convs[start:min(start+dialogBatch, len(convs))]
-		states, err := retryRateLimit(ctx, func() (map[string]bridge.DialogState, error) { return reader.DialogStates(ctx, r.acct, batch) })
+		ask := func(convs []string) (map[string]bridge.DialogState, error) {
+			return reader.DialogStates(ctx, r.acct, convs)
+		}
+		states, err := retryRateLimit(ctx, func() (map[string]bridge.DialogState, error) { return ask(batch) })
+		if refused(err) {
+			states, err = eachAlone(ctx, r, "dialogs", batch, ask)
+		}
 		if err != nil {
 			return err
 		}
@@ -185,8 +191,11 @@ func (r *runner) pollAll(ctx context.Context) error {
 		if h.poll == nil {
 			continue
 		}
+		// A refusal that a poll did not handle per conversation still must not stop the sync.
 		if err := h.poll(r, ctx); err != nil {
-			return err
+			if err := r.skipRefused(err, string(h.feature), ""); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

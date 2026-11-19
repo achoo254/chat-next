@@ -78,7 +78,10 @@ func (r *runner) pollMembers(ctx context.Context) error {
 		}
 		list, complete, err := retryRateLimit2(ctx, func() ([]bridge.Member, bool, error) { return reader.ListMembers(ctx, r.acct, conv) })
 		if err != nil {
-			return err
+			if err := r.skipRefused(err, "members", conv); err != nil {
+				return err
+			}
+			continue
 		}
 		var members []chat.ImportedMember
 		for _, m := range list {

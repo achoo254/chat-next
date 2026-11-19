@@ -141,7 +141,7 @@ func (r *runner) readReactions(ctx context.Context, reader bridge.ReactionReader
 	}
 	list, err := retryRateLimit(ctx, func() ([]bridge.Reactions, error) { return reader.MessageReactions(ctx, r.acct, conv, ids) })
 	if err != nil {
-		return err
+		return r.skipRefused(err, "reactions", conv)
 	}
 	return r.applyReactions(ctx, l, list, nil)
 }

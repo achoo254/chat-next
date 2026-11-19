@@ -41,7 +41,13 @@ func (r *runner) pollInfo(ctx context.Context) error {
 	}
 	for start := 0; start < len(convs); start += dialogBatch {
 		batch := convs[start:min(start+dialogBatch, len(convs))]
-		infos, err := retryRateLimit(ctx, func() (map[string]bridge.GroupInfo, error) { return reader.GroupInfos(ctx, r.acct, batch) })
+		ask := func(convs []string) (map[string]bridge.GroupInfo, error) {
+			return reader.GroupInfos(ctx, r.acct, convs)
+		}
+		infos, err := retryRateLimit(ctx, func() (map[string]bridge.GroupInfo, error) { return ask(batch) })
+		if refused(err) {
+			infos, err = eachAlone(ctx, r, "info", batch, ask)
+		}
 		if err != nil {
 			return err
 		}
