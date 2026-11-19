@@ -112,6 +112,9 @@ func (r *runner) doPin(ctx context.Context, sender bridge.Sender, h *outboxRow, 
 			return err
 		}
 		if k == nil {
+			if waiting, err := r.waitForSend(ctx, h); err != nil || waiting {
+				return err
+			}
 			return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
 		}
 		conv, ext = k.chat, k.msg

@@ -10,6 +10,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/feature"
 	"app.local/server/internal/chat"
 	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
@@ -45,18 +46,45 @@ type outboxRow struct {
 	Payload []byte
 }
 
-// outboxHeads returns the oldest queued row of each synced chat of the
-// account, oldest first.
+// orderedFeatures are the features whose rows of a chat go out in the order they were
+// queued: an edit must follow its send, adding a person must come before removing them.
+// Every other row holds a state wanted for one object (a topic, a message's pin or
+// reaction, the chat's mute), one row per object, so it does not wait for the others:
+// a row the other app keeps refusing for a while holds up only its own object.
+var orderedFeatures = []string{string(feature.Messages), string(feature.Members), string(feature.Invites), string(feature.Lifecycle)}
+
+// outboxHeads returns the oldest queued row of each lane of each synced chat of the
+// account, oldest first. A lane is an ordered feature of the chat, or one object of
+// any other feature (its op and seq).
 func (d *db) outboxHeads(ctx context.Context, accountID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
 		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM (
-			SELECT DISTINCT ON (external_chat_id) * FROM external_outbox
-			WHERE account_id = $1 AND status IN ('pending', 'sending') ORDER BY external_chat_id, id
-		) h ORDER BY id`, accountID)
+			SELECT DISTINCT ON (external_chat_id, lane) * FROM (
+				SELECT o.*, CASE WHEN o.feature = ANY($2) THEN o.feature ELSE o.op || ':' || o.seq END AS lane
+				FROM external_outbox o WHERE o.account_id = $1 AND o.status IN ('pending', 'sending')
+			) q ORDER BY external_chat_id, lane, id
+		) h ORDER BY id`, accountID, orderedFeatures)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: outbox heads: %w", err)
 	}
 	return pgx.CollectRows(rows, scanOutbox)
+}
+
+// waitForSend leaves a row of a message pending when the message is not in the other
+// app yet because its own send is still queued (the send and the row are in different
+// lanes); the row then goes once the message is there. It reports whether it did; a
+// message that is not going out at all is not waited for.
+func (r *runner) waitForSend(ctx context.Context, h *outboxRow) (bool, error) {
+	var queued bool
+	if err := r.e.db.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM external_outbox WHERE chat_id = $1 AND seq = $2 AND op = 'send' AND status IN ('pending', 'sending'))`,
+		h.ChatID, h.Seq).Scan(&queued); err != nil {
+		return false, fmt.Errorf("bridge: send queued: %w", err)
+	}
+	if !queued {
+		return false, nil
+	}
+	return true, r.e.db.setOutbox(ctx, []int64{h.ID}, "pending", "", time.Now().Add(r.e.cfg.BackoffMin))
 }
 
 // outboxFollowing returns the queued sends of a chat after row id, oldest first.

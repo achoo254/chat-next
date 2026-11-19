@@ -97,7 +97,7 @@ SELECT account_id, external_chat_id, chat_id, history_window, backfill_done FROM
 SELECT count(*) FROM external_logouts;   -- đăng xuất đang chờ của tài khoản đã xoá
 ```
 
-- Hàng đợi gửi (mỗi chat một hàng, theo thứ tự): xem việc đang chờ hoặc hỏng bằng
+- Hàng đợi gửi: trong mỗi chat, tin nhắn (gửi, sửa, xoá) đi theo thứ tự, thành viên, link mời, rời và xoá nhóm cũng vậy (mỗi tính năng một hàng riêng); mọi trạng thái khác (topic, ghim, reaction, tắt tiếng, đã đọc, thông tin nhóm) mỗi đối tượng một hàng, nên một lệnh đang thử lại chỉ chặn chính đối tượng đó. Ghim hay reaction cho một tin chưa gửi xong thì chờ tin đó. Xem việc đang chờ hoặc hỏng bằng
   ```sql
   SELECT status, op, count(*), max(attempts) FROM external_outbox GROUP BY status, op;
   SELECT chat_id, seq, op, status, attempts, last_error, updated_at FROM external_outbox

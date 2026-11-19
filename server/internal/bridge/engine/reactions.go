@@ -180,6 +180,9 @@ func (r *runner) doReaction(ctx context.Context, h *outboxRow) error {
 		return err
 	}
 	if k == nil {
+		if waiting, err := r.waitForSend(ctx, h); err != nil || waiting {
+			return err
+		}
 		return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
 	}
 	if err := db.startSendingState(ctx, h); err != nil {

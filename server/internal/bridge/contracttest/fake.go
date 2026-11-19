@@ -56,6 +56,7 @@ type Fake struct {
 	reactions                                  map[string]map[string]string // conv/msg -> participant -> emoji
 	reactionCalls                              []string
 	failPin                                    []error
+	failTopicEdit                              error
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
 	DedupeRandomID bool
@@ -452,6 +453,13 @@ type PinCall struct {
 	Pinned       bool
 }
 
+// FailTopicEdits makes every topic edit return err until it is called with nil.
+func (f *Fake) FailTopicEdits(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failTopicEdit = err
+}
+
 // FailPin makes the next pin calls return errs, one each.
 func (f *Fake) FailPin(errs ...error) {
 	f.mu.Lock()
@@ -659,6 +667,9 @@ func (f *Fake) EditTopic(_ context.Context, _ bridge.Account, conv, topic string
 	defer f.mu.Unlock()
 	if !f.support[feature.Topics].Out {
 		return fmt.Errorf("%w: this app does not take topic changes from Chat", bridge.ErrNotAllowed)
+	}
+	if f.failTopicEdit != nil {
+		return f.failTopicEdit
 	}
 	if err := f.nextPinFailure(); err != nil {
 		return err
