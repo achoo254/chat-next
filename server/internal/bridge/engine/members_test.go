@@ -70,20 +70,13 @@ func (e *env) membersOn(eng interface {
 	}
 }
 
-func TestMembersAreNotSyncedUntilTheFeatureIsTurnedOn(t *testing.T) {
+func TestMembersComeInWithoutBeingSwitchedOn(t *testing.T) {
 	e := newEnv(t)
 	conv := e.group("g1")
 	e.fake.AddHistory("g1", e.msg("m1", lan, "tin 1", 1))
 	e.fake.SetMembers("g1", false, tgMember("user:11", "An", false))
-	eng, chatID := e.enableWith(conv)
+	_, chatID := e.enableWith(conv)
 	e.waitTexts(chatID, []string{"tin 1"})
-	time.Sleep(400 * time.Millisecond)
-	for _, r := range e.memberRoles(chatID) {
-		if strings.HasPrefix(r, "An:") {
-			t.Fatal("a member came in with the members feature off (its default)")
-		}
-	}
-	e.membersOn(eng, feature.In)
 	e.waitMembers(chatID, "An:member")
 }
 

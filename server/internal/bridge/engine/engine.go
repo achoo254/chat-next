@@ -170,6 +170,14 @@ type runner struct {
 	infoTick int
 	// reactionsTick counts the same looks, to read the reactions of the newest messages once in a while.
 	reactionsTick int
+	// pending are the chats waiting for their first import, oldest queued first.
+	pending []*chatLink
+	// syncNow asks the runner to read the account's switch again and list the conversations.
+	syncNow chan struct{}
+	// conversationsTick counts the looks at the state, to list the conversations once in a while.
+	conversationsTick int
+	// relist asks for the conversations to be listed again (a message came from one without a chat).
+	relist bool
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -208,9 +216,12 @@ func (r *runner) run(ctx context.Context) error {
 			caughtUp = append(caughtUp, l)
 			continue
 		}
-		if err := r.backfill(runCtx, l); err != nil {
-			return r.settle(runCtx, err)
-		}
+		// Imported between events (importNext), so a long first sync of many chats
+		// does not hold up what arrives meanwhile.
+		r.pending = append(r.pending, l)
+	}
+	if err := r.syncConversations(runCtx); err != nil {
+		return r.settle(runCtx, err)
 	}
 	// A chat synced before pins were read gets them now; a chat that was just
 	// imported got them at the end of its backfill.
@@ -221,6 +232,8 @@ func (r *runner) run(ctx context.Context) error {
 	}
 	outbox := time.NewTicker(e.cfg.OutboxPoll)
 	defer outbox.Stop()
+	imports := time.NewTicker(e.cfg.OutboxPoll)
+	defer imports.Stop()
 	states := time.NewTicker(e.cfg.StatePoll)
 	defer states.Stop()
 	if err := r.pollAll(runCtx); err != nil {
@@ -236,6 +249,24 @@ func (r *runner) run(ctx context.Context) error {
 			}
 		case <-states.C:
 			if err := r.pollAll(runCtx); err != nil {
+				return r.settle(runCtx, err)
+			}
+			r.conversationsTick++
+			if r.conversationsTick%conversationsEvery == 0 || r.relist {
+				r.relist = false
+				if err := r.syncConversations(runCtx); err != nil {
+					return r.settle(runCtx, err)
+				}
+			}
+		case <-imports.C:
+			if err := r.importNext(runCtx); err != nil {
+				return r.settle(runCtx, err)
+			}
+		case <-r.syncNow:
+			if err := r.reloadSyncState(runCtx); err != nil {
+				return r.settle(runCtx, err)
+			}
+			if err := r.syncConversations(runCtx); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case err := <-subDone:
@@ -641,6 +672,9 @@ func (r *runner) onEdit(ctx context.Context, ev bridge.Event, m bridge.Message) 
 // a repeat. It reports whether it saved the adapter state in the write.
 func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, isEdit bool) (bool, error) {
 	l := r.links[m.Conversation]
+	if l == nil && r.syncOn() {
+		r.relist = true // a conversation without a chat yet: it gets one, this message with its history
+	}
 	if l == nil || !l.BackfillDone {
 		return false, nil
 	}

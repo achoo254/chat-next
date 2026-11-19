@@ -109,32 +109,13 @@ func (d Direction) Receives() bool { return d == In || d == Both }
 // Sends is whether changes in Chat reach the other app.
 func (d Direction) Sends() bool { return d == Out || d == Both }
 
-// Default is the direction of f for a chat that has none set, given the
-// direction of its messages (In for a chat that only reads, Both for one that
-// sends on what the owner writes):
-//
-//   - the owner's own state and pins (R1) and the structure of a group (R2) follow
-//     the messages, so a chat that sends on also carries these;
-//   - acting on people and groups (R3) is Off until it is switched on for the chat;
-//   - typing only comes in, and is Off until switched on;
-//   - alerts are Off until switched on, so a busy group does not start to notify by itself.
-func Default(f Feature, messages Direction) Direction {
-	if f == Messages {
-		return messages
-	}
-	if f == Alerts {
-		return Off
-	}
-	switch RiskOf(f) {
-	case R3:
-		return Off
-	case RE:
-		return Off
-	}
-	if messages == Both {
-		return Both
-	}
-	return In
+// Default is the direction of a feature of a chat: the chat's own.
+func Default(_ Feature, messages Direction) Direction {
+	// One switch per account (ADR 0024): every feature goes the way the chat does,
+	// two-way while the account is connected. What an app cannot do in a direction
+	// is left out by its Support. Acting on people and groups keeps its guard rails
+	// at each action (confirmation, log, limit), not as a switch.
+	return messages
 }
 
 // Support is what an adapter can do for a feature.

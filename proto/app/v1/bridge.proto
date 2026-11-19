@@ -30,6 +30,11 @@ service BridgeService {
   // Which apps can be connected, the user's connected accounts and their
   // synced chats.
   rpc GetBridgeStatus(GetBridgeStatusRequest) returns (GetBridgeStatusResponse);
+  // Turns on the account's one switch (ADR 0024): every conversation of the app
+  // gets a chat, its newest 2,000 messages imported, newest conversation first, and
+  // every one that appears later joins on its own; all of them sync both ways.
+  // Turning it on again does nothing.
+  rpc StartBridgeSync(StartBridgeSyncRequest) returns (StartBridgeSyncResponse);
   // Starts signing in to an app. The answer is the first step to show.
   // Rate limited (resource_exhausted): a login sends a code to a phone.
   rpc StartBridgeLogin(StartBridgeLoginRequest) returns (StartBridgeLoginResponse);
@@ -136,7 +141,35 @@ message BridgeAccount {
   // Why the connection last failed (a short text, no secret); empty when fine.
   string last_error = 4;
   repeated BridgeSyncedChat chats = 5;
+  BridgeSyncState sync_state = 6;
+  BridgeSyncProgress progress = 7;
 }
+
+enum BridgeSyncState {
+  BRIDGE_SYNC_STATE_UNSPECIFIED = 0;
+  // Not asked yet, or the user chose later.
+  BRIDGE_SYNC_STATE_OFF = 1;
+  // The first import of the conversations is running.
+  BRIDGE_SYNC_STATE_SYNCING = 2;
+  // Everything is imported; changes flow both ways as they happen.
+  BRIDGE_SYNC_STATE_LIVE = 3;
+}
+
+// How far the first import went.
+message BridgeSyncProgress {
+  // Conversations that have a chat, and how many of them are imported.
+  int32 conversations = 1;
+  int32 conversations_done = 2;
+  // Messages imported, of the ones expected (a chat still importing counts its whole window).
+  int64 messages = 3 [jstype = JS_NUMBER];
+  int64 messages_expected = 4 [jstype = JS_NUMBER];
+}
+
+message StartBridgeSyncRequest {
+  int64 account_id = 1 [jstype = JS_NUMBER];
+}
+
+message StartBridgeSyncResponse {}
 
 message GetBridgeStatusRequest {}
 

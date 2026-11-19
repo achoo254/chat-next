@@ -8,7 +8,7 @@ import (
 	"app.local/server/internal/bridge/feature"
 )
 
-func TestAChatThatSendsOnCarriesItsPinsAndAChatThatOnlyReadsDoesNot(t *testing.T) {
+func TestEveryFeatureOfALinkedChatFollowsItsDirection(t *testing.T) {
 	h := newHarness(t, nil)
 	ctx := context.Background()
 	owner := h.user("owner")
@@ -24,8 +24,10 @@ func TestAChatThatSendsOnCarriesItsPinsAndAChatThatOnlyReadsDoesNot(t *testing.T
 		if got[feature.Pins].Direction != want || !got[feature.Pins].Default || got[feature.Messages].Direction != want {
 			t.Fatalf("pins %+v, messages %+v; want both to follow %s", got[feature.Pins], got[feature.Messages], want)
 		}
-		if got[feature.Members].Direction != feature.Off || got[feature.Typing].Direction != feature.Off {
-			t.Fatalf("people and typing are %s and %s, want off", got[feature.Members].Direction, got[feature.Typing].Direction)
+		// One switch (ADR 0024): acting on people follows the chat too; its guard rails
+		// are at each action.
+		if got[feature.Members].Direction != want || got[feature.Typing].Direction != want {
+			t.Fatalf("people and typing are %s and %s, want %s", got[feature.Members].Direction, got[feature.Typing].Direction, want)
 		}
 	}
 }

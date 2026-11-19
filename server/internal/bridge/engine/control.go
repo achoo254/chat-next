@@ -178,6 +178,18 @@ type AccountView struct {
 	Status    string
 	LastError string
 	Chats     []ChatView
+	// SyncState is the account's one switch: off, syncing or live (ADR 0024).
+	SyncState string
+	Progress  SyncProgress
+}
+
+// SyncProgress is how far the first import of the account's conversations went.
+type SyncProgress struct {
+	// Conversations has a chat; Done of them are imported.
+	Conversations, Done int
+	// Messages imported so far, of Expected: a chat imported counts what it took, one
+	// still importing its whole window.
+	Messages, Expected int64
 }
 
 // ChatView is a synced chat.
@@ -195,13 +207,13 @@ type ChatView struct {
 
 // Accounts lists the accounts of owner.
 func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, error) {
-	rows, err := e.db.pool.Query(ctx, `SELECT id, source, status, last_error FROM external_accounts WHERE owner_id = $1 ORDER BY id`, owner)
+	rows, err := e.db.pool.Query(ctx, `SELECT id, source, status, last_error, sync_state FROM external_accounts WHERE owner_id = $1 ORDER BY id`, owner)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list accounts: %w", err)
 	}
 	accounts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (AccountView, error) {
 		var a AccountView
-		err := r.Scan(&a.ID, &a.Source, &a.Status, &a.LastError)
+		err := r.Scan(&a.ID, &a.Source, &a.Status, &a.LastError, &a.SyncState)
 		return a, err
 	})
 	if err != nil {
@@ -214,6 +226,9 @@ func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, erro
 		}
 		for _, l := range links {
 			accounts[i].Chats = append(accounts[i].Chats, ChatView{ConversationID: l.ExternalChat, ChatID: l.ChatID, CaughtUp: l.BackfillDone, HistoryWindow: l.HistoryMax, Title: l.Title, Direction: l.Direction, TopicsSplit: l.Forum})
+		}
+		if accounts[i].Progress, err = e.db.syncProgress(ctx, accounts[i].ID); err != nil {
+			return nil, err
 		}
 	}
 	return accounts, nil

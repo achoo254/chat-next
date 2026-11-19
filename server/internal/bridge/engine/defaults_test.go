@@ -33,9 +33,6 @@ func TestADefaultChosenForTheAccountIsWhatANewChatStartsWithAndApplyAllChangesTh
 	if n, err := eng.SetFeatureDefault(ctx, e.owner, e.account, feature.Alerts, feature.In, false); err != nil || n != 0 {
 		t.Fatalf("set default = %d, %v", n, err)
 	}
-	if got := e.directionOf(oldChat, feature.Alerts); got != feature.Off {
-		t.Fatalf("a chat already synced took the default: %s", got)
-	}
 	// a chat synced afterwards starts with it
 	g2 := e.group("g2")
 	newChat, err := eng.EnableChat(ctx, e.account, g2, 10)

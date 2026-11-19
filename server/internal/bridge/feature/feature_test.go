@@ -21,20 +21,12 @@ func TestEveryFeatureHasARiskAndADefault(t *testing.T) {
 	}
 }
 
-func TestDefaultsFollowTheMessagesExceptForPeopleAndTyping(t *testing.T) {
-	for _, tc := range []struct {
-		f        Feature
-		messages Direction
-		want     Direction
-	}{
-		{Messages, In, In}, {Messages, Both, Both},
-		{Pins, In, In}, {Pins, Both, Both},
-		{Reactions, Both, Both}, {Read, In, In}, {Notify, Both, Both}, {Dialog, Both, Both},
-		{Topics, Both, Both}, {Info, In, In},
-		{Members, Both, Off}, {Invites, Both, Off}, {Typing, Both, Off}, {Lifecycle, Both, Off}, {Alerts, Both, Off}, {Alerts, In, Off},
-	} {
-		if got := Default(tc.f, tc.messages); got != tc.want {
-			t.Errorf("Default(%s, %s) = %s, want %s", tc.f, tc.messages, got, tc.want)
+func TestEveryFeatureFollowsTheChatsDirection(t *testing.T) {
+	for _, f := range All() {
+		for _, d := range []Direction{In, Both} {
+			if got := Default(f, d); got != d {
+				t.Errorf("Default(%s, %s) = %s, want %s", f, d, got, d)
+			}
 		}
 	}
 }

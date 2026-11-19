@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/bridge.proto.
  */
 export const file_app_v1_bridge: GenFile = /*@__PURE__*/
-  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSK8AQoQQnJpZGdlU3luY2VkQ2hhdBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSEwoHY2hhdF9pZBgCIAEoA0ICMAISEQoJY2F1Z2h0X3VwGAMgASgIEhYKDmhpc3Rvcnlfd2luZG93GAQgASgFEg0KBXRpdGxlGAUgASgJEioKCWRpcmVjdGlvbhgGIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24SFAoMdG9waWNzX3NwbGl0GAcgASgIIpkBCg1CcmlkZ2VBY2NvdW50Eg4KAmlkGAEgASgDQgIwAhIOCgZzb3VyY2UYAiABKAkSKwoGc3RhdHVzGAMgASgOMhsuYXBwLnYxLkJyaWRnZUFjY291bnRTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRInCgVjaGF0cxgFIAMoCzIYLmFwcC52MS5CcmlkZ2VTeW5jZWRDaGF0IhgKFkdldEJyaWRnZVN0YXR1c1JlcXVlc3QiYwoXR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USHwoEYXBwcxgBIAMoCzIRLmFwcC52MS5CcmlkZ2VBcHASJwoIYWNjb3VudHMYAiADKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCI/ChBCcmlkZ2VMb2dpbkZpZWxkEgwKBG5hbWUYASABKAkSDQoFbGFiZWwYAiABKAkSDgoGc2VjcmV0GAMgASgIIrABCg9CcmlkZ2VMb2dpblN0ZXASKQoEa2luZBgBIAEoDjIbLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXBLaW5kEhAKCGxvZ2luX2lkGAIgASgJEigKBmZpZWxkcxgDIAMoCzIYLmFwcC52MS5CcmlkZ2VMb2dpbkZpZWxkEg4KBnByb21wdBgEIAEoCRImCgdhY2NvdW50GAUgASgLMhUuYXBwLnYxLkJyaWRnZUFjY291bnQiKQoXU3RhcnRCcmlkZ2VMb2dpblJlcXVlc3QSDgoGc291cmNlGAEgASgJIkEKGFN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRIlCgRzdGVwGAEgASgLMhcuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcCKaAQoaQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QSEAoIbG9naW5faWQYASABKAkSPAoFaW5wdXQYAiADKAsyLS5hcHAudjEuQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QuSW5wdXRFbnRyeRosCgpJbnB1dEVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiRAobQ29udGludWVCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIjgKHkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiKXAQoSQnJpZGdlQ29udmVyc2F0aW9uEgoKAmlkGAEgASgJEiwKBGtpbmQYAiABKA4yHi5hcHAudjEuQnJpZGdlQ29udmVyc2F0aW9uS2luZBINCgV0aXRsZRgDIAEoCRITCgdjaGF0X2lkGAQgASgDQgIwAhINCgVmb3J1bRgFIAEoCBIUCgx0b3BpY3Nfc3BsaXQYBiABKAgiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiKOAQoXRW5hYmxlQnJpZGdlQ2hhdFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhYKDmhpc3Rvcnlfd2luZG93GAMgASgFEioKCWRpcmVjdGlvbhgEIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24iLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlInwKHVNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIqCglkaXJlY3Rpb24YAyABKA4yFy5hcHAudjEuQnJpZGdlRGlyZWN0aW9uIiAKHlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZSKBAQoQQnJpZGdlT3V0Ym94SXRlbRIPCgNzZXEYASABKANCAjACEgoKAm9wGAIgASgJEioKBnN0YXR1cxgDIAEoDjIaLmFwcC52MS5CcmlkZ2VPdXRib3hTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRIQCghhdHRlbXB0cxgFIAEoBSIuChdMaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJDChhMaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5hcHAudjEuQnJpZGdlT3V0Ym94SXRlbSJBChlSZXRyeUJyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHAoaUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2UiQwobRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHgocRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZSJMChlMaXN0QnJpZGdlRmVhdHVyZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJ8Cg1CcmlkZ2VGZWF0dXJlEg8KB2ZlYXR1cmUYASABKAkSDAoEcmlzaxgCIAEoCRIRCglkaXJlY3Rpb24YAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJFChpMaXN0QnJpZGdlRmVhdHVyZXNSZXNwb25zZRInCghmZWF0dXJlcxgBIAMoCzIVLmFwcC52MS5CcmlkZ2VGZWF0dXJlIm4KF1NldEJyaWRnZUZlYXR1cmVSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIPCgdmZWF0dXJlGAMgASgJEhEKCWRpcmVjdGlvbhgEIAEoCSIaChhTZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2UiSwoYTGlzdEJyaWRnZUludml0ZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJLCgxCcmlkZ2VJbnZpdGUSDAoEbGluaxgBIAEoCRINCgV0aXRsZRgCIAEoCRIPCgdyZXZva2VkGAMgASgIEg0KBXVzYWdlGAQgASgFIkIKGUxpc3RCcmlkZ2VJbnZpdGVzUmVzcG9uc2USJQoHaW52aXRlcxgBIAMoCzIULmFwcC52MS5CcmlkZ2VJbnZpdGUiWwoZQ3JlYXRlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDQoFdGl0bGUYAyABKAkiHAoaQ3JlYXRlQnJpZGdlSW52aXRlUmVzcG9uc2UiWgoZUmV2b2tlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDAoEbGluaxgDIAEoCSIcChpSZXZva2VCcmlkZ2VJbnZpdGVSZXNwb25zZSJOChtMaXN0QnJpZGdlQ2FuZGlkYXRlc1JlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJIjcKD0JyaWRnZUNhbmRpZGF0ZRIWCg5wYXJ0aWNpcGFudF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIksKHExpc3RCcmlkZ2VDYW5kaWRhdGVzUmVzcG9uc2USKwoKY2FuZGlkYXRlcxgBIAMoCzIXLmFwcC52MS5CcmlkZ2VDYW5kaWRhdGUiYQoWQWRkQnJpZGdlTWVtYmVyUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFgoOcGFydGljaXBhbnRfaWQYAyABKAkiGQoXQWRkQnJpZGdlTWVtYmVyUmVzcG9uc2UiYAoXTGVhdmVCcmlkZ2VHcm91cFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhQKDGNvbmZpcm1fbmFtZRgDIAEoCSIaChhMZWF2ZUJyaWRnZUdyb3VwUmVzcG9uc2UiaAofUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFAoMY29uZmlybV9uYW1lGAMgASgJImkKIFJlcXVlc3RCcmlkZ2VHcm91cERlbGV0ZVJlc3BvbnNlEg0KBXRva2VuGAEgASgJEhwKEHVzYWJsZV9mcm9tX3VuaXgYAiABKANCAjACEhgKDGV4cGlyZXNfdW5peBgDIAEoA0ICMAIicAoYRGVsZXRlQnJpZGdlR3JvdXBSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIUCgxjb25maXJtX25hbWUYAyABKAkSDQoFdG9rZW4YBCABKAkiGwoZRGVsZXRlQnJpZGdlR3JvdXBSZXNwb25zZSI6CiBMaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiJ/ChRCcmlkZ2VGZWF0dXJlRGVmYXVsdBIPCgdmZWF0dXJlGAEgASgJEgwKBHJpc2sYAiABKAkSEQoJZGlyZWN0aW9uGAMgASgJEg4KBmlzX3NldBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJTCiFMaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVzcG9uc2USLgoIZGVmYXVsdHMYASADKAsyHC5hcHAudjEuQnJpZGdlRmVhdHVyZURlZmF1bHQicgoeU2V0QnJpZGdlRmVhdHVyZURlZmF1bHRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEg8KB2ZlYXR1cmUYAiABKAkSEQoJZGlyZWN0aW9uGAMgASgJEhQKDGFwcGx5X3RvX2FsbBgEIAEoCCIyCh9TZXRCcmlkZ2VGZWF0dXJlRGVmYXVsdFJlc3BvbnNlEg8KB2FwcGxpZWQYASABKAUiwQEKDUJyaWRnZVByb2JsZW0SDgoCaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACEhIKCmNoYXRfdGl0bGUYAyABKAkSDwoHZmVhdHVyZRgEIAEoCRIKCgJvcBgFIAEoCRIPCgNzZXEYBiABKANCAjACEg4KBnN0YXR1cxgHIAEoCRISCgpsYXN0X2Vycm9yGAggASgJEhAKCGF0dGVtcHRzGAkgASgFEhMKB2F0X3VuaXgYCiABKANCAjACIjMKGUxpc3RCcmlkZ2VQcm9ibGVtc1JlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAIiRQoaTGlzdEJyaWRnZVByb2JsZW1zUmVzcG9uc2USJwoIcHJvYmxlbXMYASADKAsyFS5hcHAudjEuQnJpZGdlUHJvYmxlbSJDChlSZXRyeUJyaWRnZVByb2JsZW1SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEg4KAmlkGAIgASgDQgIwAiIcChpSZXRyeUJyaWRnZVByb2JsZW1SZXNwb25zZSJFChtEaXNtaXNzQnJpZGdlUHJvYmxlbVJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISDgoCaWQYAiABKANCAjACIh4KHERpc21pc3NCcmlkZ2VQcm9ibGVtUmVzcG9uc2UqqAEKE0JyaWRnZUFjY291bnRTdGF0dXMSJQohQlJJREdFX0FDQ09VTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX0FDQ09VTlRfU1RBVFVTX0FDVElWRRABEiUKIUJSSURHRV9BQ0NPVU5UX1NUQVRVU19ORUVEU19MT0dJThACEiEKHUJSSURHRV9BQ0NPVU5UX1NUQVRVU19TVE9QUEVEEAMqZwoPQnJpZGdlRGlyZWN0aW9uEiAKHEJSSURHRV9ESVJFQ1RJT05fVU5TUEVDSUZJRUQQABIXChNCUklER0VfRElSRUNUSU9OX0lOEAESGQoVQlJJREdFX0RJUkVDVElPTl9CT1RIEAIqwwEKE0JyaWRnZUxvZ2luU3RlcEtpbmQSJgoiQlJJREdFX0xPR0lOX1NURVBfS0lORF9VTlNQRUNJRklFRBAAEiAKHEJSSURHRV9MT0dJTl9TVEVQX0tJTkRfSU5QVVQQARIdChlCUklER0VfTE9HSU5fU1RFUF9LSU5EX1FSEAISIgoeQlJJREdFX0xPR0lOX1NURVBfS0lORF9DT05GSVJNEAMSHwobQlJJREdFX0xPR0lOX1NURVBfS0lORF9ET05FEAQq1AEKFkJyaWRnZUNvbnZlcnNhdGlvbktpbmQSKAokQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1VOU1BFQ0lGSUVEEAASJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1BSSVZBVEUQARIgChxCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfQk9UEAISIgoeQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0dST1VQEAMSJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0NIQU5ORUwQBCrBAQoSQnJpZGdlT3V0Ym94U3RhdHVzEiQKIEJSSURHRV9PVVRCT1hfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX09VVEJPWF9TVEFUVVNfUEVORElORxABEiAKHEJSSURHRV9PVVRCT1hfU1RBVFVTX1NFTkRJTkcQAhIfChtCUklER0VfT1VUQk9YX1NUQVRVU19GQUlMRUQQAxIgChxCUklER0VfT1VUQk9YX1NUQVRVU19VTktOT1dOEAQyuhMKDUJyaWRnZVNlcnZpY2UScAoZTGlzdEJyaWRnZUZlYXR1cmVEZWZhdWx0cxIoLmFwcC52MS5MaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVxdWVzdBopLmFwcC52MS5MaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVzcG9uc2USagoXU2V0QnJpZGdlRmVhdHVyZURlZmF1bHQSJi5hcHAudjEuU2V0QnJpZGdlRmVhdHVyZURlZmF1bHRSZXF1ZXN0GicuYXBwLnYxLlNldEJyaWRnZUZlYXR1cmVEZWZhdWx0UmVzcG9uc2USWwoSTGlzdEJyaWRnZVByb2JsZW1zEiEuYXBwLnYxLkxpc3RCcmlkZ2VQcm9ibGVtc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJyaWRnZVByb2JsZW1zUmVzcG9uc2USWwoSUmV0cnlCcmlkZ2VQcm9ibGVtEiEuYXBwLnYxLlJldHJ5QnJpZGdlUHJvYmxlbVJlcXVlc3QaIi5hcHAudjEuUmV0cnlCcmlkZ2VQcm9ibGVtUmVzcG9uc2USYQoURGlzbWlzc0JyaWRnZVByb2JsZW0SIy5hcHAudjEuRGlzbWlzc0JyaWRnZVByb2JsZW1SZXF1ZXN0GiQuYXBwLnYxLkRpc21pc3NCcmlkZ2VQcm9ibGVtUmVzcG9uc2USUgoPR2V0QnJpZGdlU3RhdHVzEh4uYXBwLnYxLkdldEJyaWRnZVN0YXR1c1JlcXVlc3QaHy5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USVQoQU3RhcnRCcmlkZ2VMb2dpbhIfLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVxdWVzdBogLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVzcG9uc2USXgoTQ29udGludWVCcmlkZ2VMb2dpbhIiLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBojLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USagoXTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnMSJi5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GicuYXBwLnYxLkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVzcG9uc2USVQoQRW5hYmxlQnJpZGdlQ2hhdBIfLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVzcG9uc2USVQoQUmVtb3ZlQnJpZGdlQ2hhdBIfLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2USZwoWU2V0QnJpZGdlQ2hhdERpcmVjdGlvbhIlLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVxdWVzdBomLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVzcG9uc2USWwoSTGlzdEJyaWRnZUZlYXR1cmVzEiEuYXBwLnYxLkxpc3RCcmlkZ2VGZWF0dXJlc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJyaWRnZUZlYXR1cmVzUmVzcG9uc2USVQoQU2V0QnJpZGdlRmVhdHVyZRIfLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVxdWVzdBogLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2USWAoRTGlzdEJyaWRnZUludml0ZXMSIC5hcHAudjEuTGlzdEJyaWRnZUludml0ZXNSZXF1ZXN0GiEuYXBwLnYxLkxpc3RCcmlkZ2VJbnZpdGVzUmVzcG9uc2USWwoSQ3JlYXRlQnJpZGdlSW52aXRlEiEuYXBwLnYxLkNyZWF0ZUJyaWRnZUludml0ZVJlcXVlc3QaIi5hcHAudjEuQ3JlYXRlQnJpZGdlSW52aXRlUmVzcG9uc2USWwoSUmV2b2tlQnJpZGdlSW52aXRlEiEuYXBwLnYxLlJldm9rZUJyaWRnZUludml0ZVJlcXVlc3QaIi5hcHAudjEuUmV2b2tlQnJpZGdlSW52aXRlUmVzcG9uc2USYQoUTGlzdEJyaWRnZUNhbmRpZGF0ZXMSIy5hcHAudjEuTGlzdEJyaWRnZUNhbmRpZGF0ZXNSZXF1ZXN0GiQuYXBwLnYxLkxpc3RCcmlkZ2VDYW5kaWRhdGVzUmVzcG9uc2USUgoPQWRkQnJpZGdlTWVtYmVyEh4uYXBwLnYxLkFkZEJyaWRnZU1lbWJlclJlcXVlc3QaHy5hcHAudjEuQWRkQnJpZGdlTWVtYmVyUmVzcG9uc2USVQoQTGVhdmVCcmlkZ2VHcm91cBIfLmFwcC52MS5MZWF2ZUJyaWRnZUdyb3VwUmVxdWVzdBogLmFwcC52MS5MZWF2ZUJyaWRnZUdyb3VwUmVzcG9uc2USbQoYUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlEicuYXBwLnYxLlJlcXVlc3RCcmlkZ2VHcm91cERlbGV0ZVJlcXVlc3QaKC5hcHAudjEuUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVzcG9uc2USWAoRRGVsZXRlQnJpZGdlR3JvdXASIC5hcHAudjEuRGVsZXRlQnJpZGdlR3JvdXBSZXF1ZXN0GiEuYXBwLnYxLkRlbGV0ZUJyaWRnZUdyb3VwUmVzcG9uc2USVQoQTGlzdEJyaWRnZU91dGJveBIfLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBogLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USWwoSUmV0cnlCcmlkZ2VNZXNzYWdlEiEuYXBwLnYxLlJldHJ5QnJpZGdlTWVzc2FnZVJlcXVlc3QaIi5hcHAudjEuUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2USYQoURGlzbWlzc0JyaWRnZU1lc3NhZ2USIy5hcHAudjEuRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0GiQuYXBwLnYxLkRpc21pc3NCcmlkZ2VNZXNzYWdlUmVzcG9uc2USagoXRGlzY29ubmVjdEJyaWRnZUFjY291bnQSJi5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0GicuYXBwLnYxLkRpc2Nvbm5lY3RCcmlkZ2VBY2NvdW50UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
+  fileDesc("ChNhcHAvdjEvYnJpZGdlLnByb3RvEgZhcHAudjEiGwoJQnJpZGdlQXBwEg4KBnNvdXJjZRgBIAEoCSK8AQoQQnJpZGdlU3luY2VkQ2hhdBIXCg9jb252ZXJzYXRpb25faWQYASABKAkSEwoHY2hhdF9pZBgCIAEoA0ICMAISEQoJY2F1Z2h0X3VwGAMgASgIEhYKDmhpc3Rvcnlfd2luZG93GAQgASgFEg0KBXRpdGxlGAUgASgJEioKCWRpcmVjdGlvbhgGIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24SFAoMdG9waWNzX3NwbGl0GAcgASgIIvQBCg1CcmlkZ2VBY2NvdW50Eg4KAmlkGAEgASgDQgIwAhIOCgZzb3VyY2UYAiABKAkSKwoGc3RhdHVzGAMgASgOMhsuYXBwLnYxLkJyaWRnZUFjY291bnRTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRInCgVjaGF0cxgFIAMoCzIYLmFwcC52MS5CcmlkZ2VTeW5jZWRDaGF0EisKCnN5bmNfc3RhdGUYBiABKA4yFy5hcHAudjEuQnJpZGdlU3luY1N0YXRlEiwKCHByb2dyZXNzGAcgASgLMhouYXBwLnYxLkJyaWRnZVN5bmNQcm9ncmVzcyJ8ChJCcmlkZ2VTeW5jUHJvZ3Jlc3MSFQoNY29udmVyc2F0aW9ucxgBIAEoBRIaChJjb252ZXJzYXRpb25zX2RvbmUYAiABKAUSFAoIbWVzc2FnZXMYAyABKANCAjACEh0KEW1lc3NhZ2VzX2V4cGVjdGVkGAQgASgDQgIwAiIwChZTdGFydEJyaWRnZVN5bmNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACIhkKF1N0YXJ0QnJpZGdlU3luY1Jlc3BvbnNlIhgKFkdldEJyaWRnZVN0YXR1c1JlcXVlc3QiYwoXR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USHwoEYXBwcxgBIAMoCzIRLmFwcC52MS5CcmlkZ2VBcHASJwoIYWNjb3VudHMYAiADKAsyFS5hcHAudjEuQnJpZGdlQWNjb3VudCI/ChBCcmlkZ2VMb2dpbkZpZWxkEgwKBG5hbWUYASABKAkSDQoFbGFiZWwYAiABKAkSDgoGc2VjcmV0GAMgASgIIrABCg9CcmlkZ2VMb2dpblN0ZXASKQoEa2luZBgBIAEoDjIbLmFwcC52MS5CcmlkZ2VMb2dpblN0ZXBLaW5kEhAKCGxvZ2luX2lkGAIgASgJEigKBmZpZWxkcxgDIAMoCzIYLmFwcC52MS5CcmlkZ2VMb2dpbkZpZWxkEg4KBnByb21wdBgEIAEoCRImCgdhY2NvdW50GAUgASgLMhUuYXBwLnYxLkJyaWRnZUFjY291bnQiKQoXU3RhcnRCcmlkZ2VMb2dpblJlcXVlc3QSDgoGc291cmNlGAEgASgJIkEKGFN0YXJ0QnJpZGdlTG9naW5SZXNwb25zZRIlCgRzdGVwGAEgASgLMhcuYXBwLnYxLkJyaWRnZUxvZ2luU3RlcCKaAQoaQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QSEAoIbG9naW5faWQYASABKAkSPAoFaW5wdXQYAiADKAsyLS5hcHAudjEuQ29udGludWVCcmlkZ2VMb2dpblJlcXVlc3QuSW5wdXRFbnRyeRosCgpJbnB1dEVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiRAobQ29udGludWVCcmlkZ2VMb2dpblJlc3BvbnNlEiUKBHN0ZXAYASABKAsyFy5hcHAudjEuQnJpZGdlTG9naW5TdGVwIjgKHkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiKXAQoSQnJpZGdlQ29udmVyc2F0aW9uEgoKAmlkGAEgASgJEiwKBGtpbmQYAiABKA4yHi5hcHAudjEuQnJpZGdlQ29udmVyc2F0aW9uS2luZBINCgV0aXRsZRgDIAEoCRITCgdjaGF0X2lkGAQgASgDQgIwAhINCgVmb3J1bRgFIAEoCBIUCgx0b3BpY3Nfc3BsaXQYBiABKAgiVAofTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXNwb25zZRIxCg1jb252ZXJzYXRpb25zGAEgAygLMhouYXBwLnYxLkJyaWRnZUNvbnZlcnNhdGlvbiKOAQoXRW5hYmxlQnJpZGdlQ2hhdFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhYKDmhpc3Rvcnlfd2luZG93GAMgASgFEioKCWRpcmVjdGlvbhgEIAEoDjIXLmFwcC52MS5CcmlkZ2VEaXJlY3Rpb24iLwoYRW5hYmxlQnJpZGdlQ2hhdFJlc3BvbnNlEhMKB2NoYXRfaWQYASABKANCAjACIkoKF1JlbW92ZUJyaWRnZUNoYXRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSIaChhSZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2UiTgoeRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhQKDGRlbGV0ZV9jaGF0cxgCIAEoCCIhCh9EaXNjb25uZWN0QnJpZGdlQWNjb3VudFJlc3BvbnNlInwKHVNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIqCglkaXJlY3Rpb24YAyABKA4yFy5hcHAudjEuQnJpZGdlRGlyZWN0aW9uIiAKHlNldEJyaWRnZUNoYXREaXJlY3Rpb25SZXNwb25zZSKBAQoQQnJpZGdlT3V0Ym94SXRlbRIPCgNzZXEYASABKANCAjACEgoKAm9wGAIgASgJEioKBnN0YXR1cxgDIAEoDjIaLmFwcC52MS5CcmlkZ2VPdXRib3hTdGF0dXMSEgoKbGFzdF9lcnJvchgEIAEoCRIQCghhdHRlbXB0cxgFIAEoBSIuChdMaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAiJDChhMaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5hcHAudjEuQnJpZGdlT3V0Ym94SXRlbSJBChlSZXRyeUJyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHAoaUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2UiQwobRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAIiHgocRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXNwb25zZSJMChlMaXN0QnJpZGdlRmVhdHVyZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJ8Cg1CcmlkZ2VGZWF0dXJlEg8KB2ZlYXR1cmUYASABKAkSDAoEcmlzaxgCIAEoCRIRCglkaXJlY3Rpb24YAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJFChpMaXN0QnJpZGdlRmVhdHVyZXNSZXNwb25zZRInCghmZWF0dXJlcxgBIAMoCzIVLmFwcC52MS5CcmlkZ2VGZWF0dXJlIm4KF1NldEJyaWRnZUZlYXR1cmVSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIPCgdmZWF0dXJlGAMgASgJEhEKCWRpcmVjdGlvbhgEIAEoCSIaChhTZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2UiSwoYTGlzdEJyaWRnZUludml0ZXNSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCSJLCgxCcmlkZ2VJbnZpdGUSDAoEbGluaxgBIAEoCRINCgV0aXRsZRgCIAEoCRIPCgdyZXZva2VkGAMgASgIEg0KBXVzYWdlGAQgASgFIkIKGUxpc3RCcmlkZ2VJbnZpdGVzUmVzcG9uc2USJQoHaW52aXRlcxgBIAMoCzIULmFwcC52MS5CcmlkZ2VJbnZpdGUiWwoZQ3JlYXRlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDQoFdGl0bGUYAyABKAkiHAoaQ3JlYXRlQnJpZGdlSW52aXRlUmVzcG9uc2UiWgoZUmV2b2tlQnJpZGdlSW52aXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSDAoEbGluaxgDIAEoCSIcChpSZXZva2VCcmlkZ2VJbnZpdGVSZXNwb25zZSJOChtMaXN0QnJpZGdlQ2FuZGlkYXRlc1JlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJIjcKD0JyaWRnZUNhbmRpZGF0ZRIWCg5wYXJ0aWNpcGFudF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIksKHExpc3RCcmlkZ2VDYW5kaWRhdGVzUmVzcG9uc2USKwoKY2FuZGlkYXRlcxgBIAMoCzIXLmFwcC52MS5CcmlkZ2VDYW5kaWRhdGUiYQoWQWRkQnJpZGdlTWVtYmVyUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFgoOcGFydGljaXBhbnRfaWQYAyABKAkiGQoXQWRkQnJpZGdlTWVtYmVyUmVzcG9uc2UiYAoXTGVhdmVCcmlkZ2VHcm91cFJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISFwoPY29udmVyc2F0aW9uX2lkGAIgASgJEhQKDGNvbmZpcm1fbmFtZRgDIAEoCSIaChhMZWF2ZUJyaWRnZUdyb3VwUmVzcG9uc2UiaAofUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAhIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSFAoMY29uZmlybV9uYW1lGAMgASgJImkKIFJlcXVlc3RCcmlkZ2VHcm91cERlbGV0ZVJlc3BvbnNlEg0KBXRva2VuGAEgASgJEhwKEHVzYWJsZV9mcm9tX3VuaXgYAiABKANCAjACEhgKDGV4cGlyZXNfdW5peBgDIAEoA0ICMAIicAoYRGVsZXRlQnJpZGdlR3JvdXBSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEhcKD2NvbnZlcnNhdGlvbl9pZBgCIAEoCRIUCgxjb25maXJtX25hbWUYAyABKAkSDQoFdG9rZW4YBCABKAkiGwoZRGVsZXRlQnJpZGdlR3JvdXBSZXNwb25zZSI6CiBMaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVxdWVzdBIWCgphY2NvdW50X2lkGAEgASgDQgIwAiJ/ChRCcmlkZ2VGZWF0dXJlRGVmYXVsdBIPCgdmZWF0dXJlGAEgASgJEgwKBHJpc2sYAiABKAkSEQoJZGlyZWN0aW9uGAMgASgJEg4KBmlzX3NldBgEIAEoCBITCgtjYW5fcmVjZWl2ZRgFIAEoCBIQCghjYW5fc2VuZBgGIAEoCCJTCiFMaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVzcG9uc2USLgoIZGVmYXVsdHMYASADKAsyHC5hcHAudjEuQnJpZGdlRmVhdHVyZURlZmF1bHQicgoeU2V0QnJpZGdlRmVhdHVyZURlZmF1bHRSZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEg8KB2ZlYXR1cmUYAiABKAkSEQoJZGlyZWN0aW9uGAMgASgJEhQKDGFwcGx5X3RvX2FsbBgEIAEoCCIyCh9TZXRCcmlkZ2VGZWF0dXJlRGVmYXVsdFJlc3BvbnNlEg8KB2FwcGxpZWQYASABKAUiwQEKDUJyaWRnZVByb2JsZW0SDgoCaWQYASABKANCAjACEhMKB2NoYXRfaWQYAiABKANCAjACEhIKCmNoYXRfdGl0bGUYAyABKAkSDwoHZmVhdHVyZRgEIAEoCRIKCgJvcBgFIAEoCRIPCgNzZXEYBiABKANCAjACEg4KBnN0YXR1cxgHIAEoCRISCgpsYXN0X2Vycm9yGAggASgJEhAKCGF0dGVtcHRzGAkgASgFEhMKB2F0X3VuaXgYCiABKANCAjACIjMKGUxpc3RCcmlkZ2VQcm9ibGVtc1JlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAIiRQoaTGlzdEJyaWRnZVByb2JsZW1zUmVzcG9uc2USJwoIcHJvYmxlbXMYASADKAsyFS5hcHAudjEuQnJpZGdlUHJvYmxlbSJDChlSZXRyeUJyaWRnZVByb2JsZW1SZXF1ZXN0EhYKCmFjY291bnRfaWQYASABKANCAjACEg4KAmlkGAIgASgDQgIwAiIcChpSZXRyeUJyaWRnZVByb2JsZW1SZXNwb25zZSJFChtEaXNtaXNzQnJpZGdlUHJvYmxlbVJlcXVlc3QSFgoKYWNjb3VudF9pZBgBIAEoA0ICMAISDgoCaWQYAiABKANCAjACIh4KHERpc21pc3NCcmlkZ2VQcm9ibGVtUmVzcG9uc2UqqAEKE0JyaWRnZUFjY291bnRTdGF0dXMSJQohQlJJREdFX0FDQ09VTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX0FDQ09VTlRfU1RBVFVTX0FDVElWRRABEiUKIUJSSURHRV9BQ0NPVU5UX1NUQVRVU19ORUVEU19MT0dJThACEiEKHUJSSURHRV9BQ0NPVU5UX1NUQVRVU19TVE9QUEVEEAMqZwoPQnJpZGdlRGlyZWN0aW9uEiAKHEJSSURHRV9ESVJFQ1RJT05fVU5TUEVDSUZJRUQQABIXChNCUklER0VfRElSRUNUSU9OX0lOEAESGQoVQlJJREdFX0RJUkVDVElPTl9CT1RIEAIqigEKD0JyaWRnZVN5bmNTdGF0ZRIhCh1CUklER0VfU1lOQ19TVEFURV9VTlNQRUNJRklFRBAAEhkKFUJSSURHRV9TWU5DX1NUQVRFX09GRhABEh0KGUJSSURHRV9TWU5DX1NUQVRFX1NZTkNJTkcQAhIaChZCUklER0VfU1lOQ19TVEFURV9MSVZFEAMqwwEKE0JyaWRnZUxvZ2luU3RlcEtpbmQSJgoiQlJJREdFX0xPR0lOX1NURVBfS0lORF9VTlNQRUNJRklFRBAAEiAKHEJSSURHRV9MT0dJTl9TVEVQX0tJTkRfSU5QVVQQARIdChlCUklER0VfTE9HSU5fU1RFUF9LSU5EX1FSEAISIgoeQlJJREdFX0xPR0lOX1NURVBfS0lORF9DT05GSVJNEAMSHwobQlJJREdFX0xPR0lOX1NURVBfS0lORF9ET05FEAQq1AEKFkJyaWRnZUNvbnZlcnNhdGlvbktpbmQSKAokQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1VOU1BFQ0lGSUVEEAASJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX1BSSVZBVEUQARIgChxCUklER0VfQ09OVkVSU0FUSU9OX0tJTkRfQk9UEAISIgoeQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0dST1VQEAMSJAogQlJJREdFX0NPTlZFUlNBVElPTl9LSU5EX0NIQU5ORUwQBCrBAQoSQnJpZGdlT3V0Ym94U3RhdHVzEiQKIEJSSURHRV9PVVRCT1hfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIAocQlJJREdFX09VVEJPWF9TVEFUVVNfUEVORElORxABEiAKHEJSSURHRV9PVVRCT1hfU1RBVFVTX1NFTkRJTkcQAhIfChtCUklER0VfT1VUQk9YX1NUQVRVU19GQUlMRUQQAxIgChxCUklER0VfT1VUQk9YX1NUQVRVU19VTktOT1dOEAQyjhQKDUJyaWRnZVNlcnZpY2UScAoZTGlzdEJyaWRnZUZlYXR1cmVEZWZhdWx0cxIoLmFwcC52MS5MaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVxdWVzdBopLmFwcC52MS5MaXN0QnJpZGdlRmVhdHVyZURlZmF1bHRzUmVzcG9uc2USagoXU2V0QnJpZGdlRmVhdHVyZURlZmF1bHQSJi5hcHAudjEuU2V0QnJpZGdlRmVhdHVyZURlZmF1bHRSZXF1ZXN0GicuYXBwLnYxLlNldEJyaWRnZUZlYXR1cmVEZWZhdWx0UmVzcG9uc2USWwoSTGlzdEJyaWRnZVByb2JsZW1zEiEuYXBwLnYxLkxpc3RCcmlkZ2VQcm9ibGVtc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJyaWRnZVByb2JsZW1zUmVzcG9uc2USWwoSUmV0cnlCcmlkZ2VQcm9ibGVtEiEuYXBwLnYxLlJldHJ5QnJpZGdlUHJvYmxlbVJlcXVlc3QaIi5hcHAudjEuUmV0cnlCcmlkZ2VQcm9ibGVtUmVzcG9uc2USYQoURGlzbWlzc0JyaWRnZVByb2JsZW0SIy5hcHAudjEuRGlzbWlzc0JyaWRnZVByb2JsZW1SZXF1ZXN0GiQuYXBwLnYxLkRpc21pc3NCcmlkZ2VQcm9ibGVtUmVzcG9uc2USUgoPR2V0QnJpZGdlU3RhdHVzEh4uYXBwLnYxLkdldEJyaWRnZVN0YXR1c1JlcXVlc3QaHy5hcHAudjEuR2V0QnJpZGdlU3RhdHVzUmVzcG9uc2USUgoPU3RhcnRCcmlkZ2VTeW5jEh4uYXBwLnYxLlN0YXJ0QnJpZGdlU3luY1JlcXVlc3QaHy5hcHAudjEuU3RhcnRCcmlkZ2VTeW5jUmVzcG9uc2USVQoQU3RhcnRCcmlkZ2VMb2dpbhIfLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVxdWVzdBogLmFwcC52MS5TdGFydEJyaWRnZUxvZ2luUmVzcG9uc2USXgoTQ29udGludWVCcmlkZ2VMb2dpbhIiLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVxdWVzdBojLmFwcC52MS5Db250aW51ZUJyaWRnZUxvZ2luUmVzcG9uc2USagoXTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnMSJi5hcHAudjEuTGlzdEJyaWRnZUNvbnZlcnNhdGlvbnNSZXF1ZXN0GicuYXBwLnYxLkxpc3RCcmlkZ2VDb252ZXJzYXRpb25zUmVzcG9uc2USVQoQRW5hYmxlQnJpZGdlQ2hhdBIfLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5FbmFibGVCcmlkZ2VDaGF0UmVzcG9uc2USVQoQUmVtb3ZlQnJpZGdlQ2hhdBIfLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVxdWVzdBogLmFwcC52MS5SZW1vdmVCcmlkZ2VDaGF0UmVzcG9uc2USZwoWU2V0QnJpZGdlQ2hhdERpcmVjdGlvbhIlLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVxdWVzdBomLmFwcC52MS5TZXRCcmlkZ2VDaGF0RGlyZWN0aW9uUmVzcG9uc2USWwoSTGlzdEJyaWRnZUZlYXR1cmVzEiEuYXBwLnYxLkxpc3RCcmlkZ2VGZWF0dXJlc1JlcXVlc3QaIi5hcHAudjEuTGlzdEJyaWRnZUZlYXR1cmVzUmVzcG9uc2USVQoQU2V0QnJpZGdlRmVhdHVyZRIfLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVxdWVzdBogLmFwcC52MS5TZXRCcmlkZ2VGZWF0dXJlUmVzcG9uc2USWAoRTGlzdEJyaWRnZUludml0ZXMSIC5hcHAudjEuTGlzdEJyaWRnZUludml0ZXNSZXF1ZXN0GiEuYXBwLnYxLkxpc3RCcmlkZ2VJbnZpdGVzUmVzcG9uc2USWwoSQ3JlYXRlQnJpZGdlSW52aXRlEiEuYXBwLnYxLkNyZWF0ZUJyaWRnZUludml0ZVJlcXVlc3QaIi5hcHAudjEuQ3JlYXRlQnJpZGdlSW52aXRlUmVzcG9uc2USWwoSUmV2b2tlQnJpZGdlSW52aXRlEiEuYXBwLnYxLlJldm9rZUJyaWRnZUludml0ZVJlcXVlc3QaIi5hcHAudjEuUmV2b2tlQnJpZGdlSW52aXRlUmVzcG9uc2USYQoUTGlzdEJyaWRnZUNhbmRpZGF0ZXMSIy5hcHAudjEuTGlzdEJyaWRnZUNhbmRpZGF0ZXNSZXF1ZXN0GiQuYXBwLnYxLkxpc3RCcmlkZ2VDYW5kaWRhdGVzUmVzcG9uc2USUgoPQWRkQnJpZGdlTWVtYmVyEh4uYXBwLnYxLkFkZEJyaWRnZU1lbWJlclJlcXVlc3QaHy5hcHAudjEuQWRkQnJpZGdlTWVtYmVyUmVzcG9uc2USVQoQTGVhdmVCcmlkZ2VHcm91cBIfLmFwcC52MS5MZWF2ZUJyaWRnZUdyb3VwUmVxdWVzdBogLmFwcC52MS5MZWF2ZUJyaWRnZUdyb3VwUmVzcG9uc2USbQoYUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlEicuYXBwLnYxLlJlcXVlc3RCcmlkZ2VHcm91cERlbGV0ZVJlcXVlc3QaKC5hcHAudjEuUmVxdWVzdEJyaWRnZUdyb3VwRGVsZXRlUmVzcG9uc2USWAoRRGVsZXRlQnJpZGdlR3JvdXASIC5hcHAudjEuRGVsZXRlQnJpZGdlR3JvdXBSZXF1ZXN0GiEuYXBwLnYxLkRlbGV0ZUJyaWRnZUdyb3VwUmVzcG9uc2USVQoQTGlzdEJyaWRnZU91dGJveBIfLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVxdWVzdBogLmFwcC52MS5MaXN0QnJpZGdlT3V0Ym94UmVzcG9uc2USWwoSUmV0cnlCcmlkZ2VNZXNzYWdlEiEuYXBwLnYxLlJldHJ5QnJpZGdlTWVzc2FnZVJlcXVlc3QaIi5hcHAudjEuUmV0cnlCcmlkZ2VNZXNzYWdlUmVzcG9uc2USYQoURGlzbWlzc0JyaWRnZU1lc3NhZ2USIy5hcHAudjEuRGlzbWlzc0JyaWRnZU1lc3NhZ2VSZXF1ZXN0GiQuYXBwLnYxLkRpc21pc3NCcmlkZ2VNZXNzYWdlUmVzcG9uc2USagoXRGlzY29ubmVjdEJyaWRnZUFjY291bnQSJi5hcHAudjEuRGlzY29ubmVjdEJyaWRnZUFjY291bnRSZXF1ZXN0GicuYXBwLnYxLkRpc2Nvbm5lY3RCcmlkZ2VBY2NvdW50UmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM");
 
 /**
  * @generated from message app.v1.BridgeApp
@@ -116,6 +116,16 @@ export type BridgeAccount = Message<"app.v1.BridgeAccount"> & {
    * @generated from field: repeated app.v1.BridgeSyncedChat chats = 5;
    */
   chats: BridgeSyncedChat[];
+
+  /**
+   * @generated from field: app.v1.BridgeSyncState sync_state = 6;
+   */
+  syncState: BridgeSyncState;
+
+  /**
+   * @generated from field: app.v1.BridgeSyncProgress progress = 7;
+   */
+  progress?: BridgeSyncProgress | undefined;
 };
 
 /**
@@ -124,6 +134,74 @@ export type BridgeAccount = Message<"app.v1.BridgeAccount"> & {
  */
 export const BridgeAccountSchema: GenMessage<BridgeAccount> = /*@__PURE__*/
   messageDesc(file_app_v1_bridge, 2);
+
+/**
+ * How far the first import went.
+ *
+ * @generated from message app.v1.BridgeSyncProgress
+ */
+export type BridgeSyncProgress = Message<"app.v1.BridgeSyncProgress"> & {
+  /**
+   * Conversations that have a chat, and how many of them are imported.
+   *
+   * @generated from field: int32 conversations = 1;
+   */
+  conversations: number;
+
+  /**
+   * @generated from field: int32 conversations_done = 2;
+   */
+  conversationsDone: number;
+
+  /**
+   * Messages imported, of the ones expected (a chat still importing counts its whole window).
+   *
+   * @generated from field: int64 messages = 3 [jstype = JS_NUMBER];
+   */
+  messages: bigint;
+
+  /**
+   * @generated from field: int64 messages_expected = 4 [jstype = JS_NUMBER];
+   */
+  messagesExpected: bigint;
+};
+
+/**
+ * Describes the message app.v1.BridgeSyncProgress.
+ * Use `create(BridgeSyncProgressSchema)` to create a new message.
+ */
+export const BridgeSyncProgressSchema: GenMessage<BridgeSyncProgress> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 3);
+
+/**
+ * @generated from message app.v1.StartBridgeSyncRequest
+ */
+export type StartBridgeSyncRequest = Message<"app.v1.StartBridgeSyncRequest"> & {
+  /**
+   * @generated from field: int64 account_id = 1 [jstype = JS_NUMBER];
+   */
+  accountId: bigint;
+};
+
+/**
+ * Describes the message app.v1.StartBridgeSyncRequest.
+ * Use `create(StartBridgeSyncRequestSchema)` to create a new message.
+ */
+export const StartBridgeSyncRequestSchema: GenMessage<StartBridgeSyncRequest> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 4);
+
+/**
+ * @generated from message app.v1.StartBridgeSyncResponse
+ */
+export type StartBridgeSyncResponse = Message<"app.v1.StartBridgeSyncResponse"> & {
+};
+
+/**
+ * Describes the message app.v1.StartBridgeSyncResponse.
+ * Use `create(StartBridgeSyncResponseSchema)` to create a new message.
+ */
+export const StartBridgeSyncResponseSchema: GenMessage<StartBridgeSyncResponse> = /*@__PURE__*/
+  messageDesc(file_app_v1_bridge, 5);
 
 /**
  * @generated from message app.v1.GetBridgeStatusRequest
@@ -136,7 +214,7 @@ export type GetBridgeStatusRequest = Message<"app.v1.GetBridgeStatusRequest"> & 
  * Use `create(GetBridgeStatusRequestSchema)` to create a new message.
  */
 export const GetBridgeStatusRequestSchema: GenMessage<GetBridgeStatusRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 3);
+  messageDesc(file_app_v1_bridge, 6);
 
 /**
  * @generated from message app.v1.GetBridgeStatusResponse
@@ -158,7 +236,7 @@ export type GetBridgeStatusResponse = Message<"app.v1.GetBridgeStatusResponse"> 
  * Use `create(GetBridgeStatusResponseSchema)` to create a new message.
  */
 export const GetBridgeStatusResponseSchema: GenMessage<GetBridgeStatusResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 4);
+  messageDesc(file_app_v1_bridge, 7);
 
 /**
  * @generated from message app.v1.BridgeLoginField
@@ -187,7 +265,7 @@ export type BridgeLoginField = Message<"app.v1.BridgeLoginField"> & {
  * Use `create(BridgeLoginFieldSchema)` to create a new message.
  */
 export const BridgeLoginFieldSchema: GenMessage<BridgeLoginField> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 5);
+  messageDesc(file_app_v1_bridge, 8);
 
 /**
  * @generated from message app.v1.BridgeLoginStep
@@ -230,7 +308,7 @@ export type BridgeLoginStep = Message<"app.v1.BridgeLoginStep"> & {
  * Use `create(BridgeLoginStepSchema)` to create a new message.
  */
 export const BridgeLoginStepSchema: GenMessage<BridgeLoginStep> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 6);
+  messageDesc(file_app_v1_bridge, 9);
 
 /**
  * @generated from message app.v1.StartBridgeLoginRequest
@@ -247,7 +325,7 @@ export type StartBridgeLoginRequest = Message<"app.v1.StartBridgeLoginRequest"> 
  * Use `create(StartBridgeLoginRequestSchema)` to create a new message.
  */
 export const StartBridgeLoginRequestSchema: GenMessage<StartBridgeLoginRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 7);
+  messageDesc(file_app_v1_bridge, 10);
 
 /**
  * @generated from message app.v1.StartBridgeLoginResponse
@@ -264,7 +342,7 @@ export type StartBridgeLoginResponse = Message<"app.v1.StartBridgeLoginResponse"
  * Use `create(StartBridgeLoginResponseSchema)` to create a new message.
  */
 export const StartBridgeLoginResponseSchema: GenMessage<StartBridgeLoginResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 8);
+  messageDesc(file_app_v1_bridge, 11);
 
 /**
  * @generated from message app.v1.ContinueBridgeLoginRequest
@@ -288,7 +366,7 @@ export type ContinueBridgeLoginRequest = Message<"app.v1.ContinueBridgeLoginRequ
  * Use `create(ContinueBridgeLoginRequestSchema)` to create a new message.
  */
 export const ContinueBridgeLoginRequestSchema: GenMessage<ContinueBridgeLoginRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 9);
+  messageDesc(file_app_v1_bridge, 12);
 
 /**
  * @generated from message app.v1.ContinueBridgeLoginResponse
@@ -305,7 +383,7 @@ export type ContinueBridgeLoginResponse = Message<"app.v1.ContinueBridgeLoginRes
  * Use `create(ContinueBridgeLoginResponseSchema)` to create a new message.
  */
 export const ContinueBridgeLoginResponseSchema: GenMessage<ContinueBridgeLoginResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 10);
+  messageDesc(file_app_v1_bridge, 13);
 
 /**
  * @generated from message app.v1.ListBridgeConversationsRequest
@@ -322,7 +400,7 @@ export type ListBridgeConversationsRequest = Message<"app.v1.ListBridgeConversat
  * Use `create(ListBridgeConversationsRequestSchema)` to create a new message.
  */
 export const ListBridgeConversationsRequestSchema: GenMessage<ListBridgeConversationsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 11);
+  messageDesc(file_app_v1_bridge, 14);
 
 /**
  * @generated from message app.v1.BridgeConversation
@@ -372,7 +450,7 @@ export type BridgeConversation = Message<"app.v1.BridgeConversation"> & {
  * Use `create(BridgeConversationSchema)` to create a new message.
  */
 export const BridgeConversationSchema: GenMessage<BridgeConversation> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 12);
+  messageDesc(file_app_v1_bridge, 15);
 
 /**
  * @generated from message app.v1.ListBridgeConversationsResponse
@@ -389,7 +467,7 @@ export type ListBridgeConversationsResponse = Message<"app.v1.ListBridgeConversa
  * Use `create(ListBridgeConversationsResponseSchema)` to create a new message.
  */
 export const ListBridgeConversationsResponseSchema: GenMessage<ListBridgeConversationsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 13);
+  messageDesc(file_app_v1_bridge, 16);
 
 /**
  * @generated from message app.v1.EnableBridgeChatRequest
@@ -423,7 +501,7 @@ export type EnableBridgeChatRequest = Message<"app.v1.EnableBridgeChatRequest"> 
  * Use `create(EnableBridgeChatRequestSchema)` to create a new message.
  */
 export const EnableBridgeChatRequestSchema: GenMessage<EnableBridgeChatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 14);
+  messageDesc(file_app_v1_bridge, 17);
 
 /**
  * @generated from message app.v1.EnableBridgeChatResponse
@@ -440,7 +518,7 @@ export type EnableBridgeChatResponse = Message<"app.v1.EnableBridgeChatResponse"
  * Use `create(EnableBridgeChatResponseSchema)` to create a new message.
  */
 export const EnableBridgeChatResponseSchema: GenMessage<EnableBridgeChatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 15);
+  messageDesc(file_app_v1_bridge, 18);
 
 /**
  * @generated from message app.v1.RemoveBridgeChatRequest
@@ -462,7 +540,7 @@ export type RemoveBridgeChatRequest = Message<"app.v1.RemoveBridgeChatRequest"> 
  * Use `create(RemoveBridgeChatRequestSchema)` to create a new message.
  */
 export const RemoveBridgeChatRequestSchema: GenMessage<RemoveBridgeChatRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 16);
+  messageDesc(file_app_v1_bridge, 19);
 
 /**
  * @generated from message app.v1.RemoveBridgeChatResponse
@@ -475,7 +553,7 @@ export type RemoveBridgeChatResponse = Message<"app.v1.RemoveBridgeChatResponse"
  * Use `create(RemoveBridgeChatResponseSchema)` to create a new message.
  */
 export const RemoveBridgeChatResponseSchema: GenMessage<RemoveBridgeChatResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 17);
+  messageDesc(file_app_v1_bridge, 20);
 
 /**
  * @generated from message app.v1.DisconnectBridgeAccountRequest
@@ -497,7 +575,7 @@ export type DisconnectBridgeAccountRequest = Message<"app.v1.DisconnectBridgeAcc
  * Use `create(DisconnectBridgeAccountRequestSchema)` to create a new message.
  */
 export const DisconnectBridgeAccountRequestSchema: GenMessage<DisconnectBridgeAccountRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 18);
+  messageDesc(file_app_v1_bridge, 21);
 
 /**
  * @generated from message app.v1.DisconnectBridgeAccountResponse
@@ -510,7 +588,7 @@ export type DisconnectBridgeAccountResponse = Message<"app.v1.DisconnectBridgeAc
  * Use `create(DisconnectBridgeAccountResponseSchema)` to create a new message.
  */
 export const DisconnectBridgeAccountResponseSchema: GenMessage<DisconnectBridgeAccountResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 19);
+  messageDesc(file_app_v1_bridge, 22);
 
 /**
  * @generated from message app.v1.SetBridgeChatDirectionRequest
@@ -537,7 +615,7 @@ export type SetBridgeChatDirectionRequest = Message<"app.v1.SetBridgeChatDirecti
  * Use `create(SetBridgeChatDirectionRequestSchema)` to create a new message.
  */
 export const SetBridgeChatDirectionRequestSchema: GenMessage<SetBridgeChatDirectionRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 20);
+  messageDesc(file_app_v1_bridge, 23);
 
 /**
  * @generated from message app.v1.SetBridgeChatDirectionResponse
@@ -550,7 +628,7 @@ export type SetBridgeChatDirectionResponse = Message<"app.v1.SetBridgeChatDirect
  * Use `create(SetBridgeChatDirectionResponseSchema)` to create a new message.
  */
 export const SetBridgeChatDirectionResponseSchema: GenMessage<SetBridgeChatDirectionResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 21);
+  messageDesc(file_app_v1_bridge, 24);
 
 /**
  * @generated from message app.v1.BridgeOutboxItem
@@ -591,7 +669,7 @@ export type BridgeOutboxItem = Message<"app.v1.BridgeOutboxItem"> & {
  * Use `create(BridgeOutboxItemSchema)` to create a new message.
  */
 export const BridgeOutboxItemSchema: GenMessage<BridgeOutboxItem> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 22);
+  messageDesc(file_app_v1_bridge, 25);
 
 /**
  * @generated from message app.v1.ListBridgeOutboxRequest
@@ -608,7 +686,7 @@ export type ListBridgeOutboxRequest = Message<"app.v1.ListBridgeOutboxRequest"> 
  * Use `create(ListBridgeOutboxRequestSchema)` to create a new message.
  */
 export const ListBridgeOutboxRequestSchema: GenMessage<ListBridgeOutboxRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 23);
+  messageDesc(file_app_v1_bridge, 26);
 
 /**
  * @generated from message app.v1.ListBridgeOutboxResponse
@@ -625,7 +703,7 @@ export type ListBridgeOutboxResponse = Message<"app.v1.ListBridgeOutboxResponse"
  * Use `create(ListBridgeOutboxResponseSchema)` to create a new message.
  */
 export const ListBridgeOutboxResponseSchema: GenMessage<ListBridgeOutboxResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 24);
+  messageDesc(file_app_v1_bridge, 27);
 
 /**
  * @generated from message app.v1.RetryBridgeMessageRequest
@@ -647,7 +725,7 @@ export type RetryBridgeMessageRequest = Message<"app.v1.RetryBridgeMessageReques
  * Use `create(RetryBridgeMessageRequestSchema)` to create a new message.
  */
 export const RetryBridgeMessageRequestSchema: GenMessage<RetryBridgeMessageRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 25);
+  messageDesc(file_app_v1_bridge, 28);
 
 /**
  * @generated from message app.v1.RetryBridgeMessageResponse
@@ -660,7 +738,7 @@ export type RetryBridgeMessageResponse = Message<"app.v1.RetryBridgeMessageRespo
  * Use `create(RetryBridgeMessageResponseSchema)` to create a new message.
  */
 export const RetryBridgeMessageResponseSchema: GenMessage<RetryBridgeMessageResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 26);
+  messageDesc(file_app_v1_bridge, 29);
 
 /**
  * @generated from message app.v1.DismissBridgeMessageRequest
@@ -682,7 +760,7 @@ export type DismissBridgeMessageRequest = Message<"app.v1.DismissBridgeMessageRe
  * Use `create(DismissBridgeMessageRequestSchema)` to create a new message.
  */
 export const DismissBridgeMessageRequestSchema: GenMessage<DismissBridgeMessageRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 27);
+  messageDesc(file_app_v1_bridge, 30);
 
 /**
  * @generated from message app.v1.DismissBridgeMessageResponse
@@ -695,7 +773,7 @@ export type DismissBridgeMessageResponse = Message<"app.v1.DismissBridgeMessageR
  * Use `create(DismissBridgeMessageResponseSchema)` to create a new message.
  */
 export const DismissBridgeMessageResponseSchema: GenMessage<DismissBridgeMessageResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 28);
+  messageDesc(file_app_v1_bridge, 31);
 
 /**
  * @generated from message app.v1.ListBridgeFeaturesRequest
@@ -717,7 +795,7 @@ export type ListBridgeFeaturesRequest = Message<"app.v1.ListBridgeFeaturesReques
  * Use `create(ListBridgeFeaturesRequestSchema)` to create a new message.
  */
 export const ListBridgeFeaturesRequestSchema: GenMessage<ListBridgeFeaturesRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 29);
+  messageDesc(file_app_v1_bridge, 32);
 
 /**
  * One feature of a synced chat. Names are strings so a new feature or app adds
@@ -773,7 +851,7 @@ export type BridgeFeature = Message<"app.v1.BridgeFeature"> & {
  * Use `create(BridgeFeatureSchema)` to create a new message.
  */
 export const BridgeFeatureSchema: GenMessage<BridgeFeature> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 30);
+  messageDesc(file_app_v1_bridge, 33);
 
 /**
  * @generated from message app.v1.ListBridgeFeaturesResponse
@@ -790,7 +868,7 @@ export type ListBridgeFeaturesResponse = Message<"app.v1.ListBridgeFeaturesRespo
  * Use `create(ListBridgeFeaturesResponseSchema)` to create a new message.
  */
 export const ListBridgeFeaturesResponseSchema: GenMessage<ListBridgeFeaturesResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 31);
+  messageDesc(file_app_v1_bridge, 34);
 
 /**
  * @generated from message app.v1.SetBridgeFeatureRequest
@@ -822,7 +900,7 @@ export type SetBridgeFeatureRequest = Message<"app.v1.SetBridgeFeatureRequest"> 
  * Use `create(SetBridgeFeatureRequestSchema)` to create a new message.
  */
 export const SetBridgeFeatureRequestSchema: GenMessage<SetBridgeFeatureRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 32);
+  messageDesc(file_app_v1_bridge, 35);
 
 /**
  * @generated from message app.v1.SetBridgeFeatureResponse
@@ -835,7 +913,7 @@ export type SetBridgeFeatureResponse = Message<"app.v1.SetBridgeFeatureResponse"
  * Use `create(SetBridgeFeatureResponseSchema)` to create a new message.
  */
 export const SetBridgeFeatureResponseSchema: GenMessage<SetBridgeFeatureResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 33);
+  messageDesc(file_app_v1_bridge, 36);
 
 /**
  * @generated from message app.v1.ListBridgeInvitesRequest
@@ -857,7 +935,7 @@ export type ListBridgeInvitesRequest = Message<"app.v1.ListBridgeInvitesRequest"
  * Use `create(ListBridgeInvitesRequestSchema)` to create a new message.
  */
 export const ListBridgeInvitesRequestSchema: GenMessage<ListBridgeInvitesRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 34);
+  messageDesc(file_app_v1_bridge, 37);
 
 /**
  * @generated from message app.v1.BridgeInvite
@@ -891,7 +969,7 @@ export type BridgeInvite = Message<"app.v1.BridgeInvite"> & {
  * Use `create(BridgeInviteSchema)` to create a new message.
  */
 export const BridgeInviteSchema: GenMessage<BridgeInvite> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 35);
+  messageDesc(file_app_v1_bridge, 38);
 
 /**
  * @generated from message app.v1.ListBridgeInvitesResponse
@@ -908,7 +986,7 @@ export type ListBridgeInvitesResponse = Message<"app.v1.ListBridgeInvitesRespons
  * Use `create(ListBridgeInvitesResponseSchema)` to create a new message.
  */
 export const ListBridgeInvitesResponseSchema: GenMessage<ListBridgeInvitesResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 36);
+  messageDesc(file_app_v1_bridge, 39);
 
 /**
  * @generated from message app.v1.CreateBridgeInviteRequest
@@ -935,7 +1013,7 @@ export type CreateBridgeInviteRequest = Message<"app.v1.CreateBridgeInviteReques
  * Use `create(CreateBridgeInviteRequestSchema)` to create a new message.
  */
 export const CreateBridgeInviteRequestSchema: GenMessage<CreateBridgeInviteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 37);
+  messageDesc(file_app_v1_bridge, 40);
 
 /**
  * @generated from message app.v1.CreateBridgeInviteResponse
@@ -948,7 +1026,7 @@ export type CreateBridgeInviteResponse = Message<"app.v1.CreateBridgeInviteRespo
  * Use `create(CreateBridgeInviteResponseSchema)` to create a new message.
  */
 export const CreateBridgeInviteResponseSchema: GenMessage<CreateBridgeInviteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 38);
+  messageDesc(file_app_v1_bridge, 41);
 
 /**
  * @generated from message app.v1.RevokeBridgeInviteRequest
@@ -975,7 +1053,7 @@ export type RevokeBridgeInviteRequest = Message<"app.v1.RevokeBridgeInviteReques
  * Use `create(RevokeBridgeInviteRequestSchema)` to create a new message.
  */
 export const RevokeBridgeInviteRequestSchema: GenMessage<RevokeBridgeInviteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 39);
+  messageDesc(file_app_v1_bridge, 42);
 
 /**
  * @generated from message app.v1.RevokeBridgeInviteResponse
@@ -988,7 +1066,7 @@ export type RevokeBridgeInviteResponse = Message<"app.v1.RevokeBridgeInviteRespo
  * Use `create(RevokeBridgeInviteResponseSchema)` to create a new message.
  */
 export const RevokeBridgeInviteResponseSchema: GenMessage<RevokeBridgeInviteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 40);
+  messageDesc(file_app_v1_bridge, 43);
 
 /**
  * @generated from message app.v1.ListBridgeCandidatesRequest
@@ -1010,7 +1088,7 @@ export type ListBridgeCandidatesRequest = Message<"app.v1.ListBridgeCandidatesRe
  * Use `create(ListBridgeCandidatesRequestSchema)` to create a new message.
  */
 export const ListBridgeCandidatesRequestSchema: GenMessage<ListBridgeCandidatesRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 41);
+  messageDesc(file_app_v1_bridge, 44);
 
 /**
  * @generated from message app.v1.BridgeCandidate
@@ -1034,7 +1112,7 @@ export type BridgeCandidate = Message<"app.v1.BridgeCandidate"> & {
  * Use `create(BridgeCandidateSchema)` to create a new message.
  */
 export const BridgeCandidateSchema: GenMessage<BridgeCandidate> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 42);
+  messageDesc(file_app_v1_bridge, 45);
 
 /**
  * @generated from message app.v1.ListBridgeCandidatesResponse
@@ -1051,7 +1129,7 @@ export type ListBridgeCandidatesResponse = Message<"app.v1.ListBridgeCandidatesR
  * Use `create(ListBridgeCandidatesResponseSchema)` to create a new message.
  */
 export const ListBridgeCandidatesResponseSchema: GenMessage<ListBridgeCandidatesResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 43);
+  messageDesc(file_app_v1_bridge, 46);
 
 /**
  * @generated from message app.v1.AddBridgeMemberRequest
@@ -1078,7 +1156,7 @@ export type AddBridgeMemberRequest = Message<"app.v1.AddBridgeMemberRequest"> & 
  * Use `create(AddBridgeMemberRequestSchema)` to create a new message.
  */
 export const AddBridgeMemberRequestSchema: GenMessage<AddBridgeMemberRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 44);
+  messageDesc(file_app_v1_bridge, 47);
 
 /**
  * @generated from message app.v1.AddBridgeMemberResponse
@@ -1091,7 +1169,7 @@ export type AddBridgeMemberResponse = Message<"app.v1.AddBridgeMemberResponse"> 
  * Use `create(AddBridgeMemberResponseSchema)` to create a new message.
  */
 export const AddBridgeMemberResponseSchema: GenMessage<AddBridgeMemberResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 45);
+  messageDesc(file_app_v1_bridge, 48);
 
 /**
  * @generated from message app.v1.LeaveBridgeGroupRequest
@@ -1118,7 +1196,7 @@ export type LeaveBridgeGroupRequest = Message<"app.v1.LeaveBridgeGroupRequest"> 
  * Use `create(LeaveBridgeGroupRequestSchema)` to create a new message.
  */
 export const LeaveBridgeGroupRequestSchema: GenMessage<LeaveBridgeGroupRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 46);
+  messageDesc(file_app_v1_bridge, 49);
 
 /**
  * @generated from message app.v1.LeaveBridgeGroupResponse
@@ -1131,7 +1209,7 @@ export type LeaveBridgeGroupResponse = Message<"app.v1.LeaveBridgeGroupResponse"
  * Use `create(LeaveBridgeGroupResponseSchema)` to create a new message.
  */
 export const LeaveBridgeGroupResponseSchema: GenMessage<LeaveBridgeGroupResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 47);
+  messageDesc(file_app_v1_bridge, 50);
 
 /**
  * @generated from message app.v1.RequestBridgeGroupDeleteRequest
@@ -1158,7 +1236,7 @@ export type RequestBridgeGroupDeleteRequest = Message<"app.v1.RequestBridgeGroup
  * Use `create(RequestBridgeGroupDeleteRequestSchema)` to create a new message.
  */
 export const RequestBridgeGroupDeleteRequestSchema: GenMessage<RequestBridgeGroupDeleteRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 48);
+  messageDesc(file_app_v1_bridge, 51);
 
 /**
  * @generated from message app.v1.RequestBridgeGroupDeleteResponse
@@ -1185,7 +1263,7 @@ export type RequestBridgeGroupDeleteResponse = Message<"app.v1.RequestBridgeGrou
  * Use `create(RequestBridgeGroupDeleteResponseSchema)` to create a new message.
  */
 export const RequestBridgeGroupDeleteResponseSchema: GenMessage<RequestBridgeGroupDeleteResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 49);
+  messageDesc(file_app_v1_bridge, 52);
 
 /**
  * @generated from message app.v1.DeleteBridgeGroupRequest
@@ -1217,7 +1295,7 @@ export type DeleteBridgeGroupRequest = Message<"app.v1.DeleteBridgeGroupRequest"
  * Use `create(DeleteBridgeGroupRequestSchema)` to create a new message.
  */
 export const DeleteBridgeGroupRequestSchema: GenMessage<DeleteBridgeGroupRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 50);
+  messageDesc(file_app_v1_bridge, 53);
 
 /**
  * @generated from message app.v1.DeleteBridgeGroupResponse
@@ -1230,7 +1308,7 @@ export type DeleteBridgeGroupResponse = Message<"app.v1.DeleteBridgeGroupRespons
  * Use `create(DeleteBridgeGroupResponseSchema)` to create a new message.
  */
 export const DeleteBridgeGroupResponseSchema: GenMessage<DeleteBridgeGroupResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 51);
+  messageDesc(file_app_v1_bridge, 54);
 
 /**
  * @generated from message app.v1.ListBridgeFeatureDefaultsRequest
@@ -1247,7 +1325,7 @@ export type ListBridgeFeatureDefaultsRequest = Message<"app.v1.ListBridgeFeature
  * Use `create(ListBridgeFeatureDefaultsRequestSchema)` to create a new message.
  */
 export const ListBridgeFeatureDefaultsRequestSchema: GenMessage<ListBridgeFeatureDefaultsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 52);
+  messageDesc(file_app_v1_bridge, 55);
 
 /**
  * @generated from message app.v1.BridgeFeatureDefault
@@ -1293,7 +1371,7 @@ export type BridgeFeatureDefault = Message<"app.v1.BridgeFeatureDefault"> & {
  * Use `create(BridgeFeatureDefaultSchema)` to create a new message.
  */
 export const BridgeFeatureDefaultSchema: GenMessage<BridgeFeatureDefault> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 53);
+  messageDesc(file_app_v1_bridge, 56);
 
 /**
  * @generated from message app.v1.ListBridgeFeatureDefaultsResponse
@@ -1310,7 +1388,7 @@ export type ListBridgeFeatureDefaultsResponse = Message<"app.v1.ListBridgeFeatur
  * Use `create(ListBridgeFeatureDefaultsResponseSchema)` to create a new message.
  */
 export const ListBridgeFeatureDefaultsResponseSchema: GenMessage<ListBridgeFeatureDefaultsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 54);
+  messageDesc(file_app_v1_bridge, 57);
 
 /**
  * @generated from message app.v1.SetBridgeFeatureDefaultRequest
@@ -1342,7 +1420,7 @@ export type SetBridgeFeatureDefaultRequest = Message<"app.v1.SetBridgeFeatureDef
  * Use `create(SetBridgeFeatureDefaultRequestSchema)` to create a new message.
  */
 export const SetBridgeFeatureDefaultRequestSchema: GenMessage<SetBridgeFeatureDefaultRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 55);
+  messageDesc(file_app_v1_bridge, 58);
 
 /**
  * @generated from message app.v1.SetBridgeFeatureDefaultResponse
@@ -1361,7 +1439,7 @@ export type SetBridgeFeatureDefaultResponse = Message<"app.v1.SetBridgeFeatureDe
  * Use `create(SetBridgeFeatureDefaultResponseSchema)` to create a new message.
  */
 export const SetBridgeFeatureDefaultResponseSchema: GenMessage<SetBridgeFeatureDefaultResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 56);
+  messageDesc(file_app_v1_bridge, 59);
 
 /**
  * @generated from message app.v1.BridgeProblem
@@ -1427,7 +1505,7 @@ export type BridgeProblem = Message<"app.v1.BridgeProblem"> & {
  * Use `create(BridgeProblemSchema)` to create a new message.
  */
 export const BridgeProblemSchema: GenMessage<BridgeProblem> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 57);
+  messageDesc(file_app_v1_bridge, 60);
 
 /**
  * @generated from message app.v1.ListBridgeProblemsRequest
@@ -1444,7 +1522,7 @@ export type ListBridgeProblemsRequest = Message<"app.v1.ListBridgeProblemsReques
  * Use `create(ListBridgeProblemsRequestSchema)` to create a new message.
  */
 export const ListBridgeProblemsRequestSchema: GenMessage<ListBridgeProblemsRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 58);
+  messageDesc(file_app_v1_bridge, 61);
 
 /**
  * @generated from message app.v1.ListBridgeProblemsResponse
@@ -1461,7 +1539,7 @@ export type ListBridgeProblemsResponse = Message<"app.v1.ListBridgeProblemsRespo
  * Use `create(ListBridgeProblemsResponseSchema)` to create a new message.
  */
 export const ListBridgeProblemsResponseSchema: GenMessage<ListBridgeProblemsResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 59);
+  messageDesc(file_app_v1_bridge, 62);
 
 /**
  * @generated from message app.v1.RetryBridgeProblemRequest
@@ -1483,7 +1561,7 @@ export type RetryBridgeProblemRequest = Message<"app.v1.RetryBridgeProblemReques
  * Use `create(RetryBridgeProblemRequestSchema)` to create a new message.
  */
 export const RetryBridgeProblemRequestSchema: GenMessage<RetryBridgeProblemRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 60);
+  messageDesc(file_app_v1_bridge, 63);
 
 /**
  * @generated from message app.v1.RetryBridgeProblemResponse
@@ -1496,7 +1574,7 @@ export type RetryBridgeProblemResponse = Message<"app.v1.RetryBridgeProblemRespo
  * Use `create(RetryBridgeProblemResponseSchema)` to create a new message.
  */
 export const RetryBridgeProblemResponseSchema: GenMessage<RetryBridgeProblemResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 61);
+  messageDesc(file_app_v1_bridge, 64);
 
 /**
  * @generated from message app.v1.DismissBridgeProblemRequest
@@ -1518,7 +1596,7 @@ export type DismissBridgeProblemRequest = Message<"app.v1.DismissBridgeProblemRe
  * Use `create(DismissBridgeProblemRequestSchema)` to create a new message.
  */
 export const DismissBridgeProblemRequestSchema: GenMessage<DismissBridgeProblemRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 62);
+  messageDesc(file_app_v1_bridge, 65);
 
 /**
  * @generated from message app.v1.DismissBridgeProblemResponse
@@ -1531,7 +1609,7 @@ export type DismissBridgeProblemResponse = Message<"app.v1.DismissBridgeProblemR
  * Use `create(DismissBridgeProblemResponseSchema)` to create a new message.
  */
 export const DismissBridgeProblemResponseSchema: GenMessage<DismissBridgeProblemResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_bridge, 63);
+  messageDesc(file_app_v1_bridge, 66);
 
 /**
  * @generated from enum app.v1.BridgeAccountStatus
@@ -1601,6 +1679,43 @@ export const BridgeDirectionSchema: GenEnum<BridgeDirection> = /*@__PURE__*/
   enumDesc(file_app_v1_bridge, 1);
 
 /**
+ * @generated from enum app.v1.BridgeSyncState
+ */
+export enum BridgeSyncState {
+  /**
+   * @generated from enum value: BRIDGE_SYNC_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Not asked yet, or the user chose later.
+   *
+   * @generated from enum value: BRIDGE_SYNC_STATE_OFF = 1;
+   */
+  OFF = 1,
+
+  /**
+   * The first import of the conversations is running.
+   *
+   * @generated from enum value: BRIDGE_SYNC_STATE_SYNCING = 2;
+   */
+  SYNCING = 2,
+
+  /**
+   * Everything is imported; changes flow both ways as they happen.
+   *
+   * @generated from enum value: BRIDGE_SYNC_STATE_LIVE = 3;
+   */
+  LIVE = 3,
+}
+
+/**
+ * Describes the enum app.v1.BridgeSyncState.
+ */
+export const BridgeSyncStateSchema: GenEnum<BridgeSyncState> = /*@__PURE__*/
+  enumDesc(file_app_v1_bridge, 2);
+
+/**
  * @generated from enum app.v1.BridgeLoginStepKind
  */
 export enum BridgeLoginStepKind {
@@ -1642,7 +1757,7 @@ export enum BridgeLoginStepKind {
  * Describes the enum app.v1.BridgeLoginStepKind.
  */
 export const BridgeLoginStepKindSchema: GenEnum<BridgeLoginStepKind> = /*@__PURE__*/
-  enumDesc(file_app_v1_bridge, 2);
+  enumDesc(file_app_v1_bridge, 3);
 
 /**
  * @generated from enum app.v1.BridgeConversationKind
@@ -1678,7 +1793,7 @@ export enum BridgeConversationKind {
  * Describes the enum app.v1.BridgeConversationKind.
  */
 export const BridgeConversationKindSchema: GenEnum<BridgeConversationKind> = /*@__PURE__*/
-  enumDesc(file_app_v1_bridge, 3);
+  enumDesc(file_app_v1_bridge, 4);
 
 /**
  * @generated from enum app.v1.BridgeOutboxStatus
@@ -1723,7 +1838,7 @@ export enum BridgeOutboxStatus {
  * Describes the enum app.v1.BridgeOutboxStatus.
  */
 export const BridgeOutboxStatusSchema: GenEnum<BridgeOutboxStatus> = /*@__PURE__*/
-  enumDesc(file_app_v1_bridge, 4);
+  enumDesc(file_app_v1_bridge, 5);
 
 /**
  * The Chat Bridge (ADR 0022): the user connects an account of another app
@@ -1799,6 +1914,19 @@ export const BridgeService: GenService<{
     methodKind: "unary";
     input: typeof GetBridgeStatusRequestSchema;
     output: typeof GetBridgeStatusResponseSchema;
+  },
+  /**
+   * Turns on the account's one switch (ADR 0024): every conversation of the app
+   * gets a chat, its newest 2,000 messages imported, newest conversation first, and
+   * every one that appears later joins on its own; all of them sync both ways.
+   * Turning it on again does nothing.
+   *
+   * @generated from rpc app.v1.BridgeService.StartBridgeSync
+   */
+  startBridgeSync: {
+    methodKind: "unary";
+    input: typeof StartBridgeSyncRequestSchema;
+    output: typeof StartBridgeSyncResponseSchema;
   },
   /**
    * Starts signing in to an app. The answer is the first step to show.

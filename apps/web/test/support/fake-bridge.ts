@@ -3,6 +3,7 @@
 import { Code, ConnectError, type ConnectRouter } from "@connectrpc/connect";
 import {
 	BridgeAccountStatus,
+	BridgeSyncState,
 	BridgeConversationKind,
 	BridgeDirection,
 	BridgeLoginStepKind,
@@ -74,6 +75,7 @@ export class FakeBridge {
 				id: 1n,
 				source: "telegram",
 				status: BridgeAccountStatus.ACTIVE,
+				syncState: BridgeSyncState.LIVE,
 				lastError: "",
 				chats: [
 					{
@@ -109,6 +111,7 @@ export class FakeBridge {
 				id: 1n,
 				source: "telegram",
 				status: BridgeAccountStatus.ACTIVE,
+				syncState: BridgeSyncState.LIVE,
 				lastError: "",
 				chats: [
 					synced("user:7", 900n, "Anh Đô CEO", 2000, true, BridgeDirection.BOTH),
@@ -175,7 +178,7 @@ export class FakeBridge {
 				if (req.input["code"] === "00000") throw new ConnectError("wrong_input: wrong_code: that code is not right", Code.InvalidArgument);
 				if (req.input["code"] !== undefined) return { step: this.step(BridgeLoginStepKind.INPUT, "login-1", ["password"]) };
 				this.accounts = [
-					{ $typeName: "app.v1.BridgeAccount", id: 1n, source: "telegram", status: BridgeAccountStatus.ACTIVE, lastError: "", chats: [] },
+					{ $typeName: "app.v1.BridgeAccount", id: 1n, source: "telegram", status: BridgeAccountStatus.ACTIVE, syncState: BridgeSyncState.OFF, lastError: "", chats: [] },
 				];
 				return { step: { ...this.step(BridgeLoginStepKind.DONE, ""), account: this.accounts[0] } };
 			},

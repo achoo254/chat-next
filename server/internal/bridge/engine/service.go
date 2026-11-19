@@ -158,7 +158,7 @@ func (e *Engine) superviseAccount(ctx context.Context, id int64, h *runnerHandle
 			_ = e.db.setStatus(ctx, id, "needs_login", "stored login unreadable")
 			return
 		}
-		r := &runner{e: e, account: a, adapter: adapter, logger: logger, cmds: make(chan *chatLink, 8), puppets: map[string]int64{},
+		r := &runner{e: e, account: a, adapter: adapter, logger: logger, cmds: make(chan *chatLink, 8), syncNow: make(chan struct{}, 1), puppets: map[string]int64{},
 			acct: bridge.Account{ID: fmt.Sprint(a.ID), Session: session, State: a.UpdateState}}
 		e.mu.Lock()
 		h.r = r
@@ -284,6 +284,17 @@ func (e *Engine) EnableChat(ctx context.Context, accountID int64, conv bridge.Co
 // chat.DirectionBoth also sends what the owner writes in Chat on to the app,
 // and falls back to chat.DirectionIn for an app that cannot be written to.
 func (e *Engine) EnableChatWith(ctx context.Context, accountID int64, conv bridge.Conversation, history int, direction string) (int64, error) {
+	chatID, err := e.linkConversation(ctx, accountID, conv, history, direction)
+	if err != nil {
+		return 0, err
+	}
+	e.Nudge(accountID, conv.ID)
+	return chatID, nil
+}
+
+// linkConversation creates the chat that copies a conversation and its link, without
+// starting the import (the caller does); an existing link answers its chat.
+func (e *Engine) linkConversation(ctx context.Context, accountID int64, conv bridge.Conversation, history int, direction string) (int64, error) {
 	if history == 0 {
 		history = DefaultWindow
 	}
@@ -338,7 +349,6 @@ func (e *Engine) EnableChatWith(ctx context.Context, accountID int64, conv bridg
 	if err != nil {
 		return 0, err
 	}
-	e.Nudge(accountID, conv.ID)
 	return chatID, nil
 }
 

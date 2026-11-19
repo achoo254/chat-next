@@ -95,6 +95,15 @@ func (s *bridgeService) GetBridgeStatus(ctx context.Context, req *connect.Reques
 	})
 }
 
+func (s *bridgeService) StartBridgeSync(ctx context.Context, req *connect.Request[appv1.StartBridgeSyncRequest]) (*connect.Response[appv1.StartBridgeSyncResponse], error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.StartBridgeSyncRequest) (*appv1.StartBridgeSyncResponse, error) {
+		if err := s.engine.StartSync(ctx, me, m.GetAccountId()); err != nil {
+			return nil, err
+		}
+		return &appv1.StartBridgeSyncResponse{}, nil
+	})
+}
+
 func (s *bridgeService) StartBridgeLogin(ctx context.Context, req *connect.Request[appv1.StartBridgeLoginRequest]) (*connect.Response[appv1.StartBridgeLoginResponse], error) {
 	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.StartBridgeLoginRequest) (*appv1.StartBridgeLoginResponse, error) {
 		step, err := s.engine.StartLogin(ctx, me, m.GetSource())
@@ -348,7 +357,18 @@ func (s *bridgeService) DisconnectBridgeAccount(ctx context.Context, req *connec
 }
 
 func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
-	out := &appv1.BridgeAccount{Id: a.ID, Source: a.Source, LastError: a.LastError}
+	out := &appv1.BridgeAccount{Id: a.ID, Source: a.Source, LastError: a.LastError, Progress: &appv1.BridgeSyncProgress{
+		Conversations: int32(a.Progress.Conversations), ConversationsDone: int32(a.Progress.Done),
+		Messages: a.Progress.Messages, MessagesExpected: a.Progress.Expected,
+	}}
+	switch a.SyncState {
+	case engine.SyncSyncing:
+		out.SyncState = appv1.BridgeSyncState_BRIDGE_SYNC_STATE_SYNCING
+	case engine.SyncLive:
+		out.SyncState = appv1.BridgeSyncState_BRIDGE_SYNC_STATE_LIVE
+	default:
+		out.SyncState = appv1.BridgeSyncState_BRIDGE_SYNC_STATE_OFF
+	}
 	switch a.Status {
 	case "active":
 		out.Status = appv1.BridgeAccountStatus_BRIDGE_ACCOUNT_STATUS_ACTIVE
