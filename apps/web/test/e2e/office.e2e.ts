@@ -410,7 +410,7 @@ test("the office tab in 3D: every room of the table reached, seq gap, the framin
 		await page.waitForTimeout(500);
 		const clickedAt = await page.evaluate(() => performance.now());
 		await page.locator("[data-id=session-mode-chat]").click();
-		await page.locator("[data-id=office]").waitFor({ state: "detached" });
+		await page.locator("[data-id=office]").waitFor({ state: "hidden" });
 		await page.waitForTimeout(2_000);
 		const log = await page.evaluate(() => (window as TestWindow).__frameLog ?? []);
 		const before = log.filter(([t]) => t < clickedAt);
@@ -436,13 +436,19 @@ test("opening the office again shows everyone already there at their place: nobo
 	await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
 	for (let i = 0; i <= 6; i++) await step(page);
 	await poll("the staff in", async () => (await seen(page)).filter((s) => s.kind === "employee").length, (n) => n >= 5);
-	// Away to the chat and back: a new scene, a fresh snapshot of people who came in before it opened.
+	// Away to the chat and back: the office goes on in the background (the script plays on while the chat shows), the scene
+	// is drawn anew, and what came meanwhile is there at once.
+	const staffBefore = (await seen(page)).filter((s) => s.kind === "employee").length;
 	await page.locator("[data-id=session-mode-chat]").click();
-	await page.locator("[data-id=office]").waitFor({ state: "detached" });
+	await page.locator("[data-id=office]").waitFor({ state: "hidden" });
+	for (let i = 0; i < 4; i++) await step(page);
+	// Whoever came in within the last two seconds before the tab opens walks in from the door; the others are already there.
+	await page.waitForTimeout(3_000);
 	await page.locator("[data-id=session-mode-office]").click();
 	await page.locator("[data-id=office] .of3d[data-ready='true']").waitFor({ timeout: 60_000 });
 	await until(page, "window.__office", () => (window as TestWindow).__office !== undefined);
 	await poll("the people drawn", async () => (await readout(page))?.people.length ?? 0, (n) => n >= 6);
+	assert.ok((await seen(page)).filter((s) => s.kind === "employee").length >= staffBefore, "nobody is lost across the chat tab");
 	// The first second: everyone stands or sits where they are; nobody walks in from the lobby door.
 	for (let i = 0; i < 5; i++) {
 		const people = (await readout(page))?.people ?? [];

@@ -153,7 +153,12 @@ function FramingButton({ framing, onChange }: { framing: OfficeFraming; onChange
 	);
 }
 
-function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; threadId: string; layout: OfficeLayout; advisor: OfficeAdvisor | null }) {
+/**
+ * The office of one session. It keeps running while another tab of the session shows (`visible` false): the store and
+ * the machine link go on taking events and the frame goes on advancing, so people and counters are where the session
+ * left them when the tab opens again. Only the picture is not drawn then (the 3D scene and its graphics memory go).
+ */
+function LiveOffice({ link, threadId, layout, advisor, visible }: { link: MachineLink; threadId: string; layout: OfficeLayout; advisor: OfficeAdvisor | null; visible: boolean }) {
 	const copy = useMachinesCopy();
 	const t = copy.office;
 	const [store] = useState(() => createOfficeStore({ now: () => Date.now(), desks: deskOrder(layout, isPhone() ? "phone" : "desktop") }));
@@ -272,63 +277,67 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 	else if (state.status === "live" && state.awaitingSnapshot) notes.push({ key: "sync", text: t.catchingUp });
 	if (state.session.hiddenActors > 0) notes.push({ key: "hidden", text: t.hidden(state.session.hiddenActors) });
 	return (
-		<div className="of" ref={box} data-id="office" data-size={size} data-column={column}>
-			<div className="of-bar">
-				<FramingButton framing={framing} onChange={setFraming} />
-				<button
-					type="button"
-					className="of-toggle"
-					aria-pressed={sound}
-					title={t.soundHint}
-					onClick={() => {
-						rememberSound(!sound);
-						setSound(!sound);
-					}}
-					data-id="office-sound"
-				>
-					{t.sound}
-				</button>
-			</div>
-			{notes.map((n) => (
-				<p key={n.key} className="of-note" data-tone={n.tone} role="status">
-					{n.text}
-					{n.retry === true && (
+		<div className="of" ref={box} data-id="office" data-size={size} data-column={column} hidden={!visible}>
+			{visible && (
+				<>
+					<div className="of-bar">
+						<FramingButton framing={framing} onChange={setFraming} />
 						<button
 							type="button"
-							className="btn btn-sm mx-btn-ghost of-retry"
+							className="of-toggle"
+							aria-pressed={sound}
+							title={t.soundHint}
 							onClick={() => {
-								setRefusal(null);
-								connection.current?.retry();
+								rememberSound(!sound);
+								setSound(!sound);
 							}}
-							data-id="office-retry"
+							data-id="office-sound"
 						>
-							{copy.terminal.retry}
+							{t.sound}
 						</button>
+					</div>
+					{notes.map((n) => (
+						<p key={n.key} className="of-note" data-tone={n.tone} role="status">
+							{n.text}
+							{n.retry === true && (
+								<button
+									type="button"
+									className="btn btn-sm mx-btn-ghost of-retry"
+									onClick={() => {
+										setRefusal(null);
+										connection.current?.retry();
+									}}
+									data-id="office-retry"
+								>
+									{copy.terminal.retry}
+								</button>
+							)}
+						</p>
+					))}
+					{refusal !== null && isSessionGone(refusal.err) ? null : state.status === "loading" && !failed ? (
+						<p className="of-note" role="status">
+							{t.loading}
+						</p>
+					) : (
+						<div className="of-body" ref={stage} tabIndex={-1} data-panel={shown === null ? undefined : "open"}>
+							<Renderer
+								state={state}
+								placements={frame.placements}
+								talks={frame.talks}
+								layout={layout}
+								framing={framing}
+								size={size}
+								daypart={officeDaypart(frame.now)}
+								assets={assets}
+								now={frame.now}
+								sound={sound}
+								selectedKey={shown?.key ?? null}
+								onSelect={choose}
+							/>
+							{shown !== null ? <InspectorPanel held={shown} onClose={closePanel} /> : <OverviewPanel overview={overview} state={state} now={frame.now} compact={!column} onSelect={choose} />}
+						</div>
 					)}
-				</p>
-			))}
-			{refusal !== null && isSessionGone(refusal.err) ? null : state.status === "loading" && !failed ? (
-				<p className="of-note" role="status">
-					{t.loading}
-				</p>
-			) : (
-				<div className="of-body" ref={stage} tabIndex={-1} data-panel={shown === null ? undefined : "open"}>
-					<Renderer
-						state={state}
-						placements={frame.placements}
-						talks={frame.talks}
-						layout={layout}
-						framing={framing}
-						size={size}
-						daypart={officeDaypart(frame.now)}
-						assets={assets}
-						now={frame.now}
-						sound={sound}
-						selectedKey={shown?.key ?? null}
-						onSelect={choose}
-					/>
-					{shown !== null ? <InspectorPanel held={shown} onClose={closePanel} /> : <OverviewPanel overview={overview} state={state} now={frame.now} compact={!column} onSelect={choose} />}
-				</div>
+				</>
 			)}
 		</div>
 	);
@@ -341,12 +350,15 @@ export default function OfficeView({
 	info,
 	online,
 	advisor = null,
+	visible = true,
 }: {
 	link: MachineLink;
 	threadId: string;
 	info: MachineInfo | null;
 	online: boolean;
 	advisor?: OfficeAdvisor | null;
+	/** False while another tab of the session shows: the office goes on in the background without drawing. */
+	visible?: boolean;
 }) {
 	const t = useMachinesCopy().office;
 	let note: string | null = null;
@@ -354,6 +366,7 @@ export default function OfficeView({
 	else if (info === null) note = online ? t.loading : t.offline;
 	else if (!versionAtLeast(info.agentVersion, AGENT_OFFICE)) note = t.needsUpdate;
 	if (note !== null || !OFFICE_LAYOUT.ok) {
+		if (!visible) return null;
 		return (
 			<div className="of" data-id="office">
 				<p className="of-note" role="status">
@@ -363,5 +376,5 @@ export default function OfficeView({
 		);
 	}
 	// A new store and a closed panel for each session.
-	return <LiveOffice key={threadId} link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} advisor={advisor} />;
+	return <LiveOffice key={threadId} link={link} threadId={threadId} layout={OFFICE_LAYOUT.value} advisor={advisor} visible={visible} />;
 }

@@ -86,13 +86,16 @@ function isPending(block: Block): block is Pending {
 }
 
 /** The office tab, with Advisor as the user's profile names and dresses it (the office draws Advisor while the session's automatic Advisor is on). */
-function OfficeTab(props: { link: MachineLink; threadId: string; info: MachineInfo | null; online: boolean }) {
+function OfficeTab(props: { link: MachineLink; threadId: string; info: MachineInfo | null; online: boolean; visible: boolean }) {
 	const identity = useAdvisorIdentity();
 	const advisor = useMemo(() => ({ name: identity.name, lookId: identity.look.id }), [identity.name, identity.look.id]);
 	return <OfficeView {...props} advisor={advisor} />;
 }
 
 export function SessionChat({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
+	// Once the office has opened it stays mounted, hidden, while the chat or the terminal shows: its people and counters go on in the background.
+	const [officeOpened, setOfficeOpened] = useState(mode === "office");
+	if (mode === "office" && !officeOpened) setOfficeOpened(true);
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -322,14 +325,15 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<MacFolderAccessDialog link={link} state={state} />
 			{mode === "terminal" && <TerminalFolderNotice machine={machine} state={state} />}
-			{mode === "office" ? (
-				<div className="mx-chat-body">
-					<Suspense fallback={<p className="mx-group-note muted">{t.office.loading}</p>}>
-						<OfficeTab link={link} threadId={threadId} info={state.info} online={online} />
+			{officeOpened && (
+				<div className="mx-chat-body" style={mode === "office" ? undefined : { display: "none" }}>
+					<Suspense fallback={mode === "office" ? <p className="mx-group-note muted">{t.office.loading}</p> : null}>
+						<OfficeTab link={link} threadId={threadId} info={state.info} online={online} visible={mode === "office"} />
 					</Suspense>
-					{workspacePanel}
+					{mode === "office" && workspacePanel}
 				</div>
-			) : mode === "terminal" ? (
+			)}
+			{mode === "office" ? null : mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (
 						<Suspense fallback={<SessionLoading label={t.terminal.loading} />}>

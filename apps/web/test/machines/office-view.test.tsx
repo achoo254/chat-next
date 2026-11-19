@@ -99,7 +99,7 @@ describe("the office tab", () => {
 		expect(fake.sent).toEqual([]);
 	});
 
-	it("shows every room of the plan at once, grouped by zone, with their people and the meeting room's +N, and opens with the overview panel beside them", async () => {
+	it("shows every room of the plan at once, grouped by zone, with their people, and opens with the overview panel beside them", async () => {
 		const fake = fakeLink();
 		wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
 		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
@@ -165,6 +165,29 @@ describe("the office tab", () => {
 		const control = screen.getByRole("region", { name: "Kiểm soát" });
 		// The director's tool in the QA room is the QA tester's work.
 		expect(within(within(control).getByRole("region", { name: "Phòng QA/ISO" })).getByText("Kiểm thử phần mềm")).toBeTruthy();
+	});
+
+	it("goes on in the background while another tab of the session shows: nothing is drawn, the machine is not asked again, and what arrived meanwhile is there when the tab opens", async () => {
+		const fake = fakeLink();
+		const view = wrap(<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online />);
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
+		expect(await screen.findByRole("region", { name: "Sảnh" })).toBeTruthy();
+		view.rerender(
+			<I18nProvider>
+				<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online visible={false} />
+			</I18nProvider>,
+		);
+		expect(screen.queryByRole("region", { name: "Sảnh" })).toBeNull();
+		// An event that comes while the tab is hidden is taken in; the link is neither closed nor asked to watch again.
+		fake.deliver({ case: "officeSnapshot", value: snapshot([director()], { reportsStaff: false }) });
+		expect(fake.sent).toEqual([{ case: "officeWatch", value: { threadId: "t1", on: true, advisorRole: true } }]);
+		view.rerender(
+			<I18nProvider>
+				<OfficeView link={fake.link} threadId="t1" info={info("3.6.0")} online visible />
+			</I18nProvider>,
+		);
+		expect(await screen.findByText("AI này không báo cáo nhân viên: việc của công cụ do các phòng ban làm.")).toBeTruthy();
+		expect(fake.sent).toHaveLength(1);
 	});
 
 	it("opens a phone on the work zone and a wide screen on the whole plan", () => {
