@@ -11,6 +11,7 @@ import { AgentWorkspaceKind, type AgentProject, type AgentWorkspace } from "../.
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import type { Conn } from "../../src/machines/machine-status.ts";
 import { buildTree, locate, matches, projectIcon, shortHost, statusOf, threadStatus, unseenDone, workspaceIcon, workspaceLabels, worstStatus } from "../../src/machines/project-tree.ts";
+import { collect } from "../../src/machines/session-board.tsx";
 import type { MachineView } from "../../src/machines/use-machines.ts";
 
 let nextId = 100;
@@ -214,5 +215,21 @@ describe("row icons", () => {
 		expect(of(AgentWorkspaceKind.CLONE, "")).toBe("branch");
 		expect(of(AgentWorkspaceKind.FOLDER, "main")).toBe("branch");
 		expect(of(AgentWorkspaceKind.FOLDER, "")).toBe("folder");
+	});
+});
+
+describe("the board (Cần bạn, Đang chạy, Phiên gần đây)", () => {
+	it("leaves archived sessions out of every list, as the AI Agent column does", () => {
+		const m = machine(1, "Mac", [
+			thread("kept", "/w", ThreadState.IDLE, 3000),
+			thread("gone", "/w", ThreadState.IDLE, 4000, { archived: true }),
+			thread("asks", "/w", ThreadState.WAITING, 2000, { archived: true }),
+			thread("runs", "/w", ThreadState.RUNNING, 2000, { archived: true }),
+			thread("live", "/w", ThreadState.RUNNING, 1000),
+		]);
+		const { need, running, idle } = collect([m]);
+		expect(need.map((p) => p.thread.id)).toEqual([]);
+		expect(running.map((p) => p.thread.id)).toEqual(["live"]);
+		expect(idle.map((p) => p.thread.id)).toEqual(["kept"]);
 	});
 });

@@ -40,12 +40,14 @@ interface Placed {
 	thread: ThreadSummary;
 }
 
-function collect(machines: readonly MachineView[]) {
+/** The sessions of the board by what they need, newest first; archived ones stay in the archived list only (as in the AI Agent column). */
+export function collect(machines: readonly MachineView[]) {
 	const need: Placed[] = [];
 	const running: Placed[] = [];
 	const idle: Placed[] = [];
 	for (const machine of machines) {
 		for (const thread of machine.state.threads) {
+			if (thread.archived) continue;
 			const placed = { machine, thread };
 			if (thread.state === ThreadState.WAITING) need.push(placed);
 			else if (thread.state === ThreadState.RUNNING || thread.state === ThreadState.QUEUED) running.push(placed);
