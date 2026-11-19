@@ -53,7 +53,7 @@ func (r *runner) loadTopics(ctx context.Context, l *chatLink) error {
 	}
 	list, err := retryRateLimit(ctx, func() ([]bridge.Topic, error) { return tr.ListTopics(ctx, r.acct, l.ExternalChat) })
 	if err != nil {
-		return err
+		return r.skipRefused(err, "topics", l.ExternalChat)
 	}
 	ct := r.convTopics(l.ExternalChat)
 	ct.fetched = time.Now()

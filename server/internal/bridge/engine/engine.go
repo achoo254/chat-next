@@ -220,13 +220,13 @@ func (r *runner) run(ctx context.Context) error {
 		// does not hold up what arrives meanwhile.
 		r.pending = append(r.pending, l)
 	}
-	if err := r.syncConversations(runCtx); err != nil {
+	if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
 		return r.settle(runCtx, err)
 	}
 	// A chat synced before pins were read gets them now; a chat that was just
 	// imported got them at the end of its backfill.
 	for _, l := range caughtUp {
-		if err := r.syncPins(runCtx, l); err != nil {
+		if err := r.skipRefused(r.syncPins(runCtx, l), "pins", l.ExternalChat); err != nil {
 			return r.settle(runCtx, err)
 		}
 	}
@@ -236,7 +236,7 @@ func (r *runner) run(ctx context.Context) error {
 	defer imports.Stop()
 	states := time.NewTicker(e.cfg.StatePoll)
 	defer states.Stop()
-	if err := r.pollAll(runCtx); err != nil {
+	if err := r.skipRefused(r.pollAll(runCtx), "sync", ""); err != nil {
 		return r.settle(runCtx, err)
 	}
 	for {
@@ -244,29 +244,29 @@ func (r *runner) run(ctx context.Context) error {
 		case <-runCtx.Done():
 			return r.settle(runCtx, context.Cause(runCtx))
 		case <-outbox.C:
-			if err := r.sendDue(runCtx); err != nil {
+			if err := r.skipRefused(r.sendDue(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case <-states.C:
-			if err := r.pollAll(runCtx); err != nil {
+			if err := r.skipRefused(r.pollAll(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 			r.conversationsTick++
 			if r.conversationsTick%conversationsEvery == 0 || r.relist {
 				r.relist = false
-				if err := r.syncConversations(runCtx); err != nil {
+				if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
 					return r.settle(runCtx, err)
 				}
 			}
 		case <-imports.C:
-			if err := r.importNext(runCtx); err != nil {
+			if err := r.skipRefused(r.importNext(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case <-r.syncNow:
 			if err := r.reloadSyncState(runCtx); err != nil {
 				return r.settle(runCtx, err)
 			}
-			if err := r.syncConversations(runCtx); err != nil {
+			if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case err := <-subDone:
@@ -281,11 +281,11 @@ func (r *runner) run(ctx context.Context) error {
 				continue
 			}
 			r.links[l.ExternalChat] = l
-			if err := r.backfill(runCtx, l); err != nil {
+			if err := r.importOne(runCtx, l); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case ev := <-events:
-			if err := r.handle(runCtx, ev); err != nil {
+			if err := r.skipRefused(r.handle(runCtx, ev), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		}

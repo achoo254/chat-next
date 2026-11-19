@@ -28,7 +28,7 @@ func (r *runner) syncPins(ctx context.Context, l *chatLink) error {
 	}
 	ids, err := retryRateLimit(ctx, func() ([]string, error) { return pr.ListPinned(ctx, r.acct, l.ExternalChat) })
 	if err != nil {
-		return err
+		return r.skipRefused(err, "pins", l.ExternalChat)
 	}
 	var seqs []int64
 	skipped := 0

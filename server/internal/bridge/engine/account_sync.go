@@ -101,17 +101,8 @@ func (r *runner) importNext(ctx context.Context) error {
 		if l.BackfillDone || r.links[l.ExternalChat] != l {
 			continue
 		}
-		if err := r.backfill(ctx, l); err != nil {
-			if !refused(err) {
-				return err
-			}
-			// The other app will not give this conversation's history (a peer it no longer
-			// knows, no right to read): it keeps what it has and stops being waited for.
-			r.logger.Warn("the first import of a conversation was refused; it is left as it is", "conversation", l.ExternalChat, "reason", err.Error())
-			if err := r.e.db.finishBackfill(ctx, l.ID, ""); err != nil {
-				return err
-			}
-			l.BackfillDone = true
+		if err := r.importOne(ctx, l); err != nil {
+			return err
 		}
 		break
 	}
@@ -149,4 +140,19 @@ func (d *db) syncProgress(ctx context.Context, accountID int64) (SyncProgress, e
 		return p, fmt.Errorf("bridge: sync progress: %w", err)
 	}
 	return p, nil
+}
+
+// importOne runs the first import of a chat. One the other app refuses (a peer it no
+// longer knows, no right to read) keeps what it has and stops being waited for.
+func (r *runner) importOne(ctx context.Context, l *chatLink) error {
+	err := r.backfill(ctx, l)
+	if err == nil || !refused(err) {
+		return err
+	}
+	r.logger.Warn("the first import of a conversation was refused; it is left as it is", "conversation", l.ExternalChat, "reason", err.Error())
+	if err := r.e.db.finishBackfill(ctx, l.ID, ""); err != nil {
+		return err
+	}
+	l.BackfillDone = true
+	return nil
 }

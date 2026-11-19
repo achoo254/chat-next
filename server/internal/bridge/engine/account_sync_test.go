@@ -106,3 +106,19 @@ func TestAConversationTheOtherAppRefusesDoesNotStopTheSyncOfTheOthers(t *testing
 		t.Fatalf("the account connected %d times: a refusal stopped its sync", n)
 	}
 }
+
+func TestAnImportedConversationRefusedLaterDoesNotKeepTheAccountReconnecting(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "backfill not done" })
+	e.fake.Refuse("g1") // its pins, topics, state and info are refused from now on
+	e.start()           // a new run reads the pins of every imported chat first
+	time.Sleep(500 * time.Millisecond)
+	if n := e.fake.SubscribeCalls(); n != 2 {
+		t.Fatalf("the account connected %d times over two runs: a refusal stopped a run", n)
+	}
+	// and it still takes what comes
+	m := e.msg("m3", lan, "tin mới", 3)
+	e.fake.Push(bridge.Event{Message: &m})
+	e.waitTexts(chatID, []string{"tin 1", "tin 2", "tin mới"})
+}

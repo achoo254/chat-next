@@ -446,6 +446,9 @@ func (f *Fake) AddTopic(conv string, t bridge.Topic) {
 func (f *Fake) ListTopics(_ context.Context, _ bridge.Account, conv string) ([]bridge.Topic, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.refuse[conv] {
+		return nil, refusedErr(conv)
+	}
 	return append([]bridge.Topic(nil), f.topics[conv]...), nil
 }
 
@@ -463,6 +466,9 @@ func (f *Fake) SetPinned(conv string, ids ...string) {
 func (f *Fake) ListPinned(_ context.Context, _ bridge.Account, conv string) ([]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.refuse[conv] {
+		return nil, refusedErr(conv)
+	}
 	return append([]string(nil), f.pinned[conv]...), nil
 }
 
