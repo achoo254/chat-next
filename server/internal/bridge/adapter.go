@@ -180,7 +180,38 @@ type Message struct {
 	// topic, which the adapter names like any other.
 	Topic   string
 	Version int64
+	// Service is set for a system line of the other app instead of content: Text,
+	// Entities and Media are then empty.
+	Service *ServiceAction
 }
+
+// ServiceAction is a system line of a conversation: who did what, From being the
+// actor. Kinds the engine does not know are dropped.
+type ServiceAction struct {
+	Kind ServiceKind
+	// Title is the new name (ServiceTitleChanged) or the name it was created with
+	// (ServiceChatCreated).
+	Title string
+	// People are who joined (ServiceMembersAdded) or who was removed (ServiceMemberRemoved).
+	People []Participant
+	// MessageID is the message pinned (ServiceMessagePinned).
+	MessageID string
+}
+
+// ServiceKind is what a system line says.
+type ServiceKind string
+
+const (
+	ServiceChatCreated   ServiceKind = "chat_created"
+	ServiceMembersAdded  ServiceKind = "members_added"
+	ServiceMemberLeft    ServiceKind = "member_left"
+	ServiceMemberRemoved ServiceKind = "member_removed"
+	ServiceJoinedByLink  ServiceKind = "joined_by_link"
+	ServiceTitleChanged  ServiceKind = "title_changed"
+	ServicePhotoChanged  ServiceKind = "photo_changed"
+	ServicePhotoRemoved  ServiceKind = "photo_removed"
+	ServiceMessagePinned ServiceKind = "message_pinned"
+)
 
 // Topic is a topic of a forum conversation.
 type Topic struct {

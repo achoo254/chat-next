@@ -46,7 +46,8 @@ type ImportMessage struct {
 	// never notify.
 	Notify bool
 	// Content carries parts the text cannot (media); its entities and silent
-	// flag are replaced.
+	// flag are replaced. A Content with an action is a system line: only the
+	// action is kept, and it never notifies.
 	Content *appv1.Message
 	// Buttons are link buttons under the message, one slice per row. A button
 	// Chat does not allow (a URL scheme it forbids, a limit exceeded) is
@@ -102,6 +103,10 @@ func (s *Service) WithImport(ctx context.Context, chatID, owner int64, fn func(*
 // of users who are not members of the chat are dropped, not rejected: the
 // text still reads right and one odd span must not stop an import.
 func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *appv1.Message, error) {
+	// A system line of the other app carries only its action, like Chat's own.
+	if action := msg.Content.GetAction(); action != nil {
+		return "", &appv1.Message{Action: action, Silent: true}, nil
+	}
 	content := &appv1.Message{}
 	if msg.Content != nil {
 		content = &appv1.Message{Media: msg.Content.GetMedia()}

@@ -254,6 +254,9 @@ func documentMedia(d *tg.Document) bridge.Media {
 // mapMessage turns a Telegram message into a bridge message; ok is false
 // for a message that is not content (a service message, an empty one).
 func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bool) {
+	if s, ok := m.(*tg.MessageService); ok {
+		return b.mapService(s, self)
+	}
 	msg, ok := m.(*tg.Message)
 	if !ok {
 		return bridge.Message{}, false

@@ -137,6 +137,7 @@ export const enBridge: BridgeCopy = {
 			typing: "Typing",
 			lifecycle: "Leave and delete the group",
 			alerts: "New message alerts",
+			service: "System lines (joined, left, renamed…)",
 		},
 		direction: { off: "Off", in: "Receive only", out: "Send only", both: "Both ways" },
 		risk: { r1: "Your own state", r2: "Seen by others", r3: "Acts on people and groups", re: "Temporary" },

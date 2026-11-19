@@ -38,9 +38,12 @@ const (
 	// Alerts: a new message of the other app notifies in Chat (push and unread count), as
 	// it does in the app it comes from. Off until switched on for the chat.
 	Alerts Feature = "alerts"
+	// Service is the system lines of the other app (somebody joined, left, renamed the
+	// group, pinned a message), imported as Chat's own system messages. In only.
+	Service Feature = "service"
 )
 
-var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing, Lifecycle, Alerts}
+var all = []Feature{Messages, Pins, Topics, Reactions, Read, Notify, Dialog, Info, Members, Invites, Typing, Lifecycle, Alerts, Service}
 
 // All lists every feature, in the order they are shown.
 func All() []Feature { return append([]Feature(nil), all...) }
@@ -73,7 +76,7 @@ const (
 // RiskOf returns the risk of f.
 func RiskOf(f Feature) Risk {
 	switch f {
-	case Messages, Topics, Info:
+	case Messages, Topics, Info, Service:
 		return R2
 	case Members, Invites, Lifecycle:
 		return R3

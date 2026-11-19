@@ -79,6 +79,7 @@ func defaultSupport() map[feature.Feature]feature.Support {
 		feature.Read:      {In: true, Out: true},
 		feature.Reactions: {In: true, Out: true},
 		feature.Alerts:    {In: true},
+		feature.Service:   {In: true},
 		feature.Notify:    {In: true, Out: true},
 		feature.Dialog:    {In: true, Out: true},
 		feature.Info:      {In: true, Out: true},

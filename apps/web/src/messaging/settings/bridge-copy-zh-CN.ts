@@ -137,6 +137,7 @@ export const zhCNBridge: BridgeCopy = {
 			typing: "正在输入",
 			lifecycle: "退出和解散群",
 			alerts: "新消息通知",
+			service: "系统消息（加入、退出、改名…）",
 		},
 		direction: { off: "关闭", in: "仅接收", out: "仅发送", both: "双向" },
 		risk: { r1: "你的状态", r2: "他人可见", r3: "作用于人员和群", re: "临时" },

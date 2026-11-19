@@ -509,6 +509,28 @@ func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Me
 // appendMessages writes fresh messages (oldest first) into the chat, records
 // their keys, and wires replies in both directions.
 func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatLink, fresh []bridge.Message, senders map[string]int64, files map[string]*appv1.Message, live bool) error {
+	fresh, err := r.keepServiceLines(ctx, l, fresh)
+	if err != nil {
+		return err
+	}
+	// A system line becomes Chat's action; one that cannot be shown is left out.
+	actions := map[string]*appv1.MessageAction{}
+	kept := fresh[:0:0]
+	for _, m := range fresh {
+		if m.Service == nil {
+			kept = append(kept, m)
+			continue
+		}
+		a, ok, err := r.serviceAction(ctx, it, l, m.Service, senders[m.From.ID])
+		if err != nil {
+			return err
+		}
+		if ok {
+			actions[m.ID] = a
+			kept = append(kept, m)
+		}
+	}
+	fresh = kept
 	if len(fresh) == 0 {
 		return nil
 	}
@@ -533,6 +555,10 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 			if err := it.AddMember(ctx, from); err != nil {
 				return err
 			}
+		}
+		if a := actions[m.ID]; a != nil {
+			imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Content: &appv1.Message{Action: a}, TopicID: topicIDs[m.Topic]}
+			continue
 		}
 		content := files[m.ID]
 		label := labelFor(m, content != nil)

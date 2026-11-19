@@ -21,8 +21,8 @@ type ImportedMember struct {
 // never touched: Chat-only members stay members, and the owner is not demoted by
 // the other app. It reports whether anything changed.
 //
-// It asks for no right. A person leaving is shown as leaving (the other app does
-// not say whether they were removed), a person joining as a member count only.
+// It asks for no right and posts no system line: who joined, left or was removed is
+// said by the other app's own system lines, imported with its messages.
 func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, complete bool) (bool, error) {
 	if it.c.Type == typePrivate {
 		return false, nil
@@ -91,7 +91,9 @@ func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, c
 			return false, fmt.Errorf("chat: imported members: %w", err)
 		}
 		for _, id := range gone {
-			if err := it.t.removeMember(ctx, it.c, id, id, false); err != nil {
+			// No line of its own: the other app's system line (imported with the
+			// messages) says who left or was removed.
+			if err := it.t.removeMember(ctx, it.c, 0, id, false); err != nil {
 				return false, err
 			}
 			changed = true
