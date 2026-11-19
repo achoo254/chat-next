@@ -404,13 +404,34 @@ describe("the session's views", () => {
 		const row = { id: "s5", terminalSession: 0, open: false };
 		rememberSessionMode("1", "s5", "terminal");
 		openSessionIn("1", "other", "office");
-		// The row still names where this session was last opened; opening it from the list takes the pick.
+		// The row still names where this session was last opened, and opening it from the list goes there, not to the pick.
 		expect(rowMode("1", row)).toBe("terminal");
 		expect(rowMode("1", { ...row, open: true })).toBe("chat");
 		expect(sessionModeOf("1", "s5")).toBe("terminal");
-		expect(sessionPath("1", row, true, true)).toBe("/ai/1/s/s5/office");
-		// Where the office is not offered, it opens as its row says.
+		expect(sessionPath("1", row, true, true)).toBe("/ai/1/s/s5/terminal");
 		expect(sessionPath("1", row, true, false)).toBe("/ai/1/s/s5/terminal");
+		window.localStorage.clear();
+		storageChanged(null);
+	});
+
+	it("a session left in chat opens in chat again, whatever view was picked on another session", () => {
+		window.localStorage.clear();
+		storageChanged(null);
+		const left = { id: "old", terminalSession: 0, open: false };
+		const fresh = { id: "never", terminalSession: 0, open: false };
+		rememberSessionMode("1", "old", "chat");
+		// The terminal picked on another session: the one left in chat stays in chat; one never opened here takes the pick.
+		openSessionIn("1", "other", "terminal");
+		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old");
+		expect(sessionPath("1", fresh, true, true)).toBe("/ai/1/s/never/terminal");
+		// The office picked: the same.
+		openSessionIn("1", "other", "office");
+		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old");
+		expect(sessionPath("1", fresh, true, true)).toBe("/ai/1/s/never/office");
+		// A session left in the office opens there with chat picked.
+		rememberSessionMode("1", "old", "office");
+		openSessionIn("1", "other", "chat");
+		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old/office");
 		window.localStorage.clear();
 		storageChanged(null);
 	});
@@ -467,5 +488,14 @@ describe("a refused watch", () => {
 		expect(await screen.findByText(viMachines.errors.reasons.officeWatchLimit)).toBeTruthy();
 		fake.deliver({ case: "officeSnapshot", value: snapshot([director()]) });
 		await waitFor(() => expect(screen.queryByText(viMachines.errors.reasons.officeWatchLimit)).toBeNull());
+	});
+
+	it("a session the machine does not have: only that it is not there, no empty office", async () => {
+		const fake = fakeLink();
+		const { container } = wrap(<OfficeView link={fake.link} threadId="gone" info={info("3.6.0")} online />);
+		await fake.reject(new RemoteError(ErrorCode.NOT_FOUND, "no such thread", ErrorReason.THREAD_NOT_FOUND, ""));
+		expect(await screen.findByText(viMachines.errors.reasons.threadNotFound)).toBeTruthy();
+		expect(container.querySelector(".of-body")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Thử lại" })).toBeNull();
 	});
 });

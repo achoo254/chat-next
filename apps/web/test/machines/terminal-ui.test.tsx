@@ -365,6 +365,13 @@ describe("a session in chat or in its terminal", () => {
 		expect(sent("termOpen")).toEqual([]);
 	});
 
+	it("a session the machine does not list: the terminal address says it is not there instead of opening forever", async () => {
+		sessionAt({ page: "session-terminal", machine: "1", threadId: "gone" });
+		expect(await screen.findByText("Không thấy phiên này trên máy.")).toBeTruthy();
+		expect(screen.queryByText("Đang mở terminal…")).toBeNull();
+		expect(sent("termOpen")).toEqual([]);
+	});
+
 	it("a session another window on the machine has open: Terminal mode says so and points to the chat tab", async () => {
 		const base = machine.handler;
 		machine.handler = (frame, socket) =>

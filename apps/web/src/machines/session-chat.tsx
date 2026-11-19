@@ -340,6 +340,14 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 								onTabShown={() => navigate(aiPaths.sessionTerminal(machine, threadId), { replace: true })}
 							/>
 						</Suspense>
+					) : missing ? (
+						<div className="empty">
+							<p>{t.chat.notFound}</p>
+						</div>
+					) : !online ? (
+						<p className="note mx-group-note" role="status">
+							{t.terminal.offline}
+						</p>
 					) : (
 						state.info === null || thread === null ? (
 							<SessionLoading label={t.terminal.loading} />

@@ -3,12 +3,12 @@
 // subagents at work in a small building, view only). The terminal is offered
 // only when the machine has its terminal and the session's AI opens there
 // (ProviderCapabilities.terminal); the office when the machine's tunelo keeps
-// one (AGENT_OFFICE). The view last picked on the switch is kept on this
-// device and the next session opened from a list opens in it too (one that
-// does not offer it opens as before). Each session also remembers the mode it
-// was last opened in: its row's icon says that one (or a live hold), never
-// the device's pick. The machine keeps only the pick of the new-session
-// dialog. While
+// one (AGENT_OFFICE). Each session remembers the mode it was last opened in
+// on this device, and opens in it again from a list: its row's icon says that
+// one (or a live hold). The view last picked on the switch is kept on this
+// device too, and only a session never opened here opens in it (one that does
+// not offer it opens as before). The machine keeps only the pick of the
+// new-session dialog. While
 // the CLI holds a session, the chat view shows it read-only and points to
 // the terminal: no two views write to one session.
 import { useState, type ReactElement } from "react";
@@ -115,23 +115,19 @@ export function rememberPickedMode(mode: SessionMode): void {
 
 const SESSION_MODE_KEY = (machine: string, threadId: string) => `ai:mode:${machine}:${threadId}`;
 
-/** The mode the session was last opened in on this device; chat when never, or for a value this app does not know (another session's choice never applies). */
-export function sessionModeOf(machine: string, threadId: string): SessionMode {
+/** The mode kept for the session on this device; null when it was never opened here, or for a value this app does not know. */
+function keptMode(machine: string, threadId: string): SessionMode | null {
 	try {
 		const kept = window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId));
-		return kept === "terminal" || kept === "office" ? kept : "chat";
+		return kept === "chat" || kept === "terminal" || kept === "office" ? kept : null;
 	} catch {
-		return "chat";
+		return null;
 	}
 }
 
-/** Whether this device left the session in chat on purpose (a mode kept for it, unlike `sessionModeOf`'s chat for a session never opened). */
-function keptChat(machine: string, threadId: string): boolean {
-	try {
-		return window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId)) === "chat";
-	} catch {
-		return false;
-	}
+/** The mode the session was last opened in on this device; chat when never, or for a value this app does not know (another session's choice never applies). */
+export function sessionModeOf(machine: string, threadId: string): SessionMode {
+	return keptMode(machine, threadId) ?? "chat";
 }
 
 /** The session was just opened in `mode` (each visit records it). */
@@ -150,7 +146,7 @@ export function rememberSessionMode(machine: string, threadId: string, mode: Ses
  * `takesBack` (chat can write to it: its first message takes the session back).
  */
 export function rowMode(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, takesBack = false): SessionMode {
-	if (thread.terminalSession > 0) return takesBack && keptChat(machine, thread.id) ? "chat" : "terminal";
+	if (thread.terminalSession > 0) return takesBack && keptMode(machine, thread.id) === "chat" ? "chat" : "terminal";
 	if (thread.open) return "chat";
 	return sessionModeOf(machine, thread.id);
 }
@@ -160,7 +156,7 @@ export function modePath(machine: string, threadId: string, mode: SessionMode): 
 	return mode === "office" ? aiPaths.sessionOffice(machine, threadId) : paths.machineSession(machine, threadId);
 }
 
-/** Switch this session to `mode`: it and the device remember the choice (the next session opened from a list opens in it too). */
+/** Switch this session to `mode`: it and the device remember the choice (a session never opened here opens in it too). */
 export function openSessionIn(machine: string, threadId: string, mode: SessionMode): void {
 	rememberSessionMode(machine, threadId, mode);
 	rememberPickedMode(mode);
@@ -168,16 +164,18 @@ export function openSessionIn(machine: string, threadId: string, mode: SessionMo
 }
 
 /**
- * Where a session opens from a list: a session held in a terminal opens
- * there; else the view last picked on a switch when the session offers it
- * (the terminal when `offered`, the office when the machine keeps one,
- * `office`); else the view its row names, the terminal only when offered. An
- * office it was left in opens there (only a machine that keeps offices let it
- * be picked; an older one says to update). A session a terminal holds opens in
- * the chat it was left in when `takesBack`.
+ * Where a session opens from a list: the view its row names (a live hold,
+ * else the mode it was last opened in on this device), the terminal only when
+ * offered. Only a session never opened here, and not held, takes the view last
+ * picked on a switch when it offers it (the terminal when `offered`, the
+ * office when the machine keeps one, `office`): a pick on one session never
+ * moves another the user left in its own view. An office it was left in opens
+ * there (only a machine that keeps offices let it be picked; an older one says
+ * to update). A session a terminal holds opens in the chat it was left in when
+ * `takesBack`.
  */
 export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, office = true, takesBack = false): string {
-	const picked = thread.terminalSession > 0 ? null : pickedMode();
+	const picked = thread.terminalSession > 0 || keptMode(machine, thread.id) !== null ? null : pickedMode();
 	const usable = picked === "chat" || (picked === "terminal" && offered) || (picked === "office" && office);
 	const mode = usable && picked !== null ? picked : rowMode(machine, thread, takesBack);
 	return modePath(machine, thread.id, mode === "terminal" && !offered ? "chat" : mode);

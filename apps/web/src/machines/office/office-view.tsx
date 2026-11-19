@@ -68,6 +68,11 @@ export function isWatchLimit(err: unknown): boolean {
 	return err instanceof RemoteError && err.reason === ErrorReason.OFFICE_WATCH_LIMIT;
 }
 
+/** The machine has no such session (deleted, or never there): the office has nothing to show, only why. */
+export function isSessionGone(err: unknown): boolean {
+	return err instanceof RemoteError && err.reason === ErrorReason.THREAD_NOT_FOUND;
+}
+
 export function refusalText(copy: MachinesCopy, err: unknown): string {
 	return err instanceof RemoteError && err.reason !== ErrorReason.UNSPECIFIED ? errorText(copy, err, "") : copy.office.failed;
 }
@@ -302,7 +307,7 @@ function LiveOffice({ link, threadId, layout, advisor }: { link: MachineLink; th
 					)}
 				</p>
 			))}
-			{state.status === "loading" && !failed ? (
+			{refusal !== null && isSessionGone(refusal.err) ? null : state.status === "loading" && !failed ? (
 				<p className="of-note" role="status">
 					{t.loading}
 				</p>
