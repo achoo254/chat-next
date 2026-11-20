@@ -35,6 +35,8 @@ const answers: string[] = [];
 let advisorChanges = 0;
 /** What the core was asked for Advisor's note (thread, start of the message). */
 const notesAsked: [string, string, string | undefined][] = [];
+/** What the core was asked as a CLI's turn ended (thread, session). */
+const stopsAsked: [string, string | undefined][] = [];
 let forwardOn = true;
 let forwardBlocked: number[] = [];
 
@@ -54,6 +56,10 @@ function fakeMachine(): Machine {
       terminalNote: (thread: string, prompt: string, session?: string) => {
         notesAsked.push([thread, prompt, session]);
         return thread === "held" ? "Advisor is on" : undefined;
+      },
+      terminalStop: (thread: string, session?: string) => {
+        stopsAsked.push([thread, session]);
+        return thread === "held" ? "Ask for next steps" : undefined;
       },
     },
     localForward: {
@@ -128,6 +134,7 @@ describe("control socket", () => {
         "GET /local-forward",
         "POST /advisor/changed",
         "POST /advisor/note",
+        "POST /advisor/stop",
         "GET /status",
         "GET /trust",
         "GET /tunnels",
@@ -164,6 +171,18 @@ describe("control socket", () => {
     expect(await call("POST", "/advisor/note", { thread: "held", prompt: "x".repeat(65) })).toHaveProperty("error");
     expect(await call("POST", "/advisor/note", { prompt: "hi" })).toHaveProperty("error");
     expect(notesAsked).toHaveLength(2);
+  });
+
+  test("advisor/stop answers the reminder for a turn the core holds, nothing for any other, and refuses what is no thread", async () => {
+    expect(await call("POST", "/advisor/stop", { thread: "held", session: "s1" })).toEqual({ reason: "Ask for next steps" });
+    expect(await call("POST", "/advisor/stop", { thread: "other" })).toEqual({});
+    expect(stopsAsked).toEqual([
+      ["held", "s1"],
+      ["other", undefined],
+    ]);
+    expect(await call("POST", "/advisor/stop", {})).toHaveProperty("error");
+    expect(await call("POST", "/advisor/stop", { thread: "t".repeat(65) })).toHaveProperty("error");
+    expect(stopsAsked).toHaveLength(2);
   });
 
   test("refuses a caller without the token of control.json", async () => {

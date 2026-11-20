@@ -7,7 +7,7 @@ import type { HookCallback, HookInput } from "@anthropic-ai/claude-agent-sdk";
 import { TurnState } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
 import { AUTO_INSTRUCTIONS, AUTO_REMINDER, NOTE_SEPARATOR } from "../src/advisor/advisor-instructions.ts";
-import { PromptNotes, advisorWeighHook, createClaudeProvider } from "../src/providers/claude/index.ts";
+import { PromptNotes, advisorStopHook, advisorWeighHook, createClaudeProvider } from "../src/providers/claude/index.ts";
 import { answerPermission, type PermissionContext } from "../src/providers/antigravity/permissions.ts";
 import type { AcpPermissionParams } from "../src/providers/acp/acp-session.ts";
 import type { ApprovalRequest, AskUser, SessionNote } from "../src/providers/types.ts";
@@ -18,6 +18,7 @@ import { byCase, makeCore, until } from "./harness.ts";
 const signal = new AbortController().signal;
 const run = (hook: HookCallback, input: Record<string, unknown>) => hook(input as unknown as HookInput, undefined, { signal });
 const preToolUse = (tool: string) => ({ hook_event_name: "PreToolUse", tool_name: tool, tool_input: {}, tool_use_id: "t1", session_id: "s", transcript_path: "", cwd: "/w", permission_mode: "default" });
+const stop = (active: boolean) => ({ hook_event_name: "Stop", stop_hook_active: active, session_id: "s", transcript_path: "", cwd: "/w" });
 const prompt = (text: string) => ({ hook_event_name: "UserPromptSubmit", prompt: text, session_id: "s", transcript_path: "", cwd: "/w" });
 
 describe("Claude: advisor_weigh without a card", () => {
@@ -31,6 +32,30 @@ describe("Claude: advisor_weigh without a card", () => {
     expect(await run(hook, preToolUse("mcp__tunelo__advisor_weigh"))).toEqual({
       hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ADVISOR_OFF_REFUSAL },
     });
+  });
+});
+
+describe("Claude: a turn that never asked Advisor for next steps is held once", () => {
+  it("blocks the end of the turn with the reminder, once: the next Stop (stop_hook_active) always lets it end", async () => {
+    let asks = 0;
+    const hook = advisorStopHook(() => {
+      asks += 1;
+      return "ask for next steps";
+    });
+    expect(await run(hook, stop(false))).toEqual({ decision: "block", reason: "ask for next steps" });
+    expect(await run(hook, stop(true))).toEqual({});
+    // Claude already continues because of a hold: the core is not even asked.
+    expect(asks).toBe(1);
+  });
+
+  it("lets the turn end when nothing is owed", async () => {
+    expect(await run(advisorStopHook(() => undefined), stop(false))).toEqual({});
+  });
+
+  it("answers only the Stop event", async () => {
+    const hook = advisorStopHook(() => "ask for next steps");
+    expect(await run(hook, preToolUse("mcp__tunelo__advisor_weigh"))).toEqual({});
+    expect(await run(hook, { ...stop(false), hook_event_name: "SubagentStop" })).toEqual({});
   });
 });
 
@@ -113,6 +138,10 @@ describe("Claude: notes beside the prompt", () => {
     const after = await Promise.all(pre.map((h) => run(h, preToolUse("mcp__tunelo__advisor_weigh"))));
     expect(after).toContainEqual({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ADVISOR_OFF_REFUSAL } });
     expect(after.some((d) => JSON.stringify(d).includes('"allow"'))).toBe(false);
+    // The work session carries the Stop hook; between turns nothing is owed, so it lets the session go.
+    const stopHook = options?.hooks?.Stop?.[0]?.hooks[0];
+    if (!stopHook) throw new Error("no Stop hook");
+    expect(await run(stopHook, stop(false))).toEqual({});
     await core.stop();
   });
 });

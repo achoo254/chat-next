@@ -269,7 +269,7 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const TURN_END_HOOK = { hooks: [{ type: "command", command: "exit 0" }] };
 export const TURN_END_SETTINGS = JSON.stringify({ hooks: { Stop: [TURN_END_HOOK] } });
 
-/** How long the CLI waits for Advisor's note before a message goes on without it (the command itself gives up sooner). */
+/** How long the CLI waits for Advisor's note, or for the check as a turn ends, before going on without it (the commands themselves give up sooner). */
 const NOTE_HOOK_TIMEOUT_S = 5;
 
 /** advisor_weigh as the CLI in a terminal lists it: tunelo's MCP there is named apart from a "tunelo" the user added. */
@@ -289,7 +289,8 @@ export function shellArg(arg: string): string {
 /**
  * --settings and --mcp-config for automatic Advisor in the terminal (see
  * TerminalLaunch.advisor): the turn-end hook plus a UserPromptSubmit hook
- * that prints Advisor's note with each message, advisor_weigh allowed
+ * that prints Advisor's note with each message, a Stop hook that holds a turn
+ * which never asked for next steps (`tunelo advisor stop`), advisor_weigh allowed
  * without a prompt, and tunelo's MCP with the thread's ticket (advisor_weigh
  * only) under its own name (TERMINAL_ADVISOR_MCP_SERVER), so a "tunelo" MCP
  * the user added keeps working beside it. No key goes into either: the
@@ -299,11 +300,12 @@ export function shellArg(arg: string): string {
  * (Git Bash's own environment syntax is not relied on there).
  */
 function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): string[] {
-  if (advisor.noteCommand.length === 0) throw new Error("no command for Advisor's note");
+  if (advisor.noteCommand.length === 0 || advisor.stopCommand.length === 0) throw new Error("no command for Advisor's note");
   const home = platform === "win32" ? "" : `TUNELO_HOME=${shellArg(advisor.configDir)} `;
   const settings = {
     hooks: {
-      Stop: [TURN_END_HOOK],
+      // The turn-end hook marks each turn's end; the second holds a turn that never asked for next steps, once.
+      Stop: [TURN_END_HOOK, { hooks: [{ type: "command", command: home + advisor.stopCommand.map(shellArg).join(" "), timeout: NOTE_HOOK_TIMEOUT_S }] }],
       UserPromptSubmit: [{ hooks: [{ type: "command", command: home + advisor.noteCommand.map(shellArg).join(" "), timeout: NOTE_HOOK_TIMEOUT_S }] }],
     },
     permissions: { allow: [TERMINAL_ADVISOR_TOOL.fullName] },
@@ -438,6 +440,20 @@ export function advisorWeighHook(allowed: () => boolean): HookCallback {
       return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ADVISOR_OFF_REFUSAL } };
     }
     return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+  };
+}
+
+/**
+ * The turn is about to end (Claude's Stop hook): while automatic Advisor was on
+ * all along and next steps were never asked, Claude goes on once with the
+ * reminder. `stop_hook_active` says Claude is already continuing because a Stop
+ * hook held it, so the turn then ends whatever happens: no loop.
+ */
+export function advisorStopHook(reason: () => string | undefined): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "Stop" || input.stop_hook_active) return {};
+    const why = reason();
+    return why === undefined ? {} : { decision: "block", reason: why };
   };
 }
 
@@ -648,6 +664,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   const browserNotices = policy.sessionMcp?.browserNotices;
   const notices = browserNotices ? [browserNoticeHook(browserNotices)] : [];
   const advisorAllowed = policy.sessionMcp?.advisorAllowed;
+  const advisorStop = policy.sessionMcp?.advisorStop;
   const advisorHooks = [...(advisorAllowed ? [advisorWeighHook(advisorAllowed)] : []), advisorGitHook];
   const advisorSession = policy.advisorSession === true;
   const promptNotes = new PromptNotes();
@@ -771,6 +788,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
             { hooks: [macFolderHook(policy)] },
           ],
           UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
+          ...(advisorStop ? { Stop: [{ hooks: [advisorStopHook(advisorStop)] }] } : {}),
           PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
           PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
         },

@@ -86,6 +86,13 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   giờ bị chặn. Lệnh hook dùng đường dẫn tuyệt đối của tunelo, từng đối số trong nháy đơn cho `sh`/Git Bash, và trên macOS/Linux có tiền tố
   `TUNELO_HOME='…'` để hỏi đúng dịch vụ khi thư mục cấu hình không phải mặc định; trên Windows không có tiền tố này (dịch vụ ở thư mục khác
   mặc định thì hook không tìm thấy nó, in `{}`), và không có Git Bash (CLI dùng PowerShell) thì hook không chạy được, lỗi đó không chặn tin.
+- **Kiểm tra cuối lượt ở terminal.** Cùng `--settings` có thêm một hook `Stop` chạy `tunelo advisor stop <thread>` (hook `exit 0` cũ vẫn giữ để
+  CLI ghi mốc hết lượt). Core nhớ lượt của CLI từ lúc hook ghi chú chạy: chế độ tự động bật suốt lượt, `advisor_weigh` có gọi với
+  `next_steps` hay chưa (dịch vụ ghi nhận ngay khi lệnh gọi tới, kể cả lệnh bị từ chối, và lệnh không đọc được `kind` cũng tính là đã hỏi).
+  Lượt chưa hỏi thì hook in `{"decision":"block","reason":…}` để CLI chạy tiếp một lần kèm lời nhắc nêu đúng tên `mcp__tunelo-advisor__advisor_weigh`.
+  `stop_hook_active` của CLI (đã chạy tiếp vì hook giữ lại) kết thúc lượt ngay, không hỏi dịch vụ; core cũng tự giữ tối đa một lần mỗi lượt. Lượt
+  mở bằng lệnh `/`, `!`, `#`, lượt chế độ tự động tắt hay bị tắt rồi bật giữa chừng, và `session_id` khác phiên thread đang giữ đều không bị giữ
+  lại. Không có dịch vụ, lỗi hay quá 1,5 giây thì in `{}` và thoát 0. Phiên chat dùng cùng kiểm tra này qua hook `Stop` của SDK.
 - **Giới hạn của đường terminal.** Vé nằm trong argv của `claude` (JSON của `--mcp-config`), nên mọi tiến trình cùng user, kể cả Bash của AI
   trong terminal, đọc được bằng `ps`; với vé đó chỉ gọi được `advisor_weigh` cho đúng thread (tốn lượt TypeSafe, có thể thêm thẻ nhận định),
   không chạm bí mật, Chat hay Localman. Vé chỉ sống trong bộ nhớ: dịch vụ khởi động lại khi CLI còn chạy thì CLI đó mất Cố vấn (không nhận

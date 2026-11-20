@@ -8,9 +8,9 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ADVISOR_OFF, AUTO_INSTRUCTIONS, AUTO_REMINDER, autoInstructions, autoReminder } from "../src/advisor/advisor-instructions.ts";
+import { ADVISOR_OFF, AUTO_INSTRUCTIONS, AUTO_REMINDER, autoInstructions, autoReminder, stopReminder } from "../src/advisor/advisor-instructions.ts";
 import type { AdvisorHooks } from "../src/advisor/advisor-tools.ts";
-import { runAdvisorNote } from "../src/advisor/cli-advisor-command.ts";
+import { runAdvisorNote, runAdvisorStop } from "../src/advisor/cli-advisor-command.ts";
 import type { AgentCore } from "../src/core/agent-core.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
 import { ADVISOR_WEIGH_MCP_ENV, TICKET_ENV, type TicketScope } from "../src/mcp/session-tickets.ts";
@@ -27,7 +27,12 @@ afterEach(async () => {
   for (const core of cores.splice(0)) await core.stop();
 });
 
-const ADVISOR = { ticket: "tkt", configDir: "/cfg", noteCommand: ["/opt/tunelo", "advisor", "note", "thread-1"] };
+const ADVISOR = {
+  ticket: "tkt",
+  configDir: "/cfg",
+  noteCommand: ["/opt/tunelo", "advisor", "note", "thread-1"],
+  stopCommand: ["/opt/tunelo", "advisor", "stop", "thread-1"],
+};
 const SESSION_ID = "0b0c3f6e-1d2a-4c5b-8e9f-0a1b2c3d4e5f";
 /** advisor_weigh as the CLI in a terminal lists it. */
 const TERMINAL_TOOL = { server: "tunelo-advisor", fullName: "mcp__tunelo-advisor__advisor_weigh" };
@@ -38,7 +43,7 @@ describe("claude in the terminal with Advisor", () => {
     expect(out.args).toEqual(["--resume", SESSION_ID, "--settings", TURN_END_SETTINGS]);
   });
 
-  it("one --settings with the turn-end hook, the note hook and advisor_weigh allowed, then tunelo's MCP with the ticket only", () => {
+  it("one --settings with the turn-end hook, the note hook, the Stop check and advisor_weigh allowed, then tunelo's MCP with the ticket only", () => {
     const out = terminalCommand("/bin/claude", { dir: "/w", resumeId: SESSION_ID, model: "opus", advisor: ADVISOR }, () => "x", "darwin");
     expect(out.args.slice(0, 4)).toEqual(["--resume", SESSION_ID, "--model", "opus"]);
     expect(out.args.filter((a) => a === "--settings")).toHaveLength(1);
@@ -49,7 +54,11 @@ describe("claude in the terminal with Advisor", () => {
       hooks: { Stop: unknown[]; UserPromptSubmit: { hooks: { type: string; command: string; timeout: number }[] }[] };
       permissions: { allow: string[] };
     };
-    expect(settings.hooks.Stop).toEqual((JSON.parse(TURN_END_SETTINGS) as { hooks: { Stop: unknown[] } }).hooks.Stop);
+    // The turn-end marker as before, then the check that holds a turn which never asked for next steps.
+    expect(settings.hooks.Stop).toEqual([
+      ...(JSON.parse(TURN_END_SETTINGS) as { hooks: { Stop: unknown[] } }).hooks.Stop,
+      { hooks: [{ type: "command", command: "TUNELO_HOME='/cfg' '/opt/tunelo' 'advisor' 'stop' 'thread-1'", timeout: 5 }] },
+    ]);
     // The hook asks the service of tunelo's own config folder, wherever that is.
     expect(settings.hooks.UserPromptSubmit).toEqual([{ hooks: [{ type: "command", command: "TUNELO_HOME='/cfg' '/opt/tunelo' 'advisor' 'note' 'thread-1'", timeout: 5 }] }]);
     expect(settings.permissions.allow).toEqual(["mcp__tunelo-advisor__advisor_weigh"]);
@@ -84,8 +93,14 @@ describe("claude in the terminal with Advisor", () => {
     expect(out.args.at(-3)).toContain(`"command":"'/opt/tunelo' 'advisor' 'note' 'thread-1'"`);
   });
 
-  it("refuses an Advisor without a note command", () => {
+  it("on Windows the Stop check names no folder either", () => {
+    const out = terminalCommand("/bin/claude", { dir: "/w", advisor: ADVISOR }, () => SESSION_ID, "win32");
+    expect(out.args.at(-3)).toContain(`"command":"'/opt/tunelo' 'advisor' 'stop' 'thread-1'"`);
+  });
+
+  it("refuses an Advisor without a note command or without a Stop command", () => {
     expect(() => terminalCommand("/bin/claude", { dir: "/w", advisor: { ...ADVISOR, noteCommand: [] } }, () => SESSION_ID)).toThrow();
+    expect(() => terminalCommand("/bin/claude", { dir: "/w", advisor: { ...ADVISOR, stopCommand: [] } }, () => SESSION_ID)).toThrow();
   });
 });
 
@@ -157,6 +172,7 @@ describe("the ticket of the CLI in the terminal", () => {
     const advisor = m.launches[0]?.advisor;
     expect(advisor).toMatchObject({ ticket: "ticket-1", configDir: "/cfg" });
     expect(advisor?.noteCommand.slice(-3)).toEqual(["advisor", "note", t.id]);
+    expect(advisor?.stopCommand.slice(-3)).toEqual(["advisor", "stop", t.id]);
     m.core.terminalStarted(t.id, 1, 42);
     expect(m.leases[0]?.released).toBe(false);
     m.core.terminalEnded(1, 42);
@@ -379,6 +395,191 @@ describe("`tunelo advisor note`", () => {
     }
     // stdout gone: still exits 0.
     expect(await runAdvisorNote("t", { readStdin: async () => hook("hi"), ask: async () => ({}), print: () => Promise.reject(new Error("EPIPE")) })).toBe(0);
+  });
+});
+
+describe("the check as the CLI's turn in a terminal ends", () => {
+  /** A thread with Advisor on whose CLI runs in a terminal and got a message (the note hook ran). */
+  const open = async (message = "fix the push") => {
+    const m = machine();
+    const t = await m.thread();
+    m.core.setAdvisor(t.id, true, "phone");
+    await m.core.terminalLaunch(t.id);
+    m.core.terminalStarted(t.id, 1, 42);
+    if (message !== "") m.core.terminalNote(t.id, message, SESSION_ID);
+    return { ...m, id: t.id };
+  };
+
+  it("holds a turn that never asked for next steps, once, with the CLI's own tool name; the next Stop lets it end", async () => {
+    const m = await open();
+    const reason = m.core.terminalStop(m.id, SESSION_ID);
+    expect(reason).toBe(stopReminder(TERMINAL_TOOL));
+    expect(reason).toContain("select:mcp__tunelo-advisor__advisor_weigh");
+    // Even if the CLI did not say it continues (a hook that timed out), it is held only once per turn.
+    expect(m.core.terminalStop(m.id, SESSION_ID)).toBeUndefined();
+  });
+
+  it("not once it asked for next steps (even when refused); a decision alone does not count", async () => {
+    const asked = await open();
+    asked.core.advisorAsked(asked.id, "decision");
+    expect(asked.core.terminalStop(asked.id)).toBe(stopReminder(TERMINAL_TOOL));
+
+    const done = await open();
+    done.core.advisorAsked(done.id, "decision");
+    done.core.advisorAsked(done.id, "next_steps");
+    expect(done.core.terminalStop(done.id)).toBeUndefined();
+
+    // A call whose kind could not be read counts as asking: never hold a turn by guess.
+    const unknown = await open();
+    unknown.core.advisorAsked(unknown.id, "");
+    expect(unknown.core.terminalStop(unknown.id)).toBeUndefined();
+  });
+
+  it("the CLI already continuing because a hook held it ends the turn at once", async () => {
+    const m = await open();
+    expect(m.core.terminalStop(m.id, SESSION_ID, true)).toBeUndefined();
+    // The turn is closed: nothing is held afterwards either.
+    expect(m.core.terminalStop(m.id, SESSION_ID)).toBeUndefined();
+  });
+
+  it("a new message starts a new turn that owes its own next steps", async () => {
+    const m = await open();
+    m.core.advisorAsked(m.id, "next_steps");
+    expect(m.core.terminalStop(m.id)).toBeUndefined();
+    m.core.terminalNote(m.id, "and the tests?", SESSION_ID);
+    expect(m.core.terminalStop(m.id)).toBe(stopReminder(TERMINAL_TOOL));
+    // Held already, then another message: owed again.
+    m.core.terminalNote(m.id, "more", SESSION_ID);
+    expect(m.core.terminalStop(m.id)).toBe(stopReminder(TERMINAL_TOOL));
+  });
+
+  it("not for a command, the CLI's shell or memory input, nor before any message", async () => {
+    for (const typed of ["/compact", "  /review src", "!git status", " # always use pnpm"]) {
+      const m = await open(typed);
+      expect(m.core.terminalStop(m.id)).toBeUndefined();
+    }
+    const none = await open("");
+    expect(none.core.terminalStop(none.id)).toBeUndefined();
+    // A command typed after a message ends that message's turn from the check's view too.
+    const after = await open();
+    after.core.terminalNote(after.id, "/clear", SESSION_ID);
+    expect(after.core.terminalStop(after.id)).toBeUndefined();
+  });
+
+  it("not when Advisor was off from the message, or went off during the turn", async () => {
+    const never = machine();
+    const t = await never.thread();
+    await never.core.terminalLaunch(t.id);
+    never.core.terminalStarted(t.id, 1, 42);
+    never.core.terminalNote(t.id, "hello", SESSION_ID);
+    expect(never.core.terminalStop(t.id)).toBeUndefined();
+
+    const toggled = await open();
+    toggled.core.setAdvisor(toggled.id, false, "phone");
+    toggled.core.setAdvisor(toggled.id, true, "phone");
+    expect(toggled.core.terminalStop(toggled.id)).toBeUndefined();
+  });
+
+  it("not for another conversation of the CLI than the one the thread holds, an unknown thread, a thread outside a terminal, or an ended terminal", async () => {
+    const m = await open();
+    expect(m.core.terminalStop(m.id, "33333333-0000-4000-8000-000000000000")).toBeUndefined();
+    expect(m.core.terminalStop("no-such-thread")).toBeUndefined();
+
+    const chat = machine();
+    const t = await chat.thread();
+    chat.core.setAdvisor(t.id, true, "phone");
+    expect(chat.core.terminalStop(t.id)).toBeUndefined();
+
+    const ended = await open();
+    ended.core.terminalEnded(1, 42);
+    expect(ended.core.terminalStop(ended.id)).toBeUndefined();
+  });
+
+  it("the CLI's call to advisor_weigh through tunelo's MCP counts, even one that is refused", async () => {
+    const m = await open();
+    const hooks: AdvisorHooks = {
+      allowed: (id) => m.core.advisorAllowed(id),
+      key: async () => undefined,
+      call: (id, run) => m.core.advisorCall(id, run),
+      asked: (id, kind) => m.core.advisorAsked(id, kind),
+      isSensitive: () => false,
+    };
+    const host = new McpHost(tempDir("adv-term-asked-"), { advisor: () => hooks, localWrites: () => false });
+    const session = host.open("https://tunnel.example", host.tickets.issue(m.id, "advisor-weigh"));
+    const ask = { question: "Which?", options: ["A", "B"] };
+    await host.call(session, "advisor", "advisor_weigh", { kind: "decision", ...ask });
+    expect(m.core.terminalStop(m.id)).toBe(stopReminder(TERMINAL_TOOL));
+    m.core.terminalNote(m.id, "again", SESSION_ID);
+    await host.call(session, "advisor", "advisor_weigh", { kind: "next_steps", ...ask });
+    expect(m.core.terminalStop(m.id)).toBeUndefined();
+  });
+});
+
+describe("`tunelo advisor stop`", () => {
+  const hook = (extra: Record<string, unknown> = {}) => JSON.stringify({ session_id: "s", hook_event_name: "Stop", stop_hook_active: false, ...extra });
+  const run = async (deps: { readStdin: () => Promise<string>; ask: (body: { thread: string; session?: string }) => Promise<unknown> }, timeoutMs = 1_000) => {
+    const printed: string[] = [];
+    const code = await runAdvisorStop("thread-1", { ...deps, timeoutMs, print: async (line) => void printed.push(line) });
+    return { code, printed: printed.map((l) => JSON.parse(l) as unknown) };
+  };
+
+  it("prints a block with the service's reminder, asking with the thread and the CLI's session", async () => {
+    const asked: unknown[] = [];
+    const out = await run({
+      readStdin: async () => hook(),
+      ask: async (body) => {
+        asked.push(body);
+        return { reason: "ask for next steps" };
+      },
+    });
+    expect(out).toEqual({ code: 0, printed: [{ decision: "block", reason: "ask for next steps" }] });
+    expect(asked).toEqual([{ thread: "thread-1", session: "s" }]);
+  });
+
+  it("stop_hook_active ends it at once: no question to the service, `{}` printed", async () => {
+    let asks = 0;
+    const out = await run({
+      readStdin: async () => hook({ stop_hook_active: true }),
+      ask: async () => {
+        asks += 1;
+        return { reason: "ask for next steps" };
+      },
+    });
+    expect(out).toEqual({ code: 0, printed: [{}] });
+    expect(asks).toBe(0);
+  });
+
+  it("prints {} and exits 0 when nothing is owed, no service, no answer in time, no hook input or a reason that is no text", async () => {
+    const cases: { readStdin: () => Promise<string>; ask: () => Promise<unknown> }[] = [
+      { readStdin: async () => hook(), ask: async () => ({}) },
+      { readStdin: async () => hook(), ask: async () => ({ reason: "" }) },
+      { readStdin: async () => hook(), ask: async () => ({ reason: 42 }) },
+      { readStdin: async () => hook(), ask: () => Promise.reject(new Error("tunelo is not running")) },
+      { readStdin: async () => hook(), ask: () => new Promise(() => undefined) },
+      { readStdin: () => new Promise(() => undefined), ask: async () => ({ reason: "x" }) },
+      { readStdin: async () => "not json", ask: async () => ({ reason: "x" }) },
+      { readStdin: async () => "null", ask: async () => ({ reason: "x" }) },
+      { readStdin: () => Promise.reject(new Error("closed")), ask: async () => ({ reason: "x" }) },
+    ];
+    for (const c of cases) {
+      const started = Date.now();
+      expect(await run(c, 50)).toEqual({ code: 0, printed: [{}] });
+      expect(Date.now() - started).toBeLessThan(1_000);
+    }
+    // stdout gone: still exits 0.
+    expect(await runAdvisorStop("t", { readStdin: async () => hook(), ask: async () => ({}), print: () => Promise.reject(new Error("EPIPE")) })).toBe(0);
+  });
+
+  it("a hook input without a usable session still asks, without one", async () => {
+    const asked: unknown[] = [];
+    await run({
+      readStdin: async () => JSON.stringify({ stop_hook_active: false, session_id: "x".repeat(200) }),
+      ask: async (body) => {
+        asked.push(body);
+        return {};
+      },
+    });
+    expect(asked).toEqual([{ thread: "thread-1" }]);
   });
 });
 

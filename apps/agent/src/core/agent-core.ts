@@ -69,10 +69,10 @@ import { gitBranch, gitRoot } from "../safety/dirs.ts";
 import { previewLine } from "./preview.ts";
 import { type ItemBody, Journal } from "../threads/journal.ts";
 import type { SessionMcpLease, TicketScope } from "../mcp/session-tickets.ts";
-import { advisorNoteCommand } from "../mcp/session-mcp-launch.ts";
+import { advisorNoteCommand, advisorStopCommand } from "../mcp/session-mcp-launch.ts";
 import { AttachmentError, type AttachmentLimits, type UploadPiece, Uploads } from "../attachments/uploads.ts";
 import { keptImage, prepareAttachments, textForAi, userWords } from "../attachments/message-attachments.ts";
-import { type AdvisorToolName, type NoteState, advisorNote, noteStateAfterToggle, withNote } from "../advisor/advisor-instructions.ts";
+import { type AdvisorToolName, type NoteState, advisorNote, noteStateAfterToggle, stopReminder, withNote } from "../advisor/advisor-instructions.ts";
 import { advisorResultOf, isAdvisorWeigh } from "../advisor/advisor-tools.ts";
 import { type AdvisorCall, verdictItem } from "../advisor/advisor-verdict.ts";
 import {
@@ -340,7 +340,15 @@ type PendingNote = { note: string; state: NoteState; gen: number };
  * the CLI's conversation that heard Advisor's notes so far (its session id;
  * another one, after /clear or /resume, has heard nothing).
  */
-type TerminalAdvisor = { lease: SessionMcpLease; tool?: AdvisorToolName; session?: string };
+type TerminalAdvisor = { lease: SessionMcpLease; tool?: AdvisorToolName; session?: string; turn?: TerminalTurn };
+
+/**
+ * The CLI's running turn as Advisor sees it, from its message's hook to the
+ * end: `onAllAlong` automatic Advisor stayed on since the message; `askedNext`
+ * it called advisor_weigh for next steps; `held` its Stop hook already sent it
+ * back once.
+ */
+type TerminalTurn = { onAllAlong: boolean; askedNext: boolean; held: boolean };
 
 /** The running turn's activity: when it started, thinking or writing, output tokens per reply, and the throttle. */
 type TurnActivity = {
@@ -2105,10 +2113,17 @@ export class AgentCore {
     t.advisorNote = noteStateAfterToggle(on, t.advisorNote ?? "none");
     t.advisorGen = (t.advisorGen ?? 0) + 1;
     // Turned off during a turn: that turn is not held to asking Advisor.
-    if (!on && t.advisorTurn) t.advisorTurn.onAllAlong = false;
+    if (!on) this.dropAdvisorCover(t);
     this.saveMeta(t);
     this.opts.audit.write({ device, action: on ? "advisor_on" : "advisor_off", path: t.meta.dir, detail: t.meta.id });
     for (const fn of this.infoListeners) fn(t.meta.id);
+  }
+
+  /** Automatic Advisor went off: the running turn (chat or terminal) is no longer held to asking it. */
+  private dropAdvisorCover(t: Thread): void {
+    if (t.advisorTurn) t.advisorTurn.onAllAlong = false;
+    const turn = t.terminalLease?.turn;
+    if (turn) turn.onAllAlong = false;
   }
 
   /** The thread's automatic Advisor is on; false for an unknown thread. */
@@ -2128,7 +2143,7 @@ export class AgentCore {
       if (t.meta.kind === "advisor" || t.meta.advisor === true) continue;
       t.advisorNote = noteStateAfterToggle(this.wantsAdvisor(t), t.advisorNote ?? "none");
       t.advisorGen = (t.advisorGen ?? 0) + 1;
-      if (!this.wantsAdvisor(t) && t.advisorTurn) t.advisorTurn.onAllAlong = false;
+      if (!this.wantsAdvisor(t)) this.dropAdvisorCover(t);
       for (const fn of this.infoListeners) fn(t.meta.id);
     }
   }
@@ -2245,9 +2260,22 @@ export class AgentCore {
    * next steps.
    */
   private advisorMissed(t: Thread, state: TurnState): boolean {
+    return state === TurnState.COMPLETED && this.owesNextSteps(t);
+  }
+
+  /** The running turn had automatic Advisor on all along, with a key kept and tunelo's MCP in the session, and has not asked for next steps. */
+  private owesNextSteps(t: Thread): boolean {
     const turn = t.advisorTurn;
-    if (state !== TurnState.COMPLETED || !turn?.onAllAlong || turn.mixed || turn.askedNext) return false;
+    if (!turn?.onAllAlong || turn.mixed || turn.askedNext) return false;
     return this.autoAdvisor(t) && t.sessionMcpOpen === true && (this.opts.advisorKeySet?.() ?? false);
+  }
+
+  /**
+   * The AI is about to end the turn (its Stop hook): the reminder it reads when
+   * it still owes the next steps, else undefined. The adapter asks once per turn.
+   */
+  private advisorStopReason(t: Thread): string | undefined {
+    return this.owesNextSteps(t) ? stopReminder() : undefined;
   }
 
   /** Sessions of this AI can ask Advisor: the AI takes tunelo's MCP and the machine runs its sessions with it. */
@@ -2440,6 +2468,7 @@ export class AgentCore {
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
     const advisorAllowed = () => this.advisorAllowed(t.meta.id);
+    const advisorStop = () => this.advisorStopReason(t);
     const withMcp = lease
       ? {
           ...policy,
@@ -2449,6 +2478,7 @@ export class AgentCore {
             approveWrite: lease.approveWrite,
             describeWrite: lease.describeWrite,
             advisorAllowed,
+            ...(advisorSession ? {} : { advisorStop }),
             ...(advisorSession ? { advisorSession: true } : {}),
             ...(lease.secrets && !advisorSession ? { secrets: lease.secrets } : {}),
             ...(lease.browserNotices && !advisorSession ? { browserNotices: lease.browserNotices } : {}),
@@ -3348,10 +3378,11 @@ export class AgentCore {
   private terminalAdvisorLease(t: Thread, provider: AgentProvider): { lease: SessionMcpLease; advisor: NonNullable<TerminalLaunch["advisor"]> } | undefined {
     if (provider.capabilities.terminalAdvisor !== true || !this.sessionMcpEnabled() || this.opts.advisorKeySet?.() !== true) return undefined;
     const noteCommand = advisorNoteCommand(t.meta.id);
-    if (!noteCommand) return undefined;
+    const stopCommand = advisorStopCommand(t.meta.id);
+    if (!noteCommand || !stopCommand) return undefined;
     const lease = this.opts.sessionMcp?.(t.meta.id, "advisor-weigh");
     if (!lease) return undefined;
-    return { lease, advisor: { ticket: lease.ticket, configDir: lease.configDir, noteCommand } };
+    return { lease, advisor: { ticket: lease.ticket, configDir: lease.configDir, noteCommand, stopCommand } };
   }
 
   /** Ends a ticket of the thread's CLI in a terminal (running, or being started), if any. */
@@ -3382,10 +3413,45 @@ export class AgentCore {
       at.session = session;
       t.advisorNote = "none";
     }
-    if (/^[!#]/.test(prompt.trimStart())) return undefined;
+    const typed = prompt.trimStart();
+    // A "/" command, "!" shell or "#" memory input carries no note: no turn of it is held to asking Advisor.
+    if (/^[!#/]/.test(typed)) delete at.turn;
+    else at.turn = { onAllAlong: this.autoAdvisor(t), askedNext: false, held: false };
+    if (/^[!#]/.test(typed)) return undefined;
     const { note, state } = advisorNote(prompt, this.autoAdvisor(t), t.advisorNote ?? "none", at.tool);
     t.advisorNote = state;
     return note;
+  }
+
+  /** advisor_weigh was called for the thread (AdvisorHooks.asked): a CLI turn in a terminal that asked for next steps is no longer owed. */
+  advisorAsked(threadId: string, kind: string): void {
+    const turn = this.threads.get(threadId)?.terminalLease?.turn;
+    if (turn && (kind === "next_steps" || kind === "")) turn.askedNext = true;
+  }
+
+  /**
+   * The CLI's turn in a terminal is about to end (its Stop hook,
+   * `tunelo advisor stop`): the reminder to hand it back with when automatic
+   * Advisor was on since the message and it never asked for next steps, once
+   * per turn; undefined to let it end. The turn is closed once it is let go.
+   * `active`: the CLI already continues because a Stop hook held it.
+   */
+  terminalStop(threadId: string, session?: string, active = false): string | undefined {
+    const t = this.threads.get(threadId);
+    const at = t?.terminalLease;
+    const turn = at?.turn;
+    if (!t || !at || !turn || t.deleted || t.meta.kind === "advisor" || !t.meta.terminal) return undefined;
+    if ((session !== undefined && session !== at.session) || active || turn.held) {
+      delete at.turn;
+      return undefined;
+    }
+    const owed = turn.onAllAlong && !turn.askedNext && this.autoAdvisor(t) && (this.opts.advisorKeySet?.() ?? false);
+    if (!owed) {
+      delete at.turn;
+      return undefined;
+    }
+    turn.held = true;
+    return stopReminder(at.tool);
   }
 
   /**

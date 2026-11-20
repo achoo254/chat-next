@@ -38,6 +38,8 @@ export type AdvisorHooks = {
   allowed(threadId: string): boolean;
   /** The user's key, from the machine's own store; undefined when none is kept. */
   key(): Promise<string | undefined>;
+  /** A call of advisor_weigh with this kind came in (before it is checked): the thread's turn did ask. */
+  asked?(threadId: string, kind: string): void;
   /** Runs `run` for the thread; its signal aborts when the thread's turn is interrupted or ends. */
   call<T>(threadId: string, run: (signal: AbortSignal) => Promise<T>): Promise<T>;
   isSensitive(path: string): boolean;
@@ -129,6 +131,7 @@ function registerWeigh(server: ToolRegistrar, bound?: { hooks: AdvisorHooks; thr
     async (args) => {
       if (!bound) return refusal("off", NO_SESSION);
       const { hooks, threadId } = bound;
+      hooks.asked?.(threadId, args.kind);
       if (!hooks.allowed(threadId)) return refusal("off", ADVISOR_OFF_REFUSAL);
       const options = args.options.map((o) => o.trim());
       if (args.question.trim() === "" || options.some((o) => o === "")) return refusal("invalid", BLANK);

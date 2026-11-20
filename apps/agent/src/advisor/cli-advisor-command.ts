@@ -18,6 +18,13 @@
 // additionalContext. Whatever goes wrong (no service, a timeout, input it
 // cannot read) it prints `{}` and exits 0: the user's message always goes on
 // as typed.
+//
+// `tunelo advisor stop <thread>` is the same kind of hook, for the CLI's Stop
+// event (the turn is about to end): it asks the service whether the turn never
+// asked Advisor for next steps and, if so, prints {"decision":"block",
+// "reason":…} so the CLI goes on once with the reminder. The hook's own
+// `stop_hook_active` (the CLI already continues because a hook held it) ends
+// it at once. Same rule: whatever goes wrong it prints `{}` and exits 0.
 import { join } from "node:path";
 import type { Command } from "commander";
 import { configDir } from "../config.ts";
@@ -107,28 +114,78 @@ function noteOf(answer: unknown): string | undefined {
   return typeof note === "string" && note !== "" ? note : undefined;
 }
 
-/** `tunelo advisor note <thread>`: prints the hook's output (Advisor's note, or `{}`); always exits 0. */
-export async function runAdvisorNote(thread: string, deps: AdvisorNoteDeps): Promise<number> {
-  const timeoutMs = deps.timeoutMs ?? NOTE_TIMEOUT_MS;
-  const deadline = (deps.now ?? Date.now)() + timeoutMs - Math.min(NOTE_DEADLINE_MARGIN_MS, timeoutMs / 2);
+/** What `work` came to, or undefined when it failed or took longer than `timeoutMs`. */
+async function withinTime<T>(timeoutMs: number, work: Promise<T | undefined>): Promise<T | undefined> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<undefined>((resolve) => {
     timer = setTimeout(() => resolve(undefined), timeoutMs);
   });
-  const work = (async (): Promise<string | undefined> => {
-    const input = hookInput(await deps.readStdin());
-    if (input === undefined) return undefined;
-    return noteOf(await deps.ask({ thread, ...input, deadline }));
-  })().catch(() => undefined);
-  const note = await Promise.race([work, timeout]);
+  const answer = await Promise.race([work.catch(() => undefined), timeout]);
   clearTimeout(timer);
-  const out = note === undefined ? {} : { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: note } };
+  return answer;
+}
+
+/** Writes the hook's one line; a closed stdout means the CLI went on without it. */
+async function printHook(print: (line: string) => Promise<void>, out: unknown): Promise<number> {
   try {
-    await deps.print(JSON.stringify(out));
+    await print(JSON.stringify(out));
   } catch {
     // stdout closed: the CLI went on without the hook's answer.
   }
   return 0;
+}
+
+/** `tunelo advisor note <thread>`: prints the hook's output (Advisor's note, or `{}`); always exits 0. */
+export async function runAdvisorNote(thread: string, deps: AdvisorNoteDeps): Promise<number> {
+  const timeoutMs = deps.timeoutMs ?? NOTE_TIMEOUT_MS;
+  const deadline = (deps.now ?? Date.now)() + timeoutMs - Math.min(NOTE_DEADLINE_MARGIN_MS, timeoutMs / 2);
+  const note = await withinTime(timeoutMs, (async (): Promise<string | undefined> => {
+    const input = hookInput(await deps.readStdin());
+    if (input === undefined) return undefined;
+    return noteOf(await deps.ask({ thread, ...input, deadline }));
+  })());
+  return printHook(deps.print, note === undefined ? {} : { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: note } });
+}
+
+export type AdvisorStopDeps = {
+  /** The hook's JSON on stdin; may reject or never settle. */
+  readStdin: () => Promise<string>;
+  /** Asks the running service (POST /advisor/stop); may reject or never settle. */
+  ask: (body: { thread: string; session?: string }) => Promise<unknown>;
+  /** Writes the one line the hook prints. */
+  print: (line: string) => Promise<void>;
+  timeoutMs?: number;
+};
+
+/** What the Stop hook's JSON tells: whether the CLI already continues because a hook held it, and its session id; undefined when it is no hook JSON. */
+function stopInput(raw: string): { active: boolean; session?: string } | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const { stop_hook_active: active, session_id: session } = parsed as { stop_hook_active?: unknown; session_id?: unknown };
+  const id = typeof session === "string" && session !== "" && session.length <= 128 ? { session } : {};
+  return { active: active === true, ...id };
+}
+
+/** What the service answered to the check: its reminder, or undefined for none or anything else. */
+function reasonOf(answer: unknown): string | undefined {
+  const reason = typeof answer === "object" && answer !== null ? (answer as { reason?: unknown }).reason : undefined;
+  return typeof reason === "string" && reason !== "" ? reason : undefined;
+}
+
+/** `tunelo advisor stop <thread>`: prints the Stop hook's output (a block with the reminder, or `{}`); always exits 0. */
+export async function runAdvisorStop(thread: string, deps: AdvisorStopDeps): Promise<number> {
+  const reason = await withinTime(deps.timeoutMs ?? NOTE_TIMEOUT_MS, (async (): Promise<string | undefined> => {
+    const input = stopInput(await deps.readStdin());
+    // The CLI already continues because a hook held it: nothing to ask, the turn ends now.
+    if (input === undefined || input.active) return undefined;
+    return reasonOf(await deps.ask({ thread, ...(input.session ? { session: input.session } : {}) }));
+  })());
+  return printHook(deps.print, reason === undefined ? {} : { decision: "block", reason });
 }
 
 /** stdin to its end (at most NOTE_STDIN_MAX bytes); "" when it is a terminal (no hook runs the command). */
@@ -243,6 +300,9 @@ export function registerAdvisorCommand(program: Command, exits: Exits): void {
         // The hook of a thread's CLI in a terminal (see the top of this file).
         if (action === "note" && thread !== undefined) {
           return runAdvisorNote(thread, { readStdin, ask: (body) => callControl(dir, "POST", "/advisor/note", body), print: printLine });
+        }
+        if (action === "stop" && thread !== undefined) {
+          return runAdvisorStop(thread, { readStdin, ask: (body) => callControl(dir, "POST", "/advisor/stop", body), print: printLine });
         }
         return runAdvisorCommand(action, { dir, term: processTerminal(), notify: () => callControl(dir, "POST", "/advisor/changed") });
       }),

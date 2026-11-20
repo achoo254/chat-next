@@ -8,11 +8,32 @@ import {
   AUTO_REMINDER,
   NOTE_SEPARATOR,
   advisorNote,
+  autoInstructions,
+  autoReminder,
   noteStateAfterToggle,
   withNote,
   withoutAdvisorNote,
 } from "../src/advisor/advisor-instructions.ts";
 import { textForAi, userWords } from "../src/attachments/message-attachments.ts";
+
+describe("how the note tells the AI to load advisor_weigh", () => {
+  const terminal = { server: "tunelo-advisor", fullName: "mcp__tunelo-advisor__advisor_weigh" };
+
+  it("names the exact tool search query in the whole text and in the reminder", () => {
+    expect(autoInstructions()).toContain("ToolSearch) with the query select:mcp__tunelo__advisor_weigh");
+    expect(autoReminder()).toContain("ToolSearch with the query select:mcp__tunelo__advisor_weigh");
+  });
+
+  it("uses the full name the adapter knows for sure", () => {
+    expect(autoInstructions(terminal)).toContain("its full name is mcp__tunelo-advisor__advisor_weigh.");
+    expect(autoInstructions(terminal)).toContain("select:mcp__tunelo-advisor__advisor_weigh");
+    expect(autoReminder(terminal)).toContain("select:mcp__tunelo-advisor__advisor_weigh");
+  });
+
+  it("without a known full name, says the prefix is usual and what to do when it finds nothing", () => {
+    expect(autoInstructions()).toContain("usually mcp__tunelo__advisor_weigh; if that finds nothing, search for advisor_weigh");
+  });
+});
 
 describe("advisorNote", () => {
   it("the whole text first, then a reminder", () => {

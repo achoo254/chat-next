@@ -471,7 +471,7 @@ export type TerminalLaunch = {
    * (`tunelo advisor note <thread>`, reading the hook's JSON on stdin).
    * Unset when the machine runs no session MCP.
    */
-  advisor?: { ticket: string; configDir: string; noteCommand: string[] };
+  advisor?: { ticket: string; configDir: string; noteCommand: string[]; stopCommand: string[] };
 };
 
 /** The program the terminal process runs for a TerminalLaunch: argv, never a shell line. */

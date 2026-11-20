@@ -17,7 +17,7 @@ export function sessionMcpLaunch(mcp: Pick<SessionMcp, "ticket" | "configDir" | 
 	return { command, args, env };
 }
 
-/** Thread ids that may go into the argv of `tunelo advisor note` (the core's own UUIDs). */
+/** Thread ids that may go into the argv of `tunelo advisor note` and `tunelo advisor stop` (the core's own UUIDs). */
 const NOTE_THREAD_ID = /^[A-Za-z0-9-]{1,64}$/;
 
 /**
@@ -27,4 +27,13 @@ const NOTE_THREAD_ID = /^[A-Za-z0-9-]{1,64}$/;
  */
 export function advisorNoteCommand(threadId: string): string[] | undefined {
 	return NOTE_THREAD_ID.test(threadId) ? selfCommand("advisor", "note", threadId) : undefined;
+}
+
+/**
+ * The argv of the check made as the thread's CLI in a terminal ends a turn
+ * (`tunelo advisor stop <thread>`, reading the hook's JSON on stdin); undefined
+ * for an id that is not plainly one.
+ */
+export function advisorStopCommand(threadId: string): string[] | undefined {
+	return NOTE_THREAD_ID.test(threadId) ? selfCommand("advisor", "stop", threadId) : undefined;
 }

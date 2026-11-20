@@ -22,6 +22,11 @@ export interface SessionMcp {
 	browserNotices?: () => string[];
 	/** Advisor may be asked in this session now: its advisor_weigh calls go on without an approval card. */
 	advisorAllowed?: () => boolean;
+	/**
+	 * The turn is about to end: what to tell the AI when automatic Advisor was on all
+	 * along and it never asked for next steps (it goes on, once); undefined to let it end.
+	 */
+	advisorStop?: () => string | undefined;
 	/** The session is an Advisor thread's: its `tunelo mcp` offers Advisor's tools only (TUNELO_MCP_ADVISOR). */
 	advisorSession?: boolean;
 	/** The ticket offers advisor_weigh and nothing else (a terminal's CLI): its `tunelo mcp` lists that tool only (TUNELO_MCP_ADVISOR_WEIGH). */

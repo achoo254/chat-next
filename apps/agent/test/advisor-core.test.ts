@@ -5,7 +5,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { type Item, TurnState } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, describe, expect, it } from "vitest";
-import { ADVISOR_OFF, AUTO_INSTRUCTIONS, AUTO_REMINDER, NOTE_SEPARATOR, withNote } from "../src/advisor/advisor-instructions.ts";
+import { ADVISOR_OFF, AUTO_INSTRUCTIONS, AUTO_REMINDER, NOTE_SEPARATOR, stopReminder, withNote } from "../src/advisor/advisor-instructions.ts";
 import type { AdvisorHooks } from "../src/advisor/advisor-tools.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
 import { forgetSecrets, rememberSecret, secretVariants } from "../src/mcp/redact.ts";
@@ -43,7 +43,7 @@ type Options = {
  */
 function machine(opts: Options = {}) {
   const sent: Sent[] = [];
-  const control = { deliver: true, failStart: false, startGate: undefined as Promise<void> | undefined };
+  const control = { deliver: true, failStart: false, startGate: undefined as Promise<void> | undefined, stop: (() => undefined) as () => string | undefined };
   const jevBodies: string[] = [];
   let hang = false;
   /** The machine-wide automatic Advisor switch (AdvisorSetAuto). */
@@ -69,6 +69,8 @@ function machine(opts: Options = {}) {
       const events = new Channel<ProviderEvent>();
       events.push({ type: "session", sessionId: "adv-1" });
       const ticket = policy.sessionMcp?.ticket;
+      // What the AI's Stop hook asks as it is about to end a turn.
+      control.stop = () => policy.sessionMcp?.advisorStop?.();
       const mcpId = mcp.host && ticket ? mcp.host.open("https://tunnel.example", ticket) : undefined;
       let n = 0;
       let busy = 0;
@@ -268,6 +270,72 @@ describe("advisor_missed", () => {
     toggled.open();
     await toggled.settled(d, 2);
     expect(toggled.turns(d)[1]?.advisorMissed).toBe(false);
+  });
+});
+
+describe("the AI's Stop hook asks the core before a turn ends", () => {
+  /** Waits until the first tool call of the second turn (advisor_weigh) went through. */
+  const asked = (m: ReturnType<typeof machine>, id: string) => until(m.core, id, (i) => byCase(i, "toolCall").length === 1).then(() => new Promise((r) => setTimeout(r, 20)));
+
+  it("a turn that has not asked for next steps is held with the reminder", async () => {
+    const m = machine();
+    const id = await m.thread();
+    await m.core.send(id, "pause", "c1");
+    await until(m.core, id, (i) => byCase(i, "turn").length === 2);
+    expect(m.control.stop()).toBe(stopReminder());
+    m.open();
+    await m.settled(id, 2);
+  });
+
+  it("not once it asked for next steps, nor when it asked only for a decision", async () => {
+    const next = machine();
+    const a = await next.thread();
+    await next.core.send(a, "pause next", "c1");
+    await asked(next, a);
+    expect(next.control.stop()).toBeUndefined();
+    next.open();
+    await next.settled(a, 2);
+
+    const decision = machine();
+    const b = await decision.thread();
+    await decision.core.send(b, "weigh decision", "c1");
+    await decision.settled(b, 2);
+    // The turn is over by now; a decision alone never counted: the miss shows on the turn.
+    expect(decision.turns(b)[1]?.advisorMissed).toBe(true);
+  });
+
+  it("not with Advisor off, without a key, or between turns", async () => {
+    const off = machine();
+    const a = await off.thread("hello", false);
+    await off.core.send(a, "pause", "c1");
+    await until(off.core, a, (i) => byCase(i, "turn").length === 2);
+    expect(off.control.stop()).toBeUndefined();
+    off.open();
+    await off.settled(a, 2);
+
+    const noKey = machine({ key: false });
+    const b = await noKey.thread();
+    await noKey.core.send(b, "pause", "c1");
+    await until(noKey.core, b, (i) => byCase(i, "turn").length === 2);
+    expect(noKey.control.stop()).toBeUndefined();
+    noKey.open();
+    await noKey.settled(b, 2);
+
+    const idle = machine();
+    await idle.thread();
+    expect(idle.control.stop()).toBeUndefined();
+  });
+
+  it("not when Advisor was turned off and on again during the turn (the turn was not covered all along)", async () => {
+    const m = machine();
+    const id = await m.thread();
+    await m.core.send(id, "pause", "c1");
+    await until(m.core, id, (i) => byCase(i, "turn").length === 2);
+    m.core.setAdvisor(id, false, "phone");
+    m.core.setAdvisor(id, true, "phone");
+    expect(m.control.stop()).toBeUndefined();
+    m.open();
+    await m.settled(id, 2);
   });
 });
 

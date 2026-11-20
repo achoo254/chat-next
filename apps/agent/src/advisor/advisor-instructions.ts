@@ -14,7 +14,6 @@
 
 /** The lines after the tool's name: how and when to ask Advisor. */
 const AUTO_RULES = [
-  "list shows it by name only, load its definition first (tool search), then call it. Do not skip it because it is not loaded yet.",
   '- When you are unsure between approaches, call advisor_weigh(kind="decision") before acting. If the result is "confident" and the',
   "  chosen action is non-destructive and inside the user's request, follow it. Deleting, pushing, deploying, sending anything outside",
   "  this machine, or going beyond the request still needs the user: ask them, quoting Advisor's probabilities.",
@@ -35,26 +34,37 @@ export type AdvisorToolName = { server: string; fullName?: string };
 /** advisor_weigh in a session tunelo opens (SDK, ACP): of the "tunelo" server. */
 const SESSION_TOOL: AdvisorToolName = { server: "tunelo" };
 
+/** The name to ask the tool search for: the tool's full name where known, else the usual prefix. */
+function searchName(tool: AdvisorToolName): string {
+  return tool.fullName ?? `mcp__${tool.server}__advisor_weigh`;
+}
+
 /** The whole text of the instructions for advisor_weigh named so. */
 export function autoInstructions(tool: AdvisorToolName = SESSION_TOOL): string {
   const named = tool.fullName
     ? `its full name is ${tool.fullName}.`
-    : `its full name may carry a prefix (for example mcp__${tool.server}__advisor_weigh).`;
+    : `its full name may carry a prefix (usually ${searchName(tool)}; if that finds nothing, search for advisor_weigh).`;
   return [
     "Advisor is on for this session. Advisor weighs options and returns how likely each is right; it never writes or runs anything.",
-    `advisor_weigh is a tool of the ${tool.server} MCP server; ${named} If your tool`,
+    `advisor_weigh is a tool of the ${tool.server} MCP server; ${named}`,
+    `If your tool list shows it by name only, load it first: call the tool search (ToolSearch) with the query select:${searchName(tool)}, then call advisor_weigh. Do not skip it because it is not loaded yet.`,
     ...AUTO_RULES,
   ].join("\n");
 }
 
 /** The one-line reminder for advisor_weigh named so. */
 export function autoReminder(tool: AdvisorToolName = SESSION_TOOL): string {
-  return `Advisor is on: call the ${tool.server} MCP tool ${tool.fullName ?? "advisor_weigh"} (load its definition first if it is listed by name only): kind="decision" when unsure, and kind="next_steps" before you end this turn.`;
+  return `Advisor is on: call the ${tool.server} MCP tool ${tool.fullName ?? "advisor_weigh"} (if it is listed by name only, first load it: ToolSearch with the query select:${searchName(tool)}): kind="decision" when unsure, and kind="next_steps" before you end this turn.`;
 }
 
 export const AUTO_INSTRUCTIONS = autoInstructions();
 
 export const AUTO_REMINDER = autoReminder();
+
+/** What the AI reads when it tries to end a turn without having asked Advisor for next steps (once per turn). */
+export function stopReminder(tool: AdvisorToolName = SESSION_TOOL): string {
+  return `Advisor is on for this session and this turn has not asked it for next steps yet. Call advisor_weigh with kind="next_steps" now (2-5 short next steps the user could send, in the user's language); if it is listed by name only, first load it with ToolSearch (query select:${searchName(tool)}). Then finish your reply.`;
+}
 
 export const ADVISOR_OFF = "Advisor is now off for this session: do not call advisor_weigh.";
 

@@ -101,6 +101,11 @@ const advisorNoteInput = z.object({
   session: z.string().min(1).max(128).optional(),
   deadline: z.number().int().positive().optional(),
 });
+/** `tunelo advisor stop`: the thread and the CLI's conversation (its session id). */
+const advisorStopInput = z.object({
+  thread: z.string().min(1).max(64),
+  session: z.string().min(1).max(128).optional(),
+});
 const mcpCall = z.object({
   session: z.string().min(1).max(64),
   group: z.string().min(1).max(64),
@@ -195,6 +200,16 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     if (deadline !== undefined && Date.now() >= deadline) return {};
     const note = machineOf(t).core.terminalNote(thread, prompt, session);
     return note === undefined ? {} : { note };
+  },
+  /**
+   * `tunelo advisor stop <thread>`, the Stop hook of a thread's CLI in a
+   * terminal: the reminder to hold the turn with when it never asked Advisor
+   * for next steps (AgentCore.terminalStop), once per turn. Fixed text only.
+   */
+  "POST /advisor/stop": (t, input) => {
+    const { thread, session } = advisorStopInput.parse(input);
+    const reason = machineOf(t).core.terminalStop(thread, session);
+    return reason === undefined ? {} : { reason };
   },
   /** A stream's holder is still there (see streamControl). */
   "POST /streams/alive": (t, input) => {

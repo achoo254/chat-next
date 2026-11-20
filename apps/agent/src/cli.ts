@@ -90,6 +90,7 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     allowed: (threadId) => machine.core.advisorAllowed(threadId),
     key: () => machine.advisorKeys.key(),
     call: (threadId, run) => machine.core.advisorCall(threadId, run),
+    asked: (threadId, kind) => machine.core.advisorAsked(threadId, kind),
     isSensitive: (path) => machine.isSensitive(path),
     sessionDir: (threadId) => machine.core.advisorSessionDir(threadId),
     git: machine.workspaces.runner,
@@ -209,8 +210,8 @@ export function buildProgram(): Command {
     .version(AGENT_VERSION)
     .description("Your account's devices driving the AI coding CLI of this machine, end-to-end encrypted; and tunnels to localhost")
     .hook("preAction", async (_program, action) => {
-      // Advisor's note runs before every message typed in a terminal: nothing else on its way, it answers in time or not at all.
-      if (action.name() === "advisor" && action.args[0] === "note") return;
+      // Advisor's note runs before every message typed in a terminal, and its check as a turn ends: nothing else on its way, they answer in time or not at all.
+      if (action.name() === "advisor" && (action.args[0] === "note" || action.args[0] === "stop")) return;
       // Older installs left their sign-ins in plain text; move them under the key store once.
       await importLegacySignIns(configDir()).catch((err: Error) => console.error(`tunelo: could not move the earlier sign-in yet (${err.message})`));
     });
