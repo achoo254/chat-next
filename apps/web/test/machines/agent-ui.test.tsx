@@ -246,16 +246,17 @@ describe("composer", () => {
 		expect(screen.getByRole("button", { name: "Gửi" }).getAttribute("title")).toBe("Gửi · Enter gửi · Shift+Enter xuống dòng · Esc dừng");
 	});
 
-	it("has one button: Stop while a turn runs and nothing is typed, queueing once there is text", async () => {
+	it("has one button: Stop while a turn runs, and nothing new can be sent until it ends", async () => {
 		const user = userEvent.setup();
 		const { onSend, onStop, field } = setup({ running: true });
 		expect(screen.queryByRole("button", { name: "Gửi" })).toBeNull();
+		expect(screen.getByRole("button", { name: "Dừng" }).getAttribute("title")).toBe("Dừng · Esc");
+		await user.type(field, "rồi chạy test");
+		// The draft stays, the button stays Stop, and Enter sends nothing.
+		await user.keyboard("{Enter}");
+		expect(onSend).not.toHaveBeenCalled();
 		await user.click(screen.getByRole("button", { name: "Dừng" }));
 		expect(onStop).toHaveBeenCalledTimes(1);
-		await user.type(field, "rồi chạy test");
-		expect(screen.queryByRole("button", { name: "Dừng" })).toBeNull();
-		await user.click(screen.getByRole("button", { name: "Gửi vào hàng chờ" }));
-		expect(onSend).toHaveBeenCalledWith("rồi chạy test", []);
 	});
 
 	it("stops with Esc, unless a prompt waits for an answer", async () => {

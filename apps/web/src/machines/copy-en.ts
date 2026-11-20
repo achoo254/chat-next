@@ -1110,7 +1110,6 @@ export const enMachines: MachinesCopy = {
 		},
 		jump: { newer: "New", needYou: "Needs your approval" },
 		composer: {
-			queue: "Add to queue",
 			/** The keys, as the send button\'s tooltip. */
 			keys: "Enter to send · Shift+Enter for a new line · Esc to stop",
 		},

@@ -1,7 +1,9 @@
 // The remote chat's composer: a message goes out at once (shown until the
-// machine echoes it; while a turn runs the machine queues it). One button
-// sends, or stops the turn while it runs and the field is empty; Esc stops
-// it too (unless a prompt above waits for an answer: Esc answers that).
+// machine echoes it). One button sends, or stops the turn while it runs; while
+// a turn runs nothing new can be sent (Enter does nothing, the draft stays in
+// the box) until it finishes or is stopped. Esc stops it too (unless a prompt
+// above waits for an answer: Esc answers that). Both buttons show their label
+// as a quick tooltip (useHoverTips).
 // Typing "/" first opens a picker of the AI's commands and skills in this
 // folder (ThreadInfo); typing "@" opens the files of the session's folder
 // (FileList, tunelo 2.0.1+), and the pick goes in as "@path ". The box finds
@@ -16,6 +18,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { PlainTextBox, commandToken, type OpenToken, type PlainTextBoxHandle, type SuggestionTrigger, type TokenMatch } from "../components/plain-text-box.tsx";
 import { AttachButton, AttachTray } from "./attachment-tray.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { useHoverTips } from "./workspace/use-hover-tips.ts";
 import type { ShownAttachment } from "./transcript/tool-fold.ts";
 import type { Attachments } from "./use-attachments.ts";
 import { filterCommands, flatCommands, leadingCommand } from "./slash-commands.ts";
@@ -92,6 +95,8 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const [at, setAt] = useState<OpenToken | null>(null);
 	const [found, setFound] = useState<Found | null>(null);
 	const field = useRef<PlainTextBoxHandle>(null);
+	const root = useRef<HTMLDivElement>(null);
+	useHoverTips(root);
 	const listId = useId();
 	const groups = slash === null || at !== null ? null : filterCommands(commands, slash.query);
 	const files = at !== null && found !== null && found.query === at.query ? found.listing : null;
@@ -107,8 +112,9 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const optionId = (i: number) => `${listId}-${i}`;
 	const filesReady = attach !== undefined && attach.items.length > 0 && !attach.busy && !attach.failed;
 	const filesWaiting = attach !== undefined && (attach.busy || attach.failed);
-	const stopMode = running && text.trim() === "" && (attach?.items.length ?? 0) === 0;
-	const canSend = online && !filesWaiting && (text.trim() !== "" || filesReady);
+	// A turn in progress holds the box: stop it or wait, no new message meanwhile.
+	const stopMode = running;
+	const canSend = online && !running && !filesWaiting && (text.trim() !== "" || filesReady);
 	/** A "/skill" the message starts with, marked in the box as in the sent message. */
 	const highlight = (value: string) => {
 		const length = leadingCommand(value, commands);
@@ -292,7 +298,7 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 		);
 
 	return (
-		<div className={online ? "mx-composer" : "mx-composer disabled"}>
+		<div ref={root} className={online ? "mx-composer" : "mx-composer disabled"}>
 			{error !== "" && (
 				<p className="mx-error" role="alert">
 					{error}
@@ -360,15 +366,15 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 					onPaste={onPaste}
 				/>
 				{stopMode ? (
-					<button type="button" className="icon-btn mx-send stop" aria-label={t.chat.stop} title={t.chat.stop} disabled={!online || stopping} onClick={stop}>
+					<button type="button" className="icon-btn mx-send stop" aria-label={t.chat.stop} title={`${t.chat.stop} · Esc`} disabled={!online || stopping} onClick={stop}>
 						<MachineIcon name="stop" />
 					</button>
 				) : (
 					<button
 						type="button"
 						className="icon-btn mx-send"
-						aria-label={running ? t.agent.composer.queue : t.chat.send}
-						title={filesWaiting ? t.agent.attach.waitUpload : `${running ? t.agent.composer.queue : t.chat.send} · ${t.agent.composer.keys}`}
+						aria-label={t.chat.send}
+						title={filesWaiting ? t.agent.attach.waitUpload : `${t.chat.send} · ${t.agent.composer.keys}`}
 						disabled={!canSend}
 						onClick={send}
 					>

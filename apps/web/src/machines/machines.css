@@ -1017,3 +1017,6 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 .mx-scene-term { animation: mx-scene-bob 2.4s ease-in-out infinite; }
 @keyframes mx-scene-bob { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .mx-scene-term, .mx-scene-mascot { animation: none; } }
+
+/* ---------- Quick tooltip for icon buttons in the workspace panel and the composer (use-hover-tips.ts) ---------- */
+.ws-tip { position: fixed; z-index: 60; max-width: 280px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; line-height: 1.4; box-shadow: var(--shadow-md); pointer-events: none; overflow-wrap: anywhere; }

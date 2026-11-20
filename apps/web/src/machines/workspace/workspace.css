@@ -207,5 +207,3 @@
 	.ws-viewer { border-right: 0; box-shadow: none; }
 }
 
-/* ---------- Quick tooltip for the panel's buttons (use-hover-tips.ts) ---------- */
-.ws-tip { position: fixed; z-index: 60; max-width: 280px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; line-height: 1.4; box-shadow: var(--shadow-md); pointer-events: none; overflow-wrap: anywhere; }
