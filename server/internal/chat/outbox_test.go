@@ -263,8 +263,18 @@ func TestSetImportedDirection(t *testing.T) {
 	if err := h.svc.SetImportedDirection(ctx, owner, chatID, "sideways"); codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("a bad direction = %v, want InvalidArgument", err)
 	}
+	before := len(h.logOf(owner))
 	if err := h.svc.SetImportedDirection(ctx, owner, chatID, DirectionBoth); err != nil {
 		t.Fatal(err)
+	}
+	updated := false
+	for _, u := range h.logOf(owner)[before:] {
+		if cu, ok := u.GetKind().(*appv1.Update_ChatUpdated); ok && cu.ChatUpdated.GetChat().GetId() == chatID {
+			updated = true
+		}
+	}
+	if !updated {
+		t.Fatal("the owner's sessions were not told the chat changed when its direction did")
 	}
 	resp, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "now it goes"})
 	if err != nil {

@@ -218,7 +218,17 @@ func (s *Service) SetImportedDirection(ctx context.Context, owner, chatID int64,
 			}
 		}
 		s.logger.Info("imported chat direction changed", "chat_id", chatID, "owner_id", owner, "from", previous, "to", direction)
-		return nil
+		// The chat reads and writes differently now (a read-only copy has no right to send): the
+		// owner's open sessions are told, so a composer gives way to the note or comes back.
+		c, err := scanChat(t.tx.QueryRow(ctx, `SELECT `+chatColumns+` FROM `+chatFrom+`
+			WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL FOR UPDATE OF c`, chatID, s.cfg.TenantID))
+		if isNoRows(err) {
+			return nil // its copy was deleted: nobody is looking at it
+		}
+		if err != nil {
+			return fmt.Errorf("chat: load imported chat: %w", err)
+		}
+		return t.chatChanged(ctx, c, owner)
 	})
 	return err
 }
