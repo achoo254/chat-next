@@ -27,7 +27,8 @@ func (r *runner) pollInfo(ctx context.Context) error {
 		return nil
 	}
 	var convs []string
-	for conv, l := range r.links {
+	for _, conv := range r.inTurn("info") {
+		l := r.links[conv]
 		if !l.BackfillDone {
 			continue
 		}

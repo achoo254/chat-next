@@ -60,7 +60,8 @@ func (r *runner) pollMembers(ctx context.Context) error {
 	if (r.membersTick-1)%infoEvery != 0 {
 		return nil
 	}
-	for conv, l := range r.links {
+	for _, conv := range r.inTurn("members") {
+		l := r.links[conv]
 		if !l.BackfillDone {
 			continue
 		}

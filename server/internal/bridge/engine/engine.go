@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sort"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -180,6 +181,8 @@ type runner struct {
 	relist bool
 	// refusedUntil holds, by "what|conversation", until when a refused read is not asked again.
 	refusedUntil map[string]time.Time
+	// turn is where each look that reads conversation by conversation goes on next time.
+	turn map[string]int
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -938,4 +941,32 @@ func loggerFrom(ctx context.Context) *slog.Logger {
 		return l
 	}
 	return slog.Default()
+}
+
+// pollBudget is how many conversations one look reads for one feature. With every
+// conversation of an account synced (191 for the first real one), reading them all at
+// once made the other app ask to wait for minutes on end, and the run did nothing else
+// meanwhile; a budget spreads the reads over the looks, in turn.
+var pollBudget = 20
+
+// inTurn lists the conversations this look reads for what: the next pollBudget of the
+// imported chats, in a fixed order, going round.
+func (r *runner) inTurn(what string) []string {
+	var all []string
+	for conv, l := range r.links {
+		if l.BackfillDone {
+			all = append(all, conv)
+		}
+	}
+	if len(all) <= pollBudget {
+		return all
+	}
+	sort.Strings(all)
+	start := r.turn[what] % len(all)
+	out := make([]string, 0, pollBudget)
+	for i := 0; i < pollBudget; i++ {
+		out = append(out, all[(start+i)%len(all)])
+	}
+	r.turn[what] = (start + pollBudget) % len(all)
+	return out
 }

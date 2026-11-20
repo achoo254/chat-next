@@ -108,7 +108,8 @@ func (r *runner) pollReactions(ctx context.Context) error {
 	if (r.reactionsTick-1)%reactionsEvery != 0 {
 		return nil
 	}
-	for conv, l := range r.links {
+	for _, conv := range r.inTurn("reactions") {
+		l := r.links[conv]
 		if !l.BackfillDone {
 			continue
 		}
