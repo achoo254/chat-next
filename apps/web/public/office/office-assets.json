@@ -1052,7 +1052,7 @@
 		}
 	},
 	"directorCharacter": {
-		"file": "character-director.5d09fe20.glb",
+		"file": "character-director.da17b405.glb",
 		"clips": [
 			"Sitting_Idle",
 			"Sitting_Talking",
@@ -1083,7 +1083,7 @@
 	},
 	"staffCharacters": {
 		"planner": {
-			"file": "character-staff-planner.122daad7.glb",
+			"file": "character-staff-planner.8a08737c.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1113,7 +1113,7 @@
 			]
 		},
 		"tech-lead": {
-			"file": "character-staff-tech-lead.f4d4a625.glb",
+			"file": "character-staff-tech-lead.a5a6c220.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1143,7 +1143,7 @@
 			]
 		},
 		"fullstack-developer": {
-			"file": "character-staff-fullstack-developer.208cdc54.glb",
+			"file": "character-staff-fullstack-developer.7c420585.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1173,7 +1173,7 @@
 			]
 		},
 		"it-operator": {
-			"file": "character-staff-it-operator.72fff203.glb",
+			"file": "character-staff-it-operator.1015da35.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1203,7 +1203,7 @@
 			]
 		},
 		"game-designer": {
-			"file": "character-staff-game-designer.a216ab99.glb",
+			"file": "character-staff-game-designer.5787619f.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1233,7 +1233,7 @@
 			]
 		},
 		"ui-ux-designer": {
-			"file": "character-staff-ui-ux-designer.b7953992.glb",
+			"file": "character-staff-ui-ux-designer.3cd87ff6.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1263,7 +1263,7 @@
 			]
 		},
 		"artist": {
-			"file": "character-staff-artist.d19a7b4a.glb",
+			"file": "character-staff-artist.edd4a33c.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1293,7 +1293,7 @@
 			]
 		},
 		"tester": {
-			"file": "character-staff-tester.977a348d.glb",
+			"file": "character-staff-tester.ba648990.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1323,7 +1323,7 @@
 			]
 		},
 		"code-reviewer": {
-			"file": "character-staff-code-reviewer.114de342.glb",
+			"file": "character-staff-code-reviewer.06de0a0f.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1353,7 +1353,7 @@
 			]
 		},
 		"content-writer": {
-			"file": "character-staff-content-writer.019d0a45.glb",
+			"file": "character-staff-content-writer.a8340141.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1383,7 +1383,7 @@
 			]
 		},
 		"data-analyst": {
-			"file": "character-staff-data-analyst.4593eefc.glb",
+			"file": "character-staff-data-analyst.cf8b0ed9.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1413,7 +1413,7 @@
 			]
 		},
 		"researcher": {
-			"file": "character-staff-researcher.aedf00ee.glb",
+			"file": "character-staff-researcher.d8c1ab1b.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1443,7 +1443,7 @@
 			]
 		},
 		"finance-accountant": {
-			"file": "character-staff-finance-accountant.85e01386.glb",
+			"file": "character-staff-finance-accountant.c7856244.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
@@ -1473,7 +1473,7 @@
 			]
 		},
 		"advisor": {
-			"file": "character-staff-advisor.16ae7447.glb",
+			"file": "character-staff-advisor.d173ea75.glb",
 			"clips": [
 				"Sitting_Idle",
 				"Sitting_Talking",
