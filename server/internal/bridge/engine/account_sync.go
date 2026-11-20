@@ -89,6 +89,12 @@ func (r *runner) syncConversations(ctx context.Context) error {
 		r.links[c.ID] = l
 		r.pending = append(r.pending, l)
 	}
+	if err := r.keepRefs(ctx, list); err != nil {
+		return err
+	}
+	if err := r.dropGone(ctx, list); err != nil {
+		return err
+	}
 	return r.settleSyncState(ctx)
 }
 

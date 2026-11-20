@@ -61,6 +61,9 @@ func (c *conn) loadDialogs(ctx context.Context) ([]bridge.Conversation, error) {
 			return nil
 		}
 		peers[conv.ID] = e.Peer
+		if p, ok := e.Peer.(*tg.InputPeerChannel); ok {
+			conv.Ref = strconv.FormatInt(p.AccessHash, 10)
+		}
 		out = append(out, conv)
 		return nil
 	})

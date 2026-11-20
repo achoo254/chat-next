@@ -113,6 +113,18 @@ type Conversation struct {
 	// Forum is true for a group split into topics (a Telegram forum). Its
 	// messages carry Message.Topic and the list of topics is ListTopics.
 	Forum bool
+	// Ref is an opaque handle Chat keeps to ask about the conversation once it is no
+	// longer listed (GoneChecker); empty when the id alone is enough.
+	Ref string
+}
+
+// GoneChecker tells, for a conversation that dropped out of ListConversations, whether
+// the account is really out of it: the conversation was deleted, or the account was
+// removed or left. Missing from the list alone is not enough (an archived chat, a list
+// cut short); gone is true only when the other app says so. ref is the Conversation.Ref
+// last listed.
+type GoneChecker interface {
+	ConversationGone(ctx context.Context, acct Account, conv, ref string) (bool, error)
 }
 
 // Participant is a person in the other app, mapped to a puppet user.

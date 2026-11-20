@@ -66,6 +66,8 @@ type Fake struct {
 	forwards                                   []string
 	refuse                                     map[string]bool
 	inviteReads                                map[string]int
+	gone                                       map[string]bool
+	goneRefs                                   map[string]string
 	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
@@ -78,7 +80,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, inviteReads: map[string]int{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, inviteReads: map[string]int{}, gone: map[string]bool{}, goneRefs: map[string]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -841,6 +843,39 @@ func (f *Fake) ListInvites(_ context.Context, _ bridge.Account, conv string) ([]
 		return nil, refusedErr(conv)
 	}
 	return f.Invites(conv), nil
+}
+
+// Remove takes a conversation out of the account's list. gone says what the app answers
+// when asked about it: true as for a deleted group or one the account was removed from,
+// false as for a chat only missing from the list (archived).
+func (f *Fake) Remove(conv string, gone bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	kept := f.convs[:0]
+	for _, c := range f.convs {
+		if c.ID != conv {
+			kept = append(kept, c)
+		}
+	}
+	f.convs = kept
+	f.gone[conv] = gone
+}
+
+// ConversationGone implements bridge.GoneChecker with what Remove said.
+func (f *Fake) ConversationGone(_ context.Context, _ bridge.Account, conv, ref string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.goneRefs[conv] = ref
+	return f.gone[conv], nil
+}
+
+// GoneRef is the handle Chat last asked about a conversation with; ok is false when it
+// was never asked.
+func (f *Fake) GoneRef(conv string) (ref string, ok bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ref, ok = f.goneRefs[conv]
+	return ref, ok
 }
 
 // InviteReads is how many times the invite links of a conversation were asked for.

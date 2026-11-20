@@ -21,7 +21,7 @@ Một adapter là một thư mục `server/internal/bridge/adapters/<tên>/` cà
 | `info` | `bridge.InfoReader` | `bridge.InfoWriter` (tên, mô tả), `bridge.PhotoWriter` (ảnh nhóm; `GroupInfo.PhotoID` đổi khi ảnh đổi, `PhotoRef` là ref của `FetchMedia`) và `bridge.TopicWriter` cho sửa topic |
 | `members` | `bridge.MemberReader` (cả quyền riêng từng người) | `bridge.MemberWriter` (xoá, admin), `bridge.MemberAdder`, `bridge.PermWriter` |
 | `invites` | `bridge.InviteManager.ListInvites` | `CreateInvite`, `RevokeInvite` |
-| `lifecycle` | không có | `bridge.GroupLifecycle` (`LeaveGroup`, `DeleteGroup`) |
+| `lifecycle` | `bridge.GoneChecker.ConversationGone`: nhóm không còn trong `ListConversations` có thật đã bị xoá, bị đuổi hay đã rời không (chỉ trả `true` khi app nói vậy; `Conversation.Ref` là chuỗi mờ Chat giữ để hỏi lại sau, vd access hash) | `bridge.GroupLifecycle` (`LeaveGroup`, `DeleteGroup`) |
 | `messages` (chuyển tiếp) | `Message.Forward` (`bridge.ForwardInfo`) | `bridge.Forwarder.ForwardMessages` khi tin gốc là tin của app (không có thì gửi bản sao) |
 | `service` | sự kiện `Message` có `Service` (`bridge.ServiceAction`: vào, rời, bị xoá, vào bằng link, tạo nhóm, đổi tên, đổi ảnh, ghim tin) | không có |
 | `alerts` | không cần interface: Chat báo cho tin mới của `messages` khi tính năng này nhận | không có |

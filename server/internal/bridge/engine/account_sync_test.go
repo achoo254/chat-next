@@ -142,3 +142,42 @@ func TestAReadTheOtherAppRefusedIsNotAskedAgainEveryLook(t *testing.T) {
 		t.Fatalf("the refused conversation was asked %d times, want it left alone after the refusal", n)
 	}
 }
+
+func (e *env) directionOf(conv string) string {
+	var d string
+	_ = e.st.Pool().QueryRow(context.Background(), `SELECT direction FROM external_chats WHERE account_id = $1 AND external_chat_id = $2`, e.account, conv).Scan(&d)
+	return d
+}
+
+func TestAGroupDeletedInTheOtherAppKeepsItsCopyReadOnlyAndOneOnlyMissingStaysTwoWay(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.fake.AddConversation(bridge.Conversation{ID: "gone", Kind: bridge.ConvChannel, Title: "Kênh bị xoá", Ref: "hash-1"})
+	e.group("archived")
+	e.group("kept")
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+
+	e.fake.Remove("gone", true)
+	e.fake.Remove("archived", false)
+	e.eventually(func() bool { return e.directionOf("gone") == "in" },
+		func() string { return "the deleted channel's copy is still " + e.directionOf("gone") })
+	if ref, _ := e.fake.GoneRef("gone"); ref != "hash-1" {
+		t.Fatalf("asked with ref %q, want the one listed before (hash-1)", ref)
+	}
+	if _, asked := e.fake.GoneRef("archived"); !asked {
+		t.Fatal("the archived chat was never asked about")
+	}
+	if d := e.directionOf("archived"); d != "both" {
+		t.Fatalf("a chat only missing from the list became %q, want both", d)
+	}
+	if d := e.directionOf("kept"); d != "both" {
+		t.Fatalf("a listed chat became %q", d)
+	}
+	if e.chatOf("gone") == 0 {
+		t.Fatal("the copy of the deleted channel was removed, want it kept read-only")
+	}
+}
