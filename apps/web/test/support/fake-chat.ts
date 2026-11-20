@@ -64,6 +64,7 @@ type MessageExtras = Pick<
 	| "replyMarkup"
 	| "viaBotId"
 	| "date"
+	| "silent"
 >;
 type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string; deleted?: boolean; botInlinePlaceholder?: string };
 type ChatExtras = {

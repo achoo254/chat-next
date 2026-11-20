@@ -41,7 +41,10 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 .file-stack { display: grid; gap: var(--space-1); }
 
 /* ---------- File cards ---------- */
-.file-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1); width: min(300px, 100%); }
+/* The card fills its bubble, so the download button sits at the bubble's right edge. Its own
+   width does not size the bubble (inline-size containment): a long file name is cut, it does
+   not widen the bubble past the card; min-width gives the bubble its width instead. */
+.file-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-1); contain: inline-size; min-width: min(300px, 70vw); }
 .file-ext { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--c-selected); color: var(--c-primary); font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 500; }
 .file-ext.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
 .fc-text { display: grid; min-width: 0; }

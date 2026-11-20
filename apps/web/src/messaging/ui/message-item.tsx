@@ -527,6 +527,10 @@ export function MessageBubble({
 	const tone = toneOf(message.fromId);
 	const atMe = message.fromId !== store.selfId && mentionsSelf(message.text, message.entities, self.id, self.username);
 	const recalled = message.recalled;
+	// The bell-off mark tells a reader that a message came without a notification. Its sender
+	// knows that already, and a copy of another app (Chat Bridge) is imported silently as a
+	// whole, so there it would only say how the history arrived.
+	const showSilent = message.silent && !recalled && message.fromId !== store.selfId && chat?.externalSource === undefined;
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
@@ -551,7 +555,7 @@ export function MessageBubble({
 		<Stamp
 			date={edited ? message.editDate : message.date}
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
-			silent={message.silent && !recalled ? copy.message.silent : ""}
+			silent={showSilent ? copy.message.silent : ""}
 		>
 			{mine && !recalled && !isSavedChat(chat, null) && (
 				onItsWay !== null && delivery !== null ? (
