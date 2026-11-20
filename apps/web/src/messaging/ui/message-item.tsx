@@ -11,7 +11,6 @@
 // the pressed one waits for the bot's answer while the others stay usable.
 import { Suspense, lazy, memo, useContext, useState, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
-import type { LinkPreview } from "../data/pending-backend.ts";
 import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -40,7 +39,6 @@ const MessageMedia = lazy(() => mediaChunk().then((m) => ({ default: m.MessageMe
 const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia })));
 const PendingMediaView = lazy(() => mediaChunk().then((m) => ({ default: m.PendingMediaView })));
 const PendingAlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.PendingAlbumMedia })));
-const LinkPhoto = lazy(() => mediaChunk().then((m) => ({ default: m.LinkPhoto })));
 // Service lines and the forward and via-bot headers load with the first
 // message that has one, or once the app is idle (messaging-root.tsx); until
 // then a blank line holds their place.
@@ -48,6 +46,7 @@ const extras = () => import("./message-extras.tsx");
 const systemLine = preloadable(async () => ({ default: (await extras()).SystemLine }));
 const forwardLine = preloadable(async () => ({ default: (await extras()).ForwardLine }));
 const viaLine = preloadable(async () => ({ default: (await extras()).ViaLine }));
+const LinkPreviewCard = lazy(async () => ({ default: (await extras()).LinkPreviewCard }));
 const SystemLine = systemLine.Component;
 const ForwardLine = forwardLine.Component;
 const ViaLine = viaLine.Component;
@@ -421,32 +420,6 @@ function QuickActions({
 }
 
 
-function LinkPreviewCard({ preview, message, ctx }: { preview: LinkPreview; message: StoredMessage; ctx: RichContext }) {
-	"use no memo";
-	const photo = message.linkPreview?.photo !== undefined;
-	return (
-		<a
-			className={photo ? "lp has-thumb" : "lp"}
-			href={preview.url}
-			target="_blank"
-			rel="noopener noreferrer"
-			onClick={(event) => {
-				event.preventDefault();
-				ctx.openLink(preview.url);
-			}}
-		>
-			<span className="site">{preview.site}</span>
-			<b>{preview.title}</b>
-			{preview.description !== "" && <span className="desc">{preview.description}</span>}
-			{photo && (
-				<Suspense fallback={<span className="thumb" aria-hidden="true" />}>
-					<LinkPhoto message={message} />
-				</Suspense>
-			)}
-		</a>
-	);
-}
-
 interface BubbleProps {
 	chatId: number;
 	itemKey: string;
@@ -684,7 +657,11 @@ export function MessageBubble({
 							<MessageButtons message={message} ctx={ctx} />
 						</Suspense>
 					)}
-					{preview !== null && <LinkPreviewCard preview={preview} message={message} ctx={ctx} />}
+					{preview !== null && (
+						<Suspense fallback={null}>
+							<LinkPreviewCard preview={preview} message={message} ctx={ctx} />
+						</Suspense>
+					)}
 					{trailingStamp && <p>{stamp}</p>}
 					{!inert && (
 						<QuickActions

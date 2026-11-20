@@ -1,12 +1,18 @@
 // Lines few messages carry, loaded with the first message that shows one
 // (message-item.tsx): service messages ("… đã ghim một tin"), the "Chuyển
-// tiếp từ" header of a forwarded message and the "qua @bot" line.
+// tiếp từ" header of a forwarded message and the "qua @bot" line; also the
+// link preview card under a message that has one.
+import { Suspense, lazy } from "react";
 import type { StoredMessage } from "@achoo254/chat-core";
+import type { LinkPreview } from "../data/pending-backend.ts";
 import { useCopy } from "../copy/use-copy.ts";
 import { actionText, messagePreview, namedUserIds } from "../data/format.ts";
 import { useChat, useMessage, useUser } from "../data/services.tsx";
 import { useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
+import type { RichContext } from "./rich-text.tsx";
+
+const LinkPhoto = lazy(() => import("../media/media-content.tsx").then((m) => ({ default: m.LinkPhoto })));
 
 export function SystemLine({ message, channel }: { message: StoredMessage; channel: boolean }) {
 	const copy = useCopy();
@@ -52,5 +58,31 @@ export function ViaLine({ botId }: { botId: number }) {
 		<span className="via-bot">
 			{copy.message.viaBot} <b>@{bot.username}</b>
 		</span>
+	);
+}
+
+export function LinkPreviewCard({ preview, message, ctx }: { preview: LinkPreview; message: StoredMessage; ctx: RichContext }) {
+	"use no memo";
+	const photo = message.linkPreview?.photo !== undefined;
+	return (
+		<a
+			className={photo ? "lp has-thumb" : "lp"}
+			href={preview.url}
+			target="_blank"
+			rel="noopener noreferrer"
+			onClick={(event) => {
+				event.preventDefault();
+				ctx.openLink(preview.url);
+			}}
+		>
+			<span className="site">{preview.site}</span>
+			<b>{preview.title}</b>
+			{preview.description !== "" && <span className="desc">{preview.description}</span>}
+			{photo && (
+				<Suspense fallback={<span className="thumb" aria-hidden="true" />}>
+					<LinkPhoto message={message} />
+				</Suspense>
+			)}
+		</a>
 	);
 }
