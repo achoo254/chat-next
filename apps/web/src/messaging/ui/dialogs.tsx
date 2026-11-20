@@ -9,7 +9,7 @@ import { MiddleTruncate } from "../../components/middle-truncate.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { clock, dialogTitle, hostOf, messagePreview, namedUserIds, orgDomain, userName } from "../data/format.ts";
+import { clock, dialogTitle, hostOf, messagePreview, namedUserIds, orgDomain, toneOf, userName } from "../data/format.ts";
 import type { ReportReason, ReportTarget } from "../data/pending-backend.ts";
 import type { Reader } from "../data/remote.ts";
 import { useChat, useMessage, useServices, useUser } from "../data/services.tsx";
@@ -338,6 +338,7 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 	const user = useUser(userId);
 	const presence = usePresence(user?.isBot === true ? 0 : userId);
 	const presenceLabel = usePresenceText(presence, copy);
+	const online = presence?.kind === "online";
 	const [blocked, setBlocked] = useState<boolean | null>(null);
 	const [opening, setOpening] = useState(false);
 	const id = useDomId("profile");
@@ -369,14 +370,22 @@ export function ProfileDialog({ userId, onClose }: CloseProps & { userId: number
 		);
 	};
 	return (
-		<Modal labelledBy={id} onClose={onClose} className="large">
+		<Modal labelledBy={id} onClose={onClose} className="large profile-dialog">
 			<DialogHead id={id} title={user === undefined ? copy.profile.title : copy.profile.titleOf(name)} onClose={onClose} />
 			<div className="dlg-split">
 				<div className="dlg-pane">
-					<div className="hero">
-						<ChatAvatar id={userId} name={name} size="lg" bot={user?.isBot === true} />
+					<div className={`hero hero-profile s-${toneOf(userId)}`}>
+						<ChatAvatar
+							id={userId}
+							name={name}
+							size="xl"
+							bot={user?.isBot === true}
+							online={online}
+							photoOf={userId}
+							photoId={user?.photoId}
+						/>
 						<h2>{self ? `${name} (${copy.common.you})` : name}</h2>
-						<p>{user?.isBot === true ? copy.info.bot : presenceLabel}</p>
+						<p className={online ? "on" : undefined}>{user?.isBot === true ? copy.info.bot : presenceLabel}</p>
 					</div>
 					{!self && (
 						<div className="profile-actions">

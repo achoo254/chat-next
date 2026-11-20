@@ -742,6 +742,32 @@ dialog.modal.large .pick-list { max-height: min(420px, calc(100dvh - 360px)); ov
 .modal .info-sec:last-child { border-bottom: 0; }
 .modal .profile-actions { padding: 0 var(--space-5) var(--space-4); }
 
+/* Profile of another person: a banner in the person's own tone behind a larger avatar, actions as tiles,
+   and the details in the right pane as cards. Scoped so the info column and contact card stay as they are. */
+.profile-dialog .hero-profile { position: relative; gap: var(--space-1); padding: calc(var(--space-6) + var(--space-3)) var(--space-5) var(--space-4); }
+.profile-dialog .hero-profile::before {
+	content: ""; position: absolute; inset: 0 0 auto; height: calc(var(--space-6) + var(--space-8));
+	background: linear-gradient(160deg, color-mix(in srgb, var(--who) 30%, var(--c-surface)), color-mix(in srgb, var(--who) 8%, var(--c-surface)));
+}
+.profile-dialog .hero-profile > * { position: relative; }
+.profile-dialog .hero-profile .avatar.xl { width: 96px; height: 96px; font-size: 2rem; box-shadow: 0 0 0 4px var(--c-surface); }
+.profile-dialog .hero-profile .avatar.online::after { width: 16px; height: 16px; right: 3px; bottom: 3px; border-width: 3px; }
+.profile-dialog .hero-profile h2 { margin-top: var(--space-3); font-size: 1.375rem; }
+.profile-dialog .hero-profile p.on { color: var(--c-success-text); font-weight: 500; }
+.profile-dialog .profile-actions .btn { border-radius: var(--radius-md); }
+.profile-dialog .profile-actions .btn.danger-text:hover { background: color-mix(in srgb, var(--c-error) 10%, transparent); }
+.profile-dialog .profile-sec { padding: 0 var(--space-5) var(--space-5); border-bottom: 0; }
+.profile-dialog .profile-sec .contact-state { padding: var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); }
+.profile-dialog .contact-state .btn { flex: 1 1 100%; margin-left: 0; justify-content: center; }
+.profile-dialog .dlg-split > .dlg-pane + .dlg-pane { display: grid; align-content: start; gap: var(--space-3); padding: var(--space-4); background: color-mix(in srgb, var(--c-text) 3%, var(--c-surface)); }
+.profile-dialog .dlg-pane + .dlg-pane .info-sec { padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); }
+.profile-dialog .dlg-pane + .dlg-pane .info-sec:empty { display: none; }
+.profile-dialog .dlg-pane + .dlg-pane .info-sec h3 { margin: var(--space-1) 0 var(--space-1); }
+.profile-dialog .dlg-pane + .dlg-pane .link-row { margin: 0 calc(-1 * var(--space-2)); padding-inline: var(--space-2); border-radius: var(--radius-sm); }
+@media (max-width: 720px) {
+	.profile-dialog .dlg-split > .dlg-pane + .dlg-pane { padding: var(--space-3); }
+}
+
 /* Report form: native inputs stretched over the row, custom marks from tokens. */
 .opts { margin: 0; padding: 0; border: 0; display: grid; gap: 2px; }
 .opts legend { padding: 0; margin-bottom: var(--space-1); font-size: 0.875rem; font-weight: 500; }
