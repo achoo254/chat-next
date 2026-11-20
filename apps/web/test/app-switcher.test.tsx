@@ -11,6 +11,8 @@ import { renderApp, SELF } from "./render-app.tsx";
 
 const LONG = { timeout: 8000 };
 const UTM = "utm_source=chat&utm_medium=app_switcher";
+// The one app the shared cross-sell table suggests for chat carries its own campaign tags.
+const CROSS_SELL_UTM = "utm_source=cross_sell&utm_medium=app_switcher&utm_campaign=chat";
 const SWITCH = { name: "Chuyển ứng dụng" };
 
 function renderSignedIn(path: string): void {
@@ -42,8 +44,7 @@ describe("app switcher", () => {
 			`https://localman.hoandat.com/?${UTM}`,
 			`https://tunnel.hoandat.com/?${UTM}`,
 			`https://tuvi.hoandat.com/?${UTM}`,
-			`https://clip.hoandat.com/?${UTM}`,
-			`https://truyen.hoandat.com/?${UTM}`,
+			`https://clip.hoandat.com/?${CROSS_SELL_UTM}`,
 			`https://lockin.hoandat.com/?${UTM}`,
 			`https://chuanho.hoandat.com/?${UTM}`,
 			`https://miu.hoandat.com/?${UTM}`,
