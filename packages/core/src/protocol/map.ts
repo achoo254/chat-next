@@ -277,6 +277,7 @@ export function toChat(chat: WireChat): Chat {
 		removed: false,
 		forum: chat.forum,
 		...(chat.externalSource !== "" ? { externalSource: chat.externalSource } : {}),
+		...(chat.externalApp !== "" ? { externalApp: chat.externalApp } : {}),
 		...(chat.photo !== undefined && chat.photo.fileId !== "" ? { photoId: chat.photo.fileId } : {}),
 	};
 }

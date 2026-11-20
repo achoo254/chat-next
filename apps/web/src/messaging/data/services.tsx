@@ -87,6 +87,12 @@ export function useDialogOrder(): readonly number[] {
 	return useStoreKey("list", () => store.listSnapshot());
 }
 
+/** The apps chats are synced with, each with its unread chats: the platform folders after the built-in ones. */
+export function useAppFolders(): ReadonlyMap<string, number> {
+	const { store } = useServices();
+	return useStoreKey("folders", () => store.appFolders());
+}
+
 export function useFolderCounts(): Readonly<Record<Folder, number>> {
 	const { store } = useServices();
 	return useStoreKey("folders", () => store.folderCounts());

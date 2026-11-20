@@ -68,6 +68,8 @@ export interface ListEntry {
 	readonly unread: boolean;
 	readonly muted: boolean;
 	readonly pinned: boolean;
+	/** The app the chat is synced with, whatever the direction (Chat Bridge); "" for other chats. */
+	readonly app: string;
 }
 
 export interface UnreadTotals {
@@ -219,6 +221,7 @@ export class ChatStore {
 	private entries: readonly ListEntry[] = [];
 	private readonly entryById = new Map<number, ListEntry>();
 	private folderUnread: Readonly<Record<Folder, number>> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
+	private appUnread: ReadonlyMap<string, number> = new Map();
 	private settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 	private totals: UnreadTotals = { messages: 0, chats: 0 };
 	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
@@ -523,6 +526,11 @@ export class ChatStore {
 		return this.folderUnread;
 	}
 
+	/** The apps chats are synced with, in name order, each with its chats with unread messages (the platform folders). */
+	appFolders(): ReadonlyMap<string, number> {
+		return this.appUnread;
+	}
+
 	/** The list entry of one chat (muted, pinned, unread), for its row and menus. */
 	listEntry(chatId: number): ListEntry | undefined {
 		return this.entryById.get(chatId);
@@ -629,6 +637,7 @@ export class ChatStore {
 		let nextMuteEnd = 0;
 		const entries: ListEntry[] = [];
 		const counts: Record<Folder, number> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
+		const appCounts = new Map<string, number>();
 		const changed: number[] = [];
 		const seen = new Set<number>();
 		for (const chatId of this.order) {
@@ -646,6 +655,7 @@ export class ChatStore {
 				unread: dialog.unreadCount > 0 || dialog.unreadMentionsCount > 0 || dialog.unreadMark,
 				muted,
 				pinned: dialog.pinned,
+				app: view.chat?.externalApp ?? "",
 			};
 			const previous = this.entryById.get(chatId);
 			const same =
@@ -655,7 +665,8 @@ export class ChatStore {
 				previous.forum === fresh.forum &&
 				previous.unread === fresh.unread &&
 				previous.muted === fresh.muted &&
-				previous.pinned === fresh.pinned;
+				previous.pinned === fresh.pinned &&
+				previous.app === fresh.app;
 			const entry = same ? previous : fresh;
 			if (!same) {
 				this.entryById.set(chatId, entry);
@@ -663,8 +674,10 @@ export class ChatStore {
 			}
 			seen.add(chatId);
 			entries.push(entry);
+			if (entry.app !== "" && !appCounts.has(entry.app)) appCounts.set(entry.app, 0);
 			if (!entry.unread || (muted && !this.settings.badgeMuted)) continue;
 			for (const folder of FOLDERS) if (inFolder(entry.kind, folder, true)) counts[folder]++;
+			if (entry.app !== "") appCounts.set(entry.app, (appCounts.get(entry.app) ?? 0) + 1);
 		}
 		for (const chatId of [...this.entryById.keys()]) {
 			if (seen.has(chatId)) continue;
@@ -676,8 +689,11 @@ export class ChatStore {
 			this.emit("entries");
 			for (const chatId of changed) this.emit(`entry:${chatId}`);
 		}
-		if (FOLDERS.some((folder) => counts[folder] !== this.folderUnread[folder])) {
+		const apps = new Map([...appCounts].sort(([a], [b]) => a.localeCompare(b)));
+		const appsChanged = apps.size !== this.appUnread.size || [...apps].some(([app, count], i) => [...this.appUnread][i]?.[0] !== app || this.appUnread.get(app) !== count);
+		if (FOLDERS.some((folder) => counts[folder] !== this.folderUnread[folder]) || appsChanged) {
 			this.folderUnread = counts;
+			this.appUnread = apps;
 			this.emit("folders");
 		}
 		const totals = unreadTotals(

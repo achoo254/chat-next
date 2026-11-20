@@ -530,7 +530,7 @@ export function MessageBubble({
 	// The bell-off mark tells a reader that a message came without a notification. Its sender
 	// knows that already, and a chat synced with another app (Chat Bridge, read-only copy or
 	// two-way) is imported silently as a whole, so there it would only say how the history arrived.
-	const synced = chat?.externalSource !== undefined || delivery !== null;
+	const synced = chat?.externalApp !== undefined;
 	const showSilent = message.silent && !recalled && message.fromId !== store.selfId && !synced;
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;

@@ -10,7 +10,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
+import { appName, chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
 import { ChatAvatar, chatPhoto } from "./parts.tsx";
@@ -20,7 +20,6 @@ import { useUi } from "./ui-context.tsx";
 const LONG_PRESS_MS = 500;
 
 /** How the app a chat is copied from is named in the list (Chat Bridge). */
-const sourceName = (source: string): string => (source === "telegram" ? "Telegram" : source);
 
 /** Row heights: fixed per kind so the list can position rows absolutely. */
 export const ROW_HEIGHT = 64;
@@ -247,9 +246,9 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 							<LabelledIcon name={kindIcon} label={kindLabel(kind, copy)} className="type-ico" />
 						)}
 						<span className="title-text">{title}</span>
-						{view.chat?.externalSource !== undefined && (
-							<span className="tag" title={copy.list.copyOf(sourceName(view.chat.externalSource))}>
-								{sourceName(view.chat.externalSource)}
+						{view.chat?.externalApp !== undefined && (
+							<span className="tag" title={copy.list.copyOf(appName(view.chat.externalApp))}>
+								{appName(view.chat.externalApp)}
 							</span>
 						)}
 						{muted && <LabelledIcon name="bell-off" label={copy.list.muted} />}

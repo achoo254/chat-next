@@ -7,13 +7,15 @@
 // the tab row inside the list (mockups/chat.html#app, #contacts, #narrow) and
 // the compact top bar elsewhere (screens/shell.tsx). Badges count
 // chats with unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
+// Each app chats are synced with (Chat Bridge) adds a folder after Chưa đọc,
+// holding that app's chats; the shortcuts keep their positions.
 import type { SelfUser } from "../../api/adapters.ts";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { followInApp, Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { countLabel, FOLDERS, type Folder } from "../data/format.ts";
-import { useFolderCounts } from "../data/services.tsx";
+import { appName, countLabel, FOLDERS, type Folder } from "../data/format.ts";
+import { useAppFolders, useFolderCounts } from "../data/services.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
 import { AgentIcon } from "../../machines/cpu-icon.tsx";
@@ -23,7 +25,10 @@ const FOLDER_ICONS: Record<Folder, IconName> = { all: "message", private: "user"
 
 interface FolderProps {
 	folder: Folder;
+	/** The app folder picked, or null when a built-in folder is. */
+	app: string | null;
 	onFolder: (folder: Folder) => void;
+	onApp: (app: string) => void;
 }
 
 interface FolderRailProps {
@@ -34,13 +39,16 @@ interface FolderRailProps {
 	settings?: boolean;
 	/** "My machines" is open: its link shows as current. */
 	machines?: boolean;
+	app: string | null;
 	onFolder: (folder: Folder) => void;
+	onApp: (app: string) => void;
 }
 
-export function FolderRail({ self, folder, settings = false, machines = false, onFolder }: FolderRailProps) {
+export function FolderRail({ self, folder, settings = false, machines = false, app, onFolder, onApp }: FolderRailProps) {
 	"use no memo";
 	const copy = useCopy();
 	const counts = useFolderCounts();
+	const apps = useAppFolders();
 	return (
 		<nav className="folder-rail" aria-label={copy.folders.nav}>
 			<AccountMenuSlot self={self} />
@@ -49,7 +57,7 @@ export function FolderRail({ self, folder, settings = false, machines = false, o
 					key={item}
 					type="button"
 					className="folder"
-					aria-current={item === folder ? "true" : undefined}
+					aria-current={item === folder && app === null ? "true" : undefined}
 					onClick={() => onFolder(item)}
 				>
 					<Icon name={FOLDER_ICONS[item]} />
@@ -57,6 +65,17 @@ export function FolderRail({ self, folder, settings = false, machines = false, o
 					{item !== "unread" && counts[item] > 0 && (
 						<span className="badge" aria-label={copy.folders.unreadChats(counts[item])}>
 							{countLabel(counts[item])}
+						</span>
+					)}
+				</button>
+			))}
+			{[...apps].map(([name, unread]) => (
+				<button key={`app:${name}`} type="button" className="folder" aria-current={name === app && folder !== null ? "true" : undefined} onClick={() => onApp(name)}>
+					<Icon name="message" />
+					{appName(name)}
+					{unread > 0 && (
+						<span className="badge" aria-label={copy.folders.unreadChats(unread)}>
+							{countLabel(unread)}
 						</span>
 					)}
 				</button>
@@ -81,15 +100,21 @@ export function FolderRail({ self, folder, settings = false, machines = false, o
 }
 
 /** The compact filter row that stands in for the rail on narrow screens; AI Agent opens its own screen. */
-export function FolderTabs({ folder, onFolder }: FolderProps) {
+export function FolderTabs({ folder, app, onFolder, onApp }: FolderProps) {
 	"use no memo";
 	const copy = useCopy();
+	const apps = useAppFolders();
 	const agent = paths.machines();
 	return (
 		<div className="tabs folder-tabs" role="tablist" aria-label={copy.folders.filterTabs}>
 			{FOLDERS.map((item) => (
-				<button key={item} type="button" role="tab" aria-selected={item === folder} onClick={() => onFolder(item)}>
+				<button key={item} type="button" role="tab" aria-selected={item === folder && app === null} onClick={() => onFolder(item)}>
 					{copy.folders[item]}
+				</button>
+			))}
+			{[...apps.keys()].map((name) => (
+				<button key={`app:${name}`} type="button" role="tab" aria-selected={name === app} onClick={() => onApp(name)}>
+					{appName(name)}
 				</button>
 			))}
 			<a href={agent} role="tab" aria-selected={false} className="folder-tab-link" onClick={(event) => followInApp(event, agent)}>

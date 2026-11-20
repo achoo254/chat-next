@@ -301,6 +301,47 @@ func TestLinkedChatRefusesSending(t *testing.T) {
 	}
 }
 
+func TestAChatSyncedTwoWaysNamesItsAppButStaysWritable(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	plain := h.group(owner)
+	chatID := h.group(owner)
+	var accountID int64
+	if err := h.st.Pool().QueryRow(ctx, `
+		INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, 'telegram', 'tg-2', '\x00') RETURNING id`, owner).Scan(&accountID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.st.Pool().Exec(ctx, `INSERT INTO external_chats (account_id, external_chat_id, chat_id, direction) VALUES ($1, 'c2', $2, 'both')`, accountID, chatID); err != nil {
+		t.Fatal(err)
+	}
+	two, _, err := h.svc.GetChat(ctx, owner, chatID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if two.GetExternalApp() != "telegram" || two.GetExternalSource() != "" || two.GetMyPermissions()&permSend == 0 {
+		t.Fatalf("a two-way chat shows app %q, source %q, permissions %b: it must name its app, not be read-only, and keep the right to send",
+			two.GetExternalApp(), two.GetExternalSource(), two.GetMyPermissions())
+	}
+	none, _, err := h.svc.GetChat(ctx, owner, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none.GetExternalApp() != "" || none.GetExternalSource() != "" {
+		t.Fatalf("an unlinked chat shows app %q and source %q, want neither", none.GetExternalApp(), none.GetExternalSource())
+	}
+	if err := h.svc.SetImportedDirection(ctx, owner, chatID, DirectionIn); err != nil {
+		t.Fatal(err)
+	}
+	ro, _, err := h.svc.GetChat(ctx, owner, chatID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ro.GetExternalApp() != "telegram" || ro.GetExternalSource() != "telegram" {
+		t.Fatalf("a read-only copy shows app %q and source %q, want both telegram", ro.GetExternalApp(), ro.GetExternalSource())
+	}
+}
+
 func TestErasingTheOwnerRemovesImportedData(t *testing.T) {
 	h := newHarness(t, nil)
 	ctx := context.Background()

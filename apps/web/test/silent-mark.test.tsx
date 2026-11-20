@@ -31,12 +31,11 @@ describe("the bell-off mark of a silent message", () => {
 	it("does not show in a chat synced two ways with Telegram", async () => {
 		const fixture = new ChatFixture();
 		const partner = fixture.addUser("Anh Đô");
-		const chatId = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, partner]);
+		const chatId = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, partner], { externalApp: "telegram" });
 		fixture.send(partner, chatId, "tin hai chiều từ Telegram", { silent: true });
 		fixture.bridge.seedTwoWay(chatId);
 		renderMessaging(fixture, `/c/${chatId}`);
 
-		expect(await screen.findByText("Tin bạn gõ ở đây cũng được gửi sang Telegram.", {}, LONG)).toBeTruthy();
 		expect(within(await bubbleOf("tin hai chiều từ Telegram")).queryByRole("img", MARK)).toBeNull();
 	});
 

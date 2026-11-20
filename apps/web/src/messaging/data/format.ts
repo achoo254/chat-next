@@ -11,6 +11,9 @@ export type Folder = "all" | "private" | "group" | "bot" | "unread";
 /** In rail order; Ctrl/⌘+1…5 picks them by position. */
 export const FOLDERS: readonly Folder[] = ["all", "private", "group", "bot", "unread"];
 
+/** The name of an app a chat is synced with (Chat Bridge), as shown on a row and as a folder. */
+export const appName = (app: string): string => (app === "telegram" ? "Telegram" : app);
+
 const TONES: readonly Tone[] = ["violet", "green", "blue", "amber", "cyan", "red", "grey"];
 
 /** Stable avatar and sender colour for an id. */

@@ -354,6 +354,15 @@ export const MIGRATIONS: readonly Migration[] = [
 			"DELETE FROM sync_state",
 		],
 	},
+	{
+		version: 17,
+		statements: [
+			// The app a chat is synced with, whatever the direction (Chat Bridge); '' for every other chat.
+			"ALTER TABLE chats ADD COLUMN external_app TEXT NOT NULL DEFAULT ''",
+			// Chats already stored lack it: dropping the sync position makes the next start take a fresh snapshot.
+			"DELETE FROM sync_state",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

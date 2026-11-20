@@ -75,6 +75,8 @@ type ChatExtras = {
 	historyVisibility?: HistoryVisibility;
 	forum?: boolean;
 	externalSource?: string;
+	/** Like the server: any chat synced with an app has it, so a read-only copy (externalSource) does too. */
+	externalApp?: string;
 	title?: string;
 	photo?: WireMediaRef;
 };
@@ -532,7 +534,7 @@ export class ChatFixture {
 
 	patchChat(chat: WireChat): void {
 		const extras = this.chatExtras.get(num(chat.id));
-		if (extras !== undefined) assign(chat, create(ChatSchema, { ...chat, ...extras }));
+		if (extras !== undefined) assign(chat, create(ChatSchema, { ...chat, ...extras, externalApp: extras.externalApp ?? extras.externalSource ?? "" }));
 	}
 
 	patchDialog(dialog: WireDialog): void {

@@ -206,6 +206,10 @@ message Chat {
   // Chat Bridge fills (ADR 0022); empty for every other chat. The caller's
   // my_permissions then carry no right to send.
   string external_source = 17;
+  // The app any chat the Chat Bridge links to is synced with ("telegram"), in
+  // either direction; empty for every other chat. Unlike external_source it
+  // does not mean the chat is read-only: a chat synced two ways has it too.
+  string external_app = 18;
 }
 
 message ChatMember {

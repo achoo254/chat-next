@@ -32,7 +32,10 @@ interface Kept {
 interface ChatListProps {
 	self: SelfUser;
 	folder: Folder;
+	/** The app folder picked (Chat Bridge), or null when a built-in folder is. */
+	app: string | null;
 	onFolder: (folder: Folder) => void;
+	onApp: (app: string) => void;
 	currentChatId: number;
 	searchRef: RefObject<HTMLInputElement | null>;
 	onVisibleChats: (chatIds: readonly number[]) => void;
@@ -41,7 +44,7 @@ interface ChatListProps {
 /** The search shortcut as this platform writes it (⌘K on Apple, Ctrl K elsewhere). */
 const SEARCH_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘K" : "Ctrl K";
 
-export function ChatListColumn({ self, folder, onFolder, currentChatId, searchRef, onVisibleChats }: ChatListProps) {
+export function ChatListColumn({ self, folder, app, onFolder, onApp, currentChatId, searchRef, onVisibleChats }: ChatListProps) {
 	const copy = useCopy();
 	const ui = useUi();
 	const [query, setQuery] = useState("");
@@ -97,8 +100,8 @@ export function ChatListColumn({ self, folder, onFolder, currentChatId, searchRe
 				</Suspense>
 			) : (
 				<>
-					<FolderTabs folder={folder} onFolder={onFolder} />
-					<Dialogs folder={folder} onFolder={onFolder} currentChatId={currentChatId} onVisibleChats={onVisibleChats} />
+					<FolderTabs folder={folder} app={app} onFolder={onFolder} onApp={onApp} />
+					<Dialogs folder={folder} app={app} onFolder={onFolder} currentChatId={currentChatId} onVisibleChats={onVisibleChats} />
 				</>
 			)}
 		</section>
@@ -139,6 +142,7 @@ function Skeleton() {
 
 interface DialogsProps {
 	folder: Folder;
+	app: string | null;
 	onFolder: (folder: Folder) => void;
 	currentChatId: number;
 	onVisibleChats: (chatIds: readonly number[]) => void;
@@ -157,7 +161,7 @@ function collapseHead(chats: HTMLElement): void {
 	else if (chats.scrollTop > 24 && chats.scrollHeight - chats.clientHeight > search + 24) list?.classList.add("scrolled");
 }
 
-function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsProps) {
+function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: DialogsProps) {
 	const copy = useCopy();
 	const entries = useListEntries();
 	const status = useListStatus();
@@ -186,13 +190,13 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 		let total = 0;
 		for (const entry of entries) {
 			const unread = entry.unread || (kept.folder === folder && kept.ids.has(entry.chatId)) || (folder === "unread" && entry.chatId === currentChatId);
-			if (!inFolder(entry.kind, folder, unread)) continue;
+			if (!inFolder(entry.kind, folder, unread) || (app !== null && entry.app !== app)) continue;
 			ids.push(entry.chatId);
 			offsets.push(total);
 			total += tall.has(entry.chatId) ? TWO_LINE_ROW_HEIGHT : ROW_HEIGHT;
 		}
 		return { ids, offsets, total };
-	}, [entries, folder, kept, currentChatId, twoLine]);
+	}, [entries, folder, app, kept, currentChatId, twoLine]);
 
 	// Remember what the "Chưa đọc" filter showed, so reading a chat does not drop it.
 	if (folder === "unread" && kept.folder === folder && rows.ids.some((id) => !kept.ids.has(id))) {
@@ -245,7 +249,7 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 				<Icon name="checks" />
 				<strong>{folder === "unread" ? copy.folders.emptyTitleUnread : copy.folders.emptyTitle}</strong>
 				<span>{copy.folders.emptyBody[folder]}</span>
-				{folder !== "all" && (
+				{(folder !== "all" || app !== null) && (
 					<button type="button" className="btn btn-sm" onClick={() => onFolder("all")}>
 						{copy.folders.showAll}
 					</button>
@@ -255,7 +259,7 @@ function Dialogs({ folder, onFolder, currentChatId, onVisibleChats }: DialogsPro
 	}
 	// Only "Cloud của tôi" and bots (every account starts with the assistant
 	// bot's chat) so far: the rest of the list invites the team (#first-run).
-	const alone = folder === "all" && entries.every((entry) => entry.saved || entry.kind === "bot");
+	const alone = folder === "all" && app === null && entries.every((entry) => entry.saved || entry.kind === "bot");
 	return (
 		<div className={alone ? "chats alone" : "chats"} ref={scroller} onScroll={(event) => {
 				setScrollTop(event.currentTarget.scrollTop);

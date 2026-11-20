@@ -319,6 +319,7 @@ export function rowToChat(row: SqlRow): Chat {
 		removed: num(row, "left_chat") === LEFT_REMOVED,
 		forum: bool(row, "forum"),
 		...(str(row, "external_source") !== "" ? { externalSource: str(row, "external_source") } : {}),
+		...(str(row, "external_app") !== "" ? { externalApp: str(row, "external_app") } : {}),
 		...(str(row, "photo_id") !== "" ? { photoId: str(row, "photo_id") } : {}),
 	};
 }

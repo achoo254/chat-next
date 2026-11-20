@@ -46,6 +46,8 @@ export interface Chat {
 	readonly forum: boolean;
 	/** The app this chat is a read-only copy of ("telegram"), set by the Chat Bridge; absent for every other chat. */
 	readonly externalSource?: string;
+	/** The app the chat is synced with, in either direction (Chat Bridge); absent for other chats. */
+	readonly externalApp?: string;
 	/** Groups and channels: file_id of the chat's photo, fetched with MediaRequest.chatPhotoOf; absent without one. */
 	readonly photoId?: string;
 }

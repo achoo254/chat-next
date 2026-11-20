@@ -16,7 +16,7 @@ import { navigate, paths, useSearch, type Route } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { dialogTitle, FOLDERS, type Folder } from "../data/format.ts";
 import { hookData, hooksData } from "../data/screen-data.ts";
-import { useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
+import { useAppFolders, useChat, useDialog, useServices, useTopics, useUser } from "../data/services.tsx";
 import { ChatListColumn } from "./chat-list.tsx";
 import { CompactWindow } from "./compact-window.tsx";
 import { Conversation, EmptyConversation, preloadComposer } from "./conversation.tsx";
@@ -71,10 +71,13 @@ interface ChatScreenProps {
 	route: ChatRoute;
 	/** Held by the parent so the folder stays picked across Settings and back. */
 	folder: Folder;
+	/** The app folder picked (Chat Bridge), held with the folder; null when a built-in folder is. */
+	app: string | null;
 	onFolder: (folder: Folder) => void;
+	onApp: (app: string) => void;
 }
 
-export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScreenProps) {
+export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setFolder, onApp: setApp }: ChatScreenProps) {
 	const copy = useCopy();
 	const { source, store, remote, integrations } = useServices();
 	const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
@@ -175,6 +178,13 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 		setFolder(next);
 		if (contacts) navigate(paths.home);
 	};
+	const pickApp = (next: string) => {
+		setApp(next);
+		if (contacts) navigate(paths.home);
+	};
+	// An app folder whose chats are all gone (disconnected and deleted) is no longer picked.
+	const apps = useAppFolders();
+	const app = pickedApp !== null && apps.has(pickedApp) ? pickedApp : null;
 	// Webhook pages: their data starts with their code, so the page shows once (components/preload.ts).
 	const hookId = route.name === "chat" ? (route.hookId ?? "") : "";
 	// Their first request waits for the integrations client and the transport: fetch those with the page.
@@ -202,7 +212,7 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 	return (
 		<UiContext value={ui}>
 			<div className={classes} ref={appRef}>
-				<FolderRail self={self} folder={contacts ? null : folder} onFolder={pickFolder} />
+				<FolderRail self={self} folder={contacts ? null : folder} app={app} onFolder={pickFolder} onApp={pickApp} />
 				{contacts ? (
 					<LoaderBoundary frame={(loader) => <section className="list">{loader}</section>}>
 						<ContactsView userId={route.userId} />
@@ -214,7 +224,7 @@ export function ChatScreen({ self, route, folder, onFolder: setFolder }: ChatScr
 								<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
 							</Suspense>
 						) : (
-							<ChatListColumn self={self} folder={folder} onFolder={setFolder} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
+							<ChatListColumn self={self} folder={folder} app={app} onFolder={setFolder} onApp={setApp} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
 						)}
 						{chatId === 0 ? (
 							<EmptyConversation />

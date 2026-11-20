@@ -332,12 +332,19 @@ interface ScreenProps {
 function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps) {
 	const services = useServices();
 	const { t } = useI18n();
-	const [folder, setFolder] = useState<Folder>("all");
+	const [pick, setPick] = useState<{ readonly folder: Folder; readonly app: string | null }>({ folder: "all", app: null });
+	// Picking a built-in folder leaves the app folder; picking an app folder lists its chats of every kind.
+	const pickFolder = (folder: Folder) => setPick({ folder, app: null });
+	const pickApp = (app: string) => setPick({ folder: "all", app });
 	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
-		return <ChatScreen self={self} route={route} folder={folder} onFolder={setFolder} />;
+		return <ChatScreen self={self} route={route} folder={pick.folder} app={pick.app} onFolder={pickFolder} onApp={pickApp} />;
 	}
 	const openFolder = (next: Folder) => {
-		setFolder(next);
+		pickFolder(next);
+		navigate(paths.home);
+	};
+	const openApp = (next: string) => {
+		pickApp(next);
 		navigate(paths.home);
 	};
 	// Started on every render: the requests are shared, so this only starts what a new route needs.
@@ -393,7 +400,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 				</>
 			}
 			account={<AccountMenuSlot self={self} />}
-			rail={<FolderRail self={self} folder={null} settings={inSettingsFrame(route)} machines={route.name === "machines"} onFolder={openFolder} />}
+			rail={<FolderRail self={self} folder={null} app={null} settings={inSettingsFrame(route)} machines={route.name === "machines"} onFolder={openFolder} onApp={openApp} />}
 		>
 			<LoaderBoundary key={route.name}>
 				<Ready parts={parts}>{screen}</Ready>
