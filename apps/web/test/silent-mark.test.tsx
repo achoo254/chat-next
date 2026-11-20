@@ -1,6 +1,6 @@
 // The bell-off mark tells a reader that a message came without a notification. It is not
-// shown to the message's own sender, who knows, nor in a copy of another app's chat, whose
-// history the Chat Bridge imports silently as a whole.
+// shown to the message's own sender, who knows, nor in a chat synced with another app
+// (read-only copy or two-way), whose history the Chat Bridge imports silently as a whole.
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ChatType } from "@achoo254/chat-proto/chats";
@@ -26,6 +26,18 @@ describe("the bell-off mark of a silent message", () => {
 
 		expect(within(await bubbleOf("tin im lặng của Lan")).getByRole("img", MARK)).toBeTruthy();
 		expect(within(await bubbleOf("tin im lặng của tôi")).queryByRole("img", MARK)).toBeNull();
+	});
+
+	it("does not show in a chat synced two ways with Telegram", async () => {
+		const fixture = new ChatFixture();
+		const partner = fixture.addUser("Anh Đô");
+		const chatId = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, partner]);
+		fixture.send(partner, chatId, "tin hai chiều từ Telegram", { silent: true });
+		fixture.bridge.seedTwoWay(chatId);
+		renderMessaging(fixture, `/c/${chatId}`);
+
+		expect(await screen.findByText("Tin bạn gõ ở đây cũng được gửi sang Telegram.", {}, LONG)).toBeTruthy();
+		expect(within(await bubbleOf("tin hai chiều từ Telegram")).queryByRole("img", MARK)).toBeNull();
 	});
 
 	it("does not show in a copy of a Telegram chat", async () => {
