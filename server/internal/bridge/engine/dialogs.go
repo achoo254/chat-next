@@ -54,7 +54,9 @@ func (r *runner) pollDialogs(ctx context.Context) error {
 				return err
 			}
 			if dir.Receives() {
-				convs = append(convs, conv)
+				if !r.stillRefused("dialogs", conv) {
+					convs = append(convs, conv)
+				}
 				break
 			}
 		}

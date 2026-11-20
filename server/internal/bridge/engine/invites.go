@@ -70,6 +70,9 @@ func (r *runner) pollInvites(ctx context.Context) error {
 		if !dir.Receives() {
 			continue
 		}
+		if r.stillRefused("invites", conv) {
+			continue
+		}
 		if pending, err := r.e.db.pendingAny(ctx, l.ChatID, []string{"invite_create", "invite_revoke"}); err != nil {
 			return err
 		} else if pending {

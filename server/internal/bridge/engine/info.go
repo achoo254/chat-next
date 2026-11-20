@@ -36,7 +36,9 @@ func (r *runner) pollInfo(ctx context.Context) error {
 			return err
 		}
 		if dir.Receives() {
-			convs = append(convs, conv)
+			if !r.stillRefused("info", conv) {
+				convs = append(convs, conv)
+			}
 		}
 	}
 	for start := 0; start < len(convs); start += dialogBatch {

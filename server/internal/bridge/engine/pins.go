@@ -23,7 +23,7 @@ func (r *runner) pinReader() (bridge.PinReader, bool) {
 // message older than the imported window is not in Chat and is skipped.
 func (r *runner) syncPins(ctx context.Context, l *chatLink) error {
 	pr, ok := r.pinReader()
-	if !ok {
+	if !ok || r.stillRefused("pins", l.ExternalChat) {
 		return nil
 	}
 	ids, err := retryRateLimit(ctx, func() ([]string, error) { return pr.ListPinned(ctx, r.acct, l.ExternalChat) })

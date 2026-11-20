@@ -71,6 +71,9 @@ func (r *runner) pollMembers(ctx context.Context) error {
 		if !dir.Receives() {
 			continue
 		}
+		if r.stillRefused("members", conv) {
+			continue
+		}
 		if pending, err := r.e.db.pendingAny(ctx, l.ChatID, memberActionOps); err != nil {
 			return err
 		} else if pending {

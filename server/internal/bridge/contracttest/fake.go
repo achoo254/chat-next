@@ -65,6 +65,7 @@ type Fake struct {
 	photoFetches                               int
 	forwards                                   []string
 	refuse                                     map[string]bool
+	inviteReads                                map[string]int
 	topicByRandom                              map[int64]string
 	// DedupeRandomID makes a repeated RandomID answer with the message already
 	// sent, as the other app does; a test turns it off to see a duplicate.
@@ -77,7 +78,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, inviteReads: map[string]int{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {
@@ -834,11 +835,19 @@ func (f *Fake) Invites(conv string) []bridge.InviteLink {
 func (f *Fake) ListInvites(_ context.Context, _ bridge.Account, conv string) ([]bridge.InviteLink, error) {
 	f.mu.Lock()
 	refused := f.refuse[conv]
+	f.inviteReads[conv]++
 	f.mu.Unlock()
 	if refused {
 		return nil, refusedErr(conv)
 	}
 	return f.Invites(conv), nil
+}
+
+// InviteReads is how many times the invite links of a conversation were asked for.
+func (f *Fake) InviteReads(conv string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.inviteReads[conv]
 }
 
 // Refuse makes the app refuse every read about a conversation (history, state, info,

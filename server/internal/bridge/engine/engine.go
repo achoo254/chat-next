@@ -178,6 +178,8 @@ type runner struct {
 	conversationsTick int
 	// relist asks for the conversations to be listed again (a message came from one without a chat).
 	relist bool
+	// refusedUntil holds, by "what|conversation", until when a refused read is not asked again.
+	refusedUntil map[string]time.Time
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -190,7 +192,7 @@ func (r *runner) run(ctx context.Context) error {
 	if !held {
 		return errLeaseLost
 	}
-	runCtx, cancel := context.WithCancelCause(ctx)
+	runCtx, cancel := context.WithCancelCause(withLogger(ctx, r.logger))
 	defer cancel(nil)
 	defer e.db.releaseLease(context.WithoutCancel(ctx), r.account.ID, e.cfg.Holder)
 	go r.keepLease(runCtx, cancel)
@@ -373,7 +375,29 @@ func (r *runner) skipRefused(err error, what, conv string) error {
 		return err
 	}
 	r.logger.Warn("the other app refused this for one conversation; it is skipped", "what", what, "conversation", conv, "reason", err.Error())
+	if conv != "" {
+		r.refusedUntil[what+"|"+conv] = time.Now().Add(refusedPause)
+	}
 	return nil
+}
+
+// refusedPause is how long a read the other app refused for a conversation is not asked
+// again: a right or a peer does not come back by itself within minutes, and asking every
+// look costs calls and fills the log.
+const refusedPause = 6 * time.Hour
+
+// stillRefused reports whether what was refused for conv not long ago, so the look skips
+// it without asking.
+func (r *runner) stillRefused(what, conv string) bool {
+	until, ok := r.refusedUntil[what+"|"+conv]
+	if !ok {
+		return false
+	}
+	if time.Now().After(until) {
+		delete(r.refusedUntil, what+"|"+conv)
+		return false
+	}
+	return true
 }
 
 // eachAlone asks again for each conversation of a batch on its own, after the other app
@@ -439,6 +463,10 @@ func retryRateLimit[T any](ctx context.Context, call func() (T, error)) (T, erro
 		var limit *bridge.RateLimitError
 		if !errors.As(err, &limit) {
 			return v, err
+		}
+		// A long wait is said, or the sync looks stuck while it waits.
+		if limit.RetryAfter >= rateLimitLogAfter {
+			loggerFrom(ctx).Warn("the other app asked to wait before the next call; waiting", "wait", limit.RetryAfter.String(), "until", time.Now().Add(limit.RetryAfter).Format(time.TimeOnly))
 		}
 		if err := sleep(ctx, limit.RetryAfter); err != nil {
 			return v, err
@@ -892,4 +920,22 @@ func chatButtons(rows [][]bridge.Button) [][]chat.IntegrationButton {
 		}
 	}
 	return out
+}
+
+// rateLimitLogAfter: a wait the other app asks for at least this long is logged.
+var rateLimitLogAfter = 10 * time.Second
+
+type loggerKey struct{}
+
+// withLogger carries the runner's logger to helpers that only get a context.
+func withLogger(ctx context.Context, l *slog.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, l)
+}
+
+// loggerFrom is the logger withLogger put in ctx, else the default one.
+func loggerFrom(ctx context.Context) *slog.Logger {
+	if l, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok && l != nil {
+		return l
+	}
+	return slog.Default()
 }

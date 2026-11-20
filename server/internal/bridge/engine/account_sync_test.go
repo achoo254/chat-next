@@ -122,3 +122,23 @@ func TestAnImportedConversationRefusedLaterDoesNotKeepTheAccountReconnecting(t *
 	e.fake.Push(bridge.Event{Message: &m})
 	e.waitTexts(chatID, []string{"tin 1", "tin 2", "tin mới"})
 }
+
+func TestAReadTheOtherAppRefusedIsNotAskedAgainEveryLook(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "nhóm một", 1))
+	e.group("bad")
+	e.fake.AddHistory("bad", e.msg("b1", lan, "bị từ chối", 1))
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	e.fake.Refuse("bad")
+	// many looks: the invites of each group are read once in five
+	e.eventually(func() bool { return e.fake.InviteReads("g1") >= 4 }, func() string { return "the invites are not read" })
+	if n := e.fake.InviteReads("bad"); n > 2 {
+		t.Fatalf("the refused conversation was asked %d times, want it left alone after the refusal", n)
+	}
+}

@@ -48,7 +48,7 @@ func (r *runner) topicReader(l *chatLink) (bridge.TopicReader, bool) {
 // loadTopics asks the other app for the topics of the conversation.
 func (r *runner) loadTopics(ctx context.Context, l *chatLink) error {
 	tr, ok := r.topicReader(l)
-	if !ok {
+	if !ok || r.stillRefused("topics", l.ExternalChat) {
 		return nil
 	}
 	list, err := retryRateLimit(ctx, func() ([]bridge.Topic, error) { return tr.ListTopics(ctx, r.acct, l.ExternalChat) })

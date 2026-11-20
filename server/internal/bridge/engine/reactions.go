@@ -129,6 +129,9 @@ func (r *runner) pollReactions(ctx context.Context) error {
 // readReactions asks the other app for the reactions of the newest imported messages
 // of a chat (or of the one message id when it is set) and applies them.
 func (r *runner) readReactions(ctx context.Context, reader bridge.ReactionReader, l *chatLink, conv, id string) error {
+	if r.stillRefused("reactions", conv) {
+		return nil
+	}
 	ids := []string{id}
 	if id == "" {
 		var err error
