@@ -225,6 +225,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 		case "agent_projects_changed":
 			w.emit(EventKeys.agentProjects);
 			return;
+		case "people_changed":
+			w.emit(EventKeys.people);
+			return;
 		case "advisor_profile":
 			putAdvisorProfile(w, body.profile);
 			return;

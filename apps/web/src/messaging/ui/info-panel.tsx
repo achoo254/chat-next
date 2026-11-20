@@ -25,6 +25,7 @@ import { hiddenPins, usePinHidden } from "./pinned-bar.tsx";
 import { MuteDurations, pinLimitReached, useMute } from "./dialog-settings.tsx";
 import { displayLink, inviteLinks, isActiveInvite, useInviteLinks, useMembers, useOnlineCount } from "./members.ts";
 import { ChatAvatar, chatPhoto, CopyButton, Switch } from "./parts.tsx";
+import { PeopleSection } from "./people-section.tsx";
 import { usePresence, usePresenceText } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useUi, type Ui } from "./ui-context.tsx";
@@ -535,6 +536,8 @@ function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined
 					)}
 				</div>
 			)}
+			{/* The same person on other apps: users only, the caller's own grouping. */}
+			{!bot && peer !== undefined && !peer.isSelf && <PeopleSection userId={peer.id} name={name} />}
 			<SharedRows chatId={chat.id} onShared={onShared} />
 			{peer !== undefined && !peer.isSelf && <CommonChatsSection userId={peer.id} bot={bot} />}
 			{bot && (

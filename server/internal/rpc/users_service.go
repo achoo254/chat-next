@@ -238,6 +238,47 @@ func (s *usersService) GetContacts(ctx context.Context, req *connect.Request[app
 	})
 }
 
+// ListPeople returns the caller's people (ADR 0025).
+func (s *usersService) ListPeople(ctx context.Context, req *connect.Request[appv1.ListPeopleRequest]) (*connect.Response[appv1.ListPeopleResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, _ *appv1.ListPeopleRequest) (*appv1.ListPeopleResponse, error) {
+		people, err := s.chat.ListPeople(ctx, me)
+		return &appv1.ListPeopleResponse{People: people}, err
+	})
+}
+
+// LinkUsers joins users into one person of the caller.
+func (s *usersService) LinkUsers(ctx context.Context, req *connect.Request[appv1.LinkUsersRequest]) (*connect.Response[appv1.LinkUsersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.LinkUsersRequest) (*appv1.LinkUsersResponse, error) {
+		person, err := s.chat.LinkUsers(ctx, me, m)
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.LinkUsersResponse{Person: person}, nil
+	})
+}
+
+// UnlinkUser takes a user out of their person.
+func (s *usersService) UnlinkUser(ctx context.Context, req *connect.Request[appv1.UnlinkUserRequest]) (*connect.Response[appv1.UnlinkUserResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.UnlinkUserRequest) (*appv1.UnlinkUserResponse, error) {
+		return &appv1.UnlinkUserResponse{}, s.chat.UnlinkUser(ctx, me, m.GetUserId())
+	})
+}
+
+// ListLinkSuggestions returns the pairs that may be the same person.
+func (s *usersService) ListLinkSuggestions(ctx context.Context, req *connect.Request[appv1.ListLinkSuggestionsRequest]) (*connect.Response[appv1.ListLinkSuggestionsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ListLinkSuggestionsRequest) (*appv1.ListLinkSuggestionsResponse, error) {
+		suggestions, err := s.chat.ListLinkSuggestions(ctx, me, m.GetUserId())
+		return &appv1.ListLinkSuggestionsResponse{Suggestions: suggestions}, err
+	})
+}
+
+// RejectLinkSuggestion records that two users are not the same person.
+func (s *usersService) RejectLinkSuggestion(ctx context.Context, req *connect.Request[appv1.RejectLinkSuggestionRequest]) (*connect.Response[appv1.RejectLinkSuggestionResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.RejectLinkSuggestionRequest) (*appv1.RejectLinkSuggestionResponse, error) {
+		return &appv1.RejectLinkSuggestionResponse{}, s.chat.RejectLinkSuggestion(ctx, me, m.GetUserA(), m.GetUserB())
+	})
+}
+
 // GetBlockedUsers pages through the users the caller blocked.
 func (s *usersService) GetBlockedUsers(ctx context.Context, req *connect.Request[appv1.GetBlockedUsersRequest]) (*connect.Response[appv1.GetBlockedUsersResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetBlockedUsersRequest) (*appv1.GetBlockedUsersResponse, error) {

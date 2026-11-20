@@ -203,6 +203,54 @@ func (ReportReason) EnumDescriptor() ([]byte, []int) {
 	return file_app_v1_users_proto_rawDescGZIP(), []int{2}
 }
 
+type LinkSuggestionReason int32
+
+const (
+	LinkSuggestionReason_LINK_SUGGESTION_REASON_UNSPECIFIED LinkSuggestionReason = 0
+	// The two names are equal after folding case, accents and spaces. Weak:
+	// the app shows it as «same name, not verified».
+	LinkSuggestionReason_LINK_SUGGESTION_REASON_NAME LinkSuggestionReason = 1
+)
+
+// Enum value maps for LinkSuggestionReason.
+var (
+	LinkSuggestionReason_name = map[int32]string{
+		0: "LINK_SUGGESTION_REASON_UNSPECIFIED",
+		1: "LINK_SUGGESTION_REASON_NAME",
+	}
+	LinkSuggestionReason_value = map[string]int32{
+		"LINK_SUGGESTION_REASON_UNSPECIFIED": 0,
+		"LINK_SUGGESTION_REASON_NAME":        1,
+	}
+)
+
+func (x LinkSuggestionReason) Enum() *LinkSuggestionReason {
+	p := new(LinkSuggestionReason)
+	*p = x
+	return p
+}
+
+func (x LinkSuggestionReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LinkSuggestionReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_app_v1_users_proto_enumTypes[3].Descriptor()
+}
+
+func (LinkSuggestionReason) Type() protoreflect.EnumType {
+	return &file_app_v1_users_proto_enumTypes[3]
+}
+
+func (x LinkSuggestionReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LinkSuggestionReason.Descriptor instead.
+func (LinkSuggestionReason) EnumDescriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{3}
+}
+
 type UserStatus struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Kind  UserStatusKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=app.v1.UserStatusKind" json:"kind,omitempty"`
@@ -2319,6 +2367,629 @@ func (*SetLocaleResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_users_proto_rawDescGZIP(), []int{37}
 }
 
+// One identity of a person: a user of Chat or of another app, with the
+// private chat the caller has with them.
+type PersonMember struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// The user's name now (it can change after the link).
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// The app the user belongs to: "telegram", ...; empty for a Chat account.
+	App string `protobuf:"bytes,3,opt,name=app,proto3" json:"app,omitempty"`
+	// The caller's private chat with this user.
+	ChatId        int64 `protobuf:"varint,4,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PersonMember) Reset() {
+	*x = PersonMember{}
+	mi := &file_app_v1_users_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PersonMember) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PersonMember) ProtoMessage() {}
+
+func (x *PersonMember) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PersonMember.ProtoReflect.Descriptor instead.
+func (*PersonMember) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *PersonMember) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *PersonMember) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PersonMember) GetApp() string {
+	if x != nil {
+		return x.App
+	}
+	return ""
+}
+
+func (x *PersonMember) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+type Person struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Fixed when the link is made (the name of the Chat account if one is
+	// linked, else the name of the first user); it does not follow later
+	// renames and cannot be edited.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// At least two users, oldest link first.
+	Members       []*PersonMember `protobuf:"bytes,3,rep,name=members,proto3" json:"members,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Person) Reset() {
+	*x = Person{}
+	mi := &file_app_v1_users_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Person) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Person) ProtoMessage() {}
+
+func (x *Person) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Person.ProtoReflect.Descriptor instead.
+func (*Person) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *Person) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Person) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Person) GetMembers() []*PersonMember {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+type ListPeopleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPeopleRequest) Reset() {
+	*x = ListPeopleRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPeopleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPeopleRequest) ProtoMessage() {}
+
+func (x *ListPeopleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPeopleRequest.ProtoReflect.Descriptor instead.
+func (*ListPeopleRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{40}
+}
+
+type ListPeopleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	People        []*Person              `protobuf:"bytes,1,rep,name=people,proto3" json:"people,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPeopleResponse) Reset() {
+	*x = ListPeopleResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPeopleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPeopleResponse) ProtoMessage() {}
+
+func (x *ListPeopleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPeopleResponse.ProtoReflect.Descriptor instead.
+func (*ListPeopleResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *ListPeopleResponse) GetPeople() []*Person {
+	if x != nil {
+		return x.People
+	}
+	return nil
+}
+
+type LinkUsersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Two to 20 distinct users, none of them the caller.
+	UserIds       []int64 `protobuf:"varint,1,rep,packed,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkUsersRequest) Reset() {
+	*x = LinkUsersRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkUsersRequest) ProtoMessage() {}
+
+func (x *LinkUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkUsersRequest.ProtoReflect.Descriptor instead.
+func (*LinkUsersRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *LinkUsersRequest) GetUserIds() []int64 {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+type LinkUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Person        *Person                `protobuf:"bytes,1,opt,name=person,proto3" json:"person,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkUsersResponse) Reset() {
+	*x = LinkUsersResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkUsersResponse) ProtoMessage() {}
+
+func (x *LinkUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkUsersResponse.ProtoReflect.Descriptor instead.
+func (*LinkUsersResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *LinkUsersResponse) GetPerson() *Person {
+	if x != nil {
+		return x.Person
+	}
+	return nil
+}
+
+type UnlinkUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlinkUserRequest) Reset() {
+	*x = UnlinkUserRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlinkUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlinkUserRequest) ProtoMessage() {}
+
+func (x *UnlinkUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlinkUserRequest.ProtoReflect.Descriptor instead.
+func (*UnlinkUserRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *UnlinkUserRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+type UnlinkUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlinkUserResponse) Reset() {
+	*x = UnlinkUserResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlinkUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlinkUserResponse) ProtoMessage() {}
+
+func (x *UnlinkUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlinkUserResponse.ProtoReflect.Descriptor instead.
+func (*UnlinkUserResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{45}
+}
+
+type LinkSuggestion struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	First         *PersonMember          `protobuf:"bytes,1,opt,name=first,proto3" json:"first,omitempty"`
+	Second        *PersonMember          `protobuf:"bytes,2,opt,name=second,proto3" json:"second,omitempty"`
+	Reason        LinkSuggestionReason   `protobuf:"varint,3,opt,name=reason,proto3,enum=app.v1.LinkSuggestionReason" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkSuggestion) Reset() {
+	*x = LinkSuggestion{}
+	mi := &file_app_v1_users_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkSuggestion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkSuggestion) ProtoMessage() {}
+
+func (x *LinkSuggestion) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkSuggestion.ProtoReflect.Descriptor instead.
+func (*LinkSuggestion) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *LinkSuggestion) GetFirst() *PersonMember {
+	if x != nil {
+		return x.First
+	}
+	return nil
+}
+
+func (x *LinkSuggestion) GetSecond() *PersonMember {
+	if x != nil {
+		return x.Second
+	}
+	return nil
+}
+
+func (x *LinkSuggestion) GetReason() LinkSuggestionReason {
+	if x != nil {
+		return x.Reason
+	}
+	return LinkSuggestionReason_LINK_SUGGESTION_REASON_UNSPECIFIED
+}
+
+type ListLinkSuggestionsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// When set, only the suggestions that involve this user.
+	UserId        int64 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLinkSuggestionsRequest) Reset() {
+	*x = ListLinkSuggestionsRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLinkSuggestionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLinkSuggestionsRequest) ProtoMessage() {}
+
+func (x *ListLinkSuggestionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLinkSuggestionsRequest.ProtoReflect.Descriptor instead.
+func (*ListLinkSuggestionsRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ListLinkSuggestionsRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+type ListLinkSuggestionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Suggestions   []*LinkSuggestion      `protobuf:"bytes,1,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLinkSuggestionsResponse) Reset() {
+	*x = ListLinkSuggestionsResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLinkSuggestionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLinkSuggestionsResponse) ProtoMessage() {}
+
+func (x *ListLinkSuggestionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLinkSuggestionsResponse.ProtoReflect.Descriptor instead.
+func (*ListLinkSuggestionsResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ListLinkSuggestionsResponse) GetSuggestions() []*LinkSuggestion {
+	if x != nil {
+		return x.Suggestions
+	}
+	return nil
+}
+
+type RejectLinkSuggestionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserA         int64                  `protobuf:"varint,1,opt,name=user_a,json=userA,proto3" json:"user_a,omitempty"`
+	UserB         int64                  `protobuf:"varint,2,opt,name=user_b,json=userB,proto3" json:"user_b,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectLinkSuggestionRequest) Reset() {
+	*x = RejectLinkSuggestionRequest{}
+	mi := &file_app_v1_users_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectLinkSuggestionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectLinkSuggestionRequest) ProtoMessage() {}
+
+func (x *RejectLinkSuggestionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectLinkSuggestionRequest.ProtoReflect.Descriptor instead.
+func (*RejectLinkSuggestionRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *RejectLinkSuggestionRequest) GetUserA() int64 {
+	if x != nil {
+		return x.UserA
+	}
+	return 0
+}
+
+func (x *RejectLinkSuggestionRequest) GetUserB() int64 {
+	if x != nil {
+		return x.UserB
+	}
+	return 0
+}
+
+type RejectLinkSuggestionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectLinkSuggestionResponse) Reset() {
+	*x = RejectLinkSuggestionResponse{}
+	mi := &file_app_v1_users_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectLinkSuggestionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectLinkSuggestionResponse) ProtoMessage() {}
+
+func (x *RejectLinkSuggestionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_users_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectLinkSuggestionResponse.ProtoReflect.Descriptor instead.
+func (*RejectLinkSuggestionResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_users_proto_rawDescGZIP(), []int{50}
+}
+
 var File_app_v1_users_proto protoreflect.FileDescriptor
 
 const file_app_v1_users_proto_rawDesc = "" +
@@ -2460,7 +3131,38 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"nextCursor\"*\n" +
 	"\x10SetLocaleRequest\x12\x16\n" +
 	"\x06locale\x18\x01 \x01(\tR\x06locale\"\x13\n" +
-	"\x11SetLocaleResponse*\xcd\x01\n" +
+	"\x11SetLocaleResponse\"n\n" +
+	"\fPersonMember\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03app\x18\x03 \x01(\tR\x03app\x12\x1b\n" +
+	"\achat_id\x18\x04 \x01(\x03B\x020\x02R\x06chatId\"`\n" +
+	"\x06Person\x12\x12\n" +
+	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12.\n" +
+	"\amembers\x18\x03 \x03(\v2\x14.app.v1.PersonMemberR\amembers\"\x13\n" +
+	"\x11ListPeopleRequest\"<\n" +
+	"\x12ListPeopleResponse\x12&\n" +
+	"\x06people\x18\x01 \x03(\v2\x0e.app.v1.PersonR\x06people\"1\n" +
+	"\x10LinkUsersRequest\x12\x1d\n" +
+	"\buser_ids\x18\x01 \x03(\x03B\x020\x02R\auserIds\";\n" +
+	"\x11LinkUsersResponse\x12&\n" +
+	"\x06person\x18\x01 \x01(\v2\x0e.app.v1.PersonR\x06person\"0\n" +
+	"\x11UnlinkUserRequest\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\"\x14\n" +
+	"\x12UnlinkUserResponse\"\xa0\x01\n" +
+	"\x0eLinkSuggestion\x12*\n" +
+	"\x05first\x18\x01 \x01(\v2\x14.app.v1.PersonMemberR\x05first\x12,\n" +
+	"\x06second\x18\x02 \x01(\v2\x14.app.v1.PersonMemberR\x06second\x124\n" +
+	"\x06reason\x18\x03 \x01(\x0e2\x1c.app.v1.LinkSuggestionReasonR\x06reason\"9\n" +
+	"\x1aListLinkSuggestionsRequest\x12\x1b\n" +
+	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\"W\n" +
+	"\x1bListLinkSuggestionsResponse\x128\n" +
+	"\vsuggestions\x18\x01 \x03(\v2\x16.app.v1.LinkSuggestionR\vsuggestions\"S\n" +
+	"\x1bRejectLinkSuggestionRequest\x12\x19\n" +
+	"\x06user_a\x18\x01 \x01(\x03B\x020\x02R\x05userA\x12\x19\n" +
+	"\x06user_b\x18\x02 \x01(\x03B\x020\x02R\x05userB\"\x1e\n" +
+	"\x1cRejectLinkSuggestionResponse*\xcd\x01\n" +
 	"\x0eUserStatusKind\x12 \n" +
 	"\x1cUSER_STATUS_KIND_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17USER_STATUS_KIND_ONLINE\x10\x01\x12\x1c\n" +
@@ -2482,7 +3184,10 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x1bREPORT_REASON_PERSONAL_DATA\x10\x05\x12\x17\n" +
 	"\x13REPORT_REASON_OTHER\x10\x06\x12\x16\n" +
 	"\x12REPORT_REASON_SCAM\x10\a\x12\x18\n" +
-	"\x14REPORT_REASON_SEXUAL\x10\b2\xe1\b\n" +
+	"\x14REPORT_REASON_SEXUAL\x10\b*_\n" +
+	"\x14LinkSuggestionReason\x12&\n" +
+	"\"LINK_SUGGESTION_REASON_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bLINK_SUGGESTION_REASON_NAME\x10\x012\xf0\v\n" +
 	"\fUsersService\x12:\n" +
 	"\aGetSelf\x12\x16.app.v1.GetSelfRequest\x1a\x17.app.v1.GetSelfResponse\x12=\n" +
 	"\bGetUsers\x12\x17.app.v1.GetUsersRequest\x1a\x18.app.v1.GetUsersResponse\x12L\n" +
@@ -2502,7 +3207,14 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\rDeleteContact\x12\x1c.app.v1.DeleteContactRequest\x1a\x1d.app.v1.DeleteContactResponse\x12F\n" +
 	"\vGetContacts\x12\x1a.app.v1.GetContactsRequest\x1a\x1b.app.v1.GetContactsResponse\x12R\n" +
 	"\x0fGetBlockedUsers\x12\x1e.app.v1.GetBlockedUsersRequest\x1a\x1f.app.v1.GetBlockedUsersResponse\x12@\n" +
-	"\tSetLocale\x12\x18.app.v1.SetLocaleRequest\x1a\x19.app.v1.SetLocaleResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
+	"\tSetLocale\x12\x18.app.v1.SetLocaleRequest\x1a\x19.app.v1.SetLocaleResponse\x12C\n" +
+	"\n" +
+	"ListPeople\x12\x19.app.v1.ListPeopleRequest\x1a\x1a.app.v1.ListPeopleResponse\x12@\n" +
+	"\tLinkUsers\x12\x18.app.v1.LinkUsersRequest\x1a\x19.app.v1.LinkUsersResponse\x12C\n" +
+	"\n" +
+	"UnlinkUser\x12\x19.app.v1.UnlinkUserRequest\x1a\x1a.app.v1.UnlinkUserResponse\x12^\n" +
+	"\x13ListLinkSuggestions\x12\".app.v1.ListLinkSuggestionsRequest\x1a#.app.v1.ListLinkSuggestionsResponse\x12a\n" +
+	"\x14RejectLinkSuggestion\x12#.app.v1.RejectLinkSuggestionRequest\x1a$.app.v1.RejectLinkSuggestionResponseB#Z!app.local/server/gen/app/v1;appv1b\x06proto3"
 
 var (
 	file_app_v1_users_proto_rawDescOnce sync.Once
@@ -2516,120 +3228,151 @@ func file_app_v1_users_proto_rawDescGZIP() []byte {
 	return file_app_v1_users_proto_rawDescData
 }
 
-var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_app_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_app_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
 var file_app_v1_users_proto_goTypes = []any{
-	(UserStatusKind)(0),             // 0: app.v1.UserStatusKind
-	(PrivacyAudience)(0),            // 1: app.v1.PrivacyAudience
-	(ReportReason)(0),               // 2: app.v1.ReportReason
-	(*UserStatus)(nil),              // 3: app.v1.UserStatus
-	(*User)(nil),                    // 4: app.v1.User
-	(*GetSelfRequest)(nil),          // 5: app.v1.GetSelfRequest
-	(*GetSelfResponse)(nil),         // 6: app.v1.GetSelfResponse
-	(*GetUsersRequest)(nil),         // 7: app.v1.GetUsersRequest
-	(*GetUsersResponse)(nil),        // 8: app.v1.GetUsersResponse
-	(*UpdateProfileRequest)(nil),    // 9: app.v1.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil),   // 10: app.v1.UpdateProfileResponse
-	(*SetUsernameRequest)(nil),      // 11: app.v1.SetUsernameRequest
-	(*SetUsernameResponse)(nil),     // 12: app.v1.SetUsernameResponse
-	(*ResolveUsernameRequest)(nil),  // 13: app.v1.ResolveUsernameRequest
-	(*ResolveUsernameResponse)(nil), // 14: app.v1.ResolveUsernameResponse
-	(*SearchUsersRequest)(nil),      // 15: app.v1.SearchUsersRequest
-	(*SearchUsersResponse)(nil),     // 16: app.v1.SearchUsersResponse
-	(*BlockRequest)(nil),            // 17: app.v1.BlockRequest
-	(*BlockResponse)(nil),           // 18: app.v1.BlockResponse
-	(*UnblockRequest)(nil),          // 19: app.v1.UnblockRequest
-	(*UnblockResponse)(nil),         // 20: app.v1.UnblockResponse
-	(*PrivacySettings)(nil),         // 21: app.v1.PrivacySettings
-	(*GetPrivacyRequest)(nil),       // 22: app.v1.GetPrivacyRequest
-	(*GetPrivacyResponse)(nil),      // 23: app.v1.GetPrivacyResponse
-	(*SetPrivacyRequest)(nil),       // 24: app.v1.SetPrivacyRequest
-	(*SetPrivacyResponse)(nil),      // 25: app.v1.SetPrivacyResponse
-	(*ReportedMessages)(nil),        // 26: app.v1.ReportedMessages
-	(*ReportRequest)(nil),           // 27: app.v1.ReportRequest
-	(*ReportResponse)(nil),          // 28: app.v1.ReportResponse
-	(*AddContactRequest)(nil),       // 29: app.v1.AddContactRequest
-	(*AddContactResponse)(nil),      // 30: app.v1.AddContactResponse
-	(*DeleteContactRequest)(nil),    // 31: app.v1.DeleteContactRequest
-	(*DeleteContactResponse)(nil),   // 32: app.v1.DeleteContactResponse
-	(*GetContactsRequest)(nil),      // 33: app.v1.GetContactsRequest
-	(*GetContactsResponse)(nil),     // 34: app.v1.GetContactsResponse
-	(*Contact)(nil),                 // 35: app.v1.Contact
-	(*GetBlockedUsersRequest)(nil),  // 36: app.v1.GetBlockedUsersRequest
-	(*BlockedUser)(nil),             // 37: app.v1.BlockedUser
-	(*GetBlockedUsersResponse)(nil), // 38: app.v1.GetBlockedUsersResponse
-	(*SetLocaleRequest)(nil),        // 39: app.v1.SetLocaleRequest
-	(*SetLocaleResponse)(nil),       // 40: app.v1.SetLocaleResponse
-	(*MediaRef)(nil),                // 41: app.v1.MediaRef
+	(UserStatusKind)(0),                  // 0: app.v1.UserStatusKind
+	(PrivacyAudience)(0),                 // 1: app.v1.PrivacyAudience
+	(ReportReason)(0),                    // 2: app.v1.ReportReason
+	(LinkSuggestionReason)(0),            // 3: app.v1.LinkSuggestionReason
+	(*UserStatus)(nil),                   // 4: app.v1.UserStatus
+	(*User)(nil),                         // 5: app.v1.User
+	(*GetSelfRequest)(nil),               // 6: app.v1.GetSelfRequest
+	(*GetSelfResponse)(nil),              // 7: app.v1.GetSelfResponse
+	(*GetUsersRequest)(nil),              // 8: app.v1.GetUsersRequest
+	(*GetUsersResponse)(nil),             // 9: app.v1.GetUsersResponse
+	(*UpdateProfileRequest)(nil),         // 10: app.v1.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),        // 11: app.v1.UpdateProfileResponse
+	(*SetUsernameRequest)(nil),           // 12: app.v1.SetUsernameRequest
+	(*SetUsernameResponse)(nil),          // 13: app.v1.SetUsernameResponse
+	(*ResolveUsernameRequest)(nil),       // 14: app.v1.ResolveUsernameRequest
+	(*ResolveUsernameResponse)(nil),      // 15: app.v1.ResolveUsernameResponse
+	(*SearchUsersRequest)(nil),           // 16: app.v1.SearchUsersRequest
+	(*SearchUsersResponse)(nil),          // 17: app.v1.SearchUsersResponse
+	(*BlockRequest)(nil),                 // 18: app.v1.BlockRequest
+	(*BlockResponse)(nil),                // 19: app.v1.BlockResponse
+	(*UnblockRequest)(nil),               // 20: app.v1.UnblockRequest
+	(*UnblockResponse)(nil),              // 21: app.v1.UnblockResponse
+	(*PrivacySettings)(nil),              // 22: app.v1.PrivacySettings
+	(*GetPrivacyRequest)(nil),            // 23: app.v1.GetPrivacyRequest
+	(*GetPrivacyResponse)(nil),           // 24: app.v1.GetPrivacyResponse
+	(*SetPrivacyRequest)(nil),            // 25: app.v1.SetPrivacyRequest
+	(*SetPrivacyResponse)(nil),           // 26: app.v1.SetPrivacyResponse
+	(*ReportedMessages)(nil),             // 27: app.v1.ReportedMessages
+	(*ReportRequest)(nil),                // 28: app.v1.ReportRequest
+	(*ReportResponse)(nil),               // 29: app.v1.ReportResponse
+	(*AddContactRequest)(nil),            // 30: app.v1.AddContactRequest
+	(*AddContactResponse)(nil),           // 31: app.v1.AddContactResponse
+	(*DeleteContactRequest)(nil),         // 32: app.v1.DeleteContactRequest
+	(*DeleteContactResponse)(nil),        // 33: app.v1.DeleteContactResponse
+	(*GetContactsRequest)(nil),           // 34: app.v1.GetContactsRequest
+	(*GetContactsResponse)(nil),          // 35: app.v1.GetContactsResponse
+	(*Contact)(nil),                      // 36: app.v1.Contact
+	(*GetBlockedUsersRequest)(nil),       // 37: app.v1.GetBlockedUsersRequest
+	(*BlockedUser)(nil),                  // 38: app.v1.BlockedUser
+	(*GetBlockedUsersResponse)(nil),      // 39: app.v1.GetBlockedUsersResponse
+	(*SetLocaleRequest)(nil),             // 40: app.v1.SetLocaleRequest
+	(*SetLocaleResponse)(nil),            // 41: app.v1.SetLocaleResponse
+	(*PersonMember)(nil),                 // 42: app.v1.PersonMember
+	(*Person)(nil),                       // 43: app.v1.Person
+	(*ListPeopleRequest)(nil),            // 44: app.v1.ListPeopleRequest
+	(*ListPeopleResponse)(nil),           // 45: app.v1.ListPeopleResponse
+	(*LinkUsersRequest)(nil),             // 46: app.v1.LinkUsersRequest
+	(*LinkUsersResponse)(nil),            // 47: app.v1.LinkUsersResponse
+	(*UnlinkUserRequest)(nil),            // 48: app.v1.UnlinkUserRequest
+	(*UnlinkUserResponse)(nil),           // 49: app.v1.UnlinkUserResponse
+	(*LinkSuggestion)(nil),               // 50: app.v1.LinkSuggestion
+	(*ListLinkSuggestionsRequest)(nil),   // 51: app.v1.ListLinkSuggestionsRequest
+	(*ListLinkSuggestionsResponse)(nil),  // 52: app.v1.ListLinkSuggestionsResponse
+	(*RejectLinkSuggestionRequest)(nil),  // 53: app.v1.RejectLinkSuggestionRequest
+	(*RejectLinkSuggestionResponse)(nil), // 54: app.v1.RejectLinkSuggestionResponse
+	(*MediaRef)(nil),                     // 55: app.v1.MediaRef
 }
 var file_app_v1_users_proto_depIdxs = []int32{
 	0,  // 0: app.v1.UserStatus.kind:type_name -> app.v1.UserStatusKind
-	41, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
-	3,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
-	4,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
-	4,  // 4: app.v1.GetUsersResponse.users:type_name -> app.v1.User
-	4,  // 5: app.v1.UpdateProfileResponse.user:type_name -> app.v1.User
-	4,  // 6: app.v1.SetUsernameResponse.user:type_name -> app.v1.User
-	4,  // 7: app.v1.ResolveUsernameResponse.user:type_name -> app.v1.User
-	4,  // 8: app.v1.SearchUsersResponse.users:type_name -> app.v1.User
+	55, // 1: app.v1.User.photo:type_name -> app.v1.MediaRef
+	4,  // 2: app.v1.User.status:type_name -> app.v1.UserStatus
+	5,  // 3: app.v1.GetSelfResponse.user:type_name -> app.v1.User
+	5,  // 4: app.v1.GetUsersResponse.users:type_name -> app.v1.User
+	5,  // 5: app.v1.UpdateProfileResponse.user:type_name -> app.v1.User
+	5,  // 6: app.v1.SetUsernameResponse.user:type_name -> app.v1.User
+	5,  // 7: app.v1.ResolveUsernameResponse.user:type_name -> app.v1.User
+	5,  // 8: app.v1.SearchUsersResponse.users:type_name -> app.v1.User
 	1,  // 9: app.v1.PrivacySettings.last_seen:type_name -> app.v1.PrivacyAudience
 	1,  // 10: app.v1.PrivacySettings.profile_photo:type_name -> app.v1.PrivacyAudience
 	1,  // 11: app.v1.PrivacySettings.find_by_email:type_name -> app.v1.PrivacyAudience
 	1,  // 12: app.v1.PrivacySettings.find_by_username:type_name -> app.v1.PrivacyAudience
 	1,  // 13: app.v1.PrivacySettings.add_to_groups:type_name -> app.v1.PrivacyAudience
 	1,  // 14: app.v1.PrivacySettings.send_messages:type_name -> app.v1.PrivacyAudience
-	21, // 15: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	22, // 15: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
 	1,  // 16: app.v1.SetPrivacyRequest.last_seen:type_name -> app.v1.PrivacyAudience
 	1,  // 17: app.v1.SetPrivacyRequest.profile_photo:type_name -> app.v1.PrivacyAudience
 	1,  // 18: app.v1.SetPrivacyRequest.find_by_email:type_name -> app.v1.PrivacyAudience
 	1,  // 19: app.v1.SetPrivacyRequest.find_by_username:type_name -> app.v1.PrivacyAudience
 	1,  // 20: app.v1.SetPrivacyRequest.add_to_groups:type_name -> app.v1.PrivacyAudience
 	1,  // 21: app.v1.SetPrivacyRequest.send_messages:type_name -> app.v1.PrivacyAudience
-	21, // 22: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
-	26, // 23: app.v1.ReportRequest.messages:type_name -> app.v1.ReportedMessages
+	22, // 22: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	27, // 23: app.v1.ReportRequest.messages:type_name -> app.v1.ReportedMessages
 	2,  // 24: app.v1.ReportRequest.reason:type_name -> app.v1.ReportReason
-	4,  // 25: app.v1.AddContactResponse.user:type_name -> app.v1.User
-	4,  // 26: app.v1.GetContactsResponse.users:type_name -> app.v1.User
-	35, // 27: app.v1.GetContactsResponse.contacts:type_name -> app.v1.Contact
-	37, // 28: app.v1.GetBlockedUsersResponse.blocked:type_name -> app.v1.BlockedUser
-	4,  // 29: app.v1.GetBlockedUsersResponse.users:type_name -> app.v1.User
-	5,  // 30: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
-	7,  // 31: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
-	9,  // 32: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
-	11, // 33: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
-	13, // 34: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
-	15, // 35: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
-	17, // 36: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
-	19, // 37: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
-	22, // 38: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
-	24, // 39: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
-	27, // 40: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
-	29, // 41: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
-	31, // 42: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
-	33, // 43: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
-	36, // 44: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
-	39, // 45: app.v1.UsersService.SetLocale:input_type -> app.v1.SetLocaleRequest
-	6,  // 46: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
-	8,  // 47: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
-	10, // 48: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
-	12, // 49: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
-	14, // 50: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
-	16, // 51: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
-	18, // 52: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
-	20, // 53: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
-	23, // 54: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
-	25, // 55: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
-	28, // 56: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
-	30, // 57: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
-	32, // 58: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
-	34, // 59: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
-	38, // 60: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
-	40, // 61: app.v1.UsersService.SetLocale:output_type -> app.v1.SetLocaleResponse
-	46, // [46:62] is the sub-list for method output_type
-	30, // [30:46] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	5,  // 25: app.v1.AddContactResponse.user:type_name -> app.v1.User
+	5,  // 26: app.v1.GetContactsResponse.users:type_name -> app.v1.User
+	36, // 27: app.v1.GetContactsResponse.contacts:type_name -> app.v1.Contact
+	38, // 28: app.v1.GetBlockedUsersResponse.blocked:type_name -> app.v1.BlockedUser
+	5,  // 29: app.v1.GetBlockedUsersResponse.users:type_name -> app.v1.User
+	42, // 30: app.v1.Person.members:type_name -> app.v1.PersonMember
+	43, // 31: app.v1.ListPeopleResponse.people:type_name -> app.v1.Person
+	43, // 32: app.v1.LinkUsersResponse.person:type_name -> app.v1.Person
+	42, // 33: app.v1.LinkSuggestion.first:type_name -> app.v1.PersonMember
+	42, // 34: app.v1.LinkSuggestion.second:type_name -> app.v1.PersonMember
+	3,  // 35: app.v1.LinkSuggestion.reason:type_name -> app.v1.LinkSuggestionReason
+	50, // 36: app.v1.ListLinkSuggestionsResponse.suggestions:type_name -> app.v1.LinkSuggestion
+	6,  // 37: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
+	8,  // 38: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
+	10, // 39: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
+	12, // 40: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
+	14, // 41: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
+	16, // 42: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
+	18, // 43: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
+	20, // 44: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
+	23, // 45: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
+	25, // 46: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
+	28, // 47: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
+	30, // 48: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
+	32, // 49: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
+	34, // 50: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
+	37, // 51: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
+	40, // 52: app.v1.UsersService.SetLocale:input_type -> app.v1.SetLocaleRequest
+	44, // 53: app.v1.UsersService.ListPeople:input_type -> app.v1.ListPeopleRequest
+	46, // 54: app.v1.UsersService.LinkUsers:input_type -> app.v1.LinkUsersRequest
+	48, // 55: app.v1.UsersService.UnlinkUser:input_type -> app.v1.UnlinkUserRequest
+	51, // 56: app.v1.UsersService.ListLinkSuggestions:input_type -> app.v1.ListLinkSuggestionsRequest
+	53, // 57: app.v1.UsersService.RejectLinkSuggestion:input_type -> app.v1.RejectLinkSuggestionRequest
+	7,  // 58: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
+	9,  // 59: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
+	11, // 60: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
+	13, // 61: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
+	15, // 62: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
+	17, // 63: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
+	19, // 64: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
+	21, // 65: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
+	24, // 66: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
+	26, // 67: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
+	29, // 68: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
+	31, // 69: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
+	33, // 70: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
+	35, // 71: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
+	39, // 72: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
+	41, // 73: app.v1.UsersService.SetLocale:output_type -> app.v1.SetLocaleResponse
+	45, // 74: app.v1.UsersService.ListPeople:output_type -> app.v1.ListPeopleResponse
+	47, // 75: app.v1.UsersService.LinkUsers:output_type -> app.v1.LinkUsersResponse
+	49, // 76: app.v1.UsersService.UnlinkUser:output_type -> app.v1.UnlinkUserResponse
+	52, // 77: app.v1.UsersService.ListLinkSuggestions:output_type -> app.v1.ListLinkSuggestionsResponse
+	54, // 78: app.v1.UsersService.RejectLinkSuggestion:output_type -> app.v1.RejectLinkSuggestionResponse
+	58, // [58:79] is the sub-list for method output_type
+	37, // [37:58] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_users_proto_init() }
@@ -2655,8 +3398,8 @@ func file_app_v1_users_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_users_proto_rawDesc), len(file_app_v1_users_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   38,
+			NumEnums:      4,
+			NumMessages:   51,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

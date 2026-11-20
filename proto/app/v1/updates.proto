@@ -80,6 +80,7 @@ message Update {
     UpdateUserChanged user_changed = 30;
     UpdateAgentProjectsChanged agent_projects_changed = 31;
     UpdateAdvisorProfile advisor_profile = 32;
+    UpdatePeopleChanged people_changed = 33;
   }
 }
 
@@ -245,6 +246,11 @@ message UpdateUserChanged {
 // sessions (AgentProjectsService): call ListAgentProjects again. Carries
 // nothing else.
 message UpdateAgentProjectsChanged {}
+
+// The user's people (links between users that are the same person) or their
+// link suggestions changed on one of their sessions (UsersService): call
+// ListPeople again. Carries nothing else.
+message UpdatePeopleChanged {}
 
 // The user's Advisor profile after a change (AdvisorService), complete.
 message UpdateAdvisorProfile {

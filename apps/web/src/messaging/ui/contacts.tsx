@@ -18,6 +18,7 @@ import type { Contact } from "../data/remote.ts";
 import { useServices, useUser } from "../data/services.tsx";
 import { useCommonChats } from "./common-chats.tsx";
 import { ContactRow } from "./contact-row.tsx";
+import { ContactsLinkSuggestions } from "./link-suggestions.tsx";
 import { ChatAvatar, CopyButton, useDomId } from "./parts.tsx";
 import { presenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
@@ -129,6 +130,7 @@ export function ContactsView({ userId }: { userId: number }) {
 						<span>{t.byName}</span>
 					</div>
 				)}
+				<ContactsLinkSuggestions />
 				{body}
 			</section>
 			<section className="convo contact-main" aria-label={t.title}>

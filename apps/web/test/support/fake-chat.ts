@@ -44,6 +44,7 @@ import { FakeBots } from "./fake-bots.ts";
 import { FakeIntegrations } from "./fake-integrations.ts";
 import { FakePush } from "./fake-push.ts";
 import { FakeBridge } from "./fake-bridge.ts";
+import { FakePeople } from "./fake-people.ts";
 import { FakePrivacy } from "./fake-privacy.ts";
 import type { MessagingClient, MessagingConnector } from "../../src/messaging/data/connector.ts";
 import { ServerBackend } from "../../src/messaging/data/server-backend.ts";
@@ -323,12 +324,23 @@ export class ChatFixture {
 	readonly privacy = new FakePrivacy();
 	/** BridgeService: connected apps. */
 	readonly bridge = new FakeBridge();
+	/** UsersService people calls: links between users that are the same person, and suggestions. */
+	readonly people: FakePeople;
 
 	constructor(selfName = "Đức Thắng", selfUsername = "ductrung") {
 		this.selfName = selfName;
 		this.selfUsername = selfUsername;
 		this.selfId = this.addUser(selfName, { username: selfUsername });
 		this.privacy.username = selfUsername;
+		this.people = new FakePeople({
+			selfId: this.selfId,
+			nameOf: (userId) => this.names.get(userId) ?? "",
+			chatWith: (userId) => this.existingPrivateChat(userId),
+			appOf: (userId) => {
+				const extras = this.chatExtras.get(this.existingPrivateChat(userId));
+				return extras?.externalApp ?? extras?.externalSource ?? "";
+			},
+		});
 		this.integrations = new FakeIntegrations({
 			selfId: this.selfId,
 			roleOf: (chatId) => (this.members.get(chatId)?.includes(this.selfId) === true ? (this.chatExtras.get(chatId)?.myRole ?? MemberRole.MEMBER) : null),
@@ -787,6 +799,19 @@ export class ChatFixture {
 		this.bridge.routes(router);
 	}
 
+	/** The private chat of the signed-in user with `userId`; 0 when there is none. */
+	existingPrivateChat(userId: number): number {
+		const found = [...this.members.entries()].find(
+			([id, list]) => this.chatTypes.get(id) === ChatType.PRIVATE && list.includes(userId) && list.includes(this.selfId) && userId !== this.selfId,
+		);
+		return found?.[0] ?? 0;
+	}
+
+	/** Tells the signed-in user's sessions that their people changed on another session. */
+	announcePeopleChanged(): void {
+		this.server["pushUser"](this.selfId, { case: "peopleChanged", value: {} }, 0);
+	}
+
 	/** The private chat of the signed-in user with `userId`, created when missing. */
 	privateChatWith(userId: number): number {
 		const existing = [...this.members.entries()].find(
@@ -856,6 +881,7 @@ export class ChatFixture {
 				this.contacts.delete(num(req.userId));
 				return {};
 			},
+			...this.people.handlers(),
 			getContacts: (req) => {
 				const ids = [...this.contacts].sort((a, b) => a - b);
 				const after = req.cursor === "" ? 0 : Number(req.cursor);

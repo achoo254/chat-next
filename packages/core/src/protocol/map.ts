@@ -657,6 +657,9 @@ function toBody(update: WireUpdate): UpdateBody {
 		case "agentProjectsChanged":
 			// A content-free hint to list the AI Agent projects again; nothing for the chat store.
 			return { kind: "agent_projects_changed" };
+		case "peopleChanged":
+			// A content-free hint to list the people and link suggestions again; nothing for the chat store.
+			return { kind: "people_changed" };
 		case "advisorProfile": {
 			const profile = kind.value.profile;
 			return profile === undefined ? { kind: "unknown" } : { kind: "advisor_profile", profile: toAdvisorProfile(profile) };
