@@ -1,8 +1,10 @@
 package telegram
 
 import (
+	"errors"
 	"testing"
 
+	"app.local/server/internal/bridge"
 	"github.com/gotd/td/tg"
 )
 
@@ -25,5 +27,12 @@ func TestTelegramsAnswerAboutAGroupTellsWhetherTheAccountIsOutOfIt(t *testing.T)
 		if got := goneFrom(c.chats); got != c.gone {
 			t.Errorf("%s: gone %v, want %v", c.name, got, c.gone)
 		}
+	}
+}
+
+func TestAConversationOutOfTheDialogsIsARefusalAboutThatOneConversation(t *testing.T) {
+	err := notInDialogs("channel:1")
+	if !errors.Is(err, bridge.ErrNotAllowed) || !errors.Is(err, errNotInDialogs) {
+		t.Fatalf("notInDialogs = %v: it must be a refusal (so the engine skips the conversation and does not stop the account) and still be recognised as out of the dialogs", err)
 	}
 }

@@ -171,11 +171,6 @@ func (d *db) link(ctx context.Context, accountID int64, externalChat string) (*c
 	return l, nil
 }
 
-func (d *db) dropLink(ctx context.Context, linkID int64) error {
-	_, err := d.pool.Exec(ctx, `DELETE FROM external_chats WHERE id = $1`, linkID)
-	return err
-}
-
 func (d *db) finishBackfill(ctx context.Context, linkID int64, cursor string) error {
 	_, err := d.pool.Exec(ctx, `UPDATE external_chats SET backfill_done = true, backfill_cursor = $2 WHERE id = $1`, linkID, cursor)
 	if err != nil {

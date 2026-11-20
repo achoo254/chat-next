@@ -7,6 +7,7 @@ import (
 
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/chat"
+	"github.com/jackc/pgx/v5"
 )
 
 // The states of an account's one switch (ADR 0024).
@@ -61,6 +62,9 @@ func (r *runner) reloadSyncState(ctx context.Context) error {
 func (r *runner) syncConversations(ctx context.Context) error {
 	if !r.syncOn() {
 		return nil
+	}
+	if err := r.forgetDeleted(ctx); err != nil {
+		return err
 	}
 	list, err := retryRateLimit(ctx, func() ([]bridge.Conversation, error) { return r.adapter.ListConversations(ctx, r.acct) })
 	if err != nil {
@@ -160,5 +164,37 @@ func (r *runner) importOne(ctx context.Context, l *chatLink) error {
 		return err
 	}
 	l.BackfillDone = true
+	return nil
+}
+
+// forgetDeleted lets go of the conversations whose copy was deleted in Chat. Their link and the keys of
+// their messages go, as when a copy is deleted through the bridge: a conversation still listed then gets a
+// new copy at the listing; one that is gone from the other app is not read any more, instead of being
+// asked about forever (the other app refuses it, which used to stop the whole account's sync).
+func (r *runner) forgetDeleted(ctx context.Context) error {
+	rows, err := r.e.db.pool.Query(ctx, `
+		SELECT x.external_chat_id, x.chat_id FROM external_chats x JOIN chats c ON c.id = x.chat_id
+		WHERE x.account_id = $1 AND c.deleted_at IS NOT NULL`, r.account.ID)
+	if err != nil {
+		return fmt.Errorf("bridge: list deleted copies: %w", err)
+	}
+	type gone struct {
+		conv   string
+		chatID int64
+	}
+	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (gone, error) {
+		var g gone
+		return g, row.Scan(&g.conv, &g.chatID)
+	})
+	if err != nil {
+		return fmt.Errorf("bridge: list deleted copies: %w", err)
+	}
+	for _, g := range list {
+		delete(r.links, g.conv)
+		if err := r.e.chat.DeleteImportedChat(ctx, r.account.OwnerID, g.chatID); err != nil {
+			return err
+		}
+		r.logger.Info("the copy of a conversation was deleted in Chat; its link is let go", "conversation", g.conv, "chat_id", g.chatID)
+	}
 	return nil
 }

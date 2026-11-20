@@ -155,5 +155,7 @@ func (c *conn) inputPeer(ctx context.Context, conv string) (tg.InputPeerClass, e
 var errNotInDialogs = errors.New("telegram: the conversation is not in the account's dialogs")
 
 func notInDialogs(conv string) error {
-	return fmt.Errorf("%w: %s", errNotInDialogs, conv)
+	// A refusal about this one conversation: the engine skips it and does not ask again for a while,
+	// instead of stopping the whole account's sync.
+	return fmt.Errorf("%w: %w: %s", bridge.ErrNotAllowed, errNotInDialogs, conv)
 }

@@ -181,3 +181,60 @@ func TestAGroupDeletedInTheOtherAppKeepsItsCopyReadOnlyAndOneOnlyMissingStaysTwo
 		t.Fatal("the copy of the deleted channel was removed, want it kept read-only")
 	}
 }
+
+func TestAConversationGoneFromTheOtherAppWhoseCopyWasDeletedInChatIsNotReadAnyMore(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "nhóm một", 1))
+	e.group("dead")
+	e.fake.AddHistory("dead", e.msg("d1", lan, "nhóm bị xoá ở cả hai bên", 1))
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	copyID := e.chatOf("dead")
+	e.waitTexts(copyID, []string{"nhóm bị xoá ở cả hai bên"})
+
+	// the conversation is deleted in the other app, then its copy in Chat
+	e.fake.Remove("dead", true)
+	if _, err := e.st.Pool().Exec(ctx, `UPDATE chats SET deleted_at = now() WHERE id = $1`, copyID); err != nil {
+		t.Fatal(err)
+	}
+	// the engine lets the link go at its next listing; the reads of the group stop
+	e.eventually(func() bool { return e.chatOf("dead") == 0 }, func() string { return "the link of the deleted copy is still there" })
+	after := e.fake.InviteReads("dead")
+	base := e.fake.InviteReads("g1")
+	e.eventually(func() bool { return e.fake.InviteReads("g1") >= base+4 }, func() string { return "the looks do not go on" })
+	if n := e.fake.InviteReads("dead"); n != after {
+		t.Fatalf("the deleted copy was still read: %d reads, then %d", after, n)
+	}
+	if n := e.fake.SubscribeCalls(); n != 1 {
+		t.Fatalf("the account connected %d times: the deleted conversation stopped its sync", n)
+	}
+	var keys int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_messages WHERE chat_id = $1`, copyID).Scan(&keys); err != nil || keys != 0 {
+		t.Fatalf("%d message keys of the deleted copy are left (err %v)", keys, err)
+	}
+}
+
+func TestAConversationStillListedGetsANewCopyWithItsHistoryWhenItsCopyWasDeletedInChat(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "nhóm một", 1))
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	old := e.chatOf("g1")
+	e.waitTexts(old, []string{"nhóm một"})
+
+	if _, err := e.st.Pool().Exec(ctx, `UPDATE chats SET deleted_at = now() WHERE id = $1`, old); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { id := e.chatOf("g1"); return id != 0 && id != old }, func() string { return "the conversation got no new copy" })
+	e.waitTexts(e.chatOf("g1"), []string{"nhóm một"})
+}

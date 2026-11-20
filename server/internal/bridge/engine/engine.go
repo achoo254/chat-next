@@ -435,10 +435,9 @@ func (r *runner) withLink(ctx context.Context, l *chatLink, fn func(*chat.Import
 	if errors.Is(err, chat.ErrImportChatGone) {
 		r.logger.Warn("synced chat is gone; sync of that chat stopped", "chat_id", l.ChatID)
 		delete(r.links, l.ExternalChat)
-		if derr := r.e.db.dropLink(ctx, l.ID); derr != nil {
-			return derr
-		}
-		return nil
+		// The link and the keys of its messages go together: keys left behind would make a later copy of
+		// the same conversation take every message for one it already has, and import nothing.
+		return r.e.chat.DeleteImportedChat(ctx, r.account.OwnerID, l.ChatID)
 	}
 	return err
 }
