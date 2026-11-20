@@ -8,14 +8,18 @@
 // the compact top bar elsewhere (screens/shell.tsx). Badges count
 // chats with unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
 // Each app chats are synced with (Chat Bridge) adds a folder after Chưa đọc,
-// holding that app's chats; the shortcuts keep their positions.
+// holding that app's chats; the shortcuts keep their positions. A linked
+// person (ADR 0025) is one row of Tất cả, so its badge counts them once.
+import { useEffect, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { followInApp, Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { appName, countLabel, FOLDERS, type Folder } from "../data/format.ts";
-import { useAppFolders, useFolderCounts } from "../data/services.tsx";
+import { useAppFolders, useFolderCounts, useListEntries, useNotificationSettings, useServices } from "../data/services.tsx";
+import type { LinkedPerson } from "../people/people-api.ts";
+import type * as PersonRows from "../people/person-rows.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
 import { AgentIcon } from "../../machines/cpu-icon.tsx";
@@ -49,6 +53,11 @@ export function FolderRail({ self, folder, settings = false, machines = false, a
 	const copy = useCopy();
 	const counts = useFolderCounts();
 	const apps = useAppFolders();
+	const people = useListPeople();
+	const entries = useListEntries();
+	const { badgeMuted } = useNotificationSettings();
+	const countOf = (item: Folder): number =>
+		item === "all" && people !== null ? counts.all - people.rows.personBadgeExtra(entries, people.people, badgeMuted) : counts[item];
 	return (
 		<nav className="folder-rail" aria-label={copy.folders.nav}>
 			<AccountMenuSlot self={self} />
@@ -62,9 +71,9 @@ export function FolderRail({ self, folder, settings = false, machines = false, a
 				>
 					<Icon name={FOLDER_ICONS[item]} />
 					{copy.folders[item]}
-					{item !== "unread" && counts[item] > 0 && (
-						<span className="badge" aria-label={copy.folders.unreadChats(counts[item])}>
-							{countLabel(counts[item])}
+					{item !== "unread" && countOf(item) > 0 && (
+						<span className="badge" aria-label={copy.folders.unreadChats(countOf(item))}>
+							{countLabel(countOf(item))}
 						</span>
 					)}
 				</button>
@@ -135,4 +144,50 @@ function AgentBadge() {
 			{countLabel(needs)}
 		</span>
 	) : null;
+}
+
+/** The linked people the list folds into rows, with the code that folds them. */
+export interface ListPeople {
+	readonly people: readonly LinkedPerson[];
+	readonly rows: typeof PersonRows;
+}
+
+/**
+ * The caller's linked people for the chat list and its badge, kept current;
+ * loaded after the first screen. null until they load, while there are none,
+ * and when they fail to load: the list then shows every chat on its own.
+ */
+export function useListPeople(): ListPeople | null {
+	const services = useServices();
+	const [value, setValue] = useState<ListPeople | null>(null);
+	useEffect(() => {
+		let live = true;
+		let stop = (): void => undefined;
+		Promise.all([import("../people/people-store.ts"), import("../people/person-rows.ts")]).then(
+			([{ peopleOf }, rows]) => {
+				if (!live) return;
+				const store = peopleOf(services);
+				// What was listed stays through a failed refresh; a first list that failed leaves none.
+				const show = (): void => {
+					const { people } = store.snapshot();
+					setValue(people.length === 0 ? null : { people, rows });
+				};
+				const unsubscribe = store.subscribe(show);
+				const unwatch = store.watch(null);
+				show();
+				stop = () => {
+					unsubscribe();
+					unwatch();
+				};
+			},
+			() => {
+				// The code did not load (offline after an update): people are optional here, so the list stays as it is.
+			},
+		);
+		return () => {
+			live = false;
+			stop();
+		};
+	}, [services]);
+	return value;
 }

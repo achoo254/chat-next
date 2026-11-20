@@ -23,7 +23,7 @@ import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
-import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
+import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor, type Ui } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
@@ -53,6 +53,23 @@ const ViaLine = viaLine.Component;
 export const messageExtrasPreloads: readonly (() => Promise<void>)[] = [systemLine.preload, forwardLine.preload, viaLine.preload];
 
 const RESERVED = { visibility: "hidden" } as const;
+
+/**
+ * A message shown outside its own chat's screen (a person's merged timeline,
+ * ADR 0025): no forward and no delete there; reply and edit only through
+ * these, each in the message's own chat (absent: the action is not offered).
+ */
+export interface LimitedActions {
+	readonly reply?: (chatId: number, seq: number) => void;
+	readonly edit?: (chatId: number, seq: number) => void;
+}
+
+/** What replying to a message does: the chat's composer intent, or the limited screen's own reply; null when not offered. */
+function replyAction(ui: Ui, chatId: number, seq: number, limited: LimitedActions | undefined): (() => void) | null {
+	if (limited === undefined) return () => ui.intents.cell(chatId).set({ mode: "reply", seq });
+	const reply = limited.reply;
+	return reply === undefined ? null : () => reply(chatId, seq);
+}
 
 /** An empty line of the given class in place of one whose code is still loading. */
 function LineReserve({ className, seq }: { className: string; seq?: number }) {
@@ -220,12 +237,14 @@ function useRichContext(fromId: number): RichContext {
  * `edited`: "đã sửa" or "đã cập nhật" before the time; "" for none.
  * `silent`: the bell-off mark of a message posted without a notification
  * (mockups/integrations.html#alert-grouping), with this accessible name; "" for none.
+ * `platform`: the app the message came through, in words (merged timeline); "" for none.
  */
-function Stamp({ date, edited, silent = "", children }: { date: number; edited: string; silent?: string; children?: ReactNode }) {
+function Stamp({ date, edited, silent = "", platform = "", children }: { date: number; edited: string; silent?: string; platform?: string; children?: ReactNode }) {
 	"use no memo";
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
+			{platform !== "" && <span className="msg-app">{platform}</span>}
 			{silent !== "" && <LabelledIcon name="bell-off" label={silent} className="silent-mark" />}
 			{edited !== "" ? `${edited} ${clock(date, locale)}` : clock(date, locale)}
 			{children}
@@ -357,7 +376,8 @@ function QuickActions({
 	seq,
 	seqs,
 	label,
-	canReply,
+	onReply,
+	forward,
 	reactions,
 	mine,
 }: {
@@ -367,7 +387,10 @@ function QuickActions({
 	/** Every message of an album, forwarded together. */
 	seqs: readonly number[];
 	label: string;
-	canReply: boolean;
+	/** null: no reply button. */
+	onReply: (() => void) | null;
+	/** Offer the forward button (not on a person's merged timeline). */
+	forward: boolean;
 	reactions: StoredMessage["reactions"];
 	/** The user's own message: only the reaction button (reply, forward and the rest are in its menu: right click, long press). */
 	mine: boolean;
@@ -386,14 +409,16 @@ function QuickActions({
 		<>
 			{!mine && (
 				<div className="msg-actions" role="toolbar" aria-label={label}>
-					{canReply && (
-						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={() => ui.intents.cell(chatId).set({ mode: "reply", seq })}>
+					{onReply !== null && (
+						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={onReply}>
 							<Icon name="reply" small />
 						</button>
 					)}
-					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
-						<Icon name="forward" small />
-					</button>
+					{forward && (
+						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
+							<Icon name="forward" small />
+						</button>
+					)}
 					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
 						<Icon name="dots" small />
 					</button>
@@ -435,6 +460,10 @@ interface BubbleProps {
 	inert?: boolean;
 	runPrev?: boolean;
 	runNext?: boolean;
+	/** The app the message came through, shown in words by the time (merged timeline); "" for none. */
+	platform?: string;
+	/** Shown outside its chat's screen: the limited actions; undefined on the chat's own screen. */
+	limited?: LimitedActions;
 }
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
@@ -474,6 +503,8 @@ export function MessageBubble({
 	inert = false,
 	runPrev = false,
 	runNext = false,
+	platform = "",
+	limited,
 }: BubbleProps) {
 	const copy = useCopy();
 	const { store, self, backend } = useServices();
@@ -518,6 +549,7 @@ export function MessageBubble({
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	// A recalled message keeps its place only: nothing to reply to, react to or forward.
 	const canReply = (!channel || admin) && !message.recalled;
+	const reply = canReply ? replyAction(ui, chatId, message.seq, limited) : null;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
 	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : "", runClasses(runPrev, runNext)]
@@ -530,6 +562,7 @@ export function MessageBubble({
 			date={edited ? message.editDate : message.date}
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
 			silent={showSilent ? copy.message.silent : ""}
+			platform={platform}
 		>
 			{mine && !recalled && !isSavedChat(chat, null) && (
 				onItsWay !== null && delivery !== null ? (
@@ -555,12 +588,12 @@ export function MessageBubble({
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
 			{...(inert ? {} : trigger)}
 			onDoubleClick={
-				inert || !canReply
+				inert || reply === null
 					? undefined
 					: (event) => {
 							if ((event.target as Element).closest("a, button, .spoiler") !== null) return;
 							window.getSelection()?.removeAllRanges();
-							ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq });
+							reply();
 						}
 			}
 		>
@@ -670,7 +703,8 @@ export function MessageBubble({
 							seq={message.seq}
 							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
-							canReply={canReply}
+							onReply={reply}
+							forward={limited === undefined}
 							mine={mine}
 							reactions={message.reactions}
 						/>
@@ -700,6 +734,8 @@ interface PendingProps {
 	inert?: boolean;
 	runPrev?: boolean;
 	runNext?: boolean;
+	/** The app the message goes through, shown in words by the time (merged timeline); "" for none. */
+	platform?: string;
 }
 
 function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pending: PendingMessage; albumKeys: readonly string[] }) {
@@ -737,6 +773,7 @@ export function PendingBubble({
 	inert = false,
 	runPrev = false,
 	runNext = false,
+	platform = "",
 }: PendingProps) {
 	const copy = useCopy();
 	const { source, toasts, self } = useServices();
@@ -752,7 +789,7 @@ export function PendingBubble({
 	const icon = failed ? "alert" : "clock";
 	const label = failed ? copy.message.failed : waiting ? copy.message.queued : copy.message.sending;
 	const stamp = (
-		<Stamp date={pending.date} edited="">
+		<Stamp date={pending.date} edited="" platform={platform}>
 			<LabelledIcon name={icon} label={label} className={failed ? "fail" : undefined} />
 		</Stamp>
 	);

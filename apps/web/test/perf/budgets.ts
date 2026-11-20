@@ -36,9 +36,16 @@ export const BUNDLE_BUDGET = {
 	 * delivery state of chats that send on to another app (Chat Bridge: a small
 	 * hook, its context and the marks in a message bubble, about 0.7 KB; the
 	 * watcher that asks the server and everything drawn load only for such a
-	 * chat), so the budget is 152 KB.
+	 * chat), so the budget is 152 KB. 152.9 KB with People: a linked person as
+	 * one row of the chat list with its share of the "All" badge (about 0.6 KB
+	 * of startup glue; the grouping code and the people store load after the
+	 * first screen), the platform label and limited actions of a message
+	 * bubble (about 0.2 KB), and the person route; the merged screen itself is
+	 * lazy and shares only pure helpers (message-runs.ts), because importing
+	 * the list module from it split two shared modules into chunks of their own
+	 * (+0.7 KB). The budget is 153.5 KB.
 	 */
-	startupJsGzip: 152 * 1024,
+	startupJsGzip: 153.5 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;

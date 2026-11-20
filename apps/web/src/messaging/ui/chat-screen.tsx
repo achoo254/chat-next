@@ -51,6 +51,8 @@ const contactsCode = preloadable(async () => ({ default: (await import("./contac
 const ContactsView = contactsCode.Component;
 const ListMenu = lazy(() => import("./list-menu.tsx").then((m) => ({ default: m.ListMenu })));
 const BotLinkDialog = lazy(() => import("../bots/bot-link-dialog.tsx"));
+// A linked person's merged timeline (ADR 0025), loaded when first opened.
+const PersonScreen = lazy(() => import("../people/person-screen.tsx"));
 
 /** Panes (and the dialog switch) whose code is fetched when the browser is idle after startup (messaging-root.tsx). */
 export const chatPanePreloads: readonly (() => Promise<void>)[] = [preloadComposer, integrationsCode.preload, contactsCode.preload, dialogPreload];
@@ -64,7 +66,7 @@ function initialInfoOpen(): boolean {
 	return typeof window.matchMedia !== "function" || window.matchMedia(WIDE_QUERY).matches;
 }
 
-type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" } | { name: "bot" }>;
+type ChatRoute = Extract<Route, { name: "home" } | { name: "chat" } | { name: "invite" } | { name: "contacts" } | { name: "bot" } | { name: "person" }>;
 
 interface ChatScreenProps {
 	self: SelfUser;
@@ -205,7 +207,7 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 			.catch(() => undefined);
 	}, [contacts, remote]);
 
-	const open = chatId !== 0 || (contacts && route.userId !== 0);
+	const open = chatId !== 0 || (contacts && route.userId !== 0) || route.name === "person";
 	const adminMode = panel !== "chat";
 	const classes = ["app", "folders", showInfo || miniAppDocked ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
 
@@ -226,7 +228,11 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 						) : (
 							<ChatListColumn self={self} folder={folder} app={app} onFolder={setFolder} onApp={setApp} currentChatId={chatId} searchRef={searchRef} onVisibleChats={onVisibleChats} />
 						)}
-						{chatId === 0 ? (
+						{route.name === "person" ? (
+							<Suspense fallback={<section className="convo" aria-busy="true" />}>
+								<PersonScreen key={route.personId} personId={route.personId} />
+							</Suspense>
+						) : chatId === 0 ? (
 							<EmptyConversation />
 						) : adminMode ? (
 							<LoaderBoundary frame={adminFrame}>

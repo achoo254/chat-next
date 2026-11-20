@@ -336,7 +336,7 @@ function Screen({ self, route, onSelfChange, onSignOut, moderator }: ScreenProps
 	// Picking a built-in folder leaves the app folder; picking an app folder lists its chats of every kind.
 	const pickFolder = (folder: Folder) => setPick({ folder, app: null });
 	const pickApp = (app: string) => setPick({ folder: "all", app });
-	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot") {
+	if (route.name === "home" || route.name === "chat" || route.name === "invite" || route.name === "contacts" || route.name === "bot" || route.name === "person") {
 		return <ChatScreen self={self} route={route} folder={pick.folder} app={pick.app} onFolder={pickFolder} onApp={pickApp} />;
 	}
 	const openFolder = (next: Folder) => {

@@ -2,13 +2,16 @@
 // identities linked with this chat's person (their app and current name,
 // the one of this chat marked in words), each with "Bỏ nối"; the
 // suggestions for this user; and "Nối với…" to pick another private chat.
-// With nothing linked or suggested only "Nối với…" shows.
+// With nothing linked or suggested only "Nối với…" shows. A linked person
+// also offers their merged timeline (people/person-screen.tsx).
 import { useState } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
+import { navigate } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";
 import type { PersonMember } from "../people/people-api.ts";
 import { personOf, usePeople, type PeopleStore } from "../people/people-store.ts";
+import { personPath } from "../people/person-path.ts";
 import { LinkPickerDialog } from "./link-picker-dialog.tsx";
 import { IdentityName, UserLinkSuggestions, identityLabel, peopleFailure } from "./link-suggestions.tsx";
 
@@ -58,6 +61,12 @@ export function PeopleSection({ userId, name }: { userId: number; name: string }
 						<IdentityRow key={member.userId} store={store} member={member} current={member.userId === userId} />
 					))}
 				</ul>
+			)}
+			{person !== undefined && (
+				<button type="button" className="row link-row" onClick={() => navigate(personPath(person.id))}>
+					<Icon name="message" />
+					<span className="grow">{copy.personScreen.open}</span>
+				</button>
 			)}
 			<UserLinkSuggestions store={store} userId={userId} suggestions={suggestions} />
 			{people.status === "error" && (

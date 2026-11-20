@@ -12,7 +12,8 @@ export type Folder = "all" | "private" | "group" | "bot" | "unread";
 export const FOLDERS: readonly Folder[] = ["all", "private", "group", "bot", "unread"];
 
 /** The name of an app a chat is synced with (Chat Bridge), as shown on a row and as a folder. */
-export const appName = (app: string): string => (app === "telegram" ? "Telegram" : app);
+const APP_NAMES: Readonly<Record<string, string>> = { telegram: "Telegram", zalo: "Zalo" };
+export const appName = (app: string): string => APP_NAMES[app] ?? app;
 
 const TONES: readonly Tone[] = ["violet", "green", "blue", "amber", "cyan", "red", "grey"];
 

@@ -152,7 +152,8 @@ export function PreviewThumb({ message }: { message: Message }) {
 	);
 }
 
-function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
+/** The second line of a row: typing, the draft or the last message (also a person's row). */
+export function Preview({ view, kind, saved, draft, topics }: PreviewProps) {
 	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
