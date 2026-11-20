@@ -368,4 +368,24 @@ describe("a session row", () => {
 		expect(inTerminal.querySelector(".mx-glyph.running")).toBeNull();
 		expect(inTerminal.querySelector(".sub")?.textContent).not.toContain("trong terminal");
 	});
+
+	it("marks a session that finished since it was last seen with a dot and a bold name, and leaves a seen one plain", async () => {
+		const now = Date.now();
+		const fresh = create(ThreadSummarySchema, { id: "d", title: "Vừa xong", dir: "/w/app", provider: "claude", state: ThreadState.IDLE, updatedAt: BigInt(now), open: false });
+		const seenAlready = create(ThreadSummarySchema, { id: "s", title: "Đã xem rồi", dir: "/w/app", provider: "claude", state: ThreadState.IDLE, updatedAt: BigInt(now - 60_000), open: false });
+		const mac = machine(1, "Mac", [], { threads: [fresh, seenAlready] });
+		const server = new FakeAgentProjects();
+		server.seed("App", "", [{ machineId: 1, dir: "/w/app", branch: "", kind: 3 }]);
+		const { ctx, node } = await oneProject(server, [mac.view]);
+		const seen = new Map([["d", now - 10_000], ["s", now]]);
+		wrap(<ProjectItem node={node} open onToggle={() => undefined} ctx={{ ...ctx, seen }} />);
+		const unread = screen.getByText("Vừa xong").closest<HTMLElement>(".mx-srow");
+		const read = screen.getByText("Đã xem rồi").closest<HTMLElement>(".mx-srow");
+		if (unread === null || read === null) throw new Error("no row");
+		expect(unread.classList.contains("unread")).toBe(true);
+		expect(unread.querySelector(".unread-dot")).toBeTruthy();
+		expect(unread.querySelector(".mx-glyph.done")).toBeTruthy();
+		expect(read.classList.contains("unread")).toBe(false);
+		expect(read.querySelector(".unread-dot")).toBeNull();
+	});
 });

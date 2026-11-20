@@ -215,6 +215,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-srow .name { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mx-srow time { flex: none; font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .mx-srow .sub { flex: 1; min-width: 0; font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mx-srow.unread .name { font-weight: 700; }
+.mx-srow .unread-dot { flex: none; width: 6px; height: 6px; margin-inline-start: calc(var(--space-1) * -1); border-radius: 50%; background: var(--c-primary); }
 .mx-srow.waiting .sub { color: var(--c-warning-text); font-weight: 500; }
 .mx-srow .badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; }
 .mx-rows.skeleton li { height: 44px; margin: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--c-surface-subtle); }

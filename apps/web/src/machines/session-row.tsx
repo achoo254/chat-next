@@ -109,6 +109,8 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const ref_ = machine.entry.ref;
 	const inTerminal = terminalOffered(machine.state.info, thread.provider);
 	const status = threadStatus(thread, done);
+	// Finished since this device last looked: a check alone reads as "all fine", so the name turns bold and a dot follows it, as an unread message does.
+	const unread = status === "done";
 	const path = sessionPath(ref_, thread, inTerminal, officeOffered(machine.state.info), chatTakesTerminal(machine.state.info, thread.provider));
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
@@ -117,6 +119,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 				<span className="line">
 					<StatusGlyph status={status} icon="ai-session" who={ai} ai={thread.provider} offline={machine.conn.kind !== "on"} {...(status === "running" && !isRunning(thread) ? { detail: t.agent.projects.backgroundStatus(thread.backgroundTasks) } : {})} />
 					<span className="name">{thread.title || t.agent.newSession}</span>
+					{unread && <span className="unread-dot" aria-hidden="true" />}
 					{thread.pending > 0 && (
 						<span className="badge" aria-label={t.sessions.waiting(thread.pending)}>
 							{thread.pending}
@@ -134,7 +137,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 		// A plain anchor (not Link): the row is one of the column's arrow-key rows, and a long press on a phone (or a right click) opens its menu.
 		<a
 			href={path}
-			className={`mx-srow slim ${key}`}
+			className={`mx-srow slim ${key}${unread ? " unread" : ""}`}
 			aria-current={current ? "page" : undefined}
 			data-row=""
 			onClick={(event) => followInApp(event, path)}
@@ -150,7 +153,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 			{content}
 		</a>
 	) : (
-		<div className={`mx-srow slim ${key} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
+		<div className={`mx-srow slim ${key}${unread ? " unread" : ""} disabled`} aria-disabled="true" title={t.agent.openDisabled(connText(t, machine.conn, now))}>
 			{content}
 		</div>
 	);
