@@ -146,7 +146,7 @@ const ENDED_KEEP = 256;
  * and what started it (`entrypoint`: "cli" in a terminal, "sdk-…" for a
  * program driving it, such as this machine's own chat sessions).
  */
-type Register = { pid: number; sessionId: string; cwd?: string; startedAt?: number; procStart?: string; entrypoint?: string };
+type Register = { pid: number; sessionId: string; cwd?: string; startedAt?: number; procStart?: string; entrypoint?: string; status?: string; statusUpdatedAt?: number };
 /** How far a process's creation time may be from the `procStart` claude recorded (FILETIME steps of 100 ns: one second). */
 const PROC_START_SLACK = 10_000_000n;
 /** How far a claude's recorded start may be from when the terminal said it started the CLI. */
@@ -296,7 +296,7 @@ export class LocalSessions implements SessionHistory {
     } catch {
       k = undefined;
     }
-    if (!k) return { state: "unknown", via: "transcript" };
+    if (!k) return (await this.idleBeforeFirstMessage(sessionId)) ?? { state: "unknown", via: "transcript" };
     const since = Math.round(k.mtimeMs);
     const open = this.openWork(k);
     // Quiet since the last write of a turn: bookkeeping alone (a session merely opened) does not make it busy.
@@ -315,6 +315,26 @@ export class LocalSessions implements SessionHistory {
     if (quiet < BUSY_MS) return { state: "busy", since, ...(tool ? { tool } : {}), ...withHeld, turnOpen, via: "transcript" };
     if (!pending) return { state: "idle", since, ...withHeld, turnOpen, via: "transcript" };
     return held ? { state: "busy", since, ...(tool ? { tool } : {}), held, turnOpen, via: "process" } : { state: "idle", since, turnOpen, via: "process" };
+  }
+
+  /**
+   * A session with no transcript yet (claude writes the file with the first
+   * message, so a CLI opened with `--session-id` has none) that exactly one
+   * running claude holds and that claude's own record calls idle: idle since
+   * the record last changed, so a message typed in it (busy) or a turn that
+   * just ended starts the quiet time again. Undefined unless all of that holds.
+   */
+  private async idleBeforeFirstMessage(sessionId: string): Promise<Liveness | undefined> {
+    try {
+      const id = sessionId.toLowerCase();
+      const own = this.registers().filter((rec) => rec.sessionId === id && !rec.entrypoint?.startsWith("sdk"));
+      const [rec] = own;
+      if (own.length !== 1 || !rec || rec.status !== "idle" || rec.statusUpdatedAt === undefined) return undefined;
+      if (!(await this.runsAsRecorded(rec))) return undefined;
+      return { state: "idle", since: rec.statusUpdatedAt, held: true, turnOpen: false, untranscribed: true, via: "process" };
+    } catch {
+      return undefined;
+    }
   }
 
   /** A turn wrote in the last minute and did not end since. */
@@ -771,7 +791,7 @@ export class LocalSessions implements SessionHistory {
         // Only the small <pid>.json records; never anything else in that folder.
         if (!f.isFile() || !PROCESS_FILE.test(f.name)) continue;
         try {
-          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown; cwd?: unknown; startedAt?: unknown; procStart?: unknown; entrypoint?: unknown };
+          const rec = JSON.parse(readFileSync(join(dir, f.name), "utf8")) as { pid?: unknown; sessionId?: unknown; cwd?: unknown; startedAt?: unknown; procStart?: unknown; entrypoint?: unknown; status?: unknown; statusUpdatedAt?: unknown };
           if (typeof rec.pid !== "number" || typeof rec.sessionId !== "string" || !this.alive(rec.pid)) continue;
           out.push({
             pid: rec.pid,
@@ -780,6 +800,8 @@ export class LocalSessions implements SessionHistory {
             ...(typeof rec.startedAt === "number" ? { startedAt: rec.startedAt } : {}),
             ...(typeof rec.procStart === "string" ? { procStart: rec.procStart } : {}),
             ...(typeof rec.entrypoint === "string" ? { entrypoint: rec.entrypoint } : {}),
+            ...(typeof rec.status === "string" ? { status: rec.status } : {}),
+            ...(typeof rec.statusUpdatedAt === "number" ? { statusUpdatedAt: rec.statusUpdatedAt } : {}),
           });
         } catch {
           // being written, or gone

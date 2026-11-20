@@ -218,6 +218,59 @@ describe("the session a claude started in a terminal holds now", () => {
   });
 });
 
+describe("a session nothing was typed in (a CLI opened with --session-id has no transcript yet)", () => {
+  const STARTED = NOW - HOUR;
+  const IDLE_SINCE = NOW - 20_000;
+  function setup() {
+    const home = tempDir("claude-home-");
+    mkdirSync(join(home, "sessions"));
+    const register = (pid: number, body: Record<string, unknown>) =>
+      writeFileSync(join(home, "sessions", `${pid}.json`), JSON.stringify({ pid, kind: "interactive", entrypoint: "cli", cwd: "/w/x", startedAt: STARTED, ...body }));
+    // The process runs and started when its record says; tests replace the system's answer.
+    const live = (running: (pid: number) => boolean = () => true) =>
+      new LocalSessions({ homes: () => [home], now: () => NOW, alive: running, processStart: async (pid) => (running(pid) ? { pid, startedAt: STARTED } : undefined) } as ConstructorParameters<typeof LocalSessions>[0]);
+    return { home, register, live };
+  }
+
+  test("the one claude holding it calls itself idle: idle since its record changed, held, no turn, untranscribed", async () => {
+    const { register, live } = setup();
+    const id = randomUUID();
+    register(4242, { sessionId: id.toUpperCase(), status: "idle", statusUpdatedAt: IDLE_SINCE });
+    expect(await live().liveness(id)).toEqual({ state: "idle", since: IDLE_SINCE, held: true, turnOpen: false, untranscribed: true, via: "process" });
+  });
+
+  test("busy (a message was just typed), no status, an SDK session of this machine, two claudes or none running: unknown", async () => {
+    const { register, live } = setup();
+    const id = randomUUID();
+    const unknown = { state: "unknown", via: "transcript" };
+    register(4242, { sessionId: id, status: "busy", statusUpdatedAt: NOW - 1_000 });
+    expect(await live().liveness(id)).toEqual(unknown);
+    register(4242, { sessionId: id });
+    expect(await live().liveness(id)).toEqual(unknown);
+    register(4242, { sessionId: id, status: "idle", statusUpdatedAt: IDLE_SINCE, entrypoint: "sdk-ts" });
+    expect(await live().liveness(id)).toEqual(unknown);
+    register(4242, { sessionId: id, status: "idle", statusUpdatedAt: IDLE_SINCE });
+    register(4343, { sessionId: id, status: "idle", statusUpdatedAt: IDLE_SINCE });
+    expect(await live().liveness(id)).toEqual(unknown);
+    // Only the first of the two still runs: it is the one.
+    expect(await live((pid) => pid === 4242).liveness(id)).toMatchObject({ state: "idle", untranscribed: true });
+    // None runs (its record left behind).
+    expect(await live(() => false).liveness(id)).toEqual(unknown);
+  });
+
+  test("a transcript that exists decides as before: never untranscribed", async () => {
+    const { home, register, live } = setup();
+    const t = new Transcript(randomUUID(), "/w/x", "cli", NOW - 10_000).opening();
+    t.user("hello");
+    t.assistant([{ type: "text", text: "hi" }]);
+    t.turnEnd();
+    age(t.write(home), 5_000);
+    register(4242, { sessionId: t.sessionId, status: "idle", statusUpdatedAt: IDLE_SINCE });
+    expect(await live().liveness(t.sessionId)).toMatchObject({ state: "idle", via: "transcript" });
+    expect(await live().liveness(t.sessionId)).not.toHaveProperty("untranscribed");
+  });
+});
+
 describe("reading little", () => {
   test("a large transcript: the start and the end give the folder and the title; the count covers the whole file once, then only what was added", () => {
     const home = tempDir("claude-home-");

@@ -3456,10 +3456,25 @@ export class AgentCore {
       // TerminalService.close reports the end; a closer that did not still lets the thread go here.
       if (t.meta.terminal?.session === at.session) this.endTerminal(t);
       await this.waitTerminalCliGone(t);
+      this.forgetUntranscribedSession(t);
     })().finally(() => {
       delete t.takingFromTerminal;
     });
     return t.takingFromTerminal;
+  }
+
+  /**
+   * The CLI that held the thread's session ended before anything was typed in
+   * it, so the session was never written and cannot be resumed: the thread
+   * starts a new one with the message from chat.
+   */
+  private forgetUntranscribedSession(t: Thread): void {
+    const seg = t.meta.segments.at(-1);
+    const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
+    if (!seg?.sessionId || !history || history.end(seg.sessionId) !== undefined) return;
+    delete seg.sessionId;
+    delete t.untranscribedHeld;
+    this.saveMeta(t);
   }
 
   /** Waits until no process of the AI has the thread's session open (its CLI from the terminal exiting); refuses after TAKE_FROM_TERMINAL_EXIT_MS. */
@@ -3493,7 +3508,9 @@ export class AgentCore {
 
   /**
    * The thread's AI in the terminal can be closed and opened again resumed
-   * without losing anything: its session has a transcript to resume, its AI
+   * without losing anything: its session has a transcript to resume (or none
+   * yet, because nothing was typed in it: then there is nothing to lose and
+   * its AI's own record of the running CLI says it is idle), its AI
    * says no turn runs and the transcript ends outside a turn (no tool call
    * waiting for its result or a prompt, however old), a running process of
    * the AI still holds that very session (not another one after a /clear),
@@ -3507,9 +3524,11 @@ export class AgentCore {
     if (!t || t.deleted || !t.meta.terminal || !seg?.sessionId || !history?.liveness) return false;
     if (t.running || t.queued || t.pending.size > 0 || (t.outsidePrompts ?? 0) > 0) return false;
     try {
-      if (history.end(seg.sessionId) === undefined) return false;
+      const written = history.end(seg.sessionId) !== undefined;
       await history.prime?.();
       const live = await history.liveness(seg.sessionId);
+      // A session nothing was typed in has no transcript: only its running CLI saying it is idle tells it from one it cannot read.
+      if (!written && live.untranscribed !== true) return false;
       return live.state === "idle" && live.turnOpen === false && live.held === true && live.since !== undefined && this.now() - live.since >= quietMs;
     } catch {
       return false;
