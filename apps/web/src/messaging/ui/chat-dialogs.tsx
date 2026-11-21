@@ -6,6 +6,7 @@
 // Groups say "Trưởng nhóm / Phó nhóm", channels "Chủ kênh / Admin".
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useEffect, useState } from "react";
+import type { GroupDeleteToken } from "../settings/bridge-api.ts";
 import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -14,12 +15,15 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { isSavedChat } from "../data/format.ts";
 import type { Member, Reactor } from "../data/remote.ts";
 import { useChat, useDialog, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useBridgeCopy } from "../settings/use-bridge-copy.ts";
+import { AppNote, AppProblem } from "./app-lifecycle-parts.tsx";
 import { Quote } from "./dialogs.tsx";
 import { Glyph } from "./glyphs.tsx";
 import { useMembers } from "./members.ts";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "./parts.tsx";
 import { presenceText } from "./presence.tsx";
 import { useUi } from "./ui-context.tsx";
+import { useAppLifecycle } from "./use-app-lifecycle.ts";
 
 interface CloseProps {
 	onClose: () => void;
@@ -45,6 +49,10 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 	const [view, setView] = useState<"confirm" | "blocked" | "pick">("confirm");
 	const [heirId, setHeirId] = useState(0);
 	const [busy, setBusy] = useState(false);
+	// The group is also in another app: leaving there too, with the name typed again.
+	const inApp = useAppLifecycle(chat);
+	const [typed, setTyped] = useState("");
+	const bridge = useBridgeCopy();
 	const owner = chat?.myRole === "owner";
 	const channel = chat?.type === "channel";
 	const { members, status, hasMore, reload } = useMembers(chatId, "", owner);
@@ -56,8 +64,15 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 	// No admin on a complete member list: the owner must appoint one or delete the chat first.
 	const noHeir = owner && status === "ready" && heirs.length === 0 && !hasMore;
 
-	const leave = () => {
+	const nameTyped = typed.trim() === title.trim() && title.trim() !== "";
+	const leave = async () => {
 		setBusy(true);
+		// The app first: if it refuses, nothing is left anywhere.
+		const leftInApp = inApp !== null;
+		if (inApp !== null && !(await inApp.leave(typed))) {
+			setBusy(false);
+			return;
+		}
 		const newOwner = owner ? (heir?.person.id ?? 0) : 0;
 		remote.leaveChat(chatId, newOwner).then(
 			() => {
@@ -67,7 +82,11 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 			},
 			(err: unknown) => {
 				setBusy(false);
-				if (ownerNeedsAdmin(err)) setView("blocked");
+				// Left in the app already: the copy stays for reading, so this is not a failure to repeat.
+				if (leftInApp) {
+					toasts.show(bridge.people.danger.leaveDone);
+					onClose();
+				} else if (ownerNeedsAdmin(err)) setView("blocked");
 				else toasts.show(copy.common.failed);
 			},
 		);
@@ -171,12 +190,33 @@ export function LeaveDialog({ chatId, onClose }: CloseProps & { chatId: number }
 						<span>{copy.info.leaveNote(channel)}</span>
 					</p>
 				)}
+				{inApp !== null && (
+					<>
+						<AppNote text={bridge.people.danger.alsoLeave(inApp.appName)} />
+						<input
+							className="input"
+							autoComplete="off"
+							spellCheck={false}
+							value={typed}
+							aria-label={bridge.people.danger.nameLabel}
+							placeholder={bridge.people.danger.nameLabel}
+							onChange={(event) => setTyped(event.target.value)}
+						/>
+						<AppProblem problem={inApp.problem} chatId={chatId} />
+					</>
+				)}
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.cancel}
 				</button>
-				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={busy || (owner && status !== "ready")} onClick={leave}>
+				<button
+					type="button"
+					className="btn btn-danger"
+					aria-busy={busy}
+					disabled={busy || (owner && status !== "ready") || (inApp !== null && !nameTyped)}
+					onClick={() => void leave()}
+				>
 					{owner ? t.transferLeave(channel) : channel ? copy.info.leaveChannel : copy.info.leaveGroup}
 				</button>
 			</div>
@@ -365,8 +405,53 @@ function DeleteGroup({ chat, onClose }: CloseProps & { chat: Chat }) {
 	const id = useDomId("delete-group");
 	const t = copy.deleteChat;
 	const channel = chat.type === "channel";
-	const { busy, run } = useDelete(chat.id, t.deletedGroup(chat.title, channel), onClose);
+	const owner = chat.myRole === "owner";
+	const { busy: chatBusy, run } = useDelete(chat.id, t.deletedGroup(chat.title, channel), onClose);
 	const confirmed = typed.trim() === chat.title.trim() && chat.title.trim() !== "";
+	// The group is also in another app: deleted there first (a second confirmation after a wait), then here.
+	const inApp = useAppLifecycle(chat);
+	const bridge = useBridgeCopy();
+	const { toasts } = useServices();
+	const [pending, setPending] = useState<GroupDeleteToken | null>(null);
+	const [appBusy, setAppBusy] = useState(false);
+	const [now, setNow] = useState(() => Date.now() / 1000);
+	useEffect(() => {
+		if (pending === null) return;
+		const timer = setInterval(() => setNow(Date.now() / 1000), 500);
+		return () => clearInterval(timer);
+	}, [pending]);
+	const busy = chatBusy || appBusy;
+	const wait = pending === null ? 0 : Math.max(0, Math.ceil(pending.usableFrom - now));
+	const expired = pending !== null && now > pending.expires;
+	const askApp = async () => {
+		if (inApp === null) return;
+		setAppBusy(true);
+		const token = await inApp.requestDelete(typed);
+		setNow(Date.now() / 1000);
+		setPending(token);
+		setAppBusy(false);
+	};
+	const deleteInApp = async () => {
+		if (inApp === null || pending === null) return;
+		setAppBusy(true);
+		const done = await inApp.deleteGroup(typed, pending);
+		if (!done) {
+			setPending(null);
+			setAppBusy(false);
+			return;
+		}
+		if (owner) {
+			setAppBusy(false);
+			run();
+			return;
+		}
+		// Not the owner here: the copy stays for reading; only the app's group is gone.
+		toasts.show(bridge.people.danger.deleteDone);
+		onClose();
+	};
+	// Only the owner deletes a group, here or in the app (a copy whose app cannot be reached is Chat's own to delete).
+	const allowed = owner || inApp !== null;
+	const waiting = inApp !== null && pending !== null && !expired;
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={t.groupTitle(chat.title, channel)} onClose={onClose} />
@@ -391,14 +476,30 @@ function DeleteGroup({ chat, onClose }: CloseProps & { chat: Chat }) {
 					</label>
 					<input id={`${id}-confirm`} className="input" autoComplete="off" spellCheck={false} value={typed} onChange={(event) => setTyped(event.target.value)} />
 				</div>
+				{inApp !== null && <AppNote text={bridge.people.danger.deleteWarn(inApp.appName)} />}
+				{!allowed && <p className="note">{bridge.people.danger.needOwner}</p>}
+				{expired && <p className="note">{bridge.people.danger.expired}</p>}
+				{inApp !== null && <AppProblem problem={inApp.problem} chatId={chat.id} />}
 			</div>
 			<div className="dlg-foot">
 				<button type="button" className="btn" onClick={onClose}>
 					{copy.common.cancel}
 				</button>
-				<button type="button" className="btn btn-danger" aria-busy={busy} disabled={!confirmed || busy} onClick={run}>
-					{t.deleteGroup(channel)}
-				</button>
+				{waiting ? (
+					<button type="button" className="btn btn-danger" aria-busy={busy} disabled={wait > 0 || busy} onClick={() => void deleteInApp()}>
+						{wait > 0 ? bridge.people.danger.deleteWait(wait) : bridge.people.danger.deleteConfirm}
+					</button>
+				) : (
+					<button
+						type="button"
+						className="btn btn-danger"
+						aria-busy={busy}
+						disabled={!confirmed || busy || !allowed}
+						onClick={inApp === null ? run : () => void askApp()}
+					>
+						{t.deleteGroup(channel)}
+					</button>
+				)}
 			</div>
 		</Modal>
 	);

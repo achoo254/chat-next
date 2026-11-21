@@ -431,7 +431,7 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 						<span className="grow">{channel ? copy.info.leaveChannel : copy.info.leaveGroup}</span>
 					</button>
 				)}
-				{owner && !chat.left && (
+				{(owner || chat.externalApp !== undefined) && !chat.left && (
 					<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
 						<Icon name="trash" />
 						<span className="grow">{copy.info.deleteGroup(channel)}</span>

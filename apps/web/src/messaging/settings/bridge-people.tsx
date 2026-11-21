@@ -1,10 +1,10 @@
 // What Chat can do to people and groups in the other app, beyond the switches of the
-// feature panel: invite links of the app, adding a person, leaving and deleting a group.
-// Each part shows only when the app supports it and the feature sends for the chat;
-// leaving and deleting ask the name of the group again, and deleting waits and asks twice.
+// feature panel: invite links of the app and adding a person. Each part shows only when the
+// app supports it and the feature sends for the chat. (Leaving and deleting the group are in
+// the leave and delete dialogs of the chat, which act in the app too: ui/chat-dialogs.tsx.)
 // Loaded with the feature panel.
 import { useEffect, useState } from "react";
-import type { BridgeApi, BridgeCandidate, BridgeError, BridgeInviteView, GroupDeleteToken } from "./bridge-api.ts";
+import type { BridgeApi, BridgeCandidate, BridgeError, BridgeInviteView } from "./bridge-api.ts";
 import type { BridgeFeatureView } from "./bridge-features-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 
@@ -27,13 +27,11 @@ export function BridgePeople(props: Props) {
 	const byName = (name: string) => features.find((f) => f.feature === name);
 	const invites = byName("invites");
 	const members = byName("members");
-	const lifecycle = byName("lifecycle");
-	if (invites === undefined && members?.canSend !== true && lifecycle === undefined) return null;
+	if (invites === undefined && members?.canSend !== true) return null;
 	return (
 		<section className="br-people" data-id="bridge-people">
 			{invites !== undefined && <Invites {...props} on={sends(invites)} />}
 			{members !== undefined && members.canSend && <AddPeople {...props} on={sends(members)} />}
-			{lifecycle !== undefined && <Danger {...props} on={sends(lifecycle)} />}
 		</section>
 	);
 }
@@ -180,89 +178,6 @@ function AddPeople({ accountId, conversationId, api, disabled, on, onError, onCh
 					</button>
 				</form>
 			)}
-			{note !== "" && (
-				<p className="note" role="status">
-					{note}
-				</p>
-			)}
-		</div>
-	);
-}
-
-function Danger({ accountId, conversationId, appName, api, disabled, on, onError, onChanged }: Common) {
-	const t = useBridgeCopy();
-	const [name, setName] = useState("");
-	const [note, setNote] = useState("");
-	const [pending, setPending] = useState<GroupDeleteToken | null>(null);
-	const [now, setNow] = useState(() => Date.now() / 1000);
-	useEffect(() => {
-		if (pending === null) return;
-		const timer = setInterval(() => setNow(Date.now() / 1000), 500);
-		return () => clearInterval(timer);
-	}, [pending]);
-	const fail = (err: unknown) => {
-		const error = onError(err);
-		setNote(error.kind === "confirmation_wrong" ? t.people.danger.wrongName : error.kind === "reauth" ? "" : t.failed);
-		if (error.kind === "confirmation_wrong") setPending(null);
-	};
-	const wait = pending === null ? 0 : Math.max(0, Math.ceil(pending.usableFrom - now));
-	const expired = pending !== null && now > pending.expires;
-	return (
-		<div className="br-people-part br-danger">
-			<h4>{t.people.danger.title(appName)}</h4>
-			<p className="note">{t.people.danger.hint}</p>
-			{!on && <Off feature="lifecycle" />}
-			<input className="input" value={name} aria-label={t.people.danger.nameLabel} placeholder={t.people.danger.nameLabel} onChange={(e) => setName(e.target.value)} />
-			<div className="br-actions">
-				<button
-					type="button"
-					className="btn btn-sm btn-danger"
-					disabled={disabled || !on || name.trim() === ""}
-					onClick={() =>
-						void api.leaveGroup(accountId, conversationId, name).then(() => {
-							setNote(t.people.danger.leaveDone);
-							onChanged();
-						}, fail)
-					}
-				>
-					{t.people.danger.leave}
-				</button>
-				{pending === null || expired ? (
-					<button
-						type="button"
-						className="btn btn-sm btn-danger"
-						disabled={disabled || !on || name.trim() === ""}
-						onClick={() => {
-							setNote(expired ? t.people.danger.expired : "");
-							void api.requestGroupDelete(accountId, conversationId, name).then((token) => {
-								setNow(Date.now() / 1000);
-								setPending(token);
-								setNote("");
-							}, fail);
-						}}
-					>
-						{t.people.danger.deleteStart}
-					</button>
-				) : (
-					<>
-						<span className="note">{t.people.danger.deleteWarn(appName)}</span>
-						<button
-							type="button"
-							className="btn btn-sm btn-danger"
-							disabled={wait > 0}
-							onClick={() =>
-								void api.deleteGroup(accountId, conversationId, name, pending.token).then(() => {
-									setPending(null);
-									setNote(t.people.danger.deleteDone);
-									onChanged();
-								}, fail)
-							}
-						>
-							{wait > 0 ? t.people.danger.deleteWait(wait) : t.people.danger.deleteConfirm}
-						</button>
-					</>
-				)}
-			</div>
 			{note !== "" && (
 				<p className="note" role="status">
 					{note}
