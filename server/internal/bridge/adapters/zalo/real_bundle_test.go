@@ -10,9 +10,9 @@ import (
 )
 
 // The committed bundle, run with the real Node and ExecRunner: it says ready
-// with the protocol this adapter speaks, answers an unknown command with an
-// error event, and exits by itself once its stdin closes. No command touches
-// the network. Skipped where node is not installed.
+// with the protocol this adapter speaks, answers an unknown command and an
+// empty session with error codes, and exits by itself once its stdin closes.
+// No command touches the network. Skipped where node is not installed.
 func TestRealBundleSpeaksTheProtocolAndExitsOnStdinClose(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
@@ -33,18 +33,28 @@ func TestRealBundleSpeaksTheProtocolAndExitsOnStdinClose(t *testing.T) {
 	if err := side.send(command{Cmd: "bogus"}); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case ev, ok := <-side.events:
-		if !ok || ev.Ev != evError || ev.Code != "unknown_command" {
-			t.Fatalf("event = %+v (open %v), want error unknown_command", ev, ok)
-		}
-	case <-ctx.Done():
-		t.Fatal("no answer to the unknown command")
+	expectError(ctx, t, side, "unknown_command")
+	// A session without its fields fails before any network call, with a code.
+	if err := side.send(command{Cmd: cmdLoginSession, Session: []byte(`{}`)}); err != nil {
+		t.Fatal(err)
 	}
+	expectError(ctx, t, side, "bad_session")
 	_ = side.proc.Stdin().Close()
 	select {
 	case <-side.exited:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the sidecar did not exit after its stdin closed")
+	}
+}
+
+func expectError(ctx context.Context, t *testing.T, side *sidecar, code string) {
+	t.Helper()
+	select {
+	case ev, ok := <-side.events:
+		if !ok || ev.Ev != evError || string(ev.Code) != code {
+			t.Fatalf("event = %+v (open %v), want error %s", ev, ok, code)
+		}
+	case <-ctx.Done():
+		t.Fatalf("no error %s", code)
 	}
 }

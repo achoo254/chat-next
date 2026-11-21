@@ -34,28 +34,39 @@ type Config struct {
 
 // timing holds the waits of the adapter; tests shorten them.
 type timing struct {
-	stopGrace    time.Duration // stdin closed -> kill
-	readyTimeout time.Duration // start -> ready line
-	firstQR      time.Duration // login_qr -> first QR image
-	loginPoll    time.Duration // longest wait of one Login call for news
-	loginTTL     time.Duration // an abandoned login is stopped after this
-	connect      time.Duration // login_session -> listener connected
+	stopGrace      time.Duration // stdin closed -> kill
+	readyTimeout   time.Duration // start -> ready line
+	firstQR        time.Duration // login_qr -> first QR image (in the background)
+	loginStartWait time.Duration // longest wait of the first Login call
+	loginPoll      time.Duration // longest wait of a later Login call for news
+	loginIdle      time.Duration // a login nobody polls is stopped after this
+	loginTTL       time.Duration // any login is stopped after this
+	connect        time.Duration // login_session -> listener connected
 }
 
-var defaultTiming = timing{stopGrace: 3 * time.Second, readyTimeout: 30 * time.Second,
-	firstQR: 60 * time.Second, loginPoll: 25 * time.Second, loginTTL: 10 * time.Minute, connect: 2 * time.Minute}
+// defaultTiming keeps every Login call far below the API server's 60 s write
+// timeout (internal/api: http.Server.WriteTimeout): a start answers within
+// 3 s and a poll within 20 s; Zalo is only waited for in the background.
+var defaultTiming = timing{stopGrace: 3 * time.Second, readyTimeout: 10 * time.Second, firstQR: 30 * time.Second,
+	loginStartWait: 3 * time.Second, loginPoll: 20 * time.Second, loginIdle: 45 * time.Second,
+	loginTTL: 10 * time.Minute, connect: 2 * time.Minute}
 
 // Adapter implements bridge.Adapter for Zalo.
 type Adapter struct {
-	runner Runner
-	logger *slog.Logger
-	timing timing
+	runner   Runner
+	logger   *slog.Logger
+	timing   timing
+	now      func() time.Time
+	refusals *refusalTracker
 
-	mu         sync.Mutex
-	logins     map[string]*qrLogin
-	subs       map[string]*subscription // by Account.ID
-	heard      map[string]*heardAccount // by Account.ID
-	rejections map[string]int           // consecutive refused session logins, by Account.ID
+	mu            sync.Mutex
+	logins        map[string]*qrLogin
+	loginFailedAt map[string]time.Time     // by Chat user: when a login last failed or was abandoned
+	subs          map[string]*subscription // by Account.ID
+	heard         map[string]*heardAccount // by Account.ID
+	// mismatched holds, by Account.ID, the fingerprint of a stored session
+	// that logged in as another Zalo account; it is not tried again.
+	mismatched map[string]string
 }
 
 var (
@@ -69,8 +80,13 @@ func New(cfg Config) *Adapter {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Adapter{runner: cfg.Runner, logger: logger, timing: defaultTiming,
-		logins: map[string]*qrLogin{}, subs: map[string]*subscription{}, heard: map[string]*heardAccount{}, rejections: map[string]int{}}
+	return newAdapter(cfg.Runner, logger, time.Now)
+}
+
+func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapter {
+	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, refusals: newRefusalTracker(now),
+		logins: map[string]*qrLogin{}, loginFailedAt: map[string]time.Time{}, subs: map[string]*subscription{},
+		heard: map[string]*heardAccount{}, mismatched: map[string]string{}}
 }
 
 // Name implements bridge.Adapter.
@@ -100,9 +116,10 @@ func (a *Adapter) Close() {
 	}
 	a.mu.Unlock()
 	for _, l := range logins {
-		l.mu.Lock()
-		l.close()
-		l.mu.Unlock()
+		l.stop()
+	}
+	for _, l := range logins {
+		<-l.finished // the sidecar is stopped when runQRLogin returns
 	}
 	for _, s := range subs {
 		s.side.stop()
@@ -116,8 +133,9 @@ func (a *Adapter) Logout(_ context.Context, acct bridge.Account) error {
 	a.mu.Lock()
 	s := a.subs[acct.ID]
 	delete(a.heard, acct.ID)
-	delete(a.rejections, acct.ID)
+	delete(a.mismatched, acct.ID)
 	a.mu.Unlock()
+	a.refusals.connected(acct.ID) // forget the streak with the session
 	if s != nil {
 		s.loggedOut.Store(true)
 		s.side.stop()
@@ -135,12 +153,14 @@ func (a *Adapter) ListConversations(_ context.Context, acct bridge.Account) ([]b
 
 // Backfill implements bridge.Adapter. Zalo history is not reachable through
 // the sidecar yet; what a new conversation gets is the messages this process
-// heard in it (its first message among them), newest first, in one page.
+// kept for it (its first message among them, up to maxRecentPerConv, none
+// older than maxRecentAge), newest first, in one page. They are handed over
+// once: a second Backfill of the conversation is empty.
 func (a *Adapter) Backfill(_ context.Context, acct bridge.Account, conv string, cur bridge.Cursor, limit int) (bridge.Page, error) {
 	if cur.Before != "" {
 		return bridge.Page{Done: true}, nil
 	}
-	return bridge.Page{Messages: a.heardFor(acct.ID).recent(conv, limit), Done: true}, nil
+	return bridge.Page{Messages: a.heardFor(acct.ID).takeRecent(conv, limit), Done: true}, nil
 }
 
 // FetchMedia implements bridge.Adapter. No message carries media yet (stickers
@@ -155,7 +175,7 @@ func (a *Adapter) heardFor(account string) *heardAccount {
 	defer a.mu.Unlock()
 	h := a.heard[account]
 	if h == nil {
-		h = newHeardAccount()
+		h = newHeardAccount(a.now)
 		a.heard[account] = h
 	}
 	return h

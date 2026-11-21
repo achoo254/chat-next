@@ -120,6 +120,16 @@ func (p *fakeProcess) waitStdinClosed(t *testing.T) {
 	}
 }
 
+// waitExited fails the test unless the process exits soon.
+func (p *fakeProcess) waitExited(t *testing.T) {
+	t.Helper()
+	select {
+	case <-p.exited:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the sidecar did not exit")
+	}
+}
+
 // emit writes one stdout line; it gives up once the process exited.
 func (p *fakeProcess) emit(line string) {
 	_, _ = p.stdoutW.Write([]byte(line + "\n"))
@@ -145,21 +155,49 @@ func (p *fakeProcess) command(t *testing.T) string {
 	}
 }
 
-const readyLine = `{"ev":"ready","protocol":2}`
+const readyLine = `{"ev":"ready","protocol":3}`
 
 // fastTiming keeps tests short.
-var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second,
-	firstQR: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginTTL: time.Minute, connect: 3 * time.Second}
+var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second, firstQR: 2 * time.Second,
+	loginStartWait: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginIdle: time.Minute,
+	loginTTL: time.Minute, connect: 3 * time.Second}
 
 // newTestAdapter returns an adapter on runner with fast timings and a logger
 // that keeps every record for inspection.
 func newTestAdapter(t *testing.T, runner Runner) (*Adapter, *recordingHandler) {
 	t.Helper()
+	return newTestAdapterAt(t, runner, time.Now)
+}
+
+// newTestAdapterAt is newTestAdapter with a clock of the test's.
+func newTestAdapterAt(t *testing.T, runner Runner, now func() time.Time) (*Adapter, *recordingHandler) {
+	t.Helper()
 	h := &recordingHandler{}
-	a := New(Config{Runner: runner, Logger: slog.New(h)})
+	a := newAdapter(runner, slog.New(h), now)
 	a.timing = fastTiming
 	t.Cleanup(a.Close)
 	return a, h
+}
+
+// eventually fails the test unless cond holds within 5 seconds.
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting: %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// process returns the i-th process the runner started, waiting for it.
+func (r *fakeRunner) process(t *testing.T, i int) *fakeProcess {
+	t.Helper()
+	eventually(t, "sidecar start", func() bool { return r.starts() > i })
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.started[i]
 }
 
 // recordingHandler is a slog.Handler that keeps every record as text.

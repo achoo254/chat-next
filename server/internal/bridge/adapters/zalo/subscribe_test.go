@@ -10,17 +10,27 @@ import (
 	"app.local/server/internal/bridge"
 )
 
-const storedSession = `{"cookie":[{"key":"zpw_sek","value":"secret-cookie"}],"imei":"imei-1","userAgent":"UA"}`
+const storedSessionJSON = `{"cookie":[{"key":"zpw_sek","value":"secret-cookie"}],"imei":"imei-1","userAgent":"UA","uid":"999"}`
 
-var testAccount = bridge.Account{ID: "7", Session: []byte(storedSession)}
+var testAccount = bridge.Account{ID: "7", Session: []byte(storedSessionJSON)}
+
+const (
+	accountLine   = `{"ev":"account","uid":"999"}`
+	connectedLine = `{"ev":"listener","state":"connected"}`
+	// What the sidecar sends when Zalo refuses the stored session, and when Zalo
+	// fails (protocol 3, src/login-failure.mjs).
+	rejectedLine    = `{"ev":"error","code":"session_rejected","message":"ZcaApiError"}`
+	unavailableLine = `{"ev":"error","code":"zalo_unavailable","message":"ZcaApiError"}`
+)
 
 // scriptedSession plays a sidecar that takes login_session, then writes
 // lines, then (when exitAfter) exits as a crashed sidecar would.
 func scriptedSession(t *testing.T, lines []string, exitAfter bool) func(p *fakeProcess) {
 	return func(p *fakeProcess) {
 		p.emit(readyLine)
-		if c := p.command(t); !strings.HasPrefix(c, `{"cmd":"login_session","session":{"cookie":`) {
-			t.Errorf("command = %q, want login_session with the stored session", c)
+		c := p.command(t)
+		if !strings.HasPrefix(c, `{"cmd":"login_session","session":{"cookie":`) || strings.Contains(c, `"uid"`) {
+			t.Errorf("command = %q, want login_session with the sidecar's part of the stored session", c)
 			return
 		}
 		for _, l := range lines {
@@ -49,7 +59,8 @@ func runSubscribe(t *testing.T, a *Adapter, acct bridge.Account) ([]bridge.Event
 
 func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
 	lines := []string{
-		`{"ev":"listener","state":"connected"}`,
+		accountLine,
+		connectedLine,
 		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000","ttl":0}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000","ttl":0}`,
 		`{"ev":"message","thread":"group","self":false,"msgType":"webchat","content":"nhóm","msgId":"1002","uidFrom":"501","idTo":"900","dName":"Minh","ts":"1763700000001"}`,
@@ -78,15 +89,20 @@ func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
 	if len(convs) != 1 || convs[0].ID != "500" || convs[0].Title != "Lan" || convs[0].Kind != bridge.ConvPrivate {
 		t.Errorf("conversations = %+v", convs)
 	}
+	// The engine drops messages of a conversation it has not linked yet and
+	// reads them back through Backfill once it lists the conversation.
 	page, _ := a.Backfill(context.Background(), testAccount, "500", bridge.Cursor{}, 50)
 	if len(page.Messages) != 2 || page.Messages[0].ID != "1003" || !page.Done {
 		t.Errorf("backfill = %+v, want the two heard messages newest first", page)
 	}
-	r.started[0].waitStdinClosed(t)
+	if again, _ := a.Backfill(context.Background(), testAccount, "500", bridge.Cursor{}, 50); len(again.Messages) != 0 {
+		t.Errorf("a second backfill handed %d messages again", len(again.Messages))
+	}
+	r.process(t, 0).waitStdinClosed(t)
 }
 
 func TestSubscribeSidecarCrashIsRetryable(t *testing.T) {
-	r := &fakeRunner{script: scriptedSession(t, []string{`{"ev":"listener","state":"connected"}`}, true)}
+	r := &fakeRunner{script: scriptedSession(t, []string{accountLine, connectedLine}, true)}
 	a, _ := newTestAdapter(t, r)
 	_, err := runSubscribe(t, a, testAccount)
 	if err == nil || errors.Is(err, bridge.ErrSessionRevoked) {
@@ -94,30 +110,108 @@ func TestSubscribeSidecarCrashIsRetryable(t *testing.T) {
 	}
 }
 
-func TestSubscribeRefusedSessionBecomesRevokedAfterRepeats(t *testing.T) {
-	refused := []string{`{"ev":"error","code":"command_failed","message":"ZaloApiError"}`}
-	r := &fakeRunner{script: scriptedSession(t, refused, false)}
-	a, _ := newTestAdapter(t, r)
-	for i := 1; i < revokeAfter; i++ {
+func TestSubscribeRefusalsRevokeOnlyWhenTheyLastAnHour(t *testing.T) {
+	clock := newFakeClock()
+	r := &fakeRunner{script: scriptedSession(t, []string{rejectedLine}, false)}
+	a, _ := newTestAdapterAt(t, r, clock.now)
+	start := clock.now()
+	var err error
+	for attempts := 1; ; attempts++ {
+		_, err = runSubscribe(t, a, testAccount)
+		if errors.Is(err, bridge.ErrSessionRevoked) {
+			break
+		}
+		if err == nil || !strings.Contains(err.Error(), "refused") {
+			t.Fatalf("attempt %d: err = %v", attempts, err)
+		}
+		if attempts > 50 {
+			t.Fatal("never revoked")
+		}
+		clock.advance(5 * time.Minute) // the engine's longest backoff
+	}
+	if got := clock.elapsed(start); got < revokeMinSpan {
+		t.Errorf("revoked after %v of refusals, before %v", got, revokeMinSpan)
+	}
+}
+
+func TestSubscribeQuickRefusalsDoNotRevoke(t *testing.T) {
+	r := &fakeRunner{script: scriptedSession(t, []string{rejectedLine}, false)}
+	a, _ := newTestAdapter(t, r) // real clock: the attempts are milliseconds apart
+	for i := 0; i < 2*revokeMinRefusals; i++ {
 		if _, err := runSubscribe(t, a, testAccount); err == nil || errors.Is(err, bridge.ErrSessionRevoked) {
 			t.Fatalf("attempt %d: err = %v, want retryable", i, err)
 		}
 	}
-	if _, err := runSubscribe(t, a, testAccount); !errors.Is(err, bridge.ErrSessionRevoked) {
-		t.Fatalf("attempt %d: err = %v, want ErrSessionRevoked", revokeAfter, err)
-	}
-	if r.starts() != revokeAfter {
-		t.Errorf("sidecars started = %d, want one per Subscribe call (%d)", r.starts(), revokeAfter)
+	if r.starts() != 2*revokeMinRefusals {
+		t.Errorf("sidecars started = %d, want one per Subscribe call", r.starts())
 	}
 }
 
-func TestSubscribeNetworkFailureIsNotARefusal(t *testing.T) {
-	failed := []string{`{"ev":"error","code":"command_failed","message":"TypeError"}`}
-	r := &fakeRunner{script: scriptedSession(t, failed, false)}
-	a, _ := newTestAdapter(t, r)
-	for i := 0; i < revokeAfter+1; i++ {
+func TestSubscribeZaloUnavailableNeverRevokes(t *testing.T) {
+	clock := newFakeClock()
+	r := &fakeRunner{script: scriptedSession(t, []string{unavailableLine}, false)}
+	a, _ := newTestAdapterAt(t, r, clock.now)
+	for i := 0; i < 3; i++ { // three quick ones, as the engine's first backoffs
 		if _, err := runSubscribe(t, a, testAccount); err == nil || errors.Is(err, bridge.ErrSessionRevoked) {
-			t.Fatalf("attempt %d: err = %v, want retryable", i, err)
+			t.Fatalf("quick attempt %d: err = %v", i, err)
+		}
+		clock.advance(2 * time.Second)
+	}
+	for i := 0; i < 20; i++ { // and hours of them
+		if _, err := runSubscribe(t, a, testAccount); err == nil || errors.Is(err, bridge.ErrSessionRevoked) {
+			t.Fatalf("attempt %d: err = %v", i, err)
+		}
+		clock.advance(revokeMinGap)
+	}
+}
+
+func TestSubscribeOtherFailuresNeitherCountNorClearTheStreak(t *testing.T) {
+	clock := newFakeClock()
+	a, _ := newTestAdapterAt(t, &fakeRunner{}, clock.now)
+	run := func(line string) error {
+		a.runner = &fakeRunner{script: scriptedSession(t, []string{line}, false)}
+		_, err := runSubscribe(t, a, testAccount)
+		return err
+	}
+	_ = run(rejectedLine)
+	clock.advance(revokeMinGap)
+	_ = run(unavailableLine) // neither counts nor clears
+	_ = run(rejectedLine)
+	if _, counted := a.refusals.refused(testAccount.ID); counted != 2 {
+		t.Errorf("counted %d, want 2 (the unavailable error must not reset nor add)", counted)
+	}
+	a.runner = &fakeRunner{script: scriptedSession(t, []string{accountLine, connectedLine, `{"ev":"listener","state":"closed","code":1000}`}, false)}
+	_, _ = runSubscribe(t, a, testAccount)
+	clock.advance(revokeMinGap)
+	if _, counted := a.refusals.refused(testAccount.ID); counted != 1 {
+		t.Errorf("counted %d after a connect, want 1", counted)
+	}
+}
+
+func TestSubscribeRefusesASessionOfAnotherAccount(t *testing.T) {
+	r := &fakeRunner{script: scriptedSession(t, []string{`{"ev":"account","uid":"1234"}`, connectedLine}, false)}
+	a, h := newTestAdapter(t, r)
+	if _, err := runSubscribe(t, a, testAccount); !errors.Is(err, errAccountMismatch) || errors.Is(err, bridge.ErrSessionRevoked) {
+		t.Fatalf("err = %v, want errAccountMismatch", err)
+	}
+	if _, err := runSubscribe(t, a, testAccount); !errors.Is(err, errAccountMismatch) {
+		t.Fatalf("second try: err = %v", err)
+	}
+	if r.starts() != 1 {
+		t.Errorf("sidecars started = %d: the mismatched session must not be tried again", r.starts())
+	}
+	if strings.Contains(strings.Join(h.all(), "\n"), "1234") {
+		t.Error("the other account's id reached the log")
+	}
+}
+
+func TestSubscribeIncompleteSessionIsRevokedWithoutStarting(t *testing.T) {
+	for _, s := range []string{`{"imei":"x"}`, `{"cookie":[],"imei":"i","userAgent":"u"}`, `{"cookie":[],"imei":"i","userAgent":"u","uid":"undefined"}`} {
+		r := &fakeRunner{}
+		a, _ := newTestAdapter(t, r)
+		_, err := runSubscribe(t, a, bridge.Account{ID: "7", Session: []byte(s)})
+		if !errors.Is(err, bridge.ErrSessionRevoked) || r.starts() != 0 {
+			t.Fatalf("%s: err = %v, starts = %d", s, err, r.starts())
 		}
 	}
 }
@@ -130,35 +224,19 @@ func TestSubscribeGivesUpWhenTheListenerNeverConnects(t *testing.T) {
 	if err == nil || errors.Is(err, bridge.ErrSessionRevoked) || !strings.Contains(err.Error(), "did not connect") {
 		t.Fatalf("err = %v, want a retryable timeout", err)
 	}
-	r.started[0].waitStdinClosed(t)
-}
-
-func TestSubscribeIncompleteSessionIsRevokedWithoutStarting(t *testing.T) {
-	r := &fakeRunner{}
-	a, _ := newTestAdapter(t, r)
-	_, err := runSubscribe(t, a, bridge.Account{ID: "7", Session: []byte(`{"imei":"x"}`)})
-	if !errors.Is(err, bridge.ErrSessionRevoked) || r.starts() != 0 {
-		t.Fatalf("err = %v, starts = %d", err, r.starts())
-	}
+	r.process(t, 0).waitStdinClosed(t)
 }
 
 func TestLogoutClosesTheSidecarStdin(t *testing.T) {
-	r := &fakeRunner{script: scriptedSession(t, []string{`{"ev":"listener","state":"connected"}`}, false)}
+	r := &fakeRunner{script: scriptedSession(t, []string{accountLine, connectedLine}, false)}
 	a, _ := newTestAdapter(t, r)
 	errs := make(chan error, 1)
-	out := make(chan bridge.Event, 8)
-	go func() { errs <- a.Subscribe(context.Background(), testAccount, out) }()
-	deadline := time.Now().Add(5 * time.Second)
-	for r.starts() == 0 || a.subscribed(testAccount.ID) == nil {
-		if time.Now().After(deadline) {
-			t.Fatal("subscription did not start")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	go func() { errs <- a.Subscribe(context.Background(), testAccount, make(chan bridge.Event, 8)) }()
+	eventually(t, "subscription", func() bool { return a.subscribed(testAccount.ID) != nil })
 	if err := a.Logout(context.Background(), testAccount); err != nil {
 		t.Fatal(err)
 	}
-	r.started[0].waitStdinClosed(t)
+	r.process(t, 0).waitStdinClosed(t)
 	select {
 	case err := <-errs:
 		if !errors.Is(err, bridge.ErrSessionRevoked) {
@@ -167,7 +245,7 @@ func TestLogoutClosesTheSidecarStdin(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Subscribe did not return after Logout")
 	}
-	if r.started[0].wasKilled() {
+	if r.process(t, 0).wasKilled() {
 		t.Error("the sidecar was killed although it exited when its stdin closed")
 	}
 }
@@ -178,14 +256,17 @@ func TestSubscribeStopsTheSidecarWhenCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errs := make(chan error, 1)
 	go func() { errs <- a.Subscribe(ctx, testAccount, make(chan bridge.Event)) }()
-	for r.starts() == 0 || a.subscribed(testAccount.ID) == nil {
-		time.Sleep(10 * time.Millisecond)
-	}
+	eventually(t, "subscription", func() bool { return a.subscribed(testAccount.ID) != nil })
 	cancel()
-	if err := <-errs; !errors.Is(err, context.Canceled) {
-		t.Errorf("err = %v", err)
+	select {
+	case err := <-errs:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscribe did not return after cancel")
 	}
-	r.started[0].waitStdinClosed(t)
+	r.process(t, 0).waitStdinClosed(t)
 }
 
 // subscribed is the running subscription of an account (tests only).

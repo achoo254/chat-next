@@ -8,31 +8,47 @@ import (
 	"app.local/server/internal/bridge"
 )
 
-// Bounds of what one account remembers in memory.
+// Bounds of what one account keeps in memory. The messages kept are only the
+// ones a conversation Chat has not copied yet may need: the engine drops a
+// message of a conversation it does not know and imports it through Backfill
+// once the conversation is listed. Anything evicted before that Backfill is
+// lost to Chat (no Zalo history to fetch it again).
 const (
-	maxHeardConversations = 2000
-	maxRecentPerConv      = 200
+	maxHeardConversations = 200
+	maxRecentPerConv      = 20
+	maxHeardMessages      = 500
+	maxRecentAge          = 24 * time.Hour
+	maxKeptTextBytes      = 8 << 10
 	maxSeenMessageIDs     = 8192
 )
 
-// heardAccount is what the sidecar's listener delivered for one account in
-// this process: the conversations, the latest messages of each (Backfill of a
-// conversation Chat has not copied yet), and the message ids already seen (the
-// listener repeats messages after a reconnect).
+// heardAccount is what the listener delivered for one account in this process:
+// the conversations, the messages not yet handed to Backfill, and the ids of
+// messages already seen (the listener repeats messages after a reconnect).
 type heardAccount struct {
-	mu    sync.Mutex
-	convs map[string]*heardConversation
-	seen  *boundedSeenSet
+	mu       sync.Mutex
+	now      func() time.Time
+	convs    map[string]*heardConversation
+	messages int // kept in all conversations
+	seen     *boundedSeenSet
 }
 
 type heardConversation struct {
 	conv     bridge.Conversation
 	lastSeen time.Time
-	recent   []bridge.Message // oldest first, at most maxRecentPerConv
+	recent   []keptMessage // oldest first
+	// consumed is set once Backfill handed the messages over: Chat has the
+	// conversation from then on and gets its messages live.
+	consumed bool
 }
 
-func newHeardAccount() *heardAccount {
-	return &heardAccount{convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs)}
+type keptMessage struct {
+	msg   bridge.Message
+	heard time.Time
+}
+
+func newHeardAccount(now func() time.Time) *heardAccount {
+	return &heardAccount{now: now, convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs)}
 }
 
 // firstSighting records a message id and reports whether it is new.
@@ -48,24 +64,36 @@ func (h *heardAccount) firstSighting(id string) bool {
 func (h *heardAccount) record(conv bridge.Conversation, m bridge.Message) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	now := h.now()
 	c := h.convs[conv.ID]
 	if c == nil {
 		if len(h.convs) >= maxHeardConversations {
-			h.evictOldest()
+			h.evictOldestConversation()
 		}
 		c = &heardConversation{conv: conv}
 		h.convs[conv.ID] = c
 	} else if c.conv.Peer != nil && c.conv.Peer.NameUnknown && conv.Peer != nil && !conv.Peer.NameUnknown {
 		c.conv = conv
 	}
-	c.lastSeen = time.Now()
-	c.recent = append(c.recent, m)
-	if over := len(c.recent) - maxRecentPerConv; over > 0 {
-		c.recent = slices.Delete(c.recent, 0, over)
+	c.lastSeen = now
+	if c.consumed {
+		return
+	}
+	if len(m.Text) > maxKeptTextBytes {
+		m.Text = truncateUTF8(m.Text, maxKeptTextBytes)
+	}
+	c.recent = append(c.recent, keptMessage{msg: m, heard: now})
+	h.messages++
+	if len(c.recent) > maxRecentPerConv {
+		c.recent = slices.Delete(c.recent, 0, 1)
+		h.messages--
+	}
+	for h.messages > maxHeardMessages {
+		h.evictOldestMessage()
 	}
 }
 
-func (h *heardAccount) evictOldest() {
+func (h *heardAccount) evictOldestConversation() {
 	var oldest string
 	var at time.Time
 	for id, c := range h.convs {
@@ -73,7 +101,23 @@ func (h *heardAccount) evictOldest() {
 			oldest, at = id, c.lastSeen
 		}
 	}
+	h.messages -= len(h.convs[oldest].recent)
 	delete(h.convs, oldest)
+}
+
+func (h *heardAccount) evictOldestMessage() {
+	var oldest *heardConversation
+	for _, c := range h.convs {
+		if len(c.recent) > 0 && (oldest == nil || c.recent[0].heard.Before(oldest.recent[0].heard)) {
+			oldest = c
+		}
+	}
+	if oldest == nil {
+		h.messages = 0
+		return
+	}
+	oldest.recent = slices.Delete(oldest.recent, 0, 1)
+	h.messages--
 }
 
 // conversations lists what was heard, the most recently active first.
@@ -92,20 +136,34 @@ func (h *heardAccount) conversations() []bridge.Conversation {
 	return out
 }
 
-// recent returns up to limit messages heard in conv, newest first.
-func (h *heardAccount) recent(conv string, limit int) []bridge.Message {
+// takeRecent hands over up to limit messages kept for conv, newest first, and
+// forgets them all: Backfill is their only reader. Messages older than
+// maxRecentAge are not handed over.
+func (h *heardAccount) takeRecent(conv string, limit int) []bridge.Message {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	c := h.convs[conv]
 	if c == nil || limit <= 0 {
 		return nil
 	}
-	n := min(limit, len(c.recent))
-	out := make([]bridge.Message, 0, n)
-	for i := len(c.recent) - 1; i >= len(c.recent)-n; i-- {
-		out = append(out, c.recent[i])
+	cutoff := h.now().Add(-maxRecentAge)
+	var out []bridge.Message
+	for i := len(c.recent) - 1; i >= 0 && len(out) < limit; i-- {
+		if c.recent[i].heard.After(cutoff) {
+			out = append(out, c.recent[i].msg)
+		}
 	}
+	h.messages -= len(c.recent)
+	c.recent, c.consumed = nil, true
 	return out
+}
+
+// truncateUTF8 cuts s to at most n bytes without splitting a character.
+func truncateUTF8(s string, n int) string {
+	for n > 0 && n < len(s) && s[n]&0xC0 == 0x80 {
+		n--
+	}
+	return s[:n]
 }
 
 // boundedSeenSet remembers the last capacity ids added; the oldest goes first.
@@ -116,7 +174,7 @@ type boundedSeenSet struct {
 }
 
 func newBoundedSeenSet(capacity int) *boundedSeenSet {
-	return &boundedSeenSet{ids: make(map[string]struct{}, capacity), order: make([]string, 0, capacity)}
+	return &boundedSeenSet{ids: make(map[string]struct{}, capacity), order: make([]string, 0, max(capacity, 1))}
 }
 
 // add reports whether id was not in the set, and adds it.

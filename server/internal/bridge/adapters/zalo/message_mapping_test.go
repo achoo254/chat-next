@@ -118,12 +118,25 @@ func TestBoundedSeenSetForgetsTheOldest(t *testing.T) {
 	}
 }
 
-func TestParseSessionKeepsOnlyTheThreeFields(t *testing.T) {
-	if _, err := parseSession([]byte(`{"cookie":null,"imei":"i","userAgent":"u"}`)); err == nil {
+func TestSessionsKeepOnlyTheirFieldsAndCarryTheAccount(t *testing.T) {
+	if _, err := parseSidecarSession([]byte(`{"cookie":null,"imei":"i","userAgent":"u"}`)); err == nil {
 		t.Error("a null cookie was taken")
 	}
-	got, err := parseSession([]byte(`{"cookie":[],"imei":"i","userAgent":"u","x":1}`))
-	if err != nil || string(got) != `{"cookie":[],"imei":"i","userAgent":"u"}` {
-		t.Errorf("got %s, %v", got, err)
+	s, err := parseSidecarSession([]byte(`{"cookie":[],"imei":"i","userAgent":"u","x":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"", "undefined", "null", "12a", "123456789012345678901"} {
+		if _, err := sealable(s, bad); err == nil {
+			t.Errorf("account %q was taken", bad)
+		}
+	}
+	sealed, err := sealable(s, "42")
+	if err != nil || string(sealed) != `{"cookie":[],"imei":"i","userAgent":"u","uid":"42"}` {
+		t.Fatalf("sealed %s, %v", sealed, err)
+	}
+	forSidecar, uid, err := openStored(sealed)
+	if err != nil || uid != "42" || string(forSidecar) != `{"cookie":[],"imei":"i","userAgent":"u"}` {
+		t.Errorf("opened %s %q, %v", forSidecar, uid, err)
 	}
 }

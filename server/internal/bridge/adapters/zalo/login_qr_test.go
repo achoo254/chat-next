@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"app.local/server/internal/bridge"
 )
@@ -18,13 +19,15 @@ func qrLine(tag string) string {
 
 const loggedInLine = `{"ev":"logged_in","session":{"cookie":[{"key":"zpw_sek","value":"secret-cookie"}],"imei":"imei-1","userAgent":"UA","extra":"dropped"}}`
 
-// scriptedQR plays a sidecar that answers login_qr with a QR code, then
-// writes whatever the test sends on lines.
+// scriptedQR plays a sidecar that answers login_qr (without the listener)
+// with a QR code, then writes whatever the test sends on lines.
 func scriptedQR(t *testing.T, lines <-chan string) func(p *fakeProcess) {
 	return func(p *fakeProcess) {
 		p.emit(readyLine)
-		if c := p.command(t); c != `{"cmd":"login_qr"}` {
-			t.Errorf("command = %s, want login_qr", c)
+		if c := p.command(t); c != `{"cmd":"login_qr","listen":false}` {
+			if c != "" {
+				t.Errorf("command = %s, want login_qr without the listener", c)
+			}
 			return
 		}
 		p.emit(qrLine("first"))
@@ -39,11 +42,15 @@ func scriptedQR(t *testing.T, lines <-chan string) func(p *fakeProcess) {
 	}
 }
 
+func asOwner(owner int64) context.Context {
+	return bridge.WithLoginOwner(context.Background(), owner)
+}
+
 func TestLoginQRScannedThenDone(t *testing.T) {
 	lines := make(chan string, 4)
 	r := &fakeRunner{script: scriptedQR(t, lines)}
 	a, _ := newTestAdapter(t, r)
-	ctx := context.Background()
+	ctx := asOwner(1)
 
 	step, err := a.Login(ctx, "", nil)
 	if err != nil {
@@ -64,48 +71,68 @@ func TestLoginQRScannedThenDone(t *testing.T) {
 	}
 	lines <- loggedInLine
 	lines <- `{"ev":"account","uid":"123456789"}`
-	done, err := a.Login(ctx, step.Token, nil)
-	if err != nil || done.Kind != bridge.StepDone {
-		t.Fatalf("after confirm = %+v, %v", done, err)
+	var done bridge.LoginStep
+	eventually(t, "login done", func() bool {
+		done, err = a.Login(ctx, step.Token, nil)
+		return err != nil || done.Kind == bridge.StepDone
+	})
+	if err != nil || done.Account != "123456789" {
+		t.Fatalf("done = %+v, %v", done, err)
 	}
-	if done.Account != "123456789" {
-		t.Errorf("account = %q", done.Account)
-	}
-	want := `{"cookie":[{"key":"zpw_sek","value":"secret-cookie"}],"imei":"imei-1","userAgent":"UA"}`
+	want := `{"cookie":[{"key":"zpw_sek","value":"secret-cookie"}],"imei":"imei-1","userAgent":"UA","uid":"123456789"}`
 	if string(done.Session) != want {
 		t.Errorf("session = %s, want %s", done.Session, want)
 	}
-	r.started[0].waitStdinClosed(t)
+	r.process(t, 0).waitStdinClosed(t)
 	if _, err := a.Login(ctx, step.Token, nil); !isInputError(err) {
 		t.Errorf("login used after done: err = %v, want an input error", err)
 	}
 }
 
-func TestLoginQRExpiredGetsANewCode(t *testing.T) {
-	lines := make(chan string, 4)
+func TestLoginStartAnswersAtOnceWhileZaloIsSlow(t *testing.T) {
+	r := &fakeRunner{script: func(p *fakeProcess) { p.emit(readyLine); p.command(t) }} // never a QR code
+	a, _ := newTestAdapter(t, r)
+	a.timing.loginStartWait = 100 * time.Millisecond
+	a.timing.firstQR = time.Minute
+	began := time.Now()
+	step, err := a.Login(asOwner(1), "", nil)
+	if err != nil || step.Kind != bridge.StepQR || step.Prompt != "" {
+		t.Fatalf("step = %+v, %v; want StepQR with no image yet", step, err)
+	}
+	if took := time.Since(began); took > time.Second {
+		t.Errorf("the first call took %v", took)
+	}
+}
+
+func TestLoginQRExpiredGetsANewCodeThenGivesUp(t *testing.T) {
+	lines := make(chan string, 8)
 	r := &fakeRunner{script: scriptedQR(t, lines)}
 	a, _ := newTestAdapter(t, r)
-	ctx := context.Background()
+	ctx := asOwner(1)
 	step, err := a.Login(ctx, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	for i := 1; i <= maxQRRefresh; i++ {
+		lines <- `{"ev":"qr_expired"}`
+		eventually(t, "a fresh sidecar", func() bool { return r.starts() == i+1 })
+		r.process(t, i-1).waitExited(t) // so only the new sidecar reads lines
+	}
 	lines <- `{"ev":"qr_expired"}`
-	next, err := a.Login(ctx, step.Token, nil)
-	if err != nil || next.Kind != bridge.StepQR {
-		t.Fatalf("after expiry = %+v, %v", next, err)
+	eventually(t, "the login to give up", func() bool {
+		_, err = a.Login(ctx, step.Token, nil)
+		return err != nil
+	})
+	if !isInputError(err) || !strings.HasPrefix(err.Error(), "qr_expired") {
+		t.Fatalf("err = %v, want qr_expired", err)
 	}
-	if r.starts() != 2 {
-		t.Errorf("sidecars started = %d, want 2 (a fresh one for the new code)", r.starts())
-	}
-	r.started[0].waitStdinClosed(t)
 }
 
 func TestLoginQRDeclinedEndsTheLogin(t *testing.T) {
 	lines := make(chan string, 4)
 	r := &fakeRunner{script: scriptedQR(t, lines)}
 	a, _ := newTestAdapter(t, r)
-	ctx := context.Background()
+	ctx := asOwner(1)
 	step, err := a.Login(ctx, "", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -115,27 +142,86 @@ func TestLoginQRDeclinedEndsTheLogin(t *testing.T) {
 	if !isInputError(err) || !strings.HasPrefix(err.Error(), "qr_declined") {
 		t.Fatalf("declined: err = %v", err)
 	}
-	r.started[0].waitStdinClosed(t)
+	r.process(t, 0).waitStdinClosed(t)
+}
+
+func TestLoginRefusesABadAccountID(t *testing.T) {
+	for name, tail := range map[string][]string{
+		"undefined":              {loggedInLine, `{"ev":"account","uid":"undefined"}`},
+		"null":                   {loggedInLine, `{"ev":"account","uid":null}`},
+		"too long":               {loggedInLine, `{"ev":"account","uid":"123456789012345678901"}`},
+		"account before session": {`{"ev":"account","uid":"123"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lines := make(chan string, 4)
+			r := &fakeRunner{script: scriptedQR(t, lines)}
+			a, _ := newTestAdapter(t, r)
+			step, err := a.Login(asOwner(1), "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, l := range tail {
+				lines <- l
+			}
+			eventually(t, "the login to fail", func() bool {
+				_, err = a.Login(asOwner(1), step.Token, nil)
+				return err != nil
+			})
+			if isInputError(err) || strings.Contains(err.Error(), "login_expired") {
+				t.Fatalf("err = %v, want a failed login", err)
+			}
+		})
+	}
+}
+
+func TestLoginCancelledByTheClientStopsTheSidecar(t *testing.T) {
+	lines := make(chan string)
+	r := &fakeRunner{script: scriptedQR(t, lines)}
+	a, _ := newTestAdapter(t, r)
+	a.timing.loginPoll = time.Minute
+	step, err := a.Login(asOwner(1), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(asOwner(1))
+	go func() { time.Sleep(50 * time.Millisecond); cancel() }()
+	if _, err := a.Login(ctx, step.Token, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+	r.process(t, 0).waitStdinClosed(t)
+	if _, err := a.Login(asOwner(1), step.Token, nil); !isInputError(err) {
+		t.Errorf("a cancelled login lives on: %v", err)
+	}
+}
+
+func TestLoginNobodyPollsIsStopped(t *testing.T) {
+	r := &fakeRunner{script: scriptedQR(t, make(chan string))}
+	a, _ := newTestAdapter(t, r)
+	a.timing.loginIdle = 100 * time.Millisecond
+	if _, err := a.Login(asOwner(1), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	r.process(t, 0).waitStdinClosed(t)
 }
 
 func TestLoginFailsWhenTheSidecarErrsBeforeAQRCode(t *testing.T) {
 	r := &fakeRunner{script: func(p *fakeProcess) {
 		p.emit(readyLine)
 		p.command(t)
-		p.emit(`{"ev":"error","code":"command_failed","message":"TypeError"}`)
+		p.emit(`{"ev":"error","code":"network_error","message":"TypeError"}`)
 	}}
 	a, _ := newTestAdapter(t, r)
-	_, err := a.Login(context.Background(), "", nil)
-	if err == nil || isInputError(err) {
+	_, err := a.Login(asOwner(1), "", nil)
+	if err == nil || isInputError(err) || !strings.Contains(err.Error(), "network_error") {
 		t.Fatalf("err = %v, want a failure of the call", err)
 	}
 }
 
 func TestLoginRefusesAnotherProtocol(t *testing.T) {
-	r := &fakeRunner{script: func(p *fakeProcess) { p.emit(`{"ev":"ready","protocol":1}`) }}
+	r := &fakeRunner{script: func(p *fakeProcess) { p.emit(`{"ev":"ready","protocol":2}`) }}
 	a, _ := newTestAdapter(t, r)
-	_, err := a.Login(context.Background(), "", nil)
-	if err == nil || !strings.Contains(err.Error(), "protocol 1") {
+	_, err := a.Login(asOwner(1), "", nil)
+	if err == nil || !strings.Contains(err.Error(), "protocol 2") {
 		t.Fatalf("err = %v, want a protocol mismatch", err)
 	}
 }

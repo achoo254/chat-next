@@ -10,8 +10,11 @@ import (
 
 // protocolVersion is the stdio protocol of the sidecar this adapter speaks
 // (src/entry.mjs of the sidecar). A bundle that announces another version is
-// refused instead of half understood.
-const protocolVersion = 2
+// refused instead of half understood: the bundle ships in the same commit as
+// this code and its hash is checked at startup, so only a broken deploy can
+// pair them wrong. Version 3 lets a QR login skip the listener and names the
+// reason of a failed login.
+const protocolVersion = 3
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -42,7 +45,13 @@ const (
 type command struct {
 	Cmd     string          `json:"cmd"`
 	Session json.RawMessage `json:"session,omitempty"`
+	// Listen false asks login_qr to stop at the account event (protocol 3).
+	Listen *bool `json:"listen,omitempty"`
 }
+
+// errCodeSessionRejected is the error code of a login Zalo refused (sidecar
+// src/login-failure.mjs); the other codes only say the login failed.
+const errCodeSessionRejected = "session_rejected"
 
 // wireEvent is one line read from the sidecar. Every event shares this shape;
 // a field an event does not carry stays at its zero value. Payloads the
@@ -111,38 +120,14 @@ func (s *looseString) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// session is what a QR login yields and every later start needs: the cookie
-// jar, the device id and the browser it claimed to be. The engine seals it.
-type session struct {
-	Cookie    json.RawMessage `json:"cookie"`
-	IMEI      string          `json:"imei"`
-	UserAgent string          `json:"userAgent"`
-}
-
-// errBadSession never carries the session itself.
-var errBadSession = errors.New("zalo: stored session is incomplete")
-
-// parseSession checks a session from the sidecar or the engine and returns it
-// in canonical form (only the three fields, nothing else the sidecar added).
-func parseSession(raw []byte) ([]byte, error) {
-	var s session
-	if err := json.Unmarshal(raw, &s); err != nil {
-		return nil, errBadSession
-	}
-	cookie := bytes.TrimSpace(s.Cookie)
-	if len(cookie) == 0 || bytes.Equal(cookie, []byte("null")) || s.IMEI == "" || s.UserAgent == "" {
-		return nil, errBadSession
-	}
-	out, err := json.Marshal(s)
-	if err != nil {
-		return nil, errBadSession
-	}
-	return out, nil
-}
-
-// zaloID matches the ids Zalo gives users and messages (decimal digits on
-// the account observed; any short plain token is taken).
+// zaloID matches the ids of messages and of the people in them (decimal
+// digits on the account observed; any short plain token is taken so an
+// unexpected form drops nothing).
 var zaloID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// accountUID matches the id of the signed-in account, which keys the external
+// account: decimal digits only, so "undefined" or "null" never pass.
+var accountUID = regexp.MustCompile(`^[0-9]{1,20}$`)
 
 // codeWord is what a code from the sidecar may look like to be printed.
 var codeWord = regexp.MustCompile(`^[A-Za-z0-9_]{1,40}$`)
