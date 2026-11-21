@@ -18,7 +18,7 @@ import (
 var (
 	ErrUnknownApp   = errors.New("bridge: unknown app")
 	ErrNotFound     = errors.New("bridge: not found")
-	ErrRateLimited  = errors.New("bridge: too many sign-in attempts")
+	ErrRateLimited  = bridge.ErrLoginLimited // an adapter returns it too, for its own limits
 	ErrAccountTaken = errors.New("bridge: that account is connected by another user")
 	// ErrSendUnsupported: the app cannot be written to from Chat, or the
 	// account is signed out.
@@ -60,7 +60,7 @@ func (e *Engine) StartLogin(ctx context.Context, owner int64, source string) (Lo
 	if e.limiter != nil && !e.limiter.Allow(limitLogin, fmt.Sprintf("bridge-login:%d", owner)) {
 		return LoginStep{}, ErrRateLimited
 	}
-	step, err := adapter.Login(ctx, "", nil)
+	step, err := adapter.Login(bridge.WithLoginOwner(ctx, owner), "", nil)
 	if err != nil {
 		return LoginStep{}, err
 	}
@@ -73,7 +73,7 @@ func (e *Engine) ContinueLogin(ctx context.Context, owner int64, loginID string,
 	if !ok {
 		return LoginStep{}, ErrNotFound
 	}
-	step, err := e.adapters[p.source].Login(ctx, p.token, input)
+	step, err := e.adapters[p.source].Login(bridge.WithLoginOwner(ctx, owner), p.token, input)
 	if err != nil {
 		var wrong *bridge.InputError
 		if errors.As(err, &wrong) {
