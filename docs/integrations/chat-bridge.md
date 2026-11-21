@@ -90,7 +90,7 @@ Adapter Zalo ([`server/internal/bridge/adapters/zalo`](../../server/internal/bri
 - **Nhận:** tin chữ 1-1 (của người kia và của chính bạn), nhãn dán thành `[Nhãn dán]`, loại khác (ảnh, tệp, thoại… chưa gặp trên tài khoản thật) thành `[Tin nhắn không hỗ trợ]`. Tin lặp lại sau khi kết nối lại bị bỏ theo id. **Nhóm bị bỏ qua** (chỉ đếm trong log debug). Reaction, thu hồi, đã xem, đang gõ chưa khai nên bị bỏ qua.
 - **Không có lịch sử và danh sách hội thoại:** tiến trình phụ chưa có hai thứ này. Danh sách là các hội thoại 1-1 đã nghe thấy từ lúc server chạy; lịch sử của một hội thoại mới là những tin server đã nghe thấy trong đó (gồm tin đầu tiên). Tin đến khi server tắt thì mất.
 - **Không gửi gì sang Zalo**, không tải media, không đọc số điện thoại.
-- **Kết nối lại:** tiến trình phụ thoát hay kênh nghe đóng (kể cả mã 3000 khi mở Zalo Web, 3003 khi Zalo đá) là lỗi thử lại theo backoff của engine, mỗi lần thử một tiến trình. Zalo từ chối phiên đã lưu 3 lần liên tiếp thì tài khoản chuyển "Cần đăng nhập lại".
+- **Kết nối lại:** tiến trình phụ thoát, kênh nghe không kết nối trong 2 phút, hay kênh nghe đóng (kể cả mã 3000 khi mở Zalo Web, 3003 khi Zalo đá) là lỗi thử lại theo backoff của engine, mỗi lần thử một tiến trình. Zalo từ chối phiên đã lưu 3 lần liên tiếp thì tài khoản chuyển "Cần đăng nhập lại".
 - **Ngắt kết nối** dừng tiến trình phụ và quên những gì đã nghe; phiên **không** bị đăng xuất ở Zalo (tiến trình phụ chưa có lệnh này), gỡ thiết bị trong app Zalo trên điện thoại.
 
 ## Thêm một ứng dụng khác

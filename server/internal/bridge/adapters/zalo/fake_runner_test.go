@@ -149,7 +149,7 @@ const readyLine = `{"ev":"ready","protocol":2}`
 
 // fastTiming keeps tests short.
 var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second,
-	firstQR: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginTTL: time.Minute}
+	firstQR: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginTTL: time.Minute, connect: 3 * time.Second}
 
 // newTestAdapter returns an adapter on runner with fast timings and a logger
 // that keeps every record for inspection.

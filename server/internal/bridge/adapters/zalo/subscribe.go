@@ -57,12 +57,20 @@ func (a *Adapter) listen(ctx context.Context, account string, sub *subscription,
 	heard := a.heardFor(account)
 	connected := false
 	groupsIgnored := 0
+	// A login Zalo never answers must not hold the account forever.
+	connectTimer := time.NewTimer(a.timing.connect)
+	defer connectTimer.Stop()
 	for {
 		var ev wireEvent
 		var ok bool
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-connectTimer.C:
+			if !connected {
+				return errors.New("zalo: the listener did not connect in time")
+			}
+			continue
 		case ev, ok = <-sub.side.events:
 		}
 		if !ok {

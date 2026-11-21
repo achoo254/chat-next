@@ -39,10 +39,11 @@ type timing struct {
 	firstQR      time.Duration // login_qr -> first QR image
 	loginPoll    time.Duration // longest wait of one Login call for news
 	loginTTL     time.Duration // an abandoned login is stopped after this
+	connect      time.Duration // login_session -> listener connected
 }
 
 var defaultTiming = timing{stopGrace: 3 * time.Second, readyTimeout: 30 * time.Second,
-	firstQR: 60 * time.Second, loginPoll: 25 * time.Second, loginTTL: 10 * time.Minute}
+	firstQR: 60 * time.Second, loginPoll: 25 * time.Second, loginTTL: 10 * time.Minute, connect: 2 * time.Minute}
 
 // Adapter implements bridge.Adapter for Zalo.
 type Adapter struct {

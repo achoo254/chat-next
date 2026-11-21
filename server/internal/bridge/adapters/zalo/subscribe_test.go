@@ -122,6 +122,17 @@ func TestSubscribeNetworkFailureIsNotARefusal(t *testing.T) {
 	}
 }
 
+func TestSubscribeGivesUpWhenTheListenerNeverConnects(t *testing.T) {
+	r := &fakeRunner{script: scriptedSession(t, nil, false)}
+	a, _ := newTestAdapter(t, r)
+	a.timing.connect = 100 * time.Millisecond
+	_, err := runSubscribe(t, a, testAccount)
+	if err == nil || errors.Is(err, bridge.ErrSessionRevoked) || !strings.Contains(err.Error(), "did not connect") {
+		t.Fatalf("err = %v, want a retryable timeout", err)
+	}
+	r.started[0].waitStdinClosed(t)
+}
+
 func TestSubscribeIncompleteSessionIsRevokedWithoutStarting(t *testing.T) {
 	r := &fakeRunner{}
 	a, _ := newTestAdapter(t, r)
