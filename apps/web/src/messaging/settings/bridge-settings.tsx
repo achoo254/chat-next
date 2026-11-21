@@ -18,7 +18,9 @@ import {
 	type LoginStep,
 } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
+import { BridgeQrLogin } from "./bridge-qr-login.tsx";
 import { BridgeReauthBanner } from "./bridge-reauth-banner.tsx";
+import { QR_LOGIN_APPS } from "./qr-login-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
@@ -108,7 +110,9 @@ export default function BridgeSettings() {
 				/>
 			))}
 			{signingIn !== null && (
-				<LoginCard
+				// A QR app (Zalo) has its own card: a notice first, then the code; the others ask for fields.
+				<SignInCard
+					qr={QR_LOGIN_APPS.has(signingIn)}
 					key={signingIn}
 					api={api}
 					source={signingIn}
@@ -169,22 +173,21 @@ function loginErrorText(error: BridgeError, t: ReturnType<typeof useBridgeCopy>)
 	}
 }
 
-/** The steps of a login: each shows the fields the app asks for (phone, code, two-step password). */
-function LoginCard({
-	api,
-	source,
-	appName,
-	onDone,
-	onCancel,
-	onError,
-}: {
+interface LoginCardProps {
 	api: BridgeApi;
 	source: string;
 	appName: string;
 	onDone: () => void;
 	onCancel: () => void;
 	onError: (err: unknown) => BridgeError;
-}) {
+}
+
+function SignInCard({ qr, ...props }: LoginCardProps & { qr: boolean }) {
+	return qr ? <BridgeQrLogin {...props} /> : <LoginCard {...props} />;
+}
+
+/** The steps of a login: each shows the fields the app asks for (phone, code, two-step password). */
+function LoginCard({ api, source, appName, onDone, onCancel, onError }: LoginCardProps) {
 	const t = useBridgeCopy();
 	const [step, setStep] = useState<LoginStep | null>(null);
 	const [values, setValues] = useState<Record<string, string>>({});
@@ -225,7 +228,8 @@ function LoginCard({
 	return (
 		<form className="card pad" data-id="bridge-login" onSubmit={submit}>
 			<h2 className="card-title flush">{t.login.title(appName)}</h2>
-			{step !== null && step.kind !== "done" && step.prompt !== "" && <p className="note">{step.prompt}</p>}
+			{/* A QR step's prompt is an image (see bridge-qr-login.tsx), never shown as text. */}
+			{(step?.kind === "input" || step?.kind === "confirm") && step.prompt !== "" && <p className="note">{step.prompt}</p>}
 			{step?.kind === "qr" && <p className="note">{t.login.scan}</p>}
 			{step?.kind === "confirm" && <p className="note">{t.login.confirm}</p>}
 			{fields.map((field) => (

@@ -19,6 +19,7 @@ import {
 	type BridgeLoginStep,
 	type BridgeOutboxItem,
 } from "@achoo254/chat-proto/bridge";
+import { FakeQrLogin, QR_LOGIN_ID } from "./fake-qr-login.ts";
 
 export class FakeBridge {
 	/** Answers every call with failed_precondition bridge_disabled. */
@@ -66,6 +67,20 @@ export class FakeBridge {
 	/** The calls, in order, with the arguments that matter. */
 	readonly calls: string[] = [];
 	private nextChat = 900n;
+	/** The QR login of "zalo" (offered when a test adds it to `apps`); its done step connects a Zalo account. */
+	readonly qr = new FakeQrLogin(() => {
+		const account: BridgeAccount = {
+			$typeName: "app.v1.BridgeAccount",
+			id: 2n,
+			source: "zalo",
+			status: BridgeAccountStatus.ACTIVE,
+			syncState: BridgeSyncState.OFF,
+			lastError: "",
+			chats: [],
+		};
+		this.accounts = [...this.accounts.filter((a) => a.source !== "zalo"), account];
+		return account;
+	});
 
 	/** A connected account whose chat `chatId` sends on to the app (two-way), for the conversation tests. */
 	seedTwoWay(chatId: number): void {
@@ -180,10 +195,15 @@ export class FakeBridge {
 			startBridgeLogin: (req) => {
 				this.guard(true);
 				this.calls.push(`start:${req.source}`);
+				if (req.source === "zalo") return { step: this.qr.begin() };
 				return { step: this.step(BridgeLoginStepKind.INPUT, "login-1", ["phone"]) };
 			},
-			continueBridgeLogin: (req) => {
+			continueBridgeLogin: async (req, context) => {
 				this.guard(true);
+				if (req.loginId === QR_LOGIN_ID) {
+					this.calls.push("poll:zalo");
+					return { step: await this.qr.poll(context.signal) };
+				}
 				this.calls.push(`continue:${Object.keys(req.input).join(",")}`);
 				if (req.input["phone"] !== undefined) return { step: this.step(BridgeLoginStepKind.INPUT, "login-1", ["code"]) };
 				if (req.input["code"] === "00000") throw new ConnectError("wrong_input: wrong_code: that code is not right", Code.InvalidArgument);

@@ -68,7 +68,11 @@ export type LoginStep =
 	| { readonly kind: "qr" | "confirm"; readonly loginId: string; readonly prompt: string }
 	| { readonly kind: "done"; readonly account: BridgeAccount | null };
 
-
+/** How a login call may be stopped: `signal` aborts it (the server then ends the login), `timeoutMs` gives up on a call that hangs. */
+export interface LoginCallOptions {
+	readonly signal?: AbortSignal;
+	readonly timeoutMs?: number;
+}
 
 export type BridgeErrorKind =
 	| "disabled"
@@ -81,6 +85,10 @@ export type BridgeErrorKind =
 	| "feature_unsupported"
 	| "feature_off"
 	| "confirmation_wrong"
+	/** The server could not be reached (offline, a gateway error, a call that timed out). */
+	| "network"
+	/** The call was aborted by the page itself. */
+	| "canceled"
 	| "other";
 
 /** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…). */
@@ -168,8 +176,9 @@ export interface BridgeApi {
 	deleteGroup(accountId: number, conversationId: string, confirmName: string, token: string): Promise<void>;
 	/** What a synced chat can sync, feature by feature: only what the app supports, with the direction now in effect. */
 	features(accountId: number, conversationId: string): Promise<readonly BridgeFeatureView[]>;
-	startLogin(source: string): Promise<LoginStep>;
-	continueLogin(loginId: string, input: Readonly<Record<string, string>>): Promise<LoginStep>;
+	startLogin(source: string, options?: LoginCallOptions): Promise<LoginStep>;
+	/** With no input on a QR or confirm step: waits (on the server, up to about 20 s) for news of the login. */
+	continueLogin(loginId: string, input: Readonly<Record<string, string>>, options?: LoginCallOptions): Promise<LoginStep>;
 	/** What the chat has queued and not finished. */
 	outbox(chatId: number): Promise<readonly BridgeOutboxItem[]>;
 	/** Tries a failed or unknown message again. */

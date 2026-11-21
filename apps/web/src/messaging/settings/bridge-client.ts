@@ -104,7 +104,18 @@ export function bridgeError(err: unknown): BridgeError {
 	} else if (e.code === Code.ResourceExhausted) kind = "rate_limited";
 	else if (e.code === Code.AlreadyExists && message.startsWith("account_taken")) kind = "account_taken";
 	else if (e.code === Code.NotFound) kind = "not_found";
+	else if (e.code === Code.Canceled) kind = "canceled";
+	else if (unreachable(e)) kind = "network";
 	return new BridgeError(kind, detail);
+}
+
+/**
+ * The server was not reached or did not answer: a gateway error, a call past
+ * its deadline, or a fetch that failed (Connect wraps fetch's TypeError as
+ * Unknown, which a plain server error also is, so the cause tells them apart).
+ */
+function unreachable(e: ConnectError): boolean {
+	return e.code === Code.Unavailable || e.code === Code.DeadlineExceeded || (e.code === Code.Unknown && e.cause instanceof TypeError);
 }
 
 const clients = new WeakMap<Transport, BridgeApi>();
@@ -134,8 +145,9 @@ function createBridgeClient(transport: Transport): BridgeApi {
 				const r = await rpc.getBridgeStatus({});
 				return { apps: r.apps.map((a) => a.source), accounts: r.accounts.map(toAccount) };
 			}),
-		startLogin: (source) => call(async () => toStep((await rpc.startBridgeLogin({ source })).step)),
-		continueLogin: (loginId, input) => call(async () => toStep((await rpc.continueBridgeLogin({ loginId, input: { ...input } })).step)),
+		startLogin: (source, options) => call(async () => toStep((await rpc.startBridgeLogin({ source }, { ...options })).step)),
+		continueLogin: (loginId, input, options) =>
+			call(async () => toStep((await rpc.continueBridgeLogin({ loginId, input: { ...input } }, { ...options })).step)),
 		problems: (accountId) =>
 			call(async () => {
 				const r = await rpc.listBridgeProblems({ accountId: BigInt(accountId) });
