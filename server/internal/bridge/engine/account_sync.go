@@ -36,12 +36,17 @@ func (e *Engine) StartSync(ctx context.Context, owner, accountID int64) error {
 		a.ID, SyncSyncing, SyncOff); err != nil {
 		return fmt.Errorf("bridge: start sync: %w", err)
 	}
+	// The runner is read under the lock: a handle is registered before its runner exists, and an
+	// account that is still connecting reads its switch from the row when it does.
 	e.mu.Lock()
-	h := e.runners[a.ID]
+	var r *runner
+	if h := e.runners[a.ID]; h != nil {
+		r = h.r
+	}
 	e.mu.Unlock()
-	if h != nil {
+	if r != nil {
 		select {
-		case h.r.syncNow <- struct{}{}:
+		case r.syncNow <- struct{}{}:
 		default: // already asked
 		}
 	}
