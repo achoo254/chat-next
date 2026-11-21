@@ -13,7 +13,7 @@ Phiên đăng nhập Zalo của một tài khoản thật là thứ cần bảo 
 
 ## Cách nâng phiên bản
 
-1. Đổi phiên bản ở `package.json`, chạy `pnpm install --ignore-workspace` rồi `pnpm build` trong thư mục `sidecar/`.
+1. Đổi phiên bản ở `package.json`, chạy `pnpm install` rồi `pnpm build` trong thư mục `sidecar/`.
 2. **Đọc diff của `dist/zalo-sidecar.cjs`** (và rà lại các điều kiện bên dưới) trước khi commit. Diff không có người đọc thì không lên.
 3. Cập nhật băm trong tài liệu rà soát (kho kế hoạch riêng).
 
