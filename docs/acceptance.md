@@ -185,6 +185,7 @@ Cần tài khoản Telegram thật (mã đăng nhập gửi tới app của ngư
 | G50 | Mở dòng gộp (`/p/<id>`) | Tin của hai chat xếp theo thời gian, mỗi tin có nhãn app, ô gửi có hàng «Gửi qua» | Đạt 21/11/2026 trên production, chỉ xem; chưa cuộn ngược để nạp tin cũ |
 | G51 | Ở màn gộp: gửi chữ và ảnh tới cả hai app, trả lời một tin, tách lại | Mỗi app nhận đúng một tin, trả lời đi đúng chat của tin, hộp xác nhận chỉ hiện một lần | Chưa kiểm: cần một người thật có cả hai app và đồng ý nhận tin thử |
 | G52 | Màn gộp: vạch chưa đọc, album, chạm vào trích dẫn, dấu giao hàng, rời hoặc xoá nhóm đồng bộ | Vạch ở tin chưa đọc cũ nhất, album thành một lưới, trích dẫn cuộn tới tin gốc, nút rời và xoá làm cả ở app kia | Chưa kiểm trên production; đã có test tự động đạt trước khi deploy |
+| G53 | Server bật Zalo: Cài đặt › Kết nối ứng dụng › Zalo › Kết nối: đọc thông báo, tích ô đồng ý, bấm «Hiện mã QR», quét bằng app Zalo trên điện thoại, xác nhận trên điện thoại | Chưa tích ô thì không có lần gọi đăng nhập nào; mã hiện rõ và quét được; dòng trạng thái đổi sang «Đã quét…» rồi thẻ đóng, báo «Đã kết nối Zalo.» và tài khoản Zalo hiện «Đang kết nối»; bấm Huỷ giữa chừng thì hết lần gọi chờ; từ chối trên điện thoại thì báo bị từ chối và cho bắt đầu lại; không thấy mã trong bộ nhớ trình duyệt, URL hay console | **Chưa kiểm trên tài khoản Zalo thật.** Đạt bằng test giao diện với adapter QR giả (`bridge-qr-login.test.tsx`, `qr-login-model.test.ts`, `bridge-client-errors.test.ts`) |
 
 ## Giới hạn đã biết
 
