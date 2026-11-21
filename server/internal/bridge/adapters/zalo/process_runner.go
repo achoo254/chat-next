@@ -29,13 +29,16 @@ type Process interface {
 // ExecRunner runs the bundled sidecar with Node: `<Node> <Bundle>`, in an
 // empty temporary directory, with a fixed minimal environment. Nothing of the
 // server's environment is inherited: no database DSN, no SecretBox key, no
-// NODE_OPTIONS. Running it as a separate OS user is a deployment step (see
-// docs/integrations/zalo-sidecar.md), not done here.
+// NODE_OPTIONS. Built by NewSandboxedRunner it also runs as the sandbox OS
+// user, in a work directory given to that user; a zero ExecRunner (tests)
+// runs as the server's user.
 type ExecRunner struct {
-	// Node is the node binary, a path or a name looked up in PATH.
+	// Node is the node binary, an absolute path.
 	Node string
 	// Bundle is the absolute path of dist/zalo-sidecar.cjs.
 	Bundle string
+
+	sandbox *sandboxIdentity
 }
 
 // Start implements Runner.
@@ -56,7 +59,13 @@ func (r ExecRunner) Start(ctx context.Context) (Process, error) {
 	cmd.Dir = dir
 	cmd.Env = sidecarEnv(dir)
 	setProcessGroup(cmd)
-	p := &execProcess{cmd: cmd, dir: dir}
+	if r.sandbox != nil {
+		if err := applySandbox(cmd, dir, r.sandbox); err != nil {
+			_ = os.RemoveAll(dir)
+			return nil, err
+		}
+	}
+	p := &execProcess{cmd: cmd, dir: dir, sandboxed: r.sandbox != nil}
 	if p.stdin, err = cmd.StdinPipe(); err == nil {
 		if p.stdout, err = cmd.StdoutPipe(); err == nil {
 			p.stderr, err = cmd.StderrPipe()
@@ -66,7 +75,7 @@ func (r ExecRunner) Start(ctx context.Context) (Process, error) {
 		err = cmd.Start()
 	}
 	if err != nil {
-		_ = os.RemoveAll(dir)
+		p.removeDir()
 		return nil, fmt.Errorf("zalo: start sidecar: %w", err)
 	}
 	return p, nil
@@ -86,11 +95,12 @@ func sidecarEnv(home string) []string {
 }
 
 type execProcess struct {
-	cmd    *exec.Cmd
-	dir    string
-	stdin  io.WriteCloser
-	stdout io.Reader
-	stderr io.Reader
+	cmd       *exec.Cmd
+	dir       string
+	sandboxed bool
+	stdin     io.WriteCloser
+	stdout    io.Reader
+	stderr    io.Reader
 }
 
 func (p *execProcess) Stdin() io.WriteCloser { return p.stdin }
@@ -100,8 +110,16 @@ func (p *execProcess) Stderr() io.Reader     { return p.stderr }
 // Wait waits for the exit and removes the work directory.
 func (p *execProcess) Wait() error {
 	err := p.cmd.Wait()
-	_ = os.RemoveAll(p.dir)
+	p.removeDir()
 	return err
+}
+
+// removeDir takes the work directory back from the sandbox user and removes it.
+func (p *execProcess) removeDir() {
+	if p.sandboxed {
+		reclaimWorkDir(p.dir)
+	}
+	_ = os.RemoveAll(p.dir)
 }
 
 // Kill ends the process group, so nothing the sidecar might have started

@@ -98,11 +98,15 @@ type Config struct {
 	TelegramAPIHash string
 	// ZaloSidecarBundle is the absolute path of the Zalo sidecar bundle
 	// (ZALO_SIDECAR_BUNDLE, server/internal/bridge/adapters/zalo/sidecar/dist/
-	// zalo-sidecar.cjs). Empty, the default, offers no Zalo: the adapter is not
-	// registered. ZaloNodePath is the node binary that runs it (ZALO_NODE_PATH,
-	// absolute; default "node" from PATH).
+	// zalo-sidecar.cjs). Empty, the default, offers no Zalo. When set,
+	// ZALO_NODE_PATH (absolute path of node) and ZALO_SANDBOX_USER (the OS
+	// user the sidecar runs as) are required; ZALO_SIDECAR_SHA256 overrides the
+	// digest read from the bundle's .sha256 file. The sandbox itself is checked
+	// when the adapters are built (zalo.NewSandboxedRunner).
 	ZaloSidecarBundle string
 	ZaloNodePath      string
+	ZaloSandboxUser   string
+	ZaloSidecarSHA256 string
 	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
 	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
 	// server's own public addresses, so a bot webhook or a link preview
@@ -424,18 +428,21 @@ func Load(lookup Lookup) (Config, error) {
 	}
 
 	if raw := get("ZALO_SIDECAR_BUNDLE"); raw != "" {
+		c.ZaloSidecarBundle = raw
+		c.ZaloNodePath = get("ZALO_NODE_PATH")
+		c.ZaloSandboxUser = get("ZALO_SANDBOX_USER")
+		c.ZaloSidecarSHA256 = get("ZALO_SIDECAR_SHA256")
 		if !filepath.IsAbs(raw) {
 			errs = append(errs, invalid("ZALO_SIDECAR_BUNDLE", "must be an absolute path"))
 		}
-		c.ZaloSidecarBundle = raw
-		c.ZaloNodePath = "node"
-	}
-	if raw := get("ZALO_NODE_PATH"); raw != "" {
-		if !filepath.IsAbs(raw) {
-			errs = append(errs, invalid("ZALO_NODE_PATH", "must be an absolute path"))
+		if !filepath.IsAbs(c.ZaloNodePath) {
+			errs = append(errs, invalid("ZALO_NODE_PATH", "must be the absolute path of node when ZALO_SIDECAR_BUNDLE is set"))
 		}
-		if c.ZaloSidecarBundle != "" {
-			c.ZaloNodePath = raw
+		if c.ZaloSandboxUser == "" {
+			errs = append(errs, invalid("ZALO_SANDBOX_USER", "must name the OS user the Zalo sidecar runs as when ZALO_SIDECAR_BUNDLE is set"))
+		}
+		if c.ZaloSidecarSHA256 != "" && !sha256Hex.MatchString(c.ZaloSidecarSHA256) {
+			errs = append(errs, invalid("ZALO_SIDECAR_SHA256", "must be 64 lowercase hex digits"))
 		}
 	}
 
@@ -605,3 +612,6 @@ func loadWebPush(get func(string) string, production bool, public *url.URL) (*We
 	}
 	return &WebPush{VAPIDKey: key, Subject: subject, AllowLocal: allowLocal}, nil
 }
+
+// sha256Hex is a SHA-256 digest written as hex.
+var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
