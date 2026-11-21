@@ -44,6 +44,12 @@ jobs:
           FORBIDDEN_PATTERNS: ${{ secrets.FORBIDDEN_PATTERNS }}
       - run: pnpm typecheck
       - run: pnpm test
+      # The agent's Observatory store (bun:sqlite) inside a compiled Bun
+      # executable, built for Linux as agent-release.yml builds tunelo.
+      - name: Observatory store in a compiled Bun executable
+        run: |
+          bun build --compile --target=bun-linux-x64 apps/agent/test/support/observatory-store-compiled-smoke.ts --outfile "$RUNNER_TEMP/observatory-smoke"
+          "$RUNNER_TEMP/observatory-smoke"
       # The SDK packages: @achoo254/chat-client assembles
       # its dist/ from the workspace packages, the Bot SDK compiles its own.
       - run: pnpm build:packages
