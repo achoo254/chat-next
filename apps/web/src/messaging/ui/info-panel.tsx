@@ -405,7 +405,7 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 			)}
 			{!chat.left && <SharedRows chatId={chat.id} onShared={onShared} />}
 			{!chat.left && <PinnedBarRow chat={chat} />}
-			{chat.externalSource !== undefined && !chat.left && (
+			{chat.externalApp !== undefined && !chat.left && (
 				<Suspense fallback={null}>
 					<BridgeChatTools chatId={chat.id} title={chat.title} />
 				</Suspense>

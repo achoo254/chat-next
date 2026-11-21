@@ -12,7 +12,7 @@ const LONG = { timeout: 8000 };
 
 async function openTools(fixture: ChatFixture): Promise<HTMLElement> {
 	const other = fixture.addUser("Lan");
-	const chatId = fixture.createChat(ChatType.GROUP, "Anh Đô CEO", [fixture.selfId, other], { externalSource: "telegram" });
+	const chatId = fixture.createChat(ChatType.GROUP, "Anh Đô CEO", [fixture.selfId, other], { externalApp: "telegram" });
 	fixture.bridge.seedTwoWay(chatId);
 	// Every feature follows the chat, two-way here.
 	fixture.bridge.features = fixture.bridge.features.map((f) => ({ ...f, direction: f.canSend ? "both" : "in" }));
