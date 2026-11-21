@@ -1,18 +1,23 @@
 // The Zalo sidecar of Chat Bridge: one process per Zalo account, spoken to over stdio.
 //
 // stdin  : one JSON command per line.
-//   {"cmd":"login_qr"}                       log in by QR; the QR image comes back as an event
+//   {"cmd":"login_qr","listen":false}        log in by QR; the QR image comes back as an event.
+//                                            listen:false (protocol 3) ends at `account` without
+//                                            starting the listener; absent or true also listens
 //   {"cmd":"login_session","session":{...}}  log in with a session an earlier login returned
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
-//   {"ev":"ready","protocol":2}
+//   {"ev":"ready","protocol":3}
 //   {"ev":"qr","image":"<base64 png>"} | {"ev":"qr_scanned"} | {"ev":"qr_expired"} | {"ev":"qr_declined"}
 //   {"ev":"logged_in","session":{cookie,imei,userAgent}}   the engine keeps it (encrypted), never this process
-//   {"ev":"account","uid":".."}                      the signed-in account, once logged in (both ways)
+//   {"ev":"account","uid":"<digits>"}                the signed-in account, once logged in (both ways);
+//                                                    an id that is not 1-20 digits is error no_account
 //   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..}
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
-//   {"ev":"error","code":"..","message":".."}          sanitised: never a raw server response
+//   {"ev":"error","code":"..","message":".."}          sanitised: never a raw server response. A failed
+//     login's code says why (src/login-failure.mjs): session_rejected, zalo_unavailable,
+//     network_error, bad_session, login_failed; message is only the error's class name.
 // stderr : operational lines only: `host <name>` once per Zalo host connected to (the firewall's
 //          learning run reads them), `blocked ...` for a refused connection. No message text,
 //          cookie, imei, name or id is ever written here.
@@ -22,9 +27,11 @@ import readline from "node:readline";
 import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 import { installEgressGuard } from "./egress-guard.mjs";
+import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 
 // 2: adds the `account` event (the engine needs the account id to finish a QR login).
-const PROTOCOL = 2;
+// 3: login_qr can skip the listener; login failures carry a reason code; the uid is checked.
+const PROTOCOL = 3;
 
 installEgressGuard({
 	onHost: (host) => process.stderr.write(`host ${host}\n`),
@@ -42,7 +49,8 @@ function fail(code, error) {
 }
 
 // logging and the npm version check are off: the first prints names to stdout, the second calls
-// registry.npmjs.org on every login.
+// registry.npmjs.org on every login. selfListen departs from the audit's advice (false) on
+// purpose: without it the owner's own messages, sent from the phone, never reach Chat.
 const zalo = new Zalo({ logging: false, checkUpdate: false, selfListen: true });
 let api = null;
 
@@ -58,10 +66,21 @@ const FORWARDED = {
 	friend_event: "friend_event",
 };
 
+/** Says which account signed in; false (and an error) when the library gives no usable id. */
+function announce(loggedIn) {
+	const uid = loggedIn.getOwnId();
+	const text = typeof uid === "number" || typeof uid === "string" ? String(uid) : "";
+	if (!/^[0-9]{1,20}$/.test(text)) {
+		emit({ ev: "error", code: "no_account", message: "error" });
+		return false;
+	}
+	emit({ ev: "account", uid: text });
+	return true;
+}
+
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
 function listen(loggedIn) {
 	api = loggedIn;
-	emit({ ev: "account", uid: String(api.getOwnId()) });
 	api.listener.on("message", (message) => {
 		const data = message.data ?? {};
 		emit({
@@ -87,7 +106,7 @@ function listen(loggedIn) {
 	api.listener.start();
 }
 
-async function loginQR() {
+async function loginQR(listenAfter) {
 	// A callback is always given: without one the library writes qr.png into the working directory.
 	const loggedIn = await zalo.loginQR({}, (event) => {
 		switch (event.type) {
@@ -108,14 +127,17 @@ async function loginQR() {
 				break;
 		}
 	});
-	listen(loggedIn);
+	if (!announce(loggedIn)) return;
+	if (listenAfter) listen(loggedIn);
+	else api = loggedIn;
 }
 
 async function loginSession(session) {
 	if (session === null || typeof session !== "object" || !session.cookie || !session.imei || !session.userAgent) {
-		throw new Error("bad session");
+		throw new BadSessionError();
 	}
-	listen(await zalo.login({ cookie: session.cookie, imei: session.imei, userAgent: session.userAgent }));
+	const loggedIn = await zalo.login({ cookie: session.cookie, imei: session.imei, userAgent: session.userAgent });
+	if (announce(loggedIn)) listen(loggedIn);
 }
 
 async function handle(line) {
@@ -125,10 +147,11 @@ async function handle(line) {
 	} catch {
 		return fail("bad_command", new Error("bad json"));
 	}
+	if (command === null || typeof command !== "object") return fail("bad_command", new Error("bad json"));
 	try {
 		switch (command.cmd) {
 			case "login_qr":
-				return await loginQR();
+				return await loginQR(command.listen !== false);
 			case "login_session":
 				return await loginSession(command.session);
 			case "stop":
@@ -138,7 +161,9 @@ async function handle(line) {
 				return fail("unknown_command", new Error("unknown"));
 		}
 	} catch (error) {
-		return fail("command_failed", error);
+		// A login says why it failed; the library's message never leaves the process.
+		const login = command.cmd === "login_qr" || command.cmd === "login_session";
+		return fail(login ? loginFailureReason(error) : "command_failed", error);
 	}
 }
 

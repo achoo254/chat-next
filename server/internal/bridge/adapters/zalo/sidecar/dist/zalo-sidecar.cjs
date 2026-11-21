@@ -29106,8 +29106,41 @@ function installEgressGuard({ onHost = () => {
   };
 }
 
+// src/login-failure.mjs
+var SESSION_REJECTED = "session_rejected";
+var ZALO_UNAVAILABLE = "zalo_unavailable";
+var NETWORK_ERROR = "network_error";
+var BAD_SESSION = "bad_session";
+var LOGIN_FAILED = "login_failed";
+var REJECTED_MESSAGES = /* @__PURE__ */ new Set(["\u0110\u0103ng nh\u1EADp th\u1EA5t b\u1EA1i", "Kh\u1EDFi t\u1EA1o ng\u1EEF c\u1EA3nh th\u1EA5t b\u1EA1i."]);
+var REFUSED_STATUS = /* @__PURE__ */ new Set(["Unauthorized", "Forbidden"]);
+var NETWORK_CODES = /* @__PURE__ */ new Set(["ECONNREFUSED", "ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "EPIPE", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET"]);
+var BadSessionError = class extends Error {
+  constructor() {
+    super("bad session");
+    this.name = "BadSessionError";
+  }
+};
+function loginFailureReason(error) {
+  if (error instanceof BadSessionError) return BAD_SESSION;
+  if (error === null || typeof error !== "object") return LOGIN_FAILED;
+  if (error.name === "ZcaApiError") {
+    const message = typeof error.message === "string" ? error.message : "";
+    if (REJECTED_MESSAGES.has(message)) return SESSION_REJECTED;
+    const loginInfo = "Failed to fetch login info: ";
+    if (message.startsWith(loginInfo)) return REFUSED_STATUS.has(message.slice(loginInfo.length)) ? SESSION_REJECTED : ZALO_UNAVAILABLE;
+    if (message.startsWith("Failed to fetch") || message === "Missing signkey" || message.startsWith("Failed to encrypt")) return ZALO_UNAVAILABLE;
+    return LOGIN_FAILED;
+  }
+  if (error.name === "AbortError" || error.name === "TimeoutError") return NETWORK_ERROR;
+  const code = error.code ?? error.cause?.code;
+  if (typeof code === "string" && NETWORK_CODES.has(code)) return NETWORK_ERROR;
+  if (error instanceof TypeError && error.cause !== void 0) return NETWORK_ERROR;
+  return LOGIN_FAILED;
+}
+
 // src/entry.mjs
-var PROTOCOL = 2;
+var PROTOCOL = 3;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
 `),
@@ -29133,9 +29166,18 @@ var FORWARDED = {
   group_event: "group_event",
   friend_event: "friend_event"
 };
+function announce(loggedIn) {
+  const uid = loggedIn.getOwnId();
+  const text = typeof uid === "number" || typeof uid === "string" ? String(uid) : "";
+  if (!/^[0-9]{1,20}$/.test(text)) {
+    emit({ ev: "error", code: "no_account", message: "error" });
+    return false;
+  }
+  emit({ ev: "account", uid: text });
+  return true;
+}
 function listen(loggedIn) {
   api = loggedIn;
-  emit({ ev: "account", uid: String(api.getOwnId()) });
   api.listener.on("message", (message) => {
     const data = message.data ?? {};
     emit({
@@ -29160,7 +29202,7 @@ function listen(loggedIn) {
   api.listener.on("error", (error) => fail("listener_error", error));
   api.listener.start();
 }
-async function loginQR2() {
+async function loginQR2(listenAfter) {
   const loggedIn = await zalo.loginQR({}, (event) => {
     switch (event.type) {
       case LoginQRCallbackEventType.QRCodeGenerated:
@@ -29180,13 +29222,16 @@ async function loginQR2() {
         break;
     }
   });
-  listen(loggedIn);
+  if (!announce(loggedIn)) return;
+  if (listenAfter) listen(loggedIn);
+  else api = loggedIn;
 }
 async function loginSession(session) {
   if (session === null || typeof session !== "object" || !session.cookie || !session.imei || !session.userAgent) {
-    throw new Error("bad session");
+    throw new BadSessionError();
   }
-  listen(await zalo.login({ cookie: session.cookie, imei: session.imei, userAgent: session.userAgent }));
+  const loggedIn = await zalo.login({ cookie: session.cookie, imei: session.imei, userAgent: session.userAgent });
+  if (announce(loggedIn)) listen(loggedIn);
 }
 async function handle(line) {
   let command;
@@ -29195,10 +29240,11 @@ async function handle(line) {
   } catch {
     return fail("bad_command", new Error("bad json"));
   }
+  if (command === null || typeof command !== "object") return fail("bad_command", new Error("bad json"));
   try {
     switch (command.cmd) {
       case "login_qr":
-        return await loginQR2();
+        return await loginQR2(command.listen !== false);
       case "login_session":
         return await loginSession(command.session);
       case "stop":
@@ -29208,7 +29254,8 @@ async function handle(line) {
         return fail("unknown_command", new Error("unknown"));
     }
   } catch (error) {
-    return fail("command_failed", error);
+    const login2 = command.cmd === "login_qr" || command.cmd === "login_session";
+    return fail(login2 ? loginFailureReason(error) : "command_failed", error);
   }
 }
 var lines = import_node_readline.default.createInterface({ input: process.stdin });
