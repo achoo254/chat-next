@@ -31,7 +31,8 @@ export function BridgeChatTools({ chatId, title }: { chatId: number; title: stri
 	const onError = (err: unknown): BridgeError => {
 		const error = bridgeError(err);
 		if (error.kind === "reauth") setReauth(true);
-		else toasts.show(t.failed);
+		// A wrong typed name is already told beside the field, so it gets no toast on top.
+		else if (error.kind !== "confirmation_wrong") toasts.show(t.failed);
 		return error;
 	};
 	useEffect(() => {

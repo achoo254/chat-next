@@ -51,6 +51,8 @@ describe("people and the group in the other app, from the info panel", () => {
 		await userEvent.type(within(tools).getByLabelText("Gõ lại tên nhóm"), "sai tên");
 		await userEvent.click(within(tools).getByRole("button", { name: "Rời nhóm" }));
 		expect(await within(tools).findByText("Tên chưa đúng.", {}, LONG)).toBeTruthy();
+		// The wrong name is already told beside the field; no second "failed" toast on top of it.
+		expect(screen.queryByText("Chưa làm được, thử lại sau.")).toBeNull();
 		expect(fixture.bridge.calls).not.toContain("group:leave");
 		await userEvent.clear(within(tools).getByLabelText("Gõ lại tên nhóm"));
 		await userEvent.type(within(tools).getByLabelText("Gõ lại tên nhóm"), "Anh Đô CEO");
