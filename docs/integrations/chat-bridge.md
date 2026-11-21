@@ -81,6 +81,18 @@ Nhóm Telegram bật chủ đề đồng bộ thành **nhóm dạng forum** tron
 
 Một lần cho cả hệ thống, bởi người vận hành, bằng tài khoản Telegram: đăng nhập `my.telegram.org`, mục "API development tools", tạo ứng dụng và lấy `api_id`, `api_hash`. Đặt vào `/opt/chat/.env` (không vào repo): `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`; `api_hash` là bí mật, không in ra log hay gửi cho client.
 
+## Zalo (chỉ nhận, tắt mặc định)
+
+Adapter Zalo ([`server/internal/bridge/adapters/zalo`](../../server/internal/bridge/adapters/zalo)) chạy [tiến trình phụ Zalo](./zalo-sidecar.md) cho tài khoản cá nhân. Bước này **chỉ nhận**, chưa có giao diện riêng và chưa bật ở production.
+
+- **Bật:** đặt `ZALO_SIDECAR_BUNDLE` (đường dẫn tuyệt đối tới `dist/zalo-sidecar.cjs`) và tuỳ chọn `ZALO_NODE_PATH` (đường dẫn tuyệt đối của `node`, mặc định `node` trong `PATH`) trong `/opt/chat/.env`, cùng `BRIDGE_ENABLED=true`. Không đặt `ZALO_SIDECAR_BUNDLE` thì Zalo không có trong danh sách ứng dụng. Trước khi bật phải có môi trường chạy cách ly ở [`zalo-sidecar.md`](./zalo-sidecar.md).
+- **Đăng nhập bằng QR:** bước `qr` trả ảnh PNG dạng `data:` URL; gọi tiếp (không nhập gì) để chờ: mã hết hạn (khoảng 100 giây) thì có mã mới, tối đa 3 lần; quét xong là bước `confirm` (xác nhận trên điện thoại); xác nhận xong là `done` kèm phiên (cookie, imei, userAgent) để server niêm phong như phiên Telegram. Từ chối trên điện thoại thì đăng nhập kết thúc.
+- **Nhận:** tin chữ 1-1 (của người kia và của chính bạn), nhãn dán thành `[Nhãn dán]`, loại khác (ảnh, tệp, thoại… chưa gặp trên tài khoản thật) thành `[Tin nhắn không hỗ trợ]`. Tin lặp lại sau khi kết nối lại bị bỏ theo id. **Nhóm bị bỏ qua** (chỉ đếm trong log debug). Reaction, thu hồi, đã xem, đang gõ chưa khai nên bị bỏ qua.
+- **Không có lịch sử và danh sách hội thoại:** tiến trình phụ chưa có hai thứ này. Danh sách là các hội thoại 1-1 đã nghe thấy từ lúc server chạy; lịch sử của một hội thoại mới là những tin server đã nghe thấy trong đó (gồm tin đầu tiên). Tin đến khi server tắt thì mất.
+- **Không gửi gì sang Zalo**, không tải media, không đọc số điện thoại.
+- **Kết nối lại:** tiến trình phụ thoát hay kênh nghe đóng (kể cả mã 3000 khi mở Zalo Web, 3003 khi Zalo đá) là lỗi thử lại theo backoff của engine, mỗi lần thử một tiến trình. Zalo từ chối phiên đã lưu 3 lần liên tiếp thì tài khoản chuyển "Cần đăng nhập lại".
+- **Ngắt kết nối** dừng tiến trình phụ và quên những gì đã nghe; phiên **không** bị đăng xuất ở Zalo (tiến trình phụ chưa có lệnh này), gỡ thiết bị trong app Zalo trên điện thoại.
+
 ## Thêm một ứng dụng khác
 
 Lõi Chat không đổi khi thêm ứng dụng. Việc cần làm:
@@ -91,4 +103,4 @@ Lõi Chat không đổi khi thêm ứng dụng. Việc cần làm:
 4. Kiểm bằng adapter giả [`bridge/contracttest`](../../server/internal/bridge/contracttest/fake.go): nó có log phát lại theo trạng thái như `pts`, và các kịch bản của engine (`bridge/engine/engine_test.go`) là bộ test hợp đồng. Test tự động không chạy trên tài khoản thật; mẫu kiểm tay một lần là [`adapters/telegram/live_test.go`](../../server/internal/bridge/adapters/telegram/live_test.go) (`BRIDGE_LIVE=1`).
 5. Thêm tên ứng dụng ở `apps/web/src/messaging/settings/bridge-copy-*.ts` và `chat-row.tsx`.
 
-**Giới hạn của hợp đồng:** ứng dụng kiểu đẩy (webhook: Slack, Messenger) không có kết nối dài nên không có `Subscribe`; chúng vào Chat qua webhook đến ([`hooks`](../../server/internal/hooks)), không qua Bridge. Ứng dụng đăng nhập bằng OAuth chưa có kiểu bước đăng nhập `oauth` (chỉ `input`, `qr`, `confirm`). Zalo là ứng dụng kế tiếp dự kiến, đăng nhập `qr`; Zalo không có API chính thức cho tài khoản cá nhân nên cần phân tích riêng và xem điều khoản trước.
+**Giới hạn của hợp đồng:** ứng dụng kiểu đẩy (webhook: Slack, Messenger) không có kết nối dài nên không có `Subscribe`; chúng vào Chat qua webhook đến ([`hooks`](../../server/internal/hooks)), không qua Bridge. Ứng dụng đăng nhập bằng OAuth chưa có kiểu bước đăng nhập `oauth` (chỉ `input`, `qr`, `confirm`). Zalo (đăng nhập `qr`) là adapter thứ hai, hiện chỉ nhận: xem [Zalo](#zalo-chỉ-nhận-tắt-mặc-định).

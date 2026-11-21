@@ -1,6 +1,6 @@
 # Tiến trình phụ Zalo
 
-Adapter Zalo của Chat Bridge nói chuyện với Zalo qua một tiến trình phụ Node, `server/internal/bridge/adapters/zalo/sidecar/`, chạy thư viện [`zca-js`](https://github.com/RFS-ADRENO/zca-js) (MIT, không chính thức, mô phỏng Zalo Web). Tài liệu này nói cách thư viện được đưa vào và giữ an toàn. Adapter Go dùng nó chưa viết xong.
+Adapter Zalo của Chat Bridge nói chuyện với Zalo qua một tiến trình phụ Node, `server/internal/bridge/adapters/zalo/sidecar/`, chạy thư viện [`zca-js`](https://github.com/RFS-ADRENO/zca-js) (MIT, không chính thức, mô phỏng Zalo Web). Tài liệu này nói cách thư viện được đưa vào và giữ an toàn. Adapter Go (`server/internal/bridge/adapters/zalo`, chỉ nhận, tắt mặc định) chạy nó; cách dùng ở [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định).
 
 ## Vì sao không cài từ npm
 
@@ -27,11 +27,13 @@ Phiên đăng nhập Zalo của một tài khoản thật là thứ cần bảo 
 - `stdout` chỉ để giao thức (một dòng JSON mỗi sự kiện); `stderr` chỉ có `host ...` và `blocked ...`, không có nội dung tin, cookie, imei, tên hay id.
 - Tiến trình không ghi tệp, không sinh tiến trình con, không đọc biến môi trường; đóng `stdin` là dừng.
 
-Điều kiện của môi trường chạy (do engine và máy chủ bảo đảm, chưa làm): user hệ điều hành riêng không đọc được DSN hay khoá SecretBox; môi trường sạch (`WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không `NODE_OPTIONS`); chỉ đọc tệp đóng gói; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
+Adapter Go đã làm phần của engine: chạy `node <bundle>` với môi trường viết tay (`PATH` thư mục hệ thống, `HOME` là thư mục làm việc, `TZ=UTC`, `WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không thừa kế biến nào của server), thư mục làm việc là một thư mục tạm rỗng xoá khi tiến trình thoát, nhóm tiến trình riêng (Linux: `Pdeathsig` giết tiến trình phụ khi server chết), dừng bằng đóng `stdin` rồi giết cả nhóm sau 3 giây. `stdout` không bao giờ vào log; `stderr` chỉ vào `slog` dưới dạng tên host (`host`) hoặc chữ "blocked", dòng khác chỉ ghi là có dòng lạ, không kèm nội dung. Dòng `stdout` dài quá 1 MiB thì dừng tiến trình.
 
-## Giao thức stdio (phiên bản 1)
+Điều kiện còn lại của môi trường chạy (máy chủ bảo đảm, chưa làm; phải xong trước khi đặt `ZALO_SIDECAR_BUNDLE` ở production): user hệ điều hành riêng không đọc được DSN hay khoá SecretBox; môi trường sạch (`WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không `NODE_OPTIONS`); chỉ đọc tệp đóng gói; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
 
-Mỗi dòng là một JSON. Lệnh vào: `login_qr`, `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready`, `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `message`, `event`, `listener`, `error` (đã lọc, không có phản hồi thô). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh gửi tin.
+## Giao thức stdio (phiên bản 2)
+
+Mỗi dòng là một JSON. Lệnh vào: `login_qr`, `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready` (kèm `protocol`), `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `account` (id tài khoản Zalo sau khi đăng nhập, cả hai cách), `message`, `event`, `listener`, `error` (đã lọc, không có phản hồi thô). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh gửi tin, lấy lịch sử, liệt kê hội thoại hay đăng xuất. Bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải báo engine tài khoản nào vừa vào; adapter từ chối tiến trình phụ báo phiên bản khác.
 
 ## Rủi ro đã biết
 
