@@ -258,6 +258,30 @@ func TestLoadBotWebhookAllowLocal(t *testing.T) {
 	}
 }
 
+func TestLoadZaloSidecar(t *testing.T) {
+	env := validEnv()
+	c, err := Load(lookupFrom(env))
+	if err != nil || c.ZaloSidecarBundle != "" || c.ZaloNodePath != "" {
+		t.Fatalf("default: %q %q, %v", c.ZaloSidecarBundle, c.ZaloNodePath, err)
+	}
+	env["ZALO_SIDECAR_BUNDLE"] = "/opt/chat/zalo-sidecar.cjs"
+	if c, err = Load(lookupFrom(env)); err != nil || c.ZaloSidecarBundle != "/opt/chat/zalo-sidecar.cjs" || c.ZaloNodePath != "node" {
+		t.Fatalf("bundle only: %q %q, %v", c.ZaloSidecarBundle, c.ZaloNodePath, err)
+	}
+	env["ZALO_NODE_PATH"] = "/usr/bin/node"
+	if c, err = Load(lookupFrom(env)); err != nil || c.ZaloNodePath != "/usr/bin/node" {
+		t.Fatalf("node path: %q, %v", c.ZaloNodePath, err)
+	}
+	for name, bad := range map[string]string{"ZALO_SIDECAR_BUNDLE": "dist/zalo-sidecar.cjs", "ZALO_NODE_PATH": "node"} {
+		env := validEnv()
+		env["ZALO_SIDECAR_BUNDLE"] = "/opt/chat/zalo-sidecar.cjs"
+		env[name] = bad
+		if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), name) {
+			t.Fatalf("%s=%q: err = %v", name, bad, err)
+		}
+	}
+}
+
 func TestLoadOutboundDeny(t *testing.T) {
 	env := validEnv()
 	c, err := Load(lookupFrom(env))

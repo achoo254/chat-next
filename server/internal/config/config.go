@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,6 +96,13 @@ type Config struct {
 	// Telegram. The hash is a secret: it is never logged or sent to a client.
 	TelegramAPIID   int
 	TelegramAPIHash string
+	// ZaloSidecarBundle is the absolute path of the Zalo sidecar bundle
+	// (ZALO_SIDECAR_BUNDLE, server/internal/bridge/adapters/zalo/sidecar/dist/
+	// zalo-sidecar.cjs). Empty, the default, offers no Zalo: the adapter is not
+	// registered. ZaloNodePath is the node binary that runs it (ZALO_NODE_PATH,
+	// absolute; default "node" from PATH).
+	ZaloSidecarBundle string
+	ZaloNodePath      string
 	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
 	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
 	// server's own public addresses, so a bot webhook or a link preview
@@ -413,6 +421,22 @@ func Load(lookup Lookup) (Config, error) {
 	c.TelegramAPIHash = get("TELEGRAM_API_HASH")
 	if (c.TelegramAPIID == 0) != (c.TelegramAPIHash == "") {
 		errs = append(errs, invalid("TELEGRAM_API_ID", "and TELEGRAM_API_HASH must be set together"))
+	}
+
+	if raw := get("ZALO_SIDECAR_BUNDLE"); raw != "" {
+		if !filepath.IsAbs(raw) {
+			errs = append(errs, invalid("ZALO_SIDECAR_BUNDLE", "must be an absolute path"))
+		}
+		c.ZaloSidecarBundle = raw
+		c.ZaloNodePath = "node"
+	}
+	if raw := get("ZALO_NODE_PATH"); raw != "" {
+		if !filepath.IsAbs(raw) {
+			errs = append(errs, invalid("ZALO_NODE_PATH", "must be an absolute path"))
+		}
+		if c.ZaloSidecarBundle != "" {
+			c.ZaloNodePath = raw
+		}
 	}
 
 	if raw := get("OUTBOUND_DENY_CIDRS"); raw != "" {
