@@ -8,6 +8,8 @@ import { useChat, useDialog } from "../data/services.tsx";
 import { appLabel } from "../ui/link-suggestions.tsx";
 import { MessageBubble, PendingBubble, type LimitedActions } from "../ui/message-item.tsx";
 import { useCell, useUi } from "../ui/ui-context.tsx";
+import { ChatDelivery } from "./merged-delivery.tsx";
+import { albumMessages, type MergedGroup } from "./merged-rows.ts";
 import type { MergedItem } from "./merged-timeline.ts";
 
 // The same chunks the chat screen loads for service lines and the message menu.
@@ -15,7 +17,7 @@ const SystemLine = lazy(() => import("../ui/message-extras.tsx").then((m) => ({ 
 const MenuLayer = lazy(() => import("../ui/message-menu.tsx"));
 
 interface MergedRowProps {
-	item: MergedItem;
+	group: MergedGroup;
 	tabbable: boolean;
 	runPrev: boolean;
 	runNext: boolean;
@@ -23,7 +25,8 @@ interface MergedRowProps {
 }
 
 /** A message, a send on its way or a service line, from one of the person's chats. */
-export const MergedRow = memo(function MergedRow({ item, tabbable, runPrev, runNext, limited }: MergedRowProps) {
+export const MergedRow = memo(function MergedRow({ group, tabbable, runPrev, runNext, limited }: MergedRowProps) {
+	const item = group.item;
 	const copy = useScreensCopy();
 	const chat = useChat(item.chatId) ?? null;
 	const readOutboxMaxSeq = useDialog(item.chatId)?.dialog.readOutboxMaxSeq ?? 0;
@@ -50,18 +53,23 @@ export const MergedRow = memo(function MergedRow({ item, tabbable, runPrev, runN
 		);
 	}
 	return (
-		<MessageBubble
-			chatId={item.chatId}
-			itemKey={item.key}
-			message={item.message}
-			chat={chat}
-			readOutboxMaxSeq={readOutboxMaxSeq}
-			tabbable={tabbable}
-			runPrev={runPrev}
-			runNext={runNext}
-			platform={platform}
-			limited={limited}
-		/>
+		<ChatDelivery chatId={item.chatId}>
+			<MessageBubble
+				chatId={item.chatId}
+				itemKey={item.key}
+				rowKey={group.key}
+				albumKeys={group.album.map((member) => member.key)}
+				albumMessages={albumMessages(group)}
+				message={item.message}
+				chat={chat}
+				readOutboxMaxSeq={readOutboxMaxSeq}
+				tabbable={tabbable}
+				runPrev={runPrev}
+				runNext={runNext}
+				platform={platform}
+				limited={limited}
+			/>
+		</ChatDelivery>
 	);
 });
 
@@ -77,17 +85,19 @@ export function MergedMenu({ items, limited }: { items: ReadonlyMap<string, Merg
 	if (target === null || item === undefined) return null;
 	return (
 		<Suspense fallback={null}>
-			<MenuLayer
-				key={`${target.key}:${target.picker === true ? 1 : 0}:${target.anchor.left}:${target.anchor.top}`}
-				chatId={item.chatId}
-				itemKey={target.key}
-				chat={chat}
-				picker={target.picker === true}
-				anchor={target.anchor}
-				readOutboxMaxSeq={readOutboxMaxSeq}
-				item={item}
-				limited={limited}
-			/>
+			<ChatDelivery chatId={item.chatId}>
+				<MenuLayer
+					key={`${target.key}:${target.picker === true ? 1 : 0}:${target.anchor.left}:${target.anchor.top}`}
+					chatId={item.chatId}
+					itemKey={target.key}
+					chat={chat}
+					picker={target.picker === true}
+					anchor={target.anchor}
+					readOutboxMaxSeq={readOutboxMaxSeq}
+					item={item}
+					limited={limited}
+				/>
+			</ChatDelivery>
 		</Suspense>
 	);
 }

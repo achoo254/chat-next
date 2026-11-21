@@ -117,7 +117,7 @@ export const enBridge: BridgeCopy = {
 			sent: "Asked to add the person.",
 		},
 		danger: {
-			title: "Leave or delete the group",
+			title: (app: string): string => `Leave or delete the group in ${app}`,
 			hint: "This cannot be undone in the other app. Type the name of the group again to confirm.",
 			nameLabel: "Type the name of the group",
 			leave: "Leave the group",

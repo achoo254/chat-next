@@ -209,7 +209,7 @@ function Danger({ accountId, conversationId, appName, api, disabled, on, onError
 	const expired = pending !== null && now > pending.expires;
 	return (
 		<div className="br-people-part br-danger">
-			<h4>{t.people.danger.title}</h4>
+			<h4>{t.people.danger.title(appName)}</h4>
 			<p className="note">{t.people.danger.hint}</p>
 			{!on && <Off feature="lifecycle" />}
 			<input className="input" value={name} aria-label={t.people.danger.nameLabel} placeholder={t.people.danger.nameLabel} onChange={(e) => setName(e.target.value)} />

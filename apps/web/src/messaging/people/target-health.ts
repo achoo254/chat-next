@@ -3,7 +3,7 @@
 // newest message, which picks the first target. A read-only copy or a closed
 // chat is known from the chat itself; the account of the other app (needing
 // a login, stopped) and whether the app sends messages at all come from the
-// bridge, asked once when the screen opens. This only informs: nothing here
+// bridge, asked when the screen opens and again every minute while it is open. This only informs: nothing here
 // stops a send, and a bridge that cannot answer leaves the chats as they are.
 import type { Transport } from "@connectrpc/connect";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -49,6 +49,9 @@ async function bridgeReasons(transport: Transport, chatIds: readonly number[]): 
 	return reasons;
 }
 
+/** How often the account state is asked again while the screen is open. */
+const BRIDGE_REFRESH_MS = 60_000;
+
 export interface PersonTargets {
 	/** The person's private chats, in the order of their identities. */
 	readonly targets: readonly SendTarget[];
@@ -80,17 +83,29 @@ export function usePersonTargets(members: readonly PersonMember[]): PersonTarget
 		if (ids === "") return;
 		for (const id of ids.split(",")) store.ensureChat(Number(id));
 		let live = true;
-		bridgeReasons(
-			transport,
-			ids.split(",").map((id) => Number(id)),
-		).then(
-			(reasons) => {
-				if (live) setBridge({ ids, reasons });
-			},
-			() => undefined,
-		);
+		const chatIds = ids.split(",").map((id) => Number(id));
+		const load = () => {
+			bridgeReasons(transport, chatIds).then(
+				(reasons) => {
+					if (live) setBridge({ ids, reasons });
+				},
+				// A bridge that cannot answer now leaves what was known.
+				() => undefined,
+			);
+		};
+		load();
+		// An account that needs a sign-in or stops while the screen is open shows within a minute, or at once when the tab comes back.
+		const timer = window.setInterval(() => {
+			if (document.visibilityState === "visible") load();
+		}, BRIDGE_REFRESH_MS);
+		const onVisible = () => {
+			if (document.visibilityState === "visible") load();
+		};
+		document.addEventListener("visibilitychange", onVisible);
 		return () => {
 			live = false;
+			window.clearInterval(timer);
+			document.removeEventListener("visibilitychange", onVisible);
 		};
 	}, [store, transport, ids]);
 

@@ -285,20 +285,33 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 	}
 }
 
-function AlbumCell({ chatId, itemKey, index }: { chatId: number; itemKey: string; index: number }) {
+function AlbumCell({ chatId, itemKey, index, message }: { chatId: number; itemKey: string; index: number; message?: StoredMessage | undefined }) {
 	const copy = useMediaCopy();
 	const item = useItem(chatId, itemKey);
-	if (item?.kind !== "message") return null;
-	const media = item.message.media;
+	// A message handed over directly is not in the store (a person's merged timeline).
+	const shown = message ?? (item?.kind === "message" ? item.message : undefined);
+	if (shown === undefined) return null;
+	const media = shown.media;
 	if (media === undefined) return null;
-	if (!isVisual(media)) return <MessageMedia message={item.message} />;
-	return <PictureView chatId={chatId} seq={item.message.seq} media={media} cell label={copy.media.albumItem(index + 1, media.kind === "video")} />;
+	if (!isVisual(media)) return <MessageMedia message={shown} />;
+	return <PictureView chatId={chatId} seq={shown.seq} media={media} cell label={copy.media.albumItem(index + 1, media.kind === "video")} />;
 }
 
 /** Messages sent together (same grouped_id): photos and videos in a grid, files and audio stacked. */
-export function AlbumMedia({ chatId, keys, visual }: { chatId: number; keys: readonly string[]; visual: boolean }) {
+export function AlbumMedia({
+	chatId,
+	keys,
+	visual,
+	messages,
+}: {
+	chatId: number;
+	keys: readonly string[];
+	visual: boolean;
+	/** The album's messages in the order of keys, when they are not in the store. */
+	messages?: readonly StoredMessage[] | undefined;
+}) {
 	const copy = useMediaCopy();
-	const cells = keys.map((key, index) => <AlbumCell key={key} chatId={chatId} itemKey={key} index={index} />);
+	const cells = keys.map((key, index) => <AlbumCell key={key} chatId={chatId} itemKey={key} index={index} message={messages?.[index]} />);
 	if (!visual) return <div className="file-stack">{cells}</div>;
 	return (
 		<div className={`album n${Math.min(keys.length, 5)}`} role="group" aria-label={copy.media.album(keys.length)}>

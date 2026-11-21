@@ -121,7 +121,7 @@ export const viBridge = {
 			sent: "Đã gửi yêu cầu thêm người.",
 		},
 		danger: {
-			title: "Rời hoặc xoá nhóm",
+			title: (app: string): string => `Rời hoặc xoá nhóm ở ${app}`,
 			hint: "Không hoàn tác được ở ứng dụng kia. Gõ lại đúng tên nhóm để xác nhận.",
 			nameLabel: "Gõ lại tên nhóm",
 			leave: "Rời nhóm",

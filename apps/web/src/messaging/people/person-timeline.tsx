@@ -7,22 +7,26 @@
 // while the list is at its newest message. A chat that failed to load says
 // so above the list, with a retry, while the others show. Reading follows
 // merged-read.ts.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
+import { navigate, paths } from "../../router.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { dayLabel, sameDay } from "../data/format.ts";
-import { useServices } from "../data/services.tsx";
+import { useListStatus, useServices } from "../data/services.tsx";
 import { appLabel } from "../ui/link-suggestions.tsx";
 import type { LimitedActions } from "../ui/message-item.tsx";
 import { joinsRun } from "../ui/message-runs.ts";
 import { useSurfaceVisible } from "../ui/surface.ts";
-import type { MergedItem } from "./merged-timeline.ts";
+import { DeliveryHub } from "./merged-delivery.tsx";
 import { MergedMenu, MergedRow } from "./merged-row.tsx";
+import { groupMerged, rowOfMessage, unreadDividerKey, type MergedGroup } from "./merged-rows.ts";
+import type { MergedItem } from "./merged-timeline.ts";
 import { useMergedRead } from "./merged-read.ts";
 import type { LinkedPerson } from "./people-api.ts";
 import { useMergedTimeline } from "./use-merged-timeline.ts";
+import { useUnreadAtOpen } from "./use-unread-at-open.ts";
 
 /** Within this distance of the top, older messages load. */
 const EDGE_PX = 240;
@@ -46,7 +50,7 @@ function firstRow(element: HTMLElement): { key: string; top: number } | null {
 
 interface PersonTimelineProps {
 	person: LinkedPerson;
-	/** What a message offers here: reply and edit go through the screen that sends (none yet). */
+	/** What a message offers here: reply and edit go through the screen that sends; showing a quoted message is added here. */
 	actions: LimitedActions;
 }
 
@@ -61,15 +65,59 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 	const anchor = useRef<{ key: string; top: number } | null>(null);
 	const [atBottom, setAtBottom] = useState(true);
 	const [focused, setFocused] = useState<string | null>(null);
+	const placed = useRef(false);
 	const visible = useSurfaceVisible();
 	const loader = useLoader(status === "loading" && items.length === 0, copy.common.loading);
 	const t = copy.personScreen;
 
 	const byKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items]);
-	const lastKey = items[items.length - 1]?.key ?? "";
+	const groups = useMemo(() => groupMerged(items), [items]);
+	const groupsRef = useRef<readonly MergedGroup[]>(groups);
+	useLayoutEffect(() => {
+		groupsRef.current = groups;
+	}, [groups]);
+	const lastKey = groups[groups.length - 1]?.key ?? "";
+	// What was unread in each chat when the screen opened: the divider sits there and stays when the messages are read.
+	// The dialogs are known first: reading marks a chat read, which would erase what was unread.
+	const dialogsKnown = useListStatus() !== "loading";
+	const unreadFrom = useUnreadAtOpen(person.members, status === "ready" && dialogsKnown);
+	const divider = unreadFrom === null ? "" : unreadDividerKey(groups, unreadFrom, store.selfId);
 	const tabKey = focused !== null && byKey.has(focused) ? focused : lastKey;
 
-	useMergedRead(timeline, items, visible && atBottom && status === "ready");
+	useMergedRead(timeline, items, visible && atBottom && status === "ready" && unreadFrom !== null);
+
+	// Opened with unread messages: the divider goes at the top, as in a chat, and the reader reads down to the newest.
+	useLayoutEffect(() => {
+		const element = scroller.current;
+		if (element === null || placed.current || divider === "") return;
+		const mark = element.querySelector<HTMLElement>(".unread-div");
+		if (mark === null) return;
+		placed.current = true;
+		stick.current = false;
+		element.scrollTop = Math.max(0, mark.offsetTop - 8);
+		anchor.current = firstRow(element);
+		setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < BOTTOM_PX);
+	}, [divider]);
+
+	// A quoted message: on this timeline it is scrolled to and outlined; older than what is loaded, it opens in its own chat.
+	const jump = useCallback(
+		(chatId: number, seq: number) => {
+			const key = rowOfMessage(groupsRef.current, chatId, seq);
+			const row = key === null ? null : scroller.current?.querySelector<HTMLElement>(`[data-key="${key}"]`);
+			if (row === null || row === undefined) {
+				store.openWindow(chatId, seq);
+				navigate(paths.chat(chatId));
+				return;
+			}
+			stick.current = false;
+			const element = scroller.current;
+			if (element !== null) element.scrollTop = Math.max(0, row.offsetTop - element.clientHeight / 3);
+			row.classList.add("flash");
+			window.setTimeout(() => row.classList.remove("flash"), 1600);
+		},
+		[store],
+	);
+	const limited = useMemo<LimitedActions>(() => ({ ...actions, jump }), [actions, jump]);
 
 	// After every change of the rows: follow the newest while at it, else keep the first row where it was.
 	useLayoutEffect(() => {
@@ -112,8 +160,8 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 		if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
 		const current = (event.target as HTMLElement).closest<HTMLElement>("[data-key]");
 		if (current === null || current !== event.target) return;
-		const index = items.findIndex((item) => item.key === current.dataset.key);
-		const next = items[index + (event.key === "ArrowUp" ? -1 : 1)];
+		const index = groups.findIndex((group) => group.key === current.dataset.key);
+		const next = groups[index + (event.key === "ArrowUp" ? -1 : 1)];
 		if (index < 0 || next === undefined) return;
 		event.preventDefault();
 		setFocused(next.key);
@@ -138,7 +186,8 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 	const rows: ReactNode[] = [];
 	const now = new Date();
 	let previousDate = 0;
-	items.forEach((item, index) => {
+	groups.forEach((group, index) => {
+		const item = group.item;
 		const date = itemDate(item);
 		if (date !== 0 && (previousDate === 0 || !sameDay(previousDate, date))) {
 			rows.push(
@@ -148,20 +197,28 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 			);
 		}
 		previousDate = date || previousDate;
+		if (group.key === divider) {
+			rows.push(
+				<div className="unread-div" role="separator" key={`u${group.key}`}>
+					{copy.convo.unreadDivider}
+				</div>,
+			);
+		}
 		rows.push(
 			<MergedRow
-				key={item.key}
-				item={item}
-				tabbable={item.key === tabKey}
-				runPrev={sameRun(items[index - 1], item, store.selfId)}
-				runNext={sameRun(item, items[index + 1], store.selfId)}
-				limited={actions}
+				key={group.key}
+				group={group}
+				tabbable={group.key === tabKey}
+				runPrev={sameRun(groups[index - 1]?.item, item, store.selfId)}
+				runNext={sameRun(item, groups[index + 1]?.item, store.selfId)}
+				limited={limited}
 			/>,
 		);
 	});
 
+	const chatIds = person.members.filter((member) => member.chatId !== 0).map((member) => member.chatId);
 	return (
-		<>
+		<DeliveryHub chatIds={chatIds}>
 			{failed}
 			<div className="messages-wrap">
 				{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- arrow keys pressed on a focused message bubble here to move between messages */}
@@ -209,7 +266,7 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 					</div>
 				)}
 			</div>
-			<MergedMenu items={byKey} limited={actions} />
-		</>
+			<MergedMenu items={byKey} limited={limited} />
+		</DeliveryHub>
 	);
 }

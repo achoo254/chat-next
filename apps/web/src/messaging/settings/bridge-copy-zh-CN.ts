@@ -117,7 +117,7 @@ export const zhCNBridge: BridgeCopy = {
 			sent: "已请求添加该人员。",
 		},
 		danger: {
-			title: "退出或解散群",
+			title: (app: string): string => `在 ${app} 中退出或解散群`,
 			hint: "这在对方应用中无法撤销。请再次输入群名称以确认。",
 			nameLabel: "再次输入群名称",
 			leave: "退出群",

@@ -62,6 +62,8 @@ const RESERVED = { visibility: "hidden" } as const;
 export interface LimitedActions {
 	readonly reply?: (chatId: number, seq: number) => void;
 	readonly edit?: (chatId: number, seq: number) => void;
+	/** Show the message a reply quotes: on this screen when it is there, else in its own chat. */
+	readonly jump?: (chatId: number, seq: number) => void;
 }
 
 /** What replying to a message does: the chat's composer intent, or the limited screen's own reply; null when not offered. */
@@ -252,7 +254,7 @@ function Stamp({ date, edited, silent = "", platform = "", children }: { date: n
 	);
 }
 
-function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
+function ReplyQuote({ chatId, seq, onJump }: { chatId: number; seq: number; onJump?: ((chatId: number, seq: number) => void) | undefined }) {
 	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
@@ -268,7 +270,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 		<button
 			type="button"
 			className={`reply s-${toneOf(target.fromId)}`}
-			onClick={() => store.openWindow(chatId, seq)}
+			onClick={() => (onJump === undefined ? store.openWindow(chatId, seq) : onJump(chatId, seq))}
 		>
 			<b>{name}</b>
 			<span className="q">{messagePreview(target, nameOf, copy, channel)}</span>
@@ -452,6 +454,8 @@ interface BubbleProps {
 	rowKey?: string;
 	/** Keys of an album's messages; empty for a single message. */
 	albumKeys?: readonly string[];
+	/** The album's messages in the order of albumKeys, when they are not in the store (a person's merged timeline). */
+	albumMessages?: readonly StoredMessage[] | undefined;
 	message: StoredMessage;
 	chat: Chat | null;
 	readOutboxMaxSeq: number;
@@ -467,18 +471,29 @@ interface BubbleProps {
 }
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
-function MediaSlot({ chatId, message, albumKeys }: { chatId: number; message: StoredMessage; albumKeys: readonly string[] }) {
+function MediaSlot({
+	chatId,
+	message,
+	albumKeys,
+	albumMessages,
+}: {
+	chatId: number;
+	message: StoredMessage;
+	albumKeys: readonly string[];
+	albumMessages?: readonly StoredMessage[] | undefined;
+}) {
 	"use no memo";
 	const { store } = useServices();
 	if (albumKeys.length > 1) {
-		const shapes = albumKeys.map((key) => {
+		const shapes = albumKeys.map((key, index) => {
+			if (albumMessages !== undefined) return albumMessages[index]?.media;
 			const item = store.item(chatId, key);
 			return item?.kind === "message" ? item.message.media : undefined;
 		});
 		const visual = visualAlbum(shapes);
 		return (
 			<Suspense fallback={<MediaReserve shape={message.media ?? { kind: "document", width: 0, height: 0 }} count={albumKeys.length} visual={visual} />}>
-				<AlbumMedia chatId={chatId} keys={albumKeys} visual={visual} />
+				<AlbumMedia chatId={chatId} keys={albumKeys} visual={visual} messages={albumMessages} />
 			</Suspense>
 		);
 	}
@@ -496,6 +511,7 @@ export function MessageBubble({
 	itemKey,
 	rowKey = itemKey,
 	albumKeys = [],
+	albumMessages,
 	message,
 	chat,
 	readOutboxMaxSeq,
@@ -540,10 +556,12 @@ export function MessageBubble({
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
 	const seqs = album
-		? albumKeys.flatMap((key) => {
-				const item = store.item(chatId, key);
-				return item?.kind === "message" ? [item.message.seq] : [];
-			})
+		? (albumMessages ?? []).length > 0
+			? (albumMessages ?? []).map((member) => member.seq)
+			: albumKeys.flatMap((key) => {
+					const item = store.item(chatId, key);
+					return item?.kind === "message" ? [item.message.seq] : [];
+				})
 		: [message.seq];
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
@@ -664,9 +682,9 @@ export function MessageBubble({
 							<ViaLine botId={message.viaBotId} />
 						</Suspense>
 					)}
-					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
+					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} onJump={limited?.jump} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
-					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
+					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} albumMessages={albumMessages} />}
 					{alert === null ? (
 						<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
 					) : (

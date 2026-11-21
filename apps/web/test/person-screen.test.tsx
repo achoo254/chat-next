@@ -8,7 +8,7 @@
 import { ChatType } from "@achoo254/chat-proto/chats";
 import { act, cleanup, fireEvent, render, screen, waitFor, within, type RenderResult } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { App } from "../src/app.tsx";
 import type { MessagingConnector } from "../src/messaging/data/connector.ts";
@@ -144,7 +144,10 @@ describe("the person screen", () => {
 	it("loads older messages at the top while the first message on screen stays where it was", async () => {
 		layOut();
 		// Telegram's only message is older than every Chat message: it shows once Chat is loaded back to it.
-		const { fixture, person } = seed([{ chat: "telegram", text: "Cũ nhất" }, ...numbered("chat", 40, "Tin")]);
+		const { fixture, person, lanChat, telegramChat } = seed([{ chat: "telegram", text: "Cũ nhất" }, ...numbered("chat", 40, "Tin")]);
+		// All read: with unread messages the list opens at the divider instead of at the newest message.
+		fixture.unread(lanChat, 0);
+		fixture.unread(telegramChat, 0);
 		renderMessaging(fixture, `/p/${person}`);
 		const log = await timeline();
 		await waitFor(() => expect(bubbles(log)).toHaveLength(30), LONG);
@@ -337,5 +340,78 @@ describe("the read marker of the merged timeline", () => {
 		marker.note(new Map([[1, 20]]));
 		vi.advanceTimersByTime(1000);
 		expect(calls.at(-1)).toEqual([1, 9]);
+	});
+});
+
+/** Lan Anh on Telegram and on Chat as one person, with media on, for what the rows draw. */
+function seedRich() {
+	const fixture = new ChatFixture();
+	fixture.enableMedia();
+	const lan = fixture.addUser("Lan Anh");
+	const lanTelegram = fixture.addUser("Lan Anh");
+	const lanChat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, lan]);
+	const telegramChat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, lanTelegram], { externalApp: "telegram" });
+	const person = fixture.people.link([lan, lanTelegram]);
+	return { fixture, lan, lanTelegram, lanChat, telegramChat, person: person.id };
+}
+
+const PHOTO = { kind: "photo", mimeType: "image/jpeg", bytes: new Uint8Array(64), width: 400, height: 300, inlineThumb: new Uint8Array(8), sizes: ["s", "m"] } as const;
+
+describe("the rows of the person screen", () => {
+	beforeEach(() => {
+		window.localStorage.clear();
+		window.sessionStorage.clear();
+	});
+
+	it("puts the unread divider above the first message that was unread and keeps it after reading", async () => {
+		const { fixture, lanTelegram, telegramChat, person } = seedRich();
+		fixture.send(lanTelegram, telegramChat, "Tin chưa đọc 1");
+		fixture.send(lanTelegram, telegramChat, "Tin chưa đọc 2");
+		fixture.unread(telegramChat, 2);
+		renderMessaging(fixture, `/p/${person}`);
+		const log = await timeline();
+		const divider = await within(log).findByText("Tin chưa đọc", { selector: ".unread-div" }, LONG);
+		expect(divider.nextElementSibling?.textContent).toContain("Tin chưa đọc 1");
+	});
+
+	it("shows no divider when nothing was unread", async () => {
+		const { fixture, lanTelegram, telegramChat, person } = seedRich();
+		fixture.send(lanTelegram, telegramChat, "Đã đọc rồi");
+		fixture.unread(telegramChat, 0);
+		renderMessaging(fixture, `/p/${person}`);
+		const log = await timeline();
+		await waitFor(() => expect(bubbles(log)).toHaveLength(1), LONG);
+		expect(log.querySelector(".unread-div")).toBeNull();
+	});
+
+	it("scrolls to a quoted message on the timeline and outlines it", async () => {
+		const { fixture, lanTelegram, telegramChat, person } = seedRich();
+		const first = fixture.send(lanTelegram, telegramChat, "Câu hỏi gốc");
+		fixture.send(lanTelegram, telegramChat, "Ở giữa");
+		fixture.send(lanTelegram, telegramChat, "Trả lời câu hỏi", { replyToSeq: BigInt(first) });
+		renderMessaging(fixture, `/p/${person}`);
+		const log = await timeline();
+		await waitFor(() => expect(bubbles(log)).toHaveLength(3), LONG);
+		await within(log).findByRole("button", { name: /Câu hỏi gốc/ }, LONG);
+		await settle();
+		const quote = within(log).getByRole("button", { name: /Câu hỏi gốc/ });
+		fireEvent.click(quote);
+		const row = bubbles(log).find((candidate) => candidate.textContent?.includes("Câu hỏi gốc") === true && candidate.querySelector(".reply") === null);
+		expect(row?.classList.contains("flash")).toBe(true);
+		// Not left on: the outline goes after a moment.
+		await waitFor(() => expect(row?.classList.contains("flash")).toBe(false), { timeout: 4000 });
+	});
+
+	it("draws the photos sent together as one album with one caption", async () => {
+		const { fixture, lanTelegram, telegramChat, person } = seedRich();
+		fixture.send(lanTelegram, telegramChat, "Trước đó");
+		for (const [index, caption] of ["Ba ảnh buổi sáng", "", ""].entries()) fixture.sendFile(lanTelegram, telegramChat, PHOTO, caption, 55 + (index > 5 ? 1 : 0));
+		renderMessaging(fixture, `/p/${person}`);
+		const log = await timeline();
+		const album = await within(log).findByRole("group", { name: "Album 3 ảnh và video" }, LONG);
+		expect(within(album).getAllByRole("button", { name: /^Ảnh \d$/ })).toHaveLength(3);
+		expect(within(log).getAllByText("Ba ảnh buổi sáng")).toHaveLength(1);
+		// Two rows: the text and the whole album.
+		expect(bubbles(log)).toHaveLength(2);
 	});
 });
