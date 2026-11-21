@@ -202,7 +202,7 @@ function Danger({ accountId, conversationId, appName, api, disabled, on, onError
 	}, [pending]);
 	const fail = (err: unknown) => {
 		const error = onError(err);
-		setNote(error.kind === "confirmation_wrong" ? t.people.danger.wrongName : t.failed);
+		setNote(error.kind === "confirmation_wrong" ? t.people.danger.wrongName : error.kind === "reauth" ? "" : t.failed);
 		if (error.kind === "confirmation_wrong") setPending(null);
 	};
 	const wait = pending === null ? 0 : Math.max(0, Math.ceil(pending.usableFrom - now));

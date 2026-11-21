@@ -61,6 +61,7 @@
 .badge.at { padding: 0; min-width: 20px; }
 .tag { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; padding: 0 var(--space-1); border-radius: var(--radius-xs); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; background: color-mix(in srgb, var(--c-viz-violet) 12%, transparent); color: var(--c-viz-violet-text); }
 .tag.grey { background: var(--c-bar-track); color: var(--c-text-muted); }
+.tag-logo { flex: none; display: inline-flex; align-items: center; }
 .tag.ok { background: color-mix(in srgb, var(--c-success) 14%, transparent); color: var(--c-success-text); }
 .role { font-size: 0.75rem; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 /* Compact button for rows: smaller type and padding, still a 44px target. */

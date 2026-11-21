@@ -4,9 +4,11 @@
 // its own guard rails (the name typed again, a second confirmation that waits).
 // Loaded only for a chat copied from another app.
 import { useEffect, useState } from "react";
+import { paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
 import type { BridgeError } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
+import { BridgeReauthBanner } from "./bridge-reauth-banner.tsx";
 import type { BridgeFeatureView } from "./bridge-features-model.ts";
 import { BridgePeople } from "./bridge-people.tsx";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
@@ -25,9 +27,11 @@ export function BridgeChatTools({ chatId, title }: { chatId: number; title: stri
 	const api = bridgeClient(transport);
 	const [linked, setLinked] = useState<Linked | null>(null);
 	const [version, setVersion] = useState(0);
+	const [reauth, setReauth] = useState(false);
 	const onError = (err: unknown): BridgeError => {
 		const error = bridgeError(err);
-		if (error.kind !== "reauth") toasts.show(t.failed);
+		if (error.kind === "reauth") setReauth(true);
+		else toasts.show(t.failed);
 		return error;
 	};
 	useEffect(() => {
@@ -56,6 +60,7 @@ export function BridgeChatTools({ chatId, title }: { chatId: number; title: stri
 	return (
 		<div className="info-sec br-chat-tools" data-id="bridge-chat-tools">
 			<h3>{t.people.title}</h3>
+			{reauth && <BridgeReauthBanner returnTo={paths.chat(chatId)} />}
 			<BridgePeople
 				accountId={linked.accountId}
 				conversationId={linked.conversationId}

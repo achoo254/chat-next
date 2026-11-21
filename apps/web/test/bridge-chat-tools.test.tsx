@@ -63,6 +63,21 @@ describe("people and the group in the other app, from the info panel", () => {
 		await waitFor(() => expect(fixture.bridge.calls).toContain("group:delete"), LONG);
 	});
 
+	it("says a sign-in from the last 10 minutes is needed, with the link that comes back to this chat, not a generic failure", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.reauth = true;
+		const tools = await openTools(fixture);
+		await userEvent.type(within(tools).getByLabelText("Gõ lại tên nhóm"), "Anh Đô CEO");
+		await userEvent.click(within(tools).getByRole("button", { name: "Xoá nhóm cho mọi người…" }));
+		const banner = await within(tools).findByRole("alert", {}, LONG);
+		expect(within(banner).getByText("Thao tác này cần đăng nhập trong 10 phút gần đây.")).toBeTruthy();
+		const href = within(banner).getByRole("link", { name: "Đăng nhập lại" }).getAttribute("href") ?? "";
+		expect(href).toContain("reauth=1");
+		expect(decodeURIComponent(href)).toContain("return_to=/c/");
+		expect(within(tools).queryByText("Chưa làm được, thử lại sau.")).toBeNull();
+		expect(fixture.bridge.calls).not.toContain("group:delete");
+	});
+
 	it("is not shown for a chat that is not a copy", async () => {
 		const fixture = new ChatFixture();
 		const other = fixture.addUser("Lan");

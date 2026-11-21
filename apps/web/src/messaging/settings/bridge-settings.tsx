@@ -5,7 +5,6 @@
 // dialog standing in for the page. The phone number, code and password go to
 // the server in the call that needs them and are never kept here.
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
-import { signInUrl } from "@achoo254/chat-core";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -19,6 +18,7 @@ import {
 	type LoginStep,
 } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
+import { BridgeReauthBanner } from "./bridge-reauth-banner.tsx";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
@@ -93,7 +93,7 @@ export default function BridgeSettings() {
 			</p>
 			{reauth > 0 && (
 				<div ref={reauthBanner}>
-					<ReauthBanner />
+					<BridgeReauthBanner returnTo={paths.settings("bridge")} />
 				</div>
 			)}
 			{accounts.map((account) => (
@@ -146,21 +146,6 @@ export default function BridgeSettings() {
 					)}
 				</section>
 			)}
-		</div>
-	);
-}
-
-/** The sign-in that carries on here after the reauthentication. */
-function ReauthBanner() {
-	const t = useBridgeCopy();
-	const { locale } = useI18n();
-	return (
-		<div className="banner" role="alert">
-			<Icon name="lock" small />
-			<span className="grow">{t.reauth.body}</span>
-			<a className="btn btn-sm" href={signInUrl(locale, { reauth: true, returnTo: paths.settings("bridge") })}>
-				{t.reauth.signIn}
-			</a>
 		</div>
 	);
 }

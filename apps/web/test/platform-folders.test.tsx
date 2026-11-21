@@ -46,6 +46,14 @@ describe("platform folders", () => {
 		expect(await screen.findByText("tin thường", {}, LONG)).toBeTruthy();
 	});
 
+	it("marks a chat synced with Telegram by its logo alone, not by the app's name", async () => {
+		renderMessaging(mixed(), "/");
+		const list = await screen.findByText("tin hai chiều", {}, LONG);
+		const row = list.closest("a") as HTMLElement;
+		expect(within(row).getAllByRole("img", { name: "Telegram" })).toHaveLength(1);
+		expect(within(row).queryByText("Telegram")).toBeNull();
+	});
+
 	it("has no app folder when no chat is synced with an app", async () => {
 		const fixture = new ChatFixture();
 		const tom = fixture.addUser("Tôm");

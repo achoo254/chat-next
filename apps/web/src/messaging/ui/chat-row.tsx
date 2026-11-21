@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
+import { AppLogo, hasAppLogo } from "../../components/app-logo.tsx";
 import { appName, chatKind, countLabel, dialogTitle, inlineThumbUrl, isSavedChat, listTime, messagePreview, namedUserIds, type ChatKind } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { useDialog, useDraft, useListEntry, useServices, useTopics, useUserNames } from "../data/services.tsx";
@@ -247,11 +248,16 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 							<LabelledIcon name={kindIcon} label={kindLabel(kind, copy)} className="type-ico" />
 						)}
 						<span className="title-text">{title}</span>
-						{view.chat?.externalApp !== undefined && (
-							<span className="tag" title={copy.list.copyOf(appName(view.chat.externalApp))}>
-								{appName(view.chat.externalApp)}
-							</span>
-						)}
+						{view.chat?.externalApp !== undefined &&
+							(hasAppLogo(view.chat.externalApp) ? (
+								<span className="tag-logo" role="img" aria-label={appName(view.chat.externalApp)} title={copy.list.copyOf(appName(view.chat.externalApp))}>
+									<AppLogo app={view.chat.externalApp} />
+								</span>
+							) : (
+								<span className="tag" title={copy.list.copyOf(appName(view.chat.externalApp))}>
+									{appName(view.chat.externalApp)}
+								</span>
+							))}
 						{muted && <LabelledIcon name="bell-off" label={copy.list.muted} />}
 					</span>
 					<Preview view={view} kind={kind} saved={saved} draft={draft} topics={topics} />
