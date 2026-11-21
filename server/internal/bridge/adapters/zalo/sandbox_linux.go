@@ -3,6 +3,8 @@
 package zalo
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -11,7 +13,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 )
+
+// sudoCheckTimeout bounds the startup question to sudo.
+const sudoCheckTimeout = 10 * time.Second
 
 // realHost reads the running Linux system.
 func realHost() hostSystem {
@@ -23,6 +29,7 @@ func realHost() hostSystem {
 		stat:       func(name string) (fileFacts, error) { return factsOf(os.Stat(name)) },
 		readFile:   os.ReadFile,
 		realDir:    filepath.EvalSymlinks,
+		sudoAllows: sudoAllows,
 	}
 }
 
@@ -53,27 +60,21 @@ func factsOf(fi fs.FileInfo, err error) (fileFacts, error) {
 	return fileFacts{mode: fi.Mode(), uid: st.Uid, gid: st.Gid}, nil
 }
 
-// applySandbox gives the work directory to the sandbox user (mode 0700) and
-// makes the process start as that user and group, without supplementary
-// groups. The server needs CAP_SETUID, CAP_SETGID and CAP_CHOWN for this.
-// Go sets the parent-death signal after switching credentials, so
-// Pdeathsig still applies to the sandboxed process.
-func applySandbox(cmd *exec.Cmd, dir string, id *sandboxIdentity) error {
-	if err := os.Chmod(dir, 0o700); err != nil {
-		return fmt.Errorf("zalo: sidecar work dir: %w", err)
+// sudoAllows asks sudo, as the server's user, whether it may run exactly
+// `node bundle` as user without a password (see sudoListArgs). Nothing is run.
+func sudoAllows(sudo, user, node, bundle string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), sudoCheckTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sudo, sudoListArgs(user, node, bundle)...)
+	cmd.Dir = "/"
+	cmd.Env = sidecarEnv()
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
 	}
-	if err := os.Chown(dir, int(id.uid), int(id.gid)); err != nil {
-		return fmt.Errorf("zalo: give the sidecar work dir to the sandbox user: %w", err)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return fmt.Errorf("sudo -l exited %d: %s", exit.ExitCode(), sudoReply(out))
 	}
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: id.uid, Gid: id.gid, Groups: []uint32{}}
-	return nil
-}
-
-// reclaimWorkDir gives the work directory back to the server so it can be
-// removed (the temporary directory's sticky bit lets only the owner do it).
-func reclaimWorkDir(dir string) {
-	_ = os.Chown(dir, os.Getuid(), os.Getgid())
+	return err
 }

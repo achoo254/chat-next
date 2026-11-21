@@ -100,13 +100,16 @@ type Config struct {
 	// (ZALO_SIDECAR_BUNDLE, server/internal/bridge/adapters/zalo/sidecar/dist/
 	// zalo-sidecar.cjs). Empty, the default, offers no Zalo. When set,
 	// ZALO_NODE_PATH (absolute path of node) and ZALO_SANDBOX_USER (the OS
-	// user the sidecar runs as) are required; ZALO_SIDECAR_SHA256 overrides the
-	// digest read from the bundle's .sha256 file. The sandbox itself is checked
-	// when the adapters are built (zalo.NewSandboxedRunner).
+	// user the sidecar runs as, through sudo) are required; ZALO_SIDECAR_SHA256
+	// overrides the digest read from the bundle's .sha256 file; ZALO_SUDO_PATH
+	// is sudo (absolute, default /usr/bin/sudo). The sandbox itself, the
+	// sudoers rule included, is checked when the adapters are built
+	// (zalo.NewSandboxedRunner).
 	ZaloSidecarBundle string
 	ZaloNodePath      string
 	ZaloSandboxUser   string
 	ZaloSidecarSHA256 string
+	ZaloSudoPath      string
 	// OutboundDeny are addresses (or CIDR ranges) that requests to URLs
 	// chosen by users and bots never reach (OUTBOUND_DENY_CIDRS): the
 	// server's own public addresses, so a bot webhook or a link preview
@@ -432,6 +435,12 @@ func Load(lookup Lookup) (Config, error) {
 		c.ZaloNodePath = get("ZALO_NODE_PATH")
 		c.ZaloSandboxUser = get("ZALO_SANDBOX_USER")
 		c.ZaloSidecarSHA256 = get("ZALO_SIDECAR_SHA256")
+		c.ZaloSudoPath = get("ZALO_SUDO_PATH")
+		if c.ZaloSudoPath == "" {
+			c.ZaloSudoPath = "/usr/bin/sudo"
+		} else if !filepath.IsAbs(c.ZaloSudoPath) {
+			errs = append(errs, invalid("ZALO_SUDO_PATH", "must be an absolute path"))
+		}
 		if !filepath.IsAbs(raw) {
 			errs = append(errs, invalid("ZALO_SIDECAR_BUNDLE", "must be an absolute path"))
 		}

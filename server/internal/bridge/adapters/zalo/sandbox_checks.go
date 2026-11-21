@@ -12,8 +12,11 @@ import (
 )
 
 // SandboxConfig is how the sidecar is run apart from the server. Every field is
-// required except SHA256, which defaults to the bundle's sibling .sha256 file.
+// required except SHA256, which defaults to the bundle's sibling .sha256 file,
+// and Sudo, which defaults to /usr/bin/sudo.
 type SandboxConfig struct {
+	// Sudo is the absolute path of sudo, which starts the sidecar as User.
+	Sudo string
 	// Node is the absolute path of the node binary (no PATH lookup).
 	Node string
 	// Bundle is the absolute path of dist/zalo-sidecar.cjs.
@@ -24,11 +27,15 @@ type SandboxConfig struct {
 	SHA256 string
 }
 
-// errSandboxUnsupported: the sandbox switches OS user, which only the Linux
-// build does.
-var errSandboxUnsupported = errors.New("zalo: the sidecar sandbox (a separate OS user) needs Linux")
+// errSandboxUnsupported: the sandbox runs the sidecar as another OS user
+// through sudo, which only the Linux build does.
+var errSandboxUnsupported = errors.New("zalo: the sidecar sandbox (a separate OS user through sudo) needs Linux")
 
-// sandboxIdentity is the OS user and group the sidecar runs as.
+// defaultSudo is where sudo is when ZALO_SUDO_PATH is not set.
+const defaultSudo = "/usr/bin/sudo"
+
+// sandboxIdentity is the OS user and group the sidecar runs as, for the checks
+// of what that user can write.
 type sandboxIdentity struct{ uid, gid uint32 }
 
 // fileFacts is what the checks read about a path, without following a
@@ -47,6 +54,9 @@ type hostSystem struct {
 	stat       func(name string) (fileFacts, error) // follows links
 	readFile   func(name string) ([]byte, error)
 	realDir    func(name string) (string, error) // resolves links in a directory path
+	// sudoAllows reports, without a password and without running it, whether
+	// sudo lets the server's user run exactly `node bundle` as user.
+	sudoAllows func(sudo, user, node, bundle string) error
 }
 
 // NewSandboxedRunner checks the sandbox and returns the runner that uses it.
@@ -54,7 +64,8 @@ type hostSystem struct {
 // a real, unprivileged account other than the server's; node must be an
 // absolute path to an executable; the bundle must be a regular file the
 // sidecar's user cannot change (nor any directory above it) and must have the
-// expected SHA-256.
+// expected SHA-256; sudo must be the real set-user-ID binary and must grant
+// exactly `node bundle` as that user without a password.
 func NewSandboxedRunner(cfg SandboxConfig) (*ExecRunner, error) {
 	return prepareSandbox(cfg, realHost())
 }
@@ -86,7 +97,11 @@ func prepareSandbox(cfg SandboxConfig, h hostSystem) (*ExecRunner, error) {
 	if err := checkBundleDigest(cfg, h); err != nil {
 		return nil, err
 	}
-	return &ExecRunner{Node: cfg.Node, Bundle: cfg.Bundle, sandbox: &id}, nil
+	sudo, err := checkSudo(cfg, h)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecRunner{Node: cfg.Node, Bundle: cfg.Bundle, sudo: &sudoLaunch{path: sudo, user: cfg.User}}, nil
 }
 
 func checkNode(node string, h hostSystem) error {

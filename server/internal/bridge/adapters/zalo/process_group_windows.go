@@ -9,11 +9,11 @@ import (
 )
 
 // setProcessGroup does nothing on Windows (development only): the sidecar
-// exits when its stdin closes, and Kill ends the process itself.
+// exits when its stdin closes.
 func setProcessGroup(*exec.Cmd) {}
 
-// killProcessGroup kills the sidecar process.
-func killProcessGroup(cmd *exec.Cmd) error {
+// terminate ends the sidecar process: Windows has no SIGTERM to send.
+func terminate(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
 		return nil
 	}

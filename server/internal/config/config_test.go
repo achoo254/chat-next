@@ -261,7 +261,7 @@ func TestLoadBotWebhookAllowLocal(t *testing.T) {
 func TestLoadZaloSidecar(t *testing.T) {
 	env := validEnv()
 	c, err := Load(lookupFrom(env))
-	if err != nil || c.ZaloSidecarBundle != "" || c.ZaloNodePath != "" || c.ZaloSandboxUser != "" {
+	if err != nil || c.ZaloSidecarBundle != "" || c.ZaloNodePath != "" || c.ZaloSandboxUser != "" || c.ZaloSudoPath != "" {
 		t.Fatalf("default: %+v, %v", c, err)
 	}
 	// Without the bundle the other settings are ignored: Zalo stays off.
@@ -273,8 +273,13 @@ func TestLoadZaloSidecar(t *testing.T) {
 	env["ZALO_NODE_PATH"] = "/usr/bin/node"
 	env["ZALO_SANDBOX_USER"] = "chat-zalo"
 	if c, err = Load(lookupFrom(env)); err != nil || c.ZaloSidecarBundle != "/opt/chat/zalo-sidecar.cjs" ||
-		c.ZaloNodePath != "/usr/bin/node" || c.ZaloSandboxUser != "chat-zalo" || c.ZaloSidecarSHA256 != "" {
+		c.ZaloNodePath != "/usr/bin/node" || c.ZaloSandboxUser != "chat-zalo" || c.ZaloSidecarSHA256 != "" ||
+		c.ZaloSudoPath != "/usr/bin/sudo" {
 		t.Fatalf("enabled: %+v, %v", c, err)
+	}
+	env["ZALO_SUDO_PATH"] = "/usr/local/bin/sudo"
+	if c, err = Load(lookupFrom(env)); err != nil || c.ZaloSudoPath != "/usr/local/bin/sudo" {
+		t.Fatalf("sudo path: %q, %v", c.ZaloSudoPath, err)
 	}
 	digest := strings.Repeat("ab", 32)
 	env["ZALO_SIDECAR_SHA256"] = digest
@@ -283,7 +288,7 @@ func TestLoadZaloSidecar(t *testing.T) {
 	}
 	for name, bad := range map[string]string{
 		"ZALO_SIDECAR_BUNDLE": "dist/zalo-sidecar.cjs", "ZALO_NODE_PATH": "node",
-		"ZALO_SANDBOX_USER": "", "ZALO_SIDECAR_SHA256": "ABC",
+		"ZALO_SANDBOX_USER": "", "ZALO_SIDECAR_SHA256": "ABC", "ZALO_SUDO_PATH": "sudo",
 	} {
 		env := validEnv()
 		env["ZALO_SIDECAR_BUNDLE"] = "/opt/chat/zalo-sidecar.cjs"

@@ -245,8 +245,8 @@ func TestLogoutClosesTheSidecarStdin(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Subscribe did not return after Logout")
 	}
-	if r.process(t, 0).wasKilled() {
-		t.Error("the sidecar was killed although it exited when its stdin closed")
+	if r.process(t, 0).wasTerminated() {
+		t.Error("the sidecar was signalled although it exited when its stdin closed")
 	}
 }
 

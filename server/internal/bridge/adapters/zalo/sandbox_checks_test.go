@@ -20,10 +20,13 @@ const (
 var bundleBytes = []byte("the reviewed bundle")
 
 // fakeHost is a small file tree: root owns everything, read-only for others.
+// Its sudo grants what granted holds, and records what it was asked.
 type fakeHost struct {
-	files map[string]fileFacts
-	data  map[string][]byte
-	users map[string][2]uint32
+	files   map[string]fileFacts
+	data    map[string][]byte
+	users   map[string][2]uint32
+	granted []string // sudo, user, node, bundle
+	asked   [][]string
 }
 
 func newFakeHost() *fakeHost {
@@ -37,12 +40,14 @@ func newFakeHost() *fakeHost {
 			bundlePath:             {mode: 0o644},
 			bundlePath + ".sha256": {mode: 0o644},
 			nodePath:               {mode: 0o755},
+			defaultSudo:            {mode: fs.ModeSetuid | 0o4755},
 		},
 		data: map[string][]byte{
 			bundlePath:             bundleBytes,
 			bundlePath + ".sha256": []byte(hex.EncodeToString(sum[:]) + "  zalo-sidecar.cjs\n"),
 		},
-		users: map[string][2]uint32{"chat-zalo": {sandboxUID, sandboxGID}, "root": {0, 0}, "chat": {serverUID, serverUID}},
+		users:   map[string][2]uint32{"chat-zalo": {sandboxUID, sandboxGID}, "root": {0, 0}, "chat": {serverUID, serverUID}},
+		granted: []string{defaultSudo, "chat-zalo", nodePath, bundlePath},
 	}
 	return h
 }
@@ -75,18 +80,60 @@ func (h *fakeHost) system() hostSystem {
 			return d, nil
 		},
 		realDir: func(name string) (string, error) { return name, nil },
+		sudoAllows: func(sudo, user, node, bundle string) error {
+			got := []string{sudo, user, node, bundle}
+			h.asked = append(h.asked, got)
+			if strings.Join(got, "|") != strings.Join(h.granted, "|") {
+				return errors.New("sudo -l exited 1: Sorry, user chat is not allowed")
+			}
+			return nil
+		},
 	}
 }
 
 var goodSandbox = SandboxConfig{Node: nodePath, Bundle: bundlePath, User: "chat-zalo"}
 
 func TestSandboxAcceptsAProperSetup(t *testing.T) {
-	r, err := prepareSandbox(goodSandbox, newFakeHost().system())
+	host := newFakeHost()
+	r, err := prepareSandbox(goodSandbox, host.system())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Node != nodePath || r.Bundle != bundlePath || r.sandbox == nil || r.sandbox.uid != sandboxUID || r.sandbox.gid != sandboxGID {
+	if r.Node != nodePath || r.Bundle != bundlePath || r.sudo == nil || r.sudo.path != defaultSudo || r.sudo.user != "chat-zalo" {
 		t.Errorf("runner = %+v", r)
+	}
+	if len(host.asked) != 1 {
+		t.Errorf("sudo was asked %d times, want once", len(host.asked))
+	}
+	// The command started is exactly the one sudo was asked about.
+	name, args := r.args()
+	want := []string{defaultSudo, "-n", "-u", "chat-zalo", "--", nodePath, bundlePath}
+	if got := append([]string{name}, args...); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("command = %q, want %q", got, want)
+	}
+	if got := strings.Join(sudoListArgs("chat-zalo", nodePath, bundlePath), " "); got != "-n -u chat-zalo -l -- "+nodePath+" "+bundlePath {
+		t.Errorf("sudo question = %q", got)
+	}
+}
+
+func TestSandboxUsesTheConfiguredSudo(t *testing.T) {
+	host := newFakeHost()
+	host.files["/usr/local/bin/sudo"] = fileFacts{mode: fs.ModeSetuid | 0o4755}
+	host.granted[0] = "/usr/local/bin/sudo"
+	cfg := goodSandbox
+	cfg.Sudo = "/usr/local/bin/sudo"
+	r, err := prepareSandbox(cfg, host.system())
+	if err != nil || r.sudo.path != "/usr/local/bin/sudo" {
+		t.Fatalf("runner = %+v, %v", r, err)
+	}
+}
+
+func TestSudoReplyIsShortAndPrintable(t *testing.T) {
+	if got := sudoReply([]byte("Sorry, user chat may not run sudo\x1b[31m on host.\nsecond line")); strings.Contains(got, "\n") || strings.Contains(got, "second") {
+		t.Errorf("reply = %q", got)
+	}
+	if got := sudoReply([]byte(strings.Repeat("x", 500))); len(got) != 160 {
+		t.Errorf("reply length = %d", len(got))
 	}
 }
 
@@ -122,6 +169,16 @@ func TestSandboxRefusals(t *testing.T) {
 		"no digest file":            {host: func(h *fakeHost) { delete(h.data, bundlePath+".sha256") }, reason: "digest file"},
 		"bad digest file":           {host: func(h *fakeHost) { h.data[bundlePath+".sha256"] = []byte("nope\n") }, reason: "not a SHA-256"},
 		"configured digest differs": {cfg: func(c *SandboxConfig) { c.SHA256 = strings.Repeat("0", 64) }, reason: "digest does not match"},
+		"relative sudo":             {cfg: func(c *SandboxConfig) { c.Sudo = "sudo" }, reason: "sudo must be an absolute path"},
+		"missing sudo":              {host: func(h *fakeHost) { delete(h.files, defaultSudo) }, reason: "zalo: sudo:"},
+		"sudo without set-user-ID":  {host: func(h *fakeHost) { h.files[defaultSudo] = fileFacts{mode: 0o755} }, reason: "not a set-user-ID file owned by root"},
+		"sudo not owned by root": {host: func(h *fakeHost) {
+			h.files[defaultSudo] = fileFacts{mode: fs.ModeSetuid | 0o4755, uid: serverUID}
+		}, reason: "not a set-user-ID file owned by root"},
+		"no sudoers rule":         {host: func(h *fakeHost) { h.granted = nil }, reason: "sudoers rule for the sidecar is missing or differs"},
+		"rule for another user":   {host: func(h *fakeHost) { h.granted[1] = "zalo" }, reason: "sudoers rule"},
+		"rule for another node":   {host: func(h *fakeHost) { h.granted[2] = "/opt/other/node" }, reason: "sudoers rule"},
+		"rule for another bundle": {host: func(h *fakeHost) { h.granted[3] = "/tmp/x.cjs" }, reason: "sudoers rule"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

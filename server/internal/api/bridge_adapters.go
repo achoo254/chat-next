@@ -21,7 +21,8 @@ func bridgeAdapters(cfg config.Config, logger *slog.Logger) map[string]bridge.Ad
 	}
 	if cfg.ZaloSidecarBundle != "" {
 		runner, err := zalo.NewSandboxedRunner(zalo.SandboxConfig{
-			Node: cfg.ZaloNodePath, Bundle: cfg.ZaloSidecarBundle, User: cfg.ZaloSandboxUser, SHA256: cfg.ZaloSidecarSHA256,
+			Sudo: cfg.ZaloSudoPath, Node: cfg.ZaloNodePath, Bundle: cfg.ZaloSidecarBundle, User: cfg.ZaloSandboxUser,
+			SHA256: cfg.ZaloSidecarSHA256,
 		})
 		if err != nil {
 			logger.Error("Zalo is not offered: the sidecar sandbox check failed", "source", zalo.Name, "reason", err.Error())

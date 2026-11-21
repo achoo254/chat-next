@@ -97,7 +97,7 @@ func (s *sidecar) readStdout() {
 		// A line over the limit (or a read error): the protocol is broken, so the
 		// process goes; the reader of events sees it as an exit.
 		s.logger.Warn("zalo sidecar output unreadable; stopping it", "reason", readErrorKind(err))
-		_ = s.proc.Kill()
+		_ = s.proc.Terminate()
 	}
 }
 
@@ -122,9 +122,11 @@ func (s *sidecar) send(c command) error {
 	return nil
 }
 
-// stop closes stdin (the sidecar stops its listener and exits), then kills the
-// process group if it is still there after the grace period. It returns once
-// the process is gone; calling it again is harmless.
+// stop closes stdin (the sidecar stops its listener and exits on EOF), then
+// asks it to terminate if it is still there after the grace period, and gives
+// up waiting after a second one: through sudo nothing stronger reaches the
+// sidecar (see ExecRunner). It returns once the process is gone or given up
+// on; calling it again is harmless.
 func (s *sidecar) stop() {
 	s.stopOnce.Do(func() {
 		close(s.stopping)
@@ -138,15 +140,15 @@ func (s *sidecar) stop() {
 			return
 		case <-grace.C:
 		}
-		if err := s.proc.Kill(); err != nil {
-			s.logger.Warn("zalo sidecar could not be killed", "err", err)
+		if err := s.proc.Terminate(); err != nil {
+			s.logger.Warn("zalo sidecar could not be signalled", "err", err)
 		}
-		kill := time.NewTimer(s.grace)
-		defer kill.Stop()
+		term := time.NewTimer(s.grace)
+		defer term.Stop()
 		select {
 		case <-s.exited:
-		case <-kill.C:
-			s.logger.Error("zalo sidecar still running after kill")
+		case <-term.C:
+			s.logger.Error("zalo sidecar still running after SIGTERM; no longer waiting for it")
 		}
 	})
 }

@@ -57,7 +57,7 @@ type fakeProcess struct {
 	stdinClosed chan struct{} // closed when the adapter closed stdin
 	exited      chan struct{}
 	exitOnce    sync.Once
-	killed      bool
+	terminated  bool
 	mu          sync.Mutex
 }
 
@@ -86,9 +86,9 @@ func (p *fakeProcess) Wait() error {
 	return nil
 }
 
-func (p *fakeProcess) Kill() error {
+func (p *fakeProcess) Terminate() error {
 	p.mu.Lock()
-	p.killed = true
+	p.terminated = true
 	p.mu.Unlock()
 	p.exit()
 	return nil
@@ -104,10 +104,10 @@ func (p *fakeProcess) exit() {
 	})
 }
 
-func (p *fakeProcess) wasKilled() bool {
+func (p *fakeProcess) wasTerminated() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.killed
+	return p.terminated
 }
 
 // waitStdinClosed fails the test unless the adapter closes stdin soon.
