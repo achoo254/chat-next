@@ -1,3 +1,4 @@
 # The tunelo install script runs under sh, which a carriage return breaks:
 # keep it LF in every checkout (core.autocrlf on Windows too).
 apps/web/public/agent/install.sh text eol=lf
+server/internal/bridge/adapters/zalo/sidecar/dist/* -text

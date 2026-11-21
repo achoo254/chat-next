@@ -37,3 +37,6 @@ apps/stun/target/
 
 # Per-agent working memory written by coding agents
 **/.claude/agent-memory/
+
+# The reviewed single-file build of the Zalo sidecar is committed on purpose (CI rebuilds it and compares).
+!server/internal/bridge/adapters/zalo/sidecar/dist/

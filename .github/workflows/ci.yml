@@ -98,6 +98,30 @@ jobs:
           pnpm --filter @app/web exec playwright install-deps chromium
       - run: pnpm perf
 
+  # The Zalo sidecar is built into one reviewed file that the server runs. CI builds it again
+  # from the pinned packages and the file must be byte-identical to the committed one, so what
+  # was reviewed is what runs; its in-process egress guard is tested too.
+  zalo-sidecar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server/internal/bridge/adapters/zalo/sidecar
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      # Its own lockfile, outside the workspace: no install script runs.
+      - run: pnpm install --frozen-lockfile --ignore-workspace
+      - run: pnpm test
+      - run: pnpm build
+      - name: The committed bundle is what the pinned packages build
+        run: |
+          git diff --exit-code -- dist
+          cd dist && sha256sum -c zalo-sidecar.cjs.sha256
+
   proto:
     runs-on: ubuntu-latest
     timeout-minutes: 15

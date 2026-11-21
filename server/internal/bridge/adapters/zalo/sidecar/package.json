@@ -1,0 +1,16 @@
+{
+	"name": "chat-zalo-sidecar",
+	"private": true,
+	"type": "module",
+	"description": "The Zalo client of Chat Bridge, built into one reviewed file (dist/zalo-sidecar.cjs). Build-time tools only: nothing here is installed on the server.",
+	"scripts": {
+		"build": "node build.mjs",
+		"test": "node --test test/*.test.mjs"
+	},
+	"dependencies": {
+		"zca-js": "2.3.0"
+	},
+	"devDependencies": {
+		"esbuild": "0.27.7"
+	}
+}
