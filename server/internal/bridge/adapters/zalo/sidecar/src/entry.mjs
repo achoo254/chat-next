@@ -22,7 +22,10 @@
 //          learning run reads them), `blocked ...` for a refused connection. No message text,
 //          cookie, imei, name or id is ever written here.
 //
-// Nothing here writes a file, spawns a process or reads the environment.
+// Nothing here writes a file, spawns a process or reads the environment. src/ws-env.mjs sets the
+// two ws switches itself: the engine starts the sidecar through sudo, which resets the environment.
+// First, before anything that loads ws: sudo resets the environment (src/ws-env.mjs).
+import "./ws-env.mjs";
 import readline from "node:readline";
 import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";

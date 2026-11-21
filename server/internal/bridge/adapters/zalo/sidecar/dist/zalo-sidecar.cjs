@@ -17576,6 +17576,10 @@ var require_websocket_server = __commonJS({
   }
 });
 
+// src/ws-env.mjs
+process.env.WS_NO_BUFFER_UTIL = "1";
+process.env.WS_NO_UTF_8_VALIDATE = "1";
+
 // src/entry.mjs
 var import_node_readline = __toESM(require("node:readline"), 1);
 var import_node_timers = require("node:timers");
