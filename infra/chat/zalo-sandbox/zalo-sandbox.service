@@ -1,0 +1,16 @@
+[Unit]
+Description=Firewall chain for the Zalo sidecar's OS user
+After=network-online.target iptables.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Creates the ipset, then the rules that use it, in that order; rebuilds them after a restart of
+# iptables.service (which flushes them) when this unit is started again.
+ExecStart=/usr/local/sbin/zalo-ipset-refresh
+ExecStart=/usr/local/sbin/zalo-sandboxctl apply
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target

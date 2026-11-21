@@ -1,0 +1,84 @@
+#!/bin/bash
+# Keeps the ipset behind the Zalo sidecar's firewall (zalo-sandboxctl) in step with DNS, run by a
+# timer every few minutes. Rules of the list:
+#   - a lookup that FAILS never removes anything: the old addresses of that name stay, the
+#     failure is logged and pushed as a metric (alert ZaloIpsetLookupFailing), the run exits 1;
+#   - an address the name still returns is added and its counter reset;
+#   - an address the name no longer returns is dropped only after MISS_LIMIT successful lookups
+#     in a row that did not return it, so a provider rotating addresses never cuts a live
+#     connection;
+#   - nothing is ever emptied on its own.
+set -uo pipefail
+
+SET=zalo-hosts
+STATE_DIR=${ZALO_STATE_DIR:-/var/lib/zalo-sandbox}
+STATE="$STATE_DIR/addresses.tsv" # ip <TAB> name <TAB> misses <TAB> first_seen_epoch
+HOSTS=${ZALO_HOSTS:-/etc/zalo-sandbox/hosts.conf}
+MISS_LIMIT=${ZALO_MISS_LIMIT:-12} # 12 runs of 5 minutes: an hour
+METRICS_URL=${ZALO_METRICS_URL:-http://127.0.0.1:8428/api/v1/import/prometheus}
+
+[ "$(id -u)" -eq 0 ] || [ -n "${ZALO_TEST:-}" ] || { echo "zalo-ipset-refresh: run as root" >&2; exit 2; }
+install -d -m 755 "$STATE_DIR"
+touch "$STATE"
+ipset create -exist "$SET" hash:ip family inet maxelem 256
+
+now="$(date +%s)"
+failed=0
+tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$tmp.m"' EXIT
+
+while read -r name; do
+	case "$name" in "" | \#*) continue ;; esac
+	ips="$(getent ahostsv4 "$name" 2>/dev/null | awk '{print $1}' | sort -u)"
+	if [ -z "$ips" ]; then
+		failed=$((failed + 1))
+		logger -t zalo-ipset -p user.err "DNS lookup failed for $name; keeping its old addresses"
+		echo "zalo_ipset_lookup_ok{name=\"$name\"} 0" >>"$tmp.m"
+		# keep this name's entries untouched
+		awk -F'\t' -v n="$name" '$2 == n' "$STATE" >>"$tmp"
+		continue
+	fi
+	echo "zalo_ipset_lookup_ok{name=\"$name\"} 1" >>"$tmp.m"
+	for ip in $ips; do
+		first="$(awk -F'\t' -v i="$ip" -v n="$name" '$1 == i && $2 == n {print $4}' "$STATE" | head -1)"
+		printf '%s\t%s\t0\t%s\n' "$ip" "$name" "${first:-$now}" >>"$tmp"
+		ipset add -exist "$SET" "$ip"
+	done
+	# Addresses of this name that were not returned this time: one more miss.
+	while IFS=$'\t' read -r ip n misses first; do
+		[ "$n" = "$name" ] || continue
+		grep -qxF "$ip" <<<"$ips" && continue
+		misses=$((misses + 1))
+		if [ "$misses" -ge "$MISS_LIMIT" ]; then
+			# Removed only if no other name still lists it.
+			if ! awk -F'\t' -v i="$ip" -v n="$name" '$1 == i && $2 != n' "$STATE" | grep -q .; then ipset del -exist "$SET" "$ip"; fi
+			logger -t zalo-ipset -p user.info "dropped an address of $name after $misses runs without it"
+		else
+			printf '%s\t%s\t%s\t%s\n' "$ip" "$n" "$misses" "$first" >>"$tmp"
+		fi
+	done <"$STATE"
+done <"$HOSTS"
+
+# Names no longer in hosts.conf: keep their rows until their addresses age out through the same rule
+# (a removed name never empties the set by itself).
+while IFS=$'\t' read -r ip n misses first; do
+	grep -qxF "$n" "$HOSTS" && continue
+	printf '%s\t%s\t%s\t%s\n' "$ip" "$n" "$misses" "$first" >>"$tmp"
+done <"$STATE"
+
+sort -u "$tmp" >"$STATE.new" && mv "$STATE.new" "$STATE"
+
+entries="$(ipset list "$SET" 2>/dev/null | awk '/^Number of entries/ {print $4}')"
+maxmiss="$(awk -F'	' 'BEGIN {m = 0} $3 > m {m = $3} END {print m}' "$STATE")"
+{
+	cat "$tmp.m" 2>/dev/null
+	echo "zalo_ipset_entries ${entries:-0}"
+	echo "zalo_ipset_last_run_timestamp_seconds $now"
+	echo "zalo_ipset_max_misses $maxmiss"
+	echo "zalo_ipset_failed_lookups $failed"
+} >"$tmp.m.all"
+# The alert path is best effort: a monitoring outage must not break the refresh.
+curl -fsS -m 5 --data-binary @"$tmp.m.all" "$METRICS_URL" >/dev/null 2>&1 || logger -t zalo-ipset -p user.warning "metrics push failed"
+rm -f "$tmp.m.all"
+
+[ "$failed" -eq 0 ] || exit 1

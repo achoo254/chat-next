@@ -67,3 +67,18 @@ Lịch sử: bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải b�
 ## Rủi ro đã biết
 
 Zalo cấm phần mềm bên thứ ba trong điều khoản (Điều 4.7, 14.2); tài khoản có thể bị hạn chế. Đã chấp nhận cho tài khoản chính của chủ (quyết định trong kho kế hoạch riêng). Zalo đổi giao thức thì thư viện vỡ cho tới khi nâng phiên bản và rà soát lại.
+
+## Chuẩn bị máy chủ (đã làm trên máy dùng chung 21/11/2026, adapter vẫn tắt)
+
+Thư mục `infra/chat/zalo-sandbox/`, cài bằng `bash setup-zalo-sandbox.sh` (root, chạy lại được):
+
+- **User `zalo`** (hệ thống, không shell, không thư mục nhà): nơi tiến trình phụ chạy. `ZALO_SANDBOX_USER=zalo`.
+- **Tường lửa chỉ cho user đó** (`zalo-sandboxctl`): một chuỗi `ZALO_OUT` nối từ `OUTPUT` bằng đúng một quy tắc `-m owner --uid-owner`, không đụng tới user khác. Cho phép DNS tới các bộ phân giải của máy và cổng 443 tới `ipset` `zalo-hosts`; mọi thứ khác bị từ chối và ghi log (`zalo-sandbox-blocked:`), kể cả IPv6. Quy tắc **không** nằm trong `/etc/sysconfig/iptables`: một quy tắc nhắc tới `ipset` không được nạp lúc khởi động trước khi tập có mặt, nếu không cả lần khôi phục sẽ hỏng. Dịch vụ `zalo-sandbox.service` tạo tập rồi mới dựng quy tắc.
+- **Danh sách địa chỉ theo DNS** (`zalo-ipset-refresh`, hẹn giờ 5 phút, tên trong `/etc/zalo-sandbox/hosts.conf`): tra DNS lỗi thì **giữ địa chỉ cũ, báo, thoát mã 1**; địa chỉ chỉ bị bỏ sau 12 lần tra thành công liên tiếp không còn thấy; không bao giờ tự xoá trắng. Số liệu đẩy vào VictoriaMetrics và ba luật cảnh báo (`ZaloIpsetLookupFailing`, `ZaloIpsetRefreshStopped`, `ZaloIpsetEmpty`) nằm ở kho cấu hình Victoria; cảnh báo vào nhóm «Vận hành chat».
+- **Chế độ:** mặc định `enforce`. `zalo-sandboxctl learn [phút]` mở cửa sổ học (443 tới mọi địa chỉ được cho phép và ghi log `zalo-sandbox-learn:`), rồi tự về `enforce` sau số phút đã chọn. Dùng đúng một lần, ngay trước lần đăng nhập đầu, để hoàn thiện `hosts.conf` từ các dòng `host <tên>` của tiến trình phụ và log; sau đó `zalo-sandboxctl enforce`.
+- **Bản đóng gói:** `/opt/chat/zalo-sidecar/` (root, 0755), tệp 0644; `ZALO_SIDECAR_BUNDLE=/opt/chat/zalo-sidecar/zalo-sidecar.cjs`. Hiện chép tay từ bản đã commit (băm khớp `.sha256`); nâng bản thì chép lại, chưa nằm trong bước deploy.
+- **Đã thử trên máy thật (user `zalo` chạy được tiến trình phụ và thoát khi đóng stdin; tới `chat.zalo.me:443` được; `example.com`, cổng 80, kho npm, IPv6 và ổ cắm unix đều bị chặn; root không bị ảnh hưởng).**
+
+### Điều chưa có: cách hạ quyền từ Go
+`chat-api` chạy dưới user `chat` (pm2 giữ quyền root chỉ để khởi động rồi hạ xuống `uid: chat`), không phải root, nên runner không thể tự đổi sang uid `zalo` nếu không có `CAP_SETUID`. Cấp khả năng đó cho tiến trình `chat` cho phép nó thành **bất kỳ user nào kể cả root**, tức xoá hộp cát. Cần một cơ chế hẹp hơn trước khi bật `ZALO_SIDECAR_BUNDLE`; lựa chọn đang chờ quyết định.
+

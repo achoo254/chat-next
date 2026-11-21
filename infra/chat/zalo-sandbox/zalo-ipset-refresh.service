@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh the address list behind the Zalo sidecar firewall from DNS
+Documentation=https://github.com/achoo254/chat-next/blob/main/docs/integrations/zalo-sidecar.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zalo-ipset-refresh
+# A failed lookup exits 1 on purpose (visible in `systemctl --failed`); the timer simply runs again.
+SuccessExitStatus=0 1
+Nice=10

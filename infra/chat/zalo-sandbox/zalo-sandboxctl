@@ -1,0 +1,86 @@
+#!/bin/bash
+# Firewall around the Zalo sidecar's OS user (the unofficial Zalo client runs there, see
+# docs/integrations/zalo-sidecar.md). Only that user's outgoing traffic is touched:
+#   status            show mode, addresses and counters
+#   apply             (re)build the rules from /etc/zalo-sandbox/mode; idempotent
+#   enforce           lock to the approved list now
+#   learn [minutes]   open a learning window (default 10): 443 to any address is allowed and
+#                     logged, then it goes back to enforce by itself
+# Rules live in their own chain ZALO_OUT, reached by one jump that matches the user's uid, and are
+# NOT written into /etc/sysconfig/iptables: a rule that names an ipset must not be loaded at boot
+# before the set exists, or the whole restore would fail.
+set -euo pipefail
+
+SBUSER=zalo
+SET=zalo-hosts
+CHAIN=ZALO_OUT
+STATE=/etc/zalo-sandbox
+MODE_FILE="$STATE/mode"
+
+die() { echo "zalo-sandboxctl: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die "run as root"
+uid="$(id -u "$SBUSER" 2>/dev/null)" || die "user $SBUSER does not exist"
+[ "$uid" -ne 0 ] || die "refusing uid 0"
+
+mode() { cat "$MODE_FILE" 2>/dev/null || echo enforce; }
+
+apply() {
+	local m nameservers ns
+	m="$(mode)"
+	case "$m" in learn | enforce) ;; *) die "bad mode '$m'" ;; esac
+	ipset create -exist "$SET" hash:ip family inet maxelem 256
+	nameservers="$(awk '/^nameserver/ && $2 ~ /^[0-9.]+$/ {print $2}' /etc/resolv.conf)"
+	[ -n "$nameservers" ] || die "no IPv4 nameserver in /etc/resolv.conf"
+
+	iptables -N "$CHAIN" 2>/dev/null || iptables -F "$CHAIN"
+	for ns in $nameservers; do
+		iptables -A "$CHAIN" -d "$ns" -p udp --dport 53 -j ACCEPT
+		iptables -A "$CHAIN" -d "$ns" -p tcp --dport 53 -j ACCEPT
+	done
+	iptables -A "$CHAIN" -p tcp --dport 443 -m set --match-set "$SET" dst -j ACCEPT
+	if [ "$m" = learn ]; then
+		# New connections only, rate limited: the log tells which addresses the sidecar really used.
+		iptables -A "$CHAIN" -p tcp --dport 443 -m conntrack --ctstate NEW -m limit --limit 30/min --limit-burst 30 \
+			-j LOG --log-prefix "zalo-sandbox-learn: " --log-level 6
+		iptables -A "$CHAIN" -p tcp --dport 443 -j ACCEPT
+	fi
+	iptables -A "$CHAIN" -m limit --limit 6/min --limit-burst 10 -j LOG --log-prefix "zalo-sandbox-blocked: " --log-level 4
+	iptables -A "$CHAIN" -j REJECT --reject-with icmp-port-unreachable
+
+	# One jump, matched on the uid; present once.
+	iptables -C OUTPUT -m owner --uid-owner "$uid" -j "$CHAIN" 2>/dev/null ||
+		iptables -I OUTPUT 1 -m owner --uid-owner "$uid" -j "$CHAIN"
+	# No IPv6 for that user: the list is IPv4 only, so v6 must not be a way around it.
+	ip6tables -C OUTPUT -m owner --uid-owner "$uid" -j REJECT 2>/dev/null ||
+		ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" -j REJECT
+	echo "zalo-sandboxctl: applied in $m mode for uid $uid"
+}
+
+status() {
+	echo "mode: $(mode)"
+	echo "set $SET: $(ipset list "$SET" 2>/dev/null | awk '/^Number of entries/ {print $4}') addresses"
+	iptables -S OUTPUT | grep -- "--uid-owner $uid" || echo "jump: MISSING"
+	iptables -vnL "$CHAIN" 2>/dev/null || echo "chain $CHAIN: MISSING"
+}
+
+case "${1:-status}" in
+apply) apply ;;
+status) status ;;
+enforce)
+	install -d -m 755 "$STATE"
+	echo enforce >"$MODE_FILE"
+	apply
+	;;
+learn)
+	minutes="${2:-10}"
+	[[ "$minutes" =~ ^[0-9]+$ ]] && [ "$minutes" -ge 1 ] && [ "$minutes" -le 60 ] || die "minutes must be 1..60"
+	install -d -m 755 "$STATE"
+	echo learn >"$MODE_FILE"
+	apply
+	# The window closes by itself: a forgotten learning mode is the weak spot.
+	systemctl stop zalo-sandbox-learn-end.timer 2>/dev/null || true
+	systemd-run --quiet --unit=zalo-sandbox-learn-end --on-active="${minutes}m" /usr/local/sbin/zalo-sandboxctl enforce
+	echo "zalo-sandboxctl: learning for $minutes minutes, then enforce"
+	;;
+*) die "usage: $0 status|apply|enforce|learn [minutes]" ;;
+esac
