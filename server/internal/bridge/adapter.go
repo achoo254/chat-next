@@ -48,8 +48,10 @@ type StepKind string
 const (
 	// StepInput asks for text fields (phone number, one-time code, 2FA password).
 	StepInput StepKind = "input"
-	// StepQR shows a code to scan with the other app. Declared for the next
-	// adapter; no adapter implements it yet.
+	// StepQR shows a code to scan with the other app. Prompt is what to
+	// show: the Zalo adapter gives a data: URL of the PNG image. The caller
+	// continues with no input to wait for the scan; the step repeats (with a
+	// new code when the old one expired) until it moves on.
 	StepQR StepKind = "qr"
 	// StepConfirm waits for the user to approve on another device.
 	StepConfirm StepKind = "confirm"
@@ -70,7 +72,7 @@ type LoginStep struct {
 	Kind   StepKind
 	Token  string
 	Fields []Field // StepInput
-	Prompt string  // StepQR: payload to render; StepConfirm: instruction
+	Prompt string  // StepQR: image to show (data: URL); StepConfirm: instruction
 	// Session is set on StepDone: the adapter's own login state, sealed by
 	// the engine and given back to every later call. Opaque to the core.
 	Session []byte
