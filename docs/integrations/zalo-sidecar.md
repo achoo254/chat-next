@@ -27,22 +27,25 @@ Phiên đăng nhập Zalo của một tài khoản thật là thứ cần bảo 
 - Luôn truyền hàm nhận QR; không có thì thư viện ghi `qr.png` vào thư mục hiện tại.
 - **Bộ chặn đi ra trong tiến trình** (`src/egress-guard.mjs`, có test): mọi kết nối đi qua `net.Socket#connect`, chỉ cho phép `*.zalo.me`; từ chối IP trần và ổ cắm unix (`ws+unix:`). Thư viện lấy địa chỉ websocket và host API từ phản hồi của máy chủ mà không kiểm tra, nên lớp này cần thiết. Tên miền cho phép được in một lần ra `stderr` (`host <tên>`); đó là nguồn danh sách cho tường lửa.
 - `stdout` chỉ để giao thức (một dòng JSON mỗi sự kiện); `stderr` chỉ có `host ...` và `blocked ...`, không có nội dung tin, cookie, imei, tên hay id.
-- Tiến trình không ghi tệp, không sinh tiến trình con, không đọc biến môi trường; đóng `stdin` là dừng.
+- Tiến trình không ghi tệp, không sinh tiến trình con, không đọc biến môi trường; đóng `stdin` là dừng. Mô-đun đầu tiên `src/ws-env.mjs` tự đặt `WS_NO_BUFFER_UTIL=1` và `WS_NO_UTF_8_VALIDATE=1` trước khi `ws` chạy, vì sudo xoá môi trường (có test chạy bản đóng gói với môi trường rỗng: không lần nào thử nạp `bufferutil` hay `utf-8-validate`).
 
 ## Môi trường cách ly
 
-Adapter Go chạy `<ZALO_NODE_PATH> <bundle>` với môi trường viết tay (`PATH` thư mục hệ thống, `HOME` là thư mục làm việc, `TZ=UTC`, `WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không thừa kế biến nào của server), nhóm tiến trình riêng, dừng bằng đóng `stdin` rồi giết cả nhóm sau 3 giây. Trên Linux thêm `Pdeathsig` (giết tiến trình phụ khi server chết; tín hiệu gắn với luồng hệ điều hành đã khởi động nó, Go hiếm khi bỏ luồng, nếu có thì tiến trình phụ chết sớm và được khởi động lại). `stdout` không bao giờ vào log; `stderr` chỉ vào `slog` dưới dạng tên host (`host`) hoặc chữ "blocked", dòng khác chỉ ghi là có dòng lạ, không kèm nội dung. Dòng `stdout` dài quá 1 MiB thì dừng tiến trình.
+Adapter Go chạy đúng `<ZALO_SUDO_PATH> -n -u <ZALO_SANDBOX_USER> -- <ZALO_NODE_PATH> <bundle>`, không thêm đối số nào, trong thư mục của bundle (tiến trình phụ không ghi tệp), với môi trường viết tay (`PATH` thư mục hệ thống, `TZ=UTC`, không thừa kế biến nào của server; sudo còn xoá môi trường lần nữa), trong nhóm tiến trình riêng. `stdout` không bao giờ vào log; `stderr` chỉ vào `slog` dưới dạng tên host (`host`) hoặc chữ "blocked", dòng khác chỉ ghi là có dòng lạ, không kèm nội dung. Dòng `stdout` dài quá 1 MiB thì dừng tiến trình.
 
-**Đổi user (làm trong Go, không dùng sudo hay systemd-run):** tiến trình phụ chạy dưới `ZALO_SANDBOX_USER` bằng `SysProcAttr.Credential` (uid và gid chính của user đó, **không** nhóm phụ). Thư mục làm việc do server tạo trong thư mục tạm, chuyển chủ sang user đó với quyền `0700`, khi tiến trình thoát thì lấy lại chủ rồi xoá. Server cần `CAP_SETUID`, `CAP_SETGID` và `CAP_CHOWN` (hoặc chạy bằng root); thiếu thì mỗi lần khởi động tiến trình phụ lỗi và engine thử lại. Chỉ bản Linux làm được; hệ khác Zalo không được đăng ký.
+**Đổi user bằng sudo:** `chat-api` chạy dưới user `chat` không có quyền đổi uid, và cấp `CAP_SETUID` cho nó là cho nó thành root được. Nên một quy tắc sudoers cho `chat` chạy **đúng một lệnh** (`node` và bundle, không đối số khác) dưới user cách ly, không mật khẩu. Server **không** cần `CAP_SETUID`, `CAP_SETGID` hay `CAP_CHOWN`. Chỉ bản Linux làm được; hệ khác Zalo không được đăng ký.
+
+**Dừng:** đóng `stdin` (tiến trình phụ thoát khi gặp EOF), chờ 3 giây, gửi `SIGTERM` cho tiến trình `sudo`, chờ 3 giây nữa rồi thôi chờ và ghi log lỗi. `chat` không gửi tín hiệu được cho tiến trình của user cách ly, nhưng gửi được cho `sudo` (uid thực là `chat`); sudo chuyển `SIGTERM`, `SIGINT`, `SIGHUP`, `SIGQUIT` cho lệnh khi tín hiệu đến từ **ngoài** nhóm tiến trình của lệnh, nên tiến trình được tạo trong nhóm riêng. `SIGKILL` không chuyển được (chỉ giết sudo, bỏ mồ côi tiến trình phụ), nên không dùng. Rủi ro còn lại: một tiến trình phụ bỏ qua cả EOF lẫn `SIGTERM` sẽ chạy tiếp. Không có `Pdeathsig` (kernel xoá nó khi chạy sudo, tệp set-user-ID); server chết thì đầu ghi `stdin` đóng và tiến trình phụ thoát. Đã đo trên sudo 1.9.9 (WSL): chuyển `SIGTERM` khi gửi từ nhóm khác và **không** chuyển khi gửi từ cùng nhóm; sau `SIGKILL` cho sudo, tiến trình phụ chạy tới khi `stdin` đóng.
 
 **Kiểm lúc khởi động** (một điều sai thì Zalo không được đăng ký, log lỗi «Zalo is not offered» kèm lý do):
 
 - `ZALO_SANDBOX_USER` tồn tại, uid và gid khác 0, uid khác uid của server.
 - `ZALO_NODE_PATH` là đường dẫn tuyệt đối tới một tệp thực thi.
+- `ZALO_SUDO_PATH` là đường dẫn tuyệt đối tới tệp của root có bit set-user-ID, và `sudo -n -u <user> -l -- <node> <bundle>` thoát 0: lệnh `-l` kèm lệnh chỉ thoát 0 khi đúng dòng lệnh đó (cùng đối số, không thêm, không bớt) được phép dưới user đó mà không cần mật khẩu; thiếu đối số, thừa đối số, user khác hay lệnh khác đều thoát 1 (đo trên sudo 1.9.9). Không chạy gì.
 - Bundle: đường dẫn tuyệt đối, tệp thường (liên kết bị từ chối), không cho nhóm hay mọi người ghi, không thuộc và không ghi được bởi user cách ly; mọi thư mục từ thư mục chứa nó lên `/` không thuộc và không ghi được bởi user đó (thư mục ai cũng ghi được bị từ chối, kể cả có sticky bit).
 - SHA-256 của bundle bằng giá trị trong `zalo-sidecar.cjs.sha256` cạnh nó (hoặc `ZALO_SIDECAR_SHA256`).
 
-Điều kiện còn lại của máy chủ (chưa làm; phải xong trước khi đặt `ZALO_SIDECAR_BUNDLE` ở production): tạo user cách ly; cấp quyền cho server như trên; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
+Điều kiện còn lại của máy chủ (chưa làm; phải xong trước khi đặt `ZALO_SIDECAR_BUNDLE` ở production): tạo user cách ly; quy tắc sudoers một lệnh như trên; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
 
 ## Phân loại lỗi đăng nhập
 
