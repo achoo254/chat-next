@@ -2,18 +2,25 @@
 // messages are not in the store's windows, so each row hands its message to
 // the shared bubble itself, with the app it came through in words and the
 // limited actions of this screen; every action goes to the message's chat.
-import { Suspense, lazy, memo, useEffect } from "react";
+import { Suspense, lazy, memo, useEffect, useMemo } from "react";
+import { AlbumMessagesContext } from "../media/media-content.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useChat, useDialog } from "../data/services.tsx";
 import { appLabel } from "../ui/link-suggestions.tsx";
-import { MessageBubble, PendingBubble, type LimitedActions } from "../ui/message-item.tsx";
+import {
+	MessageBubble,
+	PendingBubble,
+	type LimitedActions,
+} from "../ui/message-item.tsx";
 import { useCell, useUi } from "../ui/ui-context.tsx";
 import { ChatDelivery } from "./merged-delivery.tsx";
 import { albumMessages, type MergedGroup } from "./merged-rows.ts";
 import type { MergedItem } from "./merged-timeline.ts";
 
 // The same chunks the chat screen loads for service lines and the message menu.
-const SystemLine = lazy(() => import("../ui/message-extras.tsx").then((m) => ({ default: m.SystemLine })));
+const SystemLine = lazy(() =>
+	import("../ui/message-extras.tsx").then((m) => ({ default: m.SystemLine })),
+);
 const MenuLayer = lazy(() => import("../ui/message-menu.tsx"));
 
 interface MergedRowProps {
@@ -25,12 +32,29 @@ interface MergedRowProps {
 }
 
 /** A message, a send on its way or a service line, from one of the person's chats. */
-export const MergedRow = memo(function MergedRow({ group, tabbable, runPrev, runNext, limited }: MergedRowProps) {
+export const MergedRow = memo(function MergedRow({
+	group,
+	tabbable,
+	runPrev,
+	runNext,
+	limited,
+}: MergedRowProps) {
 	const item = group.item;
 	const copy = useScreensCopy();
 	const chat = useChat(item.chatId) ?? null;
 	const readOutboxMaxSeq = useDialog(item.chatId)?.dialog.readOutboxMaxSeq ?? 0;
 	const platform = appLabel(item.app, copy);
+	// An album's messages are not in the store: the album's cells read them from here.
+	const album = useMemo(
+		() =>
+			new Map(
+				albumMessages(group).map((message, index) => [
+					group.album[index]?.key ?? "",
+					message,
+				]),
+			),
+		[group],
+	);
 	if (item.kind === "pending") {
 		return (
 			<PendingBubble
@@ -47,34 +71,47 @@ export const MergedRow = memo(function MergedRow({ group, tabbable, runPrev, run
 	}
 	if (item.message.action !== null) {
 		return (
-			<Suspense fallback={<span className="system" aria-hidden="true">{" "}</span>}>
+			<Suspense
+				fallback={
+					<span className="system" aria-hidden="true">
+						{" "}
+					</span>
+				}
+			>
 				<SystemLine message={item.message} channel={false} />
 			</Suspense>
 		);
 	}
 	return (
 		<ChatDelivery chatId={item.chatId}>
-			<MessageBubble
-				chatId={item.chatId}
-				itemKey={item.key}
-				rowKey={group.key}
-				albumKeys={group.album.map((member) => member.key)}
-				albumMessages={albumMessages(group)}
-				message={item.message}
-				chat={chat}
-				readOutboxMaxSeq={readOutboxMaxSeq}
-				tabbable={tabbable}
-				runPrev={runPrev}
-				runNext={runNext}
-				platform={platform}
-				limited={limited}
-			/>
+			<AlbumMessagesContext.Provider value={album}>
+				<MessageBubble
+					chatId={item.chatId}
+					itemKey={item.key}
+					rowKey={group.key}
+					albumKeys={group.album.map((member) => member.key)}
+					message={item.message}
+					chat={chat}
+					readOutboxMaxSeq={readOutboxMaxSeq}
+					tabbable={tabbable}
+					runPrev={runPrev}
+					runNext={runNext}
+					platform={platform}
+					limited={limited}
+				/>
+			</AlbumMessagesContext.Provider>
 		</ChatDelivery>
 	);
 });
 
 /** The menu of the message it was opened on, when that message is on this timeline; closed when the screen goes. */
-export function MergedMenu({ items, limited }: { items: ReadonlyMap<string, MergedItem>; limited: LimitedActions }) {
+export function MergedMenu({
+	items,
+	limited,
+}: {
+	items: ReadonlyMap<string, MergedItem>;
+	limited: LimitedActions;
+}) {
 	const ui = useUi();
 	const target = useCell(ui.menu);
 	const item = target === null ? undefined : items.get(target.key);

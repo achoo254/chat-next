@@ -6,7 +6,7 @@
 // progress, cancel, retry) and the photo of a link preview. A message that
 // is no longer available keeps its box and says so.
 import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessage, StoredMessage } from "@achoo254/chat-core";
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
@@ -285,11 +285,14 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 	}
 }
 
-function AlbumCell({ chatId, itemKey, index, message }: { chatId: number; itemKey: string; index: number; message?: StoredMessage | undefined }) {
+/** An album's messages by key, for an album whose messages are not in the store (a person's merged timeline). */
+export const AlbumMessagesContext = createContext<ReadonlyMap<string, StoredMessage> | null>(null);
+
+function AlbumCell({ chatId, itemKey, index }: { chatId: number; itemKey: string; index: number }) {
 	const copy = useMediaCopy();
 	const item = useItem(chatId, itemKey);
-	// A message handed over directly is not in the store (a person's merged timeline).
-	const shown = message ?? (item?.kind === "message" ? item.message : undefined);
+	const handed = useContext(AlbumMessagesContext);
+	const shown = handed?.get(itemKey) ?? (item?.kind === "message" ? item.message : undefined);
 	if (shown === undefined) return null;
 	const media = shown.media;
 	if (media === undefined) return null;
@@ -298,20 +301,12 @@ function AlbumCell({ chatId, itemKey, index, message }: { chatId: number; itemKe
 }
 
 /** Messages sent together (same grouped_id): photos and videos in a grid, files and audio stacked. */
-export function AlbumMedia({
-	chatId,
-	keys,
-	visual,
-	messages,
-}: {
-	chatId: number;
-	keys: readonly string[];
-	visual: boolean;
-	/** The album's messages in the order of keys, when they are not in the store. */
-	messages?: readonly StoredMessage[] | undefined;
-}) {
+export function AlbumMedia({ chatId, keys, visual }: { chatId: number; keys: readonly string[]; visual: boolean }) {
 	const copy = useMediaCopy();
-	const cells = keys.map((key, index) => <AlbumCell key={key} chatId={chatId} itemKey={key} index={index} message={messages?.[index]} />);
+	const handed = useContext(AlbumMessagesContext);
+	// Messages handed over say themselves whether they are all pictures (the store has nothing to ask).
+	if (handed !== null) visual = [...handed.values()].every((message) => message.media === undefined || isVisual(message.media));
+	const cells = keys.map((key, index) => <AlbumCell key={key} chatId={chatId} itemKey={key} index={index} />);
 	if (!visual) return <div className="file-stack">{cells}</div>;
 	return (
 		<div className={`album n${Math.min(keys.length, 5)}`} role="group" aria-label={copy.media.album(keys.length)}>

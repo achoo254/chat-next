@@ -270,7 +270,7 @@ function ReplyQuote({ chatId, seq, onJump }: { chatId: number; seq: number; onJu
 		<button
 			type="button"
 			className={`reply s-${toneOf(target.fromId)}`}
-			onClick={() => (onJump === undefined ? store.openWindow(chatId, seq) : onJump(chatId, seq))}
+			onClick={() => (onJump ?? ((chat, at) => store.openWindow(chat, at)))(chatId, seq)}
 		>
 			<b>{name}</b>
 			<span className="q">{messagePreview(target, nameOf, copy, channel)}</span>
@@ -454,8 +454,6 @@ interface BubbleProps {
 	rowKey?: string;
 	/** Keys of an album's messages; empty for a single message. */
 	albumKeys?: readonly string[];
-	/** The album's messages in the order of albumKeys, when they are not in the store (a person's merged timeline). */
-	albumMessages?: readonly StoredMessage[] | undefined;
 	message: StoredMessage;
 	chat: Chat | null;
 	readOutboxMaxSeq: number;
@@ -471,29 +469,18 @@ interface BubbleProps {
 }
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
-function MediaSlot({
-	chatId,
-	message,
-	albumKeys,
-	albumMessages,
-}: {
-	chatId: number;
-	message: StoredMessage;
-	albumKeys: readonly string[];
-	albumMessages?: readonly StoredMessage[] | undefined;
-}) {
+function MediaSlot({ chatId, message, albumKeys }: { chatId: number; message: StoredMessage; albumKeys: readonly string[] }) {
 	"use no memo";
 	const { store } = useServices();
 	if (albumKeys.length > 1) {
-		const shapes = albumKeys.map((key, index) => {
-			if (albumMessages !== undefined) return albumMessages[index]?.media;
+		const shapes = albumKeys.map((key) => {
 			const item = store.item(chatId, key);
 			return item?.kind === "message" ? item.message.media : undefined;
 		});
 		const visual = visualAlbum(shapes);
 		return (
 			<Suspense fallback={<MediaReserve shape={message.media ?? { kind: "document", width: 0, height: 0 }} count={albumKeys.length} visual={visual} />}>
-				<AlbumMedia chatId={chatId} keys={albumKeys} visual={visual} messages={albumMessages} />
+				<AlbumMedia chatId={chatId} keys={albumKeys} visual={visual} />
 			</Suspense>
 		);
 	}
@@ -511,7 +498,6 @@ export function MessageBubble({
 	itemKey,
 	rowKey = itemKey,
 	albumKeys = [],
-	albumMessages,
 	message,
 	chat,
 	readOutboxMaxSeq,
@@ -556,12 +542,10 @@ export function MessageBubble({
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
 	const seqs = album
-		? (albumMessages ?? []).length > 0
-			? (albumMessages ?? []).map((member) => member.seq)
-			: albumKeys.flatMap((key) => {
-					const item = store.item(chatId, key);
-					return item?.kind === "message" ? [item.message.seq] : [];
-				})
+		? albumKeys.flatMap((key) => {
+				const item = store.item(chatId, key);
+				return item?.kind === "message" ? [item.message.seq] : [];
+			})
 		: [message.seq];
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
@@ -684,7 +668,7 @@ export function MessageBubble({
 					)}
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} onJump={limited?.jump} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
-					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} albumMessages={albumMessages} />}
+					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
 					{alert === null ? (
 						<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
 					) : (
