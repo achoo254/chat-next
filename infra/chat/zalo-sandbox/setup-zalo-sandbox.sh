@@ -33,6 +33,11 @@ install -d -m 755 /etc/zalo-sandbox /var/lib/zalo-sandbox
 # Root-owned, nobody else writes: the reviewed bundle is copied here by the deploy (or by hand).
 install -d -m 755 -o root -g root /opt/chat/zalo-sidecar
 
+echo "== sudoers rule (the one command chat-api may run as zalo)"
+visudo -cf "$HERE/zalo-sidecar.sudoers" >/dev/null || die "zalo-sidecar.sudoers does not parse"
+install -m 0440 -o root -g root "$HERE/zalo-sidecar.sudoers" /etc/sudoers.d/zalo-sidecar
+visudo -c >/dev/null || { rm -f /etc/sudoers.d/zalo-sidecar; die "sudoers broke, rule removed"; }
+
 echo "== units"
 systemctl daemon-reload
 systemctl enable --now zalo-ipset-refresh.timer >/dev/null

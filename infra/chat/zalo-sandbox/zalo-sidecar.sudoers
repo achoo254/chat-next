@@ -1,0 +1,8 @@
+# Installed as /etc/sudoers.d/zalo-sidecar by setup-zalo-sandbox.sh (mode 0440, checked with visudo).
+# chat-api runs as the unprivileged user `chat`. It may start the reviewed Zalo sidecar bundle as the
+# sandbox user `zalo`, with exactly these arguments and nothing else: no other command, no other
+# target user, no environment of its own (env_reset stays on, setenv stays off). Giving the server
+# CAP_SETUID instead would let a compromised server become any user, root included.
+Cmnd_Alias ZALO_SIDECAR = /opt/node22/bin/node /opt/chat/zalo-sidecar/zalo-sidecar.cjs
+Defaults!ZALO_SIDECAR env_reset, !setenv
+chat ALL=(zalo) NOPASSWD: ZALO_SIDECAR
