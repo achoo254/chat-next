@@ -2,7 +2,7 @@ import type { BridgeCopy } from "./bridge-copy-vi.ts";
 
 export const enBridge: BridgeCopy = {
 	title: "Connected apps",
-	lede: "Sync your conversations from other apps into Chat. Once synced, every conversation goes both ways in real time.",
+	lede: "Sync your conversations from other apps into Chat. Each app says whether messages go both ways or only into Chat.",
 	disabled: "This server has not turned on connected apps.",
 	loadFailed: "Could not load. Try again.",
 	retry: "Try again",
@@ -49,7 +49,7 @@ export const enBridge: BridgeCopy = {
 			declined: "The sign-in was declined on the phone.",
 			expired: "The QR code expired. Start again to get a new one.",
 			limited: "Too many sign-in attempts. Wait a moment and try again.",
-			limitedIn: (seconds) => `You can try again in ${seconds} s.`,
+			limitedIn: (seconds) => `You can try again in about ${seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`}.`,
 			taken: "Another user has connected this account.",
 			reauth: "Sign in to Chat again before connecting.",
 			failed: "Could not sign in. Try again later.",
@@ -92,6 +92,12 @@ export const enBridge: BridgeCopy = {
 		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} conversations · ${messages}/${expected} messages`,
 		live: "Syncing live",
 		liveBody: (count: number): string => `${count} conversations, every change goes both ways.`,
+		receive: {
+			ask: (app: string): string => `Receive new ${app} messages in Chat?`,
+			askBody: "Private messages (text, stickers) that arrive from now on show up in Chat. One way only: older messages are not pulled in and what you type in Chat is not sent to this app.",
+			startLater: (app: string): string => `Receive ${app} messages`,
+			liveBody: (count: number): string => `${count} conversations, new messages come one way into Chat.`,
+		},
 	},
 	account: {
 		status: {

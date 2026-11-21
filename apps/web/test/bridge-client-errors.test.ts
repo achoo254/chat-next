@@ -27,4 +27,11 @@ describe("bridgeError", () => {
 		expect(declined.detail).toBe("qr_declined");
 		expect(bridgeError(new ConnectError("too many sign-in attempts; try again later", Code.ResourceExhausted)).kind).toBe("rate_limited");
 	});
+
+	it("reads how long a refused login start must wait", () => {
+		const limited = bridgeError(new ConnectError("rate_limited: too many sign-in attempts; retry_after=13", Code.ResourceExhausted));
+		expect(limited.kind).toBe("rate_limited");
+		expect(limited.detail).toBe("13");
+		expect(bridgeError(new ConnectError("too many sign-in attempts; try again later", Code.ResourceExhausted)).detail).toBe("");
+	});
 });

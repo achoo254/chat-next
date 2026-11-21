@@ -2,7 +2,7 @@ import type { BridgeCopy } from "./bridge-copy-vi.ts";
 
 export const zhCNBridge: BridgeCopy = {
 	title: "连接应用",
-	lede: "将你在其他应用中的会话同步到 Chat。同步后，所有会话双向实时同步。",
+	lede: "将你在其他应用中的会话同步到 Chat。每个应用会注明消息是双向还是仅进入 Chat。",
 	disabled: "此服务器尚未开启应用连接功能。",
 	loadFailed: "加载失败，请重试。",
 	retry: "重试",
@@ -44,7 +44,7 @@ export const zhCNBridge: BridgeCopy = {
 			declined: "登录已在手机上被拒绝。",
 			expired: "二维码已过期。请重新开始以获取新的二维码。",
 			limited: "登录尝试次数过多。请稍等片刻再试。",
-			limitedIn: (seconds) => `${seconds} 秒后可以重试。`,
+			limitedIn: (seconds) => `约 ${seconds < 90 ? `${seconds} 秒` : `${Math.ceil(seconds / 60)} 分钟`}后可以重试。`,
 			taken: "该账号已被其他用户连接。",
 			reauth: "连接前请重新登录 Chat。",
 			failed: "未能登录，请稍后再试。",
@@ -87,6 +87,12 @@ export const zhCNBridge: BridgeCopy = {
 		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} 个会话 · ${messages}/${expected} 条消息`,
 		live: "实时同步中",
 		liveBody: (count: number): string => `${count} 个会话，所有更改双向同步。`,
+		receive: {
+			ask: (app: string): string => `将 ${app} 的新消息接收到 Chat？`,
+			askBody: "从现在起收到的私聊消息（文字、贴纸）会显示在 Chat 中。仅单向：不会拉取旧消息，你在 Chat 中输入的内容也不会发送到该应用。",
+			startLater: (app: string): string => `接收 ${app} 消息`,
+			liveBody: (count: number): string => `${count} 个会话，新消息单向进入 Chat。`,
+		},
 	},
 	account: {
 		status: {

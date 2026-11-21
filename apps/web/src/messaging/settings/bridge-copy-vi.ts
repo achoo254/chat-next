@@ -3,7 +3,7 @@
 
 export const viBridge = {
 	title: "Kết nối ứng dụng",
-	lede: "Đồng bộ các cuộc trò chuyện của bạn ở ứng dụng khác vào Chat. Sau khi đồng bộ, mọi cuộc trò chuyện luôn đi hai chiều theo thời gian thực.",
+	lede: "Đồng bộ các cuộc trò chuyện của bạn ở ứng dụng khác vào Chat. Mỗi ứng dụng ghi rõ tin đi hai chiều hay chỉ về Chat.",
 	disabled: "Máy chủ này chưa bật tính năng kết nối ứng dụng.",
 	loadFailed: "Chưa tải được. Thử lại.",
 	retry: "Thử lại",
@@ -51,7 +51,8 @@ export const viBridge = {
 			declined: "Đăng nhập đã bị từ chối trên điện thoại.",
 			expired: "Mã QR đã hết hạn. Bắt đầu lại để lấy mã mới.",
 			limited: "Đã thử đăng nhập nhiều lần. Đợi một lát rồi thử lại.",
-			limitedIn: (seconds: number): string => `Thử lại được sau ${seconds} giây.`,
+			// The wait is a hint from the server: exact for a cool-down, a round figure or an upper bound otherwise.
+			limitedIn: (seconds: number): string => `Thử lại được sau khoảng ${seconds < 90 ? `${seconds} giây` : `${Math.ceil(seconds / 60)} phút`}.`,
 			taken: "Tài khoản này đang được người dùng khác kết nối.",
 			reauth: "Cần đăng nhập lại Chat trước khi kết nối.",
 			failed: "Chưa đăng nhập được. Thử lại sau.",
@@ -94,6 +95,13 @@ export const viBridge = {
 		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} cuộc trò chuyện · ${messages}/${expected} tin`,
 		live: "Đang đồng bộ trực tiếp",
 		liveBody: (count: number): string => `${count} cuộc trò chuyện, mọi thay đổi đi hai chiều.`,
+		// An app Chat only reads from (Zalo for now): nothing typed in Chat goes back to it.
+		receive: {
+			ask: (app: string): string => `Nhận tin nhắn mới từ ${app} vào Chat?`,
+			askBody: "Tin nhắn riêng (chữ, nhãn dán) đến từ bây giờ sẽ hiện trong Chat. Chỉ một chiều: tin cũ không được kéo về và tin bạn gõ trong Chat không được gửi sang ứng dụng này.",
+			startLater: (app: string): string => `Nhận tin nhắn ${app}`,
+			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới đi một chiều về Chat.`,
+		},
 	},
 	account: {
 		status: {

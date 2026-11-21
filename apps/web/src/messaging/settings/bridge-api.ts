@@ -91,7 +91,7 @@ export type BridgeErrorKind =
 	| "canceled"
 	| "other";
 
-/** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…). */
+/** A failed call. `detail` is the machine code of a wrong answer (wrong_code, wrong_password…), or for `rate_limited` the seconds to wait when the server says. */
 export class BridgeError extends Error {
 	constructor(
 		readonly kind: BridgeErrorKind,

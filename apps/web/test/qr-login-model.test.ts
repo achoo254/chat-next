@@ -1,7 +1,7 @@
 // What a QR login shows from the server's steps and errors (qr-login-model.ts).
 import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/messaging/settings/bridge-api.ts";
-import { isEnded, isSafeQrDataUrl, MAX_QR_URL_LENGTH, statusOfError, viewOfStep } from "../src/messaging/settings/qr-login-model.ts";
+import { isEnded, isSafeQrDataUrl, limitWaitSeconds, MAX_QR_URL_LENGTH, RECEIVE_ONLY_APPS, statusOfError, viewOfStep } from "../src/messaging/settings/qr-login-model.ts";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
@@ -70,5 +70,26 @@ describe("statusOfError", () => {
 		expect(isEnded("scan")).toBe(false);
 		expect(isEnded("declined")).toBe(true);
 		expect(isEnded("limited")).toBe(true);
+	});
+});
+
+describe("limitWaitSeconds", () => {
+	it("takes the wait the server asked for", () => {
+		expect(limitWaitSeconds(new BridgeError("rate_limited", "13"))).toBe(13);
+		expect(limitWaitSeconds(new BridgeError("rate_limited", "600"))).toBe(600);
+	});
+
+	it("caps an absurd hint and falls back to the adapter's cool-down without one", () => {
+		expect(limitWaitSeconds(new BridgeError("rate_limited", "999999"))).toBe(3600);
+		expect(limitWaitSeconds(new BridgeError("rate_limited"))).toBe(20);
+		expect(limitWaitSeconds(new BridgeError("rate_limited", "0"))).toBe(20);
+		expect(limitWaitSeconds(new BridgeError("rate_limited", "soon"))).toBe(20);
+	});
+});
+
+describe("RECEIVE_ONLY_APPS", () => {
+	it("lists Zalo, which Chat only reads from", () => {
+		expect(RECEIVE_ONLY_APPS.has("zalo")).toBe(true);
+		expect(RECEIVE_ONLY_APPS.has("telegram")).toBe(false);
 	});
 });

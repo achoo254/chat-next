@@ -32,6 +32,11 @@ const loginTTL = 10 * time.Minute
 // phone, and the other app penalises a flood of them.
 var limitLogin = ratelimit.Rule{Rate: 1.0 / 600, Burst: 3}
 
+// loginRefillWait is how long a refused login waits at most: the rule gives
+// one more try every 600 seconds. The limiter does not say how much of that is
+// left, so the page is told the whole of it as an upper bound.
+const loginRefillWait = 10 * time.Minute
+
 // pendingLogin is a login between two answers. The adapter's own token stays
 // on the server: the client only holds the id of this entry.
 type pendingLogin struct {
@@ -58,7 +63,7 @@ func (e *Engine) StartLogin(ctx context.Context, owner int64, source string) (Lo
 		return LoginStep{}, ErrUnknownApp
 	}
 	if e.limiter != nil && !e.limiter.Allow(limitLogin, fmt.Sprintf("bridge-login:%d", owner)) {
-		return LoginStep{}, ErrRateLimited
+		return LoginStep{}, &bridge.LoginLimited{Wait: loginRefillWait}
 	}
 	step, err := adapter.Login(bridge.WithLoginOwner(ctx, owner), "", nil)
 	if err != nil {

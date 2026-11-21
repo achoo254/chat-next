@@ -20,7 +20,7 @@ import {
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
 import { BridgeQrLogin } from "./bridge-qr-login.tsx";
 import { BridgeReauthBanner } from "./bridge-reauth-banner.tsx";
-import { QR_LOGIN_APPS } from "./qr-login-model.ts";
+import { QR_LOGIN_APPS, RECEIVE_ONLY_APPS } from "./qr-login-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
@@ -365,6 +365,8 @@ function SyncPanel({
 	onError: (err: unknown) => BridgeError;
 }) {
 	const t = useBridgeCopy();
+	// What the user is promised depends on the direction: an app Chat only reads from says so.
+	const words = RECEIVE_ONLY_APPS.has(account.source) ? { ...t.sync, ...t.sync.receive } : t.sync;
 	const { toasts } = useServices();
 	const { locale } = useI18n();
 	const [later, setLater] = useState(false);
@@ -389,17 +391,17 @@ function SyncPanel({
 			return (
 				<div className="br-sync" data-state="later">
 					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={start}>
-						{t.sync.startLater(appName)}
+						{words.startLater(appName)}
 					</button>
 				</div>
 			);
 		}
 		return (
-			<div className="callout br-sync" data-state="off" role="group" aria-label={t.sync.ask(appName)}>
+			<div className="callout br-sync" data-state="off" role="group" aria-label={words.ask(appName)}>
 				<p>
-					<b>{t.sync.ask(appName)}</b>
+					<b>{words.ask(appName)}</b>
 				</p>
-				<p className="muted">{t.sync.askBody}</p>
+				<p className="muted">{words.askBody}</p>
 				<div className="row">
 					<button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={start}>
 						{t.sync.start}
@@ -430,7 +432,7 @@ function SyncPanel({
 				<i aria-hidden="true" />
 				{t.sync.live}
 			</small>
-			<small className="muted">{t.sync.liveBody(p.conversations)}</small>
+			<small className="muted">{words.liveBody(p.conversations)}</small>
 		</div>
 	);
 }

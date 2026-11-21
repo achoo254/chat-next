@@ -101,8 +101,11 @@ export function bridgeError(err: unknown): BridgeError {
 	else if (e.code === Code.InvalidArgument && message.startsWith("wrong_input:")) {
 		kind = "wrong_input";
 		detail = message.slice("wrong_input:".length).trim().split(":")[0]?.trim() ?? "";
-	} else if (e.code === Code.ResourceExhausted) kind = "rate_limited";
-	else if (e.code === Code.AlreadyExists && message.startsWith("account_taken")) kind = "account_taken";
+	} else if (e.code === Code.ResourceExhausted) {
+		kind = "rate_limited";
+		// A login limit says how long to wait: "...; retry_after=<seconds>".
+		detail = /retry_after=(\d+)/.exec(message)?.[1] ?? "";
+	} else if (e.code === Code.AlreadyExists && message.startsWith("account_taken")) kind = "account_taken";
 	else if (e.code === Code.NotFound) kind = "not_found";
 	else if (e.code === Code.Canceled) kind = "canceled";
 	else if (unreachable(e)) kind = "network";

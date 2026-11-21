@@ -6,7 +6,7 @@
 // in a URL, and cleared when the login ends.
 import { useEffect, useRef, useState } from "react";
 import type { BridgeApi, BridgeError, LoginStep } from "./bridge-api.ts";
-import { LOGIN_RETRY_GAP_MS, statusOfError, viewOfStep, type QrLoginStatus } from "./qr-login-model.ts";
+import { limitWaitSeconds, statusOfError, viewOfStep, type QrLoginStatus } from "./qr-login-model.ts";
 
 /** The first call answers within about 3 s; give a stuck one up well after. */
 const START_TIMEOUT_MS = 20_000;
@@ -63,9 +63,9 @@ export function useQrLogin(
 		countdown.current = null;
 	};
 	/** Counts the wait after a refused start down to 0, once a second. */
-	const startCountdown = () => {
+	const startCountdown = (seconds: number) => {
 		stopCountdown();
-		let wait = Math.ceil(LOGIN_RETRY_GAP_MS / 1000);
+		let wait = seconds;
 		setState({ status: "limited", image: "", wait });
 		countdown.current = setInterval(() => {
 			wait -= 1;
@@ -95,8 +95,9 @@ export function useQrLogin(
 			} catch (err) {
 				if (signal.aborted) return;
 				running.current = null;
-				const status = statusOfError(onError(err));
-				if (status === "limited") startCountdown();
+				const failure = onError(err);
+				const status = statusOfError(failure);
+				if (status === "limited") startCountdown(limitWaitSeconds(failure));
 				else setState({ status, image: "", wait: 0 });
 				return;
 			}

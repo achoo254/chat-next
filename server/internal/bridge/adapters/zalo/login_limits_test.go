@@ -51,8 +51,17 @@ func TestAFailedLoginMakesTheUserWait(t *testing.T) {
 	if _, err := a.Login(asOwner(1), step.Token, nil); !isInputError(err) {
 		t.Fatalf("declined: %v", err)
 	}
-	if _, err := a.Login(asOwner(1), "", nil); !errors.Is(err, bridge.ErrLoginLimited) {
+	_, err = a.Login(asOwner(1), "", nil)
+	if !errors.Is(err, bridge.ErrLoginLimited) {
 		t.Fatalf("right after a failure: err = %v", err)
+	}
+	if got, want := bridge.LoginWait(err), int(loginRetryGap/time.Second); got != want {
+		t.Fatalf("wait right after a failure = %d s, want %d", got, want)
+	}
+	clock.advance(7 * time.Second)
+	_, err = a.Login(asOwner(1), "", nil)
+	if got, want := bridge.LoginWait(err), int(loginRetryGap/time.Second)-7; got != want {
+		t.Fatalf("wait 7 s later = %d s, want %d (the rest of the gap)", got, want)
 	}
 	if _, err := a.Login(asOwner(2), "", nil); err != nil {
 		t.Fatalf("another user is not held back: %v", err)

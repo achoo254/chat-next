@@ -1,7 +1,7 @@
 // Settings > Kết nối ứng dụng: connecting Zalo by QR code. The server is the
 // fake BridgeService with its Zalo-like QR login (support/fake-qr-login.ts):
 // each poll waits until the test pushes the next answer or the page aborts it.
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Code } from "@connectrpc/connect";
 import { BridgeAccountStatus, BridgeSyncState } from "@achoo254/chat-proto/bridge";
@@ -172,6 +172,19 @@ describe("the QR step", () => {
 		expect(screen.queryByRole("img", { name: QR_ALT })).toBeNull();
 		expect(fixture.bridge.qr.inFlight).toBe(0);
 	});
+
+	it("promises only what Zalo does: new messages come in one way, nothing typed in Chat goes out", async () => {
+		const fixture = zaloFixture();
+		await openPage(fixture);
+		await startZalo(fixture);
+		await answer(fixture, { kind: "qr", image: FAKE_QR_PNG });
+		await answer(fixture, { kind: "confirm" });
+		await answer(fixture, { kind: "done" });
+		const ask = await screen.findByRole("group", { name: "Nhận tin nhắn mới từ Zalo vào Chat?" }, LONG);
+		expect(within(ask).getByText(/Chỉ một chiều/)).toBeTruthy();
+		expect(screen.queryByText(/Đồng bộ toàn bộ tin nhắn Zalo/)).toBeNull();
+		expect(within(ask).queryByText(/hai chiều|thời gian thực/)).toBeNull();
+	});
 });
 
 describe("when the login does not go through", () => {
@@ -196,10 +209,20 @@ describe("when the login does not go through", () => {
 		await openPage(fixture);
 		await startZalo(fixture);
 		await expectStatus(STATUS.limited);
-		expect(screen.getByText(/Thử lại được sau \d+ giây\./)).toBeTruthy();
+		expect(screen.getByText(/Thử lại được sau khoảng \d+ giây\./)).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Bắt đầu lại" })).toHaveProperty("disabled", true);
 		expect(screen.queryByText(/too many sign-in attempts/)).toBeNull();
 		expect(fixture.bridge.qr.polls).toBe(0);
+	});
+
+	it("counts down the wait the server asks for, in minutes when it is long", async () => {
+		const fixture = zaloFixture();
+		fixture.bridge.qr.start = { kind: "error", code: Code.ResourceExhausted, message: "rate_limited: too many sign-in attempts; retry_after=600" };
+		await openPage(fixture);
+		await startZalo(fixture);
+		await expectStatus(STATUS.limited);
+		expect(screen.getByText("Thử lại được sau khoảng 10 phút.")).toBeTruthy();
+		expect(screen.queryByText(/retry_after/)).toBeNull();
 	});
 
 	it("offers a retry of the same login after a network error", async () => {

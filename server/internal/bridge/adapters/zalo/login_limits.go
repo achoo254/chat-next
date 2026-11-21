@@ -2,7 +2,6 @@ package zalo
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -20,6 +19,12 @@ const (
 	// loginRetryGap is how long a user waits after a login failed or was
 	// abandoned before starting another.
 	loginRetryGap = 20 * time.Second
+	// openLoginWait and busyLoginWait are round hints for the page's countdown
+	// when the user already has a login open or the server is full: a login
+	// nobody polls ends within loginIdle, a busy server frees a slot as soon as
+	// any of the others finishes.
+	openLoginWait = time.Minute
+	busyLoginWait = 3 * time.Minute
 )
 
 // ownerKey names the Chat user of a Login call; calls that do not say share
@@ -49,11 +54,11 @@ func (a *Adapter) admitLogin(l *qrLogin) error {
 	}
 	switch {
 	case open >= maxLoginsPerUser:
-		return fmt.Errorf("%w: a Zalo login is already open; finish it or wait a minute", bridge.ErrLoginLimited)
+		return &bridge.LoginLimited{Reason: "a Zalo login is already open; finish it or wait a minute", Wait: openLoginWait}
 	case !a.loginFailedAt[l.owner].IsZero():
-		return fmt.Errorf("%w: wait a few seconds before starting another Zalo login", bridge.ErrLoginLimited)
+		return &bridge.LoginLimited{Reason: "wait a few seconds before starting another Zalo login", Wait: loginRetryGap - now.Sub(a.loginFailedAt[l.owner])}
 	case len(a.logins) >= maxConcurrentLogins:
-		return fmt.Errorf("%w: the server is running as many Zalo logins as it allows; try again in a few minutes", bridge.ErrLoginLimited)
+		return &bridge.LoginLimited{Reason: "the server is running as many Zalo logins as it allows; try again in a few minutes", Wait: busyLoginWait}
 	}
 	a.logins[l.id] = l
 	return nil

@@ -6,6 +6,27 @@ import type { BridgeError, LoginStep } from "./bridge-api.ts";
 /** Apps whose login is a QR code scanned on the phone, shown after a notice the user accepts. */
 export const QR_LOGIN_APPS: ReadonlySet<string> = new Set(["zalo"]);
 
+/**
+ * Apps Chat only reads from: nothing typed in Chat goes back to them, so the
+ * page must not promise two-way sync. Remove an app here when its send path
+ * ships (the server reports `send_unsupported` for an app that cannot send).
+ */
+export const RECEIVE_ONLY_APPS: ReadonlySet<string> = new Set(["zalo"]);
+
+/** The longest wait a countdown shows, in seconds: a hint from the server is capped to it. */
+const MAX_LIMIT_WAIT_S = 3600;
+
+/**
+ * Seconds a refused login start waits before it may be tried again: the
+ * server's hint (`retry_after`, carried in the error's detail), else the
+ * adapter's own cool-down.
+ */
+export function limitWaitSeconds(error: BridgeError): number {
+	const hint = Number.parseInt(error.detail, 10);
+	if (Number.isFinite(hint) && hint > 0) return Math.min(hint, MAX_LIMIT_WAIT_S);
+	return Math.ceil(LOGIN_RETRY_GAP_MS / 1000);
+}
+
 /** The QR image the page agrees to show: a base64 PNG data: URL, nothing else. */
 const QR_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
 

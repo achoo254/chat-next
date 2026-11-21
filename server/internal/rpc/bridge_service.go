@@ -71,6 +71,10 @@ func bridgeError(err error) error {
 	case errors.Is(err, engine.ErrFeatureUnsupported):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("feature_unsupported: this app cannot do that"))
 	case errors.Is(err, engine.ErrRateLimited):
+		// retry_after is the wait the limit asks for in seconds; the page counts it down.
+		if wait := bridge.LoginWait(err); wait > 0 {
+			return connect.NewError(connect.CodeResourceExhausted, fmt.Errorf("rate_limited: too many sign-in attempts; retry_after=%d", wait))
+		}
 		return connect.NewError(connect.CodeResourceExhausted, errors.New("too many sign-in attempts; try again later"))
 	case errors.Is(err, engine.ErrAccountTaken):
 		return connect.NewError(connect.CodeAlreadyExists, errors.New("account_taken: this account is connected by another user"))
