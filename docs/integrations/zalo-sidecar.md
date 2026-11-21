@@ -22,18 +22,47 @@ Phiên đăng nhập Zalo của một tài khoản thật là thứ cần bảo 
 Điểm vào `src/entry.mjs` đã làm các việc này; mọi thay đổi phải giữ chúng:
 
 - `new Zalo({ logging: false, checkUpdate: false })`: log mặc định in tên và uid ra `stdout` (kênh giao thức) và kiểm tra bản mới gọi `registry.npmjs.org` mỗi lần đăng nhập.
+- **Lệch có chủ ý so với rà soát:** `selfListen: true` (rà soát khuyên `false`). Không bật thì tin chính chủ gửi từ điện thoại không bao giờ tới Chat.
+- Lỗi đăng nhập chỉ ra ngoài dưới dạng mã (`src/login-failure.mjs`), không bao giờ là thông báo của thư viện (có thể chứa phản hồi thô của máy chủ).
 - Luôn truyền hàm nhận QR; không có thì thư viện ghi `qr.png` vào thư mục hiện tại.
 - **Bộ chặn đi ra trong tiến trình** (`src/egress-guard.mjs`, có test): mọi kết nối đi qua `net.Socket#connect`, chỉ cho phép `*.zalo.me`; từ chối IP trần và ổ cắm unix (`ws+unix:`). Thư viện lấy địa chỉ websocket và host API từ phản hồi của máy chủ mà không kiểm tra, nên lớp này cần thiết. Tên miền cho phép được in một lần ra `stderr` (`host <tên>`); đó là nguồn danh sách cho tường lửa.
 - `stdout` chỉ để giao thức (một dòng JSON mỗi sự kiện); `stderr` chỉ có `host ...` và `blocked ...`, không có nội dung tin, cookie, imei, tên hay id.
 - Tiến trình không ghi tệp, không sinh tiến trình con, không đọc biến môi trường; đóng `stdin` là dừng.
 
-Adapter Go đã làm phần của engine: chạy `node <bundle>` với môi trường viết tay (`PATH` thư mục hệ thống, `HOME` là thư mục làm việc, `TZ=UTC`, `WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không thừa kế biến nào của server), thư mục làm việc là một thư mục tạm rỗng xoá khi tiến trình thoát, nhóm tiến trình riêng (Linux: `Pdeathsig` giết tiến trình phụ khi server chết), dừng bằng đóng `stdin` rồi giết cả nhóm sau 3 giây. `stdout` không bao giờ vào log; `stderr` chỉ vào `slog` dưới dạng tên host (`host`) hoặc chữ "blocked", dòng khác chỉ ghi là có dòng lạ, không kèm nội dung. Dòng `stdout` dài quá 1 MiB thì dừng tiến trình.
+## Môi trường cách ly
 
-Điều kiện còn lại của môi trường chạy (máy chủ bảo đảm, chưa làm; phải xong trước khi đặt `ZALO_SIDECAR_BUNDLE` ở production): user hệ điều hành riêng không đọc được DSN hay khoá SecretBox; môi trường sạch (`WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không `NODE_OPTIONS`); chỉ đọc tệp đóng gói; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
+Adapter Go chạy `<ZALO_NODE_PATH> <bundle>` với môi trường viết tay (`PATH` thư mục hệ thống, `HOME` là thư mục làm việc, `TZ=UTC`, `WS_NO_BUFFER_UTIL=1`, `WS_NO_UTF_8_VALIDATE=1`, không thừa kế biến nào của server), nhóm tiến trình riêng, dừng bằng đóng `stdin` rồi giết cả nhóm sau 3 giây. Trên Linux thêm `Pdeathsig` (giết tiến trình phụ khi server chết; tín hiệu gắn với luồng hệ điều hành đã khởi động nó, Go hiếm khi bỏ luồng, nếu có thì tiến trình phụ chết sớm và được khởi động lại). `stdout` không bao giờ vào log; `stderr` chỉ vào `slog` dưới dạng tên host (`host`) hoặc chữ "blocked", dòng khác chỉ ghi là có dòng lạ, không kèm nội dung. Dòng `stdout` dài quá 1 MiB thì dừng tiến trình.
 
-## Giao thức stdio (phiên bản 2)
+**Đổi user (làm trong Go, không dùng sudo hay systemd-run):** tiến trình phụ chạy dưới `ZALO_SANDBOX_USER` bằng `SysProcAttr.Credential` (uid và gid chính của user đó, **không** nhóm phụ). Thư mục làm việc do server tạo trong thư mục tạm, chuyển chủ sang user đó với quyền `0700`, khi tiến trình thoát thì lấy lại chủ rồi xoá. Server cần `CAP_SETUID`, `CAP_SETGID` và `CAP_CHOWN` (hoặc chạy bằng root); thiếu thì mỗi lần khởi động tiến trình phụ lỗi và engine thử lại. Chỉ bản Linux làm được; hệ khác Zalo không được đăng ký.
 
-Mỗi dòng là một JSON. Lệnh vào: `login_qr`, `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready` (kèm `protocol`), `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `account` (id tài khoản Zalo sau khi đăng nhập, cả hai cách), `message`, `event`, `listener`, `error` (đã lọc, không có phản hồi thô). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh gửi tin, lấy lịch sử, liệt kê hội thoại hay đăng xuất. Bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải báo engine tài khoản nào vừa vào; adapter từ chối tiến trình phụ báo phiên bản khác.
+**Kiểm lúc khởi động** (một điều sai thì Zalo không được đăng ký, log lỗi «Zalo is not offered» kèm lý do):
+
+- `ZALO_SANDBOX_USER` tồn tại, uid và gid khác 0, uid khác uid của server.
+- `ZALO_NODE_PATH` là đường dẫn tuyệt đối tới một tệp thực thi.
+- Bundle: đường dẫn tuyệt đối, tệp thường (liên kết bị từ chối), không cho nhóm hay mọi người ghi, không thuộc và không ghi được bởi user cách ly; mọi thư mục từ thư mục chứa nó lên `/` không thuộc và không ghi được bởi user đó (thư mục ai cũng ghi được bị từ chối, kể cả có sticky bit).
+- SHA-256 của bundle bằng giá trị trong `zalo-sidecar.cjs.sha256` cạnh nó (hoặc `ZALO_SIDECAR_SHA256`).
+
+Điều kiện còn lại của máy chủ (chưa làm; phải xong trước khi đặt `ZALO_SIDECAR_BUNDLE` ở production): tạo user cách ly; cấp quyền cho server như trên; tường lửa `iptables` + `ipset` theo user, làm mới theo DNS bằng timer, giữ địa chỉ cũ và cảnh báo khi tra DNS lỗi; lần đăng nhập đầu ở chế độ chỉ ghi log để học danh sách tên miền rồi khoá.
+
+## Phân loại lỗi đăng nhập
+
+`zca-js` 2.3.0 ném cùng một lớp lỗi (`ZaloApiError`, tên `ZcaApiError`) cho phiên bị từ chối và cho sự cố phía Zalo, nên tiến trình phụ đọc lỗi và chỉ gửi mã (`src/login-failure.mjs`, có test gắn với chuỗi trong bundle):
+
+| Mã | Khi nào |
+|---|---|
+| `session_rejected` | `getLoginInfo` trả 200 nhưng dữ liệu không giải mã ra đối tượng («Đăng nhập thất bại»), thông tin đăng nhập thiếu khoá («Khởi tạo ngữ cảnh thất bại.»), hoặc `getLoginInfo` trả 401/403 |
+| `zalo_unavailable` | `getLoginInfo`/`getServerInfo` trả mã HTTP lỗi khác, `Missing signkey`, lỗi mã hoá tham số |
+| `network_error` | DNS, TCP, TLS, hết giờ, bộ chặn đi ra |
+| `bad_session` | phiên đưa vào thiếu trường |
+| `login_failed` | mọi lỗi khác |
+
+**Chưa quan sát** trên tài khoản thật phản hồi của Zalo khi phiên hết hạn thật; `session_rejected` là hình dạng dự đoán từ mã nguồn. Vì vậy engine chỉ coi phiên là đã hết khi `session_rejected` lặp lại trong ít nhất một giờ (xem [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định)). Khi gặp phiên hết hạn thật, ghi lại mã nhận được và chỉnh bảng trên.
+
+## Giao thức stdio (phiên bản 3)
+
+Mỗi dòng là một JSON. Lệnh vào: `login_qr` (kèm `listen:false` để dừng ở `account` mà không mở kênh nghe; adapter luôn gửi như vậy), `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready` (kèm `protocol`), `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `account` (id tài khoản Zalo, 1-20 chữ số; id khác thì lỗi `no_account`), `message`, `event`, `listener`, `error` (chỉ mã, xem bảng trên). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh gửi tin, lấy lịch sử, liệt kê hội thoại hay đăng xuất.
+
+Lịch sử: bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải báo engine tài khoản nào vừa vào; bản 3 (21/11/2026) thêm `listen:false` và mã lỗi đăng nhập, kiểm id tài khoản. Adapter chỉ nhận đúng bản 3: bundle đi cùng commit với mã Go và băm được kiểm lúc khởi động, nên lệch bản chỉ xảy ra khi triển khai hỏng.
 
 ## Rủi ro đã biết
 
