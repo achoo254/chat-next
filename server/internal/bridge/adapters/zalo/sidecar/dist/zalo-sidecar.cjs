@@ -29107,7 +29107,7 @@ function installEgressGuard({ onHost = () => {
 }
 
 // src/entry.mjs
-var PROTOCOL = 1;
+var PROTOCOL = 2;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
 `),
@@ -29135,6 +29135,7 @@ var FORWARDED = {
 };
 function listen(loggedIn) {
   api = loggedIn;
+  emit({ ev: "account", uid: String(api.getOwnId()) });
   api.listener.on("message", (message) => {
     const data = message.data ?? {};
     emit({

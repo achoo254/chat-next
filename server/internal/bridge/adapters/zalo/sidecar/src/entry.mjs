@@ -5,9 +5,10 @@
 //   {"cmd":"login_session","session":{...}}  log in with a session an earlier login returned
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
-//   {"ev":"ready","protocol":1}
+//   {"ev":"ready","protocol":2}
 //   {"ev":"qr","image":"<base64 png>"} | {"ev":"qr_scanned"} | {"ev":"qr_expired"} | {"ev":"qr_declined"}
 //   {"ev":"logged_in","session":{cookie,imei,userAgent}}   the engine keeps it (encrypted), never this process
+//   {"ev":"account","uid":".."}                      the signed-in account, once logged in (both ways)
 //   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..}
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
@@ -22,7 +23,8 @@ import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 import { installEgressGuard } from "./egress-guard.mjs";
 
-const PROTOCOL = 1;
+// 2: adds the `account` event (the engine needs the account id to finish a QR login).
+const PROTOCOL = 2;
 
 installEgressGuard({
 	onHost: (host) => process.stderr.write(`host ${host}\n`),
@@ -59,6 +61,7 @@ const FORWARDED = {
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
 function listen(loggedIn) {
 	api = loggedIn;
+	emit({ ev: "account", uid: String(api.getOwnId()) });
 	api.listener.on("message", (message) => {
 		const data = message.data ?? {};
 		emit({
