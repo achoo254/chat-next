@@ -3,8 +3,11 @@
 // status line, until the phone confirms. Used for a new connection and for an
 // account that needs signing in again. The image is rendered only when it is
 // a checked PNG data: URL and is dropped when the login ends.
+import { signInUrl } from "@achoo254/chat-core";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
+import { useI18n } from "../../i18n/i18n.tsx";
+import { paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
 import type { BridgeApi, BridgeError } from "./bridge-api.ts";
 import { BridgeQrNotice } from "./bridge-qr-notice.tsx";
@@ -46,6 +49,8 @@ export function BridgeQrLogin({
 	const heading = useRef<HTMLHeadingElement>(null);
 	const action = useRef<HTMLButtonElement>(null);
 	const cancelButton = useRef<HTMLButtonElement>(null);
+	const reauthLink = useRef<HTMLAnchorElement>(null);
+	const { locale } = useI18n();
 	const { status, wait: seconds } = login;
 	const ended = status !== "idle" && isEnded(status);
 
@@ -55,7 +60,7 @@ export function BridgeQrLogin({
 	}, [accepted]);
 	useEffect(() => {
 		if (status !== "network" && !ended) return;
-		const next = action.current !== null && !action.current.disabled ? action.current : cancelButton.current;
+		const next = reauthLink.current ?? (action.current !== null && !action.current.disabled ? action.current : cancelButton.current);
 		next?.focus();
 	}, [status, ended]);
 
@@ -106,6 +111,13 @@ export function BridgeQrLogin({
 					<button type="button" className="btn btn-primary" data-id="bridge-qr-login-retry" ref={action} onClick={login.resume}>
 						{t.qr.retry}
 					</button>
+				)}
+				{status === "reauth" && (
+					// A plain sign-out and sign-in can be answered by the IdP session without asking the
+					// password again, which leaves the sign-in time too old: this link forces it.
+					<a className="btn btn-primary" data-id="bridge-qr-login-reauth" ref={reauthLink} href={signInUrl(locale, { reauth: true, returnTo: paths.settings("bridge") })}>
+						{t.reauth.signIn}
+					</a>
 				)}
 				{ended && status !== "reauth" && (
 					<button

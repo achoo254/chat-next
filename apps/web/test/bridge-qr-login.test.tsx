@@ -215,6 +215,20 @@ describe("when the login does not go through", () => {
 		expect(fixture.bridge.qr.polls).toBe(0);
 	});
 
+	it("puts the sign-in-again link in the QR card when the session is too old, so a plain sign-out is not mistaken for it", async () => {
+		const fixture = zaloFixture();
+		fixture.bridge.qr.start = { kind: "error", code: Code.FailedPrecondition, message: "reauth_required: sign in again (within the last 10 minutes) to do this" };
+		await openPage(fixture);
+		await startZalo(fixture);
+		await expectStatus("Cần đăng nhập lại Chat trước khi kết nối.");
+		const link = document.querySelector<HTMLAnchorElement>('[data-id="bridge-qr-login-reauth"]');
+		if (link === null) throw new Error("no sign-in link in the QR card");
+		expect(link.textContent).toBe("Đăng nhập lại");
+		expect(link.getAttribute("href")).toContain("reauth=1");
+		expect(link.getAttribute("href")).toContain(encodeURIComponent("/settings/bridge"));
+		expect(screen.queryByRole("button", { name: "Bắt đầu lại" })).toBeNull();
+	});
+
 	it("counts down the wait the server asks for, in minutes when it is long", async () => {
 		const fixture = zaloFixture();
 		fixture.bridge.qr.start = { kind: "error", code: Code.ResourceExhausted, message: "rate_limited: too many sign-in attempts; retry_after=600" };
