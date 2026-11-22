@@ -12,6 +12,10 @@
  * a value (a tool's output, a transcript item).
  */
 
+import { hideCredentialShapes } from "./credential-shapes.ts";
+
+export { hideNamedSecrets } from "./credential-shapes.ts";
+
 /** A JWT, whole or cut: base64url JSON (`eyJ` is `{"`) and up to two more segments. */
 const JWT = /eyJ[\w-]{8,}(?:\.[\w-]*){0,2}/g;
 const BEARER = /\b(Bearer)\s+[^\s"'\\,;]+/gi;
@@ -60,11 +64,25 @@ function hideSecrets(text: string): string {
 	return out;
 }
 
-/** `text` without the `known` tokens, secret values, JWTs or Bearer values. */
-export function redact(text: string, known: Iterable<string> = []): string {
+/**
+ * `text` without the `known` tokens, secret values, JWTs or Bearer values
+ * only: what `redact` did before it also hid credential shapes. Advisor's
+ * outbound check weighs a request after this, so a request holding a key is
+ * still refused whole rather than sent with the key hidden.
+ */
+export function redactTokens(text: string, known: Iterable<string> = []): string {
 	let out = hideSecrets(text);
 	for (const token of known) if (token) out = out.split(token).join(HIDDEN);
 	return out.replace(JWT, HIDDEN).replace(BEARER, `$1 ${HIDDEN}`);
+}
+
+/**
+ * `text` without the `known` tokens, secret values, JWTs, Bearer values, or
+ * credentials of a well-known shape (credential-shapes.ts: the shared list's
+ * token shapes, private key blocks, URL passwords).
+ */
+export function redact(text: string, known: Iterable<string> = []): string {
+	return hideCredentialShapes(redactTokens(text, known));
 }
 
 /** `text` without the secret values only (no JWT rule): for what the user and Claude read. */
