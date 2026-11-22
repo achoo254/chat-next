@@ -10,13 +10,18 @@
 // The projects without content live in the agent's config
 // (content-settings-config.ts); state.json and the store's content_settings
 // are rebuilt from it at start, on every change, and after a wipe. Records
-// reach the store through the ingest (the normalizer), given as `ingest`;
-// without it records are only counted and the spool is left for later.
+// reach the store through the ingest (ingest/observatory-ingest.ts, or the one
+// given as `ingest`), which also rolls old detail into daily totals on a
+// schedule. Stop waits for records still being taken, but only so long.
+import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
 import { OfficeProblems } from "../office/office-problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
+import { AcceptTracker, STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
+import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
+import { ObservatoryIngest } from "./ingest/observatory-ingest.ts";
 import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.ts";
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
 import { redactRecordAgain } from "./privacy/redact-record-again.ts";
@@ -26,6 +31,7 @@ import { clearSpool } from "./spool/clear-spool.ts";
 import { setAsideBrokenHookState } from "./spool/hook-state-file.ts";
 import { HookStateWriter } from "./spool/hook-state-writer.ts";
 import { SpoolReader } from "./spool/spool-reader.ts";
+import { ObservatoryStoreError } from "./store/store-errors.ts";
 import type { ObservatoryStore } from "./store/observatory-store.ts";
 import type { WriteOp } from "./store/write-ops.ts";
 
@@ -36,11 +42,13 @@ export type ObservatoryServiceOptions = {
   log: (line: string) => void;
   /** The machine's secret values hidden in records, besides those mcp/redact.ts remembers (the OTLP tokens are added here). */
   knownSecrets: () => readonly string[];
-  /** The ingest: takes filtered records and pushes their writes. */
+  /** The ingest: takes filtered records and pushes their writes (ObservatoryIngest by default). */
   ingest?: (push: (op: WriteOp) => void) => ObservatorySink;
   /** Opens the store at `path` (tests pass a failing one). */
   openStore?: (path: string) => Promise<ObservatoryStore>;
   now?: () => number;
+  /** How long stop() waits for records still being taken (STOP_WAIT_MS by default). */
+  stopWaitMs?: number;
   /** When an unreadable OTLP token file is read again (receiver-token.ts, receiver/otlp-receiver-host.ts); tests pass short ones. */
   tokenTimings?: Pick<OtlpReceiverHostOptions, "tokenRetryMs" | "tokenRetryEveryMs">;
 };
@@ -51,8 +59,9 @@ export class ObservatoryService {
   private sink: ObservatorySink | undefined;
   private spool: SpoolReader | undefined;
   private started = false;
-  /** `accept` calls still running (stop waits for them). */
-  private readonly accepting = new Set<Promise<void>>();
+  /** `accept` calls still running (stop waits for them, within stopWaitMs). */
+  private readonly accepting = new AcceptTracker();
+  private readonly rollups: DailyRollupScheduler;
   private readonly state: HookStateWriter;
   private readonly problems: OfficeProblems;
   private readonly now: () => number;
@@ -73,6 +82,7 @@ export class ObservatoryService {
       now: this.now,
       ...opts.tokenTimings,
     });
+    this.rollups = new DailyRollupScheduler({ prune: () => this.store.store?.prune(this.now()), problems: (place, err) => this.problems.report(place, err) });
   }
 
   /** The master switch of the agent's config (unset is on). */
@@ -91,17 +101,28 @@ export class ObservatoryService {
     for (const secret of this.opts.knownSecrets()) rememberSecret(secret);
     await this.store.open();
     // The ingest pushes into whichever writer is current (a wipe makes a new one).
-    if (this.store.writer && this.opts.ingest) this.sink = this.guard("ingest-create", () => this.opts.ingest?.((op) => this.store.writer?.push(op)));
+    const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
+    if (this.store.writer) this.sink = this.guard("ingest-create", () => ingest((op) => this.store.writer?.push(op)));
     await this.receiver.start();
     if (this.sink) this.startSpool();
+    if (this.store.store) this.rollups.start();
   }
 
-  /** Stops in order: receiver (its queue handed on), spool reader, writer (what waits written), store. Never rejects; start() works again after. */
+  /**
+   * Stops in order: receiver (its queue handed on), rollups, spool reader and
+   * the records still being taken (waited for stopWaitMs at most: one that
+   * never settles is left behind, logged), writer (what waits written), store.
+   * Never rejects; start() works again after.
+   */
   async stop(): Promise<void> {
     await this.receiver.stop();
-    await this.spool?.stop();
-    // Writes an ingest still pushes go in before the writer closes.
-    await Promise.allSettled([...this.accepting]);
+    await this.rollups.stop();
+    const taken = (async () => {
+      await this.spool?.stop();
+      // Writes an ingest still pushes go in before the writer closes.
+      await this.accepting.settled();
+    })();
+    if (!(await settledWithin(taken, this.opts.stopWaitMs ?? STOP_WAIT_MS))) this.problems.report("ingest-stop", new ObservatoryStoreError("records still being taken at stop were left behind"));
     this.store.close();
     this.spool = undefined;
     this.sink = undefined;
@@ -116,7 +137,7 @@ export class ObservatoryService {
    * written into it again from the config. Throws the wipe's error after that.
    */
   async wipe(): Promise<void> {
-    await this.spool?.stop();
+    if (this.spool && !(await settledWithin(this.spool.stop(), this.opts.stopWaitMs ?? STOP_WAIT_MS))) this.problems.report("ingest-stop", new ObservatoryStoreError("a spool run still taking records at the wipe was left behind"));
     this.spool = undefined;
     let failure = await this.store.wipe(this.started && this.enabled);
     await clearSpool(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
@@ -171,13 +192,7 @@ export class ObservatoryService {
   async accept(record: FilteredRecord, origin: RecordOrigin): Promise<void> {
     const sink = this.sink;
     if (!sink) return;
-    const running = sink.accept(record, origin);
-    this.accepting.add(running);
-    try {
-      await running;
-    } finally {
-      this.accepting.delete(running);
-    }
+    await this.accepting.track(sink.accept(record, origin));
   }
 
   /** The secret values the agent hides: the machine's and the receiver's tokens. */
@@ -188,12 +203,21 @@ export class ObservatoryService {
   private startSpool(): void {
     this.spool = new SpoolReader({
       dataDir: this.opts.dataDir,
-      accept: (record) => this.accept(redactRecordAgain(record, this.secrets()), "spool"),
+      // Before the ingest gets a record, and before one it refuses is set aside: the quarantine is as private as the store.
+      secondPass: (record) => redactRecordAgain(record, this.secrets()),
+      accept: (record) => this.accept(record, "spool"),
       commit: async () => this.store.commit(),
       problems: (place, err) => this.problems.report(place, err),
       now: this.now,
     });
     this.spool.start();
+  }
+
+  /** The store open now; throws when there is none (a read then waits for the next time). */
+  private storeNow(): ObservatoryStore {
+    const store = this.store.store;
+    if (!store) throw new ObservatoryStoreError("the Observatory store is not open");
+    return store;
   }
 
   private guard<T>(place: string, fn: () => T): T | undefined {

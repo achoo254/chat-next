@@ -55,19 +55,23 @@ function put<R>(db: SqliteConnection, spec: TableSpec<R>, row: LooseRow<R>): voi
 }
 
 /**
- * Content is not stored for a session whose project has it switched off
+ * Content is not stored for a project that has it switched off
  * (content_settings), whatever order the writes come in: a write still
  * queued from before the switch, or a late source, brings its excerpt or
  * content here and it is dropped; the stored row keeps NULL (clearContent
- * removed what was there). A session not stored yet has no known project, so
- * its content passes until clearContent runs again.
+ * removed what was there). The project is the row's own (the event that
+ * wrote the content: the stored row's, which a write never changes, else the
+ * write's), else its session's. Content whose project cannot be told is
+ * blocked as soon as any project has content off: the store fails closed,
+ * as the hook does when it cannot read its state (hook-state-file.ts).
  */
-function contentBlocked(db: SqliteConnection, sessionId: string): boolean {
+function contentBlocked(db: SqliteConnection, table: "prompts" | "tool_calls", key: string, rowKey: string, projectKey: string | null | undefined, sessionId: string): boolean {
   return (
     db.all(
-      `SELECT 1 AS blocked FROM sessions s JOIN content_settings cs ON cs.project_key = s.project_key
-       WHERE s.session_id = ? AND cs.store_content = 0`,
-      [sessionId],
+      `SELECT 1 AS blocked
+       FROM (SELECT COALESCE((SELECT t.project_key FROM ${table} t WHERE t.${key} = ?), ?, (SELECT s.project_key FROM sessions s WHERE s.session_id = ?)) AS pk) p
+       WHERE EXISTS (SELECT 1 FROM content_settings cs WHERE cs.store_content = 0 AND (p.pk IS NULL OR cs.project_key = p.pk))`,
+      [rowKey, projectKey ?? null, sessionId],
     ).length > 0
   );
 }
@@ -78,11 +82,11 @@ export function applyWriteOp(db: SqliteConnection, op: WriteOp): void {
     case "session":
       return put(db, SESSIONS, op.row);
     case "prompt": {
-      const blocked = op.row.excerpt != null && contentBlocked(db, op.row.sessionId);
+      const blocked = op.row.excerpt != null && contentBlocked(db, "prompts", "prompt_id", op.row.promptId, op.row.projectKey, op.row.sessionId);
       return put(db, PROMPTS, blocked ? { ...op.row, excerpt: undefined } : op.row);
     }
     case "toolCall": {
-      const blocked = op.row.content != null && contentBlocked(db, op.row.sessionId);
+      const blocked = op.row.content != null && contentBlocked(db, "tool_calls", "tool_use_id", op.row.toolUseId, op.row.projectKey, op.row.sessionId);
       return put(db, TOOL_CALLS, blocked ? { ...op.row, content: undefined } : op.row);
     }
     case "subagent":

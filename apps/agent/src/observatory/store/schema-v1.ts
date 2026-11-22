@@ -12,6 +12,12 @@
 // (session_id, agent_id), dedupe_key, prompt_id upsert on it;
 // instructions_loaded and git_ops keep the first copy.
 //
+// The rows that can hold content (prompts.excerpt, tool_calls.content) carry
+// the project of the event that wrote it (`project_key`): a session may move
+// between repositories, and a project's content setting covers exactly the
+// content written in it. A row without a project falls back on its
+// session's (write-ops.ts, ObservatoryStore.clearContent).
+//
 // Detail tables are kept 90 days, then rolled into `daily_rollups` (kept for
 // good) and deleted (retention.ts); each has an index on its time column for
 // that, and on session_id for a session's timeline.
@@ -36,7 +42,8 @@ export const SCHEMA_V1: readonly string[] = [
     session_id TEXT NOT NULL,
     at INTEGER NOT NULL,
     length INTEGER,
-    excerpt TEXT
+    excerpt TEXT,
+    project_key TEXT
   )`,
   `CREATE INDEX prompts_session ON prompts (session_id, at)`,
   `CREATE INDEX prompts_at ON prompts (at)`,
@@ -48,7 +55,7 @@ export const SCHEMA_V1: readonly string[] = [
     agent_id TEXT,
     at INTEGER NOT NULL,
     tool_name TEXT,
-    tool_kind TEXT,
+    office_room TEXT,
     mcp_server TEXT,
     target TEXT,
     duration_ms INTEGER,
@@ -56,7 +63,8 @@ export const SCHEMA_V1: readonly string[] = [
     output_bytes INTEGER,
     success INTEGER CHECK (success IN (0, 1)),
     error TEXT,
-    content TEXT
+    content TEXT,
+    project_key TEXT
   )`,
   `CREATE INDEX tool_calls_session ON tool_calls (session_id, at)`,
   `CREATE INDEX tool_calls_at ON tool_calls (at)`,

@@ -36,7 +36,7 @@ describe("ObservatoryStore writes and reads", () => {
       endedAt: null,
       mainModel: "claude-opus",
     });
-    expect(t.prompts).toEqual([{ promptId: "s1-p1", sessionId: "s1", at: T + 1, length: 42, excerpt: "fix the build" }]);
+    expect(t.prompts).toEqual([{ promptId: "s1-p1", sessionId: "s1", at: T + 1, length: 42, excerpt: "fix the build", projectKey: null }]);
     expect(t.toolCalls.map((c) => [c.toolUseId, c.success, c.error])).toEqual([
       ["s1-t1", true, null],
       ["s1-t2", false, "ENOENT"],
@@ -80,7 +80,7 @@ describe("ObservatoryStore writes and reads", () => {
     expect(store.sessionTimeline("s").session).toMatchObject({ source: "sdk", startedAt: T, endedAt: T + 10 });
     store.write([{ kind: "prompt", row: { promptId: "p", sessionId: "s", at: T } }]);
     store.write([{ kind: "prompt", row: { promptId: "p", sessionId: "other", at: T, length: 3 } }]);
-    expect(store.sessionTimeline("s").prompts).toEqual([{ promptId: "p", sessionId: "s", at: T, length: 3, excerpt: null }]);
+    expect(store.sessionTimeline("s").prompts).toEqual([{ promptId: "p", sessionId: "s", at: T, length: 3, excerpt: null, projectKey: null }]);
   });
 
   it("merges other columns by filling in: a later value wins, a missing one keeps the stored", () => {
@@ -195,7 +195,7 @@ describe("ObservatoryStore writes and reads", () => {
     ]);
     const t = store.sessionTimeline("a");
     expect(t.toolCalls[0]).toMatchObject({ content: null, durationMs: 7 });
-    expect(t.prompts).toEqual([{ promptId: "a-p1", sessionId: "a", at: T + 1, length: 42, excerpt: null }]);
+    expect(t.prompts).toEqual([{ promptId: "a-p1", sessionId: "a", at: T + 1, length: 42, excerpt: null, projectKey: null }]);
 
     // Switched on again: content is stored.
     store.write([{ kind: "contentSetting", row: { projectKey: "github.com/acme/app", storeContent: true, updatedAt: T + 1 } }]);

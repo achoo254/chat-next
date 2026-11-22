@@ -72,6 +72,13 @@ export function readDailyRollups(db: SqliteConnection, q: DayRange): DailyRollup
   return select(db, DAILY_ROLLUPS, "WHERE day >= ? AND day <= ? ORDER BY day, project_key, model", [q.fromDay ?? "", q.toDay ?? "9999-12-31"]);
 }
 
+/** The number and time of each stored load of `filePath` for `loadReason` in a session, by number (the ingest goes on from them after a restart). */
+export function readInstructionLoads(db: SqliteConnection, sessionId: string, filePath: string, loadReason: string): { seq: number; at: number }[] {
+  return db
+    .all("SELECT seq, at FROM instructions_loaded WHERE session_id = ? AND file_path = ? AND load_reason = ? ORDER BY seq", [sessionId, filePath, loadReason])
+    .flatMap((r) => (typeof r.seq === "number" && typeof r.at === "number" ? [{ seq: r.seq, at: r.at }] : []));
+}
+
 export function readContentSetting(db: SqliteConnection, projectKey: string): ContentSettingRow | undefined {
   return select(db, CONTENT_SETTINGS, "WHERE project_key = ?", [projectKey])[0];
 }

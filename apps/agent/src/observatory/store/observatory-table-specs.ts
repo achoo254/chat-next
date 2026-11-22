@@ -72,8 +72,9 @@ export const SESSIONS: TableSpec<SessionRow> = {
     col("sessionId", "session_id", "text", { required: true }),
     col("previousSessionId", "previous_session_id", "text", { merge: "unlessCertain" }),
     col("previousSessionInferred", "previous_session_inferred", "boolean", { merge: "unlessCertain" }),
-    col("projectKey", "project_key", "text"),
-    col("cwd", "cwd", "text"),
+    // The first project written for the session (where it started, unless its records came out of order): a later event in another folder (a `cd`) or one read again never moves it.
+    col("projectKey", "project_key", "text", { merge: "first" }),
+    col("cwd", "cwd", "text", { merge: "first" }),
     col("source", "source", "text", { required: true, merge: "first" }),
     col("internalLabel", "internal_label", "text"),
     earliest("startedAt", "started_at"),
@@ -85,7 +86,14 @@ export const SESSIONS: TableSpec<SessionRow> = {
 export const PROMPTS: TableSpec<PromptRow> = {
   table: "prompts",
   conflict: { upsert: ["promptId"] },
-  columns: [col("promptId", "prompt_id", "text", { required: true }), sessionOf(), earliest("at", "at"), col("length", "length", "integer"), col("excerpt", "excerpt", "text")],
+  columns: [
+    col("promptId", "prompt_id", "text", { required: true }),
+    sessionOf(),
+    earliest("at", "at"),
+    col("length", "length", "integer"),
+    col("excerpt", "excerpt", "text"),
+    col("projectKey", "project_key", "text", { merge: "first" }),
+  ],
 };
 
 export const TOOL_CALLS: TableSpec<ToolCallRow> = {
@@ -98,7 +106,7 @@ export const TOOL_CALLS: TableSpec<ToolCallRow> = {
     col("agentId", "agent_id", "text"),
     earliest("at", "at"),
     col("toolName", "tool_name", "text"),
-    col("toolKind", "tool_kind", "text"),
+    col("officeRoom", "office_room", "text"),
     col("mcpServer", "mcp_server", "text"),
     col("target", "target", "text"),
     col("durationMs", "duration_ms", "integer"),
@@ -107,6 +115,8 @@ export const TOOL_CALLS: TableSpec<ToolCallRow> = {
     col("success", "success", "boolean"),
     col("error", "error", "text"),
     col("content", "content", "text"),
+    // Written only with the content (the ingest's end-of-call writes), so the content's own project.
+    col("projectKey", "project_key", "text", { merge: "first" }),
   ],
 };
 

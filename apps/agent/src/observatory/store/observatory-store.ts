@@ -15,7 +15,7 @@ import { AGENT_BUSY_TIMEOUT_MS, openObservatoryDb } from "./open-observatory-db.
 import { type PruneResult, pruneExpired } from "./retention.ts";
 import { type SqliteConnection, type SqliteRuntime, isSqliteBusy } from "./sqlite-driver.ts";
 import { ObservatoryStoreBusy, ObservatoryStoreClosed, ObservatoryWipeFailed } from "./store-errors.ts";
-import { type DayRange, type SessionQuery, type SessionTimeline, readContentSetting, readDailyRollups, readSessionTimeline, readSessions } from "./store-reads.ts";
+import { type DayRange, type SessionQuery, type SessionTimeline, readContentSetting, readDailyRollups, readInstructionLoads, readSessionTimeline, readSessions } from "./store-reads.ts";
 import { type WriteOp, applyWriteOp } from "./write-ops.ts";
 
 export type { SessionTimeline };
@@ -101,6 +101,11 @@ export class ObservatoryStore {
     return readDailyRollups(this.live(), q);
   }
 
+  /** The number and time of each stored load of one instruction file for one reason in a session (store-reads.ts). */
+  instructionLoads(sessionId: string, filePath: string, loadReason: string): { seq: number; at: number }[] {
+    return readInstructionLoads(this.live(), sessionId, filePath, loadReason);
+  }
+
   /** The content setting of a project; undefined when it was never set (the default applies). */
   contentSetting(projectKey: string): ContentSettingRow | undefined {
     return readContentSetting(this.live(), projectKey);
@@ -108,15 +113,19 @@ export class ObservatoryStore {
 
   /**
    * Removes the stored content of a project (prompt excerpts, tool call
-   * content) from every row of its sessions, in one transaction; the rest of
-   * the rows stays. Rows of a session not stored (no project known) are not
-   * reached. Returns the rows changed.
+   * content) from every row written in it (the row's project, else its
+   * session's), in one transaction; the rest of the rows stays. Content whose
+   * project cannot be told (none on the row, none on its session) goes too:
+   * it may be this project's (fail closed, as write-ops.ts blocks it). Returns
+   * the rows changed.
    */
   clearContent(projectKey: string): { prompts: number; toolCalls: number } {
-    const ofProject = "session_id IN (SELECT session_id FROM sessions WHERE project_key = ?)";
+    // A row's project is its own (the event that wrote the content), else its session's; unknown counts as this one.
+    const ofProject = (table: string): string =>
+      `COALESCE(${table}.project_key, (SELECT s.project_key FROM sessions s WHERE s.session_id = ${table}.session_id), ?) = ?`;
     return this.transaction((db) => ({
-      prompts: db.run(`UPDATE prompts SET excerpt = NULL WHERE excerpt IS NOT NULL AND ${ofProject}`, [projectKey]),
-      toolCalls: db.run(`UPDATE tool_calls SET content = NULL WHERE content IS NOT NULL AND ${ofProject}`, [projectKey]),
+      prompts: db.run(`UPDATE prompts SET excerpt = NULL WHERE excerpt IS NOT NULL AND ${ofProject("prompts")}`, [projectKey, projectKey]),
+      toolCalls: db.run(`UPDATE tool_calls SET content = NULL WHERE content IS NOT NULL AND ${ofProject("tool_calls")}`, [projectKey, projectKey]),
     }));
   }
 

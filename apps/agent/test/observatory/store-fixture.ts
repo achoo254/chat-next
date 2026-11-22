@@ -23,7 +23,7 @@ export function sessionOps(id: string, at: number, project = "github.com/acme/ap
     { kind: "prompt", row: { promptId: `${id}-p1`, sessionId: id, at: at + 1, length: 42, excerpt: "fix the build" } },
     {
       kind: "toolCall",
-      row: { toolUseId: `${id}-t1`, sessionId: id, promptId: `${id}-p1`, at: at + 2, toolName: "Bash", toolKind: "builtin", durationMs: 120, success: true },
+      row: { toolUseId: `${id}-t1`, sessionId: id, promptId: `${id}-p1`, at: at + 2, toolName: "Bash", officeRoom: "server", durationMs: 120, success: true },
     },
     { kind: "toolCall", row: { toolUseId: `${id}-t2`, sessionId: id, promptId: `${id}-p1`, at: at + 3, toolName: "Read", success: false, error: "ENOENT" } },
     { kind: "subagent", row: { agentId: `${id}-a1`, sessionId: id, promptId: `${id}-p1`, agentType: "Explore", startedAt: at + 4, model: "claude-haiku", totalTokens: 900 } },

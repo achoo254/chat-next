@@ -28,7 +28,15 @@ export type SessionRow = {
   mainModel: string | null;
 };
 
-export type PromptRow = { promptId: string; sessionId: string; at: number; length: number | null; excerpt: string | null };
+export type PromptRow = {
+  promptId: string;
+  sessionId: string;
+  at: number;
+  length: number | null;
+  excerpt: string | null;
+  /** The project of the event that wrote the excerpt (the session's when null). */
+  projectKey: string | null;
+};
 
 export type ToolCallRow = {
   toolUseId: string;
@@ -37,7 +45,8 @@ export type ToolCallRow = {
   agentId: string | null;
   at: number;
   toolName: string | null;
-  toolKind: string | null;
+  /** The office room of the call (docs/office-wire.md part 4), lower case: `library`, `work`, `qa`, `post`… */
+  officeRoom: string | null;
   mcpServer: string | null;
   /** The file or domain the call touched, as the ingest extracted it. */
   target: string | null;
@@ -47,6 +56,8 @@ export type ToolCallRow = {
   success: boolean | null;
   error: string | null;
   content: string | null;
+  /** The project of the event that wrote the content (the session's when null). */
+  projectKey: string | null;
 };
 
 export type SubagentRow = {

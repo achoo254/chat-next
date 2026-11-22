@@ -56,11 +56,31 @@ export function migrate(db: SqliteConnection, path: string): void {
         for (const sql of m.statements) db.exec(sql);
         // PRAGMA takes no bound parameter; the version is a constant of this file.
         db.exec(`PRAGMA user_version = ${m.version}`);
+      } else if (version === 1) {
+        alignBeforeRelease(db);
       }
       db.exec("COMMIT");
     } catch (err) {
       rollbackQuietly(db);
       throw err;
     }
+  }
+}
+
+/**
+ * Version 1 changed before it was released: `tool_calls.tool_kind` became
+ * `office_room`, and `prompts` and `tool_calls` gained `project_key`. A
+ * database a development build wrote before that is brought in line in place
+ * (same version, rows kept: the new columns start NULL, which falls back on
+ * the session's project), so its writes do not fail on a missing column.
+ * Each step runs only when its column is missing, so running it again
+ * changes nothing.
+ */
+function alignBeforeRelease(db: SqliteConnection): void {
+  const columnsOf = (table: string): Set<unknown> => new Set(db.all(`PRAGMA table_info(${table})`).map((c) => c.name));
+  const toolCalls = columnsOf("tool_calls");
+  if (toolCalls.has("tool_kind") && !toolCalls.has("office_room")) db.exec("ALTER TABLE tool_calls RENAME COLUMN tool_kind TO office_room");
+  for (const table of ["prompts", "tool_calls"]) {
+    if (!columnsOf(table).has("project_key")) db.exec(`ALTER TABLE ${table} ADD COLUMN project_key TEXT`);
   }
 }

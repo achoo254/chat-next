@@ -11,27 +11,37 @@
 // (cursor.json), and a file is deleted only once read to its end that way.
 // When either fails the run stops and the chunk is read again next time (the
 // store ignores a duplicate). A record the ingest refuses SPOOL_MAX_ATTEMPTS
-// runs in a row is set aside (spool-quarantine.ts) and the reader goes on, so
-// one bad record never holds the files after it. An agent restarted halfway
-// goes on from the saved position. `dropped-` files are added to the dropped
-// count and deleted.
+// runs in a row is set aside (spool-quarantine.ts: as the ingest got it, after
+// the second pass) and the reader goes on, so one bad record never holds the
+// files after it; the tries are saved before the commit, so a commit failing
+// right after never sets the same record aside twice. An agent restarted
+// halfway goes on from the saved position. `dropped-` files are added to the
+// dropped count and deleted. Quarantined records past their time are deleted
+// once an hour.
 import { readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { readLinesUntil } from "../../office/office-bounded-lines.ts";
 import { type FilteredRecord, isFilteredRecord } from "../privacy/filtered-record.ts";
 import { ObservatoryStoreError } from "../store/store-errors.ts";
 import { SPOOL_CURSOR_FILE, SPOOL_DIR, SPOOL_GRACE_MS, SPOOL_MAX_LINE_BYTES, parseSpoolFileName, spoolFileSettled } from "./spool-files.ts";
-import { SPOOL_MAX_ATTEMPTS, type SpoolCursor, lineKey, readSpoolCursor, setAsideRefused, writeSpoolCursor } from "./spool-quarantine.ts";
+import { type RefusedRecord, SPOOL_MAX_ATTEMPTS, type SpoolCursor, lineKey, pruneQuarantine, readSpoolCursor, setAsideRefused, writeSpoolCursor } from "./spool-quarantine.ts";
 
 export const SPOOL_READ_EVERY_MS = 10_000;
 /** Bytes read in one run at most. */
 export const SPOOL_RUN_BUDGET_BYTES = 4 * 1024 * 1024;
 const CHUNK_BYTES = 256 * 1024;
 const FIRST_RUN_DELAY_MS = 2_000;
+const QUARANTINE_PRUNE_EVERY_MS = 60 * 60_000;
 
 export type SpoolReaderOptions = {
   dataDir: string;
-  /** Takes each record read (the agent redacts it again and hands it to the ingest); rejects when it could not. */
+  /**
+   * The agent's second pass over each record read (privacy/redact-record-again.ts),
+   * before it is accepted or set aside; records as read when absent (they are
+   * final already).
+   */
+  secondPass?: (record: FilteredRecord) => FilteredRecord;
+  /** Takes each record read, after the second pass (the agent hands it to the ingest); rejects when it could not. */
   accept: (record: FilteredRecord) => Promise<void>;
   /** Resolves once everything accepted so far is stored (or dropped and counted); rejects when the store cannot take it now. */
   commit: () => Promise<void>;
@@ -70,6 +80,7 @@ export class SpoolReader {
   private first: ReturnType<typeof setTimeout> | undefined;
   private running: Promise<void> | undefined;
   private stopping = false;
+  private quarantinePrunedAt = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly opts: SpoolReaderOptions) {
     this.dir = join(opts.dataDir, SPOOL_DIR);
@@ -110,7 +121,11 @@ export class SpoolReader {
       this.stats.pendingBytes = 0;
       return; // no spool yet
     }
-    const now = (this.opts.now ?? Date.now)();
+    const now = this.now();
+    if (now - this.quarantinePrunedAt >= QUARANTINE_PRUNE_EVERY_MS) {
+      this.quarantinePrunedAt = now;
+      await pruneQuarantine(this.dir, now).catch((err: unknown) => this.opts.problems("spool-quarantine-prune", err));
+    }
     const files = names
       .flatMap((name) => {
         const parsed = parseSpoolFileName(name);
@@ -139,26 +154,27 @@ export class SpoolReader {
     let at = cursor?.file === name ? cursor.offset : 0;
     let attempts = cursor?.file === name ? cursor.attempts : {};
     while (at < size && budget > 0 && !this.stopping) {
-      const taken: Promise<Buffer | undefined>[] = [];
+      const taken: Promise<RefusedRecord | undefined>[] = [];
       const hasAttempts = Object.keys(attempts).length > 0;
       const { next, bytesRead } = await readLinesUntil(path, at, Math.min(size, at + CHUNK_BYTES), SPOOL_MAX_LINE_BYTES, (line) => {
         // Set aside already in an earlier run of this chunk.
         if (hasAttempts && (attempts[lineKey(line)] ?? 0) >= SPOOL_MAX_ATTEMPTS) return;
         const record = this.record(line);
         // Each outcome is settled at once: a refusal must not go unhandled while the chunk is still being read.
-        if (record) taken.push(this.opts.accept(record).then(() => undefined, () => Buffer.from(line)));
+        if (record) taken.push(this.opts.accept(record).then(() => undefined, () => ({ key: lineKey(line), record })));
       });
-      const refused = (await Promise.all(taken)).filter((line): line is Buffer => line !== undefined);
+      const refused = (await Promise.all(taken)).filter((r): r is RefusedRecord => r !== undefined);
       this.stats.rejected += refused.length;
-      const outcome = await setAsideRefused(this.dir, refused, attempts, this.opts.quarantineMaxBytes);
+      const outcome = await setAsideRefused(this.dir, refused, attempts, this.now(), this.opts.quarantineMaxBytes);
       this.stats.quarantined += outcome.quarantined;
       this.stats.quarantineDropped += outcome.dropped;
       if (outcome.quarantined + outcome.dropped > 0) this.opts.problems("spool-quarantine", new ObservatoryStoreError("spool records the ingest kept refusing were set aside"));
-      if (outcome.waiting) {
-        // Tried again next run, from the same place; the tries are kept across a restart.
+      if (outcome.waiting || outcome.quarantined + outcome.dropped > 0) {
+        // The tries are kept across a restart, and before the commit: a commit failing now reads the chunk again without setting a record aside twice.
         await writeSpoolCursor(this.dir, { file: name, offset: at, attempts });
-        throw new ObservatoryStoreError(`the ingest refused ${refused.length} spool record(s)`);
       }
+      // Tried again next run, from the same place.
+      if (outcome.waiting) throw new ObservatoryStoreError(`the ingest refused ${refused.length} spool record(s)`);
       await this.opts.commit();
       this.stats.loaded += taken.length - refused.length;
       // No newline up to the end: a line a hook never finished (it was stopped mid-write). Nothing more to read.
@@ -175,15 +191,18 @@ export class SpoolReader {
     return budget;
   }
 
-  /** The record a line holds; undefined (counted) for anything else. */
+  private now(): number {
+    return (this.opts.now ?? Date.now)();
+  }
+
+  /** The record a line holds, after the second pass; undefined (counted) for anything else. */
   private record(line: Buffer): FilteredRecord | undefined {
-    let value: unknown;
     try {
-      value = JSON.parse(line.toString("utf8"));
+      const value: unknown = JSON.parse(line.toString("utf8"));
+      if (isFilteredRecord(value)) return this.opts.secondPass ? this.opts.secondPass(value) : value;
     } catch {
-      value = undefined;
+      // not JSON, or the second pass could not read it: not a record
     }
-    if (isFilteredRecord(value)) return value;
     this.stats.malformed++;
     return undefined;
   }
