@@ -43,9 +43,12 @@ export const BUNDLE_BUDGET = {
 	 * bubble (about 0.2 KB), and the person route; the merged screen itself is
 	 * lazy and shares only pure helpers (message-runs.ts), because importing
 	 * the list module from it split two shared modules into chunks of their own
-	 * (+0.7 KB). The budget is 153.5 KB.
+	 * (+0.7 KB). 153.7 KB with the Telegram and Zalo folders always listed, each
+	 * with its logo (the Zalo logo, the merge of the known apps into the folder
+	 * list and the logo in the rail and the tabs, about 0.2 KB). The budget is
+	 * 154 KB.
 	 */
-	startupJsGzip: 153.5 * 1024,
+	startupJsGzip: 154 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;

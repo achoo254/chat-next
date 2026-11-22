@@ -184,7 +184,7 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 		setApp(next);
 		if (contacts) navigate(paths.home);
 	};
-	// An app folder whose chats are all gone (disconnected and deleted) is no longer picked.
+	// An app folder that is no longer listed (its chats are all gone) is no longer picked; Telegram and Zalo always are.
 	const apps = useAppFolders();
 	const app = pickedApp !== null && apps.has(pickedApp) ? pickedApp : null;
 	// Webhook pages: their data starts with their code, so the page shows once (components/preload.ts).

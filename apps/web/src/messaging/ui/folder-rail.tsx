@@ -7,11 +7,13 @@
 // the tab row inside the list (mockups/chat.html#app, #contacts, #narrow) and
 // the compact top bar elsewhere (screens/shell.tsx). Badges count
 // chats with unread messages, muted chats left out. ⌘/Ctrl+1…5 pick a folder.
-// Each app chats are synced with (Chat Bridge) adds a folder after Chưa đọc,
-// holding that app's chats; the shortcuts keep their positions. A linked
+// Each app chats are synced with (Chat Bridge) has a folder after Chưa đọc, with its
+// logo, holding that app's chats; Telegram and Zalo are always there, empty or not,
+// and the shortcuts keep their positions. A linked
 // person (ADR 0025) is one row of Tất cả, so its badge counts them once.
 import { useEffect, useState } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
+import { AppLogo, hasAppLogo } from "../../components/app-logo.tsx";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon, type IconName } from "../../components/icon.tsx";
 import { followInApp, Link, paths } from "../../router.tsx";
@@ -80,7 +82,7 @@ export function FolderRail({ self, folder, settings = false, machines = false, a
 			))}
 			{[...apps].map(([name, unread]) => (
 				<button key={`app:${name}`} type="button" className="folder" aria-current={name === app && folder !== null ? "true" : undefined} onClick={() => onApp(name)}>
-					<Icon name="message" />
+					{hasAppLogo(name) ? <AppLogo app={name} size={20} /> : <Icon name="message" />}
 					{appName(name)}
 					{unread > 0 && (
 						<span className="badge" aria-label={copy.folders.unreadChats(unread)}>
@@ -123,6 +125,7 @@ export function FolderTabs({ folder, app, onFolder, onApp }: FolderProps) {
 			))}
 			{[...apps.keys()].map((name) => (
 				<button key={`app:${name}`} type="button" role="tab" aria-selected={name === app} onClick={() => onApp(name)}>
+					{hasAppLogo(name) && <AppLogo app={name} size={16} />}
 					{appName(name)}
 				</button>
 			))}

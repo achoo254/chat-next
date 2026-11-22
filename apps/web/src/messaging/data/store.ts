@@ -25,7 +25,7 @@ import {
 } from "@achoo254/chat-core";
 import { browserNetwork, ConnectionStatus, type NetworkStatus } from "./connection-status.ts";
 import { Permission } from "./remote.ts";
-import { chatKind, FOLDERS, inFolder, isSavedChat, type ChatKind, type Folder } from "./format.ts";
+import { chatKind, FOLDERS, inFolder, isSavedChat, withKnownApps, type ChatKind, type Folder } from "./format.ts";
 import type { ChatSource } from "./source.ts";
 
 export type WindowItem =
@@ -221,7 +221,7 @@ export class ChatStore {
 	private entries: readonly ListEntry[] = [];
 	private readonly entryById = new Map<number, ListEntry>();
 	private folderUnread: Readonly<Record<Folder, number>> = { all: 0, private: 0, group: 0, bot: 0, unread: 0 };
-	private appUnread: ReadonlyMap<string, number> = new Map();
+	private appUnread: ReadonlyMap<string, number> = withKnownApps(new Map());
 	private settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 	private totals: UnreadTotals = { messages: 0, chats: 0 };
 	private readonly settingsRefresh = new Coalescer(() => this.loadSettings());
@@ -526,7 +526,7 @@ export class ChatStore {
 		return this.folderUnread;
 	}
 
-	/** The apps chats are synced with, in name order, each with its chats with unread messages (the platform folders). */
+	/** The apps chats are synced with (Telegram and Zalo always), each with its chats with unread messages (the platform folders). */
 	appFolders(): ReadonlyMap<string, number> {
 		return this.appUnread;
 	}
@@ -689,7 +689,7 @@ export class ChatStore {
 			this.emit("entries");
 			for (const chatId of changed) this.emit(`entry:${chatId}`);
 		}
-		const apps = new Map([...appCounts].sort(([a], [b]) => a.localeCompare(b)));
+		const apps = withKnownApps(new Map([...appCounts].sort(([a], [b]) => a.localeCompare(b))));
 		const appsChanged = apps.size !== this.appUnread.size || [...apps].some(([app, count], i) => [...this.appUnread][i]?.[0] !== app || this.appUnread.get(app) !== count);
 		if (FOLDERS.some((folder) => counts[folder] !== this.folderUnread[folder]) || appsChanged) {
 			this.folderUnread = counts;

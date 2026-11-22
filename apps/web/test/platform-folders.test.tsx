@@ -1,5 +1,6 @@
-// A chat synced with another app (Chat Bridge) adds a folder for that app after the built-in
-// ones, whatever its direction; the built-in folders and their shortcuts do not move.
+// Telegram and Zalo (Chat Bridge) each have a folder after the built-in ones, with their logo,
+// whether or not a chat is synced yet; a chat synced with one lands in it whatever its direction,
+// and the built-in folders and their shortcuts do not move.
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
@@ -54,7 +55,7 @@ describe("platform folders", () => {
 		expect(within(row).queryByText("Telegram")).toBeNull();
 	});
 
-	it("has no app folder when no chat is synced with an app", async () => {
+	it("lists Telegram and Zalo with their logos even when no chat is synced with an app", async () => {
 		const fixture = new ChatFixture();
 		const tom = fixture.addUser("Tôm");
 		const plain = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, tom]);
@@ -62,7 +63,34 @@ describe("platform folders", () => {
 		renderMessaging(fixture, "/");
 		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
 		await screen.findByText("tin thường", {}, LONG);
-		expect(within(rail).queryByRole("button", { name: /^Telegram/ })).toBeNull();
+		const labels = within(rail)
+			.getAllByRole("button")
+			.map((button) => button.textContent ?? "");
+		const telegram = labels.findIndex((text) => text.startsWith("Telegram"));
+		const zalo = labels.findIndex((text) => text.startsWith("Zalo"));
+		expect(telegram).toBeGreaterThan(labels.findIndex((text) => text.startsWith("Chưa đọc")));
+		expect(zalo).toBe(telegram + 1);
+		// Each carries its logo (drawn, hidden from the reader) and no unread badge.
+		for (const name of [/^Telegram/, /^Zalo/]) {
+			const folder = within(rail).getByRole("button", { name });
+			expect(folder.querySelector("svg circle")).not.toBeNull();
+			expect(folder.querySelector(".badge")).toBeNull();
+		}
+	});
+
+	it("opens an empty app folder to an empty list and goes back to all", async () => {
+		const fixture = new ChatFixture();
+		const tom = fixture.addUser("Tôm");
+		const plain = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, tom]);
+		fixture.send(tom, plain, "tin thường");
+		renderMessaging(fixture, "/");
+		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
+		await screen.findByText("tin thường", {}, LONG);
+		await userEvent.click(within(rail).getByRole("button", { name: /^Zalo/ }));
+		await screen.findByText("Chưa có chat nào ở đây", {}, LONG);
+		expect(screen.queryByText("tin thường")).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Xem tất cả chat" }));
+		expect(await screen.findByText("tin thường", {}, LONG)).toBeTruthy();
 	});
 
 	it("counts the unread chats of an app in its folder", async () => {
@@ -70,6 +98,6 @@ describe("platform folders", () => {
 		renderMessaging(fixture, "/");
 		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
 		const folder = await within(rail).findByRole("button", { name: /^Telegram/ }, LONG);
-		expect(within(folder).getByLabelText("2 chat chưa đọc")).toBeTruthy();
+		expect(await within(folder).findByLabelText("2 chat chưa đọc", {}, LONG)).toBeTruthy();
 	});
 });

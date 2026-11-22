@@ -15,6 +15,15 @@ export const FOLDERS: readonly Folder[] = ["all", "private", "group", "bot", "un
 const APP_NAMES: Readonly<Record<string, string>> = { telegram: "Telegram", zalo: "Zalo" };
 export const appName = (app: string): string => APP_NAMES[app] ?? app;
 
+/**
+ * The apps Chat can be synced with, always listed as folders, with or without a chat yet
+ * (the rest follow in name order): a connected app is found in the rail before its first message.
+ */
+export function withKnownApps(apps: ReadonlyMap<string, number>): ReadonlyMap<string, number> {
+	const known: [string, number][] = Object.keys(APP_NAMES).map((app) => [app, apps.get(app) ?? 0]);
+	return new Map([...known, ...[...apps].filter(([app]) => !(app in APP_NAMES))]);
+}
+
 const TONES: readonly Tone[] = ["violet", "green", "blue", "amber", "cyan", "red", "grey"];
 
 /** Stable avatar and sender colour for an id. */
