@@ -73,6 +73,20 @@ func TestRetryInternalLeavesOtherErrorsAlone(t *testing.T) {
 	}
 }
 
+func TestRetryInternalSkipsCallsThatCannotBeRepeatedSafely(t *testing.T) {
+	shortWaits(t)
+	for _, input := range []bin.Encoder{&tg.MessagesExportChatInviteRequest{}, &tg.ChannelsDeleteChannelRequest{}} {
+		inv := &scriptedInvoker{errs: []error{tgerr.New(500, "INTERNAL")}}
+		if err := retryInternal().Handle(inv).Invoke(context.Background(), input, nil); !isInternal(err) || inv.calls != 1 {
+			t.Fatalf("%T: err = %v after %d calls, want one call", input, err, inv.calls)
+		}
+	}
+	inv := &scriptedInvoker{errs: []error{tgerr.New(500, "RANDOM_ID_DUPLICATE")}}
+	if err := retryInternal().Handle(inv).Invoke(context.Background(), &tg.MessagesSendMessageRequest{}, nil); err == nil || inv.calls != 1 {
+		t.Fatalf("RANDOM_ID_DUPLICATE: err = %v after %d calls, want one call", err, inv.calls)
+	}
+}
+
 func TestRetryInternalStopsWaitingWhenTheCallIsCancelled(t *testing.T) {
 	saved := internalRetryWaits
 	internalRetryWaits = []time.Duration{time.Hour}

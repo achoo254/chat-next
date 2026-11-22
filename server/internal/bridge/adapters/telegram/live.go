@@ -36,7 +36,12 @@ func (a *Adapter) startLive(sess []byte, handler telegram.UpdateHandler, require
 	if len(sess) > 0 {
 		_ = l.storage.StoreSession(context.Background(), sess)
 	}
-	opts := telegram.Options{SessionStorage: l.storage, Middlewares: []telegram.Middleware{retryInternal()}}
+	opts := telegram.Options{SessionStorage: l.storage}
+	if requireAuth {
+		// Only a signed-in account's calls are repeated: a login step sent twice could send a
+		// second code or leave a session behind that nobody holds.
+		opts.Middlewares = []telegram.Middleware{retryInternal()}
+	}
 	if handler != nil {
 		opts.UpdateHandler = handler
 	}

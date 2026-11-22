@@ -18,12 +18,16 @@ var internalRetryWaits = []time.Duration{500 * time.Millisecond, 2 * time.Second
 
 // retryInternal repeats a call that Telegram answered with an internal error, up to
 // len(internalRetryWaits) more times. The request is sent again unchanged: a send keeps
-// its random_id, so Telegram drops a copy it already took. Any other error, and the last
-// internal one, is returned as it is.
+// its random_id, so Telegram answers with the message it already took. A call with no
+// such key that Telegram may have applied before failing (onceOnly) is not repeated. Any
+// other error, and the last internal one, is returned as it is.
 func retryInternal() telegram.Middleware {
 	return telegram.MiddlewareFunc(func(next tg.Invoker) telegram.InvokeFunc {
 		return func(ctx context.Context, input bin.Encoder, output bin.Decoder) error {
 			err := next.Invoke(ctx, input, output)
+			if onceOnly(input) {
+				return err
+			}
 			for _, wait := range internalRetryWaits {
 				if !isInternal(err) {
 					return err
@@ -43,7 +47,20 @@ func retryInternal() telegram.Middleware {
 }
 
 // isInternal reports an error Telegram raised for a fault on its side (code 500).
+// RANDOM_ID_DUPLICATE shares the code but says the send already went through.
 func isInternal(err error) bool {
 	rpc, ok := tgerr.As(err)
-	return ok && rpc.IsCode(500)
+	return ok && rpc.IsCode(500) && rpc.Type != "RANDOM_ID_DUPLICATE"
+}
+
+// onceOnly reports a call that Telegram may have carried out before the fault and that
+// has no key to recognise a repeat: a second invite link, or an error for a person
+// already added or a group already deleted, would follow.
+func onceOnly(input bin.Encoder) bool {
+	switch input.(type) {
+	case *tg.MessagesExportChatInviteRequest, *tg.ChannelsInviteToChannelRequest, *tg.MessagesAddChatUserRequest,
+		*tg.ChannelsDeleteChannelRequest, *tg.MessagesDeleteChatRequest:
+		return true
+	}
+	return false
 }
