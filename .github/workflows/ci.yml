@@ -121,6 +121,15 @@ jobs:
         run: |
           git diff --exit-code -- dist
           cd dist && sha256sum -c zalo-sidecar.cjs.sha256
+      - name: The server's install check passes the committed Zalo files, and refuses what it must
+        working-directory: .
+        run: |
+          bash infra/chat/zalo-sandbox/install-from-release.test.sh
+          rel="$(mktemp -d)"
+          mkdir "$rel/zalo-sidecar" "$rel/zalo-sandbox"
+          cp server/internal/bridge/adapters/zalo/sidecar/dist/zalo-sidecar.cjs server/internal/bridge/adapters/zalo/sidecar/dist/zalo-sidecar.cjs.sha256 "$rel/zalo-sidecar/"
+          cp infra/chat/zalo-sandbox/hosts.conf "$rel/zalo-sandbox/"
+          bash infra/chat/zalo-sandbox/install-from-release.sh validate "$rel"
 
   proto:
     runs-on: ubuntu-latest

@@ -6,6 +6,8 @@
 # reach, checks it, moves it to /opt/chat/releases/<id>, replaces its nginx
 # conf with the reviewed copy from the root-owned /opt/chat/infra/nginx (so an
 # upload cannot change nginx), and runs /opt/chat/infra/activate-release.sh.
+# The Zalo sidecar bundle and firewall host list in the release are checked first and
+# installed after activation (infra/chat/zalo-sandbox/install-from-release.sh).
 # Infra scripts themselves change only through a root deploy
 # (infra/chat/deploy.sh).
 set -euo pipefail
@@ -45,6 +47,21 @@ rm -rf "$STAGE/$ID/nginx"
 cp -R "$ROOT/infra/nginx" "$STAGE/$ID/nginx"
 chmod -R a+rX "$STAGE/$ID"
 chmod 755 "$STAGE/$ID/server"
+
+# The Zalo sidecar bundle and the firewall host list travel with the release. They are checked here,
+# before anything is activated: a release whose host list reaches outside zalo.me, or whose bundle
+# does not match its digest, is refused. They are installed only after the release is active.
+ZALO_INSTALL="$ROOT/infra/zalo-sandbox/install-from-release.sh"
+if [ -f "$ZALO_INSTALL" ]; then
+	if ! bash "$ZALO_INSTALL" validate "$STAGE/$ID"; then
+		rm -rf "${STAGE:?}/$ID"
+		echo "incoming release $ID refused: its Zalo files did not pass the check" >&2
+		exit 2
+	fi
+fi
 mv "$STAGE/$ID" "$DST"
 
-exec bash "$ROOT/infra/activate-release.sh" "$ID"
+bash "$ROOT/infra/activate-release.sh" "$ID"
+if [ -f "$ZALO_INSTALL" ]; then
+	bash "$ZALO_INSTALL" install "$DST"
+fi

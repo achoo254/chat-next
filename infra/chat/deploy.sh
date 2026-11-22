@@ -37,6 +37,10 @@ echo "== build server (linux/amd64, static)"
 (cd server && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$rel/server" ./cmd/server)
 
 cp -R infra/chat/nginx "$rel/nginx"
+# The reviewed Zalo sidecar bundle and the firewall host list go with the release; the server checks them.
+mkdir -p "$rel/zalo-sidecar" "$rel/zalo-sandbox"
+cp server/internal/bridge/adapters/zalo/sidecar/dist/zalo-sidecar.cjs server/internal/bridge/adapters/zalo/sidecar/dist/zalo-sidecar.cjs.sha256 "$rel/zalo-sidecar/"
+cp infra/chat/zalo-sandbox/hosts.conf "$rel/zalo-sandbox/"
 echo "$id" >"$rel/RELEASE"
 
 echo "== upload release $id"
@@ -50,3 +54,4 @@ $SSH "$SSH_TARGET" "chmod 755 $ROOT/releases/$id/server"
 
 echo "== activate"
 $SSH "$SSH_TARGET" "bash $ROOT/infra/activate-release.sh '$id'"
+$SSH "$SSH_TARGET" "bash $ROOT/infra/zalo-sandbox/install-from-release.sh install $ROOT/releases/$id"
