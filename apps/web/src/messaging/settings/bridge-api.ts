@@ -189,3 +189,13 @@ export interface BridgeApi {
 	disconnect(accountId: number, deleteChats: boolean): Promise<void>;
 }
 
+/** What every sign-in card (by fields or by QR code) is given by the settings page. */
+export interface BridgeLoginProps {
+	api: BridgeApi;
+	source: string;
+	appName: string;
+	onDone: () => void;
+	onCancel: () => void;
+	onError: (err: unknown) => BridgeError;
+}
+

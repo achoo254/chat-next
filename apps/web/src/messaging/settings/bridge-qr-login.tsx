@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useServices } from "../data/services.tsx";
-import type { BridgeLoginProps } from "./bridge-fields-login.tsx";
+import type { BridgeLoginProps } from "./bridge-api.ts";
 import { BridgeQrNotice } from "./bridge-qr-notice.tsx";
 import { BridgeSignInFrame, type SignInTone } from "./bridge-sign-in-frame.tsx";
 import { isEnded, isSafeQrDataUrl, type QrLoginStatus } from "./qr-login-model.ts";
@@ -85,7 +85,7 @@ export function BridgeQrLogin({ api, source, appName, onDone, onCancel, onError 
 							text: (
 								<>
 									{t.qr.status[status]}
-									{status === "limited" && seconds > 0 && <span className="br-qr-wait"> {t.qr.status.limitedIn(seconds)}</span>}
+									{status === "limited" && seconds > 0 && <span className="br-qr-wait" aria-hidden="true"> {t.qr.status.limitedIn(seconds)}</span>}
 								</>
 							),
 							tone: toneOf(status),

@@ -16,6 +16,7 @@ export function BridgeQrNotice({ appName, onAccept, onCancel }: { appName: strin
 			appName={appName}
 			method={t.qr.method}
 			title={t.qr.notice.title(appName)}
+			warning
 			actions={
 				<>
 					<button type="button" className="btn btn-primary" data-id="bridge-qr-notice-continue" disabled={!accepted} onClick={onAccept}>

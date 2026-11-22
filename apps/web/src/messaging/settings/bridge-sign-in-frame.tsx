@@ -24,6 +24,7 @@ export function BridgeSignInFrame({
 	appName,
 	method,
 	title,
+	warning = false,
 	headingRef,
 	status,
 	actions,
@@ -35,9 +36,11 @@ export function BridgeSignInFrame({
 	/** How this app signs in ("by phone number", "by QR code"), under the title. */
 	method: string;
 	title: string;
+	/** The step is a warning to read before going on (the notice before an unofficial login). */
+	warning?: boolean;
 	/** Focus lands here when a new step opens. */
 	headingRef?: Ref<HTMLHeadingElement>;
-	/** The live line under the body; omitted when there is nothing to say. */
+	/** The line under the body; omitted when there is nothing to say. */
 	status?: SignInStatus | undefined;
 	actions: ReactNode;
 	/** Given for a step with fields: the frame is a form and Enter submits it. */
@@ -45,31 +48,39 @@ export function BridgeSignInFrame({
 	children: ReactNode;
 }) {
 	const titleId = useId();
+	const error = status?.tone === "error" ? status : undefined;
+	const hint = status !== undefined && status.tone !== "error" ? status : undefined;
 	const content = (
 		<>
 			<header className="br-head br-signin-head">
 				<span className="avatar av-blue" aria-hidden="true">
 					{initials(appName)}
 				</span>
-				<span className="grow br-text">
+				<div className="grow br-text">
 					<h2 className="br-signin-title" id={titleId} ref={headingRef} tabIndex={-1}>
+						{warning && <Icon name="alert" small />}
 						{title}
 					</h2>
 					<small>{method}</small>
-				</span>
+				</div>
 			</header>
 			<div className="br-signin-body">{children}</div>
-			{status !== undefined && (
-				<p
-					className="br-signin-status"
-					role={status.tone === "error" ? "alert" : "status"}
-					aria-live="polite"
-					data-id={`${dataId}-status`}
-					data-tone={status.tone}
-					data-state={status.state}
-				>
-					{status.tone === "error" && <Icon name="alert" small />}
-					<span>{status.text}</span>
+			{/* The polite region stays in the page (empty when quiet) so a new hint is read when it
+			    appears; a problem goes in its own alert instead, so no region ever changes its role. */}
+			<p
+				className="br-signin-status"
+				role="status"
+				aria-live="polite"
+				data-id={error === undefined ? `${dataId}-status` : undefined}
+				data-tone={hint?.tone}
+				data-state={hint?.state}
+			>
+				{hint?.text}
+			</p>
+			{error !== undefined && (
+				<p className="br-signin-status" role="alert" data-id={`${dataId}-status`} data-tone="error" data-state={error.state}>
+					<Icon name="alert" small />
+					<span>{error.text}</span>
 				</p>
 			)}
 			<div className="br-signin-actions">{actions}</div>

@@ -4,18 +4,9 @@
 // (bridge-qr-login.tsx). The values go to the server in the call that needs them
 // and are never kept here.
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
-import type { BridgeApi, BridgeError, LoginStep } from "./bridge-api.ts";
+import type { BridgeError, BridgeLoginProps, LoginStep } from "./bridge-api.ts";
 import { BridgeSignInFrame, type SignInStatus } from "./bridge-sign-in-frame.tsx";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
-
-export interface BridgeLoginProps {
-	api: BridgeApi;
-	source: string;
-	appName: string;
-	onDone: () => void;
-	onCancel: () => void;
-	onError: (err: unknown) => BridgeError;
-}
 
 /** What a failed login step says to the user. */
 function loginErrorText(error: BridgeError, t: ReturnType<typeof useBridgeCopy>): string {
@@ -69,6 +60,8 @@ export function BridgeFieldsLogin({ api, source, appName, onDone, onCancel, onEr
 			(err: unknown) => {
 				setBusy(false);
 				setError(loginErrorText(onError(err), t));
+				// The disabled button dropped the focus: put it back in the field to correct.
+				firstField.current?.focus();
 			},
 		);
 	};

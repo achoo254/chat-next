@@ -66,6 +66,17 @@ describe("connecting an app", () => {
 		expect(within(form).getByText("Đăng nhập bằng số điện thoại và mã xác nhận")).toBeTruthy();
 		expect(within(form).getByRole("button", { name: "Tiếp tục" }).className).toContain("btn-primary");
 		expect(form.querySelector(".br-signin-actions")).not.toBeNull();
+	});
+
+	it("never offers to sign in to Chat again: a refused action is a plain failure on this page", async () => {
+		const fixture = new ChatFixture();
+		await openPage(fixture);
+		await signIn();
+		await screen.findByText("Đồng bộ toàn bộ tin nhắn Telegram vào Chat?", {}, LONG);
+		fixture.bridge.reauth = true;
+		await userEvent.click(screen.getByRole("button", { name: "Đồng bộ" }));
+		expect(await screen.findByText("Chưa làm được, thử lại sau.", {}, LONG)).toBeTruthy();
+		expect(screen.queryByRole("link", { name: "Đăng nhập lại" })).toBeNull();
 		expect(screen.queryByText("Thao tác này cần đăng nhập trong 10 phút gần đây.")).toBeNull();
 	});
 

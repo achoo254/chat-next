@@ -10,9 +10,9 @@ import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useServices } from "../data/services.tsx";
-import type { BridgeAccount, BridgeApi, BridgeError, BridgeStatus } from "./bridge-api.ts";
+import type { BridgeAccount, BridgeApi, BridgeError, BridgeLoginProps, BridgeStatus } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
-import { BridgeFieldsLogin, type BridgeLoginProps } from "./bridge-fields-login.tsx";
+import { BridgeFieldsLogin } from "./bridge-fields-login.tsx";
 import { BridgeQrLogin } from "./bridge-qr-login.tsx";
 import { QR_LOGIN_APPS, RECEIVE_ONLY_APPS } from "./qr-login-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
@@ -50,7 +50,7 @@ export default function BridgeSettings() {
 		return () => clearInterval(timer);
 	}, [importing]);
 
-	const onError = (err: unknown): BridgeError => bridgeError(err);
+	const onError = bridgeError;
 
 	if (load.status === "loading") return <div className="set-body" aria-busy="true" />;
 	if (load.status === "error") {
@@ -155,9 +155,8 @@ function AccountCard({
 	const { toasts } = useServices();
 	const [disconnecting, setDisconnecting] = useState(false);
 	const [busy, setBusy] = useState(false);
-	const fail = (err: unknown) => {
+	const fail = () => {
 		setBusy(false);
-		onError(err);
 		toasts.show(t.failed);
 	};
 	const disconnect = (deleteChats: boolean) => {
@@ -212,7 +211,7 @@ function AccountCard({
 					</div>
 				</div>
 			)}
-			<SyncPanel account={account} api={api} appName={appName} onChange={onChange} onError={onError} />
+			<SyncPanel account={account} api={api} appName={appName} onChange={onChange} />
 			<Suspense fallback={null}>
 				<BridgeAccountTools accountId={account.id} api={api} onChange={onChange} onError={onError} />
 			</Suspense>
@@ -229,13 +228,11 @@ function SyncPanel({
 	api,
 	appName,
 	onChange,
-	onError,
 }: {
 	account: BridgeAccount;
 	api: BridgeApi;
 	appName: string;
 	onChange: () => void;
-	onError: (err: unknown) => BridgeError;
 }) {
 	const t = useBridgeCopy();
 	// What the user is promised depends on the direction: an app Chat only reads from says so.
@@ -252,9 +249,8 @@ function SyncPanel({
 				setBusy(false);
 				onChange();
 			},
-			(err: unknown) => {
+			() => {
 				setBusy(false);
-				onError(err);
 				toasts.show(t.failed);
 			},
 		);
