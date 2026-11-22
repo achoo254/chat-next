@@ -10,7 +10,7 @@ import { MachineInfoSchema, OfficeActorState, OfficeEventsSchema, OfficeRoom, Of
 import { act as reactAct, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import type { LinkState, MachineLink } from "../../src/machines/link/machine-link.ts";
 import { OFFICE_LAYOUT } from "../../src/machines/office/office-layout.ts";
@@ -37,6 +37,13 @@ function fakeLink() {
 	};
 	return { link: link as unknown as MachineLink, deliver: (body: Frame["body"]) => reactAct(() => frames.forEach((listener) => listener(body))) };
 }
+
+// The office shows its 2D view while the lazy 3D chunk loads and then swaps the tree for the
+// scene (which falls back to 2D without WebGL). Loading the chunk first makes that swap happen
+// before any press, instead of at a time that depends on the speed of the machine.
+beforeAll(async () => {
+	await import("../../src/office-3d/office-canvas.tsx");
+});
 
 beforeEach(() => {
 	vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
