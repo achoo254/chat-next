@@ -29070,6 +29070,7 @@ var Zalo = class {
 // src/egress-guard.mjs
 var import_node_net = __toESM(require("node:net"), 1);
 var ALLOWED = /(^|\.)zalo\.me$/i;
+var EXTRA_HOSTS = /* @__PURE__ */ new Set(["jr.zaloapp.com"]);
 function targetOf(args) {
   const first = Array.isArray(args[0]) ? args[0][0] : args[0];
   if (first !== null && typeof first === "object") {
@@ -29083,7 +29084,7 @@ function isAllowed(target) {
   if (target.path !== void 0) return false;
   const host = target.host ?? "";
   if (import_node_net.default.isIP(host) !== 0) return false;
-  return ALLOWED.test(host);
+  return ALLOWED.test(host) || EXTRA_HOSTS.has(host.toLowerCase());
 }
 function installEgressGuard({ onHost = () => {
 }, onBlocked = () => {

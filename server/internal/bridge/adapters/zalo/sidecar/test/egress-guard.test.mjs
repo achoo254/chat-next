@@ -3,6 +3,12 @@ import net from "node:net";
 import test from "node:test";
 import { installEgressGuard, isAllowed, targetOf } from "../src/egress-guard.mjs";
 
+test("one exact host outside zalo.me is allowed, and nothing around it", () => {
+	assert.equal(isAllowed({ host: "jr.zaloapp.com" }), true);
+	assert.equal(isAllowed({ host: "JR.ZALOAPP.COM" }), true);
+	for (const host of ["zaloapp.com", "x.jr.zaloapp.com", "chat.zaloapp.com", "jr.zaloapp.com.evil.com", "jr.zaloapp.com."]) assert.equal(isAllowed({ host }), false, host);
+});
+
 test("only zalo.me and its subdomains are allowed", () => {
 	for (const host of ["zalo.me", "chat.zalo.me", "ws2-msg.chat.zalo.me", "WPA.CHAT.ZALO.ME"]) assert.equal(isAllowed({ host }), true, host);
 	for (const host of ["evil.com", "zalo.me.evil.com", "notzalo.me", "registry.npmjs.org", "localhost", "", "zalo.me.", "xzalo.me"]) {

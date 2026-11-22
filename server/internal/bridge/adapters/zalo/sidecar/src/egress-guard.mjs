@@ -1,11 +1,14 @@
 // In-process egress guard: whatever a library or a server response asks for, this process
-// connects only to *.zalo.me. It wraps the one place every outgoing connection passes through
+// connects only to *.zalo.me and to the few exact Zalo hosts named below. It wraps the one place every outgoing connection passes through
 // (net.Socket#connect: http, https, tls and ws all end there), so it holds without knowing
 // the library's internals. It also refuses unix sockets (`ws+unix:`) and IP literals.
 // The firewall around the process is the second layer; this is the one that knows names.
 import net from "node:net";
 
 const ALLOWED = /(^|\.)zalo\.me$/i;
+// Exact hosts outside zalo.me that the login flow is redirected to. Each is one host, never a domain:
+// jr.zaloapp.com is where the library's session check ends up after a QR login (seen on a real login).
+const EXTRA_HOSTS = new Set(["jr.zaloapp.com"]);
 
 /** Where a Socket#connect call goes: a host name, or a unix path. */
 export function targetOf(args) {
@@ -24,7 +27,7 @@ export function isAllowed(target) {
 	if (target.path !== undefined) return false;
 	const host = target.host ?? "";
 	if (net.isIP(host) !== 0) return false;
-	return ALLOWED.test(host);
+	return ALLOWED.test(host) || EXTRA_HOSTS.has(host.toLowerCase());
 }
 
 /**
