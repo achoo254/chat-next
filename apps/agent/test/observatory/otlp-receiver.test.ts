@@ -46,6 +46,15 @@ function send(port: number, opts: { method?: string; path?: string; headers?: Ou
 
 const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 20));
 
+/** Waits until `done()` holds, checking every 10 ms, at most `ms`; fails naming `what` (a large body is filtered off the request, later under load). */
+async function waitUntil(done: () => boolean, what: () => string, ms = 5_000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!done()) {
+    if (Date.now() > deadline) throw new Error(`timed out after ${ms} ms waiting for ${what()}`);
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
 describe("who the receiver answers", () => {
   it("refuses a wrong or missing token with 401, accepts the previous one and counts its use", async () => {
     const { r, got } = await receiver({ now: () => 1_234 });
@@ -102,6 +111,8 @@ describe("what the receiver keeps", () => {
     const huge = otelLog("api_request", [{ key: "model", value: { stringValue: "m".repeat(300 * 1024) } }]);
     expect((await send(r.port, { body: JSON.stringify(otlpBody([huge, ...OTEL_LOGS])) })).status).toBe(200);
     expect((await send(r.port, { body: JSON.stringify(otlpBody([huge, huge, huge])) })).status).toBe(413);
+    await waitUntil(() => got.length >= 3 && r.stats.tooLarge >= 2, () => `3 records taken and 2 counted too large (now ${got.length} taken, ${r.stats.tooLarge} too large)`);
+    // A moment more: nothing beyond that may come.
     await settle();
     expect(got).toHaveLength(3);
     expect(r.stats.tooLarge).toBe(2);
