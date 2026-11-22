@@ -105,19 +105,26 @@ label.br-conv-main:hover { background: var(--c-hover); }
 .br-progress::-webkit-progress-value { background: var(--c-primary-solid); border-radius: var(--radius-full); transition: width 0.3s ease; }
 .br-progress::-moz-progress-bar { background: var(--c-primary-solid); border-radius: var(--radius-full); }
 
-/* QR login (Zalo): the notice accepted first, then the code with numbered steps and a live status line. */
-.br-qr-heading { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); font-size: 1rem; font-weight: 600; }
-.br-qr-heading:focus { outline: none; }
-.br-qr-heading:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-xs); }
-.br-qr-points { display: grid; gap: var(--space-2); margin: 0 0 var(--space-3); padding-left: var(--space-5); font-size: 0.875rem; line-height: 1.5; }
-.br-qr-notice .opt { margin-bottom: var(--space-2); font-size: 0.875rem; }
+/* Connecting an app, every method in one frame (bridge-sign-in-frame.tsx): the head
+   of the account card, the step's body, one status line, the actions in a footer. */
+.br-signin-title { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.br-signin-title:focus { outline: none; }
+.br-signin-title:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-xs); }
+.br-signin-body { display: grid; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
+.br-signin-body > * { min-width: 0; }
+.br-signin-body > .note { margin: 0; }
+.br-signin-status { display: flex; align-items: flex-start; gap: var(--space-2); min-height: 1.5em; margin: 0; padding: 0 var(--space-4) var(--space-3); font-size: 0.875rem; font-weight: 500; color: var(--c-text-muted); }
+.br-signin-status .icon { flex: none; margin-top: 2px; }
+.br-signin-status[data-tone="error"] { color: var(--c-error-text); }
+.br-signin-status[data-tone="success"] { color: var(--c-success-text); }
+.br-signin-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); }
+
+/* QR login (Zalo): the notice's points, then the code with numbered steps beside it. */
+.br-qr-points { display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); font-size: 0.875rem; line-height: 1.5; }
+.br-signin .opt.check { font-size: 0.875rem; }
 .br-qr-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); }
 /* The code needs dark modules on white paper with a quiet zone in every theme, so the frame is plain white (not a theme token) once a code shows. */
-.br-qr-frame { flex: none; display: grid; place-items: center; width: 280px; height: 280px; max-width: 100%; aspect-ratio: 1; border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-surface-subtle); color: var(--c-text-muted); }
+.br-qr-frame { flex: none; display: grid; place-items: center; width: 280px; height: auto; max-width: 100%; aspect-ratio: 1; border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-surface-subtle); color: var(--c-text-muted); }
 .br-qr-frame[data-ready="true"] { background: #fff; }
 .br-qr-image { display: block; width: 264px; max-width: calc(100% - var(--space-4)); height: auto; aspect-ratio: 1; image-rendering: pixelated; user-select: none; }
 .br-qr-steps { flex: 1; min-width: 12rem; display: grid; gap: var(--space-2); margin: 0; padding-left: var(--space-5); font-size: 0.875rem; line-height: 1.5; }
-.br-qr-status { min-height: 1.5em; margin: var(--space-3) 0; font-size: 0.875rem; font-weight: 500; }
-.br-qr-status:is([data-state="network"], [data-state="declined"], [data-state="expired"], [data-state="limited"], [data-state="taken"], [data-state="failed"]) { color: var(--c-error-text); }
-.br-qr-status[data-state="confirm"] { color: var(--c-success-text); }
-.br-qr .row { flex-wrap: wrap; }

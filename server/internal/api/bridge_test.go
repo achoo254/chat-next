@@ -32,7 +32,9 @@ func TestBridgeServiceIsOffByDefault(t *testing.T) {
 }
 
 // With the bridge on and no app connected, the user sees an empty status and
-// a login for an app the server does not have is refused.
+// a login for an app the server does not have is refused for that reason. A
+// plain sign-in carries no recent auth_time, so reaching unknown_app also shows
+// the login steps no longer ask for a fresh sign-in to Chat.
 func TestBridgeServiceWithTheBridgeOn(t *testing.T) {
 	e := newEnv(t, func(c *config.Config, _ *api.Options) { c.BridgeEnabled = true })
 	ctx := context.Background()
@@ -44,7 +46,11 @@ func TestBridgeServiceWithTheBridgeOn(t *testing.T) {
 		t.Fatalf("status = %v, want no app and no account", status)
 	}
 	_, err := bridge.StartBridgeLogin(ctx, connect.NewRequest(&appv1.StartBridgeLoginRequest{Source: "telegram"}))
-	if code := codeOf(err); code != connect.CodeInvalidArgument && code != connect.CodeFailedPrecondition {
-		t.Fatalf("login to an app the server lacks = %v, want invalid_argument (or reauth_required)", err)
+	if codeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "unknown_app") {
+		t.Fatalf("login to an app the server lacks = %v, want invalid_argument unknown_app", err)
+	}
+	_, err = bridge.ContinueBridgeLogin(ctx, connect.NewRequest(&appv1.ContinueBridgeLoginRequest{LoginId: "missing"}))
+	if err != nil && strings.Contains(err.Error(), "reauth_required") {
+		t.Fatalf("continuing a login asked for a fresh sign-in: %v", err)
 	}
 }

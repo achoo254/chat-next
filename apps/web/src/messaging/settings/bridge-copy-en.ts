@@ -33,6 +33,7 @@ export const enBridge: BridgeCopy = {
 			continue: "Show QR code",
 		},
 		title: (app) => `Scan the QR code to sign in to ${app}`,
+		method: "Sign in with a QR code on your phone",
 		imageAlt: (app) => `${app} sign-in QR code`,
 		steps: (app) => [
 			`Open ${app} on your phone.`,
@@ -51,7 +52,6 @@ export const enBridge: BridgeCopy = {
 			limited: "Too many sign-in attempts. Wait a moment and try again.",
 			limitedIn: (seconds) => `You can try again in about ${seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`}.`,
 			taken: "Another user has connected this account.",
-			reauth: "Sign in to Chat again before connecting.",
 			failed: "Could not sign in. Try again later.",
 			done: (app) => `${app} connected.`,
 		},
@@ -61,6 +61,8 @@ export const enBridge: BridgeCopy = {
 	},
 	login: {
 		title: (app) => `Sign in to ${app}`,
+		method: "Sign in with your phone number and a code",
+		preparing: "Opening the sign-in…",
 		next: "Continue",
 		cancel: "Cancel",
 		scan: "Scan this code with the app",
@@ -106,7 +108,7 @@ export const enBridge: BridgeCopy = {
 			stopped: "Disconnected; the chats stay read-only",
 		},
 		lastError: (text) => `Last error: ${text}`,
-		reconnect: "Sign in again",
+		reconnect: "Reconnect",
 	},
 	delivery: {
 		note: (app) => `What you type here is also sent to ${app}.`,

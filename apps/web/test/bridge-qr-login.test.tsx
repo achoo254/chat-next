@@ -84,6 +84,10 @@ describe("offering Zalo", () => {
 		await openPage(fixture);
 		await userEvent.click(connectButton("Zalo"));
 		expect(await screen.findByRole("heading", { name: "Trước khi kết nối Zalo" }, LONG)).toBeTruthy();
+		// The same frame as the field login: the method under the title, the actions in its footer.
+		const notice = screen.getByRole("region", { name: "Trước khi kết nối Zalo" });
+		expect(within(notice).getByText("Đăng nhập bằng mã QR trên điện thoại")).toBeTruthy();
+		expect(notice.querySelector(".br-signin-actions")).not.toBeNull();
 		expect(screen.getByText(/trái với điều khoản sử dụng của Zalo/)).toBeTruthy();
 		const go = screen.getByRole("button", { name: "Hiện mã QR" });
 		expect(go).toHaveProperty("disabled", true);
@@ -215,18 +219,14 @@ describe("when the login does not go through", () => {
 		expect(fixture.bridge.qr.polls).toBe(0);
 	});
 
-	it("puts the sign-in-again link in the QR card when the session is too old, so a plain sign-out is not mistaken for it", async () => {
+	it("never sends the user to sign in to Chat again: a refusal of that kind reads as a failed login that can start again", async () => {
 		const fixture = zaloFixture();
 		fixture.bridge.qr.start = { kind: "error", code: Code.FailedPrecondition, message: "reauth_required: sign in again (within the last 10 minutes) to do this" };
 		await openPage(fixture);
 		await startZalo(fixture);
-		await expectStatus("Cần đăng nhập lại Chat trước khi kết nối.");
-		const link = document.querySelector<HTMLAnchorElement>('[data-id="bridge-qr-login-reauth"]');
-		if (link === null) throw new Error("no sign-in link in the QR card");
-		expect(link.textContent).toBe("Đăng nhập lại");
-		expect(link.getAttribute("href")).toContain("reauth=1");
-		expect(link.getAttribute("href")).toContain(encodeURIComponent("/settings/bridge"));
-		expect(screen.queryByRole("button", { name: "Bắt đầu lại" })).toBeNull();
+		await expectStatus("Chưa đăng nhập được. Thử lại sau.");
+		expect(screen.queryByRole("link", { name: "Đăng nhập lại" })).toBeNull();
+		expect(screen.getByRole("button", { name: "Bắt đầu lại" })).toBeTruthy();
 	});
 
 	it("counts down the wait the server asks for, in minutes when it is long", async () => {
@@ -312,7 +312,7 @@ describe("signing in again", () => {
 			{ $typeName: "app.v1.BridgeAccount", id: 2n, source: "zalo", status: BridgeAccountStatus.NEEDS_LOGIN, syncState: BridgeSyncState.LIVE, lastError: "", chats: [] },
 		];
 		await openPage(fixture);
-		await userEvent.click(screen.getByRole("button", { name: "Đăng nhập lại" }));
+		await userEvent.click(screen.getByRole("button", { name: "Kết nối lại" }));
 		expect(await screen.findByRole("heading", { name: "Trước khi kết nối Zalo" }, LONG)).toBeTruthy();
 		await userEvent.click(screen.getByRole("checkbox", { name: /Tôi đã hiểu/ }));
 		await userEvent.click(screen.getByRole("button", { name: "Hiện mã QR" }));

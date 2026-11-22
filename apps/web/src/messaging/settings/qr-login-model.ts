@@ -57,11 +57,10 @@ export type QrLoginStatus =
 	| "expired"
 	| "limited"
 	| "taken"
-	| "reauth"
 	| "failed";
 
 /** Statuses after which the login is over on the server: the user starts again. */
-const ENDED: ReadonlySet<QrLoginStatus> = new Set(["declined", "expired", "limited", "taken", "reauth", "failed"]);
+const ENDED: ReadonlySet<QrLoginStatus> = new Set(["declined", "expired", "limited", "taken", "failed"]);
 
 export function isEnded(status: QrLoginStatus): boolean {
 	return ENDED.has(status);
@@ -97,8 +96,6 @@ export function statusOfError(error: BridgeError): QrLoginStatus {
 			return "limited";
 		case "account_taken":
 			return "taken";
-		case "reauth":
-			return "reauth";
 		case "not_found":
 			return "expired";
 		case "wrong_input":

@@ -4,7 +4,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BridgeSyncState } from "@achoo254/chat-proto/bridge";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { matchRoute } from "../src/router.tsx";
 import { ChatFixture } from "./support/fake-chat.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
@@ -57,29 +57,16 @@ describe("connecting an app", () => {
 		expect(screen.getByLabelText(/Mã đăng nhập/)).toBeTruthy();
 	});
 
-	it("offers a way back when the sign-in is too old", async () => {
+	it("draws the field login in the shared sign-in frame, with no sign-in-again banner on the page", async () => {
 		const fixture = new ChatFixture();
-		fixture.bridge.reauth = true;
 		await openPage(fixture);
 		await userEvent.click(screen.getByRole("button", { name: "Kết nối" }));
-		const link = await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG);
-		expect(link.getAttribute("href")).toContain("reauth");
-		// The banner is the only message: the card does not add a second, misleading error.
-		expect(screen.queryByText("Chưa làm được, thử lại sau.")).toBeNull();
-	});
-
-	it("brings the sign-in banner into view when starting the sync is refused", async () => {
-		const scrolled = vi.fn();
-		Element.prototype.scrollIntoView = scrolled;
-		const fixture = new ChatFixture();
-		await openPage(fixture);
-		await signIn();
-		await screen.findByText("Đồng bộ toàn bộ tin nhắn Telegram vào Chat?", {}, LONG);
-		fixture.bridge.reauth = true;
-		await userEvent.click(screen.getByRole("button", { name: "Đồng bộ" }));
-		expect(await screen.findByRole("link", { name: "Đăng nhập lại" }, LONG)).toBeTruthy();
-		await waitFor(() => expect(scrolled).toHaveBeenCalled());
-		expect(fixture.bridge.calls.some((c) => c.startsWith("sync:"))).toBe(false);
+		await screen.findByLabelText(/Số điện thoại/, {}, LONG);
+		const form = screen.getByRole("form", { name: "Đăng nhập Telegram" });
+		expect(within(form).getByText("Đăng nhập bằng số điện thoại và mã xác nhận")).toBeTruthy();
+		expect(within(form).getByRole("button", { name: "Tiếp tục" }).className).toContain("btn-primary");
+		expect(form.querySelector(".br-signin-actions")).not.toBeNull();
+		expect(screen.queryByText("Thao tác này cần đăng nhập trong 10 phút gần đây.")).toBeNull();
 	});
 
 	it("says so when the server has the bridge off", async () => {

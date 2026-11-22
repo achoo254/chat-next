@@ -35,6 +35,7 @@ export const viBridge = {
 			continue: "Hiện mã QR",
 		},
 		title: (app: string): string => `Quét mã QR để đăng nhập ${app}`,
+		method: "Đăng nhập bằng mã QR trên điện thoại",
 		imageAlt: (app: string): string => `Mã QR đăng nhập ${app}`,
 		steps: (app: string): readonly string[] => [
 			`Mở ${app} trên điện thoại.`,
@@ -54,7 +55,6 @@ export const viBridge = {
 			// The wait is a hint from the server: exact for a cool-down, a round figure or an upper bound otherwise.
 			limitedIn: (seconds: number): string => `Thử lại được sau khoảng ${seconds < 90 ? `${seconds} giây` : `${Math.ceil(seconds / 60)} phút`}.`,
 			taken: "Tài khoản này đang được người dùng khác kết nối.",
-			reauth: "Cần đăng nhập lại Chat trước khi kết nối.",
 			failed: "Chưa đăng nhập được. Thử lại sau.",
 			done: (app: string): string => `Đã kết nối ${app}.`,
 		},
@@ -64,6 +64,8 @@ export const viBridge = {
 	},
 	login: {
 		title: (app: string): string => `Đăng nhập ${app}`,
+		method: "Đăng nhập bằng số điện thoại và mã xác nhận",
+		preparing: "Đang mở đăng nhập…",
 		next: "Tiếp tục",
 		cancel: "Huỷ",
 		scan: "Quét mã này bằng ứng dụng",
@@ -110,7 +112,7 @@ export const viBridge = {
 			stopped: "Đã ngắt kết nối, các chat còn lại ở chế độ chỉ đọc",
 		} as Record<string, string>,
 		lastError: (text: string): string => `Lỗi gần nhất: ${text}`,
-		reconnect: "Đăng nhập lại",
+		reconnect: "Kết nối lại",
 	},
 	/** Messages of a chat that sends on to the app: where each is on its way (shown in the conversation). */
 	delivery: {

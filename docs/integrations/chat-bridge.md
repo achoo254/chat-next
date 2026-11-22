@@ -7,7 +7,7 @@ Chat Bridge đồng bộ mọi cuộc trò chuyện của chính bạn ở một
 ## Dùng
 
 1. Người vận hành bật tính năng và cấp `api_id`, `api_hash` ([Cấp api_id](#cấp-api_id-và-api_hash)).
-2. Cài đặt › **Kết nối ứng dụng** › Telegram › Kết nối. Nhập số điện thoại kèm mã quốc gia, mã đăng nhập Telegram gửi tới app trên thiết bị khác của bạn (hoặc SMS), và mật khẩu hai bước nếu tài khoản có. Chỉ bước đăng nhập này đòi đăng nhập Chat trong 10 phút gần đây (nó cấp quyền đọc cả tài khoản); nếu không trang đưa sang đăng nhập lại.
+2. Cài đặt › **Kết nối ứng dụng** › Telegram › Kết nối. Nhập số điện thoại kèm mã quốc gia, mã đăng nhập Telegram gửi tới app trên thiết bị khác của bạn (hoặc SMS), và mật khẩu hai bước nếu tài khoản có. Kết nối không bắt đăng nhập lại Chat. Telegram và Zalo dùng chung một khung đăng nhập: tên bước, cách đăng nhập của app, một dòng trạng thái và nút ở cùng chỗ.
 3. Đăng nhập xong, trang hỏi **Đồng bộ toàn bộ tin nhắn Telegram vào Chat?** Bấm **Đồng bộ** (hoặc **Để sau**, rồi bấm nút đồng bộ ở thẻ tài khoản khi muốn).
 4. Mọi cuộc trò chuyện (chat riêng, nhóm, kênh, bot) có một chat trong Chat với 2.000 tin gần nhất, cuộc có tin mới nhất trước. Thẻ tài khoản hiện một thanh tiến trình tổng: số cuộc đã xong và số tin đã nhập trên tổng. Tin mới đến trong lúc nhập vẫn vào. Lịch sử nhập không báo thông báo đẩy và không tính tin chưa đọc.
 5. Nhập xong, thẻ hiện **Đang đồng bộ trực tiếp**. Cuộc trò chuyện mới xuất hiện ở Telegram sau đó tự có chat trong Chat. Ngắt kết nối thì các chat còn lại ở chế độ chỉ đọc (hoặc xoá hết, tuỳ chọn khi ngắt).

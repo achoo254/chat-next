@@ -58,7 +58,7 @@ describe("statusOfError", () => {
 		[new BridgeError("not_found"), "expired"],
 		[new BridgeError("rate_limited"), "limited"],
 		[new BridgeError("account_taken"), "taken"],
-		[new BridgeError("reauth"), "reauth"],
+		[new BridgeError("reauth"), "failed"],
 		[new BridgeError("network"), "network"],
 		[new BridgeError("other"), "failed"],
 	] as const)("maps %s to %s", (error, status) => {

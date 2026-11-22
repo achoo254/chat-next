@@ -3,23 +3,17 @@
 // how much history, see their progress, and disconnect. Everything is a page in
 // the settings frame (docs/settings-menu.md); a confirmation is inline, never a
 // dialog standing in for the page. The phone number, code and password go to
-// the server in the call that needs them and are never kept here.
-import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState, type FormEvent } from "react";
+// the server in the call that needs them and are never kept here. Connecting
+// never asks to sign in to Chat again: the other app's own proof is enough.
+import { lazy, Suspense, useEffect, useEffectEvent, useState } from "react";
 import { initials } from "../../components/avatar.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
-import { paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
-import {
-	BridgeError,
-	type BridgeAccount,
-	type BridgeApi,
-	type BridgeStatus,
-	type LoginStep,
-} from "./bridge-api.ts";
+import type { BridgeAccount, BridgeApi, BridgeError, BridgeStatus } from "./bridge-api.ts";
 import { bridgeClient, bridgeError } from "./bridge-client.ts";
+import { BridgeFieldsLogin, type BridgeLoginProps } from "./bridge-fields-login.tsx";
 import { BridgeQrLogin } from "./bridge-qr-login.tsx";
-import { BridgeReauthBanner } from "./bridge-reauth-banner.tsx";
 import { QR_LOGIN_APPS, RECEIVE_ONLY_APPS } from "./qr-login-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
@@ -36,9 +30,6 @@ export default function BridgeSettings() {
 	const { transport } = useServices();
 	const api = bridgeClient(transport);
 	const [load, setLoad] = useState<Load>({ status: "loading" });
-	// How many times an action was refused for a sign-in that is too old.
-	const [reauth, setReauth] = useState(0);
-	const reauthBanner = useRef<HTMLDivElement>(null);
 	/** The app being signed in to (a new connection, or an account that needs a new login). */
 	const [signingIn, setSigningIn] = useState<string | null>(null);
 
@@ -59,15 +50,7 @@ export default function BridgeSettings() {
 		return () => clearInterval(timer);
 	}, [importing]);
 
-	const onError = (err: unknown): BridgeError => {
-		const error = bridgeError(err);
-		if (error.kind === "reauth") setReauth((n) => n + 1);
-		return error;
-	};
-	// The refused action may be far below the banner (the chat picker): bring the banner into view each time, or the click looks like it did nothing.
-	useEffect(() => {
-		if (reauth > 0) reauthBanner.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
-	}, [reauth]);
+	const onError = (err: unknown): BridgeError => bridgeError(err);
 
 	if (load.status === "loading") return <div className="set-body" aria-busy="true" />;
 	if (load.status === "error") {
@@ -93,11 +76,6 @@ export default function BridgeSettings() {
 				<Icon name="plug" small />
 				{t.lede}
 			</p>
-			{reauth > 0 && (
-				<div ref={reauthBanner}>
-					<BridgeReauthBanner returnTo={paths.settings("bridge")} />
-				</div>
-			)}
 			{accounts.map((account) => (
 				<AccountCard
 					key={account.id}
@@ -110,7 +88,6 @@ export default function BridgeSettings() {
 				/>
 			))}
 			{signingIn !== null && (
-				// A QR app (Zalo) has its own card: a notice first, then the code; the others ask for fields.
 				<SignInCard
 					qr={QR_LOGIN_APPS.has(signingIn)}
 					key={signingIn}
@@ -154,114 +131,9 @@ export default function BridgeSettings() {
 	);
 }
 
-/**
- * What a failed login step says to the user. A reauthentication needs no text
- * here: the page banner already carries the "sign in again" link.
- */
-function loginErrorText(error: BridgeError, t: ReturnType<typeof useBridgeCopy>): string {
-	switch (error.kind) {
-		case "reauth":
-			return "";
-		case "wrong_input":
-			return t.login.errors[error.detail] ?? t.failed;
-		case "rate_limited":
-			return t.login.rateLimited;
-		case "account_taken":
-			return t.login.accountTaken;
-		default:
-			return t.failed;
-	}
-}
-
-interface LoginCardProps {
-	api: BridgeApi;
-	source: string;
-	appName: string;
-	onDone: () => void;
-	onCancel: () => void;
-	onError: (err: unknown) => BridgeError;
-}
-
-function SignInCard({ qr, ...props }: LoginCardProps & { qr: boolean }) {
-	return qr ? <BridgeQrLogin {...props} /> : <LoginCard {...props} />;
-}
-
-/** The steps of a login: each shows the fields the app asks for (phone, code, two-step password). */
-function LoginCard({ api, source, appName, onDone, onCancel, onError }: LoginCardProps) {
-	const t = useBridgeCopy();
-	const [step, setStep] = useState<LoginStep | null>(null);
-	const [values, setValues] = useState<Record<string, string>>({});
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState("");
-
-	const advance = (next: LoginStep) => {
-		if (next.kind === "done") return onDone();
-		setStep(next);
-		setValues({});
-		setError("");
-	};
-	const begin = useEffectEvent(() => {
-		api.startLogin(source).then(advance, (err: unknown) => setError(loginErrorText(onError(err), t)));
-	});
-	useEffect(() => {
-		begin();
-	}, []);
-
-	const submit = (event: FormEvent) => {
-		event.preventDefault();
-		if (step === null || step.kind === "done") return;
-		setBusy(true);
-		setError("");
-		api.continueLogin(step.loginId, values).then(
-			(next) => {
-				setBusy(false);
-				advance(next);
-			},
-			(err: unknown) => {
-				setBusy(false);
-				setError(loginErrorText(onError(err), t));
-			},
-		);
-	};
-	const fields = step?.kind === "input" ? step.fields : [];
-	const ready = fields.length > 0 && fields.every((f) => (values[f.name] ?? "").trim() !== "");
-	return (
-		<form className="card pad" data-id="bridge-login" onSubmit={submit}>
-			<h2 className="card-title flush">{t.login.title(appName)}</h2>
-			{/* A QR step's prompt is an image (see bridge-qr-login.tsx), never shown as text. */}
-			{(step?.kind === "input" || step?.kind === "confirm") && step.prompt !== "" && <p className="note">{step.prompt}</p>}
-			{step?.kind === "qr" && <p className="note">{t.login.scan}</p>}
-			{step?.kind === "confirm" && <p className="note">{t.login.confirm}</p>}
-			{fields.map((field) => (
-				<label className="field" key={field.name}>
-					<span>{t.login.fields[field.name] ?? field.label}</span>
-					<input
-						className="input"
-						name={field.name}
-						type={field.name === "phone" ? "tel" : field.secret ? "password" : "text"}
-						inputMode={field.name === "code" ? "numeric" : undefined}
-						autoComplete="off"
-						value={values[field.name] ?? ""}
-						onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-					/>
-				</label>
-			))}
-			{error !== "" && (
-				<div className="banner error" role="alert">
-					<Icon name="alert" small />
-					<span className="grow">{error}</span>
-				</div>
-			)}
-			<div className="row">
-				<button type="submit" className="btn primary" disabled={busy || !ready}>
-					{t.login.next}
-				</button>
-				<button type="button" className="btn" onClick={onCancel}>
-					{t.login.cancel}
-				</button>
-			</div>
-		</form>
-	);
+/** A QR app (Zalo) signs in with its own card (a notice first, then the code); the others ask for fields. Both share one frame. */
+function SignInCard({ qr, ...props }: BridgeLoginProps & { qr: boolean }) {
+	return qr ? <BridgeQrLogin {...props} /> : <BridgeFieldsLogin {...props} />;
 }
 
 function AccountCard({
@@ -285,7 +157,8 @@ function AccountCard({
 	const [busy, setBusy] = useState(false);
 	const fail = (err: unknown) => {
 		setBusy(false);
-		if (onError(err).kind !== "reauth") toasts.show(t.failed);
+		onError(err);
+		toasts.show(t.failed);
 	};
 	const disconnect = (deleteChats: boolean) => {
 		setBusy(true);
@@ -381,7 +254,8 @@ function SyncPanel({
 			},
 			(err: unknown) => {
 				setBusy(false);
-				if (onError(err).kind !== "reauth") toasts.show(t.failed);
+				onError(err);
+				toasts.show(t.failed);
 			},
 		);
 	};

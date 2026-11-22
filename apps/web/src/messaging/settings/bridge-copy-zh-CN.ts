@@ -33,6 +33,7 @@ export const zhCNBridge: BridgeCopy = {
 			continue: "显示二维码",
 		},
 		title: (app) => `扫描二维码登录 ${app}`,
+		method: "用手机扫描二维码登录",
 		imageAlt: (app) => `${app} 登录二维码`,
 		steps: (app) => [`在手机上打开 ${app}。`, "点击搜索栏中的扫码图标。", "扫描此屏幕上的二维码。", "在手机上确认登录。"],
 		status: {
@@ -46,7 +47,6 @@ export const zhCNBridge: BridgeCopy = {
 			limited: "登录尝试次数过多。请稍等片刻再试。",
 			limitedIn: (seconds) => `约 ${seconds < 90 ? `${seconds} 秒` : `${Math.ceil(seconds / 60)} 分钟`}后可以重试。`,
 			taken: "该账号已被其他用户连接。",
-			reauth: "连接前请重新登录 Chat。",
 			failed: "未能登录，请稍后再试。",
 			done: (app) => `已连接 ${app}。`,
 		},
@@ -56,6 +56,8 @@ export const zhCNBridge: BridgeCopy = {
 	},
 	login: {
 		title: (app) => `登录 ${app}`,
+		method: "用手机号和验证码登录",
+		preparing: "正在打开登录…",
 		next: "继续",
 		cancel: "取消",
 		scan: "请用该应用扫描此码",
@@ -101,7 +103,7 @@ export const zhCNBridge: BridgeCopy = {
 			stopped: "已断开连接，聊天保持只读",
 		},
 		lastError: (text) => `最近的错误：${text}`,
-		reconnect: "重新登录",
+		reconnect: "重新连接",
 	},
 	delivery: {
 		note: (app) => `你在此处输入的内容也会发送到 ${app}。`,

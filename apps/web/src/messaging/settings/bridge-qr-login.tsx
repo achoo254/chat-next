@@ -1,16 +1,15 @@
 // Signing in to an app by QR code (Zalo, Chat Bridge ADR 0022): a notice the
 // user accepts first, then the code with short numbered steps and a live
 // status line, until the phone confirms. Used for a new connection and for an
-// account that needs signing in again. The image is rendered only when it is
-// a checked PNG data: URL and is dropped when the login ends.
-import { signInUrl } from "@achoo254/chat-core";
-import { useEffect, useId, useRef, useState } from "react";
+// account that needs signing in again. Drawn in the shared sign-in frame, like
+// the login by fields (bridge-fields-login.tsx). The image is rendered only
+// when it is a checked PNG data: URL and is dropped when the login ends.
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
-import { useI18n } from "../../i18n/i18n.tsx";
-import { paths } from "../../router.tsx";
 import { useServices } from "../data/services.tsx";
-import type { BridgeApi, BridgeError } from "./bridge-api.ts";
+import type { BridgeLoginProps } from "./bridge-fields-login.tsx";
 import { BridgeQrNotice } from "./bridge-qr-notice.tsx";
+import { BridgeSignInFrame, type SignInTone } from "./bridge-sign-in-frame.tsx";
 import { isEnded, isSafeQrDataUrl, type QrLoginStatus } from "./qr-login-model.ts";
 import { useBridgeCopy } from "./use-bridge-copy.ts";
 import { useQrLogin } from "./use-qr-login.ts";
@@ -18,21 +17,15 @@ import { useQrLogin } from "./use-qr-login.ts";
 /** Side of the QR image in CSS pixels (scannable from a phone held at arm's length). */
 const QR_SIZE = 264;
 
-export function BridgeQrLogin({
-	api,
-	source,
-	appName,
-	onDone,
-	onCancel,
-	onError,
-}: {
-	api: BridgeApi;
-	source: string;
-	appName: string;
-	onDone: () => void;
-	onCancel: () => void;
-	onError: (err: unknown) => BridgeError;
-}) {
+/** Statuses read as a problem; "confirm" is good news; the rest are plain hints. */
+const PROBLEMS: ReadonlySet<QrLoginStatus> = new Set(["network", "declined", "expired", "limited", "taken", "failed"]);
+
+function toneOf(status: QrLoginStatus): SignInTone {
+	if (status === "confirm") return "success";
+	return PROBLEMS.has(status) ? "error" : "info";
+}
+
+export function BridgeQrLogin({ api, source, appName, onDone, onCancel, onError }: BridgeLoginProps) {
 	const t = useBridgeCopy();
 	const { toasts } = useServices();
 	const [accepted, setAccepted] = useState(false);
@@ -45,12 +38,9 @@ export function BridgeQrLogin({
 		},
 		onError,
 	);
-	const titleId = useId();
 	const heading = useRef<HTMLHeadingElement>(null);
 	const action = useRef<HTMLButtonElement>(null);
 	const cancelButton = useRef<HTMLButtonElement>(null);
-	const reauthLink = useRef<HTMLAnchorElement>(null);
-	const { locale } = useI18n();
 	const { status, wait: seconds } = login;
 	const ended = status !== "idle" && isEnded(status);
 
@@ -60,7 +50,7 @@ export function BridgeQrLogin({
 	}, [accepted]);
 	useEffect(() => {
 		if (status !== "network" && !ended) return;
-		const next = reauthLink.current ?? (action.current !== null && !action.current.disabled ? action.current : cancelButton.current);
+		const next = action.current !== null && !action.current.disabled ? action.current : cancelButton.current;
 		next?.focus();
 	}, [status, ended]);
 
@@ -82,10 +72,51 @@ export function BridgeQrLogin({
 		onCancel();
 	};
 	return (
-		<section className="card pad br-qr" data-id="bridge-qr-login" aria-labelledby={titleId}>
-			<h2 className="br-qr-heading" id={titleId} ref={heading} tabIndex={-1}>
-				{t.qr.title(appName)}
-			</h2>
+		<BridgeSignInFrame
+			dataId="bridge-qr-login"
+			appName={appName}
+			method={t.qr.method}
+			title={t.qr.title(appName)}
+			headingRef={heading}
+			status={
+				status === "idle"
+					? undefined
+					: {
+							text: (
+								<>
+									{t.qr.status[status]}
+									{status === "limited" && seconds > 0 && <span className="br-qr-wait"> {t.qr.status.limitedIn(seconds)}</span>}
+								</>
+							),
+							tone: toneOf(status),
+							state: status,
+						}
+			}
+			actions={
+				<>
+					{status === "network" && (
+						<button type="button" className="btn btn-primary" data-id="bridge-qr-login-retry" ref={action} onClick={login.resume}>
+							{t.qr.retry}
+						</button>
+					)}
+					{ended && (
+						<button
+							type="button"
+							className="btn btn-primary"
+							data-id="bridge-qr-login-restart"
+							ref={action}
+							disabled={status === "limited" && seconds > 0}
+							onClick={login.start}
+						>
+							{t.qr.startAgain}
+						</button>
+					)}
+					<button type="button" className="btn" data-id="bridge-qr-login-cancel" ref={cancelButton} onClick={cancel}>
+						{t.qr.cancel}
+					</button>
+				</>
+			}
+		>
 			<div className="br-qr-body">
 				<div className="br-qr-frame" data-id="bridge-qr-login-code" data-ready={image !== ""}>
 					{image !== "" ? (
@@ -102,43 +133,6 @@ export function BridgeQrLogin({
 					))}
 				</ol>
 			</div>
-			<p className="br-qr-status" role="status" aria-live="polite" data-id="bridge-qr-login-status" data-state={status}>
-				{statusText(status, t)}
-				{status === "limited" && seconds > 0 && <span className="br-qr-wait"> {t.qr.status.limitedIn(seconds)}</span>}
-			</p>
-			<div className="row">
-				{status === "network" && (
-					<button type="button" className="btn btn-primary" data-id="bridge-qr-login-retry" ref={action} onClick={login.resume}>
-						{t.qr.retry}
-					</button>
-				)}
-				{status === "reauth" && (
-					// A plain sign-out and sign-in can be answered by the IdP session without asking the
-					// password again, which leaves the sign-in time too old: this link forces it.
-					<a className="btn btn-primary" data-id="bridge-qr-login-reauth" ref={reauthLink} href={signInUrl(locale, { reauth: true, returnTo: paths.settings("bridge") })}>
-						{t.reauth.signIn}
-					</a>
-				)}
-				{ended && status !== "reauth" && (
-					<button
-						type="button"
-						className="btn btn-primary"
-						data-id="bridge-qr-login-restart"
-						ref={action}
-						disabled={status === "limited" && seconds > 0}
-						onClick={login.start}
-					>
-						{t.qr.startAgain}
-					</button>
-				)}
-				<button type="button" className="btn" data-id="bridge-qr-login-cancel" ref={cancelButton} onClick={cancel}>
-					{t.qr.cancel}
-				</button>
-			</div>
-		</section>
+		</BridgeSignInFrame>
 	);
-}
-
-function statusText(status: QrLoginStatus | "idle", t: ReturnType<typeof useBridgeCopy>): string {
-	return status === "idle" ? "" : t.qr.status[status];
 }

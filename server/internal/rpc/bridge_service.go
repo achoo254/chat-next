@@ -26,11 +26,12 @@ type bridgeService struct {
 	logger *slog.Logger
 }
 
-// bridgeCall runs fn for the signed-in user. Only the calls that grant access
-// to a new external account (the login steps) pass recent: the session's IdP
-// sign-in must be recent (the same rule as resetting a bot token). Enabling or
-// removing a synced chat and disconnecting never widen access, so they do not
-// ask for a fresh sign-in.
+// bridgeCall runs fn for the signed-in user. Only the calls that cannot be
+// undone in the other app (leaving or deleting a group there) pass recent: the
+// session's IdP sign-in must be recent (the same rule as resetting a bot token).
+// The login steps do not: connecting an account already needs the other app's
+// own proof (its code and password, or a scan confirmed on the phone), so a
+// second sign-in to Chat only stood in the way.
 func bridgeCall[Req, Resp any](ctx context.Context, s *bridgeService, req *connect.Request[Req], recent bool,
 	fn func(me int64, msg *Req) (*Resp, error),
 ) (*connect.Response[Resp], error) {
@@ -110,7 +111,7 @@ func (s *bridgeService) StartBridgeSync(ctx context.Context, req *connect.Reques
 }
 
 func (s *bridgeService) StartBridgeLogin(ctx context.Context, req *connect.Request[appv1.StartBridgeLoginRequest]) (*connect.Response[appv1.StartBridgeLoginResponse], error) {
-	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.StartBridgeLoginRequest) (*appv1.StartBridgeLoginResponse, error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.StartBridgeLoginRequest) (*appv1.StartBridgeLoginResponse, error) {
 		step, err := s.engine.StartLogin(ctx, me, m.GetSource())
 		if err != nil {
 			return nil, err
@@ -120,7 +121,7 @@ func (s *bridgeService) StartBridgeLogin(ctx context.Context, req *connect.Reque
 }
 
 func (s *bridgeService) ContinueBridgeLogin(ctx context.Context, req *connect.Request[appv1.ContinueBridgeLoginRequest]) (*connect.Response[appv1.ContinueBridgeLoginResponse], error) {
-	return bridgeCall(ctx, s, req, true, func(me int64, m *appv1.ContinueBridgeLoginRequest) (*appv1.ContinueBridgeLoginResponse, error) {
+	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.ContinueBridgeLoginRequest) (*appv1.ContinueBridgeLoginResponse, error) {
 		step, err := s.engine.ContinueLogin(ctx, me, m.GetLoginId(), m.GetInput())
 		if err != nil {
 			return nil, err
