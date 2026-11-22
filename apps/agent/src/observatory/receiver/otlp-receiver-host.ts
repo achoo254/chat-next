@@ -5,7 +5,7 @@
 // of the agent shows one.
 import { rememberSecret } from "../../mcp/redact.ts";
 import type { OtlpReceiver } from "./otlp-receiver.ts";
-import { type ReceiverTokens, revokePreviousToken, rotateTokens } from "./receiver-token.ts";
+import { type ReceiverTokens, type RotateOptions, revokePreviousToken, rotateTokens } from "./receiver-token.ts";
 import { type ReceiverStatusState, type StartReceiverOptions, startOtlpReceiver } from "./start-otlp-receiver.ts";
 
 /** How often a token file that could not be read is read again. */
@@ -77,9 +77,15 @@ export class OtlpReceiverHost {
     this.current = "off";
   }
 
-  /** A new token; the current one stays accepted until the next rotation or revokePrevious(). */
-  async rotate(): Promise<ReceiverTokens> {
-    return this.use(await rotateTokens(this.opts.dataDir));
+  /**
+   * A new token; the current one stays accepted until the next rotation or
+   * revokePrevious(). With `replaceUnreadable`, a token file that cannot be
+   * read is replaced, and a receiver waiting on it starts now.
+   */
+  async rotate(opts: RotateOptions = {}): Promise<ReceiverTokens> {
+    const tokens = this.use(await rotateTokens(this.opts.dataDir, { ...opts, ...(this.opts.tokenRetryMs ? { retryMs: this.opts.tokenRetryMs } : {}) }));
+    if (this.current === "token-unreadable") await this.attempt();
+    return tokens;
   }
 
   /** Stops accepting the token before the last rotation, now. */

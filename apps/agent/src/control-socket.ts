@@ -16,6 +16,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer, request } from "node:http";
 import { join } from "node:path";
 import { z } from "zod";
+import { OBSERVATORY_CONTROL_ROUTES } from "./commands/observatory-control-routes.ts";
 import type { Machine } from "./machine.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
 import { redactMessage } from "./mcp/redact.ts";
@@ -217,6 +218,8 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
     if (!t.streams.touch(id)) throw new Error("no such stream");
     return { alive: true };
   },
+  /** `tunelo observatory …`: Observatory's state, export, deletion, content switch and token. */
+  ...OBSERVATORY_CONTROL_ROUTES,
 };
 
 /** Commands that answer with a stream of JSON lines while the caller stays connected. */

@@ -590,6 +590,32 @@ export interface AgentProvider {
   listCommands?(req: CommandsRequest): Promise<SlashCommand[]>;
 }
 
+/**
+ * Observatory's part in the working sessions an AI opens for tunelo
+ * (observatory/session-observer.ts). Never a store, a network call or a wait:
+ * a session must run as if Observatory were not there when it is off, slow or
+ * gone. Not given to the probes (usage, commands) or the one-shot writer.
+ */
+export interface SessionObserver {
+  /**
+   * The environment that sends the session's OpenTelemetry logs to the
+   * agent's receiver, for a session whose AI folder is `home`; undefined when
+   * Observatory or its receiver is off, or the user exports telemetry of their
+   * own (in this process's environment or that folder's settings).
+   */
+  otelEnv(home: string): Record<string, string> | undefined;
+  /**
+   * tunelo and the arguments before `observatory hook <event>`, for the hooks
+   * of a CLI in the terminal whose AI folder is `home`; undefined when
+   * Observatory is off or that folder's settings hold its hooks already.
+   */
+  hookCommand(home: string): readonly string[] | undefined;
+  /** Writes settings holding a secret (the receiver's token) to a private file; its path. Throws when it cannot. */
+  privateSettingsFile(json: string): string;
+  /** One hook event of a session the agent runs; returns at once, never throws. `label` marks an internal session (Advisor). */
+  hookEvent(event: string, payload: unknown, label?: string): void;
+}
+
 export type CommandsRequest = {
   /** Absolute working directory. */
   dir: string;

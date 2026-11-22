@@ -1,11 +1,12 @@
 // Observatory inside the running agent: the store (opened with the agent's
-// short busy timeout) and its batch writer, the OTLP receiver, the hook
-// spool reader, and state.json for the hooks. Started with the agent after
-// the usage ledger, stopped before the core: the receiver's queue is filtered
-// and handed on, the spool reader finishes its chunk, the writer writes what
-// waits, then the store closes. Nothing here ever throws into the agent or
-// stops it: a part that fails stays off, the problem goes to the throttled
-// log (no content), and status() tells.
+// short busy timeout) and its batch writer, the OTLP receiver, the intake of
+// records (observatory-intake.ts: the ingest, the hook spool reader, the SDK
+// sessions' hook callbacks), and state.json for the hooks. Started with the
+// agent after the usage ledger, stopped before the core: the receiver's queue
+// is filtered and handed on, the spool reader finishes its chunk, the writer
+// writes what waits, then the store closes. Nothing here ever throws into the
+// agent or stops it: a part that fails stays off, the problem goes to the
+// throttled log (no content), and status() tells.
 //
 // The projects without content live in the agent's config
 // (content-settings-config.ts); state.json and the store's content_settings
@@ -19,18 +20,16 @@ import { rememberSecret } from "../mcp/redact.ts";
 import { OfficeProblems } from "../office/office-problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
-import { AcceptTracker, STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
 import { ObservatoryIngest } from "./ingest/observatory-ingest.ts";
+import { ObservatoryIntake } from "./observatory-intake.ts";
 import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.ts";
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
-import { redactRecordAgain } from "./privacy/redact-record-again.ts";
 import { OtlpReceiverHost, type OtlpReceiverHostOptions } from "./receiver/otlp-receiver-host.ts";
-import type { ReceiverTokens } from "./receiver/receiver-token.ts";
+import type { ReceiverTokens, RotateOptions } from "./receiver/receiver-token.ts";
 import { clearSpool } from "./spool/clear-spool.ts";
 import { setAsideBrokenHookState } from "./spool/hook-state-file.ts";
 import { HookStateWriter } from "./spool/hook-state-writer.ts";
-import { SpoolReader } from "./spool/spool-reader.ts";
 import { ObservatoryStoreError } from "./store/store-errors.ts";
 import type { ObservatoryStore } from "./store/observatory-store.ts";
 import type { WriteOp } from "./store/write-ops.ts";
@@ -51,16 +50,17 @@ export type ObservatoryServiceOptions = {
   stopWaitMs?: number;
   /** When an unreadable OTLP token file is read again (receiver-token.ts, receiver/otlp-receiver-host.ts); tests pass short ones. */
   tokenTimings?: Pick<OtlpReceiverHostOptions, "tokenRetryMs" | "tokenRetryEveryMs">;
+  /** Paths whose content is never kept, for the SDK sessions' hook records (safety/sensitive-paths.ts; the machine's own by default). */
+  isSensitive?: (absolutePath: string) => boolean;
+  /** Schedules the SDK hook queue's work (sdk-hook-feed.ts); tests pass their own. */
+  scheduleSdkFeed?: (work: () => void) => void;
 };
 
 export class ObservatoryService {
   private readonly store: AgentStoreHost;
   private readonly receiver: OtlpReceiverHost;
-  private sink: ObservatorySink | undefined;
-  private spool: SpoolReader | undefined;
+  private readonly intake: ObservatoryIntake;
   private started = false;
-  /** `accept` calls still running (stop waits for them, within stopWaitMs). */
-  private readonly accepting = new AcceptTracker();
   private readonly rollups: DailyRollupScheduler;
   private readonly state: HookStateWriter;
   private readonly problems: OfficeProblems;
@@ -69,20 +69,33 @@ export class ObservatoryService {
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
     this.problems = new OfficeProblems((line) => opts.log(line.replace(/^office: /, "observatory: ")), this.now);
-    this.state = new HookStateWriter(opts.dataDir, () => ({ enabled: this.enabled, contentOff: contentOffOf(opts.config) }), (err) => this.problems.report("state-file", err));
-    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems: (place, err) => this.problems.report(place, err), now: this.now });
+    const problems = (place: string, err: unknown): void => this.problems.report(place, err);
+    this.state = new HookStateWriter(opts.dataDir, () => ({ enabled: this.enabled, contentOff: contentOffOf(opts.config) }), (err) => problems("state-file", err));
+    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now });
+    this.intake = new ObservatoryIntake({
+      config: opts.config,
+      dataDir: opts.dataDir,
+      secrets: () => this.secrets(),
+      running: () => this.enabled && this.started,
+      commit: () => this.store.commit(),
+      problems,
+      now: this.now,
+      stopWaitMs: opts.stopWaitMs,
+      isSensitive: opts.isSensitive,
+      scheduleSdkFeed: opts.scheduleSdkFeed,
+    });
     this.receiver = new OtlpReceiverHost({
       config: opts.config,
       dataDir: opts.dataDir,
       known: () => this.secrets(),
       onRecords: (records) => {
-        for (const r of records) this.accept(r, "otlp").catch((err: unknown) => this.problems.report("ingest", err));
+        for (const r of records) this.accept(r, "otlp").catch((err: unknown) => problems("ingest", err));
       },
-      problems: (place, err) => this.problems.report(place, err),
+      problems,
       now: this.now,
       ...opts.tokenTimings,
     });
-    this.rollups = new DailyRollupScheduler({ prune: () => this.store.store?.prune(this.now()), problems: (place, err) => this.problems.report(place, err) });
+    this.rollups = new DailyRollupScheduler({ prune: () => this.store.store?.prune(this.now()), problems });
   }
 
   /** The master switch of the agent's config (unset is on). */
@@ -102,9 +115,9 @@ export class ObservatoryService {
     await this.store.open();
     // The ingest pushes into whichever writer is current (a wipe makes a new one).
     const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
-    if (this.store.writer) this.sink = this.guard("ingest-create", () => ingest((op) => this.store.writer?.push(op)));
+    const sink = this.store.writer ? this.guard("ingest-create", () => ingest((op) => this.store.writer?.push(op))) : undefined;
     await this.receiver.start();
-    if (this.sink) this.startSpool();
+    if (sink) this.intake.open(sink);
     if (this.store.store) this.rollups.start();
   }
 
@@ -117,15 +130,8 @@ export class ObservatoryService {
   async stop(): Promise<void> {
     await this.receiver.stop();
     await this.rollups.stop();
-    const taken = (async () => {
-      await this.spool?.stop();
-      // Writes an ingest still pushes go in before the writer closes.
-      await this.accepting.settled();
-    })();
-    if (!(await settledWithin(taken, this.opts.stopWaitMs ?? STOP_WAIT_MS))) this.problems.report("ingest-stop", new ObservatoryStoreError("records still being taken at stop were left behind"));
+    await this.intake.close();
     this.store.close();
-    this.spool = undefined;
-    this.sink = undefined;
     this.started = false;
   }
 
@@ -137,12 +143,11 @@ export class ObservatoryService {
    * written into it again from the config. Throws the wipe's error after that.
    */
   async wipe(): Promise<void> {
-    if (this.spool && !(await settledWithin(this.spool.stop(), this.opts.stopWaitMs ?? STOP_WAIT_MS))) this.problems.report("ingest-stop", new ObservatoryStoreError("a spool run still taking records at the wipe was left behind"));
-    this.spool = undefined;
+    await this.intake.pauseSpool();
     let failure = await this.store.wipe(this.started && this.enabled);
     await clearSpool(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
     await this.state.write();
-    if (this.sink && this.store.writer) this.startSpool();
+    if (this.store.writer) this.intake.resumeSpool();
     if (failure !== undefined) throw failure;
   }
 
@@ -150,20 +155,29 @@ export class ObservatoryService {
    * Switches content on or off for a project: the config first (the truth),
    * then state.json (the hooks follow at once), then the store's setting
    * (writes still queued go in before it) and, when off, the content already
-   * stored is removed. Throws when the store cannot take it now (the config
-   * and the hooks already follow the new setting; the next start copies it).
+   * stored is removed and the spool's settled files are taken in now (their
+   * content blocked by the store) and deleted; the minute still being written
+   * follows within a minute and a few seconds, blocked the same way. Throws
+   * when the store cannot take it now (the config and the hooks already follow
+   * the new setting; the next start copies it and clears the content).
    */
   async setProjectContent(projectKey: string, storeContent: boolean): Promise<void> {
     setContentOff(this.opts.config, projectKey, storeContent);
     await this.state.write();
     this.store.writer?.push({ kind: "contentSetting", row: { projectKey, storeContent, updatedAt: this.now() } });
     this.store.writer?.flush();
-    if (!storeContent) this.store.store?.clearContent(projectKey);
+    if (storeContent) return;
+    this.store.store?.clearContent(projectKey);
+    await this.intake.drainSpool();
   }
 
-  /** A new OTLP token for the running receiver; the current one stays accepted until the next rotation or revokePreviousToken(). */
-  rotateToken(): Promise<ReceiverTokens> {
-    return this.receiver.rotate();
+  /**
+   * A new OTLP token for the running receiver; the current one stays accepted
+   * until the next rotation or revokePreviousToken(). `replaceUnreadable`
+   * replaces a token file that cannot be read (receiver-token.ts).
+   */
+  rotateToken(opts: RotateOptions = {}): Promise<ReceiverTokens> {
+    return this.receiver.rotate(opts);
   }
 
   /** Stops accepting the token before the last rotation, now. */
@@ -171,9 +185,27 @@ export class ObservatoryService {
     return this.receiver.revokePrevious();
   }
 
+  /** Where Claude Code sends its logs to the running receiver: its port and current token; undefined unless it listens. */
+  otlpClient(): { port: number; token: string } | undefined {
+    const port = this.receiver.running?.port;
+    const [token] = this.receiver.tokenValues();
+    return this.receiver.state === "listening" && port !== undefined && token !== undefined ? { port, token } : undefined;
+  }
+
+  /** One hook event of a session the agent runs through the SDK: queued, returns at once, never throws (sdk-hook-feed.ts). */
+  takeHookEvent(event: string, payload: unknown, label?: string): void {
+    this.intake.takeHookEvent(event, payload, label);
+  }
+
+  /** Writes the export of everything stored to `file` (store/observatory-export.ts), after what waits is written. */
+  async exportToFile(file: string, overwrite: boolean): Promise<{ rows: number }> {
+    this.store.writer?.flush();
+    return this.storeNow().exportToFile(file, { overwrite });
+  }
+
   /** Reads the settled spool files now instead of at the next tick (a command waiting for its data, tests). */
   async drainSpool(): Promise<void> {
-    await this.spool?.drainOnce();
+    await this.intake.drainSpool();
   }
 
   status(): ObservatoryStatus {
@@ -182,35 +214,23 @@ export class ObservatoryService {
       store: this.store.state,
       receiverState: this.receiver.state,
       receiver: this.receiver.running,
-      spool: this.spool?.stats,
+      spool: this.intake.spoolStats,
       lastDbWriteAt: this.store.lastWriteAt,
       pendingWrites: this.store.writer?.pending ?? 0,
+      lastRecordAt: this.intake.lastRecordAt,
+      ingest: this.intake.ingestStats,
+      sdkHooks: this.intake.sdkStats,
     });
   }
 
   /** Takes one record from any source; resolves once its writes are queued (without an ingest it is dropped). */
-  async accept(record: FilteredRecord, origin: RecordOrigin): Promise<void> {
-    const sink = this.sink;
-    if (!sink) return;
-    await this.accepting.track(sink.accept(record, origin));
+  accept(record: FilteredRecord, origin: RecordOrigin): Promise<void> {
+    return this.intake.accept(record, origin);
   }
 
   /** The secret values the agent hides: the machine's and the receiver's tokens. */
   secrets(): string[] {
     return [...this.opts.knownSecrets(), ...this.receiver.tokenValues()].filter((s) => s.length > 0);
-  }
-
-  private startSpool(): void {
-    this.spool = new SpoolReader({
-      dataDir: this.opts.dataDir,
-      // Before the ingest gets a record, and before one it refuses is set aside: the quarantine is as private as the store.
-      secondPass: (record) => redactRecordAgain(record, this.secrets()),
-      accept: (record) => this.accept(record, "spool"),
-      commit: async () => this.store.commit(),
-      problems: (place, err) => this.problems.report(place, err),
-      now: this.now,
-    });
-    this.spool.start();
   }
 
   /** The store open now; throws when there is none (a read then waits for the next time). */

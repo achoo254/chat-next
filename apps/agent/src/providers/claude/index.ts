@@ -20,6 +20,7 @@ import {
   type Query,
   type SDKMessage,
   type SDKUserMessage,
+  type Settings,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
@@ -55,6 +56,7 @@ import type {
   ProviderInfo,
   ProviderSession,
   Question,
+  SessionObserver,
   SessionPolicy,
   SlashCommand,
   TerminalCommand,
@@ -67,6 +69,16 @@ import { MessageMapper } from "./message-mapper.ts";
 import { claudeWriter } from "./one-shot-writer.ts";
 import { ClaudeUsage } from "./usage-scan.ts";
 import { toolKind, toolPaths, toolSummary } from "./tool-map.ts";
+import { MIN_CLAUDE_VERSION, versionAtLeast } from "../../observatory/install/observatory-install-checks.ts";
+import {
+  ADVISOR_LABEL,
+  type CliSettings,
+  OBSERVED_ADVISOR_EVENTS,
+  OBSERVED_SDK_EVENTS,
+  ObservedSessionLifecycle,
+  withObservatoryHookGroups,
+  withObservedHooks,
+} from "./observatory-session-hooks.ts";
 
 export { MessageMapper };
 
@@ -176,6 +188,8 @@ export function createClaudeProvider(
     accounts?: ClaudeAccountsDeps;
     /** When a running process started, as the system tells (LocalSessionsOptions.processStart); tests replace it. */
     processStart?: ProcessStartLookup;
+    /** Observatory for the working sessions (sessions and terminals; never the probes or the writer); undefined while it is off. */
+    observer?: () => SessionObserver | undefined;
   } = {},
 ): AgentProvider {
   const queryFn: QueryFn = deps.query ?? ((p) => sdkQuery(p));
@@ -195,6 +209,19 @@ export function createClaudeProvider(
     : undefined;
   const homes = deps.homes ?? (accounts ? () => accounts.claudeHomes() : () => [defaultClaudeHome()]);
   const history = new LocalSessions({ homes, ...(deps.processStart ? { processStart: deps.processStart } : {}) });
+  // Whether the installed claude runs hooks in exec form (Observatory's terminal hooks), by binary, as `--version` told.
+  const execHooks = new Map<string, boolean>();
+  const runsExecHooks = async (bin: string): Promise<boolean> => {
+    const known = execHooks.get(bin);
+    if (known !== undefined) return known;
+    const version = await run(bin, ["--version"], { timeout: 15_000 }).then(
+      (r) => r.stdout,
+      () => undefined,
+    );
+    if (version === undefined) return false;
+    execHooks.set(bin, versionAtLeast(version, MIN_CLAUDE_VERSION));
+    return execHooks.get(bin) === true;
+  };
 
   return {
     id: CLAUDE_PROVIDER_ID,
@@ -227,7 +254,10 @@ export function createClaudeProvider(
       const loginState: Detected["loginState"] = account === null ? "unknown" : account.loggedIn ? "ok" : "needs-login";
       const minor = version?.split(".").slice(0, 2).join(".");
       const out: Detected = { installed: true, loginState, untestedVersion: !minor || !TESTED.includes(minor) };
-      if (version) out.version = version;
+      if (version) {
+        out.version = version;
+        execHooks.set(bin, versionAtLeast(version, MIN_CLAUDE_VERSION));
+      }
       const defaultModel = settingsModel(opts.account?.dir ?? defaultClaudeHome());
       if (defaultModel) out.defaultModel = defaultModel;
       return out;
@@ -236,13 +266,22 @@ export function createClaudeProvider(
     async start({ policy, resumeId, askUser }) {
       const bin = await findBinary();
       if (!bin) throw new Error("claude is not installed");
-      return startSession(queryFn, bin, policy, askUser, resumeId);
+      return startSession(queryFn, bin, policy, askUser, resumeId, deps.observer?.());
     },
 
     terminal: {
       async command(req) {
         const bin = await findBinary();
-        return bin ? terminalCommand(bin, req, randomUUID) : undefined;
+        if (!bin) return undefined;
+        const observer = deps.observer?.();
+        if (!observer) return terminalCommand(bin, req, randomUUID);
+        const home = req.account?.dir ?? defaultClaudeHome();
+        const observatory: TerminalObservatory = {
+          hookCommand: (await runsExecHooks(bin)) ? withoutFailing(() => observer.hookCommand(home)) : undefined,
+          otelEnv: withoutFailing(() => observer.otelEnv(home)),
+          settingsFile: (json) => observer.privateSettingsFile(json),
+        };
+        return terminalCommand(bin, req, randomUUID, process.platform, observatory);
       },
     },
   };
@@ -254,6 +293,15 @@ function claudeSettingsFiles(policy: SessionPolicy): string[] {
   const files = [join(home, "settings.json")];
   if (policy.projectSettings) files.push(join(policy.dir, ".claude", "settings.json"), join(policy.dir, ".claude", "settings.local.json"));
   return files;
+}
+
+/** What Observatory gives a session, or nothing when it fails: Observatory never keeps a session from opening. */
+function withoutFailing<T>(give: () => T): T | undefined {
+  try {
+    return give();
+  } catch {
+    return undefined;
+  }
 }
 
 /** Claude's session ids (UUIDs): nothing else becomes an argument. */
@@ -299,10 +347,10 @@ export function shellArg(arg: string): string {
  * another folder than the default is the one asked; on Windows it does not
  * (Git Bash's own environment syntax is not relied on there).
  */
-function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): string[] {
+function advisorSettings(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): CliSettings {
   if (advisor.noteCommand.length === 0 || advisor.stopCommand.length === 0) throw new Error("no command for Advisor's note");
   const home = platform === "win32" ? "" : `TUNELO_HOME=${shellArg(advisor.configDir)} `;
-  const settings = {
+  return {
     hooks: {
       // The turn-end hook marks each turn's end; the second holds a turn that never asked for next steps, once.
       Stop: [TURN_END_HOOK, { hooks: [{ type: "command", command: home + advisor.stopCommand.map(shellArg).join(" "), timeout: NOTE_HOOK_TIMEOUT_S }] }],
@@ -310,8 +358,38 @@ function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: 
     },
     permissions: { allow: [TERMINAL_ADVISOR_TOOL.fullName] },
   };
+}
+
+/** --mcp-config for automatic Advisor in the terminal: tunelo's MCP with the thread's ticket, advisor_weigh only. */
+function advisorMcpArgs(advisor: NonNullable<TerminalLaunch["advisor"]>): string[] {
   const mcp = { type: "stdio", ...sessionMcpLaunch({ ticket: advisor.ticket, configDir: advisor.configDir, advisorWeighOnly: true }) };
-  return ["--settings", JSON.stringify(settings), "--mcp-config", JSON.stringify({ mcpServers: { [TERMINAL_ADVISOR_MCP_SERVER]: mcp } })];
+  return ["--mcp-config", JSON.stringify({ mcpServers: { [TERMINAL_ADVISOR_MCP_SERVER]: mcp } })];
+}
+
+/** Observatory's part in a terminal's CLI (SessionObserver): its hooks' argv and OTel environment, each unset when not added. */
+export type TerminalObservatory = {
+  hookCommand: readonly string[] | undefined;
+  otelEnv: Record<string, string> | undefined;
+  /** Writes settings holding the receiver's token to a private file; its path. */
+  settingsFile: (json: string) => string;
+};
+
+/**
+ * The --settings value: the settings as JSON, or, when they hold the OTel
+ * environment (the receiver's token), the path of a private file holding them,
+ * so the token is never on a command line. A file that cannot be written
+ * leaves the environment out: the CLI starts all the same.
+ */
+function settingsValue(settings: CliSettings, observatory: TerminalObservatory | undefined): string {
+  const withHooks = observatory?.hookCommand ? withObservatoryHookGroups(settings, observatory.hookCommand) : settings;
+  if (observatory?.otelEnv) {
+    try {
+      return observatory.settingsFile(JSON.stringify({ ...withHooks, env: observatory.otelEnv }));
+    } catch {
+      // without telemetry this time
+    }
+  }
+  return JSON.stringify(withHooks);
 }
 
 /**
@@ -319,13 +397,21 @@ function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: 
  * its session (resumed, or a new one with an id picked here), model,
  * effort, permission mode and account, and the hook that marks each turn's end
  * (TURN_END_SETTINGS); with `req.advisor`, automatic Advisor's hook, tool and
- * MCP in the same --settings, then --mcp-config (advisorArgs). Only values
- * from Claude's own lists become arguments.
+ * MCP in the same --settings, then --mcp-config (advisorSettings); with
+ * `observatory`, Observatory's hooks and environment in that same --settings
+ * (settingsValue): never a second --settings. Only values from Claude's own
+ * lists become arguments.
  * Setting sources stay the CLI's own (user, project, local): the folder's
  * skills, commands and settings load as in any terminal, after the CLI's own
  * folder trust prompt.
  */
-export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => string, platform: NodeJS.Platform = process.platform): TerminalCommand {
+export function terminalCommand(
+  bin: string,
+  req: TerminalLaunch,
+  newId: () => string,
+  platform: NodeJS.Platform = process.platform,
+  observatory?: TerminalObservatory,
+): TerminalCommand {
   const args: string[] = [];
   let sessionId: string | undefined;
   if (req.resumeId !== undefined) {
@@ -338,8 +424,9 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
   if (req.effort && CLAUDE_CAPABILITIES.effortLevels.includes(req.effort)) args.push("--effort", req.effort);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
-  if (req.advisor) args.push(...advisorArgs(req.advisor, platform));
-  else args.push("--settings", TURN_END_SETTINGS);
+  const settings: CliSettings = req.advisor ? advisorSettings(req.advisor, platform) : { hooks: { Stop: [TURN_END_HOOK] } };
+  args.push("--settings", settingsValue(settings, observatory));
+  if (req.advisor) args.push(...advisorMcpArgs(req.advisor));
   return {
     file: bin,
     args,
@@ -655,7 +742,7 @@ export function userMessage(text: string, images: readonly ImageInput[] = []): S
   return { type: "user", message: { role: "user", content }, parent_tool_use_id: null } as SDKUserMessage;
 }
 
-function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askUser: AskUser, resumeId?: string): ProviderSession {
+function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askUser: AskUser, resumeId?: string, observer?: SessionObserver): ProviderSession {
   const inbox = new Channel<SDKUserMessage>();
   const events = new Channel<ProviderEvent>();
   // No sign-in secret value goes to the devices or the journal.
@@ -763,11 +850,17 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         mcpServers: policy.sessionMcp ? { [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) } : {},
         tools: [...CLAUDE_ADVISOR_TOOLS],
         disallowedTools: [...CLAUDE_ADVISOR_DISALLOWED],
-        hooks: {
-          PreToolUse: [{ hooks: [advisorSessionHook(policy)] }],
-          UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
-          PostToolUse: [{ hooks: [advisorOutputHook] }],
-        },
+        // Observed too, its records labelled internal: kept out of every total.
+        hooks: withObservedHooks(
+          {
+            PreToolUse: [{ hooks: [advisorSessionHook(policy)] }],
+            UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
+            PostToolUse: [{ hooks: [advisorOutputHook] }],
+          },
+          observer,
+          OBSERVED_ADVISOR_EVENTS,
+          ADVISOR_LABEL,
+        ),
         permissionMode: "default",
         includePartialMessages: true,
         canUseTool,
@@ -780,25 +873,31 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         mcpServers: policy.sessionMcp
           ? { ...withoutTuneloMcp(policy.mcpServers), [SESSION_MCP_SERVER]: sessionMcpServer(policy.sessionMcp) }
           : (policy.mcpServers as NonNullable<Options["mcpServers"]>),
-        // Also guards a `tunelo` MCP the machine's own config adds.
-        hooks: {
-          PreToolUse: [
-            { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
-            ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
-            { hooks: [macFolderHook(policy)] },
-          ],
-          UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
-          ...(advisorStop ? { Stop: [{ hooks: [advisorStopHook(advisorStop)] }] } : {}),
-          PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
-          PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
-        },
+        // Also guards a `tunelo` MCP the machine's own config adds. Observatory's callbacks go after tunelo's own.
+        hooks: withObservedHooks(
+          {
+            PreToolUse: [
+              { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
+              ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
+              { hooks: [macFolderHook(policy)] },
+            ],
+            UserPromptSubmit: [{ hooks: [promptNotes.hook] }],
+            ...(advisorStop ? { Stop: [{ hooks: [advisorStopHook(advisorStop)] }] } : {}),
+            PostToolUse: [{ hooks: [secretOutputHook(secrets), ...notices] }],
+            PostToolUseFailure: [{ hooks: [secretOutputHook(secrets), ...notices] }],
+          },
+          observer,
+          OBSERVED_SDK_EVENTS,
+        ),
         // Without a mode picked on a device, the session follows the machine's own
         // Claude settings (permissions.defaultMode and allow/deny rules).
         includePartialMessages: true,
         canUseTool,
       };
-  // A profile picked on the machine: its own sign-in, the shared projects.
-  if (policy.account) options.env = claudeEnv(policy.account.dir);
+  // A profile picked on the machine: its own sign-in, the shared projects. With Observatory on, the environment is always
+  // given (the service's own, or the profile's), with the OTel variables of the agent's receiver when it listens.
+  const otelEnv = observer ? withoutFailing(() => observer.otelEnv(policy.account?.dir ?? defaultClaudeHome())) : undefined;
+  if (policy.account || observer) options.env = claudeEnv(policy.account?.dir, otelEnv ?? {});
   // Claude Code runs this before every Bash command: the secrets a running command may read (secret-env.ts).
   if (secrets) options.env = { ...(options.env ?? claudeEnv(undefined)), CLAUDE_ENV_FILE: secrets.loader };
   if (policy.model) options.model = policy.model;
@@ -814,10 +913,13 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   const q = queryFn({ prompt: inbox, options });
   const mapper = new MessageMapper(policy.dir, emit);
   let hidden: string[] = [];
+  // Observatory: the callbacks never get SessionStart at startup nor SessionEnd at the end, so both are told from here.
+  const lifecycle = observer ? new ObservedSessionLifecycle(observer, policy.dir, resumeId ? "resume" : "startup", advisorSession ? ADVISOR_LABEL : undefined) : undefined;
 
   void (async () => {
     try {
       for await (const msg of q) {
+        if (lifecycle && typeof msg.session_id === "string") lifecycle.saw(msg.session_id, msg.type === "system" && msg.subtype === "init" ? { model: msg.model, permission_mode: msg.permissionMode } : undefined);
         if (msg.type === "result") {
           turnOpen = false;
           const state = interrupted ? "interrupted" : msg.subtype === "success" && !msg.is_error ? "completed" : "failed";
@@ -855,6 +957,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       if (turnOpen) {
         emit({ type: "turn-end", state: interrupted || closed ? "interrupted" : "failed", durationMs: 0 });
       }
+      lifecycle?.ended();
       events.close();
     }
   })();
@@ -961,6 +1064,13 @@ async function pushInfo(q: Query, events: Channel<ProviderEvent>) {
 }
 
 /**
+ * Settings of the probes (usage, commands), above the user's (the command
+ * line's level): no hook of any settings file or plugin runs, so a probe never
+ * shows up as a session (Observatory's installed hooks among them).
+ */
+export const PROBE_SETTINGS = { disableAllHooks: true } as const satisfies Settings;
+
+/**
  * Plan usage of an account without sending a message: a session with no
  * prompt starts, reports usage and closes. null when unknown (signed out,
  * the experimental API missing on this claude, or no answer within
@@ -974,7 +1084,15 @@ export async function probeUsage(
 ): Promise<NonNullable<RateLimits> | null> {
   const inbox = new Channel<SDKUserMessage>();
   const abort = new AbortController();
-  const options: Options = { pathToClaudeCodeExecutable: bin, cwd: homedir(), settingSources: [], strictMcpConfig: true, mcpServers: {}, abortController: abort };
+  const options: Options = {
+    pathToClaudeCodeExecutable: bin,
+    cwd: homedir(),
+    settingSources: [],
+    strictMcpConfig: true,
+    mcpServers: {},
+    settings: PROBE_SETTINGS,
+    abortController: abort,
+  };
   if (accountDir) options.env = claudeEnv(accountDir);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((resolve) => {
@@ -1020,6 +1138,8 @@ export async function probeCommands(bin: string, req: CommandsRequest, queryFn: 
     strictMcpConfig: true,
     mcpServers: {},
     persistSession: false,
+    // The user's settings load (their skills and commands), but none of their hooks: Observatory's, once installed, would record the probe as a session.
+    settings: PROBE_SETTINGS,
     abortController: abort,
   };
   if (req.account) options.env = claudeEnv(req.account.dir);

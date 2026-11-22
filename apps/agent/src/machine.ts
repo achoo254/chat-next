@@ -55,6 +55,7 @@ import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
 import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
 import { ObservatoryService, type ObservatoryServiceOptions } from "./observatory/observatory-service.ts";
 import { observatoryDataDirFor } from "./observatory/spool/observatory-data-dir.ts";
+import { ObservatorySessionObserver } from "./observatory/session-observer.ts";
 
 const MAX_CONNECTIONS = 16;
 /** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
@@ -136,6 +137,8 @@ export class Machine {
   private readonly usageApi: UsageApi;
   /** Claude Code's sessions as observed on this machine (hooks, OpenTelemetry), in its local store. */
   readonly observatory: ObservatoryService;
+  /** Observatory's part in the Claude sessions and terminals this machine opens. */
+  private readonly sessionObserver: ObservatorySessionObserver;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -210,6 +213,8 @@ export class Machine {
       builtinProviders({
         configDir: dir,
         fences: () => this.macFolders.aiFences(),
+        // Built below; asked for at each session or terminal opened, after the constructor.
+        observer: () => (this.observatory.enabled ? this.sessionObserver : undefined),
         accounts: {
           store: new AccountsStore(dir),
           audit: this.audit,
@@ -239,7 +244,9 @@ export class Machine {
       knownSecrets: () => [this.config.get().machineSecret ?? ""],
       ...(opts.observatory?.ingest ? { ingest: opts.observatory.ingest } : {}),
       ...(opts.observatory?.openStore ? { openStore: opts.observatory.openStore } : {}),
+      isSensitive: this.isSensitive,
     });
+    this.sessionObserver = new ObservatorySessionObserver({ service: this.observatory, dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir), selfCommand: () => selfCommand() });
     this.usageNotifier = new UsageNotifier({
       ledger: this.usage.ledger,
       rules: () => this.usageRules(),

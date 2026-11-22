@@ -8,6 +8,9 @@ import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { PATH_LINE, type UninstallDeps, type UninstallEnvironment, uninstall, uninstallTargets, withoutPathLine } from "../../src/commands/uninstall.ts";
+import { uninstallObservatory } from "../../src/observatory/install/observatory-install.ts";
+import { recordInstall } from "../../src/observatory/install/install-state-file.ts";
+import { addObservatory } from "../../src/observatory/install/settings-json-observatory.ts";
 
 // Expected paths are POSIX paths.
 const posix = process.platform !== "win32";
@@ -22,6 +25,10 @@ function deps(environment: UninstallEnvironment, over: Partial<UninstallDeps> = 
   const steps: string[] = [];
   const d: UninstallDeps = {
     environment,
+    removeObservatoryHooks: vi.fn(async () => {
+      steps.push("observatory");
+      return 0;
+    }),
     logout: vi.fn(async () => {
       steps.push("logout");
       return 0;
@@ -100,7 +107,7 @@ describe("tunelo uninstall", () => {
     const e = unixMachine();
     const { d, steps } = deps(e);
     expect(await uninstall(e.configDir, d)).toBe(0);
-    expect(steps).toEqual(["logout", "keys"]);
+    expect(steps).toEqual(["observatory", "logout", "keys"]);
     expect(existsSync(e.configDir)).toBe(false);
     for (const f of ["tunelo", "tunelo.old", "tunelo-term-host"]) expect(existsSync(join(home, ".local", "bin", f))).toBe(false);
     expect(readFileSync(join(home, ".zprofile"), "utf8")).toBe(profile(""));
@@ -124,7 +131,7 @@ describe("tunelo uninstall", () => {
       },
     });
     expect(await uninstall(e.configDir, d)).toBe(0);
-    expect(steps).toEqual(["service", "keys"]);
+    expect(steps).toEqual(["observatory", "service", "keys"]);
     expect(existsSync(e.configDir)).toBe(false);
   });
 
@@ -134,10 +141,48 @@ describe("tunelo uninstall", () => {
     const { d, steps } = deps(e);
     expect(await uninstall(e.configDir, d)).toBe(0);
     expect(steps).toEqual([
+      "observatory",
       "logout",
       "keys",
       `path ${win32.join(env.LOCALAPPDATA, "tunelo")}`,
       `after exit ${win32.join(env.APPDATA, "tunelo")} | ${win32.join(env.LOCALAPPDATA, "tunelo")}`,
     ]);
+  });
+
+  test("takes Observatory's hooks out of Claude Code's settings before the config folder goes, the rest of the file kept", async () => {
+    const e = unixMachine();
+    const claudeHome = join(home, ".claude");
+    mkdirSync(claudeHome, { recursive: true });
+    const before = ["{", '  "model": "opus",', '  "hooks": {', '    "Stop": [', '      { "hooks": [{ "type": "command", "command": "mine" }] }', "    ]", "  }", "}", ""].join("\n");
+    const settings = join(claudeHome, "settings.json");
+    const installed = addObservatory(before, ["/home/u/.local/bin/tunelo"], undefined);
+    writeFileSync(settings, installed.text);
+    await recordInstall(join(home, "install-state.json"), settings, installed);
+    let configThere = false;
+    const { d } = deps(e, {
+      removeObservatoryHooks: async () => {
+        configThere = existsSync(e.configDir);
+        return uninstallObservatory({ claudeHome, profileHomes: () => [], syncProfile: () => undefined, stateFile: join(home, "install-state.json"), print: () => undefined });
+      },
+    });
+    expect(await uninstall(e.configDir, d)).toBe(0);
+    expect(configThere).toBe(true);
+    expect(readFileSync(settings, "utf8")).toBe(before);
+    expect(existsSync(e.configDir)).toBe(false);
+  });
+
+  test("a failure to take Observatory out is told, and the uninstall goes on", async () => {
+    const e = unixMachine();
+    const lines: string[] = [];
+    const { d, steps } = deps(e, {
+      removeObservatoryHooks: async () => {
+        throw new Error("settings locked");
+      },
+      log: (line) => lines.push(line),
+    });
+    expect(await uninstall(e.configDir, d)).toBe(0);
+    expect(steps).toEqual(["logout", "keys"]);
+    expect(lines.some((l) => l.includes("settings locked") && l.includes("tunelo observatory uninstall"))).toBe(true);
+    expect(existsSync(e.configDir)).toBe(false);
   });
 });

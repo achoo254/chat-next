@@ -1,8 +1,10 @@
 // What `tunelo observatory status` shows of the running agent's Observatory:
 // counts and states only, never content or a token.
+import type { IngestStats } from "./ingest/observatory-ingest.ts";
 import type { OtlpReceiver } from "./receiver/otlp-receiver.ts";
 import { type ReceiverStats, emptyReceiverStats } from "./receiver/receiver-stats.ts";
 import type { ReceiverStatusState } from "./receiver/start-otlp-receiver.ts";
+import type { SdkFeedStats } from "./sdk-hook-feed.ts";
 import type { SpoolStats } from "./spool/spool-reader.ts";
 
 export type ObservatoryStatus = {
@@ -22,6 +24,12 @@ export type ObservatoryStatus = {
   lastDbWriteAt: number | undefined;
   /** Writes waiting for the next batch. */
   pendingWrites: number;
+  /** When the last record of any source was taken (Unix ms). */
+  lastRecordAt: number | undefined;
+  /** The ingest's counts (unknown events and fields, missing keys…); undefined with another ingest or none running. */
+  ingest: IngestStats | undefined;
+  /** The hook callbacks of the SDK sessions the agent runs. */
+  sdkHooks: SdkFeedStats;
 };
 
 export type StatusParts = {
@@ -32,6 +40,9 @@ export type StatusParts = {
   spool: SpoolStats | undefined;
   lastDbWriteAt: number | undefined;
   pendingWrites: number;
+  lastRecordAt: number | undefined;
+  ingest: IngestStats | undefined;
+  sdkHooks: SdkFeedStats;
 };
 
 /** A snapshot (copies, so later counting does not change it). */
@@ -48,5 +59,8 @@ export function observatoryStatus(p: StatusParts): ObservatoryStatus {
     spool: p.spool ? { ...p.spool } : undefined,
     lastDbWriteAt: p.lastDbWriteAt,
     pendingWrites: p.pendingWrites,
+    lastRecordAt: p.lastRecordAt,
+    ingest: p.ingest ? { ...p.ingest } : undefined,
+    sdkHooks: { ...p.sdkHooks },
   };
 }

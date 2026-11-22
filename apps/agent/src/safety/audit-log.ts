@@ -9,7 +9,9 @@
 // content or a commit message; the usage rules switched, the usage ledger
 // deleted; Advisor's key set or removed (its fingerprint, never the key), and
 // a session's automatic Advisor turned on or off; a folder macOS protects the
-// user let tunelo ask macOS for).
+// user let tunelo ask macOS for; Observatory's content kept or not for a
+// project (its key), its data deleted, its hooks installed into or taken out
+// of Claude Code's settings).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -55,7 +57,11 @@ export type AuditAction =
   | "advisor_off"
   | "advisor_auto_on"
   | "advisor_auto_off"
-  | "mac_folder_access";
+  | "mac_folder_access"
+  | "observatory_content"
+  | "observatory_delete"
+  | "observatory_install"
+  | "observatory_uninstall";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };
 

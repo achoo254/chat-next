@@ -3,7 +3,7 @@
 // busy timeout (the store's default, AGENT_BUSY_TIMEOUT_MS), and a writer
 // whose every batch written is noted for status. Opening copies the
 // projects without content from the config into the store (a new or wiped
-// store has none). A wipe follows the order the writer asks for: writer
+// store has none) and removes the content they still hold. A wipe follows the order the writer asks for: writer
 // closed, store wiped, then a new store and writer whether the wipe worked or
 // not.
 import { join } from "node:path";
@@ -47,13 +47,28 @@ export class AgentStoreHost {
       this.store = store;
       this.writer = writer;
       this.state = "open";
-      for (const op of contentOffWrites(contentOffOf(this.opts.config), this.opts.now())) writer.push(op);
+      const off = contentOffOf(this.opts.config);
+      for (const op of contentOffWrites(off, this.opts.now())) writer.push(op);
       writer.flush();
+      // A project switched off while the store was closed (Observatory off, the agent stopped, the store failing to open):
+      // its content stored before is removed now. Once per project at each open; nothing left to remove the next time.
+      this.clearContentOf(off);
     } catch (err) {
       this.store = undefined;
       this.writer = undefined;
       this.state = "failed";
       this.opts.problems("store-open", err);
+    }
+  }
+
+  /** Removes the content stored for `projectKeys`; a failure is reported (the store stays open, the next open tries again). */
+  private clearContentOf(projectKeys: readonly string[]): void {
+    for (const projectKey of projectKeys) {
+      try {
+        this.store?.clearContent(projectKey);
+      } catch (err) {
+        this.opts.problems("content-clear", err);
+      }
     }
   }
 

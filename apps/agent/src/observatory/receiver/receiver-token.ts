@@ -91,10 +91,26 @@ export async function loadOrCreateTokens(dataDir: string, retryMs: readonly numb
   }
 }
 
+export type RotateOptions = {
+  /**
+   * A token file that cannot be read (TokenUnreadable) is replaced by a new
+   * token with no previous one, instead of throwing: the only way out of a
+   * broken file besides deleting it by hand. Sessions holding the old token
+   * stop reporting until they start again.
+   */
+  replaceUnreadable?: boolean;
+  retryMs?: readonly number[];
+};
+
 /** A new token; the current one stays accepted (as the only previous one) until the next rotation or a revoke. */
-export async function rotateTokens(dataDir: string): Promise<ReceiverTokens> {
-  const old = await loadOrCreateTokens(dataDir);
-  const tokens: ReceiverTokens = { current: newToken(), previous: old.current };
+export async function rotateTokens(dataDir: string, opts: RotateOptions = {}): Promise<ReceiverTokens> {
+  let old: ReceiverTokens | undefined;
+  try {
+    old = await loadOrCreateTokens(dataDir, opts.retryMs);
+  } catch (err) {
+    if (!(err instanceof TokenUnreadable) || opts.replaceUnreadable !== true) throw err;
+  }
+  const tokens: ReceiverTokens = old ? { current: newToken(), previous: old.current } : { current: newToken() };
   await saveTokens(dataDir, tokens);
   return tokens;
 }

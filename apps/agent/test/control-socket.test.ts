@@ -142,6 +142,12 @@ describe("control socket", () => {
         "POST /local-forward/blocked",
         "POST /mcp/call",
         "POST /mcp/tools",
+        // Covered by test/observatory/observatory-control-routes.test.ts.
+        "GET /observatory/status",
+        "POST /observatory/content",
+        "POST /observatory/delete",
+        "POST /observatory/export",
+        "POST /observatory/rotate-token",
         "POST /registration/retry",
         "POST /restart",
         "POST /streams/alive",

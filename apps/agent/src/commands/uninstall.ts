@@ -1,5 +1,6 @@
-// `tunelo uninstall`: `tunelo logout` (without the network it warns and goes
-// on), then everything the install script and tunelo put on the machine:
+// `tunelo uninstall`: Observatory's hooks taken out of Claude Code's
+// settings first (they would run a tunelo that is gone), `tunelo logout`
+// (without the network it warns and goes on), then everything the install script and tunelo put on the machine:
 // the background service and the terminal process with their units, the
 // config folder, the key store entries (macOS Keychain; DPAPI and plain key
 // files sit in the config folder), the PATH lines the install script added,
@@ -16,6 +17,7 @@ import { basename, dirname, join, win32 } from "node:path";
 import { deleteKeyStore } from "../keystore.ts";
 import { isCompiled, uninstallService } from "../service.ts";
 import { logout } from "./logout.ts";
+import { uninstallObservatoryHooks } from "./observatory-command.ts";
 
 /** The line install.sh adds to shell profiles; removed only when nothing else is left in its folder. */
 export const PATH_LINE = 'export PATH="$HOME/.local/bin:$PATH"';
@@ -78,6 +80,8 @@ export function withoutPathLine(text: string): string {
 /** What uninstalling touches beyond the listed paths; tests replace it. */
 export interface UninstallDeps {
   environment: UninstallEnvironment;
+  /** `tunelo observatory uninstall`: resolves with its exit code. */
+  removeObservatoryHooks: () => Promise<number>;
   /** `tunelo logout --force`: resolves with its exit code. */
   logout: (dir: string) => Promise<number>;
   /** Stops the service and removes its units; logout does it, this is for when logout failed early. */
@@ -116,6 +120,7 @@ function deleteWindowsDirsAfterExit(dirs: string[]): void {
 export function defaultUninstallDeps(configDir: string): UninstallDeps {
   return {
     environment: { platform: process.platform, home: homedir(), env: process.env, configDir, binary: isCompiled() ? process.execPath : undefined },
+    removeObservatoryHooks: () => uninstallObservatoryHooks((line) => console.log(`  ${line}`)),
     logout: (dir) => logout(dir, { force: true }),
     removeService: (dir) => uninstallService(dir),
     deleteKeyStore,
@@ -138,6 +143,12 @@ function oldCopies(file: string): string[] {
 /** Uninstalls tunelo from this machine. Resolves with the exit code. */
 export async function uninstall(dir: string, deps: UninstallDeps = defaultUninstallDeps(dir)): Promise<number> {
   const e = deps.environment;
+  // Before anything is deleted: an installed hook naming a binary that is gone would only lose its events, but none is left behind.
+  const hooks = await deps.removeObservatoryHooks().catch((err: unknown) => {
+    deps.log(`  Warning: could not take Observatory out of Claude Code's settings (${(err as Error).message}); run \`tunelo observatory uninstall\` before deleting tunelo, or remove its hooks from ~/.claude/settings.json.`);
+    return 0;
+  });
+  if (hooks !== 0) deps.log("  Warning: Observatory's hooks may still be in Claude Code's settings; remove the hooks running `tunelo observatory hook` from ~/.claude/settings.json.");
   // Leaves the account; without the network it warns and goes on (--force).
   try {
     await deps.logout(dir);

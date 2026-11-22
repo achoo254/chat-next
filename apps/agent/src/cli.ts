@@ -12,6 +12,7 @@ import { callControl, controlPid, serveControl } from "./control-socket.ts";
 import { registerLocalForwardCommand } from "./commands/config.ts";
 import { logout } from "./commands/logout.ts";
 import { registerMcpLocalWritesCommand } from "./commands/mcp-local-writes.ts";
+import { registerObservatoryCommand } from "./commands/observatory-command.ts";
 import { status } from "./commands/status.ts";
 import { uninstall } from "./commands/uninstall.ts";
 import { importLegacySignIns } from "./identity/legacy-import.ts";
@@ -212,6 +213,8 @@ export function buildProgram(): Command {
     .hook("preAction", async (_program, action) => {
       // Advisor's note runs before every message typed in a terminal, and its check as a turn ends: nothing else on its way, they answer in time or not at all.
       if (action.name() === "advisor" && (action.args[0] === "note" || action.args[0] === "stop")) return;
+      // Observatory's hook runs on every event of a Claude Code session: the filter and the spool, nothing else.
+      if (action.name() === "hook" && action.parent?.name() === "observatory") return;
       // Older installs left their sign-ins in plain text; move them under the key store once.
       await importLegacySignIns(configDir()).catch((err: Error) => console.error(`tunelo: could not move the earlier sign-in yet (${err.message})`));
     });
@@ -283,6 +286,7 @@ export function buildProgram(): Command {
     .action((path: string) => console.log(probeHere(path)));
   registerMcpCommand(program);
   registerAdvisorCommand(program, exits);
+  registerObservatoryCommand(program, exits);
 
   // Tunnels.
   registerHttpCommand(program, display);
