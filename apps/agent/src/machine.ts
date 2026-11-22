@@ -53,6 +53,8 @@ import { UsageScheduler } from "./usage/scheduler.ts";
 import { type UsageHint, UsageNotifier } from "./usage/notify.ts";
 import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
 import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
+import { ObservatoryService, type ObservatoryServiceOptions } from "./observatory/observatory-service.ts";
+import { observatoryDataDirFor } from "./observatory/spool/observatory-data-dir.ts";
 
 const MAX_CONNECTIONS = 16;
 /** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
@@ -107,6 +109,8 @@ export type MachineOptions = {
   termHostUnit?: TermHostUnit;
   /** Environment for finding the terminal process binary (TUNELO_TERM_HOST_BIN); the process's own when not given. */
   env?: NodeJS.ProcessEnv;
+  /** Observatory's data folder, ingest and store (observatory/observatory-service.ts); the machine's when not given. */
+  observatory?: Partial<Pick<ObservatoryServiceOptions, "dataDir" | "ingest" | "openStore">>;
 };
 
 export class Machine {
@@ -130,6 +134,8 @@ export class Machine {
   readonly usageNotifier: UsageNotifier;
   /** Usage for the devices' link. */
   private readonly usageApi: UsageApi;
+  /** Claude Code's sessions as observed on this machine (hooks, OpenTelemetry), in its local store. */
+  readonly observatory: ObservatoryService;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -224,6 +230,15 @@ export class Machine {
         await this.usageNotifier.check(scan.read > 0);
       },
       log: this.log,
+    });
+    this.observatory = new ObservatoryService({
+      config: this.config,
+      dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir),
+      log: this.log,
+      // The sign-in secrets and Advisor's key are hidden too, once loaded (mcp/redact.ts remembers them).
+      knownSecrets: () => [this.config.get().machineSecret ?? ""],
+      ...(opts.observatory?.ingest ? { ingest: opts.observatory.ingest } : {}),
+      ...(opts.observatory?.openStore ? { openStore: opts.observatory.openStore } : {}),
     });
     this.usageNotifier = new UsageNotifier({
       ledger: this.usage.ledger,
@@ -455,6 +470,8 @@ export class Machine {
     this.terminal.start();
     for (const s of this.core.sessionIds()) this.usage.launched.add(s.provider, s.sessionId);
     this.usage.start();
+    // Never rejects: a part of Observatory that cannot start stays off and its status says why.
+    await this.observatory.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     return actual;
   }
@@ -477,6 +494,8 @@ export class Machine {
     clearTimeout(this.announcingProjects);
     this.projects.stop();
     this.workspaces.stop();
+    // Its queues go into the store before the store closes; never rejects.
+    await this.observatory.stop();
     await this.core.stop();
   }
 

@@ -1,0 +1,99 @@
+// The agent's Observatory store and its batch writer as one part of the
+// service: the database in the data folder, opened with the agent's short
+// busy timeout (the store's default, AGENT_BUSY_TIMEOUT_MS), and a writer
+// whose every batch written is noted for status. Opening copies the
+// projects without content from the config into the store (a new or wiped
+// store has none). A wipe follows the order the writer asks for: writer
+// closed, store wiped, then a new store and writer whether the wipe worked or
+// not.
+import { join } from "node:path";
+import type { ConfigStore } from "../config.ts";
+import { contentOffOf, contentOffWrites } from "./content-settings-config.ts";
+import { ObservatoryBatchWriter } from "./store/batch-writer.ts";
+import { OBSERVATORY_DB_FILE } from "./store/observatory-db-path.ts";
+import { ObservatoryStore } from "./store/observatory-store.ts";
+import { ObservatoryStoreError } from "./store/store-errors.ts";
+import type { WriteOp } from "./store/write-ops.ts";
+
+export type AgentStoreHostOptions = {
+  config: ConfigStore;
+  dataDir: string;
+  /** Opens the store at `path`; ObservatoryStore.open by default. */
+  open?: ((path: string) => Promise<ObservatoryStore>) | undefined;
+  problems: (place: string, err: unknown) => void;
+  now: () => number;
+};
+
+export class AgentStoreHost {
+  store: ObservatoryStore | undefined;
+  writer: ObservatoryBatchWriter | undefined;
+  state: "open" | "failed" | "off" = "off";
+  /** When a batch last went into the store (Unix ms). */
+  lastWriteAt: number | undefined;
+
+  constructor(private readonly opts: AgentStoreHostOptions) {}
+
+  /** Opens the store and its writer; on failure the state says so (reported, never thrown). */
+  async open(): Promise<void> {
+    try {
+      const store = await (this.opts.open ?? ((p: string) => ObservatoryStore.open({ path: p })))(join(this.opts.dataDir, OBSERVATORY_DB_FILE));
+      const sink = {
+        write: (ops: readonly WriteOp[]): void => {
+          store.write(ops);
+          this.lastWriteAt = this.opts.now();
+        },
+      };
+      const writer = new ObservatoryBatchWriter(sink, { onError: (err) => this.opts.problems("store-write", err) });
+      this.store = store;
+      this.writer = writer;
+      this.state = "open";
+      for (const op of contentOffWrites(contentOffOf(this.opts.config), this.opts.now())) writer.push(op);
+      writer.flush();
+    } catch (err) {
+      this.store = undefined;
+      this.writer = undefined;
+      this.state = "failed";
+      this.opts.problems("store-open", err);
+    }
+  }
+
+  /** Writes what waits, closes; never throws. */
+  close(): void {
+    try {
+      this.writer?.close();
+      this.store?.close();
+    } catch (err) {
+      this.opts.problems("store-close", err);
+    }
+    this.store = undefined;
+    this.writer = undefined;
+    this.state = "off";
+  }
+
+  /** Wipes the database and opens a new one (when `reopen`); resolves with the wipe's error, if any, instead of throwing it. */
+  async wipe(reopen: boolean): Promise<unknown> {
+    this.writer?.close();
+    let failure: unknown;
+    try {
+      await this.store?.wipe();
+    } catch (err) {
+      failure = err;
+    }
+    this.close();
+    if (reopen) await this.open();
+    return failure;
+  }
+
+  /**
+   * Writes what the writer holds now; throws when it is not all in the store
+   * (the writer stopped, or the database cannot take writes now and they wait
+   * for a later try). Writes the store refused for their own data were dropped
+   * and reported by the writer: they count as done.
+   */
+  commit(): void {
+    const writer = this.writer;
+    if (!writer || writer.isStopped) throw new ObservatoryStoreError("the Observatory store does not take writes");
+    writer.flush();
+    if (writer.isStopped || writer.pending > 0) throw new ObservatoryStoreError("the Observatory store could not take the writes now");
+  }
+}

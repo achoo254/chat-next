@@ -69,6 +69,21 @@ export type AgentConfig = {
    * (safety/mac-folders.ts), by the folder's path. Unset: never asked.
    */
   macFolders?: Record<string, "granted" | "denied">;
+  /** Observatory (observatory/observatory-service.ts). */
+  observatory?: ObservatoryConfig;
+};
+
+export type ObservatoryConfig = {
+  /** The master switch; unset is on. */
+  enabled?: boolean;
+  /** The OTLP receiver's port, picked once (observatory/receiver/receiver-port.ts) and kept. */
+  otlpPort?: number;
+  /**
+   * Project keys whose content is not stored. The source of truth: the
+   * store's content_settings and the hooks' state.json are copies made from
+   * it, again after a wipe.
+   */
+  contentOff?: string[];
 };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */
