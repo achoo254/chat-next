@@ -91,7 +91,7 @@ Phiên Telegram niêm phong bằng `SESSION_KEY` (nhãn riêng, AAD gắn id tà
 
 ## Theo dõi
 
-Log có `component=bridge` kèm `external_account_id` và `source`; không có số điện thoại, mã, khoá phiên hay nội dung tin (khoá `phone`, `session`, `auth_key`, `phone_code_hash`, `message_text` bị che). Lỗi gần nhất của từng tài khoản (tối đa 512 ký tự) hiện ở trang Kết nối ứng dụng. Trạng thái tài khoản (`active`, `needs_login`, `stopped`):
+Log có `component=bridge` kèm `external_account_id` và `source`; không có số điện thoại, mã, khoá phiên hay nội dung tin (khoá `phone`, `session`, `auth_key`, `phone_code_hash`, `message_text` bị che). Lỗi gần nhất của từng tài khoản (tối đa 512 ký tự) hiện ở trang Kết nối ứng dụng. Lỗi đó được ghi khi vòng đồng bộ dừng rồi kết nối lại, và được xoá khi lần chạy sau đã giữ được bằng hai lần backoff tối đa (10 phút với cấu hình mặc định), nên một lỗi đã qua không nằm mãi trên trang. Lỗi nội bộ của chính Telegram (mã 500, ví dụ `RPC_MCGET_FAIL`, `INTERNAL`) được adapter gửi lại đúng lời gọi đó tối đa hai lần (chờ 0,5 giây rồi 2 giây) trước khi báo lên engine; lời gọi gửi tin giữ nguyên `random_id` nên Telegram bỏ bản trùng. Trạng thái tài khoản (`active`, `needs_login`, `stopped`):
 
 ```sql
 SELECT id, owner_id, source, status, last_error, lease_until FROM external_accounts;

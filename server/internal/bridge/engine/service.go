@@ -164,7 +164,15 @@ func (e *Engine) superviseAccount(ctx context.Context, id int64, h *runnerHandle
 		h.r = r
 		e.mu.Unlock()
 		started := time.Now()
+		// A run that stays up as long as the backoff counts as healthy (below) also clears the
+		// error the last stop left on the account, so the page does not show a problem that is over.
+		healthy := time.AfterFunc(2*e.cfg.BackoffMax, func() {
+			if err := e.db.clearLastError(context.WithoutCancel(ctx), id); err != nil {
+				logger.Warn("the last error of the account could not be cleared", "err", err)
+			}
+		})
 		err = r.run(ctx)
+		healthy.Stop()
 		if ctx.Err() != nil {
 			return
 		}

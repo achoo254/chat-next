@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -480,6 +481,21 @@ func TestDisconnectReconnectsFromTheSavedState(t *testing.T) {
 	if e.fake.SubscribeCalls() < 1 {
 		t.Fatal("never subscribed")
 	}
+}
+
+// The error of a stop stays on the account while it reconnects, and is cleared once the
+// next run has stayed up as long as the backoff, so the page shows no problem that is over.
+func TestALastErrorIsClearedOnceTheAccountRunsAgain(t *testing.T) {
+	e := newEnv(t)
+	lastError := func() string {
+		var s string
+		_ = e.st.Pool().QueryRow(context.Background(), `SELECT last_error FROM external_accounts WHERE id = $1`, e.account).Scan(&s)
+		return s
+	}
+	e.fake.FailSubscribe(errors.New("rpc error code 500: RPC_MCGET_FAIL"))
+	e.start()
+	e.eventually(func() bool { return strings.Contains(lastError(), "RPC_MCGET_FAIL") }, func() string { return "the stop was not recorded" })
+	e.eventually(func() bool { return lastError() == "" }, func() string { return "the last error stayed after the account ran again: " + lastError() })
 }
 
 func TestRevokedSessionStopsTheAccount(t *testing.T) {

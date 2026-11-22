@@ -116,6 +116,13 @@ func (d *db) releaseLease(ctx context.Context, id int64, holder string) {
 	_, _ = d.pool.Exec(ctx, `UPDATE external_accounts SET lease_until = NULL, lease_holder = NULL WHERE id = $1 AND lease_holder = $2`, id, holder)
 }
 
+// clearLastError forgets the error of an earlier stop once the account runs again; a
+// status changed meanwhile (signed out, stopped) keeps its reason.
+func (d *db) clearLastError(ctx context.Context, id int64) error {
+	_, err := d.pool.Exec(ctx, `UPDATE external_accounts SET last_error = '', updated_at = now() WHERE id = $1 AND status = 'active' AND last_error <> ''`, id)
+	return err
+}
+
 func (d *db) setStatus(ctx context.Context, id int64, status, lastError string) error {
 	if len(lastError) > 512 {
 		lastError = lastError[:512]

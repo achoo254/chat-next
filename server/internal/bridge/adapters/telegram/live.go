@@ -36,7 +36,7 @@ func (a *Adapter) startLive(sess []byte, handler telegram.UpdateHandler, require
 	if len(sess) > 0 {
 		_ = l.storage.StoreSession(context.Background(), sess)
 	}
-	opts := telegram.Options{SessionStorage: l.storage}
+	opts := telegram.Options{SessionStorage: l.storage, Middlewares: []telegram.Middleware{retryInternal()}}
 	if handler != nil {
 		opts.UpdateHandler = handler
 	}
