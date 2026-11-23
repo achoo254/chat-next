@@ -38,9 +38,6 @@ type accountRow struct {
 	UpdateState []byte
 	// SyncState is off, syncing or live: whether every conversation is synced (ADR 0024).
 	SyncState string
-	// SendEnabled is the owner's switch for writing to an app that gates sending per
-	// account (bridge.SendGated); other apps ignore it.
-	SendEnabled bool
 }
 
 // chatLink is a synced conversation: the Chat chat it fills.
@@ -85,8 +82,8 @@ type db struct {
 func (d *db) loadAccount(ctx context.Context, id int64) (*accountRow, error) {
 	a := &accountRow{}
 	err := d.pool.QueryRow(ctx, `
-		SELECT id, owner_id, source, external_ref, status, secret, update_state, sync_state, send_enabled FROM external_accounts WHERE id = $1`, id).
-		Scan(&a.ID, &a.OwnerID, &a.Source, &a.Ref, &a.Status, &a.Secret, &a.UpdateState, &a.SyncState, &a.SendEnabled)
+		SELECT id, owner_id, source, external_ref, status, secret, update_state, sync_state FROM external_accounts WHERE id = $1`, id).
+		Scan(&a.ID, &a.OwnerID, &a.Source, &a.Ref, &a.Status, &a.Secret, &a.UpdateState, &a.SyncState)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: load account: %w", err)
 	}

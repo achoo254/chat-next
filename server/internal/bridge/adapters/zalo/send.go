@@ -37,8 +37,8 @@ const (
 )
 
 var (
-	_ bridge.Sender    = (*Adapter)(nil)
-	_ bridge.SendGated = (*Adapter)(nil)
+	_ bridge.Sender      = (*Adapter)(nil)
+	_ bridge.RetryUnsafe = (*Adapter)(nil)
 )
 
 // errNotListening: the account's sidecar is not running, so nothing can be
@@ -58,8 +58,9 @@ type sendState struct {
 	log      *sentLog
 }
 
-// SendGated implements bridge.SendGated: the owner switches sending on per account.
-func (a *Adapter) SendGated() {}
+// RetryUnsafe implements bridge.RetryUnsafe: the sent log lives in this process
+// only and is bounded, so a doubtful send is left to the owner.
+func (a *Adapter) RetryUnsafe() {}
 
 // EditMessage implements bridge.Sender. Zalo has no editing; it is never declared.
 func (a *Adapter) EditMessage(context.Context, bridge.Account, bridge.EditRequest) error {

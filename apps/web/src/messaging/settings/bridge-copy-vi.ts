@@ -26,9 +26,10 @@ export const viBridge = {
 			title: (app: string): string => `Trước khi kết nối ${app}`,
 			points: (app: string): readonly string[] => [
 				`${app} không có API chính thức cho tài khoản cá nhân. Chat kết nối qua một cách không chính thức, trái với điều khoản sử dụng của ${app}.`,
-				`${app} có thể hạn chế hoặc khoá tài khoản vì việc này. Hãy cân nhắc trước khi kết nối.`,
+				`Khi đã kết nối, chữ bạn tự gõ trong Chat được gửi sang ${app} bằng tài khoản cá nhân chính của bạn. Chat không tự gửi gì.`,
+				`${app} có thể hạn chế hoặc khoá tài khoản cá nhân chính của bạn vì việc này. Hãy cân nhắc trước khi kết nối.`,
+				`Đừng mở ${app} Web hoặc ${app} trên máy tính trong lúc đang kết nối.`,
 				"Chỉ dùng tài khoản của chính bạn.",
-				"Chat chỉ đọc tin nhắn. Chỉ khi bạn bật «Gửi tin» cho tài khoản, Chat mới gửi chữ bạn tự gõ trong Chat.",
 				"Phiên đăng nhập được lưu mã hoá trên máy chủ. Bạn có thể ngắt kết nối và xoá nó bất cứ lúc nào.",
 			],
 			accept: "Tôi đã hiểu các điều trên và dùng tài khoản của chính mình.",
@@ -97,32 +98,14 @@ export const viBridge = {
 		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} cuộc trò chuyện · ${messages}/${expected} tin`,
 		live: "Đang đồng bộ trực tiếp",
 		liveBody: (count: number): string => `${count} cuộc trò chuyện, mọi thay đổi đi hai chiều.`,
-		// An app Chat only reads from (Zalo for now): nothing typed in Chat goes back to it.
-		receive: {
-			ask: (app: string): string => `Nhận tin nhắn mới từ ${app} vào Chat?`,
-			askBody: "Tin nhắn riêng (chữ, nhãn dán) đến từ bây giờ sẽ hiện trong Chat. Chỉ một chiều: tin cũ không được kéo về và tin bạn gõ trong Chat không được gửi sang ứng dụng này.",
-			startLater: (app: string): string => `Nhận tin nhắn ${app}`,
-			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới đi một chiều về Chat.`,
+		// An app Chat syncs private text with, from the time it is connected (Zalo for now):
+		// no older messages, no groups, and only the text typed in Chat goes out.
+		privateText: {
+			ask: (app: string): string => `Đồng bộ tin nhắn riêng ${app} với Chat?`,
+			askBody: "Tin nhắn riêng (chữ, nhãn dán) đến từ bây giờ sẽ hiện trong Chat, và chữ bạn gõ trong các chat đó được gửi sang ứng dụng này. Tin cũ và nhóm không được kéo về.",
+			startLater: (app: string): string => `Đồng bộ tin nhắn ${app}`,
+			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới về Chat và chữ bạn gõ trong Chat được gửi đi.`,
 		},
-	},
-	/** The sending switch of an account whose app sends only once the owner allows it (Zalo): off by default, a risk notice before it goes on. */
-	send: {
-		label: (app: string): string => `Gửi tin sang ${app}`,
-		hint: "Tắt: tin chỉ về Chat. Bật: chữ bạn tự gõ trong các chat của tài khoản này được gửi sang ứng dụng kia.",
-		liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới về Chat và chữ bạn gõ trong Chat được gửi đi.`,
-		confirm: {
-			title: (app: string): string => `Bật gửi tin sang ${app}?`,
-			points: (app: string): readonly string[] => [
-				`Chat gửi tin qua một cách không chính thức, trái với điều khoản sử dụng của ${app}.`,
-				`${app} có thể hạn chế hoặc khoá tài khoản cá nhân chính của bạn vì việc này.`,
-				"Chỉ chữ do chính bạn gõ trong Chat được gửi đi; Chat không tự gửi gì.",
-				`Đừng mở ${app} Web hoặc ${app} trên máy tính trong lúc đang kết nối.`,
-			],
-			action: "Tôi hiểu, bật gửi tin",
-			busy: "Đang bật…",
-		},
-		on: "Đã bật gửi tin.",
-		off: "Đã tắt gửi tin. Các chat chỉ nhận tin.",
 	},
 	account: {
 		status: {

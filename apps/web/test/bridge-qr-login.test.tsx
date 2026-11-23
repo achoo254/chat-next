@@ -89,6 +89,11 @@ describe("offering Zalo", () => {
 		expect(within(notice).getByText("Đăng nhập bằng mã QR trên điện thoại")).toBeTruthy();
 		expect(notice.querySelector(".br-signin-actions")).not.toBeNull();
 		expect(screen.getByText(/trái với điều khoản sử dụng của Zalo/)).toBeTruthy();
+		// Sending is part of connecting: the notice says so, with what it risks.
+		expect(within(notice).getByText(/chữ bạn tự gõ trong Chat được gửi sang Zalo bằng tài khoản cá nhân chính của bạn/)).toBeTruthy();
+		expect(within(notice).getByText(/hạn chế hoặc khoá tài khoản cá nhân chính của bạn/)).toBeTruthy();
+		expect(within(notice).getByText(/Đừng mở Zalo Web hoặc Zalo trên máy tính trong lúc đang kết nối/)).toBeTruthy();
+		expect(within(notice).queryByText(/sau này/)).toBeNull();
 		const go = screen.getByRole("button", { name: "Hiện mã QR" });
 		expect(go).toHaveProperty("disabled", true);
 		await userEvent.click(go);
@@ -177,17 +182,18 @@ describe("the QR step", () => {
 		expect(fixture.bridge.qr.inFlight).toBe(0);
 	});
 
-	it("promises only what Zalo does: new messages come in one way, nothing typed in Chat goes out", async () => {
+	it("promises only what Zalo does: new private messages come in and the text typed in Chat goes out", async () => {
 		const fixture = zaloFixture();
 		await openPage(fixture);
 		await startZalo(fixture);
 		await answer(fixture, { kind: "qr", image: FAKE_QR_PNG });
 		await answer(fixture, { kind: "confirm" });
 		await answer(fixture, { kind: "done" });
-		const ask = await screen.findByRole("group", { name: "Nhận tin nhắn mới từ Zalo vào Chat?" }, LONG);
-		expect(within(ask).getByText(/Chỉ một chiều/)).toBeTruthy();
+		const ask = await screen.findByRole("group", { name: "Đồng bộ tin nhắn riêng Zalo với Chat?" }, LONG);
+		expect(within(ask).getByText(/chữ bạn gõ trong các chat đó được gửi sang ứng dụng này/)).toBeTruthy();
+		expect(within(ask).getByText(/Tin cũ và nhóm không được kéo về/)).toBeTruthy();
 		expect(screen.queryByText(/Đồng bộ toàn bộ tin nhắn Zalo/)).toBeNull();
-		expect(within(ask).queryByText(/hai chiều|thời gian thực/)).toBeNull();
+		expect(within(ask).queryByText(/một chiều|thời gian thực|2\.000/)).toBeNull();
 	});
 });
 
@@ -309,7 +315,7 @@ describe("signing in again", () => {
 	it("reuses the notice and the QR flow for a Zalo account that needs a new login", async () => {
 		const fixture = zaloFixture();
 		fixture.bridge.accounts = [
-			{ $typeName: "app.v1.BridgeAccount", id: 2n, source: "zalo", status: BridgeAccountStatus.NEEDS_LOGIN, syncState: BridgeSyncState.LIVE, lastError: "", chats: [], sendGated: true, sendEnabled: false },
+			{ $typeName: "app.v1.BridgeAccount", id: 2n, source: "zalo", status: BridgeAccountStatus.NEEDS_LOGIN, syncState: BridgeSyncState.LIVE, lastError: "", chats: [] },
 		];
 		await openPage(fixture);
 		await userEvent.click(screen.getByRole("button", { name: "Kết nối lại" }));

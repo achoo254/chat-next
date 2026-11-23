@@ -110,15 +110,6 @@ func (s *bridgeService) StartBridgeSync(ctx context.Context, req *connect.Reques
 	})
 }
 
-func (s *bridgeService) SetBridgeSendEnabled(ctx context.Context, req *connect.Request[appv1.SetBridgeSendEnabledRequest]) (*connect.Response[appv1.SetBridgeSendEnabledResponse], error) {
-	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.SetBridgeSendEnabledRequest) (*appv1.SetBridgeSendEnabledResponse, error) {
-		if err := s.engine.SetSendEnabled(ctx, me, m.GetAccountId(), m.GetEnabled()); err != nil {
-			return nil, err
-		}
-		return &appv1.SetBridgeSendEnabledResponse{}, nil
-	})
-}
-
 func (s *bridgeService) StartBridgeLogin(ctx context.Context, req *connect.Request[appv1.StartBridgeLoginRequest]) (*connect.Response[appv1.StartBridgeLoginResponse], error) {
 	return bridgeCall(ctx, s, req, false, func(me int64, m *appv1.StartBridgeLoginRequest) (*appv1.StartBridgeLoginResponse, error) {
 		step, err := s.engine.StartLogin(ctx, me, m.GetSource())
@@ -327,7 +318,7 @@ func (s *bridgeService) DisconnectBridgeAccount(ctx context.Context, req *connec
 }
 
 func accountMessage(a engine.AccountView) *appv1.BridgeAccount {
-	out := &appv1.BridgeAccount{Id: a.ID, Source: a.Source, LastError: a.LastError, SendGated: a.SendGated, SendEnabled: a.SendGated && a.SendEnabled, Progress: &appv1.BridgeSyncProgress{
+	out := &appv1.BridgeAccount{Id: a.ID, Source: a.Source, LastError: a.LastError, Progress: &appv1.BridgeSyncProgress{
 		Conversations: int32(a.Progress.Conversations), ConversationsDone: int32(a.Progress.Done),
 		Messages: a.Progress.Messages, MessagesExpected: a.Progress.Expected,
 	}}

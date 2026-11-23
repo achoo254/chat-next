@@ -24,9 +24,10 @@ export const enBridge: BridgeCopy = {
 			title: (app) => `Before you connect ${app}`,
 			points: (app) => [
 				`${app} has no official API for personal accounts. Chat connects in an unofficial way that is against ${app}'s terms of use.`,
-				`${app} may restrict or lock the account because of this. Think it over before you connect.`,
+				`Once connected, the text you type in Chat yourself is sent to ${app} from your main personal account. Chat sends nothing on its own.`,
+				`${app} may restrict or ban your main personal account because of this. Think it over before you connect.`,
+				`Do not open ${app} Web or ${app} on a computer while connected.`,
 				"Use only your own account.",
-				"Chat only reads messages. Only once you turn on “Send messages” for the account does Chat send the text you type in Chat yourself.",
 				"The login session is stored encrypted on the server. You can disconnect and remove it at any time.",
 			],
 			accept: "I understand the above and am using my own account.",
@@ -94,31 +95,12 @@ export const enBridge: BridgeCopy = {
 		progress: (done: number, total: number, messages: string, expected: string): string => `${done}/${total} conversations · ${messages}/${expected} messages`,
 		live: "Syncing live",
 		liveBody: (count: number): string => `${count} conversations, every change goes both ways.`,
-		receive: {
-			ask: (app: string): string => `Receive new ${app} messages in Chat?`,
-			askBody: "Private messages (text, stickers) that arrive from now on show up in Chat. One way only: older messages are not pulled in and what you type in Chat is not sent to this app.",
-			startLater: (app: string): string => `Receive ${app} messages`,
-			liveBody: (count: number): string => `${count} conversations, new messages come one way into Chat.`,
+		privateText: {
+			ask: (app: string): string => `Sync your private ${app} messages with Chat?`,
+			askBody: "Private messages (text, stickers) that arrive from now on show up in Chat, and the text you type in those chats is sent to this app. Older messages and groups are not pulled in.",
+			startLater: (app: string): string => `Sync ${app} messages`,
+			liveBody: (count: number): string => `${count} conversations, new messages come into Chat and the text you type in Chat is sent.`,
 		},
-	},
-	/** The sending switch of an account whose app sends only once the owner allows it (Zalo): off by default, a risk notice before it goes on. */
-	send: {
-		label: (app: string): string => `Send messages to ${app}`,
-		hint: "Off: messages only come into Chat. On: the text you type in this account's chats is sent to the other app.",
-		liveBody: (count: number): string => `${count} conversations, new messages come into Chat and the text you type in Chat is sent.`,
-		confirm: {
-			title: (app: string): string => `Turn on sending to ${app}?`,
-			points: (app: string): readonly string[] => [
-				`Chat sends through an unofficial client, against the terms of use of ${app}.`,
-				`${app} may restrict or ban your main personal account for it.`,
-				"Only text you type in Chat yourself is sent; Chat sends nothing on its own.",
-				`Do not open ${app} Web or ${app} on a computer while connected.`,
-			],
-			action: "I understand, turn on sending",
-			busy: "Turning on…",
-		},
-		on: "Sending is on.",
-		off: "Sending is off. The chats only receive.",
 	},
 	account: {
 		status: {

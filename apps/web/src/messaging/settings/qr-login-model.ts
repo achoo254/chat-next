@@ -7,12 +7,12 @@ import type { BridgeError, LoginStep } from "./bridge-api.ts";
 export const QR_LOGIN_APPS: ReadonlySet<string> = new Set(["zalo"]);
 
 /**
- * Apps Chat only reads from unless the owner switches sending on for the
- * account (`sendEnabled`): until then nothing typed in Chat goes back to them,
- * so the page must not promise two-way sync. Even with sending on, only the
- * owner's text goes out, never every change.
+ * Apps Chat syncs only private text with, from the time the account is
+ * connected: older messages and groups are not pulled in, and only the text
+ * the owner types in Chat goes out (no edits, deletions or files), so the page
+ * must not promise every conversation and every change both ways.
  */
-export const RECEIVE_ONLY_APPS: ReadonlySet<string> = new Set(["zalo"]);
+export const PRIVATE_TEXT_APPS: ReadonlySet<string> = new Set(["zalo"]);
 
 /** The longest wait a countdown shows, in seconds: a hint from the server is capped to it. */
 const MAX_LIMIT_WAIT_S = 3600;

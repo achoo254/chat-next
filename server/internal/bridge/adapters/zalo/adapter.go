@@ -5,9 +5,8 @@
 //
 // It receives live 1-1 text and sticker messages after a QR login and lists
 // the conversations heard since the process started; it sends text to one
-// person the account talks with (send.go), only for an account whose owner
-// switched sending on (bridge.SendGated). Groups are ignored, media is a label,
-// and there is no history beyond what this process heard (see Backfill).
+// person the account talks with (send.go). Groups are ignored, media is a
+// label, and there is no history beyond what this process heard (see Backfill).
 package zalo
 
 import (

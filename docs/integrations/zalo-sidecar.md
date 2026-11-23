@@ -1,6 +1,6 @@
 # Tiến trình phụ Zalo
 
-Adapter Zalo của Chat Bridge nói chuyện với Zalo qua một tiến trình phụ Node, `server/internal/bridge/adapters/zalo/sidecar/`, chạy thư viện [`zca-js`](https://github.com/RFS-ADRENO/zca-js) (MIT, không chính thức, mô phỏng Zalo Web). Tài liệu này nói cách thư viện được đưa vào và giữ an toàn. Adapter Go (`server/internal/bridge/adapters/zalo`, chỉ nhận, tắt mặc định) chạy nó; cách dùng ở [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định).
+Adapter Zalo của Chat Bridge nói chuyện với Zalo qua một tiến trình phụ Node, `server/internal/bridge/adapters/zalo/sidecar/`, chạy thư viện [`zca-js`](https://github.com/RFS-ADRENO/zca-js) (MIT, không chính thức, mô phỏng Zalo Web). Tài liệu này nói cách thư viện được đưa vào và giữ an toàn. Adapter Go (`server/internal/bridge/adapters/zalo`, chữ 1-1 hai chiều, tắt mặc định) chạy nó; cách dùng ở [`chat-bridge.md`](./chat-bridge.md#zalo-chữ-1-1-hai-chiều-tắt-mặc-định).
 
 ## Vì sao không cài từ npm
 
@@ -59,7 +59,7 @@ Adapter Go chạy đúng `<ZALO_SUDO_PATH> -n -u <ZALO_SANDBOX_USER> -- <ZALO_NO
 | `bad_session` | phiên đưa vào thiếu trường |
 | `login_failed` | mọi lỗi khác |
 
-**Chưa quan sát** trên tài khoản thật phản hồi của Zalo khi phiên hết hạn thật; `session_rejected` là hình dạng dự đoán từ mã nguồn. Vì vậy engine chỉ coi phiên là đã hết khi `session_rejected` lặp lại trong ít nhất một giờ (xem [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định)). Khi gặp phiên hết hạn thật, ghi lại mã nhận được và chỉnh bảng trên.
+**Chưa quan sát** trên tài khoản thật phản hồi của Zalo khi phiên hết hạn thật; `session_rejected` là hình dạng dự đoán từ mã nguồn. Vì vậy engine chỉ coi phiên là đã hết khi `session_rejected` lặp lại trong ít nhất một giờ (xem [`chat-bridge.md`](./chat-bridge.md#zalo-chữ-1-1-hai-chiều-tắt-mặc-định)). Khi gặp phiên hết hạn thật, ghi lại mã nhận được và chỉnh bảng trên.
 
 ## Giao thức stdio (phiên bản 4)
 
@@ -75,7 +75,7 @@ Chỉ chữ, chỉ chat 1-1 (`src/send.mjs`, có test chạy `zca-js` thật v�
 - `zca-js` tự đặt mã gửi `clientId: Date.now()` và không trả lại, nên `sent` không có `cliMsgId`; `ts` là đồng hồ của tiến trình phụ lúc Zalo trả lời.
 - **Mã `send_error`:** chắc chắn không tạo tin: `rate_limited` (HTTP 429), `session_rejected` (HTTP 401/403), `refused` (Zalo trả mã lỗi riêng, kèm `zaloCode` dạng số, không kèm thông báo), `bad_request`, `not_logged_in`. Chưa rõ tin có được tạo không: `network_error`, `zalo_unavailable` (HTTP lỗi khác), `unclear` (gồm trả lời không có `msgId`). Mã riêng của Zalo cho «bị chặn», «quá nhanh» **chưa quan sát** trên tài khoản thật; khi gặp, ghi `zaloCode` vào đây.
 - **Lịch sử:** `zca-js` 2.3.0 chỉ có `listener.requestOldMessages(ThreadType.User, null)`: xin qua websocket trang tin cũ mới nhất của **mọi** chat 1-1 (không lọc theo người), trang về sau dưới dạng sự kiện `old_messages` không mang mã yêu cầu. Nên mỗi lúc chỉ một yêu cầu (`busy`), chờ 10 giây (`timeout`), cần kênh nghe đang nối (`listener_down`); trang được cắt còn tin của một người (tối đa 50 tin mới nhất) và `oldestTs` của cả trang cho biết trang phủ về tới đâu. Cỡ trang do Zalo quyết; chưa đo trên tài khoản thật.
-- Khử trùng khi gửi lại cùng `RandomID` nằm ở adapter Go (`send.go`, `sent_log.go`), xem [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định).
+- Khử trùng khi gửi lại cùng `RandomID` nằm ở adapter Go (`send.go`, `sent_log.go`), xem [`chat-bridge.md`](./chat-bridge.md#zalo-chữ-1-1-hai-chiều-tắt-mặc-định).
 
 ## Rủi ro đã biết
 

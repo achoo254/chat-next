@@ -36,7 +36,20 @@ func (e *Engine) StartSync(ctx context.Context, owner, accountID int64) error {
 		a.ID, SyncSyncing, SyncOff); err != nil {
 		return fmt.Errorf("bridge: start sync: %w", err)
 	}
-	e.wakeSync(a.ID)
+	// The runner is read under the lock: a handle is registered before its runner exists, and an
+	// account that is still connecting reads its switch from the row when it does.
+	e.mu.Lock()
+	var r *runner
+	if h := e.runners[a.ID]; h != nil {
+		r = h.r
+	}
+	e.mu.Unlock()
+	if r != nil {
+		select {
+		case r.syncNow <- struct{}{}:
+		default: // already asked
+		}
+	}
 	return nil
 }
 
@@ -88,13 +101,49 @@ func (r *runner) syncConversations(ctx context.Context) error {
 	if err := r.keepRefs(ctx, list); err != nil {
 		return err
 	}
-	if err := r.alignSendDirection(ctx, list); err != nil {
+	if err := r.raiseListed(ctx, list); err != nil {
 		return err
 	}
 	if err := r.dropGone(ctx, list); err != nil {
 		return err
 	}
 	return r.settleSyncState(ctx)
+}
+
+// raiseListed makes two-way the read-only chats of the conversations the app lists now,
+// for an app Chat can write to: a connected account syncs both ways (ADR 0024). A chat
+// left read-only by a disconnect the owner signed in again after, or by a conversation
+// that was gone or left and is back, is raised here; one whose conversation is not
+// listed stays as it is, and a two-way chat is never lowered here. Each change goes
+// through the chat service, which tells the owner's open sessions.
+func (r *runner) raiseListed(ctx context.Context, list []bridge.Conversation) error {
+	if !r.e.canSend(r.account.Source) {
+		return nil
+	}
+	listed := make(map[string]bool, len(list))
+	for _, c := range list {
+		listed[c.ID] = true
+	}
+	// The stored direction decides, not the runner's copy: a chat may have been lowered
+	// since the runner loaded its links.
+	links, err := r.e.db.links(ctx, r.account.ID)
+	if err != nil {
+		return err
+	}
+	for _, l := range links {
+		if l.Direction != chat.DirectionIn || !listed[l.ExternalChat] {
+			continue
+		}
+		if err := r.e.chat.SetImportedDirection(ctx, r.account.OwnerID, l.ChatID, chat.DirectionBoth); err != nil {
+			return err
+		}
+		// The runner's own copy follows (the look for conversations gone from the app
+		// asks only about two-way ones).
+		if have := r.links[l.ExternalChat]; have != nil {
+			have.Direction = chat.DirectionBoth
+		}
+	}
+	return nil
 }
 
 // importNext imports the next conversation waiting for its first import. One at a

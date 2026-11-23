@@ -317,7 +317,7 @@ func (e *Engine) linkConversation(ctx context.Context, accountID int64, conv bri
 	if err != nil {
 		return 0, err
 	}
-	if direction == chat.DirectionBoth && !e.canSend(a) {
+	if direction == chat.DirectionBoth && !e.canSend(a.Source) {
 		direction = chat.DirectionIn
 	}
 	if existing, err := e.db.link(ctx, accountID, conv.ID); err != nil || existing != nil {

@@ -50,8 +50,6 @@ function toAccount(a: WireAccount): BridgeAccount {
 		source: a.source,
 		status: STATUSES[a.status] ?? "stopped",
 		lastError: a.lastError,
-		sendGated: a.sendGated,
-		sendEnabled: a.sendGated && a.sendEnabled,
 		syncState: a.syncState === WireSyncState.LIVE ? "live" : a.syncState === WireSyncState.SYNCING ? "syncing" : "off",
 		progress: {
 			conversations: a.progress?.conversations ?? 0,
@@ -244,10 +242,6 @@ function createBridgeClient(transport: Transport): BridgeApi {
 		startSync: (accountId) =>
 			call(async () => {
 				await rpc.startBridgeSync({ accountId: BigInt(accountId) });
-			}),
-		setSendEnabled: (accountId, enabled) =>
-			call(async () => {
-				await rpc.setBridgeSendEnabled({ accountId: BigInt(accountId), enabled });
 			}),
 		disconnect: (accountId, deleteChats) =>
 			call(async () => {

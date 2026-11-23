@@ -215,11 +215,10 @@ func (r *runner) dispatch(ctx context.Context, ev bridge.Event) (saved bool, err
 }
 
 // withSender runs op with the adapter's Sender, or fails the row when the app
-// cannot be written to. The account's own sending switch is checked before any
-// op runs (sendRow).
+// cannot be written to.
 func (r *runner) withSender(ctx context.Context, h *outboxRow, op func(context.Context, bridge.Sender, *outboxRow) error) error {
 	sender, ok := r.adapter.(bridge.Sender)
-	if !ok || !adapterSends(r.adapter) {
+	if !ok || !r.adapter.Capabilities().Has(bridge.CapSend) {
 		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "send_unsupported: this app cannot be written to from Chat", time.Time{})
 	}
 	return op(ctx, sender, h)

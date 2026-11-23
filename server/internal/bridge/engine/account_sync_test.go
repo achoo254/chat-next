@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/bridge/engine"
 )
@@ -237,4 +238,44 @@ func TestAConversationStillListedGetsANewCopyWithItsHistoryWhenItsCopyWasDeleted
 	}
 	e.eventually(func() bool { id := e.chatOf("g1"); return id != 0 && id != old }, func() string { return "the conversation got no new copy" })
 	e.waitTexts(e.chatOf("g1"), []string{"nhóm một"})
+}
+
+func TestAConnectedAccountRaisesTheReadOnlyChatsOfTheConversationsItListsAgain(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	// Two read-only copies, as a disconnect leaves them: g1 is still in the app, old is not.
+	g1 := e.enable(e.group("g1"), 100)
+	old := e.enable(bridge.Conversation{ID: "old", Kind: bridge.ConvGroup, Title: "Nhóm cũ"}, 100)
+	if e.directionOf("g1") != "in" || e.directionOf("old") != "in" {
+		t.Fatalf("directions before the sync = %q, %q; want both read-only", e.directionOf("g1"), e.directionOf("old"))
+	}
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.directionOf("g1") == "both" }, func() string { return "the listed chat stayed read-only" })
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	if got := e.directionOf("old"); got != "in" {
+		t.Fatalf("the chat of a conversation the app does not list = %q, want it left read-only", got)
+	}
+	seq := e.say(g1, "đi")
+	e.waitOutbox(g1, seq, "send", "sent")
+	if _, err := e.chat.SendMessage(ctx, e.owner, &appv1.SendMessageRequest{ChatId: old, Text: "x"}); err == nil {
+		t.Fatal("a chat left read-only accepts messages")
+	}
+}
+
+func TestAnAppThatCannotBeWrittenToNeverRaisesAChat(t *testing.T) {
+	e := newEnv(t)
+	e.adapter = readOnlyApp{e.fake}
+	ctx := context.Background()
+	e.group("g1")
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	if got := e.directionOf("g1"); got != "in" {
+		t.Fatalf("direction = %q, want in", got)
+	}
 }

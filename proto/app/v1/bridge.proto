@@ -41,14 +41,6 @@ service BridgeService {
   // every one that appears later joins on its own; all of them sync both ways.
   // Turning it on again does nothing.
   rpc StartBridgeSync(StartBridgeSyncRequest) returns (StartBridgeSyncResponse);
-  // Turns the sending switch of an account on or off, for an app that sends only
-  // once the owner allows it (BridgeAccount.send_gated). On: the chats of the
-  // conversations the app lists send what the user writes in Chat on to the app
-  // (within seconds, as the account lists them). Off: every chat of the account is
-  // read-only again and what is queued for the app is cancelled. failed_precondition
-  // send_unsupported when the app has no such switch, or when turning it on for an
-  // account that is not connected.
-  rpc SetBridgeSendEnabled(SetBridgeSendEnabledRequest) returns (SetBridgeSendEnabledResponse);
   // Starts signing in to an app. The answer is the first step to show.
   // Rate limited (resource_exhausted): a login sends a code to a phone.
   rpc StartBridgeLogin(StartBridgeLoginRequest) returns (StartBridgeLoginResponse);
@@ -172,11 +164,10 @@ message BridgeAccount {
   repeated BridgeSyncedChat chats = 5;
   BridgeSyncState sync_state = 6;
   BridgeSyncProgress progress = 7;
-  // The app sends only once the owner switches sending on for the account
-  // (SetBridgeSendEnabled); send_enabled is that switch, off by default. Apps
-  // without the switch report false for both.
-  bool send_gated = 8;
-  bool send_enabled = 9;
+  // A per-account sending switch, removed: an app Chat can write to syncs both
+  // ways as soon as the account is connected.
+  reserved 8, 9;
+  reserved "send_gated", "send_enabled";
 }
 
 enum BridgeSyncState {
@@ -204,13 +195,6 @@ message StartBridgeSyncRequest {
 }
 
 message StartBridgeSyncResponse {}
-
-message SetBridgeSendEnabledRequest {
-  int64 account_id = 1 [jstype = JS_NUMBER];
-  bool enabled = 2;
-}
-
-message SetBridgeSendEnabledResponse {}
 
 message GetBridgeStatusRequest {}
 

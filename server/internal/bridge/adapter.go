@@ -475,7 +475,8 @@ type Pinner interface {
 type Sender interface {
 	// SendMessage creates the message and returns its ids. A repeated
 	// RandomID must not create a second message; if the app cannot promise
-	// that, the adapter must not declare CapSend.
+	// that, the adapter must not declare CapSend, unless it recognises a
+	// repeat within limits of its own and implements RetryUnsafe.
 	SendMessage(ctx context.Context, acct Account, m OutMessage) (SentRef, error)
 	// EditMessage changes the text of a message the account owner sent.
 	EditMessage(ctx context.Context, acct Account, e EditRequest) error
@@ -483,12 +484,14 @@ type Sender interface {
 	DeleteMessages(ctx context.Context, acct Account, d Delete) error
 }
 
-// SendGated marks an adapter whose sending the owner switches on per account,
-// off until then. The engine lets Chat write to such an adapter only for an
-// account with sending enabled (external_accounts.send_enabled); other adapters
-// are not gated.
-type SendGated interface {
-	SendGated()
+// RetryUnsafe marks a Sender whose calls are not safe to repeat blindly: it
+// recognises a repeated RandomID only within limits (not after every restart),
+// so a call that may have gone out could post twice if sent again. The engine
+// never repeats such a call on its own: a row left in flight by a stop, and a
+// call that failed for a reason that does not say nothing went out, become
+// 'unknown' for the owner to retry or dismiss. Other Senders are retried.
+type RetryUnsafe interface {
+	RetryUnsafe()
 }
 
 // ErrNotAllowed is returned when the other app refuses the action for

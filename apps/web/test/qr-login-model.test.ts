@@ -1,7 +1,7 @@
 // What a QR login shows from the server's steps and errors (qr-login-model.ts).
 import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/messaging/settings/bridge-api.ts";
-import { isEnded, isSafeQrDataUrl, limitWaitSeconds, MAX_QR_URL_LENGTH, RECEIVE_ONLY_APPS, statusOfError, viewOfStep } from "../src/messaging/settings/qr-login-model.ts";
+import { isEnded, isSafeQrDataUrl, limitWaitSeconds, MAX_QR_URL_LENGTH, PRIVATE_TEXT_APPS, statusOfError, viewOfStep } from "../src/messaging/settings/qr-login-model.ts";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
@@ -87,9 +87,9 @@ describe("limitWaitSeconds", () => {
 	});
 });
 
-describe("RECEIVE_ONLY_APPS", () => {
-	it("lists Zalo, which Chat only reads from", () => {
-		expect(RECEIVE_ONLY_APPS.has("zalo")).toBe(true);
-		expect(RECEIVE_ONLY_APPS.has("telegram")).toBe(false);
+describe("PRIVATE_TEXT_APPS", () => {
+	it("lists Zalo, which Chat syncs only private text with", () => {
+		expect(PRIVATE_TEXT_APPS.has("zalo")).toBe(true);
+		expect(PRIVATE_TEXT_APPS.has("telegram")).toBe(false);
 	});
 });

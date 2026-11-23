@@ -186,9 +186,6 @@ type AccountView struct {
 	// SyncState is the account's one switch: off, syncing or live (ADR 0024).
 	SyncState string
 	Progress  SyncProgress
-	// SendGated is true when the app is written to only once the owner switches
-	// sending on for the account; SendEnabled is that switch.
-	SendGated, SendEnabled bool
 }
 
 // SyncProgress is how far the first import of the account's conversations went.
@@ -215,14 +212,13 @@ type ChatView struct {
 
 // Accounts lists the accounts of owner.
 func (e *Engine) Accounts(ctx context.Context, owner int64) ([]AccountView, error) {
-	rows, err := e.db.pool.Query(ctx, `SELECT id, source, status, last_error, sync_state, send_enabled FROM external_accounts WHERE owner_id = $1 ORDER BY id`, owner)
+	rows, err := e.db.pool.Query(ctx, `SELECT id, source, status, last_error, sync_state FROM external_accounts WHERE owner_id = $1 ORDER BY id`, owner)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: list accounts: %w", err)
 	}
 	accounts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (AccountView, error) {
 		var a AccountView
-		err := r.Scan(&a.ID, &a.Source, &a.Status, &a.LastError, &a.SyncState, &a.SendEnabled)
-		a.SendGated = sendSwitchable(e.adapters[a.Source])
+		err := r.Scan(&a.ID, &a.Source, &a.Status, &a.LastError, &a.SyncState)
 		return a, err
 	})
 	if err != nil {
@@ -363,17 +359,17 @@ func (e *Engine) Disconnect(ctx context.Context, owner, accountID int64, deleteC
 		return e.removeAccount(ctx, a)
 	}
 	// Chats stay: the account keeps its row (and the links that make them
-	// read-only) but loses its login. Nothing queued can be sent any more, and the
-	// sending switch of a gated app goes off: signing in again asks for it anew.
+	// read-only) but loses its login. Nothing queued can be sent any more.
 	if _, err = e.db.pool.Exec(ctx, `UPDATE external_chats SET direction = 'in' WHERE account_id = $1`, a.ID); err != nil {
 		return err
 	}
-	if err := e.db.cancelOutbox(ctx, a.ID, ""); err != nil {
+	if _, err = e.db.pool.Exec(ctx, `
+		UPDATE external_outbox SET status = 'cancelled', updated_at = now()
+		WHERE account_id = $1 AND status IN ('pending', 'sending', 'failed', 'unknown')`, a.ID); err != nil {
 		return err
 	}
 	_, err = e.db.pool.Exec(ctx, `
-		UPDATE external_accounts SET status = 'stopped', secret = '\x00', update_state = NULL, lease_holder = NULL, lease_until = NULL,
-			send_enabled = false, updated_at = now()
+		UPDATE external_accounts SET status = 'stopped', secret = '\x00', update_state = NULL, lease_holder = NULL, lease_until = NULL, updated_at = now()
 		WHERE id = $1`, a.ID)
 	return err
 }
@@ -406,12 +402,14 @@ func (e *Engine) removeAccount(ctx context.Context, a *accountRow) error {
 	return nil
 }
 
-// canSend reports whether Chat may write to the other app with account a: its
-// adapter can be written to and, for an adapter that gates sending per account,
-// the owner switched sending on.
-func (e *Engine) canSend(a *accountRow) bool {
-	adapter := e.adapters[a.Source]
-	return adapterSends(adapter) && (!sendGated(adapter) || a.SendEnabled)
+// canSend reports whether the adapter of source can be written to.
+func (e *Engine) canSend(source string) bool {
+	adapter := e.adapters[source]
+	if adapter == nil {
+		return false
+	}
+	_, ok := adapter.(bridge.Sender)
+	return ok && adapter.Capabilities().Has(bridge.CapSend)
 }
 
 // canTopics reports whether the adapter of source reads topics.
@@ -438,7 +436,7 @@ func (e *Engine) SetDirection(ctx context.Context, owner, accountID int64, conve
 	if l == nil {
 		return ErrNotFound
 	}
-	if direction == chat.DirectionBoth && (!e.canSend(a) || a.Status == "stopped") {
+	if direction == chat.DirectionBoth && (!e.canSend(a.Source) || a.Status == "stopped") {
 		return ErrSendUnsupported
 	}
 	return e.chat.SetImportedDirection(ctx, owner, l.ChatID, direction)
