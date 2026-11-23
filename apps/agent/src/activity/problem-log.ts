@@ -1,4 +1,4 @@
-// Problems of a background reader (the office view, Observatory), for the
+// Problems of a background reader (Observatory), for the
 // machine's log. Such a reader never lets an error reach the core's own work, but a problem must not vanish either:
 // each place logs at most one line per interval, with how many times it
 // happened since. A line names the place and the error's kind (its name or
@@ -28,7 +28,7 @@ export class ProblemLog {
     private readonly now: () => number = Date.now,
     private readonly intervalMs = PROBLEM_LOG_INTERVAL_MS,
     /** The first word of each line: who had the problem. */
-    private readonly label = "office",
+    private readonly label = "observatory",
   ) {}
 
   /** A problem at `place` (a fixed name in the code, never data). */

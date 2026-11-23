@@ -60,7 +60,7 @@ export function urlDomain(url: unknown): string | undefined {
   }
 }
 
-/** Only programs on the office's list of common commands are named; anything else is "". */
+/** Only programs on the list of common commands (SUBJECT_COMMANDS) are named; anything else is "". */
 const LISTED_PROGRAM = {
   program: (name: string): string | undefined => (SUBJECT_COMMANDS.has(name) ? name : undefined),
   script: (): string | undefined => undefined,

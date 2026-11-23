@@ -1,6 +1,6 @@
 // What the AIs tunelo knows call advisor_weigh of tunelo's MCP. Without
-// dependencies, so the office (which acts a call out as a visit to Advisor)
-// does not load Advisor's tools.
+// dependencies, so code that only needs to recognise the call does not load
+// Advisor's tools.
 import { SESSION_MCP_SERVER, TERMINAL_ADVISOR_MCP_SERVER } from "../mcp/session-mcp-server.js";
 
 /** Claude `mcp__tunelo__advisor_weigh` (and `mcp__tunelo-advisor__…` in a terminal), agy `mcp_tunelo_advisor_weigh`. */

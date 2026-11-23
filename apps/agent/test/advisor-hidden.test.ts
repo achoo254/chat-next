@@ -1,6 +1,6 @@
 // Advisor's threads stay out of sight: a device that never said it knows them
 // (an older web) neither lists them nor hears their status; the machine's
-// session list, its sessions' folders and the office leave them out; the
+// session list and its sessions' folders leave them out; the
 // session's MCP has Advisor's tools only; over the link only the device that
 // asked stops a question; and a question answered while nobody looks asks
 // for one content-free push.
@@ -17,7 +17,6 @@ import { Machine } from "../src/machine.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
 import { sessionMcpLaunch } from "../src/mcp/session-mcp-launch.ts";
 import { ADVISOR_MCP_ENV } from "../src/mcp/session-tickets.ts";
-import { officeHubFor } from "../src/office/office-hub.ts";
 import type { AgentProvider, LocalSession, ProviderEvent, SessionHistory, SessionQuery } from "../src/providers/types.ts";
 import type { AdvisorHooks } from "../src/advisor/advisor-tools.ts";
 import { Channel } from "../src/util/channel.ts";
@@ -137,7 +136,7 @@ describe("over the link", () => {
 });
 
 describe("on the machine", () => {
-  it("the AI's session list leaves Advisor's sessions out and never opens one; the office has none", async () => {
+  it("the AI's session list leaves Advisor's sessions out and never opens one", async () => {
     const queries: SessionQuery[] = [];
     const advisorSession: LocalSession = { sessionId: "adv-session", dir: "/w", title: "Advisor", updatedAt: 1, messages: 1, entrypoint: "", busy: false };
     const history: SessionHistory = {
@@ -159,7 +158,6 @@ describe("on the machine", () => {
     await expect(core.openLocal({ provider: "adv", sessionId: "adv-session", consent: { sensitive: false, projectSettings: false }, openAnyway: true, device: "phone" })).rejects.toMatchObject({
       reason: ErrorReason.SESSION_NOT_FOUND,
     });
-    expect(() => officeHubFor(core, [ai]).watch(t.id, () => undefined)).toThrow(/no such thread/);
     expect(core.accountStates().map((s) => s.threadId)).not.toContain(t.id);
     await core.stop();
   });

@@ -21,8 +21,7 @@
 // holds the session at all (busy or idle) is told beside it, from the same reads.
 import { type Dirent, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery, SubagentReport } from "../types.ts";
-import { ClaudeSubagentFeed } from "./office-subagents.ts";
+import type { HistoryEntry, HistoryRead, Liveness, LocalSession, SessionHistory, SessionPage, SessionQuery } from "../types.ts";
 import { type ProcessStartLookup, windowsProcessStart } from "./process-start.ts";
 import { ClaudeProcesses, heldSessions, isClaudeCommand } from "./running-claude.ts";
 import { TranscriptReader, oneLine, parseRecord, promptText, scanLines, withFile } from "./transcript.ts";
@@ -216,8 +215,6 @@ export class LocalSessions implements SessionHistory {
   private readonly alive: (pid: number) => boolean;
   private readonly processes: ClaudeProcesses;
   private readonly processStart: ProcessStartLookup;
-  /** The subagents' records of sessions, for the office view (office-subagents.ts). */
-  private readonly subagentFeed = new ClaudeSubagentFeed((sessionId) => this.sessionFiles(sessionId)[0]);
 
   constructor(private readonly opts: LocalSessionsOptions) {
     this.now = opts.now ?? Date.now;
@@ -388,10 +385,6 @@ export class LocalSessions implements SessionHistory {
     } catch {
       return new Map<string, boolean>();
     }
-  }
-
-  subagentActivity(sessionId: string, since: number): Promise<SubagentReport> {
-    return this.subagentFeed.read(sessionId, since);
   }
 
   /**

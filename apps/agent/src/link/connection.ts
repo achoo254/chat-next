@@ -56,7 +56,6 @@ import type { Workspaces } from "../workspace/workspaces.ts";
 import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-link.ts";
 import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
 import { LedgerUnreadable } from "../usage/ledger.ts";
-import { type OfficeHub, type OfficeSink, officeHubFor } from "../office/office-hub.ts";
 import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
 import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
@@ -166,8 +165,8 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
 }
 
-/** Bytes waiting on a device's socket over which its office and Observatory events are dropped (it sees a gap in seq and asks for a snapshot). */
-const OFFICE_BUFFERED_MAX = 1024 * 1024;
+/** Bytes waiting on a device's socket over which its Observatory events are dropped (it sees a gap in seq and asks for a snapshot). */
+const OBSERVATORY_BUFFERED_MAX = 1024 * 1024;
 
 /** How often a followed thread's transcript is looked at for turns typed outside Chat. */
 const FOLLOW_MS = 1_500;
@@ -260,15 +259,9 @@ export class Connection {
   private screenShareLink: ScreenShareLink | undefined;
   private terminal: TerminalConnection | undefined;
   private workspaceLink: WorkspaceLink | undefined;
-  /** The machine's offices (OfficeWatch), and where this connection gets the events of those it watches. */
-  private office: OfficeHub | undefined;
-  private readonly officeSink: OfficeSink = (events) => {
-    if ((this.socket.buffered?.() ?? 0) > OFFICE_BUFFERED_MAX) return;
-    this.send("", { case: "officeEvents", value: events });
-  };
   /** Where this connection gets the events of the Observatory sessions it watches. */
   private readonly observatorySink: ObservatoryEventSink = (events) => {
-    if ((this.socket.buffered?.() ?? 0) > OFFICE_BUFFERED_MAX) return;
+    if ((this.socket.buffered?.() ?? 0) > OBSERVATORY_BUFFERED_MAX) return;
     this.send("", { case: "observatoryEvents", value: events });
   };
   /** Messages queued before the link opened, not yet opened (decrypted). */
@@ -328,7 +321,6 @@ export class Connection {
     this.screenShareLink?.close();
     if (this.terminal) this.ctx.terminal?.forget(this.terminal);
     this.workspaceLink?.close();
-    this.office?.forget(this.officeSink);
     this.ctx.observatory?.forget(this.observatorySink);
     this.socket.close(code, reason);
   }
@@ -407,8 +399,6 @@ export class Connection {
         if (this.subscribed.has(threadId)) void this.pushGitChanges(threadId);
       }),
     );
-    this.office = officeHubFor(this.ctx.core, this.ctx.providers ?? []);
-    this.unsubscribe.push(this.office.attach());
     const secrets = this.ctx.secrets;
     if (secrets) {
       this.unsubscribe.push(secrets.onEvent((event) => this.secretEvent(event)));
@@ -979,15 +969,6 @@ export class Connection {
         case "usageSettingsSet":
         case "usageDelete":
           return this.usageFrame(id, b);
-        case "officeWatch": {
-          const office = this.office;
-          if (!office) return this.send(id, { case: "error", value: refusal("the link is not open", ErrorReason.UNSUPPORTED_REQUEST) });
-          if (!b.value.on) {
-            office.unwatch(b.value.threadId, this.officeSink);
-            return ack();
-          }
-          return this.send(id, { case: "officeSnapshot", value: office.watch(b.value.threadId, this.officeSink, b.value.advisorRole) });
-        }
         case "observatorySessionList":
         case "observatoryWatch":
         case "observatoryEarlier":

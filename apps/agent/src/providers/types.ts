@@ -332,34 +332,6 @@ export type HistoryEntry = { at: number } & (
   | Extract<ProviderEvent, { type: "text" | "tool-start" | "tool-end" | "diff" | "todo" | "subagent" | "compaction" }>
 );
 
-/** A tool call a subagent made, by name only; `command` (a shell call's) stays on the machine. */
-export type SubagentToolCall = { toolId: string; name: string; kind: ToolKind; at: number; done: boolean; ok: boolean; command?: string };
-
-/** One subagent of a session as the AI's record of it tells (SessionHistory.subagentActivity). */
-export type SubagentActivity = {
-  /** The tool call that started it; "" for an agent of a workflow (see workflowId). */
-  toolUseId: string;
-  agentType: string;
-  description: string;
-  /** 1 for a subagent of the conversation, N + 1 for one a depth-N subagent started. */
-  spawnDepth: number;
-  /** The subagent (its toolUseId) whose tool call started this one; "" when the conversation did or it is not known. */
-  parentToolUseId: string;
-  /** The workflow it belongs to; "" when none. */
-  workflowId: string;
-  background: boolean;
-  finished: boolean;
-  /** Unix ms of the newest thing read about it (its record changed, a tool call started or ended); 0 when unknown. */
-  updatedAt: number;
-  /** Its newest tool calls (a few) that started, ended or still run at or after `since`, oldest first. */
-  tools: SubagentToolCall[];
-};
-
-/** Token counts of one call to the AI's API (deduplicated by `key`). */
-export type SessionUsageCall = { key: string; at: number; inputTokens: number; outputTokens: number };
-
-export type SubagentReport = { subagents: SubagentActivity[]; usage: SessionUsageCall[] };
-
 /** Where a session's transcript ends now; read() continues from such a position. */
 export type HistoryRead = { entries: HistoryEntry[]; end: number };
 
@@ -398,15 +370,6 @@ export interface SessionHistory {
    * there are none or no record. Never fails.
    */
   endedBackground?(sessionId: string): ReadonlyMap<string, boolean>;
-  /**
-   * What the session's subagents did, from the AI's own record of them, for
-   * the office view of a session the machine does not run: each subagent's
-   * kind and state, the tool calls of each read since the previous call (by
-   * name only), and the token counts of the session's calls to the AI's API
-   * at or after `since` (Unix ms). Never a message, a tool's input or its
-   * result. Empty when there is no record. Never fails.
-   */
-  subagentActivity?(sessionId: string, since: number): Promise<SubagentReport>;
   /** Whether a running process of the AI holds the session, as of the last prime(). Never fails. */
   holds?(sessionId: string): boolean;
   /**
