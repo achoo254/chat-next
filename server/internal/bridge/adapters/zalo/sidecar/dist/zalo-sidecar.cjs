@@ -29185,14 +29185,23 @@ var peerNames = /* @__PURE__ */ new Map();
 async function lookupPeerName(loggedIn, uid) {
   if (peerNames.has(uid)) return peerNames.get(uid);
   try {
-    const info = await loggedIn.getUserInfo(uid);
-    const profile = info?.changed_profiles?.[uid] ?? info?.changed_profiles?.[`${uid}_0`];
-    const name = String(profile?.displayName || profile?.zaloName || "");
+    const name = profileName(await loggedIn.getUserInfo(uid), uid);
+    process.stderr.write(`lookup ${name === "" ? "empty" : "ok"}
+`);
     if (name !== "") peerNames.set(uid, name);
     return name;
   } catch {
+    process.stderr.write("lookup failed\n");
     return "";
   }
+}
+function profileName(info, uid) {
+  for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
+    const profile = group?.[uid] ?? group?.[`${uid}_0`];
+    const name = String(profile?.displayName || profile?.zaloName || "");
+    if (name !== "") return name;
+  }
+  return "";
 }
 function listen(loggedIn) {
   api = loggedIn;

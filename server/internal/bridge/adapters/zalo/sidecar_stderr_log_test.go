@@ -21,6 +21,15 @@ func TestLogStderrNamesTheBlockedHost(t *testing.T) {
 	}
 }
 
+func TestLogStderrReportsHowANameLookupEnded(t *testing.T) {
+	for _, result := range []string{"ok", "empty", "failed"} {
+		got := stderrLog("lookup " + result + "\n")
+		if !strings.Contains(got, "peer name lookup") || !strings.Contains(got, "result="+result) {
+			t.Errorf("lookup %s: got %q", result, got)
+		}
+	}
+}
+
 func TestLogStderrBlockedWithoutAPlainNameLogsNoText(t *testing.T) {
 	lines := []string{"blocked\n", "blocked unix-socket\n", "blocked 10.9.8.7\n", "blocked ::1\n", "blocked evil host with spaces\n", "blocked a=b\"c\n"}
 	for _, line := range lines {

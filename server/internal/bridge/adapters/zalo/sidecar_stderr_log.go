@@ -42,6 +42,8 @@ func logStderr(r io.Reader, logger *slog.Logger) {
 			} else {
 				logger.Debug("zalo sidecar reported a host that is not a plain name")
 			}
+		case line == "lookup ok" || line == "lookup empty" || line == "lookup failed":
+			logger.Info("zalo peer name lookup", "result", strings.TrimPrefix(line, "lookup "))
 		case line == "blocked" || strings.HasPrefix(line, "blocked "):
 			// The refused target is a DNS name, an IP address or the word "unix-socket": the
 			// name is what completes the allow-list, so only a plain DNS name is logged; an IP

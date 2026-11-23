@@ -20,7 +20,8 @@
 //     network_error, bad_session, login_failed; message is only the error's class name.
 // stderr : operational lines only: `host <name>` once per Zalo host connected to (the firewall's
 //          learning run reads them), `blocked ...` for a refused connection. No message text,
-//          cookie, imei, name or id is ever written here.
+//          cookie, imei, name or id is ever written here. `lookup ok|empty|failed` says only how a
+//          name lookup of the other person of a 1-1 chat ended.
 //
 // Nothing here writes a file, spawns a process or reads the environment. src/ws-env.mjs sets the
 // two ws switches itself: the engine starts the sidecar through sudo, which resets the environment.
@@ -93,14 +94,25 @@ const peerNames = new Map();
 async function lookupPeerName(loggedIn, uid) {
 	if (peerNames.has(uid)) return peerNames.get(uid);
 	try {
-		const info = await loggedIn.getUserInfo(uid);
-		const profile = info?.changed_profiles?.[uid] ?? info?.changed_profiles?.[`${uid}_0`];
-		const name = String(profile?.displayName || profile?.zaloName || "");
+		const name = profileName(await loggedIn.getUserInfo(uid), uid);
+		// Operational only: whether the lookup found a name, never the name or the id.
+		process.stderr.write(`lookup ${name === "" ? "empty" : "ok"}\n`);
 		if (name !== "") peerNames.set(uid, name);
 		return name;
 	} catch {
+		process.stderr.write("lookup failed\n");
 		return "";
 	}
+}
+
+/** The display name in a getUserInfo answer, which keeps a profile under its id with or without the `_0` suffix. */
+function profileName(info, uid) {
+	for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
+		const profile = group?.[uid] ?? group?.[`${uid}_0`];
+		const name = String(profile?.displayName || profile?.zaloName || "");
+		if (name !== "") return name;
+	}
+	return "";
 }
 
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
