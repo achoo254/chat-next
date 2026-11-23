@@ -14,8 +14,9 @@ import (
 // this code and its hash is checked at startup, so only a broken deploy can
 // pair them wrong. Version 3 lets a QR login skip the listener and names the
 // reason of a failed login; version 4 sends a text to one person and reads
-// the newest page of 1-1 messages (send, history).
-const protocolVersion = 4
+// the newest page of 1-1 messages (send, history); version 5 gives a history
+// message the hash of its text instead of the text.
+const protocolVersion = 5
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -110,13 +111,15 @@ type wireEvent struct {
 }
 
 // historyMessage is one message of a history page (sidecar src/history.mjs).
-// Content is the text of a text message and null otherwise.
+// TextHash is the hash of the text of a text message (see hashText), empty
+// otherwise: matching needs equality only, and a page of hashes keeps the line
+// short whatever the texts are.
 type historyMessage struct {
-	Self    bool            `json:"self"`
-	MsgType looseString     `json:"msgType"`
-	Content json.RawMessage `json:"content"`
-	MsgID   looseString     `json:"msgId"`
-	TS      looseString     `json:"ts"`
+	Self     bool        `json:"self"`
+	MsgType  looseString `json:"msgType"`
+	TextHash string      `json:"textHash"`
+	MsgID    looseString `json:"msgId"`
+	TS       looseString `json:"ts"`
 }
 
 // decodeEvent parses one stdout line. A line that is not a JSON object with an

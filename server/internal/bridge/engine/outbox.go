@@ -45,6 +45,10 @@ type outboxRow struct {
 	Pinned bool
 	// Payload is the state wanted by a row of a feature whose change is more than a message number (JSON).
 	Payload []byte
+	// MaybeSent: an earlier call for this send may have created the message (the row went
+	// 'unknown' at some point); Created is when the row was queued.
+	MaybeSent bool
+	Created   time.Time
 }
 
 // orderedFeatures are the features whose rows of a chat go out in the order they were
@@ -60,7 +64,7 @@ var orderedFeatures = []string{string(feature.Messages), string(feature.Members)
 // (its op and seq).
 func (d *db) outboxHeads(ctx context.Context, accountID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM (
+		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload, maybe_sent, created_at FROM (
 			SELECT DISTINCT ON (external_chat_id, lane) * FROM (
 				SELECT o.*, CASE WHEN o.feature = ANY($2) THEN o.feature WHEN o.op IN ('create_topic', 'set_topic', 'pin_topic') THEN 'topic:' || o.seq ELSE o.op || ':' || o.seq END AS lane
 				FROM external_outbox o WHERE o.account_id = $1 AND o.status IN ('pending', 'sending')
@@ -92,7 +96,7 @@ func (r *runner) waitForSend(ctx context.Context, h *outboxRow) (bool, error) {
 // outboxFollowing returns the queued sends of a chat after row id, oldest first.
 func (d *db) outboxFollowing(ctx context.Context, accountID int64, externalChat string, afterID int64) ([]*outboxRow, error) {
 	rows, err := d.pool.Query(ctx, `
-		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload FROM external_outbox
+		SELECT id, chat_id, seq, external_chat_id, op, random_id, status, attempts, next_attempt_at, pinned, payload, maybe_sent, created_at FROM external_outbox
 		WHERE account_id = $1 AND external_chat_id = $2 AND id > $3 AND op = 'send' AND status IN ('pending', 'sending')
 		ORDER BY id LIMIT $4`, accountID, externalChat, afterID, sendAlbumMax)
 	if err != nil {
@@ -103,7 +107,7 @@ func (d *db) outboxFollowing(ctx context.Context, accountID int64, externalChat 
 
 func scanOutbox(r pgx.CollectableRow) (*outboxRow, error) {
 	var o outboxRow
-	err := r.Scan(&o.ID, &o.ChatID, &o.Seq, &o.ExternalChat, &o.Op, &o.RandomID, &o.Status, &o.Attempts, &o.Due, &o.Pinned, &o.Payload)
+	err := r.Scan(&o.ID, &o.ChatID, &o.Seq, &o.ExternalChat, &o.Op, &o.RandomID, &o.Status, &o.Attempts, &o.Due, &o.Pinned, &o.Payload, &o.MaybeSent, &o.Created)
 	return &o, err
 }
 
@@ -116,7 +120,7 @@ func shortError(msg string) string {
 }
 
 // setOutbox moves rows to status; due, when set, is when a pending row may
-// be tried again.
+// be tried again. A row moved to 'unknown' is marked maybe_sent for good.
 //
 // A row is only marked sent while it is the call in flight ('sending'). Chat queues a state
 // (the name of a topic, closed, pin, mute) by overwriting the row of the same kind and putting
@@ -128,7 +132,8 @@ func (d *db) setOutbox(ctx context.Context, ids []int64, status, lastError strin
 		due = time.Now()
 	}
 	_, err := d.pool.Exec(ctx, `
-		UPDATE external_outbox SET status = $2, last_error = $3, next_attempt_at = $4, updated_at = now()
+		UPDATE external_outbox SET status = $2, last_error = $3, next_attempt_at = $4, updated_at = now(),
+			maybe_sent = maybe_sent OR $2::text = 'unknown'
 		WHERE id = ANY($1) AND NOT ($2::text = 'sent' AND status = 'pending')`,
 		ids, status, shortError(lastError), due)
 	if err != nil {
@@ -167,7 +172,7 @@ func (d *db) startSendingState(ctx context.Context, h *outboxRow) error {
 // decides whether to send them again.
 func (d *db) forgetStale(ctx context.Context, accountID int64, after time.Duration) error {
 	_, err := d.pool.Exec(ctx, `
-		UPDATE external_outbox SET status = 'unknown', last_error = 'unclear whether it was sent', updated_at = now()
+		UPDATE external_outbox SET status = 'unknown', last_error = 'unclear whether it was sent', maybe_sent = true, updated_at = now()
 		WHERE account_id = $1 AND op = 'send' AND status = 'sending' AND updated_at < now() - make_interval(secs => $2)`,
 		accountID, after.Seconds())
 	if err != nil {
@@ -412,6 +417,11 @@ func (r *runner) buildOut(ctx context.Context, h *outboxRow, outs []*chat.Outbou
 	first := outs[0]
 	text, ents := outContent(ctx, r.e.db.pool, r.account.ID, first.Text, first.Entities)
 	msg := bridge.OutMessage{Conversation: h.ExternalChat, Text: text, Entities: ents, RandomID: h.RandomID}
+	if h.MaybeSent {
+		// The owner retried a send whose earlier call may have gone out; that call came after
+		// the row was queued.
+		msg.RetrySince = h.Created
+	}
 	if first.ReplyToSeq > 0 {
 		k, err := externalOf(ctx, r.e.db.pool, h.ChatID, first.ReplyToSeq)
 		if err != nil {
@@ -572,7 +582,7 @@ func retryUnsafe(adapter bridge.Adapter) bool {
 // run that stopped into 'unknown', instead of repeating it on its own.
 func (d *db) interruptedToUnknown(ctx context.Context, accountID int64) error {
 	if _, err := d.pool.Exec(ctx, `
-		UPDATE external_outbox SET status = 'unknown', last_error = 'unclear whether it was sent', updated_at = now()
+		UPDATE external_outbox SET status = 'unknown', last_error = 'unclear whether it was sent', maybe_sent = true, updated_at = now()
 		WHERE account_id = $1 AND status = 'sending'`, accountID); err != nil {
 		return fmt.Errorf("bridge: interrupted sends: %w", err)
 	}

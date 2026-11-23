@@ -337,7 +337,8 @@ func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, 
 // postable checks that me may post in the chat (and topic). plain says the
 // message is me's own text, file, forward or copy (not a bot message, an inline
 // result or a service message): only that kind may go into a chat linked to
-// another app, and only when the link sends on (see linkedSendRule).
+// another app, and only when the link sends on (see linkedSendRule); an app that
+// takes only composer text (SetComposerOnlyApps) also needs ctx FromComposer.
 func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64, plain bool) (int64, error) {
 	if !c.can(m, permSend) {
 		return 0, errDenied("you cannot send messages in this chat")
@@ -345,7 +346,7 @@ func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *member
 	if err := s.checkUnrestricted(ctx, q, me); err != nil {
 		return 0, err
 	}
-	if err := linkedSendRule(ctx, q, c.ID, me, plain); err != nil {
+	if err := linkedSendRule(ctx, q, c.ID, me, plain, s.composerOnlyApp); err != nil {
 		return 0, err
 	}
 	if err := checkPrivatePeer(ctx, q, c, me); err != nil {
@@ -1050,6 +1051,8 @@ type textOverride struct {
 }
 
 func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, toChat, toTopic int64, randomIDs []int64, forward bool, override *textOverride) (*appv1.ForwardMessagesResponse, error) {
+	// A forward or a copy is never text typed in the composer, whoever marked ctx.
+	ctx = notFromComposer(ctx)
 	for _, r := range randomIDs {
 		if r < 0 {
 			return nil, errInvalid("random_id must not be negative")

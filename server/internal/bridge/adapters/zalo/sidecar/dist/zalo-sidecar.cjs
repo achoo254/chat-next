@@ -16103,7 +16103,7 @@ var require_websocket = __commonJS({
     var net2 = require("net");
     var querystring = require("querystring");
     var tls = require("tls");
-    var { randomBytes, createHash } = require("crypto");
+    var { randomBytes, createHash: createHash2 } = require("crypto");
     var { Duplex, Readable } = require("stream");
     var { URL: URL2 } = require("url");
     var PerMessageDeflate2 = require_permessage_deflate();
@@ -16794,7 +16794,7 @@ var require_websocket = __commonJS({
           abortHandshake(websocket, socket, "Invalid Upgrade header");
           return;
         }
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash2("sha1").update(key + GUID).digest("base64");
         if (res.headers["sec-websocket-accept"] !== digest) {
           abortHandshake(websocket, socket, "Invalid Sec-WebSocket-Accept header");
           return;
@@ -17179,7 +17179,7 @@ var require_websocket_server = __commonJS({
     var EventEmitter2 = require("events");
     var http = require("http");
     var { Duplex } = require("stream");
-    var { createHash } = require("crypto");
+    var { createHash: createHash2 } = require("crypto");
     var extension2 = require_extension();
     var PerMessageDeflate2 = require_permessage_deflate();
     var subprotocol2 = require_subprotocol();
@@ -17489,7 +17489,7 @@ var require_websocket_server = __commonJS({
           );
         }
         if (this._state > RUNNING) return abortHandshake(socket, 503);
-        const digest = createHash("sha1").update(key + GUID).digest("base64");
+        const digest = createHash2("sha1").update(key + GUID).digest("base64");
         const headers = [
           "HTTP/1.1 101 Switching Protocols",
           "Upgrade: websocket",
@@ -29112,6 +29112,7 @@ function installEgressGuard({ onHost = () => {
 }
 
 // src/history.mjs
+var import_node_crypto2 = require("node:crypto");
 var MAX_HISTORY_MESSAGES = 50;
 var LISTENER_DOWN = "listener_down";
 var BUSY = "busy";
@@ -29149,6 +29150,9 @@ function createHistory(listener, { isConnected, timeoutMs }) {
     }
   };
 }
+function textHash(text) {
+  return (0, import_node_crypto2.createHash)("sha256").update(text, "utf8").digest("hex");
+}
 function pageFor(messages2, peer) {
   let oldestTs = 0;
   const own = [];
@@ -29160,7 +29164,7 @@ function pageFor(messages2, peer) {
     own.push({
       self: Boolean(message.isSelf),
       msgType: data.msgType,
-      content: typeof data.content === "string" ? data.content : null,
+      textHash: typeof data.content === "string" && data.content !== "" ? textHash(data.content) : null,
       msgId: data.msgId,
       ts: data.ts
     });
@@ -29254,7 +29258,7 @@ function sendFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 4;
+var PROTOCOL = 5;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}

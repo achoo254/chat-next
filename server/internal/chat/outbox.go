@@ -159,16 +159,57 @@ func (t *txn) queueDeletes(ctx context.Context, chatID, me int64, seqs []int64) 
 	return nil
 }
 
+// composerKey marks the context of a send the user typed in Chat's composer.
+type composerKey struct{}
+
+// FromComposer marks ctx as the send of a text the user typed in Chat's message
+// composer: only the RPC the apps' composers call sets it, never a tool, an agent
+// or any other caller, so a new caller is not taken for the composer.
+func FromComposer(ctx context.Context) context.Context {
+	return context.WithValue(ctx, composerKey{}, true)
+}
+
+// notFromComposer drops the mark of FromComposer.
+func notFromComposer(ctx context.Context) context.Context {
+	return context.WithValue(ctx, composerKey{}, false)
+}
+
+func fromComposer(ctx context.Context) bool {
+	typed, _ := ctx.Value(composerKey{}).(bool)
+	return typed
+}
+
+// SetComposerOnlyApps names the apps whose linked chats take only text the owner
+// types in Chat's composer (FromComposer): their adapter cannot recognise a
+// repeated send on its own (bridge.RetryUnsafe), so nothing is sent from the
+// owner's account there that the owner did not write by hand. Call it before
+// serving.
+func (s *Service) SetComposerOnlyApps(apps []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.composerOnly = make(map[string]bool, len(apps))
+	for _, app := range apps {
+		s.composerOnly[app] = true
+	}
+}
+
+// composerOnlyApp reports whether a chat linked to app takes only composer text.
+func (s *Service) composerOnlyApp(app string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.composerOnly[app]
+}
+
 // linkedSendRule is the gate of a chat linked to another app. plain is a
 // text or media message, a forward or a copy from its own user (not a bot's, not
 // an inline result, not a service message): the only kind that can be sent on.
-func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool) error {
-	var direction string
+// composerOnly says whether an app takes only text typed in the composer.
+func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool, composerOnly func(app string) bool) error {
+	var direction, status, app string
 	var owner int64
-	var status string
 	err := q.QueryRow(ctx, `
-		SELECT x.direction, a.owner_id, a.status FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
-		WHERE x.chat_id = $1`, chatID).Scan(&direction, &owner, &status)
+		SELECT x.direction, a.owner_id, a.status, a.source FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
+		WHERE x.chat_id = $1`, chatID).Scan(&direction, &owner, &status, &app)
 	if isNoRows(err) {
 		return nil
 	}
@@ -182,6 +223,8 @@ func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool
 		return errDenied("imported_chat_read_only: the account of this chat is disconnected; sending into it is not available")
 	case !plain || me != owner:
 		return errDenied("imported_chat_send_unsupported: only your own text and files can be sent on to the other app")
+	case composerOnly(app) && !fromComposer(ctx):
+		return errDenied("imported_chat_composer_only: this chat only takes text typed in Chat; forwards, copies, files and messages sent by tools or agents are not sent to the other app")
 	}
 	return nil
 }

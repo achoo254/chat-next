@@ -16,19 +16,19 @@ import (
 //
 // Zalo does not recognise a repeated send: zca-js gives each request a
 // client id from the clock. So the adapter keeps, per account, the RandomIDs
-// it tried and the owner's own messages it heard (sent_log.go), and before
-// sending a RandomID again it looks for the message an earlier try created:
-// first among the messages heard live, then in the newest history page. When
-// neither can tell, it returns an error and sends nothing.
+// it tried and the owner's own messages it heard (sent_log.go). A RandomID it
+// never tried is new and goes out at once, unless the engine says it repeats
+// a call that may have gone out (OutMessage.RetrySince: the owner retried a
+// send left 'unknown', maybe in another process). Only then, or for a
+// RandomID it tried itself without learning the outcome, it looks for the
+// message an earlier try created: first among the messages heard live, then
+// in the newest history page. When neither can tell, it returns an error and
+// sends nothing.
 //
-// A RandomID this process never saw is new, except in the first
-// restartWindow after the adapter started: then it may be the retry of a send
-// the previous process made, and it is checked against the history first.
+// Looking only then matters: the owner may type the same text on the phone
+// ("ok"), and a new message from Chat must not be taken for that one.
 
 const (
-	// restartWindow mirrors the engine's SendRetryWindow (10 min by default):
-	// how long after a restart the engine repeats a send that was in flight.
-	restartWindow = 10 * time.Minute
 	// maxTextRunes bounds one message; a longer text is refused, not cut.
 	maxTextRunes = 4000
 	// rateLimitWait is how long the engine waits after Zalo throttled a send
@@ -41,9 +41,9 @@ var (
 	_ bridge.RetryUnsafe = (*Adapter)(nil)
 )
 
-// errNotListening: the account's sidecar is not running, so nothing can be
-// sent or checked; the engine tries again once it is back.
-var errNotListening = errors.New("zalo: not connected to Zalo for this account; the send waits")
+// errNotListening: the account's sidecar is not running, so nothing was sent
+// or checked; the owner can retry once the account is connected again.
+var errNotListening = errors.New("zalo: not connected to Zalo for this account; nothing was sent")
 
 // errUnsure: an earlier try of this RandomID may have created the message and
 // neither what was heard nor the history can tell; nothing is sent.
@@ -136,14 +136,15 @@ func (a *Adapter) earlierTry(ctx context.Context, st *sendState, side *sidecar, 
 	switch {
 	case seen && att.ref != nil:
 		return *att.ref, true, nil
-	case !seen && !now.Before(a.started.Add(restartWindow)):
+	case !seen && m.RetrySince.IsZero():
 		return bridge.SentRef{}, false, nil // new
 	case seen && now.Sub(att.lastTry) < a.timing.sendAnswer:
 		// The last try may still land; its answer or echo is not in yet.
 		return bridge.SentRef{}, true, fmt.Errorf("%w (the last try is too recent)", errUnsure)
 	}
-	// Seen with an open outcome, or perhaps sent by the previous process.
-	st.log.open(rid, m.Conversation, text, a.started.Add(-restartWindow-zaloClockSlack), a.started.Add(a.timing.sendAnswer+zaloClockSlack))
+	// Tried here with an open outcome, or a retry of a call that may have gone out
+	// (from this process, or from one before it): its message is no older than the send.
+	st.log.open(rid, m.Conversation, text, m.RetrySince.Add(-zaloClockSlack))
 	if ref, ok := st.log.claimHeard(rid); ok {
 		return ref, true, nil
 	}
@@ -211,7 +212,7 @@ func sendError(code, zaloCode string) (nothingCreated bool, err error) {
 	case "bad_request":
 		return true, fmt.Errorf("%w: the message was refused before it was sent", bridge.ErrNotAllowed)
 	case "not_logged_in":
-		return true, errors.New("zalo: the sidecar is not logged in yet; the send waits")
+		return true, errors.New("zalo: the sidecar is not logged in yet; nothing was sent")
 	}
 	return false, fmt.Errorf("zalo: whether the message went out is not known (%s)", code)
 }
@@ -250,8 +251,8 @@ func (p historyPage) candidates(conv string) []ownMessage {
 		if !h.Self || string(h.MsgType) != msgTypeText || !ok || !zaloID.MatchString(string(h.MsgID)) {
 			continue
 		}
-		if text, ok := textContent(h.Content); ok {
-			out = append(out, ownMessage{conv: conv, text: hashText(text), id: string(h.MsgID), date: at})
+		if text, ok := parseTextHash(h.TextHash); ok {
+			out = append(out, ownMessage{conv: conv, text: text, id: string(h.MsgID), date: at})
 		}
 	}
 	return out

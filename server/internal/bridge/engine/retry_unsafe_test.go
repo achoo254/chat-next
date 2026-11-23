@@ -69,11 +69,32 @@ func TestADoubtfulSendOfAnAppThatCannotBeRetriedBlindlyWaitsForTheOwner(t *testi
 	e.fake.FailSend(&bridge.RateLimitError{RetryAfter: 50 * time.Millisecond})
 	next := e.say(chatID, "chờ rồi đi")
 	e.waitOutbox(chatID, next, "send", "sent")
-	// and the owner's retry sends the unknown one
+	// and the owner's retry sends the unknown one, telling the app it may repeat a call that went out
 	if err := e.engine().RetryMessage(context.Background(), e.owner, chatID, seq); err != nil {
 		t.Fatal(err)
 	}
 	e.waitOutbox(chatID, seq, "send", "sent")
+	checkRetryMarks(t, e.fake.Sent(), map[string]bool{"chờ rồi đi": false, "có thể đã đi": true})
+}
+
+// checkRetryMarks checks, per text sent, whether the app was told the call may
+// repeat one that went out (OutMessage.RetrySince).
+func checkRetryMarks(t *testing.T, sent []bridge.OutMessage, want map[string]bool) {
+	t.Helper()
+	if len(sent) != len(want) {
+		t.Fatalf("sent %d messages, want %d", len(sent), len(want))
+	}
+	for _, m := range sent {
+		marked, ok := want[m.Text]
+		switch {
+		case !ok:
+			t.Errorf("sent %q, not expected", m.Text)
+		case marked && (m.RetrySince.IsZero() || m.RetrySince.After(time.Now())):
+			t.Errorf("%q: RetrySince = %v, want when the send was queued", m.Text, m.RetrySince)
+		case !marked && !m.RetrySince.IsZero():
+			t.Errorf("%q: RetrySince = %v on a send no earlier call may have made", m.Text, m.RetrySince)
+		}
+	}
 }
 
 func TestASendLeftInFlightOfAnAppThatCannotBeRetriedBlindlyIsUnknownAtTheNextStart(t *testing.T) {
@@ -90,6 +111,12 @@ func TestASendLeftInFlightOfAnAppThatCannotBeRetriedBlindlyIsUnknownAtTheNextSta
 	if got := sentTexts(e.fake); len(got) != 0 {
 		t.Fatalf("sent = %v: an interrupted send was repeated on its own", got)
 	}
+	// The owner's retry, in this later run, still says the call may repeat one that went out.
+	if err := e.engine().RetryMessage(context.Background(), e.owner, chatID, seq); err != nil {
+		t.Fatal(err)
+	}
+	e.waitOutbox(chatID, seq, "send", "sent")
+	checkRetryMarks(t, e.fake.Sent(), map[string]bool{"đang đi dở": true})
 }
 
 func TestAnUnclassifiedSendFailureOfAnyOtherAppIsTriedAgainOnItsOwn(t *testing.T) {

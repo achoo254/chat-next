@@ -2,7 +2,9 @@ package zalo
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,9 +24,26 @@ const (
 )
 
 // textHash stands for a text in memory: matching needs equality only.
+//
+// The scheme is shared with the sidecar (src/history.mjs, textHash), which
+// hands back the texts of a history page this way: SHA-256 of the text's
+// UTF-8 bytes exactly as Zalo gave them (no trimming or normalisation), as
+// lowercase hex on the wire.
 type textHash [sha256.Size]byte
 
 func hashText(s string) textHash { return sha256.Sum256([]byte(s)) }
+
+// parseTextHash reads a hash the sidecar sent; false when it is not one.
+func parseTextHash(s string) (textHash, bool) {
+	var h textHash
+	if len(s) != hex.EncodedLen(len(h)) || strings.ToLower(s) != s {
+		return h, false
+	}
+	if _, err := hex.Decode(h[:], []byte(s)); err != nil {
+		return h, false
+	}
+	return h, true
+}
 
 // sendAttempt is what this process knows about one RandomID.
 type sendAttempt struct {
@@ -32,12 +51,11 @@ type sendAttempt struct {
 	// texts are every text tried under the RandomID: the engine reads the
 	// message anew for each try, so an edit in Chat can change it.
 	texts []textHash
-	// lower and upper bound when Zalo's copy of an earlier try can be dated
-	// (upper zero: no bound).
-	lower, upper time.Time
-	lastTry      time.Time // zero: never tried by this process
-	created      time.Time
-	ref          *bridge.SentRef // set once the message is known to exist
+	// lower is the earliest Zalo's copy of an earlier try can be dated.
+	lower   time.Time
+	lastTry time.Time // zero: never tried by this process
+	created time.Time
+	ref     *bridge.SentRef // set once the message is known to exist
 }
 
 // ownMessage is a text message of the owner: heard live or read in a history page.
@@ -77,28 +95,26 @@ func (l *sentLog) lookup(rid int64) (sendAttempt, bool) {
 	return *a, true
 }
 
-// open records rid with where an earlier try's message may lie, unless it is
-// known already; either way text joins the texts tried.
-func (l *sentLog) open(rid int64, conv string, text textHash, lower, upper time.Time) {
+// open records rid with the earliest time an earlier try's message may be
+// dated, unless it is known already; either way text joins the texts tried.
+func (l *sentLog) open(rid int64, conv string, text textHash, lower time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.attemptFor(rid, conv, lower, upper).addText(text)
+	l.attemptFor(rid, conv, lower).addText(text)
 }
 
-// tried records that rid is being sent now with text. From now on its
-// message may be dated any time after the earliest try, so the upper bound
-// of a RandomID checked against the previous process goes.
+// tried records that rid is being sent now with text.
 func (l *sentLog) tried(rid int64, conv string, text textHash) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
-	a := l.attemptFor(rid, conv, now.Add(-zaloClockSlack), time.Time{})
+	a := l.attemptFor(rid, conv, now.Add(-zaloClockSlack))
 	a.addText(text)
-	a.lastTry, a.upper = now, time.Time{}
+	a.lastTry = now
 }
 
-// attemptFor returns the attempt of rid, creating it with the given bounds.
-func (l *sentLog) attemptFor(rid int64, conv string, lower, upper time.Time) *sendAttempt {
+// attemptFor returns the attempt of rid, creating it with the given lower bound.
+func (l *sentLog) attemptFor(rid int64, conv string, lower time.Time) *sendAttempt {
 	if a := l.attempts[rid]; a != nil {
 		return a
 	}
@@ -106,7 +122,7 @@ func (l *sentLog) attemptFor(rid int64, conv string, lower, upper time.Time) *se
 	if len(l.order) >= maxSendAttempts {
 		l.drop(l.order[0])
 	}
-	a := &sendAttempt{conv: conv, lower: lower, upper: upper, created: l.now()}
+	a := &sendAttempt{conv: conv, lower: lower, created: l.now()}
 	l.attempts[rid] = a
 	l.order = append(l.order, rid)
 	return a
@@ -164,8 +180,8 @@ func (l *sentLog) claimAmong(rid int64, candidates []ownMessage) (bridge.SentRef
 }
 
 // claim takes the earliest candidate of rid's conversation with one of its
-// texts, dated within its bounds and not the answer of another RandomID, as
-// the message rid created.
+// texts, dated no earlier than its lower bound and not the answer of another
+// RandomID, as the message rid created.
 func (l *sentLog) claim(rid int64, candidates []ownMessage) (bridge.SentRef, bool) {
 	a := l.attempts[rid]
 	if a == nil {
@@ -174,7 +190,7 @@ func (l *sentLog) claim(rid int64, candidates []ownMessage) (bridge.SentRef, boo
 	var best *ownMessage
 	for i := range candidates {
 		c := &candidates[i]
-		if c.conv != a.conv || !slices.Contains(a.texts, c.text) || c.date.Before(a.lower) || (!a.upper.IsZero() && c.date.After(a.upper)) {
+		if c.conv != a.conv || !slices.Contains(a.texts, c.text) || c.date.Before(a.lower) {
 			continue
 		}
 		if other, ok := l.claimed[c.id]; ok && other != rid {

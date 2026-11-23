@@ -3,8 +3,10 @@
 // asks the websocket for the newest page of old messages of ALL 1-1 chats (cmd 510, no chat
 // filter); the page comes back later as the listener event `old_messages` (messages, ThreadType.User),
 // with no request id. So one request is open at a time, the page is cut down to the one chat
-// asked for here, and only the shape the engine needs leaves the process. The page's size is
-// Zalo's choice; `oldestTs` (over the whole page) says how far back it reaches.
+// asked for here, and only the shape the engine needs leaves the process: no text, only its
+// hash (textHash), so the answer stays one short line whatever the messages say. The page's
+// size is Zalo's choice; `oldestTs` (over the whole page) says how far back it reaches.
+import { createHash } from "node:crypto";
 import { ThreadType } from "zca-js";
 
 /** Most messages of the chat handed back from one page, the newest kept. */
@@ -54,7 +56,19 @@ export function createHistory(listener, { isConnected, timeoutMs }) {
 	};
 }
 
-/** What the engine gets of a page: the chat's messages and how far back the whole page reaches. */
+/**
+ * The hash of a text as the engine compares it (hashText in sent_log.go, defined the same way on
+ * both sides): SHA-256 of the text's UTF-8 bytes exactly as Zalo gave them, no trimming or
+ * normalisation, as lowercase hex.
+ */
+export function textHash(text) {
+	return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/**
+ * What the engine gets of a page: the chat's messages and how far back the whole page reaches. A
+ * message carries the hash of its text when it is a non-empty text, null otherwise.
+ */
 export function pageFor(messages, peer) {
 	let oldestTs = 0;
 	const own = [];
@@ -66,7 +80,7 @@ export function pageFor(messages, peer) {
 		own.push({
 			self: Boolean(message.isSelf),
 			msgType: data.msgType,
-			content: typeof data.content === "string" ? data.content : null,
+			textHash: typeof data.content === "string" && data.content !== "" ? textHash(data.content) : null,
 			msgId: data.msgId,
 			ts: data.ts,
 		});

@@ -53,6 +53,7 @@ func Invoke[Req, Resp any](ctx context.Context, sess store.Session,
 	if err := checkIDs(msg); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
+	ctx = context.WithValue(ctx, inProcessKey{}, true)
 	resp, err := method(context.WithValue(ctx, sessionKey{}, sess), connect.NewRequest(msg))
 	if err != nil {
 		return nil, err
@@ -63,6 +64,16 @@ func Invoke[Req, Resp any](ctx context.Context, sess store.Session,
 		return nil, fmt.Errorf("rpc: response violates the id contract: %w", err)
 	}
 	return resp.Msg, nil
+}
+
+// inProcessKey marks a call made through Invoke rather than over /rpc.
+type inProcessKey struct{}
+
+// calledInProcess reports whether the handler runs for Invoke (the MCP tools)
+// rather than for a client of /rpc.
+func calledInProcess(ctx context.Context) bool {
+	in, _ := ctx.Value(inProcessKey{}).(bool)
+	return in
 }
 
 // checkIDs applies protoids.Check to a generated message.

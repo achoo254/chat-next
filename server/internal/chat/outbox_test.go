@@ -3,20 +3,27 @@ package chat
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	appv1 "app.local/server/gen/app/v1"
 	"connectrpc.com/connect"
 )
 
-// linkChat links chatID to a new external account of owner with direction.
+// linkChat links chatID to a new Telegram account of owner with direction.
 func (h *harness) linkChat(owner, chatID int64, direction string) int64 {
+	h.t.Helper()
+	return h.linkChatTo("telegram", owner, chatID, direction)
+}
+
+// linkChatTo links chatID to a new external account of owner in app with direction.
+func (h *harness) linkChatTo(app string, owner, chatID int64, direction string) int64 {
 	h.t.Helper()
 	ctx := context.Background()
 	var accountID int64
 	if err := h.st.Pool().QueryRow(ctx, `
-		INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, 'telegram', $2, '\x00') RETURNING id`,
-		owner, fmt.Sprintf("tg-%d-%d", owner, chatID)).Scan(&accountID); err != nil {
+		INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, $2, $3, '\x00') RETURNING id`,
+		owner, app, fmt.Sprintf("%s-%d-%d", app, owner, chatID)).Scan(&accountID); err != nil {
 		h.t.Fatal(err)
 	}
 	if _, err := h.st.Pool().Exec(ctx, `INSERT INTO external_chats (account_id, external_chat_id, chat_id, direction) VALUES ($1, 'c1', $2, $3)`,
@@ -150,6 +157,51 @@ func TestTheOwnersForwardIntoATwoWayChatIsQueuedWithItsOriginal(t *testing.T) {
 	}
 	if fromChat != src || fromSeq != msg.GetMessage().GetSeq() {
 		t.Fatalf("queued forward names %d/%d, want %d/%d", fromChat, fromSeq, src, msg.GetMessage().GetSeq())
+	}
+}
+
+// A chat linked to an app that takes only composer text (Zalo) takes the owner's
+// typed text and nothing else; a chat of any other app (Telegram) is as before.
+func TestAComposerOnlyAppTakesOnlyTextTypedInTheComposer(t *testing.T) {
+	h := newHarness(t, nil)
+	h.svc.SetComposerOnlyApps([]string{"zalo"})
+	ctx := context.Background()
+	typed := FromComposer(ctx)
+	owner := h.user("owner")
+	zalo, telegram, src := h.group(owner), h.group(owner), h.group(owner)
+	h.linkChatTo("zalo", owner, zalo, DirectionBoth)
+	h.linkChat(owner, telegram, DirectionBoth)
+	original := h.send(owner, src, "gốc").GetMessage().GetSeq()
+
+	sent, err := h.svc.SendMessage(typed, owner, &appv1.SendMessageRequest{ChatId: zalo, Text: "gõ tay"})
+	if err != nil {
+		t.Fatalf("composer text into the Zalo chat: %v", err)
+	}
+	if got := h.outboxRows(zalo, sent.GetMessage().GetSeq()); !equalStrings(got, []string{"send:pending"}) {
+		t.Fatalf("queue = %v, want one pending send", got)
+	}
+	refused := map[string]error{}
+	_, refused["send not from the composer"] = h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: zalo, Text: "từ công cụ"})
+	_, refused["forward"] = h.svc.ForwardMessages(typed, owner, &appv1.ForwardMessagesRequest{FromChatId: src, Seqs: []int64{original}, ToChatId: zalo})
+	_, refused["copy"] = h.svc.CopyMessage(typed, owner, &appv1.CopyMessageRequest{FromChatId: src, Seq: original, ToChatId: zalo})
+	for what, err := range refused {
+		if codeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "imported_chat_composer_only") {
+			t.Errorf("%s into the Zalo chat = %v, want PermissionDenied imported_chat_composer_only", what, err)
+		}
+	}
+	var n int
+	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1`, zalo).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("the Zalo chat queued %d rows (err %v), want only the typed text", n, err)
+	}
+
+	if _, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: telegram, Text: "từ công cụ"}); err != nil {
+		t.Fatalf("a send not from the composer into the Telegram chat: %v", err)
+	}
+	if _, err := h.svc.ForwardMessages(ctx, owner, &appv1.ForwardMessagesRequest{FromChatId: src, Seqs: []int64{original}, ToChatId: telegram}); err != nil {
+		t.Fatalf("a forward into the Telegram chat: %v", err)
+	}
+	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1 AND op = 'send'`, telegram).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("the Telegram chat queued %d sends (err %v), want 2", n, err)
 	}
 }
 

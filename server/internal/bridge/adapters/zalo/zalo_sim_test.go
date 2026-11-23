@@ -2,6 +2,7 @@ package zalo
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -162,11 +163,11 @@ func (z *zaloSim) history(p *fakeProcess, c command) {
 	}
 	page := z.messages[max(0, len(z.messages)-z.pageSize):]
 	type out struct {
-		Self    bool   `json:"self"`
-		MsgType string `json:"msgType"`
-		Content string `json:"content"`
-		MsgID   string `json:"msgId"`
-		TS      int64  `json:"ts"`
+		Self     bool   `json:"self"`
+		MsgType  string `json:"msgType"`
+		TextHash string `json:"textHash"`
+		MsgID    string `json:"msgId"`
+		TS       int64  `json:"ts"`
 	}
 	var oldest int64
 	var mine []out
@@ -175,7 +176,8 @@ func (z *zaloSim) history(p *fakeProcess, c command) {
 			oldest = m.at.UnixMilli()
 		}
 		if m.peer == c.Peer {
-			mine = append(mine, out{Self: m.self, MsgType: msgTypeText, Content: m.text, MsgID: m.id, TS: m.at.UnixMilli()})
+			h := hashText(m.text)
+			mine = append(mine, out{Self: m.self, MsgType: msgTypeText, TextHash: hex.EncodeToString(h[:]), MsgID: m.id, TS: m.at.UnixMilli()})
 		}
 	}
 	z.mu.Unlock()
@@ -220,6 +222,3 @@ func simAccount(t *testing.T, z *zaloSim, hold bool) (*Adapter, *recordingHandle
 	eventually(t, "the account hears peer 500", func() bool { return a.heardFor(testAccount.ID).knows("500") })
 	return a, h, r
 }
-
-// oldProcess makes the adapter look started long ago: a RandomID it never saw is new.
-func oldProcess(a *Adapter) { a.started = time.Now().Add(-time.Hour) }

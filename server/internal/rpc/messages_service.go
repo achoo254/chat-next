@@ -20,7 +20,12 @@ type messagesService struct {
 	logger *slog.Logger
 }
 
+// SendMessage over /rpc is what the apps' composers call with the text the user
+// typed; the same handler run by an MCP tool is not (chat.FromComposer).
 func (s *messagesService) SendMessage(ctx context.Context, req *connect.Request[appv1.SendMessageRequest]) (*connect.Response[appv1.SendMessageResponse], error) {
+	if !calledInProcess(ctx) {
+		ctx = chat.FromComposer(ctx)
+	}
 	return call(ctx, s.logger, req, func(me int64, m *appv1.SendMessageRequest) (*appv1.SendMessageResponse, error) {
 		return s.chat.SendMessage(ctx, me, m)
 	})

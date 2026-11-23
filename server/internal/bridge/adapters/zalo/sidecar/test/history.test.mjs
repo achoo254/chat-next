@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { ThreadType } from "zca-js";
-import { createHistory, MAX_HISTORY_MESSAGES, pageFor } from "../src/history.mjs";
+import { createHistory, MAX_HISTORY_MESSAGES, pageFor, textHash } from "../src/history.mjs";
 
 /** A listener that records requests for old messages; the test answers them. */
 function fakeListener() {
@@ -31,14 +31,29 @@ test("the page is cut down to one person and says how far back it reaches", () =
 	assert.equal(page.count, 4);
 	assert.equal(page.oldestTs, 1000);
 	assert.deepEqual(
-		page.messages.map((m) => [m.msgId, m.self, m.content]),
+		page.messages.map((m) => [m.msgId, m.self, m.textHash]),
 		[
-			["10", false, "chào"],
-			["11", true, "đã gửi"],
+			["10", false, textHash("chào")],
+			["11", true, textHash("đã gửi")],
 			["12", false, null],
 		],
 	);
-	assert.ok(!JSON.stringify(page).includes("người khác"));
+	for (const text of ["người khác", "chào", "đã gửi"]) assert.ok(!JSON.stringify(page).includes(text));
+});
+
+test("a text's hash is SHA-256 of its UTF-8 bytes as given, in lowercase hex", () => {
+	// The same vectors are checked against hashText in Go (sent_log_test.go).
+	assert.equal(textHash("ok"), "2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df");
+	assert.equal(textHash("đã gửi"), "e454723bc686b2c0ef3668c4453724dd0a18e939fa2465e7fb72ebd74af0abdb");
+	assert.notEqual(textHash("ok "), textHash("ok"));
+});
+
+test("a long page stays short on the wire", () => {
+	const long = "x".repeat(100_000);
+	const many = Array.from({ length: MAX_HISTORY_MESSAGES }, (_, i) =>
+		userMessage({ uidFrom: "500", idTo: "0", msgId: String(i), msgType: "webchat", content: long, ts: String(1000 + i) }),
+	);
+	assert.ok(JSON.stringify(pageFor(many, "500")).length < 16 * 1024);
 });
 
 test("only the newest messages of the person are handed back", () => {

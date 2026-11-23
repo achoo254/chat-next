@@ -1,6 +1,7 @@
 package zalo
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -67,19 +68,17 @@ func TestSentLogClaimsAMessageForOneRandomIDOnly(t *testing.T) {
 	}
 }
 
-func TestSentLogMatchesOnlyWithinTheBounds(t *testing.T) {
+func TestSentLogMatchesNothingOlderThanTheLowerBound(t *testing.T) {
 	clock := newFakeClock()
 	l := newSentLog(clock.now)
 	text := hashText("đã gửi")
 	start := clock.now()
-	l.open(1, "500", text, start.Add(-time.Minute), start)
+	l.open(1, "500", text, start.Add(-time.Minute))
 	before := ownMessage{conv: "500", text: text, id: "1", date: start.Add(-2 * time.Minute)}
-	after := ownMessage{conv: "500", text: text, id: "2", date: start.Add(time.Minute)}
-	if ref, ok := l.claimAmong(1, []ownMessage{before, after}); ok {
-		t.Fatalf("matched %v outside the bounds", ref)
+	if ref, ok := l.claimAmong(1, []ownMessage{before}); ok {
+		t.Fatalf("matched %v from before the send was queued", ref)
 	}
-	// Once this process tries it, a later copy is its own.
-	l.tried(1, "500", text)
+	after := ownMessage{conv: "500", text: text, id: "2", date: start.Add(time.Minute)}
 	if ref, ok := l.claimAmong(1, []ownMessage{before, after}); !ok || ref.IDs[0] != "2" {
 		t.Fatalf("claim = %v %v, want message 2", ref, ok)
 	}
@@ -93,5 +92,24 @@ func TestSentLogMatchesAnyTextTriedUnderTheRandomID(t *testing.T) {
 	m := ownMessage{conv: "500", text: hashText("trước khi sửa"), id: "9", date: clock.now()}
 	if _, ok := l.claimAmong(1, []ownMessage{m}); !ok {
 		t.Fatal("the text of the first try was not matched")
+	}
+}
+
+// The sidecar hashes the texts of a history page the same way (src/history.mjs,
+// textHash; the same vectors are in its test).
+func TestTextHashMatchesTheSidecar(t *testing.T) {
+	for text, want := range map[string]string{
+		"ok":     "2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df",
+		"đã gửi": "e454723bc686b2c0ef3668c4453724dd0a18e939fa2465e7fb72ebd74af0abdb",
+	} {
+		got, ok := parseTextHash(want)
+		if !ok || got != hashText(text) {
+			t.Errorf("%q: parsed %v, hash differs or does not parse", text, ok)
+		}
+	}
+	for _, bad := range []string{"", "ok", strings.Repeat("A", 64), strings.Repeat("g", 64), strings.Repeat("a", 62)} {
+		if _, ok := parseTextHash(bad); ok {
+			t.Errorf("%q parsed as a hash", bad)
+		}
 	}
 }

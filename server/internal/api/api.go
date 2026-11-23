@@ -249,8 +249,10 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		if err != nil {
 			return nil, fmt.Errorf("api: bridge secrets: %w", err)
 		}
+		adapters := bridgeAdapters(cfg, logger.With("component", "bridge"))
+		chatSvc.SetComposerOnlyApps(composerOnlyApps(adapters))
 		bridgeEngine = bridgeengine.New(bridgeengine.Config{TenantID: cfg.TenantID},
-			bridgeengine.Deps{Pool: st.Pool(), Chat: chatSvc, Box: box, Adapters: bridgeAdapters(cfg, logger.With("component", "bridge")), Media: mediaSvc, Limiter: limiter, Logger: logger.With("component", "bridge")})
+			bridgeengine.Deps{Pool: st.Pool(), Chat: chatSvc, Box: box, Adapters: adapters, Media: mediaSvc, Limiter: limiter, Logger: logger.With("component", "bridge")})
 	}
 	rpcDeps := rpc.Deps{
 		Store: st, IdP: idp, Sessions: sessions, Origins: origins, SignIn: routes, Chat: chatSvc, Hooks: hookSvc, Media: mediaSvc,

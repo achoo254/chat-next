@@ -414,6 +414,15 @@ type OutMessage struct {
 	// An album takes one RandomID; the adapter derives the id of item i as
 	// RandomID+i, the same way on every retry.
 	RandomID int64
+	// RetrySince is zero unless an earlier call with this RandomID may have
+	// created the message: the send went 'unknown' (cut off by a stop, in
+	// flight too long, or failed without saying nothing went out) and the
+	// owner retried it, possibly in another process. Then it is when the send
+	// was queued, so no earlier call was made before it. An adapter that
+	// recognises a repeat only within limits (RetryUnsafe) looks for the
+	// earlier copy only when this is set or the RandomID is one it tried
+	// itself; any other RandomID is new and goes out at once.
+	RetrySince time.Time
 }
 
 // OutMedia is a file attached to an OutMessage. Open returns the bytes anew

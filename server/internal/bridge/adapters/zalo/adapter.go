@@ -62,7 +62,6 @@ type Adapter struct {
 	logger   *slog.Logger
 	timing   timing
 	now      func() time.Time
-	started  time.Time // when this process's adapter was made (see restartWindow)
 	refusals *refusalTracker
 	requests atomic.Uint64 // ids of commands the sidecar answers
 
@@ -92,7 +91,7 @@ func New(cfg Config) *Adapter {
 }
 
 func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapter {
-	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, started: now(), refusals: newRefusalTracker(now),
+	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, refusals: newRefusalTracker(now),
 		logins: map[string]*qrLogin{}, loginFailedAt: map[string]time.Time{}, subs: map[string]*subscription{},
 		heard: map[string]*heardAccount{}, sending: map[string]*sendState{}, mismatched: map[string]string{}}
 }

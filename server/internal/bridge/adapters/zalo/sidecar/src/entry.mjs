@@ -11,7 +11,7 @@
 //                                            messages, cut down to that person; `history` or `history_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
-//   {"ev":"ready","protocol":4}
+//   {"ev":"ready","protocol":5}
 //   {"ev":"qr","image":"<base64 png>"} | {"ev":"qr_scanned"} | {"ev":"qr_expired"} | {"ev":"qr_declined"}
 //   {"ev":"logged_in","session":{cookie,imei,userAgent}}   the engine keeps it (encrypted), never this process
 //   {"ev":"account","uid":"<digits>"}                the signed-in account, once logged in (both ways);
@@ -23,7 +23,8 @@
 //   {"ev":"send_error","id":..,"code":"..","zaloCode":<int>?}  src/send.mjs: codes that say nothing was
 //     created (rate_limited, session_rejected, refused, bad_request, not_logged_in) and codes that leave
 //     it open (network_error, zalo_unavailable, unclear); zaloCode only with refused
-//   {"ev":"history","id":..,"count":<page size>,"oldestTs":<ms>,"messages":[{self,msgType,content,msgId,ts}]}
+//   {"ev":"history","id":..,"count":<page size>,"oldestTs":<ms>,"messages":[{self,msgType,textHash,msgId,ts}]}
+//     textHash: SHA-256 hex of a text message's text (src/history.mjs), null for any other message
 //   {"ev":"history_error","id":..,"code":"listener_down"|"busy"|"timeout"|"failed"}
 //   {"ev":"error","code":"..","message":".."}          sanitised: never a raw server response. A failed
 //     login's code says why (src/login-failure.mjs): session_rejected, zalo_unavailable,
@@ -50,7 +51,8 @@ import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendTex
 // 2: adds the `account` event (the engine needs the account id to finish a QR login).
 // 3: login_qr can skip the listener; login failures carry a reason code; the uid is checked.
 // 4: send (text, 1-1) and history; old_messages is no longer forwarded as an event (history reads it).
-const PROTOCOL = 4;
+// 5: a history message carries the hash of its text (textHash), not the text.
+const PROTOCOL = 5;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;

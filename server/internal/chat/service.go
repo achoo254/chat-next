@@ -140,7 +140,10 @@ type Service struct {
 	// committed, when set, learns that a transaction wrote outbox rows
 	// (the bot update consumer cuts them right away).
 	committed func()
-	epoch     int64
+	// composerOnly names the apps whose linked chats take only composer text
+	// (SetComposerOnlyApps).
+	composerOnly map[string]bool
+	epoch        int64
 	// previewSlots bounds the link preview fetches running after sends.
 	previewSlots chan struct{}
 
