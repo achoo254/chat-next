@@ -18,6 +18,7 @@ import { appendSpoolLine } from "../../src/observatory/spool/spool-append.ts";
 import { SPOOL_GRACE_MS } from "../../src/observatory/spool/spool-files.ts";
 import { ObservatoryStore } from "../../src/observatory/store/observatory-store.ts";
 import type { WriteOp } from "../../src/observatory/store/write-ops.ts";
+import type { LiveTailEvent } from "../../src/observatory/spool/spool-live-tail.ts";
 import { obsTempDir, removeObsTempDirs } from "./obs-temp-dirs.ts";
 
 afterAll(removeObsTempDirs);
@@ -193,6 +194,30 @@ describe("the OTLP token", () => {
     expect(tokenFile(data)).toEqual({ current: rotated.current });
     expect(await post(port, first)).toBe(401);
     expect(s.secrets()).toContain(rotated.current);
+  });
+});
+
+describe("the spool's live tail through the service", () => {
+  it("hands a watched session's unread spool records to the listeners, redacted, without content, and stops with the service", async () => {
+    const dir = obsTempDir("service-tail");
+    const t = 29_400_000 * 60_000;
+    const { s, data } = await service(dir, undefined, () => t + 10_000);
+    const events: LiveTailEvent[] = [];
+    const off = s.onLiveEvent((e) => events.push(e));
+    s.watchSession("sess-1");
+    const line = (session: string): string =>
+      JSON.stringify({ v: 1, src: "hook", event: "Stop", at: t + 1, f: { session_id: session, prompt_id: "example-machine-secret-value" }, c: { last_assistant_message: "sample content" } });
+    expect(await appendSpoolLine(data, line("sess-1"), t + 1)).toBe("written");
+    expect(await appendSpoolLine(data, line("sess-other"), t + 1)).toBe("written");
+    await expect.poll(() => events.length, { timeout: 3_000 }).toBe(1);
+    expect(events[0]).toMatchObject({ provisional: true, sessionId: "sess-1", event: "Stop" });
+    expect(JSON.stringify(events)).not.toContain("example-machine-secret-value");
+    expect(JSON.stringify(events)).not.toContain("sample content");
+    const started = Date.now();
+    await s.stop();
+    expect(Date.now() - started).toBeLessThan(5_000);
+    off();
+    s.unwatchSession("sess-1");
   });
 });
 

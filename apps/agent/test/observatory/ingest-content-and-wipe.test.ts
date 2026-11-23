@@ -246,13 +246,16 @@ describe("a database a development build wrote before version 1 settled", () => 
     raw.exec("ALTER TABLE tool_calls RENAME COLUMN office_room TO tool_kind");
     raw.exec("ALTER TABLE tool_calls DROP COLUMN project_key");
     raw.exec("ALTER TABLE prompts DROP COLUMN project_key");
+    // …and without what version 2 added.
+    for (const column of ["station", "station_flags", "target_key", "read_offset", "read_limit"]) raw.exec(`ALTER TABLE tool_calls DROP COLUMN ${column}`);
+    for (const sql of ["DROP INDEX tool_calls_tool", "DROP INDEX sessions_project", "DROP TABLE session_events", "DROP TABLE bottlenecks", "PRAGMA user_version = 1"]) raw.exec(sql);
     raw.close();
 
     // Twice: the second open finds nothing to change.
     for (let open = 0; open < 2; open++) {
       const store = await ObservatoryStore.open({ path });
       try {
-        expect(store.schemaVersion).toBe(1);
+        expect(store.schemaVersion).toBe(2);
         store.write([{ kind: "toolCall", row: { toolUseId: `t${open}`, sessionId: "s", at: 2, toolName: "Bash", officeRoom: "qa", projectKey: "github.com/example/x" } }]);
         const t = store.sessionTimeline("s");
         expect(t.toolCalls.find((c) => c.toolUseId === "old")).toMatchObject({ officeRoom: "server", content: "kept", durationMs: 7, projectKey: null });

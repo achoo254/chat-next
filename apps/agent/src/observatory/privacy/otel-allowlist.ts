@@ -8,8 +8,14 @@
 // `tool_input`, `error`). Resource attributes are never kept at all: only
 // `service.name` is read, to accept Claude Code's records.
 //
-// Events other than these five (user_prompt, assistant_response,
+// Events other than these six (user_prompt, assistant_response,
 // plugin_loaded, hook_execution_*, …) are dropped whole.
+//
+// `api_error` and `tool_decision`'s `permission_mode` were read off real
+// records of Claude Code 2.1.330 (console exporter: an unknown model name for
+// the error, a PreToolUse hook blocking a call for the decision). The error's
+// message (`error`) is not kept: a session event holds the model, the status
+// code and whether it was a rate limit, and nothing reads the text.
 
 export type OtelRule = "id" | "label" | "number" | "bool";
 
@@ -68,6 +74,13 @@ export const OTEL_EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, 
     source: "label",
     tool_source: "label",
     classifier_verdict: "label",
+    permission_mode: "label",
+  },
+  api_error: {
+    model: "label",
+    status_code: "number",
+    attempt: "number",
+    duration_ms: "number",
   },
   mcp_server_connection: {
     status: "label",

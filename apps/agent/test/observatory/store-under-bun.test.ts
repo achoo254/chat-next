@@ -33,7 +33,7 @@ describe.skipIf(version === "")(`the Observatory store under Bun ${version || "(
     if (run.status !== 0) throw new Error(`bun failed: ${run.stderr}`);
     const result = JSON.parse(run.stdout.trim().split("\n").at(-1) ?? "{}") as Result;
     expect(result.runtime).toBe("bun");
-    expect(result.schemaVersion).toBe(1);
+    expect(result.schemaVersion).toBe(2);
     expect(result.timeline).toEqual(written);
 
     const again = await ObservatoryStore.open({ path });

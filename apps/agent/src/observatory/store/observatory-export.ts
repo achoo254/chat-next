@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { open as openFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { SCHEMA_VERSION, schemaVersionOf } from "./migrate.ts";
-import { OBSERVATORY_TABLES } from "./schema-v1.ts";
+import { OBSERVATORY_TABLES } from "./schema-tables.ts";
 import type { SqliteConnection } from "./sqlite-driver.ts";
 import { ObservatoryStoreError } from "./store-errors.ts";
 

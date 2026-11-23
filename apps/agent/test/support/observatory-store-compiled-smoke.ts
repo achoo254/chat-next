@@ -22,7 +22,7 @@ try {
   await store.wipe();
   const left = readdirSync(join(dir, "observatory"));
   console.log(JSON.stringify({ ...result, filesLeft: left.length }));
-  ok = result.runtime === "bun" && result.schemaVersion === 1 && result.sessions === 1 && result.prompts === 1 && left.length === 0;
+  ok = result.runtime === "bun" && result.schemaVersion === 2 && result.sessions === 1 && result.prompts === 1 && left.length === 0;
 } catch (err) {
   console.error(err);
 } finally {

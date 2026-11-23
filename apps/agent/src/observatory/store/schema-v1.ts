@@ -172,19 +172,3 @@ export const SCHEMA_V1: readonly string[] = [
  * before the table existed gets it too.
  */
 export const META_TABLE = "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)";
-
-/** Every table of the schema, in the order an export lists them. */
-export const OBSERVATORY_TABLES = [
-  "sessions",
-  "prompts",
-  "tool_calls",
-  "subagents",
-  "api_requests",
-  "instructions_loaded",
-  "git_ops",
-  "content_settings",
-  "daily_rollups",
-  "meta",
-] as const;
-
-export type ObservatoryTable = (typeof OBSERVATORY_TABLES)[number];

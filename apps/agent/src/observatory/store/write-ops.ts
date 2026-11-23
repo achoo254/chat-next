@@ -3,21 +3,25 @@
 // row by row, each its own commit, measured about a hundred times slower.
 import type {
   ApiRequestRow,
+  BottleneckRow,
   ContentSettingRow,
   GitOpRow,
   InstructionLoadedRow,
   PromptRow,
   RowWrite,
+  SessionEventRow,
   SessionRow,
   SubagentRow,
   ToolCallRow,
 } from "./observatory-rows.ts";
 import {
   API_REQUESTS,
+  BOTTLENECKS,
   CONTENT_SETTINGS,
   GIT_OPS,
   INSTRUCTIONS_LOADED,
   PROMPTS,
+  SESSION_EVENTS,
   SESSIONS,
   SUBAGENTS,
   TOOL_CALLS,
@@ -34,6 +38,8 @@ export type SubagentWrite = RowWrite<SubagentRow, "sessionId" | "agentId" | "sta
 export type ApiRequestWrite = RowWrite<ApiRequestRow, "dedupeKey" | "sessionId" | "at">;
 export type InstructionLoadedWrite = RowWrite<InstructionLoadedRow, "sessionId" | "seq" | "at" | "filePath" | "loadReason">;
 export type GitOpWrite = RowWrite<GitOpRow, "sessionId" | "at" | "kind">;
+export type SessionEventWrite = RowWrite<SessionEventRow, "dedupeKey" | "sessionId" | "at" | "kind">;
+export type BottleneckWrite = RowWrite<BottleneckRow, "sessionId" | "rule" | "subkey" | "severity" | "status" | "openedAt" | "updatedAt">;
 
 /**
  * One write: kinds with an upsert key merge into the row of their key, the
@@ -48,6 +54,8 @@ export type WriteOp =
   | { kind: "apiRequest"; row: ApiRequestWrite }
   | { kind: "instructionLoaded"; row: InstructionLoadedWrite }
   | { kind: "gitOp"; row: GitOpWrite }
+  | { kind: "sessionEvent"; row: SessionEventWrite }
+  | { kind: "bottleneck"; row: BottleneckWrite }
   | { kind: "contentSetting"; row: ContentSettingRow };
 
 function put<R>(db: SqliteConnection, spec: TableSpec<R>, row: LooseRow<R>): void {
@@ -97,6 +105,10 @@ export function applyWriteOp(db: SqliteConnection, op: WriteOp): void {
       return put(db, INSTRUCTIONS_LOADED, op.row);
     case "gitOp":
       return put(db, GIT_OPS, op.row);
+    case "sessionEvent":
+      return put(db, SESSION_EVENTS, op.row);
+    case "bottleneck":
+      return put(db, BOTTLENECKS, op.row);
     case "contentSetting":
       return put(db, CONTENT_SETTINGS, op.row);
     default: {

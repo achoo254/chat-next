@@ -1,15 +1,17 @@
 // How each Observatory row type (observatory-rows.ts) maps onto its table
-// (schema-v1.ts): field, column and type, whether the column is required,
+// (schema-v1.ts, schema-v2.ts): field, column and type, whether the column is required,
 // how a second write of the same key merges into it, and what a write does
 // on a duplicate. row-codec.ts builds the statements and converts values
 // from these.
 import type {
   ApiRequestRow,
+  BottleneckRow,
   ContentSettingRow,
   DailyRollupRow,
   GitOpRow,
   InstructionLoadedRow,
   PromptRow,
+  SessionEventRow,
   SessionRow,
   SubagentRow,
   ToolCallRow,
@@ -25,8 +27,14 @@ export type ColumnType = "text" | "integer" | "real" | "boolean";
  * - `min` / `max`: the smaller / larger of the two, ignoring a missing one;
  * - `unlessCertain` (the link to the previous session and its flag): `fill`,
  *   unless the stored link is a certain one (previous_session_inferred = 0).
+ * - `exactStation` (a tool call's station and its flags, together): an exact
+ *   station (from the raw call, without the `estimated` bit) is taken, an
+ *   estimated one only fills a call that has none, so the hook's exact
+ *   station wins over OpenTelemetry's estimate whichever came first;
+ * - `latest`: the new value, NULL included (a row its one writer always
+ *   writes whole: a bottleneck finding reopened has no closing time).
  */
-export type Merge = "fill" | "first" | "min" | "max" | "unlessCertain";
+export type Merge = "fill" | "first" | "min" | "max" | "unlessCertain" | "exactStation" | "latest";
 
 export type Column<R> = {
   readonly field: keyof R & string;
@@ -117,6 +125,11 @@ export const TOOL_CALLS: TableSpec<ToolCallRow> = {
     col("content", "content", "text"),
     // Written only with the content (the ingest's end-of-call writes), so the content's own project.
     col("projectKey", "project_key", "text", { merge: "first" }),
+    col("station", "station", "text", { merge: "exactStation" }),
+    col("stationFlags", "station_flags", "integer", { merge: "exactStation" }),
+    col("targetKey", "target_key", "text"),
+    col("readOffset", "read_offset", "integer"),
+    col("readLimit", "read_limit", "integer"),
   ],
 };
 
@@ -182,6 +195,45 @@ export const GIT_OPS: TableSpec<GitOpRow> = {
     col("sha", "sha", "text"),
     col("branch", "branch", "text"),
     col("kind", "kind", "text", { required: true }),
+  ],
+};
+
+/** An event read again, or told by two records of one call (a todo list's Pre and Post), keeps its earliest time and its first values. */
+export const SESSION_EVENTS: TableSpec<SessionEventRow> = {
+  table: "session_events",
+  conflict: { upsert: ["dedupeKey"] },
+  columns: [
+    col("dedupeKey", "dedupe_key", "text", { required: true }),
+    sessionOf(),
+    earliest("at", "at"),
+    col("kind", "kind", "text", { required: true, merge: "first" }),
+    col("agentId", "agent_id", "text", { merge: "first" }),
+    col("toolUseId", "tool_use_id", "text", { merge: "first" }),
+    col("station", "station", "text", { merge: "first" }),
+    col("label", "label", "text", { merge: "first" }),
+    col("number", "number", "real", { merge: "first" }),
+    col("flag", "flag", "boolean", { merge: "first" }),
+  ],
+};
+
+/** A finding is written whole every time (opened, raised, closed): the stored row becomes the write. */
+export const BOTTLENECKS: TableSpec<BottleneckRow> = {
+  table: "bottlenecks",
+  conflict: { upsert: ["sessionId", "rule", "subkey"] },
+  columns: [
+    col("sessionId", "session_id", "text", { required: true }),
+    col("rule", "rule", "text", { required: true }),
+    col("subkey", "subkey", "text", { required: true }),
+    col("station", "station", "text", { merge: "latest" }),
+    col("severity", "severity", "text", { required: true, merge: "latest" }),
+    col("status", "status", "text", { required: true, merge: "latest" }),
+    col("openedAt", "opened_at", "integer", { required: true, merge: "latest" }),
+    col("updatedAt", "updated_at", "integer", { required: true, merge: "latest" }),
+    col("closedAt", "closed_at", "integer", { merge: "latest" }),
+    col("value", "value", "real", { merge: "latest" }),
+    col("threshold", "threshold", "real", { merge: "latest" }),
+    col("n", "n", "integer", { merge: "latest" }),
+    col("evidenceJson", "evidence_json", "text", { merge: "latest" }),
   ],
 };
 

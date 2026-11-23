@@ -14,12 +14,17 @@
 // - a commit Claude Code did not describe, written once per tool call;
 // - a tool call's measures (duration, sizes): OpenTelemetry's are exact, the
 //   hooks' sizes estimates, so once OpenTelemetry measured a call the hooks'
-//   values for it are left out, whichever source came first.
+//   values for it are left out, whichever source came first;
+// - a change of a session's permission mode or main model: the value each
+//   record shows is compared with the latest one seen before it (a record
+//   older than that one is ignored, so sources arriving out of order do not
+//   make changes up); the first value seen after a start is no change.
 import type { RecordOrigin } from "../privacy/filtered-record.ts";
 import type { ToolCallWrite, WriteOp } from "../store/write-ops.ts";
 import { BoundedMap } from "./bounded-map.ts";
 import { InstructionLoadSeq, type StoredLoads } from "./instruction-load-seq.ts";
-import type { ClearHalf, InstructionLoad, ToolEdge, UndescribedCommit } from "./normalized-record.ts";
+import type { ClearHalf, InstructionLoad, SessionValue, ToolEdge, UndescribedCommit } from "./normalized-record.ts";
+import { sessionEventOp } from "./session-event-write.ts";
 
 /** The longest time between the two halves of a /clear (hooks run apart; the spool's clock is the hook process's). */
 export const CLEAR_PAIR_MS = 30_000;
@@ -38,6 +43,8 @@ export class IngestJoins {
   /** Sessions already given a link, and sessions already used as the previous one. */
   private readonly linked = new BoundedMap<string, true>(MAX_ENTRIES);
   private readonly commits = new BoundedMap<string, true>(MAX_ENTRIES);
+  /** The latest permission mode and main model seen per session. */
+  private readonly latest = new BoundedMap<string, { at: number; value: string }>(MAX_ENTRIES);
   private readonly loadSeq: InstructionLoadSeq;
 
   /** `storedLoads` reads the instruction loads already stored (instruction-load-seq.ts); none by default. */
@@ -129,6 +136,16 @@ export class IngestJoins {
   instructionLoaded(load: InstructionLoad, origin: RecordOrigin): WriteOp[] {
     const seq = this.loadSeq.seqOf(load, origin);
     return [{ kind: "instructionLoaded", row: { sessionId: load.sessionId, seq, at: load.at, filePath: load.filePath, memoryType: load.memoryType, loadReason: load.loadReason } }];
+  }
+
+  /** The event of a change of the session's `kind` value (its permission mode, its main model), when `seen` changes it. */
+  valueSeen(kind: "permission_mode" | "model_change", seen: SessionValue): WriteOp[] {
+    const key = JSON.stringify([kind, seen.sessionId]);
+    const before = this.latest.get(key);
+    if (before && seen.at < before.at) return [];
+    this.latest.set(key, { at: seen.at, value: seen.value });
+    if (!before || before.value === seen.value) return [];
+    return [sessionEventOp(kind, { sessionId: seen.sessionId, at: seen.at, station: "CORE", label: seen.value }, [seen.at, seen.value])];
   }
 
   /** The write of a commit Claude Code did not describe, once per tool call: the branch `branchOf` tells, no sha. */

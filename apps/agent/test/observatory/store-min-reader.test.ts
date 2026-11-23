@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { MIN_READER_VERSION, SCHEMA_VERSION } from "../../src/observatory/store/migrate.ts";
 import { NEWER_DB_EXPORT_NOTE } from "../../src/observatory/store/observatory-export.ts";
 import { ObservatoryStore } from "../../src/observatory/store/observatory-store.ts";
-import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-v1.ts";
+import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-tables.ts";
 import { openSqlite } from "../../src/observatory/store/sqlite-driver.ts";
 import { ObservatorySchemaTooNew } from "../../src/observatory/store/store-errors.ts";
 import { DAY, sessionOps, tempDbPath } from "./store-fixture.ts";
@@ -19,10 +19,10 @@ async function newerDb(minReader: number | undefined): Promise<string> {
   store.write(sessionOps("old", Date.now() - 200 * DAY));
   store.close();
   const db = await openSqlite(path);
-  db.exec("ALTER TABLE tool_calls ADD COLUMN station TEXT");
-  db.exec("UPDATE tool_calls SET station = 'TERMINAL'");
-  db.exec("CREATE TABLE session_events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, at INTEGER NOT NULL)");
-  db.run("INSERT INTO session_events VALUES (?, ?, ?)", ["e1", "old", Date.now() - 200 * DAY]);
+  db.exec("ALTER TABLE tool_calls ADD COLUMN future_lane TEXT");
+  db.exec("UPDATE tool_calls SET future_lane = 'TERMINAL'");
+  db.exec("CREATE TABLE future_events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, at INTEGER NOT NULL)");
+  db.run("INSERT INTO future_events VALUES (?, ?, ?)", ["e1", "old", Date.now() - 200 * DAY]);
   if (minReader === undefined) db.exec("DROP TABLE meta");
   else db.run("UPDATE meta SET value = ? WHERE key = 'min_reader_version'", [String(minReader)]);
   db.exec(`PRAGMA user_version = ${NEWER}`);
@@ -93,8 +93,8 @@ describe("a database a newer agent wrote, readable by this one", () => {
     store.close();
 
     const db = await openSqlite(path);
-    expect(db.all("SELECT station FROM tool_calls WHERE session_id = 'new'")).toEqual([{ station: null }, { station: null }]);
-    expect(db.all("SELECT station, duration_ms FROM tool_calls WHERE tool_use_id = 'old-t1'")).toEqual([{ station: "TERMINAL", duration_ms: 999 }]);
+    expect(db.all("SELECT future_lane FROM tool_calls WHERE session_id = 'new'")).toEqual([{ future_lane: null }, { future_lane: null }]);
+    expect(db.all("SELECT future_lane, duration_ms FROM tool_calls WHERE tool_use_id = 'old-t1'")).toEqual([{ future_lane: "TERMINAL", duration_ms: 999 }]);
     db.close();
   });
 
@@ -105,7 +105,7 @@ describe("a database a newer agent wrote, readable by this one", () => {
     expect(store.sessionTimeline("old").toolCalls).toHaveLength(0);
     store.close();
     const db = await openSqlite(path);
-    expect(db.all("SELECT id FROM session_events")).toEqual([{ id: "e1" }]);
+    expect(db.all("SELECT id FROM future_events")).toEqual([{ id: "e1" }]);
     db.close();
   });
 

@@ -12,19 +12,23 @@
 // removes something raises it (MIN_READER_VERSION), and an agent below it
 // refuses the database before writing a byte (ObservatorySchemaTooNew).
 import { META_TABLE, SCHEMA_V1 } from "./schema-v1.ts";
+import { SCHEMA_V2 } from "./schema-v2.ts";
 import type { SqliteConnection } from "./sqlite-driver.ts";
 import { ObservatorySchemaTooNew, ObservatoryStoreError } from "./store-errors.ts";
 
 /** The schema version this agent writes. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-/** The lowest schema version that can read and write a database at SCHEMA_VERSION. */
+/** The lowest schema version that can read and write a database at SCHEMA_VERSION (version 2 only adds). */
 export const MIN_READER_VERSION = 1;
 
 const MIN_READER_KEY = "min_reader_version";
 
 /** The statements that take the schema from `version - 1` to `version`, by version. */
-const MIGRATIONS: readonly { version: number; statements: readonly string[] }[] = [{ version: 1, statements: SCHEMA_V1 }];
+const MIGRATIONS: readonly { version: number; statements: readonly string[] }[] = [
+  { version: 1, statements: SCHEMA_V1 },
+  { version: 2, statements: SCHEMA_V2 },
+];
 
 /**
  * Ends an open transaction after a failure. SQLite ends some transactions
@@ -101,7 +105,7 @@ export function migrate(db: SqliteConnection, path: string): SchemaAccess {
         for (const sql of m.statements) db.exec(sql);
         // PRAGMA takes no bound parameter; the version is a constant of this file.
         db.exec(`PRAGMA user_version = ${m.version}`);
-      } else if (access.version === 1) {
+      } else if (m.version === 1 && access.version === 1) {
         alignBeforeRelease(db);
       }
       return false;

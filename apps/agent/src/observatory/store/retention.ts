@@ -77,6 +77,9 @@ const CHILDREN: readonly Expiring[] = [
   child("git_ops", "at", "''", [], (c) => void c.gitOps++),
   // Which instruction files loaded is not counted; the rows only expire.
   child("instructions_loaded", "at", "''", [], () => undefined),
+  // Neither are a session's lifecycle events nor its bottleneck findings (by the time they opened).
+  child("session_events", "at", "''", [], () => undefined),
+  child("bottlenecks", "opened_at", "''", [], () => undefined),
 ];
 
 const SESSIONS: Expiring = {

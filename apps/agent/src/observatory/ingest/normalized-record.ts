@@ -3,7 +3,7 @@
 // ingest's join state (ingest-joins.ts) completes: a tool's duration from its
 // Pre and Post, the /clear pair of two sessions, the place of an instruction
 // load among the session's loads, the branch of a commit Claude Code did not
-// describe.
+// describe, a change of the session's permission mode or model.
 import type { SessionSource } from "../store/observatory-rows.ts";
 import type { SessionWrite, WriteOp } from "../store/write-ops.ts";
 
@@ -18,6 +18,9 @@ export type InstructionLoad = { sessionId: string; at: number; filePath: string;
 
 /** A `git commit` whose tool response had no gitOperation: the branch is read from the repository of `cwd` (with `~`). */
 export type UndescribedCommit = { sessionId: string; toolUseId: string; promptId?: string | undefined; at: number; cwd: string };
+
+/** A value of a session's main thread seen at a time (its permission mode, its model): a change from the one before is a session event. */
+export type SessionValue = { sessionId: string; at: number; value: string };
 
 /**
  * - stored: the record's writes are in `ops` (and the join facts);
@@ -45,6 +48,10 @@ export type NormalizedRecord = {
   clearStarted?: ClearHalf;
   instruction?: InstructionLoad;
   undescribedCommit?: UndescribedCommit;
+  /** The main thread's permission mode this record shows. */
+  permissionMode?: SessionValue;
+  /** The model of a main-thread API call this record describes. */
+  mainModel?: SessionValue;
   /** Field names the normalizer does not know for this event. */
   unknownFields: string[];
   /** Fields present with an unexpected type (treated as absent). */

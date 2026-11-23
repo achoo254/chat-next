@@ -6,7 +6,9 @@
 // or latest of the two, so events of one call arriving from several sources
 // in any order end as the same row. A value once stored is never set back to
 // NULL by a write (ObservatoryStore.clearContent is the one way to remove
-// stored content). An `ignore` table keeps the first copy of a duplicate.
+// stored content), except in a column merged `latest` (a row its one writer
+// always writes whole). An `ignore` table keeps the first copy of a duplicate.
+import { StationFlag } from "../live-map/station-map.ts";
 import type { Column, Merge, TableSpec } from "./observatory-table-specs.ts";
 import type { SqlRow, SqlValue } from "./sqlite-driver.ts";
 import { ObservatoryInvalidWrite, ObservatoryStoreError } from "./store-errors.ts";
@@ -31,6 +33,12 @@ function mergeSql(merge: Merge, c: string): string {
     // final: an inferred one arriving later never replaces it. SET reads the row before the update.
     case "unlessCertain":
       return `CASE WHEN previous_session_inferred = 0 THEN ${c} ELSE COALESCE(${n}, ${c}) END`;
+    // The station and its flags move together, judged by the new write: exact (a station without the
+    // estimated bit) replaces what is stored; estimated only fills a call stored without a station.
+    case "exactStation":
+      return `CASE WHEN excluded.station IS NOT NULL AND (COALESCE(excluded.station_flags, 0) & ${StationFlag.estimated}) = 0 THEN COALESCE(${n}, ${c}) WHEN station IS NULL THEN ${n} ELSE ${c} END`;
+    case "latest":
+      return n;
   }
 }
 

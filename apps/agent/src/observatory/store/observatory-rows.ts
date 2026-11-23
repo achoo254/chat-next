@@ -1,6 +1,6 @@
 // The rows of the Observatory tables as the agent sees them (camelCase,
 // NULL as null, flags as booleans); observatory-table-specs.ts maps each
-// onto its table (schema-v1.ts). A read returns every field; a write gives
+// onto its table (schema-v1.ts, schema-v2.ts). A read returns every field; a write gives
 // the key and the NOT NULL columns, and leaves out what its source does not
 // know (the merge of observatory-table-specs.ts decides what the stored row
 // keeps).
@@ -45,7 +45,7 @@ export type ToolCallRow = {
   agentId: string | null;
   at: number;
   toolName: string | null;
-  /** The office room of the call (docs/office-wire.md part 4), lower case: `library`, `work`, `qa`, `post`… */
+  /** The office room of a call stored by an agent of the first release (lower case: `library`, `work`…); no longer written. */
   officeRoom: string | null;
   mcpServer: string | null;
   /** The file or domain the call touched, as the ingest extracted it. */
@@ -58,6 +58,15 @@ export type ToolCallRow = {
   content: string | null;
   /** The project of the event that wrote the content (the session's when null). */
   projectKey: string | null;
+  /** The call's Live Map station (live-map/station-map.ts); null on a row stored before stations existed. */
+  station: string | null;
+  /** StationFlag bits; `estimated` when the station was placed from the filtered target. */
+  stationFlags: number | null;
+  /** The salted key of the file the call touched (privacy/target-key-salt.ts). */
+  targetKey: string | null;
+  /** A Read's page: its first line and line count, when the call named them. */
+  readOffset: number | null;
+  readLimit: number | null;
 };
 
 export type SubagentRow = {
@@ -101,6 +110,63 @@ export type InstructionLoadedRow = {
 };
 
 export type GitOpRow = { sessionId: string; promptId: string | null; at: number; sha: string | null; branch: string | null; kind: string };
+
+/** What a session event records (schema-v2.ts): never content, only a kind, a short label, a number and a flag. */
+export const SESSION_EVENT_KINDS = [
+  "permission_request",
+  "permission_decision",
+  "permission_denied",
+  "hook_block",
+  "compact_start",
+  "compact_end",
+  "stop",
+  "stop_failure",
+  "notification",
+  "model_change",
+  "permission_mode",
+  "todo_counts",
+  "api_error",
+  "mcp_connection",
+] as const;
+
+export type SessionEventKind = (typeof SESSION_EVENT_KINDS)[number];
+
+export type SessionEventRow = {
+  /** The event's key: its kind and the ids that tell it apart from every other event (the ingest builds it). */
+  dedupeKey: string;
+  sessionId: string;
+  at: number;
+  kind: SessionEventKind;
+  agentId: string | null;
+  toolUseId: string | null;
+  station: string | null;
+  /** A name the privacy filter kept: a tool, a model, a trigger, a mode, a status. */
+  label: string | null;
+  number: number | null;
+  flag: boolean | null;
+};
+
+export type BottleneckSeverity = "warn" | "alert";
+export type BottleneckStatus = "open" | "closed";
+
+/** A finding of a bottleneck rule; one row per (session, rule, subkey), written whole by its one writer. */
+export type BottleneckRow = {
+  sessionId: string;
+  rule: string;
+  /** What the rule watches within the session (a tool, a file key, a model); '' when the rule has none. */
+  subkey: string;
+  station: string | null;
+  severity: BottleneckSeverity;
+  status: BottleneckStatus;
+  openedAt: number;
+  updatedAt: number;
+  closedAt: number | null;
+  value: number | null;
+  threshold: number | null;
+  n: number | null;
+  /** The measures and the ids of the events behind the finding, as JSON (never content). */
+  evidenceJson: string | null;
+};
 
 export type ContentSettingRow = { projectKey: string; storeContent: boolean; updatedAt: number };
 

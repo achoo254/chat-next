@@ -44,7 +44,7 @@ describe("ObservatoryStore.prune", () => {
 
     const result = prune();
     expect(result.more).toBe(false);
-    expect(result.deleted).toEqual({ prompts: 1, tool_calls: 2, subagents: 1, api_requests: 1, git_ops: 1, instructions_loaded: 1, sessions: 1 });
+    expect(result.deleted).toEqual({ prompts: 1, tool_calls: 2, subagents: 1, api_requests: 1, git_ops: 1, instructions_loaded: 1, session_events: 0, bottlenecks: 0, sessions: 1 });
 
     expect(store.sessionTimeline("old")).toMatchObject({ session: null, prompts: [], toolCalls: [], subagents: [], apiRequests: [], instructionsLoaded: [], gitOps: [] });
     expect(store.sessionTimeline("new").toolCalls).toHaveLength(2);

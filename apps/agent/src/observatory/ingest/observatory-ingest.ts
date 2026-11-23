@@ -78,6 +78,8 @@ export class ObservatoryIngest implements ObservatorySink {
   private readonly joins: IngestJoins;
   /** Sessions seen from an SDK callback. */
   private readonly sdkSessions = new BoundedMap<string, true>(MAX_SESSIONS);
+  /** Sessions with an internal label (the Advisor's; always SDK sessions too). */
+  private readonly internalSessions = new BoundedMap<string, true>(MAX_SESSIONS);
   private readonly logged = new Set<string>();
 
   constructor(private readonly opts: ObservatoryIngestOptions) {
@@ -95,9 +97,19 @@ export class ObservatoryIngest implements ObservatorySink {
     return Promise.resolve();
   }
 
+  /**
+   * A session whose spool records are left out: one the agent runs through
+   * the SDK (its callbacks are its one source) or one with an internal label.
+   * Known from the records taken since the agent started.
+   */
+  isAgentSession(sessionId: string): boolean {
+    return this.sdkSessions.has(sessionId) || this.internalSessions.has(sessionId);
+  }
+
   private take(record: FilteredRecord, origin: RecordOrigin): void {
     const n = record.src === "hook" ? normalizeHookRecord(record, origin) : normalizeOtelRecord(record);
     if (n.sessionId && origin === "sdk") this.sdkSessions.set(n.sessionId, true);
+    if (n.sessionId && n.session?.internalLabel) this.internalSessions.set(n.sessionId, true);
     if (n.sessionId && origin === "spool" && this.sdkSessions.has(n.sessionId)) {
       this.stats.sdkSpoolSkipped++;
       return;
@@ -124,6 +136,8 @@ export class ObservatoryIngest implements ObservatorySink {
     if (n.clearStarted) ops.push(...this.joins.clearStarted(n.clearStarted));
     if (n.instruction) ops.push(...this.joins.instructionLoaded(n.instruction, origin));
     if (n.undescribedCommit) ops.push(...this.joins.undescribedCommit(n.undescribedCommit, (cwd) => this.branchOf(cwd)));
+    if (n.permissionMode) ops.push(...this.joins.valueSeen("permission_mode", n.permissionMode));
+    if (n.mainModel) ops.push(...this.joins.valueSeen("model_change", n.mainModel));
     return ops;
   }
 

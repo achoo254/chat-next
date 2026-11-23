@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCHEMA_VERSION } from "../../src/observatory/store/migrate.ts";
 import { ObservatoryStore } from "../../src/observatory/store/observatory-store.ts";
 import { API_REQUESTS, CONTENT_SETTINGS, DAILY_ROLLUPS, GIT_OPS, INSTRUCTIONS_LOADED, PROMPTS, SESSIONS, SUBAGENTS, TOOL_CALLS } from "../../src/observatory/store/observatory-table-specs.ts";
-import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-v1.ts";
+import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-tables.ts";
 import { openSqlite } from "../../src/observatory/store/sqlite-driver.ts";
 import { ObservatorySchemaTooNew, ObservatoryStoreClosed } from "../../src/observatory/store/store-errors.ts";
 import { sessionOps, tempDbPath } from "./store-fixture.ts";

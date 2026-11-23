@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { deleteObservatoryDb } from "../../src/observatory/store/observatory-db-files.ts";
 import { ObservatoryStore } from "../../src/observatory/store/observatory-store.ts";
-import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-v1.ts";
+import { OBSERVATORY_TABLES } from "../../src/observatory/store/schema-tables.ts";
 import { openSqlite } from "../../src/observatory/store/sqlite-driver.ts";
 import { ObservatoryStoreClosed, ObservatoryStoreError, ObservatoryWipeFailed } from "../../src/observatory/store/store-errors.ts";
 import { tempDir } from "../harness.ts";
@@ -32,7 +32,7 @@ describe("ObservatoryStore export", () => {
     expect(summary.rows).toBe(13 + 1);
     expect(out.tables.meta).toEqual([{ key: "min_reader_version", value: "1" }]);
     expect(Object.keys(out)).toEqual(["schemaVersion", "tables"]);
-    expect(out.schemaVersion).toBe(1);
+    expect(out.schemaVersion).toBe(2);
     expect(Object.keys(out.tables)).toEqual([...OBSERVATORY_TABLES]);
     expect(out.tables.sessions).toEqual([
       {

@@ -14,12 +14,18 @@
 // reach the store through the ingest (ingest/observatory-ingest.ts, or the one
 // given as `ingest`), which also rolls old detail into daily totals on a
 // schedule. Stop waits for records still being taken, but only so long.
+//
+// The spool's tail is read for the sessions someone watches
+// (spool/spool-live-tail.ts): watchSession/unwatchSession say which, and
+// onLiveEvent listeners get the provisional events (never content). It runs
+// while the service runs and stops with it, within the same wait.
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
 import { ProblemLog } from "../activity/problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
+import { STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
 import { ObservatoryIngest } from "./ingest/observatory-ingest.ts";
 import { ObservatoryIntake } from "./observatory-intake.ts";
@@ -31,7 +37,9 @@ import { deleteTargetKeySalt, ensureTargetKeySalt, readTargetKeySalt } from "./p
 
 /** How often the agent reads the target key salt file again (observatory-service.ts followTargetKeySalt). */
 const TARGET_KEY_SALT_CHECK_MS = 60_000;
+import { redactRecordAgain } from "./privacy/redact-record-again.ts";
 import { clearSpool } from "./spool/clear-spool.ts";
+import { type LiveTailEvent, SpoolLiveTail } from "./spool/spool-live-tail.ts";
 import { setAsideBrokenHookState } from "./spool/hook-state-file.ts";
 import { HookStateWriter } from "./spool/hook-state-writer.ts";
 import { ObservatoryStoreError } from "./store/store-errors.ts";
@@ -73,6 +81,10 @@ export class ObservatoryService {
   /** Reads the salt file again now and then, so a salt another process replaced (an offline delete) is followed. */
   private saltTimer: ReturnType<typeof setInterval> | undefined;
   private readonly now: () => number;
+  private readonly liveTail: SpoolLiveTail;
+  private readonly liveListeners = new Set<(event: LiveTailEvent) => void>();
+  /** The sink records go to while running (the ingest), asked which sessions the agent runs itself. */
+  private sink: ObservatorySink | undefined;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
@@ -105,6 +117,22 @@ export class ObservatoryService {
       ...opts.tokenTimings,
     });
     this.rollups = new DailyRollupScheduler({ prune: () => this.store.store?.prune(this.now()), problems });
+    this.liveTail = new SpoolLiveTail({
+      dataDir: opts.dataDir,
+      secondPass: (record) => redactRecordAgain(record, this.secrets()),
+      skipSession: (sessionId) => this.sink instanceof ObservatoryIngest && this.sink.isAgentSession(sessionId),
+      onEvent: (event) => {
+        for (const listener of this.liveListeners) {
+          try {
+            listener(event);
+          } catch (err) {
+            problems("live-tail-listener", err);
+          }
+        }
+      },
+      problems,
+      now: this.now,
+    });
   }
 
   /** The master switch of the agent's config (unset is on). */
@@ -129,7 +157,11 @@ export class ObservatoryService {
     const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
     const sink = this.store.writer ? this.guard("ingest-create", () => ingest((op) => this.store.writer?.push(op))) : undefined;
     await this.receiver.start();
-    if (sink) this.intake.open(sink);
+    this.sink = sink;
+    if (sink) {
+      this.intake.open(sink);
+      this.liveTail.start();
+    }
     if (this.store.store) this.rollups.start();
   }
 
@@ -144,7 +176,11 @@ export class ObservatoryService {
     this.saltTimer = undefined;
     await this.receiver.stop();
     await this.rollups.stop();
-    await this.intake.close();
+    const tail = settledWithin(this.liveTail.stop(), this.opts.stopWaitMs ?? STOP_WAIT_MS).then((done) => {
+      if (!done) this.problems.report("live-tail-stop", new ObservatoryStoreError("a spool tail read still running at stop was left behind"));
+    });
+    await Promise.all([this.intake.close(), tail]);
+    this.sink = undefined;
     this.store.close();
     this.started = false;
   }
@@ -256,6 +292,26 @@ export class ObservatoryService {
       ingest: this.intake.ingestStats,
       sdkHooks: this.intake.sdkStats,
     });
+  }
+
+  /**
+   * Someone watches `sessionId`: its records still in the spool are read
+   * every half second and handed to the onLiveEvent listeners. Counted: each
+   * call needs its unwatchSession. Remembered across stop and start.
+   */
+  watchSession(sessionId: string): void {
+    this.liveTail.watch(sessionId);
+  }
+
+  /** One watcher of `sessionId` left. */
+  unwatchSession(sessionId: string): void {
+    this.liveTail.unwatch(sessionId);
+  }
+
+  /** Calls `listener` with every provisional event of a watched session; returns the call that removes it. */
+  onLiveEvent(listener: (event: LiveTailEvent) => void): () => void {
+    this.liveListeners.add(listener);
+    return () => void this.liveListeners.delete(listener);
   }
 
   /** Takes one record from any source; resolves once its writes are queued (without an ingest it is dropped). */

@@ -1,5 +1,10 @@
 // The reads ObservatoryStore serves, over one connection: rows decoded by
-// their table's spec (row-codec.ts), each list in a stable order.
+// their table's spec (row-codec.ts), each list in a stable order. A tool
+// call stored without a station (by an agent of the first release) is read
+// with the one its filtered target suggests, flagged `estimated`
+// (live-map/station-map.ts): the office room that release stored was worked
+// out from that same target, so it would add nothing.
+import { stationOfTarget } from "../live-map/station-map.ts";
 import type {
   ApiRequestRow,
   ContentSettingRow,
@@ -7,6 +12,7 @@ import type {
   GitOpRow,
   InstructionLoadedRow,
   PromptRow,
+  SessionEventRow,
   SessionRow,
   SubagentRow,
   ToolCallRow,
@@ -18,6 +24,7 @@ import {
   GIT_OPS,
   INSTRUCTIONS_LOADED,
   PROMPTS,
+  SESSION_EVENTS,
   SESSIONS,
   SUBAGENTS,
   TOOL_CALLS,
@@ -37,6 +44,7 @@ export type SessionTimeline = {
   apiRequests: ApiRequestRow[];
   instructionsLoaded: InstructionLoadedRow[];
   gitOps: GitOpRow[];
+  sessionEvents: SessionEventRow[];
 };
 
 export type SessionQuery = { from?: number; to?: number; limit?: number };
@@ -44,6 +52,13 @@ export type DayRange = { fromDay?: string; toDay?: string };
 
 function select<R>(db: SqliteConnection, spec: TableSpec<R>, where: string, params: readonly SqlValue[]): R[] {
   return db.all(`SELECT ${selectList(spec)} FROM ${spec.table} ${where}`, params).map((raw) => decodeRow(spec, raw));
+}
+
+/** `row` with a station: its own, else the one its tool and filtered target suggest (estimated). */
+export function withStation(row: ToolCallRow): ToolCallRow {
+  if (row.station !== null || row.toolName === null) return row;
+  const place = stationOfTarget(row.toolName, row.target ?? undefined);
+  return { ...row, station: place.station, stationFlags: (row.stationFlags ?? 0) | place.flags };
 }
 
 /** Sessions started in [from, to) (Unix ms), newest first, at most `limit` (up to 1000; 100 by default). */
@@ -59,11 +74,12 @@ export function readSessionTimeline(db: SqliteConnection, sessionId: string): Se
   return {
     session: select(db, SESSIONS, "WHERE session_id = ?", id)[0] ?? null,
     prompts: select(db, PROMPTS, `${bySession} at, prompt_id`, id),
-    toolCalls: select(db, TOOL_CALLS, `${bySession} at, tool_use_id`, id),
+    toolCalls: select(db, TOOL_CALLS, `${bySession} at, tool_use_id`, id).map(withStation),
     subagents: select(db, SUBAGENTS, `${bySession} started_at, agent_id`, id),
     apiRequests: select(db, API_REQUESTS, `${bySession} at, dedupe_key`, id),
     instructionsLoaded: select(db, INSTRUCTIONS_LOADED, `${bySession} at, seq, file_path`, id),
     gitOps: select(db, GIT_OPS, `${bySession} at, rowid`, id),
+    sessionEvents: select(db, SESSION_EVENTS, `${bySession} at, dedupe_key`, id),
   };
 }
 
