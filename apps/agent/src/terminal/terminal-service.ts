@@ -34,6 +34,7 @@ import { type ChildProcess, childProcesses } from "./child-processes.ts";
 import { AGENT_VERSION } from "../version.ts";
 import { Grants, TerminalDenied } from "./grants.ts";
 import { ControlError, type DaemonAudit, type DaemonEvent, type DaemonSession, type HelloResult, sessionListSchema } from "./host-link.ts";
+import { resumeHintOfSession } from "./exit-resume-hint.ts";
 import { HostSupervisor, type TermHostUnit, type TerminalAvailabilityState, TerminalUnavailable } from "./host-supervisor.ts";
 import { type TerminalPeer, TerminalConnection } from "./terminal-connection.ts";
 import { TerminalError } from "./terminal-error.ts";
@@ -114,7 +115,8 @@ export interface AiTerminals {
   started(threadId: string, session: number, pid: number): void;
   /** What launch said to run did not start (the terminal process refused or failed): chat may write to the thread again. */
   abandoned(threadId: string): void;
-  ended(session: number, pid: number): void;
+  /** `exitSession`: the session the AI's CLI printed as the one to resume when it exited. */
+  ended(session: number, pid: number, exitSession?: string): void;
   /** Only these sessions still run in terminal process `pid`. */
   alive(pid: number, sessions: ReadonlySet<number>): void;
   /** The thread's AI can close and open again resumed with nothing lost (no turn, quiet for `quietMs`). */
@@ -137,7 +139,7 @@ export function aiTerminalsOf(core: AgentCore, programs: (pid: number) => Promis
     threadOf: (session, pid) => core.terminalThread(session, pid),
     started: (threadId, session, pid) => core.terminalStarted(threadId, session, pid),
     abandoned: (threadId) => core.terminalAbandoned(threadId),
-    ended: (session, pid) => core.terminalEnded(session, pid),
+    ended: (session, pid, exitSession) => core.terminalEnded(session, pid, exitSession),
     alive: (pid, sessions) => core.terminalAlive(pid, sessions),
     idle: (threadId, quietMs) => core.terminalIdle(threadId, quietMs),
     follow: (threadId) => core.terminalFollow(threadId),
@@ -712,7 +714,7 @@ export class TerminalService {
         return this.audit([e]);
       case "session_exit":
         // The attached links get the Exit frame; a thread's AI that exited lets chat write again.
-        this.opts.ai?.ended(e.session, this.hostPid);
+        this.opts.ai?.ended(e.session, this.hostPid, resumeHintOfSession(this.opts.configDir, e.session));
         return;
       case "signal":
       case "conn_state": {

@@ -94,6 +94,36 @@ describe("a CLI in the terminal that went on in another session", () => {
     expect(m.segments()).toEqual([m.launched]);
   });
 
+  test("the CLI exits after /clear: the session it printed on exit is the one the terminal opens again, though no claude runs any more", async () => {
+    const m = await heldByTerminal();
+    m.conversation(m.launched, "build it", "Built.");
+    const fresh = randomUUID();
+    m.conversation(fresh, "now the docs", "Docs written.");
+    // Nothing in the register: the process is gone, only the line it printed tells.
+    m.core.terminalEnded(1, HOST_PID, fresh.toUpperCase());
+    expect(m.segments()).toEqual([m.launched, fresh]);
+    const spec = await m.core.terminalLaunch(m.thread.id);
+    expect(spec.args.slice(0, 2)).toEqual(["--resume", fresh]);
+  });
+
+  test("a session another thread already holds is not taken: one conversation never shows as two threads", async () => {
+    const m = await heldByTerminal();
+    m.conversation(m.launched, "build it", "Built.");
+    m.register(process.pid, m.launched);
+    await m.core.lookElsewhere();
+    // /clear in the terminal; meanwhile the new session was opened as a thread of its own.
+    const fresh = randomUUID();
+    m.conversation(fresh, "now the docs", "Docs written.");
+    const owner = await m.core.openLocal({ provider: "claude", sessionId: fresh, consent: { sensitive: false, projectSettings: false }, openAnyway: true, device: "phone" });
+    m.register(process.pid, fresh);
+    expect(m.core.terminalFollow(m.thread.id)).toBe(false);
+    await m.core.lookElsewhere();
+    m.core.terminalEnded(1, HOST_PID);
+    expect(m.segments()).toEqual([m.launched]);
+    expect(m.core.sessionIdOf(owner.id)).toBe(fresh);
+    expect(m.core.sessionIds().filter((s) => s.sessionId === fresh)).toHaveLength(1);
+  });
+
   test("two running claudes that could be the terminal's, or none started with it: nothing changes, as before", async () => {
     const m = await heldByTerminal();
     const a = randomUUID();

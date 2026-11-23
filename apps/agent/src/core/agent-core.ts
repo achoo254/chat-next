@@ -3678,7 +3678,7 @@ export class AgentCore {
    * got one, else as a new segment. True when the thread changed session.
    * Never fails.
    */
-  private followTerminal(t: Thread): boolean {
+  private followTerminal(t: Thread, exitSession?: string): boolean {
     const at = t.meta.terminal;
     const seg = t.meta.segments.at(-1);
     const history = this.opts.providers.find((p) => p.id === t.meta.provider)?.history;
@@ -3686,7 +3686,8 @@ export class AgentCore {
     let held: string | undefined;
     let before: number | undefined;
     try {
-      held = history.terminalHeldSession({ dir: t.meta.dir, startedAt: at.startedAt, ...(seg.sessionId ? { sessionId: seg.sessionId } : {}) })?.toLowerCase();
+      // The session the CLI printed when it exited is exact; the register of running claudes is gone by then.
+      held = exitSession?.toLowerCase() ?? history.terminalHeldSession({ dir: t.meta.dir, startedAt: at.startedAt, ...(seg.sessionId ? { sessionId: seg.sessionId } : {}) })?.toLowerCase();
       // Nothing can be told: what was known stays.
       if (!held) return false;
       if (held === seg.sessionId?.toLowerCase()) {
@@ -3697,6 +3698,9 @@ export class AgentCore {
         t.untranscribedHeld = held;
         return false;
       }
+      // A session is one thread's: another thread that already shows it keeps it, so one conversation never has two rows.
+      const holder = this.holder(held);
+      if (holder && holder !== t) return false;
       before = seg.sessionId ? history.end(seg.sessionId) : undefined;
     } catch {
       return false;
@@ -3739,11 +3743,14 @@ export class AgentCore {
     for (const fn of this.listeners) fn(t.meta.id, [item]);
   }
 
-  /** `session` of terminal process `pid` ended (its AI exited, or it was closed). */
-  terminalEnded(session: number, pid: number): void {
+  /**
+   * `session` of terminal process `pid` ended (its AI exited, or it was closed).
+   * `exitSession`: the session the CLI said it ended in ("claude --resume <id>"), which the thread opens again.
+   */
+  terminalEnded(session: number, pid: number, exitSession?: string): void {
     const id = this.terminalThread(session, pid);
     const t = id ? this.threads.get(id) : undefined;
-    if (t) this.endTerminal(t);
+    if (t) this.endTerminal(t, exitSession);
   }
 
   /** Only these sessions of terminal process `pid` still run: every other thread's terminal ended (a new process, or ends missed). */
@@ -3755,9 +3762,9 @@ export class AgentCore {
   }
 
   /** The terminal let go of the thread: chat may write again; what the CLI wrote comes in. */
-  private endTerminal(t: Thread): void {
+  private endTerminal(t: Thread, exitSession?: string): void {
     // A CLI still running (closed from a device) may have gone on in another session: the thread keeps that one.
-    this.followTerminal(t);
+    this.followTerminal(t, exitSession);
     if (t.meta.terminal?.startedAt !== undefined) t.lastTerminal = { startedAt: t.meta.terminal.startedAt, endedAt: this.now() };
     const started = t.meta.terminal?.newSession;
     delete t.meta.terminal;
