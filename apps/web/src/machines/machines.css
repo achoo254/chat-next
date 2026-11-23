@@ -38,21 +38,21 @@
 
 /* The AI Agent column: one toggle for what needs the user or runs, then every project of every machine. */
 /* "Chỉ hiện cần bạn / đang chạy": a switch, the label beside it. */
-/* First steps: three numbered rows; the current one is open with its button, done ones show a check, later ones wait greyed. */
-.mx-steps { display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-3); }
-.mx-steps h3 { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
-.mx-steps ol { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.mx-steps li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+/* First steps: three numbered rows under the project tree, set off by a rule; the current one is open with its button, done ones show a check, later ones wait greyed. */
+.mx-first-steps { display: grid; gap: var(--space-4); margin-top: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-2); border-top: 1px solid var(--c-border-subtle); }
+.mx-first-steps h3 { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
+.mx-first-steps ol { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.mx-first-steps li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .mx-step-mark { display: grid; place-items: center; width: 24px; height: 24px; box-sizing: border-box; border: 1px solid var(--c-border); border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--c-text-muted); }
 .mx-step-body { display: grid; justify-items: start; gap: var(--space-2); min-width: 0; padding-top: 2px; }
 .mx-step-body b { font-size: 0.9375rem; font-weight: 600; }
 .mx-step-body p { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-step-body .btn { margin-top: var(--space-1); }
-.mx-steps li[data-state="current"] .mx-step-mark { border-color: var(--c-primary-solid); background: var(--c-primary-solid); color: var(--c-on-primary); }
-.mx-steps li[data-state="current"] .mx-step-body { padding: var(--space-3); margin: calc(-1 * var(--space-1)) 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); }
-.mx-steps li[data-state="done"] .mx-step-mark { border-color: var(--c-success); color: var(--c-success); }
-.mx-steps li[data-state="done"] b { color: var(--c-text-muted); font-weight: 500; }
-.mx-steps li[data-state="todo"] { opacity: 0.7; }
+.mx-first-steps li[data-state="current"] .mx-step-mark { border-color: var(--c-primary-solid); background: var(--c-primary-solid); color: var(--c-on-primary); }
+.mx-first-steps li[data-state="current"] .mx-step-body { padding: var(--space-3); margin: calc(-1 * var(--space-1)) 0; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); }
+.mx-first-steps li[data-state="done"] .mx-step-mark { border-color: var(--c-success); color: var(--c-success); }
+.mx-first-steps li[data-state="done"] b { color: var(--c-text-muted); font-weight: 500; }
+.mx-first-steps li[data-state="todo"] { opacity: 0.7; }
 /* Machines that need the user: their count, in the attention colour of the machine cards' own pill. */
 .mx-manage-count { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--c-warning) 55%, transparent); border-radius: var(--radius-full); background: color-mix(in srgb, var(--c-warning) 16%, var(--c-surface)); color: var(--c-warning-text); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
 .mx-groups { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-4); }
