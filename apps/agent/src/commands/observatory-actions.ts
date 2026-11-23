@@ -55,7 +55,7 @@ function statusLines(s: ObservatoryStatus): string[] {
   const lines = [
     `Receiver: ${r.state}${r.port !== undefined ? ` on 127.0.0.1:${r.port}` : ""}${note ? ` (${note})` : ""}`,
     `  requests ${r.stats.requests}, records ${r.stats.received}, refused for the token ${r.stats.unauthorized}, other refusals ${r.stats.refused}, too large ${r.stats.tooLarge}, queue full ${r.stats.queueFull}, malformed ${r.stats.malformed}, previous token ${r.stats.previousToken}`,
-    `Store: ${s.store}; last write ${when(s.lastDbWriteAt)}; ${s.pendingWrites} writes waiting`,
+    `Store: ${s.store}${s.newerDb ? ` (written by a newer tunelo: schema ${s.newerDb.databaseVersion}, this one knows ${s.newerDb.agentVersion}; only the tables it knows are written and exported, the rest is left as it is)` : ""}; last write ${when(s.lastDbWriteAt)}; ${s.pendingWrites} writes waiting`,
     `Last event: ${when(s.lastRecordAt)}`,
   ];
   if (s.spool) {

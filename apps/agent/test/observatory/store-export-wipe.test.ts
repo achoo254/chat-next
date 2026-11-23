@@ -28,7 +28,9 @@ describe("ObservatoryStore export", () => {
     store.close();
 
     const out = JSON.parse(chunks.join("")) as Exported;
-    expect(summary.rows).toBe(13);
+    // 12 rows of the session, and the database's own minimum reader version.
+    expect(summary.rows).toBe(13 + 1);
+    expect(out.tables.meta).toEqual([{ key: "min_reader_version", value: "1" }]);
     expect(Object.keys(out)).toEqual(["schemaVersion", "tables"]);
     expect(out.schemaVersion).toBe(1);
     expect(Object.keys(out.tables)).toEqual([...OBSERVATORY_TABLES]);

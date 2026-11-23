@@ -53,11 +53,12 @@ describe("ObservatoryStore.open", () => {
     again.close();
   });
 
-  it("refuses a database of a newer schema and writes nothing to it", async () => {
+  it("refuses a database of a newer schema that this agent may not read, and writes nothing to it", async () => {
     const path = tempDbPath();
     (await ObservatoryStore.open({ path })).close();
     const db = await openSqlite(path);
     db.exec("PRAGMA journal_mode = DELETE");
+    db.run("UPDATE meta SET value = ? WHERE key = 'min_reader_version'", [String(SCHEMA_VERSION + 1)]);
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION + 1}`);
     db.close();
     const before = readFileSync(path);
@@ -69,13 +70,14 @@ describe("ObservatoryStore.open", () => {
     expect(existsSync(`${path}-wal`)).toBe(false);
   });
 
-  it("refuses a newer database whose last commits are still in its -wal, changing no byte of either file", async () => {
-    // A newer agent that was killed: its schema version and a row only in the -wal.
+  it("refuses a newer database it may not read whose last commits are still in its -wal, changing no byte of either file", async () => {
+    // A newer agent that was killed: its schema version, minimum reader and a row only in the -wal.
     const source = tempDbPath();
     (await ObservatoryStore.open({ path: source })).close();
     const newer = await openSqlite(source);
     newer.exec("PRAGMA wal_autocheckpoint = 0");
     newer.exec(`PRAGMA user_version = ${SCHEMA_VERSION + 1}`);
+    newer.run("UPDATE meta SET value = ? WHERE key = 'min_reader_version'", [String(SCHEMA_VERSION + 1)]);
     newer.exec("INSERT INTO content_settings VALUES ('k', 1, 1)");
     // Copy the files while the newer agent still has them open: as a crash leaves them.
     const path = join(dirname(tempDbPath()), "copy", "observatory.db");

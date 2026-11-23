@@ -6,7 +6,7 @@
 // thread for its work plus at most the busy timeout when another connection
 // holds the lock (then it throws ObservatoryStoreBusy, nothing written). The
 // agent keeps batches small (batch-writer.ts) and the timeout short.
-import { rollbackQuietly, schemaVersionOf } from "./migrate.ts";
+import { SCHEMA_VERSION, isNewerThanAgent, rollbackQuietly, schemaVersionOf } from "./migrate.ts";
 import { deleteObservatoryDb } from "./observatory-db-files.ts";
 import { observatoryDbPath } from "./observatory-db-path.ts";
 import { type ExportFileOptions, type ExportSink, type ExportSummary, exportObservatory, exportObservatoryToFile } from "./observatory-export.ts";
@@ -37,7 +37,7 @@ export class ObservatoryStore {
     private db: SqliteConnection,
   ) {}
 
-  /** Opens the database, creating and migrating it; throws ObservatorySchemaTooNew, untouched, for a newer one. */
+  /** Opens the database, creating and migrating it; throws ObservatorySchemaTooNew, untouched, for a newer one this agent may not read. */
   static async open(opts: OpenOptions = {}): Promise<ObservatoryStore> {
     const path = opts.path ?? observatoryDbPath();
     return new ObservatoryStore(path, opts, await openObservatoryDb(path, opts.runtime, opts.busyTimeoutMs ?? AGENT_BUSY_TIMEOUT_MS));
@@ -49,6 +49,20 @@ export class ObservatoryStore {
 
   get schemaVersion(): number {
     return schemaVersionOf(this.live());
+  }
+
+  /**
+   * True when a newer agent wrote the database and still lets this one use
+   * it (migrate.ts): this agent writes, prunes and exports only the tables
+   * and columns it knows, and leaves the rest as it found it.
+   */
+  get newerThanAgent(): boolean {
+    return isNewerThanAgent(this.live());
+  }
+
+  /** The schema version this agent writes (the database's may be higher, see newerThanAgent). */
+  get agentSchemaVersion(): number {
+    return SCHEMA_VERSION;
   }
 
   private live(): SqliteConnection {

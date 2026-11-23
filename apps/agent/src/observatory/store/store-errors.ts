@@ -7,7 +7,7 @@ export class ObservatoryStoreError extends Error {
   override readonly name: string = "ObservatoryStoreError";
 }
 
-/** The database was written by a newer agent: it is left untouched. */
+/** The database was written by a newer agent that does not let this one read it (migrate.ts): it is left untouched. */
 export class ObservatorySchemaTooNew extends ObservatoryStoreError {
   override readonly name = "ObservatorySchemaTooNew";
 
@@ -15,8 +15,12 @@ export class ObservatorySchemaTooNew extends ObservatoryStoreError {
     readonly found: number,
     readonly supported: number,
     readonly path: string,
+    /** The database's minimum reader version; undefined when it records none. */
+    readonly minReader?: number,
   ) {
-    super(`the Observatory database ${path} has schema version ${found}; this agent knows up to ${supported} and leaves it untouched`);
+    super(
+      `the Observatory database ${path} has schema version ${found} and needs an agent of schema ${minReader === undefined ? found : minReader} or later to read it; this agent knows up to ${supported} and leaves it untouched`,
+    );
   }
 }
 

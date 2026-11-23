@@ -5,6 +5,9 @@
 //
 //   {"schemaVersion":1,"tables":{"sessions":[{...},...],"prompts":[...],...}}
 //
+// A database a newer agent wrote (migrate.ts) is exported with the tables
+// this agent knows only, and says so in a "note" before "tables".
+//
 // written to a sink page by page (EXPORT_PAGE_ROWS rows by rowid), the event
 // loop getting a turn between pages, so a large database is never held in
 // memory nor the agent stalled. Pages are read one by one, not in one
@@ -13,12 +16,15 @@
 import { randomUUID } from "node:crypto";
 import { open as openFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { schemaVersionOf } from "./migrate.ts";
+import { SCHEMA_VERSION, schemaVersionOf } from "./migrate.ts";
 import { OBSERVATORY_TABLES } from "./schema-v1.ts";
 import type { SqliteConnection } from "./sqlite-driver.ts";
 import { ObservatoryStoreError } from "./store-errors.ts";
 
 export const EXPORT_PAGE_ROWS = 500;
+
+/** The note of an export of a database a newer agent wrote. */
+export const NEWER_DB_EXPORT_NOTE = "This database was written by a newer tunelo; the tables this version does not know are not in this export.";
 const ROWID = "__export_rowid";
 
 /** Where an export goes: called with each piece of the JSON text, in order; the next piece waits for it. */
@@ -43,7 +49,9 @@ function rowJson(table: string, raw: Readonly<Record<string, unknown>>): string 
 export async function exportObservatory(db: () => SqliteConnection, sink: ExportSink, pageRows: number = EXPORT_PAGE_ROWS): Promise<ExportSummary> {
   if (!Number.isSafeInteger(pageRows) || pageRows < 1) throw new ObservatoryStoreError(`the export page size must be a positive integer, not ${String(pageRows)}`);
   let rows = 0;
-  await sink(`{"schemaVersion":${schemaVersionOf(db())},"tables":{`);
+  const version = schemaVersionOf(db());
+  const note = version > SCHEMA_VERSION ? `"note":${JSON.stringify(NEWER_DB_EXPORT_NOTE)},` : "";
+  await sink(`{"schemaVersion":${version},${note}"tables":{`);
   for (const [i, table] of OBSERVATORY_TABLES.entries()) {
     await sink(`${i > 0 ? "," : ""}${JSON.stringify(table)}:[`);
     let after = 0;

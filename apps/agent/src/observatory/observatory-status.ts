@@ -1,5 +1,6 @@
 // What `tunelo observatory status` shows of the running agent's Observatory:
 // counts and states only, never content or a token.
+import type { NewerDb } from "./agent-store-host.ts";
 import type { IngestStats } from "./ingest/observatory-ingest.ts";
 import type { OtlpReceiver } from "./receiver/otlp-receiver.ts";
 import { type ReceiverStats, emptyReceiverStats } from "./receiver/receiver-stats.ts";
@@ -11,6 +12,8 @@ export type ObservatoryStatus = {
   enabled: boolean;
   /** off: not opened (Observatory off); failed: could not be opened (see the agent's log). */
   store: "open" | "failed" | "off";
+  /** Set while the open database was written by a newer agent that lets this one use it: only the tables this agent knows are written, pruned and exported. */
+  newerDb: NewerDb | undefined;
   receiver: {
     state: ReceiverStatusState;
     /** The machine's port, when one is set. */
@@ -35,6 +38,7 @@ export type ObservatoryStatus = {
 export type StatusParts = {
   enabled: boolean;
   store: ObservatoryStatus["store"];
+  newerDb: NewerDb | undefined;
   receiverState: ReceiverStatusState;
   receiver: OtlpReceiver | undefined;
   spool: SpoolStats | undefined;
@@ -50,6 +54,7 @@ export function observatoryStatus(p: StatusParts): ObservatoryStatus {
   return {
     enabled: p.enabled,
     store: p.store,
+    newerDb: p.newerDb ? { ...p.newerDb } : undefined,
     receiver: {
       state: p.receiverState,
       port: p.receiver?.port,

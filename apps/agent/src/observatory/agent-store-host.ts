@@ -24,12 +24,17 @@ export type AgentStoreHostOptions = {
   now: () => number;
 };
 
+/** The schema versions of a database a newer agent wrote, and of this agent. */
+export type NewerDb = { databaseVersion: number; agentVersion: number };
+
 export class AgentStoreHost {
   store: ObservatoryStore | undefined;
   writer: ObservatoryBatchWriter | undefined;
   state: "open" | "failed" | "off" = "off";
   /** When a batch last went into the store (Unix ms). */
   lastWriteAt: number | undefined;
+  /** Set while the open database was written by a newer agent that lets this one use it (store/migrate.ts). */
+  newerDb: NewerDb | undefined;
 
   constructor(private readonly opts: AgentStoreHostOptions) {}
 
@@ -47,6 +52,7 @@ export class AgentStoreHost {
       this.store = store;
       this.writer = writer;
       this.state = "open";
+      this.newerDb = store.newerThanAgent ? { databaseVersion: store.schemaVersion, agentVersion: store.agentSchemaVersion } : undefined;
       const off = contentOffOf(this.opts.config);
       for (const op of contentOffWrites(off, this.opts.now())) writer.push(op);
       writer.flush();
@@ -57,6 +63,7 @@ export class AgentStoreHost {
       this.store = undefined;
       this.writer = undefined;
       this.state = "failed";
+      this.newerDb = undefined;
       this.opts.problems("store-open", err);
     }
   }
@@ -83,6 +90,7 @@ export class AgentStoreHost {
     this.store = undefined;
     this.writer = undefined;
     this.state = "off";
+    this.newerDb = undefined;
   }
 
   /** Wipes the database and opens a new one (when `reopen`); resolves with the wipe's error, if any, instead of throwing it. */

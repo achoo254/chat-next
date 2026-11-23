@@ -165,6 +165,14 @@ export const SCHEMA_V1: readonly string[] = [
   )`,
 ];
 
+/**
+ * Facts about the database file itself, by key (migrate.ts):
+ * `min_reader_version` is the lowest schema version that may still read and
+ * write it. Created with IF NOT EXISTS on every open, so a database made
+ * before the table existed gets it too.
+ */
+export const META_TABLE = "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)";
+
 /** Every table of the schema, in the order an export lists them. */
 export const OBSERVATORY_TABLES = [
   "sessions",
@@ -176,6 +184,7 @@ export const OBSERVATORY_TABLES = [
   "git_ops",
   "content_settings",
   "daily_rollups",
+  "meta",
 ] as const;
 
 export type ObservatoryTable = (typeof OBSERVATORY_TABLES)[number];

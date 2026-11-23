@@ -212,6 +212,7 @@ export class ObservatoryService {
     return observatoryStatus({
       enabled: this.enabled,
       store: this.store.state,
+      newerDb: this.store.newerDb,
       receiverState: this.receiver.state,
       receiver: this.receiver.running,
       spool: this.intake.spoolStats,
