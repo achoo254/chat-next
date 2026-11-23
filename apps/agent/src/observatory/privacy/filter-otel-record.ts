@@ -44,9 +44,15 @@ function attribute(attributes: unknown, key: string): string | number | boolean 
   return undefined;
 }
 
+const DECIMAL = /^-?\d{1,18}(\.\d{1,18})?$/;
+
 function keptValue(rule: OtelRule, value: string | number | boolean, known: readonly string[]): OtelFieldValue | undefined {
   if (rule === "id") return idValue(typeof value === "number" ? String(value) : value);
-  if (rule === "number") return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  // Claude Code may send numbers as string attributes ("569"): a plain decimal is read as its number.
+  if (rule === "number") {
+    const n = typeof value === "string" && DECIMAL.test(value) ? Number(value) : value;
+    return typeof n === "number" && Number.isFinite(n) ? n : undefined;
+  }
   if (rule === "bool") return typeof value === "boolean" ? value : value === "true" ? true : value === "false" ? false : undefined;
   const label = labelValue(value);
   return label === undefined ? undefined : redact(label, known);

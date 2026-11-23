@@ -66,4 +66,24 @@ describe("the excerpt window", () => {
       expect(kept).not.toContain("zzzz");
     }
   });
+  it("reads numbers sent as string attributes, and nothing else as a number", () => {
+    const body = {
+      resourceLogs: [{ resource: { attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }] }, scopeLogs: [{ logRecords: [{
+        timeUnixNano: "1700000000000000000",
+        body: { stringValue: "claude_code.tool_result" },
+        attributes: [
+          { key: "event.name", value: { stringValue: "tool_result" } },
+          { key: "session.id", value: { stringValue: "s" } },
+          { key: "tool_name", value: { stringValue: "Bash" } },
+          { key: "duration_ms", value: { stringValue: "569" } },
+          { key: "tool_result_size_bytes", value: { stringValue: "12abc" } },
+          { key: "success", value: { stringValue: "true" } },
+        ],
+      }] }] }],
+    };
+    const out = filterOtlpLogs(body, [], 1);
+    const f = out.records[0]?.f;
+    expect(f).toMatchObject({ duration_ms: 569, success: true });
+    expect(f?.tool_result_size_bytes).toBeUndefined();
+  });
 });
