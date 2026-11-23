@@ -1,7 +1,8 @@
 // What the Advisor mascot keeps on this device, outside React: the last five
 // copies with where they were made (memory only, never stored), the
 // questions this tab asked and waits for (sessionStorage: only their ids,
-// so a reload goes on showing them), where the mascot sits and whether it
+// so a reload goes on showing them), the automatic answers given lately
+// (localStorage, per device), where the mascot sits and whether it
 // shows (localStorage, per device), the mascot's mood as the live part
 // (advisor-bubble.tsx) works it out, a short line to say beside it, and
 // text waiting for a session's composer ("Gửi sang phiên").
@@ -76,7 +77,8 @@ export interface Question {
 /**
  * An answer Advisor gave on its own (automatic mode) while a session showed:
  * kept for a while, so one that came and went from beside the mascot can still
- * be found and followed back to its session. Memory only, never stored.
+ * be found and followed back to its session. Kept in localStorage (this
+ * device only), so a reload does not lose them; sign-out clears them.
  */
 export interface HistoryEntry {
 	/** The verdict's item id. */
@@ -152,6 +154,7 @@ const HIDDEN_KEY = "advisor:hidden";
 const MACHINE_KEY = "advisor:machine";
 const AI_KEY = "advisor:ai:";
 const QUESTIONS_KEY = "advisor:questions";
+const HISTORY_KEY = "advisor:history";
 
 function readJson(storage: () => Storage, key: string): unknown {
 	try {
@@ -209,6 +212,32 @@ function saveQuestions(questions: readonly Question[]): void {
 	writeItem(session, QUESTIONS_KEY, kept.length === 0 ? null : JSON.stringify(kept));
 }
 
+/** The automatic answers a reload left on this device; entries of the wrong shape are dropped. */
+function readHistory(): HistoryEntry[] {
+	const raw = readJson(local, HISTORY_KEY);
+	if (!Array.isArray(raw)) return [];
+	const out: HistoryEntry[] = [];
+	for (const entry of raw) {
+		if (typeof entry !== "object" || entry === null) continue;
+		const e = entry as Record<string, unknown>;
+		const id = str(e.id);
+		const machine = str(e.machine);
+		const threadId = str(e.threadId);
+		const target = str(e.target);
+		const text = str(e.text);
+		if (id === "" || machine === "" || threadId === "" || target === "" || text === "") continue;
+		if (typeof e.at !== "number" || !Number.isFinite(e.at)) continue;
+		const unavailable = e.unavailable === "missing" || e.unavailable === "unreachable" ? e.unavailable : "";
+		out.push({ id, machine, threadId, title: str(e.title), text, target, at: e.at, unavailable });
+		if (out.length === MAX_HISTORY) break;
+	}
+	return out;
+}
+
+function saveHistory(history: readonly HistoryEntry[]): void {
+	writeItem(local, HISTORY_KEY, history.length === 0 ? null : JSON.stringify(history));
+}
+
 let nextId = 0;
 
 export class AdvisorStore {
@@ -227,7 +256,7 @@ export class AdvisorStore {
 			busy: false,
 			flash: "",
 			flashTarget: "",
-			history: [],
+			history: readHistory(),
 			dot: false,
 			dock: readDock(),
 			hidden: readJson(local, HIDDEN_KEY) === true,
@@ -297,6 +326,7 @@ export class AdvisorStore {
 
 	forgetAll(): void {
 		saveQuestions([]);
+		saveHistory([]);
 		this.set({ copies: [], used: new Set(), questions: [], fills: new Map(), session: null, chat: null, open: false, flash: "", flashTarget: "", history: [], dot: false, mood: "idle", note: "", busy: false });
 	}
 
@@ -346,12 +376,16 @@ export class AdvisorStore {
 
 	addHistory(entry: HistoryEntry): void {
 		if (this.state.history.some((h) => h.id === entry.id)) return;
-		this.set({ history: [entry, ...this.state.history].slice(0, MAX_HISTORY) });
+		const history = [entry, ...this.state.history].slice(0, MAX_HISTORY);
+		saveHistory(history);
+		this.set({ history });
 	}
 
 	/** The session of this answer cannot be opened: the answer stays listed, no longer tappable. */
 	markUnavailable(id: string, why: "missing" | "unreachable"): void {
-		this.set({ history: this.state.history.map((h) => (h.id === id ? { ...h, unavailable: why } : h)) });
+		const history = this.state.history.map((h) => (h.id === id ? { ...h, unavailable: why } : h));
+		saveHistory(history);
+		this.set({ history });
 	}
 
 	setDot(dot: boolean): void {
