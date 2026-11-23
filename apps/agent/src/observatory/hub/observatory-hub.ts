@@ -29,7 +29,9 @@
 //
 // Every snapshot and every `session` event carries the session's live state
 // (live-state.ts), worked out from its newest events, provisional ones
-// included. The Live Map's other requests are answered here too: an event's
+// included, after the older rows that still change it (a call running since
+// before them, the last turn end, the main thread's last request): the state
+// the whole session gives. The Live Map's other requests are answered here too: an event's
 // stored content by its id (the only content that leaves the machine, read
 // with the project's setting applied) and a station's numbers.
 import { create } from "@bufbuild/protobuf";
@@ -54,6 +56,7 @@ import {
 import { AgentError } from "../../core/agent-core.ts";
 import { BoundedMap } from "../ingest/bounded-map.ts";
 import { LOAD_MATCH_MS } from "../ingest/instruction-load-seq.ts";
+import { TOOL_ERROR } from "../ingest/normalize-hook-record.ts";
 import type { InstructionLoad } from "../ingest/normalized-record.ts";
 import type { LiveTailEvent } from "../spool/spool-live-tail.ts";
 import type { StoredContent } from "../store/live-map-reads.ts";
@@ -93,7 +96,7 @@ const MAX_SESSION_ID_LENGTH = 200;
 const MAX_EVENT_ID_LENGTH = 2_048;
 /** A station's name: upper-case letters and `_` (live-map/station-map.ts); one this agent has no row of gives empty numbers. */
 const STATION_NAME = /^[A-Z][A-Z_]{0,31}$/;
-/** The newest events the live state is worked out from. */
+/** The newest events the live state is worked out from, with the older rows that still change it (store liveCarry); also the most running calls carried. */
 export const LIVE_WINDOW = 200;
 
 /** Where a watching connection gets a session's events. */
@@ -560,7 +563,11 @@ export class ObservatoryHub {
   private stateOf(sessionId: string, w: Watched, store: ObservatoryStore): ObservatorySessionState {
     const row = store.session(sessionId);
     const facts = store.liveFacts(sessionId);
-    const entries = this.withProvisional(w, store, store.timelinePage(sessionId, undefined, LIVE_WINDOW).entries, undefined).map((o) => o.entry);
+    const page = store.timelinePage(sessionId, undefined, LIVE_WINDOW);
+    const oldest = page.entries[0];
+    // Older rows that still count (a call running since before the window, the last turn end, the last main-thread request).
+    const carried = page.more && oldest ? store.liveCarry(sessionId, oldest, LIVE_WINDOW, TOOL_ERROR.interrupted) : [];
+    const entries = this.withProvisional(w, store, [...carried, ...page.entries], undefined).map((o) => o.entry);
     const live = liveStateOf({ entries, endedAt: row?.endedAt ?? null, mainModel: row?.mainModel ?? null, openBottlenecks: facts.openBottlenecks, largestContext: facts.largestContext });
     return sessionState(row, store.sessionTotals(sessionId), live);
   }

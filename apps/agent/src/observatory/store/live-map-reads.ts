@@ -14,7 +14,7 @@ import type { SessionRow } from "./observatory-rows.ts";
 import { SESSIONS } from "./observatory-table-specs.ts";
 import { decodeRow, selectList } from "./row-codec.ts";
 import type { SqlRow, SqlValue, SqliteConnection } from "./sqlite-driver.ts";
-import { type TimelineEntry, type TimelineKind, compareTimeline, selectTimelineEntries } from "./timeline-reads.ts";
+import { type RowFilter, type TimelineEntry, type TimelineKind, type TimelinePlace, compareTimeline, newestOfKind, selectTimelineEntries } from "./timeline-reads.ts";
 import { contentBlocked } from "./write-ops.ts";
 
 /** Durations a station's percentiles are worked out from at most. */
@@ -117,6 +117,55 @@ export function readLiveFacts(db: SqliteConnection, sessionId: string): LiveFact
     [sessionId, sessionId],
   )[0];
   return { openBottlenecks: num(row?.open), largestContext: num(row?.largest) };
+}
+
+// --- the older rows the live state still needs -----------------------------------
+
+/** Session events that end a turn (hub/live-state.ts). */
+const TURN_END_EVENTS: RowFilter = { where: "kind IN ('stop', 'stop_failure') OR (kind = 'notification' AND label = 'idle_prompt')", params: [] };
+/** Session events that set the core's state (hub/live-state.ts). */
+const CORE_EVENTS: RowFilter = {
+  where:
+    "kind IN ('permission_request', 'permission_decision', 'permission_denied', 'hook_block', 'compact_start', 'compact_end', 'stop', 'stop_failure') OR (kind = 'notification' AND label IN ('permission_prompt', 'idle_prompt'))",
+  params: [],
+};
+const MAIN_THREAD = "agent_id IS NULL OR agent_id = ''";
+
+/**
+ * The rows of a session sorting before `before` (the oldest of the newest
+ * events its live state is worked out from) that still change that state,
+ * oldest first: the newest row of each kind that sets the core's state, the
+ * newest turn end (a stop, an idle prompt, a tool call ended
+ * `interruptedError`), the tool calls not ended since it (the newest `limit`)
+ * with the events that say they never ran, and the main thread's newest API
+ * request and newest one with a speed. Folded before the newest events
+ * (hub/live-state.ts), they give the state the whole session gives: the
+ * calls still running, the core's state, the speed and the context, however
+ * many events came after them.
+ */
+export function readLiveCarry(db: SqliteConnection, sessionId: string, before: TimelinePlace, limit: number, interruptedError: string): TimelineEntry[] {
+  const newest = (kind: TimelineKind, filter?: RowFilter): TimelineEntry[] => newestOfKind(db, kind, sessionId, before, 1, filter);
+  const stopped = newest("sessionEvent", TURN_END_EVENTS);
+  // Only an interrupted call after the last stop can be the later end: the scan stops there.
+  const ends = [...stopped, ...newest("toolCall", { where: "error = ? AND at >= ?", params: [interruptedError, stopped[0]?.at ?? 0] })];
+  // Calls at the turn end's millisecond are read too: the fold puts each on its side of the end.
+  const since = Math.max(0, ...ends.map((e) => e.at));
+  const open = newestOfKind(db, "toolCall", sessionId, before, limit, { where: "success IS NULL AND at >= ?", params: [since] });
+  const ids = open.map((e) => e.key);
+  const notRun = chunks(ids).flatMap((part) => newestOfKind(db, "sessionEvent", sessionId, before, part.length, { where: `kind IN ('permission_denied', 'hook_block') AND tool_use_id IN (${inList(part.length)})`, params: part }));
+  const rows = [
+    ...newest("prompt"),
+    ...newest("subagent"),
+    ...newest("toolCall"),
+    ...newest("sessionEvent", CORE_EVENTS),
+    ...newest("apiRequest", { where: MAIN_THREAD, params: [] }),
+    ...newest("apiRequest", { where: `(${MAIN_THREAD}) AND output_tokens > 0 AND duration_ms > 0`, params: [] }),
+    ...ends,
+    ...open,
+    ...notRun,
+  ];
+  const byPlace = new Map(rows.map((e) => [`${e.kind}\u0000${e.key}`, e]));
+  return [...byPlace.values()].sort(compareTimeline);
 }
 
 // --- a station's numbers ---------------------------------------------------------

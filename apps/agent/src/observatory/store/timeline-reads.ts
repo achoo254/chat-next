@@ -139,11 +139,21 @@ export function selectTimelineEntries(db: SqliteConnection, kind: TimelineKind, 
   return db.all(`SELECT ${t.columns}, ${t.at} AS tl_at, ${t.key} AS tl_key FROM ${t.table} WHERE ${where}${tail}`, params).map((raw) => decodeEntry(kind, raw));
 }
 
-/** The newest `limit` rows of one kind that sort before `before` (every row when it is undefined), newest first. */
-function newestOfKind(db: SqliteConnection, kind: TimelineKind, sessionId: string, before: TimelinePlace | undefined, limit: number): TimelineEntry[] {
+/** A condition on a kind's rows beyond the session and the place (SQL over the kind's own columns, with its parameters). */
+export type RowFilter = { readonly where: string; readonly params: readonly SqlValue[] };
+
+/**
+ * The newest `limit` rows of one kind of a session that sort before `before`
+ * (every row when it is undefined) and meet `filter`, newest first.
+ */
+export function newestOfKind(db: SqliteConnection, kind: TimelineKind, sessionId: string, before: TimelinePlace | undefined, limit: number, filter?: RowFilter): TimelineEntry[] {
   const t = TABLES[kind];
   let where = "session_id = ?";
   const params: SqlValue[] = [sessionId];
+  if (filter) {
+    where += ` AND (${filter.where})`;
+    params.push(...filter.params);
+  }
   if (before) {
     const order = kindOrder(kind) - kindOrder(before.kind);
     // A kind sorting before the cursor's keeps its rows of the cursor's millisecond; one after it does not.

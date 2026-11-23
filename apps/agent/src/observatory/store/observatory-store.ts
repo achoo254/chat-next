@@ -9,7 +9,7 @@
 import { SCHEMA_VERSION, isNewerThanAgent, rollbackQuietly, schemaVersionOf } from "./migrate.ts";
 import { deleteObservatoryDb } from "./observatory-db-files.ts";
 import { observatoryDbPath } from "./observatory-db-path.ts";
-import { type LiveFacts, type StationDrill, type StationQuery, type StoredContent, readContent, readLiveFacts, readStation, readThreadSessions } from "./live-map-reads.ts";
+import { type LiveFacts, type StationDrill, type StationQuery, type StoredContent, readContent, readLiveCarry, readLiveFacts, readStation, readThreadSessions } from "./live-map-reads.ts";
 import { type ExportFileOptions, type ExportSink, type ExportSummary, exportObservatory, exportObservatoryToFile } from "./observatory-export.ts";
 import type { ContentSettingRow, DailyRollupRow, SessionRow } from "./observatory-rows.ts";
 import { AGENT_BUSY_TIMEOUT_MS, openObservatoryDb } from "./open-observatory-db.ts";
@@ -161,6 +161,11 @@ export class ObservatoryStore {
   /** A session's open findings and largest context (live-map-reads.ts). */
   liveFacts(sessionId: string): LiveFacts {
     return readLiveFacts(this.live(), sessionId);
+  }
+
+  /** A session's rows before `before` that still change its live state, oldest first (live-map-reads.ts). */
+  liveCarry(sessionId: string, before: TimelinePlace, limit: number, interruptedError: string): TimelineEntry[] {
+    return readLiveCarry(this.live(), sessionId, before, limit, interruptedError);
   }
 
   /** One station's numbers in a session (live-map-reads.ts). */

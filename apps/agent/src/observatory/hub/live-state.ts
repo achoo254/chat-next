@@ -2,7 +2,9 @@
 // out from its events in timeline order and nothing else, so a device
 // replaying the events up to a time gets what a device watching live got at
 // that time (docs/observatory-wire.md, "Trạng thái lõi"). The hub runs it over
-// the session's newest events, provisional ones included; the open findings
+// the session's newest events, provisional ones included, after the older
+// rows that still change the result (store/live-map-reads.ts readLiveCarry),
+// so it gives what the whole session gives; the open findings
 // and the largest context come from the store (they may be older than those
 // events), and a device replaying keeps them from the events it has.
 //

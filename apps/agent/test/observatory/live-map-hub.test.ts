@@ -18,8 +18,11 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentError } from "../../src/core/agent-core.ts";
 import { type ObservatoryEventSink, ObservatoryHub } from "../../src/observatory/hub/observatory-hub.ts";
+import { liveStateOf } from "../../src/observatory/hub/live-state.ts";
+import { sessionState } from "../../src/observatory/hub/observatory-wire.ts";
 import type { LiveTailEvent } from "../../src/observatory/spool/spool-live-tail.ts";
 import type { ObservatoryStore } from "../../src/observatory/store/observatory-store.ts";
+import type { TimelineEntry } from "../../src/observatory/store/timeline-reads.ts";
 import type { WriteOp } from "../../src/observatory/store/write-ops.ts";
 import { openTempStore, sessionOps } from "./store-fixture.ts";
 
@@ -120,6 +123,103 @@ describe("the live state", () => {
     await wait(40);
     const state = a.events().at(-1)?.kind;
     expect(state?.case === "session" ? [state.value.live?.core, state.value.live?.running] : undefined).toEqual([ObservatoryCoreState.WAITING_USER, []]);
+  });
+});
+
+describe("the live state of a session longer than its window", () => {
+  /** The live state the whole session gives, as the wire carries it. */
+  function wholeSession(store: ObservatoryStore, sessionId: string) {
+    const entries: TimelineEntry[] = [];
+    let page = store.timelinePage(sessionId, undefined, 500);
+    entries.unshift(...page.entries);
+    while (page.more && page.entries[0]) {
+      page = store.timelinePage(sessionId, page.entries[0], 500);
+      entries.unshift(...page.entries);
+    }
+    const row = store.session(sessionId);
+    const facts = store.liveFacts(sessionId);
+    const live = liveStateOf({ entries, endedAt: row?.endedAt ?? null, mainModel: row?.mainModel ?? null, openBottlenecks: facts.openBottlenecks, largestContext: facts.largestContext });
+    return sessionState(row, store.sessionTotals(sessionId), live).live;
+  }
+
+  it("still counts a main call running since before its newest 200 events, as the whole session does", async () => {
+    const { hub, write, store } = await setup();
+    const ops: WriteOp[] = [
+      session("s", T, { mainModel: "claude-sonnet-5-5" }),
+      { kind: "prompt", row: { promptId: "p1", sessionId: "s", at: T + 1 } },
+      { kind: "apiRequest", row: { dedupeKey: "main", sessionId: "s", at: T + 2, model: "claude-sonnet-5-5", inputTokens: 50_000, outputTokens: 100, durationMs: 2_000 } },
+      toolCall("s", "build", T + 3, { toolName: "Bash", station: "TESTING", target: "pnpm" }),
+    ];
+    // A subagent busy while the build runs: its calls end, its requests are not the main thread's.
+    for (let i = 0; i < 150; i++) {
+      ops.push(toolCall("s", `sub${i}`, T + 10 + i * 2, { durationMs: 5, success: true }));
+      ops.push({ kind: "apiRequest", row: { dedupeKey: `sub-r${i}`, sessionId: "s", at: T + 11 + i * 2, agentId: "a1", model: "claude-haiku-5-0", inputTokens: 900, outputTokens: 10, durationMs: 300 } });
+    }
+    write(ops);
+    const live = hub.watch("s", recorder().sink).session?.live;
+    expect(live?.running).toEqual(expect.arrayContaining([expect.objectContaining({ station: "TESTING", count: 1 })]));
+    expect(live?.contextTokens).toBe(50_000n);
+    expect(json(live)).toBe(json(wholeSession(store, "s")));
+  });
+
+  it.each([1, 2, 3, 4, 5])("matches the whole session's on a random long session (seed %i)", async (seed) => {
+    const { hub, write, store } = await setup();
+    let x = seed * 7_919;
+    const rand = (n: number): number => {
+      x = (x * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return x % n;
+    };
+    const ops: WriteOp[] = [session("s", T, { mainModel: "claude-opus-5-1" })];
+    let at = T;
+    for (let i = 0; i < 700; i++) {
+      at += 1 + rand(3);
+      const id = `t${i}`;
+      const station = ["FILES", "TESTING", "SANDBOX", "GIT"][rand(4)] ?? "FILES";
+      const agent = rand(3) === 0 ? { agentId: "a1" } : {};
+      switch (rand(12)) {
+        case 0:
+          ops.push({ kind: "prompt", row: { promptId: `p${i}`, sessionId: "s", at } });
+          break;
+        case 1:
+        case 2:
+        case 3:
+          ops.push(toolCall("s", id, at, { station, ...agent, durationMs: 5, success: true }));
+          break;
+        case 4:
+          // Never ends (still running, or lost to a turn's end).
+          ops.push(toolCall("s", id, at, { station, ...agent }));
+          break;
+        case 5:
+          ops.push({ kind: "toolCall", row: { toolUseId: id, sessionId: "s", at, toolName: "Bash", station, stationFlags: 0, success: false, error: "interrupted" } });
+          break;
+        case 6:
+          ops.push(toolCall("s", id, at, { station }));
+          ops.push({ kind: "sessionEvent", row: { dedupeKey: `d${i}`, sessionId: "s", at: at + 1, kind: "permission_denied", toolUseId: id } });
+          break;
+        case 7:
+          ops.push({ kind: "sessionEvent", row: { dedupeKey: `e${i}`, sessionId: "s", at, kind: rand(2) === 0 ? "stop" : "permission_request" } });
+          break;
+        case 8:
+          ops.push({ kind: "sessionEvent", row: { dedupeKey: `n${i}`, sessionId: "s", at, kind: "notification", label: rand(2) === 0 ? "idle_prompt" : "permission_prompt" } });
+          break;
+        case 9:
+          ops.push({ kind: "apiRequest", row: { dedupeKey: `r${i}`, sessionId: "s", at, model: "claude-opus-5-1", inputTokens: 1_000 + rand(90_000), outputTokens: rand(2) * 300, durationMs: 1_000 + rand(3_000) } });
+          break;
+        default:
+          // Rows that say nothing of the live state.
+          ops.push({ kind: "apiRequest", row: { dedupeKey: `r${i}`, sessionId: "s", at, agentId: "a1", model: "claude-haiku-5-0", inputTokens: 500, outputTokens: 5, durationMs: 100 } });
+          ops.push({ kind: "instructionLoaded", row: { sessionId: "s", seq: i, at, filePath: "~/work/app/CLAUDE.md", loadReason: "nested_traversal" } });
+      }
+    }
+    write(ops);
+    // At every 50th row the window holds a different part of the session.
+    const all = ops.slice(1);
+    for (let n = 50; n <= all.length; n += 50) {
+      const { hub: h, write: w, store: s } = await setup();
+      w([session("s", T, { mainModel: "claude-opus-5-1" }), ...all.slice(0, n)]);
+      expect(json(h.watch("s", recorder().sink).session?.live)).toBe(json(wholeSession(s, "s")));
+    }
+    expect(json(hub.watch("s", recorder().sink).session?.live)).toBe(json(wholeSession(store, "s")));
   });
 });
 

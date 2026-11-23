@@ -147,7 +147,8 @@ khẳng định không có chuỗi đánh dấu, định danh hay tên khoá đ�
 - Ảnh chụp và trang cũ tối đa 500 sự kiện (mặc định 200). Danh sách phiên tối đa 200 (mặc định 50).
 - 4 phiên mỗi kết nối, 16 phiên cho cả máy, 8 kết nối mỗi phiên.
 - Gom sự kiện 250 ms; `session` chỉ gửi khi đổi.
-- Sự kiện tạm giữ tối đa 2 000 dòng mỗi phiên đang xem (cũ nhất bị bỏ). Trạng thái sống tính trên 200 sự kiện mới nhất.
+- Sự kiện tạm giữ tối đa 2 000 dòng mỗi phiên đang xem (cũ nhất bị bỏ). Trạng thái sống tính trên 200 sự kiện mới nhất cùng các dòng cũ hơn còn ảnh hưởng
+  tới nó (mục 6.3), trong đó tối đa 200 lời gọi tool đang chạy.
 - Khoan sâu: p50/p95 trên tối đa 10 000 thời lượng (lấy mẫu đều, cờ `sampled`); 20 phần, 5 mục chậm nhất, 20 sự kiện gần nhất, 5 phiên trước, 50 phát hiện.
   Đo: dưới 100 ms trên DB 200 000 dòng `tool_calls` (`live-map-hub.test.ts`).
 
@@ -186,8 +187,11 @@ chụp kế tiếp. Lịch sử tua lại của thiết bị giữ những gì c
 ### 6.3 Trạng thái sống (`ObservatoryLiveState`)
 
 `{core=1, tokens_per_second=2, context_percent=3, context_tokens=4, context_window=5, context_window_assumed=6, main_model=7, running=8
-(ObservatoryStationCount {station, count}), open_bottlenecks=9}`. Agent tính từ 200 sự kiện mới nhất (cả sự kiện tạm) bằng hàm thuần
-`hub/live-state.ts`; thiết bị tua lại áp **cùng quy tắc** lên các sự kiện tới mốc thì ra cùng kết quả. Chỉ `open_bottlenecks` và ngữ cảnh lớn nhất của phiên
+(ObservatoryStationCount {station, count}), open_bottlenecks=9}`. Agent tính bằng hàm thuần `hub/live-state.ts` trên 200 sự kiện mới nhất (cả sự kiện
+tạm), đặt sau các dòng cũ hơn vẫn còn ảnh hưởng tới kết quả (`store/live-map-reads.ts` `readLiveCarry`): dòng mới nhất của mỗi loại đặt trạng thái lõi, lần
+kết thúc lượt mới nhất, các lời gọi tool chưa kết thúc kể từ đó (tối đa 200, mới nhất) cùng sự kiện báo chúng không chạy, và lượt API mới nhất của luồng chính
+(cả lượt mới nhất có tốc độ). Nhờ vậy kết quả bằng kết quả tính trên toàn bộ phiên, kể cả khi một lời gọi dài bắt đầu trước 200 sự kiện gần nhất. Thiết bị tua
+lại áp **cùng quy tắc** lên các sự kiện tới mốc thì ra cùng kết quả. Chỉ `open_bottlenecks` và ngữ cảnh lớn nhất của phiên
 được đọc thêm từ DB (có thể cũ hơn 200 sự kiện); khi tua, thiết bị lấy từ sự kiện `bottleneck` (mở khi `opened_at ≤ mốc` và chưa `closed_at ≤ mốc`).
 
 Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói về nó:
