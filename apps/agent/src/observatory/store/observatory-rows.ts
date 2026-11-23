@@ -45,7 +45,7 @@ export type ToolCallRow = {
   agentId: string | null;
   at: number;
   toolName: string | null;
-  /** The office room of a call stored by an agent of the first release (lower case: `library`, `work`…); no longer written. */
+  /** The office room of a call stored by an agent that still drew the office view (schema v1, lower case: `library`, `work`…); no longer written. */
   officeRoom: string | null;
   mcpServer: string | null;
   /** The file or domain the call touched, as the ingest extracted it. */

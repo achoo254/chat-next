@@ -57,7 +57,9 @@ chạy được trên điện thoại (web, PWA, app Capacitor); CSP prod không
   `thư mục/tên`.
 - **Schema v2 chỉ thêm** (cột của `tool_calls`, bảng `session_events` và `bottlenecks`, chỉ mục); bảng `meta` giữ `min_reader_version` = 1. Agent bản
   trước mở được DB v2 và chỉ ghi bảng nó biết, nên lùi agent không cần `wipe` và không mất dữ liệu.
-- **Khung sự kiện không bao giờ mang nội dung**, dù đọc từ DB hay từ đuôi spool: chỉ nhãn, số, id. Nội dung (lệnh, đường dẫn, kết quả) thiết bị xin
+- **Khung sự kiện không bao giờ mang nội dung**, dù đọc từ DB hay từ đuôi spool: chỉ nhãn, số, id và đích đã lọc của tool (`thư mục/tên`, tên
+  miền, tên chương trình, `server › tool`). Hai trường là đường dẫn đầy đủ, chỉ đổi thư mục nhà thành `~` (ngoài thư mục nhà thì vẫn tuyệt đối):
+  `cwd` của phiên và `file_path` của tệp hướng dẫn đã nạp (cũng nằm trong id sự kiện `instruction:…`). Nội dung (lệnh, đường dẫn, kết quả) thiết bị xin
   theo id sự kiện khi người xem bấm (`ObservatoryContent`), agent đọc từ DB và áp công tắc nội dung của dự án, nên tắt nội dung hay xoá nội dung có
   hiệu lực theo một đường duy nhất.
 - **Đọc đuôi spool cho phiên đang xem**: spool trễ 5 đến 75 giây trước khi vào DB, nên khi có thiết bị xem một phiên terminal hay CLI, agent đọc các tệp

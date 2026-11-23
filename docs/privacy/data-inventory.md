@@ -95,8 +95,10 @@ tắt nội dung và không chứa đường dẫn, lệnh hay chữ của ngư�
 và phát sự kiện tạm cho thiết bị; nó không ghi đĩa, không sửa hay xoá tệp, vị trí đọc chỉ nằm trong bộ nhớ và mất khi không còn ai xem. Bản ghi trong
 DB thay sự kiện tạm cùng id.
 
-**Khung sự kiện không mang nội dung.** Khung Observatory tới thiết bị (qua kênh mã hoá đầu cuối giữa thiết bị và máy) chỉ có nhãn, số và id, dù sự kiện
-đọc từ DB hay từ đuôi spool. Nội dung đã che (lệnh, đường dẫn, đoạn kết quả) chỉ tới thiết bị khi người xem bấm một sự kiện: thiết bị xin theo id, agent
+**Khung sự kiện không mang nội dung.** Khung Observatory tới thiết bị (qua kênh mã hoá đầu cuối giữa thiết bị và máy) chỉ có nhãn, số, id và đích đã
+lọc của tool (`thư mục/tên`, tên miền, tên chương trình, `server › tool`), dù sự kiện đọc từ DB hay từ đuôi spool. Có hai ngoại lệ là đường dẫn đầy đủ,
+chỉ đổi thư mục nhà thành `~` (ngoài thư mục nhà thì vẫn là đường dẫn tuyệt đối): thư mục làm việc của phiên (`cwd` trong thông tin phiên) và đường dẫn
+tệp hướng dẫn Claude Code đã nạp (`file_path` của sự kiện nạp hướng dẫn, cũng nằm trong id `instruction:<số>:<lý do>:<tệp>` của sự kiện đó). Nội dung đã che (lệnh, đường dẫn, đoạn kết quả) chỉ tới thiết bị khi người xem bấm một sự kiện: thiết bị xin theo id, agent
 đọc từ DB và áp công tắc nội dung của dự án (`tunelo observatory content <thư mục> off`), nên dự án đã tắt nội dung không gửi gì, kể cả cho sự kiện đã
 lưu trước khi tắt. "Ẩn chi tiết" trên thiết bị (nhớ trong `localStorage`) còn giấu tên tệp, tên miền, lệnh, tên tool MCP và email trên màn hình.
 

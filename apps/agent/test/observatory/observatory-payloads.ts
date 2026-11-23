@@ -1,5 +1,5 @@
-// Hook payloads and an OTLP logs request shaped like the ones the spike and
-// phase 1 recorded from Claude Code 2.1.330, with every identifying value
+// Hook payloads and an OTLP logs request shaped like the ones recorded from
+// Claude Code 2.1.330, with every identifying value
 // replaced by an obviously fake one (example.invalid, example-*). The fake
 // values are listed in FAKE_IDENTIFIERS so tests can check none survives.
 import { join } from "node:path";
