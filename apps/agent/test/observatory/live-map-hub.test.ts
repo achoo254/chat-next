@@ -15,7 +15,7 @@ import {
   ObservatoryContentState,
   ObservatoryCoreState,
 } from "@achoo254/chat-proto/remote/remote";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentError } from "../../src/core/agent-core.ts";
 import { type ObservatoryEventSink, ObservatoryHub } from "../../src/observatory/hub/observatory-hub.ts";
 import type { LiveTailEvent } from "../../src/observatory/spool/spool-live-tail.ts";
@@ -197,6 +197,34 @@ describe("provisional events", () => {
     const seqs = a.events().map((e) => Number(e.seq));
     expect(seqs).toEqual(seqs.map((_, i) => i + 1));
     expect(hub.watched).toEqual(["s"]);
+  });
+
+  it("held while the store lags are looked up once, not at every flush, and still give way to their stored row", async () => {
+    const { hub, write, store } = await setup();
+    write([session("s", T)]);
+    const a = recorder();
+    hub.watch("s", a.sink);
+    const held = Array.from({ length: 50 }, (_, i) => toolCall("s", `h${i}`, T + 1 + i, { toolName: "Bash", station: "TESTING", target: "pnpm" }));
+    held.forEach((op, i) => hub.provisional(tail("s", T + 1 + i, [op], { event: "PreToolUse" })));
+    await wait(40);
+    const lookups = vi.spyOn(store, "timelineEntry");
+    // The session's row changes at every flush (a stuck spool still moves the session), the held rows stay unstored.
+    for (let i = 1; i <= 5; i++) {
+      write([session("s", T, { mainModel: `claude-sonnet-5-${i}` })]);
+      await wait(40);
+    }
+    expect(lookups).not.toHaveBeenCalled();
+    hub.watch("s", recorder().sink);
+    expect(lookups).not.toHaveBeenCalled();
+    // The store takes one: it goes out stored, the others stay provisional.
+    const first = held[0];
+    if (!first) throw new Error("no held row");
+    write([first]);
+    await wait(40);
+    const h0 = a.events().flatMap((e) => (e.id === "tool:h0" ? [e.provisional] : []));
+    expect(h0).toEqual([true, false]);
+    expect(hub.watch("s", recorder().sink).events.filter((e) => e.provisional)).toHaveLength(49);
+    lookups.mockRestore();
   });
 
   it("are in a snapshot until stored, and an instruction file load takes the number the ingest will give it", async () => {

@@ -129,10 +129,17 @@ type Watched = {
   provisional: Map<string, Provisional>;
   /** Provisional rows changed since the last flush, by event id. */
   provisionalPending: Set<string>;
+  /**
+   * Refs of provisional rows the store was asked for and did not have, by ref
+   * id. A row only comes into the store through a write written() hears, which
+   * takes its ref out: until then it is not asked again, so a spool the
+   * reader cannot drain costs no read per held row at each flush.
+   */
+  unstored: Set<string>;
 };
 
 function newWatched(): Watched {
-  return { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "", provisional: new Map(), provisionalPending: new Set() };
+  return { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "", provisional: new Map(), provisionalPending: new Set(), unstored: new Set() };
 }
 
 function refuse(message: string, reason: ErrorReason): AgentError {
@@ -265,7 +272,9 @@ export class ObservatoryHub {
       touched = true;
       w.stateDirty = true;
       const ref = timelineRefOf(op);
-      if (ref) w.pending.set(ref.id, ref);
+      if (!ref) continue;
+      w.pending.set(ref.id, ref);
+      w.unstored.delete(ref.id);
     }
     if (touched) this.scheduleFlush();
   }
@@ -411,6 +420,7 @@ export class ObservatoryHub {
       w.lastState = "";
       w.provisional.clear();
       w.provisionalPending.clear();
+      w.unstored.clear();
     }
   }
 
@@ -458,7 +468,7 @@ export class ObservatoryHub {
       for (const id of held) {
         const p = w.provisional.get(id);
         if (!p || outgoing.has(id)) continue;
-        const entry = store.timelineEntry(p.ref);
+        const entry = this.storedRowOf(w, store, p);
         outgoing.set(id, entry ? this.stored(w, entry) : { entry: p.entry, provisional: true });
       }
       for (const o of [...outgoing.values()].sort((a, b) => compareTimeline(a.entry, b.entry))) {
@@ -514,11 +524,19 @@ export class ObservatoryHub {
     const have = new Set(stored.map(eventId));
     for (const [id, p] of [...w.provisional]) {
       if (have.has(id)) continue;
-      const entry = store.timelineEntry(p.ref);
+      const entry = this.storedRowOf(w, store, p);
       const o = entry ? this.stored(w, entry) : { entry: p.entry, provisional: true };
       if (o.provisional && (!oldest || compareTimeline(o.entry, oldest) >= 0)) out.push(o);
     }
     return out.sort((a, b) => compareTimeline(a.entry, b.entry));
+  }
+
+  /** The stored row of a provisional one, as stored now; undefined when it is not, without asking again a store known not to have it. */
+  private storedRowOf(w: Watched, store: ObservatoryStore, p: Provisional): TimelineEntry | undefined {
+    if (w.unstored.has(p.ref.id)) return undefined;
+    const entry = store.timelineEntry(p.ref);
+    if (!entry) w.unstored.add(p.ref.id);
+    return entry;
   }
 
   /** A stored row with what its provisional row knows; the provisional row is dropped once the store has it all. */
@@ -527,7 +545,10 @@ export class ObservatoryHub {
     const p = w.provisional.get(id);
     if (!p) return { entry, provisional: false };
     const merged = overlay(entry, p.entry);
-    if (!merged.added) w.provisional.delete(id);
+    if (!merged.added) {
+      w.provisional.delete(id);
+      w.unstored.delete(p.ref.id);
+    }
     return { entry: merged.entry, provisional: merged.added };
   }
 
@@ -544,9 +565,11 @@ export class ObservatoryHub {
     w.provisional.delete(id);
     w.provisional.set(id, { op: merged, entry, ref });
     while (w.provisional.size > SENT_WINDOW) {
-      const first = w.provisional.keys().next();
+      const first = w.provisional.entries().next();
       if (first.done === true) break;
-      w.provisional.delete(first.value);
+      const [oldest, dropped] = first.value;
+      w.provisional.delete(oldest);
+      w.unstored.delete(dropped.ref.id);
     }
     w.provisionalPending.add(id);
     return true;
