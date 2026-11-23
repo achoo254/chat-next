@@ -206,13 +206,16 @@ function endTurn(d: LiveMapScene, core: CoreState): void {
 	clearQueues(d);
 }
 
-/** Output tokens per second of one request: over its time after the first token when known, else its whole duration. */
+/** The shortest stretch a speed is read from: a request streaming for a few milliseconds says nothing about how fast the model writes (the same number as the machine's). */
+const MIN_STREAM_MS = 200;
+
+/** Output tokens per second of one request: over its time after the first token when that is long enough to read, else over its whole duration, else none. */
 function speedOf(e: { outputTokens?: number; durationMs?: number; ttftMs?: number }): number | null {
 	const total = e.durationMs ?? 0;
 	const output = e.outputTokens ?? 0;
-	if (output <= 0 || total <= 0) return null;
 	const writing = total - (e.ttftMs ?? 0);
-	return (output * 1000) / (writing > 0 ? writing : total);
+	const ms = writing >= MIN_STREAM_MS ? writing : total;
+	return output > 0 && ms >= MIN_STREAM_MS ? (output * 1000) / ms : null;
 }
 
 /** One event into a draft scene (mutated). */

@@ -165,6 +165,17 @@ describe("the Live Map state", () => {
 		expect(s.scene.tokensPerSecond).toBeCloseTo(200);
 	});
 
+	it("reads no speed from a request that streamed for a few milliseconds, and falls back on its whole duration when only the stretch after the first token is that short", () => {
+		const base = { kind: "api", agentId: "", model: "claude-opus", seq: 0, provisional: false } as const;
+		const speed = (over: { durationMs: number; ttftMs: number }): number | null => {
+			const e: LiveMapEvent = { ...base, id: "api:s", at: 0, outputTokens: 100, ...over };
+			return live(start(), numbered([e])).scene.tokensPerSecond;
+		};
+		expect(speed({ durationMs: 3, ttftMs: 0 })).toBeNull();
+		expect(speed({ durationMs: 5_000, ttftMs: 4_998 })).toBe(20);
+		expect(speed({ durationMs: 3_000, ttftMs: 1_000 })).toBe(50);
+	});
+
 	it("keeps each station's running calls, queue, latest call, counts and failures", () => {
 		const s = live(
 			start(),

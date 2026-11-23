@@ -162,10 +162,17 @@ export function liveStateOf(input: LiveInput): LiveState {
   };
 }
 
-/** Output tokens per second of one request: over its time after the first token when known, else its whole duration. */
-function tokensPerSecond(r: { outputTokens: number | null; durationMs: number | null; ttftMs: number | null }): number {
+/** The shortest stretch a speed is read from: a request streaming for a few milliseconds says nothing about how fast the model writes. */
+const MIN_STREAM_MS = 200;
+
+/**
+ * Output tokens per second of one request: over its time after the first token
+ * when that is long enough to read, else over its whole duration, else none.
+ */
+function tokensPerSecond(r: { outputTokens: number | null; durationMs: number | null; ttftMs: number | null }): number | null {
+  const output = r.outputTokens ?? 0;
   const total = r.durationMs ?? 0;
   const writing = total - (r.ttftMs ?? 0);
-  const ms = writing > 0 ? writing : total;
-  return ((r.outputTokens ?? 0) * 1000) / ms;
+  const ms = writing >= MIN_STREAM_MS ? writing : total;
+  return output > 0 && ms >= MIN_STREAM_MS ? (output * 1000) / ms : null;
 }

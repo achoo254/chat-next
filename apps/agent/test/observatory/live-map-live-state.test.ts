@@ -93,6 +93,14 @@ describe("tokens and context", () => {
     expect(s.mainModel).toBe("claude-sonnet-5-5");
   });
 
+  it("reads no speed from a request that streamed for a few milliseconds, and falls back on its whole duration when only the stretch after the first token is that short", () => {
+    const speed = (row: Parameters<typeof api>[1]) => live([prompt(T), api(T + 1, { model: "claude-sonnet-5-5", outputTokens: 100, ...row })]).tokensPerSecond;
+    expect(speed({ durationMs: 3, ttftMs: 0 })).toBeNull();
+    // 100 tokens, 5 000 ms in all, the first token at 4 998 ms: the 2 ms after it are not a speed.
+    expect(speed({ durationMs: 5_000, ttftMs: 4_998 })).toBe(20);
+    expect(speed({ durationMs: 3_000, ttftMs: 1_000 })).toBe(50);
+  });
+
   it("has no percent for a model it does not know, and the long window once the context passed the standard one", () => {
     expect(live([api(T, { model: "gpt-9", inputTokens: 100 })]).contextPercent).toBeNull();
     const long = live([api(T, { model: "claude-sonnet-5-5", inputTokens: 250_000 })]);
