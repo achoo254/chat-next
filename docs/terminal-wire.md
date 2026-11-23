@@ -150,7 +150,7 @@ Chi tiết `Snapshot` dựng bởi emulator (chỉ trong chế độ dự phòng
 ### Phiên bản
 
 `hello` mang `{major, minor}`. Cùng `major` thì tương thích; `minor` chỉ thêm trường mới. Daemon cũ còn phiên vẫn phục vụ agent mới cùng `major`.
-Hiện tại: `major` 1, `minor` 1. `minor` 1 thêm trường `connections` vào kết quả `hello`; daemon luôn gửi trường này, agent nói `minor` 0 bỏ qua nó và vẫn chạy như cũ. Agent gặp daemon `minor` 0 (không có `connections`) thì không dọn kết nối mồ côi.
+Hiện tại: `major` 1, `minor` 2. `minor` 1 thêm trường `connections` vào kết quả `hello`; daemon luôn gửi trường này, agent nói `minor` 0 bỏ qua nó và vẫn chạy như cũ. Agent gặp daemon `minor` 0 (không có `connections`) thì không dọn kết nối mồ côi. `minor` 2 cho `open` nhận `TUNELO_MCP_HTTP_TICKET` trong `env` (daemon thêm `127.0.0.1,localhost` vào `NO_PROXY`); agent gặp daemon dưới `minor` 2 thì mở CLI với MCP qua stdio như cũ, không gửi biến này.
 
 ### Lệnh (agent → daemon)
 
@@ -159,7 +159,7 @@ Mọi lệnh có `id` (số nguyên) và `cmd`; trả lời `{id, ok: true, resu
 | `cmd` | Tham số | Kết quả |
 |---|---|---|
 | `hello` | `major, minor, token, agentVersion` | `major, minor, daemonVersion, pid, sessions[], connections[]` (từ `minor` 1), `pendingAudit[]` |
-| `open` | `cols, rows, shell?, args?, cwd?, env?` (`env` chỉ nhận `CLAUDE_CONFIG_DIR`) | `session` |
+| `open` | `cols, rows, shell?, args?, cwd?, env?` (`env` chỉ nhận `CLAUDE_CONFIG_DIR` và, từ `minor` 2, `TUNELO_MCP_HTTP_TICKET`: 16–128 ký tự base64url) | `session` |
 | `close` | `session` | `{}`; treo máy shell (SIGHUP shell và nhóm tiến trình tiền cảnh, sau 2 giây SIGKILL), gỡ phiên khi tiến trình đã thoát |
 | `resize` | `session, cols, rows` | `{}` |
 | `list` | không | `sessions[]` (`session, title, cols, rows, createdAt, attached, exited?`; `exited` là `{code, signal}` khi tiến trình đã thoát) |
@@ -269,7 +269,7 @@ Agent cũ gặp các thân này trả `Error` với `ERROR_REASON_UNSUPPORTED_RE
 
 Người dùng mở một phiên AI bằng giao diện terminal thay vì chat: AI chạy bằng chính CLI của nó trong một phiên PTY. Chỉ thêm trường, không đổi gì cũ.
 
-- `TermAiSession {thread_id=1}`. Thiết bị **chỉ nêu luồng**; không có trường nào cho chương trình, tham số hay môi trường. Agent lấy nhà cung cấp, phiên (tiếp tục bằng id phiên của luồng, hoặc phiên mới), thư mục của luồng, tài khoản đang chọn trên máy (`CLAUDE_CONFIG_DIR`), model và chế độ quyền như phiên chat sẽ dùng, rồi gọi `open` với `shell`, `args`, `cwd`, `env` theo mục 6. `cwd` của yêu cầu bị bỏ qua.
+- `TermAiSession {thread_id=1}`. Thiết bị **chỉ nêu luồng**; không có trường nào cho chương trình, tham số hay môi trường. Agent lấy nhà cung cấp, phiên (tiếp tục bằng id phiên của luồng, hoặc phiên mới), thư mục của luồng, tài khoản đang chọn trên máy (`CLAUDE_CONFIG_DIR`), vé MCP của phiên (`TUNELO_MCP_HTTP_TICKET`, để `--mcp-config` gọi `${TUNELO_MCP_HTTP_TICKET}` thay vì đặt vé vào argv; chỉ khi daemon từ `minor` 2), model và chế độ quyền như phiên chat sẽ dùng, rồi gọi `open` với `shell`, `args`, `cwd`, `env` theo mục 6. `cwd` của yêu cầu bị bỏ qua.
 - Lệnh cụ thể đến từ mặt `terminal` của adapter nhà cung cấp (Claude: `claude --resume <id>` hoặc `claude --session-id <uuid mới>`, kèm `--model`, `--permission-mode` chỉ khi giá trị nằm trong danh sách của chính adapter). Không có `--setting-sources`: CLI nạp cấu hình như ở mọi terminal (người dùng, dự án, local; skill và lệnh của dự án hiện như thường, sau hộp thoại tin thư mục của chính CLI), bất kể mức cấu hình dự án của luồng. Lõi và web không biết tên CLI. Id phiên phải đúng dạng UUID nên không thành được cờ.
 - Chỉ dùng khi `ProviderCapabilities.terminal = 12` của AI là `true` và `MachineInfo.terminal` là `AVAILABLE`. Agent cũ bỏ qua trường lạ và sẽ mở shell thường, nên web không gửi `ai_session` khi thiếu cờ này.
 - Một luồng có nhiều nhất một phiên terminal: yêu cầu lặp lại (thiết bị khác, tải lại trang) nhận lại đúng phiên đó. Agent nhớ `(phiên, pid daemon)` trong meta của luồng; khi daemon chạy lại (pid khác) hay phiên thoát (`session_exit`) hay bị `TermClose`, luồng được thả.

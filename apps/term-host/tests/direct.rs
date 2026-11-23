@@ -525,7 +525,7 @@ fn reconnected_agent_hello_lists_the_connections_that_outlived_the_old_one() {
     let mut t;
     {
         let (agent, hello) = d.agent();
-        assert_eq!(hello["minor"], 1);
+        assert_eq!(hello["minor"], 2);
         assert_eq!(hello["connections"], json!([]));
         s = open_sh(&agent);
         // Conn 7: relay first, then the direct path too (it outlives the agent).

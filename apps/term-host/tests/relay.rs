@@ -126,6 +126,27 @@ fn claude_config_dir_is_only_set_when_given() {
 }
 
 #[test]
+fn mcp_ticket_reaches_the_process_environment() {
+    let d = TestDaemon::start();
+    let (agent, _) = d.agent();
+    let r = agent
+        .call(
+            "open",
+            json!({ "cols": 80, "rows": 24, "shell": "/bin/sh", "env": { "TUNELO_MCP_HTTP_TICKET": "tk_AbC-9xxxxxxxxxxx" } }),
+        )
+        .expect("open");
+    let s = r["session"].as_u64().expect("id") as u32;
+    let mut t = attach_new(&agent, 1, 1, s);
+    run(
+        &mut t,
+        s,
+        "echo TK=$TUNELO_MCP_HTTP_TICKET.\r",
+        "TK=tk_AbC-9xxxxxxxxxxx.",
+    );
+    run(&mut t, s, "echo NP=$NO_PROXY.\r", "127.0.0.1,localhost.");
+}
+
+#[test]
 fn malformed_and_unattached_frames_get_errors() {
     let d = TestDaemon::start();
     let (agent, _) = d.agent();

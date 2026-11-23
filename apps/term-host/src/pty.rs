@@ -26,6 +26,9 @@ pub struct OpenSpec {
     pub args: Vec<String>,
     pub cwd: Option<PathBuf>,
     pub claude_config_dir: Option<String>,
+    /// The ticket of tunelo's MCP for the AI's CLI (`TUNELO_MCP_HTTP_TICKET`): its
+    /// `--mcp-config` names it as `${TUNELO_MCP_HTTP_TICKET}`, so it is never in argv.
+    pub mcp_ticket: Option<String>,
     /// macOS: a sandbox profile the process runs in (`sandbox-exec -p`), so
     /// it is refused at once in the folders tunelo may not enter instead of
     /// waiting on a macOS prompt. The working folder is entered inside it.
@@ -194,9 +197,7 @@ fn command(spec: &OpenSpec) -> CommandBuilder {
         let mut cmd = sandboxed(spec, profile);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
-        if let Some(dir) = &spec.claude_config_dir {
-            cmd.env("CLAUDE_CONFIG_DIR", dir);
-        }
+        set_ai_env(&mut cmd, spec);
         return cmd;
     }
     let mut cmd = match &spec.shell {
@@ -209,13 +210,46 @@ fn command(spec: &OpenSpec) -> CommandBuilder {
     };
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
-    if let Some(dir) = &spec.claude_config_dir {
-        cmd.env("CLAUDE_CONFIG_DIR", dir);
-    }
+    set_ai_env(&mut cmd, spec);
     if let Some(cwd) = &spec.cwd {
         cmd.cwd(cwd);
     }
     cmd
+}
+
+/// The environment the AI's CLI was opened with (the agent's fixed names only).
+fn set_ai_env(cmd: &mut CommandBuilder, spec: &OpenSpec) {
+    if let Some(dir) = &spec.claude_config_dir {
+        cmd.env("CLAUDE_CONFIG_DIR", dir);
+    }
+    if let Some(ticket) = &spec.mcp_ticket {
+        cmd.env("TUNELO_MCP_HTTP_TICKET", ticket);
+        // The endpoint is on loopback: a proxy from this environment must not carry the ticket.
+        let no_proxy = loopback_no_proxy(
+            std::env::var("NO_PROXY")
+                .or_else(|_| std::env::var("no_proxy"))
+                .ok()
+                .as_deref(),
+        );
+        cmd.env("NO_PROXY", &no_proxy);
+        cmd.env("no_proxy", &no_proxy);
+    }
+}
+
+/// NO_PROXY with 127.0.0.1 and localhost added to what it already names.
+pub fn loopback_no_proxy(given: Option<&str>) -> String {
+    let mut hosts: Vec<&str> = given
+        .unwrap_or("")
+        .split(',')
+        .map(str::trim)
+        .filter(|h| !h.is_empty())
+        .collect();
+    for h in ["127.0.0.1", "localhost"] {
+        if !hosts.contains(&h) {
+            hosts.push(h);
+        }
+    }
+    hosts.join(",")
 }
 
 /// Spawn the process on a new PTY and start its reader, writer and waiter
@@ -458,6 +492,16 @@ mod tests {
     use super::*;
 
     #[cfg(unix)]
+    #[test]
+    fn loopback_joins_what_no_proxy_already_names() {
+        assert_eq!(loopback_no_proxy(None), "127.0.0.1,localhost");
+        assert_eq!(loopback_no_proxy(Some("")), "127.0.0.1,localhost");
+        assert_eq!(
+            loopback_no_proxy(Some("corp.example, localhost")),
+            "corp.example,localhost,127.0.0.1"
+        );
+    }
+
     #[test]
     fn a_sandboxed_program_enters_its_folder_inside_the_sandbox() {
         let spec = OpenSpec {

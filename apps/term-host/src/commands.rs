@@ -15,7 +15,8 @@ use crate::wire::{MAX_DIM, MIN_DIM};
 
 pub const MAJOR: u64 = 1;
 /// 1: `hello` lists the live connections (`connections`).
-pub const MINOR: u64 = 1;
+/// 2: `open` takes `TUNELO_MCP_HTTP_TICKET` in `env`.
+pub const MINOR: u64 = 2;
 /// Default lifetime of a grant without a transport.
 pub const DEFAULT_GRANT_MS: u64 = 60_000;
 pub const MAX_GRANT_MS: u64 = 600_000;
@@ -351,12 +352,33 @@ fn open_spec(p: OpenP) -> Result<OpenSpec, CmdError> {
         None => None,
     };
     let mut claude_config_dir = None;
+    let mut mcp_ticket = None;
     for (k, v) in p.env.unwrap_or_default() {
-        if k != "CLAUDE_CONFIG_DIR" {
-            return Err(bad("env only accepts CLAUDE_CONFIG_DIR"));
+        match k.as_str() {
+            "CLAUDE_CONFIG_DIR" => {
+                checked_text(&v, "CLAUDE_CONFIG_DIR")?;
+                claude_config_dir = Some(v);
+            }
+            "TUNELO_MCP_HTTP_TICKET" => {
+                // A ticket is base64url, 43 characters (session-tickets.ts); the agent takes 16 to 128.
+                if v.len() < 16
+                    || v.len() > 128
+                    || !v
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                {
+                    return Err(bad(
+                        "TUNELO_MCP_HTTP_TICKET must be 16 to 128 base64url characters",
+                    ));
+                }
+                mcp_ticket = Some(v);
+            }
+            _ => {
+                return Err(bad(
+                    "env only accepts CLAUDE_CONFIG_DIR and TUNELO_MCP_HTTP_TICKET",
+                ))
+            }
         }
-        checked_text(&v, "CLAUDE_CONFIG_DIR")?;
-        claude_config_dir = Some(v);
     }
     Ok(OpenSpec {
         cols,
@@ -365,6 +387,7 @@ fn open_spec(p: OpenP) -> Result<OpenSpec, CmdError> {
         args,
         cwd,
         claude_config_dir,
+        mcp_ticket,
         sandbox: p.sandbox,
     })
 }
@@ -531,6 +554,31 @@ mod tests {
                 ..
             }))
         ));
+        let (_, r) = p(
+            json!({"id": 1, "cmd": "open", "cols": 80, "rows": 24, "env": {"TUNELO_MCP_HTTP_TICKET": "aB3_-xxxxxxxxxxxxxxx"}}),
+        );
+        assert!(matches!(
+            r,
+            Ok(Command::Open(OpenSpec {
+                mcp_ticket: Some(_),
+                ..
+            }))
+        ));
+        for bad_ticket in [
+            "",
+            "short_ticket",
+            "a b xxxxxxxxxxxxxxxxx",
+            "a;rmxxxxxxxxxxxxxxxx",
+            "x$(id)xxxxxxxxxxxxxxx",
+        ] {
+            let (_, r) = p(
+                json!({"id": 1, "cmd": "open", "cols": 80, "rows": 24, "env": {"TUNELO_MCP_HTTP_TICKET": bad_ticket}}),
+            );
+            assert!(r.is_err(), "{bad_ticket:?}");
+        }
+        let (_, r) =
+            p(json!({"id": 1, "cmd": "open", "cols": 80, "rows": 24, "env": {"PATH": "/x"}}));
+        assert!(r.is_err());
     }
 
     #[test]
