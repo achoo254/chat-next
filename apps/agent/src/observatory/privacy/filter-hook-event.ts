@@ -8,7 +8,7 @@ import { redact } from "../../mcp/redact.ts";
 import type { FilteredHookRecord, HookFieldValue } from "./filtered-record.ts";
 import { FILTERED_RECORD_VERSION } from "./filtered-record.ts";
 import { COMMON_HOOK_FIELDS, type FieldRule, HOOK_EVENT_FIELDS, TOOL_EVENTS, isKeptHookEvent } from "./hook-allowlist.ts";
-import { type PathContext, baseName, idValue, keptPath, labelValue } from "./privacy-labels.ts";
+import { type PathContext, baseName, idValue, isSecretPath, keptPath, labelValue } from "./privacy-labels.ts";
 import { hideAccountNames, hideHomePaths } from "./home-and-account.ts";
 import { finalExcerpt, windowExcerpt } from "./content-excerpt.ts";
 import { REDACT_WINDOW_CHARS, approxJsonBytes, boundedJson } from "./privacy-text.ts";
@@ -52,7 +52,8 @@ function toolInputFields(toolName: string, toolInput: unknown, path: PathContext
   const place = stationOf(toolName, toolInput);
   const f: Record<string, HookFieldValue> = { station: place.station, station_flags: place.flags };
   const file = typeof args.file_path === "string" ? args.file_path : typeof args.notebook_path === "string" ? args.notebook_path : "";
-  if (salt && file !== "" && FILE_KEY_TOOLS.has(toolName)) {
+  // A secret file gets no key: with the salt, a key would confirm where such a file lies.
+  if (salt && file !== "" && FILE_KEY_TOOLS.has(toolName) && !isSecretPath(file, path)) {
     const key = targetKeyOf(salt, file, path.home, path.cwd);
     if (key) f.target_key = key;
   }

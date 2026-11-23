@@ -70,10 +70,34 @@ describe("stationOf", () => {
   });
 });
 
+describe("a chained shell line", () => {
+  it("keeps the flags of every command it chains", () => {
+    expect(stationOf("Bash", { command: "git add -A && git commit -m x" })).toEqual({ station: "GIT", flags: commit });
+    expect(stationOf("Bash", { command: "git commit -m x && git push" })).toEqual({ station: "GIT", flags: commit | push });
+    expect(stationOf("Bash", { command: "npm run build && npm run deploy" })).toEqual({ station: "GIT", flags: deploy });
+    expect(stationOf("Bash", { command: "pnpm lint; pnpm test" })).toEqual({ station: "TESTING", flags: 0 });
+    expect(stationOf("Bash", { command: "cat a.log | grep error" })).toEqual({ station: "SANDBOX", flags: 0 });
+  });
+
+  it("knows the common deploy tools", () => {
+    for (const command of ["wrangler deploy", "fly deploy", "vercel --prod", "kubectl apply -f k8s.yaml", "docker push img:1", "helm upgrade app ./chart"]) {
+      expect(stationOf("Bash", { command }), command).toEqual({ station: "GIT", flags: deploy });
+    }
+    for (const command of ["wrangler dev", "kubectl get pods", "docker build ."]) expect(stationOf("Bash", { command }).station, command).toBe("SANDBOX");
+  });
+
+  it("reads a heredoc of megabytes in bounded time", () => {
+    const command = `cat <<'EOF' > big.txt\n${"x ".repeat(1_000_000)}\nEOF`;
+    const t = performance.now();
+    expect(stationOf("Bash", { command }).station).toBe("SANDBOX");
+    expect(performance.now() - t).toBeLessThan(200);
+  });
+});
+
 describe("isMemoryPath", () => {
   it("knows instruction and memory files, not files that merely look alike", () => {
-    for (const p of ["CLAUDE.md", "a/CLAUDE.md", "MEMORY.md", ".claude/rules/x.md", "a\\.claude\\agent-memory\\b.md", "x/memory/y.md"]) expect(isMemoryPath(p), p).toBe(true);
-    for (const p of ["CLAUDE.md.bak", "src/memory.ts", "docs/rules/x.md", "a/memorybank/y.md"]) expect(isMemoryPath(p), p).toBe(false);
+    for (const p of ["CLAUDE.md", "a/claude.md", "a/CLAUDE.local.md", "MEMORY.md", ".claude/rules/x.md", "a\\.claude\\agent-memory\\b.md", "x/memory/y.md"]) expect(isMemoryPath(p), p).toBe(true);
+    for (const p of ["CLAUDE.md.bak", "src/memory.ts", "src/memory/cache.ts", "docs/rules/x.md", "a/memorybank/y.md"]) expect(isMemoryPath(p), p).toBe(false);
   });
 });
 

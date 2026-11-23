@@ -5,6 +5,7 @@
 // anything else → shell. What the line really runs (past `cd`, wrappers,
 // `npx`, `pnpm run`, `bash -c`, `python -m`) is command-walk.ts's.
 import { type CommandRules, skipOptions, walkCommand } from "./command-walk.ts";
+import { simpleCommands } from "./shell-words.ts";
 
 export type CommandClass = "check" | "commit" | "push" | "git" | "deploy" | "shell";
 
@@ -21,6 +22,20 @@ export const CHECK_SCRIPT = /^(test|lint|typecheck|type-check|tsc|vitest|jest|es
 const DEPLOY_NAME = /(^|[._:-])deploy([._:-]|$)/;
 /** Programs that copy to another host. */
 const COPY_COMMANDS = new Set(["rsync", "scp"]);
+/** Deploy tools and the subcommands that ship (`wrangler deploy`, `kubectl apply`); an empty set means any call ships (`vercel`). */
+const DEPLOY_SUBCOMMANDS: Record<string, ReadonlySet<string>> = {
+  wrangler: new Set(["deploy", "publish"]),
+  fly: new Set(["deploy"]),
+  flyctl: new Set(["deploy"]),
+  vercel: new Set(),
+  netlify: new Set(["deploy"]),
+  kubectl: new Set(["apply", "rollout", "set", "replace"]),
+  helm: new Set(["install", "upgrade"]),
+  docker: new Set(["push"]),
+  firebase: new Set(["deploy"]),
+};
+/** At most this many commands of one line are classed (commandClasses). */
+const MAX_CHAINED_COMMANDS = 16;
 /** git's own options that take a value (`git -C dir commit`). */
 const GIT_VALUE_FLAGS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"]);
 
@@ -45,6 +60,8 @@ function programClass(name: string, rest: readonly string[]): CommandClass | und
   if (name === "git") return gitClass(rest);
   if (name === "gh") return "git";
   if (COPY_COMMANDS.has(name)) return "deploy";
+  const ships = DEPLOY_SUBCOMMANDS[name];
+  if (ships) return ships.size === 0 || ships.has(rest[0] ?? "") ? "deploy" : "shell";
   if (CHECK_COMMANDS.has(name)) return "check";
   const sub = CHECK_SUBCOMMANDS[name];
   if (sub) return sub.has(rest[0] ?? "") ? "check" : "shell";
@@ -55,7 +72,17 @@ function programClass(name: string, rest: readonly string[]): CommandClass | und
 
 const CLASS_RULES: CommandRules<CommandClass> = { program: programClass, script: scriptClass, fallback: "shell" };
 
-/** The class of a shell command line. */
+/** The class of a shell command line, read as its main command (past `cd` and other setup). */
 export function commandClass(command: string): CommandClass {
   return walkCommand(command, CLASS_RULES);
+}
+
+/**
+ * The class of every command a line chains (`git add -A && git commit`,
+ * `npm run build && npm run deploy`), the first MAX_CHAINED_COMMANDS of them.
+ */
+export function commandClasses(command: string): CommandClass[] {
+  const commands = simpleCommands(command).slice(0, MAX_CHAINED_COMMANDS);
+  if (commands.length <= 1) return [commandClass(command)];
+  return commands.map((c) => walkCommand(c.words.map((w) => w.raw).join(" "), CLASS_RULES));
 }

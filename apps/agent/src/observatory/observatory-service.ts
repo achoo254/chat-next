@@ -27,7 +27,10 @@ import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
 import { OtlpReceiverHost, type OtlpReceiverHostOptions } from "./receiver/otlp-receiver-host.ts";
 import type { ReceiverTokens, RotateOptions } from "./receiver/receiver-token.ts";
-import { deleteTargetKeySalt, ensureTargetKeySalt } from "./privacy/target-key-salt.ts";
+import { deleteTargetKeySalt, ensureTargetKeySalt, readTargetKeySalt } from "./privacy/target-key-salt.ts";
+
+/** How often the agent reads the target key salt file again (observatory-service.ts followTargetKeySalt). */
+const TARGET_KEY_SALT_CHECK_MS = 60_000;
 import { clearSpool } from "./spool/clear-spool.ts";
 import { setAsideBrokenHookState } from "./spool/hook-state-file.ts";
 import { HookStateWriter } from "./spool/hook-state-writer.ts";
@@ -67,6 +70,8 @@ export class ObservatoryService {
   private readonly problems: ProblemLog;
   /** The salt of `target_key` (privacy/target-key-salt.ts); undefined until made, or when it could not be. */
   private targetKeySalt: Buffer | undefined;
+  /** Reads the salt file again now and then, so a salt another process replaced (an offline delete) is followed. */
+  private saltTimer: ReturnType<typeof setInterval> | undefined;
   private readonly now: () => number;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
@@ -117,6 +122,8 @@ export class ObservatoryService {
     // Hidden in every output of this process from now on, in every encoded form too.
     for (const secret of this.opts.knownSecrets()) rememberSecret(secret);
     await this.makeTargetKeySalt();
+    this.saltTimer = setInterval(() => void this.followTargetKeySalt(), TARGET_KEY_SALT_CHECK_MS);
+    this.saltTimer.unref?.();
     await this.store.open();
     // The ingest pushes into whichever writer is current (a wipe makes a new one).
     const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
@@ -133,6 +140,8 @@ export class ObservatoryService {
    * Never rejects; start() works again after.
    */
   async stop(): Promise<void> {
+    clearInterval(this.saltTimer);
+    this.saltTimer = undefined;
     await this.receiver.stop();
     await this.rollups.stop();
     await this.intake.close();
@@ -158,6 +167,13 @@ export class ObservatoryService {
     await this.state.write();
     if (this.store.writer) this.intake.resumeSpool();
     if (failure !== undefined) throw failure;
+  }
+
+  /** Takes the salt file's current bytes when they changed (the hook process reads the file for every call). */
+  private async followTargetKeySalt(): Promise<void> {
+    const onDisk = await readTargetKeySalt(this.opts.dataDir);
+    if (onDisk && !onDisk.equals(this.targetKeySalt ?? Buffer.alloc(0))) this.targetKeySalt = onDisk;
+    else if (!onDisk) await this.makeTargetKeySalt();
   }
 
   /** Reads or makes the salt of `target_key`; a failure is reported and calls keep no key. */

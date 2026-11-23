@@ -11,7 +11,7 @@
 // the agent when missing and deleted with the database by a wipe; the hook
 // process only reads it, and without it keeps no key. It is never exported.
 import { createHmac, randomBytes } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, posix, win32 } from "node:path";
 import { tildePath } from "./home-and-account.ts";
 
@@ -31,20 +31,45 @@ export async function readTargetKeySalt(dataDir: string): Promise<Buffer | undef
   }
 }
 
-/** The salt, made (0600, never replacing one another process made first) when missing. */
-export async function ensureTargetKeySalt(dataDir: string): Promise<Buffer> {
-  const existing = await readTargetKeySalt(dataDir);
-  if (existing) return existing;
-  await mkdir(dataDir, { recursive: true, mode: 0o700 });
-  // A salt of the wrong size is replaced; a new one is only ever written whole.
-  await rm(saltPath(dataDir), { force: true });
+/** The salt file's bytes; undefined when there is no file. Other read errors are thrown (an unreadable salt is never replaced). */
+async function readSaltFile(dataDir: string): Promise<Buffer | undefined> {
   try {
-    await writeFile(saltPath(dataDir), randomBytes(SALT_BYTES), { mode: 0o600, flag: "wx" });
+    return await readFile(saltPath(dataDir));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
+  }
+}
+
+/**
+ * Writes a new salt whole: into a 0600 temp file, then linked to its name,
+ * which fails when another process made one first (that one is kept).
+ */
+async function writeNewSalt(dataDir: string): Promise<void> {
+  const tmp = `${saltPath(dataDir)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  await writeFile(tmp, randomBytes(SALT_BYTES), { mode: 0o600, flag: "wx" });
+  try {
+    await link(tmp, saltPath(dataDir));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  } finally {
+    await rm(tmp, { force: true });
   }
-  const salt = await readTargetKeySalt(dataDir);
-  if (!salt) throw new Error("the Observatory target key salt could not be read back");
+}
+
+/**
+ * The salt, made when missing (never replacing one another process made
+ * first) and kept private (0600). A file of the wrong size (cut short by a
+ * crash) is replaced; a file that cannot be read is an error, left as it is.
+ */
+export async function ensureTargetKeySalt(dataDir: string): Promise<Buffer> {
+  await mkdir(dataDir, { recursive: true, mode: 0o700 });
+  const found = await readSaltFile(dataDir);
+  if (found && found.length !== SALT_BYTES) await rm(saltPath(dataDir), { force: true });
+  if (!found || found.length !== SALT_BYTES) await writeNewSalt(dataDir);
+  await chmod(saltPath(dataDir), 0o600);
+  const salt = await readSaltFile(dataDir);
+  if (!salt || salt.length !== SALT_BYTES) throw new Error("the Observatory target key salt could not be read back");
   return salt;
 }
 
@@ -56,7 +81,8 @@ export async function deleteTargetKeySalt(dataDir: string): Promise<void> {
 /** The path a key is made of: absolute (against `cwd`), home folder as `~`, forward slashes, lower case on Windows. */
 export function targetKeyPath(path: string, home: string, cwd: string | undefined, platform: NodeJS.Platform = process.platform): string | undefined {
   const paths = platform === "win32" ? win32 : posix;
-  const absolute = paths.isAbsolute(path) ? path : cwd ? paths.resolve(cwd, path) : undefined;
+  // resolve also drops `.` and `..`, so `a/../b.ts` and `b.ts` are one file.
+  const absolute = paths.isAbsolute(path) ? paths.resolve(path) : cwd ? paths.resolve(cwd, path) : undefined;
   if (absolute === undefined) return undefined;
   const p = tildePath(absolute, home).replaceAll("\\", "/");
   return platform === "win32" ? p.toLowerCase() : p;

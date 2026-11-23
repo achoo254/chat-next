@@ -71,6 +71,11 @@ describe("target_key", () => {
     expect(pre("Read", { file_path: join("apps", "web", "src", "index.ts") }).f.target_key).toBe(a.target_key);
   });
 
+  it("is not kept for a secret file, and is the same for a path written with ..", () => {
+    expect(pre("Read", { file_path: join(FAKE_CWD, ".env") }).f.target_key).toBeUndefined();
+    expect(pre("Read", { file_path: join(FAKE_CWD, "src", "..", "a.ts") }).f.target_key).toBe(pre("Read", { file_path: join(FAKE_CWD, "a.ts") }).f.target_key);
+  });
+
   it("is not kept without a salt, nor for a tool that names no file", () => {
     expect(pre("Read", { file_path: join(FAKE_CWD, "a.ts") }, { ...contentOff, targetKeySalt: undefined }).f.target_key).toBeUndefined();
     expect(pre("Bash", { command: "cat a.ts" }).f.target_key).toBeUndefined();
@@ -101,12 +106,23 @@ describe("the target key salt file", () => {
     expect(await readTargetKeySalt(dir)).toBeUndefined();
   });
 
-  it("is replaced when it is not 32 bytes", async () => {
+  it("is made once when several processes ask at the same time", async () => {
+    const dir = join(tempDir("observatory-salt-"), "observatory");
+    const salts = await Promise.all(Array.from({ length: 8 }, () => ensureTargetKeySalt(dir)));
+    for (const salt of salts) expect(salt).toEqual(salts[0]);
+  });
+
+  it("is replaced when it is not 32 bytes, made private when it is not", async () => {
     const dir = tempDir("observatory-salt-");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, TARGET_KEY_SALT_FILE), "short");
     if (posix) chmodSync(join(dir, TARGET_KEY_SALT_FILE), 0o644);
     expect(await readTargetKeySalt(dir)).toBeUndefined();
     expect(await ensureTargetKeySalt(dir)).toHaveLength(32);
+    if (posix) {
+      chmodSync(join(dir, TARGET_KEY_SALT_FILE), 0o644);
+      await ensureTargetKeySalt(dir);
+      expect(statSync(join(dir, TARGET_KEY_SALT_FILE)).mode & 0o777).toBe(0o600);
+    }
   });
 });
