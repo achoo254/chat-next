@@ -43,9 +43,15 @@ export const BUNDLE_BUDGET = {
 	 * bubble (about 0.2 KB), and the person route; the merged screen itself is
 	 * lazy and shares only pure helpers (message-runs.ts), because importing
 	 * the list module from it split two shared modules into chunks of their own
-	 * (+0.7 KB). The budget is 153.5 KB.
+	 * (+0.7 KB). The budget is 153.5 KB. 153.5 KB with the Live Map's lazy
+	 * renderer (PixiJS): no app module entered startup, but PixiJS's own
+	 * on-demand chunks (its renderers and browser extensions) use the
+	 * bundler's runtime helpers without importing the react vendor chunk, so
+	 * rolldown again keeps the helpers in a startup chunk of their own
+	 * (153.23 → 153.53 KB, the split's overhead; the bundler has no setting
+	 * for where its runtime goes). The budget is 153.6 KB.
 	 */
-	startupJsGzip: 153.5 * 1024,
+	startupJsGzip: 153.6 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;
@@ -59,9 +65,17 @@ export const BUNDLE_BUDGET = {
 export const LIVE_MAP_MODULE = "src/machines/observatory/live-map-view.tsx";
 export const MACHINES_SCREEN_MODULE = "src/machines/machines-screen.tsx";
 
+/**
+ * PixiJS's own on-demand parts a browser loads for the Live Map: its browser
+ * extensions and both renderers it may pick (WebGL, else Canvas; both counted,
+ * though only one loads). Its WebGPU renderer (never asked for) and its web
+ * worker environment are not counted.
+ */
+const PIXI_ON_DEMAND = /\/pixi\.js\/lib\/(environment-browser\/browserAll|rendering\/renderers\/gl\/WebGLRenderer|rendering\/renderers\/canvas\/CanvasRenderer)\.mjs$/;
+
 /** On-demand parts that belong to the Live Map's count. */
 export function liveMapPart(key: string): boolean {
-	return key.startsWith("src/machines/observatory/");
+	return key.startsWith("src/machines/observatory/") || PIXI_ON_DEMAND.test(key);
 }
 
 export const LIVE_MAP_BUDGET = {

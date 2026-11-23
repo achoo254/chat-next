@@ -86,6 +86,8 @@ export type LiveMapEventBody =
 			readonly toolName: string;
 			/** "" unless an MCP tool. */
 			readonly mcpServer: string;
+			/** What the privacy filter kept of it: a file as `folder/name`, a domain, a command's program, `server › tool`; "" when none. */
+			readonly target: string;
 			/** The station code as the machine sent it (station-catalog.ts reads an unknown one as CORE). */
 			readonly station: string;
 			readonly stationFlags: number;
@@ -281,6 +283,7 @@ function bodyFromWire(kind: ObservatoryEvent["kind"]): LiveMapEventBody {
 				agentId: v.agentId,
 				toolName: v.toolName,
 				mcpServer: v.mcpServer,
+				target: v.target,
 				station: v.station,
 				stationFlags: v.stationFlags,
 				...(v.success === undefined ? {} : { success: v.success }),

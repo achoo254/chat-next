@@ -27,7 +27,7 @@ export function tool(
 	{ provisional = false, ...over }: Partial<Extract<LiveMapEventBody, { kind: "tool" }>> & { provisional?: boolean } = {},
 	seq = 0,
 ): LiveMapEvent {
-	return at({ kind: "tool", toolUseId: use, agentId: "", toolName: "Read", mcpServer: "", station: "FILES", stationFlags: 0, ...over }, `tool:${use}`, ms, seq, provisional);
+	return at({ kind: "tool", toolUseId: use, agentId: "", toolName: "Read", mcpServer: "", target: "", station: "FILES", stationFlags: 0, ...over }, `tool:${use}`, ms, seq, provisional);
 }
 
 export const subagent = (agent: string, ms: number, endedAt = 0, seq = 0): LiveMapEvent =>
