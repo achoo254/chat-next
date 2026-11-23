@@ -61,6 +61,9 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now), Text: messageText(ev)}
+	if ev.Self && !peer.NameUnknown {
+		m.Peer = &peer
+	}
 	return m, conv, nil
 }
 

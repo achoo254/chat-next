@@ -750,6 +750,12 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 		return false, err
 	}
 	r.puppets[m.From.ID] = from
+	if m.Peer != nil {
+		// The owner's own message names the other side: a chat met nameless takes its name.
+		if _, err := r.e.db.ensurePuppet(ctx, r.account, *m.Peer); err != nil {
+			return false, err
+		}
+	}
 	files, err := r.copyFiles(ctx, l, []bridge.Message{m})
 	if err != nil {
 		return false, err

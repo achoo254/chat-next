@@ -61,6 +61,9 @@ func TestMapMessageSelfTakesTheLookedUpPeerName(t *testing.T) {
 	if conv.Peer.NameUnknown || conv.Peer.Name != "Trịnh Hải Ngân" || conv.Title != "Trịnh Hải Ngân" {
 		t.Errorf("conversation = %+v", conv)
 	}
+	if m.Peer == nil || m.Peer.ID != "500" || m.Peer.Name != "Trịnh Hải Ngân" {
+		t.Errorf("message peer = %+v", m.Peer)
+	}
 }
 
 func TestMapMessageLabels(t *testing.T) {

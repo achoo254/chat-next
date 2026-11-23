@@ -199,6 +199,10 @@ type Message struct {
 	Service *ServiceAction
 	// Forward is set for a message forwarded from elsewhere.
 	Forward *ForwardInfo
+	// Peer is the other side of a 1-1 conversation when the message is the owner's
+	// own: it lets the engine rename a chat whose other side was first met without a
+	// name. Nil otherwise.
+	Peer *Participant
 }
 
 // ForwardInfo says where a forwarded message came from.
