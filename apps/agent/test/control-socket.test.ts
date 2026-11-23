@@ -148,6 +148,8 @@ describe("control socket", () => {
         "POST /observatory/delete",
         "POST /observatory/export",
         "POST /observatory/rotate-token",
+        "POST /observatory/thresholds",
+        "POST /observatory/thresholds/rules",
         "POST /registration/retry",
         "POST /restart",
         "POST /streams/alive",
