@@ -45,10 +45,15 @@ export function loginFailureReason(error) {
 		if (message.startsWith("Failed to fetch") || message === "Missing signkey" || message.startsWith("Failed to encrypt")) return ZALO_UNAVAILABLE;
 		return LOGIN_FAILED;
 	}
-	if (error.name === "AbortError" || error.name === "TimeoutError") return NETWORK_ERROR;
+	return isNetworkError(error) ? NETWORK_ERROR : LOGIN_FAILED;
+}
+
+/** Whether an error is the connection to Zalo failing (DNS, TCP, TLS, timeout, egress guard). */
+export function isNetworkError(error) {
+	if (error === null || typeof error !== "object") return false;
+	if (error.name === "AbortError" || error.name === "TimeoutError") return true;
 	const code = error.code ?? error.cause?.code;
-	if (typeof code === "string" && NETWORK_CODES.has(code)) return NETWORK_ERROR;
+	if (typeof code === "string" && NETWORK_CODES.has(code)) return true;
 	// fetch() fails with a TypeError ("fetch failed") whose cause is the socket error.
-	if (error instanceof TypeError && error.cause !== undefined) return NETWORK_ERROR;
-	return LOGIN_FAILED;
+	return error instanceof TypeError && error.cause !== undefined;
 }

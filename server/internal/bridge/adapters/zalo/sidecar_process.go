@@ -13,7 +13,10 @@ import (
 
 // sidecar is a running sidecar seen through its protocol: commands go in with
 // send, parsed events come out of events (closed once stdout ends), and stop
-// closes stdin then kills after a grace period.
+// closes stdin then kills after a grace period. A command with an id is sent
+// with request; its answer is handed to that caller by the stdout reader and
+// never goes through events, so a caller is answered even while the reader of
+// events is busy (the engine reads events and sends from one goroutine).
 type sidecar struct {
 	proc   Process
 	logger *slog.Logger
@@ -25,6 +28,9 @@ type sidecar struct {
 
 	stdinMu  sync.Mutex
 	stopOnce sync.Once
+
+	answersMu sync.Mutex
+	waiting   map[string]chan wireEvent // by command id
 }
 
 // startSidecar starts a process and waits for its ready line.
@@ -37,7 +43,8 @@ func startSidecar(ctx context.Context, r Runner, logger *slog.Logger, t timing) 
 		return nil, err
 	}
 	s := &sidecar{proc: proc, logger: logger, grace: t.stopGrace,
-		events: make(chan wireEvent, 64), stopping: make(chan struct{}), exited: make(chan struct{})}
+		events: make(chan wireEvent, 64), stopping: make(chan struct{}), exited: make(chan struct{}),
+		waiting: map[string]chan wireEvent{}}
 	var readers sync.WaitGroup
 	readers.Add(2)
 	go func() { defer readers.Done(); s.readStdout() }()
@@ -88,6 +95,10 @@ func (s *sidecar) readStdout() {
 			s.logger.Debug("zalo sidecar line dropped", "reason", err.Error())
 			continue
 		}
+		if isAnswer(ev.Ev) {
+			s.answer(ev)
+			continue
+		}
 		select {
 		case s.events <- ev:
 		case <-s.stopping:
@@ -120,6 +131,54 @@ func (s *sidecar) send(c command) error {
 		return errors.New("zalo: sidecar does not take commands (stdin closed)")
 	}
 	return nil
+}
+
+// errNoAnswer: the sidecar did not answer a command in time, or stopped first.
+// Whatever the command asked for may or may not have happened.
+var errNoAnswer = errors.New("zalo: the sidecar did not answer")
+
+// request writes a command with an id and waits for its answer, at most
+// timeout. An answer that comes later is dropped.
+func (s *sidecar) request(ctx context.Context, c command, timeout time.Duration) (wireEvent, error) {
+	ch := make(chan wireEvent, 1)
+	s.answersMu.Lock()
+	s.waiting[c.ID] = ch
+	s.answersMu.Unlock()
+	defer func() {
+		s.answersMu.Lock()
+		delete(s.waiting, c.ID)
+		s.answersMu.Unlock()
+	}()
+	if err := s.send(c); err != nil {
+		return wireEvent{}, err
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case ev := <-ch:
+		return ev, nil
+	case <-ctx.Done():
+		return wireEvent{}, ctx.Err()
+	case <-timer.C:
+		return wireEvent{}, fmt.Errorf("%w within %v", errNoAnswer, timeout)
+	case <-s.stopping:
+		return wireEvent{}, fmt.Errorf("%w: it was stopped", errNoAnswer)
+	case <-s.exited:
+		return wireEvent{}, fmt.Errorf("%w: it exited", errNoAnswer)
+	}
+}
+
+// answer hands an answer to the caller waiting for its id, if any.
+func (s *sidecar) answer(ev wireEvent) {
+	s.answersMu.Lock()
+	ch := s.waiting[ev.ID]
+	delete(s.waiting, ev.ID)
+	s.answersMu.Unlock()
+	if ch == nil {
+		s.logger.Debug("zalo sidecar answer nobody waits for", "event", safeCode(ev.Ev))
+		return
+	}
+	ch <- ev // buffered for one; the id was removed, so this is the only send
 }
 
 // stop closes stdin (the sidecar stops its listener and exits on EOF), then

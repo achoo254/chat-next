@@ -5,9 +5,13 @@
 //                                            listen:false (protocol 3) ends at `account` without
 //                                            starting the listener; absent or true also listens
 //   {"cmd":"login_session","session":{...}}  log in with a session an earlier login returned
+//   {"cmd":"send","id":"<req id>","to":"<uid digits>","text":".."}  (protocol 4) send one text message
+//                                            to one person (1-1 only); answered by `sent` or `send_error`
+//   {"cmd":"history","id":"<req id>","peer":"<uid digits>"}  (protocol 4) the newest page of 1-1
+//                                            messages, cut down to that person; `history` or `history_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
-//   {"ev":"ready","protocol":3}
+//   {"ev":"ready","protocol":4}
 //   {"ev":"qr","image":"<base64 png>"} | {"ev":"qr_scanned"} | {"ev":"qr_expired"} | {"ev":"qr_declined"}
 //   {"ev":"logged_in","session":{cookie,imei,userAgent}}   the engine keeps it (encrypted), never this process
 //   {"ev":"account","uid":"<digits>"}                the signed-in account, once logged in (both ways);
@@ -15,9 +19,17 @@
 //   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..}
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
+//   {"ev":"sent","id":..,"msgId":"<digits>","ts":<ms>}    ts is this process's clock when Zalo answered
+//   {"ev":"send_error","id":..,"code":"..","zaloCode":<int>?}  src/send.mjs: codes that say nothing was
+//     created (rate_limited, session_rejected, refused, bad_request, not_logged_in) and codes that leave
+//     it open (network_error, zalo_unavailable, unclear); zaloCode only with refused
+//   {"ev":"history","id":..,"count":<page size>,"oldestTs":<ms>,"messages":[{self,msgType,content,msgId,ts}]}
+//   {"ev":"history_error","id":..,"code":"listener_down"|"busy"|"timeout"|"failed"}
 //   {"ev":"error","code":"..","message":".."}          sanitised: never a raw server response. A failed
 //     login's code says why (src/login-failure.mjs): session_rejected, zalo_unavailable,
 //     network_error, bad_session, login_failed; message is only the error's class name.
+// Never called: sendSeenEvent, sendDeliveredEvent, sendTypingEvent, addReaction, findUser,
+// getMultiUsersByPhones. Nothing is sent to a group.
 // stderr : operational lines only: `host <name>` once per Zalo host connected to (the firewall's
 //          learning run reads them), `blocked ...` for a refused connection. No message text,
 //          cookie, imei, name or id is ever written here. `lookup ok|empty|failed` says only how a
@@ -31,11 +43,17 @@ import readline from "node:readline";
 import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 import { installEgressGuard } from "./egress-guard.mjs";
+import { createHistory, HistoryError } from "./history.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
+import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
 
 // 2: adds the `account` event (the engine needs the account id to finish a QR login).
 // 3: login_qr can skip the listener; login failures carry a reason code; the uid is checked.
-const PROTOCOL = 3;
+// 4: send (text, 1-1) and history; old_messages is no longer forwarded as an event (history reads it).
+const PROTOCOL = 4;
+
+/** How long a history request waits for its page. */
+const HISTORY_TIMEOUT_MS = 10_000;
 
 installEgressGuard({
 	onHost: (host) => process.stderr.write(`host ${host}\n`),
@@ -57,6 +75,10 @@ function fail(code, error) {
 // purpose: without it the owner's own messages, sent from the phone, never reach Chat.
 const zalo = new Zalo({ logging: false, checkUpdate: false, selfListen: true });
 let api = null;
+/** Whether the websocket listener is connected (a history request needs it). */
+let connected = false;
+/** Pages of old messages; set once the listener starts. */
+let history = null;
 
 /** What the websocket listener reports besides messages, and the label the engine sees. */
 const FORWARDED = {
@@ -65,7 +87,6 @@ const FORWARDED = {
 	undo: "undo",
 	seen_messages: "seen",
 	delivered_messages: "delivered",
-	old_messages: "old_messages",
 	group_event: "group_event",
 	friend_event: "friend_event",
 };
@@ -141,9 +162,19 @@ function listen(loggedIn) {
 		});
 	});
 	for (const [name, label] of Object.entries(FORWARDED)) api.listener.on(name, (payload) => emit({ ev: "event", name: label, payload }));
-	api.listener.on("connected", () => emit({ ev: "listener", state: "connected" }));
-	api.listener.on("disconnected", (code) => emit({ ev: "listener", state: "disconnected", code }));
-	api.listener.on("closed", (code) => emit({ ev: "listener", state: "closed", code }));
+	history = createHistory(api.listener, { isConnected: () => connected, timeoutMs: HISTORY_TIMEOUT_MS });
+	api.listener.on("connected", () => {
+		connected = true;
+		emit({ ev: "listener", state: "connected" });
+	});
+	api.listener.on("disconnected", (code) => {
+		connected = false;
+		emit({ ev: "listener", state: "disconnected", code });
+	});
+	api.listener.on("closed", (code) => {
+		connected = false;
+		emit({ ev: "listener", state: "closed", code });
+	});
 	api.listener.on("error", (error) => fail("listener_error", error));
 	api.listener.start();
 }
@@ -182,6 +213,33 @@ async function loginSession(session) {
 	if (announce(loggedIn)) listen(loggedIn);
 }
 
+/** Sends one text message; the answer carries the engine's request id, never the text. */
+async function send(command) {
+	const id = command.id;
+	if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+	if (!isUserId(command.to) || typeof command.text !== "string" || command.text === "") {
+		return emit({ ev: "send_error", id, code: BAD_REQUEST });
+	}
+	try {
+		const { msgId, ts } = await sendText(api, command.to, command.text);
+		emit({ ev: "sent", id, msgId, ts });
+	} catch (error) {
+		emit({ ev: "send_error", id, ...sendFailure(error) });
+	}
+}
+
+/** Reads the newest page of 1-1 messages for one person. */
+async function readHistory(command) {
+	const id = command.id;
+	if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
+	if (!isUserId(command.peer)) return emit({ ev: "history_error", id, code: "failed" });
+	try {
+		emit({ ev: "history", id, ...(await history.read(command.peer)) });
+	} catch (error) {
+		emit({ ev: "history_error", id, code: error instanceof HistoryError ? error.code : "failed" });
+	}
+}
+
 async function handle(line) {
 	let command;
 	try {
@@ -196,6 +254,10 @@ async function handle(line) {
 				return await loginQR(command.listen !== false);
 			case "login_session":
 				return await loginSession(command.session);
+			case "send":
+			case "history":
+				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+				return command.cmd === "send" ? await send(command) : await readHistory(command);
 			case "stop":
 				api?.listener.stop();
 				return setTimeout(() => process.exit(0), 200);

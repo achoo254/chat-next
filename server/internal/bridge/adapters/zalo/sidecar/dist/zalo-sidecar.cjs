@@ -27236,7 +27236,7 @@ var sendMessageFactory = apiFactory()((api2, ctx, utils) => {
   function getGroupLayoutId() {
     return Date.now();
   }
-  async function send(data) {
+  async function send2(data) {
     if (!Array.isArray(data))
       data = [data];
     const requests = [];
@@ -27568,18 +27568,18 @@ var sendMessageFactory = apiFactory()((api2, ctx, utils) => {
       const canBeDesc = isSingleFile && ["jpg", "jpeg", "png", "webp"].includes(firstExtFile);
       if (!canBeDesc && msg.length > 0 || msg.length > 0 && quote) {
         await handleMessage(message, threadId, type).then(async (data) => {
-          responses.message = (await send(data))[0];
+          responses.message = (await send2(data))[0];
         });
         msg = "";
         mentions = void 0;
       }
       const handledData = await handleAttachment({ msg, mentions, attachments, quote, ttl, styles, urgency }, threadId, type);
-      responses.attachment = await send(handledData);
+      responses.attachment = await send2(handledData);
       msg = "";
     }
     if (msg.length > 0) {
       const handledData = await handleMessage(message, threadId, type);
-      responses.message = (await send(handledData))[0];
+      responses.message = (await send2(handledData))[0];
     }
     return responses;
   };
@@ -29111,6 +29111,64 @@ function installEgressGuard({ onHost = () => {
   };
 }
 
+// src/history.mjs
+var MAX_HISTORY_MESSAGES = 50;
+var LISTENER_DOWN = "listener_down";
+var BUSY = "busy";
+var TIMEOUT = "timeout";
+var HistoryError = class extends Error {
+  constructor(code) {
+    super(code);
+    this.name = "HistoryError";
+    this.code = code;
+  }
+};
+function createHistory(listener, { isConnected, timeoutMs }) {
+  let pending = null;
+  listener.on("old_messages", (messages2, type) => {
+    if (pending === null || type !== ThreadType.User) return;
+    const { resolve, timer } = pending;
+    pending = null;
+    clearTimeout(timer);
+    resolve(Array.isArray(messages2) ? messages2 : []);
+  });
+  return {
+    /** The page cut down to the 1-1 chat with `peer`. */
+    async read(peer) {
+      if (!isConnected()) throw new HistoryError(LISTENER_DOWN);
+      if (pending !== null) throw new HistoryError(BUSY);
+      const messages2 = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pending = null;
+          reject(new HistoryError(TIMEOUT));
+        }, timeoutMs);
+        pending = { resolve, timer };
+        listener.requestOldMessages(ThreadType.User, null);
+      });
+      return pageFor(messages2, peer);
+    }
+  };
+}
+function pageFor(messages2, peer) {
+  let oldestTs = 0;
+  const own = [];
+  for (const message of messages2) {
+    const data = message?.data ?? {};
+    const ts = Number(data.ts);
+    if (Number.isFinite(ts) && ts > 0 && (oldestTs === 0 || ts < oldestTs)) oldestTs = ts;
+    if (String(message?.threadId ?? "") !== peer) continue;
+    own.push({
+      self: Boolean(message.isSelf),
+      msgType: data.msgType,
+      content: typeof data.content === "string" ? data.content : null,
+      msgId: data.msgId,
+      ts: data.ts
+    });
+  }
+  own.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+  return { count: messages2.length, oldestTs, messages: own.slice(-MAX_HISTORY_MESSAGES) };
+}
+
 // src/login-failure.mjs
 var SESSION_REJECTED = "session_rejected";
 var ZALO_UNAVAILABLE = "zalo_unavailable";
@@ -29137,15 +29195,67 @@ function loginFailureReason(error) {
     if (message.startsWith("Failed to fetch") || message === "Missing signkey" || message.startsWith("Failed to encrypt")) return ZALO_UNAVAILABLE;
     return LOGIN_FAILED;
   }
-  if (error.name === "AbortError" || error.name === "TimeoutError") return NETWORK_ERROR;
+  return isNetworkError(error) ? NETWORK_ERROR : LOGIN_FAILED;
+}
+function isNetworkError(error) {
+  if (error === null || typeof error !== "object") return false;
+  if (error.name === "AbortError" || error.name === "TimeoutError") return true;
   const code = error.code ?? error.cause?.code;
-  if (typeof code === "string" && NETWORK_CODES.has(code)) return NETWORK_ERROR;
-  if (error instanceof TypeError && error.cause !== void 0) return NETWORK_ERROR;
-  return LOGIN_FAILED;
+  if (typeof code === "string" && NETWORK_CODES.has(code)) return true;
+  return error instanceof TypeError && error.cause !== void 0;
+}
+
+// src/send.mjs
+var RATE_LIMITED = "rate_limited";
+var SESSION_REJECTED2 = "session_rejected";
+var REFUSED = "refused";
+var BAD_REQUEST = "bad_request";
+var NOT_LOGGED_IN = "not_logged_in";
+var NETWORK_ERROR2 = "network_error";
+var ZALO_UNAVAILABLE2 = "zalo_unavailable";
+var UNCLEAR = "unclear";
+var LOCAL_MESSAGES = /* @__PURE__ */ new Set(["Missing message content", "Missing threadId", "Failed to encrypt message"]);
+var HTTP_FAILED = "Request failed with status code ";
+function isUserId(value) {
+  return typeof value === "string" && /^[0-9]{1,20}$/.test(value);
+}
+function isRequestId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(value);
+}
+var NoMessageIdError = class extends Error {
+  constructor() {
+    super("no message id");
+    this.name = "NoMessageIdError";
+  }
+};
+async function sendText(api2, to, text) {
+  const result = await api2.sendMessage({ msg: text }, to, ThreadType.User);
+  const id = result?.message?.msgId;
+  const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
+  if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError();
+  return { msgId, ts: Date.now() };
+}
+function sendFailure(error) {
+  if (error === null || typeof error !== "object") return { code: UNCLEAR };
+  if (error.name === "ZcaApiError") {
+    const message = typeof error.message === "string" ? error.message : "";
+    if (message.startsWith(HTTP_FAILED)) {
+      const status = Number(message.slice(HTTP_FAILED.length));
+      if (status === 429) return { code: RATE_LIMITED };
+      if (status === 401 || status === 403) return { code: SESSION_REJECTED2 };
+      return { code: ZALO_UNAVAILABLE2 };
+    }
+    if (LOCAL_MESSAGES.has(message) || message.startsWith("Invalid mentions")) return { code: BAD_REQUEST };
+    const zaloCode = Number(error.code);
+    if (error.code !== null && Number.isInteger(zaloCode)) return { code: REFUSED, zaloCode };
+    return { code: UNCLEAR };
+  }
+  return { code: isNetworkError(error) ? NETWORK_ERROR2 : UNCLEAR };
 }
 
 // src/entry.mjs
-var PROTOCOL = 3;
+var PROTOCOL = 4;
+var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
 `),
@@ -29161,13 +29271,14 @@ function fail(code, error) {
 }
 var zalo = new Zalo({ logging: false, checkUpdate: false, selfListen: true });
 var api = null;
+var connected = false;
+var history = null;
 var FORWARDED = {
   typing: "typing",
   reaction: "reaction",
   undo: "undo",
   seen_messages: "seen",
   delivered_messages: "delivered",
-  old_messages: "old_messages",
   group_event: "group_event",
   friend_event: "friend_event"
 };
@@ -29228,9 +29339,19 @@ function listen(loggedIn) {
     });
   });
   for (const [name, label] of Object.entries(FORWARDED)) api.listener.on(name, (payload) => emit({ ev: "event", name: label, payload }));
-  api.listener.on("connected", () => emit({ ev: "listener", state: "connected" }));
-  api.listener.on("disconnected", (code) => emit({ ev: "listener", state: "disconnected", code }));
-  api.listener.on("closed", (code) => emit({ ev: "listener", state: "closed", code }));
+  history = createHistory(api.listener, { isConnected: () => connected, timeoutMs: HISTORY_TIMEOUT_MS });
+  api.listener.on("connected", () => {
+    connected = true;
+    emit({ ev: "listener", state: "connected" });
+  });
+  api.listener.on("disconnected", (code) => {
+    connected = false;
+    emit({ ev: "listener", state: "disconnected", code });
+  });
+  api.listener.on("closed", (code) => {
+    connected = false;
+    emit({ ev: "listener", state: "closed", code });
+  });
   api.listener.on("error", (error) => fail("listener_error", error));
   api.listener.start();
 }
@@ -29265,6 +29386,29 @@ async function loginSession(session) {
   const loggedIn = await zalo.login({ cookie: session.cookie, imei: session.imei, userAgent: session.userAgent });
   if (announce(loggedIn)) listen(loggedIn);
 }
+async function send(command) {
+  const id = command.id;
+  if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+  if (!isUserId(command.to) || typeof command.text !== "string" || command.text === "") {
+    return emit({ ev: "send_error", id, code: BAD_REQUEST });
+  }
+  try {
+    const { msgId, ts } = await sendText(api, command.to, command.text);
+    emit({ ev: "sent", id, msgId, ts });
+  } catch (error) {
+    emit({ ev: "send_error", id, ...sendFailure(error) });
+  }
+}
+async function readHistory(command) {
+  const id = command.id;
+  if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
+  if (!isUserId(command.peer)) return emit({ ev: "history_error", id, code: "failed" });
+  try {
+    emit({ ev: "history", id, ...await history.read(command.peer) });
+  } catch (error) {
+    emit({ ev: "history_error", id, code: error instanceof HistoryError ? error.code : "failed" });
+  }
+}
 async function handle(line) {
   let command;
   try {
@@ -29279,6 +29423,10 @@ async function handle(line) {
         return await loginQR2(command.listen !== false);
       case "login_session":
         return await loginSession(command.session);
+      case "send":
+      case "history":
+        if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+        return command.cmd === "send" ? await send(command) : await readHistory(command);
       case "stop":
         api?.listener.stop();
         return (0, import_node_timers.setTimeout)(() => process.exit(0), 200);

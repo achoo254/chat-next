@@ -58,6 +58,13 @@ func (h *heardAccount) firstSighting(id string) bool {
 	return h.seen.add(id)
 }
 
+// knows reports whether a conversation was heard (and not evicted since).
+func (h *heardAccount) knows(conv string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.convs[conv] != nil
+}
+
 // record keeps a message and its conversation. A conversation heard only
 // through the owner's own messages keeps a stand-in title until the other
 // side writes and gives a name.
@@ -180,6 +187,12 @@ type boundedSeenSet struct {
 
 func newBoundedSeenSet(capacity int) *boundedSeenSet {
 	return &boundedSeenSet{ids: make(map[string]struct{}, capacity), order: make([]string, 0, max(capacity, 1))}
+}
+
+// has reports whether id is in the set.
+func (s *boundedSeenSet) has(id string) bool {
+	_, ok := s.ids[id]
+	return ok
 }
 
 // add reports whether id was not in the set, and adds it.

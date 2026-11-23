@@ -13,8 +13,9 @@ import (
 // refused instead of half understood: the bundle ships in the same commit as
 // this code and its hash is checked at startup, so only a broken deploy can
 // pair them wrong. Version 3 lets a QR login skip the listener and names the
-// reason of a failed login.
-const protocolVersion = 3
+// reason of a failed login; version 4 sends a text to one person and reads
+// the newest page of 1-1 messages (send, history).
+const protocolVersion = 4
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -24,6 +25,8 @@ const maxLineBytes = 1 << 20
 const (
 	cmdLoginQR      = "login_qr"
 	cmdLoginSession = "login_session"
+	cmdSend         = "send"
+	cmdHistory      = "history"
 )
 
 // Events the sidecar writes on stdout.
@@ -39,7 +42,18 @@ const (
 	evOther      = "event"
 	evListener   = "listener"
 	evError      = "error"
+	// Answers to a command with an id (send, history). They are routed to
+	// the caller by id and never reach the listener's loop.
+	evSent         = "sent"
+	evSendError    = "send_error"
+	evHistory      = "history"
+	evHistoryError = "history_error"
 )
+
+// isAnswer reports whether an event answers a command with an id.
+func isAnswer(ev string) bool {
+	return ev == evSent || ev == evSendError || ev == evHistory || ev == evHistoryError
+}
 
 // command is one line written to the sidecar.
 type command struct {
@@ -47,6 +61,11 @@ type command struct {
 	Session json.RawMessage `json:"session,omitempty"`
 	// Listen false asks login_qr to stop at the account event (protocol 3).
 	Listen *bool `json:"listen,omitempty"`
+	// ID names a send or history command; its answer carries it back.
+	ID   string `json:"id,omitempty"`
+	To   string `json:"to,omitempty"`   // send: the person's Zalo id
+	Text string `json:"text,omitempty"` // send: never logged
+	Peer string `json:"peer,omitempty"` // history: the person's Zalo id
 }
 
 // errCodeSessionRejected is the error code of a login Zalo refused (sidecar
@@ -82,6 +101,22 @@ type wireEvent struct {
 	State   string          `json:"state"`
 	Code    looseString     `json:"code"`
 	Message string          `json:"message"`
+	// answers: sent, send_error, history, history_error
+	ID       string           `json:"id"`
+	ZaloCode looseString      `json:"zaloCode"`
+	Count    int              `json:"count"`
+	OldestTS looseString      `json:"oldestTs"`
+	Messages []historyMessage `json:"messages"`
+}
+
+// historyMessage is one message of a history page (sidecar src/history.mjs).
+// Content is the text of a text message and null otherwise.
+type historyMessage struct {
+	Self    bool            `json:"self"`
+	MsgType looseString     `json:"msgType"`
+	Content json.RawMessage `json:"content"`
+	MsgID   looseString     `json:"msgId"`
+	TS      looseString     `json:"ts"`
 }
 
 // decodeEvent parses one stdout line. A line that is not a JSON object with an

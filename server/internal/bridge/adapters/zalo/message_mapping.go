@@ -71,14 +71,22 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 func messageText(ev wireEvent) string {
 	switch string(ev.MsgType) {
 	case msgTypeText:
-		var text string
-		if err := json.Unmarshal(ev.Content, &text); err == nil && text != "" {
+		if text, ok := textContent(ev.Content); ok {
 			return text
 		}
 	case msgTypeSticker:
 		return labelSticker
 	}
 	return labelUnsupported
+}
+
+// textContent is the text of a text message's content, false when it has none.
+func textContent(content json.RawMessage) (string, bool) {
+	var text string
+	if err := json.Unmarshal(content, &text); err != nil || text == "" {
+		return "", false
+	}
+	return text, true
 }
 
 // parseTimestamp reads Zalo's send time, milliseconds since 1970 (seconds are

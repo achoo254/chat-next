@@ -155,12 +155,13 @@ func (p *fakeProcess) command(t *testing.T) string {
 	}
 }
 
-const readyLine = `{"ev":"ready","protocol":3}`
+const readyLine = `{"ev":"ready","protocol":4}`
 
 // fastTiming keeps tests short.
 var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second, firstQR: 2 * time.Second,
 	loginStartWait: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginIdle: time.Minute,
-	loginTTL: time.Minute, connect: 3 * time.Second}
+	loginTTL: time.Minute, connect: 3 * time.Second,
+	sendGap: 20 * time.Millisecond, sendAnswer: 300 * time.Millisecond, historyAnswer: 300 * time.Millisecond}
 
 // newTestAdapter returns an adapter on runner with fast timings and a logger
 // that keeps every record for inspection.

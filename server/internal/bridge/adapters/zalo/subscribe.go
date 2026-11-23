@@ -72,6 +72,7 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 // listen handles the events of a subscribed sidecar.
 func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, out chan<- bridge.Event) error {
 	heard := a.heardFor(st.account)
+	own := a.sendStateFor(st.account).log
 	groupsIgnored := 0
 	// A login Zalo never answers must not hold the account forever.
 	connectTimer := time.NewTimer(a.timing.connect)
@@ -102,7 +103,7 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 				a.logger.Debug("zalo group message ignored", "ignored_since_connect", groupsIgnored)
 				continue
 			}
-			if err := a.deliver(ctx, heard, ev, out); err != nil {
+			if err := a.deliver(ctx, heard, own, ev, out); err != nil {
 				return err
 			}
 		case evAccount:
@@ -125,8 +126,9 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 }
 
 // deliver maps a 1-1 message, drops a repeat, keeps it for ListConversations
-// and Backfill, then hands it to the engine.
-func (a *Adapter) deliver(ctx context.Context, heard *heardAccount, ev wireEvent, out chan<- bridge.Event) error {
+// and Backfill (and, for the owner's own text, for matching a repeated send),
+// then hands it to the engine.
+func (a *Adapter) deliver(ctx context.Context, heard *heardAccount, own *sentLog, ev wireEvent, out chan<- bridge.Event) error {
 	m, conv, err := mapMessage(ev, a.now())
 	if err != nil {
 		a.logger.Debug("zalo message dropped", "reason", err.Error())
@@ -136,6 +138,9 @@ func (a *Adapter) deliver(ctx context.Context, heard *heardAccount, ev wireEvent
 		return nil
 	}
 	heard.record(conv, m)
+	if text, ok := textContent(ev.Content); ok && ev.Self && string(ev.MsgType) == msgTypeText {
+		own.heard(ownMessage{conv: conv.ID, text: hashText(text), id: m.ID, date: m.Date})
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

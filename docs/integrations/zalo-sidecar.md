@@ -61,11 +61,21 @@ Adapter Go chạy đúng `<ZALO_SUDO_PATH> -n -u <ZALO_SANDBOX_USER> -- <ZALO_NO
 
 **Chưa quan sát** trên tài khoản thật phản hồi của Zalo khi phiên hết hạn thật; `session_rejected` là hình dạng dự đoán từ mã nguồn. Vì vậy engine chỉ coi phiên là đã hết khi `session_rejected` lặp lại trong ít nhất một giờ (xem [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định)). Khi gặp phiên hết hạn thật, ghi lại mã nhận được và chỉnh bảng trên.
 
-## Giao thức stdio (phiên bản 3)
+## Giao thức stdio (phiên bản 4)
 
-Mỗi dòng là một JSON. Lệnh vào: `login_qr` (kèm `listen:false` để dừng ở `account` mà không mở kênh nghe; adapter luôn gửi như vậy), `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready` (kèm `protocol`), `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `account` (id tài khoản Zalo, 1-20 chữ số; id khác thì lỗi `no_account`), `message`, `event`, `listener`, `error` (chỉ mã, xem bảng trên). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh gửi tin, lấy lịch sử, liệt kê hội thoại hay đăng xuất.
+Mỗi dòng là một JSON. Lệnh vào: `login_qr` (kèm `listen:false` để dừng ở `account` mà không mở kênh nghe; adapter luôn gửi như vậy), `login_session` (kèm `session`), `stop`. Sự kiện ra: `ready` (kèm `protocol`), `qr`, `qr_scanned`, `qr_expired`, `qr_declined`, `logged_in` (kèm phiên, engine giữ), `account` (id tài khoản Zalo, 1-20 chữ số; id khác thì lỗi `no_account`), `message`, `event`, `listener`, `error` (chỉ mã, xem bảng trên). Bản 4 thêm hai lệnh có `id` (mã do engine đặt, câu trả lời mang lại đúng mã đó): `send` (kèm `to`, `text`) trả `sent` (`msgId`, `ts`) hoặc `send_error` (`code`, `zaloCode` khi có); `history` (kèm `peer`) trả `history` (`count`, `oldestTs`, `messages`) hoặc `history_error` (`code`). Xem [Gửi tin](#gửi-tin). Chi tiết ở đầu `src/entry.mjs`. Chưa có lệnh liệt kê hội thoại hay đăng xuất.
 
-Lịch sử: bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải báo engine tài khoản nào vừa vào; bản 3 (21/11/2026) thêm `listen:false` và mã lỗi đăng nhập, kiểm id tài khoản. Adapter chỉ nhận đúng bản 3: bundle đi cùng commit với mã Go và băm được kiểm lúc khởi động, nên lệch bản chỉ xảy ra khi triển khai hỏng.
+Lịch sử: bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải báo engine tài khoản nào vừa vào; bản 3 (21/11/2026) thêm `listen:false` và mã lỗi đăng nhập, kiểm id tài khoản; bản 4 (23/11/2026) thêm `send` và `history`, thôi chuyển `old_messages` thành `event` (lệnh `history` đọc nó). Adapter chỉ nhận đúng bản 4: bundle đi cùng commit với mã Go và băm được kiểm lúc khởi động, nên lệch bản chỉ xảy ra khi triển khai hỏng.
+
+## Gửi tin
+
+Chỉ chữ, chỉ chat 1-1 (`src/send.mjs`, có test chạy `zca-js` thật với `fetch` giả). `api.sendMessage({ msg }, to, ThreadType.User)` của `zca-js` 2.3.0 gửi đúng **một** yêu cầu `POST <zpwServiceMap.chat[0]>/api/message/sms`; host lấy từ bản đồ dịch vụ Zalo trả lúc đăng nhập (`zpw_service_map_v3`), không cố định trong mã. Bộ chặn đi ra không phải mở thêm: host đó phải thuộc `*.zalo.me`, nếu bản đồ trỏ ra ngoài thì lần gửi bị chặn và báo `network_error` (có test). Tường lửa thì khác: `hosts.conf` hiện chưa có host dịch vụ chat (tên dự kiến dạng `tt-chat<N>-wpa.chat.zalo.me`), nên lần gửi thật đầu tiên cần học tên đó (log `zalo-sandbox-blocked`, dòng `host` trên stderr) rồi thêm vào danh sách.
+
+- Không gọi `sendSeenEvent`, `sendDeliveredEvent`, `sendTypingEvent`, `addReaction`, `findUser`, `getMultiUsersByPhones` (test đọc `src/entry.mjs`). Không gửi vào nhóm.
+- `zca-js` tự đặt mã gửi `clientId: Date.now()` và không trả lại, nên `sent` không có `cliMsgId`; `ts` là đồng hồ của tiến trình phụ lúc Zalo trả lời.
+- **Mã `send_error`:** chắc chắn không tạo tin: `rate_limited` (HTTP 429), `session_rejected` (HTTP 401/403), `refused` (Zalo trả mã lỗi riêng, kèm `zaloCode` dạng số, không kèm thông báo), `bad_request`, `not_logged_in`. Chưa rõ tin có được tạo không: `network_error`, `zalo_unavailable` (HTTP lỗi khác), `unclear` (gồm trả lời không có `msgId`). Mã riêng của Zalo cho «bị chặn», «quá nhanh» **chưa quan sát** trên tài khoản thật; khi gặp, ghi `zaloCode` vào đây.
+- **Lịch sử:** `zca-js` 2.3.0 chỉ có `listener.requestOldMessages(ThreadType.User, null)`: xin qua websocket trang tin cũ mới nhất của **mọi** chat 1-1 (không lọc theo người), trang về sau dưới dạng sự kiện `old_messages` không mang mã yêu cầu. Nên mỗi lúc chỉ một yêu cầu (`busy`), chờ 10 giây (`timeout`), cần kênh nghe đang nối (`listener_down`); trang được cắt còn tin của một người (tối đa 50 tin mới nhất) và `oldestTs` của cả trang cho biết trang phủ về tới đâu. Cỡ trang do Zalo quyết; chưa đo trên tài khoản thật.
+- Khử trùng khi gửi lại cùng `RandomID` nằm ở adapter Go (`send.go`, `sent_log.go`), xem [`chat-bridge.md`](./chat-bridge.md#zalo-chỉ-nhận-tắt-mặc-định).
 
 ## Rủi ro đã biết
 

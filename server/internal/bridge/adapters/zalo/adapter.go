@@ -3,10 +3,11 @@
 // (sidecar/dist/zalo-sidecar.cjs) over its stdio protocol, one process per
 // login and one per subscribed account.
 //
-// This step only receives: QR login, live 1-1 text and sticker messages, and
-// conversations heard since the process started. Nothing is sent to Zalo
-// (no CapSend), groups are ignored, and there is no history beyond what this
-// process heard (see Backfill).
+// It receives live 1-1 text and sticker messages after a QR login and lists
+// the conversations heard since the process started; it sends text to one
+// person the account talks with (send.go), only for an account whose owner
+// switched sending on (bridge.SendGated). Groups are ignored, media is a label,
+// and there is no history beyond what this process heard (see Backfill).
 package zalo
 
 import (
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"app.local/server/internal/bridge"
@@ -42,6 +44,9 @@ type timing struct {
 	loginIdle      time.Duration // a login nobody polls is stopped after this
 	loginTTL       time.Duration // any login is stopped after this
 	connect        time.Duration // login_session -> listener connected
+	sendGap        time.Duration // least time between two sends of one account
+	sendAnswer     time.Duration // send -> answer; also how long a try may still land
+	historyAnswer  time.Duration // history -> page
 }
 
 // defaultTiming keeps every Login call far below the API server's 60 s write
@@ -49,7 +54,8 @@ type timing struct {
 // 3 s and a poll within 20 s; Zalo is only waited for in the background.
 var defaultTiming = timing{stopGrace: 3 * time.Second, readyTimeout: 10 * time.Second, firstQR: 30 * time.Second,
 	loginStartWait: 3 * time.Second, loginPoll: 20 * time.Second, loginIdle: 45 * time.Second,
-	loginTTL: 10 * time.Minute, connect: 2 * time.Minute}
+	loginTTL: 10 * time.Minute, connect: 2 * time.Minute,
+	sendGap: 2 * time.Second, sendAnswer: 30 * time.Second, historyAnswer: 15 * time.Second}
 
 // Adapter implements bridge.Adapter for Zalo.
 type Adapter struct {
@@ -57,13 +63,16 @@ type Adapter struct {
 	logger   *slog.Logger
 	timing   timing
 	now      func() time.Time
+	started  time.Time // when this process's adapter was made (see restartWindow)
 	refusals *refusalTracker
+	requests atomic.Uint64 // ids of commands the sidecar answers
 
 	mu            sync.Mutex
 	logins        map[string]*qrLogin
 	loginFailedAt map[string]time.Time     // by Chat user: when a login last failed or was abandoned
 	subs          map[string]*subscription // by Account.ID
 	heard         map[string]*heardAccount // by Account.ID
+	sending       map[string]*sendState    // by Account.ID
 	// mismatched holds, by Account.ID, the fingerprint of a stored session
 	// that logged in as another Zalo account; it is not tried again.
 	mismatched map[string]string
@@ -84,22 +93,23 @@ func New(cfg Config) *Adapter {
 }
 
 func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapter {
-	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, refusals: newRefusalTracker(now),
+	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, started: now(), refusals: newRefusalTracker(now),
 		logins: map[string]*qrLogin{}, loginFailedAt: map[string]time.Time{}, subs: map[string]*subscription{},
-		heard: map[string]*heardAccount{}, mismatched: map[string]string{}}
+		heard: map[string]*heardAccount{}, sending: map[string]*sendState{}, mismatched: map[string]string{}}
 }
 
 // Name implements bridge.Adapter.
 func (a *Adapter) Name() string { return Name }
 
-// Capabilities implements bridge.Adapter: live messages only, read only.
+// Capabilities implements bridge.Adapter: live messages, and text sent out.
 func (a *Adapter) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapLive: true}
+	return bridge.Capabilities{bridge.CapLive: true, bridge.CapSend: true}
 }
 
-// Features implements bridge.Featured: messages come in; nothing goes out.
+// Features implements bridge.Featured: messages come in and go out (text
+// only). No edits, deletes, topics, pins or media.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
-	return map[feature.Feature]feature.Support{feature.Messages: {In: true}}
+	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}}
 }
 
 // Close stops every login and subscription sidecar.
@@ -133,6 +143,7 @@ func (a *Adapter) Logout(_ context.Context, acct bridge.Account) error {
 	a.mu.Lock()
 	s := a.subs[acct.ID]
 	delete(a.heard, acct.ID)
+	delete(a.sending, acct.ID)
 	delete(a.mismatched, acct.ID)
 	a.mu.Unlock()
 	a.refusals.connected(acct.ID) // forget the streak with the session
