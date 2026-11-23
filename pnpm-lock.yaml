@@ -160,12 +160,6 @@ importers:
       '@aparajita/capacitor-secure-storage':
         specifier: 8.0.1
         version: 8.0.1
-      '@babylonjs/core':
-        specifier: 9.36.0
-        version: 9.36.0
-      '@babylonjs/loaders':
-        specifier: 9.36.0
-        version: 9.36.0(@babylonjs/core@9.36.0)(babylonjs-gltf2interface@9.36.0)
       '@bufbuild/protobuf':
         specifier: 2.16.0
         version: 2.16.0
@@ -533,15 +527,6 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
-
-  '@babylonjs/core@9.36.0':
-    resolution: {integrity: sha512-PCrCshQ6hhvyxsp/FAq7GMPrmX8asloy+fXs1+mF2SCREx0hqCb4xtfbIoyID43rqX8+1UTw5RtodixXowRp7w==}
-
-  '@babylonjs/loaders@9.36.0':
-    resolution: {integrity: sha512-jjTbfUztgiuBQ4I2lX4JJHJmZ8oB9yLVq8NLn9HVq8VGzn5HdpKQmK0knw4wCX+Nq+QYAT/WXmHbopyOAHk2CA==}
-    peerDependencies:
-      '@babylonjs/core': ^9.0.0
-      babylonjs-gltf2interface: ^9.0.0
 
   '@bramus/specificity@2.4.3':
     resolution: {integrity: sha512-0GEz8qJWokkUVYQYRukmkSHIFNoBH8QTreeHrAFbvz1XFYc3Y+puhMs8PQ5x8GNugiC2l5jvDBXKLbBIByeSBw==}
@@ -1497,9 +1482,6 @@ packages:
 
   babel-plugin-react-compiler@1.0.0:
     resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
-
-  babylonjs-gltf2interface@9.36.0:
-    resolution: {integrity: sha512-FFt9u17MasOdMNlevIJFkqKiIlRayT4zf+XMD0cTAyrhxCkjORPfRfZMEEtpUSveJiovcE7f2gg7tCfuyQtZEg==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -3382,13 +3364,6 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@babylonjs/core@9.36.0': {}
-
-  '@babylonjs/loaders@9.36.0(@babylonjs/core@9.36.0)(babylonjs-gltf2interface@9.36.0)':
-    dependencies:
-      '@babylonjs/core': 9.36.0
-      babylonjs-gltf2interface: 9.36.0
-
   '@bramus/specificity@2.4.3':
     dependencies:
       css-tree: 3.2.1
@@ -4261,8 +4236,6 @@ snapshots:
   babel-plugin-react-compiler@1.0.0:
     dependencies:
       '@babel/types': 7.29.8
-
-  babylonjs-gltf2interface@9.36.0: {}
 
   balanced-match@1.0.2: {}
 

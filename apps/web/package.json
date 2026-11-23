@@ -23,8 +23,6 @@
     "@achoo254/chat-proto": "workspace:*",
     "@achoo254/chat-remote-protocol": "workspace:*",
     "@aparajita/capacitor-secure-storage": "8.0.1",
-    "@babylonjs/core": "9.36.0",
-    "@babylonjs/loaders": "9.36.0",
     "@bufbuild/protobuf": "2.16.0",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",

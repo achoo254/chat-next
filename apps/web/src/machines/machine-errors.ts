@@ -194,8 +194,6 @@ function reasonText(r: Reasons, observe: MachinesCopy["observe"], err: RemoteErr
 			return r.usageLedgerBlocked;
 		case ErrorReason.NOTHING_STAGED:
 			return r.nothingStaged;
-		case ErrorReason.OFFICE_WATCH_LIMIT:
-			return r.officeWatchLimit;
 		case ErrorReason.ADVISOR_UNAVAILABLE:
 			return r.advisorUnavailable;
 		case ErrorReason.ADVISOR_KEY_INVALID:

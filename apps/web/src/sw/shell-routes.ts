@@ -1,6 +1,6 @@
 // Which requests the service worker answers (service-worker.ts). Only the
 // app shell (page loads of the app's own routes and the build's files) and
-// the office's hashed assets with their asset list (public/office/). The
+// the Live Map's hashed assets with their asset list (public/observatory/). The
 // server's endpoints (Connect RPC, realtime, sign-in, webhooks, Bot API,
 // health) and every other origin (the media host) always go to the network
 // untouched, so no API answer or user file ever lands in the cache.
@@ -15,23 +15,63 @@ export const SHELL_PAGE = "/index.html";
 const SERVER_PATHS = ["/rpc", "/ws", "/auth", "/hook", "/bot", "/healthz", "/e2e"] as const;
 
 /**
- * The office's 3D and 2D assets (public/office/), kept across builds: their
+ * The Live Map's assets (public/observatory/), kept across builds: their
  * names carry a content hash, so a cached copy never goes stale. Not under
- * CACHE_PREFIX, so pruning the builds' caches leaves it alone; the office
- * tab drops the entries its asset list no longer names
- * (machines/office/office-asset-cache.ts). Renaming it drops the whole cache.
+ * CACHE_PREFIX, so pruning the builds' caches leaves it alone; the worker
+ * drops the entries a newly fetched asset list no longer names
+ * (observatoryEntriesToDelete). Renaming it drops the whole cache.
  */
-export const OFFICE_CACHE = "office-assets-v1";
+export const OBSERVATORY_CACHE = "observatory-assets-v1";
 
-/** The office's asset list: the one office file without a hash in its name. */
-export const OFFICE_MANIFEST = "/office/office-assets.json";
+/** The cache of the 3D office the Live Map replaced; the worker deletes it on activate. */
+export const RETIRED_CACHES = ["office-assets-v1"] as const;
 
-/** "/office/<name>.<8 hex>.<glb|webp|mp3>", sounds under "/office/sfx/" too. */
-const OFFICE_FILE = /^\/office\/(?:sfx\/)?[A-Za-z0-9_-][A-Za-z0-9._-]*\.[0-9a-f]{8}\.(?:glb|webp|mp3)$/;
+/** Where the Live Map's assets are served from. */
+const OBSERVATORY_BASE = "/observatory/";
 
-/** A content-hashed office asset (a pathname, no query). */
-export function isOfficeFile(pathname: string): boolean {
-	return OFFICE_FILE.test(pathname);
+/** The Live Map's asset list: the one file there without a hash in its name. */
+export const OBSERVATORY_MANIFEST = `${OBSERVATORY_BASE}observatory-assets.json`;
+
+/** "/observatory/<name>.<8 hex>.<webp|json>": the plates, the scene table, the sprite sheets. */
+const OBSERVATORY_FILE = /^\/observatory\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.[0-9a-f]{8}\.(?:webp|json)$/;
+
+/** A content-hashed Live Map asset (a pathname, no query). */
+export function isObservatoryFile(pathname: string): boolean {
+	return OBSERVATORY_FILE.test(pathname);
+}
+
+/**
+ * The hashed files an asset list names, as absolute paths. Walks the whole
+ * list, so it stays right when the list's shape changes: any string naming a
+ * hashed Live Map file counts.
+ */
+export function observatoryListFiles(list: unknown): Set<string> {
+	const out = new Set<string>();
+	const walk = (value: unknown): void => {
+		if (typeof value === "string") {
+			const path = OBSERVATORY_BASE + value;
+			if (isObservatoryFile(path)) out.add(path);
+		} else if (Array.isArray(value)) {
+			for (const item of value) walk(item);
+		} else if (typeof value === "object" && value !== null) {
+			for (const item of Object.values(value)) walk(item);
+		}
+	};
+	walk(list);
+	return out;
+}
+
+/**
+ * The cached Live Map files (pathnames) a new asset list no longer names: an
+ * earlier bake's. The list names every file the scene loads (plates, scene
+ * table, each atlas's sheet and image). The list itself, and anything not a
+ * hashed file, stays; a list naming no hashed file at all deletes nothing,
+ * so a broken list never empties the cache.
+ */
+export function observatoryEntriesToDelete(cached: Iterable<string>, list: unknown): string[] {
+	const listed = observatoryListFiles(list);
+	if (listed.size === 0) return [];
+	return [...cached].filter((path) => isObservatoryFile(path) && !listed.has(path));
 }
 
 export type ShellRoute =
@@ -39,10 +79,10 @@ export type ShellRoute =
 	| "page"
 	/** A file of the build: cache first. */
 	| "file"
-	/** A hashed office asset: cache first from OFFICE_CACHE, cached on the way in. */
-	| "office-file"
-	/** The office's asset list: network first, its cached copy offline. */
-	| "office-manifest"
+	/** A hashed Live Map asset: cache first from OBSERVATORY_CACHE, cached on the way in. */
+	| "observatory-file"
+	/** The Live Map's asset list: network first, its cached copy offline. */
+	| "observatory-manifest"
 	/** Not the shell's business: the browser handles it as without a worker. */
 	| "network";
 
@@ -73,8 +113,8 @@ export function shellRoute(request: RequestInfo, origin: string, shellFiles: Rea
 	if (url.origin !== origin || serverPath(url.pathname)) return "network";
 	if (request.mode === "navigate") return "page";
 	// A query would make another cache entry for the same file: left to the network.
-	if (url.search === "" && url.pathname === OFFICE_MANIFEST) return "office-manifest";
-	if (url.search === "" && isOfficeFile(url.pathname)) return "office-file";
+	if (url.search === "" && url.pathname === OBSERVATORY_MANIFEST) return "observatory-manifest";
+	if (url.search === "" && isObservatoryFile(url.pathname)) return "observatory-file";
 	if (isHashedAsset(url.pathname) || shellFiles.has(url.pathname)) return "file";
 	return "network";
 }

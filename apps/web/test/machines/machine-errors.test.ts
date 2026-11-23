@@ -10,9 +10,12 @@ import { machineErrorText, needsProjectTrust } from "../../src/machines/machine-
 
 const refused = (reason: ErrorReason, subject = "", code = ErrorCode.INVALID) => new RemoteError(code, "english from the machine", reason, subject);
 
+/** Reasons kept in the proto for wire compatibility but answering a request this app no longer sends (the 3D office's watch). */
+const RETIRED_REASONS: ReadonlySet<ErrorReason> = new Set([ErrorReason.OFFICE_WATCH_LIMIT]);
+
 describe("machine errors", () => {
 	it("words every known reason in each language, never the machine's English", () => {
-		const reasons = Object.values(ErrorReason).filter((r): r is ErrorReason => typeof r === "number" && r !== ErrorReason.UNSPECIFIED);
+		const reasons = Object.values(ErrorReason).filter((r): r is ErrorReason => typeof r === "number" && r !== ErrorReason.UNSPECIFIED && !RETIRED_REASONS.has(r));
 		expect(reasons.length).toBeGreaterThan(20);
 		for (const copy of [viMachines, enMachines, zhCNMachines]) {
 			for (const reason of reasons) {

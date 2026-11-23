@@ -567,7 +567,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			}
 			const last = fresh.at(-1)?.body;
 			if (last?.case !== "advisorVerdict" || store.snapshot().open || store.snapshot().busy) return;
-			// The page as it shows now (the session in its chat, terminal or office view): a tap on the line returns to it.
+			// The page as it shows now (the session in its chat, terminal or Observe view): a tap on the line returns to it.
 			store.setFlash(verdictLine(last.value), page);
 			window.clearTimeout(timer);
 			timer = window.setTimeout(() => store.setFlash(""), FLASH_MS);
@@ -583,7 +583,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 
 /**
  * The page a verdict of a session leads back to: the page as it shows now (the
- * session's chat, terminal or office tab, kept with its query) when it is that
+ * session's chat, terminal or Observe tab, kept with its query) when it is that
  * session's, else the session itself. Another session or screen may be showing
  * when the verdict is noticed (panes and tabs side by side), and a tap must
  * not go there.

@@ -15,13 +15,22 @@
 //   tabs still run, since nginx serves only the current release's files and
 //   those tabs load lazy chunks of their own build. Tabs then show the
 //   "Đã có bản mới" bar (register-service-worker.ts); nothing reloads them.
-// - The office's hashed assets live in their own cache (OFFICE_CACHE), kept
-//   across builds: cache first, cached on the way in. Its asset list is
+// - The Live Map's hashed assets live in their own cache (OBSERVATORY_CACHE),
+//   kept across builds: cache first, cached on the way in. Its asset list is
 //   network first, so a new bake is seen at once, with the cached copy
-//   offline. The office tab prunes and fills that cache
-//   (machines/office/office-asset-cache.ts).
+//   offline; a newly fetched list drops the cached files it no longer names.
+//   The 3D office's cache (RETIRED_CACHES) is deleted on activate.
 import { answerBuild, askBuild, isBuildQuery, type MessageTarget } from "./build-messages.ts";
-import { CACHE_PREFIX, cachesToDelete, isHashedAsset, OFFICE_CACHE, SHELL_PAGE, shellRoute } from "./shell-routes.ts";
+import {
+	CACHE_PREFIX,
+	cachesToDelete,
+	isHashedAsset,
+	OBSERVATORY_CACHE,
+	observatoryEntriesToDelete,
+	RETIRED_CACHES,
+	SHELL_PAGE,
+	shellRoute,
+} from "./shell-routes.ts";
 
 export interface AppShellBuild {
 	readonly version: string;
@@ -87,15 +96,16 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 	scope.addEventListener("activate", (event) => {
 		// Control the open tabs now, so the files they load later come from the caches.
 		// Pruning waits for a tab's build question: activation holds back every fetch.
-		event.waitUntil(scope.clients.claim());
+		// The retired caches have no reader left, so they go now; a failure only leaves them for the next activation.
+		event.waitUntil(Promise.all([scope.clients.claim(), dropRetiredCaches()]));
 	});
 
 	scope.addEventListener("fetch", (event) => {
 		const route = shellRoute(event.request, scope.location.origin, files);
 		if (route === "page") event.respondWith(page(event.request));
 		else if (route === "file") event.respondWith(file(event.request));
-		else if (route === "office-file") event.respondWith(officeFile(event));
-		else if (route === "office-manifest") event.respondWith(officeManifest(event.request));
+		else if (route === "observatory-file") event.respondWith(observatoryFile(event));
+		else if (route === "observatory-manifest") event.respondWith(observatoryManifest(event));
 	});
 
 	scope.addEventListener("message", (event) => {
@@ -131,28 +141,31 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 		return response;
 	}
 
-	async function officeFile(event: FetchEventLike): Promise<Response> {
+	async function observatoryFile(event: FetchEventLike): Promise<Response> {
 		const { request } = event;
-		const cached = await caches.match(request, { cacheName: OFFICE_CACHE });
+		const cached = await caches.match(request, { cacheName: OBSERVATORY_CACHE });
 		if (cached !== undefined) return cached;
 		const response = await fetch(request);
 		// Stored in the background: the page reads the file while it streams in.
-		if (keepable(response)) event.waitUntil(storeOffice(request, response.clone()));
+		if (keepable(response)) event.waitUntil(storeObservatory(request, response.clone()));
 		return response;
 	}
 
-	async function officeManifest(request: Request): Promise<Response> {
+	async function observatoryManifest(event: FetchEventLike): Promise<Response> {
+		const { request } = event;
 		let response: Response;
 		try {
 			response = await fetch(request);
 		} catch (err) {
-			const cached = await caches.match(request, { cacheName: OFFICE_CACHE });
+			const cached = await caches.match(request, { cacheName: OBSERVATORY_CACHE });
 			if (cached !== undefined) return cached;
 			throw err;
 		}
-		// Stored before answering: once the page has the list, the cached
-		// copy is the same one (office-asset-cache.ts reads it from there).
-		if (keepable(response)) await storeOffice(request, response.clone());
+		if (keepable(response)) {
+			// Stored before answering, so an offline open reads the list the page saw; the earlier bake's files go in the background.
+			await storeObservatory(request, response.clone());
+			event.waitUntil(pruneObservatory(response.clone()));
+		}
 		return response;
 	}
 
@@ -161,12 +174,33 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 		return response.status === 200 && response.type === "basic";
 	}
 
-	async function storeOffice(request: Request, response: Response): Promise<void> {
+	async function storeObservatory(request: Request, response: Response): Promise<void> {
 		try {
-			const cache = await caches.open(OFFICE_CACHE);
+			const cache = await caches.open(OBSERVATORY_CACHE);
 			await cache.put(request, response);
 		} catch {
 			// Out of quota or storage gone: not caching only costs a download next time.
+		}
+	}
+
+	/** Deletes the cached Live Map files the fresh asset list no longer names. */
+	async function pruneObservatory(list: Response): Promise<void> {
+		try {
+			const json: unknown = await list.json();
+			const cache = await caches.open(OBSERVATORY_CACHE);
+			const cached = (await cache.keys()).map((key) => new URL(key.url).pathname);
+			await Promise.all(observatoryEntriesToDelete(cached, json).map((path) => cache.delete(path)));
+		} catch (err) {
+			// A list that does not parse, or storage gone: the files stay until the next list.
+			console.warn("service worker: pruning the Live Map cache:", err);
+		}
+	}
+
+	async function dropRetiredCaches(): Promise<void> {
+		try {
+			await Promise.all(RETIRED_CACHES.map((key) => caches.delete(key)));
+		} catch (err) {
+			console.warn("service worker: deleting retired caches:", err);
 		}
 	}
 
