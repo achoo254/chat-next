@@ -46,6 +46,7 @@ import {
 	aiPane,
 	closePane,
 	closeSession,
+	markAiClosed,
 	cycleFocus,
 	cycleTab,
 	EMPTY_LAYOUT,
@@ -399,6 +400,7 @@ export function TerminalDock({
 		const before = sessionsOf(layout);
 		const ai = new Set(layout.tabs.flatMap((x) => panesOf(x.root).filter((p) => p.ai === true).map((p) => p.session)));
 		for (const id of ids) next = closePane(next, id);
+		next = markAiClosed(layout, next, ids);
 		const after = sessionsOf(next);
 		setLayout(next);
 		for (const session of before) if (!after.has(session) && !ai.has(session)) closeSessionOnMachine(session);
@@ -492,6 +494,8 @@ export function TerminalDock({
 		if (threadId !== undefined) {
 			if (turnBusy) setWaitingTurn(true);
 			// A tab picked in the AI Agent column stays in front.
+			// The AI's tab the user closed stays closed while other tabs remain; with none left the dock opens it again.
+			else if (layout.aiClosed === true && layout.tabs.length > 0) return;
 			else void showAi(tabAtStart.current !== undefined && layout.tabs.some((x) => x.id === tabAtStart.current));
 		} else if (openShellIn === undefined && showAtStart.current === undefined && layout.tabs.length === 0) void run({ kind: "new-tab" });
 	});

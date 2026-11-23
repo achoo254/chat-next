@@ -42,6 +42,11 @@ export interface DockLayout {
 	readonly tabs: readonly TerminalTab[];
 	/** The tab shown ("" with no tabs). */
 	readonly active: string;
+	/**
+	 * The user closed the session's AI tab on purpose: opening the dock again does not bring it back
+	 * (the "+" menu or the AI Agent column still can). Never set by a session that ended or is gone.
+	 */
+	readonly aiClosed?: true;
 }
 
 export const EMPTY_LAYOUT: DockLayout = { tabs: [], active: "" };
@@ -89,7 +94,15 @@ export function activeTab(layout: DockLayout): TerminalTab | null {
 export function addTab(layout: DockLayout, session: number, ai = false): DockLayout {
 	const pane: PaneNode = { kind: "pane", id: newId("pane"), session, ...(ai ? { ai: true as const } : {}) };
 	const tab: TerminalTab = { id: newId("tab"), root: pane, focus: pane.id };
-	return { tabs: [...layout.tabs, tab].slice(-MAX_TABS), active: tab.id };
+	// A new AI tab is the AI shown again: the earlier close no longer holds.
+	const { aiClosed: _closed, ...kept } = layout;
+	return { ...(ai ? kept : layout), tabs: [...layout.tabs, tab].slice(-MAX_TABS), active: tab.id };
+}
+
+/** Closed by the user: the layout remembers it when the AI's own tab was among `closedPaneIds`. */
+export function markAiClosed(before: DockLayout, after: DockLayout, closedPaneIds: readonly string[]): DockLayout {
+	const wasAi = before.tabs.some((t) => panesOf(t.root).some((p) => p.ai === true && closedPaneIds.includes(p.id)));
+	return wasAi ? { ...after, aiClosed: true } : after;
 }
 
 function mapTab(layout: DockLayout, tabId: string, change: (tab: TerminalTab) => TerminalTab): DockLayout {
@@ -134,7 +147,7 @@ export function closePane(layout: DockLayout, paneId: string): DockLayout {
 		const index = layout.tabs.indexOf(tab);
 		const tabs = layout.tabs.filter((t) => t !== tab);
 		const active = layout.active === tab.id ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? "") : layout.active;
-		return { tabs, active };
+		return { ...layout, tabs, active };
 	}
 	const order = panesOf(tab.root).map((p) => p.id);
 	const left = panesOf(root);
@@ -259,7 +272,7 @@ export function parseLayout(value: unknown): DockLayout | null {
 		tabs.push({ id: t.id, root, focus });
 	}
 	const active = tabs.some((t) => t.id === v.active) ? v.active : (tabs[0]?.id ?? "");
-	return { tabs, active };
+	return { tabs, active, ...(v.aiClosed === true ? { aiClosed: true as const } : {}) };
 }
 
 // --- the store ---------------------------------------------------------------------------
