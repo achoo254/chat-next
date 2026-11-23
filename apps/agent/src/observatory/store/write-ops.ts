@@ -73,7 +73,7 @@ function put<R>(db: SqliteConnection, spec: TableSpec<R>, row: LooseRow<R>): voi
  * blocked as soon as any project has content off: the store fails closed,
  * as the hook does when it cannot read its state (hook-state-file.ts).
  */
-function contentBlocked(db: SqliteConnection, table: "prompts" | "tool_calls", key: string, rowKey: string, projectKey: string | null | undefined, sessionId: string): boolean {
+export function contentBlocked(db: SqliteConnection, table: "prompts" | "tool_calls", key: string, rowKey: string, projectKey: string | null | undefined, sessionId: string): boolean {
   return (
     db.all(
       `SELECT 1 AS blocked

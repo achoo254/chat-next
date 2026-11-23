@@ -1,14 +1,16 @@
-# Đặc tả khung Observatory (phiên bản 1)
+# Đặc tả khung Observatory (phiên bản 1, kèm Live Map)
 
 Nguồn duy nhất cho **khung Observatory**: thiết bị (web, PWA, app) đọc dòng thời gian của một phiên Claude Code mà Observatory của agent (`tunelo`) đã lưu
 trong SQLite trên máy, qua kênh E2E sẵn có (`proto/remote/v1/remote.proto`, mục "Observatory"). Agent và web viết theo file này; khi mã và file này lệch nhau
 thì sửa file này cùng lúc với mã.
 
-Có từ `AGENT_VERSION` **3.26.0** (`AGENT_OBSERVATORY` trong `apps/web/src/machines/agent-version.ts`), không đổi số giao thức. Agent cũ gặp các khung này trả
-`Error` với `ERROR_REASON_UNSUPPORTED_REQUEST` như mọi khung lạ, nên web chỉ dùng tính năng khi máy đủ bản.
+Có từ `AGENT_VERSION` **3.26.0** (`AGENT_OBSERVATORY` trong `apps/web/src/machines/agent-version.ts`), không đổi số giao thức. Phần Live Map (mục 6: trạng
+thái sống, sự kiện tạm, điểm nghẽn, nội dung theo id, số khoan sâu, liệt kê theo luồng) phát hành cùng bản, cờ riêng `AGENT_LIVE_MAP` (cũng 3.26.0) để web bật tab
+"Quan sát". Agent cũ gặp các khung này trả `Error` với `ERROR_REASON_UNSUPPORTED_REQUEST` như mọi khung lạ, nên web chỉ dùng tính năng khi máy đủ bản.
 
-Mã agent: `apps/agent/src/observatory/hub/` (hub và ánh xạ ra khung), `apps/agent/src/observatory/store/timeline-reads.ts` (đọc dòng thời gian không nội
-dung), `apps/agent/src/link/connection.ts` (đăng ký khung).
+Mã agent: `apps/agent/src/observatory/hub/` (hub, ánh xạ ra khung, trạng thái sống `live-state.ts`), `apps/agent/src/observatory/store/timeline-reads.ts`
+(đọc dòng thời gian không nội dung), `apps/agent/src/observatory/store/live-map-reads.ts` (luồng → phiên, nội dung theo id, số khoan sâu),
+`apps/agent/src/observatory/live-map/model-window.ts` (cửa sổ ngữ cảnh), `apps/agent/src/link/connection.ts` (đăng ký khung).
 
 ## 1. Khái niệm
 
@@ -24,22 +26,30 @@ dung), `apps/agent/src/link/connection.ts` (đăng ký khung).
   xem; không còn ai xem thì bỏ hết, lần xem sau bắt đầu dãy mới. Thiết bị luôn bắt đầu bằng ảnh chụp và lấy `seq` của ảnh chụp làm mốc.
 - Thời gian là Unix mili giây theo đồng hồ của máy.
 
-## 2. Khung (thân `Frame` số 186 đến 192)
+## 2. Khung (thân `Frame` số 186 đến 196)
 
-Số đã giữ: **186–192** (lớn nhất trước đó trên `origin/main` và nhánh `feat/observatory-store` là 185, kiểm 23/11/2026). Lý do lỗi mới: **91–93**.
+Số đã giữ: **186–192** (lớn nhất trước đó trên `origin/main` và nhánh `feat/observatory-store` là 185, kiểm 23/11/2026) và **193–196** cho Live Map (lớn nhất
+trên `origin/main` là 185, trên nhánh `feat/observatory-store` là 192, trên các nhánh khác của `origin` không quá 184, kiểm 23/11/2026). Lý do lỗi mới: **91–93**;
+Live Map không thêm lý do, yêu cầu sai dùng lại `ERROR_REASON_OBSERVATORY_INVALID` (93). Khung văn phòng cũ **168–170** và mọi thông điệp `Office*` đánh dấu
+`deprecated`: không bao giờ dùng lại các số đó.
 
 | Số | Thân | Chiều | Trả lời |
 |---|---|---|---|
-| 186 | `ObservatorySessionList {limit=1}` | A → B | `ObservatorySessionListResult` |
+| 186 | `ObservatorySessionList {limit=1, thread_id=2}` | A → B | `ObservatorySessionListResult` |
 | 187 | `ObservatorySessionListResult {sessions=1 (ObservatorySessionInfo)}` | B → A | |
 | 188 | `ObservatoryWatch {session_id=1, on=2, limit=3}` | A → B | `on`: `ObservatorySnapshot`; tắt: `Ack` |
 | 189 | `ObservatorySnapshot {session_id=1, epoch=2, seq=3, session=4 (ObservatorySessionState), events=5, earlier=6}` | B → A | |
 | 190 | `ObservatoryEvents {session_id=1, epoch=2, events=3}` | B → A, không hỏi | |
 | 191 | `ObservatoryEarlier {session_id=1, earlier=2, limit=3}` | A → B | `ObservatoryEarlierResult` |
 | 192 | `ObservatoryEarlierResult {session_id=1, events=2, earlier=3}` | B → A | |
+| 193 | `ObservatoryContent {session_id=1, event_id=2}` | A → B | `ObservatoryContentResult` |
+| 194 | `ObservatoryContentResult {session_id=1, event_id=2, state=3, text=4}` | B → A | |
+| 195 | `ObservatoryStation {session_id=1, station=2, at=3}` | A → B | `ObservatoryStationResult` |
+| 196 | `ObservatoryStationResult {session_id=1, station=2, at=3, numbers=4, parts=5, slowest=6, recent=7, previous=8, bottlenecks=9}` | B → A | |
 
 - `ObservatorySessionList`: phiên gần đây nhất của máy, **mới nhất trước** (theo `started_at`). `limit` 0 là 50, tối đa 200. Có cả phiên nội bộ (Cố vấn,
-  `internal_label` khác rỗng): thiết bị tự quyết ẩn hay hiện.
+  `internal_label` khác rỗng): thiết bị tự quyết ẩn hay hiện. Có `thread_id`: chỉ các phiên Claude Code của luồng đó (mục 6.1); luồng của AI khác hay luồng máy
+  không có: danh sách rỗng.
 - `ObservatoryWatch{on}`: ảnh chụp gồm dòng của phiên và số tổng (`session`), cộng **N sự kiện mới nhất**, cũ trước (`limit` 0 là 200, tối đa 500; `seq` của
   chúng là 0). `earlier` khác rỗng khi còn sự kiện cũ hơn. Xem phiên chưa có trong DB vẫn được: ảnh chụp rỗng (`session.info` không đặt), sự kiện tới khi
   dòng được ghi.
@@ -51,8 +61,8 @@ Số đã giữ: **186–192** (lớn nhất trước đó trên `origin/main` v
 - Trần: **4** phiên mỗi kết nối, **16** phiên cho cả máy, **8** kết nối cùng xem một phiên. Vượt trần: `Error` (`ERROR_CODE_INVALID`,
   `ERROR_REASON_OBSERVATORY_WATCH_LIMIT`); không lượt xem nào bị đẩy ra. Xem lại phiên kết nối đang xem không bao giờ bị từ chối.
 - Observatory tắt trên máy, hoặc DB chưa mở được: mọi khung trên trả `Error` (`ERROR_CODE_INVALID`, `ERROR_REASON_OBSERVATORY_OFF`).
-- `session_id` rỗng, dài quá 200 ký tự hay có ký tự điều khiển, hoặc `earlier` không do máy này tạo: `Error` (`ERROR_CODE_INVALID`,
-  `ERROR_REASON_OBSERVATORY_INVALID`).
+- `session_id` rỗng, dài quá 200 ký tự hay có ký tự điều khiển, `earlier` hay `event_id` không do máy này tạo, `station` không phải tên trạm (chữ hoa và `_`,
+  tối đa 32 ký tự), `at` âm: `Error` (`ERROR_CODE_INVALID`, `ERROR_REASON_OBSERVATORY_INVALID`).
 - Sự kiện được gom tối đa 250 ms một khung. Không gửi khung rỗng.
 - Kết nối đang nghẽn (socket còn trên 1 MiB chưa gửi) thì khung sự kiện của nó bị bỏ: thiết bị thấy hở `seq` và xin ảnh chụp mới. Agent đọc lại dòng từ DB
   bị lỗi cũng bỏ qua một `seq` cho cùng mục đích.
@@ -68,7 +78,7 @@ Số đã giữ: **186–192** (lớn nhất trước đó trên `origin/main` v
 
 ## 3. Trạng thái (`ObservatorySessionState`) và sự kiện (`ObservatoryEvent`)
 
-`ObservatorySessionState {info=1 (ObservatorySessionInfo), totals=2 (ObservatorySessionTotals)}`.
+`ObservatorySessionState {info=1 (ObservatorySessionInfo), totals=2 (ObservatorySessionTotals), live=3 (ObservatoryLiveState, mục 6.3)}`.
 
 `ObservatorySessionInfo {session_id=1, previous_session_id=2, previous_session_inferred=3, project_key=4, cwd=5, source=6, internal_label=7, started_at=8,
 ended_at=9, main_model=10}`:
@@ -86,7 +96,7 @@ ended_at=9, main_model=10}`:
 cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_events=13, last_event_at=14}`: số đếm và tổng của mọi dòng đã lưu của phiên.
 `cache_write_tokens` gộp ghi cache 5 phút và 1 giờ; `cost_usd_estimate` là tổng ước tính của Claude Code, chỉ có nghĩa khi `has_cost`.
 
-`ObservatoryEvent {seq=1, at=2, id=3, oneof kind}`:
+`ObservatoryEvent {seq=1, at=2, id=3, oneof kind, provisional=13}` (`provisional`: mục 6.2):
 
 | Số | `kind` | `id` | Trường |
 |---|---|---|---|
@@ -97,7 +107,8 @@ cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_eve
 | 8 | `instruction_loaded` | `instruction:<số>:<lý do>:<tệp>` | `file_path` (thư mục nhà là `~`), `memory_type`, `load_reason`, `load_seq` |
 | 9 | `git_op` | `git:<số dòng>` | `prompt_id`, `sha`, `branch`, `kind` |
 | 10 | `session_event` | `event:<khoá chống trùng>` | `kind`, `agent_id`, `tool_use_id`, `station`, `label`, `number`, `flag` |
-| 11 | `session` | `session` | `ObservatorySessionState` mới (chỉ trong `ObservatoryEvents`, sau các sự kiện cùng khung, chỉ khi dòng phiên hay số tổng đổi) |
+| 11 | `session` | `session` | `ObservatorySessionState` mới (chỉ trong `ObservatoryEvents`, sau các sự kiện cùng khung, chỉ khi dòng phiên, số tổng hay trạng thái sống đổi) |
+| 12 | `bottleneck` | `bottleneck:<quy tắc>:<khoá con>` | phát hiện điểm nghẽn (mục 6.4) |
 
 - Trường số kiểu `optional` không đặt nghĩa là DB không có giá trị (khác 0).
 - `station` là trạm Live Map (`CORE`, `FILES`, `MEMORY`, `TESTING`, `GIT`, `SANDBOX`, `MCP`, `EXTERNAL`, `SKILLS`, `ORCHESTRATOR`); `station_flags` là các bit
@@ -115,15 +126,16 @@ cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_eve
   epoch mới và xem lại.
 - Nguồn sự kiện là DB: mỗi lô ghi vào store báo hub các dòng vừa chạm; dòng của phiên đang xem được đọc lại đúng như đã lưu (đã gộp) rồi gửi. Phiên không ai xem:
   hub không đọc gì, không giữ gì.
-- Người xem đầu tiên của một phiên bật đọc đuôi spool cho phiên đó (`watchSession`), người cuối rời thì tắt (`unwatchSession`). Giai đoạn này chỉ bật/tắt; sự
-  kiện tạm từ đuôi spool chưa lên dây (giai đoạn Live Map thêm).
-- Spool của phiên terminal và CLI được nạp chậm 5–75 giây, nên sự kiện của các phiên đó tới thiết bị chậm tương ứng.
+- Người xem đầu tiên của một phiên bật đọc đuôi spool cho phiên đó (`watchSession`), người cuối rời thì tắt (`unwatchSession`); dòng đọc được tới thiết bị ngay
+  dưới dạng sự kiện tạm (mục 6.2).
+- Spool của phiên terminal và CLI được nạp vào DB chậm 5–75 giây; sự kiện tạm tới trước trong vòng nửa giây cộng thời gian gom, bản DB tới sau cùng `id`.
 
 ## 4. Cam kết dữ liệu không rời máy
 
 Không khung Observatory nào chứa: chữ của prompt, input hay output của tool, nội dung tin nhắn, lỗi dạng chữ tự do, nội dung tệp, đường dẫn đầy đủ dưới thư mục nhà
 (luôn là `~`), hay **bất kỳ định danh tài khoản nào** (email, mã tài khoản, `organization.id`, tên người dùng của hệ điều hành). Chỉ đi ra: id, nhãn bộ lọc riêng
-tư đã giữ, số, cờ. Nội dung đã lưu (bản cắt ngắn khi dự án bật lưu nội dung) **ở lại DB**; xin nội dung theo id là việc của giai đoạn sau.
+tư đã giữ, số, cờ. Nội dung đã lưu (bản cắt ngắn khi dự án bật lưu nội dung) **ở lại DB**; đường duy nhất đưa nó ra là `ObservatoryContent` theo id (mục 6.5),
+đọc DB lúc hỏi với công tắc nội dung của dự án.
 
 Bảo đảm bằng mã: `timeline-reads.ts` bỏ `prompts.excerpt` và `tool_calls.content` ngay lúc đọc, `hub/observatory-wire.ts` chép từng trường theo tên (cột mới của
 bảng không tự lên dây). Test `apps/agent/test/observatory/observatory-link.test.ts` bật lưu nội dung (mặc định), bơm chuỗi đánh dấu vào prompt, lệnh và output
@@ -135,4 +147,108 @@ khẳng định không có chuỗi đánh dấu, định danh hay tên khoá đ�
 - Ảnh chụp và trang cũ tối đa 500 sự kiện (mặc định 200). Danh sách phiên tối đa 200 (mặc định 50).
 - 4 phiên mỗi kết nối, 16 phiên cho cả máy, 8 kết nối mỗi phiên.
 - Gom sự kiện 250 ms; `session` chỉ gửi khi đổi.
-- Không có bảng điểm nghẽn (`bottlenecks`) và sự kiện tạm từ đuôi spool trên dây; giai đoạn Live Map thêm khung, không đổi các số trên.
+- Sự kiện tạm giữ tối đa 2 000 dòng mỗi phiên đang xem (cũ nhất bị bỏ). Trạng thái sống tính trên 200 sự kiện mới nhất.
+- Khoan sâu: p50/p95 trên tối đa 10 000 thời lượng (lấy mẫu đều, cờ `sampled`); 20 phần, 5 mục chậm nhất, 20 sự kiện gần nhất, 5 phiên trước, 50 phát hiện.
+  Đo: dưới 100 ms trên DB 200 000 dòng `tool_calls` (`live-map-hub.test.ts`).
+
+## 6. Live Map
+
+### 6.1 Luồng → phiên
+
+`ObservatorySessionList{thread_id}`: agent lấy `session_id` mà từng đoạn (segment) của luồng tunelo ghi, chỉ đoạn của AI Claude Code (`claude`), rồi đi theo
+`sessions.previous_session_id` **cả hai chiều**: lùi tới các phiên trước `/clear`, tiến tới phiên mới hơn (luồng có thể vẫn ghi phiên trước lần `/clear` cuối,
+`agent-core.ts` chỉ ghi đè `sessionId` khi Claude Code báo). Phiên của đoạn chưa có trong DB vẫn được đi theo. Tối đa 500 phiên được xét; trả mới nhất trước,
+theo `limit`. Nối suy đoán (`previous_session_inferred`) cũng được đi theo.
+
+### 6.2 Sự kiện tạm (`provisional`)
+
+Spool của phiên terminal và CLI vào DB chậm; với phiên đang có người xem, agent đọc đuôi các tệp phút chưa nạp (`spool/spool-live-tail.ts`, nửa giây một lần),
+bỏ nội dung trước mọi bước, chuẩn hoá như lúc ghi DB và gửi **sự kiện tạm** (`provisional = true`) **cùng `id` mà dòng DB sẽ có**. Nhiều bản ghi của một dòng
+(bắt đầu rồi kết thúc tool) gộp thành một sự kiện. Khi DB có dòng đó:
+
+- DB có đủ những gì bản tạm biết: gửi bản DB (`provisional = false`) như sự kiện **cập nhật** cùng `id`; bản tạm bị bỏ.
+- DB còn thiếu (đã có lúc bắt đầu, chưa có kết thúc): gửi bản DB đã điền phần bản tạm biết, vẫn `provisional = true`, tới khi DB đủ.
+
+Ảnh chụp gồm cả sự kiện tạm chưa có trong DB, mới hơn sự kiện cũ nhất của ảnh chụp (có thể vượt `limit`). Lệnh commit không có sự kiện `git_op` tạm (khoá của
+nó là số dòng DB): lời gọi tool mang cờ `commit` của trạm `GIT` đủ để cảnh chuyển động. Tệp hướng dẫn nạp được đánh số như ingest sẽ đánh (sau các lần nạp đã
+lưu và đang giữ của cùng tệp, cùng lý do); số đoán sai thì bản DB tới với `id` khác. Thiết bị sắp sự kiện theo `(at, id)` như mục 1.
+
+### 6.3 Trạng thái sống (`ObservatoryLiveState`)
+
+`{core=1, tokens_per_second=2, context_percent=3, context_tokens=4, context_window=5, context_window_assumed=6, main_model=7, running=8
+(ObservatoryStationCount {station, count}), open_bottlenecks=9}`. Agent tính từ 200 sự kiện mới nhất (cả sự kiện tạm) bằng hàm thuần
+`hub/live-state.ts`; thiết bị tua lại áp **cùng quy tắc** lên các sự kiện tới mốc thì ra cùng kết quả. Chỉ `open_bottlenecks` và ngữ cảnh lớn nhất của phiên
+được đọc thêm từ DB (có thể cũ hơn 200 sự kiện); khi tua, thiết bị lấy từ sự kiện `bottleneck` (mở khi `opened_at ≤ mốc` và chưa `closed_at ≤ mốc`).
+
+Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói về nó:
+
+| Sự kiện | Trạng thái |
+|---|---|
+| prompt, tool, subagent, lượt API của luồng chính, `permission_decision`, `permission_denied`, `hook_block` | `THINKING` (hook và OTel không tách nghĩ với viết) |
+| `permission_request`, `notification` nhãn `permission_prompt` | `WAITING_PERMISSION` |
+| `compact_start` | `COMPACTING`; `compact_end` về `THINKING` nếu đang trong lượt, không thì `WAITING_USER` (hay `IDLE` nếu trước đó rảnh) |
+| `stop`, `notification` nhãn `idle_prompt` | `WAITING_USER` (kết thúc lượt) |
+| `stop_failure` | `FAILED` (kết thúc lượt) |
+| không có sự kiện; phiên đã kết thúc (`ended_at` ≥ sự kiện cuối) | `IDLE` |
+
+- `running`: lời gọi tool chưa kết thúc (`success` chưa đặt) kể từ lúc lượt bắt đầu, theo trạm; lời gọi có `permission_denied` hay `hook_block` cùng
+  `tool_use_id` không tính; kết thúc lượt đặt về rỗng.
+- `tokens_per_second`: lượt API mới nhất của luồng chính có `output_tokens` và `duration_ms`: `output_tokens / (duration_ms − ttft_ms)` giây (thiếu TTFT thì
+  cả thời lượng).
+- Ngữ cảnh: lượt API mới nhất của luồng chính: `input + cache_read + cache_write_5m + cache_write_1h`. `context_window` theo `model-window.ts`: model không
+  phải id Claude (`claude-(opus|sonnet|haiku)-<số>…`) thì **không có phần trăm**; có `[1m]` hoặc ngữ cảnh lớn nhất của phiên đã vượt 200 000 thì 1 000 000;
+  còn lại 200 000 với `context_window_assumed = true`. Lý do: bản ghi OTel `api_request` của Claude Code 2.1.330 mang cùng `model` (`claude-sonnet-5-5`) cho
+  phiên thường và phiên `sonnet[1m]`, không có thuộc tính nào về cửa sổ (đo 23/11/2026), nên phiên 1M hiện đầy gấp năm lần cho tới khi vượt 200 000.
+- `main_model`: model của lượt API mới nhất của luồng chính, không có thì `main_model` của phiên.
+
+### 6.4 Điểm nghẽn (`ObservatoryBottleneck`)
+
+`{rule=1, subkey=2, station=3, severity=4 ('warn'|'alert'), status=5 ('open'|'closed'), opened_at=6, updated_at=7, closed_at=8 (0 khi mở), value=9,
+threshold=10, n=11, evidence_ids=12}`. Một dòng `bottlenecks` mỗi `(phiên, quy tắc, khoá con)`; mở, nâng mức, đóng đều tới thiết bị là sự kiện cùng `id`
+`bottleneck:<rule>:<subkey>`, đứng ở `opened_at` trong dòng thời gian (có trong ảnh chụp và trang cũ). `evidence_ids`: tối đa 20 `id` sự kiện lấy từ khoá
+`eventIds` của `evidence_json` (người ghi là bộ chạy quy tắc); chuỗi không phải `id` sự kiện bị bỏ, phần số đo khác của JSON không lên dây.
+
+### 6.5 Nội dung theo id (`ObservatoryContent`)
+
+Đường **duy nhất** đưa nội dung ra khỏi máy. Agent đọc DB lúc hỏi: `prompt:<id>` trả bản cắt của prompt, `tool:<id>` trả JSON `{"input","output","error",
+"reason"}` đã che của lời gọi tool. `state`:
+
+| `state` | Khi |
+|---|---|
+| `STORED` (1) | có nội dung, `text` là nội dung |
+| `OFF` (2) | dự án của dòng tắt lưu nội dung (cùng quy tắc chặn của store `write-ops.ts`: dự án không xác định bị chặn khi có dự án nào tắt), kể cả trước khi `clearContent` xoá |
+| `NONE` (3) | loại sự kiện không có nội dung, hoặc không lưu nội dung (đã xoá, chưa từng có) |
+| `NOT_YET` (4) | dòng chưa có trong DB: sự kiện tạm, hoặc `id` máy không có |
+
+`text` rỗng ở mọi trạng thái khác `STORED`.
+
+### 6.6 Số khoan sâu (`ObservatoryStation`)
+
+`ObservatoryStationNumbers {calls=1, failures=2, ended=3, p50_ms=4, p95_ms=5, sampled=6, api_requests=7, input_tokens=8, output_tokens=9,
+cache_read_tokens=10, cache_write_tokens=11, cost_usd_estimate=12, has_cost=13, requests_without_cost=14}`; tỷ lệ lỗi là `failures / ended`.
+
+- Mục của trạm là lời gọi tool có `station` đó (dòng lưu không có trạm tính theo trạm ước lượng). `EXTERNAL` thêm mỗi lượt API là một lời gọi (phần là model)
+  và mỗi `api_error` là một lời gọi lỗi.
+- Token và chi phí: `CORE` cộng lượt API của luồng chính, `ORCHESTRATOR` của subagent, `EXTERNAL` mọi lượt; trạm khác 0. `has_cost = false` thì "không có chi
+  phí"; `requests_without_cost` đếm lượt thiếu ước tính (agent không tự tính).
+- `parts` (`ObservatoryStationPart {kind, key, numbers}`), gọi nhiều nhất trước, tối đa 20; `kind`: `mcp_server` (MCP), `file` (`FILES`, `MEMORY`: `thư mục/tên`),
+  `domain` (`EXTERNAL`), `program` (`SANDBOX`, `TESTING`, `GIT`), `tool` (trạm khác), `model` (lượt API).
+- `slowest`: 5 mục chậm nhất; `recent`: 20 mục và sự kiện vòng đời của trạm mới nhất; đều là `ObservatoryEvent` không nội dung, `seq` 0.
+- `previous`: tối đa 5 phiên cùng `project_key` bắt đầu trước, bỏ phiên nội bộ, mới nhất trước, chỉ `numbers` (cả phiên).
+- `bottlenecks`: phát hiện của trạm trong phiên, đang mở trước, tối đa 50.
+- `at` khác 0: chỉ tính dòng có thời điểm ≤ `at` (tua lại); phiên trước luôn tính cả.
+
+### 6.7 Trạm
+
+`station` là một trong: `CORE` (lõi AI), `FILES` (đọc, ghi, tìm tệp), `MEMORY` (ghi tệp hướng dẫn/bộ nhớ), `TESTING` (kiểm thử, lint, typecheck), `GIT` (git,
+commit, push, deploy), `SANDBOX` (lệnh shell khác), `MCP`, `EXTERNAL` (web, API Anthropic), `SKILLS`, `ORCHESTRATOR` (subagent, TodoWrite, plan mode).
+Nguồn: `apps/agent/src/observatory/live-map/station-map.ts`. Trạm thiết bị không biết vẽ ở `CORE`; yêu cầu khoan sâu cho trạm hợp lệ về tên nhưng không có dòng
+trả số rỗng.
+
+### 6.8 Cam kết "khung sự kiện không mang nội dung"
+
+Mọi `ObservatoryEvent` (ảnh chụp, `ObservatoryEvents`, trang cũ, `slowest`/`recent` của khoan sâu), mọi trạng thái và mọi phát hiện chỉ mang id, nhãn đã lọc,
+số, cờ, **cả đường DB lẫn đường đọc đuôi**. Nội dung chỉ đi qua `ObservatoryContentResult`. Bảo đảm bằng mã: đọc đuôi bỏ `c` trước mọi bước, `timeline-reads.ts`
+bỏ `excerpt`/`content` ở cả dòng DB lẫn dòng dựng từ bản ghi tạm. Test: `live-map-link.test.ts` (dự án bật nội dung, tắt giữa phiên, nội dung đã xoá; quét mọi
+khung trừ đúng một câu trả lời nội dung lúc còn bật, cả JSON lẫn byte, tìm chuỗi mẫu, định danh giả và tên khoá định danh), `live-map-hub.test.ts` (tắt mà chưa xoá
+đã trả `OFF`).

@@ -6,19 +6,33 @@
 //
 // The `earlier` cursor of a page is the place of its oldest event:
 // `<at>.<kind number>.<key>`, opaque to devices and checked when it comes back.
+//
+// A bottleneck finding's evidence goes out as the event ids its JSON lists
+// under `eventIds` (at most MAX_EVIDENCE, each one shaped as an event id):
+// the measures beside them stay in the store.
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import {
+  type ObservatoryBottleneck,
+  ObservatoryBottleneckSchema,
+  ObservatoryCoreState,
   type ObservatoryEvent,
   ObservatoryEventSchema,
+  ObservatoryLiveStateSchema,
   type ObservatorySessionInfo,
   ObservatorySessionInfoSchema,
   ObservatorySessionSource,
   type ObservatorySessionState,
   ObservatorySessionStateSchema,
   ObservatorySessionTotalsSchema,
+  type ObservatoryStationNumbers,
+  ObservatoryStationNumbersSchema,
+  type ObservatoryStationResult,
+  ObservatoryStationResultSchema,
 } from "@achoo254/chat-proto/remote/remote";
-import type { SessionRow, SessionSource } from "../store/observatory-rows.ts";
-import { type SessionTotals, TIMELINE_KINDS, type TimelineEntry, type TimelinePlace } from "../store/timeline-reads.ts";
+import type { BottleneckRow, SessionRow, SessionSource } from "../store/observatory-rows.ts";
+import type { StationDrill, StationNumbers } from "../store/live-map-reads.ts";
+import { type SessionTotals, TIMELINE_KINDS, type TimelineEntry, type TimelineKind, type TimelinePlace } from "../store/timeline-reads.ts";
+import type { CoreState, LiveState } from "./live-state.ts";
 
 /** The id of the `session` event (the session's row and totals). */
 export const SESSION_EVENT_ID = "session";
@@ -41,6 +55,33 @@ const ID_PREFIX: Record<TimelineEntry["kind"], string> = {
   instructionLoaded: "instruction",
   gitOp: "git",
   sessionEvent: "event",
+  bottleneck: "bottleneck",
+};
+
+const KIND_OF_PREFIX = new Map(Object.entries(ID_PREFIX).map(([kind, prefix]) => [prefix, kind as TimelineKind]));
+
+/** Evidence ids a finding carries on the wire at most. */
+const MAX_EVIDENCE = 20;
+/** The longest evidence id taken (a key is an id or a file path, both bounded well below). */
+const MAX_EVIDENCE_ID = 320;
+
+/** True when `s` has a control character. */
+export function hasControl(s: string): boolean {
+  return [...s].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
+}
+
+/** An event id as evidence: the id of a timeline row, short, without control characters. */
+function isEvidenceId(id: string): boolean {
+  return id.length <= MAX_EVIDENCE_ID && !hasControl(id) && parseEventId(id) !== undefined;
+}
+
+const CORE_STATES: Record<CoreState, ObservatoryCoreState> = {
+  idle: ObservatoryCoreState.IDLE,
+  thinking: ObservatoryCoreState.THINKING,
+  waiting_permission: ObservatoryCoreState.WAITING_PERMISSION,
+  waiting_user: ObservatoryCoreState.WAITING_USER,
+  compacting: ObservatoryCoreState.COMPACTING,
+  failed: ObservatoryCoreState.FAILED,
 };
 
 const MAX_U32 = 0xffff_ffff;
@@ -84,9 +125,24 @@ export function sessionInfo(row: SessionRow): ObservatorySessionInfo {
   });
 }
 
-export function sessionState(row: SessionRow | undefined, totals: SessionTotals): ObservatorySessionState {
+export function sessionState(row: SessionRow | undefined, totals: SessionTotals, live?: LiveState): ObservatorySessionState {
   return create(ObservatorySessionStateSchema, {
     ...(row ? { info: sessionInfo(row) } : {}),
+    ...(live
+      ? {
+          live: create(ObservatoryLiveStateSchema, {
+            core: CORE_STATES[live.core],
+            ...optNum("tokensPerSecond", live.tokensPerSecond),
+            ...optNum("contextPercent", live.contextPercent),
+            contextTokens: u64(live.contextTokens),
+            contextWindow: u64(live.contextWindow),
+            contextWindowAssumed: live.contextWindowAssumed,
+            mainModel: live.mainModel,
+            running: live.running.map((r) => ({ station: r.station, count: u32(r.count) })),
+            openBottlenecks: u32(live.openBottlenecks),
+          }),
+        }
+      : {}),
     totals: create(ObservatorySessionTotalsSchema, {
       prompts: u32(totals.prompts),
       toolCalls: u32(totals.toolCalls),
@@ -109,6 +165,44 @@ export function sessionState(row: SessionRow | undefined, totals: SessionTotals)
 /** The event id of a timeline row: its kind's prefix and its key. */
 export function eventId(entry: Pick<TimelineEntry, "kind" | "key">): string {
   return `${ID_PREFIX[entry.kind]}:${entry.key}`;
+}
+
+/** The kind and key an event id names; undefined for one this agent does not make. */
+export function parseEventId(id: string): { kind: TimelineKind; key: string } | undefined {
+  const colon = id.indexOf(":");
+  const kind = colon > 0 ? KIND_OF_PREFIX.get(id.slice(0, colon)) : undefined;
+  const key = id.slice(colon + 1);
+  return kind === undefined || key === "" ? undefined : { kind, key };
+}
+
+/** The event ids a finding's evidence JSON lists under `eventIds`; [] when it lists none or is not JSON. */
+function evidenceIds(json: string | null): string[] {
+  if (json === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  const ids = typeof parsed === "object" && parsed !== null && "eventIds" in parsed ? parsed.eventIds : undefined;
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string" && isEvidenceId(id)).slice(0, MAX_EVIDENCE) : [];
+}
+
+export function bottleneck(r: BottleneckRow): ObservatoryBottleneck {
+  return create(ObservatoryBottleneckSchema, {
+    rule: r.rule,
+    subkey: r.subkey,
+    station: text(r.station),
+    severity: r.severity,
+    status: r.status,
+    openedAt: BigInt(r.openedAt),
+    updatedAt: BigInt(r.updatedAt),
+    closedAt: BigInt(r.closedAt ?? 0),
+    ...optNum("value", r.value),
+    ...optNum("threshold", r.threshold),
+    ...optU32("n", r.n),
+    evidenceIds: evidenceIds(r.evidenceJson),
+  });
 }
 
 /** The `kind` of the event of one timeline row: every field by name, never content. */
@@ -204,12 +298,48 @@ function eventKind(entry: TimelineEntry): NonNullable<MessageInitShape<typeof Ob
         },
       };
     }
+    case "bottleneck":
+      return { case: "bottleneck", value: bottleneck(entry.row) };
   }
 }
 
-/** The event of one timeline row; `seq` 0 outside ObservatoryEvents. */
-export function timelineEvent(entry: TimelineEntry, seq = 0n): ObservatoryEvent {
-  return create(ObservatoryEventSchema, { seq, at: BigInt(entry.at), id: eventId(entry), kind: eventKind(entry) });
+/** The event of one timeline row; `seq` 0 outside ObservatoryEvents; `provisional` for one read from the spool's tail. */
+export function timelineEvent(entry: TimelineEntry, seq = 0n, provisional = false): ObservatoryEvent {
+  return create(ObservatoryEventSchema, { seq, at: BigInt(entry.at), id: eventId(entry), kind: eventKind(entry), provisional });
+}
+
+function stationNumbers(n: StationNumbers): ObservatoryStationNumbers {
+  return create(ObservatoryStationNumbersSchema, {
+    calls: u32(n.calls),
+    failures: u32(n.failures),
+    ended: u32(n.ended),
+    ...optU32("p50Ms", n.p50Ms),
+    ...optU32("p95Ms", n.p95Ms),
+    sampled: n.sampled,
+    apiRequests: u32(n.apiRequests),
+    inputTokens: u64(n.inputTokens),
+    outputTokens: u64(n.outputTokens),
+    cacheReadTokens: u64(n.cacheReadTokens),
+    cacheWriteTokens: u64(n.cacheWriteTokens),
+    costUsdEstimate: n.hasCost ? n.costUsd : 0,
+    hasCost: n.hasCost,
+    requestsWithoutCost: u32(n.requestsWithoutCost),
+  });
+}
+
+/** A station's numbers as a device gets them: events without content, findings by their row. */
+export function stationResult(sessionId: string, station: string, at: number, d: StationDrill): ObservatoryStationResult {
+  return create(ObservatoryStationResultSchema, {
+    sessionId,
+    station,
+    at: BigInt(at),
+    numbers: stationNumbers(d.numbers),
+    parts: d.parts.map((p) => ({ kind: p.kind, key: p.key, numbers: stationNumbers(p.numbers) })),
+    slowest: d.slowest.map((e) => timelineEvent(e)),
+    recent: d.recent.map((e) => timelineEvent(e)),
+    previous: d.previous.map((p) => ({ sessionId: p.sessionId, startedAt: BigInt(p.startedAt), numbers: stationNumbers(p.numbers) })),
+    bottlenecks: d.bottlenecks.flatMap((e) => (e.kind === "bottleneck" ? [bottleneck(e.row)] : [])),
+  });
 }
 
 /** The `session` event: the session's row and totals replaced. */

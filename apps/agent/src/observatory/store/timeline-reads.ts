@@ -1,16 +1,19 @@
 // The reads behind a device watching one session (observatory/hub/): the
 // session's row and totals, its timeline paged from the newest back, and one
-// stored row again after a write touched it. Timeline rows are read without
-// their content: a prompt's excerpt and a tool call's content never leave
-// this file, so nothing built on these reads can send them.
+// stored row again after a write touched it, and the row a write would make
+// before the store has it (a provisional event of the spool's tail).
+// Timeline rows are read without their content: a prompt's excerpt and a tool
+// call's content never leave this file, so nothing built on these reads can
+// send them.
 //
 // A session's timeline is every row of the event tables, ordered by time,
 // then by kind (TIMELINE_KINDS order), then by the row's key: a total order,
 // so a page that starts where the last one ended skips nothing and repeats
-// nothing, whatever rows share a millisecond.
-import type { ApiRequestRow, GitOpRow, InstructionLoadedRow, PromptRow, SessionEventRow, SessionRow, SubagentRow, ToolCallRow } from "./observatory-rows.ts";
-import { API_REQUESTS, GIT_OPS, INSTRUCTIONS_LOADED, PROMPTS, SESSION_EVENTS, SESSIONS, SUBAGENTS, TOOL_CALLS } from "./observatory-table-specs.ts";
-import { decodeRow, selectList } from "./row-codec.ts";
+// nothing, whatever rows share a millisecond. A bottleneck finding sits at
+// the time it opened.
+import type { ApiRequestRow, BottleneckRow, GitOpRow, InstructionLoadedRow, PromptRow, SessionEventRow, SessionRow, SubagentRow, ToolCallRow } from "./observatory-rows.ts";
+import { API_REQUESTS, BOTTLENECKS, GIT_OPS, INSTRUCTIONS_LOADED, PROMPTS, SESSION_EVENTS, SESSIONS, SUBAGENTS, TOOL_CALLS, type TableSpec } from "./observatory-table-specs.ts";
+import { type LooseRow, decodeRow, encodeRow, selectList } from "./row-codec.ts";
 import type { SqlRow, SqlValue, SqliteConnection } from "./sqlite-driver.ts";
 import { ObservatoryStoreError } from "./store-errors.ts";
 import { withStation } from "./store-reads.ts";
@@ -31,12 +34,13 @@ export type TimelineEntry = { at: number; key: string } & (
   | { kind: "instructionLoaded"; row: InstructionLoadedRow }
   | { kind: "gitOp"; row: GitOpRow }
   | { kind: "sessionEvent"; row: SessionEventRow }
+  | { kind: "bottleneck"; row: BottleneckRow }
 );
 
 export type TimelineKind = TimelineEntry["kind"];
 
-/** The kinds in their order among rows of the same millisecond. */
-export const TIMELINE_KINDS: readonly TimelineKind[] = ["prompt", "toolCall", "subagent", "apiRequest", "instructionLoaded", "gitOp", "sessionEvent"];
+/** The kinds in their order among rows of the same millisecond (a cursor names a kind by its place here: only append). */
+export const TIMELINE_KINDS: readonly TimelineKind[] = ["prompt", "toolCall", "subagent", "apiRequest", "instructionLoaded", "gitOp", "sessionEvent", "bottleneck"];
 
 /** A place in a session's timeline: a page before it holds the rows that sort before it. */
 export type TimelinePlace = { at: number; kind: TimelineKind; key: string };
@@ -80,6 +84,8 @@ const TABLES: Record<TimelineKind, { table: string; columns: string; at: string;
   // A commit has no key of its own but its row id, padded so it sorts as a number.
   gitOp: { table: GIT_OPS.table, columns: selectList(GIT_OPS), at: "at", key: "printf('%012d', id)" },
   sessionEvent: { table: SESSION_EVENTS.table, columns: selectList(SESSION_EVENTS), at: "at", key: "dedupe_key" },
+  // One finding per rule and subkey in a session.
+  bottleneck: { table: BOTTLENECKS.table, columns: selectList(BOTTLENECKS), at: "opened_at", key: "rule || ':' || subkey" },
 };
 
 const KIND_ORDER = new Map(TIMELINE_KINDS.map((k, i) => [k, i]));
@@ -122,10 +128,13 @@ function decodeEntry(kind: TimelineKind, raw: SqlRow): TimelineEntry {
       return { ...place, kind, row: decodeRow(GIT_OPS, raw) };
     case "sessionEvent":
       return { ...place, kind, row: decodeRow(SESSION_EVENTS, raw) };
+    case "bottleneck":
+      return { ...place, kind, row: decodeRow(BOTTLENECKS, raw) };
   }
 }
 
-function selectEntries(db: SqliteConnection, kind: TimelineKind, where: string, params: readonly SqlValue[], tail = ""): TimelineEntry[] {
+/** The rows of one kind `where` holds (`tail` orders and limits them, by `tl_at` and `tl_key`), each without content. */
+export function selectTimelineEntries(db: SqliteConnection, kind: TimelineKind, where: string, params: readonly SqlValue[], tail = ""): TimelineEntry[] {
   const t = TABLES[kind];
   return db.all(`SELECT ${t.columns}, ${t.at} AS tl_at, ${t.key} AS tl_key FROM ${t.table} WHERE ${where}${tail}`, params).map((raw) => decodeEntry(kind, raw));
 }
@@ -150,7 +159,7 @@ function newestOfKind(db: SqliteConnection, kind: TimelineKind, sessionId: strin
     }
   }
   params.push(limit);
-  return selectEntries(db, kind, where, params, " ORDER BY tl_at DESC, tl_key DESC LIMIT ?");
+  return selectTimelineEntries(db, kind, where, params, " ORDER BY tl_at DESC, tl_key DESC LIMIT ?");
 }
 
 /** The `limit` (1 to MAX_TIMELINE_PAGE) newest rows of a session before `before` (the newest of all when undefined), oldest first. */
@@ -184,6 +193,8 @@ export function timelineRefOf(op: WriteOp): TimelineRef | undefined {
     }
     case "sessionEvent":
       return ref("sessionEvent", op.row.sessionId, "dedupe_key = ?", [op.row.dedupeKey]);
+    case "bottleneck":
+      return ref("bottleneck", op.row.sessionId, "session_id = ? AND rule = ? AND subkey = ?", [op.row.sessionId, op.row.rule, op.row.subkey]);
     default:
       return undefined;
   }
@@ -191,7 +202,60 @@ export function timelineRefOf(op: WriteOp): TimelineRef | undefined {
 
 /** The row `ref` names as stored now; undefined when it is not (a write the store refused). */
 export function readTimelineEntry(db: SqliteConnection, ref: TimelineRef): TimelineEntry | undefined {
-  return selectEntries(db, ref.kind, ref.where, ref.params, " LIMIT 1")[0];
+  return selectTimelineEntries(db, ref.kind, ref.where, ref.params, " LIMIT 1")[0];
+}
+
+/** `row` as its table's spec reads it back: every field, NULL as null; throws ObservatoryInvalidWrite when a required one is missing. */
+function asStored<R>(spec: TableSpec<R>, row: LooseRow<R>): R {
+  const values = encodeRow(spec, row);
+  return decodeRow(spec, Object.fromEntries(spec.columns.map((c, i) => [c.column, values[i] ?? null])));
+}
+
+/** The key of an instruction load in the timeline (the SQL of TABLES.instructionLoaded.key). */
+function instructionKey(r: Pick<InstructionLoadedRow, "seq" | "loadReason" | "filePath">): string {
+  return `${String(r.seq).padStart(6, "0")}:${r.loadReason}:${r.filePath}`;
+}
+
+/**
+ * The timeline row `op` would make, without content, before the store has
+ * it (a provisional event of the spool's tail), placed and keyed as the
+ * stored row will be. Undefined for a write that is not a timeline row, and
+ * for a commit (its key is the row id the store gives it). Throws
+ * ObservatoryInvalidWrite when a required field is missing.
+ */
+export function timelineEntryOfWrite(op: WriteOp): TimelineEntry | undefined {
+  switch (op.kind) {
+    case "prompt": {
+      const { excerpt: _excerpt, ...row } = asStored(PROMPTS, op.row);
+      return { at: row.at, key: row.promptId, kind: "prompt", row };
+    }
+    case "toolCall": {
+      const { content: _content, ...row } = withStation(asStored(TOOL_CALLS, op.row));
+      return { at: row.at, key: row.toolUseId, kind: "toolCall", row };
+    }
+    case "subagent": {
+      const row = asStored(SUBAGENTS, op.row);
+      return { at: row.startedAt, key: row.agentId, kind: "subagent", row };
+    }
+    case "apiRequest": {
+      const row = asStored(API_REQUESTS, op.row);
+      return { at: row.at, key: row.dedupeKey, kind: "apiRequest", row };
+    }
+    case "instructionLoaded": {
+      const row = asStored(INSTRUCTIONS_LOADED, op.row);
+      return { at: row.at, key: instructionKey(row), kind: "instructionLoaded", row };
+    }
+    case "sessionEvent": {
+      const row = asStored(SESSION_EVENTS, op.row);
+      return { at: row.at, key: row.dedupeKey, kind: "sessionEvent", row };
+    }
+    case "bottleneck": {
+      const row = asStored(BOTTLENECKS, op.row);
+      return { at: row.openedAt, key: `${row.rule}:${row.subkey}`, kind: "bottleneck", row };
+    }
+    default:
+      return undefined;
+  }
 }
 
 /** A session's own row; undefined while none is stored. */

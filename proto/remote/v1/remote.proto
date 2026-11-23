@@ -305,14 +305,16 @@ message Frame {
     // B → A
     ThreadEarlierResult thread_earlier_result = 167;
 
-    // The office of a session (tunelo 3.6.0+); see "the office of a session"
-    // below.
+    // The office of a session (tunelo 3.6.0 to 3.25.x), replaced by the Live
+    // Map (Observatory). Deprecated: never reuse 168, 169 and 170. A tunelo
+    // without the office answers OfficeWatch with
+    // ERROR_REASON_UNSUPPORTED_REQUEST.
     // A → B
-    OfficeWatch office_watch = 168;
+    OfficeWatch office_watch = 168 [deprecated = true];
     // B → A
-    OfficeSnapshot office_snapshot = 169;
+    OfficeSnapshot office_snapshot = 169 [deprecated = true];
     // Unasked, to the connections watching the thread's office.
-    OfficeEvents office_events = 170;
+    OfficeEvents office_events = 170 [deprecated = true];
 
     // A → B (tunelo 3.9.0+).
     AccountAcceptCurrent account_accept_current = 172;
@@ -358,6 +360,16 @@ message Frame {
     ObservatoryEarlier observatory_earlier = 191;
     // B → A
     ObservatoryEarlierResult observatory_earlier_result = 192;
+    // The Live Map's requests besides the timeline (tunelo 3.26.0+): an
+    // event's stored content by its id, and a station's numbers.
+    // A → B, answered with ObservatoryContentResult
+    ObservatoryContent observatory_content = 193;
+    // B → A
+    ObservatoryContentResult observatory_content_result = 194;
+    // A → B, answered with ObservatoryStationResult
+    ObservatoryStation observatory_station = 195;
+    // B → A
+    ObservatoryStationResult observatory_station_result = 196;
 
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
@@ -1675,8 +1687,9 @@ enum ErrorReason {
   // (docs/observatory-wire.md). Watching again a session already watched on
   // the connection is never refused; stop another watch first.
   ERROR_REASON_OBSERVATORY_WATCH_LIMIT = 92;
-  // An Observatory request with a session id or an `earlier` that B cannot
-  // read (empty, too long, control characters, not one B sent).
+  // An Observatory request with a session id, an `earlier`, an event id or
+  // a station that B cannot read (empty, too long, control characters, not
+  // one B sent, not a station of docs/observatory-wire.md).
   ERROR_REASON_OBSERVATORY_INVALID = 93;
 }
 
@@ -3797,6 +3810,10 @@ message UsageDelete {}
 // text or a file's content: only tool names, the room and animation B picked
 // for them, short subjects (a file name without its folder, a command's
 // first word, a host name; empty for a sensitive path), and counts.
+//
+// Deprecated: the Live Map of Observatory replaces the office. Every message
+// and enum here and frames 168 to 170 stay only so their numbers are never
+// reused.
 
 // A → B: start (on) or stop watching the office of a thread for this
 // connection. On: answered with OfficeSnapshot (asking again is how a device
@@ -3805,6 +3822,7 @@ message UsageDelete {}
 // ERROR_REASON_THREAD_NOT_FOUND for an unknown thread;
 // ERROR_REASON_OFFICE_WATCH_LIMIT past the offices watched at once.
 message OfficeWatch {
+  option deprecated = true;
   string thread_id = 1;
   bool on = 2;
   // The device draws Advisor (OFFICE_ROLE_ADVISOR, tunelo 3.13.0+). B sends
@@ -3817,6 +3835,7 @@ message OfficeWatch {
 // B → A: the whole office of a thread. Events with seq up to and including
 // `seq` are in it; the next OfficeEvents of the same epoch starts at seq + 1.
 message OfficeSnapshot {
+  option deprecated = true;
   string thread_id = 1;
   // The agent's epoch (as in Cursor): a device drops what it holds for
   // another epoch and applies this snapshot.
@@ -3829,12 +3848,14 @@ message OfficeSnapshot {
 // 250 ms. Each event's seq is one more than the one before it, across
 // frames; a device that sees a gap (or another epoch) watches again.
 message OfficeEvents {
+  option deprecated = true;
   string thread_id = 1;
   uint64 epoch = 2;
   repeated OfficeEvent events = 3;
 }
 
 message OfficeState {
+  option deprecated = true;
   // The director first, then everyone else in the order they came in. At
   // most 64; the rest are counted in OfficeSession.hidden_actors.
   repeated OfficeActor actors = 1;
@@ -3853,6 +3874,7 @@ message OfficeState {
 // An employee no longer in the office: the fields of its OfficeActor a
 // device needs to name it again, as they were when it left.
 message OfficeResident {
+  option deprecated = true;
   // The tool call that started it (its OfficeActor.id).
   string id = 1;
   string agent_type = 2;
@@ -3869,6 +3891,7 @@ message OfficeResident {
 // The session's own numbers, sent whole in the snapshot and in an event
 // whenever one of them changes.
 message OfficeSession {
+  option deprecated = true;
   // A turn runs, on this machine or elsewhere (ThreadSummary.busy_elsewhere).
   bool busy = 1;
   // The AI waits for the user: an approval, a question, or a sign-in secret.
@@ -3889,6 +3912,7 @@ message OfficeSession {
 
 // The todo list as counts only, never the entries' text.
 message OfficeTodoCounts {
+  option deprecated = true;
   uint32 pending = 1;
   uint32 in_progress = 2;
   uint32 done = 3;
@@ -3896,6 +3920,7 @@ message OfficeTodoCounts {
 
 // Tokens and estimated cost of the turns B saw end in this session.
 message OfficeUsage {
+  option deprecated = true;
   uint64 input_tokens = 1;
   uint64 output_tokens = 2;
   // At the AI's API prices, in US dollars; only an estimate (a subscription
@@ -3911,6 +3936,7 @@ message OfficeUsage {
 // Test, lint and typecheck commands (activities in OFFICE_ROOM_QA) that
 // ended this session.
 message OfficeChecks {
+  option deprecated = true;
   uint32 passed = 1;
   uint32 failed = 2;
   // The latest one passed; meaningless while passed + failed is 0.
@@ -3918,6 +3944,7 @@ message OfficeChecks {
 }
 
 message OfficeActor {
+  option deprecated = true;
   // "director" for the main agent; an employee's or a machine's id is the
   // tool call that started it.
   string id = 1;
@@ -3949,6 +3976,7 @@ message OfficeActor {
 // TCP port it listens on when its own words say so, and when it started.
 // Never the command's text.
 message OfficeService {
+  option deprecated = true;
   OfficeServiceKind kind = 1;
   // A port given on the command line (`--port 5173`, `-p 3000`,
   // `PORT=8080`) of a dev server or database, 1 to 65535; 0 when not known.
@@ -3959,6 +3987,7 @@ message OfficeService {
 }
 
 message OfficeActivity {
+  option deprecated = true;
   // The tool call's id, or a fixed id for what is not a tool call
   // ("think", "arrive", "hand-in").
   string id = 1;
@@ -3974,6 +4003,7 @@ message OfficeActivity {
 }
 
 message OfficeEvent {
+  option deprecated = true;
   uint64 seq = 1;
   // Unix milliseconds on the machine.
   int64 at = 2;
@@ -3993,11 +4023,13 @@ message OfficeEvent {
 }
 
 message OfficeActorLeave {
+  option deprecated = true;
   string actor_id = 1;
 }
 
 // The actor's activity is this one now (it replaces the one shown).
 message OfficeActivityStart {
+  option deprecated = true;
   string actor_id = 1;
   OfficeActivity activity = 2;
 }
@@ -4005,22 +4037,27 @@ message OfficeActivityStart {
 // The activity ended; the actor's activity clears only when it is the one
 // shown (activity.id == activity_id).
 message OfficeActivityEnd {
+  option deprecated = true;
   string actor_id = 1;
   string activity_id = 2;
   bool ok = 3;
 }
 
-message OfficeTurnStart {}
+message OfficeTurnStart {
+  option deprecated = true;
+}
 
 // A permission prompt for the actor's tool: WAITING makes the actor
 // OFFICE_ACTOR_STATE_AWAITING_APPROVAL, any other state sets it back to
 // what it was.
 message OfficeApproval {
+  option deprecated = true;
   string actor_id = 1;
   OfficeApprovalState state = 2;
 }
 
 enum OfficeRole {
+  option deprecated = true;
   OFFICE_ROLE_UNSPECIFIED = 0;
   OFFICE_ROLE_DIRECTOR = 1;
   OFFICE_ROLE_EMPLOYEE = 2;
@@ -4033,6 +4070,7 @@ enum OfficeRole {
 }
 
 enum OfficeActorState {
+  option deprecated = true;
   OFFICE_ACTOR_STATE_UNSPECIFIED = 0;
   OFFICE_ACTOR_STATE_IDLE = 1;
   OFFICE_ACTOR_STATE_WORKING = 2;
@@ -4043,6 +4081,7 @@ enum OfficeActorState {
 
 // How an activity is acted out.
 enum OfficeAnimGroup {
+  option deprecated = true;
   OFFICE_ANIM_GROUP_UNSPECIFIED = 0;
   // Leafing through files: reading and searching.
   OFFICE_ANIM_GROUP_READ = 1;
@@ -4069,6 +4108,7 @@ enum OfficeAnimGroup {
 // agent type's home room (a device applies those); both are here so devices
 // and the building's layout file share one code.
 enum OfficeRoom {
+  option deprecated = true;
   OFFICE_ROOM_UNSPECIFIED = 0;
   OFFICE_ROOM_LOBBY = 1;
   OFFICE_ROOM_DIRECTOR = 2;
@@ -4086,6 +4126,7 @@ enum OfficeRoom {
 
 // The kind of a machine's background command (docs/office-wire.md, part 4).
 enum OfficeServiceKind {
+  option deprecated = true;
   OFFICE_SERVICE_KIND_UNSPECIFIED = 0;
   // A dev or app server: `pnpm dev`, `vite`, `next dev`, `uvicorn`.
   OFFICE_SERVICE_KIND_DEV_SERVER = 1;
@@ -4104,6 +4145,7 @@ enum OfficeServiceKind {
 }
 
 enum OfficeApprovalState {
+  option deprecated = true;
   OFFICE_APPROVAL_STATE_UNSPECIFIED = 0;
   OFFICE_APPROVAL_STATE_WAITING = 1;
   OFFICE_APPROVAL_STATE_ALLOWED = 2;
@@ -4128,6 +4170,11 @@ enum OfficeApprovalState {
 message ObservatorySessionList {
   // At most this many; 0 is 50, B caps it at 200.
   uint32 limit = 1;
+  // Only the Claude Code sessions of this tunelo thread: its segments'
+  // sessions and those each continues or is continued by after /clear,
+  // newest first. A thread of another AI, or one B does not know, has none.
+  // "" lists the machine's sessions.
+  string thread_id = 2;
 }
 
 message ObservatorySessionListResult {
@@ -4196,6 +4243,55 @@ message ObservatorySessionState {
   // Unset while nothing of the session's own row is stored yet.
   ObservatorySessionInfo info = 1;
   ObservatorySessionTotals totals = 2;
+  // What the Live Map shows of the session as a whole (tunelo 3.26.0+).
+  ObservatoryLiveState live = 3;
+}
+
+// The session as a whole, worked out from its newest events (provisional
+// ones included) by the rules of docs/observatory-wire.md, so a device
+// replaying the events up to a time works out the same.
+message ObservatoryLiveState {
+  ObservatoryCoreState core = 1;
+  // Output tokens per second of the main thread's newest API request that
+  // has a duration; unset without one.
+  optional double tokens_per_second = 2;
+  // How full the main thread's context was at its newest API request, in
+  // percent of context_window; unset when the model is not one B knows.
+  optional double context_percent = 3;
+  // The context at that request in tokens (input, cache read and cache
+  // writes); 0 without one.
+  uint64 context_tokens = 4;
+  // The window context_percent is of, in tokens; 0 when unknown.
+  uint64 context_window = 5;
+  // The window is the model's standard one, assumed: Claude Code's records
+  // do not tell a session with the 1M-token window until its context passes
+  // the standard one.
+  bool context_window_assumed = 6;
+  // The main thread's model: its newest API request's, else the session's.
+  string main_model = 7;
+  // Tool calls started and not ended since the last turn ended, by station.
+  repeated ObservatoryStationCount running = 8;
+  // Bottleneck findings open now.
+  uint32 open_bottlenecks = 9;
+}
+
+enum ObservatoryCoreState {
+  OBSERVATORY_CORE_STATE_UNSPECIFIED = 0;
+  // Nothing stored yet, or the session ended.
+  OBSERVATORY_CORE_STATE_IDLE = 1;
+  // A turn runs: thinking or writing (the records do not tell them apart).
+  OBSERVATORY_CORE_STATE_THINKING = 2;
+  OBSERVATORY_CORE_STATE_WAITING_PERMISSION = 3;
+  // The turn ended and no prompt followed.
+  OBSERVATORY_CORE_STATE_WAITING_USER = 4;
+  OBSERVATORY_CORE_STATE_COMPACTING = 5;
+  // The turn ended in a failure.
+  OBSERVATORY_CORE_STATE_FAILED = 6;
+}
+
+message ObservatoryStationCount {
+  string station = 1;
+  uint32 count = 2;
 }
 
 message ObservatorySessionInfo {
@@ -4272,7 +4368,12 @@ message ObservatoryEvent {
     // The session's row or totals changed (only in ObservatoryEvents; id
     // "session").
     ObservatorySessionState session = 11;
+    // A bottleneck finding opened, raised or closed (one id for all three).
+    ObservatoryBottleneck bottleneck = 12;
   }
+  // Read from the hook spool before the store took it: the stored event
+  // follows under the same id and replaces it.
+  bool provisional = 13;
 }
 
 // A prompt the user sent: never its text.
@@ -4367,4 +4468,124 @@ message ObservatorySessionEvent {
   string label = 5;
   optional double number = 6;
   optional bool flag = 7;
+}
+
+// A finding of a bottleneck rule in the session (docs/observatory-wire.md):
+// one per rule and subkey, opened, raised and closed in place.
+message ObservatoryBottleneck {
+  string rule = 1;
+  // What the rule watches within the session (a tool, a file's key, a
+  // model, a server); "" for a rule without one.
+  string subkey = 2;
+  string station = 3;
+  // `warn` or `alert`.
+  string severity = 4;
+  // `open` or `closed`.
+  string status = 5;
+  // Unix milliseconds; closed_at 0 while open.
+  int64 opened_at = 6;
+  int64 updated_at = 7;
+  int64 closed_at = 8;
+  optional double value = 9;
+  optional double threshold = 10;
+  optional uint32 n = 11;
+  // The ids of the events behind it (ObservatoryEvent.id), at most 20.
+  repeated string evidence_ids = 12;
+}
+
+// A → B: the stored content of one event of a session (a prompt's text, a
+// tool call's input and output, as the privacy filter kept and cut them),
+// read from the store now: a project with content switched off, or content
+// cleared, gives none, whatever a device was sent before. Events never carry
+// content; this is the one way it leaves the machine.
+message ObservatoryContent {
+  string session_id = 1;
+  // ObservatoryEvent.id.
+  string event_id = 2;
+}
+
+message ObservatoryContentResult {
+  string session_id = 1;
+  string event_id = 2;
+  ObservatoryContentState state = 3;
+  // Only with OBSERVATORY_CONTENT_STATE_STORED.
+  string text = 4;
+}
+
+enum ObservatoryContentState {
+  OBSERVATORY_CONTENT_STATE_UNSPECIFIED = 0;
+  OBSERVATORY_CONTENT_STATE_STORED = 1;
+  // The project keeps no content (switched off).
+  OBSERVATORY_CONTENT_STATE_OFF = 2;
+  // Nothing kept: an event of a kind without content, or none was stored.
+  OBSERVATORY_CONTENT_STATE_NONE = 3;
+  // The event is not stored (yet): a provisional one, or an id B does not
+  // have.
+  OBSERVATORY_CONTENT_STATE_NOT_YET = 4;
+}
+
+// A → B: the numbers of one Live Map station in a session (the drawer).
+message ObservatoryStation {
+  string session_id = 1;
+  // `CORE`, `FILES`… (docs/observatory-wire.md).
+  string station = 2;
+  // Only what happened up to this time (Unix ms, while replaying); 0 for
+  // everything.
+  int64 at = 3;
+}
+
+message ObservatoryStationResult {
+  string session_id = 1;
+  string station = 2;
+  int64 at = 3;
+  ObservatoryStationNumbers numbers = 4;
+  // By part, the most called first, at most 20.
+  repeated ObservatoryStationPart parts = 5;
+  // The slowest calls, slowest first, at most 5 (seq 0, no content).
+  repeated ObservatoryEvent slowest = 6;
+  // The newest calls and the station's lifecycle events, newest first, at
+  // most 20 (seq 0, no content).
+  repeated ObservatoryEvent recent = 7;
+  // The same station in up to 5 earlier sessions of the same project
+  // (internal sessions left out), the newest first.
+  repeated ObservatoryStationPrevious previous = 8;
+  // The station's bottleneck findings in the session, open ones first.
+  repeated ObservatoryBottleneck bottlenecks = 9;
+}
+
+message ObservatoryStationNumbers {
+  uint32 calls = 1;
+  uint32 failures = 2;
+  // Calls that ended (the error rate is failures / ended).
+  uint32 ended = 3;
+  optional uint32 p50_ms = 4;
+  optional uint32 p95_ms = 5;
+  // The percentiles are of an even sample of 10 000 calls.
+  bool sampled = 6;
+  // The API requests counted for the station (docs/observatory-wire.md);
+  // all 0 for a station without.
+  uint32 api_requests = 7;
+  uint64 input_tokens = 8;
+  uint64 output_tokens = 9;
+  uint64 cache_read_tokens = 10;
+  uint64 cache_write_tokens = 11;
+  // The sum of Claude Code's estimates; only meaningful with has_cost.
+  double cost_usd_estimate = 12;
+  bool has_cost = 13;
+  // API requests counted without an estimate of their own.
+  uint32 requests_without_cost = 14;
+}
+
+message ObservatoryStationPart {
+  // What the part is: `mcp_server`, `tool`, `file` (`folder/name`),
+  // `domain`, `program` or `model`.
+  string kind = 1;
+  string key = 2;
+  ObservatoryStationNumbers numbers = 3;
+}
+
+message ObservatoryStationPrevious {
+  string session_id = 1;
+  int64 started_at = 2;
+  ObservatoryStationNumbers numbers = 3;
 }

@@ -58,6 +58,7 @@ import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
 import { LedgerUnreadable } from "../usage/ledger.ts";
 import { type OfficeHub, type OfficeSink, officeHubFor } from "../office/office-hub.ts";
 import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
+import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
 
 export type Socket = {
@@ -112,7 +113,7 @@ export type LinkContext = {
   /** Automatic Advisor for the whole machine (AdvisorSetAuto); absent where the machine has no Advisor (tests). */
   advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
   /** The Claude Code sessions Observatory stored (ObservatoryWatch and the requests beside it); absent where the machine has none (tests). */
-  observatory?: Pick<ObservatoryHub, "listSessions" | "watch" | "unwatch" | "forget" | "earlier">;
+  observatory?: Pick<ObservatoryHub, "listSessions" | "watch" | "unwatch" | "forget" | "earlier" | "content" | "station">;
 };
 
 /** The class and reason of each refusal of Advisor's key store. */
@@ -990,6 +991,8 @@ export class Connection {
         case "observatorySessionList":
         case "observatoryWatch":
         case "observatoryEarlier":
+        case "observatoryContent":
+        case "observatoryStation":
           return this.observatoryFrame(id, b);
         case "projectConfigGet": {
           const dir = b.value.dir;
@@ -1027,8 +1030,12 @@ export class Connection {
     const hub = this.ctx.observatory;
     if (!hub) return this.send(id, { case: "error", value: refusal("this machine has no Observatory", ErrorReason.UNSUPPORTED_REQUEST) });
     switch (b.case) {
-      case "observatorySessionList":
-        return this.send(id, { case: "observatorySessionListResult", value: hub.listSessions(b.value.limit) });
+      case "observatorySessionList": {
+        // A thread's sessions are the Claude Code sessions its segments name (none for another AI's thread).
+        const thread = b.value.threadId;
+        const seeds = thread ? this.ctx.core.segmentSessions(thread).flatMap((s) => (s.provider === CLAUDE_PROVIDER_ID ? [s.sessionId] : [])) : undefined;
+        return this.send(id, { case: "observatorySessionListResult", value: hub.listSessions(b.value.limit, seeds) });
+      }
       case "observatoryWatch":
         if (!b.value.on) {
           hub.unwatch(b.value.sessionId, this.observatorySink);
@@ -1037,6 +1044,10 @@ export class Connection {
         return this.send(id, { case: "observatorySnapshot", value: hub.watch(b.value.sessionId, this.observatorySink, b.value.limit) });
       case "observatoryEarlier":
         return this.send(id, { case: "observatoryEarlierResult", value: hub.earlier(b.value.sessionId, b.value.earlier, b.value.limit) });
+      case "observatoryContent":
+        return this.send(id, { case: "observatoryContentResult", value: hub.content(b.value.sessionId, b.value.eventId) });
+      case "observatoryStation":
+        return this.send(id, { case: "observatoryStationResult", value: hub.station(b.value.sessionId, b.value.station, Number(b.value.at)) });
     }
   }
 
@@ -1073,7 +1084,7 @@ type ProjectFrame = Extract<
   { case: "projectList" | "projectAdd" | "projectCreate" | "projectClone" | "projectCloneCancel" | "projectUpdate" | "projectReorder" | "projectRemove" }
 >;
 
-type ObservatoryFrame = Extract<Frame["body"], { case: "observatorySessionList" | "observatoryWatch" | "observatoryEarlier" }>;
+type ObservatoryFrame = Extract<Frame["body"], { case: "observatorySessionList" | "observatoryWatch" | "observatoryEarlier" | "observatoryContent" | "observatoryStation" }>;
 
 type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
 

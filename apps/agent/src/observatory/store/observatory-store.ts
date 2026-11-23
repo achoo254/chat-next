@@ -9,6 +9,7 @@
 import { SCHEMA_VERSION, isNewerThanAgent, rollbackQuietly, schemaVersionOf } from "./migrate.ts";
 import { deleteObservatoryDb } from "./observatory-db-files.ts";
 import { observatoryDbPath } from "./observatory-db-path.ts";
+import { type LiveFacts, type StationDrill, type StationQuery, type StoredContent, readContent, readLiveFacts, readStation, readThreadSessions } from "./live-map-reads.ts";
 import { type ExportFileOptions, type ExportSink, type ExportSummary, exportObservatory, exportObservatoryToFile } from "./observatory-export.ts";
 import type { ContentSettingRow, DailyRollupRow, SessionRow } from "./observatory-rows.ts";
 import { AGENT_BUSY_TIMEOUT_MS, openObservatoryDb } from "./open-observatory-db.ts";
@@ -21,6 +22,7 @@ import {
   type TimelineEntry,
   type TimelinePage,
   type TimelinePlace,
+  type TimelineKind,
   type TimelineRef,
   readSession,
   readSessionTotals,
@@ -144,6 +146,26 @@ export class ObservatoryStore {
   /** The timeline row a write touched, as stored now, without content; undefined when it is not stored. */
   timelineEntry(ref: TimelineRef): TimelineEntry | undefined {
     return readTimelineEntry(this.live(), ref);
+  }
+
+  /** A thread's sessions, newest first: `seeds` and the sessions linked to them through /clear (live-map-reads.ts). */
+  threadSessions(seeds: readonly string[], limit: number): SessionRow[] {
+    return readThreadSessions(this.live(), seeds, limit);
+  }
+
+  /** The stored content of one timeline row of a session, the project's content setting applied (live-map-reads.ts). */
+  content(sessionId: string, kind: TimelineKind, key: string): StoredContent {
+    return readContent(this.live(), sessionId, kind, key);
+  }
+
+  /** A session's open findings and largest context (live-map-reads.ts). */
+  liveFacts(sessionId: string): LiveFacts {
+    return readLiveFacts(this.live(), sessionId);
+  }
+
+  /** One station's numbers in a session (live-map-reads.ts). */
+  station(q: StationQuery): StationDrill {
+    return readStation(this.live(), q);
   }
 
   /** The number and time of each stored load of one instruction file for one reason in a session (store-reads.ts). */

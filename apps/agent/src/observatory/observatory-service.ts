@@ -23,7 +23,9 @@
 // The hub (hub/observatory-hub.ts) serves the devices watching a session's
 // timeline: every batch the store takes is handed to it, and it starts with
 // the service (a new epoch), stops first when the service stops, and takes a
-// new epoch after a wipe.
+// new epoch after a wipe. It hears the spool's tail too (onLiveEvent): the
+// sessions it watches are the ones whose tail is read, and their provisional
+// rows go to their watchers before the store has them.
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
@@ -106,6 +108,7 @@ export class ObservatoryService {
       problems,
       now: this.now,
     });
+    this.onLiveEvent((event) => this.hub.provisional(event));
     this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now, onWritten: (ops) => this.hub.written(ops) });
     this.intake = new ObservatoryIntake({
       config: opts.config,

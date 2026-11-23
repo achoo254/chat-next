@@ -984,6 +984,12 @@ export class AgentCore {
     return this.threads.get(threadId)?.meta.segments.at(-1)?.sessionId ?? "";
   }
 
+  /** The AI session id each segment of a thread names, oldest first, with its AI ([] for a thread the machine does not have). */
+  segmentSessions(threadId: string): { provider: string; sessionId: string }[] {
+    const segments = this.threads.get(threadId)?.meta.segments ?? [];
+    return segments.flatMap((seg) => (seg.sessionId ? [{ provider: seg.provider, sessionId: seg.sessionId }] : []));
+  }
+
   /** The AI session ids of every thread's sessions, by provider. */
   sessionIds(): { provider: string; sessionId: string }[] {
     const out: { provider: string; sessionId: string }[] = [];

@@ -12,10 +12,28 @@
 // watch again), reset() follows a wipe the same way. The first watcher of a
 // session asks the service to read its spool's tail (watchSession), the last
 // one to leave stops it (unwatchSession).
+//
+// The spool's tail (spool/spool-live-tail.ts) hands the hub provisional rows
+// of a watched session before the store has them (provisional()): each goes
+// out as a provisional event under the id its stored row will have, and the
+// stored row, once written, replaces it as an update. A stored row that still
+// lacks what the provisional one knew (the store has the call's start, the
+// tail its end) goes out with that filled in, still provisional, until the
+// store has it all. Neither path carries content (the tail drops it before
+// anything else; timeline-reads.ts leaves it out of stored rows).
+//
+// Every snapshot and every `session` event carries the session's live state
+// (live-state.ts), worked out from its newest events, provisional ones
+// included. The Live Map's other requests are answered here too: an event's
+// stored content by its id (the only content that leaves the machine, read
+// with the project's setting applied) and a station's numbers.
 import { create } from "@bufbuild/protobuf";
 import {
   ErrorCode,
   ErrorReason,
+  type ObservatoryContentResult,
+  ObservatoryContentResultSchema,
+  ObservatoryContentState,
   type ObservatoryEarlierResult,
   ObservatoryEarlierResultSchema,
   type ObservatoryEvent,
@@ -23,15 +41,31 @@ import {
   ObservatoryEventsSchema,
   type ObservatorySessionListResult,
   ObservatorySessionListResultSchema,
+  type ObservatorySessionState,
   type ObservatorySnapshot,
   ObservatorySnapshotSchema,
+  type ObservatoryStationResult,
 } from "@achoo254/chat-proto/remote/remote";
 import { AgentError } from "../../core/agent-core.ts";
 import { BoundedMap } from "../ingest/bounded-map.ts";
+import { LOAD_MATCH_MS } from "../ingest/instruction-load-seq.ts";
+import type { InstructionLoad } from "../ingest/normalized-record.ts";
+import type { LiveTailEvent } from "../spool/spool-live-tail.ts";
+import type { StoredContent } from "../store/live-map-reads.ts";
 import type { ObservatoryStore } from "../store/observatory-store.ts";
-import { MAX_TIMELINE_PAGE, type TimelinePage, type TimelineRef, compareTimeline, timelineRefOf } from "../store/timeline-reads.ts";
+import { StationFlag } from "../live-map/station-map.ts";
+import {
+  MAX_TIMELINE_PAGE,
+  type TimelineEntry,
+  type TimelinePage,
+  type TimelineRef,
+  compareTimeline,
+  timelineEntryOfWrite,
+  timelineRefOf,
+} from "../store/timeline-reads.ts";
 import type { WriteOp } from "../store/write-ops.ts";
-import { decodeCursor, encodeCursor, sessionEvent, sessionInfo, sessionState, timelineEvent } from "./observatory-wire.ts";
+import { liveStateOf } from "./live-state.ts";
+import { decodeCursor, encodeCursor, eventId, hasControl, parseEventId, sessionEvent, sessionInfo, sessionState, stationResult, timelineEvent } from "./observatory-wire.ts";
 
 /** Events are gathered this long before they go out. */
 export const FLUSH_MS = 250;
@@ -46,10 +80,16 @@ export const DEFAULT_PAGE = 200;
 /** Sessions listed when the device names no number, and at most. */
 export const DEFAULT_SESSIONS_LISTED = 50;
 export const MAX_SESSIONS_LISTED = 200;
-/** Rows of a session whose last event is remembered, so writing the same row again sends nothing. */
+/** Rows of a session whose last event is remembered, so writing the same row again sends nothing; also the provisional rows held per session. */
 const SENT_WINDOW = 2_000;
 /** The longest session id taken (Claude Code's are UUIDs). */
 const MAX_SESSION_ID_LENGTH = 200;
+/** The longest event id taken (a key is an id or a file path, both bounded well below). */
+const MAX_EVENT_ID_LENGTH = 2_048;
+/** A station's name: upper-case letters and `_` (live-map/station-map.ts); one this agent has no row of gives empty numbers. */
+const STATION_NAME = /^[A-Z][A-Z_]{0,31}$/;
+/** The newest events the live state is worked out from. */
+export const LIVE_WINDOW = 200;
 
 /** Where a watching connection gets a session's events. */
 export type ObservatoryEventSink = (events: ObservatoryEvents) => void;
@@ -67,6 +107,12 @@ export type ObservatoryHubOptions = {
   flushMs?: number;
 };
 
+/** A row of the spool's tail not (fully) in the store yet: the writes seen for it merged, and where its stored row is. */
+type Provisional = { op: WriteOp; entry: TimelineEntry; ref: TimelineRef };
+
+/** An event to send and whether it is provisional. */
+type Outgoing = { entry: TimelineEntry; provisional: boolean };
+
 type Watched = {
   sinks: Set<ObservatoryEventSink>;
   /** The last event's seq this epoch. */
@@ -79,7 +125,15 @@ type Watched = {
   sent: BoundedMap<string, string>;
   /** What the session's row and totals were when last sent (or snapshotted). */
   lastState: string;
+  /** Provisional rows by event id, oldest first, at most SENT_WINDOW. */
+  provisional: Map<string, Provisional>;
+  /** Provisional rows changed since the last flush, by event id. */
+  provisionalPending: Set<string>;
 };
+
+function newWatched(): Watched {
+  return { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "", provisional: new Map(), provisionalPending: new Set() };
+}
 
 function refuse(message: string, reason: ErrorReason): AgentError {
   return new AgentError(ErrorCode.INVALID, message, { reason });
@@ -92,8 +146,7 @@ function pageSize(limit: number, fallback: number, max: number): number {
 
 /** A session id as Claude Code makes them: not empty, short, no control characters. */
 function checkSessionId(sessionId: string): void {
-  const control = [...sessionId].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
-  if (sessionId === "" || sessionId.length > MAX_SESSION_ID_LENGTH || control) throw refuse("not a session id", ErrorReason.OBSERVATORY_INVALID);
+  if (sessionId === "" || sessionId.length > MAX_SESSION_ID_LENGTH || hasControl(sessionId)) throw refuse("not a session id", ErrorReason.OBSERVATORY_INVALID);
 }
 
 /** A message as text, to tell whether it changed (64-bit numbers as decimals). */
@@ -103,7 +156,59 @@ function printOf(value: unknown): string {
 
 /** A fingerprint of an event without its seq. */
 function fingerprint(e: ObservatoryEvent): string {
-  return printOf(e.kind);
+  return printOf([e.kind, e.provisional]);
+}
+
+const CONTENT_STATES: Record<StoredContent["state"], ObservatoryContentState> = {
+  stored: ObservatoryContentState.STORED,
+  off: ObservatoryContentState.OFF,
+  none: ObservatoryContentState.NONE,
+  notYet: ObservatoryContentState.NOT_YET,
+};
+
+/** Fields of a row as plain values (the merges below are field by field, whatever the kind). */
+type Fields = Record<string, unknown>;
+
+/** The time fields of a row: the earliest of two writes is kept, as the store does. */
+const EARLIEST = new Set(["at", "startedAt"]);
+
+/** `next` merged over `prev`, written for the same row: a value `next` has replaces, a time keeps the earliest. */
+function mergeWrite(prev: WriteOp, next: WriteOp): WriteOp {
+  const row: Fields = { ...prev.row };
+  for (const [k, v] of Object.entries(next.row)) {
+    if (v === undefined || v === null) continue;
+    const old = row[k];
+    row[k] = EARLIEST.has(k) && typeof old === "number" && typeof v === "number" ? Math.min(old, v) : v;
+  }
+  // Same kind and same row: the merged fields are those of the kind's write.
+  return { kind: next.kind, row } as WriteOp;
+}
+
+/** A station placed from the raw call, not estimated from the filtered target. */
+const isExact = (flags: unknown): boolean => ((typeof flags === "number" ? flags : 0) & StationFlag.estimated) === 0;
+
+/**
+ * The stored row with what the provisional one knows and it lacks: a value
+ * the stored row has no value for, and an exact station over an estimated
+ * one. `added` tells whether anything was.
+ */
+function overlay(stored: TimelineEntry, held: TimelineEntry): { entry: TimelineEntry; added: boolean } {
+  if (stored.kind !== held.kind) return { entry: stored, added: false };
+  const row: Fields = { ...stored.row };
+  const from: Fields = { ...held.row };
+  let added = false;
+  for (const [k, v] of Object.entries(from)) {
+    if (v === null || v === undefined || row[k] !== null) continue;
+    row[k] = v;
+    added = true;
+  }
+  if (stored.kind === "toolCall" && from.station !== null && isExact(from.stationFlags) && !isExact(row.stationFlags)) {
+    row.station = from.station;
+    row.stationFlags = from.stationFlags;
+    added = true;
+  }
+  // The same kind's row with some of its NULL fields filled from a row of that kind.
+  return { entry: added ? ({ ...stored, row } as TimelineEntry) : stored, added };
 }
 
 export class ObservatoryHub {
@@ -165,10 +270,58 @@ export class ObservatoryHub {
     if (touched) this.scheduleFlush();
   }
 
-  /** The machine's most recent sessions, newest first. */
-  listSessions(limit: number): ObservatorySessionListResult {
-    const rows = this.store().sessions({ limit: pageSize(limit, DEFAULT_SESSIONS_LISTED, MAX_SESSIONS_LISTED) });
+  /**
+   * The machine's most recent sessions, newest first; with `threadSessions`
+   * (the Claude Code sessions a thread's segments name; [] for a thread of
+   * another AI) only those and the sessions linked to them through /clear.
+   */
+  listSessions(limit: number, threadSessions?: readonly string[]): ObservatorySessionListResult {
+    const n = pageSize(limit, DEFAULT_SESSIONS_LISTED, MAX_SESSIONS_LISTED);
+    const store = this.store();
+    const seeds = threadSessions?.filter((id) => id !== "" && id.length <= MAX_SESSION_ID_LENGTH && !hasControl(id));
+    const rows = seeds === undefined ? store.sessions({ limit: n }) : seeds.length === 0 ? [] : store.threadSessions(seeds, n);
     return create(ObservatorySessionListResultSchema, { sessions: rows.map(sessionInfo) });
+  }
+
+  /**
+   * Rows of a watched session read from the spool's tail before the store
+   * has them (ObservatoryService.onLiveEvent): sent within FLUSH_MS as
+   * provisional events. Rows of a session nobody watches are dropped. Never
+   * throws.
+   */
+  provisional(event: LiveTailEvent): void {
+    const w = this.running ? this.sessions.get(event.sessionId) : undefined;
+    if (!w) return;
+    try {
+      let held = false;
+      for (const op of event.ops) held = this.hold(w, event.sessionId, op) || held;
+      if (event.instruction) {
+        const op = this.instructionOp(w, event.instruction);
+        if (op) held = this.hold(w, event.sessionId, op) || held;
+      }
+      if (held || event.ops.some((op) => op.kind === "session")) w.stateDirty = true;
+      if (w.stateDirty) this.scheduleFlush();
+    } catch (err) {
+      this.opts.problems("hub-provisional", err);
+    }
+  }
+
+  /** The stored content of one event of a session, the project's content setting applied. Watching is not needed. */
+  content(sessionId: string, id: string): ObservatoryContentResult {
+    checkSessionId(sessionId);
+    const parsed = id.length <= MAX_EVENT_ID_LENGTH && !hasControl(id) ? parseEventId(id) : undefined;
+    if (!parsed) throw refuse("not an event id of this machine", ErrorReason.OBSERVATORY_INVALID);
+    const found = this.store().content(sessionId, parsed.kind, parsed.key);
+    return create(ObservatoryContentResultSchema, { sessionId, eventId: id, state: CONTENT_STATES[found.state], text: found.state === "stored" ? found.text : "" });
+  }
+
+  /** One station's numbers in a session, up to `at` (Unix ms; 0 for everything). Watching is not needed. */
+  station(sessionId: string, station: string, at = 0): ObservatoryStationResult {
+    checkSessionId(sessionId);
+    if (!STATION_NAME.test(station)) throw refuse("not a station", ErrorReason.OBSERVATORY_INVALID);
+    if (!Number.isSafeInteger(at) || at < 0) throw refuse("not a time", ErrorReason.OBSERVATORY_INVALID);
+    const drill = this.store().station({ sessionId, station, ...(at > 0 ? { at } : {}) });
+    return stationResult(sessionId, station, at, drill);
   }
 
   /**
@@ -185,15 +338,18 @@ export class ObservatoryHub {
     if (!w?.sinks.has(sink)) this.checkLimits(sink, w);
     // Reads first: a store that fails leaves no watch behind.
     if (w) this.flushSession(sessionId, w, store);
+    const fresh = w ?? newWatched();
     const page = store.timelinePage(sessionId, undefined, pageSize(limit, DEFAULT_PAGE, MAX_TIMELINE_PAGE));
-    const state = sessionState(store.session(sessionId), store.sessionTotals(sessionId));
+    const oldest = page.more ? page.entries[0] : undefined;
+    const outgoing = this.withProvisional(fresh, store, page.entries, oldest);
+    const state = this.stateOf(sessionId, fresh, store);
     if (!w) {
-      w = { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "" };
+      w = fresh;
       this.sessions.set(sessionId, w);
       this.tellService("watch", () => this.opts.watchSession(sessionId));
     }
     w.sinks.add(sink);
-    const events = page.entries.map((e) => timelineEvent(e));
+    const events = outgoing.map((o) => timelineEvent(o.entry, 0n, o.provisional));
     for (const e of events) w.sent.set(e.id, fingerprint(e));
     w.lastState = printOf(state);
     return create(ObservatorySnapshotSchema, { sessionId, epoch: this.epoch, seq: w.seq, session: state, events, earlier: this.earlierOf(page) });
@@ -253,6 +409,8 @@ export class ObservatoryHub {
       w.stateDirty = false;
       w.sent = new BoundedMap(SENT_WINDOW);
       w.lastState = "";
+      w.provisional.clear();
+      w.provisionalPending.clear();
     }
   }
 
@@ -283,20 +441,28 @@ export class ObservatoryHub {
    * watchers see a gap and ask for a snapshot (the store has the truth).
    */
   private flushSession(sessionId: string, w: Watched, store: ObservatoryStore): void {
-    if (w.pending.size === 0 && !w.stateDirty) return;
+    if (w.pending.size === 0 && w.provisionalPending.size === 0 && !w.stateDirty) return;
     const refs = [...w.pending.values()];
+    const held = [...w.provisionalPending];
     const stateDirty = w.stateDirty;
     w.pending.clear();
+    w.provisionalPending.clear();
     w.stateDirty = false;
     const events: ObservatoryEvent[] = [];
     try {
-      const entries = refs.flatMap((ref) => {
+      const outgoing = new Map<string, Outgoing>();
+      for (const ref of refs) {
         const entry = store.timelineEntry(ref);
-        return entry && entry.row.sessionId === sessionId ? [entry] : [];
-      });
-      entries.sort(compareTimeline);
-      for (const entry of entries) {
-        const event = timelineEvent(entry);
+        if (entry && entry.row.sessionId === sessionId) outgoing.set(eventId(entry), this.stored(w, entry));
+      }
+      for (const id of held) {
+        const p = w.provisional.get(id);
+        if (!p || outgoing.has(id)) continue;
+        const entry = store.timelineEntry(p.ref);
+        outgoing.set(id, entry ? this.stored(w, entry) : { entry: p.entry, provisional: true });
+      }
+      for (const o of [...outgoing.values()].sort((a, b) => compareTimeline(a.entry, b.entry))) {
+        const event = timelineEvent(o.entry, 0n, o.provisional);
         const print = fingerprint(event);
         if (w.sent.get(event.id) === print) continue;
         w.sent.set(event.id, print);
@@ -304,7 +470,7 @@ export class ObservatoryHub {
         events.push(event);
       }
       if (stateDirty) {
-        const state = sessionState(store.session(sessionId), store.sessionTotals(sessionId));
+        const state = this.stateOf(sessionId, w, store);
         const print = printOf(state);
         if (print !== w.lastState) {
           w.lastState = print;
@@ -326,6 +492,81 @@ export class ObservatoryHub {
         this.opts.problems("hub-send", err);
       }
     }
+  }
+
+  /** The session's row, totals and live state as stored now, its provisional rows included. */
+  private stateOf(sessionId: string, w: Watched, store: ObservatoryStore): ObservatorySessionState {
+    const row = store.session(sessionId);
+    const facts = store.liveFacts(sessionId);
+    const entries = this.withProvisional(w, store, store.timelinePage(sessionId, undefined, LIVE_WINDOW).entries, undefined).map((o) => o.entry);
+    const live = liveStateOf({ entries, endedAt: row?.endedAt ?? null, mainModel: row?.mainModel ?? null, openBottlenecks: facts.openBottlenecks, largestContext: facts.largestContext });
+    return sessionState(row, store.sessionTotals(sessionId), live);
+  }
+
+  /**
+   * `stored` (a page of stored rows, oldest first) with the provisional rows
+   * filled in, and the provisional rows not stored yet that sort after
+   * `oldest` (every one when undefined), in timeline order.
+   */
+  private withProvisional(w: Watched, store: ObservatoryStore, stored: readonly TimelineEntry[], oldest: TimelineEntry | undefined): Outgoing[] {
+    const out = stored.map((entry) => this.stored(w, entry));
+    if (w.provisional.size === 0) return out;
+    const have = new Set(stored.map(eventId));
+    for (const [id, p] of [...w.provisional]) {
+      if (have.has(id)) continue;
+      const entry = store.timelineEntry(p.ref);
+      const o = entry ? this.stored(w, entry) : { entry: p.entry, provisional: true };
+      if (o.provisional && (!oldest || compareTimeline(o.entry, oldest) >= 0)) out.push(o);
+    }
+    return out.sort((a, b) => compareTimeline(a.entry, b.entry));
+  }
+
+  /** A stored row with what its provisional row knows; the provisional row is dropped once the store has it all. */
+  private stored(w: Watched, entry: TimelineEntry): Outgoing {
+    const id = eventId(entry);
+    const p = w.provisional.get(id);
+    if (!p) return { entry, provisional: false };
+    const merged = overlay(entry, p.entry);
+    if (!merged.added) w.provisional.delete(id);
+    return { entry: merged.entry, provisional: merged.added };
+  }
+
+  /** Holds one write of the spool's tail as a provisional row; false for a write that is not a timeline row of `sessionId`. */
+  private hold(w: Watched, sessionId: string, op: WriteOp): boolean {
+    const ref = timelineRefOf(op);
+    const alone = ref && ref.sessionId === sessionId ? timelineEntryOfWrite(op) : undefined;
+    if (!ref || !alone) return false;
+    const id = eventId(alone);
+    const prev = w.provisional.get(id);
+    const merged = prev ? mergeWrite(prev.op, op) : op;
+    const entry = prev ? timelineEntryOfWrite(merged) : alone;
+    if (!entry) return false;
+    w.provisional.delete(id);
+    w.provisional.set(id, { op: merged, entry, ref });
+    while (w.provisional.size > SENT_WINDOW) {
+      const first = w.provisional.keys().next();
+      if (first.done === true) break;
+      w.provisional.delete(first.value);
+    }
+    w.provisionalPending.add(id);
+    return true;
+  }
+
+  /**
+   * The write of an instruction file loaded, numbered as the ingest will
+   * number it from the spool (ingest/instruction-load-seq.ts): after the
+   * loads of the file for the reason stored and held; undefined when a stored
+   * load is this one (its stored event went out already).
+   */
+  private instructionOp(w: Watched, load: InstructionLoad): WriteOp | undefined {
+    const store = this.opts.store();
+    if (!store) return undefined;
+    const stored = store.instructionLoads(load.sessionId, load.filePath, load.loadReason);
+    if (stored.some((s) => Math.abs(s.at - load.at) <= LOAD_MATCH_MS)) return undefined;
+    const held = [...w.provisional.values()].flatMap((p) => (p.entry.kind === "instructionLoaded" && p.entry.row.filePath === load.filePath && p.entry.row.loadReason === load.loadReason ? [p.entry.row] : []));
+    const same = held.find((r) => r.at === load.at);
+    const seq = same?.seq ?? stored.reduce((next, s) => Math.max(next, s.seq + 1), 0) + held.length;
+    return { kind: "instructionLoaded", row: { sessionId: load.sessionId, seq, at: load.at, filePath: load.filePath, loadReason: load.loadReason, memoryType: load.memoryType } };
   }
 
   /** Tells the service a session is watched or not; its failure is logged, never thrown into a request. */
