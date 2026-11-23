@@ -57,11 +57,15 @@
 .lmd-notice { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-info) 10%, var(--c-surface)); color: var(--c-info-text); font-size: 0.8125rem; }
 .lmd-notice span { flex: 1; }
 
-/* The map and the panel beside it: a column at the right of the map on a wide screen (not over it). */
+/* The map and the panel: beside each other when the room the view really has is wide (the machine's file panel and the session list take part of the window), the panel below the map when it is not. The room is measured on `.lmd-wrap`, not the window. */
+.lmd-wrap { container: lmd / inline-size; }
 .lmd-host { position: relative; }
 @media (min-width: 761px) {
+	.lmd-host[data-open] > .lmd-panel { position: static; width: auto; max-height: min(60dvh, 520px); margin-top: var(--space-2); }
+}
+@container lmd (min-width: 720px) {
 	.lmd-host[data-open] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: var(--space-2); align-items: start; }
-	.lmd-host[data-open] > .lmd-panel { position: static; width: auto; max-height: min(80dvh, 720px); }
+	.lmd-host[data-open] > .lmd-panel { max-height: min(80dvh, 720px); margin-top: 0; }
 }
 
 /* Phone held upright: the panel is a sheet from the bottom over the map's lower part, the bar compact. */

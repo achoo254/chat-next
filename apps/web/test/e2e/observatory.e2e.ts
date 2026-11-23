@@ -177,6 +177,23 @@ test("a station's drawer shows its numbers, and the replay bar plays, scrubs and
 	await page.context().close();
 });
 
+test("with little room beside the map (a side panel open) the drawer goes below it and the map keeps its width", async () => {
+	const { page, errors } = await open(1280, 900);
+	// The room the view really has, as when the file panel and the session list take most of the window.
+	await page.locator(".lmd-wrap").evaluate((el) => {
+		(el as HTMLElement).style.width = "520px";
+	});
+	await page.locator("[data-id=observe-place-files]").click();
+	const drawer = page.locator("[data-id=lmd-drawer]");
+	await drawer.waitFor();
+	const frame = await page.locator(".lm-frame").boundingBox();
+	const panel = await drawer.boundingBox();
+	assert.ok(frame && panel, "the map and the drawer are laid out");
+	assert.ok(frame.width >= 480, `the map keeps its width (${Math.round(frame.width)} px)`);
+	assert.ok(panel.y >= frame.y + frame.height - 1, "the drawer is below the map, not beside it");
+	assert.deepEqual(errors, [], "no page error");
+});
+
 test("hiding details hides the names, and an event opened then does not ask for its content", async () => {
 	const { page, errors } = await open(1280, 900);
 	assert.ok((await page.locator("[data-id=observe-detail]").count()) > 0, "names show at first");

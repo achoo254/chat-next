@@ -160,39 +160,41 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 					</Link>
 				</div>
 			)}
-			<div className="lmd-host" data-open={panelOpen || undefined}>
-				<LiveMapStage
-					state={shown}
-					accountEmail={accountEmail}
-					selectedPlace={selected.place}
-					onStation={(place) => {
-						setSelected({ place, eventId: null });
-						setDetail(null);
-					}}
-					onEvent={(eventId) => {
-						setSelected({ place: null, eventId });
-						setDetail(findEvent(eventId) ?? null);
-					}}
-					onHideDetails={setHideDetails}
-				/>
-				{detail !== null ? (
-					<EventDetail link={link} sessionId={state.sessionId} online={online} event={detail} hideDetails={hideDetails} onReplayTo={replayTo} onClose={() => setDetail(null)} />
-				) : (
-					station !== null && (
-						<StationDrawer
-							link={link}
-							sessionId={state.sessionId}
-							online={online}
-							station={station}
-							at={replaying ? cursor.at : 0}
-							startedAt={state.info?.startedAt ?? 0}
-							hideDetails={hideDetails}
-							onOpenEvent={setDetail}
-							onEvidence={(event) => setGoal({ event })}
-							onClose={() => setSelected({ place: null, eventId: null })}
-						/>
-					)
-				)}
+			<div className="lmd-wrap">
+				<div className="lmd-host" data-open={panelOpen || undefined}>
+					<LiveMapStage
+						state={shown}
+						accountEmail={accountEmail}
+						selectedPlace={selected.place}
+						onStation={(place) => {
+							setSelected({ place, eventId: null });
+							setDetail(null);
+						}}
+						onEvent={(eventId) => {
+							setSelected({ place: null, eventId });
+							setDetail(findEvent(eventId) ?? null);
+						}}
+						onHideDetails={setHideDetails}
+					/>
+					{detail !== null ? (
+						<EventDetail link={link} sessionId={state.sessionId} online={online} event={detail} hideDetails={hideDetails} onReplayTo={replayTo} onClose={() => setDetail(null)} />
+					) : (
+						station !== null && (
+							<StationDrawer
+								link={link}
+								sessionId={state.sessionId}
+								online={online}
+								station={station}
+								at={replaying ? cursor.at : 0}
+								startedAt={state.info?.startedAt ?? 0}
+								hideDetails={hideDetails}
+								onOpenEvent={setDetail}
+								onEvidence={(event) => setGoal({ event })}
+								onClose={() => setSelected({ place: null, eventId: null })}
+							/>
+						)
+					)}
+				</div>
 			</div>
 			{history !== null && timeline !== null && (
 				<ReplayBar
