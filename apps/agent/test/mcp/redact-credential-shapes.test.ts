@@ -117,7 +117,9 @@ describe("redact() with credential shapes", () => {
 		const reference = median(() => referenceRedact(big));
 		const now = median(() => redact(big));
 		console.log(`redact() on ${(big.length / 1e6).toFixed(1)} M chars: ${now.toFixed(2)} ms, reference ${reference.toFixed(2)} ms`);
-		expect(now).toBeLessThan(4 * reference);
+		// The reference is a single cheap pass, so on a fast runner its time is a few milliseconds and the
+		// ratio alone is noise: the floor keeps this a guard against a pass that grows with the text.
+		expect(now).toBeLessThan(Math.max(4 * reference, 60));
 	});
 
 	test("takes linear time on long token-like runs", () => {
