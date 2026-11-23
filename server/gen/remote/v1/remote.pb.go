@@ -613,9 +613,10 @@ const (
 	// runs on the machine (subject: what runs, e.g. a terminal or a session's
 	// title). Nothing changed.
 	ErrorReason_ERROR_REASON_ACCOUNT_SWITCH_BLOCKED ErrorReason = 76
-	// OfficeWatch{on} for an office more than the agent keeps at once: 4 per
-	// connection, 16 for the machine (docs/office-wire.md). Watching again an
-	// office already watched is never refused; stop another watch first.
+	// OfficeWatch{on} for an office more than the agent kept at once: 4 per
+	// connection, 16 for the machine. Watching again an office already watched
+	// was never refused. Retired with the office: an agent that serves the
+	// Live Map answers OfficeWatch with ERROR_REASON_UNSUPPORTED_REQUEST.
 	ErrorReason_ERROR_REASON_OFFICE_WATCH_LIMIT ErrorReason = 77
 	// AccountAcceptCurrent for an account the AI already keeps under another
 	// entry (subject: its email).
@@ -2535,7 +2536,7 @@ func (OfficeRoom) EnumDescriptor() ([]byte, []int) {
 	return file_remote_v1_remote_proto_rawDescGZIP(), []int{34}
 }
 
-// The kind of a machine's background command (docs/office-wire.md, part 4).
+// The kind of a machine's background command, as the office named it.
 //
 // Deprecated: Marked as deprecated in remote/v1/remote.proto.
 type OfficeServiceKind int32

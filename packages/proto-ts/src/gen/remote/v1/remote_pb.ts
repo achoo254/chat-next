@@ -13388,9 +13388,10 @@ export enum ErrorReason {
   ACCOUNT_SWITCH_BLOCKED = 76,
 
   /**
-   * OfficeWatch{on} for an office more than the agent keeps at once: 4 per
-   * connection, 16 for the machine (docs/office-wire.md). Watching again an
-   * office already watched is never refused; stop another watch first.
+   * OfficeWatch{on} for an office more than the agent kept at once: 4 per
+   * connection, 16 for the machine. Watching again an office already watched
+   * was never refused. Retired with the office: an agent that serves the
+   * Live Map answers OfficeWatch with ERROR_REASON_UNSUPPORTED_REQUEST.
    *
    * @generated from enum value: ERROR_REASON_OFFICE_WATCH_LIMIT = 77;
    */
@@ -14772,7 +14773,7 @@ export const OfficeRoomSchema: GenEnum<OfficeRoom> = /*@__PURE__*/
   enumDesc(file_remote_v1_remote, 34);
 
 /**
- * The kind of a machine's background command (docs/office-wire.md, part 4).
+ * The kind of a machine's background command, as the office named it.
  *
  * @generated from enum remote.v1.OfficeServiceKind
  * @deprecated

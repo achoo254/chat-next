@@ -1626,9 +1626,10 @@ enum ErrorReason {
   // runs on the machine (subject: what runs, e.g. a terminal or a session's
   // title). Nothing changed.
   ERROR_REASON_ACCOUNT_SWITCH_BLOCKED = 76;
-  // OfficeWatch{on} for an office more than the agent keeps at once: 4 per
-  // connection, 16 for the machine (docs/office-wire.md). Watching again an
-  // office already watched is never refused; stop another watch first.
+  // OfficeWatch{on} for an office more than the agent kept at once: 4 per
+  // connection, 16 for the machine. Watching again an office already watched
+  // was never refused. Retired with the office: an agent that serves the
+  // Live Map answers OfficeWatch with ERROR_REASON_UNSUPPORTED_REQUEST.
   ERROR_REASON_OFFICE_WATCH_LIMIT = 77;
   // AccountAcceptCurrent for an account the AI already keeps under another
   // entry (subject: its email).
@@ -3802,9 +3803,7 @@ message UsageDelete {}
 // 3.6.0+): the AI's main agent is the director, each subagent an employee,
 // each background shell a machine, and every tool call an activity in one of
 // the building's rooms. B turns each AI's own events into these shapes on
-// the machine; a device only draws them. docs/office-wire.md is the full
-// contract (rooms for each tool and command, gaps in seq, which signals
-// each kind of session lacks).
+// the machine; a device only draws them.
 //
 // Nothing here carries a tool's input or output, a command's text, a todo's
 // text or a file's content: only tool names, the room and animation B picked
@@ -3813,7 +3812,8 @@ message UsageDelete {}
 //
 // Deprecated: the Live Map of Observatory replaces the office. Every message
 // and enum here and frames 168 to 170 stay only so their numbers are never
-// reused.
+// reused. An agent that serves the Live Map no longer keeps offices and
+// answers OfficeWatch with ERROR_REASON_UNSUPPORTED_REQUEST.
 
 // A → B: start (on) or stop watching the office of a thread for this
 // connection. On: answered with OfficeSnapshot (asking again is how a device
@@ -4124,7 +4124,7 @@ enum OfficeRoom {
   OFFICE_ROOM_QA = 12;
 }
 
-// The kind of a machine's background command (docs/office-wire.md, part 4).
+// The kind of a machine's background command, as the office named it.
 enum OfficeServiceKind {
   option deprecated = true;
   OFFICE_SERVICE_KIND_UNSPECIFIED = 0;

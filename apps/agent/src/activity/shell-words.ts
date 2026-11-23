@@ -3,10 +3,10 @@
 // setup in front of the real command dropped (`cd dir &&`, environment
 // assignments, `export`, PowerShell's `$env:X = …;`) and the wrappers that
 // only change how it runs (`env`, `sudo -u x`, `timeout 60`, `nice -n 5`,
-// `time`). What is left is what the command does. docs/office-wire.md,
-// parts 4 and 5.
+// `time`). What is left is what the command does. docs/observatory-wire.md,
+// sections 4 and 6.7.
 //
-// The parse only picks a room (an enum) and checks a word against a fixed
+// The parse only picks a station (an enum) and checks a word against a fixed
 // list of command names: a misparse may misroute, but the only text that
 // ever leaves the machine is a name from that list (SUBJECT_COMMANDS).
 

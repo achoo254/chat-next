@@ -1,11 +1,11 @@
 // How a shell command line is read for what it really runs, on the machine
-// only (docs/office-wire.md, part 4): past setup and wrappers
+// only (docs/observatory-wire.md, sections 4 and 6.7): past setup and wrappers
 // (shell-words.ts), through runners (`npx x`), package managers
 // (`pnpm --filter app run dev`, `pnpm exec vitest`), make-like tools
 // (`make test`), shells given a string (`bash -c "…"`) and interpreters
 // (`python -m pytest`, `uv run x`, `node node_modules/vitest/vitest.mjs`), to
 // the program or the script name at the end. A caller's rules turn that into
-// its own answer (a room, a service kind); the walk itself returns only what
+// its own answer (a station, a command class); the walk itself returns only what
 // the rules return, never a word of the command.
 import { commandName, commandWords, isListedCommand } from "./shell-words.ts";
 
