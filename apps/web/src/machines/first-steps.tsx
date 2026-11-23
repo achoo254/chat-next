@@ -30,8 +30,8 @@ export function FirstSteps({ progress, addProject }: { progress: FirstStepsProgr
 	const order: StepId[] = ["machine", "project", "session"];
 	const current = order.find((id) => !done[id]);
 	return (
-		<section className="mx-steps" data-id="first-steps" aria-labelledby="mx-steps-title">
-			<h3 id="mx-steps-title">{copy.title}</h3>
+		<section className="mx-first-steps" data-id="first-steps" aria-labelledby="mx-first-steps-title">
+			<h3 id="mx-first-steps-title">{copy.title}</h3>
 			<ol>
 				{order.map((id, index) => {
 					const state = done[id] ? "done" : id === current ? "current" : "todo";
