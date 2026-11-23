@@ -190,6 +190,8 @@ function recomputeBottlenecks(d: LiveMapScene): void {
 
 /** Tool calls that never ran: denied, or blocked by a hook. */
 const NOT_RUN = new Set(["permission_denied", "hook_block"]);
+/** The machine's label of a tool call the person interrupted (the turn ends with it). */
+const INTERRUPTED = "interrupted";
 
 function active(d: LiveMapScene): void {
 	d.core = "thinking";
@@ -245,6 +247,8 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 					if (!e.success) wire.failures += 1;
 				}
 			}
+			// The person stopped the turn (Esc, Ctrl+C): Claude Code tells no Stop, only this call's end.
+			if (e.error === INTERRUPTED) endTurn(d, "waiting_user");
 			return;
 		}
 		case "subagent": {

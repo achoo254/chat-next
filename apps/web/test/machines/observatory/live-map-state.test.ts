@@ -146,6 +146,17 @@ describe("the Live Map state", () => {
 		expect(stopped.scene.stations.FILES.running).toEqual([]);
 	});
 
+	it("ends the turn at a call the person interrupted (Esc or Ctrl+C sends no Stop), not at a call that failed on its own", () => {
+		const running = live(start(), numbered([prompt(1, 0), tool("t1", 10), tool("t2", 20, { station: "SANDBOX", toolName: "Bash" })]));
+		const interrupted = live(running, numbered([tool("t2", 20, { station: "SANDBOX", toolName: "Bash", success: false, durationMs: 400, error: "interrupted" })], running.seq + 1));
+		expect(interrupted.scene).toMatchObject({ core: "waiting_user", inTurn: false });
+		expect(interrupted.scene.stations.FILES.running).toEqual([]);
+		expect(interrupted.scene.stations.SANDBOX).toMatchObject({ running: [], calls: 1, failures: 1 });
+		const failed = live(running, numbered([tool("t2", 20, { station: "SANDBOX", toolName: "Bash", success: false, durationMs: 400, error: "failed" })], running.seq + 1));
+		expect(failed.scene.core).toBe("thinking");
+		expect(failed.scene.stations.FILES.running).toEqual(["tool:t1"]);
+	});
+
 	it("takes the main agent's speed over its whole duration when the first token's time is unknown, and keeps it past a request without numbers", () => {
 		const base = { kind: "api", agentId: "", model: "claude-opus", seq: 0, provisional: false } as const;
 		const noTtft: LiveMapEvent = { ...base, id: "api:a1", at: 0, outputTokens: 300, durationMs: 1_500 };

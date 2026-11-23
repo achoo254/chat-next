@@ -2,10 +2,11 @@
 // WebGL then Canvas (never WebGPU) without autostart at a resolution of at
 // most 2, picks the plate by MAX_TEXTURE_SIZE, draws nothing more after its
 // first frame while idle, plays animations with their source events in the
-// log, stops on a lost context and draws again on restore, and on destroy
+// log, stops turning a thinking core no event moved for a while, stops on a lost context and draws again on restore, and on destroy
 // removes every listener and destroys the app with its children and textures.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
+import { CORE_SPIN_IDLE_MS } from "../../src/machines/observatory/render/prop-map.ts";
 import { prompt, tool } from "../machines/observatory/live-map-fixtures.ts";
 import { played, shippedAssets } from "./render-fixtures.ts";
 
@@ -160,6 +161,31 @@ describe("mounting the Live Map", () => {
 		expect(handle.frames()).toBeGreaterThan(60);
 		expect(handle.animationLog().map((e) => e.eventId)).toEqual(expect.arrayContaining(["prompt:p1", "tool:r1"]));
 		expect(handle.animationLog().every((e) => e.eventId !== "")).toBe(true);
+		handle.destroy();
+	});
+
+	it("stops turning the thinking core when no event came for CORE_SPIN_IDLE_MS, and turns again on a new event", async () => {
+		const handle = await mountLiveMap(options());
+		frames.run(100);
+		// A turn the person interrupted while the model thought: no event ends it.
+		const thinking = played([prompt(1, 0)]);
+		handle.update({ ...thinking.state, live: null }, thinking.animations);
+		frames.run(CORE_SPIN_IDLE_MS - 1_000);
+		expect(frames.queue.size).toBe(1);
+		frames.run(2_000);
+		const still = handle.frames();
+		frames.run(60_000);
+		expect(handle.frames()).toBe(still);
+		expect(frames.queue.size).toBe(0);
+		// The same state again does not start it.
+		handle.update({ ...thinking.state, live: null }, []);
+		frames.run(1_000);
+		expect(handle.frames()).toBe(still);
+		// A new event does.
+		const next = played([prompt(1, 0), tool("r1", 10)]);
+		handle.update({ ...next.state, live: null }, []);
+		frames.run(1_000);
+		expect(handle.frames()).toBeGreaterThan(still + 30);
 		handle.destroy();
 	});
 

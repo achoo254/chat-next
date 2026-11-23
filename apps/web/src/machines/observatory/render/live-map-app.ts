@@ -13,15 +13,16 @@
 // that cannot start under it falls back to the still view.
 //
 // Renderers: WebGL, else PixiJS's Canvas renderer; never WebGPU. Frames run
-// only while something moves (frame-gate.ts); a lost GPU context shows the
-// still plate (context-guard.ts).
+// only while something moves (frame-gate.ts), and the thinking core stops
+// turning when no event came for CORE_SPIN_IDLE_MS; a lost GPU context shows
+// the still plate (context-guard.ts).
 import "pixi.js/unsafe-eval";
 import { Application, Spritesheet, Texture, type SpritesheetData } from "pixi.js";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import { AnimationDirector, type DirectorLogEntry } from "./animation-director.ts";
 import { guardContext } from "./context-guard.ts";
 import { createFrameGate, intersectionWatcher, type FrameGateDeps } from "./frame-gate.ts";
-import { lookOf, sameLook, type SceneLook } from "./prop-map.ts";
+import { CORE_SPIN_IDLE_MS, lookOf, sameLook, type SceneLook } from "./prop-map.ts";
 import { SceneLayers, makeGlowTexture, readPalette } from "./scene-layers.ts";
 import { choosePlate, fitScene, unproject, type PlaceId, type PlateFile, type SceneAssets } from "./scene-table.ts";
 
@@ -146,9 +147,18 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		let look: SceneLook = lookOf(state, o.assets.scene);
 		layers.setLook(look);
 		let spin: { start: number; base: number; speed: number } | null = null;
+		/** The newest event the core turns for and when it came (this clock): past CORE_SPIN_IDLE_MS without a newer one, the core stops. */
+		let spinFor: { eventId: string; since: number } | null = null;
+		const spinStale = (t: number): boolean => spinFor !== null && t - spinFor.since >= CORE_SPIN_IDLE_MS;
 		const spinTurns = (t: number): number | null => (spin === null ? null : spin.base + ((t - spin.start) / 1000) * spin.speed);
 		const setSpin = (next: SceneLook["spin"], t: number): void => {
-			if (next === null) spin = null;
+			if (next === null) {
+				spin = null;
+				spinFor = null;
+				return;
+			}
+			if (spinFor?.eventId !== next.eventId) spinFor = { eventId: next.eventId, since: t };
+			if (spinStale(t)) spin = null;
 			else if (spin === null) {
 				spin = { start: t, base: 0, speed: next.speed };
 				director.note(next.eventId, "core", "core-spin", t);
@@ -163,6 +173,7 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 			canvas,
 			() => {
 				const t = now();
+				if (spinStale(t)) spin = null;
 				layers.drawFrame(director.frame(t), spinTurns(t));
 				app.render();
 				return director.busy || spin !== null;

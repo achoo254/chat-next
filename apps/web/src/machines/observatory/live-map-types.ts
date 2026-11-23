@@ -94,6 +94,8 @@ export type LiveMapEventBody =
 			/** Unset while the call runs. */
 			readonly success?: boolean;
 			readonly durationMs?: number;
+			/** Why it did not succeed, a fixed label (`failed`, `interrupted`, `permission denied`); unset when none was sent. */
+			readonly error?: string;
 	  }
 	| { readonly kind: "subagent"; readonly agentId: string; readonly agentType: string; readonly endedAt: number; readonly model: string }
 	| {
@@ -290,6 +292,7 @@ function bodyFromWire(kind: ObservatoryEvent["kind"]): LiveMapEventBody {
 				stationFlags: v.stationFlags,
 				...(v.success === undefined ? {} : { success: v.success }),
 				...(v.durationMs === undefined ? {} : { durationMs: v.durationMs }),
+				...(v.error === "" ? {} : { error: v.error }),
 			};
 		}
 		case "subagent":

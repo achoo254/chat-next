@@ -110,11 +110,16 @@ describe("the Live Map view with its panels", () => {
 		expect(again?.case === "observatoryStation" && again.value.at).toBe(0n);
 	});
 
-	it("replays to the event's moment from its detail", async () => {
+	it("replays to the event's moment from its detail, the core as it was then", async () => {
 		const { view } = await open();
+		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("waiting_permission");
 		await userEvent.click(id(view, "stub-piece") as Element);
 		await userEvent.click(id(view, "lmd-replay-here") as Element);
 		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("replay");
+		// At the prompt the core thought; the machine's state now (waiting for permission) is not that moment's.
+		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("thinking");
+		await userEvent.click(id(view, "lmd-live") as Element);
+		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("waiting_permission");
 	});
 
 	it("opens at the event a link names, at its moment", async () => {

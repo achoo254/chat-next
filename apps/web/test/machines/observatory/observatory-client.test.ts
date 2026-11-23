@@ -95,6 +95,9 @@ describe("Observatory's requests", () => {
 		const provisional = eventFromWire(create(ObservatoryEventSchema, { at: 5n, id: "tool:t1", provisional: true, kind: { case: "toolCall", value: { toolUseId: "t1", station: "GIT", stationFlags: 1 } } }));
 		expect(provisional).toMatchObject({ kind: "tool", id: "tool:t1", provisional: true, station: "GIT", stationFlags: 1 });
 		expect(provisional).not.toHaveProperty("success");
+		expect(provisional).not.toHaveProperty("error");
+		const interrupted = eventFromWire(create(ObservatoryEventSchema, { at: 6n, id: "tool:t2", kind: { case: "toolCall", value: { toolUseId: "t2", station: "SANDBOX", success: false, durationMs: 40, error: "interrupted" } } }));
+		expect(interrupted).toMatchObject({ kind: "tool", success: false, durationMs: 40, error: "interrupted" });
 		const finding = eventFromWire(
 			create(ObservatoryEventSchema, {
 				at: 7n,

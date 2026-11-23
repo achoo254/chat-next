@@ -387,6 +387,13 @@ export interface SceneLook {
 	readonly spin: { readonly speed: number; readonly eventId: string } | null;
 }
 
+/**
+ * The core stops turning when no event came this long, whatever its state:
+ * a turn can end with no record at all (the person interrupted the model while
+ * it thought), and an idle map draws no frame.
+ */
+export const CORE_SPIN_IDLE_MS = 2 * 60_000;
+
 /** Turns per second of the core's ring at a given output speed: 0.15 at rest, up to 1.5. */
 export function spinSpeed(tokensPerSecond: number | null): number {
 	if (tokensPerSecond === null || tokensPerSecond <= 0) return 0.15;

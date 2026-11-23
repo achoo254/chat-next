@@ -2,7 +2,8 @@
 // view showed at that moment, on a generated session of more than 2 000
 // events where provisional versions come first and stored ones later and out
 // of order; the history built from a snapshot and older pages gives the same;
-// a stored version is never replaced by a provisional one; findings open and
+// a later version of an id replaces the earlier one (a provisional end after
+// the stored start), a call interrupted by the person ends the turn; findings open and
 // close by their own times; the context's fill follows the machine's rule;
 // playing squeezes long silences; the cap, the checkpoints, the timeline and
 // the cursor.
@@ -102,13 +103,16 @@ function session(minEvents: number, seed: number): { arrivals: Arrival[]; finals
 				const station = pick(STATIONS);
 				const duration = 50 + Math.floor(r() * 4_000);
 				const success = r() > 0.1;
-				const over = { station, durationMs: duration, success, ...(station === "MCP" ? { mcpServer: pick(["s1", "s2"]) } : {}) };
+				// Some failures are the person interrupting the turn (Esc, Ctrl+C): the turn ends with them.
+				const error = success ? undefined : r() < 0.3 ? "interrupted" : "failed";
+				const over = { station, durationMs: duration, success, ...(error === undefined ? {} : { error }), ...(station === "MCP" ? { mcpServer: pick(["s1", "s2"]) } : {}) };
 				const start = tool(key, ms, { station, ...(station === "MCP" ? { mcpServer: over.mcpServer } : {}), provisional: true });
 				const ended = tool(key, ms, over);
 				arrive(ms, start);
-				// The stored row before the call ended: still provisional, filled with what the tail knew (it runs).
+				// The store took the call while it ran: its stored version (not provisional) says it runs.
 				const early = ms + Math.floor(r() * 3_000);
-				if (early < ms + duration) arrive(early, start);
+				if (early < ms + duration) arrive(early, { ...start, provisional: false });
+				// The spool's tail reads its end before the store has it: a provisional version after the stored one.
 				arrive(ms + duration, { ...ended, provisional: true });
 				arrive(ms + duration + Math.floor(r() * 8_000), ended);
 			} else if (kind < 0.6) {
@@ -239,15 +243,32 @@ describe("replaying a session", () => {
 });
 
 describe("versions of one event", () => {
-	it("keeps the stored version when a provisional one arrives after it, in a page or live", () => {
-		const stored = tool("t1", 1_000, { success: true, durationMs: 200 });
-		const provisional = tool("t1", 1_000, { provisional: true });
-		let h = historyOf(snapshot([stored]));
-		h = withLive(h, [provisional]);
-		expect(h.byId.get("tool:t1")).toEqual(stored);
-		h = withPage(historyOf(snapshot([provisional])), [stored], "");
-		expect(h.byId.get("tool:t1")).toEqual(stored);
+	it("takes the later version of an id, as the live view does: a provisional end after the stored start, a stored version after a provisional one", () => {
+		const storedRunning = tool("t1", 1_000);
+		const provisionalEnded = tool("t1", 1_000, { success: true, durationMs: 200, provisional: true });
+		const storedEnded = tool("t1", 1_000, { success: true, durationMs: 200 });
+		let h = historyOf(snapshot([prompt(1, 0), storedRunning]));
+		h = withLive(h, [provisionalEnded]);
+		expect(h.byId.get("tool:t1")).toEqual(provisionalEnded);
+		expect(stateAt(h, T0 + 1_500).scene.stations.FILES).toMatchObject({ running: [], calls: 1 });
+		h = withLive(h, [storedEnded]);
+		expect(h.byId.get("tool:t1")).toEqual(storedEnded);
+		h = withPage(historyOf(snapshot([tool("t1", 1_000, { provisional: true })])), [storedEnded], "");
+		expect(h.byId.get("tool:t1")).toEqual(storedEnded);
 		expect(h.events).toHaveLength(1);
+	});
+
+	it("ends the turn at a call interrupted by the person, once it ended, as the live view does", () => {
+		const events = [prompt(1, 0), tool("t1", 1_000, { station: "SANDBOX" }), tool("t2", 1_500, { station: "TESTING", success: false, durationMs: 2_000, error: "interrupted" })];
+		const h = historyOf(snapshot(events));
+		const during = stateAt(h, T0 + 2_000);
+		expect(coreOf(during)).toBe("thinking");
+		expect(during.scene.stations.TESTING.running).toEqual(["tool:t2"]);
+		const after = stateAt(h, T0 + 3_500);
+		expect(coreOf(after)).toBe("waiting_user");
+		expect(after.scene.stations.SANDBOX.running).toEqual([]);
+		expect(after.live).toMatchObject({ core: "waiting_user", running: [] });
+		expect(after.scene).toEqual(fromSnapshot(snapshot(events)).scene);
 	});
 
 	it("shows a tool call running before its end and ended from then on", () => {

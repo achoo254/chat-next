@@ -143,7 +143,7 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 		<div
 			className="mx-body"
 			data-id="observe-map"
-			data-core={state.live?.core ?? coreOf(state)}
+			data-core={shown.live?.core ?? coreOf(shown)}
 			data-selected-place={selected.place ?? undefined}
 			data-selected-event={selected.eventId ?? undefined}
 		>

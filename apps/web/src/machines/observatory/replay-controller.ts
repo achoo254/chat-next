@@ -20,9 +20,10 @@
 //
 // History: the snapshot's events, older pages asked until the session's start
 // (`needsEarlier`, `pageBack`), and live events arriving while replaying
-// (`withLive`: held, the replayed moment does not move). A stored version
-// replaces a provisional one with the same id whatever the arrival order; a
-// provisional version never replaces a stored one. At most
+// (`withLive`: held, the replayed moment does not move). A later version of an
+// id replaces the earlier one, as the live view's reducer does: the machine
+// sends a provisional version after the stored one when the spool's tail
+// knows more (a call's end read before the store has it). At most
 // REPLAY_BUFFER_CAP events are held: paging back stops there (`partial`, the
 // replay starts at the oldest event held), and live events past it fold the
 // oldest thousand into the base scene. Every CHECKPOINT_EVERY events the
@@ -138,7 +139,7 @@ function versionAt(e: HeldEvent, at: number): HeldEvent {
 	switch (e.kind) {
 		case "tool": {
 			if (e.success === undefined) return e;
-			const { success: _success, durationMs: _duration, ...running } = e;
+			const { success: _success, durationMs: _duration, error: _error, ...running } = e;
 			return running;
 		}
 		case "subagent":
@@ -194,8 +195,6 @@ function merged(h: ReplayHistory, incoming: readonly LiveMapEvent[], older: bool
 		if (!isHeld(e)) continue;
 		if (h.floor !== null && compare(e, h.floor) <= 0) continue;
 		const held = byId.get(e.id);
-		// The stored version wins over a provisional one, whatever came first.
-		if (held !== undefined && !held.provisional && e.provisional) continue;
 		const event: HeldEvent = e.seq === 0 ? e : { ...e, seq: 0 };
 		if (held !== undefined) replaced = true;
 		byId.set(e.id, event);
