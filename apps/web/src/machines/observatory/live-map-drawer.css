@@ -1,5 +1,7 @@
 /* The Live Map's station drawer and event detail (station-drawer.tsx, event-detail.tsx) and its replay bar (replay-bar.tsx); loaded with the Live Map's chunk. Classes are `lmd-`, apart from the renderer's `lm-`. The panels are not modal: a column at the right of the map on a wide screen, a sheet from the bottom on a phone (docs/modal-popup-design.md section 3: header and footer stay in view, only the body scrolls). */
 .lmd-panel { position: absolute; top: var(--space-2); right: var(--space-2); bottom: var(--space-2); z-index: 2; display: flex; flex-direction: column; width: min(360px, calc(100% - 2 * var(--space-2))); max-height: calc(100% - 2 * var(--space-2)); box-sizing: border-box; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); box-shadow: var(--shadow-md); }
+/* The drawer's top edge in its station's colour, the colour of the station's marks on the replay bar. */
+.lmd-panel[data-station] { border-top: 3px solid var(--station, var(--c-border-subtle)); }
 .lmd-head { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-2); border-bottom: 1px solid var(--c-border-subtle); }
 .lmd-title { flex: 1; min-width: 0; }
 .lmd-title h3 { margin: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
@@ -43,12 +45,8 @@
 .lmd-bar-time { margin-left: auto; font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--c-text-muted); }
 .lmd-track { position: relative; height: 28px; }
 .lmd-marks { position: absolute; inset: 8px 0; border-radius: var(--radius-full); background: var(--c-bar-track); overflow: hidden; }
-.lmd-mark { position: absolute; top: 0; bottom: 0; min-width: 2px; background: var(--c-viz-grey); }
-.lmd-mark[data-station="CORE"] { background: var(--c-viz-violet); }
-.lmd-mark[data-station="ORCHESTRATOR"], .lmd-mark[data-station="MCP"] { background: var(--c-viz-blue); }
-.lmd-mark[data-station="FILES"], .lmd-mark[data-station="TESTING"] { background: var(--c-viz-green); }
-.lmd-mark[data-station="MEMORY"], .lmd-mark[data-station="EXTERNAL"] { background: var(--c-viz-cyan); }
-.lmd-mark[data-station="SKILLS"], .lmd-mark[data-station="GIT"] { background: var(--c-viz-amber); }
+/* A mark takes its station's colour (station-palette.css); a mark of no known station stays grey. */
+.lmd-mark { position: absolute; top: 0; bottom: 0; min-width: 2px; background: var(--station, var(--c-viz-grey)); }
 .lmd-mark[data-bottleneck] { background: var(--c-warning); }
 .lmd-mark[data-failed] { background: var(--c-viz-red); }
 .lmd-slider { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; accent-color: var(--c-primary); cursor: pointer; }

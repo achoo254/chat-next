@@ -37,6 +37,7 @@ import { StationDrawer } from "./station-drawer.tsx";
 import { useObservatorySession, useThreadSessions } from "./use-observatory-session.ts";
 import { useReplayHistory } from "./use-replay-history.ts";
 import "./live-map-drawer.css";
+import "./station-palette.css";
 
 /** Marks the bar draws across the timeline. */
 const BAR_MARKS = 120;
