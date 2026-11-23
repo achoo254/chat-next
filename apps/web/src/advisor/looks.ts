@@ -1,5 +1,5 @@
-// The four looks of Advisor (plan 261116-0931 phase 4: drawn offline on the
-// GPU, transparent WebP 256 px; licence in docs/office-asset-licenses.md),
+// The four looks of Advisor (drawn offline on the GPU, transparent WebP
+// 256 px; licence in docs/asset-licenses.md),
 // each with its four moods and its main colours (from the idle picture).
 // An unknown look id (a newer client's) shows the first look.
 import catAnswering from "./assets/cat/answering.webp";

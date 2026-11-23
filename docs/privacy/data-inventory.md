@@ -73,6 +73,33 @@ Agent không ghi đè một file của sổ (mục lục hoặc file tháng) nó
 
 Agent `tunelo` giữ, cho mỗi thư mục người dùng bật hay tắt cấu hình `.claude` của dự án từ thiết bị của tài khoản, đường dẫn thư mục và mức (`full`/`off`) trong `<thư mục config tunelo>/data/project-config.json` (quyền 0600) trên chính máy đó, tới khi người dùng đổi; server chat không nhận gì. Mỗi lần đổi được ghi vào nhật ký đồng ý trên máy (`project_settings`: thiết bị, thời điểm, thư mục, `level:full`/`level:off`). Thiết bị của tài khoản thấy mức của thư mục và của từng phiên qua kênh mã hoá đầu cuối.
 
+## Observatory trên máy: phần của Live Map
+
+Observatory của `tunelo` lưu dòng thời gian các phiên Claude Code trong SQLite trên chính máy (`observatory/observatory.db` cạnh cấu hình của tunelo;
+Windows `%LOCALAPPDATA%\tunelo\observatory\`; thư mục 0700, tệp 0600). Server chat không nhận gì. Bảng dưới là phần tab Quan sát (Live Map,
+[ADR 0027](../adr/0027-observatory-live-map.md)) thêm vào DB và vào đường gửi tới thiết bị; khung gửi đi: [`observatory-wire.md`](../observatory-wire.md).
+Mọi trường dẫn xuất dưới đây được tính trong bộ lọc riêng tư, lúc payload gốc của hook còn trong bộ nhớ, rồi payload bị bỏ; chúng có mặt cả khi dự án
+tắt nội dung và không chứa đường dẫn, lệnh hay chữ của người dùng.
+
+| Dữ liệu | Nơi lưu | Giữ bao lâu | Cơ sở |
+|---|---|---|---|
+| Trạm của lời gọi tool (một trong mười mã: `CORE`, `ORCHESTRATOR`, `FILES`, `MEMORY`, `SKILLS`, `MCP`, `EXTERNAL`, `SANDBOX`, `TESTING`, `GIT`) và cờ của nó (commit, push, deploy, ghi tệp, ghi tệp hướng dẫn hay bộ nhớ, "ước lượng" khi trạm suy từ đích đã lọc) | `tool_calls.station`, `tool_calls.station_flags` | Như dòng `tool_calls`: 90 ngày rồi chỉ còn tổng theo ngày; `tunelo observatory delete` xoá hết | ĐY (người dùng bật Observatory trên máy của mình) |
+| Khoá của tệp mà tool đọc hoặc ghi: HMAC-SHA-256 của đường dẫn đầy đủ (thư mục nhà thành `~`) dưới muối riêng của máy, cắt 16 byte; chỉ để biết hai lần đọc là cùng một tệp, không suy ngược ra tên tệp khi không có muối | `tool_calls.target_key`; muối 32 byte ngẫu nhiên ở `target-key.salt` trong thư mục Observatory (0600) | Khoá: như dòng `tool_calls`. Muối: tới khi `tunelo observatory delete` (xoá cùng DB, lần sau tạo muối mới nên khoá cũ không nối được với khoá mới); muối không bao giờ nằm trong bản xuất (`tunelo observatory export`) hay rời máy | ĐY |
+| Trang đọc của tool Read (dòng bắt đầu, số dòng) | `tool_calls.read_offset`, `tool_calls.read_limit` | Như dòng `tool_calls` | ĐY |
+| Sự kiện vòng đời của phiên: xin quyền, quyết định, từ chối, hook chặn, nén ngữ cảnh bắt đầu và xong, hết lượt, lượt lỗi, thông báo, đổi model, đổi chế độ quyền, số todo (chỉ ba số chờ / đang làm / xong, không chữ của mục), lỗi API, server MCP kết nối. Mỗi dòng chỉ có loại, id phiên, id subagent, id lời gọi tool, trạm, một nhãn ngắn mà bộ lọc đã giữ (tên tool, model, lý do), một số và một cờ | `session_events` | 90 ngày, không vào tổng theo ngày; `tunelo observatory delete` xoá | ĐY |
+| Sự kiện OTel `api_error` của Claude Code: model, mã trạng thái HTTP, lần thử, thời lượng (chỉ các trường này qua danh sách cho phép của bộ nhận) | `session_events` (loại `api_error`) | Như dòng trên | ĐY |
+| Phát hiện điểm nghẽn: phiên, mã quy tắc, khoá phụ (tên tool, model hay server MCP), trạm, mức, trạng thái mở/đóng, các mốc thời gian, giá trị, ngưỡng, số mẫu, và tối đa vài id sự kiện làm bằng chứng (không nội dung) | `bottlenecks` | 90 ngày; `tunelo observatory delete` xoá | ĐY |
+| Phiên bản schema thấp nhất đọc được DB (`min_reader_version`), không có dữ liệu cá nhân | `meta` | Như DB | ĐY |
+
+**Đọc đuôi spool.** Spool của hook vào DB trễ 5 đến 75 giây. Chỉ khi có thiết bị đang xem một phiên, agent đọc phần chưa nạp của tệp spool của phiên đó
+và phát sự kiện tạm cho thiết bị; nó không ghi đĩa, không sửa hay xoá tệp, vị trí đọc chỉ nằm trong bộ nhớ và mất khi không còn ai xem. Bản ghi trong
+DB thay sự kiện tạm cùng id.
+
+**Khung sự kiện không mang nội dung.** Khung Observatory tới thiết bị (qua kênh mã hoá đầu cuối giữa thiết bị và máy) chỉ có nhãn, số và id, dù sự kiện
+đọc từ DB hay từ đuôi spool. Nội dung đã che (lệnh, đường dẫn, đoạn kết quả) chỉ tới thiết bị khi người xem bấm một sự kiện: thiết bị xin theo id, agent
+đọc từ DB và áp công tắc nội dung của dự án (`tunelo observatory content <thư mục> off`), nên dự án đã tắt nội dung không gửi gì, kể cả cho sự kiện đã
+lưu trước khi tắt. "Ẩn chi tiết" trên thiết bị (nhớ trong `localStorage`) còn giấu tên tệp, tên miền, lệnh, tên tool MCP và email trên màn hình.
+
 ## Cố vấn trên máy và thiết bị của người dùng
 
 Cố vấn ([ADR 0020](../adr/0020-advisor-mascot-jev.md)) chạy trên máy của người dùng (agent `tunelo`) và trong trình duyệt; server chat chỉ giữ hồ sơ ở bảng trên và chuyển một thông báo đẩy không nội dung ("Cố vấn đã trả lời" kèm tên máy, giống thông báo "cần bạn").

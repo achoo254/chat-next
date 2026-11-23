@@ -107,7 +107,7 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   tin mới sau thẻ, không bao giờ mang lệnh `/` hay `!`.
 - **Văn phòng:** Cố vấn ngồi ghế đầu bàn Phòng họp (`meeting-0`) khi chế độ tự động bật, không theo lịch sống, không trò chuyện; bố cục tầng không
   đổi để giữ ảnh đã bake. Khung không mang tên hay ngoại hình: web lấy từ hồ sơ của người xem. Mọi cảnh suy từ journal nên dựng lại được
-  ([`office-wire.md`](../office-wire.md)).
+  (`office-wire.md` (đã gỡ cùng văn phòng, còn trong lịch sử git)). Văn phòng đã được thay bằng Live Map ([ADR 0027](./0027-observatory-live-map.md)), không có chỗ cho Cố vấn.
 - **Thứ tự phát hành: server → web → tunelo.** Web phát hành trước biết bỏ vai trò văn phòng lạ và thread ADVISOR; tunelo mới chỉ gửi những thứ đó
   cho thiết bị báo đã biết (`OfficeWatch.advisor_role`, `ThreadList.advisor`). Web mới gặp tunelo cũ thì mascot ngủ kèm "Máy cần cập nhật tunelo".
 

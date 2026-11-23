@@ -1,6 +1,6 @@
 # ADR 0021: Văn phòng một mặt bằng bốn khu, tài sản bake theo khu và cache bền
 
-- Trạng thái: Đã chấp nhận
+- Trạng thái: Bị thay thế bởi [ADR 0027](./0027-observatory-live-map.md) ngày 23/11/2026: tab Quan sát (Live Map 2D) thay văn phòng, mã và tài sản văn phòng đã gỡ khỏi repo. Phần dưới chỉ còn là lịch sử.
 - Ngày: 2026-11-17
 - Thay phần "toà nhà nhiều tầng" của [ADR 0018](./0018-office-view-babylon-normalized-agent-stream.md) và phần "tầng 4" của [ADR 0019](./0019-office-living-floor-and-resident-talks.md). Phần còn lại của hai ADR (luồng sự kiện chuẩn hoá, bảng phòng và tín hiệu, lịch sống, trò chuyện viết sẵn) giữ nguyên.
 

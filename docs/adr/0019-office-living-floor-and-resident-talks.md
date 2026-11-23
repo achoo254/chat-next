@@ -1,6 +1,6 @@
 # ADR 0019: Văn phòng AI sống 24/7: tầng sinh hoạt, lịch theo giờ người xem, trò chuyện viết sẵn
 
-- Trạng thái: Đã chấp nhận
+- Trạng thái: Bị thay thế bởi [ADR 0027](./0027-observatory-live-map.md) ngày 23/11/2026: tab Quan sát (Live Map 2D) thay văn phòng, mã và tài sản văn phòng đã gỡ khỏi repo. Phần dưới chỉ còn là lịch sử.
 - Ngày: 2026-11-16
 - Bổ sung [ADR 0018](./0018-office-view-babylon-normalized-agent-stream.md).
 
@@ -41,7 +41,7 @@ chỉ dùng dữ kiện agent đã chuẩn hoá, không gọi model khi chạy.
 
 - **Cư dân qua lần tải lại**: `OfficeState.residents` (proto chỉ thêm) mang tối đa 32 nhân viên đã rời trong phiên, chỉ các trường `OfficeActor` vốn đã
   gửi. Web mở văn phòng mới thì tuyển lại họ theo thứ tự vào rồi cho thành cư dân ngoài giờ, nên tên và số thứ tự như thiết bị xem từ đầu
-  ([`office-wire.md`](../office-wire.md) mục 3).
+  (`office-wire.md` (đã gỡ cùng văn phòng, còn trong lịch sử git) mục 3).
 - **Nhãn dịch vụ**: agent phân loại lệnh nền ngay trên máy (cùng phép đọc lệnh với phân phòng) thành 7 nhóm, kèm cổng ghi trên dòng lệnh và lúc chạy
   (`OfficeActor.service`); chỉ enum, số cổng và thời điểm rời máy. Web gọi máy theo nhóm ("Máy chủ dev") với bong bóng "Máy chủ dev · cổng 5173 · 12 phút".
   Máy chủ dev, theo dõi test và cơ sở dữ liệu chạy tới khi bị dừng nên không bao giờ "Chạy lâu" hay ngủ gật; build, CI, git, script vẫn theo luật kẹt 5 phút.
