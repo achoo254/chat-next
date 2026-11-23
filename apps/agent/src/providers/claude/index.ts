@@ -25,7 +25,7 @@ import {
 import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
 import { TERMINAL_ADVISOR_MCP_SERVER } from "../../mcp/session-mcp-server.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
-import { sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
+import { loopbackNoProxy, sessionMcpHttp, sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
 import { redactDeep } from "../../mcp/redact.ts";
 import { ADVISOR_OFF_REFUSAL } from "../../advisor/advisor-tools.ts";
 import { ADVISOR_GIT_ONLY, ADVISOR_ONLY_TOOLS, CLAUDE_ADVISOR_DISALLOWED, CLAUDE_ADVISOR_TOOLS, advisorGuard, claudeOwnTool } from "../../advisor/advisor-guard.ts";
@@ -299,7 +299,7 @@ export function shellArg(arg: string): string {
  * another folder than the default is the one asked; on Windows it does not
  * (Git Bash's own environment syntax is not relied on there).
  */
-function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): string[] {
+function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: NodeJS.Platform): { args: string[]; env: Record<string, string> } {
   if (advisor.noteCommand.length === 0 || advisor.stopCommand.length === 0) throw new Error("no command for Advisor's note");
   const home = platform === "win32" ? "" : `TUNELO_HOME=${shellArg(advisor.configDir)} `;
   const settings = {
@@ -310,8 +310,14 @@ function advisorArgs(advisor: NonNullable<TerminalLaunch["advisor"]>, platform: 
     },
     permissions: { allow: [TERMINAL_ADVISOR_TOOL.fullName] },
   };
-  const mcp = { type: "stdio", ...sessionMcpLaunch({ ticket: advisor.ticket, configDir: advisor.configDir, advisorWeighOnly: true }) };
-  return ["--settings", JSON.stringify(settings), "--mcp-config", JSON.stringify({ mcpServers: { [TERMINAL_ADVISOR_MCP_SERVER]: mcp } })];
+  // The service's own endpoint when the launch may use it (the ticket then rides in the environment, and the
+  // terminal process adds loopback to NO_PROXY), else `tunelo mcp`.
+  const http = sessionMcpHttp(advisor);
+  const mcp = http?.config ?? { type: "stdio", ...sessionMcpLaunch({ ticket: advisor.ticket, configDir: advisor.configDir, advisorWeighOnly: true }) };
+  return {
+    args: ["--settings", JSON.stringify(settings), "--mcp-config", JSON.stringify({ mcpServers: { [TERMINAL_ADVISOR_MCP_SERVER]: mcp } })],
+    env: http?.env ?? {},
+  };
 }
 
 /**
@@ -338,23 +344,36 @@ export function terminalCommand(bin: string, req: TerminalLaunch, newId: () => s
   if (req.model && CLAUDE_CAPABILITIES.models.some((m) => m.id === req.model)) args.push("--model", req.model);
   if (req.effort && CLAUDE_CAPABILITIES.effortLevels.includes(req.effort)) args.push("--effort", req.effort);
   if (req.permissionMode && CLAUDE_CAPABILITIES.permissionModes.includes(req.permissionMode)) args.push("--permission-mode", req.permissionMode);
-  if (req.advisor) args.push(...advisorArgs(req.advisor, platform));
+  const advisor = req.advisor ? advisorArgs(req.advisor, platform) : undefined;
+  if (advisor) args.push(...advisor.args);
   else args.push("--settings", TURN_END_SETTINGS);
   return {
     file: bin,
     args,
-    env: req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {},
+    env: { ...(req.account ? { CLAUDE_CONFIG_DIR: req.account.dir } : {}), ...advisor?.env },
     ...(sessionId ? { sessionId } : {}),
     ...(req.advisor ? { advisorTool: TERMINAL_ADVISOR_TOOL } : {}),
   };
 }
 
 /**
- * tunelo's own MCP in a session: `tunelo mcp` over stdio, with the
- * session's ticket. It holds no token; the service adds them.
+ * tunelo's own MCP in a session: the service's endpoint over HTTP when it
+ * serves one (the ticket in claude's environment, see sessionMcpEnv), else
+ * `tunelo mcp` over stdio with the session's ticket. It holds no token; the
+ * service adds them.
  */
 export function sessionMcpServer(mcp: SessionMcp): McpServerConfig {
-  return { type: "stdio", ...sessionMcpLaunch(mcp) };
+  return sessionMcpHttp(mcp)?.config ?? { type: "stdio", ...sessionMcpLaunch(mcp) };
+}
+
+/**
+ * What claude's environment needs for sessionMcpServer: the ticket its HTTP
+ * config names and loopback in NO_PROXY (a proxy would carry the ticket);
+ * nothing for stdio.
+ */
+export function sessionMcpEnv(mcp: SessionMcp | undefined, base: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const http = mcp ? sessionMcpHttp(mcp) : undefined;
+  return http ? { ...http.env, ...loopbackNoProxy(base) } : {};
 }
 
 /** How much of a tool's input an approval card shows. */
@@ -801,6 +820,10 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
   if (policy.account) options.env = claudeEnv(policy.account.dir);
   // Claude Code runs this before every Bash command: the secrets a running command may read (secret-env.ts).
   if (secrets) options.env = { ...(options.env ?? claudeEnv(undefined)), CLAUDE_ENV_FILE: secrets.loader };
+  // tunelo's MCP over HTTP: its config names the ticket, the environment holds it (never argv).
+  const baseEnv = options.env ?? claudeEnv(undefined);
+  const mcpEnv = sessionMcpEnv(policy.sessionMcp, baseEnv);
+  if (Object.keys(mcpEnv).length > 0) options.env = { ...baseEnv, ...mcpEnv };
   if (policy.model) options.model = policy.model;
   if (policy.effort) options.effort = policy.effort as EffortLevel;
   // An Advisor session stays in Claude's default mode: no mode, bypass or rule from anywhere else.

@@ -27,7 +27,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, TerminalAvailability, TerminalUpdateHoldReason, type TermListResultSchema } from "@achoo254/chat-proto/remote/remote";
 import { fromBase64Url, toBase64Url } from "@achoo254/chat-remote-protocol";
 import { type ConfigStore, deviceLabel } from "../config.ts";
-import { AgentError, type AgentCore, type OrphanVerdict, type TerminalSpec } from "../core/agent-core.ts";
+import { AgentError, type AgentCore, type OrphanVerdict, type TerminalLaunchOptions, type TerminalSpec } from "../core/agent-core.ts";
 import type { ShellEnv } from "../providers/types.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
 import { type ChildProcess, childProcesses } from "./child-processes.ts";
@@ -96,6 +96,9 @@ export class TokenBucket {
   }
 }
 
+/** The control minor from which the terminal process takes `TUNELO_MCP_HTTP_TICKET` in an open's env. */
+export const HTTP_TICKET_MINOR = 2;
+
 /**
  * The threads whose AI a device opens in the terminal (the agent core). The
  * device names a thread only; what runs comes from `launch`. Sessions are
@@ -104,7 +107,7 @@ export class TokenBucket {
  */
 export interface AiTerminals {
   /** What to run for the thread's AI; throws (an AgentError) when it cannot run there now. */
-  launch(threadId: string): Promise<TerminalSpec>;
+  launch(threadId: string, opts?: TerminalLaunchOptions): Promise<TerminalSpec>;
   sessionOf(threadId: string, pid: number): number | undefined;
   /** "" when no thread's AI runs in it. */
   threadOf(session: number, pid: number): string;
@@ -129,7 +132,7 @@ export interface AiTerminals {
 /** The core as the terminal sees it. */
 export function aiTerminalsOf(core: AgentCore, programs: (pid: number) => Promise<ChildProcess[] | undefined> = childProcesses): AiTerminals {
   return {
-    launch: (threadId) => core.terminalLaunch(threadId),
+    launch: (threadId, opts) => core.terminalLaunch(threadId, opts),
     sessionOf: (threadId, pid) => core.terminalSession(threadId, pid),
     threadOf: (session, pid) => core.terminalThread(session, pid),
     started: (threadId, session, pid) => core.terminalStarted(threadId, session, pid),
@@ -190,6 +193,8 @@ export class TerminalService {
   private auditPid = 0;
   private auditSeq = 0;
   private hostPid = 0;
+  /** The control minor of the terminal process that answered the last hello. */
+  private hostMinor = 0;
   /** Connections listed by the last hello that this run does not hold; closed when the grace ends. */
   private orphans = new Set<number>();
   private orphanTimer: ReturnType<typeof setTimeout> | undefined;
@@ -374,7 +379,8 @@ export class TerminalService {
       await this.ensure();
       const running = ai.sessionOf(threadId, this.hostPid);
       if (running !== undefined) return running;
-      const { shell, args, cwd, env: vars } = await ai.launch(threadId);
+      // A terminal process older than HTTP_TICKET_MINOR (kept running past an update) refuses the ticket in env.
+      const { shell, args, cwd, env: vars } = await ai.launch(threadId, { httpTicket: this.hostMinor >= HTTP_TICKET_MINOR });
       const withVars = Object.keys(vars).length > 0 ? { env: vars } : {};
       let session: unknown;
       try {
@@ -543,6 +549,7 @@ export class TerminalService {
 
   private onReady(hello: HelloResult): void {
     this.hostPid = hello.pid;
+    this.hostMinor = hello.minor;
     this.opts.log(`terminal: connected (terminal process ${hello.daemonVersion}, ${hello.sessions.length} session(s))`);
     this.opts.ai?.alive(hello.pid, new Set(hello.sessions.filter((s) => s.exited === undefined).map((s) => s.session)));
     this.audit(hello.pendingAudit);

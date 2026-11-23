@@ -1,8 +1,11 @@
 /**
- * Tickets of the AI sessions tunelo opens. Each session's `tunelo mcp`
- * gets one in `TUNELO_MCP_TICKET`, so the service knows which session a
- * tool call comes from. A ticket only names a session: it is no credential
- * and never turns into a token. It ends with the session.
+ * Tickets of the AI sessions tunelo opens. A session presents its ticket to
+ * the service's MCP endpoint (`TUNELO_MCP_HTTP_TICKET` in the AI's
+ * environment) or hands it to its `tunelo mcp` (`TUNELO_MCP_TICKET`), so the
+ * service knows which session a tool call comes from. A ticket never turns
+ * into a token of an app, but it is a bearer: whoever holds it runs the
+ * session's read tools, and its writes once approved on the device. It ends
+ * with the session.
  */
 import { randomBytes } from "node:crypto";
 import type { SessionSecretHooks } from "../sign-in-secrets/secret-env.ts";
@@ -12,6 +15,11 @@ export interface SessionMcp {
 	ticket: string;
 	/** tunelo's config folder, for the `tunelo mcp` the session starts. */
 	configDir: string;
+	/**
+	 * The service's own MCP endpoint (session-mcp-http.ts): the session connects
+	 * there instead of starting `tunelo mcp`; absent where it does not serve one.
+	 */
+	url?: string;
 	/** The user approved this call of a write tool on the device: the service lets it run once. */
 	approveWrite(exposed: string, input: Record<string, unknown>): void;
 	/** One line for a write's approval card (recipient, URL); undefined to keep the default. */
@@ -39,6 +47,13 @@ export interface SessionMcpLease extends SessionMcp {
 }
 
 export const TICKET_ENV = "TUNELO_MCP_TICKET";
+/**
+ * The ticket in the AI's own environment for the service's MCP endpoint,
+ * which its MCP config names as `${TUNELO_MCP_HTTP_TICKET}`. Not TICKET_ENV:
+ * a `tunelo mcp` the user added to the CLI inherits the AI's environment
+ * and must not take the session's ticket for its own.
+ */
+export const HTTP_TICKET_ENV = "TUNELO_MCP_HTTP_TICKET";
 /** Set ("1") for an Advisor thread's `tunelo mcp`: it lists Advisor's tools and nothing else. */
 export const ADVISOR_MCP_ENV = "TUNELO_MCP_ADVISOR";
 /** Set ("1") for the `tunelo mcp` of a CLI in a terminal: it lists advisor_weigh and nothing else. */

@@ -1,4 +1,4 @@
-import type { CallToolResult, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import type { Command } from "commander";
@@ -13,24 +13,18 @@ import {
 	resolveServerUrl,
 } from "../tunnels/server-url.js";
 import { AGENT_VERSION } from "../version.ts";
-import { TOOL_GROUPS, ToolTable } from "./groups.js";
-import { LocalTunnels } from "./local-tunnels.js";
 import { type McpContext, createMcpContext } from "./mcp-context.js";
 import type { OfferedTool } from "./mcp-host.ts";
 import { failure } from "./mcp-result.js";
 import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { redactMessage } from "./redact.js";
 import { ADVISOR_MCP_ENV, ADVISOR_WEIGH_MCP_ENV, TICKET_ENV } from "./session-tickets.js";
-import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
-import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
-import { ADVISOR_GROUP, registerAdvisorTools } from "../advisor/advisor-tools.ts";
+import { type ToolArgs, type ToolMode, registerSessionTools } from "./session-tool-registry.ts";
 
 const NOT_RUNNING =
 	"tunelo is not running in the background: run `tunelo login`, then call the tool again.";
 /** How long the list waits for the service to name the Chat and Localman tools. */
 const REMOTE_LIST_WAIT_MS = 8_000;
-
-type ToolArgs = Record<string, unknown>;
 
 /**
  * This client's session in the background service. It lasts while the
@@ -91,19 +85,12 @@ function isToolResult(value: unknown): value is CallToolResult {
 	);
 }
 
-/** Arguments as the server's JSON Schema advertises them; the server itself validates them. */
-function advertisedSchema(schema: Record<string, unknown>): StandardSchemaWithJSON<ToolArgs> {
-	return {
-		"~standard": {
-			version: 1,
-			vendor: "tunelo",
-			validate: (value) =>
-				typeof value === "object" && value !== null && !Array.isArray(value)
-					? { value: value as ToolArgs }
-					: { issues: [{ message: "Tool arguments must be a JSON object" }] },
-			jsonSchema: { input: () => schema, output: () => schema },
-		},
-	};
+/** What the session that started this process lets it list, from the environment it was given. */
+function toolModeFromEnv(ticket: string | undefined): ToolMode {
+	if (!ticket) return "local";
+	if (process.env[ADVISOR_WEIGH_MCP_ENV] === "1") return "weigh";
+	if (process.env[ADVISOR_MCP_ENV] === "1") return "advisor";
+	return "session";
 }
 
 /**
@@ -185,71 +172,11 @@ export function registerMcpCommand(program: Command): void {
 
 			// Advisor's own session lists Advisor's tools and nothing else; the AI's CLI in a terminal lists advisor_weigh
 			// alone (the service refuses the rest anyway).
-			const weighOnly = ticket !== undefined && process.env[ADVISOR_WEIGH_MCP_ENV] === "1";
-			const advisorOnly = ticket !== undefined && (process.env[ADVISOR_MCP_ENV] === "1" || weighOnly);
-			// A client that may not write does not see write tools (the service refuses them anyway).
+			const mode = toolModeFromEnv(ticket);
+			const advisorOnly = mode === "advisor" || mode === "weigh";
 			const offered = advisorOnly ? { tools: [], writes: false } : await offeredTools(dir, context, ticket);
 			if (!offered.writes && !advisorOnly) context.log(LOCAL_WRITES_OFF);
-
-			// The tunnel tools come from the same table the service runs.
-			for (const group of TOOL_GROUPS) {
-				if (!group.register || advisorOnly) continue;
-				const table = new ToolTable();
-				group.register(table, { context, tunnels: new LocalTunnels(context) });
-				for (const [name, config] of table.entries()) {
-					if (!offered.writes && group.writeTools.includes(name)) continue;
-					const { title, description, annotations, inputSchema } = config;
-					if (inputSchema) {
-						server.registerTool(
-							name,
-							{ title, description, inputSchema, ...(annotations ? { annotations } : {}) },
-							(args: ToolArgs) => forward(group.name, name, args),
-						);
-					} else {
-						server.registerTool(
-							name,
-							{ title, description, ...(annotations ? { annotations } : {}) },
-							() => forward(group.name, name, {}),
-						);
-					}
-				}
-			}
-
-			// Sign-in secrets, the tunelo browser and Advisor: only a session tunelo opened has a device to ask and a thread.
-			if (ticket) {
-				const all: [string, (t: ToolTable) => void][] = [
-					[SECRETS_GROUP, (t) => registerSecretTools(t)],
-					[BROWSER_GROUP, (t) => registerBrowserTools(t)],
-					[ADVISOR_GROUP, (t) => registerAdvisorTools(t, undefined, advisorOnly && !weighOnly ? "advisor-session" : "work-session")],
-				];
-				const groups = advisorOnly ? all.filter(([group]) => group === ADVISOR_GROUP) : all;
-				for (const [group, register] of groups) {
-					const table = new ToolTable();
-					register(table);
-					for (const [name, config] of table.entries()) {
-						const { title, description, annotations, inputSchema } = config;
-						if (!inputSchema) continue;
-						server.registerTool(
-							name,
-							{ title, description, inputSchema, ...(annotations ? { annotations } : {}) },
-							(args: ToolArgs) => forward(group, name, args),
-						);
-					}
-				}
-			}
-
-			for (const tool of offered.tools) {
-				server.registerTool(
-					tool.exposed,
-					{
-						...(tool.title ? { title: tool.title } : {}),
-						description: tool.description,
-						inputSchema: advertisedSchema(tool.inputSchema),
-						...(tool.annotations ? { annotations: tool.annotations } : {}),
-					},
-					(args: ToolArgs) => forward(tool.group, tool.name, args),
-				);
-			}
+			registerSessionTools(server, { mode, context, offered, forward });
 
 			let exiting = false;
 			const shutdown = (): void => {

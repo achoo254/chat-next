@@ -183,6 +183,11 @@ type ThreadMeta = {
 
 /** What the terminal process runs for a thread's AI in its terminal (see TerminalRunner). */
 export type TerminalSpec = { shell: string; args: string[]; cwd: string; env: Record<string, string> };
+/** What the running terminal process can take for a launch. */
+export type TerminalLaunchOptions = {
+  /** The session's ticket may ride in the CLI's environment (tunelo's MCP over HTTP); else `tunelo mcp` over stdio. */
+  httpTicket?: boolean;
+};
 
 /** A session kept on the machine, as devices see it (LocalSession in the protocol). */
 export type LocalSessionView = LocalSession & { threadId: string; busyElsewhere: boolean; sensitive: boolean };
@@ -2475,6 +2480,7 @@ export class AgentCore {
           sessionMcp: {
             ticket: lease.ticket,
             configDir: lease.configDir,
+            ...(lease.url ? { url: lease.url } : {}),
             approveWrite: lease.approveWrite,
             describeWrite: lease.describeWrite,
             advisorAllowed,
@@ -3285,7 +3291,7 @@ export class AgentCore {
    * terminal writes to it. Refused while a turn runs here or elsewhere, and
    * while another process of the AI has the session open even idle.
    */
-  async terminalLaunch(threadId: string): Promise<TerminalSpec> {
+  async terminalLaunch(threadId: string, opts: TerminalLaunchOptions = {}): Promise<TerminalSpec> {
     const t = this.thread(threadId);
     this.notOnAdvisor(t, "open in a terminal");
     const provider = this.provider(t.meta.provider);
@@ -3325,7 +3331,7 @@ export class AgentCore {
     t.launching = true;
     // A launch that never reported back gives way to this one.
     this.releaseLease(t, "launchLease");
-    const lease = this.terminalAdvisorLease(t, provider);
+    const lease = this.terminalAdvisorLease(t, provider, opts.httpTicket === true);
     let command: Awaited<ReturnType<TerminalRunner["command"]>>;
     try {
       command = await provider.terminal.command({
@@ -3375,14 +3381,14 @@ export class AgentCore {
    * whether or not automatic Advisor is on now, so turning it on works from
    * the next message without opening the CLI again.
    */
-  private terminalAdvisorLease(t: Thread, provider: AgentProvider): { lease: SessionMcpLease; advisor: NonNullable<TerminalLaunch["advisor"]> } | undefined {
+  private terminalAdvisorLease(t: Thread, provider: AgentProvider, httpTicket: boolean): { lease: SessionMcpLease; advisor: NonNullable<TerminalLaunch["advisor"]> } | undefined {
     if (provider.capabilities.terminalAdvisor !== true || !this.sessionMcpEnabled() || this.opts.advisorKeySet?.() !== true) return undefined;
     const noteCommand = advisorNoteCommand(t.meta.id);
     const stopCommand = advisorStopCommand(t.meta.id);
     if (!noteCommand || !stopCommand) return undefined;
     const lease = this.opts.sessionMcp?.(t.meta.id, "advisor-weigh");
     if (!lease) return undefined;
-    return { lease, advisor: { ticket: lease.ticket, configDir: lease.configDir, noteCommand, stopCommand } };
+    return { lease, advisor: { ticket: lease.ticket, configDir: lease.configDir, ...(lease.url && httpTicket ? { url: lease.url } : {}), noteCommand, stopCommand } };
   }
 
   /** Ends a ticket of the thread's CLI in a terminal (running, or being started), if any. */

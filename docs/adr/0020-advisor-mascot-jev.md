@@ -73,7 +73,8 @@ mã hoá đầu cuối (ADR 0013), không AI nào được gắn cứng (ADR 001
   bỏ dở, thread bị xoá hay dịch vụ dừng); máy không có khoá thì lệnh terminal giữ nguyên như trước Cố vấn, và khoá đặt sau khi terminal đã mở
   có tác dụng từ lần mở terminal kế tiếp. Có vé thì `terminalCommand` thêm vào cùng một chuỗi `--settings` hook `UserPromptSubmit` chạy
   `tunelo advisor note <thread>` và quyền cho sẵn `mcp__tunelo-advisor__advisor_weigh`, rồi `--mcp-config` với server **`tunelo-advisor`**
-  (`tunelo mcp` mang vé và `TUNELO_MCP_ADVISOR_WEIGH=1`). Tên riêng, không phải `tunelo`, để MCP `tunelo` người dùng tự thêm
+  (từ 23/11/2026 là endpoint HTTP loopback của dịch vụ với vé trong biến môi trường, [ADR 0026](./0026-session-mcp-over-loopback-http.md); dự phòng là
+  `tunelo mcp` mang vé và `TUNELO_MCP_ADVISOR_WEIGH=1`). Tên riêng, không phải `tunelo`, để MCP `tunelo` người dùng tự thêm
   (`claude mcp add tunelo -- tunelo mcp`) vẫn chạy song song, không bên nào che bên nào; chỉ dẫn gửi cho CLI này nêu đúng tên đầy đủ
   `mcp__tunelo-advisor__advisor_weigh` (phiên chat giữ `tunelo`). Vé phạm vi này chỉ có `advisor_weigh`: dịch vụ từ chối mọi nhóm khác (bí
   mật, trình duyệt, Chat, Localman, đường hầm, `advisor_git`/`advisor_grep`) và không liệt kê tool của app.

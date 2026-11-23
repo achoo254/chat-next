@@ -29,6 +29,7 @@ Mỗi ADR trong [`adr/`](./adr/) ghi một quyết định mà sửa về sau ph
 | [0019 Tầng sinh hoạt và trò chuyện](./adr/0019-office-living-floor-and-resident-talks.md) | Nhân vật sống 24/7 theo lịch giờ người xem, bỏ tan ca, trò chuyện viết sẵn điền bằng dữ kiện chuẩn hoá, ngủ gật khi kẹt. |
 | [0021 Văn phòng một mặt bằng và cache tài sản](./adr/0021-office-single-plan-and-asset-cache.md) | Bốn khu trên một mặt bằng, bỏ thang máy và thanh tầng, tài sản bake theo khu, cache bền ở máy người xem |
 | [0020 Cố vấn (Jev)](./adr/0020-advisor-mascot-jev.md) | Mascot trên mọi màn, ngữ cảnh copy chỉ gửi khi người dùng đính, phiên Cố vấn chỉ đọc do tunelo ép theo (máy, thư mục, AI), Jev bằng khoá TypeSafe BYOK trên máy, chế độ tự động theo phiên. |
+| [0026 MCP của phiên qua HTTP loopback](./adr/0026-session-mcp-over-loopback-http.md) | Dịch vụ tunelo tự phục vụ MCP cho phiên nó mở trên `127.0.0.1`, xác thực bằng vé phiên nằm trong biến môi trường (không argv); bỏ tiến trình `tunelo mcp` khoảng 45 MB mỗi phiên, stdio còn làm dự phòng và cho ACP. |
 | [0022 Chat Bridge](./adr/0022-chat-bridge.md) | Đưa chat của ứng dụng khác (Telegram trước) vào Chat, và gửi từ Chat sang đó theo từng chat: adapter Go, người dùng ảo, đường ghi nội bộ `ImportTx`, khoá chống trùng, không tải thêm lịch sử cũ. |
 
 Đổi một quyết định: viết ADR mới mang số kế tiếp, ghi ADR cũ là "Bị thay thế bởi ADR NNNN" trong dòng trạng thái, và làm theo mục "Cách thay đổi" của ADR cũ.

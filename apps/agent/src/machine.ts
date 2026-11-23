@@ -248,7 +248,8 @@ export class Machine {
       log: this.log,
       deny: new ForwardDenyList({
         configDir: dir,
-        ownPorts: () => (this.port ? [this.port] : []),
+        // The device link, and the MCP endpoint of the sessions (session-mcp-http.ts).
+        ownPorts: () => [this.port, portOf(this.opts.mcp?.httpUrl)].filter((p): p is number => p !== undefined && p > 0),
         extraPorts: () => forwardSettings.read().blockedPorts,
         ideLockDirs: () => this.providers.flatMap((p) => p.ideLockDirs?.() ?? []),
         log: this.log,
@@ -841,6 +842,13 @@ function refusalReason(verdict: string): string {
   return "not a device of the machine's account";
 }
 
+/** The port of a local URL; undefined without one. */
+function portOf(url: string | undefined): number | undefined {
+  if (!url) return undefined;
+  const port = Number(new URL(url).port);
+  return Number.isInteger(port) && port > 0 ? port : undefined;
+}
+
 /**
  * A new session's MCP: a ticket of `mcp` for the thread, ended with the
  * session; none when the machine turned tunelo's MCP off (`sessionMcp: false`).
@@ -858,10 +866,13 @@ export function sessionMcpFor(
   return (threadId, scope = "session") => {
     if (config.get().sessionMcp === false) return undefined;
     const ticket = mcp.tickets.issue(threadId, scope);
+    // Served by this process when it listens; otherwise the session starts `tunelo mcp`.
+    const url = mcp.httpUrl ? { url: mcp.httpUrl } : {};
     if (scope === "advisor-weigh") {
       return {
         ticket,
         configDir: config.dir,
+        ...url,
         advisorWeighOnly: true,
         // advisor_weigh is never a write: nothing to approve or describe.
         approveWrite: () => undefined,
@@ -880,6 +891,7 @@ export function sessionMcpFor(
     return {
       ticket,
       configDir: config.dir,
+      ...url,
       approveWrite: (exposed, input) => mcp.approve(ticket, exposed, input),
       describeWrite: (exposed, input) => mcp.describeWrite(exposed, input),
       ...(env ? { secrets: env } : {}),

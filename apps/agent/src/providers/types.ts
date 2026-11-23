@@ -471,14 +471,14 @@ export type TerminalLaunch = {
    * (`tunelo advisor note <thread>`, reading the hook's JSON on stdin).
    * Unset when the machine runs no session MCP.
    */
-  advisor?: { ticket: string; configDir: string; noteCommand: string[]; stopCommand: string[] };
+  advisor?: { ticket: string; configDir: string; url?: string; noteCommand: string[]; stopCommand: string[] };
 };
 
 /** The program the terminal process runs for a TerminalLaunch: argv, never a shell line. */
 export type TerminalCommand = {
   file: string;
   args: string[];
-  /** Environment the AI needs; only names the terminal process accepts (see ShellEnv). */
+  /** Environment the AI needs; only names the terminal process accepts (ShellEnv, and TUNELO_MCP_TICKET). */
   env: Record<string, string>;
   /** The new session's id, when the CLI lets the caller pick it (so the thread knows it at once). */
   sessionId?: string;

@@ -139,7 +139,7 @@ function terminalAi(opts: { terminalAdvisor?: boolean; command?: (req: TerminalL
   return { provider, launches, transcript };
 }
 
-function machine(ai = terminalAi(), more: { sessionMcpEnabled?: () => boolean; key?: boolean } = {}) {
+function machine(ai = terminalAi(), more: { sessionMcpEnabled?: () => boolean; key?: boolean; url?: string } = {}) {
   const leases: Lease[] = [];
   const { core, work } = makeCore([ai.provider], {
     sessionMcp: (threadId, scope) => {
@@ -148,6 +148,7 @@ function machine(ai = terminalAi(), more: { sessionMcpEnabled?: () => boolean; k
       return {
         ticket: lease.ticket,
         configDir: "/cfg",
+        ...(more.url ? { url: more.url } : {}),
         approveWrite: () => undefined,
         describeWrite: async () => undefined,
         release: () => {
@@ -177,6 +178,17 @@ describe("the ticket of the CLI in the terminal", () => {
     expect(m.leases[0]?.released).toBe(false);
     m.core.terminalEnded(1, 42);
     expect(m.leases[0]?.released).toBe(true);
+  });
+
+  it("names the service's MCP endpoint only when the terminal process takes the ticket in env (control minor 2)", async () => {
+    const m = machine(terminalAi(), { url: "http://127.0.0.1:41234/mcp" });
+    const t = await m.thread();
+    // A terminal process kept running from before the update: `tunelo mcp` over stdio, as before.
+    await m.core.terminalLaunch(t.id, { httpTicket: false });
+    expect(m.launches[0]?.advisor?.url).toBeUndefined();
+    m.core.terminalAbandoned(t.id);
+    await m.core.terminalLaunch(t.id, { httpTicket: true });
+    expect(m.launches[1]?.advisor?.url).toBe("http://127.0.0.1:41234/mcp");
   });
 
   it("ends when the launch fails, finds no CLI or is abandoned", async () => {

@@ -88,7 +88,7 @@ Khoá lạ chưa có trong danh sách làm máy hỏi Chat ngay (một heartbeat
 
 ## MCP của tunelo trong phiên claude (09/11/2026)
 
-- Phiên claude do tunelo mở có MCP `tunelo` (stdio, chính file chạy `tunelo mcp`). Có ba nhóm tool, khai báo trong danh sách tĩnh `apps/agent/src/mcp/groups.ts`:
+- Phiên claude do tunelo mở có MCP `tunelo`: từ 23/11/2026 là endpoint HTTP loopback của dịch vụ ([ADR 0026](./0026-session-mcp-over-loopback-http.md)), trước đó là stdio (chính file chạy `tunelo mcp`, nay chỉ còn làm dự phòng). Có ba nhóm tool, khai báo trong danh sách tĩnh `apps/agent/src/mcp/groups.ts`:
   - `tunnel`: 11 tool của CLI Tunelo 1.x, chạy trong dịch vụ.
   - `chat`: `chat_list_chats`, `chat_get_messages`, `chat_search_messages`, …; tool ghi `chat_send_message`.
   - `localman`: `localman_list_collections`, `localman_list_history`, `localman_list_machines`, …; tool ghi `localman_send_request`.
@@ -99,7 +99,8 @@ Khoá lạ chưa có trong danh sách làm máy hỏi Chat ngay (một heartbeat
   - Mọi chuỗi rời phía MCP đều qua một hàm che (`mcp/redact.ts`): kết quả, lỗi, danh sách tool, stderr của `tunelo mcp`, lỗi của kênh điều khiển, log. Hàm này bỏ token đã gửi, mọi chuỗi dạng JWT và `Bearer …`, kể cả khi server hay proxy đứng trước nó chép lại header.
   - Mỗi lời gọi ghi một dòng vào `agent.log`: phiên, nhóm, tool, kết quả. Không ghi tham số.
 - Vé `TUNELO_MCP_TICKET` (256 bit, mỗi phiên một vé, hết khi phiên đóng) **chỉ là định danh phiên, không phải bí mật**:
-  - claude nhận vé qua argv (`--mcp-config`), nên mọi tiến trình cùng user đọc được vé, kể cả Bash trong chính phiên.
+  - claude nhận vé qua biến môi trường `TUNELO_MCP_HTTP_TICKET` (`--mcp-config` chỉ ghi `${TUNELO_MCP_HTTP_TICKET}`, ADR 0026); trước 23/11/2026 là argv. Bash trong chính phiên vẫn đọc được vé.
+  - Từ ADR 0026, vé một mình đủ để gọi endpoint loopback, nên vé là bearer của phiên: tool đọc chạy được, tool ghi vẫn cần lần cấp duyệt.
   - Vé đã hết bị từ chối.
 - **Quyền ghi nằm ở lần cấp duyệt, giữ trong dịch vụ** (`mcp/write-approvals.ts`):
   - Tool ghi gồm `chat_send_message`, `localman_send_request`, mở/đóng tunnel, dừng tiến trình tunnel, và lượt có `confirm_token` của `revoke_linked_machine`.

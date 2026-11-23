@@ -19,6 +19,7 @@ import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
 import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
 import { McpHost } from "./mcp/mcp-host.js";
+import { serveSessionMcp } from "./mcp/session-mcp-http.ts";
 import { goOnline } from "./online.ts";
 import { startService, stopService } from "./service.ts";
 import { probeHere } from "./safety/mac-folders.ts";
@@ -82,6 +83,12 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     advisor: () => advisor(),
     isAdvisorThread: (threadId) => isAdvisorThread(threadId),
   });
+  // tunelo's MCP for the sessions this service opens, served here: no `tunelo mcp` process per session.
+  // Without it (the port could not be opened) the sessions fall back to `tunelo mcp` over stdio.
+  const mcpHttp = await serveSessionMcp(mcp, { dir, log }).catch((err: unknown) => {
+    log(`mcp http: not served, sessions start tunelo mcp (${(err as Error).message})`);
+    return undefined;
+  });
   const machine = new Machine({ config, mcp });
   secrets = () => machine.secrets;
   browser = () => machine.browser;
@@ -108,6 +115,7 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     online.stop();
     tunnels.closeAll("closed because tunelo stopped");
     mcp.endAll();
+    await mcpHttp?.close();
     stopControl();
     await machine.stop();
     process.exit(0);

@@ -43,6 +43,7 @@ import { failure } from "./mcp-result.js";
 import { RemoteProxy, type RemoteTool, identityAccess } from "./remote-proxy.js";
 import { hideSensitiveHeaders, redact, redactMessage } from "./redact.js";
 import { SessionTickets } from "./session-tickets.js";
+import type { ToolMode } from "./session-tool-registry.ts";
 import { WriteApprovals } from "./write-approvals.js";
 import { SECRETS_GROUP, SECRET_TOOLS, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import type { SecretService } from "../sign-in-secrets/secret-service.ts";
@@ -113,6 +114,13 @@ export class McpHost {
 	private readonly remote: RemoteProxy;
 	private readonly localWrites: () => boolean;
 	private readonly log: (line: string) => void;
+	private readonly releaseListeners = new Set<(ticket: string) => void>();
+	/**
+	 * Where the service serves tunelo's MCP over HTTP to the sessions it opens
+	 * (session-mcp-http.ts); undefined until it listens, and on a machine where
+	 * it could not: those sessions then start `tunelo mcp` over stdio.
+	 */
+	httpUrl: string | undefined;
 
 	constructor(
 		private readonly dir: string,
@@ -278,9 +286,29 @@ export class McpHost {
 		if (found) this.approvals.grant(ticket, found.group.name, found.tool, input);
 	}
 
+	/**
+	 * What a client presenting a live `ticket` may list (session-tool-registry.ts);
+	 * undefined for an unknown or ended ticket.
+	 */
+	toolMode(ticket: string): ToolMode | undefined {
+		const threadId = this.tickets.owner(ticket);
+		if (threadId === undefined) return undefined;
+		if (this.tickets.scope(ticket) === "advisor-weigh") return "weigh";
+		return this.advisorThread(threadId) ? "advisor" : "session";
+	}
+
+	/** Calls `listener` with each ticket as it ends; returns how to stop. */
+	onRelease(listener: (ticket: string) => void): () => void {
+		this.releaseListeners.add(listener);
+		return () => {
+			this.releaseListeners.delete(listener);
+		};
+	}
+
 	/** Ends a session's ticket and its approvals not spent. */
 	release(ticket: string): void {
 		this.tickets.revoke(ticket);
+		for (const listener of this.releaseListeners) listener(ticket);
 		this.approvals.forget(ticket);
 		this.options.secrets?.()?.endSession(ticket);
 		this.options.browser?.()?.endSession(ticket);

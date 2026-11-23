@@ -451,6 +451,33 @@ describe("tunelo's MCP in a claude session", () => {
     expect(tickets.owner(ticket)).toBeUndefined();
   });
 
+  it("connects to the service's endpoint over HTTP when it serves one: the ticket in claude's environment only, loopback past any proxy", async () => {
+    const sdk = fakeQuery();
+    const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
+    provider.detect = async () => ({ installed: true, version: "2.1.330", loginState: "ok" });
+    const tickets = new SessionTickets();
+    let ticket = "";
+    const url = "http://127.0.0.1:41234/mcp";
+    const { core, work } = makeCore([provider], {
+      sessionMcp: (threadId) => {
+        ticket = tickets.issue(threadId);
+        return { ticket, configDir: "/tmp/tunelo-config", url, approveWrite: () => undefined, describeWrite: async () => undefined, release: () => tickets.revoke(ticket) };
+      },
+    });
+    const t = await core.create({ provider: "claude", model: "", dir: work, text: "hello", consent, device: "test" });
+    await until(core, t.id, (i) => turnDone(1)(byCase(i, "turn")));
+    const options = sdk.log.options[0];
+    expect(options?.mcpServers?.tunelo).toEqual({ type: "http", url, headers: { Authorization: "Bearer ${TUNELO_MCP_HTTP_TICKET}" } });
+    expect(JSON.stringify(options?.mcpServers)).not.toContain(ticket);
+    expect(options?.env?.TUNELO_MCP_HTTP_TICKET).toBe(ticket);
+    // Not the name a `tunelo mcp` the user added reads: it would take the session's ticket for its own.
+    expect(options?.env?.TUNELO_MCP_TICKET).toBe(process.env.TUNELO_MCP_TICKET);
+    expect(options?.env?.NO_PROXY?.split(",")).toEqual(expect.arrayContaining(["127.0.0.1", "localhost"]));
+    expect(options?.env?.no_proxy).toBe(options?.env?.NO_PROXY);
+    expect(options?.hooks?.PreToolUse?.[0]?.matcher).toBe("^mcp__tunelo__");
+    await core.stop();
+  });
+
   it("is absent when the machine turned it off", async () => {
     const sdk = fakeQuery();
     const provider = createClaudeProvider({ query: sdk.fn, findBinary: async () => "claude" });
