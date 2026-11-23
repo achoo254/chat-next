@@ -177,11 +177,11 @@ export function registerObservatoryCommand(program: Command, exits: Exits): void
     .description("what Claude Code sessions on this machine did (timings, tools, tokens, cost), kept on this machine: install, status, export, delete, content");
   observatory
     .command("install")
-    .description("report Claude Code sessions started outside tunelo too: adds tunelo's hooks and OpenTelemetry settings to ~/.claude/settings.json (asks first)")
+    .description("report Claude Code sessions started outside tunelo too: adds tunelo's hooks and OpenTelemetry settings to the settings.json of your Claude folder (~/.claude, or the one CLAUDE_CONFIG_DIR names; asks first)")
     .action(exits(() => install(processTerminal())));
   observatory
     .command("uninstall")
-    .description("take tunelo's hooks and OpenTelemetry settings out of ~/.claude/settings.json, leaving the rest as it was")
+    .description("take tunelo's hooks and OpenTelemetry settings out of every settings.json an install changed, leaving the rest as it was")
     .action(exits(() => uninstallObservatoryHooks((line) => console.log(line))));
   observatory
     .command("status")

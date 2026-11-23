@@ -326,6 +326,60 @@ describe("an install record that is missing or out of date", () => {
   });
 });
 
+describe("an install made while the machine's Claude folder was another one", () => {
+  /** A second Claude folder (CLAUDE_CONFIG_DIR named it at install time), with its own settings.json. */
+  function otherFolder(m: Machine, name: string, settings: string): { home: string; file: string; deps: InstallDeps } {
+    const home = join(m.root, name);
+    mkdirSync(home, { recursive: true });
+    const file = join(home, "settings.json");
+    writeFileSync(file, settings);
+    // The profiles follow the folder in use at each run; here only the folder itself matters.
+    return { home, file, deps: m.deps({ claudeHome: home, profileHomes: () => [], syncProfile: () => undefined }) };
+  }
+
+  it("is taken out by the uninstall too, byte for byte, the machine's folder, its profiles and any other settings.json left as they are", async () => {
+    const m = machine();
+    const alt = otherFolder(m, "custom-claude", SETTINGS.replace('"sonnet"', '"opus"'));
+    const untouched = otherFolder(m, "never-installed", SETTINGS);
+    expect(await installObservatory(alt.deps)).toBe(0);
+    expect(counts(alt.file).SessionStart).toBe(1);
+    // Never written there: the hand-made copy of the hooks stays (install did not put it there).
+    writeFileSync(untouched.file, read(alt.file));
+    const handMade = read(untouched.file);
+    const machineFile = join(m.claudeHome, "settings.json");
+    expect(await uninstallObservatory(m.deps())).toBe(0);
+    expect(read(alt.file)).toBe(SETTINGS.replace('"sonnet"', '"opus"'));
+    expect(read(machineFile)).toBe(SETTINGS);
+    for (const home of m.profiles) expect(read(join(home, "settings.json"))).toBe(SETTINGS);
+    expect(read(untouched.file)).toBe(handMade);
+    expect(m.lines.at(-1)).toBe(`Observatory is uninstalled from ${alt.file}.`);
+    // Nothing recorded any more: a second uninstall finds nothing to take out.
+    expect(read(join(m.root, "data", "install-state.json"))).toBe('{"files":{}}');
+    expect(await uninstallObservatory(m.deps())).toBe(0);
+    expect(m.lines.at(-1)).toBe("Observatory was not installed for Claude Code sessions outside tunelo.");
+  });
+
+  it("whose folder is gone since is forgotten, and one that cannot be written fails the uninstall, telling where", async () => {
+    const m = machine();
+    const gone = otherFolder(m, "gone", SETTINGS);
+    const locked = otherFolder(m, "locked", SETTINGS);
+    expect(await installObservatory(gone.deps)).toBe(0);
+    expect(await installObservatory(locked.deps)).toBe(0);
+    rmSync(gone.home, { recursive: true });
+    chmodSync(locked.file, 0o444);
+    try {
+      expect(await uninstallObservatory(m.deps())).toBe(1);
+      expect(m.lines.join("\n")).toContain(locked.file);
+      expect(counts(locked.file).SessionStart).toBe(1);
+    } finally {
+      chmodSync(locked.file, 0o644);
+    }
+    expect(await uninstallObservatory(m.deps())).toBe(0);
+    expect(read(locked.file)).toBe(SETTINGS);
+    expect(read(join(m.root, "data", "install-state.json"))).toBe('{"files":{}}');
+  });
+});
+
 describe("a settings.json that is a hard link", () => {
   it("is refused by install, uninstall and a token refresh, leaving both names linked and nothing behind", async () => {
     const m = machine(null);

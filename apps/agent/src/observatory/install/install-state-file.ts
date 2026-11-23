@@ -46,6 +46,11 @@ export async function installRecord(stateFile: string, settingsFile: string): Pr
   return (await readState(stateFile)).files[settingsFile];
 }
 
+/** Every settings.json an install recorded changing and no uninstall took back yet. */
+export async function recordedSettingsFiles(stateFile: string): Promise<string[]> {
+  return Object.keys((await readState(stateFile)).files);
+}
+
 /** Replaces what is recorded for `settingsFile` with `record` (the install works out what of an earlier record still holds). */
 export async function recordInstall(stateFile: string, settingsFile: string, record: InstallRecord): Promise<void> {
   const state = await readState(stateFile);

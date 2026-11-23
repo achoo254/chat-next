@@ -145,10 +145,10 @@ export async function uninstall(dir: string, deps: UninstallDeps = defaultUninst
   const e = deps.environment;
   // Before anything is deleted: an installed hook naming a binary that is gone would only lose its events, but none is left behind.
   const hooks = await deps.removeObservatoryHooks().catch((err: unknown) => {
-    deps.log(`  Warning: could not take Observatory out of Claude Code's settings (${(err as Error).message}); run \`tunelo observatory uninstall\` before deleting tunelo, or remove its hooks from ~/.claude/settings.json.`);
+    deps.log(`  Warning: could not take Observatory out of Claude Code's settings (${(err as Error).message}); run \`tunelo observatory uninstall\` before deleting tunelo, or remove its hooks from the settings.json of your Claude folder (~/.claude, or the one CLAUDE_CONFIG_DIR names).`);
     return 0;
   });
-  if (hooks !== 0) deps.log("  Warning: Observatory's hooks may still be in Claude Code's settings; remove the hooks running `tunelo observatory hook` from ~/.claude/settings.json.");
+  if (hooks !== 0) deps.log("  Warning: Observatory's hooks may still be in Claude Code's settings; remove the hooks running `tunelo observatory hook` from the settings.json named above.");
   // Leaves the account; without the network it warns and goes on (--force).
   try {
     await deps.logout(dir);

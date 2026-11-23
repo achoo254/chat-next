@@ -14,10 +14,12 @@
 // nothing is written and the backup goes). The containers the install made
 // are recorded (install-state-file.ts); the uninstall takes out exactly what
 // install added, giving the file its bytes back, and never restores a backup
-// over the file.
+// over the file. It also takes Observatory out of any other settings.json an
+// earlier install recorded (CLAUDE_CONFIG_DIR named another machine folder
+// then), and touches no settings.json install did not change.
 import { chmod, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { forgetCreated, installRecord, recordInstall } from "./install-state-file.ts";
+import { join, resolve } from "node:path";
+import { forgetCreated, installRecord, recordInstall, recordedSettingsFiles } from "./install-state-file.ts";
 import type { ManagedVerdict } from "./managed-settings-check.ts";
 import { type InstallCheckDeps, describeChange, machineRefusal, settingsFileProblem, settingsRefusal, settingsTextRefusal } from "./observatory-install-checks.ts";
 import { OBSERVED_HOOK_EVENTS, observatoryEnvKeys, observatoryHookCounts, observatoryOtelEnv, parseSettings } from "./observatory-settings-markers.ts";
@@ -192,40 +194,76 @@ export async function installObservatory(deps: InstallDeps): Promise<number> {
   return 0;
 }
 
-/** Takes Observatory's hook groups and OTel keys out of the machine's settings.json; resolves with the exit code. */
-export async function uninstallObservatory(t: SettingsTarget): Promise<number> {
-  const file = settingsFile(t.claudeHome);
-  syncProfiles(t);
+/** What taking Observatory out of one settings.json did: changed it, found nothing of it, found no file, or could not (the reason printed). */
+type TakeOut = "changed" | "unchanged" | "absent" | "failed";
+
+/** Takes Observatory's hook groups and OTel keys out of one settings.json, as the install recorded it, and forgets the record. */
+async function takeOut(t: SettingsTarget, file: string): Promise<TakeOut> {
   const text = await readText(file);
-  if (text === undefined) return 0;
+  if (text === undefined) {
+    await forgetCreated(t.stateFile, file);
+    return "absent";
+  }
   const textWhy = settingsTextRefusal(file, text);
   if (textWhy) {
     t.print(`tunelo: cannot uninstall Observatory: ${textWhy} Observatory's entries were left in it.`);
-    return 1;
+    return "failed";
   }
   const next = withoutObservatory(text, await installRecord(t.stateFile, file));
   if (next !== text) {
     const problem = await settingsFileProblem(file);
     if (problem) {
       t.print(`tunelo: cannot uninstall Observatory: ${problem}; remove the hooks running \`tunelo observatory hook\` there yourself.`);
-      return 1;
+      return "failed";
     }
     try {
       await writeWhole(file, next, text);
     } catch (err) {
       if (!(err instanceof ChangedMeanwhile)) throw err;
       t.print(`tunelo: ${err.message}`);
-      return 1;
+      return "failed";
     }
   }
   await forgetCreated(t.stateFile, file);
+  return next === text ? "unchanged" : "changed";
+}
+
+/**
+ * Takes Observatory's hook groups and OTel keys out of the machine's
+ * settings.json, and out of every other settings.json an earlier install
+ * recorded changing (the machine's Claude folder was another one then:
+ * CLAUDE_CONFIG_DIR named it); resolves with the exit code. The profiles
+ * follow the machine's folder only: another recorded folder has its own
+ * settings.json taken back, nothing else.
+ */
+export async function uninstallObservatory(t: SettingsTarget): Promise<number> {
+  const file = settingsFile(t.claudeHome);
   syncProfiles(t);
-  const wrong = await misplaced(t, 0);
+  const machine = await takeOut(t, file);
+  if (machine === "failed") return 1;
+  const changed = machine === "changed" ? [file] : [];
+  const wrong: string[] = [];
+  let failed = false;
+  for (const other of await recordedSettingsFiles(t.stateFile)) {
+    if (resolve(other) === resolve(file)) continue;
+    const outcome = await takeOut(t, other);
+    if (outcome === "failed") failed = true;
+    if (outcome === "changed") changed.push(other);
+    if (outcome === "changed" || outcome === "unchanged") {
+      const settings = parseSettings(await readText(other).catch(() => undefined));
+      if (!settings || Object.keys(observatoryHookCounts(settings)).length > 0) wrong.push(other);
+    }
+  }
+  if (machine !== "absent") {
+    syncProfiles(t);
+    wrong.unshift(...(await misplaced(t, 0)));
+  }
   if (wrong.length > 0) {
     t.print(`tunelo: Observatory is NOT uninstalled: its hooks are still in ${wrong.join(", ")}. Remove the hooks running \`tunelo observatory hook\` there, or run \`tunelo observatory uninstall\` again.`);
     return 1;
   }
-  t.print(next === text ? "Observatory was not installed for Claude Code sessions outside tunelo." : `Observatory is uninstalled from ${file}.`);
+  if (failed) return 1;
+  t.print(changed.length === 0 ? "Observatory was not installed for Claude Code sessions outside tunelo." : `Observatory is uninstalled from ${changed.join(", ")}.`);
   return 0;
 }
 
