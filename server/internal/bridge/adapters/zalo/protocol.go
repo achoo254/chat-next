@@ -72,7 +72,10 @@ type wireEvent struct {
 	UIDFrom  looseString     `json:"uidFrom"`
 	IDTo     looseString     `json:"idTo"`
 	DName    string          `json:"dName"`
-	TS       looseString     `json:"ts"`
+	// PeerName is the other person's name looked up by the sidecar for a message
+	// the owner sent (there dName is the owner's own name).
+	PeerName string      `json:"peerName"`
+	TS       looseString `json:"ts"`
 	// event, listener, error
 	Name    string          `json:"name"`
 	Payload json.RawMessage `json:"payload"`

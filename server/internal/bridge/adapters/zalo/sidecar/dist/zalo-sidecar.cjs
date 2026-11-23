@@ -29181,14 +29181,32 @@ function announce(loggedIn) {
   emit({ ev: "account", uid: text });
   return true;
 }
+var peerNames = /* @__PURE__ */ new Map();
+async function lookupPeerName(loggedIn, uid) {
+  if (peerNames.has(uid)) return peerNames.get(uid);
+  try {
+    const info = await loggedIn.getUserInfo(uid);
+    const profile = info?.changed_profiles?.[uid] ?? info?.changed_profiles?.[`${uid}_0`];
+    const name = String(profile?.displayName || profile?.zaloName || "");
+    if (name !== "") peerNames.set(uid, name);
+    return name;
+  } catch {
+    return "";
+  }
+}
 function listen(loggedIn) {
   api = loggedIn;
-  api.listener.on("message", (message) => {
+  api.listener.on("message", async (message) => {
     const data = message.data ?? {};
+    const isGroup = message.type === ThreadType.Group;
+    const self2 = Boolean(message.isSelf);
+    const peerUid = String(self2 ? data.idTo ?? "" : data.uidFrom ?? "");
+    const peerName = !isGroup && self2 && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeerName(loggedIn, peerUid) : "";
     emit({
       ev: "message",
-      thread: message.type === ThreadType.Group ? "group" : "user",
-      self: Boolean(message.isSelf),
+      thread: isGroup ? "group" : "user",
+      self: self2,
+      peerName,
       msgType: data.msgType,
       content: data.content,
       msgId: data.msgId,

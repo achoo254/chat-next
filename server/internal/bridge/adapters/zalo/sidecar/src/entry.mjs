@@ -81,15 +81,42 @@ function announce(loggedIn) {
 	return true;
 }
 
+/** Names already looked up, by Zalo id: one lookup per person for the life of the process. */
+const peerNames = new Map();
+
+/**
+ * The display name of the other person of a 1-1 message. For a message the owner sent, `dName` is
+ * the owner's own name, so the other side's name has to be asked for; "" when Zalo gives none
+ * (the engine then keeps its stand-in title). A failed lookup is not cached, so the next
+ * message tries again.
+ */
+async function lookupPeerName(loggedIn, uid) {
+	if (peerNames.has(uid)) return peerNames.get(uid);
+	try {
+		const info = await loggedIn.getUserInfo(uid);
+		const profile = info?.changed_profiles?.[uid] ?? info?.changed_profiles?.[`${uid}_0`];
+		const name = String(profile?.displayName || profile?.zaloName || "");
+		if (name !== "") peerNames.set(uid, name);
+		return name;
+	} catch {
+		return "";
+	}
+}
+
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
 function listen(loggedIn) {
 	api = loggedIn;
-	api.listener.on("message", (message) => {
+	api.listener.on("message", async (message) => {
 		const data = message.data ?? {};
+		const isGroup = message.type === ThreadType.Group;
+		const self = Boolean(message.isSelf);
+		const peerUid = String(self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
+		const peerName = !isGroup && self && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeerName(loggedIn, peerUid) : "";
 		emit({
 			ev: "message",
-			thread: message.type === ThreadType.Group ? "group" : "user",
-			self: Boolean(message.isSelf),
+			thread: isGroup ? "group" : "user",
+			self,
+			peerName,
 			msgType: data.msgType,
 			content: data.content,
 			msgId: data.msgId,

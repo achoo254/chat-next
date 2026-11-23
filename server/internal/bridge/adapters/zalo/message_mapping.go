@@ -49,7 +49,11 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	}
 	peer := bridge.Participant{ID: peerID, Name: "Zalo " + peerID, NameUnknown: true}
 	sender := bridge.Participant{ID: from, IsSelf: true}
-	if !ev.Self {
+	if ev.Self {
+		if ev.PeerName != "" {
+			peer.Name, peer.NameUnknown = ev.PeerName, false
+		}
+	} else {
 		if ev.DName != "" {
 			peer.Name, peer.NameUnknown = ev.DName, false
 		}

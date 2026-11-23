@@ -49,6 +49,20 @@ func TestMapMessageSelfUsesTheRecipientAsConversation(t *testing.T) {
 	}
 }
 
+func TestMapMessageSelfTakesTheLookedUpPeerName(t *testing.T) {
+	ev := mustEvent(t, `{"ev":"message","thread":"user","self":true,"peerName":"Trịnh Hải Ngân","msgType":"webchat","content":"ok","msgId":"7","uidFrom":"999","idTo":"500","dName":"Chủ","ts":"1763700000000"}`)
+	m, conv, err := mapMessage(ev, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.From.IsSelf || m.From.Name != "" {
+		t.Errorf("sender = %+v", m.From)
+	}
+	if conv.Peer.NameUnknown || conv.Peer.Name != "Trịnh Hải Ngân" || conv.Title != "Trịnh Hải Ngân" {
+		t.Errorf("conversation = %+v", conv)
+	}
+}
+
 func TestMapMessageLabels(t *testing.T) {
 	cases := map[string]string{
 		`{"ev":"message","thread":"user","msgType":"chat.sticker","content":{"id":1,"catId":2,"type":7},"msgId":"1","uidFrom":"5","idTo":"6"}`: labelSticker,
