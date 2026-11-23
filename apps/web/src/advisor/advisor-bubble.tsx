@@ -392,7 +392,7 @@ function RecentAnswers({ presence, store, collapsed }: { presence: Presence; sto
 		setChecking("");
 		if (result === "ok") {
 			store.setOpen(false);
-			navigate(entry.target);
+			navigate(presence.pageOf(entry.machine, entry.threadId));
 			return;
 		}
 		store.markUnavailable(entry.id, result);
@@ -477,7 +477,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 		if (top === undefined) return;
 		store.fill(question.machine, threadId, top.text);
 		store.setOpen(false);
-		navigate(paths.machineSession(question.machine, threadId));
+		navigate(presence.pageOf(question.machine, threadId));
 	};
 	// A question about a chat message is answered into that chat's box when it is still open: nothing is sent, the user reads it first.
 	const chat = useAdvisorState(store).chat;
@@ -619,7 +619,7 @@ function AnswerView({ question, answer, presence, store, lost, onAgain }: Answer
 						className="btn btn-sm"
 						onClick={() => {
 							store.setOpen(false);
-							navigate(paths.machineSession(question.machine, question.threadId));
+							navigate(presence.pageOf(question.machine, question.threadId));
 						}}
 					>
 						{t.answer.view}

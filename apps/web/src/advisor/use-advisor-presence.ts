@@ -14,6 +14,7 @@ import type { AdvisorTone } from "@achoo254/chat-core";
 import { LOCAL_REF, localMachine, type LinkHub } from "../machines/link/link-hub.ts";
 import { OfflineError, RemoteError, type LinkState, type MachineLink } from "../machines/link/machine-link.ts";
 import { shouldConnect } from "../machines/machine-status.ts";
+import { chatTakesTerminal, observeOffered, sessionPath, terminalOffered } from "../machines/session-mode.tsx";
 import type { MachineEntry } from "../machines/machines-client.ts";
 import { inFolder } from "../machines/projects-view.ts";
 import { EMPTY_JOURNAL, orderedItems, type Journal } from "../machines/transcript/reducer.ts";
@@ -231,6 +232,8 @@ export interface Presence {
 	readonly sessionsFor: (question: Question) => readonly ThreadSummary[];
 	/** Whether a session can still be opened: the machine answers and still lists it. */
 	readonly checkSession: (machine: string, threadId: string) => Promise<SessionCheck>;
+	/** The page that opens a session now, read from the machine's link as it is at the tap (`pageOfSession`). */
+	readonly pageOf: (machine: string, threadId: string) => string;
 }
 
 export type SessionCheck = "ok" | "missing" | "unreachable";
@@ -478,6 +481,7 @@ export function useAdvisorPresence(attachedMachine: string, open: boolean, store
 		stop,
 		sessionsFor,
 		checkSession,
+		pageOf: (machine, threadId) => pageOfSession(machine, threadId, hub.link(machine).snapshot()),
 	};
 }
 
@@ -549,7 +553,10 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 		const link = hub.link(machine);
 		let seen: Set<string> | null = null;
 		let timer = 0;
+		let line = "";
 		const check = () => {
+			// The view the session has changed (a terminal took it, or gave it back): the line leads to the new one.
+			if (line !== "" && store.snapshot().flash === line) store.setFlash(line, pageOfSession(machine, threadId, link.snapshot()));
 			const journal = link.snapshot().journals.get(threadId);
 			if (journal === undefined) return;
 			const verdicts = orderedItems(journal).filter((i) => i.body.case === "advisorVerdict");
@@ -559,7 +566,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			}
 			const fresh = verdicts.filter((i) => !seen?.has(i.id));
 			for (const i of fresh) seen.add(i.id);
-			const page = pageOfSession(machine, threadId, window.location.pathname, window.location.search);
+			const page = pageOfSession(machine, threadId, link.snapshot());
 			const thread = link.snapshot().threads.find((x) => x.id === threadId);
 			for (const i of fresh) {
 				const text = i.body.case === "advisorVerdict" ? verdictLine(i.body.value) : "";
@@ -567,8 +574,9 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 			}
 			const last = fresh.at(-1)?.body;
 			if (last?.case !== "advisorVerdict" || store.snapshot().open || store.snapshot().busy) return;
-			// The page as it shows now (the session in its chat, terminal or Observe view): a tap on the line returns to it.
-			store.setFlash(verdictLine(last.value), page);
+			// A tap on the line opens the session in the view it has now (kept fresh below while the line shows).
+			line = verdictLine(last.value);
+			store.setFlash(line, page);
 			window.clearTimeout(timer);
 			timer = window.setTimeout(() => store.setFlash(""), FLASH_MS);
 		};
@@ -577,20 +585,23 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 		return () => {
 			off();
 			window.clearTimeout(timer);
+			// The line is about the chat that shows: it goes with it, not on to other screens.
+			if (line !== "" && store.snapshot().flash === line) store.setFlash("");
 		};
 	}, [hub, machine, threadId, store]);
 }
 
 /**
- * The page a verdict of a session leads back to: the page as it shows now (the
- * session's chat, terminal or Observe tab, kept with its query) when it is that
- * session's, else the session itself. Another session or screen may be showing
- * when the verdict is noticed (panes and tabs side by side), and a tap must
- * not go there.
+ * The page that opens a session now: the view its row in the session list
+ * names (the terminal while one holds it, else the view it was last opened
+ * in on this device). A tap from beside the mascot or from the recent answers
+ * must not drop a session held by a terminal into its read-only chat. The
+ * session's chat when the machine's state is not known.
  */
-export function pageOfSession(machine: string, threadId: string, pathname: string, search: string): string {
-	const own = paths.machineSession(machine, threadId);
-	return pathname === own || pathname.startsWith(`${own}/`) ? pathname + search : own;
+export function pageOfSession(machine: string, threadId: string, state: Pick<LinkState, "threads" | "info"> | null): string {
+	const thread = state?.threads.find((x) => x.id === threadId);
+	if (state === null || thread === undefined) return paths.machineSession(machine, threadId);
+	return sessionPath(machine, thread, terminalOffered(state.info, thread.provider), observeOffered(state.info, thread.provider), chatTakesTerminal(state.info, thread.provider));
 }
 
 /** "Option (82%)" for a verdict; its error code when Advisor did not answer (worded by the mascot). */

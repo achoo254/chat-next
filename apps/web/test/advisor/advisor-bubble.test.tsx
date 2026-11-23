@@ -6,7 +6,7 @@
 // the session's composer; a sensitive folder asks first (NEEDS_CONSENT);
 // Stop names the question; an outdated machine puts the mascot to sleep.
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { AdvisorTone, ErrorCode, ErrorReason, LoginState, Role, ThreadKind, ThreadState, TurnState, type Frame, type ThreadCreate, type ThreadSend } from "@achoo254/chat-proto/remote/remote";
+import { AdvisorTone, ErrorCode, ErrorReason, LoginState, TerminalAvailability, Role, ThreadKind, ThreadState, TurnState, type Frame, type ThreadCreate, type ThreadSend } from "@achoo254/chat-proto/remote/remote";
 import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -141,9 +141,10 @@ beforeEach(async () => {
 							os: "darwin",
 							agentVersion: "3.13.0",
 							maxSessions: 3,
+							terminal: TerminalAvailability.AVAILABLE,
 							...(advisor === undefined ? {} : { advisor: { ...advisor, keyFingerprint: advisor.keySet ? "a1b2c3" : "" } }),
 							providers: [
-								{ id: "claude", name: "Claude Code", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession, terminalAdvisor } },
+								{ id: "claude", name: "Claude Code", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession, terminalAdvisor, terminal: true } },
 								{ id: "antigravity", name: "Antigravity", loginState: LoginState.OK, capabilities: { sessionMcp: true, advisorSession: false } },
 							],
 						},
@@ -302,7 +303,8 @@ describe("a question with something attached", () => {
 describe("recent automatic answers", () => {
 	const entry = (id: string, threadId: string) => ({ id, machine: "1", threadId, title: "Sửa lỗi push", text: `${PICK} (82%)`, target: `/ai/1/s/${threadId}/terminal`, at: Date.now(), unavailable: "" as const });
 
-	it("lists them when the bubble opens and follows one back to its session that still exists", async () => {
+	it("lists them when the bubble opens and follows one back to its session in the view it was left in", async () => {
+		window.localStorage.setItem("ai:mode:1:s1", "terminal");
 		const store = new AdvisorStore();
 		store.addHistory(entry("v1", "s1"));
 		store.setOpen(true);
