@@ -99,3 +99,23 @@ func TestHeardBoundsConversations(t *testing.T) {
 		t.Errorf("messages = %d", h.messages)
 	}
 }
+
+func TestHeardListsAConversationOnlyOnceItsOtherSideHasAName(t *testing.T) {
+	clock := newFakeClock()
+	h := newHeardAccount(clock.now)
+	conv, m := heardMessage("a", 1)
+	conv.Peer.Name, conv.Peer.NameUnknown = "Zalo a", true
+	h.record(conv, m)
+	if got := h.conversations(); len(got) != 0 {
+		t.Fatalf("a conversation without a name was listed: %+v", got)
+	}
+	named, m2 := heardMessage("a", 2)
+	h.record(named, m2)
+	got := h.conversations()
+	if len(got) != 1 || got[0].Title != "P" {
+		t.Fatalf("listed %+v", got)
+	}
+	if kept := h.takeRecent("a", 10); len(kept) != 2 {
+		t.Fatalf("kept %d messages, want both", len(kept))
+	}
+}

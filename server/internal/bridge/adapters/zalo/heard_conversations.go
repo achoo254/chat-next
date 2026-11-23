@@ -120,12 +120,17 @@ func (h *heardAccount) evictOldestMessage() {
 	h.messages--
 }
 
-// conversations lists what was heard, the most recently active first.
+// conversations lists what was heard, the most recently active first. A conversation
+// whose other side has no name yet is left out, so Chat never shows a bare Zalo id as
+// the title: its messages stay kept, and it is listed once a message gives the name.
 func (h *heardAccount) conversations() []bridge.Conversation {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	list := make([]*heardConversation, 0, len(h.convs))
 	for _, c := range h.convs {
+		if c.conv.Peer != nil && c.conv.Peer.NameUnknown {
+			continue
+		}
 		list = append(list, c)
 	}
 	slices.SortFunc(list, func(x, y *heardConversation) int { return y.lastSeen.Compare(x.lastSeen) })
