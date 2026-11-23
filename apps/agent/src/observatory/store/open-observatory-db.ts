@@ -6,7 +6,11 @@
 //    version (migrate.ts): a newer schema that does not let this agent read
 //    it is refused here, before any write connection exists (a read-write
 //    connection closing last would checkpoint a newer agent's -wal into the
-//    file, changing it);
+//    file, changing it). A read-only connection cannot open a WAL database
+//    whose -wal and -shm are gone (bun:sqlite on macOS: SQLITE_CANTOPEN, as
+//    after every clean close); with no -wal there is nothing of another
+//    agent's to checkpoint, so the same reads run on a read-write
+//    connection that writes nothing;
 // 3. the file and folder made private, the write connection opened with the
 //    caller's busy timeout, WAL with synchronous=NORMAL (a crash may lose the
 //    last commits, never the file's integrity), then the migrations (none for
@@ -16,8 +20,9 @@
 // holds, with the caller's thread blocked: the agent passes a short one (a
 // batch it cannot write now is retried later), the CLI a long one.
 import { migrate, schemaAccess } from "./migrate.ts";
+import { existsSync } from "node:fs";
 import { prepareObservatoryDbFile, restrictObservatoryDbFile } from "./observatory-db-files.ts";
-import { type SqliteConnection, type SqliteRuntime, openSqlite } from "./sqlite-driver.ts";
+import { type SqliteConnection, type SqliteOpenMode, type SqliteRuntime, isSqliteCantOpen, openSqlite } from "./sqlite-driver.ts";
 import { ObservatoryStoreError } from "./store-errors.ts";
 
 /** The agent's wait for a lock: its event loop is blocked for at most this long per call. */
@@ -38,17 +43,27 @@ function setBusyTimeout(db: SqliteConnection, ms: number): void {
   db.exec(`PRAGMA busy_timeout = ${ms}`);
 }
 
-/** Opens `path` for writing (creating and migrating it); throws ObservatorySchemaTooNew, untouched, for a newer database this agent may not read. */
-export async function openObservatoryDb(path: string, runtime: SqliteRuntime | undefined, busyTimeoutMs: number): Promise<SqliteConnection> {
-  if (!Number.isSafeInteger(busyTimeoutMs) || busyTimeoutMs < 0) throw new ObservatoryStoreError(`the busy timeout must be a non-negative integer, not ${String(busyTimeoutMs)}`);
-  await prepareObservatoryDbFile(path);
-
-  const reader = await openSqlite(path, runtime, "readonly");
+/** Reads, on a connection of its own, whether this agent may use the database (migrate.ts); throws ObservatorySchemaTooNew when it may not. */
+async function checkAccess(path: string, runtime: SqliteRuntime | undefined, busyTimeoutMs: number, mode: SqliteOpenMode): Promise<void> {
+  const reader = await openSqlite(path, runtime, mode);
   try {
     setBusyTimeout(reader, busyTimeoutMs);
     schemaAccess(reader, path);
   } finally {
     closeQuietly(reader);
+  }
+}
+
+/** Opens `path` for writing (creating and migrating it); throws ObservatorySchemaTooNew, untouched, for a newer database this agent may not read. */
+export async function openObservatoryDb(path: string, runtime: SqliteRuntime | undefined, busyTimeoutMs: number): Promise<SqliteConnection> {
+  if (!Number.isSafeInteger(busyTimeoutMs) || busyTimeoutMs < 0) throw new ObservatoryStoreError(`the busy timeout must be a non-negative integer, not ${String(busyTimeoutMs)}`);
+  await prepareObservatoryDbFile(path);
+
+  try {
+    await checkAccess(path, runtime, busyTimeoutMs, "readonly");
+  } catch (err) {
+    if (!isSqliteCantOpen(err) || existsSync(`${path}-wal`)) throw err;
+    await checkAccess(path, runtime, busyTimeoutMs, "readwrite");
   }
 
   await restrictObservatoryDbFile(path);

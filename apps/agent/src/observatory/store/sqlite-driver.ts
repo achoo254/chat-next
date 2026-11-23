@@ -51,9 +51,10 @@ export async function openSqlite(path: string, runtime: SqliteRuntime = currentS
 }
 
 const SQLITE_BUSY = 5;
+const SQLITE_CANTOPEN = 14;
 const SQLITE_CONSTRAINT = 19;
 const SQLITE_MISMATCH = 20;
-const PRIMARY_CODES: Record<string, number> = { SQLITE_BUSY, SQLITE_CONSTRAINT, SQLITE_MISMATCH };
+const PRIMARY_CODES: Record<string, number> = { SQLITE_BUSY, SQLITE_CANTOPEN, SQLITE_CONSTRAINT, SQLITE_MISMATCH };
 
 /** The primary SQLite result code of a driver error (extended codes reduced); undefined for an error SQLite did not raise. */
 export function sqliteResultCode(err: unknown): number | undefined {
@@ -71,6 +72,11 @@ export function sqliteResultCode(err: unknown): number | undefined {
 /** SQLITE_BUSY: another connection holds the lock past the busy timeout. */
 export function isSqliteBusy(err: unknown): boolean {
   return sqliteResultCode(err) === SQLITE_BUSY;
+}
+
+/** SQLITE_CANTOPEN: the file (or, for a read-only connection, its WAL index) could not be opened. */
+export function isSqliteCantOpen(err: unknown): boolean {
+  return sqliteResultCode(err) === SQLITE_CANTOPEN;
 }
 
 /** A constraint or a type mismatch: the statement's own values are at fault, not the database. */

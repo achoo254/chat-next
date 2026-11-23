@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createSensitiveCheck } from "../../src/safety/sensitive-paths.ts";
 
 /** A home folder that does not exist on any machine. */
-export const FAKE_HOME = process.platform === "win32" ? "C:\\Users\\example-user" : "/home/example-user";
+export const FAKE_HOME = process.platform === "win32" ? "C:\\Users\\example-user" : process.platform === "darwin" ? "/Users/example-user" : "/home/example-user";
 export const FAKE_CWD = join(FAKE_HOME, "work", "example-app");
 export const isFakeSensitive = createSensitiveCheck({ home: FAKE_HOME });
 

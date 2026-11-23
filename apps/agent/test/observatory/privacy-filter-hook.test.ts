@@ -47,7 +47,7 @@ describe("the hook allowlist", () => {
   });
 
   it("never rewrites a short or ordinary account name, nor structured fields", () => {
-    const home = process.platform === "win32" ? "C:\\Users\\dev" : "/home/dev";
+    const home = process.platform === "win32" ? "C:\\Users\\dev" : process.platform === "darwin" ? "/Users/dev" : "/home/dev";
     const dev: HookFilterContext = { home, isSensitive: isFakeSensitive, contentAllowed: true, stage: "final" };
     const payload = {
       session_id: "s",

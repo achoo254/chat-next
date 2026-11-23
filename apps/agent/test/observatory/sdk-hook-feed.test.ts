@@ -22,7 +22,7 @@ afterEach(async () => {
   for (const stop of stops.splice(0)) await stop();
 });
 
-const HOME = process.platform === "win32" ? "C:\\Users\\example-person" : "/home/example-person";
+const HOME = process.platform === "win32" ? "C:\\Users\\example-person" : process.platform === "darwin" ? "/Users/example-person" : "/home/example-person";
 const CWD = join(HOME, "work", "app");
 const PROJECT = "github.com/example/app";
 const DAY = 24 * 60 * 60 * 1000;
