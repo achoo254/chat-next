@@ -92,7 +92,6 @@ export function normalizeOtelRecord(record: FilteredOtelRecord): NormalizedRecor
           agentId,
           at: start,
           toolName,
-          officeRoom: cls?.officeRoom,
           mcpServer: cls?.mcpServer,
           durationMs,
           inputBytes: r.number("tool_input_size_bytes"),

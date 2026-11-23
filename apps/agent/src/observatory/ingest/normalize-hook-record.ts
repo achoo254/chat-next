@@ -87,8 +87,8 @@ export function normalizeHookRecord(record: FilteredHookRecord, origin: RecordOr
     if (!toolUseId) return undefined;
     const toolName = r.text("tool_name");
     const target = r.text("target");
-    const cls = toolName ? classifyTool(toolName, target) : undefined;
-    return { toolUseId, sessionId, promptId, agentId, at, toolName, officeRoom: cls?.officeRoom, mcpServer: cls?.mcpServer, target, inputBytes: r.number("input_bytes") };
+    const cls = toolName ? classifyTool(toolName, target, { station: r.text("station"), flags: r.number("station_flags") }) : undefined;
+    return { toolUseId, sessionId, promptId, agentId, at, toolName, mcpServer: cls?.mcpServer, target, inputBytes: r.number("input_bytes") };
   };
 
   switch (record.event) {

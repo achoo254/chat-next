@@ -167,11 +167,11 @@ describe("the spike's session through the service", () => {
       expect(t.toolCalls).toHaveLength(7);
       const byId = new Map(t.toolCalls.map((c) => [c.toolUseId, c]));
       expect(t.toolCalls.every((c) => c.success === true && c.durationMs !== null && c.inputBytes !== null)).toBe(true);
-      expect(byId.get("toolu_03")).toMatchObject({ toolName: "Grep", agentId: "agent-0001", durationMs: 72, officeRoom: "library", outputBytes: 512 });
-      expect(byId.get("toolu_01")).toMatchObject({ toolName: "Read", agentId: null, officeRoom: "library", target: "src/app.ts" });
-      expect(byId.get("toolu_02")).toMatchObject({ toolName: "Agent", officeRoom: "lobby", target: "Explore" });
-      expect(byId.get("toolu_04")).toMatchObject({ officeRoom: "work" });
-      expect(byId.get("toolu_07")).toMatchObject({ officeRoom: "post", target: "git", promptId: "prompt-2", durationMs: 626 });
+      expect(byId.get("toolu_03")).toMatchObject({ toolName: "Grep", agentId: "agent-0001", durationMs: 72, officeRoom: null, outputBytes: 512 });
+      expect(byId.get("toolu_01")).toMatchObject({ toolName: "Read", agentId: null, officeRoom: null, target: "src/app.ts" });
+      expect(byId.get("toolu_02")).toMatchObject({ toolName: "Agent", officeRoom: null, target: "Explore" });
+      expect(byId.get("toolu_04")).toMatchObject({ officeRoom: null });
+      expect(byId.get("toolu_07")).toMatchObject({ officeRoom: null, target: "git", promptId: "prompt-2", durationMs: 626 });
       expect(JSON.parse(byId.get("toolu_01")?.content ?? "{}")).toMatchObject({ input: expect.stringContaining("app.ts"), output: expect.stringContaining("TODO") });
 
       expect(t.subagents).toEqual([

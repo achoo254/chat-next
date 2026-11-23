@@ -1,5 +1,5 @@
 // Whole lines of a file from a position on, but no line starting past a
-// given end: the office reads the AIs' growing records a bounded piece at a
+// given end: the agent reads the AIs' growing records a bounded piece at a
 // time (a byte budget per read), and goes on from where it stopped the next
 // time. A line still being written (no newline yet) is left for later; a
 // line longer than `cap` is skipped whole.

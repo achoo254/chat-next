@@ -2,7 +2,7 @@
 // typed in front of the command (assignments, PowerShell's $env:, `cd dir`,
 // wrappers) or as a quoted value never comes out (docs/office-wire.md, part 5).
 import { describe, expect, it } from "vitest";
-import { SUBJECT_COMMANDS, commandWords, shellSubject, simpleCommands } from "../src/office/office-shell-words.ts";
+import { SUBJECT_COMMANDS, commandWords, shellSubject, simpleCommands } from "../src/activity/shell-words.ts";
 
 const MARK = "ZZMARKER-91c4-private";
 

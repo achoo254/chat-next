@@ -9,8 +9,8 @@ import { tempDir } from "./harness.ts";
 
 const reads = vi.hoisted(() => ({ paths: [] as string[] }));
 
-vi.mock("../src/office/office-bounded-lines.ts", async (importActual) => {
-  const actual = await importActual<typeof import("../src/office/office-bounded-lines.ts")>();
+vi.mock("../src/activity/bounded-lines.ts", async (importActual) => {
+  const actual = await importActual<typeof import("../src/activity/bounded-lines.ts")>();
   return {
     readLinesUntil: (path: string, ...rest: Parameters<typeof actual.readLinesUntil> extends [string, ...infer R] ? R : never) => {
       reads.paths.push(path);

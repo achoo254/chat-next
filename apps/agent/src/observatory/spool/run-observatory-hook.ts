@@ -1,6 +1,6 @@
 // What `tunelo observatory hook <event>` does, as a function the command
 // calls (the command and its fast path come later): read the hook payload
-// from stdin, check state.json, filter (privacy/filter-hook-event.ts),
+// from stdin, check state.json (and read the target key salt beside it), filter (privacy/filter-hook-event.ts),
 // append one line to the spool, done. No network, no store, no waiting for
 // the agent. Whatever happens it resolves (never rejects), and within
 // HOOK_DEADLINE_MS: Claude Code does not kill an async hook before the
@@ -9,6 +9,7 @@
 // still pending.
 import { filterHookEvent } from "../privacy/filter-hook-event.ts";
 import { isKeptHookEvent } from "../privacy/hook-allowlist.ts";
+import { readTargetKeySalt } from "../privacy/target-key-salt.ts";
 import { contentAllowed, readHookState } from "./hook-state-file.ts";
 import { appendSpoolLine, countDropped } from "./spool-append.ts";
 import { HOOK_DEADLINE_MS } from "./spool-files.ts";
@@ -66,7 +67,7 @@ function projectKeyOf(cwd: unknown, repoKey: (cwd: string) => string): string | 
 async function hook(event: string, deps: ObservatoryHookDeps, signal: AbortSignal): Promise<HookOutcome> {
   const now = deps.now ?? Date.now;
   if (!isKeptHookEvent(event)) return "ignored";
-  const state = await readHookState(deps.dataDir);
+  const [state, targetKeySalt] = await Promise.all([readHookState(deps.dataDir), readTargetKeySalt(deps.dataDir)]);
   if (!state.enabled) return "off";
   const text = await readStdin(deps.stdin, deps.maxStdinBytes ?? MAX_HOOK_STDIN_BYTES, signal);
   if (signal.aborted) return "timeout";
@@ -90,6 +91,7 @@ async function hook(event: string, deps: ObservatoryHookDeps, signal: AbortSigna
       isSensitive: deps.isSensitive,
       contentAllowed: contentAllowed(state, projectKey),
       projectKey,
+      targetKeySalt,
       ...(deps.accountNames ? { accountNames: deps.accountNames } : {}),
     },
     now(),

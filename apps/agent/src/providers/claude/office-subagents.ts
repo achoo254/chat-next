@@ -20,8 +20,8 @@
 import type { Dirent, Stats } from "node:fs";
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { readLinesUntil } from "../../office/office-bounded-lines.ts";
-import { type OfficeLog, OfficeProblems } from "../../office/office-problem-log.ts";
+import { readLinesUntil } from "../../activity/bounded-lines.ts";
+import { type ProblemSink as OfficeLog, ProblemLog as OfficeProblems } from "../../activity/problem-log.ts";
 import type { SessionUsageCall, SubagentActivity, SubagentReport, SubagentToolCall } from "../types.ts";
 import { type Line, clean, parseAgentLine } from "./office-subagent-lines.ts";
 import { toolKind } from "./tool-map.ts";

@@ -1,4 +1,4 @@
-// The words of a shell command line as the office reads them, on the machine
+// The words of a shell command line as they are read, on the machine
 // only: split into simple commands (quotes and substitutions respected), the
 // setup in front of the real command dropped (`cd dir &&`, environment
 // assignments, `export`, PowerShell's `$env:X = …;`) and the wrappers that

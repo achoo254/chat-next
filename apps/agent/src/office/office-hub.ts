@@ -25,7 +25,7 @@ import {
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import type { AgentProvider, HistoryEntry, ProviderEvent } from "../providers/types.ts";
 import { ADVISOR_ID } from "./office-actor.ts";
-import { type OfficeLog, OfficeProblems } from "./office-problem-log.ts";
+import { type ProblemSink as OfficeLog, ProblemLog as OfficeProblems } from "../activity/problem-log.ts";
 import { OfficeMemory, OfficeThread } from "./office-thread.ts";
 
 /** Events are gathered this long before they go out. */

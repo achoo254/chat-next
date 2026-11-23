@@ -11,6 +11,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { runsGitCommit } from "../../src/observatory/ingest/git-commit-command.ts";
 import { ObservatoryIngest } from "../../src/observatory/ingest/observatory-ingest.ts";
 import { classifyTool } from "../../src/observatory/ingest/tool-classification.ts";
+import { StationFlag } from "../../src/observatory/live-map/station-map.ts";
 import type { FilteredHookRecord, FilteredOtelRecord, FilteredRecord, RecordOrigin } from "../../src/observatory/privacy/filtered-record.ts";
 import { ObservatoryStore, type SessionTimeline } from "../../src/observatory/store/observatory-store.ts";
 import type { WriteOp } from "../../src/observatory/store/write-ops.ts";
@@ -99,7 +100,7 @@ describe("a tool call without duration_ms", () => {
     for (const order of [[pre, post], [post, pre]]) {
       const r = await rig();
       await r.feed(order);
-      expect(r.store.sessionTimeline("sess-a").toolCalls).toEqual([expect.objectContaining({ toolUseId: "t9", at: 2_000, durationMs: 250, officeRoom: "qa" })]);
+      expect(r.store.sessionTimeline("sess-a").toolCalls).toEqual([expect.objectContaining({ toolUseId: "t9", at: 2_000, durationMs: 250, officeRoom: null })]);
     }
   });
 });
@@ -303,22 +304,32 @@ describe("telling a git commit from the command line", () => {
 });
 
 describe("the class of a tool call", () => {
-  it("is the office room of docs/office-wire.md part 4", () => {
-    const cases: [string, string | undefined, string, string?][] = [
-      ["Read", "src/app.ts", "library"],
-      ["Grep", undefined, "library"],
-      ["WebFetch", "example.com", "library"],
-      ["Edit", "src/app.ts", "work"],
-      ["Skill", "review", "work"],
-      ["TodoWrite", undefined, "planning"],
-      ["Agent", "Explore", "lobby"],
-      ["Bash", "vitest", "qa"],
-      ["Bash", "git", "post"],
-      ["Bash", "", "server"],
-      ["mcp__github__create_issue", "github › create_issue", "post", "github"],
-      ["mcp__tunelo__send_message", undefined, "lobby", "tunelo"],
-      ["mcp__tunelo__advisor_weigh", undefined, "meeting", "tunelo"],
+  it("is the station the privacy filter worked out, an unknown name read as CORE", () => {
+    expect(classifyTool("Bash", "git", { station: "GIT", flags: StationFlag.push })).toEqual({ station: "GIT", stationFlags: StationFlag.push });
+    expect(classifyTool("Edit", "rules/a.md", { station: "MEMORY", flags: undefined })).toEqual({ station: "MEMORY", stationFlags: 0 });
+    expect(classifyTool("Bash", "x", { station: "SPACESHIP", flags: 0 })).toEqual({ station: "CORE", stationFlags: 0 });
+  });
+
+  it("is estimated from the filtered target when the record has no station (an older hook, OpenTelemetry)", () => {
+    const est = StationFlag.estimated;
+    const cases: [string, string | undefined, string, number, string?][] = [
+      ["Read", "src/app.ts", "FILES", 0],
+      ["Grep", undefined, "FILES", 0],
+      ["WebFetch", "example.com", "EXTERNAL", 0],
+      ["Edit", "src/app.ts", "FILES", StationFlag.write],
+      ["Write", "~/CLAUDE.md", "MEMORY", StationFlag.write | StationFlag.memory],
+      ["Skill", "review", "SKILLS", 0],
+      ["TodoWrite", undefined, "ORCHESTRATOR", 0],
+      ["Agent", "Explore", "ORCHESTRATOR", 0],
+      ["Bash", "vitest", "TESTING", 0],
+      ["Bash", "git", "GIT", 0],
+      ["Bash", "", "SANDBOX", 0],
+      ["mcp__github__create_issue", "github › create_issue", "MCP", 0, "github"],
+      ["mcp__tunelo__advisor_weigh", undefined, "MCP", 0, "tunelo"],
+      ["SomethingNew", undefined, "CORE", 0],
     ];
-    for (const [name, target, room, server] of cases) expect(classifyTool(name, target), name).toEqual({ officeRoom: room, ...(server ? { mcpServer: server } : {}) });
+    for (const [name, target, station, flags, server] of cases) {
+      expect(classifyTool(name, target), name).toEqual({ station, stationFlags: flags | est, ...(server ? { mcpServer: server } : {}) });
+    }
   });
 });

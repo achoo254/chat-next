@@ -1,13 +1,13 @@
-// How the office reads what a shell command line really runs, on the machine
+// How a shell command line is read for what it really runs, on the machine
 // only (docs/office-wire.md, part 4): past setup and wrappers
-// (office-shell-words.ts), through runners (`npx x`), package managers
+// (shell-words.ts), through runners (`npx x`), package managers
 // (`pnpm --filter app run dev`, `pnpm exec vitest`), make-like tools
 // (`make test`), shells given a string (`bash -c "…"`) and interpreters
 // (`python -m pytest`, `uv run x`, `node node_modules/vitest/vitest.mjs`), to
 // the program or the script name at the end. A caller's rules turn that into
 // its own answer (a room, a service kind); the walk itself returns only what
 // the rules return, never a word of the command.
-import { commandName, commandWords, isListedCommand } from "./office-shell-words.ts";
+import { commandName, commandWords, isListedCommand } from "./shell-words.ts";
 
 /** What a caller makes of the program or script a command runs. */
 export interface CommandRules<R> {

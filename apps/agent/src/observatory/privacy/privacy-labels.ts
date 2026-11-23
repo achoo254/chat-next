@@ -4,8 +4,8 @@
 // checks that decide a path or a command touches a secret file, whose
 // content is then never kept (only the file's name).
 import { isAbsolute, resolve } from "node:path";
-import { walkCommand } from "../../office/office-command-walk.ts";
-import { SUBJECT_COMMANDS, shellSubject } from "../../office/office-shell-words.ts";
+import { walkCommand } from "../../activity/command-walk.ts";
+import { SUBJECT_COMMANDS, shellSubject } from "../../activity/shell-words.ts";
 import { mentionsSensitive } from "../../safety/sensitive-paths.ts";
 import { isSecretName } from "../../workspace/paths.ts";
 import { tildePath } from "./home-and-account.ts";

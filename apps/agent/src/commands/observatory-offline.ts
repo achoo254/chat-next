@@ -15,6 +15,7 @@ import { contentOffOf, setContentOff } from "../observatory/content-settings-con
 import { ObservatoryIngest } from "../observatory/ingest/observatory-ingest.ts";
 import { redactRecordAgain } from "../observatory/privacy/redact-record-again.ts";
 import { OTLP_TOKEN_FILE, type ReceiverTokens, loadOrCreateTokens } from "../observatory/receiver/receiver-token.ts";
+import { deleteTargetKeySalt } from "../observatory/privacy/target-key-salt.ts";
 import { clearSpool } from "../observatory/spool/clear-spool.ts";
 import { writeHookState } from "../observatory/spool/hook-state-file.ts";
 import { SpoolReader } from "../observatory/spool/spool-reader.ts";
@@ -49,6 +50,8 @@ export function exportOffline(dataDir: string, file: string, overwrite: boolean)
 export async function deleteOffline(dataDir: string): Promise<void> {
   await withStore(dataDir, (store) => store.wipe());
   await clearSpool(dataDir);
+  // The keys stored under it went with the database; the agent makes a new one at its start.
+  await deleteTargetKeySalt(dataDir);
 }
 
 /** The secret values the agent would hide: the machine's and the receiver's tokens. */

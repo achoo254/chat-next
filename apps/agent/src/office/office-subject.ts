@@ -3,7 +3,7 @@
 // name. Never a whole command, a path, a query or anything the core holds
 // sensitive (docs/office-wire.md, part 5).
 import type { ToolKind } from "../providers/types.ts";
-import { shellSubject } from "./office-shell-words.ts";
+import { shellSubject } from "../activity/shell-words.ts";
 
 export const SUBJECT_MAX = 40;
 

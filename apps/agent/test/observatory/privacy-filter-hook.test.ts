@@ -12,7 +12,7 @@ import { FAKE_CWD, FAKE_HOME, FAKE_IDENTIFIERS, HOOK_PAYLOADS, isFakeSensitive }
 
 // Both passes at once, as a source inside the agent: two-pass-redaction.test.ts covers the hook's pass and the agent's apart.
 const ctx: HookFilterContext = { home: FAKE_HOME, isSensitive: isFakeSensitive, contentAllowed: true, stage: "final" };
-const DERIVED = ["target", "input_bytes", "output_bytes", "git_op", "git_sha", "git_kind", "git_branch", "tool_use_ids", "prompt_length", "project_key"];
+const DERIVED = ["target", "input_bytes", "output_bytes", "git_op", "git_sha", "git_kind", "git_branch", "tool_use_ids", "prompt_length", "project_key", "station", "station_flags", "target_key", "read_offset", "read_limit", "todo_pending", "todo_in_progress", "todo_done"];
 const JWT = `eyJ${"a".repeat(30)}.${"b".repeat(30)}.${"c".repeat(30)}`;
 
 function filter(event: string, payload: Record<string, unknown>, over: Partial<HookFilterContext> = {}): FilteredHookRecord {

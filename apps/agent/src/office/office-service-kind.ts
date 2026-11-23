@@ -1,15 +1,15 @@
 // What a background shell command is, as the office labels its machine
 // (docs/office-wire.md, part 4): read on the machine only, through the same
-// walk as the room (office-command-walk.ts), of the line's last command that
+// walk as the room (activity/command-walk.ts), of the line's last command that
 // says what it is (`git pull && pnpm dev` is a dev server), into one of seven kinds, plus
 // the TCP port a dev server or database was told to listen on when the
 // command's own words say so (`--port 5173`, `-p 3000`, `PORT=8080`). No
 // system scan; only the kind's enum and the port's number leave the machine,
 // never a word of the command.
 import { OfficeServiceKind } from "@achoo254/chat-proto/remote/remote";
-import { CHECK_COMMANDS, CHECK_SCRIPT } from "./office-command-room.ts";
-import { type CommandRules, walkCommand } from "./office-command-walk.ts";
-import { simpleCommands } from "./office-shell-words.ts";
+import { CHECK_COMMANDS, CHECK_SCRIPT } from "../activity/command-class.ts";
+import { type CommandRules, walkCommand } from "../activity/command-walk.ts";
+import { simpleCommands } from "../activity/shell-words.ts";
 
 export type ServiceLabel = { kind: OfficeServiceKind; port: number };
 

@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { create } from "@bufbuild/protobuf";
 import { ItemSchema, OfficeActorState, OfficeRole, ThreadState, ThreadSummarySchema, ToolKind } from "@achoo254/chat-proto/remote/remote";
 import { describe, expect, it } from "vitest";
-import { readLinesUntil } from "../src/office/office-bounded-lines.ts";
-import { OfficeProblems, errorKind } from "../src/office/office-problem-log.ts";
+import { readLinesUntil } from "../src/activity/bounded-lines.ts";
+import { ProblemLog, errorKind } from "../src/activity/problem-log.ts";
 import { OfficeMemory, OfficeThread } from "../src/office/office-thread.ts";
 import { tempDir } from "./harness.ts";
 
@@ -49,7 +49,7 @@ describe("office problems", () => {
   it("logs a place at most once an interval, with how many more happened, never the message", () => {
     const lines: string[] = [];
     let now = 0;
-    const p = new OfficeProblems((l) => lines.push(l), () => now, 1_000);
+    const p = new ProblemLog((l) => lines.push(l), () => now, 1_000);
     p.report("poll", new TypeError("secret text"));
     p.report("poll", new TypeError("secret text"));
     p.report("send events", Object.assign(new Error("C:\\Users\\me\\private"), { code: "EACCES" }));

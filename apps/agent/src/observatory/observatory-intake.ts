@@ -34,6 +34,8 @@ export type ObservatoryIntakeOptions = {
   stopWaitMs?: number | undefined;
   isSensitive?: ((absolutePath: string) => boolean) | undefined;
   scheduleSdkFeed?: ((work: () => void) => void) | undefined;
+  /** The machine's salt for `target_key` now (privacy/target-key-salt.ts). */
+  targetKeySalt?: (() => Uint8Array | undefined) | undefined;
 };
 
 export class ObservatoryIntake {
@@ -55,6 +57,7 @@ export class ObservatoryIntake {
       contentAllowed: (projectKey) => contentAllowed({ enabled: true, contentOff: contentOffOf(opts.config), unreadable: false }, projectKey),
       known: () => opts.secrets(),
       accountNames: machineAccountNames(home),
+      ...(opts.targetKeySalt ? { targetKeySalt: opts.targetKeySalt } : {}),
       enabled: opts.running,
       problems: opts.problems,
       now: opts.now,

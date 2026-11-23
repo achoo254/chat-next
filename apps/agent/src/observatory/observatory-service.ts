@@ -17,7 +17,7 @@
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
-import { OfficeProblems } from "../office/office-problem-log.ts";
+import { ProblemLog } from "../activity/problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
@@ -27,6 +27,7 @@ import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
 import { OtlpReceiverHost, type OtlpReceiverHostOptions } from "./receiver/otlp-receiver-host.ts";
 import type { ReceiverTokens, RotateOptions } from "./receiver/receiver-token.ts";
+import { deleteTargetKeySalt, ensureTargetKeySalt } from "./privacy/target-key-salt.ts";
 import { clearSpool } from "./spool/clear-spool.ts";
 import { setAsideBrokenHookState } from "./spool/hook-state-file.ts";
 import { HookStateWriter } from "./spool/hook-state-writer.ts";
@@ -63,12 +64,14 @@ export class ObservatoryService {
   private started = false;
   private readonly rollups: DailyRollupScheduler;
   private readonly state: HookStateWriter;
-  private readonly problems: OfficeProblems;
+  private readonly problems: ProblemLog;
+  /** The salt of `target_key` (privacy/target-key-salt.ts); undefined until made, or when it could not be. */
+  private targetKeySalt: Buffer | undefined;
   private readonly now: () => number;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
-    this.problems = new OfficeProblems((line) => opts.log(line.replace(/^office: /, "observatory: ")), this.now);
+    this.problems = new ProblemLog(opts.log, this.now, undefined, "observatory");
     const problems = (place: string, err: unknown): void => this.problems.report(place, err);
     this.state = new HookStateWriter(opts.dataDir, () => ({ enabled: this.enabled, contentOff: contentOffOf(opts.config) }), (err) => problems("state-file", err));
     this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now });
@@ -83,6 +86,7 @@ export class ObservatoryService {
       stopWaitMs: opts.stopWaitMs,
       isSensitive: opts.isSensitive,
       scheduleSdkFeed: opts.scheduleSdkFeed,
+      targetKeySalt: () => this.targetKeySalt,
     });
     this.receiver = new OtlpReceiverHost({
       config: opts.config,
@@ -112,6 +116,7 @@ export class ObservatoryService {
     if (!this.enabled) return;
     // Hidden in every output of this process from now on, in every encoded form too.
     for (const secret of this.opts.knownSecrets()) rememberSecret(secret);
+    await this.makeTargetKeySalt();
     await this.store.open();
     // The ingest pushes into whichever writer is current (a wipe makes a new one).
     const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
@@ -146,9 +151,22 @@ export class ObservatoryService {
     await this.intake.pauseSpool();
     let failure = await this.store.wipe(this.started && this.enabled);
     await clearSpool(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
+    // The keys stored under the old salt are gone with the database; new ones start from a new salt.
+    this.targetKeySalt = undefined;
+    await deleteTargetKeySalt(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
+    if (this.started && this.enabled) await this.makeTargetKeySalt();
     await this.state.write();
     if (this.store.writer) this.intake.resumeSpool();
     if (failure !== undefined) throw failure;
+  }
+
+  /** Reads or makes the salt of `target_key`; a failure is reported and calls keep no key. */
+  private async makeTargetKeySalt(): Promise<void> {
+    try {
+      this.targetKeySalt = await ensureTargetKeySalt(this.opts.dataDir);
+    } catch (err) {
+      this.problems.report("target-key-salt", err);
+    }
   }
 
   /**

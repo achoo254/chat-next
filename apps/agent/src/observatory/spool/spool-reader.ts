@@ -20,7 +20,7 @@
 // once an hour.
 import { readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { readLinesUntil } from "../../office/office-bounded-lines.ts";
+import { readLinesUntil } from "../../activity/bounded-lines.ts";
 import { type FilteredRecord, isFilteredRecord } from "../privacy/filtered-record.ts";
 import { ObservatoryStoreError } from "../store/store-errors.ts";
 import { SPOOL_CURSOR_FILE, SPOOL_DIR, SPOOL_GRACE_MS, SPOOL_MAX_LINE_BYTES, parseSpoolFileName, spoolFileSettled } from "./spool-files.ts";
@@ -45,7 +45,7 @@ export type SpoolReaderOptions = {
   accept: (record: FilteredRecord) => Promise<void>;
   /** Resolves once everything accepted so far is stored (or dropped and counted); rejects when the store cannot take it now. */
   commit: () => Promise<void>;
-  /** A problem at a fixed place, for the throttled log (office/office-problem-log.ts). */
+  /** A problem at a fixed place, for the throttled log (activity/problem-log.ts). */
   problems: (place: string, err: unknown) => void;
   now?: () => number;
   graceMs?: number;

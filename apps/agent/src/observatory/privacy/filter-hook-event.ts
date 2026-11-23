@@ -12,6 +12,8 @@ import { type PathContext, baseName, idValue, keptPath, labelValue } from "./pri
 import { hideAccountNames, hideHomePaths } from "./home-and-account.ts";
 import { finalExcerpt, windowExcerpt } from "./content-excerpt.ts";
 import { REDACT_WINDOW_CHARS, approxJsonBytes, boundedJson } from "./privacy-text.ts";
+import { stationOf } from "../live-map/station-map.ts";
+import { targetKeyOf } from "./target-key-salt.ts";
 import { toolTarget } from "./tool-target.ts";
 
 export type HookFilterContext = {
@@ -31,7 +33,45 @@ export type HookFilterContext = {
   accountNames?: readonly string[];
   /** The project key of the session's real `cwd` (usage/repo-key.ts), worked out before `cwd` is shortened. */
   projectKey?: string | undefined;
+  /** The machine's salt for `target_key` (target-key-salt.ts); without it no key is kept. */
+  targetKeySalt?: Uint8Array | undefined;
 };
+
+const FILE_KEY_TOOLS = new Set(["Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "NotebookRead"]);
+const TODO_STATUS_FIELDS: Readonly<Record<string, string>> = { pending: "todo_pending", in_progress: "todo_in_progress", completed: "todo_done" };
+
+const wholeNumber = (v: unknown): number | undefined => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : undefined);
+
+/**
+ * What a tool call's raw input says that the record keeps without content:
+ * its Live Map station and flags, the salted key of its file, a Read's page,
+ * a TodoWrite's counts by status. Read here, while the raw input is in memory.
+ */
+function toolInputFields(toolName: string, toolInput: unknown, path: PathContext, salt: Uint8Array | undefined): Record<string, HookFieldValue> {
+  const args = record(toolInput);
+  const place = stationOf(toolName, toolInput);
+  const f: Record<string, HookFieldValue> = { station: place.station, station_flags: place.flags };
+  const file = typeof args.file_path === "string" ? args.file_path : typeof args.notebook_path === "string" ? args.notebook_path : "";
+  if (salt && file !== "" && FILE_KEY_TOOLS.has(toolName)) {
+    const key = targetKeyOf(salt, file, path.home, path.cwd);
+    if (key) f.target_key = key;
+  }
+  if (toolName === "Read") {
+    const offset = wholeNumber(args.offset);
+    const limit = wholeNumber(args.limit);
+    if (offset !== undefined) f.read_offset = offset;
+    if (limit !== undefined) f.read_limit = limit;
+  }
+  if (toolName === "TodoWrite" && Array.isArray(args.todos)) {
+    const counts: Record<string, number> = { todo_pending: 0, todo_in_progress: 0, todo_done: 0 };
+    for (const item of args.todos) {
+      const field = TODO_STATUS_FIELDS[String(record(item).status)];
+      if (field) counts[field] = (counts[field] ?? 0) + 1;
+    }
+    Object.assign(f, counts);
+  }
+  return f;
+}
 
 /** Ids of one PostToolBatch kept at most. */
 const MAX_BATCH_IDS = 100;
@@ -102,6 +142,7 @@ export function filterHookEvent(event: string, payload: unknown, ctx: HookFilter
     secret = t.secret;
     if (t.target) f.target = cleanText(t.target, known, ctx.home);
     if (input.tool_input !== undefined) f.input_bytes = approxJsonBytes(input.tool_input);
+    Object.assign(f, toolInputFields(input.tool_name, input.tool_input, path, ctx.targetKeySalt));
   }
   if (event === "PostToolUse" && input.tool_response !== undefined) {
     f.output_bytes = approxJsonBytes(input.tool_response);

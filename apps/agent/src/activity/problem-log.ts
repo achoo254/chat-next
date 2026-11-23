@@ -1,11 +1,11 @@
-// Problems of the office view, for the machine's log. The office never lets
-// an error reach the core's own work, but a problem must not vanish either:
+// Problems of a background reader (the office view, Observatory), for the
+// machine's log. Such a reader never lets an error reach the core's own work, but a problem must not vanish either:
 // each place logs at most one line per interval, with how many times it
 // happened since. A line names the place and the error's kind (its name or
 // system code), never its message: messages may carry paths or content.
 
-/** Where office problems go: one line each. */
-export type OfficeLog = (line: string) => void;
+/** Where problems go: one line each. */
+export type ProblemSink = (line: string) => void;
 
 export const PROBLEM_LOG_INTERVAL_MS = 60_000;
 
@@ -20,13 +20,15 @@ export function errorKind(err: unknown): string {
   return typeof err;
 }
 
-export class OfficeProblems {
+export class ProblemLog {
   private readonly places = new Map<string, { lastAt: number; since: number }>();
 
   constructor(
-    private readonly log: OfficeLog,
+    private readonly log: ProblemSink,
     private readonly now: () => number = Date.now,
     private readonly intervalMs = PROBLEM_LOG_INTERVAL_MS,
+    /** The first word of each line: who had the problem. */
+    private readonly label = "office",
   ) {}
 
   /** A problem at `place` (a fixed name in the code, never data). */
@@ -39,6 +41,6 @@ export class OfficeProblems {
     }
     const more = p && p.since > 0 ? ` (+${p.since} since the last line)` : "";
     this.places.set(place, { lastAt: at, since: 0 });
-    this.log(`office: ${place} failed: ${errorKind(err)}${more}`);
+    this.log(`${this.label}: ${place} failed: ${errorKind(err)}${more}`);
   }
 }

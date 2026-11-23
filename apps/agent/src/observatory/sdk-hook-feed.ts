@@ -44,6 +44,8 @@ export type SdkHookFeedOptions = {
   /** The secret values the agent hides (the machine's and the receiver's tokens). */
   known: () => Iterable<string>;
   accountNames?: readonly string[];
+  /** The machine's salt for `target_key` now (privacy/target-key-salt.ts); undefined keeps no key. */
+  targetKeySalt?: () => Uint8Array | undefined;
   /** Whether Observatory is on now: off, a payload is not even queued. */
   enabled: () => boolean;
   problems: (place: string, err: unknown) => void;
@@ -116,6 +118,7 @@ export class SdkHookFeed {
           known: this.opts.known(),
           stage: "final",
           projectKey,
+          targetKeySalt: this.opts.targetKeySalt?.(),
           ...(this.opts.accountNames ? { accountNames: this.opts.accountNames } : {}),
         },
         item.at,

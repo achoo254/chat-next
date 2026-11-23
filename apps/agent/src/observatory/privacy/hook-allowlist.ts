@@ -49,6 +49,35 @@ export const HOOK_EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, 
   Notification: { notification_type: "label" },
 };
 
+/**
+ * Fields the filter derives from the raw payload and keeps in `f` (never
+ * content): the tool's target label and sizes, the commit of a `git commit`,
+ * the prompt's length, the project key; for a tool event its Live Map
+ * station and flags (live-map/station-map.ts), the salted key of the file it
+ * touched (target-key-salt.ts), a Read's page (offset, limit) and the counts
+ * of a TodoWrite's list by status (the items' text is dropped).
+ */
+export const DERIVED_HOOK_FIELDS: Readonly<Record<string, "label" | "number" | "id" | "ids">> = {
+  target: "label",
+  input_bytes: "number",
+  output_bytes: "number",
+  git_op: "label",
+  git_sha: "id",
+  git_kind: "label",
+  git_branch: "label",
+  tool_use_ids: "ids",
+  prompt_length: "number",
+  project_key: "label",
+  station: "label",
+  station_flags: "number",
+  target_key: "id",
+  read_offset: "number",
+  read_limit: "number",
+  todo_pending: "number",
+  todo_in_progress: "number",
+  todo_done: "number",
+};
+
 /** The hook events Observatory keeps. */
 export function isKeptHookEvent(event: string): boolean {
   return Object.hasOwn(HOOK_EVENT_FIELDS, event);
