@@ -309,7 +309,7 @@ describe("signing in again", () => {
 	it("reuses the notice and the QR flow for a Zalo account that needs a new login", async () => {
 		const fixture = zaloFixture();
 		fixture.bridge.accounts = [
-			{ $typeName: "app.v1.BridgeAccount", id: 2n, source: "zalo", status: BridgeAccountStatus.NEEDS_LOGIN, syncState: BridgeSyncState.LIVE, lastError: "", chats: [] },
+			{ $typeName: "app.v1.BridgeAccount", id: 2n, source: "zalo", status: BridgeAccountStatus.NEEDS_LOGIN, syncState: BridgeSyncState.LIVE, lastError: "", chats: [], sendGated: true, sendEnabled: false },
 		];
 		await openPage(fixture);
 		await userEvent.click(screen.getByRole("button", { name: "Kết nối lại" }));

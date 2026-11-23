@@ -28,7 +28,7 @@ export const viBridge = {
 				`${app} không có API chính thức cho tài khoản cá nhân. Chat kết nối qua một cách không chính thức, trái với điều khoản sử dụng của ${app}.`,
 				`${app} có thể hạn chế hoặc khoá tài khoản vì việc này. Hãy cân nhắc trước khi kết nối.`,
 				"Chỉ dùng tài khoản của chính bạn.",
-				"Chat chỉ đọc tin nhắn và (sau này) gửi những gì bạn tự gõ trong Chat.",
+				"Chat chỉ đọc tin nhắn. Chỉ khi bạn bật «Gửi tin» cho tài khoản, Chat mới gửi chữ bạn tự gõ trong Chat.",
 				"Phiên đăng nhập được lưu mã hoá trên máy chủ. Bạn có thể ngắt kết nối và xoá nó bất cứ lúc nào.",
 			],
 			accept: "Tôi đã hiểu các điều trên và dùng tài khoản của chính mình.",
@@ -104,6 +104,25 @@ export const viBridge = {
 			startLater: (app: string): string => `Nhận tin nhắn ${app}`,
 			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới đi một chiều về Chat.`,
 		},
+	},
+	/** The sending switch of an account whose app sends only once the owner allows it (Zalo): off by default, a risk notice before it goes on. */
+	send: {
+		label: (app: string): string => `Gửi tin sang ${app}`,
+		hint: "Tắt: tin chỉ về Chat. Bật: chữ bạn tự gõ trong các chat của tài khoản này được gửi sang ứng dụng kia.",
+		liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới về Chat và chữ bạn gõ trong Chat được gửi đi.`,
+		confirm: {
+			title: (app: string): string => `Bật gửi tin sang ${app}?`,
+			points: (app: string): readonly string[] => [
+				`Chat gửi tin qua một cách không chính thức, trái với điều khoản sử dụng của ${app}.`,
+				`${app} có thể hạn chế hoặc khoá tài khoản cá nhân chính của bạn vì việc này.`,
+				"Chỉ chữ do chính bạn gõ trong Chat được gửi đi; Chat không tự gửi gì.",
+				`Đừng mở ${app} Web hoặc ${app} trên máy tính trong lúc đang kết nối.`,
+			],
+			action: "Tôi hiểu, bật gửi tin",
+			busy: "Đang bật…",
+		},
+		on: "Đã bật gửi tin.",
+		off: "Đã tắt gửi tin. Các chat chỉ nhận tin.",
 	},
 	account: {
 		status: {

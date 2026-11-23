@@ -483,6 +483,14 @@ type Sender interface {
 	DeleteMessages(ctx context.Context, acct Account, d Delete) error
 }
 
+// SendGated marks an adapter whose sending the owner switches on per account,
+// off until then. The engine lets Chat write to such an adapter only for an
+// account with sending enabled (external_accounts.send_enabled); other adapters
+// are not gated.
+type SendGated interface {
+	SendGated()
+}
+
 // ErrNotAllowed is returned when the other app refuses the action for
 // this account (no right to post in a channel, blocked by the user, not a
 // member). Retrying cannot help; the message is shown as failed with the

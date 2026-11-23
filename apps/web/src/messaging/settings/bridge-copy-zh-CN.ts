@@ -26,7 +26,7 @@ export const zhCNBridge: BridgeCopy = {
 				`${app} 没有面向个人账号的官方 API。Chat 通过非官方方式连接，这违反 ${app} 的使用条款。`,
 				`${app} 可能因此限制或封禁该账号。请在连接前慎重考虑。`,
 				"只使用你本人的账号。",
-				"Chat 只读取消息，并且（以后）只发送你在 Chat 中亲自输入的内容。",
+				"Chat 只读取消息。只有你为该账号开启“发送消息”后，Chat 才会发送你在 Chat 中亲自输入的文字。",
 				"登录会话加密保存在服务器上。你可以随时断开连接并删除它。",
 			],
 			accept: "我已了解以上内容，并使用我本人的账号。",
@@ -95,6 +95,25 @@ export const zhCNBridge: BridgeCopy = {
 			startLater: (app: string): string => `接收 ${app} 消息`,
 			liveBody: (count: number): string => `${count} 个会话，新消息单向进入 Chat。`,
 		},
+	},
+	/** The sending switch of an account whose app sends only once the owner allows it (Zalo): off by default, a risk notice before it goes on. */
+	send: {
+		label: (app: string): string => `向 ${app} 发送消息`,
+		hint: "关闭：消息只进入 Chat。开启：你在此账号的聊天中输入的文字会发送到对方应用。",
+		liveBody: (count: number): string => `${count} 个会话，新消息进入 Chat，你在 Chat 中输入的文字也会发出。`,
+		confirm: {
+			title: (app: string): string => `开启向 ${app} 发送消息？`,
+			points: (app: string): readonly string[] => [
+				`Chat 通过非官方方式发送消息，违反 ${app} 的使用条款。`,
+				`${app} 可能因此限制或封禁你的主要个人账号。`,
+				"只发送你在 Chat 中亲自输入的文字；Chat 不会自动发送任何内容。",
+				`连接期间请勿打开 ${app} 网页版或电脑版。`,
+			],
+			action: "我已了解，开启发送",
+			busy: "正在开启…",
+		},
+		on: "已开启发送。",
+		off: "已关闭发送。聊天只接收消息。",
 	},
 	account: {
 		status: {

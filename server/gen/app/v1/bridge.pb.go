@@ -503,10 +503,15 @@ type BridgeAccount struct {
 	Source string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
 	Status BridgeAccountStatus    `protobuf:"varint,3,opt,name=status,proto3,enum=app.v1.BridgeAccountStatus" json:"status,omitempty"`
 	// Why the connection last failed (a short text, no secret); empty when fine.
-	LastError     string              `protobuf:"bytes,4,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
-	Chats         []*BridgeSyncedChat `protobuf:"bytes,5,rep,name=chats,proto3" json:"chats,omitempty"`
-	SyncState     BridgeSyncState     `protobuf:"varint,6,opt,name=sync_state,json=syncState,proto3,enum=app.v1.BridgeSyncState" json:"sync_state,omitempty"`
-	Progress      *BridgeSyncProgress `protobuf:"bytes,7,opt,name=progress,proto3" json:"progress,omitempty"`
+	LastError string              `protobuf:"bytes,4,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	Chats     []*BridgeSyncedChat `protobuf:"bytes,5,rep,name=chats,proto3" json:"chats,omitempty"`
+	SyncState BridgeSyncState     `protobuf:"varint,6,opt,name=sync_state,json=syncState,proto3,enum=app.v1.BridgeSyncState" json:"sync_state,omitempty"`
+	Progress  *BridgeSyncProgress `protobuf:"bytes,7,opt,name=progress,proto3" json:"progress,omitempty"`
+	// The app sends only once the owner switches sending on for the account
+	// (SetBridgeSendEnabled); send_enabled is that switch, off by default. Apps
+	// without the switch report false for both.
+	SendGated     bool `protobuf:"varint,8,opt,name=send_gated,json=sendGated,proto3" json:"send_gated,omitempty"`
+	SendEnabled   bool `protobuf:"varint,9,opt,name=send_enabled,json=sendEnabled,proto3" json:"send_enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -588,6 +593,20 @@ func (x *BridgeAccount) GetProgress() *BridgeSyncProgress {
 		return x.Progress
 	}
 	return nil
+}
+
+func (x *BridgeAccount) GetSendGated() bool {
+	if x != nil {
+		return x.SendGated
+	}
+	return false
+}
+
+func (x *BridgeAccount) GetSendEnabled() bool {
+	if x != nil {
+		return x.SendEnabled
+	}
+	return false
 }
 
 // How far the first import went.
@@ -741,6 +760,94 @@ func (*StartBridgeSyncResponse) Descriptor() ([]byte, []int) {
 	return file_app_v1_bridge_proto_rawDescGZIP(), []int{5}
 }
 
+type SetBridgeSendEnabledRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBridgeSendEnabledRequest) Reset() {
+	*x = SetBridgeSendEnabledRequest{}
+	mi := &file_app_v1_bridge_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBridgeSendEnabledRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBridgeSendEnabledRequest) ProtoMessage() {}
+
+func (x *SetBridgeSendEnabledRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBridgeSendEnabledRequest.ProtoReflect.Descriptor instead.
+func (*SetBridgeSendEnabledRequest) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SetBridgeSendEnabledRequest) GetAccountId() int64 {
+	if x != nil {
+		return x.AccountId
+	}
+	return 0
+}
+
+func (x *SetBridgeSendEnabledRequest) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+type SetBridgeSendEnabledResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBridgeSendEnabledResponse) Reset() {
+	*x = SetBridgeSendEnabledResponse{}
+	mi := &file_app_v1_bridge_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBridgeSendEnabledResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBridgeSendEnabledResponse) ProtoMessage() {}
+
+func (x *SetBridgeSendEnabledResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_bridge_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBridgeSendEnabledResponse.ProtoReflect.Descriptor instead.
+func (*SetBridgeSendEnabledResponse) Descriptor() ([]byte, []int) {
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{7}
+}
+
 type GetBridgeStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -749,7 +856,7 @@ type GetBridgeStatusRequest struct {
 
 func (x *GetBridgeStatusRequest) Reset() {
 	*x = GetBridgeStatusRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[6]
+	mi := &file_app_v1_bridge_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +868,7 @@ func (x *GetBridgeStatusRequest) String() string {
 func (*GetBridgeStatusRequest) ProtoMessage() {}
 
 func (x *GetBridgeStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[6]
+	mi := &file_app_v1_bridge_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +881,7 @@ func (x *GetBridgeStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBridgeStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetBridgeStatusRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{6}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{8}
 }
 
 type GetBridgeStatusResponse struct {
@@ -787,7 +894,7 @@ type GetBridgeStatusResponse struct {
 
 func (x *GetBridgeStatusResponse) Reset() {
 	*x = GetBridgeStatusResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[7]
+	mi := &file_app_v1_bridge_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -799,7 +906,7 @@ func (x *GetBridgeStatusResponse) String() string {
 func (*GetBridgeStatusResponse) ProtoMessage() {}
 
 func (x *GetBridgeStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[7]
+	mi := &file_app_v1_bridge_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +919,7 @@ func (x *GetBridgeStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBridgeStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetBridgeStatusResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{7}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetBridgeStatusResponse) GetApps() []*BridgeApp {
@@ -841,7 +948,7 @@ type BridgeLoginField struct {
 
 func (x *BridgeLoginField) Reset() {
 	*x = BridgeLoginField{}
-	mi := &file_app_v1_bridge_proto_msgTypes[8]
+	mi := &file_app_v1_bridge_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +960,7 @@ func (x *BridgeLoginField) String() string {
 func (*BridgeLoginField) ProtoMessage() {}
 
 func (x *BridgeLoginField) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[8]
+	mi := &file_app_v1_bridge_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +973,7 @@ func (x *BridgeLoginField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeLoginField.ProtoReflect.Descriptor instead.
 func (*BridgeLoginField) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{8}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BridgeLoginField) GetName() string {
@@ -906,7 +1013,7 @@ type BridgeLoginStep struct {
 
 func (x *BridgeLoginStep) Reset() {
 	*x = BridgeLoginStep{}
-	mi := &file_app_v1_bridge_proto_msgTypes[9]
+	mi := &file_app_v1_bridge_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -918,7 +1025,7 @@ func (x *BridgeLoginStep) String() string {
 func (*BridgeLoginStep) ProtoMessage() {}
 
 func (x *BridgeLoginStep) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[9]
+	mi := &file_app_v1_bridge_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -931,7 +1038,7 @@ func (x *BridgeLoginStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeLoginStep.ProtoReflect.Descriptor instead.
 func (*BridgeLoginStep) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BridgeLoginStep) GetKind() BridgeLoginStepKind {
@@ -978,7 +1085,7 @@ type StartBridgeLoginRequest struct {
 
 func (x *StartBridgeLoginRequest) Reset() {
 	*x = StartBridgeLoginRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[10]
+	mi := &file_app_v1_bridge_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1097,7 @@ func (x *StartBridgeLoginRequest) String() string {
 func (*StartBridgeLoginRequest) ProtoMessage() {}
 
 func (x *StartBridgeLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[10]
+	mi := &file_app_v1_bridge_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1110,7 @@ func (x *StartBridgeLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBridgeLoginRequest.ProtoReflect.Descriptor instead.
 func (*StartBridgeLoginRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{10}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *StartBridgeLoginRequest) GetSource() string {
@@ -1022,7 +1129,7 @@ type StartBridgeLoginResponse struct {
 
 func (x *StartBridgeLoginResponse) Reset() {
 	*x = StartBridgeLoginResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[11]
+	mi := &file_app_v1_bridge_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1034,7 +1141,7 @@ func (x *StartBridgeLoginResponse) String() string {
 func (*StartBridgeLoginResponse) ProtoMessage() {}
 
 func (x *StartBridgeLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[11]
+	mi := &file_app_v1_bridge_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1047,7 +1154,7 @@ func (x *StartBridgeLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartBridgeLoginResponse.ProtoReflect.Descriptor instead.
 func (*StartBridgeLoginResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{11}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StartBridgeLoginResponse) GetStep() *BridgeLoginStep {
@@ -1068,7 +1175,7 @@ type ContinueBridgeLoginRequest struct {
 
 func (x *ContinueBridgeLoginRequest) Reset() {
 	*x = ContinueBridgeLoginRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[12]
+	mi := &file_app_v1_bridge_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1080,7 +1187,7 @@ func (x *ContinueBridgeLoginRequest) String() string {
 func (*ContinueBridgeLoginRequest) ProtoMessage() {}
 
 func (x *ContinueBridgeLoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[12]
+	mi := &file_app_v1_bridge_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1093,7 +1200,7 @@ func (x *ContinueBridgeLoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContinueBridgeLoginRequest.ProtoReflect.Descriptor instead.
 func (*ContinueBridgeLoginRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{12}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ContinueBridgeLoginRequest) GetLoginId() string {
@@ -1119,7 +1226,7 @@ type ContinueBridgeLoginResponse struct {
 
 func (x *ContinueBridgeLoginResponse) Reset() {
 	*x = ContinueBridgeLoginResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[13]
+	mi := &file_app_v1_bridge_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1131,7 +1238,7 @@ func (x *ContinueBridgeLoginResponse) String() string {
 func (*ContinueBridgeLoginResponse) ProtoMessage() {}
 
 func (x *ContinueBridgeLoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[13]
+	mi := &file_app_v1_bridge_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1144,7 +1251,7 @@ func (x *ContinueBridgeLoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContinueBridgeLoginResponse.ProtoReflect.Descriptor instead.
 func (*ContinueBridgeLoginResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{13}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ContinueBridgeLoginResponse) GetStep() *BridgeLoginStep {
@@ -1163,7 +1270,7 @@ type ListBridgeConversationsRequest struct {
 
 func (x *ListBridgeConversationsRequest) Reset() {
 	*x = ListBridgeConversationsRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[14]
+	mi := &file_app_v1_bridge_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1175,7 +1282,7 @@ func (x *ListBridgeConversationsRequest) String() string {
 func (*ListBridgeConversationsRequest) ProtoMessage() {}
 
 func (x *ListBridgeConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[14]
+	mi := &file_app_v1_bridge_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1188,7 +1295,7 @@ func (x *ListBridgeConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeConversationsRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{14}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListBridgeConversationsRequest) GetAccountId() int64 {
@@ -1217,7 +1324,7 @@ type BridgeConversation struct {
 
 func (x *BridgeConversation) Reset() {
 	*x = BridgeConversation{}
-	mi := &file_app_v1_bridge_proto_msgTypes[15]
+	mi := &file_app_v1_bridge_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1229,7 +1336,7 @@ func (x *BridgeConversation) String() string {
 func (*BridgeConversation) ProtoMessage() {}
 
 func (x *BridgeConversation) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[15]
+	mi := &file_app_v1_bridge_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1242,7 +1349,7 @@ func (x *BridgeConversation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeConversation.ProtoReflect.Descriptor instead.
 func (*BridgeConversation) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{15}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BridgeConversation) GetId() string {
@@ -1296,7 +1403,7 @@ type ListBridgeConversationsResponse struct {
 
 func (x *ListBridgeConversationsResponse) Reset() {
 	*x = ListBridgeConversationsResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[16]
+	mi := &file_app_v1_bridge_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +1415,7 @@ func (x *ListBridgeConversationsResponse) String() string {
 func (*ListBridgeConversationsResponse) ProtoMessage() {}
 
 func (x *ListBridgeConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[16]
+	mi := &file_app_v1_bridge_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +1428,7 @@ func (x *ListBridgeConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeConversationsResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{16}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListBridgeConversationsResponse) GetConversations() []*BridgeConversation {
@@ -1344,7 +1451,7 @@ type EnableBridgeChatRequest struct {
 
 func (x *EnableBridgeChatRequest) Reset() {
 	*x = EnableBridgeChatRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[17]
+	mi := &file_app_v1_bridge_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1463,7 @@ func (x *EnableBridgeChatRequest) String() string {
 func (*EnableBridgeChatRequest) ProtoMessage() {}
 
 func (x *EnableBridgeChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[17]
+	mi := &file_app_v1_bridge_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1476,7 @@ func (x *EnableBridgeChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnableBridgeChatRequest.ProtoReflect.Descriptor instead.
 func (*EnableBridgeChatRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{17}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EnableBridgeChatRequest) GetAccountId() int64 {
@@ -1409,7 +1516,7 @@ type EnableBridgeChatResponse struct {
 
 func (x *EnableBridgeChatResponse) Reset() {
 	*x = EnableBridgeChatResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[18]
+	mi := &file_app_v1_bridge_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1528,7 @@ func (x *EnableBridgeChatResponse) String() string {
 func (*EnableBridgeChatResponse) ProtoMessage() {}
 
 func (x *EnableBridgeChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[18]
+	mi := &file_app_v1_bridge_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1541,7 @@ func (x *EnableBridgeChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnableBridgeChatResponse.ProtoReflect.Descriptor instead.
 func (*EnableBridgeChatResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{18}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *EnableBridgeChatResponse) GetChatId() int64 {
@@ -1454,7 +1561,7 @@ type RemoveBridgeChatRequest struct {
 
 func (x *RemoveBridgeChatRequest) Reset() {
 	*x = RemoveBridgeChatRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[19]
+	mi := &file_app_v1_bridge_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1466,7 +1573,7 @@ func (x *RemoveBridgeChatRequest) String() string {
 func (*RemoveBridgeChatRequest) ProtoMessage() {}
 
 func (x *RemoveBridgeChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[19]
+	mi := &file_app_v1_bridge_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1479,7 +1586,7 @@ func (x *RemoveBridgeChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBridgeChatRequest.ProtoReflect.Descriptor instead.
 func (*RemoveBridgeChatRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{19}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RemoveBridgeChatRequest) GetAccountId() int64 {
@@ -1504,7 +1611,7 @@ type RemoveBridgeChatResponse struct {
 
 func (x *RemoveBridgeChatResponse) Reset() {
 	*x = RemoveBridgeChatResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[20]
+	mi := &file_app_v1_bridge_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1516,7 +1623,7 @@ func (x *RemoveBridgeChatResponse) String() string {
 func (*RemoveBridgeChatResponse) ProtoMessage() {}
 
 func (x *RemoveBridgeChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[20]
+	mi := &file_app_v1_bridge_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1529,7 +1636,7 @@ func (x *RemoveBridgeChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBridgeChatResponse.ProtoReflect.Descriptor instead.
 func (*RemoveBridgeChatResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{20}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{22}
 }
 
 type DisconnectBridgeAccountRequest struct {
@@ -1542,7 +1649,7 @@ type DisconnectBridgeAccountRequest struct {
 
 func (x *DisconnectBridgeAccountRequest) Reset() {
 	*x = DisconnectBridgeAccountRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[21]
+	mi := &file_app_v1_bridge_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1554,7 +1661,7 @@ func (x *DisconnectBridgeAccountRequest) String() string {
 func (*DisconnectBridgeAccountRequest) ProtoMessage() {}
 
 func (x *DisconnectBridgeAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[21]
+	mi := &file_app_v1_bridge_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1567,7 +1674,7 @@ func (x *DisconnectBridgeAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectBridgeAccountRequest.ProtoReflect.Descriptor instead.
 func (*DisconnectBridgeAccountRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{21}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DisconnectBridgeAccountRequest) GetAccountId() int64 {
@@ -1592,7 +1699,7 @@ type DisconnectBridgeAccountResponse struct {
 
 func (x *DisconnectBridgeAccountResponse) Reset() {
 	*x = DisconnectBridgeAccountResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[22]
+	mi := &file_app_v1_bridge_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1604,7 +1711,7 @@ func (x *DisconnectBridgeAccountResponse) String() string {
 func (*DisconnectBridgeAccountResponse) ProtoMessage() {}
 
 func (x *DisconnectBridgeAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[22]
+	mi := &file_app_v1_bridge_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1617,7 +1724,7 @@ func (x *DisconnectBridgeAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DisconnectBridgeAccountResponse.ProtoReflect.Descriptor instead.
 func (*DisconnectBridgeAccountResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{22}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{24}
 }
 
 type SetBridgeChatDirectionRequest struct {
@@ -1631,7 +1738,7 @@ type SetBridgeChatDirectionRequest struct {
 
 func (x *SetBridgeChatDirectionRequest) Reset() {
 	*x = SetBridgeChatDirectionRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[23]
+	mi := &file_app_v1_bridge_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1643,7 +1750,7 @@ func (x *SetBridgeChatDirectionRequest) String() string {
 func (*SetBridgeChatDirectionRequest) ProtoMessage() {}
 
 func (x *SetBridgeChatDirectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[23]
+	mi := &file_app_v1_bridge_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1656,7 +1763,7 @@ func (x *SetBridgeChatDirectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeChatDirectionRequest.ProtoReflect.Descriptor instead.
 func (*SetBridgeChatDirectionRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{23}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SetBridgeChatDirectionRequest) GetAccountId() int64 {
@@ -1688,7 +1795,7 @@ type SetBridgeChatDirectionResponse struct {
 
 func (x *SetBridgeChatDirectionResponse) Reset() {
 	*x = SetBridgeChatDirectionResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[24]
+	mi := &file_app_v1_bridge_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1700,7 +1807,7 @@ func (x *SetBridgeChatDirectionResponse) String() string {
 func (*SetBridgeChatDirectionResponse) ProtoMessage() {}
 
 func (x *SetBridgeChatDirectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[24]
+	mi := &file_app_v1_bridge_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1713,7 +1820,7 @@ func (x *SetBridgeChatDirectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeChatDirectionResponse.ProtoReflect.Descriptor instead.
 func (*SetBridgeChatDirectionResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{24}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{26}
 }
 
 type BridgeOutboxItem struct {
@@ -1731,7 +1838,7 @@ type BridgeOutboxItem struct {
 
 func (x *BridgeOutboxItem) Reset() {
 	*x = BridgeOutboxItem{}
-	mi := &file_app_v1_bridge_proto_msgTypes[25]
+	mi := &file_app_v1_bridge_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1743,7 +1850,7 @@ func (x *BridgeOutboxItem) String() string {
 func (*BridgeOutboxItem) ProtoMessage() {}
 
 func (x *BridgeOutboxItem) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[25]
+	mi := &file_app_v1_bridge_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1756,7 +1863,7 @@ func (x *BridgeOutboxItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeOutboxItem.ProtoReflect.Descriptor instead.
 func (*BridgeOutboxItem) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{25}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *BridgeOutboxItem) GetSeq() int64 {
@@ -1803,7 +1910,7 @@ type ListBridgeOutboxRequest struct {
 
 func (x *ListBridgeOutboxRequest) Reset() {
 	*x = ListBridgeOutboxRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[26]
+	mi := &file_app_v1_bridge_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1815,7 +1922,7 @@ func (x *ListBridgeOutboxRequest) String() string {
 func (*ListBridgeOutboxRequest) ProtoMessage() {}
 
 func (x *ListBridgeOutboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[26]
+	mi := &file_app_v1_bridge_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1828,7 +1935,7 @@ func (x *ListBridgeOutboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeOutboxRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeOutboxRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{26}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListBridgeOutboxRequest) GetChatId() int64 {
@@ -1847,7 +1954,7 @@ type ListBridgeOutboxResponse struct {
 
 func (x *ListBridgeOutboxResponse) Reset() {
 	*x = ListBridgeOutboxResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[27]
+	mi := &file_app_v1_bridge_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1859,7 +1966,7 @@ func (x *ListBridgeOutboxResponse) String() string {
 func (*ListBridgeOutboxResponse) ProtoMessage() {}
 
 func (x *ListBridgeOutboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[27]
+	mi := &file_app_v1_bridge_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1872,7 +1979,7 @@ func (x *ListBridgeOutboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeOutboxResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeOutboxResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{27}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListBridgeOutboxResponse) GetItems() []*BridgeOutboxItem {
@@ -1892,7 +1999,7 @@ type RetryBridgeMessageRequest struct {
 
 func (x *RetryBridgeMessageRequest) Reset() {
 	*x = RetryBridgeMessageRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[28]
+	mi := &file_app_v1_bridge_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1904,7 +2011,7 @@ func (x *RetryBridgeMessageRequest) String() string {
 func (*RetryBridgeMessageRequest) ProtoMessage() {}
 
 func (x *RetryBridgeMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[28]
+	mi := &file_app_v1_bridge_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1917,7 +2024,7 @@ func (x *RetryBridgeMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryBridgeMessageRequest.ProtoReflect.Descriptor instead.
 func (*RetryBridgeMessageRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{28}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RetryBridgeMessageRequest) GetChatId() int64 {
@@ -1942,7 +2049,7 @@ type RetryBridgeMessageResponse struct {
 
 func (x *RetryBridgeMessageResponse) Reset() {
 	*x = RetryBridgeMessageResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[29]
+	mi := &file_app_v1_bridge_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1954,7 +2061,7 @@ func (x *RetryBridgeMessageResponse) String() string {
 func (*RetryBridgeMessageResponse) ProtoMessage() {}
 
 func (x *RetryBridgeMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[29]
+	mi := &file_app_v1_bridge_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1967,7 +2074,7 @@ func (x *RetryBridgeMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryBridgeMessageResponse.ProtoReflect.Descriptor instead.
 func (*RetryBridgeMessageResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{29}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{31}
 }
 
 type DismissBridgeMessageRequest struct {
@@ -1980,7 +2087,7 @@ type DismissBridgeMessageRequest struct {
 
 func (x *DismissBridgeMessageRequest) Reset() {
 	*x = DismissBridgeMessageRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[30]
+	mi := &file_app_v1_bridge_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1992,7 +2099,7 @@ func (x *DismissBridgeMessageRequest) String() string {
 func (*DismissBridgeMessageRequest) ProtoMessage() {}
 
 func (x *DismissBridgeMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[30]
+	mi := &file_app_v1_bridge_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2005,7 +2112,7 @@ func (x *DismissBridgeMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissBridgeMessageRequest.ProtoReflect.Descriptor instead.
 func (*DismissBridgeMessageRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{30}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DismissBridgeMessageRequest) GetChatId() int64 {
@@ -2030,7 +2137,7 @@ type DismissBridgeMessageResponse struct {
 
 func (x *DismissBridgeMessageResponse) Reset() {
 	*x = DismissBridgeMessageResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[31]
+	mi := &file_app_v1_bridge_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2042,7 +2149,7 @@ func (x *DismissBridgeMessageResponse) String() string {
 func (*DismissBridgeMessageResponse) ProtoMessage() {}
 
 func (x *DismissBridgeMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[31]
+	mi := &file_app_v1_bridge_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2055,7 +2162,7 @@ func (x *DismissBridgeMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissBridgeMessageResponse.ProtoReflect.Descriptor instead.
 func (*DismissBridgeMessageResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{31}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{33}
 }
 
 type ListBridgeFeaturesRequest struct {
@@ -2068,7 +2175,7 @@ type ListBridgeFeaturesRequest struct {
 
 func (x *ListBridgeFeaturesRequest) Reset() {
 	*x = ListBridgeFeaturesRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[32]
+	mi := &file_app_v1_bridge_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2080,7 +2187,7 @@ func (x *ListBridgeFeaturesRequest) String() string {
 func (*ListBridgeFeaturesRequest) ProtoMessage() {}
 
 func (x *ListBridgeFeaturesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[32]
+	mi := &file_app_v1_bridge_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2093,7 +2200,7 @@ func (x *ListBridgeFeaturesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeFeaturesRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeFeaturesRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{32}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListBridgeFeaturesRequest) GetAccountId() int64 {
@@ -2132,7 +2239,7 @@ type BridgeFeature struct {
 
 func (x *BridgeFeature) Reset() {
 	*x = BridgeFeature{}
-	mi := &file_app_v1_bridge_proto_msgTypes[33]
+	mi := &file_app_v1_bridge_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2144,7 +2251,7 @@ func (x *BridgeFeature) String() string {
 func (*BridgeFeature) ProtoMessage() {}
 
 func (x *BridgeFeature) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[33]
+	mi := &file_app_v1_bridge_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2157,7 +2264,7 @@ func (x *BridgeFeature) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeFeature.ProtoReflect.Descriptor instead.
 func (*BridgeFeature) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{33}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *BridgeFeature) GetFeature() string {
@@ -2211,7 +2318,7 @@ type ListBridgeFeaturesResponse struct {
 
 func (x *ListBridgeFeaturesResponse) Reset() {
 	*x = ListBridgeFeaturesResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[34]
+	mi := &file_app_v1_bridge_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2223,7 +2330,7 @@ func (x *ListBridgeFeaturesResponse) String() string {
 func (*ListBridgeFeaturesResponse) ProtoMessage() {}
 
 func (x *ListBridgeFeaturesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[34]
+	mi := &file_app_v1_bridge_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2236,7 +2343,7 @@ func (x *ListBridgeFeaturesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeFeaturesResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeFeaturesResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{34}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListBridgeFeaturesResponse) GetFeatures() []*BridgeFeature {
@@ -2258,7 +2365,7 @@ type SetBridgeFeatureRequest struct {
 
 func (x *SetBridgeFeatureRequest) Reset() {
 	*x = SetBridgeFeatureRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[35]
+	mi := &file_app_v1_bridge_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2270,7 +2377,7 @@ func (x *SetBridgeFeatureRequest) String() string {
 func (*SetBridgeFeatureRequest) ProtoMessage() {}
 
 func (x *SetBridgeFeatureRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[35]
+	mi := &file_app_v1_bridge_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2283,7 +2390,7 @@ func (x *SetBridgeFeatureRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeFeatureRequest.ProtoReflect.Descriptor instead.
 func (*SetBridgeFeatureRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{35}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SetBridgeFeatureRequest) GetAccountId() int64 {
@@ -2322,7 +2429,7 @@ type SetBridgeFeatureResponse struct {
 
 func (x *SetBridgeFeatureResponse) Reset() {
 	*x = SetBridgeFeatureResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[36]
+	mi := &file_app_v1_bridge_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2334,7 +2441,7 @@ func (x *SetBridgeFeatureResponse) String() string {
 func (*SetBridgeFeatureResponse) ProtoMessage() {}
 
 func (x *SetBridgeFeatureResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[36]
+	mi := &file_app_v1_bridge_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2347,7 +2454,7 @@ func (x *SetBridgeFeatureResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeFeatureResponse.ProtoReflect.Descriptor instead.
 func (*SetBridgeFeatureResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{36}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{38}
 }
 
 type ListBridgeInvitesRequest struct {
@@ -2360,7 +2467,7 @@ type ListBridgeInvitesRequest struct {
 
 func (x *ListBridgeInvitesRequest) Reset() {
 	*x = ListBridgeInvitesRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[37]
+	mi := &file_app_v1_bridge_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2372,7 +2479,7 @@ func (x *ListBridgeInvitesRequest) String() string {
 func (*ListBridgeInvitesRequest) ProtoMessage() {}
 
 func (x *ListBridgeInvitesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[37]
+	mi := &file_app_v1_bridge_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2385,7 +2492,7 @@ func (x *ListBridgeInvitesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeInvitesRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeInvitesRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{37}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ListBridgeInvitesRequest) GetAccountId() int64 {
@@ -2415,7 +2522,7 @@ type BridgeInvite struct {
 
 func (x *BridgeInvite) Reset() {
 	*x = BridgeInvite{}
-	mi := &file_app_v1_bridge_proto_msgTypes[38]
+	mi := &file_app_v1_bridge_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2427,7 +2534,7 @@ func (x *BridgeInvite) String() string {
 func (*BridgeInvite) ProtoMessage() {}
 
 func (x *BridgeInvite) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[38]
+	mi := &file_app_v1_bridge_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2440,7 +2547,7 @@ func (x *BridgeInvite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeInvite.ProtoReflect.Descriptor instead.
 func (*BridgeInvite) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{38}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *BridgeInvite) GetLink() string {
@@ -2480,7 +2587,7 @@ type ListBridgeInvitesResponse struct {
 
 func (x *ListBridgeInvitesResponse) Reset() {
 	*x = ListBridgeInvitesResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[39]
+	mi := &file_app_v1_bridge_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2492,7 +2599,7 @@ func (x *ListBridgeInvitesResponse) String() string {
 func (*ListBridgeInvitesResponse) ProtoMessage() {}
 
 func (x *ListBridgeInvitesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[39]
+	mi := &file_app_v1_bridge_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2505,7 +2612,7 @@ func (x *ListBridgeInvitesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeInvitesResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeInvitesResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{39}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListBridgeInvitesResponse) GetInvites() []*BridgeInvite {
@@ -2526,7 +2633,7 @@ type CreateBridgeInviteRequest struct {
 
 func (x *CreateBridgeInviteRequest) Reset() {
 	*x = CreateBridgeInviteRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[40]
+	mi := &file_app_v1_bridge_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2538,7 +2645,7 @@ func (x *CreateBridgeInviteRequest) String() string {
 func (*CreateBridgeInviteRequest) ProtoMessage() {}
 
 func (x *CreateBridgeInviteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[40]
+	mi := &file_app_v1_bridge_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2551,7 +2658,7 @@ func (x *CreateBridgeInviteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBridgeInviteRequest.ProtoReflect.Descriptor instead.
 func (*CreateBridgeInviteRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{40}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CreateBridgeInviteRequest) GetAccountId() int64 {
@@ -2583,7 +2690,7 @@ type CreateBridgeInviteResponse struct {
 
 func (x *CreateBridgeInviteResponse) Reset() {
 	*x = CreateBridgeInviteResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[41]
+	mi := &file_app_v1_bridge_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2595,7 +2702,7 @@ func (x *CreateBridgeInviteResponse) String() string {
 func (*CreateBridgeInviteResponse) ProtoMessage() {}
 
 func (x *CreateBridgeInviteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[41]
+	mi := &file_app_v1_bridge_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2608,7 +2715,7 @@ func (x *CreateBridgeInviteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBridgeInviteResponse.ProtoReflect.Descriptor instead.
 func (*CreateBridgeInviteResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{41}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{43}
 }
 
 type RevokeBridgeInviteRequest struct {
@@ -2622,7 +2729,7 @@ type RevokeBridgeInviteRequest struct {
 
 func (x *RevokeBridgeInviteRequest) Reset() {
 	*x = RevokeBridgeInviteRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[42]
+	mi := &file_app_v1_bridge_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2634,7 +2741,7 @@ func (x *RevokeBridgeInviteRequest) String() string {
 func (*RevokeBridgeInviteRequest) ProtoMessage() {}
 
 func (x *RevokeBridgeInviteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[42]
+	mi := &file_app_v1_bridge_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2647,7 +2754,7 @@ func (x *RevokeBridgeInviteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeBridgeInviteRequest.ProtoReflect.Descriptor instead.
 func (*RevokeBridgeInviteRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{42}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RevokeBridgeInviteRequest) GetAccountId() int64 {
@@ -2679,7 +2786,7 @@ type RevokeBridgeInviteResponse struct {
 
 func (x *RevokeBridgeInviteResponse) Reset() {
 	*x = RevokeBridgeInviteResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[43]
+	mi := &file_app_v1_bridge_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2691,7 +2798,7 @@ func (x *RevokeBridgeInviteResponse) String() string {
 func (*RevokeBridgeInviteResponse) ProtoMessage() {}
 
 func (x *RevokeBridgeInviteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[43]
+	mi := &file_app_v1_bridge_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2704,7 +2811,7 @@ func (x *RevokeBridgeInviteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeBridgeInviteResponse.ProtoReflect.Descriptor instead.
 func (*RevokeBridgeInviteResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{43}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{45}
 }
 
 type ListBridgeCandidatesRequest struct {
@@ -2717,7 +2824,7 @@ type ListBridgeCandidatesRequest struct {
 
 func (x *ListBridgeCandidatesRequest) Reset() {
 	*x = ListBridgeCandidatesRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[44]
+	mi := &file_app_v1_bridge_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2729,7 +2836,7 @@ func (x *ListBridgeCandidatesRequest) String() string {
 func (*ListBridgeCandidatesRequest) ProtoMessage() {}
 
 func (x *ListBridgeCandidatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[44]
+	mi := &file_app_v1_bridge_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2742,7 +2849,7 @@ func (x *ListBridgeCandidatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeCandidatesRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeCandidatesRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{44}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ListBridgeCandidatesRequest) GetAccountId() int64 {
@@ -2770,7 +2877,7 @@ type BridgeCandidate struct {
 
 func (x *BridgeCandidate) Reset() {
 	*x = BridgeCandidate{}
-	mi := &file_app_v1_bridge_proto_msgTypes[45]
+	mi := &file_app_v1_bridge_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2782,7 +2889,7 @@ func (x *BridgeCandidate) String() string {
 func (*BridgeCandidate) ProtoMessage() {}
 
 func (x *BridgeCandidate) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[45]
+	mi := &file_app_v1_bridge_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2795,7 +2902,7 @@ func (x *BridgeCandidate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeCandidate.ProtoReflect.Descriptor instead.
 func (*BridgeCandidate) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{45}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *BridgeCandidate) GetParticipantId() string {
@@ -2821,7 +2928,7 @@ type ListBridgeCandidatesResponse struct {
 
 func (x *ListBridgeCandidatesResponse) Reset() {
 	*x = ListBridgeCandidatesResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[46]
+	mi := &file_app_v1_bridge_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2833,7 +2940,7 @@ func (x *ListBridgeCandidatesResponse) String() string {
 func (*ListBridgeCandidatesResponse) ProtoMessage() {}
 
 func (x *ListBridgeCandidatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[46]
+	mi := &file_app_v1_bridge_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2846,7 +2953,7 @@ func (x *ListBridgeCandidatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeCandidatesResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeCandidatesResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{46}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *ListBridgeCandidatesResponse) GetCandidates() []*BridgeCandidate {
@@ -2867,7 +2974,7 @@ type AddBridgeMemberRequest struct {
 
 func (x *AddBridgeMemberRequest) Reset() {
 	*x = AddBridgeMemberRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[47]
+	mi := &file_app_v1_bridge_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2879,7 +2986,7 @@ func (x *AddBridgeMemberRequest) String() string {
 func (*AddBridgeMemberRequest) ProtoMessage() {}
 
 func (x *AddBridgeMemberRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[47]
+	mi := &file_app_v1_bridge_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2892,7 +2999,7 @@ func (x *AddBridgeMemberRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddBridgeMemberRequest.ProtoReflect.Descriptor instead.
 func (*AddBridgeMemberRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{47}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *AddBridgeMemberRequest) GetAccountId() int64 {
@@ -2924,7 +3031,7 @@ type AddBridgeMemberResponse struct {
 
 func (x *AddBridgeMemberResponse) Reset() {
 	*x = AddBridgeMemberResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[48]
+	mi := &file_app_v1_bridge_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2936,7 +3043,7 @@ func (x *AddBridgeMemberResponse) String() string {
 func (*AddBridgeMemberResponse) ProtoMessage() {}
 
 func (x *AddBridgeMemberResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[48]
+	mi := &file_app_v1_bridge_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2949,7 +3056,7 @@ func (x *AddBridgeMemberResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddBridgeMemberResponse.ProtoReflect.Descriptor instead.
 func (*AddBridgeMemberResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{48}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{50}
 }
 
 type LeaveBridgeGroupRequest struct {
@@ -2963,7 +3070,7 @@ type LeaveBridgeGroupRequest struct {
 
 func (x *LeaveBridgeGroupRequest) Reset() {
 	*x = LeaveBridgeGroupRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[49]
+	mi := &file_app_v1_bridge_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2975,7 +3082,7 @@ func (x *LeaveBridgeGroupRequest) String() string {
 func (*LeaveBridgeGroupRequest) ProtoMessage() {}
 
 func (x *LeaveBridgeGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[49]
+	mi := &file_app_v1_bridge_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2988,7 +3095,7 @@ func (x *LeaveBridgeGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveBridgeGroupRequest.ProtoReflect.Descriptor instead.
 func (*LeaveBridgeGroupRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{49}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *LeaveBridgeGroupRequest) GetAccountId() int64 {
@@ -3020,7 +3127,7 @@ type LeaveBridgeGroupResponse struct {
 
 func (x *LeaveBridgeGroupResponse) Reset() {
 	*x = LeaveBridgeGroupResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[50]
+	mi := &file_app_v1_bridge_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3032,7 +3139,7 @@ func (x *LeaveBridgeGroupResponse) String() string {
 func (*LeaveBridgeGroupResponse) ProtoMessage() {}
 
 func (x *LeaveBridgeGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[50]
+	mi := &file_app_v1_bridge_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3045,7 +3152,7 @@ func (x *LeaveBridgeGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveBridgeGroupResponse.ProtoReflect.Descriptor instead.
 func (*LeaveBridgeGroupResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{50}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{52}
 }
 
 type RequestBridgeGroupDeleteRequest struct {
@@ -3059,7 +3166,7 @@ type RequestBridgeGroupDeleteRequest struct {
 
 func (x *RequestBridgeGroupDeleteRequest) Reset() {
 	*x = RequestBridgeGroupDeleteRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[51]
+	mi := &file_app_v1_bridge_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3071,7 +3178,7 @@ func (x *RequestBridgeGroupDeleteRequest) String() string {
 func (*RequestBridgeGroupDeleteRequest) ProtoMessage() {}
 
 func (x *RequestBridgeGroupDeleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[51]
+	mi := &file_app_v1_bridge_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3084,7 +3191,7 @@ func (x *RequestBridgeGroupDeleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestBridgeGroupDeleteRequest.ProtoReflect.Descriptor instead.
 func (*RequestBridgeGroupDeleteRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{51}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *RequestBridgeGroupDeleteRequest) GetAccountId() int64 {
@@ -3119,7 +3226,7 @@ type RequestBridgeGroupDeleteResponse struct {
 
 func (x *RequestBridgeGroupDeleteResponse) Reset() {
 	*x = RequestBridgeGroupDeleteResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[52]
+	mi := &file_app_v1_bridge_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3131,7 +3238,7 @@ func (x *RequestBridgeGroupDeleteResponse) String() string {
 func (*RequestBridgeGroupDeleteResponse) ProtoMessage() {}
 
 func (x *RequestBridgeGroupDeleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[52]
+	mi := &file_app_v1_bridge_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3144,7 +3251,7 @@ func (x *RequestBridgeGroupDeleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestBridgeGroupDeleteResponse.ProtoReflect.Descriptor instead.
 func (*RequestBridgeGroupDeleteResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{52}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *RequestBridgeGroupDeleteResponse) GetToken() string {
@@ -3180,7 +3287,7 @@ type DeleteBridgeGroupRequest struct {
 
 func (x *DeleteBridgeGroupRequest) Reset() {
 	*x = DeleteBridgeGroupRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[53]
+	mi := &file_app_v1_bridge_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3192,7 +3299,7 @@ func (x *DeleteBridgeGroupRequest) String() string {
 func (*DeleteBridgeGroupRequest) ProtoMessage() {}
 
 func (x *DeleteBridgeGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[53]
+	mi := &file_app_v1_bridge_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3205,7 +3312,7 @@ func (x *DeleteBridgeGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBridgeGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteBridgeGroupRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{53}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *DeleteBridgeGroupRequest) GetAccountId() int64 {
@@ -3244,7 +3351,7 @@ type DeleteBridgeGroupResponse struct {
 
 func (x *DeleteBridgeGroupResponse) Reset() {
 	*x = DeleteBridgeGroupResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[54]
+	mi := &file_app_v1_bridge_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3256,7 +3363,7 @@ func (x *DeleteBridgeGroupResponse) String() string {
 func (*DeleteBridgeGroupResponse) ProtoMessage() {}
 
 func (x *DeleteBridgeGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[54]
+	mi := &file_app_v1_bridge_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3269,7 +3376,7 @@ func (x *DeleteBridgeGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBridgeGroupResponse.ProtoReflect.Descriptor instead.
 func (*DeleteBridgeGroupResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{54}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{56}
 }
 
 type ListBridgeFeatureDefaultsRequest struct {
@@ -3281,7 +3388,7 @@ type ListBridgeFeatureDefaultsRequest struct {
 
 func (x *ListBridgeFeatureDefaultsRequest) Reset() {
 	*x = ListBridgeFeatureDefaultsRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[55]
+	mi := &file_app_v1_bridge_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3293,7 +3400,7 @@ func (x *ListBridgeFeatureDefaultsRequest) String() string {
 func (*ListBridgeFeatureDefaultsRequest) ProtoMessage() {}
 
 func (x *ListBridgeFeatureDefaultsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[55]
+	mi := &file_app_v1_bridge_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3306,7 +3413,7 @@ func (x *ListBridgeFeatureDefaultsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeFeatureDefaultsRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeFeatureDefaultsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{55}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ListBridgeFeatureDefaultsRequest) GetAccountId() int64 {
@@ -3332,7 +3439,7 @@ type BridgeFeatureDefault struct {
 
 func (x *BridgeFeatureDefault) Reset() {
 	*x = BridgeFeatureDefault{}
-	mi := &file_app_v1_bridge_proto_msgTypes[56]
+	mi := &file_app_v1_bridge_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3344,7 +3451,7 @@ func (x *BridgeFeatureDefault) String() string {
 func (*BridgeFeatureDefault) ProtoMessage() {}
 
 func (x *BridgeFeatureDefault) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[56]
+	mi := &file_app_v1_bridge_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3357,7 +3464,7 @@ func (x *BridgeFeatureDefault) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeFeatureDefault.ProtoReflect.Descriptor instead.
 func (*BridgeFeatureDefault) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{56}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *BridgeFeatureDefault) GetFeature() string {
@@ -3411,7 +3518,7 @@ type ListBridgeFeatureDefaultsResponse struct {
 
 func (x *ListBridgeFeatureDefaultsResponse) Reset() {
 	*x = ListBridgeFeatureDefaultsResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[57]
+	mi := &file_app_v1_bridge_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3423,7 +3530,7 @@ func (x *ListBridgeFeatureDefaultsResponse) String() string {
 func (*ListBridgeFeatureDefaultsResponse) ProtoMessage() {}
 
 func (x *ListBridgeFeatureDefaultsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[57]
+	mi := &file_app_v1_bridge_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3436,7 +3543,7 @@ func (x *ListBridgeFeatureDefaultsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListBridgeFeatureDefaultsResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeFeatureDefaultsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{57}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ListBridgeFeatureDefaultsResponse) GetDefaults() []*BridgeFeatureDefault {
@@ -3458,7 +3565,7 @@ type SetBridgeFeatureDefaultRequest struct {
 
 func (x *SetBridgeFeatureDefaultRequest) Reset() {
 	*x = SetBridgeFeatureDefaultRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[58]
+	mi := &file_app_v1_bridge_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3470,7 +3577,7 @@ func (x *SetBridgeFeatureDefaultRequest) String() string {
 func (*SetBridgeFeatureDefaultRequest) ProtoMessage() {}
 
 func (x *SetBridgeFeatureDefaultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[58]
+	mi := &file_app_v1_bridge_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3483,7 +3590,7 @@ func (x *SetBridgeFeatureDefaultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeFeatureDefaultRequest.ProtoReflect.Descriptor instead.
 func (*SetBridgeFeatureDefaultRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{58}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *SetBridgeFeatureDefaultRequest) GetAccountId() int64 {
@@ -3524,7 +3631,7 @@ type SetBridgeFeatureDefaultResponse struct {
 
 func (x *SetBridgeFeatureDefaultResponse) Reset() {
 	*x = SetBridgeFeatureDefaultResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[59]
+	mi := &file_app_v1_bridge_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3536,7 +3643,7 @@ func (x *SetBridgeFeatureDefaultResponse) String() string {
 func (*SetBridgeFeatureDefaultResponse) ProtoMessage() {}
 
 func (x *SetBridgeFeatureDefaultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[59]
+	mi := &file_app_v1_bridge_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3549,7 +3656,7 @@ func (x *SetBridgeFeatureDefaultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetBridgeFeatureDefaultResponse.ProtoReflect.Descriptor instead.
 func (*SetBridgeFeatureDefaultResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{59}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *SetBridgeFeatureDefaultResponse) GetApplied() int32 {
@@ -3579,7 +3686,7 @@ type BridgeProblem struct {
 
 func (x *BridgeProblem) Reset() {
 	*x = BridgeProblem{}
-	mi := &file_app_v1_bridge_proto_msgTypes[60]
+	mi := &file_app_v1_bridge_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3591,7 +3698,7 @@ func (x *BridgeProblem) String() string {
 func (*BridgeProblem) ProtoMessage() {}
 
 func (x *BridgeProblem) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[60]
+	mi := &file_app_v1_bridge_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3604,7 +3711,7 @@ func (x *BridgeProblem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BridgeProblem.ProtoReflect.Descriptor instead.
 func (*BridgeProblem) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{60}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *BridgeProblem) GetId() int64 {
@@ -3686,7 +3793,7 @@ type ListBridgeProblemsRequest struct {
 
 func (x *ListBridgeProblemsRequest) Reset() {
 	*x = ListBridgeProblemsRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[61]
+	mi := &file_app_v1_bridge_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3698,7 +3805,7 @@ func (x *ListBridgeProblemsRequest) String() string {
 func (*ListBridgeProblemsRequest) ProtoMessage() {}
 
 func (x *ListBridgeProblemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[61]
+	mi := &file_app_v1_bridge_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3711,7 +3818,7 @@ func (x *ListBridgeProblemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeProblemsRequest.ProtoReflect.Descriptor instead.
 func (*ListBridgeProblemsRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{61}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *ListBridgeProblemsRequest) GetAccountId() int64 {
@@ -3730,7 +3837,7 @@ type ListBridgeProblemsResponse struct {
 
 func (x *ListBridgeProblemsResponse) Reset() {
 	*x = ListBridgeProblemsResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[62]
+	mi := &file_app_v1_bridge_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3742,7 +3849,7 @@ func (x *ListBridgeProblemsResponse) String() string {
 func (*ListBridgeProblemsResponse) ProtoMessage() {}
 
 func (x *ListBridgeProblemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[62]
+	mi := &file_app_v1_bridge_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3755,7 +3862,7 @@ func (x *ListBridgeProblemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBridgeProblemsResponse.ProtoReflect.Descriptor instead.
 func (*ListBridgeProblemsResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{62}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *ListBridgeProblemsResponse) GetProblems() []*BridgeProblem {
@@ -3775,7 +3882,7 @@ type RetryBridgeProblemRequest struct {
 
 func (x *RetryBridgeProblemRequest) Reset() {
 	*x = RetryBridgeProblemRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[63]
+	mi := &file_app_v1_bridge_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3787,7 +3894,7 @@ func (x *RetryBridgeProblemRequest) String() string {
 func (*RetryBridgeProblemRequest) ProtoMessage() {}
 
 func (x *RetryBridgeProblemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[63]
+	mi := &file_app_v1_bridge_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3800,7 +3907,7 @@ func (x *RetryBridgeProblemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryBridgeProblemRequest.ProtoReflect.Descriptor instead.
 func (*RetryBridgeProblemRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{63}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *RetryBridgeProblemRequest) GetAccountId() int64 {
@@ -3825,7 +3932,7 @@ type RetryBridgeProblemResponse struct {
 
 func (x *RetryBridgeProblemResponse) Reset() {
 	*x = RetryBridgeProblemResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[64]
+	mi := &file_app_v1_bridge_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3837,7 +3944,7 @@ func (x *RetryBridgeProblemResponse) String() string {
 func (*RetryBridgeProblemResponse) ProtoMessage() {}
 
 func (x *RetryBridgeProblemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[64]
+	mi := &file_app_v1_bridge_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3850,7 +3957,7 @@ func (x *RetryBridgeProblemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryBridgeProblemResponse.ProtoReflect.Descriptor instead.
 func (*RetryBridgeProblemResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{64}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{66}
 }
 
 type DismissBridgeProblemRequest struct {
@@ -3863,7 +3970,7 @@ type DismissBridgeProblemRequest struct {
 
 func (x *DismissBridgeProblemRequest) Reset() {
 	*x = DismissBridgeProblemRequest{}
-	mi := &file_app_v1_bridge_proto_msgTypes[65]
+	mi := &file_app_v1_bridge_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3875,7 +3982,7 @@ func (x *DismissBridgeProblemRequest) String() string {
 func (*DismissBridgeProblemRequest) ProtoMessage() {}
 
 func (x *DismissBridgeProblemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[65]
+	mi := &file_app_v1_bridge_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3888,7 +3995,7 @@ func (x *DismissBridgeProblemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissBridgeProblemRequest.ProtoReflect.Descriptor instead.
 func (*DismissBridgeProblemRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{65}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *DismissBridgeProblemRequest) GetAccountId() int64 {
@@ -3913,7 +4020,7 @@ type DismissBridgeProblemResponse struct {
 
 func (x *DismissBridgeProblemResponse) Reset() {
 	*x = DismissBridgeProblemResponse{}
-	mi := &file_app_v1_bridge_proto_msgTypes[66]
+	mi := &file_app_v1_bridge_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3925,7 +4032,7 @@ func (x *DismissBridgeProblemResponse) String() string {
 func (*DismissBridgeProblemResponse) ProtoMessage() {}
 
 func (x *DismissBridgeProblemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_bridge_proto_msgTypes[66]
+	mi := &file_app_v1_bridge_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3938,7 +4045,7 @@ func (x *DismissBridgeProblemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissBridgeProblemResponse.ProtoReflect.Descriptor instead.
 func (*DismissBridgeProblemResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_bridge_proto_rawDescGZIP(), []int{66}
+	return file_app_v1_bridge_proto_rawDescGZIP(), []int{68}
 }
 
 var File_app_v1_bridge_proto protoreflect.FileDescriptor
@@ -3955,7 +4062,7 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x0ehistory_window\x18\x04 \x01(\x05R\rhistoryWindow\x12\x14\n" +
 	"\x05title\x18\x05 \x01(\tR\x05title\x125\n" +
 	"\tdirection\x18\x06 \x01(\x0e2\x17.app.v1.BridgeDirectionR\tdirection\x12!\n" +
-	"\ftopics_split\x18\a \x01(\bR\vtopicsSplit\"\xaf\x02\n" +
+	"\ftopics_split\x18\a \x01(\bR\vtopicsSplit\"\xf1\x02\n" +
 	"\rBridgeAccount\x12\x12\n" +
 	"\x02id\x18\x01 \x01(\x03B\x020\x02R\x02id\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x123\n" +
@@ -3965,7 +4072,10 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x05chats\x18\x05 \x03(\v2\x18.app.v1.BridgeSyncedChatR\x05chats\x126\n" +
 	"\n" +
 	"sync_state\x18\x06 \x01(\x0e2\x17.app.v1.BridgeSyncStateR\tsyncState\x126\n" +
-	"\bprogress\x18\a \x01(\v2\x1a.app.v1.BridgeSyncProgressR\bprogress\"\xba\x01\n" +
+	"\bprogress\x18\a \x01(\v2\x1a.app.v1.BridgeSyncProgressR\bprogress\x12\x1d\n" +
+	"\n" +
+	"send_gated\x18\b \x01(\bR\tsendGated\x12!\n" +
+	"\fsend_enabled\x18\t \x01(\bR\vsendEnabled\"\xba\x01\n" +
 	"\x12BridgeSyncProgress\x12$\n" +
 	"\rconversations\x18\x01 \x01(\x05R\rconversations\x12-\n" +
 	"\x12conversations_done\x18\x02 \x01(\x05R\x11conversationsDone\x12\x1e\n" +
@@ -3974,7 +4084,12 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x16StartBridgeSyncRequest\x12!\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\"\x19\n" +
-	"\x17StartBridgeSyncResponse\"\x18\n" +
+	"\x17StartBridgeSyncResponse\"Z\n" +
+	"\x1bSetBridgeSendEnabledRequest\x12!\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\x03B\x020\x02R\taccountId\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\"\x1e\n" +
+	"\x1cSetBridgeSendEnabledResponse\"\x18\n" +
 	"\x16GetBridgeStatusRequest\"s\n" +
 	"\x17GetBridgeStatusResponse\x12%\n" +
 	"\x04apps\x18\x01 \x03(\v2\x11.app.v1.BridgeAppR\x04apps\x121\n" +
@@ -4223,7 +4338,7 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x1cBRIDGE_OUTBOX_STATUS_PENDING\x10\x01\x12 \n" +
 	"\x1cBRIDGE_OUTBOX_STATUS_SENDING\x10\x02\x12\x1f\n" +
 	"\x1bBRIDGE_OUTBOX_STATUS_FAILED\x10\x03\x12 \n" +
-	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\xb1\x14\n" +
+	"\x1cBRIDGE_OUTBOX_STATUS_UNKNOWN\x10\x042\x94\x15\n" +
 	"\rBridgeService\x12u\n" +
 	"\x19ListBridgeFeatureDefaults\x12(.app.v1.ListBridgeFeatureDefaultsRequest\x1a).app.v1.ListBridgeFeatureDefaultsResponse\"\x03\x88\x02\x01\x12o\n" +
 	"\x17SetBridgeFeatureDefault\x12&.app.v1.SetBridgeFeatureDefaultRequest\x1a'.app.v1.SetBridgeFeatureDefaultResponse\"\x03\x88\x02\x01\x12[\n" +
@@ -4231,7 +4346,8 @@ const file_app_v1_bridge_proto_rawDesc = "" +
 	"\x12RetryBridgeProblem\x12!.app.v1.RetryBridgeProblemRequest\x1a\".app.v1.RetryBridgeProblemResponse\x12a\n" +
 	"\x14DismissBridgeProblem\x12#.app.v1.DismissBridgeProblemRequest\x1a$.app.v1.DismissBridgeProblemResponse\x12R\n" +
 	"\x0fGetBridgeStatus\x12\x1e.app.v1.GetBridgeStatusRequest\x1a\x1f.app.v1.GetBridgeStatusResponse\x12R\n" +
-	"\x0fStartBridgeSync\x12\x1e.app.v1.StartBridgeSyncRequest\x1a\x1f.app.v1.StartBridgeSyncResponse\x12U\n" +
+	"\x0fStartBridgeSync\x12\x1e.app.v1.StartBridgeSyncRequest\x1a\x1f.app.v1.StartBridgeSyncResponse\x12a\n" +
+	"\x14SetBridgeSendEnabled\x12#.app.v1.SetBridgeSendEnabledRequest\x1a$.app.v1.SetBridgeSendEnabledResponse\x12U\n" +
 	"\x10StartBridgeLogin\x12\x1f.app.v1.StartBridgeLoginRequest\x1a .app.v1.StartBridgeLoginResponse\x12^\n" +
 	"\x13ContinueBridgeLogin\x12\".app.v1.ContinueBridgeLoginRequest\x1a#.app.v1.ContinueBridgeLoginResponse\x12o\n" +
 	"\x17ListBridgeConversations\x12&.app.v1.ListBridgeConversationsRequest\x1a'.app.v1.ListBridgeConversationsResponse\"\x03\x88\x02\x01\x12Z\n" +
@@ -4266,7 +4382,7 @@ func file_app_v1_bridge_proto_rawDescGZIP() []byte {
 }
 
 var file_app_v1_bridge_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_app_v1_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 68)
+var file_app_v1_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 70)
 var file_app_v1_bridge_proto_goTypes = []any{
 	(BridgeAccountStatus)(0),                  // 0: app.v1.BridgeAccountStatus
 	(BridgeDirection)(0),                      // 1: app.v1.BridgeDirection
@@ -4280,68 +4396,70 @@ var file_app_v1_bridge_proto_goTypes = []any{
 	(*BridgeSyncProgress)(nil),                // 9: app.v1.BridgeSyncProgress
 	(*StartBridgeSyncRequest)(nil),            // 10: app.v1.StartBridgeSyncRequest
 	(*StartBridgeSyncResponse)(nil),           // 11: app.v1.StartBridgeSyncResponse
-	(*GetBridgeStatusRequest)(nil),            // 12: app.v1.GetBridgeStatusRequest
-	(*GetBridgeStatusResponse)(nil),           // 13: app.v1.GetBridgeStatusResponse
-	(*BridgeLoginField)(nil),                  // 14: app.v1.BridgeLoginField
-	(*BridgeLoginStep)(nil),                   // 15: app.v1.BridgeLoginStep
-	(*StartBridgeLoginRequest)(nil),           // 16: app.v1.StartBridgeLoginRequest
-	(*StartBridgeLoginResponse)(nil),          // 17: app.v1.StartBridgeLoginResponse
-	(*ContinueBridgeLoginRequest)(nil),        // 18: app.v1.ContinueBridgeLoginRequest
-	(*ContinueBridgeLoginResponse)(nil),       // 19: app.v1.ContinueBridgeLoginResponse
-	(*ListBridgeConversationsRequest)(nil),    // 20: app.v1.ListBridgeConversationsRequest
-	(*BridgeConversation)(nil),                // 21: app.v1.BridgeConversation
-	(*ListBridgeConversationsResponse)(nil),   // 22: app.v1.ListBridgeConversationsResponse
-	(*EnableBridgeChatRequest)(nil),           // 23: app.v1.EnableBridgeChatRequest
-	(*EnableBridgeChatResponse)(nil),          // 24: app.v1.EnableBridgeChatResponse
-	(*RemoveBridgeChatRequest)(nil),           // 25: app.v1.RemoveBridgeChatRequest
-	(*RemoveBridgeChatResponse)(nil),          // 26: app.v1.RemoveBridgeChatResponse
-	(*DisconnectBridgeAccountRequest)(nil),    // 27: app.v1.DisconnectBridgeAccountRequest
-	(*DisconnectBridgeAccountResponse)(nil),   // 28: app.v1.DisconnectBridgeAccountResponse
-	(*SetBridgeChatDirectionRequest)(nil),     // 29: app.v1.SetBridgeChatDirectionRequest
-	(*SetBridgeChatDirectionResponse)(nil),    // 30: app.v1.SetBridgeChatDirectionResponse
-	(*BridgeOutboxItem)(nil),                  // 31: app.v1.BridgeOutboxItem
-	(*ListBridgeOutboxRequest)(nil),           // 32: app.v1.ListBridgeOutboxRequest
-	(*ListBridgeOutboxResponse)(nil),          // 33: app.v1.ListBridgeOutboxResponse
-	(*RetryBridgeMessageRequest)(nil),         // 34: app.v1.RetryBridgeMessageRequest
-	(*RetryBridgeMessageResponse)(nil),        // 35: app.v1.RetryBridgeMessageResponse
-	(*DismissBridgeMessageRequest)(nil),       // 36: app.v1.DismissBridgeMessageRequest
-	(*DismissBridgeMessageResponse)(nil),      // 37: app.v1.DismissBridgeMessageResponse
-	(*ListBridgeFeaturesRequest)(nil),         // 38: app.v1.ListBridgeFeaturesRequest
-	(*BridgeFeature)(nil),                     // 39: app.v1.BridgeFeature
-	(*ListBridgeFeaturesResponse)(nil),        // 40: app.v1.ListBridgeFeaturesResponse
-	(*SetBridgeFeatureRequest)(nil),           // 41: app.v1.SetBridgeFeatureRequest
-	(*SetBridgeFeatureResponse)(nil),          // 42: app.v1.SetBridgeFeatureResponse
-	(*ListBridgeInvitesRequest)(nil),          // 43: app.v1.ListBridgeInvitesRequest
-	(*BridgeInvite)(nil),                      // 44: app.v1.BridgeInvite
-	(*ListBridgeInvitesResponse)(nil),         // 45: app.v1.ListBridgeInvitesResponse
-	(*CreateBridgeInviteRequest)(nil),         // 46: app.v1.CreateBridgeInviteRequest
-	(*CreateBridgeInviteResponse)(nil),        // 47: app.v1.CreateBridgeInviteResponse
-	(*RevokeBridgeInviteRequest)(nil),         // 48: app.v1.RevokeBridgeInviteRequest
-	(*RevokeBridgeInviteResponse)(nil),        // 49: app.v1.RevokeBridgeInviteResponse
-	(*ListBridgeCandidatesRequest)(nil),       // 50: app.v1.ListBridgeCandidatesRequest
-	(*BridgeCandidate)(nil),                   // 51: app.v1.BridgeCandidate
-	(*ListBridgeCandidatesResponse)(nil),      // 52: app.v1.ListBridgeCandidatesResponse
-	(*AddBridgeMemberRequest)(nil),            // 53: app.v1.AddBridgeMemberRequest
-	(*AddBridgeMemberResponse)(nil),           // 54: app.v1.AddBridgeMemberResponse
-	(*LeaveBridgeGroupRequest)(nil),           // 55: app.v1.LeaveBridgeGroupRequest
-	(*LeaveBridgeGroupResponse)(nil),          // 56: app.v1.LeaveBridgeGroupResponse
-	(*RequestBridgeGroupDeleteRequest)(nil),   // 57: app.v1.RequestBridgeGroupDeleteRequest
-	(*RequestBridgeGroupDeleteResponse)(nil),  // 58: app.v1.RequestBridgeGroupDeleteResponse
-	(*DeleteBridgeGroupRequest)(nil),          // 59: app.v1.DeleteBridgeGroupRequest
-	(*DeleteBridgeGroupResponse)(nil),         // 60: app.v1.DeleteBridgeGroupResponse
-	(*ListBridgeFeatureDefaultsRequest)(nil),  // 61: app.v1.ListBridgeFeatureDefaultsRequest
-	(*BridgeFeatureDefault)(nil),              // 62: app.v1.BridgeFeatureDefault
-	(*ListBridgeFeatureDefaultsResponse)(nil), // 63: app.v1.ListBridgeFeatureDefaultsResponse
-	(*SetBridgeFeatureDefaultRequest)(nil),    // 64: app.v1.SetBridgeFeatureDefaultRequest
-	(*SetBridgeFeatureDefaultResponse)(nil),   // 65: app.v1.SetBridgeFeatureDefaultResponse
-	(*BridgeProblem)(nil),                     // 66: app.v1.BridgeProblem
-	(*ListBridgeProblemsRequest)(nil),         // 67: app.v1.ListBridgeProblemsRequest
-	(*ListBridgeProblemsResponse)(nil),        // 68: app.v1.ListBridgeProblemsResponse
-	(*RetryBridgeProblemRequest)(nil),         // 69: app.v1.RetryBridgeProblemRequest
-	(*RetryBridgeProblemResponse)(nil),        // 70: app.v1.RetryBridgeProblemResponse
-	(*DismissBridgeProblemRequest)(nil),       // 71: app.v1.DismissBridgeProblemRequest
-	(*DismissBridgeProblemResponse)(nil),      // 72: app.v1.DismissBridgeProblemResponse
-	nil,                                       // 73: app.v1.ContinueBridgeLoginRequest.InputEntry
+	(*SetBridgeSendEnabledRequest)(nil),       // 12: app.v1.SetBridgeSendEnabledRequest
+	(*SetBridgeSendEnabledResponse)(nil),      // 13: app.v1.SetBridgeSendEnabledResponse
+	(*GetBridgeStatusRequest)(nil),            // 14: app.v1.GetBridgeStatusRequest
+	(*GetBridgeStatusResponse)(nil),           // 15: app.v1.GetBridgeStatusResponse
+	(*BridgeLoginField)(nil),                  // 16: app.v1.BridgeLoginField
+	(*BridgeLoginStep)(nil),                   // 17: app.v1.BridgeLoginStep
+	(*StartBridgeLoginRequest)(nil),           // 18: app.v1.StartBridgeLoginRequest
+	(*StartBridgeLoginResponse)(nil),          // 19: app.v1.StartBridgeLoginResponse
+	(*ContinueBridgeLoginRequest)(nil),        // 20: app.v1.ContinueBridgeLoginRequest
+	(*ContinueBridgeLoginResponse)(nil),       // 21: app.v1.ContinueBridgeLoginResponse
+	(*ListBridgeConversationsRequest)(nil),    // 22: app.v1.ListBridgeConversationsRequest
+	(*BridgeConversation)(nil),                // 23: app.v1.BridgeConversation
+	(*ListBridgeConversationsResponse)(nil),   // 24: app.v1.ListBridgeConversationsResponse
+	(*EnableBridgeChatRequest)(nil),           // 25: app.v1.EnableBridgeChatRequest
+	(*EnableBridgeChatResponse)(nil),          // 26: app.v1.EnableBridgeChatResponse
+	(*RemoveBridgeChatRequest)(nil),           // 27: app.v1.RemoveBridgeChatRequest
+	(*RemoveBridgeChatResponse)(nil),          // 28: app.v1.RemoveBridgeChatResponse
+	(*DisconnectBridgeAccountRequest)(nil),    // 29: app.v1.DisconnectBridgeAccountRequest
+	(*DisconnectBridgeAccountResponse)(nil),   // 30: app.v1.DisconnectBridgeAccountResponse
+	(*SetBridgeChatDirectionRequest)(nil),     // 31: app.v1.SetBridgeChatDirectionRequest
+	(*SetBridgeChatDirectionResponse)(nil),    // 32: app.v1.SetBridgeChatDirectionResponse
+	(*BridgeOutboxItem)(nil),                  // 33: app.v1.BridgeOutboxItem
+	(*ListBridgeOutboxRequest)(nil),           // 34: app.v1.ListBridgeOutboxRequest
+	(*ListBridgeOutboxResponse)(nil),          // 35: app.v1.ListBridgeOutboxResponse
+	(*RetryBridgeMessageRequest)(nil),         // 36: app.v1.RetryBridgeMessageRequest
+	(*RetryBridgeMessageResponse)(nil),        // 37: app.v1.RetryBridgeMessageResponse
+	(*DismissBridgeMessageRequest)(nil),       // 38: app.v1.DismissBridgeMessageRequest
+	(*DismissBridgeMessageResponse)(nil),      // 39: app.v1.DismissBridgeMessageResponse
+	(*ListBridgeFeaturesRequest)(nil),         // 40: app.v1.ListBridgeFeaturesRequest
+	(*BridgeFeature)(nil),                     // 41: app.v1.BridgeFeature
+	(*ListBridgeFeaturesResponse)(nil),        // 42: app.v1.ListBridgeFeaturesResponse
+	(*SetBridgeFeatureRequest)(nil),           // 43: app.v1.SetBridgeFeatureRequest
+	(*SetBridgeFeatureResponse)(nil),          // 44: app.v1.SetBridgeFeatureResponse
+	(*ListBridgeInvitesRequest)(nil),          // 45: app.v1.ListBridgeInvitesRequest
+	(*BridgeInvite)(nil),                      // 46: app.v1.BridgeInvite
+	(*ListBridgeInvitesResponse)(nil),         // 47: app.v1.ListBridgeInvitesResponse
+	(*CreateBridgeInviteRequest)(nil),         // 48: app.v1.CreateBridgeInviteRequest
+	(*CreateBridgeInviteResponse)(nil),        // 49: app.v1.CreateBridgeInviteResponse
+	(*RevokeBridgeInviteRequest)(nil),         // 50: app.v1.RevokeBridgeInviteRequest
+	(*RevokeBridgeInviteResponse)(nil),        // 51: app.v1.RevokeBridgeInviteResponse
+	(*ListBridgeCandidatesRequest)(nil),       // 52: app.v1.ListBridgeCandidatesRequest
+	(*BridgeCandidate)(nil),                   // 53: app.v1.BridgeCandidate
+	(*ListBridgeCandidatesResponse)(nil),      // 54: app.v1.ListBridgeCandidatesResponse
+	(*AddBridgeMemberRequest)(nil),            // 55: app.v1.AddBridgeMemberRequest
+	(*AddBridgeMemberResponse)(nil),           // 56: app.v1.AddBridgeMemberResponse
+	(*LeaveBridgeGroupRequest)(nil),           // 57: app.v1.LeaveBridgeGroupRequest
+	(*LeaveBridgeGroupResponse)(nil),          // 58: app.v1.LeaveBridgeGroupResponse
+	(*RequestBridgeGroupDeleteRequest)(nil),   // 59: app.v1.RequestBridgeGroupDeleteRequest
+	(*RequestBridgeGroupDeleteResponse)(nil),  // 60: app.v1.RequestBridgeGroupDeleteResponse
+	(*DeleteBridgeGroupRequest)(nil),          // 61: app.v1.DeleteBridgeGroupRequest
+	(*DeleteBridgeGroupResponse)(nil),         // 62: app.v1.DeleteBridgeGroupResponse
+	(*ListBridgeFeatureDefaultsRequest)(nil),  // 63: app.v1.ListBridgeFeatureDefaultsRequest
+	(*BridgeFeatureDefault)(nil),              // 64: app.v1.BridgeFeatureDefault
+	(*ListBridgeFeatureDefaultsResponse)(nil), // 65: app.v1.ListBridgeFeatureDefaultsResponse
+	(*SetBridgeFeatureDefaultRequest)(nil),    // 66: app.v1.SetBridgeFeatureDefaultRequest
+	(*SetBridgeFeatureDefaultResponse)(nil),   // 67: app.v1.SetBridgeFeatureDefaultResponse
+	(*BridgeProblem)(nil),                     // 68: app.v1.BridgeProblem
+	(*ListBridgeProblemsRequest)(nil),         // 69: app.v1.ListBridgeProblemsRequest
+	(*ListBridgeProblemsResponse)(nil),        // 70: app.v1.ListBridgeProblemsResponse
+	(*RetryBridgeProblemRequest)(nil),         // 71: app.v1.RetryBridgeProblemRequest
+	(*RetryBridgeProblemResponse)(nil),        // 72: app.v1.RetryBridgeProblemResponse
+	(*DismissBridgeProblemRequest)(nil),       // 73: app.v1.DismissBridgeProblemRequest
+	(*DismissBridgeProblemResponse)(nil),      // 74: app.v1.DismissBridgeProblemResponse
+	nil,                                       // 75: app.v1.ContinueBridgeLoginRequest.InputEntry
 }
 var file_app_v1_bridge_proto_depIdxs = []int32{
 	1,  // 0: app.v1.BridgeSyncedChat.direction:type_name -> app.v1.BridgeDirection
@@ -4352,78 +4470,80 @@ var file_app_v1_bridge_proto_depIdxs = []int32{
 	6,  // 5: app.v1.GetBridgeStatusResponse.apps:type_name -> app.v1.BridgeApp
 	8,  // 6: app.v1.GetBridgeStatusResponse.accounts:type_name -> app.v1.BridgeAccount
 	3,  // 7: app.v1.BridgeLoginStep.kind:type_name -> app.v1.BridgeLoginStepKind
-	14, // 8: app.v1.BridgeLoginStep.fields:type_name -> app.v1.BridgeLoginField
+	16, // 8: app.v1.BridgeLoginStep.fields:type_name -> app.v1.BridgeLoginField
 	8,  // 9: app.v1.BridgeLoginStep.account:type_name -> app.v1.BridgeAccount
-	15, // 10: app.v1.StartBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
-	73, // 11: app.v1.ContinueBridgeLoginRequest.input:type_name -> app.v1.ContinueBridgeLoginRequest.InputEntry
-	15, // 12: app.v1.ContinueBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
+	17, // 10: app.v1.StartBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
+	75, // 11: app.v1.ContinueBridgeLoginRequest.input:type_name -> app.v1.ContinueBridgeLoginRequest.InputEntry
+	17, // 12: app.v1.ContinueBridgeLoginResponse.step:type_name -> app.v1.BridgeLoginStep
 	4,  // 13: app.v1.BridgeConversation.kind:type_name -> app.v1.BridgeConversationKind
-	21, // 14: app.v1.ListBridgeConversationsResponse.conversations:type_name -> app.v1.BridgeConversation
+	23, // 14: app.v1.ListBridgeConversationsResponse.conversations:type_name -> app.v1.BridgeConversation
 	1,  // 15: app.v1.EnableBridgeChatRequest.direction:type_name -> app.v1.BridgeDirection
 	1,  // 16: app.v1.SetBridgeChatDirectionRequest.direction:type_name -> app.v1.BridgeDirection
 	5,  // 17: app.v1.BridgeOutboxItem.status:type_name -> app.v1.BridgeOutboxStatus
-	31, // 18: app.v1.ListBridgeOutboxResponse.items:type_name -> app.v1.BridgeOutboxItem
-	39, // 19: app.v1.ListBridgeFeaturesResponse.features:type_name -> app.v1.BridgeFeature
-	44, // 20: app.v1.ListBridgeInvitesResponse.invites:type_name -> app.v1.BridgeInvite
-	51, // 21: app.v1.ListBridgeCandidatesResponse.candidates:type_name -> app.v1.BridgeCandidate
-	62, // 22: app.v1.ListBridgeFeatureDefaultsResponse.defaults:type_name -> app.v1.BridgeFeatureDefault
-	66, // 23: app.v1.ListBridgeProblemsResponse.problems:type_name -> app.v1.BridgeProblem
-	61, // 24: app.v1.BridgeService.ListBridgeFeatureDefaults:input_type -> app.v1.ListBridgeFeatureDefaultsRequest
-	64, // 25: app.v1.BridgeService.SetBridgeFeatureDefault:input_type -> app.v1.SetBridgeFeatureDefaultRequest
-	67, // 26: app.v1.BridgeService.ListBridgeProblems:input_type -> app.v1.ListBridgeProblemsRequest
-	69, // 27: app.v1.BridgeService.RetryBridgeProblem:input_type -> app.v1.RetryBridgeProblemRequest
-	71, // 28: app.v1.BridgeService.DismissBridgeProblem:input_type -> app.v1.DismissBridgeProblemRequest
-	12, // 29: app.v1.BridgeService.GetBridgeStatus:input_type -> app.v1.GetBridgeStatusRequest
+	33, // 18: app.v1.ListBridgeOutboxResponse.items:type_name -> app.v1.BridgeOutboxItem
+	41, // 19: app.v1.ListBridgeFeaturesResponse.features:type_name -> app.v1.BridgeFeature
+	46, // 20: app.v1.ListBridgeInvitesResponse.invites:type_name -> app.v1.BridgeInvite
+	53, // 21: app.v1.ListBridgeCandidatesResponse.candidates:type_name -> app.v1.BridgeCandidate
+	64, // 22: app.v1.ListBridgeFeatureDefaultsResponse.defaults:type_name -> app.v1.BridgeFeatureDefault
+	68, // 23: app.v1.ListBridgeProblemsResponse.problems:type_name -> app.v1.BridgeProblem
+	63, // 24: app.v1.BridgeService.ListBridgeFeatureDefaults:input_type -> app.v1.ListBridgeFeatureDefaultsRequest
+	66, // 25: app.v1.BridgeService.SetBridgeFeatureDefault:input_type -> app.v1.SetBridgeFeatureDefaultRequest
+	69, // 26: app.v1.BridgeService.ListBridgeProblems:input_type -> app.v1.ListBridgeProblemsRequest
+	71, // 27: app.v1.BridgeService.RetryBridgeProblem:input_type -> app.v1.RetryBridgeProblemRequest
+	73, // 28: app.v1.BridgeService.DismissBridgeProblem:input_type -> app.v1.DismissBridgeProblemRequest
+	14, // 29: app.v1.BridgeService.GetBridgeStatus:input_type -> app.v1.GetBridgeStatusRequest
 	10, // 30: app.v1.BridgeService.StartBridgeSync:input_type -> app.v1.StartBridgeSyncRequest
-	16, // 31: app.v1.BridgeService.StartBridgeLogin:input_type -> app.v1.StartBridgeLoginRequest
-	18, // 32: app.v1.BridgeService.ContinueBridgeLogin:input_type -> app.v1.ContinueBridgeLoginRequest
-	20, // 33: app.v1.BridgeService.ListBridgeConversations:input_type -> app.v1.ListBridgeConversationsRequest
-	23, // 34: app.v1.BridgeService.EnableBridgeChat:input_type -> app.v1.EnableBridgeChatRequest
-	25, // 35: app.v1.BridgeService.RemoveBridgeChat:input_type -> app.v1.RemoveBridgeChatRequest
-	29, // 36: app.v1.BridgeService.SetBridgeChatDirection:input_type -> app.v1.SetBridgeChatDirectionRequest
-	38, // 37: app.v1.BridgeService.ListBridgeFeatures:input_type -> app.v1.ListBridgeFeaturesRequest
-	41, // 38: app.v1.BridgeService.SetBridgeFeature:input_type -> app.v1.SetBridgeFeatureRequest
-	43, // 39: app.v1.BridgeService.ListBridgeInvites:input_type -> app.v1.ListBridgeInvitesRequest
-	46, // 40: app.v1.BridgeService.CreateBridgeInvite:input_type -> app.v1.CreateBridgeInviteRequest
-	48, // 41: app.v1.BridgeService.RevokeBridgeInvite:input_type -> app.v1.RevokeBridgeInviteRequest
-	50, // 42: app.v1.BridgeService.ListBridgeCandidates:input_type -> app.v1.ListBridgeCandidatesRequest
-	53, // 43: app.v1.BridgeService.AddBridgeMember:input_type -> app.v1.AddBridgeMemberRequest
-	55, // 44: app.v1.BridgeService.LeaveBridgeGroup:input_type -> app.v1.LeaveBridgeGroupRequest
-	57, // 45: app.v1.BridgeService.RequestBridgeGroupDelete:input_type -> app.v1.RequestBridgeGroupDeleteRequest
-	59, // 46: app.v1.BridgeService.DeleteBridgeGroup:input_type -> app.v1.DeleteBridgeGroupRequest
-	32, // 47: app.v1.BridgeService.ListBridgeOutbox:input_type -> app.v1.ListBridgeOutboxRequest
-	34, // 48: app.v1.BridgeService.RetryBridgeMessage:input_type -> app.v1.RetryBridgeMessageRequest
-	36, // 49: app.v1.BridgeService.DismissBridgeMessage:input_type -> app.v1.DismissBridgeMessageRequest
-	27, // 50: app.v1.BridgeService.DisconnectBridgeAccount:input_type -> app.v1.DisconnectBridgeAccountRequest
-	63, // 51: app.v1.BridgeService.ListBridgeFeatureDefaults:output_type -> app.v1.ListBridgeFeatureDefaultsResponse
-	65, // 52: app.v1.BridgeService.SetBridgeFeatureDefault:output_type -> app.v1.SetBridgeFeatureDefaultResponse
-	68, // 53: app.v1.BridgeService.ListBridgeProblems:output_type -> app.v1.ListBridgeProblemsResponse
-	70, // 54: app.v1.BridgeService.RetryBridgeProblem:output_type -> app.v1.RetryBridgeProblemResponse
-	72, // 55: app.v1.BridgeService.DismissBridgeProblem:output_type -> app.v1.DismissBridgeProblemResponse
-	13, // 56: app.v1.BridgeService.GetBridgeStatus:output_type -> app.v1.GetBridgeStatusResponse
-	11, // 57: app.v1.BridgeService.StartBridgeSync:output_type -> app.v1.StartBridgeSyncResponse
-	17, // 58: app.v1.BridgeService.StartBridgeLogin:output_type -> app.v1.StartBridgeLoginResponse
-	19, // 59: app.v1.BridgeService.ContinueBridgeLogin:output_type -> app.v1.ContinueBridgeLoginResponse
-	22, // 60: app.v1.BridgeService.ListBridgeConversations:output_type -> app.v1.ListBridgeConversationsResponse
-	24, // 61: app.v1.BridgeService.EnableBridgeChat:output_type -> app.v1.EnableBridgeChatResponse
-	26, // 62: app.v1.BridgeService.RemoveBridgeChat:output_type -> app.v1.RemoveBridgeChatResponse
-	30, // 63: app.v1.BridgeService.SetBridgeChatDirection:output_type -> app.v1.SetBridgeChatDirectionResponse
-	40, // 64: app.v1.BridgeService.ListBridgeFeatures:output_type -> app.v1.ListBridgeFeaturesResponse
-	42, // 65: app.v1.BridgeService.SetBridgeFeature:output_type -> app.v1.SetBridgeFeatureResponse
-	45, // 66: app.v1.BridgeService.ListBridgeInvites:output_type -> app.v1.ListBridgeInvitesResponse
-	47, // 67: app.v1.BridgeService.CreateBridgeInvite:output_type -> app.v1.CreateBridgeInviteResponse
-	49, // 68: app.v1.BridgeService.RevokeBridgeInvite:output_type -> app.v1.RevokeBridgeInviteResponse
-	52, // 69: app.v1.BridgeService.ListBridgeCandidates:output_type -> app.v1.ListBridgeCandidatesResponse
-	54, // 70: app.v1.BridgeService.AddBridgeMember:output_type -> app.v1.AddBridgeMemberResponse
-	56, // 71: app.v1.BridgeService.LeaveBridgeGroup:output_type -> app.v1.LeaveBridgeGroupResponse
-	58, // 72: app.v1.BridgeService.RequestBridgeGroupDelete:output_type -> app.v1.RequestBridgeGroupDeleteResponse
-	60, // 73: app.v1.BridgeService.DeleteBridgeGroup:output_type -> app.v1.DeleteBridgeGroupResponse
-	33, // 74: app.v1.BridgeService.ListBridgeOutbox:output_type -> app.v1.ListBridgeOutboxResponse
-	35, // 75: app.v1.BridgeService.RetryBridgeMessage:output_type -> app.v1.RetryBridgeMessageResponse
-	37, // 76: app.v1.BridgeService.DismissBridgeMessage:output_type -> app.v1.DismissBridgeMessageResponse
-	28, // 77: app.v1.BridgeService.DisconnectBridgeAccount:output_type -> app.v1.DisconnectBridgeAccountResponse
-	51, // [51:78] is the sub-list for method output_type
-	24, // [24:51] is the sub-list for method input_type
+	12, // 31: app.v1.BridgeService.SetBridgeSendEnabled:input_type -> app.v1.SetBridgeSendEnabledRequest
+	18, // 32: app.v1.BridgeService.StartBridgeLogin:input_type -> app.v1.StartBridgeLoginRequest
+	20, // 33: app.v1.BridgeService.ContinueBridgeLogin:input_type -> app.v1.ContinueBridgeLoginRequest
+	22, // 34: app.v1.BridgeService.ListBridgeConversations:input_type -> app.v1.ListBridgeConversationsRequest
+	25, // 35: app.v1.BridgeService.EnableBridgeChat:input_type -> app.v1.EnableBridgeChatRequest
+	27, // 36: app.v1.BridgeService.RemoveBridgeChat:input_type -> app.v1.RemoveBridgeChatRequest
+	31, // 37: app.v1.BridgeService.SetBridgeChatDirection:input_type -> app.v1.SetBridgeChatDirectionRequest
+	40, // 38: app.v1.BridgeService.ListBridgeFeatures:input_type -> app.v1.ListBridgeFeaturesRequest
+	43, // 39: app.v1.BridgeService.SetBridgeFeature:input_type -> app.v1.SetBridgeFeatureRequest
+	45, // 40: app.v1.BridgeService.ListBridgeInvites:input_type -> app.v1.ListBridgeInvitesRequest
+	48, // 41: app.v1.BridgeService.CreateBridgeInvite:input_type -> app.v1.CreateBridgeInviteRequest
+	50, // 42: app.v1.BridgeService.RevokeBridgeInvite:input_type -> app.v1.RevokeBridgeInviteRequest
+	52, // 43: app.v1.BridgeService.ListBridgeCandidates:input_type -> app.v1.ListBridgeCandidatesRequest
+	55, // 44: app.v1.BridgeService.AddBridgeMember:input_type -> app.v1.AddBridgeMemberRequest
+	57, // 45: app.v1.BridgeService.LeaveBridgeGroup:input_type -> app.v1.LeaveBridgeGroupRequest
+	59, // 46: app.v1.BridgeService.RequestBridgeGroupDelete:input_type -> app.v1.RequestBridgeGroupDeleteRequest
+	61, // 47: app.v1.BridgeService.DeleteBridgeGroup:input_type -> app.v1.DeleteBridgeGroupRequest
+	34, // 48: app.v1.BridgeService.ListBridgeOutbox:input_type -> app.v1.ListBridgeOutboxRequest
+	36, // 49: app.v1.BridgeService.RetryBridgeMessage:input_type -> app.v1.RetryBridgeMessageRequest
+	38, // 50: app.v1.BridgeService.DismissBridgeMessage:input_type -> app.v1.DismissBridgeMessageRequest
+	29, // 51: app.v1.BridgeService.DisconnectBridgeAccount:input_type -> app.v1.DisconnectBridgeAccountRequest
+	65, // 52: app.v1.BridgeService.ListBridgeFeatureDefaults:output_type -> app.v1.ListBridgeFeatureDefaultsResponse
+	67, // 53: app.v1.BridgeService.SetBridgeFeatureDefault:output_type -> app.v1.SetBridgeFeatureDefaultResponse
+	70, // 54: app.v1.BridgeService.ListBridgeProblems:output_type -> app.v1.ListBridgeProblemsResponse
+	72, // 55: app.v1.BridgeService.RetryBridgeProblem:output_type -> app.v1.RetryBridgeProblemResponse
+	74, // 56: app.v1.BridgeService.DismissBridgeProblem:output_type -> app.v1.DismissBridgeProblemResponse
+	15, // 57: app.v1.BridgeService.GetBridgeStatus:output_type -> app.v1.GetBridgeStatusResponse
+	11, // 58: app.v1.BridgeService.StartBridgeSync:output_type -> app.v1.StartBridgeSyncResponse
+	13, // 59: app.v1.BridgeService.SetBridgeSendEnabled:output_type -> app.v1.SetBridgeSendEnabledResponse
+	19, // 60: app.v1.BridgeService.StartBridgeLogin:output_type -> app.v1.StartBridgeLoginResponse
+	21, // 61: app.v1.BridgeService.ContinueBridgeLogin:output_type -> app.v1.ContinueBridgeLoginResponse
+	24, // 62: app.v1.BridgeService.ListBridgeConversations:output_type -> app.v1.ListBridgeConversationsResponse
+	26, // 63: app.v1.BridgeService.EnableBridgeChat:output_type -> app.v1.EnableBridgeChatResponse
+	28, // 64: app.v1.BridgeService.RemoveBridgeChat:output_type -> app.v1.RemoveBridgeChatResponse
+	32, // 65: app.v1.BridgeService.SetBridgeChatDirection:output_type -> app.v1.SetBridgeChatDirectionResponse
+	42, // 66: app.v1.BridgeService.ListBridgeFeatures:output_type -> app.v1.ListBridgeFeaturesResponse
+	44, // 67: app.v1.BridgeService.SetBridgeFeature:output_type -> app.v1.SetBridgeFeatureResponse
+	47, // 68: app.v1.BridgeService.ListBridgeInvites:output_type -> app.v1.ListBridgeInvitesResponse
+	49, // 69: app.v1.BridgeService.CreateBridgeInvite:output_type -> app.v1.CreateBridgeInviteResponse
+	51, // 70: app.v1.BridgeService.RevokeBridgeInvite:output_type -> app.v1.RevokeBridgeInviteResponse
+	54, // 71: app.v1.BridgeService.ListBridgeCandidates:output_type -> app.v1.ListBridgeCandidatesResponse
+	56, // 72: app.v1.BridgeService.AddBridgeMember:output_type -> app.v1.AddBridgeMemberResponse
+	58, // 73: app.v1.BridgeService.LeaveBridgeGroup:output_type -> app.v1.LeaveBridgeGroupResponse
+	60, // 74: app.v1.BridgeService.RequestBridgeGroupDelete:output_type -> app.v1.RequestBridgeGroupDeleteResponse
+	62, // 75: app.v1.BridgeService.DeleteBridgeGroup:output_type -> app.v1.DeleteBridgeGroupResponse
+	35, // 76: app.v1.BridgeService.ListBridgeOutbox:output_type -> app.v1.ListBridgeOutboxResponse
+	37, // 77: app.v1.BridgeService.RetryBridgeMessage:output_type -> app.v1.RetryBridgeMessageResponse
+	39, // 78: app.v1.BridgeService.DismissBridgeMessage:output_type -> app.v1.DismissBridgeMessageResponse
+	30, // 79: app.v1.BridgeService.DisconnectBridgeAccount:output_type -> app.v1.DisconnectBridgeAccountResponse
+	52, // [52:80] is the sub-list for method output_type
+	24, // [24:52] is the sub-list for method input_type
 	24, // [24:24] is the sub-list for extension type_name
 	24, // [24:24] is the sub-list for extension extendee
 	0,  // [0:24] is the sub-list for field type_name
@@ -4440,7 +4560,7 @@ func file_app_v1_bridge_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_bridge_proto_rawDesc), len(file_app_v1_bridge_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   68,
+			NumMessages:   70,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

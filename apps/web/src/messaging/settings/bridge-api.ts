@@ -47,6 +47,9 @@ export interface BridgeAccount {
 	readonly chats: readonly BridgeChat[];
 	readonly syncState: BridgeSyncState;
 	readonly progress: BridgeSyncProgress;
+	/** The app sends only once the owner switches sending on for the account (Zalo); `sendEnabled` is that switch. */
+	readonly sendGated: boolean;
+	readonly sendEnabled: boolean;
 }
 
 export interface BridgeStatus {
@@ -157,6 +160,8 @@ export interface BridgeApi {
 	status(): Promise<BridgeStatus>;
 	/** Turns the account's one switch on: every conversation syncs, both ways, live. */
 	startSync(accountId: number): Promise<void>;
+	/** Turns the account's sending switch on or off (only for an account with `sendGated`). Off makes every chat read-only and drops what is queued. */
+	setSendEnabled(accountId: number, enabled: boolean): Promise<void>;
 	problems(accountId: number): Promise<readonly BridgeProblem[]>;
 	retryProblem(accountId: number, id: number): Promise<void>;
 	/** Gives up a problem that is not a send. */

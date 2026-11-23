@@ -77,6 +77,8 @@ export class FakeBridge {
 			syncState: BridgeSyncState.OFF,
 			lastError: "",
 			chats: [],
+			sendGated: true,
+			sendEnabled: false,
 		};
 		this.accounts = [...this.accounts.filter((a) => a.source !== "zalo"), account];
 		return account;
@@ -92,6 +94,8 @@ export class FakeBridge {
 				status: BridgeAccountStatus.ACTIVE,
 				syncState: BridgeSyncState.LIVE,
 				lastError: "",
+				sendGated: false,
+				sendEnabled: false,
 				chats: [
 					{
 						$typeName: "app.v1.BridgeSyncedChat",
@@ -128,6 +132,8 @@ export class FakeBridge {
 				status: BridgeAccountStatus.ACTIVE,
 				syncState: BridgeSyncState.LIVE,
 				lastError: "",
+				sendGated: false,
+				sendEnabled: false,
 				chats: [
 					synced("user:7", 900n, "Anh Đô CEO", 2000, true, BridgeDirection.BOTH),
 					synced("chat:9", 901n, "Work - OneDash Audit Logs", 500, false),
@@ -192,6 +198,17 @@ export class FakeBridge {
 				}
 				return {};
 			},
+			setBridgeSendEnabled: (req) => {
+				this.guard(true);
+				this.calls.push(`send:${req.accountId}:${req.enabled}`);
+				const account = this.accounts.find((a) => a.id === req.accountId);
+				if (account === undefined) throw new ConnectError("not found", Code.NotFound);
+				if (!account.sendGated || (req.enabled && account.status !== BridgeAccountStatus.ACTIVE)) {
+					throw new ConnectError("send_unsupported: no sending switch", Code.FailedPrecondition);
+				}
+				account.sendEnabled = req.enabled;
+				return {};
+			},
 			startBridgeLogin: (req) => {
 				this.guard(true);
 				this.calls.push(`start:${req.source}`);
@@ -209,7 +226,7 @@ export class FakeBridge {
 				if (req.input["code"] === "00000") throw new ConnectError("wrong_input: wrong_code: that code is not right", Code.InvalidArgument);
 				if (req.input["code"] !== undefined) return { step: this.step(BridgeLoginStepKind.INPUT, "login-1", ["password"]) };
 				this.accounts = [
-					{ $typeName: "app.v1.BridgeAccount", id: 1n, source: "telegram", status: BridgeAccountStatus.ACTIVE, syncState: BridgeSyncState.OFF, lastError: "", chats: [] },
+					{ $typeName: "app.v1.BridgeAccount", id: 1n, source: "telegram", status: BridgeAccountStatus.ACTIVE, syncState: BridgeSyncState.OFF, lastError: "", chats: [], sendGated: false, sendEnabled: false },
 				];
 				return { step: { ...this.step(BridgeLoginStepKind.DONE, ""), account: this.accounts[0] } };
 			},

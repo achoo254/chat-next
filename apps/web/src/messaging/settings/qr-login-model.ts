@@ -7,9 +7,10 @@ import type { BridgeError, LoginStep } from "./bridge-api.ts";
 export const QR_LOGIN_APPS: ReadonlySet<string> = new Set(["zalo"]);
 
 /**
- * Apps Chat only reads from: nothing typed in Chat goes back to them, so the
- * page must not promise two-way sync. Remove an app here when its send path
- * ships (the server reports `send_unsupported` for an app that cannot send).
+ * Apps Chat only reads from unless the owner switches sending on for the
+ * account (`sendEnabled`): until then nothing typed in Chat goes back to them,
+ * so the page must not promise two-way sync. Even with sending on, only the
+ * owner's text goes out, never every change.
  */
 export const RECEIVE_ONLY_APPS: ReadonlySet<string> = new Set(["zalo"]);
 

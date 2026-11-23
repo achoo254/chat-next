@@ -54,6 +54,9 @@ const (
 	// BridgeServiceStartBridgeSyncProcedure is the fully-qualified name of the BridgeService's
 	// StartBridgeSync RPC.
 	BridgeServiceStartBridgeSyncProcedure = "/app.v1.BridgeService/StartBridgeSync"
+	// BridgeServiceSetBridgeSendEnabledProcedure is the fully-qualified name of the BridgeService's
+	// SetBridgeSendEnabled RPC.
+	BridgeServiceSetBridgeSendEnabledProcedure = "/app.v1.BridgeService/SetBridgeSendEnabled"
 	// BridgeServiceStartBridgeLoginProcedure is the fully-qualified name of the BridgeService's
 	// StartBridgeLogin RPC.
 	BridgeServiceStartBridgeLoginProcedure = "/app.v1.BridgeService/StartBridgeLogin"
@@ -143,6 +146,14 @@ type BridgeServiceClient interface {
 	// every one that appears later joins on its own; all of them sync both ways.
 	// Turning it on again does nothing.
 	StartBridgeSync(context.Context, *connect.Request[v1.StartBridgeSyncRequest]) (*connect.Response[v1.StartBridgeSyncResponse], error)
+	// Turns the sending switch of an account on or off, for an app that sends only
+	// once the owner allows it (BridgeAccount.send_gated). On: the chats of the
+	// conversations the app lists send what the user writes in Chat on to the app
+	// (within seconds, as the account lists them). Off: every chat of the account is
+	// read-only again and what is queued for the app is cancelled. failed_precondition
+	// send_unsupported when the app has no such switch, or when turning it on for an
+	// account that is not connected.
+	SetBridgeSendEnabled(context.Context, *connect.Request[v1.SetBridgeSendEnabledRequest]) (*connect.Response[v1.SetBridgeSendEnabledResponse], error)
 	// Starts signing in to an app. The answer is the first step to show.
 	// Rate limited (resource_exhausted): a login sends a code to a phone.
 	StartBridgeLogin(context.Context, *connect.Request[v1.StartBridgeLoginRequest]) (*connect.Response[v1.StartBridgeLoginResponse], error)
@@ -271,6 +282,12 @@ func NewBridgeServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+BridgeServiceStartBridgeSyncProcedure,
 			connect.WithSchema(bridgeServiceMethods.ByName("StartBridgeSync")),
+			connect.WithClientOptions(opts...),
+		),
+		setBridgeSendEnabled: connect.NewClient[v1.SetBridgeSendEnabledRequest, v1.SetBridgeSendEnabledResponse](
+			httpClient,
+			baseURL+BridgeServiceSetBridgeSendEnabledProcedure,
+			connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeSendEnabled")),
 			connect.WithClientOptions(opts...),
 		),
 		startBridgeLogin: connect.NewClient[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse](
@@ -405,6 +422,7 @@ type bridgeServiceClient struct {
 	dismissBridgeProblem      *connect.Client[v1.DismissBridgeProblemRequest, v1.DismissBridgeProblemResponse]
 	getBridgeStatus           *connect.Client[v1.GetBridgeStatusRequest, v1.GetBridgeStatusResponse]
 	startBridgeSync           *connect.Client[v1.StartBridgeSyncRequest, v1.StartBridgeSyncResponse]
+	setBridgeSendEnabled      *connect.Client[v1.SetBridgeSendEnabledRequest, v1.SetBridgeSendEnabledResponse]
 	startBridgeLogin          *connect.Client[v1.StartBridgeLoginRequest, v1.StartBridgeLoginResponse]
 	continueBridgeLogin       *connect.Client[v1.ContinueBridgeLoginRequest, v1.ContinueBridgeLoginResponse]
 	listBridgeConversations   *connect.Client[v1.ListBridgeConversationsRequest, v1.ListBridgeConversationsResponse]
@@ -464,6 +482,11 @@ func (c *bridgeServiceClient) GetBridgeStatus(ctx context.Context, req *connect.
 // StartBridgeSync calls app.v1.BridgeService.StartBridgeSync.
 func (c *bridgeServiceClient) StartBridgeSync(ctx context.Context, req *connect.Request[v1.StartBridgeSyncRequest]) (*connect.Response[v1.StartBridgeSyncResponse], error) {
 	return c.startBridgeSync.CallUnary(ctx, req)
+}
+
+// SetBridgeSendEnabled calls app.v1.BridgeService.SetBridgeSendEnabled.
+func (c *bridgeServiceClient) SetBridgeSendEnabled(ctx context.Context, req *connect.Request[v1.SetBridgeSendEnabledRequest]) (*connect.Response[v1.SetBridgeSendEnabledResponse], error) {
+	return c.setBridgeSendEnabled.CallUnary(ctx, req)
 }
 
 // StartBridgeLogin calls app.v1.BridgeService.StartBridgeLogin.
@@ -603,6 +626,14 @@ type BridgeServiceHandler interface {
 	// every one that appears later joins on its own; all of them sync both ways.
 	// Turning it on again does nothing.
 	StartBridgeSync(context.Context, *connect.Request[v1.StartBridgeSyncRequest]) (*connect.Response[v1.StartBridgeSyncResponse], error)
+	// Turns the sending switch of an account on or off, for an app that sends only
+	// once the owner allows it (BridgeAccount.send_gated). On: the chats of the
+	// conversations the app lists send what the user writes in Chat on to the app
+	// (within seconds, as the account lists them). Off: every chat of the account is
+	// read-only again and what is queued for the app is cancelled. failed_precondition
+	// send_unsupported when the app has no such switch, or when turning it on for an
+	// account that is not connected.
+	SetBridgeSendEnabled(context.Context, *connect.Request[v1.SetBridgeSendEnabledRequest]) (*connect.Response[v1.SetBridgeSendEnabledResponse], error)
 	// Starts signing in to an app. The answer is the first step to show.
 	// Rate limited (resource_exhausted): a login sends a code to a phone.
 	StartBridgeLogin(context.Context, *connect.Request[v1.StartBridgeLoginRequest]) (*connect.Response[v1.StartBridgeLoginResponse], error)
@@ -727,6 +758,12 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 		BridgeServiceStartBridgeSyncProcedure,
 		svc.StartBridgeSync,
 		connect.WithSchema(bridgeServiceMethods.ByName("StartBridgeSync")),
+		connect.WithHandlerOptions(opts...),
+	)
+	bridgeServiceSetBridgeSendEnabledHandler := connect.NewUnaryHandler(
+		BridgeServiceSetBridgeSendEnabledProcedure,
+		svc.SetBridgeSendEnabled,
+		connect.WithSchema(bridgeServiceMethods.ByName("SetBridgeSendEnabled")),
 		connect.WithHandlerOptions(opts...),
 	)
 	bridgeServiceStartBridgeLoginHandler := connect.NewUnaryHandler(
@@ -865,6 +902,8 @@ func NewBridgeServiceHandler(svc BridgeServiceHandler, opts ...connect.HandlerOp
 			bridgeServiceGetBridgeStatusHandler.ServeHTTP(w, r)
 		case BridgeServiceStartBridgeSyncProcedure:
 			bridgeServiceStartBridgeSyncHandler.ServeHTTP(w, r)
+		case BridgeServiceSetBridgeSendEnabledProcedure:
+			bridgeServiceSetBridgeSendEnabledHandler.ServeHTTP(w, r)
 		case BridgeServiceStartBridgeLoginProcedure:
 			bridgeServiceStartBridgeLoginHandler.ServeHTTP(w, r)
 		case BridgeServiceContinueBridgeLoginProcedure:
@@ -940,6 +979,10 @@ func (UnimplementedBridgeServiceHandler) GetBridgeStatus(context.Context, *conne
 
 func (UnimplementedBridgeServiceHandler) StartBridgeSync(context.Context, *connect.Request[v1.StartBridgeSyncRequest]) (*connect.Response[v1.StartBridgeSyncResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.StartBridgeSync is not implemented"))
+}
+
+func (UnimplementedBridgeServiceHandler) SetBridgeSendEnabled(context.Context, *connect.Request[v1.SetBridgeSendEnabledRequest]) (*connect.Response[v1.SetBridgeSendEnabledResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.BridgeService.SetBridgeSendEnabled is not implemented"))
 }
 
 func (UnimplementedBridgeServiceHandler) StartBridgeLogin(context.Context, *connect.Request[v1.StartBridgeLoginRequest]) (*connect.Response[v1.StartBridgeLoginResponse], error) {

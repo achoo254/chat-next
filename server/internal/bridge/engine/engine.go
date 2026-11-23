@@ -208,6 +208,12 @@ func (r *runner) run(ctx context.Context) error {
 	for _, l := range links {
 		r.links[l.ExternalChat] = l
 	}
+	if sendGated(r.adapter) {
+		// A call to a gated app cut off by a stop may have gone out: the owner decides.
+		if err := e.db.interruptedToUnknown(runCtx, r.account.ID); err != nil {
+			return err
+		}
+	}
 
 	// Subscribe first: what happens while history is imported waits in the
 	// queue instead of falling between the two.

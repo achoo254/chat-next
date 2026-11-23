@@ -19,6 +19,7 @@ import { useBridgeCopy } from "./use-bridge-copy.ts";
 import "./bridge-settings.css";
 
 const BridgeAccountTools = lazy(() => import("./bridge-account-tools.tsx").then((m) => ({ default: m.BridgeAccountTools })));
+const BridgeSendSwitch = lazy(() => import("./bridge-send-switch.tsx").then((m) => ({ default: m.BridgeSendSwitch })));
 
 /** How often the progress of an import is read while one runs. */
 const PROGRESS_POLL_MS = 3000;
@@ -213,6 +214,7 @@ function AccountCard({
 			)}
 			<SyncPanel account={account} api={api} appName={appName} onChange={onChange} />
 			<Suspense fallback={null}>
+				{account.sendGated && <BridgeSendSwitch account={account} api={api} appName={appName} onChange={onChange} />}
 				<BridgeAccountTools accountId={account.id} api={api} onChange={onChange} onError={onError} />
 			</Suspense>
 		</section>
@@ -235,8 +237,10 @@ function SyncPanel({
 	onChange: () => void;
 }) {
 	const t = useBridgeCopy();
-	// What the user is promised depends on the direction: an app Chat only reads from says so.
-	const words = RECEIVE_ONLY_APPS.has(account.source) ? { ...t.sync, ...t.sync.receive } : t.sync;
+	// What the user is promised depends on the direction: an app Chat only reads from says so,
+	// and one whose sending the owner switched on says what goes out.
+	const receiveOnly = RECEIVE_ONLY_APPS.has(account.source);
+	const words = !receiveOnly ? t.sync : account.sendEnabled ? { ...t.sync, ...t.sync.receive, liveBody: t.send.liveBody } : { ...t.sync, ...t.sync.receive };
 	const { toasts } = useServices();
 	const { locale } = useI18n();
 	const [later, setLater] = useState(false);

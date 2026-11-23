@@ -307,6 +307,8 @@ describe("sending to several apps", () => {
 				status: BridgeAccountStatus.NEEDS_LOGIN,
 				syncState: BridgeSyncState.LIVE,
 				lastError: "",
+				sendGated: false,
+				sendEnabled: false,
 				chats: [
 					{ $typeName: "app.v1.BridgeSyncedChat", conversationId: "user:7", chatId: BigInt(chats.telegram), caughtUp: true, historyWindow: 2000, title: "Lan Anh", direction: BridgeDirection.BOTH, topicsSplit: false },
 				],

@@ -273,6 +273,17 @@ func (r *runner) sendRow(ctx context.Context, h *outboxRow) error {
 	if owner == nil {
 		return r.e.db.setOutbox(ctx, []int64{h.ID}, "failed", "unknown operation", time.Time{})
 	}
+	// An app gated per account takes nothing while the owner has its sending switched
+	// off, whatever the row; the switch is read now, as the owner may just have turned it.
+	if sendGated(r.adapter) {
+		on, err := r.e.db.sendEnabled(ctx, r.account.ID)
+		if err != nil {
+			return err
+		}
+		if !on {
+			return r.e.db.setOutbox(ctx, []int64{h.ID}, "cancelled", sendOffReason, time.Time{})
+		}
+	}
 	// A feature switched off for the chat after the row was queued: nothing goes.
 	dir, err := r.e.db.featureDirection(ctx, r.account.ID, h.ExternalChat, owner.feature)
 	if err != nil {
@@ -306,6 +317,11 @@ func (r *runner) settleCall(ctx context.Context, rows []*outboxRow, err error) e
 		return r.e.db.setOutbox(ctx, ids, "pending", err.Error(), r.pause)
 	case errors.Is(err, bridge.ErrNotAllowed), errors.Is(err, bridge.ErrEditExpired), errors.Is(err, bridge.ErrTooLarge):
 		return r.e.db.setOutbox(ctx, ids, "failed", err.Error(), time.Time{})
+	case sendGated(r.adapter):
+		// The call reached the adapter of a gated app and failed for a reason that does not
+		// say nothing went out: sending it again on its own could post it twice from the
+		// owner's account, so the owner decides (retry by hand).
+		return r.e.db.setOutbox(ctx, ids, "unknown", err.Error(), time.Time{})
 	case attempts >= r.e.cfg.SendAttempts:
 		return r.e.db.setOutbox(ctx, ids, "failed", fmt.Sprintf("gave up after %d attempts: %v", attempts, err), time.Time{})
 	}

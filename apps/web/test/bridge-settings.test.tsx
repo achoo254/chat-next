@@ -3,7 +3,7 @@
 // through, and disconnecting. The server is a fake BridgeService.
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BridgeSyncState } from "@achoo254/chat-proto/bridge";
+import { BridgeAccountStatus, BridgeSyncState } from "@achoo254/chat-proto/bridge";
 import { beforeEach, describe, expect, it } from "vitest";
 import { matchRoute } from "../src/router.tsx";
 import { ChatFixture } from "./support/fake-chat.ts";
@@ -150,5 +150,72 @@ describe("what did not go through", () => {
 		await waitFor(() => expect(fixture.bridge.calls).toContain("problem:dismiss:5"), LONG);
 		await userEvent.click(await screen.findByRole("button", { name: "Thử lại" }, LONG));
 		await waitFor(() => expect(fixture.bridge.calls).toContain("problem:retry:6"), LONG);
+	});
+});
+
+describe("sending to an app that gates it", () => {
+	function zaloLive(fixture: ChatFixture, sendEnabled = false): void {
+		fixture.bridge.apps = ["telegram", "zalo"];
+		fixture.bridge.accounts = [
+			{
+				$typeName: "app.v1.BridgeAccount",
+				id: 2n,
+				source: "zalo",
+				status: BridgeAccountStatus.ACTIVE,
+				syncState: BridgeSyncState.LIVE,
+				lastError: "",
+				chats: [],
+				progress: { $typeName: "app.v1.BridgeSyncProgress", conversations: 4, conversationsDone: 4, messages: 40n, messagesExpected: 40n },
+				sendGated: true,
+				sendEnabled,
+			},
+		];
+	}
+
+	it("is off by default and goes on only after the risk notice is accepted", async () => {
+		const fixture = new ChatFixture();
+		zaloLive(fixture);
+		await openPage(fixture);
+		const toggle = await screen.findByRole("switch", { name: "Gửi tin sang Zalo" }, LONG);
+		expect(toggle.getAttribute("aria-checked")).toBe("false");
+		expect(toggle.getAttribute("aria-describedby")).toBeTruthy();
+		expect(screen.getByText("4 cuộc trò chuyện, tin mới đi một chiều về Chat.")).toBeTruthy();
+
+		// cancelling the notice changes nothing
+		await userEvent.click(toggle);
+		let dialog = await screen.findByRole("dialog", { name: "Bật gửi tin sang Zalo?" }, LONG);
+		expect(within(dialog).getByText(/khoá tài khoản cá nhân chính của bạn/)).toBeTruthy();
+		expect(within(dialog).getByText(/Đừng mở Zalo Web hoặc Zalo trên máy tính/)).toBeTruthy();
+		expect(within(dialog).getByText(/Chỉ chữ do chính bạn gõ trong Chat được gửi đi/)).toBeTruthy();
+		await userEvent.click(within(dialog).getByRole("button", { name: "Huỷ" }));
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(fixture.bridge.calls.some((c) => c.startsWith("send:"))).toBe(false);
+
+		await userEvent.click(screen.getByRole("switch", { name: "Gửi tin sang Zalo" }));
+		dialog = await screen.findByRole("dialog", { name: "Bật gửi tin sang Zalo?" }, LONG);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Tôi hiểu, bật gửi tin" }));
+		await waitFor(() => expect(fixture.bridge.calls).toContain("send:2:true"), LONG);
+		await waitFor(() => expect(screen.getByRole("switch", { name: "Gửi tin sang Zalo" }).getAttribute("aria-checked")).toBe("true"), LONG);
+		expect(screen.getByText("4 cuộc trò chuyện, tin mới về Chat và chữ bạn gõ trong Chat được gửi đi.")).toBeTruthy();
+	});
+
+	it("goes off without a notice", async () => {
+		const fixture = new ChatFixture();
+		zaloLive(fixture, true);
+		await openPage(fixture);
+		const toggle = await screen.findByRole("switch", { name: "Gửi tin sang Zalo" }, LONG);
+		expect(toggle.getAttribute("aria-checked")).toBe("true");
+		await userEvent.click(toggle);
+		await waitFor(() => expect(fixture.bridge.calls).toContain("send:2:false"), LONG);
+		expect(screen.queryByRole("dialog")).toBeNull();
+		await waitFor(() => expect(screen.getByRole("switch", { name: "Gửi tin sang Zalo" }).getAttribute("aria-checked")).toBe("false"), LONG);
+	});
+
+	it("is not offered for an app that does not gate sending", async () => {
+		const fixture = new ChatFixture();
+		fixture.bridge.seedDemo();
+		await openPage(fixture);
+		expect(await screen.findByText("Đang đồng bộ trực tiếp", {}, LONG)).toBeTruthy();
+		expect(screen.queryByRole("switch")).toBeNull();
 	});
 });
