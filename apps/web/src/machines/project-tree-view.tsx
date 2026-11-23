@@ -247,6 +247,8 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 								<MachineIcon name={open ? "chevron-down" : "chevron-right"} small />
 							</button>
 						)}
+						{/* A workspace without sessions cannot fold; keep the toggle's width so its icon lines up with the folding rows. */}
+						{!foldable && <span className="mx-ws-toggle" aria-hidden="true" />}
 					{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
 						<StatusGlyph status={node.status} icon={workspaceIcon(node)} ai={node.ai} offline={node.offline} />
 						<b>{label.title}</b>
