@@ -14,7 +14,7 @@ import { StatusGlyph } from "./status-glyph.tsx";
 import { threadStatus } from "./project-tree.ts";
 import { clockText, useNow } from "./transcript/run-time.ts";
 import type { Conn } from "./machine-status.ts";
-import { chatTakesTerminal, ModeIcon, officeOffered, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
+import { chatTakesTerminal, ModeIcon, observeOffered, rowMode, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./thread-actions.tsx";
 import { aiName, isRunning, modelName, stateKey, timeAgo, type MachineView } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -111,7 +111,7 @@ export function SessionRow({ machine, thread, now, current, done }: { machine: M
 	const status = threadStatus(thread, done);
 	// Finished since this device last looked: a check alone reads as "all fine", so the name turns bold and a dot follows it, as an unread message does.
 	const unread = status === "done";
-	const path = sessionPath(ref_, thread, inTerminal, officeOffered(machine.state.info), chatTakesTerminal(machine.state.info, thread.provider));
+	const path = sessionPath(ref_, thread, inTerminal, observeOffered(machine.state.info, thread.provider), chatTakesTerminal(machine.state.info, thread.provider));
 	const ai = aiName(machine.state.info, thread.provider);
 	const content = (
 		<>

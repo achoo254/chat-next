@@ -1,7 +1,7 @@
 // The terminal's path and round trip, always true to the path in use:
 // "Trực tiếp 12 ms" over WebRTC, "Qua relay 85 ms" through the relay, or
 // what the link is doing instead. A session's header shows it on every view
-// (chat, terminal, office) under the title: with no terminal attached it
+// (chat, terminal, Observe) under the title: with no terminal attached it
 // tells the machine's own link, which always goes through the relay.
 import { useSyncExternalStore } from "react";
 import type { MachinesCopy } from "../machines/copy-vi.ts";

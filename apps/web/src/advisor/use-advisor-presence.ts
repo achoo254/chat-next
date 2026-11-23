@@ -14,7 +14,7 @@ import type { AdvisorTone } from "@achoo254/chat-core";
 import { LOCAL_REF, localMachine, type LinkHub } from "../machines/link/link-hub.ts";
 import { OfflineError, RemoteError, type LinkState, type MachineLink } from "../machines/link/machine-link.ts";
 import { shouldConnect } from "../machines/machine-status.ts";
-import { chatTakesTerminal, officeOffered, sessionPath, terminalOffered } from "../machines/session-mode.tsx";
+import { chatTakesTerminal, observeOffered, sessionPath, terminalOffered } from "../machines/session-mode.tsx";
 import type { MachineEntry } from "../machines/machines-client.ts";
 import { inFolder } from "../machines/projects-view.ts";
 import { EMPTY_JOURNAL, orderedItems, type Journal } from "../machines/transcript/reducer.ts";
@@ -601,7 +601,7 @@ function useVerdictFlash(hub: LinkHub, store: AdvisorStore): void {
 export function pageOfSession(machine: string, threadId: string, state: Pick<LinkState, "threads" | "info"> | null): string {
 	const thread = state?.threads.find((x) => x.id === threadId);
 	if (state === null || thread === undefined) return paths.machineSession(machine, threadId);
-	return sessionPath(machine, thread, terminalOffered(state.info, thread.provider), officeOffered(state.info), chatTakesTerminal(state.info, thread.provider));
+	return sessionPath(machine, thread, terminalOffered(state.info, thread.provider), observeOffered(state.info, thread.provider), chatTakesTerminal(state.info, thread.provider));
 }
 
 /** "Option (82%)" for a verdict; its error code when Advisor did not answer (worded by the mascot). */

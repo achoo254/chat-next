@@ -514,7 +514,6 @@ export class AgentCore {
   private infoListeners = new Set<(threadId: string) => void>();
   private turnEndListeners = new Set<(threadId: string) => void>();
   private activityListeners = new Set<(activity: ThreadActivity) => void>();
-  private providerEventListeners = new Set<(threadId: string, e: ProviderEvent | HistoryEntry) => void>();
   private advisorAnswerListeners = new Set<(threadId: string, clientMsgId: string, state: TurnState) => void>();
   private elsewhereTimer: ReturnType<typeof setInterval> | undefined;
   /** The look for activity elsewhere under way; one at a time. */
@@ -785,17 +784,6 @@ export class AgentCore {
     return () => this.activityListeners.delete(fn);
   }
 
-  /**
-   * Called with each event of a thread's AI session before the core handles
-   * it, and with each entry read back from its transcript (turns run
-   * elsewhere): what the journal does not keep (a subagent's kind, its tool
-   * calls), for the office view. A listener must not throw.
-   */
-  onProviderEvent(fn: (threadId: string, e: ProviderEvent | HistoryEntry) => void): () => void {
-    this.providerEventListeners.add(fn);
-    return () => this.providerEventListeners.delete(fn);
-  }
-
   /** What the thread's running turn is doing now; undefined when none runs (or the thread is unknown). */
   activity(threadId: string): ThreadActivity | undefined {
     const t = this.threads.get(threadId);
@@ -987,6 +975,12 @@ export class AgentCore {
   /** The AI session id of the thread's latest session ("" when it has none yet). */
   sessionIdOf(threadId: string): string {
     return this.threads.get(threadId)?.meta.segments.at(-1)?.sessionId ?? "";
+  }
+
+  /** The AI session id each segment of a thread names, oldest first, with its AI ([] for a thread the machine does not have). */
+  segmentSessions(threadId: string): { provider: string; sessionId: string }[] {
+    const segments = this.threads.get(threadId)?.meta.segments ?? [];
+    return segments.flatMap((seg) => (seg.sessionId ? [{ provider: seg.provider, sessionId: seg.sessionId }] : []));
   }
 
   /** The AI session ids of every thread's sessions, by provider. */
@@ -1567,7 +1561,6 @@ export class AgentCore {
     }
     const items: Item[] = [];
     for (const e of entries) {
-      for (const fn of this.providerEventListeners) fn(t.meta.id, e);
       const entry = historyItem(e, t.meta.dir, this.opts.isSensitive);
       const found = t.journal.get(entry.id);
       const prev = found && found.seq > shownFrom ? found : undefined;
@@ -2636,7 +2629,6 @@ export class AgentCore {
       t.resuming.heard = true;
       if (t.resuming.failed) this.put(t, `error:${randomUUID()}`, { case: "error", value: { message: "the AI reported an error" } });
     }
-    for (const fn of this.providerEventListeners) fn(t.meta.id, e);
     t.lastActive = this.now();
     switch (e.type) {
       case "session": {

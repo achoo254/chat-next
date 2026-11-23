@@ -1,5 +1,5 @@
 // Settings › Cố vấn: the Advisor profile kept with the account (name, look,
-// tone: every device and the office follow it), whether the mascot shows on
+// tone: every device follows it), whether the mascot shows on
 // this device, and the TypeSafe key (advisor-key-section.tsx).
 import { useRef, useState, type FormEvent } from "react";
 import type { AdvisorTone } from "@achoo254/chat-core";

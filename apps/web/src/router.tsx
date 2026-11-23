@@ -43,8 +43,10 @@ export type MachinesView =
 	| { readonly page: "session"; readonly machine: string; readonly threadId: string }
 	/** The session opened in its AI's own CLI, in the machine's terminal. */
 	| { readonly page: "session-terminal"; readonly machine: string; readonly threadId: string }
-	/** The session's office: its AI and subagents at work in a small building (view only). */
-	| { readonly page: "session-office"; readonly machine: string; readonly threadId: string }
+	/** The session's "Quan sát": the Live Map of its Claude Code session (view only); its old /office opens it too. ?at=<ms>&event=<id> point at a moment. */
+	| { readonly page: "session-observe"; readonly machine: string; readonly threadId: string }
+	/** The Live Map of one of the machine's Claude Code sessions by its own id (from the machine's list); ?at=<ms>&event=<id> as above. */
+	| { readonly page: "observe-session"; readonly machine: string; readonly sessionId: string }
 	/**
 	 * "Hiệu quả": the machine's AI usage of one repository, `key` its
 	 * canonical key ("host/path"), `local:<folder>` or `scratch`; "" for
@@ -158,6 +160,9 @@ const BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/;
 const CONSOLE_TABS: readonly ConsoleTab[] = ["token", "updates", "dead-letters", "stats", "commands", "mini-app"];
 /** Thread ids of a machine's agent (UUIDs today; any opaque id of this shape). */
 const THREAD_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** A Claude Code session id as Observatory takes it: 1 to 200 characters, no control characters. */
+// eslint-disable-next-line no-control-regex -- the range is the control characters the machine refuses in a session id
+const SESSION_ID = /^[^\u0000-\u001f\u007f]{1,200}$/;
 
 function parseId(value: string | undefined): number | null {
 	if (value === undefined || !ID.test(value)) return null;
@@ -247,13 +252,18 @@ function matchMachines(parts: readonly string[]): Route | null {
 	if (parts.length === 2 && parts[1] === "info") return route({ page: "info", machine });
 	if (parts.length === 2 && parts[1] === "accounts") return route({ page: "accounts", machine });
 	if (parts.length === 2 && parts[1] === "terminal") return route({ page: "terminal", machine });
+	if (parts.length === 3 && parts[1] === "observe") {
+		const sessionId = decodeURIComponent(parts[2] ?? "");
+		return SESSION_ID.test(sessionId) ? route({ page: "observe-session", machine, sessionId }) : null;
+	}
 	// The third part: a thread id, or the repository key of the usage page (only a filter of the machine's own report).
 	const threadId = parts[2] === undefined ? "" : decodeURIComponent(parts[2]);
 	if (parts[1] === "usage") return route({ page: "usage", machine, key: threadId });
 	if (parts[1] !== "s" || !THREAD_ID.test(threadId)) return null;
 	if (parts.length === 3) return route({ page: "session", machine, threadId });
 	if (parts.length === 4 && parts[3] === "terminal") return route({ page: "session-terminal", machine, threadId });
-	if (parts.length === 4 && parts[3] === "office") return route({ page: "session-office", machine, threadId });
+	// The office, which Observe replaced: its old links open Observe (the screen then replaces the address).
+	if (parts.length === 4 && (parts[3] === "observe" || parts[3] === "office")) return route({ page: "session-observe", machine, threadId });
 	return null;
 }
 

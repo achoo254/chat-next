@@ -7,7 +7,7 @@ import { CLAUDE_PROVIDER_ID } from "./claude/accounts/paths.ts";
 import { ANTIGRAVITY_PROVIDER_ID } from "./antigravity/agy.ts";
 import { createAntigravityProvider } from "./antigravity/index.ts";
 import { claudeHomesIn, createClaudeProvider } from "./claude/index.ts";
-import type { AgentProvider, ProviderInfo } from "./types.ts";
+import type { AgentProvider, ProviderInfo, SessionObserver } from "./types.ts";
 
 /** What every AI's accounts need from the machine; each AI's calls name the AI. */
 export type AccountsHost = {
@@ -29,13 +29,17 @@ export type ProviderSources = {
   accounts?: AccountsHost;
   /** macOS: what the AI's long-lived processes may not touch (MacFolders.aiFences); Claude reads it from each session's policy. */
   fences?: () => AiFences;
+  /** Observatory for the AI's working sessions; undefined while it is off (observatory/session-observer.ts). */
+  observer?: () => SessionObserver | undefined;
 };
 
 export function builtinProviders(src: ProviderSources): AgentProvider[] {
   const a = src.accounts;
+  const observer = src.observer ? { observer: src.observer } : {};
   const claude = createClaudeProvider(
     a
       ? {
+          ...observer,
           accounts: {
             configDir: src.configDir,
             store: a.store,
@@ -45,7 +49,7 @@ export function builtinProviders(src: ProviderSources): AgentProvider[] {
             log: a.log,
           },
         }
-      : { homes: () => claudeHomesIn(src.configDir) },
+      : { ...observer, homes: () => claudeHomesIn(src.configDir) },
   );
   const fences = src.fences ? { fences: src.fences } : {};
   const antigravity = createAntigravityProvider(

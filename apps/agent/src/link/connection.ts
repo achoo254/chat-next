@@ -56,7 +56,8 @@ import type { Workspaces } from "../workspace/workspaces.ts";
 import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-link.ts";
 import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
 import { LedgerUnreadable } from "../usage/ledger.ts";
-import { type OfficeHub, type OfficeSink, officeHubFor } from "../office/office-hub.ts";
+import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
+import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
 
 export type Socket = {
@@ -110,6 +111,8 @@ export type LinkContext = {
   onAdvisorKey?: () => void;
   /** Automatic Advisor for the whole machine (AdvisorSetAuto); absent where the machine has no Advisor (tests). */
   advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
+  /** The Claude Code sessions Observatory stored (ObservatoryWatch and the requests beside it); absent where the machine has none (tests). */
+  observatory?: Pick<ObservatoryHub, "listSessions" | "watch" | "unwatch" | "forget" | "earlier" | "content" | "station">;
 };
 
 /** The class and reason of each refusal of Advisor's key store. */
@@ -162,8 +165,8 @@ export function errorBody(err: unknown): { code: ErrorCode; message: string; rea
   return { code: ErrorCode.INTERNAL, message, reason: ErrorReason.UNSPECIFIED, subject: "" };
 }
 
-/** Bytes waiting on a device's socket over which its office events are dropped (it sees a gap in seq and asks for a snapshot). */
-const OFFICE_BUFFERED_MAX = 1024 * 1024;
+/** Bytes waiting on a device's socket over which its Observatory events are dropped (it sees a gap in seq and asks for a snapshot). */
+const OBSERVATORY_BUFFERED_MAX = 1024 * 1024;
 
 /** How often a followed thread's transcript is looked at for turns typed outside Chat. */
 const FOLLOW_MS = 1_500;
@@ -256,11 +259,10 @@ export class Connection {
   private screenShareLink: ScreenShareLink | undefined;
   private terminal: TerminalConnection | undefined;
   private workspaceLink: WorkspaceLink | undefined;
-  /** The machine's offices (OfficeWatch), and where this connection gets the events of those it watches. */
-  private office: OfficeHub | undefined;
-  private readonly officeSink: OfficeSink = (events) => {
-    if ((this.socket.buffered?.() ?? 0) > OFFICE_BUFFERED_MAX) return;
-    this.send("", { case: "officeEvents", value: events });
+  /** Where this connection gets the events of the Observatory sessions it watches. */
+  private readonly observatorySink: ObservatoryEventSink = (events) => {
+    if ((this.socket.buffered?.() ?? 0) > OBSERVATORY_BUFFERED_MAX) return;
+    this.send("", { case: "observatoryEvents", value: events });
   };
   /** Messages queued before the link opened, not yet opened (decrypted). */
   private rawPending = 0;
@@ -319,7 +321,7 @@ export class Connection {
     this.screenShareLink?.close();
     if (this.terminal) this.ctx.terminal?.forget(this.terminal);
     this.workspaceLink?.close();
-    this.office?.forget(this.officeSink);
+    this.ctx.observatory?.forget(this.observatorySink);
     this.socket.close(code, reason);
   }
 
@@ -397,8 +399,6 @@ export class Connection {
         if (this.subscribed.has(threadId)) void this.pushGitChanges(threadId);
       }),
     );
-    this.office = officeHubFor(this.ctx.core, this.ctx.providers ?? []);
-    this.unsubscribe.push(this.office.attach());
     const secrets = this.ctx.secrets;
     if (secrets) {
       this.unsubscribe.push(secrets.onEvent((event) => this.secretEvent(event)));
@@ -969,15 +969,12 @@ export class Connection {
         case "usageSettingsSet":
         case "usageDelete":
           return this.usageFrame(id, b);
-        case "officeWatch": {
-          const office = this.office;
-          if (!office) return this.send(id, { case: "error", value: refusal("the link is not open", ErrorReason.UNSUPPORTED_REQUEST) });
-          if (!b.value.on) {
-            office.unwatch(b.value.threadId, this.officeSink);
-            return ack();
-          }
-          return this.send(id, { case: "officeSnapshot", value: office.watch(b.value.threadId, this.officeSink, b.value.advisorRole) });
-        }
+        case "observatorySessionList":
+        case "observatoryWatch":
+        case "observatoryEarlier":
+        case "observatoryContent":
+        case "observatoryStation":
+          return this.observatoryFrame(id, b);
         case "projectConfigGet": {
           const dir = b.value.dir;
           if (!dir) return this.send(id, { case: "error", value: refusal("a folder is needed", ErrorReason.FOLDER_NOT_FOUND) });
@@ -1007,6 +1004,32 @@ export class Connection {
     const usage = this.ctx.usage;
     if (!usage) return this.send(id, { case: "error", value: refusal("this machine keeps no usage ledger", ErrorReason.UNSUPPORTED_REQUEST) });
     void handleUsage(usage, id, b, (i, body) => this.send(i, body), this.device).catch((err: unknown) => this.sendError(id, err));
+  }
+
+  /** Observatory's sessions: the store's reads are short and synchronous, so each is answered at once. */
+  private observatoryFrame(id: string, b: ObservatoryFrame): void {
+    const hub = this.ctx.observatory;
+    if (!hub) return this.send(id, { case: "error", value: refusal("this machine has no Observatory", ErrorReason.UNSUPPORTED_REQUEST) });
+    switch (b.case) {
+      case "observatorySessionList": {
+        // A thread's sessions are the Claude Code sessions its segments name (none for another AI's thread).
+        const thread = b.value.threadId;
+        const seeds = thread ? this.ctx.core.segmentSessions(thread).flatMap((s) => (s.provider === CLAUDE_PROVIDER_ID ? [s.sessionId] : [])) : undefined;
+        return this.send(id, { case: "observatorySessionListResult", value: hub.listSessions(b.value.limit, seeds) });
+      }
+      case "observatoryWatch":
+        if (!b.value.on) {
+          hub.unwatch(b.value.sessionId, this.observatorySink);
+          return this.send(id, { case: "ack", value: {} });
+        }
+        return this.send(id, { case: "observatorySnapshot", value: hub.watch(b.value.sessionId, this.observatorySink, b.value.limit) });
+      case "observatoryEarlier":
+        return this.send(id, { case: "observatoryEarlierResult", value: hub.earlier(b.value.sessionId, b.value.earlier, b.value.limit) });
+      case "observatoryContent":
+        return this.send(id, { case: "observatoryContentResult", value: hub.content(b.value.sessionId, b.value.eventId) });
+      case "observatoryStation":
+        return this.send(id, { case: "observatoryStationResult", value: hub.station(b.value.sessionId, b.value.station, Number(b.value.at)) });
+    }
   }
 
   /** The tunelo browser: answered later, by id; input in order. */
@@ -1041,6 +1064,8 @@ type ProjectFrame = Extract<
   Frame["body"],
   { case: "projectList" | "projectAdd" | "projectCreate" | "projectClone" | "projectCloneCancel" | "projectUpdate" | "projectReorder" | "projectRemove" }
 >;
+
+type ObservatoryFrame = Extract<Frame["body"], { case: "observatorySessionList" | "observatoryWatch" | "observatoryEarlier" | "observatoryContent" | "observatoryStation" }>;
 
 type SecretFrame = Extract<Frame["body"], { case: "secretProvide" | "secretDecline" | "secretList" | "secretRemove" }>;
 

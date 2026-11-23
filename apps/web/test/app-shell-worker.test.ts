@@ -1,6 +1,6 @@
 // The app shell's service worker (src/sw/app-shell-worker.ts) run against an
 // in-memory CacheStorage, a fake network and fake tabs.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	startAppShellWorker,
 	type AppShellBuild,
@@ -11,7 +11,7 @@ import {
 	type WindowClientLike,
 } from "../src/sw/app-shell-worker.ts";
 import { askBuild, BUILD_QUERY, BUILD_REPLY } from "../src/sw/build-messages.ts";
-import { CACHE_PREFIX, OFFICE_CACHE } from "../src/sw/shell-routes.ts";
+import { CACHE_PREFIX, OBSERVATORY_CACHE, RETIRED_CACHES } from "../src/sw/shell-routes.ts";
 
 const ORIGIN = "https://chat.hoandat.com";
 const url = (path: string) => new URL(path, ORIGIN).toString();
@@ -42,6 +42,8 @@ class MemoryCaches {
 			addAll: async (requests: RequestInfo[]) => {
 				for (const request of requests) entries.set(key(request), `network ${key(request)}`);
 			},
+			keys: () => Promise.resolve([...entries.keys()].map((path) => new Request(url(path)))),
+			delete: (request: RequestInfo | URL) => Promise.resolve(entries.delete(key(request))),
 		};
 		return Promise.resolve(cache as unknown as Cache);
 	}
@@ -93,6 +95,8 @@ interface Harness {
 	online: boolean;
 	/** The network's status for every answer (200 by default). */
 	status: number;
+	/** Bodies the network answers by path; any other path answers "network <path>". */
+	readonly bodies: Map<string, string>;
 	install(): Promise<void>;
 	activate(): Promise<void>;
 	request(path: string, mode?: string): Promise<Response | null>;
@@ -118,6 +122,7 @@ function startWorker(shell: AppShellBuild, caches = new MemoryCaches()): Harness
 		tabs,
 		online: true,
 		status: 200,
+		bodies: new Map(),
 		async install() {
 			await dispatchExtendable("install");
 		},
@@ -161,7 +166,8 @@ function startWorker(shell: AppShellBuild, caches = new MemoryCaches()): Harness
 		fetch: (request) => {
 			calls.push(`fetch ${new URL(request.url).pathname}`);
 			if (!harness.online) return Promise.reject(new TypeError("offline"));
-			const response = new Response(`network ${new URL(request.url).pathname}`, { status: harness.status });
+			const path = new URL(request.url).pathname;
+			const response = new Response(harness.bodies.get(path) ?? `network ${path}`, { status: harness.status });
 			// A same-origin answer, as the browser's fetch gives it.
 			Object.defineProperty(response, "type", { value: "basic" });
 			return Promise.resolve(response);
@@ -268,54 +274,106 @@ describe("app shell worker: requests", () => {
 	});
 });
 
-describe("app shell worker: office assets", () => {
-	const GLB = "/office/character.5cc7bd69.glb";
-	const LIST = "/office/office-assets.json";
-	const office = (caches: MemoryCaches) => caches.stores.get(OFFICE_CACHE);
+describe("app shell worker: Live Map assets", () => {
+	const PLATE = "/observatory/observatory-plate-2560.ab9a1124.webp";
+	const SCENE = "/observatory/live-map-scene.74f6dbef.json";
+	const LIST = "/observatory/observatory-assets.json";
+	const listOf = (plate: string, scene: string) => JSON.stringify({ formatVersion: 1, plate: { full: { file: plate } }, scene, atlases: [] });
+	const LIST_BODY = listOf("observatory-plate-2560.ab9a1124.webp", "live-map-scene.74f6dbef.json");
+	const stored = (caches: MemoryCaches) => caches.stores.get(OBSERVATORY_CACHE);
+	const withList = (worker: Harness, body = LIST_BODY): Harness => {
+		worker.bodies.set(LIST, body);
+		return worker;
+	};
 
-	it("downloads an office file once, then serves it from its own cache, offline too", async () => {
+	it("downloads a Live Map file once, then serves it from its own cache, offline too", async () => {
 		const worker = startWorker(NEW);
 		await worker.install();
-		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
-		expect(office(worker.caches)?.get(GLB)).toBe(`network ${GLB}`);
+		expect(await (await worker.request(PLATE))?.text()).toBe(`network ${PLATE}`);
+		expect(stored(worker.caches)?.get(PLATE)).toBe(`network ${PLATE}`);
 		worker.online = false;
-		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
-		expect(worker.calls.filter((call) => call === `fetch ${GLB}`)).toHaveLength(1);
+		expect(await (await worker.request(PLATE))?.text()).toBe(`network ${PLATE}`);
+		expect(worker.calls.filter((call) => call === `fetch ${PLATE}`)).toHaveLength(1);
 		// Not in any build's cache, so pruning builds never drops it.
-		expect(worker.caches.stores.get(`${CACHE_PREFIX}new`)?.has(GLB)).toBe(false);
+		expect(worker.caches.stores.get(`${CACHE_PREFIX}new`)?.has(PLATE)).toBe(false);
 	});
 
-	it("keeps the office cache across builds", async () => {
+	it("keeps the Live Map cache across builds", async () => {
 		const caches = new MemoryCaches();
 		const old = startWorker(OLD, caches);
 		await old.install();
-		await old.request(GLB);
+		await old.request(PLATE);
 		const worker = startWorker(NEW, caches);
 		await worker.install();
 		await worker.activate();
 		await worker.ask();
-		// The old build's cache went with its last tab; the office cache stayed.
-		expect([...caches.stores.keys()]).toEqual([OFFICE_CACHE, `${CACHE_PREFIX}new`]);
+		// The old build's cache went with its last tab; the Live Map cache stayed.
+		expect([...caches.stores.keys()]).toEqual([OBSERVATORY_CACHE, `${CACHE_PREFIX}new`]);
 		worker.online = false;
-		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
+		expect(await (await worker.request(PLATE))?.text()).toBe(`network ${PLATE}`);
+	});
+
+	it("deletes the retired 3D office cache on activate, and nothing else", async () => {
+		const caches = new MemoryCaches();
+		await caches.open("office-assets-v1").then((cache) => cache.put("/office/character.5cc7bd69.glb", new Response("3d")));
+		const worker = startWorker(NEW, caches);
+		await worker.install();
+		await worker.request(PLATE);
+		await worker.activate();
+		expect(RETIRED_CACHES).toEqual(["office-assets-v1"]);
+		expect([...caches.stores.keys()]).toEqual([`${CACHE_PREFIX}new`, OBSERVATORY_CACHE]);
+		// The old office path is no longer the worker's: it goes to the network untouched.
+		expect(await worker.request("/office/character.5cc7bd69.glb")).toBeNull();
 	});
 
 	it("asks the network for the asset list every time and answers with the stored copy offline", async () => {
-		const worker = startWorker(NEW);
+		const worker = withList(startWorker(NEW));
 		await worker.install();
 		await worker.request(LIST);
 		await worker.request(LIST);
 		expect(worker.calls.filter((call) => call === `fetch ${LIST}`)).toHaveLength(2);
-		expect(office(worker.caches)?.get(LIST)).toBe(`network ${LIST}`);
+		expect(stored(worker.caches)?.get(LIST)).toBe(LIST_BODY);
 		worker.online = false;
-		expect(await (await worker.request(LIST))?.text()).toBe(`network ${LIST}`);
+		expect(await (await worker.request(LIST))?.text()).toBe(LIST_BODY);
+	});
+
+	it("drops the files of an earlier bake once a new list no longer names them", async () => {
+		const worker = withList(startWorker(NEW));
+		await worker.install();
+		await worker.request(PLATE);
+		await worker.request(SCENE);
+		await worker.request(LIST);
+		expect([...(stored(worker.caches)?.keys() ?? [])]).toEqual([PLATE, SCENE, LIST]);
+		const plate = "/observatory/observatory-plate-2560.0123abcd.webp";
+		withList(worker, listOf("observatory-plate-2560.0123abcd.webp", "live-map-scene.74f6dbef.json"));
+		await worker.request(LIST);
+		expect([...(stored(worker.caches)?.keys() ?? [])]).toEqual([SCENE, LIST]);
+		await worker.request(plate);
+		expect(stored(worker.caches)?.has(plate)).toBe(true);
+	});
+
+	it("keeps the cached files when the list names none or does not parse", async () => {
+		const worker = withList(startWorker(NEW), JSON.stringify({ formatVersion: 1 }));
+		await worker.install();
+		await worker.request(PLATE);
+		await worker.request(LIST);
+		expect(stored(worker.caches)?.has(PLATE)).toBe(true);
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		try {
+			withList(worker, "not json");
+			expect(await (await worker.request(LIST))?.text()).toBe("not json");
+			expect(warn).toHaveBeenCalledOnce();
+		} finally {
+			warn.mockRestore();
+		}
+		expect(stored(worker.caches)?.has(PLATE)).toBe(true);
 	});
 
 	it("fails offline when it never had the file or the list", async () => {
 		const worker = startWorker(NEW);
 		await worker.install();
 		worker.online = false;
-		await expect(worker.request(GLB)).rejects.toThrow("offline");
+		await expect(worker.request(PLATE)).rejects.toThrow("offline");
 		await expect(worker.request(LIST)).rejects.toThrow("offline");
 	});
 
@@ -323,17 +381,17 @@ describe("app shell worker: office assets", () => {
 		const worker = startWorker(NEW);
 		await worker.install();
 		worker.status = 404;
-		expect((await worker.request(GLB))?.status).toBe(404);
+		expect((await worker.request(PLATE))?.status).toBe(404);
 		expect((await worker.request(LIST))?.status).toBe(404);
-		expect(office(worker.caches)?.size ?? 0).toBe(0);
+		expect(stored(worker.caches)?.size ?? 0).toBe(0);
 	});
 
 	it("still answers when storing a copy fails (out of quota)", async () => {
-		const worker = startWorker(NEW);
+		const worker = withList(startWorker(NEW));
 		await worker.install();
 		worker.caches.failPuts = true;
-		expect(await (await worker.request(GLB))?.text()).toBe(`network ${GLB}`);
-		expect(await (await worker.request(LIST))?.text()).toBe(`network ${LIST}`);
-		expect(office(worker.caches)?.size ?? 0).toBe(0);
+		expect(await (await worker.request(PLATE))?.text()).toBe(`network ${PLATE}`);
+		expect(await (await worker.request(LIST))?.text()).toBe(LIST_BODY);
+		expect(stored(worker.caches)?.size ?? 0).toBe(0);
 	});
 });

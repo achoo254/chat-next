@@ -181,6 +181,10 @@ describe("connection", () => {
     link.conn.receive(session.seal(create(FrameSchema, { id: "4c", body: { case: "macFolderAccessAsk", value: { path: join(m.work) } } })));
     const ask = (await frames(session, link.next, (f) => f.id === "4c")).at(-1)?.body;
     expect(ask?.case === "error" && ask.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
+    // The 3D office is gone: an older app's watch is refused like any request the machine does not serve.
+    link.conn.receive(session.seal(create(FrameSchema, { id: "4d", body: { case: "officeWatch", value: { threadId: id, on: true } } })));
+    const office = (await frames(session, link.next, (f) => f.id === "4d")).at(-1)?.body;
+    expect(office?.case === "error" && office.value.reason).toBe(ErrorReason.UNSUPPORTED_REQUEST);
 
     // A denial with words reaches the core and lands on the card.
     link.conn.receive(

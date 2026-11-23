@@ -8,14 +8,15 @@
 // reconnect resubscribes from the cursor and a reset reloads the snapshot.
 // Files dragged anywhere over the session go to the composer when dropped.
 // "Chat | Terminal" in the header opens the same session in its AI's own CLI
-// instead (session-mode.tsx); while the CLI holds it, the chat is read-only.
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+// instead, and "Quan sát" shows its Claude Code session on the Live Map
+// (session-mode.tsx); while the CLI holds it, the chat is read-only.
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, type SecretPrompt, type SlashCommand, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch } from "../router.tsx";
-import { aiPaths } from "./ai-paths.ts";
+import { aiPaths, observeFocus } from "./ai-paths.ts";
 import { AdvisorVerdictCard } from "./cards/advisor-verdict.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
@@ -50,7 +51,7 @@ import { usePopover } from "./use-popover.ts";
 import { AGENT_LIVE_ACTIVITY, versionAtLeast } from "./agent-version.ts";
 import { ActivityLine, type ActivitySource } from "./activity-line.tsx";
 import { BrowserDock, BrowserViewHost, ScreenViewHost } from "./browser/takeover-card.tsx";
-import { ModeIcon, ModeSwitch, TerminalHeldBar, officeOffered, openSessionIn, rememberSessionMode, sessionModes, terminalOffered, type SessionMode } from "./session-mode.tsx";
+import { ModeIcon, ModeSwitch, TerminalHeldBar, observeOffered, openSessionIn, rememberSessionMode, sessionModes, terminalOffered, type SessionMode } from "./session-mode.tsx";
 import { PanelToggle, useWorkspacePanel, WorkspacePanelHost } from "./workspace/panel-toggle.tsx";
 import { SessionPathPill, TerminalScreen } from "./terminal-screen.ts";
 import { isPhone, useViewportFit } from "./viewport-fit.ts";
@@ -60,13 +61,12 @@ import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
 import { SessionEmpty, SessionLoading } from "./session-scene.tsx";
 import { useAdvisorScope, useAdvisorSession } from "../advisor/advisor-context.tsx";
-import { useAdvisorIdentity } from "../advisor/use-advisor-identity.ts";
 import { advisorStore, useSessionFill } from "../advisor/advisor-store.ts";
 
 export { versionAtLeast };
 
-/** The session's office (machines/office): loaded, with its styles and the building's layout, the first time it opens. */
-const OfficeView = lazy(() => import("./office/office-view.tsx"));
+/** The session's "Quan sát" (machines/observatory): loaded the first time it opens, unmounted whenever another view shows. */
+const LiveMapView = lazy(() => import("./observatory/live-map-view.tsx"));
 
 /** The first tunelo that takes a message with a denial and lists a session's files. */
 const AGENT_2_0_1 = [2, 0, 1] as const;
@@ -85,17 +85,7 @@ function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
 
-/** The office tab, with Advisor as the user's profile names and dresses it (the office draws Advisor while the session's automatic Advisor is on). */
-function OfficeTab(props: { link: MachineLink; threadId: string; info: MachineInfo | null; online: boolean; visible: boolean }) {
-	const identity = useAdvisorIdentity();
-	const advisor = useMemo(() => ({ name: identity.name, lookId: identity.look.id }), [identity.name, identity.look.id]);
-	return <OfficeView {...props} advisor={advisor} />;
-}
-
 export function SessionChat({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
-	// Once the office has opened it stays mounted, hidden, while the chat or the terminal shows: its people and counters go on in the background.
-	const [officeOpened, setOfficeOpened] = useState(mode === "office");
-	if (mode === "office" && !officeOpened) setOfficeOpened(true);
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -104,7 +94,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useWatch(link, threadId);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
 	// `?tab=<id>`: one of the session's terminal tabs to bring to the front (its row in the AI Agent column).
-	const pickedTab = new URLSearchParams(useSearch()).get("tab") || undefined;
+	const search = useSearch();
+	const pickedTab = new URLSearchParams(search).get("tab") || undefined;
 	// Advisor's own thread ("Xem phiên Cố vấn"): read only here; questions go through the mascot, which names them.
 	const advisorThread = state.advisorThreads.some((x) => x.id === threadId);
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
@@ -202,7 +193,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	const dir = thread?.dir ?? "";
 	const offered = terminalOffered(state.info, provider);
 	// The views of the session's header: the switch shows once there are two.
-	const modes = sessionModes(offered, officeOffered(state.info), mode);
+	const modes = sessionModes(offered, observeOffered(state.info, provider), mode);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
 	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
@@ -325,15 +316,16 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<MacFolderAccessDialog link={link} state={state} />
 			{mode === "terminal" && <TerminalFolderNotice machine={machine} state={state} />}
-			{officeOpened && (
-				<div className="mx-chat-body" style={mode === "office" ? undefined : { display: "none" }}>
-					<Suspense fallback={mode === "office" ? <p className="mx-group-note muted">{t.office.loading}</p> : null}>
-						<OfficeTab link={link} threadId={threadId} info={state.info} online={online} visible={mode === "office"} />
+			{/* Observe is mounted only while it shows: leaving the tab stops the watch and frees the renderer (iOS does not reclaim GPU memory by itself). */}
+			{mode === "observe" && (
+				<div className="mx-chat-body">
+					<Suspense fallback={<SessionLoading label={t.observe.loading} />}>
+						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", threadId }} focus={observeFocus(search)} />
 					</Suspense>
-					{mode === "office" && workspacePanel}
+					{workspacePanel}
 				</div>
 			)}
-			{mode === "office" ? null : mode === "terminal" ? (
+			{mode === "observe" ? null : mode === "terminal" ? (
 				<div className="mx-chat-body">
 					{offered && thread !== null ? (
 						<Suspense fallback={<SessionLoading label={t.terminal.loading} />}>

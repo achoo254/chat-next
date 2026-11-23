@@ -74,7 +74,7 @@ describe("tunelo CLI", () => {
 			.split("\n")
 			.filter((l) => /^ {2}[a-z]/.test(l))
 			.map((l) => l.trim().split(/\s+/)[0]);
-		expect(listed).toEqual(["login", "logout", "status", "update", "uninstall", "logs", "http", "tcp", "kill", "watch", "config"]);
+		expect(listed).toEqual(["login", "logout", "status", "update", "uninstall", "logs", "observatory", "http", "tcp", "kill", "watch", "config"]);
 		for (const gone of ["install", "devices", "audit", "authenticator", "profiles", "claude", "secrets", "browser", "usage", "link", "links", "whoami", "version", "start", "stop", "run", "mcp", "trust", "disk-access"]) {
 			expect(listed).not.toContain(gone);
 		}
@@ -83,7 +83,7 @@ describe("tunelo CLI", () => {
 	});
 
 	test("hidden commands still run; removed ones are unknown", async () => {
-		for (const hidden of [["start"], ["stop"], ["run"], ["mcp"], ["trust"], ["untrust"], ["trusted"], ["config", "local-forward"], ["config", "mcp-local-writes"]]) {
+		for (const hidden of [["start"], ["stop"], ["run"], ["mcp"], ["trust"], ["untrust"], ["trusted"], ["config", "local-forward"], ["config", "mcp-local-writes"], ["observatory", "hook"]]) {
 			const { code, stdout } = await tunelo([...hidden, "--help"]);
 			expect(code).toBe(0);
 			expect(stdout).toContain(`Usage: tunelo ${hidden.join(" ")}`);

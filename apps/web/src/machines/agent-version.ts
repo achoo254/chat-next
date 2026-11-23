@@ -31,8 +31,16 @@ export const AGENT_LIVE_ACTIVITY = [2, 5, 0] as const;
 /** Images saved in the session's folder for its terminal (AttachmentSave). */
 export const AGENT_TERMINAL_IMAGES = [2, 7, 1] as const;
 
-/** The first tunelo that keeps the office of a session (OfficeWatch, docs/office-wire.md). */
-export const AGENT_OFFICE = [3, 6, 0] as const;
+/** The first tunelo that serves Observatory's Claude Code session timelines (ObservatoryWatch and the requests beside it, docs/observatory-wire.md). */
+export const AGENT_OBSERVATORY = [3, 26, 0] as const;
+
+/**
+ * The first tunelo that serves the Live Map: live state, provisional events
+ * from the spool's tail, bottleneck findings, an event's content by its id
+ * (ObservatoryContent) and a station's numbers (ObservatoryStation);
+ * docs/observatory-wire.md. Released with AGENT_OBSERVATORY.
+ */
+export const AGENT_LIVE_MAP = [3, 26, 0] as const;
 
 /** The first tunelo that takes a folder macOS protects back (MacFolderAccessRevoke), so the machine's folder list offers it. */
 export const AGENT_MAC_FOLDER_REVOKE = [3, 22, 0] as const;

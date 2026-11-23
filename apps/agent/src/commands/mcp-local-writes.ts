@@ -71,7 +71,8 @@ export async function runLocalWrites(action: string | undefined, dir: string, te
 	return 0;
 }
 
-function processTerminal(): Terminal {
+/** The person at this process's terminal (stdin and stdout). */
+export function processTerminal(): Terminal {
 	return {
 		interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
 		async ask(question) {

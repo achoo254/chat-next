@@ -4,19 +4,29 @@
 // One list for both sides, so that what the web offers the machine never
 // refuses for this reason. A basic gitleaks-like set: a few well-known token
 // prefixes, private key blocks, credentials in URLs and assignments, and long
-// random-looking strings.
+// random-looking strings. The agent's redaction (apps/agent mcp/redact.ts)
+// hides the token shapes of this same list, so web, Advisor and redaction
+// never drift apart.
 
-/** One shape: a regular expression's source and flags (no `g`: test() only). */
-export type SecretPattern = { id: string; source: string; flags: string };
+/**
+ * One shape: a regular expression's source and flags (no `g`: test() only).
+ * `prefixes`, for a token shape: the literal texts one of which every match
+ * starts with, so a scanner can find them first (indexOf) and run the
+ * expression only there.
+ */
+export type SecretPattern = { id: string; source: string; flags: string; prefixes?: readonly string[] };
 
 export const ADVISOR_SECRET_PATTERNS: readonly SecretPattern[] = [
   { id: "jwt", source: String.raw`eyJ[\w-]{8,}\.[\w-]{8,}`, flags: "" },
   { id: "bearer", source: String.raw`\bBearer\s+[A-Za-z0-9._~+/=-]{8,}`, flags: "i" },
-  { id: "sk", source: String.raw`\bsk-[A-Za-z0-9_-]{16,}`, flags: "" },
-  { id: "typesafe", source: String.raw`\bts_[A-Za-z0-9_]{16,}`, flags: "" },
-  { id: "github", source: String.raw`\bgh[pousr]_[A-Za-z0-9]{20,}`, flags: "" },
-  { id: "gitlab", source: String.raw`\bglpat-[A-Za-z0-9_-]{20,}`, flags: "" },
-  { id: "aws", source: String.raw`\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`, flags: "" },
+  { id: "sk", source: String.raw`\bsk-[A-Za-z0-9_-]{16,}`, flags: "", prefixes: ["sk-"] },
+  { id: "typesafe", source: String.raw`\bts_[A-Za-z0-9_]{16,}`, flags: "", prefixes: ["ts_"] },
+  { id: "github", source: String.raw`\bgh[pousr]_[A-Za-z0-9]{20,}`, flags: "", prefixes: ["ghp_", "gho_", "ghu_", "ghs_", "ghr_"] },
+  { id: "github-pat", source: String.raw`\bgithub_pat_[A-Za-z0-9_]{20,}`, flags: "", prefixes: ["github_pat_"] },
+  { id: "gitlab", source: String.raw`\bglpat-[A-Za-z0-9_-]{20,}`, flags: "", prefixes: ["glpat-"] },
+  { id: "aws", source: String.raw`\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`, flags: "", prefixes: ["AKIA", "ASIA"] },
+  { id: "slack", source: String.raw`\bxox[abprs]-[A-Za-z0-9-]{10,}`, flags: "", prefixes: ["xoxa-", "xoxb-", "xoxp-", "xoxr-", "xoxs-"] },
+  { id: "google", source: String.raw`\bAIza[0-9A-Za-z_-]{35}`, flags: "", prefixes: ["AIza"] },
   { id: "pem", source: String.raw`-----BEGIN [A-Z0-9 ]+-----`, flags: "" },
   { id: "url-userinfo", source: String.raw`[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`, flags: "i" },
   // A key, password, token or secret set to a value that looks like one: at

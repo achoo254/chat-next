@@ -1,0 +1,24 @@
+{
+	"formatVersion": 1,
+	"note": "Live Map assets (tools/observatory-art in the workspace); file names carry a content hash. plate.full is the 2560x1920 picture, plate.half the 1280x960 one for devices whose MAX_TEXTURE_SIZE is below 2560. Scene table and sprite anchors are in 2560x1920 plate pixels; scale them with the plate in use. Atlases are PixiJS spritesheets (frame anchors set).",
+	"space": {
+		"width": 2560,
+		"height": 1920
+	},
+	"plate": {
+		"full": {
+			"file": "observatory-plate-2560.ab9a1124.webp",
+			"width": 2560,
+			"height": 1920
+		},
+		"half": {
+			"file": "observatory-plate-1280.bd70a00a.webp",
+			"width": 1280,
+			"height": 960
+		}
+	},
+	"scene": "live-map-scene.74f6dbef.json",
+	"sceneMeasuredOn": "concept-04",
+	"atlases": [],
+	"sprites": {}
+}

@@ -45,8 +45,13 @@ export const BUNDLE_BUDGET = {
 	 * the list module from it split two shared modules into chunks of their own
 	 * (+0.7 KB). 153.7 KB with the Telegram and Zalo folders always listed, each
 	 * with its logo (the Zalo logo, the merge of the known apps into the folder
-	 * list and the logo in the rail and the tabs, about 0.2 KB). The budget is
-	 * 154 KB.
+	 * list and the logo in the rail and the tabs, about 0.2 KB). The Live Map's
+	 * lazy renderer (PixiJS) adds no app module to startup, but its own
+	 * on-demand chunks (its renderers and browser extensions) use the
+	 * bundler's runtime helpers without importing the react vendor chunk, so
+	 * rolldown keeps the helpers in a startup chunk of their own (0.3 KB, the
+	 * split's overhead; the bundler has no setting for where its runtime
+	 * goes). The budget is 154 KB.
 	 */
 	startupJsGzip: 154 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
@@ -54,27 +59,30 @@ export const BUNDLE_BUDGET = {
 } as const;
 
 /**
- * The 3D office (apps/web/src/office-3d): the lazy modules the Office tab
- * loads for it (manifest keys), counted with their static imports and
- * Babylon's on-demand parts (shaders), minus what a signed-in start and the
- * Office tab itself (OFFICE_VIEW_MODULE) already loaded.
+ * The Live Map ("Quan sát", apps/web/src/machines/observatory): the lazy
+ * module the Observe tab loads (manifest key), counted with its static imports
+ * and its own on-demand parts, minus what a signed-in start and the AI Agent
+ * screen (MACHINES_SCREEN_MODULE, open before any session) already loaded.
  */
-export const OFFICE_3D_MODULES = ["src/office-3d/office-canvas.tsx", "src/office-3d/office-world.ts"] as const;
-export const OFFICE_VIEW_MODULE = "src/machines/office/office-view.tsx";
+export const LIVE_MAP_MODULE = "src/machines/observatory/live-map-view.tsx";
+export const MACHINES_SCREEN_MODULE = "src/machines/machines-screen.tsx";
 
 /**
- * On-demand parts that belong to the 3D office's count, for one backend: a
- * device runs WebGPU (WGSL shaders) or WebGL2 (GLSL shaders), never both, so
- * each backend's count leaves out the other's shader chunks.
+ * PixiJS's own on-demand parts a browser loads for the Live Map: its browser
+ * extensions and both renderers it may pick (WebGL, else Canvas; both counted,
+ * though only one loads). Its WebGPU renderer (never asked for) and its web
+ * worker environment are not counted.
  */
-export function office3dPart(backend: "webgpu" | "webgl2"): (key: string) => boolean {
-	const other = backend === "webgpu" ? "/@babylonjs/core/Shaders/" : "/@babylonjs/core/ShadersWGSL/";
-	return (key) => (key.includes("@babylonjs/") && !key.includes(other)) || key.startsWith("src/office-3d/");
+const PIXI_ON_DEMAND = /\/pixi\.js\/lib\/(environment-browser\/browserAll|rendering\/renderers\/gl\/WebGLRenderer|rendering\/renderers\/canvas\/CanvasRenderer)\.mjs$/;
+
+/** On-demand parts that belong to the Live Map's count. */
+export function liveMapPart(key: string): boolean {
+	return key.startsWith("src/machines/observatory/") || PIXI_ON_DEMAND.test(key);
 }
 
-export const OFFICE_3D_BUDGET = {
-	/** Plan decision 7: the 3D chunk under 1 MB gzip, models and textures not counted (the spike page measured 807 KB). */
-	jsGzip: 1024 * 1024,
+export const LIVE_MAP_BUDGET = {
+	/** The Live Map chunk under 350 KB gzip, images and other assets not counted. */
+	jsGzip: 350 * 1024,
 } as const;
 
 /** GitHub Actions and most CI systems set CI=true. */

@@ -22,7 +22,8 @@ import { SavedSecrets } from "./saved-secrets.tsx";
 import { MachineBrowser } from "./browser/machine-browser.tsx";
 import { MachineScreen } from "./screen/machine-screen.tsx";
 import { MachineTerminalSessions } from "./machine-terminal-sessions.tsx";
-import { terminalGate } from "./agent-version.ts";
+import { AGENT_LIVE_MAP, terminalGate, versionAtLeast } from "./agent-version.ts";
+import { MachineClaudeSessions } from "./observatory/machine-claude-sessions.tsx";
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { aiName, mcpAiName, useEntry, useHub, useLink } from "./use-machines.ts";
@@ -113,6 +114,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 			<div className="mx-body">
 				<MacFolderAccessDialog link={link} state={state} />
 				{terminalGate(state.info) === "available" && <MachineTerminalSessions machine={machine} link={link} online={online} threads={state.threads} />}
+				{state.info !== null && versionAtLeast(state.info.agentVersion, AGENT_LIVE_MAP) && <MachineClaudeSessions machine={machine} link={link} online={online} />}
 				<MacFoldersCard link={link} state={state} />
 				{hasAccounts && (
 					<section className="card pad mx-card" data-id="machine-ai-accounts">

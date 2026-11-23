@@ -1,9 +1,11 @@
 // How a session opens: the chat view, its AI's own CLI in the machine's
-// terminal (for those who prefer the CLI), or its office (the AI and its
-// subagents at work in a small building, view only). The terminal is offered
-// only when the machine has its terminal and the session's AI opens there
-// (ProviderCapabilities.terminal); the office when the machine's tunelo keeps
-// one (AGENT_OFFICE). Each session remembers the mode it was last opened in
+// terminal (for those who prefer the CLI), or "Quan sát" (the Live Map of the
+// Claude Code session as the machine's Observatory records it, view only).
+// The terminal is offered only when the machine has its terminal and the
+// session's AI opens there (ProviderCapabilities.terminal); Observe when the
+// machine's tunelo serves the Live Map (AGENT_LIVE_MAP) and the session runs
+// Claude Code. A mode kept as "office" (the view Observe replaced) reads as
+// Observe. Each session remembers the mode it was last opened in
 // on this device, and opens in it again from a list: its row's icon says that
 // one (or a live hold). The view last picked on the switch is kept on this
 // device too, and only a session never opened here opens in it (one that does
@@ -15,7 +17,7 @@ import { useState, type ReactElement } from "react";
 import type { MachineInfo, ProjectDefaults, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
-import { AGENT_OFFICE, terminalGate, versionAtLeast } from "./agent-version.ts";
+import { AGENT_LIVE_MAP, terminalGate, versionAtLeast } from "./agent-version.ts";
 import { iconSvg } from "../components/icon.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -23,7 +25,7 @@ import { endOnPurpose } from "../terminal/ended-sessions.ts";
 import { errorText, isRunning, providerOf } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
-export type SessionMode = "chat" | "terminal" | "office";
+export type SessionMode = "chat" | "terminal" | "observe";
 
 const MODE_KEY = (machine: string) => `ai:mode:${machine}`;
 
@@ -37,19 +39,28 @@ export function chatTakesTerminal(info: MachineInfo | null, provider: string): b
 	return providerOf(info, provider)?.capabilities?.chatTakesTerminal === true;
 }
 
-/** The machine's tunelo keeps the office of a session. */
-export function officeOffered(info: Pick<MachineInfo, "agentVersion"> | null): boolean {
-	return info !== null && versionAtLeast(info.agentVersion, AGENT_OFFICE);
+/** The AI whose sessions Observatory records (it reads Claude Code's own hooks and telemetry). */
+export const OBSERVED_PROVIDER = "claude";
+
+/** The machine's tunelo serves the Live Map, and the session's AI is the one Observatory records. */
+export function observeOffered(info: Pick<MachineInfo, "agentVersion"> | null, provider: string): boolean {
+	return info !== null && provider === OBSERVED_PROVIDER && versionAtLeast(info.agentVersion, AGENT_LIVE_MAP);
 }
 
 /**
- * The views a session offers, in the order the switch shows them. An office
+ * The views a session offers, in the order the switch shows them. Observe
  * open now stays among them (remembered, on a machine that went offline or
  * back to an older tunelo), so there is always a way back to chat; a terminal
  * not offered says so on its own page.
  */
-export function sessionModes(terminal: boolean, office: boolean, current: SessionMode = "chat"): SessionMode[] {
-	return (["chat", "terminal", "office"] as const).filter((m) => m === "chat" || (m === "terminal" ? terminal : office || current === "office"));
+export function sessionModes(terminal: boolean, observe: boolean, current: SessionMode = "chat"): SessionMode[] {
+	return (["chat", "terminal", "observe"] as const).filter((m) => m === "chat" || (m === "terminal" ? terminal : observe || current === "observe"));
+}
+
+/** A mode as kept in storage: "office" (the view Observe replaced) reads as Observe; null for a value this app does not know. */
+function storedMode(kept: string | null): SessionMode | null {
+	if (kept === "office") return "observe";
+	return kept === "chat" || kept === "terminal" || kept === "observe" ? kept : null;
 }
 
 /** The mode new sessions on the machine open in, as last picked when starting one (chat when none, or when storage is refused). */
@@ -84,8 +95,7 @@ let pickedWatched = false;
 
 function readPicked(): SessionMode | null {
 	try {
-		const kept = window.localStorage.getItem(PICKED_MODE_KEY);
-		return kept === "chat" || kept === "terminal" || kept === "office" ? kept : null;
+		return storedMode(window.localStorage.getItem(PICKED_MODE_KEY));
 	} catch {
 		return null;
 	}
@@ -118,8 +128,7 @@ const SESSION_MODE_KEY = (machine: string, threadId: string) => `ai:mode:${machi
 /** The mode kept for the session on this device; null when it was never opened here, or for a value this app does not know. */
 function keptMode(machine: string, threadId: string): SessionMode | null {
 	try {
-		const kept = window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId));
-		return kept === "chat" || kept === "terminal" || kept === "office" ? kept : null;
+		return storedMode(window.localStorage.getItem(SESSION_MODE_KEY(machine, threadId)));
 	} catch {
 		return null;
 	}
@@ -153,7 +162,7 @@ export function rowMode(machine: string, thread: Pick<ThreadSummary, "id" | "ter
 
 export function modePath(machine: string, threadId: string, mode: SessionMode): string {
 	if (mode === "terminal") return aiPaths.sessionTerminal(machine, threadId);
-	return mode === "office" ? aiPaths.sessionOffice(machine, threadId) : paths.machineSession(machine, threadId);
+	return mode === "observe" ? aiPaths.sessionObserve(machine, threadId) : paths.machineSession(machine, threadId);
 }
 
 /** Switch this session to `mode`: it and the device remember the choice (a session never opened here opens in it too). */
@@ -167,35 +176,34 @@ export function openSessionIn(machine: string, threadId: string, mode: SessionMo
  * Where a session opens from a list: the view its row names (a live hold,
  * else the mode it was last opened in on this device), the terminal only when
  * offered. Only a session never opened here, and not held, takes the view last
- * picked on a switch when it offers it (the terminal when `offered`, the
- * office when the machine keeps one, `office`): a pick on one session never
- * moves another the user left in its own view. An office it was left in opens
- * there (only a machine that keeps offices let it be picked; an older one says
- * to update). A session a terminal holds opens in the chat it was left in when
- * `takesBack`.
+ * picked on a switch when it offers it (the terminal when `offered`, Observe
+ * when `observe`): a pick on one session never moves another the user left in
+ * its own view. Observe it was left in opens there (only a machine that serves
+ * it let it be picked; an older one says to update). A session a terminal
+ * holds opens in the chat it was left in when `takesBack`.
  */
-export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, office = true, takesBack = false): string {
+export function sessionPath(machine: string, thread: Pick<ThreadSummary, "id" | "terminalSession" | "open">, offered: boolean, observe = true, takesBack = false): string {
 	const picked = thread.terminalSession > 0 || keptMode(machine, thread.id) !== null ? null : pickedMode();
-	const usable = picked === "chat" || (picked === "terminal" && offered) || (picked === "office" && office);
+	const usable = picked === "chat" || (picked === "terminal" && offered) || (picked === "observe" && observe);
 	const mode = usable && picked !== null ? picked : rowMode(machine, thread, takesBack);
 	return modePath(machine, thread.id, mode === "terminal" && !offered ? "chat" : mode);
 }
 
-/** A small building: the office view. */
-const OFFICE_ICON = (
+/** An eye: Observe. */
+const OBSERVE_ICON = (
 	<>
-		<path d="M4 20V6l8-3 8 3v14" />
-		<path d="M2.5 20h19M9 20v-4h6v4M8 8h2M14 8h2M8 12h2M14 12h2" />
+		<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+		<circle cx="12" cy="12" r="3" />
 	</>
 );
 
 /** The icon of a view. */
 export function ModeIcon({ mode }: { mode: SessionMode }): ReactElement {
-	if (mode === "office") return iconSvg(OFFICE_ICON, true);
+	if (mode === "observe") return iconSvg(OBSERVE_ICON, true);
 	return <MachineIcon name={mode === "terminal" ? "terminal" : "chat"} small />;
 }
 
-/** "Chat | Terminal | Office" in the session header: only with two views or more. */
+/** "Chat | Terminal | Observe" in the session header: only with two views or more. */
 export function ModeSwitch({ machine, threadId, mode, modes }: { machine: string; threadId: string; mode: SessionMode; modes: readonly SessionMode[] }) {
 	const t = useMachinesCopy();
 	if (modes.length < 2) return null;

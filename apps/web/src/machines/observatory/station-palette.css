@@ -1,0 +1,58 @@
+/* The Live Map's station palette: one colour per station (station-catalog.ts), the same wherever a station is coloured: the marks of the
+   replay bar, the drawer's edge, and the renderer when it tints by station (it reads tokens from CSS, render/scene-layers.ts readPalette).
+   Radix Colors step 11 of ten hues (light scale in light, dark scale in dark), like the app's --c-viz-* tokens: each keeps at least 3:1
+   against --c-bar-track in both themes, and none is the amber of a bottleneck (--c-warning), the red of a failure (--c-error) or the grey of
+   no station. test/machines/observatory/station-palette.test.ts checks the codes, the contrast, that the hues stay apart and that the two
+   dark blocks match. Blocks as in tokens.css of @achoo254/app-shell: light, dark by OS preference unless data-theme="light", dark forced. */
+:root {
+	--c-station-core: #6550b9; /* violet-11 */
+	--c-station-orchestrator: #953ea3; /* plum-11 */
+	--c-station-files: #0d74ce; /* blue-11 */
+	--c-station-memory: #107d98; /* cyan-11 */
+	--c-station-skills: #815e46; /* brown-11 */
+	--c-station-mcp: #008573; /* teal-11 */
+	--c-station-external: #c2298a; /* pink-11 */
+	--c-station-sandbox: #5c7c2f; /* lime-11 */
+	--c-station-testing: #218358; /* green-11 */
+	--c-station-git: #cc4e00; /* orange-11 */
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--c-station-core: #baa7ff;
+		--c-station-orchestrator: #e796f3;
+		--c-station-files: #70b8ff;
+		--c-station-memory: #4ccce6;
+		--c-station-skills: #dbb594;
+		--c-station-mcp: #0bd8b6;
+		--c-station-external: #ff8dcc;
+		--c-station-sandbox: #bde56c;
+		--c-station-testing: #3dd68c;
+		--c-station-git: #ffa057;
+	}
+}
+
+:root[data-theme="dark"] {
+	--c-station-core: #baa7ff;
+	--c-station-orchestrator: #e796f3;
+	--c-station-files: #70b8ff;
+	--c-station-memory: #4ccce6;
+	--c-station-skills: #dbb594;
+	--c-station-mcp: #0bd8b6;
+	--c-station-external: #ff8dcc;
+	--c-station-sandbox: #bde56c;
+	--c-station-testing: #3dd68c;
+	--c-station-git: #ffa057;
+}
+
+/* Any element tagged with a station (data-station, the code the machine sends) gets its colour as --station. */
+[data-station="CORE"] { --station: var(--c-station-core); }
+[data-station="ORCHESTRATOR"] { --station: var(--c-station-orchestrator); }
+[data-station="FILES"] { --station: var(--c-station-files); }
+[data-station="MEMORY"] { --station: var(--c-station-memory); }
+[data-station="SKILLS"] { --station: var(--c-station-skills); }
+[data-station="MCP"] { --station: var(--c-station-mcp); }
+[data-station="EXTERNAL"] { --station: var(--c-station-external); }
+[data-station="SANDBOX"] { --station: var(--c-station-sandbox); }
+[data-station="TESTING"] { --station: var(--c-station-testing); }
+[data-station="GIT"] { --station: var(--c-station-git); }

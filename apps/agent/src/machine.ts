@@ -53,6 +53,9 @@ import { UsageScheduler } from "./usage/scheduler.ts";
 import { type UsageHint, UsageNotifier } from "./usage/notify.ts";
 import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
 import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
+import { ObservatoryService, type ObservatoryServiceOptions } from "./observatory/observatory-service.ts";
+import { observatoryDataDirFor } from "./observatory/spool/observatory-data-dir.ts";
+import { ObservatorySessionObserver } from "./observatory/session-observer.ts";
 
 const MAX_CONNECTIONS = 16;
 /** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
@@ -107,6 +110,8 @@ export type MachineOptions = {
   termHostUnit?: TermHostUnit;
   /** Environment for finding the terminal process binary (TUNELO_TERM_HOST_BIN); the process's own when not given. */
   env?: NodeJS.ProcessEnv;
+  /** Observatory's data folder, ingest and store (observatory/observatory-service.ts); the machine's when not given. */
+  observatory?: Partial<Pick<ObservatoryServiceOptions, "dataDir" | "ingest" | "openStore">>;
 };
 
 export class Machine {
@@ -130,6 +135,10 @@ export class Machine {
   readonly usageNotifier: UsageNotifier;
   /** Usage for the devices' link. */
   private readonly usageApi: UsageApi;
+  /** Claude Code's sessions as observed on this machine (hooks, OpenTelemetry), in its local store. */
+  readonly observatory: ObservatoryService;
+  /** Observatory's part in the Claude sessions and terminals this machine opens. */
+  private readonly sessionObserver: ObservatorySessionObserver;
   private readonly updater: AgentUpdater;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
@@ -204,6 +213,8 @@ export class Machine {
       builtinProviders({
         configDir: dir,
         fences: () => this.macFolders.aiFences(),
+        // Built below; asked for at each session or terminal opened, after the constructor.
+        observer: () => (this.observatory.enabled ? this.sessionObserver : undefined),
         accounts: {
           store: new AccountsStore(dir),
           audit: this.audit,
@@ -225,6 +236,17 @@ export class Machine {
       },
       log: this.log,
     });
+    this.observatory = new ObservatoryService({
+      config: this.config,
+      dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir),
+      log: this.log,
+      // The sign-in secrets and Advisor's key are hidden too, once loaded (mcp/redact.ts remembers them).
+      knownSecrets: () => [this.config.get().machineSecret ?? ""],
+      ...(opts.observatory?.ingest ? { ingest: opts.observatory.ingest } : {}),
+      ...(opts.observatory?.openStore ? { openStore: opts.observatory.openStore } : {}),
+      isSensitive: this.isSensitive,
+    });
+    this.sessionObserver = new ObservatorySessionObserver({ service: this.observatory, dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir), selfCommand: () => selfCommand() });
     this.usageNotifier = new UsageNotifier({
       ledger: this.usage.ledger,
       rules: () => this.usageRules(),
@@ -456,6 +478,8 @@ export class Machine {
     this.terminal.start();
     for (const s of this.core.sessionIds()) this.usage.launched.add(s.provider, s.sessionId);
     this.usage.start();
+    // Never rejects: a part of Observatory that cannot start stays off and its status says why.
+    await this.observatory.start();
     this.log(`tunelo ${AGENT_VERSION} listening on ws://127.0.0.1:${actual}`);
     return actual;
   }
@@ -478,6 +502,8 @@ export class Machine {
     clearTimeout(this.announcingProjects);
     this.projects.stop();
     this.workspaces.stop();
+    // Its queues go into the store before the store closes; never rejects.
+    await this.observatory.stop();
     await this.core.stop();
   }
 
@@ -646,6 +672,7 @@ export class Machine {
         onAdvisorKey: () => this.advisorKeyChanged(),
         advisorAuto: { available: () => this.sessionMcpEnabled(), set: (on, device) => this.setAdvisorAuto(on, device) },
         macFolders: this.macFolders,
+        observatory: this.observatory.hub,
         onPing: () => (this.lastPing = Date.now()),
       },
     );

@@ -1,7 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CACHE_PREFIX, cachesToDelete, isOfficeFile, MAX_UNKNOWN_KEPT, OFFICE_CACHE, shellRoute } from "../src/sw/shell-routes.ts";
+import {
+	CACHE_PREFIX,
+	cachesToDelete,
+	isObservatoryFile,
+	MAX_UNKNOWN_KEPT,
+	OBSERVATORY_CACHE,
+	OBSERVATORY_MANIFEST,
+	observatoryEntriesToDelete,
+	observatoryListFiles,
+	shellRoute,
+} from "../src/sw/shell-routes.ts";
 import { appShell, entryScript, SERVICE_WORKER_FILE } from "../vite-service-worker.ts";
 
 const ORIGIN = "https://chat.hoandat.com";
@@ -39,39 +49,55 @@ describe("service worker routes", () => {
 		expect(shellRoute(get("/botanist", "navigate"), ORIGIN, FILES)).toBe("page");
 	});
 
-	it("serves the office's hashed assets from their own cache and its asset list network first", () => {
+	it("serves the Live Map's hashed assets from their own cache and its asset list network first", () => {
 		const files = [
-			"/office/character.5cc7bd69.glb",
-			"/office/lightmap-floor-1-day-1024.76b39f5d.webp",
-			"/office/office-2d-floor-1-night-phone.320794d2.webp",
-			"/office/sfx/typing.aa1b7357.mp3",
+			"/observatory/observatory-plate-2560.ab9a1124.webp",
+			"/observatory/observatory-plate-1280.bd70a00a.webp",
+			"/observatory/live-map-scene.74f6dbef.json",
+			"/observatory/props-atlas.0123abcd.json",
 		];
-		for (const path of files) expect(shellRoute(get(path), ORIGIN, FILES), path).toBe("office-file");
-		expect(shellRoute(get("/office/office-assets.json"), ORIGIN, FILES)).toBe("office-manifest");
-		expect(OFFICE_CACHE.startsWith(CACHE_PREFIX)).toBe(false);
+		for (const path of files) expect(shellRoute(get(path), ORIGIN, FILES), path).toBe("observatory-file");
+		expect(shellRoute(get(OBSERVATORY_MANIFEST), ORIGIN, FILES)).toBe("observatory-manifest");
+		expect(OBSERVATORY_MANIFEST).toBe("/observatory/observatory-assets.json");
+		expect(OBSERVATORY_CACHE.startsWith(CACHE_PREFIX)).toBe(false);
 	});
 
-	it("leaves office files without a hash, with a query or of another type to the network", () => {
+	it("leaves Live Map files without a hash, with a query or of another type, and the old office paths, to the network", () => {
 		const others = [
-			"/office/character.glb",
-			"/office/character.5cc7bd6.glb",
-			"/office/character.5CC7BD69.glb",
-			"/office/character.5cc7bd69.png",
-			"/office/character.5cc7bd69.glb?v=2",
-			"/office/office-assets.json?x=1",
-			"/office/other/typing.aa1b7357.mp3",
-			"/office/.5cc7bd69.glb",
-			"/office/../character.5cc7bd69.glb",
+			"/observatory/observatory-plate.webp",
+			"/observatory/observatory-plate.ab9a112.webp",
+			"/observatory/observatory-plate.AB9A1124.webp",
+			"/observatory/observatory-plate.ab9a1124.png",
+			"/observatory/observatory-plate.ab9a1124.webp?v=2",
+			"/observatory/observatory-assets.json?x=1",
+			"/observatory/sub/observatory-plate.ab9a1124.webp",
+			"/observatory/.ab9a1124.webp",
+			"/observatory/../observatory-plate.ab9a1124.webp",
+			"/office/character.5cc7bd69.glb",
+			"/office/office-assets.json",
 		];
 		for (const path of others) expect(shellRoute(get(path), ORIGIN, FILES), path).toBe("network");
-		expect(shellRoute({ method: "HEAD", mode: "cors", url: `${ORIGIN}/office/character.5cc7bd69.glb` }, ORIGIN, FILES)).toBe("network");
-		expect(shellRoute(get("https://media-chat.hoandat.com/office/character.5cc7bd69.glb"), ORIGIN, FILES)).toBe("network");
+		expect(shellRoute({ method: "HEAD", mode: "cors", url: `${ORIGIN}/observatory/observatory-plate-2560.ab9a1124.webp` }, ORIGIN, FILES)).toBe("network");
+		expect(shellRoute(get("https://media-chat.hoandat.com/observatory/observatory-plate-2560.ab9a1124.webp"), ORIGIN, FILES)).toBe("network");
 	});
 
-	it("tells the office's hashed file names apart", () => {
-		expect(isOfficeFile("/office/sfx/cheer-tv.8d7134db.mp3")).toBe(true);
-		expect(isOfficeFile("/office/office-assets.json")).toBe(false);
-		expect(isOfficeFile("/assets/character.5cc7bd69.glb")).toBe(false);
+	it("tells the Live Map's hashed file names apart", () => {
+		expect(isObservatoryFile("/observatory/live-map-scene.74f6dbef.json")).toBe(true);
+		expect(isObservatoryFile(OBSERVATORY_MANIFEST)).toBe(false);
+		expect(isObservatoryFile("/assets/live-map-scene.74f6dbef.json")).toBe(false);
+	});
+
+	it("names the files of the public asset list, and drops only cached hashed files a new list leaves out", () => {
+		const list: unknown = JSON.parse(repoFile("apps/web/public/observatory/observatory-assets.json"));
+		const named = observatoryListFiles(list);
+		// The plates and the scene table at least, each a file the release ships.
+		expect(named.size).toBeGreaterThanOrEqual(3);
+		for (const path of named) expect(existsSync(resolve(process.cwd(), `public${path}`)), path).toBe(true);
+		const cached = [...named, OBSERVATORY_MANIFEST, "/observatory/observatory-plate-2560.00000000.webp"];
+		expect(observatoryEntriesToDelete(cached, list)).toEqual(["/observatory/observatory-plate-2560.00000000.webp"]);
+		// A list naming nothing hashed (broken) never empties the cache.
+		expect(observatoryEntriesToDelete(cached, { formatVersion: 1 })).toEqual([]);
+		expect(observatoryEntriesToDelete(cached, null)).toEqual([]);
 	});
 
 	it("deletes only other builds' shell caches that no open tab runs", () => {
@@ -169,25 +195,27 @@ describe("service worker kill switch (infra/chat/sw-kill-switch.js)", () => {
 	});
 });
 
-describe("office asset headers (infra/chat/nginx/chat.hoandat.com.conf)", () => {
-	it("keeps the hashed office files for a year and revalidates their list", () => {
+describe("Live Map asset headers (infra/chat/nginx/chat.hoandat.com.conf)", () => {
+	it("keeps the hashed Live Map files for a year and revalidates their list", () => {
 		const conf = repoFile("infra/chat/nginx/chat.hoandat.com.conf");
 		// A regex with braces must be quoted, or nginx fails to load the file.
 		const match = /location ~ "([^"]+)" \{([^}]*)\}/g;
-		const office = [...conf.matchAll(match)].find((m) => m[1]?.startsWith("^/office/"));
-		expect(office).toBeDefined();
-		const pattern = new RegExp(office?.[1] ?? "$^");
-		const body = office?.[2] ?? "";
+		const observatory = [...conf.matchAll(match)].find((m) => m[1]?.startsWith("^/observatory/"));
+		expect(observatory).toBeDefined();
+		const pattern = new RegExp(observatory?.[1] ?? "$^");
+		const body = observatory?.[2] ?? "";
 		expect(body).toContain("expires 1y;");
 		expect(body).toContain('Cache-Control "public, immutable"');
 		expect(body).toContain("X-Content-Type-Options nosniff");
 		expect(body).toContain("try_files $uri =404;");
 		// nginx and the worker agree on what is hashed.
-		for (const path of ["/office/character.5cc7bd69.glb", "/office/sfx/typing.aa1b7357.mp3", "/office/office-2d-floor-1-day-phone.ce536219.webp"]) {
+		for (const path of ["/observatory/observatory-plate-2560.ab9a1124.webp", "/observatory/live-map-scene.74f6dbef.json"]) {
 			expect(pattern.test(path), path).toBe(true);
-			expect(isOfficeFile(path), path).toBe(true);
+			expect(isObservatoryFile(path), path).toBe(true);
 		}
 		// The list falls to "location /": no-cache.
-		expect(pattern.test("/office/office-assets.json")).toBe(false);
+		expect(pattern.test(OBSERVATORY_MANIFEST)).toBe(false);
+		// The 3D office's assets are gone, and so is their location.
+		expect(conf).not.toContain("^/office/");
 	});
 });

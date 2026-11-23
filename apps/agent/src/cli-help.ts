@@ -4,7 +4,7 @@
 import { type Command, Help } from "commander";
 
 export const HELP_GROUPS: readonly { title: string; commands: readonly string[] }[] = [
-  { title: "Machine", commands: ["login", "logout", "status", "update", "uninstall", "logs"] },
+  { title: "Machine", commands: ["login", "logout", "status", "update", "uninstall", "logs", "observatory"] },
   { title: "Tunnel", commands: ["http", "tcp", "kill", "watch", "config"] },
 ];
 

@@ -69,7 +69,38 @@ export type AgentConfig = {
    * (safety/mac-folders.ts), by the folder's path. Unset: never asked.
    */
   macFolders?: Record<string, "granted" | "denied">;
+  /** Observatory (observatory/observatory-service.ts). */
+  observatory?: ObservatoryConfig;
 };
+
+export type ObservatoryConfig = {
+  /** The master switch; unset is on. */
+  enabled?: boolean;
+  /** The OTLP receiver's port, picked once (observatory/receiver/receiver-port.ts) and kept. */
+  otlpPort?: number;
+  /**
+   * Project keys whose content is not stored. The source of truth: the
+   * store's content_settings and the hooks' state.json are copies made from
+   * it, again after a wipe.
+   */
+  contentOff?: string[];
+  /** The bottleneck rules (observatory/bottlenecks/bottleneck-thresholds.ts): their switch and thresholds. */
+  thresholds?: ObservatoryThresholdsConfig;
+};
+
+/**
+ * The bottleneck rules' switch and the thresholds that differ from their
+ * defaults. Read as untrusted (the file can be edited by hand): a value of the
+ * wrong type is logged and the default used.
+ */
+export type ObservatoryThresholdsConfig = {
+  /** The rules run; unset is on. */
+  enabled?: boolean;
+  /** By rule name: its parameters (`values`), and per subkey (a tool key, a model, a server…) under `subkeys`. */
+  rules?: Record<string, ThresholdOverrides>;
+};
+
+export type ThresholdOverrides = { values?: Record<string, unknown>; subkeys?: Record<string, Record<string, unknown>> };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */
 function platformDir(name: string): string {

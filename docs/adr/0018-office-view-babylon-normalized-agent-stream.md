@@ -1,6 +1,6 @@
 # ADR 0018: Văn phòng của phiên AI: toà nhà 3D Babylon.js, luồng hoạt động do agent chuẩn hoá
 
-- Trạng thái: Đã chấp nhận
+- Trạng thái: Bị thay thế bởi [ADR 0027](./0027-observatory-live-map.md) ngày 23/11/2026: tab Quan sát (Live Map 2D) thay văn phòng, mã và tài sản văn phòng đã gỡ khỏi repo. Phần dưới chỉ còn là lịch sử.
 - Ngày: 2026-11-15
 - Bổ sung [ADR 0013](./0013-remote-machines.md), [ADR 0014](./0014-tunelo-machine-agent.md) và [ADR 0017](./0017-provider-neutral-ai-agent.md).
 
@@ -33,7 +33,7 @@ Antigravity) phải dùng chung một giao diện, và relay hay máy chủ chat
 
 - Mỗi tầng là một diorama: vỏ phòng (sàn, tường, thang máy, cầu thang) lắp trong Blender theo tệp bố cục, đồ đạc và đồ lặt vặt là GLB sinh bằng
   AI, nhân vật là một mesh gắn xương với nhiều texture. Script sinh và nguồn gốc nằm ở repo workspace riêng tư; repo này chỉ chứa tài sản đã xuất
-  (`apps/web/public/office/`) và giấy phép ([`office-asset-licenses.md`](../office-asset-licenses.md)).
+  (`apps/web/public/office/`) và giấy phép (`office-asset-licenses.md`, đã gỡ cùng tài sản; giấy phép còn dùng nằm ở [`asset-licenses.md`](../asset-licenses.md)).
 - Ánh sáng tĩnh bake thành hai lightmap cho mỗi tầng (ngày; đêm có đèn bàn và màn hình), trộn theo giờ máy xem
   (`apps/web/src/machines/office/office-daypart.ts`, `apps/web/src/office-3d/scene/lightmap-blend.ts`). Trạng thái phiên quyết định người; giờ máy
   xem chỉ quyết định ánh sáng.
@@ -52,7 +52,7 @@ Antigravity) phải dùng chung một giao diện, và relay hay máy chủ chat
   (lúc phiên rảnh). Chọn dạng toà nhà nhiều tầng thay vì "mở phòng khi cần", để mỗi việc có chỗ cố định mà người xem học được.
 - **Phân phòng trên máy**: agent chọn nhóm hoạt ảnh và phòng cho mỗi hoạt động (`apps/agent/src/office/office-activity-map.ts`,
   `office-command-room.ts`); lệnh shell chỉ được đọc trên máy để chọn phòng, nội dung lệnh không đi vào khung nào. Bảng phân phòng và cam kết dữ
-  liệu: [`office-wire.md`](../office-wire.md) mục 4 và 8.
+  liệu: `office-wire.md` (đã gỡ cùng văn phòng, còn trong lịch sử git) mục 4 và 8.
 - **Xếp chỗ ở web**: bàn nhà, phòng gốc theo loại agent, thời gian ở lại một phòng, người dư bàn, Chủ tịch ở sảnh là việc trình bày nên nằm ở web,
   trong một hàm thuần dùng chung cho bản 3D và 2D (`apps/web/src/machines/office/office-placement.ts`). Đổi cách bày không cần phát hành agent.
 - Thanh tầng tự theo tầng vừa có việc, có chặn để không nhảy tầng liên tục và ngừng một lúc khi người dùng tự chọn tầng
@@ -96,7 +96,7 @@ Antigravity) phải dùng chung một giao diện, và relay hay máy chủ chat
 ## Hệ quả
 
 - Thêm một AI mới là thêm phần chuẩn hoá trong adapter của nó; web và proto không đổi. AI nào thiếu tín hiệu (subagent, chi phí, từ chối) thì
-  văn phòng thiếu đúng phần đó, có ghi chú trên màn hình, không đoán thêm. Bảng tín hiệu theo loại phiên: [`office-wire.md`](../office-wire.md) mục 7.
+  văn phòng thiếu đúng phần đó, có ghi chú trên màn hình, không đoán thêm. Bảng tín hiệu theo loại phiên: `office-wire.md` (đã gỡ cùng văn phòng, còn trong lịch sử git) mục 7.
 - Đổi bố cục là đổi tệp bố cục, bake lại tài sản và dựng lại ảnh 2D; trong lúc chờ, cảnh dùng khối giữ chỗ.
 - Hai bản sao mã 3D (chat-next và Chùa Nhỏ) tiến hoá độc lập cho tới khi có app 3D thứ ba.
 - Tài sản 3D tải riêng khi mở tab, tầng nạp lười; điện thoại chạy cùng 3 tầng, dùng 6 trong 8 bàn của tầng 1.
