@@ -104,9 +104,19 @@
 .ws-branch-btn { width: 100%; justify-content: flex-start; }
 .ws-branch-btn .ws-branch-name { flex: 1; text-align: left; }
 .ws-branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--c-primary); }
-.ws-branch-menu { left: 0; right: auto; width: min(320px, 85vw); max-height: 360px; overflow-y: auto; }
-.ws-branch-menu button { min-height: 32px; }
-.ws-branch-menu button small { margin-left: auto; color: var(--c-text-muted); font-size: 0.6875rem; white-space: nowrap; }
+.ws-branchbar { position: relative; }
+.ws-branchbar .ws-branch { position: static; }
+.ws-branch-menu { max-height: 360px; overflow-x: hidden; overflow-y: auto; }
+@media (min-width: 761px) {
+	.ws-branch-menu { top: calc(var(--space-1) + 32px + var(--space-1)); left: var(--space-3); right: var(--space-3); width: auto; }
+}
+/* On a phone the menu is the bottom sheet of machines.css: it spans the screen, whatever width .ws-menu sets. */
+@media (max-width: 760px) {
+	.ws-branch-menu { width: auto; max-height: 80dvh; }
+}
+.ws-branch-menu button { min-height: 32px; height: auto; min-width: 0; }
+.ws-branch-menu .ws-branch-name { flex: 1 1 auto; }
+.ws-branch-menu button small { flex: 0 1 auto; min-width: 0; max-width: 50%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); font-size: 0.6875rem; white-space: nowrap; }
 .ws-filter { height: 32px; padding: 0 var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-bg); color: var(--c-text); font: inherit; font-size: 0.8125rem; }
 .ws-upstream { display: inline-flex; align-items: center; gap: var(--space-1); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
 .ws-ab { display: inline-flex; gap: 4px; font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; color: var(--c-text); }

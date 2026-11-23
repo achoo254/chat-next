@@ -786,6 +786,13 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
 		await click(".ws-tab", /Quản lý mã nguồn/);
 		await find(() => document.querySelector(".ws-commit-row"));
 	},
+	// The branch selector opened: the menu must stay inside the panel (and the window), whatever the branch names' length.
+	"workspace-branch-menu": async () => {
+		await openWorkspacePanel();
+		await click(".ws-tab", /Quản lý mã nguồn/);
+		(await find(() => document.querySelector<HTMLElement>("[data-id=workspace-branch]"))).click();
+		await find(() => document.querySelector(".ws-branch-menu .ws-branch-name"));
+	},
 	// A changed file's diff in the drawer.
 	"workspace-diff": async () => {
 		await openWorkspacePanel();

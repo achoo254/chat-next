@@ -109,6 +109,7 @@ export const PAGES: Readonly<Record<string, string>> = {
 	"machine-workspace-explorer": "?at=machine-chat&open=workspace-explorer",
 	"machine-workspace-preview": "?at=machine-chat&open=workspace-preview",
 	"machine-workspace-scm": "?at=machine-chat&open=workspace-scm",
+	"machine-workspace-branch-menu": "?at=machine-chat&open=workspace-branch-menu",
 	"machine-workspace-diff": "?at=machine-chat&open=workspace-diff",
 	"machine-workspace-confirm": "?at=machine-chat&open=workspace-confirm",
 	"machine-secret-command": "?at=machine-chat&open=secret-command",
