@@ -188,6 +188,7 @@ Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói v�
 | `permission_request`, `notification` nhãn `permission_prompt` | `WAITING_PERMISSION` |
 | `compact_start` | `COMPACTING`; `compact_end` về `THINKING` nếu đang trong lượt, không thì `WAITING_USER` (hay `IDLE` nếu trước đó rảnh) |
 | `stop`, `notification` nhãn `idle_prompt` | `WAITING_USER` (kết thúc lượt) |
+| tool kết thúc với `error` = `interrupted` (người dùng bấm Esc/Ctrl+C; khi đó Claude Code không gửi `Stop`) | `WAITING_USER` (kết thúc lượt) |
 | `stop_failure` | `FAILED` (kết thúc lượt) |
 | không có sự kiện; phiên đã kết thúc (`ended_at` ≥ sự kiện cuối) | `IDLE` |
 

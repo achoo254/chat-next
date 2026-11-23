@@ -13,7 +13,7 @@ import { contextHigh } from "../../src/observatory/bottlenecks/rules/context-hig
 import { costSpike } from "../../src/observatory/bottlenecks/rules/cost-spike.ts";
 import { mcpErrors } from "../../src/observatory/bottlenecks/rules/mcp-errors.ts";
 import { repeatRead } from "../../src/observatory/bottlenecks/rules/repeat-read.ts";
-import { apiEventId, sessionEventId, subagentEventId, toolEventId } from "../../src/observatory/bottlenecks/rules/rule-support.ts";
+import { apiEventId, runningSubagents, runningToolCalls, sessionEventId, subagentEventId, toolEventId, turnEndAt, turnRunning } from "../../src/observatory/bottlenecks/rules/rule-support.ts";
 import type { Prior, Rule, Verdict } from "../../src/observatory/bottlenecks/rules/rule-types.ts";
 import { subagentIdle } from "../../src/observatory/bottlenecks/rules/subagent-idle.ts";
 import { toolKeyOf } from "../../src/observatory/bottlenecks/rules/tool-key.ts";
@@ -294,5 +294,30 @@ describe("cost_spike", () => {
     const ops = [...turn(5), ev("stop", T + 10 * SEC)];
     expect(run(costSpike, model(ops), { now: T + 60 * SEC, h: { turns: turns(20, 0.5) } })).toHaveLength(1);
     expect(run(costSpike, model(ops), { now: T + 71 * SEC, h: { turns: turns(20, 0.5) } })).toEqual([]);
+  });
+});
+
+describe("a turn's end", () => {
+  const prompt: WriteOp = { kind: "prompt", row: { promptId: "p1", sessionId: S, at: T } };
+  const subagent: WriteOp = { kind: "subagent", row: { sessionId: S, agentId: "agent-1", promptId: "p1", startedAt: T + SEC } };
+
+  /** A Bash call that ran 3 s and ended without success, `error` its label. */
+  const failed = (id: string, at: number, error: string): WriteOp[] => [
+    ...bash(id, at, undefined),
+    { kind: "toolCall", row: { toolUseId: id, sessionId: S, promptId: "p1", at, toolName: "Bash", durationMs: 3 * SEC, success: false, error } },
+  ];
+
+  it("comes with a tool call ended interrupted (Esc or Ctrl+C sends no Stop): nothing of the turn runs any more", () => {
+    const m = model([prompt, subagent, ...bash("hung", T + SEC, undefined), ...failed("t2", T + 2 * SEC, "interrupted")]);
+    expect(turnRunning(m)).toBe(false);
+    expect(turnEndAt(m, { promptId: "p1", at: T })).toBe(T + 5 * SEC);
+    expect(runningToolCalls(m)).toEqual([]);
+    expect(runningSubagents(m)).toEqual([]);
+  });
+
+  it("does not come with a call that failed on its own", () => {
+    const m = model([prompt, ...bash("hung", T + SEC, undefined), ...failed("t2", T + 2 * SEC, "failed")]);
+    expect(turnRunning(m)).toBe(true);
+    expect(runningToolCalls(m).map((c) => c.toolUseId)).toEqual(["hung"]);
   });
 });

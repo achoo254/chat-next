@@ -54,6 +54,15 @@ describe("the core's state", () => {
     expect(live([prompt(T), event("stop", T + 1), event("compact_start", T + 2), event("compact_end", T + 3)]).core).toBe("waiting_user");
     expect(live([prompt(T), tool("t1", T + 1, "FILES")], { endedAt: T + 5 })).toMatchObject({ core: "idle", running: [] });
   });
+
+  it("waits for the user once a tool call ends interrupted (Esc or Ctrl+C sends no Stop), not after a call that failed on its own", () => {
+    const ended = (id: string, at: number, error: string): TimelineEntry =>
+      entry({ kind: "toolCall", row: { toolUseId: id, sessionId: S, at, toolName: "Bash", station: "TESTING", stationFlags: 0, success: false, durationMs: 50, error } });
+    expect(live([prompt(T), tool("t1", T + 1, "FILES"), ended("t2", T + 2, "interrupted")])).toMatchObject({ core: "waiting_user", running: [] });
+    expect(live([prompt(T), tool("t1", T + 1, "FILES"), ended("t2", T + 2, "failed")])).toMatchObject({ core: "thinking", running: [{ station: "FILES", count: 1 }] });
+    // The next prompt starts a turn again.
+    expect(live([prompt(T), ended("t2", T + 2, "interrupted"), prompt(T + 9)]).core).toBe("thinking");
+  });
 });
 
 describe("the running tool calls", () => {

@@ -14,7 +14,10 @@
 // never inside it, and the findings go back through the same writer. Each
 // session is loaded once from the store when first met (its rows and its
 // stored findings), then followed from the writes; sessions quiet for
-// ACTIVE_MS, or ended, are closed and forgotten. Sessions with an internal
+// ACTIVE_MS (a SessionEnd never came), or ended, are closed and forgotten.
+// Switched off in the config, the runner scores nothing and closes every open
+// finding (those it follows at the next tick, those stored at start), so no
+// finding stays lit while nothing could close it. Sessions with an internal
 // label (the Advisor's) are never scored. The history the rules compare with
 // (history-percentiles.ts) is read on a read-only connection of the runner's
 // own, so the store's write connection is never held for it.
@@ -115,6 +118,7 @@ export class BottleneckRunner {
     this.timer = setInterval(() => this.tick(), this.opts.tickMs ?? TICK_MS);
     this.timer.unref?.();
     if (this.enabled) this.resumeOpenFindings();
+    else this.closeStoredFindings();
   }
 
   /** Stops the tick, drops what waits and what it follows, closes the read connection (before a wipe or the store's close). */
@@ -155,8 +159,12 @@ export class BottleneckRunner {
 
   /** Scores the sessions time can change (see the file's head); the timer calls it. */
   tick(): void {
-    if (!this.running || !this.enabled) return;
+    if (!this.running) return;
     const now = this.now();
+    if (!this.enabled) {
+      this.closeFollowed(now);
+      return;
+    }
     for (const [sessionId, f] of [...this.sessions]) {
       try {
         const m = f.model;
@@ -164,11 +172,29 @@ export class BottleneckRunner {
           if (now - (m.endedAt ?? now) > ENDED_KEPT_MS) this.sessions.delete(sessionId);
           continue;
         }
+        // Quiet with no SessionEnd (its terminal closed, its process killed): its findings close and it is forgotten.
+        if (now - m.lastActivityAt > ACTIVE_MS) {
+          this.emit(f.findings.closeAll(now));
+          this.sessions.delete(sessionId);
+          continue;
+        }
         if (turnRunning(m) || runningToolCalls(m).length > 0 || runningSubagents(m).length > 0 || f.findings.hasOpen) this.score(f, now);
       } catch (err) {
         this.opts.problems("bottleneck-tick", err);
       }
     }
+  }
+
+  /** The rules were switched off: every followed session's open findings close, and none is followed any more. */
+  private closeFollowed(now: number): void {
+    for (const f of this.sessions.values()) {
+      try {
+        this.emit(f.findings.closeAll(now));
+      } catch (err) {
+        this.opts.problems("bottleneck-tick", err);
+      }
+    }
+    this.sessions.clear();
   }
 
   private enqueue(item: Pending): void {
@@ -297,6 +323,21 @@ export class BottleneckRunner {
       for (const sessionId of readSessionsWithOpenFindings(this.reader, RESUMED_AT_START)) {
         const f = this.follow(sessionId);
         if (f) this.score(f, now);
+      }
+    } catch (err) {
+      this.opts.problems("bottleneck-resume", err);
+    }
+  }
+
+  /** Findings an earlier run left open, closed now: the rules are switched off. */
+  private closeStoredFindings(): void {
+    if (!this.reader) return;
+    try {
+      const now = this.now();
+      for (const sessionId of readSessionsWithOpenFindings(this.reader, RESUMED_AT_START)) {
+        const findings = new SessionFindings(sessionId);
+        findings.load(readSessionFindings(this.reader, sessionId));
+        this.emit(findings.closeAll(now));
       }
     } catch (err) {
       this.opts.problems("bottleneck-resume", err);

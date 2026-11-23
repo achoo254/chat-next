@@ -1,8 +1,9 @@
 // Facts several rules read the same way: event ids as devices know them, when
-// a turn ended, whether a tool call or subagent still runs, a severity from
+// a turn ended (a Stop, or a tool call interrupted by the person), whether a tool call or subagent still runs, a severity from
 // two thresholds.
+import { TOOL_ERROR } from "../../ingest/normalize-hook-record.ts";
 import type { BottleneckSeverity } from "../../store/observatory-rows.ts";
-import { type PromptState, type SessionModel, type SubagentState, type ToolCallState, toolEnded } from "../session-model.ts";
+import { type PromptState, type SessionModel, type SubagentState, type ToolCallState, toolEndAt, toolEnded } from "../session-model.ts";
 
 /** Evidence ids kept per finding at most. */
 export const MAX_EVIDENCE = 20;
@@ -34,18 +35,34 @@ const TURN_END_KINDS = new Set(["stop", "stop_failure"]);
 /** Events that end a tool call that never told its end (blocked by a hook, denied). */
 const CALL_END_KINDS = new Set(["hook_block", "permission_denied", "permission_decision"]);
 
-/** The time of the session's latest turn end (Stop, StopFailure); -Infinity when none. */
+/**
+ * The times the session's turns ended: each Stop or StopFailure, and the end
+ * of each tool call that ended interrupted (the person stopped the turn with
+ * Esc or Ctrl+C, and Claude Code tells no Stop then).
+ */
+function turnEnds(session: SessionModel): number[] {
+  const ends: number[] = [];
+  for (const e of session.events) if (TURN_END_KINDS.has(e.kind)) ends.push(e.at);
+  for (const c of session.toolCalls) {
+    if (c.error !== TOOL_ERROR.interrupted) continue;
+    const end = toolEndAt(c);
+    if (end !== undefined) ends.push(end);
+  }
+  return ends;
+}
+
+/** The time of the session's latest turn end (turnEnds); -Infinity when none. */
 export function lastTurnEndAt(session: SessionModel): number {
   let at = Number.NEGATIVE_INFINITY;
-  for (const e of session.events) if (TURN_END_KINDS.has(e.kind) && e.at > at) at = e.at;
+  for (const end of turnEnds(session)) if (end > at) at = end;
   return at;
 }
 
-/** When the turn of `prompt` ended: its first Stop after it, the next prompt, or the session's end; undefined while it runs. */
+/** When the turn of `prompt` ended: its first turn end (turnEnds) after it, the next prompt, or the session's end; undefined while it runs. */
 export function turnEndAt(session: SessionModel, prompt: PromptState): number | undefined {
   const ends: number[] = [];
-  const stop = session.events.find((e) => TURN_END_KINDS.has(e.kind) && e.at >= prompt.at);
-  if (stop) ends.push(stop.at);
+  const stops = turnEnds(session).filter((at) => at >= prompt.at);
+  if (stops.length > 0) ends.push(Math.min(...stops));
   const next = session.prompts.find((p) => p.at > prompt.at);
   if (next) ends.push(next.at);
   if (session.endedAt !== null && session.endedAt >= prompt.at) ends.push(session.endedAt);

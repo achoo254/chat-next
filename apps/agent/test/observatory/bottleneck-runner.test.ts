@@ -2,7 +2,9 @@
 // closed by their rule's condition or the session's end, written as rows with
 // evidence ids and heard by onFinding; the 15 s tick catching a hung call and
 // a silent subagent with no new event; a provisional event from the spool's
-// tail scored before the store has it; internal sessions left out; a normal
+// tail scored before the store has it; internal sessions left out; switching
+// the rules off closes their open findings; a session quiet without a
+// SessionEnd is forgotten; a normal
 // session (the spike's, and a real working session reduced to tool names,
 // timings and file numbers) yields no finding; no content ever reaches a
 // finding; a batch of 1 000 writes is scored in under 50 ms.
@@ -10,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../../src/config.ts";
-import { BottleneckRunner } from "../../src/observatory/bottlenecks/bottleneck-runner.ts";
+import { ACTIVE_MS, BottleneckRunner } from "../../src/observatory/bottlenecks/bottleneck-runner.ts";
 import type { FindingChange } from "../../src/observatory/bottlenecks/finding-lifecycle.ts";
 import { classifyTool } from "../../src/observatory/ingest/tool-classification.ts";
 import { StationFlag } from "../../src/observatory/live-map/station-map.ts";
@@ -200,6 +202,42 @@ describe("what is scored", () => {
     const S = "sess-off";
     await r.put([session(S, T), prompt("p1", S, T), ...[1, 2, 3].flatMap((i) => read(S, `r${i}`, T + i * SEC, "k1"))]);
     expect(r.changes).toEqual([]);
+  });
+
+  it("closes the open findings once switched off, those it follows and those an earlier run stored", async () => {
+    const r = await rig();
+    const S = "sess-switched-off";
+    await r.put([session(S, T), prompt("p1", S, T), ...[1, 2, 3].flatMap((i) => read(S, `r${i}`, T + i * SEC, "k1"))]);
+    expect(r.changes).toMatchObject([{ type: "open", row: { rule: "repeat_read" } }]);
+    r.config.update((c) => (c.observatory = { thresholds: { enabled: false } }));
+    r.clock.now = T + MIN;
+    r.runner.tick();
+    expect(r.changes.at(-1)).toMatchObject({ type: "close", row: { rule: "repeat_read", closedAt: T + MIN } });
+    expect(r.runner.followed).toBe(0);
+
+    // Stored open by a run while on, then the agent starts again switched off.
+    r.config.update((c) => (c.observatory = { thresholds: { enabled: true } }));
+    const S2 = "sess-switched-off-later";
+    await r.put([session(S2, T), prompt("p1", S2, T), ...[1, 2, 3].flatMap((i) => read(S2, `s${i}`, T + i * SEC, "k2"))]);
+    r.runner.stop();
+    r.config.update((c) => (c.observatory = { thresholds: { enabled: false } }));
+    r.changes.length = 0;
+    await r.runner.start();
+    expect(r.changes).toMatchObject([{ type: "close", row: { rule: "repeat_read", subkey: "k2" } }]);
+    expect((await bottleneckRows(r.store)).every((row) => row.status === "closed")).toBe(true);
+  });
+
+  it("forgets a session quiet for ACTIVE_MS that never ended (no SessionEnd)", async () => {
+    const r = await rig();
+    const S = "sess-quiet";
+    await r.put([session(S, T), prompt("p1", S, T), ...read(S, "r1", T + SEC, "k1"), stop(S, T + 2 * SEC)]);
+    expect(r.runner.followed).toBe(1);
+    r.clock.now = T + 2 * SEC + ACTIVE_MS - 1;
+    r.runner.tick();
+    expect(r.runner.followed).toBe(1);
+    r.clock.now = T + 2 * SEC + ACTIVE_MS + 1;
+    r.runner.tick();
+    expect(r.runner.followed).toBe(0);
   });
 
   it("takes thresholds from the config, by subkey, and uses the default for a value of the wrong type (logged)", async () => {

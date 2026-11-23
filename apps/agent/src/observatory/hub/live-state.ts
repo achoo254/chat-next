@@ -16,7 +16,10 @@
 //   else waiting for the user;
 // - the turn stopped (or an `idle_prompt` notification): waiting for the
 //   user; stopped with a failure: failed;
+// - a tool call that ended interrupted: waiting for the user (the person
+//   stopped the turn with Esc or Ctrl+C, and Claude Code tells no Stop then);
 // - no event, or the session ended after its last event: idle.
+import { TOOL_ERROR } from "../ingest/normalize-hook-record.ts";
 import type { Station } from "../live-map/station-map.ts";
 import { contextTokensOf, contextWindowOf } from "../live-map/model-window.ts";
 import type { TimelineEntry } from "../store/timeline-reads.ts";
@@ -86,6 +89,7 @@ export function liveStateOf(input: LiveInput): LiveState {
         active();
         if (e.row.success === null && !notRun.has(e.row.toolUseId)) running.set(e.row.toolUseId, e.row.station ?? "CORE");
         else running.delete(e.row.toolUseId);
+        if (e.row.error === TOOL_ERROR.interrupted) endTurn("waiting_user");
         break;
       case "apiRequest":
         if (!isMainThread(e.row.agentId)) break;
