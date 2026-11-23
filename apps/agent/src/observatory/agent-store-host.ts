@@ -22,6 +22,8 @@ export type AgentStoreHostOptions = {
   open?: ((path: string) => Promise<ObservatoryStore>) | undefined;
   problems: (place: string, err: unknown) => void;
   now: () => number;
+  /** A batch went into the store (the hub reads the rows of watched sessions again); a throw is reported, the batch stays written. */
+  onWritten?: ((ops: readonly WriteOp[]) => void) | undefined;
 };
 
 /** The schema versions of a database a newer agent wrote, and of this agent. */
@@ -46,6 +48,11 @@ export class AgentStoreHost {
         write: (ops: readonly WriteOp[]): void => {
           store.write(ops);
           this.lastWriteAt = this.opts.now();
+          try {
+            this.opts.onWritten?.(ops);
+          } catch (err) {
+            this.opts.problems("store-written", err);
+          }
         },
       };
       const writer = new ObservatoryBatchWriter(sink, { onError: (err) => this.opts.problems("store-write", err) });

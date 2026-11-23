@@ -19,6 +19,11 @@
 // (spool/spool-live-tail.ts): watchSession/unwatchSession say which, and
 // onLiveEvent listeners get the provisional events (never content). It runs
 // while the service runs and stops with it, within the same wait.
+//
+// The hub (hub/observatory-hub.ts) serves the devices watching a session's
+// timeline: every batch the store takes is handed to it, and it starts with
+// the service (a new epoch), stops first when the service stops, and takes a
+// new epoch after a wipe.
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
@@ -28,6 +33,7 @@ import { contentOffOf, setContentOff } from "./content-settings-config.ts";
 import { STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
 import { ObservatoryIngest } from "./ingest/observatory-ingest.ts";
+import { ObservatoryHub } from "./hub/observatory-hub.ts";
 import { ObservatoryIntake } from "./observatory-intake.ts";
 import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.ts";
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
@@ -85,13 +91,22 @@ export class ObservatoryService {
   private readonly liveListeners = new Set<(event: LiveTailEvent) => void>();
   /** The sink records go to while running (the ingest), asked which sessions the agent runs itself. */
   private sink: ObservatorySink | undefined;
+  /** The sessions devices watch (ObservatoryWatch and the requests beside it). */
+  readonly hub: ObservatoryHub;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
     this.problems = new ProblemLog(opts.log, this.now, undefined, "observatory");
     const problems = (place: string, err: unknown): void => this.problems.report(place, err);
     this.state = new HookStateWriter(opts.dataDir, () => ({ enabled: this.enabled, contentOff: contentOffOf(opts.config) }), (err) => problems("state-file", err));
-    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now });
+    this.hub = new ObservatoryHub({
+      store: () => this.store.store,
+      watchSession: (sessionId) => this.watchSession(sessionId),
+      unwatchSession: (sessionId) => this.unwatchSession(sessionId),
+      problems,
+      now: this.now,
+    });
+    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now, onWritten: (ops) => this.hub.written(ops) });
     this.intake = new ObservatoryIntake({
       config: opts.config,
       dataDir: opts.dataDir,
@@ -163,15 +178,18 @@ export class ObservatoryService {
       this.liveTail.start();
     }
     if (this.store.store) this.rollups.start();
+    this.hub.start();
   }
 
   /**
-   * Stops in order: receiver (its queue handed on), rollups, spool reader and
-   * the records still being taken (waited for stopWaitMs at most: one that
-   * never settles is left behind, logged), writer (what waits written), store.
+   * Stops in order: hub (what waits for devices dropped), receiver (its
+   * queue handed on), rollups, spool reader and the records still being
+   * taken (waited for stopWaitMs at most: one that never settles is left
+   * behind, logged), writer (what waits written), store.
    * Never rejects; start() works again after.
    */
   async stop(): Promise<void> {
+    this.hub.stop();
     clearInterval(this.saltTimer);
     this.saltTimer = undefined;
     await this.receiver.stop();
@@ -202,6 +220,8 @@ export class ObservatoryService {
     if (this.started && this.enabled) await this.makeTargetKeySalt();
     await this.state.write();
     if (this.store.writer) this.intake.resumeSpool();
+    // Devices watching a session take it again from the new store.
+    this.hub.reset();
     if (failure !== undefined) throw failure;
   }
 

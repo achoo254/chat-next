@@ -16,6 +16,17 @@ import { type PruneResult, pruneExpired } from "./retention.ts";
 import { type SqliteConnection, type SqliteRuntime, isSqliteBusy } from "./sqlite-driver.ts";
 import { ObservatoryStoreBusy, ObservatoryStoreClosed, ObservatoryWipeFailed } from "./store-errors.ts";
 import { type DayRange, type SessionQuery, type SessionTimeline, readContentSetting, readDailyRollups, readInstructionLoads, readSessionTimeline, readSessions } from "./store-reads.ts";
+import {
+  type SessionTotals,
+  type TimelineEntry,
+  type TimelinePage,
+  type TimelinePlace,
+  type TimelineRef,
+  readSession,
+  readSessionTotals,
+  readTimelineEntry,
+  readTimelinePage,
+} from "./timeline-reads.ts";
 import { type WriteOp, applyWriteOp } from "./write-ops.ts";
 
 export type { SessionTimeline };
@@ -113,6 +124,26 @@ export class ObservatoryStore {
    */
   dailyRollups(q: DayRange = {}): DailyRollupRow[] {
     return readDailyRollups(this.live(), q);
+  }
+
+  /** One session's own row; undefined while none is stored. */
+  session(sessionId: string): SessionRow | undefined {
+    return readSession(this.live(), sessionId);
+  }
+
+  /** One session's counts, tokens and cost as stored now (timeline-reads.ts). */
+  sessionTotals(sessionId: string): SessionTotals {
+    return readSessionTotals(this.live(), sessionId);
+  }
+
+  /** Up to `limit` (at most 500) of a session's newest timeline rows before `before`, oldest first, without content (timeline-reads.ts). */
+  timelinePage(sessionId: string, before: TimelinePlace | undefined, limit: number): TimelinePage {
+    return readTimelinePage(this.live(), sessionId, before, limit);
+  }
+
+  /** The timeline row a write touched, as stored now, without content; undefined when it is not stored. */
+  timelineEntry(ref: TimelineRef): TimelineEntry | undefined {
+    return readTimelineEntry(this.live(), ref);
   }
 
   /** The number and time of each stored load of one instruction file for one reason in a session (store-reads.ts). */

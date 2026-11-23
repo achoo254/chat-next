@@ -342,6 +342,23 @@ message Frame {
     // A → B, answered with Ack
     AdvisorKeyPromote advisor_key_promote = 185;
 
+    // Observatory: a Claude Code session's timeline as the machine stored it
+    // (tunelo 3.26.0+); see "Observatory" below.
+    // A → B, answered with ObservatorySessionListResult
+    ObservatorySessionList observatory_session_list = 186;
+    // B → A
+    ObservatorySessionListResult observatory_session_list_result = 187;
+    // A → B
+    ObservatoryWatch observatory_watch = 188;
+    // B → A
+    ObservatorySnapshot observatory_snapshot = 189;
+    // Unasked, to the connections watching the session.
+    ObservatoryEvents observatory_events = 190;
+    // A → B, answered with ObservatoryEarlierResult
+    ObservatoryEarlier observatory_earlier = 191;
+    // B → A
+    ObservatoryEarlierResult observatory_earlier_result = 192;
+
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
     MacFolderAccessRevoke mac_folder_access_revoke = 179;
@@ -1649,6 +1666,18 @@ enum ErrorReason {
   // to a machine that keeps its own key: its own key stays. Remove it first
   // (AdvisorRemoveKey with source OWN).
   ERROR_REASON_ADVISOR_OWN_KEY = 90;
+  // An Observatory request (ObservatorySessionList, ObservatoryWatch,
+  // ObservatoryEarlier) while Observatory is switched off on the machine, or
+  // its database is not open. Nothing changed.
+  ERROR_REASON_OBSERVATORY_OFF = 91;
+  // ObservatoryWatch{on} past the sessions watched at once: 4 per connection,
+  // 16 for the machine, 8 connections for one session
+  // (docs/observatory-wire.md). Watching again a session already watched on
+  // the connection is never refused; stop another watch first.
+  ERROR_REASON_OBSERVATORY_WATCH_LIMIT = 92;
+  // An Observatory request with a session id or an `earlier` that B cannot
+  // read (empty, too long, control characters, not one B sent).
+  ERROR_REASON_OBSERVATORY_INVALID = 93;
 }
 
 enum ErrorCode {
@@ -4080,4 +4109,262 @@ enum OfficeApprovalState {
   OFFICE_APPROVAL_STATE_ALLOWED = 2;
   OFFICE_APPROVAL_STATE_DENIED = 3;
   OFFICE_APPROVAL_STATE_CANCELLED = 4;
+}
+
+// --- Observatory --------------------------------------------------------------
+// The timeline of one Claude Code session as the machine's Observatory stored
+// it (tunelo 3.26.0+): prompts, tool calls, subagents, API requests,
+// instruction files loaded, git commits and the session's lifecycle events.
+// A session is named by Claude Code's own session id, not a thread: sessions
+// run in a terminal or the CLI outside tunelo have no thread.
+// docs/observatory-wire.md is the full contract.
+//
+// Nothing here carries content: no prompt text, no tool input or output, no
+// message, no account identifier. Only ids, the short labels Observatory's
+// privacy filter kept (a tool's name, a file as `folder/name` or `~/…`, a
+// domain, a model, a branch), numbers and flags.
+
+// A → B: the machine's most recent sessions, newest first.
+message ObservatorySessionList {
+  // At most this many; 0 is 50, B caps it at 200.
+  uint32 limit = 1;
+}
+
+message ObservatorySessionListResult {
+  repeated ObservatorySessionInfo sessions = 1;
+}
+
+// A → B: start (on) or stop watching one session for this connection. On:
+// answered with ObservatorySnapshot (asking again is how a device asks for a
+// fresh snapshot after a gap in seq, another epoch or a reconnect). Off:
+// answered with Ack. Closing the connection stops every watch it had. A
+// session not stored yet may be watched: its snapshot is empty and its
+// events follow once it is.
+message ObservatoryWatch {
+  string session_id = 1;
+  bool on = 2;
+  // The newest events the snapshot carries: 0 is 200, B caps it at 500.
+  uint32 limit = 3;
+}
+
+// B → A: the session as stored now. Events with seq up to and including
+// `seq` are in it; the next ObservatoryEvents of the same epoch starts at
+// seq + 1.
+message ObservatorySnapshot {
+  string session_id = 1;
+  // Observatory's epoch on the machine: it changes when the agent or its
+  // Observatory starts again, and when the data is wiped. A device drops
+  // what it holds for another epoch and applies this snapshot.
+  uint64 epoch = 2;
+  uint64 seq = 3;
+  ObservatorySessionState session = 4;
+  // The newest events, oldest first; their seq is 0.
+  repeated ObservatoryEvent events = 5;
+  // Where older events start (ObservatoryEarlier); empty when none is older.
+  string earlier = 6;
+}
+
+// B → A, unasked: what was stored for the session since, in order. Each
+// event's seq is one more than the one before it, across frames; a device
+// that sees a gap (or another epoch) watches again.
+message ObservatoryEvents {
+  string session_id = 1;
+  uint64 epoch = 2;
+  repeated ObservatoryEvent events = 3;
+}
+
+// A → B: events older than a snapshot or a page held.
+message ObservatoryEarlier {
+  string session_id = 1;
+  // ObservatorySnapshot.earlier or ObservatoryEarlierResult.earlier, as B
+  // sent it.
+  string earlier = 2;
+  // At most this many: 0 is 200, B caps it at 500.
+  uint32 limit = 3;
+}
+
+message ObservatoryEarlierResult {
+  string session_id = 1;
+  // Oldest first; their seq is 0.
+  repeated ObservatoryEvent events = 2;
+  // Where the next older page starts; empty when none is older.
+  string earlier = 3;
+}
+
+// The session's own row and totals; the `session` event replaces both.
+message ObservatorySessionState {
+  // Unset while nothing of the session's own row is stored yet.
+  ObservatorySessionInfo info = 1;
+  ObservatorySessionTotals totals = 2;
+}
+
+message ObservatorySessionInfo {
+  string session_id = 1;
+  // The session this one continues after /clear; "" when none.
+  string previous_session_id = 2;
+  // The link was inferred by pairing times, not reported by Claude Code.
+  bool previous_session_inferred = 3;
+  // The repository: its origin remote without any password
+  // (`github.com/acme/app`), `local:<folder name>` without one, `scratch`
+  // for a temp folder.
+  string project_key = 4;
+  // The working folder, the home folder as `~`.
+  string cwd = 5;
+  ObservatorySessionSource source = 6;
+  // An internal session (Advisor's), left out of statistics; "" otherwise.
+  string internal_label = 7;
+  // Unix milliseconds.
+  int64 started_at = 8;
+  // Unix milliseconds; 0 while it has not ended.
+  int64 ended_at = 9;
+  string main_model = 10;
+}
+
+enum ObservatorySessionSource {
+  OBSERVATORY_SESSION_SOURCE_UNSPECIFIED = 0;
+  // Run by tunelo through the Agent SDK.
+  OBSERVATORY_SESSION_SOURCE_SDK = 1;
+  // Run by tunelo in its terminal.
+  OBSERVATORY_SESSION_SOURCE_TERMINAL = 2;
+  // A Claude Code CLI session with Observatory's hooks installed (a terminal
+  // session of tunelo may be reported so too: their records look alike).
+  OBSERVATORY_SESSION_SOURCE_CLI = 3;
+}
+
+message ObservatorySessionTotals {
+  uint32 prompts = 1;
+  uint32 tool_calls = 2;
+  uint32 tool_failures = 3;
+  uint32 subagents = 4;
+  uint32 api_requests = 5;
+  uint64 input_tokens = 6;
+  uint64 output_tokens = 7;
+  uint64 cache_read_tokens = 8;
+  // Cache writes, five-minute and one-hour together.
+  uint64 cache_write_tokens = 9;
+  // The sum of the API requests' estimated costs that have one.
+  double cost_usd_estimate = 10;
+  // At least one API request had a cost.
+  bool has_cost = 11;
+  uint32 git_ops = 12;
+  uint32 session_events = 13;
+  // Unix milliseconds of the newest stored event; 0 when none.
+  int64 last_event_at = 14;
+}
+
+message ObservatoryEvent {
+  // 0 in a snapshot or a page.
+  uint64 seq = 1;
+  // Unix milliseconds on the machine: when it happened (a subagent: when it
+  // started).
+  int64 at = 2;
+  // Stable for the stored row: an event with an id the device holds replaces
+  // it (a tool call that ended, a subagent that stopped).
+  string id = 3;
+  oneof kind {
+    ObservatoryPrompt prompt = 4;
+    ObservatoryToolCall tool_call = 5;
+    ObservatorySubagent subagent = 6;
+    ObservatoryApiRequest api_request = 7;
+    ObservatoryInstructionLoaded instruction_loaded = 8;
+    ObservatoryGitOp git_op = 9;
+    ObservatorySessionEvent session_event = 10;
+    // The session's row or totals changed (only in ObservatoryEvents; id
+    // "session").
+    ObservatorySessionState session = 11;
+  }
+}
+
+// A prompt the user sent: never its text.
+message ObservatoryPrompt {
+  string prompt_id = 1;
+  // Its length in UTF-16 code units.
+  optional uint32 length = 2;
+}
+
+message ObservatoryToolCall {
+  string tool_use_id = 1;
+  string prompt_id = 2;
+  // The subagent that called it; "" for the main agent.
+  string agent_id = 3;
+  string tool_name = 4;
+  string mcp_server = 5;
+  // What the call touched as the privacy filter labelled it: a file as
+  // `folder/name`, a domain, a command's program, `server › tool`.
+  string target = 6;
+  optional uint32 duration_ms = 7;
+  optional uint64 input_bytes = 8;
+  optional uint64 output_bytes = 9;
+  // Unset while the call has not ended.
+  optional bool success = 10;
+  // A short fixed code when it failed: `failed`, `interrupted`,
+  // `permission denied`; "" otherwise.
+  string error = 11;
+  // The Live Map station and its flags (docs/observatory-wire.md).
+  string station = 12;
+  uint32 station_flags = 13;
+  // A salted key of the file touched, the same for every call on it.
+  string target_key = 14;
+  optional uint32 read_offset = 15;
+  optional uint32 read_limit = 16;
+}
+
+message ObservatorySubagent {
+  string agent_id = 1;
+  string prompt_id = 2;
+  string agent_type = 3;
+  // Unix milliseconds; ended_at 0 while it runs.
+  int64 started_at = 4;
+  int64 ended_at = 5;
+  string model = 6;
+  optional uint64 total_tokens = 7;
+  optional uint32 tool_count = 8;
+}
+
+message ObservatoryApiRequest {
+  string prompt_id = 1;
+  string agent_id = 2;
+  string model = 3;
+  optional uint64 input_tokens = 4;
+  optional uint64 output_tokens = 5;
+  optional uint64 cache_read_tokens = 6;
+  optional uint64 cache_write_5m_tokens = 7;
+  optional uint64 cache_write_1h_tokens = 8;
+  // Claude Code's own estimate; unset when it gave none.
+  optional double cost_usd_estimate = 9;
+  optional uint32 duration_ms = 10;
+  optional uint32 ttft_ms = 11;
+  string query_source = 12;
+}
+
+message ObservatoryInstructionLoaded {
+  // The file, the home folder as `~`.
+  string file_path = 1;
+  string memory_type = 2;
+  string load_reason = 3;
+  // The load's place among the session's loads of this file for this reason.
+  uint32 load_seq = 4;
+}
+
+message ObservatoryGitOp {
+  string prompt_id = 1;
+  string sha = 2;
+  string branch = 3;
+  // `commit`, `push`…
+  string kind = 4;
+}
+
+// A lifecycle event of the session (a permission prompt, a compaction, a
+// stop, a model change…): a kind and the short label, number and flag
+// Observatory keeps for it.
+message ObservatorySessionEvent {
+  // docs/observatory-wire.md lists them; a device ignores one it does not
+  // know.
+  string kind = 1;
+  string agent_id = 2;
+  string tool_use_id = 3;
+  string station = 4;
+  string label = 5;
+  optional double number = 6;
+  optional bool flag = 7;
 }

@@ -671,6 +671,7 @@ export class Machine {
         onAdvisorKey: () => this.advisorKeyChanged(),
         advisorAuto: { available: () => this.sessionMcpEnabled(), set: (on, device) => this.setAdvisorAuto(on, device) },
         macFolders: this.macFolders,
+        observatory: this.observatory.hub,
         onPing: () => (this.lastPing = Date.now()),
       },
     );
