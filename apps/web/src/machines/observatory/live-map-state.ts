@@ -4,7 +4,12 @@
 // the subagents and the station each one is at, one MCP wire per server, the
 // to-do board, and the animations still to play (each names the event that
 // caused it). The renderer only reads this; replaying a session builds the
-// same state from the same events.
+// same state from the same events. The core's state, the running calls and
+// the main agent's speed follow the machine's own rules for its live state
+// (apps/agent/src/observatory/hub/live-state.ts, docs/observatory-wire.md
+// section 6.3), so a replay matches what a live view was sent; while
+// watching live, the machine's `live` state (with the context's fill and
+// whether its window was assumed) is kept as sent.
 //
 // Events are kept ordered by (at, id), not by arrival: a provisional event
 // read from the spool's tail comes first and the stored version with the same
@@ -19,7 +24,7 @@
 // of another epoch, or one past a gap in `seq`, asks for a fresh snapshot; an
 // event at or below the applied `seq` is dropped; an event of a kind this app
 // does not know only moves `seq` on.
-import type { LiveMapEvent, LiveMapSessionInfo, LiveMapSnapshot } from "./live-map-types.ts";
+import type { CoreState, LiveMapEvent, LiveMapLiveState, LiveMapSessionInfo, LiveMapSnapshot } from "./live-map-types.ts";
 import { STATION_CODES, stationOf, type StationCode } from "./station-catalog.ts";
 
 /** Events this far behind the newest one still play their animation; older ones only count. */
@@ -29,7 +34,7 @@ export const LOG_CAP = 2_000;
 /** Animations not taken by a renderer by then are dropped, oldest first. */
 export const ANIMATION_CAP = 200;
 
-export type CoreState = "idle" | "thinking" | "waiting_permission" | "waiting_user" | "compacting" | "failed";
+export type { CoreState };
 export type BottleneckLevel = "none" | "warn" | "alert";
 
 export interface StationState {
@@ -68,6 +73,12 @@ export interface TodoBoard {
 
 export interface LiveMapScene {
 	core: CoreState;
+	/** A turn runs (a prompt or a call since the last stop). */
+	inTurn: boolean;
+	/** The core's state before a compaction started. */
+	beforeCompact: CoreState;
+	/** Calls denied or blocked by a hook: they never ran. */
+	notRun: Set<string>;
 	/** The main agent's latest model; "" before any. */
 	model: string;
 	/** Output tokens per second of the main agent's latest API request; null when it gave no numbers. */
@@ -94,6 +105,8 @@ export interface LiveMapState {
 	/** The last event applied; the next one must be seq + 1. */
 	readonly seq: number;
 	readonly info: LiveMapSessionInfo | null;
+	/** The session as a whole as the machine last sent it; null before it sent one (or for an older machine). */
+	readonly live: LiveMapLiveState | null;
 	/** Where older events start; "" when none is older. */
 	readonly earlier: string;
 	/** The kept events, ordered by (at, id), one per id. */
@@ -135,7 +148,7 @@ function perStation<T>(make: (code: StationCode) => T): Record<StationCode, T> {
 }
 
 export function emptyScene(): LiveMapScene {
-	return { core: "idle", model: "", tokensPerSecond: null, stations: perStation(emptyStation), subagents: {}, mcp: {}, todo: null, bottlenecks: new Map() };
+	return { core: "idle", inTurn: false, beforeCompact: "idle", notRun: new Set(), model: "", tokensPerSecond: null, stations: perStation(emptyStation), subagents: {}, mcp: {}, todo: null, bottlenecks: new Map() };
 }
 
 function cloneScene(s: LiveMapScene): LiveMapScene {
@@ -147,17 +160,13 @@ function cloneScene(s: LiveMapScene): LiveMapScene {
 	for (const [id, sub] of Object.entries(s.subagents)) subagents[id] = { ...sub };
 	const mcp: Record<string, McpWireState> = {};
 	for (const [server, wire] of Object.entries(s.mcp)) mcp[server] = { ...wire };
-	return { ...s, stations, subagents, mcp, todo: s.todo === null ? null : { ...s.todo }, bottlenecks: new Map(s.bottlenecks) };
+	return { ...s, stations, subagents, mcp, todo: s.todo === null ? null : { ...s.todo }, bottlenecks: new Map(s.bottlenecks), notRun: new Set(s.notRun) };
 }
 
 /** (at, id) order: by time, then by id in code-unit order (the same on every device). */
 function compare(a: { at: number; id: string }, b: { at: number; id: string }): number {
 	if (a.at !== b.at) return a.at - b.at;
 	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
-function anyQueued(d: LiveMapScene): boolean {
-	return STATION_CODES.some((code) => d.stations[code].queued > 0);
 }
 
 function clearQueues(d: LiveMapScene): void {
@@ -179,21 +188,47 @@ function recomputeBottlenecks(d: LiveMapScene): void {
 	}
 }
 
+/** Tool calls that never ran: denied, or blocked by a hook. */
+const NOT_RUN = new Set(["permission_denied", "hook_block"]);
+
+function active(d: LiveMapScene): void {
+	d.core = "thinking";
+	d.inTurn = true;
+}
+
+/** The turn is over: nothing runs, nothing waits for permission. */
+function endTurn(d: LiveMapScene, core: CoreState): void {
+	d.core = core;
+	d.inTurn = false;
+	for (const code of STATION_CODES) d.stations[code].running = [];
+	clearQueues(d);
+}
+
+/** Output tokens per second of one request: over its time after the first token when known, else its whole duration. */
+function speedOf(e: { outputTokens?: number; durationMs?: number; ttftMs?: number }): number | null {
+	const total = e.durationMs ?? 0;
+	const output = e.outputTokens ?? 0;
+	if (output <= 0 || total <= 0) return null;
+	const writing = total - (e.ttftMs ?? 0);
+	return (output * 1000) / (writing > 0 ? writing : total);
+}
+
 /** One event into a draft scene (mutated). */
 function step(d: LiveMapScene, e: SceneEvent): void {
 	switch (e.kind) {
 		case "prompt":
-			d.core = "thinking";
+			active(d);
 			clearQueues(d);
 			return;
 		case "tool": {
+			active(d);
 			const code = stationOf(e.station);
 			const st = d.stations[code];
 			// A call ran there: whatever asked for permission there was answered.
 			st.queued = 0;
-			if (d.core !== "compacting") d.core = anyQueued(d) ? "waiting_permission" : "thinking";
-			if (e.success === undefined) st.running.push(e.id);
-			else {
+			if (e.success === undefined) {
+				if (!d.notRun.has(e.toolUseId)) st.running.push(e.id);
+			} else {
 				st.calls += 1;
 				if (!e.success) st.failures += 1;
 				st.last = e.id;
@@ -213,48 +248,58 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 			return;
 		}
 		case "subagent": {
+			active(d);
 			const sub = (d.subagents[e.agentId] ??= { agentId: e.agentId, agentType: e.agentType, running: true, station: "ORCHESTRATOR" });
 			sub.agentType = e.agentType;
 			sub.running = e.endedAt === 0;
 			return;
 		}
-		case "api":
+		case "api": {
 			if (e.agentId !== "") return;
+			active(d);
 			if (e.model !== "") d.model = e.model;
-			{
-				const generating = (e.durationMs ?? 0) - (e.ttftMs ?? 0);
-				d.tokensPerSecond = e.outputTokens !== undefined && generating > 0 ? (e.outputTokens * 1000) / generating : null;
-			}
+			const speed = speedOf(e);
+			if (speed !== null) d.tokensPerSecond = speed;
 			return;
+		}
 		case "instruction":
 		case "git":
 			return;
 		case "lifecycle": {
 			const st = d.stations[stationOf(e.station)];
+			if (NOT_RUN.has(e.name) && e.toolUseId !== "") {
+				d.notRun.add(e.toolUseId);
+				const id = `tool:${e.toolUseId}`;
+				for (const code of STATION_CODES) d.stations[code].running = d.stations[code].running.filter((x) => x !== id);
+			}
 			switch (e.name) {
 				case "permission_request":
 					st.queued += 1;
-					if (d.core !== "compacting") d.core = "waiting_permission";
+					d.core = "waiting_permission";
+					d.inTurn = true;
 					return;
 				case "permission_decision":
 				case "permission_denied":
 				case "hook_block":
 					st.queued = Math.max(0, st.queued - 1);
-					if (d.core === "waiting_permission" && !anyQueued(d)) d.core = "thinking";
+					active(d);
 					return;
 				case "compact_start":
+					if (d.core !== "compacting") d.beforeCompact = d.core;
 					d.core = "compacting";
 					return;
 				case "compact_end":
-					d.core = anyQueued(d) ? "waiting_permission" : "thinking";
+					d.core = d.inTurn ? "thinking" : d.beforeCompact === "idle" ? "idle" : "waiting_user";
 					return;
 				case "stop":
-					d.core = "waiting_user";
-					clearQueues(d);
+					endTurn(d, "waiting_user");
 					return;
 				case "stop_failure":
-					d.core = "failed";
-					clearQueues(d);
+					endTurn(d, "failed");
+					return;
+				case "notification":
+					if (e.label === "permission_prompt") d.core = "waiting_permission";
+					else if (e.label === "idle_prompt") endTurn(d, "waiting_user");
 					return;
 				case "todo_counts":
 					d.todo = parseTodoCounts(e.label) ?? d.todo;
@@ -272,6 +317,12 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 			recomputeBottlenecks(d);
 			return;
 	}
+}
+
+/** The core's state, idle once the session ended after its last event (the machine's rule). */
+export function coreOf(state: Pick<LiveMapState, "scene" | "info" | "newestAt">): CoreState {
+	const ended = state.info?.endedAt ?? 0;
+	return ended > 0 && ended >= state.newestAt ? "idle" : state.scene.core;
 }
 
 /** The scene of `events` (ordered) on top of `base`. */
@@ -331,6 +382,7 @@ function capped(state: LiveMapState, log: LiveMapEvent[]): Pick<LiveMapState, "l
  */
 function merge(state: LiveMapState, events: readonly LiveMapEvent[], animate: boolean): LiveMapState {
 	let info = state.info;
+	let live = state.live;
 	let seq = state.seq;
 	let newestAt = state.newestAt;
 	const log = [...state.log];
@@ -341,6 +393,7 @@ function merge(state: LiveMapState, events: readonly LiveMapEvent[], animate: bo
 		if (e.seq > seq) seq = e.seq;
 		if (e.kind === "session") {
 			info = e.info;
+			live = e.live;
 			continue;
 		}
 		if (!isSceneEvent(e)) continue;
@@ -381,6 +434,7 @@ function merge(state: LiveMapState, events: readonly LiveMapEvent[], animate: bo
 		...state,
 		...kept,
 		info,
+		live,
 		seq,
 		newestAt,
 		scene,
@@ -395,6 +449,7 @@ export function fromSnapshot(snapshot: LiveMapSnapshot): LiveMapState {
 		epoch: snapshot.epoch,
 		seq: 0,
 		info: snapshot.info,
+		live: snapshot.live,
 		earlier: snapshot.earlier,
 		log: [],
 		floor: null,

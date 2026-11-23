@@ -7,16 +7,17 @@
 // demand; unmounted (and the watch stopped) as soon as the tab is left.
 import type { MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { Link } from "../../router.tsx";
-import { AGENT_OBSERVATORY, versionAtLeast } from "../agent-version.ts";
+import { AGENT_LIVE_MAP, versionAtLeast } from "../agent-version.ts";
 import { SessionLoading } from "../session-scene.tsx";
 import { usagePath } from "../usage/usage-paths.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { failureText, type ObservatoryLink } from "./observatory-client.ts";
-import { useObservatorySession, useThreadSession } from "./use-observatory-session.ts";
+import { coreOf } from "./live-map-state.ts";
+import { useObservatorySession, useThreadSessions } from "./use-observatory-session.ts";
 
-/** The session to show: the one a thread runs (null while the thread is not known yet), or one by its own id. */
+/** The session to show: the one a thread runs now (its newest), or one by its own id. */
 export type LiveMapTarget =
-	| { readonly kind: "thread"; readonly thread: { readonly id: string; readonly provider: string; readonly dir: string } | null }
+	| { readonly kind: "thread"; readonly threadId: string }
 	| { readonly kind: "session"; readonly sessionId: string };
 
 export interface LiveMapViewProps {
@@ -47,16 +48,17 @@ function Note({ text, retry }: { text: string; retry?: (() => void) | undefined 
 
 export default function LiveMapView({ link, machine, info, online, target }: LiveMapViewProps) {
 	const t = useMachinesCopy().observe;
-	const served = info !== null && versionAtLeast(info.agentVersion, AGENT_OBSERVATORY);
-	const threadSession = useThreadSession(link, served && target.kind === "thread" ? target.thread : null, online);
-	const sessionId = !served ? null : target.kind === "session" ? target.sessionId : threadSession.kind === "found" ? threadSession.sessionId : null;
+	const served = info !== null && versionAtLeast(info.agentVersion, AGENT_LIVE_MAP);
+	const threadSessions = useThreadSessions(link, served && target.kind === "thread" ? target.threadId : null, online);
+	const newest = threadSessions.kind === "done" ? (threadSessions.value[0]?.sessionId ?? null) : null;
+	const sessionId = !served ? null : target.kind === "session" ? target.sessionId : newest;
 	const watched = useObservatorySession(link, sessionId);
 
 	if (info === null) return online ? <SessionLoading label={t.loading} /> : <Note text={t.offline} />;
 	if (!served) return <Note text={t.needsUpdate} />;
 	if (target.kind === "thread") {
-		if (threadSession.kind === "none") return <Note text={t.noSession} />;
-		if (threadSession.kind === "failed") return <Note text={failureText(t, threadSession.failure)} />;
+		if (threadSessions.kind === "done" && newest === null) return <Note text={t.noSession} />;
+		if (threadSessions.kind === "failed") return <Note text={failureText(t, threadSessions.failure)} />;
 	}
 	if (watched.failure !== null) {
 		const again = watched.failure === "limit" || watched.failure === "failed" || watched.failure === "offline";
@@ -65,7 +67,7 @@ export default function LiveMapView({ link, machine, info, online, target }: Liv
 	if (watched.state === null) return online ? <SessionLoading label={t.loading} /> : <Note text={t.offline} />;
 	const projectKey = watched.state.info?.projectKey ?? "";
 	return (
-		<div className="mx-body" data-id="observe-map" data-core={watched.state.scene.core}>
+		<div className="mx-body" data-id="observe-map" data-core={watched.state.live?.core ?? coreOf(watched.state)}>
 			{watched.disconnected && (
 				<p className="note mx-group-note" role="status" data-id="observe-disconnected">
 					{t.disconnected}

@@ -3,7 +3,7 @@
 // Claude Code session as the machine's Observatory records it, view only).
 // The terminal is offered only when the machine has its terminal and the
 // session's AI opens there (ProviderCapabilities.terminal); Observe when the
-// machine's tunelo serves Observatory (AGENT_OBSERVATORY) and the session runs
+// machine's tunelo serves the Live Map (AGENT_LIVE_MAP) and the session runs
 // Claude Code. A mode kept as "office" (the view Observe replaced) reads as
 // Observe. Each session remembers the mode it was last opened in
 // on this device, and opens in it again from a list: its row's icon says that
@@ -17,7 +17,7 @@ import { useState, type ReactElement } from "react";
 import type { MachineInfo, ProjectDefaults, ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import { navigate, paths } from "../router.tsx";
 import { aiPaths } from "./ai-paths.ts";
-import { AGENT_OBSERVATORY, terminalGate, versionAtLeast } from "./agent-version.ts";
+import { AGENT_LIVE_MAP, terminalGate, versionAtLeast } from "./agent-version.ts";
 import { iconSvg } from "../components/icon.tsx";
 import type { MachineLink } from "./link/machine-link.ts";
 import { MachineIcon } from "./machine-icons.tsx";
@@ -42,9 +42,9 @@ export function chatTakesTerminal(info: MachineInfo | null, provider: string): b
 /** The AI whose sessions Observatory records (it reads Claude Code's own hooks and telemetry). */
 export const OBSERVED_PROVIDER = "claude";
 
-/** The machine's tunelo serves Observatory, and the session's AI is the one it records. */
+/** The machine's tunelo serves the Live Map, and the session's AI is the one Observatory records. */
 export function observeOffered(info: Pick<MachineInfo, "agentVersion"> | null, provider: string): boolean {
-	return info !== null && provider === OBSERVED_PROVIDER && versionAtLeast(info.agentVersion, AGENT_OBSERVATORY);
+	return info !== null && provider === OBSERVED_PROVIDER && versionAtLeast(info.agentVersion, AGENT_LIVE_MAP);
 }
 
 /**

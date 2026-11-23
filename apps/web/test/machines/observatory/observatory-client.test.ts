@@ -7,7 +7,13 @@ import {
 	ErrorCode,
 	ErrorReason,
 	LocalSessionSchema,
+	ObservatoryBottleneckSchema,
+	ObservatoryContentResultSchema,
+	ObservatoryContentState,
+	ObservatoryCoreState,
 	ObservatoryEarlierResultSchema,
+	ObservatoryEventSchema,
+	ObservatoryStationResultSchema,
 	ObservatorySessionInfoSchema,
 	ObservatorySessionListResultSchema,
 	ObservatorySessionSource,
@@ -24,13 +30,15 @@ import {
 	listMachineSessions,
 	OBSERVATORY_TIMEOUT_MS,
 	OFFLINE_NOTICE_MS,
-	threadSessionId,
+	eventContent,
+	stationDrill,
+	threadSessions,
 	threadsBySession,
 	watchSession,
 	WATCH_RETRY_MS,
 	type WatchSink,
 } from "../../../src/machines/observatory/observatory-client.ts";
-import type { LiveMapEvent, LiveMapSnapshot } from "../../../src/machines/observatory/live-map-types.ts";
+import { eventFromWire, type LiveMapEvent, type LiveMapSnapshot } from "../../../src/machines/observatory/live-map-types.ts";
 import { FakeLink, fakePage, wireEvents, wireSnapshot } from "./fake-observatory-link.ts";
 
 /** A sink that records what it is handed and asks for a snapshot when told to. */
@@ -72,7 +80,7 @@ describe("Observatory's requests", () => {
 			value: create(ObservatorySessionListResultSchema, { sessions: [create(ObservatorySessionInfoSchema, { sessionId: "s1", source: ObservatorySessionSource.TERMINAL, startedAt: 5n })] }),
 		});
 		expect(await listed).toEqual([expect.objectContaining({ sessionId: "s1", source: "terminal", startedAt: 5, endedAt: 0 })]);
-		expect(fake.sent[0]).toEqual({ case: "observatorySessionList", value: { limit: 40 } });
+		expect(fake.sent[0]).toEqual({ case: "observatorySessionList", value: { limit: 40, threadId: "" } });
 		const page = earlierEvents(fake.link, "s1", "cursor", 100);
 		fake.answer({ case: "observatoryEarlierResult", value: create(ObservatoryEarlierResultSchema, { sessionId: "s1" }) });
 		expect(await page).toEqual({ events: [], earlier: "" });
@@ -83,32 +91,96 @@ describe("Observatory's requests", () => {
 		await expect(refused).rejects.toSatisfy((err: unknown) => failureOf(err) === "update");
 	});
 
-	it("finds the session a thread holds, the most recently changed first, and the thread of each session", async () => {
+	it("reads provisional events, bottleneck findings and the session's live state from the wire", () => {
+		const provisional = eventFromWire(create(ObservatoryEventSchema, { at: 5n, id: "tool:t1", provisional: true, kind: { case: "toolCall", value: { toolUseId: "t1", station: "GIT", stationFlags: 1 } } }));
+		expect(provisional).toMatchObject({ kind: "tool", id: "tool:t1", provisional: true, station: "GIT", stationFlags: 1 });
+		expect(provisional).not.toHaveProperty("success");
+		const finding = eventFromWire(
+			create(ObservatoryEventSchema, {
+				at: 7n,
+				id: "bottleneck:repeat_read:k1",
+				kind: { case: "bottleneck", value: { rule: "repeat_read", subkey: "k1", station: "FILES", severity: "warn", status: "closed", openedAt: 7n, closedAt: 9n, value: 6, threshold: 5, n: 6 } },
+			}),
+		);
+		expect(finding).toMatchObject({ kind: "bottleneck", rule: "repeat_read", open: false, severity: "warn", closedAt: 9, value: 6, threshold: 5, n: 6, provisional: false });
+		const session = eventFromWire(
+			create(ObservatoryEventSchema, { id: "session", kind: { case: "session", value: { live: { core: ObservatoryCoreState.COMPACTING, contextWindowAssumed: true, running: [{ station: "FILES", count: 2 }] } } } }),
+		);
+		expect(session).toMatchObject({ kind: "session", info: null, live: { core: "compacting", contextWindowAssumed: true, contextPercent: null, tokensPerSecond: null, running: [{ station: "FILES", count: 2 }] } });
+		// A core state of a newer machine reads as the safe default.
+		// A value past the generated enum, as protobuf hands one through from a newer machine.
+		const newer = 99 as ObservatoryCoreState;
+		expect(eventFromWire(create(ObservatoryEventSchema, { id: "session", kind: { case: "session", value: { live: { core: newer } } } }))).toMatchObject({ live: { core: "idle" } });
+	});
+
+	it("lists a thread's sessions by the machine's own list, newest first", async () => {
 		const fake = new FakeLink();
-		const answer = () =>
-			fake.answer({
-				case: "sessionListResult",
-				value: create(SessionListResultSchema, {
-					sessions: [
-						create(LocalSessionSchema, { sessionId: "old", threadId: "t1", updatedAt: 1n }),
-						create(LocalSessionSchema, { sessionId: "new", threadId: "t1", updatedAt: 9n }),
-						create(LocalSessionSchema, { sessionId: "free", threadId: "", updatedAt: 5n }),
-					],
-				}),
-			});
-		const found = threadSessionId(fake.link, { id: "t1", provider: "claude", dir: "/w" });
-		answer();
-		expect(await found).toBe("new");
-		expect(fake.sent[0]).toEqual({ case: "sessionList", value: { provider: "claude", dir: "/w", limit: 100 } });
-		const none = threadSessionId(fake.link, { id: "t2", provider: "claude", dir: "/w" });
-		answer();
-		expect(await none).toBeNull();
+		const listed = threadSessions(fake.link, "t1");
+		fake.answer({
+			case: "observatorySessionListResult",
+			value: create(ObservatorySessionListResultSchema, { sessions: [create(ObservatorySessionInfoSchema, { sessionId: "after-clear" }), create(ObservatorySessionInfoSchema, { sessionId: "before-clear" })] }),
+		});
+		expect((await listed).map((s) => s.sessionId)).toEqual(["after-clear", "before-clear"]);
+		expect(fake.sent[0]).toEqual({ case: "observatorySessionList", value: { limit: 50, threadId: "t1" } });
+	});
+
+	it("finds the thread holding each session from the machine's transcripts", async () => {
+		const fake = new FakeLink();
 		const byId = threadsBySession(fake.link, "claude");
-		answer();
+		fake.answer({
+			case: "sessionListResult",
+			value: create(SessionListResultSchema, {
+				sessions: [
+					create(LocalSessionSchema, { sessionId: "old", threadId: "t1", updatedAt: 1n }),
+					create(LocalSessionSchema, { sessionId: "new", threadId: "t1", updatedAt: 9n }),
+					create(LocalSessionSchema, { sessionId: "free", threadId: "", updatedAt: 5n }),
+				],
+			}),
+		});
 		expect([...(await byId)]).toEqual([
 			["new", "t1"],
 			["old", "t1"],
 		]);
+		expect(fake.sent[0]).toEqual({ case: "sessionList", value: { provider: "claude", dir: "", limit: 100 } });
+	});
+
+	it("asks an event's content by id, and gives no text unless it is stored", async () => {
+		const fake = new FakeLink();
+		const stored = eventContent(fake.link, "s1", "prompt:p1");
+		fake.answer({ case: "observatoryContentResult", value: create(ObservatoryContentResultSchema, { sessionId: "s1", eventId: "prompt:p1", state: ObservatoryContentState.STORED, text: "fix the bug" }) });
+		expect(await stored).toEqual({ eventId: "prompt:p1", state: "stored", text: "fix the bug" });
+		expect(fake.sent[0]).toEqual({ case: "observatoryContent", value: { sessionId: "s1", eventId: "prompt:p1" } });
+		const off = eventContent(fake.link, "s1", "tool:t1");
+		fake.answer({ case: "observatoryContentResult", value: create(ObservatoryContentResultSchema, { eventId: "tool:t1", state: ObservatoryContentState.OFF, text: "leak" }) });
+		expect(await off).toEqual({ eventId: "tool:t1", state: "off", text: "" });
+		const notYet = eventContent(fake.link, "s1", "tool:t2");
+		fake.answer({ case: "observatoryContentResult", value: create(ObservatoryContentResultSchema, { eventId: "tool:t2", state: ObservatoryContentState.NOT_YET }) });
+		expect((await notYet).state).toBe("not_yet");
+	});
+
+	it("asks a station's numbers up to a moment, with its parts, events, earlier sessions and findings", async () => {
+		const fake = new FakeLink();
+		const drill = stationDrill(fake.link, "s1", "SANDBOX", 5_000);
+		expect(fake.sent[0]).toEqual({ case: "observatoryStation", value: { sessionId: "s1", station: "SANDBOX", at: 5_000n } });
+		fake.answer({
+			case: "observatoryStationResult",
+			value: create(ObservatoryStationResultSchema, {
+				sessionId: "s1",
+				station: "SANDBOX",
+				at: 5_000n,
+				numbers: { calls: 4, failures: 1, ended: 4, p50Ms: 120, p95Ms: 900, inputTokens: 10n, hasCost: false, requestsWithoutCost: 2 },
+				parts: [{ kind: "program", key: "pnpm", numbers: { calls: 3, ended: 3 } }],
+				slowest: [create(ObservatoryEventSchema, { at: 10n, id: "tool:t1", kind: { case: "toolCall", value: { toolUseId: "t1", station: "SANDBOX", durationMs: 900 } } })],
+				previous: [{ sessionId: "s0", startedAt: 1n, numbers: { calls: 2 } }],
+				bottlenecks: [create(ObservatoryBottleneckSchema, { rule: "slow_tool", subkey: "Bash", station: "SANDBOX", severity: "alert", status: "open", openedAt: 7n, evidenceIds: ["tool:t1"] })],
+			}),
+		});
+		const got = await drill;
+		expect(got.numbers).toMatchObject({ calls: 4, failures: 1, ended: 4, p50Ms: 120, p95Ms: 900, inputTokens: 10, hasCost: false, requestsWithoutCost: 2 });
+		expect(got.parts).toEqual([{ kind: "program", key: "pnpm", numbers: expect.objectContaining({ calls: 3, ended: 3 }) }]);
+		expect(got.slowest.map((e) => [e.id, e.kind === "tool" ? e.durationMs : null])).toEqual([["tool:t1", 900]]);
+		expect(got.previous).toEqual([{ sessionId: "s0", startedAt: 1, numbers: expect.objectContaining({ calls: 2 }) }]);
+		expect(got.bottlenecks).toEqual([expect.objectContaining({ rule: "slow_tool", severity: "alert", open: true, openedAt: 7, closedAt: 0, evidenceIds: ["tool:t1"] })]);
 	});
 });
 

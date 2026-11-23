@@ -17,17 +17,17 @@ export const info = (over: Partial<LiveMapSessionInfo> = {}): LiveMapSessionInfo
 	...over,
 });
 
-const at = (body: LiveMapEventBody, id: string, ms: number, seq = 0): LiveMapEvent => ({ ...body, id, at: T0 + ms, seq });
+const at = (body: LiveMapEventBody, id: string, ms: number, seq = 0, provisional = false): LiveMapEvent => ({ ...body, id, at: T0 + ms, seq, provisional });
 
 export const prompt = (n: number, ms: number, seq = 0): LiveMapEvent => at({ kind: "prompt", promptId: `p${n}` }, `prompt:p${n}`, ms, seq);
 
 export function tool(
 	use: string,
 	ms: number,
-	over: Partial<Extract<LiveMapEventBody, { kind: "tool" }>> = {},
+	{ provisional = false, ...over }: Partial<Extract<LiveMapEventBody, { kind: "tool" }>> & { provisional?: boolean } = {},
 	seq = 0,
 ): LiveMapEvent {
-	return at({ kind: "tool", toolUseId: use, agentId: "", toolName: "Read", mcpServer: "", station: "FILES", stationFlags: 0, provisional: false, ...over }, `tool:${use}`, ms, seq);
+	return at({ kind: "tool", toolUseId: use, agentId: "", toolName: "Read", mcpServer: "", station: "FILES", stationFlags: 0, ...over }, `tool:${use}`, ms, seq, provisional);
 }
 
 export const subagent = (agent: string, ms: number, endedAt = 0, seq = 0): LiveMapEvent =>
@@ -40,7 +40,12 @@ export const lifecycle = (name: string, key: string, ms: number, over: Partial<E
 	at({ kind: "lifecycle", name, agentId: "", toolUseId: "", station: "CORE", label: "", ...over }, `event:${key}`, ms, seq);
 
 export const bottleneck = (key: string, ms: number, station: string, severity: "warn" | "alert", open: boolean, seq = 0): LiveMapEvent =>
-	at({ kind: "bottleneck", station, severity, open }, `bottleneck:${key}`, ms, seq);
+	at(
+		{ kind: "bottleneck", rule: key, subkey: "", station, severity, open, openedAt: T0 + ms, updatedAt: T0 + ms, closedAt: open ? 0 : T0 + ms + 1, evidenceIds: [] },
+		`bottleneck:${key}`,
+		ms,
+		seq,
+	);
 
 export const unknown = (ms: number, seq: number): LiveMapEvent => at({ kind: "unknown" }, `later:${seq}`, ms, seq);
 
@@ -49,6 +54,7 @@ export const snapshot = (events: readonly LiveMapEvent[], over: Partial<LiveMapS
 	epoch: 1n,
 	seq: 0,
 	info: info(),
+	live: null,
 	events,
 	earlier: "",
 	...over,

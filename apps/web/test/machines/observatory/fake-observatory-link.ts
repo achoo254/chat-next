@@ -2,7 +2,7 @@
 // hand, frames played as the machine sends them, the page's visibility
 // switched by the test.
 import { create } from "@bufbuild/protobuf";
-import { FrameSchema, ObservatoryEventSchema, ObservatoryEventsSchema, ObservatorySessionSource, ObservatorySnapshotSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
+import { FrameSchema, ObservatoryCoreState, ObservatoryEventSchema, ObservatoryEventsSchema, ObservatorySessionSource, ObservatorySnapshotSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
 import type { LinkState } from "../../../src/machines/link/machine-link.ts";
 import type { ObservatoryLink } from "../../../src/machines/observatory/observatory-client.ts";
 
@@ -81,7 +81,10 @@ export const wireSnapshot = (seq: bigint, epoch = 1n, sessionId = "s1"): Frame["
 		sessionId,
 		epoch,
 		seq,
-		session: { info: { sessionId, projectKey: "github.com/acme/app", source: ObservatorySessionSource.CLI, startedAt: 1_000n } },
+		session: {
+			info: { sessionId, projectKey: "github.com/acme/app", source: ObservatorySessionSource.CLI, startedAt: 1_000n },
+			live: { core: ObservatoryCoreState.WAITING_PERMISSION, contextPercent: 40, contextTokens: 80_000n, contextWindow: 200_000n, contextWindowAssumed: true },
+		},
 		events: [create(ObservatoryEventSchema, { at: 10n, id: "prompt:p1", kind: { case: "prompt", value: { promptId: "p1" } } })],
 	}),
 });

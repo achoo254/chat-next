@@ -8,6 +8,7 @@ import {
 	applyEvents,
 	foldScene,
 	emptyScene,
+	coreOf,
 	fromSnapshot,
 	LOG_CAP,
 	parseTodoCounts,
@@ -18,7 +19,7 @@ import {
 	type LiveMapState,
 } from "../../../src/machines/observatory/live-map-state.ts";
 import type { LiveMapEvent } from "../../../src/machines/observatory/live-map-types.ts";
-import { api, bottleneck, lifecycle, numbered, prompt, snapshot, subagent, tool, unknown } from "./live-map-fixtures.ts";
+import { api, bottleneck, info, lifecycle, numbered, prompt, snapshot, subagent, tool, unknown } from "./live-map-fixtures.ts";
 
 /** Everything but the animations queued on the way. */
 const settled = (s: LiveMapState) => ({ ...s, animations: [] });
@@ -117,6 +118,40 @@ describe("the Live Map state", () => {
 		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10)])).toBe("waiting_user");
 		expect(core([prompt(1, 0), lifecycle("stop_failure", "s1", 10)])).toBe("failed");
 		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), prompt(2, 20)])).toBe("thinking");
+		// Notifications: a permission prompt waits, an idle prompt ends the turn.
+		expect(core([prompt(1, 0), lifecycle("notification", "n1", 10, { label: "permission_prompt" })])).toBe("waiting_permission");
+		expect(core([prompt(1, 0), lifecycle("notification", "n1", 10, { label: "idle_prompt" })])).toBe("waiting_user");
+		// A compaction outside a turn goes back to waiting for the user, or to idle when nothing had happened.
+		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), lifecycle("compact_start", "c1", 20), lifecycle("compact_end", "c2", 30)])).toBe("waiting_user");
+		expect(core([lifecycle("compact_start", "c1", 20), lifecycle("compact_end", "c2", 30)])).toBe("idle");
+		// A subagent's API request is not the main thread's.
+		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), api("sub", 20, { agentId: "ag1" })])).toBe("waiting_user");
+	});
+
+	it("is idle once the session ended after its last event", () => {
+		const s = live(start(), numbered([prompt(1, 0), lifecycle("stop", "s1", 10)]));
+		expect(coreOf(s)).toBe("waiting_user");
+		expect(coreOf({ ...s, info: info({ endedAt: s.newestAt }) })).toBe("idle");
+		expect(coreOf({ ...s, info: info({ endedAt: s.newestAt - 1 }) })).toBe("waiting_user");
+	});
+
+	it("clears the running calls when the turn ends, and never counts a denied or blocked call as running", () => {
+		const s = live(start(), numbered([prompt(1, 0), tool("t1", 10), tool("t2", 20, { station: "SANDBOX" }), lifecycle("permission_denied", "d2", 25, { toolUseId: "t2", station: "SANDBOX" })]));
+		expect(s.scene.stations.FILES.running).toEqual(["tool:t1"]);
+		expect(s.scene.stations.SANDBOX.running).toEqual([]);
+		// The denied call's stored version after the denial still does not run.
+		const again = live(s, numbered([tool("t3", 30, { station: "SANDBOX" }), lifecycle("hook_block", "b3", 31, { toolUseId: "t3", station: "SANDBOX" })], s.seq + 1));
+		expect(again.scene.stations.SANDBOX.running).toEqual([]);
+		const stopped = live(again, numbered([lifecycle("stop", "s1", 40)], again.seq + 1));
+		expect(stopped.scene.stations.FILES.running).toEqual([]);
+	});
+
+	it("takes the main agent's speed over its whole duration when the first token's time is unknown, and keeps it past a request without numbers", () => {
+		const base = { kind: "api", agentId: "", model: "claude-opus", seq: 0, provisional: false } as const;
+		const noTtft: LiveMapEvent = { ...base, id: "api:a1", at: 0, outputTokens: 300, durationMs: 1_500 };
+		const noNumbers: LiveMapEvent = { ...base, id: "api:a2", at: 10 };
+		const s = live(start(), numbered([noTtft, noNumbers]));
+		expect(s.scene.tokensPerSecond).toBeCloseTo(200);
 	});
 
 	it("keeps each station's running calls, queue, latest call, counts and failures", () => {
@@ -133,7 +168,8 @@ describe("the Live Map state", () => {
 		);
 		expect(s.scene.stations.FILES).toEqual({ running: ["tool:t3"], queued: 0, last: "tool:t2", calls: 2, failures: 1, bottleneck: "none" });
 		expect(s.scene.stations.GIT.queued).toBe(2);
-		expect(s.scene.core).toBe("waiting_permission");
+		// A call ran after the requests: the machine's rule says thinking.
+		expect(s.scene.core).toBe("thinking");
 		// The call ends: its stored version replaces the running one.
 		const ended = live(s, numbered([tool("t3", 30, { success: true })], s.seq + 1));
 		expect(ended.scene.stations.FILES).toMatchObject({ running: [], last: "tool:t3", calls: 3 });
@@ -211,10 +247,23 @@ describe("the Live Map state", () => {
 		expect(paged.earlier).toBe("");
 	});
 
-	it("takes the session's row from a session event", () => {
-		const s = fromSnapshot(snapshot([], { info: null }));
-		const next = reduce(s, { kind: "session", info: snapshot([]).info, id: "session", at: 0, seq: 1 });
+	it("takes the session's row and live state from a snapshot and a session event, the window's assumption included", () => {
+		const liveState = {
+			core: "thinking" as const,
+			tokensPerSecond: 50,
+			contextPercent: 40,
+			contextTokens: 80_000,
+			contextWindow: 200_000,
+			contextWindowAssumed: true,
+			mainModel: "claude-sonnet-5-5",
+			running: [{ station: "FILES", count: 1 }],
+			openBottlenecks: 0,
+		};
+		const s = fromSnapshot(snapshot([], { info: null, live: liveState }));
+		expect(s.live?.contextWindowAssumed).toBe(true);
+		const next = reduce(s, { kind: "session", info: snapshot([]).info, live: { ...liveState, contextWindow: 1_000_000, contextWindowAssumed: false }, id: "session", at: 0, seq: 1, provisional: false });
 		expect(next.info?.projectKey).toBe("github.com/acme/app");
+		expect(next.live).toMatchObject({ contextWindow: 1_000_000, contextWindowAssumed: false });
 		expect(next.log).toEqual([]);
 	});
 });

@@ -1,12 +1,14 @@
-// A watched Claude Code session for the Live Map: the session a thread runs
-// (useThreadSession), and the session's state as the machine sends it
+// A watched Claude Code session for the Live Map: a thread's sessions
+// (useThreadSessions), the session's state as the machine sends it
 // (useObservatorySession: a snapshot, then events by the device-side rules of
-// docs/observatory-wire.md section 2, through live-map-state.ts). The watch
+// docs/observatory-wire.md section 2, through live-map-state.ts), and what
+// the viewer asks of it: an event's content, a station's numbers. The watch
 // lives exactly as long as the component using it: leaving the tab unmounts
 // it and stops watching, nothing is kept mounted while hidden.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyEvents, fromSnapshot, type LiveMapState } from "./live-map-state.ts";
-import { failureOf, threadSessionId, watchSession, type ObservatoryFailure, type ObservatoryLink, type ObservatoryWatch, type WatchOptions, type WatchSink } from "./observatory-client.ts";
+import type { LiveMapContent, LiveMapSessionInfo, StationDrill } from "./live-map-types.ts";
+import { eventContent, failureOf, stationDrill, threadSessions, watchSession, type ObservatoryFailure, type ObservatoryLink, type ObservatoryWatch, type WatchOptions, type WatchSink } from "./observatory-client.ts";
 
 export interface ObservatorySession {
 	/** null until the first snapshot. */
@@ -81,37 +83,54 @@ export function useObservatorySession(link: ObservatoryLink, sessionId: string |
 	return { ...shown, retry };
 }
 
-export type ThreadSession =
-	| { readonly kind: "loading" }
-	/** The thread holds no Claude Code session yet (nothing sent in it). */
-	| { readonly kind: "none" }
-	| { readonly kind: "found"; readonly sessionId: string }
-	| { readonly kind: "failed"; readonly failure: ObservatoryFailure };
+/** An answer asked of the machine: loading, the value, or why it failed. */
+export type Asked<T> = { readonly kind: "loading" } | { readonly kind: "done"; readonly value: T } | { readonly kind: "failed"; readonly failure: ObservatoryFailure };
+
+const LOADING = { kind: "loading" } as const;
 
 /**
- * The session `thread` runs, asked once the link is open (and again after it
- * reopens: a /clear may have moved the thread on). null thread: nothing asked.
+ * Asks once per `key` while online (and again after the link reopens); a null
+ * key asks nothing. An answer for an earlier key never shows.
  */
-export function useThreadSession(link: ObservatoryLink, thread: { readonly id: string; readonly provider: string; readonly dir: string } | null, online: boolean): ThreadSession {
-	const [found, setFound] = useState<{ key: string; session: ThreadSession } | null>(null);
-	const id = thread?.id ?? "";
-	const provider = thread?.provider ?? "";
-	const dir = thread?.dir ?? "";
-	const key = `${id}\n${provider}\n${dir}`;
+function useAsk<T>(key: string | null, online: boolean, ask: () => Promise<T>): Asked<T> {
+	const [answer, setAnswer] = useState<{ key: string; asked: Asked<T> } | null>(null);
+	const latest = useRef(ask);
 	useEffect(() => {
-		if (!online || id === "") return;
+		latest.current = ask;
+	});
+	useEffect(() => {
+		if (!online || key === null) return;
 		let active = true;
-		threadSessionId(link, { id, provider, dir }).then(
-			(sessionId) => {
-				if (active) setFound({ key, session: sessionId === null ? { kind: "none" } : { kind: "found", sessionId } });
+		latest.current().then(
+			(value) => {
+				if (active) setAnswer({ key, asked: { kind: "done", value } });
 			},
 			(err: unknown) => {
-				if (active) setFound({ key, session: { kind: "failed", failure: failureOf(err) } });
+				if (active) setAnswer({ key, asked: { kind: "failed", failure: failureOf(err) } });
 			},
 		);
 		return () => {
 			active = false;
 		};
-	}, [link, online, id, provider, dir, key]);
-	return found !== null && found.key === key ? found.session : { kind: "loading" };
+	}, [key, online]);
+	return answer !== null && answer.key === key ? answer.asked : LOADING;
+}
+
+/**
+ * A thread's Claude Code sessions, newest first (the first is the one it runs
+ * now; earlier ones are the conversations before /clear), asked once the link
+ * is open and again after it reopens. null thread: nothing asked.
+ */
+export function useThreadSessions(link: ObservatoryLink, threadId: string | null, online: boolean): Asked<readonly LiveMapSessionInfo[]> {
+	return useAsk(threadId, online, () => threadSessions(link, threadId ?? ""));
+}
+
+/** An event's content, asked when the viewer opens it (null: nothing asked). */
+export function useEventContent(link: ObservatoryLink, sessionId: string, eventId: string | null, online: boolean): Asked<LiveMapContent> {
+	return useAsk(eventId === null ? null : `${sessionId}\n${eventId}`, online, () => eventContent(link, sessionId, eventId ?? ""));
+}
+
+/** A station's numbers, asked when its drawer opens (null: nothing asked), up to `at` (0: the whole session). */
+export function useStationDrill(link: ObservatoryLink, sessionId: string, station: string | null, at: number, online: boolean): Asked<StationDrill> {
+	return useAsk(station === null ? null : `${sessionId}\n${station}\n${at}`, online, () => stationDrill(link, sessionId, station ?? "", at));
 }

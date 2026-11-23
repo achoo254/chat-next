@@ -319,7 +319,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			{mode === "observe" && (
 				<div className="mx-chat-body">
 					<Suspense fallback={<SessionLoading label={t.observe.loading} />}>
-						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", thread: thread === null ? null : { id: threadId, provider: thread.provider, dir: thread.dir } }} />
+						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", threadId }} />
 					</Suspense>
 					{workspacePanel}
 				</div>

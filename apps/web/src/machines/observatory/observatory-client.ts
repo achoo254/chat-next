@@ -1,6 +1,7 @@
 // Observatory's requests on a machine's link (docs/observatory-wire.md): the
-// machine's recent Claude Code sessions, a page of older events, the session a
-// thread runs (and the thread holding a session), and watching one session. Every request has its own deadline;
+// machine's recent Claude Code sessions, a thread's sessions, the thread
+// holding each session, a page of older events, an event's content by id, a
+// station's numbers (drill-down), and watching one session. Every request has its own deadline;
 // a machine whose tunelo does not know a request (UNSUPPORTED_REQUEST) reads
 // as "update tunelo".
 //
@@ -16,7 +17,18 @@
 import { ErrorReason, type Frame } from "@achoo254/chat-proto/remote/remote";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { OfflineError, RemoteError, type MachineLink } from "../link/machine-link.ts";
-import { eventFromWire, sessionInfoFromWire, snapshotFromWire, type LiveMapEvent, type LiveMapSessionInfo, type LiveMapSnapshot } from "./live-map-types.ts";
+import {
+	contentFromWire,
+	eventFromWire,
+	sessionInfoFromWire,
+	snapshotFromWire,
+	stationDrillFromWire,
+	type LiveMapContent,
+	type LiveMapEvent,
+	type LiveMapSessionInfo,
+	type LiveMapSnapshot,
+	type StationDrill,
+} from "./live-map-types.ts";
 
 /** What Observatory needs of a link (tests pass a fake one). */
 export type ObservatoryLink = Pick<MachineLink, "request" | "onFrame" | "subscribe" | "snapshot">;
@@ -56,9 +68,13 @@ export function failureOf(err: unknown): ObservatoryFailure {
 	}
 }
 
-/** The machine's most recent sessions, newest first (at most `limit`, the machine caps it at 200). */
-export async function listMachineSessions(link: Pick<ObservatoryLink, "request">, limit: number): Promise<LiveMapSessionInfo[]> {
-	const frame = await link.request({ case: "observatorySessionList", value: { limit } }, OBSERVATORY_TIMEOUT_MS);
+/**
+ * The machine's most recent sessions, newest first (at most `limit`, the
+ * machine caps it at 200); with `threadId`, only that thread's Claude Code
+ * sessions, followed across /clear both ways (empty for another AI's thread).
+ */
+export async function listMachineSessions(link: Pick<ObservatoryLink, "request">, limit: number, threadId = ""): Promise<LiveMapSessionInfo[]> {
+	const frame = await link.request({ case: "observatorySessionList", value: { limit, threadId } }, OBSERVATORY_TIMEOUT_MS);
 	if (frame.body.case !== "observatorySessionListResult") throw new Error(`unexpected answer ${String(frame.body.case)}`);
 	return frame.body.value.sessions.map(sessionInfoFromWire);
 }
@@ -70,16 +86,12 @@ export async function earlierEvents(link: Pick<ObservatoryLink, "request">, sess
 	return { events: frame.body.value.events.map(eventFromWire), earlier: frame.body.value.earlier };
 }
 
-/** Transcripts looked at when matching sessions to threads. */
+/** Transcripts looked at when matching sessions to threads (the machine's list of sessions carries no thread). */
 const HELD_SESSIONS_LIMIT = 100;
 
-/**
- * The machine's transcripts of `provider` (in `dir` and below; "" for every
- * folder) that a thread holds, most recently changed first, as its session
- * list (SessionList) says.
- */
-async function heldSessions(link: Pick<ObservatoryLink, "request">, provider: string, dir: string): Promise<{ sessionId: string; threadId: string }[]> {
-	const frame = await link.request({ case: "sessionList", value: { provider, dir, limit: HELD_SESSIONS_LIMIT } }, OBSERVATORY_TIMEOUT_MS);
+/** The machine's transcripts of `provider` that a thread holds, most recently changed first, as its session list (SessionList) says. */
+async function heldSessions(link: Pick<ObservatoryLink, "request">, provider: string): Promise<{ sessionId: string; threadId: string }[]> {
+	const frame = await link.request({ case: "sessionList", value: { provider, dir: "", limit: HELD_SESSIONS_LIMIT } }, OBSERVATORY_TIMEOUT_MS);
 	if (frame.body.case !== "sessionListResult") throw new Error(`unexpected answer ${String(frame.body.case)}`);
 	return frame.body.value.sessions
 		.filter((s) => s.threadId !== "")
@@ -87,20 +99,31 @@ async function heldSessions(link: Pick<ObservatoryLink, "request">, provider: st
 		.map((s) => ({ sessionId: s.sessionId, threadId: s.threadId }));
 }
 
-/**
- * The Claude Code session a thread runs now: the most recently changed
- * transcript the thread holds; null when it holds none yet. The machine's own
- * list of a thread's sessions, following /clear forward, replaces this once
- * Observatory lists sessions by thread.
- */
-export async function threadSessionId(link: Pick<ObservatoryLink, "request">, thread: { readonly id: string; readonly provider: string; readonly dir: string }): Promise<string | null> {
-	const held = await heldSessions(link, thread.provider, thread.dir);
-	return held.find((s) => s.threadId === thread.id)?.sessionId ?? null;
+/** A thread's sessions asked at most: its segments and the sessions /clear chained to them. */
+export const THREAD_SESSIONS_LIMIT = 50;
+
+/** A thread's Claude Code sessions, newest first (the first is the one it runs now); empty when it has none yet. */
+export function threadSessions(link: Pick<ObservatoryLink, "request">, threadId: string): Promise<LiveMapSessionInfo[]> {
+	return listMachineSessions(link, THREAD_SESSIONS_LIMIT, threadId);
+}
+
+/** An event's content as stored (section 6.5): the only way content leaves the machine, read when the viewer asks. */
+export async function eventContent(link: Pick<ObservatoryLink, "request">, sessionId: string, eventId: string): Promise<LiveMapContent> {
+	const frame = await link.request({ case: "observatoryContent", value: { sessionId, eventId } }, OBSERVATORY_TIMEOUT_MS);
+	if (frame.body.case !== "observatoryContentResult") throw new Error(`unexpected answer ${String(frame.body.case)}`);
+	return contentFromWire(frame.body.value);
+}
+
+/** A station's numbers for the session (section 6.6), up to `at` (0: the whole session). */
+export async function stationDrill(link: Pick<ObservatoryLink, "request">, sessionId: string, station: string, at = 0): Promise<StationDrill> {
+	const frame = await link.request({ case: "observatoryStation", value: { sessionId, station, at: BigInt(at) } }, OBSERVATORY_TIMEOUT_MS);
+	if (frame.body.case !== "observatoryStationResult") throw new Error(`unexpected answer ${String(frame.body.case)}`);
+	return stationDrillFromWire(frame.body.value);
 }
 
 /** The thread holding each of the machine's sessions of `provider` that one holds (by session id). */
 export async function threadsBySession(link: Pick<ObservatoryLink, "request">, provider: string): Promise<ReadonlyMap<string, string>> {
-	const held = await heldSessions(link, provider, "");
+	const held = await heldSessions(link, provider);
 	return new Map(held.map((s) => [s.sessionId, s.threadId]));
 }
 
