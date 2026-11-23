@@ -16,22 +16,6 @@ function tokenCount(usage: unknown): number | undefined {
   return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-/** A short name or type the AI gave (its agent type), without control characters; undefined when it gave none. */
-function shortName(v: unknown): string | undefined {
-  if (typeof v !== "string") return undefined;
-  // eslint-disable-next-line no-control-regex
-  const name = v.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").trim().slice(0, 60);
-  return name === "" ? undefined : name;
-}
-
-/** A shell call's command line (only to pick a room for the office view, on the machine). */
-function shellCommand(name: string, input: Record<string, unknown>): string | undefined {
-  if (toolKind(name) !== "shell") return undefined;
-  return typeof input.command === "string" ? input.command : undefined;
-}
-
-type ToolBlock = { type?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; is_error?: boolean };
-
 /** Maps SDK messages of the top-level conversation onto ProviderEvents. */
 export class MessageMapper {
   private messageId = "";
@@ -52,11 +36,7 @@ export class MessageMapper {
   map(msg: SDKMessage): void {
     if ("parent_tool_use_id" in msg && msg.parent_tool_use_id) {
       // Inside a subagent: only its file edits show (with the subagent), no tool cards; its tokens count with the turn's.
-      // Its tool calls go to the office view only, by name.
-      if (msg.type === "assistant") {
-        this.subagentEdits(msg.parent_tool_use_id, msg.message.content);
-        this.subagentToolCalls(msg.parent_tool_use_id, msg.message.content);
-      } else if (msg.type === "user") this.subagentToolResults(msg.parent_tool_use_id, msg.message.content);
+      if (msg.type === "assistant") this.subagentEdits(msg.parent_tool_use_id, msg.message.content);
       else if (msg.type === "stream_event") this.outputTokens(msg.parent_tool_use_id, msg.event);
       return;
     }
@@ -64,7 +44,6 @@ export class MessageMapper {
       case "system":
         if (msg.subtype === "init") this.emit({ type: "session", sessionId: msg.session_id });
         else if (msg.subtype === "compact_boundary") this.emit({ type: "compaction", tokensBefore: msg.compact_metadata.pre_tokens });
-        else if (msg.subtype === "task_notification" && msg.tool_use_id) this.emit({ type: "background-task", toolId: msg.tool_use_id, ok: msg.status === "completed" });
         return;
       case "stream_event":
         this.stream(msg.event);
@@ -163,15 +142,7 @@ export class MessageMapper {
     const kind = toolKind(name);
     if (kind === "subagent") {
       this.subagents.add(id);
-      const agentType = shortName(input.subagent_type);
-      this.emit({
-        type: "subagent",
-        toolId: id,
-        description: toolSummary(name, input, this.dir),
-        done: false,
-        ...(agentType ? { agentType } : {}),
-        ...(input.run_in_background === true ? { background: true } : {}),
-      });
+      this.emit({ type: "subagent", toolId: id, description: toolSummary(name, input, this.dir), done: false });
       return;
     }
     this.emit({
@@ -193,36 +164,6 @@ export class MessageMapper {
       if (b.type !== "tool_use" || !b.id || !b.name || toolKind(b.name) !== "edit") continue;
       const diff = toolDiff(b.name, (b.input ?? {}) as Record<string, unknown>, this.dir);
       if (diff) this.emit({ type: "diff", toolId: b.id, ...diff, parentToolId });
-    }
-  }
-
-  /** The tool calls a subagent makes, for the office view: names (and a shell's command, kept on the machine), never shown in the chat. */
-  private subagentToolCalls(parentToolId: string, content: unknown) {
-    if (!Array.isArray(content)) return;
-    for (const b of content as ToolBlock[]) {
-      if (b.type !== "tool_use" || !b.id || !b.name) continue;
-      const input = typeof b.input === "object" && b.input !== null ? (b.input as Record<string, unknown>) : {};
-      const command = shellCommand(b.name, input);
-      const agentType = toolKind(b.name) === "subagent" ? shortName(input.subagent_type) : undefined;
-      this.emit({
-        type: "subagent-tool",
-        parentToolId,
-        toolId: b.id,
-        name: b.name,
-        kind: toolKind(b.name),
-        done: false,
-        ...(command !== undefined ? { command } : {}),
-        ...(agentType ? { agentType } : {}),
-      });
-    }
-  }
-
-  /** Results of a subagent's tool calls, for the office view. */
-  private subagentToolResults(parentToolId: string, content: unknown) {
-    if (!Array.isArray(content)) return;
-    for (const b of content as ToolBlock[]) {
-      if (b.type !== "tool_result" || !b.tool_use_id) continue;
-      this.emit({ type: "subagent-tool", parentToolId, toolId: b.tool_use_id, name: "", kind: "other", done: true, ok: b.is_error !== true });
     }
   }
 

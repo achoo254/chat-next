@@ -138,28 +138,7 @@ export type ProviderEvent =
   /** `parentToolId`: an edit made inside that subagent. */
   | { type: "diff"; toolId: string; path: string; unified: string; added: number; removed: number; parentToolId?: string }
   | { type: "todo"; entries: TodoEntry[] }
-  /**
-   * A subagent of the conversation starting (done false) or its tool call
-   * answering (done true). `agentType`: the kind of agent the AI started, in
-   * its own name ("code-reviewer"), when it says. `background`: it runs in
-   * the background, so its tool call answers at once and its end comes as a
-   * background-task event.
-   */
-  | { type: "subagent"; toolId: string; description: string; done: boolean; agentType?: string; background?: boolean }
-  /**
-   * A tool call inside the subagent started by `parentToolId`, starting (done
-   * false) or answering (done true, with ok). Only the office view uses it;
-   * the chat shows no card for it. `command`: a shell call's command line,
-   * read on the machine only to pick a room, never sent anywhere.
-   * `agentType`: for a subagent the subagent starts, when the AI says.
-   */
-  | { type: "subagent-tool"; parentToolId: string; toolId: string; name: string; kind: ToolKind; done: boolean; ok?: boolean; command?: string; agentType?: string }
-  /**
-   * Work the AI runs in the background (a shell, a subagent) for the tool call
-   * `toolId` ended; `ok` false when it failed or was stopped. Only the office
-   * view uses it.
-   */
-  | { type: "background-task"; toolId: string; ok: boolean }
+  | { type: "subagent"; toolId: string; description: string; done: boolean }
   | { type: "status"; text: string }
   | { type: "usage"; contextTokens: number; contextWindow: number }
   /**
@@ -362,14 +341,6 @@ export interface SessionHistory {
    * record. Never fails.
    */
   backgroundTasks?(sessionId: string): number;
-  /**
-   * Which of those tasks ended, by the id of the tool call that launched each
-   * (true: it finished by itself; false: it failed or was stopped), from the
-   * same record pass as backgroundTasks(), so the office can tell which
-   * machine left when the count falls. The most recent ones only; empty when
-   * there are none or no record. Never fails.
-   */
-  endedBackground?(sessionId: string): ReadonlyMap<string, boolean>;
   /** Whether a running process of the AI holds the session, as of the last prime(). Never fails. */
   holds?(sessionId: string): boolean;
   /**
