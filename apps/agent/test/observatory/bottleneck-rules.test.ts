@@ -276,7 +276,7 @@ describe("cost_spike", () => {
   it("warns past 2× the p95 of the project's earlier turns, alerts past 4×", () => {
     const h = { turns: [...turns(18, 0.5), ...turns(2, 1)] };
     expect(run(costSpike, model(turn(1.9)), { now: T + 2 * SEC, h })).toEqual([]);
-    expect(run(costSpike, model(turn(2.1)), { now: T + 2 * SEC, h })).toMatchObject([{ subkey: "p1", station: "MONITORING", severity: "warn", n: 20, measures: { unit: "usd", baselineP95: 1 } }]);
+    expect(run(costSpike, model(turn(2.1)), { now: T + 2 * SEC, h })).toMatchObject([{ subkey: "p1", station: "CORE", severity: "warn", n: 20, measures: { unit: "usd", baselineP95: 1 } }]);
     expect(run(costSpike, model(turn(4.1)), { now: T + 2 * SEC, h })[0]?.severity).toBe("alert");
   });
 

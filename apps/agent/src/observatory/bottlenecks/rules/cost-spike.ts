@@ -1,4 +1,4 @@
-// `cost_spike` (MONITORING, by prompt id): a turn (a prompt and every API
+// `cost_spike` (CORE: the Live Map has no station of its own for cost; by prompt id): a turn (a prompt and every API
 // call it made, subagents' too) costing more than `warnRatio` × the p95 of
 // the project's turns before it (alert past `alertRatio` ×), with at least
 // `minN` of them (the latest turns of the last 90 days:
@@ -39,7 +39,7 @@ export const costSpike: Rule = {
       if (!severity) continue;
       out.push({
         subkey: prompt.promptId,
-        station: "MONITORING",
+        station: "CORE",
         severity,
         value,
         threshold: line * t.warnRatio,

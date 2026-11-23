@@ -26,16 +26,24 @@
 // new epoch after a wipe. It hears the spool's tail too (onLiveEvent): the
 // sessions it watches are the ones whose tail is read, and their provisional
 // rows go to their watchers before the store has them.
+//
+// The bottleneck rules (bottlenecks/bottleneck-runner.ts) score every batch
+// the store takes and every provisional event, and every 15 s what time
+// changes; their findings go back through the writer, so the hub sends them
+// to devices like any other row. They start after the store, stop with the
+// hub, and stop around a wipe (their read connection closed first).
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
 import { ProblemLog } from "../activity/problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
+import { BottleneckRunner } from "./bottlenecks/bottleneck-runner.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
 import { STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
 import { ObservatoryIngest } from "./ingest/observatory-ingest.ts";
 import { ObservatoryHub } from "./hub/observatory-hub.ts";
+import { contextWindowOf } from "./live-map/model-window.ts";
 import { ObservatoryIntake } from "./observatory-intake.ts";
 import { type ObservatoryStatus, observatoryStatus } from "./observatory-status.ts";
 import type { FilteredRecord, ObservatorySink, RecordOrigin } from "./privacy/filtered-record.ts";
@@ -95,6 +103,8 @@ export class ObservatoryService {
   private sink: ObservatorySink | undefined;
   /** The sessions devices watch (ObservatoryWatch and the requests beside it). */
   readonly hub: ObservatoryHub;
+  /** The bottleneck rules; onFinding() hears every finding opened, raised or closed. */
+  readonly bottlenecks: BottleneckRunner;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
@@ -109,7 +119,25 @@ export class ObservatoryService {
       now: this.now,
     });
     this.onLiveEvent((event) => this.hub.provisional(event));
-    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now, onWritten: (ops) => this.hub.written(ops) });
+    this.bottlenecks = new BottleneckRunner({
+      config: opts.config,
+      store: () => this.store.store,
+      push: (op) => this.store.writer?.push(op),
+      problems,
+      now: this.now,
+      // Only a window known for sure: Claude Code's records cannot tell a 1M session, so an assumed 200 000 would read it too full.
+      contextWindow: (model, largest) => {
+        const window = contextWindowOf(model, largest);
+        return window && !window.assumed ? window.tokens : undefined;
+      },
+    });
+    this.onLiveEvent((event) => this.bottlenecks.liveEvent(event));
+    // The runner only queues (it scores once the writer's flush returned), so it never throws into the hub's turn.
+    const written = (ops: readonly WriteOp[]): void => {
+      this.bottlenecks.written(ops);
+      this.hub.written(ops);
+    };
+    this.store = new AgentStoreHost({ config: opts.config, dataDir: opts.dataDir, open: opts.openStore, problems, now: this.now, onWritten: written });
     this.intake = new ObservatoryIntake({
       config: opts.config,
       dataDir: opts.dataDir,
@@ -182,6 +210,7 @@ export class ObservatoryService {
     }
     if (this.store.store) this.rollups.start();
     this.hub.start();
+    if (this.store.writer) await this.bottlenecks.start();
   }
 
   /**
@@ -193,6 +222,7 @@ export class ObservatoryService {
    */
   async stop(): Promise<void> {
     this.hub.stop();
+    this.bottlenecks.stop();
     clearInterval(this.saltTimer);
     this.saltTimer = undefined;
     await this.receiver.stop();
@@ -215,6 +245,8 @@ export class ObservatoryService {
    */
   async wipe(): Promise<void> {
     await this.intake.pauseSpool();
+    // Its read connection is closed before the files go (Windows cannot delete an open file).
+    this.bottlenecks.stop();
     let failure = await this.store.wipe(this.started && this.enabled);
     await clearSpool(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
     // The keys stored under the old salt are gone with the database; new ones start from a new salt.
@@ -223,6 +255,7 @@ export class ObservatoryService {
     if (this.started && this.enabled) await this.makeTargetKeySalt();
     await this.state.write();
     if (this.store.writer) this.intake.resumeSpool();
+    if (this.store.writer) await this.bottlenecks.start();
     // Devices watching a session take it again from the new store.
     this.hub.reset();
     if (failure !== undefined) throw failure;

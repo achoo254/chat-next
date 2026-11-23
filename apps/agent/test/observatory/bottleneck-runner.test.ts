@@ -103,8 +103,8 @@ describe("finding lifecycle", () => {
     let rows = await bottleneckRows(r.store);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ session_id: S, rule: "repeat_read", subkey: "k1", station: "FILES", severity: "alert", status: "open" });
-    const evidence = JSON.parse(String(rows[0]?.evidence_json)) as { events: string[]; measures: Record<string, unknown> };
-    expect(evidence.events).toEqual(["tool:r5", "tool:r4", "tool:r3", "tool:r2", "tool:r1"]);
+    const evidence = JSON.parse(String(rows[0]?.evidence_json)) as { eventIds: string[]; measures: Record<string, unknown> };
+    expect(evidence.eventIds).toEqual(["tool:r5", "tool:r4", "tool:r3", "tool:r2", "tool:r1"]);
     r.clock.now = T + 10 * SEC;
     await r.put(call(S, "e1", "Edit", T + 9 * SEC, 20, { station: "FILES", stationFlags: StationFlag.write, targetKey: "k1" }));
     expect(r.changes.at(-1)).toMatchObject({ type: "close", row: { status: "closed", closedAt: T + 10 * SEC } });
@@ -180,7 +180,7 @@ describe("what is scored", () => {
     await r.runner.idle();
     expect(r.changes).toMatchObject([{ type: "open", row: { rule: "repeat_read" } }]);
     const rows = await bottleneckRows(r.store);
-    expect(JSON.parse(String(rows[0]?.evidence_json)).events).toEqual(["tool:r3", "tool:r2", "tool:r1"]);
+    expect(JSON.parse(String(rows[0]?.evidence_json)).eventIds).toEqual(["tool:r3", "tool:r2", "tool:r1"]);
     r.runner.liveEvent({ provisional: true, sessionId: S, event: "SessionEnd", at: T + 9 * SEC, ops: [] });
     await r.runner.idle();
     expect(r.changes.at(-1)).toMatchObject({ type: "close", row: { closedAt: T + 9 * SEC } });

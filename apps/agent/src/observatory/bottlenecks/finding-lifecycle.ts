@@ -14,9 +14,9 @@ export type FindingChange = { type: "open" | "update" | "close"; row: Bottleneck
 
 const keyOf = (rule: string, subkey: string): string => `${rule}\u0000${subkey}`;
 
-/** The evidence column: the measures and at most MAX_EVIDENCE event ids (never content). */
+/** The evidence column: the measures and at most MAX_EVIDENCE event ids under `eventIds`, the key the hub sends to devices (never content). */
 export function evidenceJson(verdict: Verdict): string {
-  return JSON.stringify({ measures: verdict.measures, events: verdict.evidence.slice(0, MAX_EVIDENCE) });
+  return JSON.stringify({ measures: verdict.measures, eventIds: verdict.evidence.slice(0, MAX_EVIDENCE) });
 }
 
 export class SessionFindings {
