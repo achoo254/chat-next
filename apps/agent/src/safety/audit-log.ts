@@ -11,7 +11,8 @@
 // a session's automatic Advisor turned on or off; a folder macOS protects the
 // user let tunelo ask macOS for; Observatory's content kept or not for a
 // project (its key), its data deleted, its hooks installed into or taken out
-// of Claude Code's settings).
+// of Claude Code's settings, its bottleneck thresholds changed or its rules
+// switched).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 export type AuditAction =
@@ -61,6 +62,7 @@ export type AuditAction =
   | "observatory_content"
   | "observatory_delete"
   | "observatory_install"
+  | "observatory_thresholds"
   | "observatory_uninstall";
 
 export type AuditEntry = { at: number; device: string; action: AuditAction; path: string; detail: string };

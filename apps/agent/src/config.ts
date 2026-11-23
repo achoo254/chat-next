@@ -84,7 +84,23 @@ export type ObservatoryConfig = {
    * it, again after a wipe.
    */
   contentOff?: string[];
+  /** The bottleneck rules (observatory/bottlenecks/bottleneck-thresholds.ts): their switch and thresholds. */
+  thresholds?: ObservatoryThresholdsConfig;
 };
+
+/**
+ * The bottleneck rules' switch and the thresholds that differ from their
+ * defaults. Read as untrusted (the file can be edited by hand): a value of the
+ * wrong type is logged and the default used.
+ */
+export type ObservatoryThresholdsConfig = {
+  /** The rules run; unset is on. */
+  enabled?: boolean;
+  /** By rule name: its parameters (`values`), and per subkey (a tool key, a model, a server…) under `subkeys`. */
+  rules?: Record<string, ThresholdOverrides>;
+};
+
+export type ThresholdOverrides = { values?: Record<string, unknown>; subkeys?: Record<string, Record<string, unknown>> };
 
 /** %APPDATA%\<name> on Windows, ~/.config/<name> elsewhere. */
 function platformDir(name: string): string {

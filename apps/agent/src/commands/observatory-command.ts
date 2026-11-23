@@ -4,6 +4,7 @@
 //   (observatory/install/observatory-install.ts); install asks first, in a
 //   terminal;
 // - status, export, delete, content, rotate-token (observatory-actions.ts);
+// - thresholds: the bottleneck rules' thresholds (observatory-thresholds.ts);
 // - hook <event> (hidden): what an installed hook runs. It reads the
 //   payload, filters it and appends one line to the spool, nothing else: no
 //   sign-in import, no key store, no network (cli.ts lets it skip its
@@ -37,6 +38,7 @@ import {
   observatoryStatusCommand,
 } from "./observatory-actions.ts";
 import { type Terminal, processTerminal } from "./mcp-local-writes.ts";
+import { registerObservatoryThresholdsCommand } from "./observatory-thresholds.ts";
 
 type Exits = <A extends unknown[]>(run: (...args: A) => Promise<number>) => (...args: A) => Promise<void>;
 
@@ -205,5 +207,6 @@ export function registerObservatoryCommand(program: Command, exits: Exits): void
     .description("a new token for the local receiver; the previous one keeps working until the next rotation")
     .option("--replace-unreadable", "replace a token file that cannot be read (sessions holding the old token stop reporting)")
     .action(exits((options: { replaceUnreadable?: boolean }) => observatoryRotateCommand(cliDeps(processTerminal()), options.replaceUnreadable === true)));
+  registerObservatoryThresholdsCommand(observatory, exits, () => cliDeps(processTerminal()));
   observatory.command("hook <event>", { hidden: true }).description("what an installed hook runs: one event from stdin to the spool").action(hook);
 }
