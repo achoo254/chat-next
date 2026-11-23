@@ -26,8 +26,8 @@ function switchBlocked(r: Reasons, ai: string, subject: string): string {
 	return b.session(ai, subject);
 }
 
-/** The sentence for a reason; undefined when this page does not know it. */
-function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefined {
+/** The sentence for a reason; undefined when this page does not know it. Observatory's reasons read as the Observe tab says them. */
+function reasonText(r: Reasons, observe: MachinesCopy["observe"], err: RemoteError, ai: string): string | undefined {
 	const s = err.subject;
 	switch (err.reason) {
 		case ErrorReason.FOLDER_NOT_FOUND:
@@ -210,6 +210,12 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 			return r.advisorOwnKey;
 		case ErrorReason.SESSION_LIMIT:
 			return r.sessionLimit(s);
+		case ErrorReason.OBSERVATORY_OFF:
+			return observe.off;
+		case ErrorReason.OBSERVATORY_WATCH_LIMIT:
+			return observe.limit;
+		case ErrorReason.OBSERVATORY_INVALID:
+			return observe.failed;
 		default:
 			return undefined;
 	}
@@ -219,7 +225,7 @@ function reasonText(r: Reasons, err: RemoteError, ai: string): string | undefine
 export function machineErrorText(t: MachinesCopy, err: unknown, ai: string): string {
 	if (err instanceof OfflineError) return t.errors.offline;
 	if (!(err instanceof RemoteError)) return t.errors.generic;
-	const known = reasonText(t.errors.reasons, err, ai);
+	const known = reasonText(t.errors.reasons, t.observe, err, ai);
 	if (known !== undefined) return known;
 	switch (err.code) {
 		case ErrorCode.STALE:

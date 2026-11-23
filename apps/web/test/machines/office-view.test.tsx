@@ -2,8 +2,8 @@
 // room of the plan grouped by zone with its people and boards on a plain
 // background, the framing button, the line for an AI that does not report its
 // staff, the baked picture with each person at their anchor and the work
-// zone's framing on a phone, and the session header's view switch (shown only
-// with two views or more) with the office's route.
+// zone's framing on a phone. The session header's views and routes are tested
+// with Observe (test/machines/observatory/session-observe.test.tsx).
 import { create } from "@bufbuild/protobuf";
 import { ErrorCode, ErrorReason, MachineInfoSchema, OfficeActorState, OfficeRoom, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { act as reactAct, render, screen, waitFor, within } from "@testing-library/react";
@@ -13,7 +13,6 @@ import { resolve } from "node:path";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
-import { aiPaths } from "../../src/machines/ai-paths.ts";
 import { RemoteError, type LinkState, type MachineLink } from "../../src/machines/link/machine-link.ts";
 import { viMachines } from "../../src/machines/copy-vi.ts";
 import OfficeView, { openingFraming, refusalText } from "../../src/machines/office/office-view.tsx";
@@ -24,8 +23,6 @@ import type { ScreenSize } from "../../src/machines/office/office-geometry.ts";
 import { OFFICE_LAYOUT, type OfficeLayout } from "../../src/machines/office/office-layout.ts";
 import { EMPTY_MEMORY, officePlacement } from "../../src/machines/office/office-placement.ts";
 import type { OfficeFraming } from "../../src/machines/office/office-renderer.ts";
-import { ModeSwitch, modePath, officeOffered, openSessionIn, pickedMode, rememberSessionMode, rowMode, sessionModeOf, sessionModes, sessionPath } from "../../src/machines/session-mode.tsx";
-import { matchRoute } from "../../src/router.tsx";
 import { act, director, session, snapshot, staff, storeAt } from "./office-builders.ts";
 
 /** The shipped layout (the tests of office-layout.ts check it parses). */
@@ -348,147 +345,6 @@ describe("the 2D picture", () => {
 		frame.scrollLeft = 7;
 		observers.forEach((notify) => notify());
 		expect(frame.scrollLeft).toBe(7);
-	});
-});
-
-describe("the session's views", () => {
-	it("offers the office from tunelo 3.6.0 and lists the views in order", () => {
-		expect(officeOffered(info("3.5.1"))).toBe(false);
-		expect(officeOffered(info("3.6.0"))).toBe(true);
-		expect(officeOffered(null)).toBe(false);
-		expect(sessionModes(true, true)).toEqual(["chat", "terminal", "office"]);
-		expect(sessionModes(false, true)).toEqual(["chat", "office"]);
-		expect(sessionModes(false, false)).toEqual(["chat"]);
-		// A remembered office on a machine offline or back on an older tunelo: still a way back to chat.
-		expect(sessionModes(false, false, "office")).toEqual(["chat", "office"]);
-		expect(sessionModes(false, false, "terminal")).toEqual(["chat"]);
-	});
-
-	it("shows the switch only with two views: chat, terminal and office; chat and office; nothing for chat alone", () => {
-		const { container, rerender } = wrap(<ModeSwitch machine="1" threadId="s1" mode="office" modes={["chat", "terminal", "office"]} />);
-		const group = within(container).getByRole("group");
-		expect(within(group).getAllByRole("button").map((b) => [b.getAttribute("data-id"), b.getAttribute("aria-pressed")])).toEqual([
-			["session-mode-chat", "false"],
-			["session-mode-terminal", "false"],
-			["session-mode-office", "true"],
-		]);
-		rerender(
-			<I18nProvider>
-				<ModeSwitch machine="1" threadId="s1" mode="chat" modes={["chat", "office"]} />
-			</I18nProvider>,
-		);
-		expect(within(container).getAllByRole("button").map((b) => b.textContent)).toEqual(["Trò chuyện", "Văn phòng"]);
-		rerender(
-			<I18nProvider>
-				<ModeSwitch machine="1" threadId="s1" mode="chat" modes={["chat"]} />
-			</I18nProvider>,
-		);
-		expect(container.innerHTML).toBe("");
-	});
-
-	/** Storage changed outside this page's own writes (another tab, a clear): the page hears it as a storage event. */
-	const storageChanged = (key: string | null): void => {
-		window.dispatchEvent(new StorageEvent("storage", { key }));
-	};
-
-	it("opens the next session in the view last picked on a switch, where that session offers it", () => {
-		window.localStorage.clear();
-		storageChanged(null);
-		const other = { id: "s9", terminalSession: 0, open: false };
-		expect(pickedMode()).toBeNull();
-		expect(sessionPath("1", other, true)).toBe("/ai/1/s/s9");
-		// Picked the office on one session: the next one opens there too, the same address format.
-		openSessionIn("1", "abc", "office");
-		expect(pickedMode()).toBe("office");
-		expect(sessionPath("1", other, true, true)).toBe("/ai/1/s/s9/office");
-		expect(sessionPath("2", other, false, true)).toBe("/ai/2/s/s9/office");
-		// A machine without the office (an older tunelo): as before (chat, or the mode that session was left in).
-		expect(sessionPath("2", other, false, false)).toBe("/ai/2/s/s9");
-		rememberSessionMode("2", "s9", "terminal");
-		expect(sessionPath("2", other, true, false)).toBe("/ai/2/s/s9/terminal");
-		// The terminal picked: only where it is offered; a session held in a terminal stays there.
-		openSessionIn("1", "abc", "terminal");
-		expect(sessionPath("1", other, true)).toBe("/ai/1/s/s9/terminal");
-		expect(sessionPath("1", { ...other, id: "s8" }, false)).toBe("/ai/1/s/s8");
-		openSessionIn("1", "abc", "chat");
-		expect(sessionPath("1", { ...other, terminalSession: 3 }, true)).toBe("/ai/1/s/s9/terminal");
-		expect(sessionPath("1", other, true)).toBe("/ai/1/s/s9");
-		// A value this app does not know: no pick.
-		window.localStorage.setItem("ai:mode:picked", "garden");
-		storageChanged("ai:mode:picked");
-		expect(pickedMode()).toBeNull();
-		window.localStorage.clear();
-		storageChanged(null);
-	});
-
-	it("a row's icon says the session's own mode or hold, never the device's pick, and the pick does not erase it", () => {
-		window.localStorage.clear();
-		storageChanged(null);
-		const row = { id: "s5", terminalSession: 0, open: false };
-		rememberSessionMode("1", "s5", "terminal");
-		openSessionIn("1", "other", "office");
-		// The row still names where this session was last opened, and opening it from the list goes there, not to the pick.
-		expect(rowMode("1", row)).toBe("terminal");
-		expect(rowMode("1", { ...row, open: true })).toBe("chat");
-		expect(sessionModeOf("1", "s5")).toBe("terminal");
-		expect(sessionPath("1", row, true, true)).toBe("/ai/1/s/s5/terminal");
-		expect(sessionPath("1", row, true, false)).toBe("/ai/1/s/s5/terminal");
-		window.localStorage.clear();
-		storageChanged(null);
-	});
-
-	it("a session left in chat opens in chat again, whatever view was picked on another session", () => {
-		window.localStorage.clear();
-		storageChanged(null);
-		const left = { id: "old", terminalSession: 0, open: false };
-		const fresh = { id: "never", terminalSession: 0, open: false };
-		rememberSessionMode("1", "old", "chat");
-		// The terminal picked on another session: the one left in chat stays in chat; one never opened here takes the pick.
-		openSessionIn("1", "other", "terminal");
-		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old");
-		expect(sessionPath("1", fresh, true, true)).toBe("/ai/1/s/never/terminal");
-		// The office picked: the same.
-		openSessionIn("1", "other", "office");
-		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old");
-		expect(sessionPath("1", fresh, true, true)).toBe("/ai/1/s/never/office");
-		// A session left in the office opens there with chat picked.
-		rememberSessionMode("1", "old", "office");
-		openSessionIn("1", "other", "chat");
-		expect(sessionPath("1", left, true, true)).toBe("/ai/1/s/old/office");
-		window.localStorage.clear();
-		storageChanged(null);
-	});
-
-	it("reads the pick from storage once, and again only when another tab changes it", () => {
-		window.localStorage.clear();
-		storageChanged(null);
-		const read = vi.spyOn(Storage.prototype, "getItem");
-		try {
-			for (let i = 0; i < 20; i++) pickedMode();
-			expect(read.mock.calls.filter(([key]) => key === "ai:mode:picked")).toHaveLength(1);
-			// Another tab picks the terminal.
-			window.localStorage.setItem("ai:mode:picked", "terminal");
-			expect(pickedMode()).toBeNull();
-			storageChanged("ai:mode:picked");
-			expect(pickedMode()).toBe("terminal");
-			expect(read.mock.calls.filter(([key]) => key === "ai:mode:picked")).toHaveLength(2);
-		} finally {
-			read.mockRestore();
-			window.localStorage.clear();
-			storageChanged(null);
-		}
-	});
-
-	it("routes /office, remembers it per session, and reads an unknown kept value as chat", () => {
-		expect(matchRoute("/ai/1/s/abc/office")).toEqual({ name: "machines", view: { page: "session-office", machine: "1", threadId: "abc" } });
-		expect(aiPaths.sessionOffice("1", "abc")).toBe("/ai/1/s/abc/office");
-		expect(modePath("1", "abc", "office")).toBe("/ai/1/s/abc/office");
-		rememberSessionMode("1", "abc", "office");
-		expect(sessionModeOf("1", "abc")).toBe("office");
-		const thread = { id: "abc", terminalSession: 0, open: false };
-		expect(sessionPath("1", thread, false)).toBe("/ai/1/s/abc/office");
-		window.localStorage.setItem("ai:mode:1:abc", "garden");
-		expect(sessionModeOf("1", "abc")).toBe("chat");
 	});
 });
 

@@ -1,0 +1,445 @@
+// What the Live Map shows of one Claude Code session, worked out from its
+// events alone (pure functions, no clock): the core's state, each station's
+// running calls, permission queue, latest call, counts and bottleneck level,
+// the subagents and the station each one is at, one MCP wire per server, the
+// to-do board, and the animations still to play (each names the event that
+// caused it). The renderer only reads this; replaying a session builds the
+// same state from the same events.
+//
+// Events are kept ordered by (at, id), not by arrival: a provisional event
+// read from the spool's tail comes first and the stored version with the same
+// id later, sometimes out of order with its neighbours. A later version of an
+// id replaces the earlier one, and the scene is folded again from the ordered
+// events whenever an event lands anywhere but at the end, so the scene is the
+// same whatever the arrival order. Only an event that arrives within
+// REORDER_WINDOW_MS of the newest one queues an animation: an older one is
+// late news, shown in the counts but not played.
+//
+// The device side of the watch (docs/observatory-wire.md section 2): an event
+// of another epoch, or one past a gap in `seq`, asks for a fresh snapshot; an
+// event at or below the applied `seq` is dropped; an event of a kind this app
+// does not know only moves `seq` on.
+import type { LiveMapEvent, LiveMapSessionInfo, LiveMapSnapshot } from "./live-map-types.ts";
+import { STATION_CODES, stationOf, type StationCode } from "./station-catalog.ts";
+
+/** Events this far behind the newest one still play their animation; older ones only count. */
+export const REORDER_WINDOW_MS = 2_000;
+/** The events kept in order; older ones are folded into the base scene and can no longer be replaced. */
+export const LOG_CAP = 2_000;
+/** Animations not taken by a renderer by then are dropped, oldest first. */
+export const ANIMATION_CAP = 200;
+
+export type CoreState = "idle" | "thinking" | "waiting_permission" | "waiting_user" | "compacting" | "failed";
+export type BottleneckLevel = "none" | "warn" | "alert";
+
+export interface StationState {
+	/** Ids of the calls running there, in event order. */
+	running: string[];
+	/** Permission requests waiting there. */
+	queued: number;
+	/** Id of the latest call that ended there; null before any. */
+	last: string | null;
+	/** Calls that ended there. */
+	calls: number;
+	failures: number;
+	bottleneck: BottleneckLevel;
+}
+
+export interface SubagentState {
+	agentId: string;
+	agentType: string;
+	running: boolean;
+	/** Where its latest call was; the orchestrator before any. */
+	station: StationCode;
+}
+
+export interface McpWireState {
+	server: string;
+	running: number;
+	calls: number;
+	failures: number;
+}
+
+export interface TodoBoard {
+	pending: number;
+	inProgress: number;
+	done: number;
+}
+
+export interface LiveMapScene {
+	core: CoreState;
+	/** The main agent's latest model; "" before any. */
+	model: string;
+	/** Output tokens per second of the main agent's latest API request; null when it gave no numbers. */
+	tokensPerSecond: number | null;
+	stations: Record<StationCode, StationState>;
+	subagents: Record<string, SubagentState>;
+	mcp: Record<string, McpWireState>;
+	todo: TodoBoard | null;
+	/** Open bottleneck findings by event id. */
+	bottlenecks: Map<string, { station: StationCode; severity: "warn" | "alert" }>;
+}
+
+export type AnimationCue = "prompt" | "tool-start" | "tool-end" | "subagent-start" | "subagent-end" | "api" | "instruction" | "git" | "lifecycle" | "bottleneck";
+
+export interface Animation {
+	readonly eventId: string;
+	readonly station: StationCode;
+	readonly cue: AnimationCue;
+}
+
+export interface LiveMapState {
+	readonly sessionId: string;
+	readonly epoch: bigint;
+	/** The last event applied; the next one must be seq + 1. */
+	readonly seq: number;
+	readonly info: LiveMapSessionInfo | null;
+	/** Where older events start; "" when none is older. */
+	readonly earlier: string;
+	/** The kept events, ordered by (at, id), one per id. */
+	readonly log: readonly LiveMapEvent[];
+	/** The last event folded into `base`; events at or before it are not kept. */
+	readonly floor: { readonly at: number; readonly id: string } | null;
+	readonly base: LiveMapScene;
+	readonly scene: LiveMapScene;
+	/** The newest `at` seen. */
+	readonly newestAt: number;
+	readonly animations: readonly Animation[];
+}
+
+/** Events that take part in the scene (the session's own row and unknown kinds do not). */
+type SceneEvent = Exclude<LiveMapEvent, { kind: "session" } | { kind: "unknown" }>;
+
+function isSceneEvent(e: LiveMapEvent): e is SceneEvent {
+	return e.kind !== "session" && e.kind !== "unknown";
+}
+
+function emptyStation(): StationState {
+	return { running: [], queued: 0, last: null, calls: 0, failures: 0, bottleneck: "none" };
+}
+
+/** A value for every station. */
+function perStation<T>(make: (code: StationCode) => T): Record<StationCode, T> {
+	return {
+		CORE: make("CORE"),
+		ORCHESTRATOR: make("ORCHESTRATOR"),
+		FILES: make("FILES"),
+		MEMORY: make("MEMORY"),
+		SKILLS: make("SKILLS"),
+		MCP: make("MCP"),
+		EXTERNAL: make("EXTERNAL"),
+		SANDBOX: make("SANDBOX"),
+		TESTING: make("TESTING"),
+		GIT: make("GIT"),
+	};
+}
+
+export function emptyScene(): LiveMapScene {
+	return { core: "idle", model: "", tokensPerSecond: null, stations: perStation(emptyStation), subagents: {}, mcp: {}, todo: null, bottlenecks: new Map() };
+}
+
+function cloneScene(s: LiveMapScene): LiveMapScene {
+	const stations = perStation((code) => {
+		const st = s.stations[code];
+		return { ...st, running: [...st.running] };
+	});
+	const subagents: Record<string, SubagentState> = {};
+	for (const [id, sub] of Object.entries(s.subagents)) subagents[id] = { ...sub };
+	const mcp: Record<string, McpWireState> = {};
+	for (const [server, wire] of Object.entries(s.mcp)) mcp[server] = { ...wire };
+	return { ...s, stations, subagents, mcp, todo: s.todo === null ? null : { ...s.todo }, bottlenecks: new Map(s.bottlenecks) };
+}
+
+/** (at, id) order: by time, then by id in code-unit order (the same on every device). */
+function compare(a: { at: number; id: string }, b: { at: number; id: string }): number {
+	if (a.at !== b.at) return a.at - b.at;
+	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function anyQueued(d: LiveMapScene): boolean {
+	return STATION_CODES.some((code) => d.stations[code].queued > 0);
+}
+
+function clearQueues(d: LiveMapScene): void {
+	for (const code of STATION_CODES) d.stations[code].queued = 0;
+}
+
+/** "pending/in progress/done" as the machine labels a to-do count; null when unreadable. */
+export function parseTodoCounts(label: string): TodoBoard | null {
+	const parts = /^(\d+)\/(\d+)\/(\d+)$/.exec(label);
+	if (parts === null) return null;
+	return { pending: Number(parts[1]), inProgress: Number(parts[2]), done: Number(parts[3]) };
+}
+
+function recomputeBottlenecks(d: LiveMapScene): void {
+	for (const code of STATION_CODES) d.stations[code].bottleneck = "none";
+	for (const finding of d.bottlenecks.values()) {
+		const st = d.stations[finding.station];
+		if (finding.severity === "alert" || st.bottleneck === "none") st.bottleneck = finding.severity;
+	}
+}
+
+/** One event into a draft scene (mutated). */
+function step(d: LiveMapScene, e: SceneEvent): void {
+	switch (e.kind) {
+		case "prompt":
+			d.core = "thinking";
+			clearQueues(d);
+			return;
+		case "tool": {
+			const code = stationOf(e.station);
+			const st = d.stations[code];
+			// A call ran there: whatever asked for permission there was answered.
+			st.queued = 0;
+			if (d.core !== "compacting") d.core = anyQueued(d) ? "waiting_permission" : "thinking";
+			if (e.success === undefined) st.running.push(e.id);
+			else {
+				st.calls += 1;
+				if (!e.success) st.failures += 1;
+				st.last = e.id;
+			}
+			if (e.agentId !== "") {
+				const sub = (d.subagents[e.agentId] ??= { agentId: e.agentId, agentType: "", running: true, station: code });
+				sub.station = code;
+			}
+			if (e.mcpServer !== "") {
+				const wire = (d.mcp[e.mcpServer] ??= { server: e.mcpServer, running: 0, calls: 0, failures: 0 });
+				if (e.success === undefined) wire.running += 1;
+				else {
+					wire.calls += 1;
+					if (!e.success) wire.failures += 1;
+				}
+			}
+			return;
+		}
+		case "subagent": {
+			const sub = (d.subagents[e.agentId] ??= { agentId: e.agentId, agentType: e.agentType, running: true, station: "ORCHESTRATOR" });
+			sub.agentType = e.agentType;
+			sub.running = e.endedAt === 0;
+			return;
+		}
+		case "api":
+			if (e.agentId !== "") return;
+			if (e.model !== "") d.model = e.model;
+			{
+				const generating = (e.durationMs ?? 0) - (e.ttftMs ?? 0);
+				d.tokensPerSecond = e.outputTokens !== undefined && generating > 0 ? (e.outputTokens * 1000) / generating : null;
+			}
+			return;
+		case "instruction":
+		case "git":
+			return;
+		case "lifecycle": {
+			const st = d.stations[stationOf(e.station)];
+			switch (e.name) {
+				case "permission_request":
+					st.queued += 1;
+					if (d.core !== "compacting") d.core = "waiting_permission";
+					return;
+				case "permission_decision":
+				case "permission_denied":
+				case "hook_block":
+					st.queued = Math.max(0, st.queued - 1);
+					if (d.core === "waiting_permission" && !anyQueued(d)) d.core = "thinking";
+					return;
+				case "compact_start":
+					d.core = "compacting";
+					return;
+				case "compact_end":
+					d.core = anyQueued(d) ? "waiting_permission" : "thinking";
+					return;
+				case "stop":
+					d.core = "waiting_user";
+					clearQueues(d);
+					return;
+				case "stop_failure":
+					d.core = "failed";
+					clearQueues(d);
+					return;
+				case "todo_counts":
+					d.todo = parseTodoCounts(e.label) ?? d.todo;
+					return;
+				case "model_change":
+					if (e.label !== "") d.model = e.label;
+					return;
+				default:
+					return;
+			}
+		}
+		case "bottleneck":
+			if (e.open) d.bottlenecks.set(e.id, { station: stationOf(e.station), severity: e.severity });
+			else d.bottlenecks.delete(e.id);
+			recomputeBottlenecks(d);
+			return;
+	}
+}
+
+/** The scene of `events` (ordered) on top of `base`. */
+export function foldScene(base: LiveMapScene, events: readonly LiveMapEvent[]): LiveMapScene {
+	const d = cloneScene(base);
+	for (const e of events) if (isSceneEvent(e)) step(d, e);
+	return d;
+}
+
+/** The animation an event plays as it arrives; `before` is the version of its id held until now. */
+function cueOf(e: SceneEvent, before: SceneEvent | undefined): Animation | null {
+	const at = (cue: AnimationCue, station: StationCode): Animation => ({ eventId: e.id, station, cue });
+	switch (e.kind) {
+		case "tool": {
+			const station = stationOf(e.station);
+			const wasRunning = before?.kind === "tool" && before.success === undefined;
+			if (e.success === undefined) return before === undefined ? at("tool-start", station) : null;
+			return before === undefined || wasRunning ? at("tool-end", station) : null;
+		}
+		case "subagent": {
+			const wasRunning = before?.kind === "subagent" && before.endedAt === 0;
+			if (e.endedAt === 0) return before === undefined ? at("subagent-start", "ORCHESTRATOR") : null;
+			return before === undefined || wasRunning ? at("subagent-end", "ORCHESTRATOR") : null;
+		}
+		case "bottleneck":
+			return at("bottleneck", stationOf(e.station));
+		default:
+			if (before !== undefined) return null;
+			switch (e.kind) {
+				case "prompt":
+					return at("prompt", "CORE");
+				case "api":
+					return at("api", "CORE");
+				case "instruction":
+					return at("instruction", "MEMORY");
+				case "git":
+					return at("git", "GIT");
+				case "lifecycle":
+					return at("lifecycle", stationOf(e.station));
+			}
+	}
+}
+
+/** Keeps the log at LOG_CAP by folding its oldest events into the base. */
+function capped(state: LiveMapState, log: LiveMapEvent[]): Pick<LiveMapState, "log" | "base" | "floor"> {
+	if (log.length <= LOG_CAP) return { log, base: state.base, floor: state.floor };
+	const dropped = log.slice(0, log.length - LOG_CAP);
+	const last = dropped[dropped.length - 1];
+	return { log: log.slice(dropped.length), base: foldScene(state.base, dropped), floor: last === undefined ? state.floor : { at: last.at, id: last.id } };
+}
+
+/**
+ * `events` into the state in arrival order: each replaces the kept event
+ * with its id or takes its place in (at, id) order. The scene is folded again
+ * only when an event did not land at the end. `animate`: queue animations
+ * (not for a page of older events).
+ */
+function merge(state: LiveMapState, events: readonly LiveMapEvent[], animate: boolean): LiveMapState {
+	let info = state.info;
+	let seq = state.seq;
+	let newestAt = state.newestAt;
+	const log = [...state.log];
+	const appended: SceneEvent[] = [];
+	let refold = false;
+	const animations = animate ? [...state.animations] : null;
+	for (const e of events) {
+		if (e.seq > seq) seq = e.seq;
+		if (e.kind === "session") {
+			info = e.info;
+			continue;
+		}
+		if (!isSceneEvent(e)) continue;
+		if (state.floor !== null && compare(e, state.floor) <= 0) continue;
+		// The log is the session's history, the same however it arrived: seq belongs to the watch, not the event.
+		const event: SceneEvent = e.seq === 0 ? e : { ...e, seq: 0 };
+		const index = log.findIndex((x) => x.id === e.id);
+		const held = index < 0 ? undefined : log[index];
+		const before = held !== undefined && isSceneEvent(held) ? held : undefined;
+		if (index >= 0) {
+			log.splice(index, 1);
+			refold = true;
+		}
+		// Binary search for the first kept event after `e`.
+		let lo = 0;
+		let hi = log.length;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			const x = log[mid];
+			if (x !== undefined && compare(x, e) <= 0) lo = mid + 1;
+			else hi = mid;
+		}
+		log.splice(lo, 0, event);
+		if (lo !== log.length - 1) refold = true;
+		else appended.push(event);
+		if (e.at > newestAt) newestAt = e.at;
+		if (animations !== null && e.at >= newestAt - REORDER_WINDOW_MS) {
+			const cue = cueOf(event, before);
+			if (cue !== null) animations.push(cue);
+		}
+	}
+	const kept = capped(state, log);
+	let scene: LiveMapScene;
+	if (refold || kept.base !== state.base) scene = foldScene(kept.base, kept.log);
+	else if (appended.length > 0) scene = foldScene(state.scene, appended);
+	else scene = state.scene;
+	return {
+		...state,
+		...kept,
+		info,
+		seq,
+		newestAt,
+		scene,
+		animations: animations === null ? state.animations : animations.slice(-ANIMATION_CAP),
+	};
+}
+
+/** The state a snapshot starts: its events in order, no animation queued (a snapshot is the scene as it stands). */
+export function fromSnapshot(snapshot: LiveMapSnapshot): LiveMapState {
+	const empty: LiveMapState = {
+		sessionId: snapshot.sessionId,
+		epoch: snapshot.epoch,
+		seq: 0,
+		info: snapshot.info,
+		earlier: snapshot.earlier,
+		log: [],
+		floor: null,
+		base: emptyScene(),
+		scene: emptyScene(),
+		newestAt: 0,
+		animations: [],
+	};
+	return { ...merge(empty, snapshot.events, false), seq: snapshot.seq };
+}
+
+/** One event as it arrives (its seq already checked by applyEvents). */
+export function reduce(state: LiveMapState, event: LiveMapEvent): LiveMapState {
+	return merge(state, [event], true);
+}
+
+/**
+ * A frame of events for the watched session: the state after them, or
+ * "need-snapshot" when the frame is of another epoch or skips a seq (the
+ * events before the gap are applied, the rest wait for the snapshot).
+ */
+export function applyEvents(state: LiveMapState, epoch: bigint, events: readonly LiveMapEvent[]): { state: LiveMapState; needSnapshot: boolean } {
+	if (epoch !== state.epoch) return { state, needSnapshot: true };
+	const next: LiveMapEvent[] = [];
+	let seq = state.seq;
+	let gap = false;
+	for (const e of events) {
+		if (e.seq <= seq) continue;
+		if (e.seq > seq + 1) {
+			gap = true;
+			break;
+		}
+		next.push(e);
+		seq = e.seq;
+	}
+	return { state: next.length === 0 ? state : merge(state, next, true), needSnapshot: gap };
+}
+
+/** A page of older events (ObservatoryEarlier): placed in order, no animation, `seq` untouched. */
+export function withEarlier(state: LiveMapState, events: readonly LiveMapEvent[], earlier: string): LiveMapState {
+	return { ...merge(state, events, false), seq: state.seq, earlier };
+}
+
+/** The queued animations, and the state without them (the renderer takes them as it plays). */
+export function takeAnimations(state: LiveMapState): [readonly Animation[], LiveMapState] {
+	if (state.animations.length === 0) return [state.animations, state];
+	return [state.animations, { ...state, animations: [] }];
+}

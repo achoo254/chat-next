@@ -51,27 +51,22 @@ export const BUNDLE_BUDGET = {
 } as const;
 
 /**
- * The 3D office (apps/web/src/office-3d): the lazy modules the Office tab
- * loads for it (manifest keys), counted with their static imports and
- * Babylon's on-demand parts (shaders), minus what a signed-in start and the
- * Office tab itself (OFFICE_VIEW_MODULE) already loaded.
+ * The Live Map ("Quan sát", apps/web/src/machines/observatory): the lazy
+ * module the Observe tab loads (manifest key), counted with its static imports
+ * and its own on-demand parts, minus what a signed-in start and the AI Agent
+ * screen (MACHINES_SCREEN_MODULE, open before any session) already loaded.
  */
-export const OFFICE_3D_MODULES = ["src/office-3d/office-canvas.tsx", "src/office-3d/office-world.ts"] as const;
-export const OFFICE_VIEW_MODULE = "src/machines/office/office-view.tsx";
+export const LIVE_MAP_MODULE = "src/machines/observatory/live-map-view.tsx";
+export const MACHINES_SCREEN_MODULE = "src/machines/machines-screen.tsx";
 
-/**
- * On-demand parts that belong to the 3D office's count, for one backend: a
- * device runs WebGPU (WGSL shaders) or WebGL2 (GLSL shaders), never both, so
- * each backend's count leaves out the other's shader chunks.
- */
-export function office3dPart(backend: "webgpu" | "webgl2"): (key: string) => boolean {
-	const other = backend === "webgpu" ? "/@babylonjs/core/Shaders/" : "/@babylonjs/core/ShadersWGSL/";
-	return (key) => (key.includes("@babylonjs/") && !key.includes(other)) || key.startsWith("src/office-3d/");
+/** On-demand parts that belong to the Live Map's count. */
+export function liveMapPart(key: string): boolean {
+	return key.startsWith("src/machines/observatory/");
 }
 
-export const OFFICE_3D_BUDGET = {
-	/** Plan decision 7: the 3D chunk under 1 MB gzip, models and textures not counted (the spike page measured 807 KB). */
-	jsGzip: 1024 * 1024,
+export const LIVE_MAP_BUDGET = {
+	/** The Live Map chunk under 350 KB gzip, images and other assets not counted. */
+	jsGzip: 350 * 1024,
 } as const;
 
 /** GitHub Actions and most CI systems set CI=true. */
