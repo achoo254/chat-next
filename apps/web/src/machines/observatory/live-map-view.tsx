@@ -10,6 +10,8 @@
 // plays the session back: the scene is then rebuilt at the replayed moment by
 // the same reducer as live (replay-controller.ts) and the drawer asks its
 // numbers up to that moment. A link goes to the repository's "Hiệu quả" page.
+// The first map opened after the update says the Office tab became Observe
+// (office-replaced-notice.tsx).
 // Loaded on demand; unmounted (the watch stopped, the renderer destroyed) as
 // soon as the tab is left.
 import type { MachineInfo } from "@achoo254/chat-proto/remote/remote";
@@ -25,6 +27,7 @@ import { EventDetail } from "./event-detail.tsx";
 import { coreOf, type LiveMapState } from "./live-map-state.ts";
 import type { LiveMapEvent } from "./live-map-types.ts";
 import { failureText, type ObservatoryLink } from "./observatory-client.ts";
+import { OfficeReplacedNotice } from "./office-replaced-notice.tsx";
 import { LiveMapStage, readHideDetails } from "./render/live-map-stage.tsx";
 import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
 import { ReplayBar } from "./replay-bar.tsx";
@@ -143,6 +146,7 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 			data-selected-place={selected.place ?? undefined}
 			data-selected-event={selected.eventId ?? undefined}
 		>
+			<OfficeReplacedNotice />
 			{disconnected && (
 				<p className="note mx-group-note" role="status" data-id="observe-disconnected">
 					{t.disconnected}

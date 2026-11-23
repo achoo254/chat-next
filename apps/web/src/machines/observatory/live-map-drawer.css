@@ -55,6 +55,10 @@
 .lmd-slider:disabled { cursor: default; }
 .lmd-bar-notes { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
 
+/* The one-time notice over the map (office-replaced-notice.tsx). */
+.lmd-notice { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-info) 10%, var(--c-surface)); color: var(--c-info-text); font-size: 0.8125rem; }
+.lmd-notice span { flex: 1; }
+
 /* The map and the panel beside it: a column at the right of the map on a wide screen (not over it). */
 .lmd-host { position: relative; }
 @media (min-width: 761px) {

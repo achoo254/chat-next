@@ -1311,6 +1311,8 @@ export const enMachines: MachinesCopy = {
 		retry: "Try again",
 		title: "Observe",
 		usage: "Repository efficiency",
+		/** The one-time notice of the Observe view (office-replaced-notice.tsx). */
+		replaced: { text: "The Office tab has been replaced by Observe", close: "Close the notice" },
 		/** The Live Map scene (render/live-map-stage.tsx). */
 		map: {
 			label: "Map of the Claude Code session",

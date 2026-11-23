@@ -1329,6 +1329,8 @@ export const viMachines = {
 		retry: "Thử lại",
 		title: "Quan sát",
 		usage: "Hiệu quả của repo",
+		/** The one-time notice of the Observe view (office-replaced-notice.tsx). */
+		replaced: { text: "Tab Văn phòng đã được thay bằng Quan sát", close: "Đóng thông báo" },
 		/** The Live Map scene (render/live-map-stage.tsx). */
 		map: {
 			label: "Bản đồ phiên Claude Code",

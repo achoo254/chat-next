@@ -1303,6 +1303,8 @@ export const zhCNMachines: MachinesCopy = {
 		retry: "重试",
 		title: "观察",
 		usage: "仓库效率",
+		/** The one-time notice of the Observe view (office-replaced-notice.tsx). */
+		replaced: { text: "“办公室”标签已由“观察”取代", close: "关闭通知" },
 		/** The Live Map scene (render/live-map-stage.tsx). */
 		map: {
 			label: "Claude Code 会话地图",
