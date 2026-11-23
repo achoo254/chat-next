@@ -34,6 +34,8 @@ export interface LiveMapStageProps {
 	readonly selectedPlace: PlaceId | null;
 	readonly onStation: (place: PlaceId) => void;
 	readonly onEvent: (eventId: string) => void;
+	/** "Ẩn chi tiết" was switched: the drawer and the detail follow it. */
+	readonly onHideDetails?: (hide: boolean) => void;
 	/** Test seams: the asset loader and the renderer's module. */
 	readonly loadAssets?: () => Promise<SceneAssets>;
 	readonly loadRenderer?: () => Promise<{ mountLiveMap: Mount }>;
@@ -47,6 +49,11 @@ function readFlag(key: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** Whether "Ẩn chi tiết" is on (remembered on this device). */
+export function readHideDetails(): boolean {
+	return readFlag(HIDE_DETAILS_KEY);
 }
 
 function writeFlag(key: string, on: boolean): void {
@@ -100,7 +107,7 @@ interface Tag {
 	readonly mine?: boolean;
 }
 
-export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
+export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, onHideDetails, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
 	const copy = useMachinesCopy().observe;
 	const t = copy.map;
 	const [frame, setFrame] = useState<HTMLDivElement | null>(null);
@@ -221,10 +228,10 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 	const core = state.live?.core ?? coreOf(state);
 
 	const toggleHide = (): void => {
-		setHide((h) => {
-			writeFlag(HIDE_DETAILS_KEY, !h);
-			return !h;
-		});
+		const next = !hide;
+		writeFlag(HIDE_DETAILS_KEY, next);
+		setHide(next);
+		onHideDetails?.(next);
 	};
 
 	const onClick = (e: MouseEvent<HTMLDivElement>): void => {

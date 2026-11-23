@@ -261,6 +261,16 @@ export function historyOf(snapshot: LiveMapSnapshot): ReplayHistory {
 	return merged(empty, snapshot.events, false);
 }
 
+/**
+ * A replay's history from a watch's state (its kept log and where older
+ * events start). Events folded into the state's base are not held: the
+ * replay then starts where the log does (`partial`).
+ */
+export function historyOfState(state: LiveMapState): ReplayHistory {
+	const h = historyOf({ sessionId: state.sessionId, epoch: state.epoch, seq: state.seq, info: state.info, live: state.live, events: state.log, earlier: state.earlier });
+	return state.floor === null ? h : { ...h, partial: true };
+}
+
 /** Live events of the watched session, held while replaying. */
 export function withLive(h: ReplayHistory, events: readonly LiveMapEvent[]): ReplayHistory {
 	return merged(h, events, false);

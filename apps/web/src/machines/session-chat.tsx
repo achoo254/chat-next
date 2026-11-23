@@ -16,7 +16,7 @@ import { AnswersSchema, Decision, PromptState, ThreadState, type MachineInfo, ty
 import { Icon } from "../components/screen-icons.tsx";
 import { useI18n } from "../i18n/i18n.tsx";
 import { Link, navigate, paths, useSearch } from "../router.tsx";
-import { aiPaths } from "./ai-paths.ts";
+import { aiPaths, observeFocus } from "./ai-paths.ts";
 import { AdvisorVerdictCard } from "./cards/advisor-verdict.tsx";
 import { ApprovalCard } from "./cards/approval.tsx";
 import { DiffCard } from "./cards/diff.tsx";
@@ -94,7 +94,8 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useWatch(link, threadId);
 	const thread = state.threads.find((x) => x.id === threadId) ?? null;
 	// `?tab=<id>`: one of the session's terminal tabs to bring to the front (its row in the AI Agent column).
-	const pickedTab = new URLSearchParams(useSearch()).get("tab") || undefined;
+	const search = useSearch();
+	const pickedTab = new URLSearchParams(search).get("tab") || undefined;
 	// Advisor's own thread ("Xem phiên Cố vấn"): read only here; questions go through the mascot, which names them.
 	const advisorThread = state.advisorThreads.some((x) => x.id === threadId);
 	const items = orderedItems(state.journals.get(threadId) ?? EMPTY_JOURNAL);
@@ -319,7 +320,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			{mode === "observe" && (
 				<div className="mx-chat-body">
 					<Suspense fallback={<SessionLoading label={t.observe.loading} />}>
-						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", threadId }} />
+						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", threadId }} focus={observeFocus(search)} />
 					</Suspense>
 					{workspacePanel}
 				</div>

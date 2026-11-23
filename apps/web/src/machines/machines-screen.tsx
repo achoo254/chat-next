@@ -12,7 +12,7 @@ import { ListResizer } from "../messaging/ui/list-resizer.tsx";
 import { navigate, paths, usePathname, useSearch, type MachinesView } from "../router.tsx";
 import { AddMachine } from "./add-machine.tsx";
 import { terminalGate } from "./agent-version.ts";
-import { canonicalAiPath } from "./ai-paths.ts";
+import { canonicalAiPath, observeFocus } from "./ai-paths.ts";
 import { LocalMachine } from "./local-machine.tsx";
 import { MachineDetail } from "./machine-detail.tsx";
 import { LinkBanner } from "./link-banner.tsx";
@@ -120,12 +120,13 @@ function ObserveSessionPage({ machine, sessionId }: { machine: string; sessionId
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
 	const [link, state] = useLink(hub, machine);
+	const focus = observeFocus(useSearch());
 	return (
 		<div className="mx-scroll">
 			<PageHead back={paths.machineInfo(machine)} backLabel={t.back} backToOrigin title={t.observe.title} />
 			<LinkBanner machine={machine} name={entry?.name ?? ""} status={state.status} />
 			<Suspense fallback={<SessionLoading label={t.observe.loading} />}>
-				<LiveMapView link={link} machine={machine} info={state.info} online={state.status.kind === "open"} target={{ kind: "session", sessionId }} />
+				<LiveMapView link={link} machine={machine} info={state.info} online={state.status.kind === "open"} target={{ kind: "session", sessionId }} focus={focus} />
 			</Suspense>
 		</div>
 	);

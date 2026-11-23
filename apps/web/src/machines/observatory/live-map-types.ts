@@ -101,6 +101,8 @@ export type LiveMapEventBody =
 			readonly agentId: string;
 			readonly model: string;
 			readonly outputTokens?: number;
+			/** The context the request carried (input, cache read, both cache writes); unset when the event gave none of them. */
+			readonly contextTokens?: number;
 			readonly durationMs?: number;
 			readonly ttftMs?: number;
 	  }
@@ -295,11 +297,14 @@ function bodyFromWire(kind: ObservatoryEvent["kind"]): LiveMapEventBody {
 		case "apiRequest": {
 			const v = kind.value;
 			const outputTokens = optNum(v.outputTokens);
+			const carried = [v.inputTokens, v.cacheReadTokens, v.cacheWrite5mTokens, v.cacheWrite1hTokens].map(optNum);
+			const contextTokens = carried.some((n) => n !== undefined) ? carried.reduce<number>((sum, n) => sum + (n ?? 0), 0) : undefined;
 			return {
 				kind: "api",
 				agentId: v.agentId,
 				model: v.model,
 				...(outputTokens === undefined ? {} : { outputTokens }),
+				...(contextTokens === undefined ? {} : { contextTokens }),
 				...(v.durationMs === undefined ? {} : { durationMs: v.durationMs }),
 				...(v.ttftMs === undefined ? {} : { ttftMs: v.ttftMs }),
 			};
