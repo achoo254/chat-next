@@ -173,6 +173,16 @@ bỏ nội dung trước mọi bước, chuẩn hoá như lúc ghi DB và gửi 
 nó là số dòng DB): lời gọi tool mang cờ `commit` của trạm `GIT` đủ để cảnh chuyển động. Tệp hướng dẫn nạp được đánh số như ingest sẽ đánh (sau các lần nạp đã
 lưu và đang giữ của cùng tệp, cùng lý do); số đoán sai thì bản DB tới với `id` khác. Thiết bị sắp sự kiện theo `(at, id)` như mục 1.
 
+Spool reader chỉ xoá một tệp phút khi mọi bản ghi trong đó đã vào DB hoặc đã bị cách ly. Đuôi spool thấy tệp nó từng đọc biến mất thì báo hub
+(`spoolFileTaken`); sự kiện tạm không còn tệp nào chưa được nạp thì:
+
+- DB có dòng đó: gửi bản DB (`provisional = false`), kể cả khi bản DB thiếu phần chỉ bản tạm biết (bản ghi kết thúc bị cách ly). DB là sự thật cuối cùng.
+- DB không có (bản ghi bị cách ly hay bị từ chối, tệp hướng dẫn bị đánh số khác lúc đoán): hub **rút lại** sự kiện tạm bằng cách bỏ qua một `seq` rồi gửi
+  `session`. Thiết bị thấy khoảng trống, xin ảnh chụp mới, và ảnh chụp không còn sự kiện đó. Không cần trường hay loại sự kiện mới trên dây.
+
+Sự kiện tạm bị đẩy khỏi giới hạn 2 000 dòng (mục 5) vẫn được bản DB thay khi DB nhận nó; chỉ khi bản ghi đó **cũng** bị cách ly thì thiết bị giữ nó tới ảnh
+chụp kế tiếp. Lịch sử tua lại của thiết bị giữ những gì cảnh trực tiếp đã hiện, nên sự kiện đã rút vẫn có trong đó tới lần xem lại phiên.
+
 ### 6.3 Trạng thái sống (`ObservatoryLiveState`)
 
 `{core=1, tokens_per_second=2, context_percent=3, context_tokens=4, context_window=5, context_window_assumed=6, main_model=7, running=8

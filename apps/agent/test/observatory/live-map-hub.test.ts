@@ -71,7 +71,7 @@ const toolCall = (sessionId: string, toolUseId: string, at: number, row: Partial
   row: { toolUseId, sessionId, at, toolName: "Read", station: "FILES", stationFlags: 0, ...row, ...(row.station === null ? { station: undefined, stationFlags: undefined } : {}) },
 });
 
-const tail = (sessionId: string, at: number, ops: WriteOp[], extra: Partial<LiveTailEvent> = {}): LiveTailEvent => ({ provisional: true, sessionId, event: "PostToolUse", at, ops, ...extra });
+const tail = (sessionId: string, at: number, ops: WriteOp[], extra: Partial<LiveTailEvent> = {}): LiveTailEvent => ({ provisional: true, sessionId, event: "PostToolUse", at, ops, file: "events-1.jsonl", ...extra });
 
 describe("a thread's sessions", () => {
   it("are its segments' sessions and the ones linked to them by /clear both ways, newest first; another AI's thread has none", async () => {
@@ -225,6 +225,68 @@ describe("provisional events", () => {
     expect(h0).toEqual([true, false]);
     expect(hub.watch("s", recorder().sink).events.filter((e) => e.provisional)).toHaveLength(49);
     lookups.mockRestore();
+  });
+
+  it("never stored once the spool reader took their files are withdrawn through a seq gap, and a snapshot no longer holds them", async () => {
+    const { hub, write } = await setup();
+    write([session("s", T)]);
+    const a = recorder();
+    hub.watch("s", a.sink);
+    const load = { sessionId: "s", at: T + 4, filePath: "~/work/app/CLAUDE.md", loadReason: "session_start" };
+    // A tool call set aside by the reader, and an instruction load the hub numbered 0 that the ingest numbers 1.
+    hub.provisional(tail("s", T + 3, [toolCall("s", "lost", T + 3, { toolName: "Bash", station: "TESTING", target: "pnpm" })], { event: "PreToolUse", file: "events-1.jsonl" }));
+    hub.provisional(tail("s", T + 4, [], { event: "InstructionsLoaded", instruction: load, file: "events-1.jsonl" }));
+    // A call still read from the next file stays.
+    hub.provisional(tail("s", T + 70_000, [toolCall("s", "next", T + 70_000, {})], { event: "PreToolUse", file: "events-2.jsonl" }));
+    await wait(40);
+    expect(a.events().map((e) => [e.id, e.provisional])).toEqual([
+      ["tool:lost", true],
+      ["instruction:000000:session_start:~/work/app/CLAUDE.md", true],
+      ["tool:next", true],
+      ["session", false],
+    ]);
+    write([{ kind: "instructionLoaded", row: { ...load, seq: 1 } }]);
+    await wait(40);
+    const seen = a.events().length;
+    hub.spoolFileTaken("events-1.jsonl");
+    await wait(40);
+    const after = a.events().slice(seen);
+    const last = Number(a.events()[seen - 1]?.seq);
+    expect(after.map((e) => e.kind.case)).toEqual(["session"]);
+    // The frame starts past a skipped seq: every watcher asks for a snapshot.
+    expect(Number(after[0]?.seq)).toBe(last + 2);
+    const snap = hub.watch("s", a.sink);
+    expect(snap.events.map((e) => [e.id, e.provisional])).toEqual([
+      ["instruction:000001:session_start:~/work/app/CLAUDE.md", false],
+      ["tool:next", true],
+    ]);
+  });
+
+  it("stored in part once the spool reader took their files go out as stored, with no gap", async () => {
+    const { hub, write } = await setup();
+    write([session("s", T)]);
+    const a = recorder();
+    hub.watch("s", a.sink);
+    const pre = toolCall("s", "t1", T + 1, { toolName: "Bash", station: "TESTING", target: "pnpm" });
+    const post = toolCall("s", "t1", T + 1, { toolName: "Bash", station: "TESTING", target: "pnpm", durationMs: 40, success: true });
+    hub.provisional(tail("s", T + 1, [pre], { event: "PreToolUse", file: "events-1.jsonl" }));
+    hub.provisional(tail("s", T + 61_000, [post], { file: "events-2.jsonl" }));
+    await wait(40);
+    // The start is stored, its file taken; the end's file is still read.
+    write([pre]);
+    hub.spoolFileTaken("events-1.jsonl");
+    await wait(40);
+    // The end was set aside: its file goes too, the call is what the store has.
+    hub.spoolFileTaken("events-2.jsonl");
+    await wait(40);
+    const tools = a.events().flatMap((e) => (e.kind.case === "toolCall" ? [[e.provisional, e.kind.value.success]] : []));
+    expect(tools).toEqual([
+      [true, true],
+      [false, undefined],
+    ]);
+    const seqs = a.events().map((e) => Number(e.seq));
+    expect(seqs).toEqual(seqs.map((_, i) => i + 1));
+    expect(hub.watch("s", a.sink).events.map((e) => [e.id, e.provisional])).toEqual([["tool:t1", false]]);
   });
 
   it("are in a snapshot until stored, and an instruction file load takes the number the ingest will give it", async () => {

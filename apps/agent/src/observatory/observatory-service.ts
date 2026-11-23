@@ -176,6 +176,7 @@ export class ObservatoryService {
           }
         }
       },
+      onTaken: (file) => this.hub.spoolFileTaken(file),
       problems,
       now: this.now,
     });

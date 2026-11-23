@@ -5,7 +5,7 @@
 // pass; no content in an event even when the record carries it; never a
 // write or a deletion.
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { StationFlag } from "../../src/observatory/live-map/station-map.ts";
@@ -26,13 +26,14 @@ afterEach(async () => {
   for (const t of tails.splice(0)) await t.stop();
 });
 
-type Rig = { dir: string; tail: SpoolLiveTail; events: LiveTailEvent[]; clock: { now: number }; problems: string[]; skipped: Set<string> };
+type Rig = { dir: string; tail: SpoolLiveTail; events: LiveTailEvent[]; taken: string[]; clock: { now: number }; problems: string[]; skipped: Set<string> };
 
 function rig(): Rig {
   const dataDir = obsTempDir("live-tail");
   const dir = join(dataDir, SPOOL_DIR);
   mkdirSync(dir, { recursive: true });
   const events: LiveTailEvent[] = [];
+  const taken: string[] = [];
   const clock = { now: T + 30_000 };
   const problems: string[] = [];
   const skipped = new Set<string>();
@@ -41,13 +42,14 @@ function rig(): Rig {
     secondPass: (r) => redactRecordAgain(r, [MACHINE_SECRET]),
     skipSession: (id) => skipped.has(id),
     onEvent: (e) => events.push(e),
+    onTaken: (file) => taken.push(file),
     problems: (place) => problems.push(place),
     now: () => clock.now,
     intervalMs: 20,
   });
   tails.push(tail);
   tail.start();
-  return { dir, tail, events, clock, problems, skipped };
+  return { dir, tail, events, taken, clock, problems, skipped };
 }
 
 const record = (event: string, at: number, f: Record<string, string | number>, c?: Record<string, string>): FilteredHookRecord => ({ v: 1, src: "hook", event, at, f: { session_id: "s1", ...f }, ...(c ? { c } : {}) });
@@ -77,6 +79,29 @@ describe("the spool's live tail", () => {
       [true, "PreToolUse", T + 2_000],
     ]);
     expect(r.events[0]?.ops[0]).toMatchObject({ kind: "toolCall", row: { toolUseId: "t1", station: "FILES", stationFlags: 0, target: "src/a.ts" } });
+  });
+
+  it("names the file of each event, and tells once when the spool reader took a file it read from", async () => {
+    const r = rig();
+    r.tail.watch("s1");
+    const before = fileOf(r.dir, T - 60_000);
+    const now = fileOf(r.dir, T);
+    writeFileSync(before, line(toolPre("a", T - 30_000)));
+    writeFileSync(now, line(toolPre("b", T + 1_000)));
+    // A file of another session only: nothing read from it, nothing told when it goes.
+    const other = fileOf(r.dir, T + 60_000);
+    await r.tail.readOnce();
+    expect(r.events.map((e) => e.file)).toEqual([spoolFileName("events", minuteOf(T - 60_000)), spoolFileName("events", minuteOf(T))]);
+    writeFileSync(other, line({ ...toolPre("c", T + 1_000), f: { ...toolPre("c", T + 1_000).f, session_id: "s9" } }));
+    rmSync(before);
+    rmSync(other);
+    await r.tail.readOnce();
+    await r.tail.readOnce();
+    expect(r.taken).toEqual([spoolFileName("events", minuteOf(T - 60_000))]);
+    // A folder that cannot be read tells nothing.
+    rmSync(r.dir, { recursive: true });
+    await r.tail.readOnce();
+    expect(r.taken).toHaveLength(1);
   });
 
   it("reads the minute just over and the current one, not older ones, and follows a change of minute", async () => {

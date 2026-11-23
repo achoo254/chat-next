@@ -19,8 +19,13 @@
 // stored row, once written, replaces it as an update. A stored row that still
 // lacks what the provisional one knew (the store has the call's start, the
 // tail its end) goes out with that filled in, still provisional, until the
-// store has it all. Neither path carries content (the tail drops it before
-// anything else; timeline-reads.ts leaves it out of stored rows).
+// store has it all. Once the spool reader has taken every file a provisional
+// row came from (spoolFileTaken()), the store holds all of it it ever will:
+// its stored row goes out as it is, and a row never stored (a record set
+// aside, an instruction load numbered otherwise) is withdrawn through a seq
+// gap, so watchers take a snapshot without it. Neither path carries content
+// (the tail drops it before anything else; timeline-reads.ts leaves it out of
+// stored rows).
 //
 // Every snapshot and every `session` event carries the session's live state
 // (live-state.ts), worked out from its newest events, provisional ones
@@ -107,8 +112,12 @@ export type ObservatoryHubOptions = {
   flushMs?: number;
 };
 
-/** A row of the spool's tail not (fully) in the store yet: the writes seen for it merged, and where its stored row is. */
-type Provisional = { op: WriteOp; entry: TimelineEntry; ref: TimelineRef };
+/**
+ * A row of the spool's tail not (fully) in the store yet: the writes seen for
+ * it merged, where its stored row is, and the spool files its records came
+ * from that the spool reader has not taken yet.
+ */
+type Provisional = { op: WriteOp; entry: TimelineEntry; ref: TimelineRef; files: Set<string> };
 
 /** An event to send and whether it is provisional. */
 type Outgoing = { entry: TimelineEntry; provisional: boolean };
@@ -136,10 +145,12 @@ type Watched = {
    * reader cannot drain costs no read per held row at each flush.
    */
   unstored: Set<string>;
+  /** Provisional rows whose spool files the reader has all taken since the last flush, by event id: the store has all of them it will ever have. */
+  settled: Set<string>;
 };
 
 function newWatched(): Watched {
-  return { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "", provisional: new Map(), provisionalPending: new Set(), unstored: new Set() };
+  return { sinks: new Set(), seq: 0n, pending: new Map(), stateDirty: false, sent: new BoundedMap(SENT_WINDOW), lastState: "", provisional: new Map(), provisionalPending: new Set(), unstored: new Set(), settled: new Set() };
 }
 
 function refuse(message: string, reason: ErrorReason): AgentError {
@@ -303,16 +314,37 @@ export class ObservatoryHub {
     if (!w) return;
     try {
       let held = false;
-      for (const op of event.ops) held = this.hold(w, event.sessionId, op) || held;
+      for (const op of event.ops) held = this.hold(w, event.sessionId, op, event.file) || held;
       if (event.instruction) {
         const op = this.instructionOp(w, event.instruction);
-        if (op) held = this.hold(w, event.sessionId, op) || held;
+        if (op) held = this.hold(w, event.sessionId, op, event.file) || held;
       }
       if (held || event.ops.some((op) => op.kind === "session")) w.stateDirty = true;
       if (w.stateDirty) this.scheduleFlush();
     } catch (err) {
       this.opts.problems("hub-provisional", err);
     }
+  }
+
+  /**
+   * The spool reader took `file` (ObservatoryService, from the spool's tail):
+   * every record in it is stored by now, or will never be (set aside, refused,
+   * an instruction load numbered otherwise than the hub guessed). A
+   * provisional row with no other file left goes at the next flush: as its
+   * stored row when there is one, else it is withdrawn, which watchers see as
+   * a gap (they take a snapshot without it). Never throws.
+   */
+  spoolFileTaken(file: string): void {
+    if (!this.running) return;
+    let settled = false;
+    for (const w of this.sessions.values()) {
+      for (const [id, p] of w.provisional) {
+        if (!p.files.delete(file) || p.files.size > 0) continue;
+        w.settled.add(id);
+        settled = true;
+      }
+    }
+    if (settled) this.scheduleFlush();
   }
 
   /** The stored content of one event of a session, the project's content setting applied. Watching is not needed. */
@@ -421,6 +453,7 @@ export class ObservatoryHub {
       w.provisional.clear();
       w.provisionalPending.clear();
       w.unstored.clear();
+      w.settled.clear();
     }
   }
 
@@ -451,12 +484,14 @@ export class ObservatoryHub {
    * watchers see a gap and ask for a snapshot (the store has the truth).
    */
   private flushSession(sessionId: string, w: Watched, store: ObservatoryStore): void {
-    if (w.pending.size === 0 && w.provisionalPending.size === 0 && !w.stateDirty) return;
+    if (w.pending.size === 0 && w.provisionalPending.size === 0 && w.settled.size === 0 && !w.stateDirty) return;
     const refs = [...w.pending.values()];
     const held = [...w.provisionalPending];
-    const stateDirty = w.stateDirty;
+    const settled = [...w.settled];
+    let stateDirty = w.stateDirty;
     w.pending.clear();
     w.provisionalPending.clear();
+    w.settled.clear();
     w.stateDirty = false;
     const events: ObservatoryEvent[] = [];
     try {
@@ -464,6 +499,23 @@ export class ObservatoryHub {
       for (const ref of refs) {
         const entry = store.timelineEntry(ref);
         if (entry && entry.row.sessionId === sessionId) outgoing.set(eventId(entry), this.stored(w, entry));
+      }
+      let withdrawn = false;
+      for (const id of settled) {
+        const p = w.provisional.get(id);
+        if (!p || p.files.size > 0) continue;
+        const entry = this.storedRowOf(w, store, p);
+        w.provisional.delete(id);
+        w.unstored.delete(p.ref.id);
+        // The store has all of the row it will have: that goes out, not what only the spool knew.
+        if (entry) outgoing.set(id, { entry, provisional: false });
+        else withdrawn = true;
+      }
+      if (withdrawn) {
+        // A seq skipped: every watcher takes a snapshot, which no longer holds the withdrawn rows. A `session` event goes out after it, so the gap is seen now.
+        w.seq += 1n;
+        w.lastState = "";
+        stateDirty = true;
       }
       for (const id of held) {
         const p = w.provisional.get(id);
@@ -553,7 +605,7 @@ export class ObservatoryHub {
   }
 
   /** Holds one write of the spool's tail as a provisional row; false for a write that is not a timeline row of `sessionId`. */
-  private hold(w: Watched, sessionId: string, op: WriteOp): boolean {
+  private hold(w: Watched, sessionId: string, op: WriteOp, file: string): boolean {
     const ref = timelineRefOf(op);
     const alone = ref && ref.sessionId === sessionId ? timelineEntryOfWrite(op) : undefined;
     if (!ref || !alone) return false;
@@ -563,7 +615,7 @@ export class ObservatoryHub {
     const entry = prev ? timelineEntryOfWrite(merged) : alone;
     if (!entry) return false;
     w.provisional.delete(id);
-    w.provisional.set(id, { op: merged, entry, ref });
+    w.provisional.set(id, { op: merged, entry, ref, files: new Set([...(prev?.files ?? []), file]) });
     while (w.provisional.size > SENT_WINDOW) {
       const first = w.provisional.entries().next();
       if (first.done === true) break;

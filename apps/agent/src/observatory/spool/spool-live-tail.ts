@@ -10,7 +10,11 @@
 // It never writes the store and never deletes or changes a file. Only whole
 // lines (ending in a newline) are read: a line a hook is still writing waits
 // for the next read. Positions are kept per file and per session, so a
-// session watched later is shown the file from its start.
+// session watched later is shown the file from its start. A file it read
+// that is no longer in the folder was taken by the spool reader, which
+// deletes a file only once every record in it is stored or set aside: that is
+// told (onTaken), so a provisional row from it that never reaches the store
+// is not shown for ever.
 //
 // An event carries no content, whatever the project's setting: the record's
 // content (`c`) is dropped before anything else, the second privacy pass
@@ -43,6 +47,8 @@ export type LiveTailEvent = {
   ops: WriteOp[];
   /** An instruction file loaded (its number among the session's loads is given once stored). */
   instruction?: InstructionLoad;
+  /** The spool file the record was read from (its name). */
+  file: string;
 };
 
 export type SpoolLiveTailOptions = {
@@ -52,6 +58,8 @@ export type SpoolLiveTailOptions = {
   /** A session whose records are left out (one the agent runs through the SDK, one with an internal label). */
   skipSession: (sessionId: string) => boolean;
   onEvent: (event: LiveTailEvent) => void;
+  /** The spool reader took (deleted) a file records were read from: each is stored by now, or never will be. */
+  onTaken?: (file: string) => void;
   problems: (place: string, err: unknown) => void;
   now?: () => number;
   intervalMs?: number;
@@ -70,6 +78,8 @@ function withoutContent(record: FilteredHookRecord): FilteredHookRecord {
 export class SpoolLiveTail {
   private readonly dir: string;
   private readonly watches = new Map<string, Watch>();
+  /** Files records were read from, while they are in the folder. */
+  private readonly readFrom = new Set<string>();
   private timer: ReturnType<typeof setInterval> | undefined;
   private running: Promise<void> | undefined;
   private started = false;
@@ -136,8 +146,9 @@ export class SpoolLiveTail {
     try {
       names = await readdir(this.dir);
     } catch {
-      return []; // no spool yet
+      return []; // no spool yet (nothing is told taken: a folder that cannot be read says nothing of its files)
     }
+    this.tellTaken(new Set(names));
     const minute = minuteOf((this.opts.now ?? Date.now)());
     return names
       .flatMap((name) => {
@@ -157,6 +168,19 @@ export class SpoolLiveTail {
       if (!this.started) return;
       await this.readFile(name);
       await yieldLoop();
+    }
+  }
+
+  /** Tells onTaken of each file read from that `names` (the folder now) no longer holds. */
+  private tellTaken(names: ReadonlySet<string>): void {
+    for (const name of [...this.readFrom]) {
+      if (names.has(name)) continue;
+      this.readFrom.delete(name);
+      try {
+        this.opts.onTaken?.(name);
+      } catch (err) {
+        this.opts.problems("spool-live-tail-taken", err);
+      }
     }
   }
 
@@ -209,7 +233,8 @@ export class SpoolLiveTail {
       if (record.src !== "hook") return;
       const n = normalizeHookRecord(withoutContent(record), "spool");
       if (n.outcome !== "stored" || (n.ops.length === 0 && !n.instruction)) return;
-      const event: LiveTailEvent = { provisional: true, sessionId, event: record.event, at: record.at, ops: n.ops, ...(n.instruction ? { instruction: n.instruction } : {}) };
+      const event: LiveTailEvent = { provisional: true, sessionId, event: record.event, at: record.at, ops: n.ops, ...(n.instruction ? { instruction: n.instruction } : {}), file: name };
+      this.readFrom.add(name);
       this.opts.onEvent(event);
     } catch (err) {
       this.opts.problems("spool-live-tail-event", err);

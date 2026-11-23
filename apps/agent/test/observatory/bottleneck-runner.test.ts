@@ -178,12 +178,12 @@ describe("what is scored", () => {
     const r = await rig();
     const S = "sess-live";
     await r.put([session(S, T), prompt("p1", S, T)]);
-    for (const i of [1, 2, 3]) r.runner.liveEvent({ provisional: true, sessionId: S, event: "PreToolUse", at: T + i * SEC, ops: read(S, `r${i}`, T + i * SEC, "k1").slice(0, 1) });
+    for (const i of [1, 2, 3]) r.runner.liveEvent({ provisional: true, sessionId: S, event: "PreToolUse", at: T + i * SEC, ops: read(S, `r${i}`, T + i * SEC, "k1").slice(0, 1), file: "events-1.jsonl" });
     await r.runner.idle();
     expect(r.changes).toMatchObject([{ type: "open", row: { rule: "repeat_read" } }]);
     const rows = await bottleneckRows(r.store);
     expect(JSON.parse(String(rows[0]?.evidence_json)).eventIds).toEqual(["tool:r3", "tool:r2", "tool:r1"]);
-    r.runner.liveEvent({ provisional: true, sessionId: S, event: "SessionEnd", at: T + 9 * SEC, ops: [] });
+    r.runner.liveEvent({ provisional: true, sessionId: S, event: "SessionEnd", at: T + 9 * SEC, ops: [], file: "events-1.jsonl" });
     await r.runner.idle();
     expect(r.changes.at(-1)).toMatchObject({ type: "close", row: { closedAt: T + 9 * SEC } });
   });
