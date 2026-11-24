@@ -1338,6 +1338,7 @@ export const zhCNMachines: MachinesCopy = {
 			more: (n: number) => `+${n}`,
 			batch: (n: number) => `×${n}`,
 			subagents: (n: number) => `${n} 个子代理`,
+			shells: (n: number) => `${n} 个后台 shell`,
 			todo: (pending: number, doing: number, done: number) => `${pending} 待办 · ${doing} 进行 · ${done} 完成`,
 			context: (percent: number) => `上下文 ${percent}%`,
 			contextApprox: (percent: number) => `上下文 ~${percent}%`,

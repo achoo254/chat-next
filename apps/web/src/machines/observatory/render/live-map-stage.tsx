@@ -105,6 +105,10 @@ interface Tag {
 	readonly detail: string;
 	readonly bottleneck: "none" | "warn" | "alert";
 	readonly mine?: boolean;
+	/** The tool running here now (`Bash`, `Bash +1` when more run, a subagent's type); "" when none: the place is at work. */
+	readonly working: string;
+	/** What that call works on (a file, a command's program): names, hidden by "Ẩn chi tiết". */
+	readonly workingTarget?: string;
 }
 
 export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, onHideDetails, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
@@ -300,6 +304,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 									key={`hit-${tag.place}`}
 									type="button"
 									className="lm-hit"
+									data-working={tag.working !== "" || undefined}
 									data-place={tag.place}
 									data-id={`observe-place-${tag.place}`}
 									aria-label={tag.name}
@@ -314,7 +319,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 							const at = project(assets.scene.places[tag.place].label, fit);
 							const more = overflow[tag.place];
 							const batch = batches[tag.place];
-							const cls = ["lm-tag", tag.bottleneck !== "none" ? `is-${tag.bottleneck}` : "", selectedPlace === tag.place ? "is-selected" : "", tag.mine === true ? "is-mine" : ""].filter(Boolean).join(" ");
+							const cls = ["lm-tag", tag.bottleneck !== "none" ? `is-${tag.bottleneck}` : "", selectedPlace === tag.place ? "is-selected" : "", tag.mine === true ? "is-mine" : "", tag.working !== "" ? "is-working" : ""].filter(Boolean).join(" ");
 							return (
 								<div key={`tag-${tag.place}`} className={cls} style={{ left: `clamp(var(--lm-tag-half), ${at.x}px, calc(100% - var(--lm-tag-half)))`, top: `clamp(1.1rem, ${at.y}px, calc(100% - 5rem))` }} data-id={`observe-tag-${tag.place}`} aria-hidden="true">
 									<b>
@@ -322,6 +327,11 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 										{tag.name}
 									</b>
 									{tag.facts.length > 0 && <i>{tag.facts.join(" · ")}</i>}
+									{tag.working !== "" && (
+										<i className="lm-working" data-id="observe-working">
+											{!hide && tag.workingTarget ? `${tag.working} · ${tag.workingTarget}` : tag.working}
+										</i>
+									)}
 									{tag.detail !== "" && !hide && (
 										<i className="lm-detail" data-id="observe-detail">
 											{tag.detail}
@@ -352,6 +362,21 @@ function plateStyle(fit: SceneFit, assets: SceneAssets): CSSProperties {
 	return { left: fit.offsetX, top: fit.offsetY, width: assets.scene.space.width * fit.scale, height: assets.scene.space.height * fit.scale };
 }
 
+/** What runs at a station now: the oldest running call's tool and its target, `+N` for the others; empty when nothing runs. */
+function workingOf(running: readonly string[], byId: ReadonlyMap<string, LiveMapEvent>): { working: string; workingTarget: string } {
+	const first = running.length === 0 ? undefined : byId.get(running[0] ?? "");
+	const more = running.length > 1 ? ` +${running.length - 1}` : "";
+	if (first?.kind !== "tool") return { working: running.length === 0 ? "" : `+${running.length}`, workingTarget: "" };
+	return { working: `${first.toolName}${more}`, workingTarget: first.target };
+}
+
+/** A subagent that runs keeps the orchestrator at work even when no call of its own is running. */
+function subagentWork(s: LiveMapState["scene"], working: string): { working?: string } {
+	if (working !== "") return {};
+	const sub = Object.values(s.subagents).find((x) => x.running);
+	return sub === undefined ? {} : { working: sub.agentType === "" ? "subagent" : sub.agentType };
+}
+
 /** The name tag of every place, from the state. */
 function useTags(state: LiveMapState, accountEmail: string, assets: SceneAssets | null): Tag[] {
 	const copy = useMachinesCopy().observe;
@@ -368,8 +393,8 @@ function useTags(state: LiveMapState, accountEmail: string, assets: SceneAssets 
 		const out: Tag[] = [];
 		const core = state.live?.core ?? coreOf(state);
 		const model = SHORT_MODEL.exec(state.live?.mainModel || s.model)?.[1] ?? (state.live?.mainModel || s.model);
-		out.push({ place: "core", name: copy.stations.CORE, facts: [model, t.core[core]].filter((x) => x !== ""), detail: "", bottleneck: s.stations.CORE.bottleneck });
-		out.push({ place: "user-desk", name: t.userDesk, facts: prompts > 0 ? [t.prompt(prompts)] : [], detail: accountEmail, bottleneck: "none", mine: true });
+		out.push({ place: "core", name: copy.stations.CORE, facts: [model, t.core[core]].filter((x) => x !== ""), detail: "", bottleneck: s.stations.CORE.bottleneck, working: "" });
+		out.push({ place: "user-desk", name: t.userDesk, facts: prompts > 0 ? [t.prompt(prompts)] : [], detail: accountEmail, bottleneck: "none", mine: true, working: "" });
 		for (const code of STATION_CODES) {
 			if (code === "CORE") continue;
 			const st = s.stations[code];
@@ -380,14 +405,15 @@ function useTags(state: LiveMapState, accountEmail: string, assets: SceneAssets 
 				if (running > 0) facts.push(t.subagents(running));
 				if (s.todo !== null) facts.push(t.todo(s.todo.pending, s.todo.inProgress, s.todo.done));
 			}
+			if (code === "SANDBOX" && s.backgroundShells.size > 0) facts.push(t.shells(s.backgroundShells.size));
 			const last = st.last === null ? undefined : byId.get(st.last);
 			const detail = last?.kind === "tool" ? last.target : "";
-			out.push({ place: STATION_PLACE[code as StationCode], name: copy.stations[code], facts, detail, bottleneck: st.bottleneck });
+			out.push({ place: STATION_PLACE[code as StationCode], name: copy.stations[code], facts, detail, bottleneck: st.bottleneck, ...workingOf(st.running, byId), ...(code === "ORCHESTRATOR" ? subagentWork(s, workingOf(st.running, byId).working) : {}) });
 		}
 		const waiting = Object.values(s.stations).reduce((n, st) => n + st.queued, 0);
-		out.push({ place: "security", name: t.gateway, facts: waiting > 0 ? [t.waiting(waiting)] : [], detail: "", bottleneck: "none" });
+		out.push({ place: "security", name: t.gateway, facts: waiting > 0 ? [t.waiting(waiting)] : [], detail: "", bottleneck: "none", working: "" });
 		const tps = state.live?.tokensPerSecond ?? s.tokensPerSecond;
-		out.push({ place: "monitoring", name: t.monitoring, facts: tps === null ? [] : [t.speed(Math.round(tps))], detail: "", bottleneck: "none" });
+		out.push({ place: "monitoring", name: t.monitoring, facts: tps === null ? [] : [t.speed(Math.round(tps))], detail: "", bottleneck: "none", working: "" });
 		return out;
 	}, [state, accountEmail, assets, copy, t]);
 }

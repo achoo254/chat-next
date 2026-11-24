@@ -91,6 +91,22 @@ describe("the Live Map frame", () => {
 		expect(files?.textContent).toContain(t.map.calls(1, 0));
 	});
 
+	it("a place with a running call is at work: its tag names the tool and target, the details switch hides the target, and it stops when the call ends", async () => {
+		const running = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "TESTING" }), tool("b2", 21, { toolName: "Bash", target: "git", station: "TESTING" })]).state;
+		const { container, rerenderWith } = setup(running);
+		await flush();
+		const testing = container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]");
+		expect(testing?.textContent).toBe("Bash +1 · pnpm");
+		expect(container.querySelector("[data-id=observe-tag-testing]")?.classList.contains("is-working")).toBe(true);
+		expect(container.querySelector("[data-id=observe-place-testing]")?.hasAttribute("data-working")).toBe(true);
+		expect(container.querySelector("[data-id=observe-tag-files] [data-id=observe-working]")).toBeNull();
+		await userEvent.click(screen.getByLabelText(t.map.hideDetails));
+		expect(container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]")?.textContent).toBe("Bash +1");
+		rerenderWith(played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "TESTING" }), tool("b1", 30, { toolName: "Bash", target: "pnpm", station: "TESTING", success: true })]).state);
+		await flush();
+		expect(container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]")).toBeNull();
+	});
+
 	it("'Ẩn chi tiết' hides file names and the email, and is remembered", async () => {
 		const { state } = played([tool("r1", 20, { target: "src/app.ts", success: true })]);
 		const first = setup(state);

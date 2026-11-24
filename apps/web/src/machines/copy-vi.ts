@@ -1366,6 +1366,7 @@ export const viMachines = {
 			more: (n: number) => `+${n}`,
 			batch: (n: number) => `×${n}`,
 			subagents: (n: number) => `${n} subagent`,
+			shells: (n: number) => `${n} shell nền`,
 			todo: (pending: number, doing: number, done: number) => `${pending} chờ · ${doing} làm · ${done} xong`,
 			context: (percent: number) => `ngữ cảnh ${percent}%`,
 			contextApprox: (percent: number) => `ngữ cảnh ~${percent}%`,

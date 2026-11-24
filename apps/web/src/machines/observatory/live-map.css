@@ -26,6 +26,17 @@
 .lm-tag.is-alert b span { color: var(--c-error-text); }
 .lm-tag.is-mine { border-color: var(--c-success); }
 .lm-tag.is-selected { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
+.lm-tag.is-working { border-color: var(--c-primary); }
+.lm-tag i.lm-working { color: var(--c-primary); font-weight: 600; }
+.lm-tag i.lm-working::before { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-right: 0.35em; border-radius: 50%; background: var(--c-primary); animation: lm-pulse 1.4s ease-in-out infinite; }
+/* A place at work breathes: a soft tint over its click area while a call runs there. */
+.lm-hit[data-working] { animation: lm-breathe 1.8s ease-in-out infinite; }
+@keyframes lm-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@keyframes lm-breathe { 0%, 100% { background: color-mix(in srgb, var(--c-primary) 4%, transparent); } 50% { background: color-mix(in srgb, var(--c-primary) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) {
+	.lm-tag i.lm-working::before, .lm-hit[data-working] { animation: none; }
+	.lm-hit[data-working] { background: color-mix(in srgb, var(--c-primary) 14%, transparent); }
+}
 .lm-batch { font-style: normal; font-weight: 700; color: var(--c-primary); }
 .lm-note { margin: 0; }
 /* A phone: tags keep their names only. */

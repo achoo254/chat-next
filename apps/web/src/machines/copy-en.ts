@@ -1346,6 +1346,7 @@ export const enMachines: MachinesCopy = {
 			more: (n: number) => `+${n}`,
 			batch: (n: number) => `×${n}`,
 			subagents: (n: number) => `${n} subagent${n === 1 ? "" : "s"}`,
+			shells: (n: number) => `${n} background shell${n === 1 ? "" : "s"}`,
 			todo: (pending: number, doing: number, done: number) => `${pending} to do · ${doing} doing · ${done} done`,
 			context: (percent: number) => `context ${percent}%`,
 			contextApprox: (percent: number) => `context ~${percent}%`,
