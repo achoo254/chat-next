@@ -225,6 +225,24 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		if (node !== null) element.scrollTop = node.offsetTop - saved.offset;
 	}, [window_, keys.length, lastKey, typing, store, chatId, topicId]);
 
+	// The open chat's row clicked again (as Telegram does): to the newest message,
+	// once the window is live. The token seen at mount is not a request.
+	const seenNewest = useRef<number | null>(null);
+	useLayoutEffect(() => {
+		const element = scroller.current;
+		if (element === null || window_ === undefined || window_.status !== "ready") return;
+		if (seenNewest.current === null) {
+			seenNewest.current = window_.newestToken;
+			return;
+		}
+		if (seenNewest.current === window_.newestToken || !window_.live) return;
+		seenNewest.current = window_.newestToken;
+		stick.current = true;
+		pinned.current = false;
+		element.scrollTop = element.scrollHeight;
+		setAtBottom(true);
+	}, [window_]);
+
 	// Leaving the chat: remembered where the reader was unless at the newest message (then it opens at the first unread, or at the newest).
 	const live = useRef(false);
 	useLayoutEffect(() => {

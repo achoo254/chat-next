@@ -234,7 +234,10 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const unread = dialog.unreadCount;
 	return (
 		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position} {...trigger}>
-			<Link to={paths.chat(chatId)} className="chat-row" current={current}>
+			<Link to={paths.chat(chatId)} className="chat-row" current={current} onNavigate={() => {
+					// The open chat's row clicked again: to its newest message, as Telegram does.
+					if (current) store.scrollToNewest(chatId);
+				}}>
 				<ChatAvatar
 					id={chatId}
 					name={title}

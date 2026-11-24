@@ -51,6 +51,8 @@ export interface ChatWindow {
 	readonly focusToken: number;
 	/** Bumps on every opening of the chat, so the list goes to the unread divider again. */
 	readonly openings: number;
+	/** Bumps when the list is asked to go to the newest message (the open chat's row clicked again). */
+	readonly newestToken: number;
 	/** Messages of this chat still in the outbox (the offline banner counts them). */
 	readonly pendingCount: number;
 }
@@ -937,6 +939,7 @@ export class ChatStore {
 				focusSeq: 0,
 				focusToken: 0,
 				openings: 0,
+				newestToken: 0,
 				pendingCount: 0,
 			},
 			items: new Map(),
@@ -982,6 +985,14 @@ export class ChatStore {
 		if (state === undefined || !state.window.hasNewer) return;
 		const last = this.lastSeq(state);
 		void this.load(chatId, { direction: "newer", offsetSeq: last, limit: PAGE }, "append", 0);
+	}
+
+	/** Asks the open list to scroll to the newest message, loading it first when the window is elsewhere (Telegram: the open chat's row clicked again). */
+	scrollToNewest(chatId: number): void {
+		const state = this.windows.get(chatId);
+		if (state === undefined) return;
+		this.setWindow(state, { ...state.window, newestToken: state.window.newestToken + 1 });
+		this.jumpToNewest(chatId);
 	}
 
 	/** Back to the newest messages (the "to bottom" button). */
