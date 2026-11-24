@@ -185,6 +185,8 @@ type runner struct {
 	turn map[string]int
 	// floodUntil is when the wait the other app last asked for ends (see holdFlood).
 	floodUntil time.Time
+	// windows are the history windows half read when the other app asked to wait, by link id.
+	windows map[int64]windowProgress
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -233,13 +235,18 @@ func (r *runner) run(ctx context.Context) error {
 		// does not hold up what arrives meanwhile.
 		r.pending = append(r.pending, l)
 	}
-	if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
+	// The periodic reads and the imports put a long wait off instead of sleeping it in the loop.
+	busyCtx := deferLongWaits(runCtx)
+	if err := r.skipBusy(r.syncConversations(busyCtx), "sync", ""); err != nil {
 		return r.settle(runCtx, err)
 	}
 	// A chat synced before pins were read gets them now; a chat that was just
 	// imported got them at the end of its backfill.
 	for _, l := range caughtUp {
-		if err := r.skipBusy(r.syncPins(runCtx, l), "pins", l.ExternalChat); err != nil {
+		if r.floodHeld() {
+			break // read at the next run; asking during the wait only makes it longer
+		}
+		if err := r.skipBusy(r.syncPins(busyCtx, l), "pins", l.ExternalChat); err != nil {
 			return r.settle(runCtx, err)
 		}
 	}
@@ -249,8 +256,10 @@ func (r *runner) run(ctx context.Context) error {
 	defer imports.Stop()
 	states := time.NewTicker(e.cfg.StatePoll)
 	defer states.Stop()
-	if err := r.skipBusy(r.pollAll(runCtx), "sync", ""); err != nil {
-		return r.settle(runCtx, err)
+	if !r.floodHeld() {
+		if err := r.skipBusy(r.pollAll(busyCtx), "sync", ""); err != nil {
+			return r.settle(runCtx, err)
+		}
 	}
 	for {
 		select {
@@ -264,13 +273,13 @@ func (r *runner) run(ctx context.Context) error {
 			if r.floodHeld() {
 				continue
 			}
-			if err := r.skipBusy(r.pollAll(runCtx), "sync", ""); err != nil {
+			if err := r.skipBusy(r.pollAll(busyCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 			r.conversationsTick++
 			if r.conversationsTick%conversationsEvery == 0 || r.relist {
 				r.relist = false
-				if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
+				if err := r.skipBusy(r.syncConversations(busyCtx), "sync", ""); err != nil {
 					return r.settle(runCtx, err)
 				}
 			}
@@ -278,14 +287,18 @@ func (r *runner) run(ctx context.Context) error {
 			if r.floodHeld() {
 				continue
 			}
-			if err := r.skipBusy(r.importNext(runCtx), "sync", ""); err != nil {
+			if err := r.skipBusy(r.importNext(busyCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case <-r.syncNow:
 			if err := r.reloadSyncState(runCtx); err != nil {
 				return r.settle(runCtx, err)
 			}
-			if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
+			if r.floodHeld() {
+				r.relist = true // listed at the first look after the wait
+				continue
+			}
+			if err := r.skipBusy(r.syncConversations(busyCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case err := <-subDone:
@@ -300,7 +313,11 @@ func (r *runner) run(ctx context.Context) error {
 				continue
 			}
 			r.links[l.ExternalChat] = l
-			if err := r.importOne(runCtx, l); err != nil {
+			if r.floodHeld() {
+				r.pending = append([]*chatLink{l}, r.pending...) // imported first once the wait is over
+				continue
+			}
+			if err := r.importOne(busyCtx, l); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case ev := <-events:
@@ -480,7 +497,7 @@ func retryRateLimit[T any](ctx context.Context, call func() (T, error)) (T, erro
 		if !errors.As(err, &limit) {
 			return v, err
 		}
-		if limit.RetryAfter > maxInlineWait {
+		if limit.RetryAfter > maxInlineWait && defersLongWaits(ctx) {
 			// Sleeping here would hold the run's only loop (live events, sends from Chat, the
 			// other reads) for as long as the other app asks; the caller defers instead.
 			return v, err
@@ -499,13 +516,16 @@ func retryRateLimit[T any](ctx context.Context, call func() (T, error)) (T, erro
 // first. History comes newest first in pages; it is held in memory (a window
 // is at most history_window messages) so that Chat gets it in time order.
 func (r *runner) fetchWindow(ctx context.Context, l *chatLink) ([]bridge.Message, error) {
-	var newestFirst []bridge.Message
-	cur := bridge.Cursor{}
-	for len(newestFirst) < l.HistoryMax {
+	newestFirst, cur, complete := r.takeWindow(l)
+	for !complete && len(newestFirst) < l.HistoryMax {
 		page, err := retryRateLimit(ctx, func() (bridge.Page, error) {
 			return r.adapter.Backfill(ctx, r.acct, l.ExternalChat, cur, min(r.e.cfg.PageSize, l.HistoryMax-len(newestFirst)))
 		})
 		if err != nil {
+			var limit *bridge.RateLimitError
+			if errors.As(err, &limit) && len(newestFirst) > 0 {
+				r.keepWindow(l, newestFirst, cur) // the next try goes on from this page
+			}
 			return nil, err
 		}
 		newestFirst = append(newestFirst, page.Messages...)
@@ -538,6 +558,12 @@ func (r *runner) backfill(ctx context.Context, l *chatLink) error {
 	for start := 0; start < len(msgs); start += r.e.cfg.BatchSize {
 		batch := msgs[start:min(start+r.e.cfg.BatchSize, len(msgs))]
 		if err := r.importBatch(ctx, l, batch); err != nil {
+			if isWait(err) {
+				// A file or the topics of the batch must wait: the window read stays, and
+				// what is written already (earlier batches, the start of this one) is skipped next time.
+				r.keepWholeWindow(l, msgs)
+				return err
+			}
 			if !isSkippable(err) {
 				return err
 			}
@@ -546,6 +572,10 @@ func (r *runner) backfill(ctx context.Context, l *chatLink) error {
 			r.logger.Warn("history batch refused; importing its messages one by one", "reason", err.Error(), "messages", len(batch))
 			for i := range batch {
 				if err := r.importBatch(ctx, l, batch[i:i+1]); err != nil {
+					if isWait(err) {
+						r.keepWholeWindow(l, msgs)
+						return err
+					}
 					if !isSkippable(err) {
 						return err
 					}
@@ -589,10 +619,22 @@ func (r *runner) importBatch(ctx context.Context, l *chatLink, batch []bridge.Me
 		senders[m.From.ID] = id
 		r.puppets[m.From.ID] = id
 	}
-	files, err := r.copyFiles(ctx, l, batch)
+	files, waitsAt, err := r.copyFiles(ctx, l, batch)
 	if err != nil {
+		if waitsAt > 0 {
+			// The files before the one that must wait are copied already: their messages
+			// are written now, so the next try does not fetch them again.
+			if werr := r.writeBatch(ctx, l, batch[:waitsAt], senders, files); werr != nil {
+				return werr
+			}
+		}
 		return err
 	}
+	return r.writeBatch(ctx, l, batch, senders, files)
+}
+
+// writeBatch writes the messages of batch Chat does not have yet, in one transaction.
+func (r *runner) writeBatch(ctx context.Context, l *chatLink, batch []bridge.Message, senders map[string]int64, files map[string]*appv1.Message) error {
 	return r.withLink(ctx, l, func(it *chat.ImportTx) error {
 		ids := make([]string, len(batch))
 		for i, m := range batch {
@@ -758,8 +800,22 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 	if l == nil && r.syncOn() {
 		r.relist = true // a conversation without a chat yet: it gets one, this message with its history
 	}
-	if l == nil || !l.BackfillDone {
+	if l == nil {
 		return false, nil
+	}
+	if !l.BackfillDone {
+		// A chat whose first import waits with part of its history read takes the message
+		// into that part, or it would fall between the pages read and the import.
+		r.foldIntoWindow(l, m, isEdit)
+		// An edit of a message an earlier batch already wrote is applied now: the import
+		// skips messages Chat has, so the edit would be lost there.
+		if !isEdit {
+			return false, nil
+		}
+		have, err := lookupMessage(ctx, r.e.db.pool, r.account.ID, m.Conversation, m.ID)
+		if err != nil || have == nil {
+			return false, err
+		}
 	}
 	if err := r.prepareTopics(ctx, l, []bridge.Message{m}); err != nil {
 		return false, err
@@ -775,7 +831,7 @@ func (r *runner) upsert(ctx context.Context, ev bridge.Event, m bridge.Message, 
 			return false, err
 		}
 	}
-	files, err := r.copyFiles(ctx, l, []bridge.Message{m})
+	files, _, err := r.copyFiles(ctx, l, []bridge.Message{m})
 	if err != nil {
 		return false, err
 	}
@@ -905,8 +961,10 @@ func (r *runner) onDelete(ctx context.Context, ev bridge.Event, d bridge.Delete)
 // copyFiles copies the files of the messages of batch that are not yet
 // imported, before any Chat transaction opens (a download can take long and
 // the chat is locked while a transaction is open). Messages already imported
-// are skipped, so repeating an import does not download twice.
-func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Message) (map[string]*appv1.Message, error) {
+// are skipped, so repeating an import does not download twice. When the other
+// app asks to wait for a file (only during an import, see copyFile), waitsAt is
+// the index in batch of its message: the files before it are in the map.
+func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Message) (files map[string]*appv1.Message, waitsAt int, err error) {
 	var withMedia []bridge.Message
 	for _, m := range batch {
 		if len(m.Media) > 0 {
@@ -914,7 +972,7 @@ func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Mess
 		}
 	}
 	if len(withMedia) == 0 || r.e.mediaSvc == nil {
-		return nil, nil
+		return nil, 0, nil
 	}
 	ids := make([]string, len(withMedia))
 	for i, m := range withMedia {
@@ -922,18 +980,22 @@ func (r *runner) copyFiles(ctx context.Context, l *chatLink, batch []bridge.Mess
 	}
 	known, err := knownMessages(ctx, r.e.db.pool, r.account.ID, l.ExternalChat, ids)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	files := map[string]*appv1.Message{}
+	files = map[string]*appv1.Message{}
 	for _, m := range withMedia {
 		if known[m.ID] {
 			continue
 		}
-		if content := r.copyFile(ctx, m); content != nil {
+		content, err := r.copyFile(ctx, m)
+		if err != nil {
+			return files, slices.IndexFunc(batch, func(b bridge.Message) bool { return b.ID == m.ID }), err
+		}
+		if content != nil {
 			files[m.ID] = content
 		}
 	}
-	return files, nil
+	return files, 0, nil
 }
 
 // chatButtons turns the link buttons of a bridge message into the buttons of

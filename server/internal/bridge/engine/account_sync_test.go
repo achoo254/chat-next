@@ -1,14 +1,18 @@
 package engine_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/color"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/bridge/contracttest"
 	"app.local/server/internal/bridge/engine"
 )
 
@@ -321,5 +325,140 @@ func TestALongWaitFromTheOtherAppDoesNotHoldUpLiveEventsAndTheImportResumesAfter
 	}
 	if got := fmt.Sprint(e.texts(e.chatOf("g1"))); !strings.Contains(got, "mới") {
 		t.Fatalf("g1 texts = %s, want the imported history in it", got)
+	}
+}
+
+func TestAnImportStoppedHalfWayByAWaitGoesOnFromThePageItReached(t *testing.T) {
+	t.Cleanup(engine.SetMaxInlineWait(20 * time.Millisecond)) // first cleanup: runs after the engine stopped
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g1")
+	var want []string
+	for i := 1; i <= 20; i++ { // three pages of seven
+		text := fmt.Sprintf("tin %d", i)
+		e.fake.AddHistory("g1", e.msg(fmt.Sprintf("m%d", i), lan, text, i))
+		want = append(want, text)
+	}
+	want = append(want, "tin mới lúc chờ")
+	e.fake.BeforePage = func(conv string, page int) {
+		if conv == "g1" && page == 2 {
+			e.fake.FailBackfill(&bridge.RateLimitError{RetryAfter: 300 * time.Millisecond})
+			// and a message arrives while the import waits, newer than every page read
+			live := e.msg("m21", lan, "tin mới lúc chờ", 21)
+			e.fake.Push(bridge.Event{Message: &live})
+		}
+	}
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { g1 := e.chatOf("g1"); return g1 != 0 && e.backfillDone(g1) }, func() string { return "g1 never imported" })
+	e.waitTexts(e.chatOf("g1"), want)
+	// page 1, page 2 refused with the wait, page 2 again, page 3: page 1 is not asked for twice
+	if got := e.fake.BackfillCalls(); got != 4 {
+		t.Fatalf("history calls = %d, want 4", got)
+	}
+}
+
+// mediaWaitsOnce is an app that asks to wait at the waitAt-th file read (once), then serves files.
+type mediaWaitsOnce struct {
+	*contracttest.Fake
+	mu     sync.Mutex
+	waitAt int
+	calls  int
+	data   []byte
+	// onWait runs when the wait is asked for (a test pushes what happens meanwhile).
+	onWait func()
+}
+
+func (a *mediaWaitsOnce) FetchMedia(_ context.Context, _ bridge.Account, _ string) (bridge.MediaStream, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.calls++
+	if a.calls == a.waitAt {
+		if a.onWait != nil {
+			a.onWait()
+		}
+		return nil, &bridge.RateLimitError{RetryAfter: 300 * time.Millisecond}
+	}
+	return &bytesStream{Reader: bytes.NewReader(a.data), size: int64(len(a.data))}, nil
+}
+
+type bytesStream struct {
+	*bytes.Reader
+	size int64
+}
+
+func (s *bytesStream) Close() error     { return nil }
+func (s *bytesStream) MimeType() string { return "image/jpeg" }
+func (s *bytesStream) Size() int64      { return s.size }
+
+func TestAFileTheOtherAppMakesWaitForIsCopiedAfterTheWaitNotLabelled(t *testing.T) {
+	t.Cleanup(engine.SetMaxInlineWait(20 * time.Millisecond)) // first cleanup: runs after the engine stopped
+	e := newEnvWithMedia(t, true)
+	app := &mediaWaitsOnce{Fake: e.fake, waitAt: 1, data: jpegOf(t, color.RGBA{B: 200, A: 255})}
+	e.adapter = app
+	ctx := context.Background()
+	e.group("g1")
+	photo := e.msg("m1", lan, "", 1)
+	photo.Media = []bridge.Media{{Kind: "photo", Ref: "g1/1"}}
+	e.fake.AddHistory("g1", photo, e.msg("m2", lan, "sau ảnh", 2))
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { g1 := e.chatOf("g1"); return g1 != 0 && e.backfillDone(g1) }, func() string { return "g1 never imported" })
+	var labelled, withFile int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FILTER (WHERE text = '[Ảnh]'), count(*) FILTER (WHERE text = '') FROM messages WHERE chat_id = $1`, e.chatOf("g1")).Scan(&labelled, &withFile); err != nil {
+		t.Fatal(err)
+	}
+	app.mu.Lock()
+	calls := app.calls
+	app.mu.Unlock()
+	if labelled != 0 || withFile != 1 || calls != 2 {
+		t.Fatalf("labelled %d, with the file %d, reads %d; want the photo copied on the read after the wait", labelled, withFile, calls)
+	}
+}
+
+func TestAWaitForAFileKeepsWhatCameBeforeItAndAnEditMadeMeanwhileReachesIt(t *testing.T) {
+	t.Cleanup(engine.SetMaxInlineWait(20 * time.Millisecond)) // first cleanup: runs after the engine stopped
+	e := newEnvWithMedia(t, true)
+	ctx := context.Background()
+	e.group("g1")
+	// batches of five: the first is text, the second starts with two photos, the other app asks to wait at the second
+	var hist []bridge.Message
+	for i := 1; i <= 5; i++ {
+		hist = append(hist, e.msg(fmt.Sprintf("m%d", i), lan, fmt.Sprintf("tin %d", i), i))
+	}
+	for i := 6; i <= 7; i++ {
+		p := e.msg(fmt.Sprintf("m%d", i), lan, "", i)
+		p.Media = []bridge.Media{{Kind: "photo", Ref: fmt.Sprintf("g1/%d", i)}}
+		hist = append(hist, p)
+	}
+	e.fake.AddHistory("g1", hist...)
+	app := &mediaWaitsOnce{Fake: e.fake, waitAt: 2, data: jpegOf(t, color.RGBA{R: 90, A: 255})}
+	app.onWait = func() {
+		// during the wait, someone edits a message the first batch already wrote
+		edited := e.msg("m2", lan, "tin 2 (đã sửa)", 2)
+		edited.Version = 2
+		e.fake.Push(bridge.Event{Edit: &bridge.Edit{Message: edited}})
+	}
+	e.adapter = app
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { g1 := e.chatOf("g1"); return g1 != 0 && e.backfillDone(g1) }, func() string { return "g1 never imported" })
+	e.waitTexts(e.chatOf("g1"), []string{"tin 1", "tin 2 (đã sửa)", "tin 3", "tin 4", "tin 5"})
+	var photos int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM messages WHERE chat_id = $1 AND text = ''`, e.chatOf("g1")).Scan(&photos); err != nil || photos != 2 {
+		t.Fatalf("photo messages = %d, %v; want both photos copied, not labelled", photos, err)
+	}
+	app.mu.Lock()
+	calls := app.calls
+	app.mu.Unlock()
+	// m6 copied, m7 asked to wait (m6 written meanwhile), m7 again: m6 is not fetched twice
+	if calls != 3 {
+		t.Fatalf("file reads = %d, want 3", calls)
 	}
 }

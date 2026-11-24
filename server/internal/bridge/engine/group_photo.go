@@ -56,6 +56,10 @@ func (r *runner) takePhoto(ctx context.Context, l *chatLink, info bridge.GroupIn
 			return nil
 		}
 		stream, err := retryRateLimit(ctx, func() (bridge.MediaStream, error) { return r.adapter.FetchMedia(ctx, r.acct, info.PhotoRef) })
+		var limit *bridge.RateLimitError
+		if errors.As(err, &limit) {
+			return err // a periodic look: held (skipBusy) and the photo taken at a later look
+		}
 		if err != nil {
 			r.logger.Warn("copying a group photo failed", "chat_id", l.ChatID, "reason", err.Error())
 			return nil

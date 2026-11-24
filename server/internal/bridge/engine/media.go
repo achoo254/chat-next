@@ -84,30 +84,37 @@ func withLabel(label, text string, ents []bridge.Entity) (string, []bridge.Entit
 // file of the account's owner. It returns the message content that carries
 // it, or nil when nothing was copied (no media service, a kind Chat cannot
 // show, over the cap, or a failure: the message is then imported with a
-// label, never dropped).
-func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message {
+// label, never dropped). A long wait the other app asks for during an import
+// comes back as the error, so the batch is put off instead of labelled.
+func (r *runner) copyFile(ctx context.Context, m bridge.Message) (*appv1.Message, error) {
 	if r.e.mediaSvc == nil || len(m.Media) == 0 {
-		return nil
+		return nil, nil
 	}
 	med := m.Media[0]
 	kind, ok := uploadKind(med)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	limit := r.e.cfg.MediaMaxBytes
 	if med.Size > limit {
-		return nil
+		return nil, nil
 	}
 	stream, err := retryRateLimit(ctx, func() (bridge.MediaStream, error) {
 		return r.adapter.FetchMedia(ctx, r.acct, med.Ref)
 	})
+	var wait *bridge.RateLimitError
+	if errors.As(err, &wait) {
+		// Only an import gets the wait back (see deferLongWaits): it puts the batch off,
+		// nothing written yet, instead of importing the message with a label for good.
+		return nil, err
+	}
 	if err != nil {
 		r.logger.Warn("copying a file failed; the message is imported with a label", "kind", med.Kind, "reason", err.Error())
-		return nil
+		return nil, nil
 	}
 	defer func() { _ = stream.Close() }()
 	if size := stream.Size(); size > limit {
-		return nil
+		return nil, nil
 	}
 	body, unwatch := watched(ctx, stream)
 	defer unwatch()
@@ -116,9 +123,9 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) *appv1.Message 
 	})
 	if err != nil {
 		r.logger.Warn("storing a file failed; the message is imported with a label", "kind", med.Kind, "reason", err.Error())
-		return nil
+		return nil, nil
 	}
-	return &appv1.Message{Media: file.Ref()}
+	return &appv1.Message{Media: file.Ref()}, nil
 }
 
 // uploadRetryWait is how long an import waits when the owner's upload rate is

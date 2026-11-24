@@ -202,8 +202,9 @@ func (r *runner) importOne(ctx context.Context, l *chatLink) error {
 	err := r.backfill(ctx, l)
 	var limit *bridge.RateLimitError
 	if errors.As(err, &limit) {
-		// A long wait is not slept in the loop. Nothing half-done is lost: an import skips what
-		// is already in the chat, so the chat is first in line when the wait ends.
+		// A long wait is not slept in the loop. The chat is first in line when the wait ends;
+		// the pages of history already read are kept (keepWindow) and what an earlier batch
+		// imported is skipped, so the next try goes on from where this one stopped.
 		r.holdFlood(limit, "import")
 		r.pending = append([]*chatLink{l}, r.pending...)
 		return nil
