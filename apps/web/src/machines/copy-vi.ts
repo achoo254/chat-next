@@ -1324,7 +1324,26 @@ export const viMachines = {
 		off: "Observatory đang tắt trên máy nên chưa xem được phiên.",
 		limit: "Máy đang có quá nhiều phiên được xem cùng lúc. Đóng tab Quan sát ở phiên hoặc thiết bị khác rồi thử lại.",
 		failed: "Máy chưa mở được phiên này để quan sát.",
-		noSession: "Luồng này chưa có phiên Claude Code nào trên máy. Gửi một tin để bắt đầu.",
+		/** The thread's empty Observe view (observatory/observe-empty-state.tsx) and reopening its session so Observatory records it. */
+		empty: {
+			never: "Luồng này chưa có phiên Claude Code nào. Gửi một tin để bắt đầu; Quan sát ghi phiên từ lúc đó.",
+			notRecorded: "Quan sát chỉ ghi các phiên mở sau khi bật (tunelo 3.26.0 trở lên). Phiên của luồng này mở trước đó nên chưa có bản ghi.",
+			/** Followed by the command, shown as code. */
+			elsewhere: "Phiên đang chạy ở nơi khác trên máy. Đóng nó ở đó, hoặc cài hook cho mọi phiên bằng lệnh:",
+			elsewhereCommand: "tunelo observatory install",
+			relaunch: "Mở lại phiên để bắt đầu ghi",
+			relaunching: "Đang mở lại…",
+			blockedRunning: "Luồng đang chạy một lượt. Chờ lượt xong rồi mở lại phiên.",
+			confirmTitle: "Mở lại phiên trong terminal?",
+			confirmBody: "Claude trong terminal sẽ đóng và mở lại, tiếp tục đúng cuộc trò chuyện.",
+			confirm: "Mở lại",
+			doneChat: "Đã đóng phiên. Tin kế tiếp mở lại phiên và Quan sát ghi từ đó.",
+			doneTerminal: "Đã mở lại Claude trong terminal. Quan sát ghi phiên từ prompt kế tiếp.",
+			errorRunning: "Luồng vừa bắt đầu một lượt nên chưa mở lại được. Chờ lượt xong rồi thử lại.",
+			errorElsewhere: "Phiên đang mở ở nơi khác trên máy. Đóng nó ở đó rồi thử lại.",
+			/** The old terminal closed, the new one did not open: `why` is the machine's reason. */
+			errorNotReopened: (why: string) => `Terminal cũ đã đóng nhưng chưa mở lại được Claude: ${why} Mở lại từ tab Terminal.`,
+		},
 		retry: "Thử lại",
 		title: "Quan sát",
 		usage: "Hiệu quả của repo",

@@ -16,7 +16,7 @@ import { Icon } from "../components/screen-icons.tsx";
 import { type MachinesView } from "../router.tsx";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { FirstSteps, stepsPending } from "./first-steps.tsx";
-import { isBlocked, type Conn } from "./machine-status.ts";
+import { isBlocked, isListLoading, type Conn } from "./machine-status.ts";
 import { useProjectSync, type SyncHost } from "./project-actions.ts";
 import { buildTree, locate, type Filter } from "./project-tree.ts";
 import { movedTo, useProjectDrag } from "./project-drag.ts";
@@ -237,7 +237,7 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 	};
 	const directory = hub.directory();
 	// Every machine that can answer did: the account's progress (first-steps.tsx) can be told.
-	const settled = snapshot.status !== "loading" && machines.every((m) => m.conn.kind !== "on" || m.state.listed);
+	const settled = snapshot.status !== "loading" && !machines.some(isListLoading);
 	const progress = { machines: machines.length, projects: snapshot.projects.length, sessions: threads.length };
 	const showSteps = filter === "all" && directory.status === "ready" && (machines.length === 0 || settled) && stepsPending(progress);
 	// Machines that need the user ("Quản lý máy" counts them): blocked on this device, or a tunelo too old to talk to.

@@ -20,7 +20,7 @@ import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { locate } from "./project-tree.ts";
 import { FirstMachine } from "./first-machine.tsx";
-import { isBlocked } from "./machine-status.ts";
+import { isBlocked, isListLoading } from "./machine-status.ts";
 import { NewSession } from "./new-session.tsx";
 import { OfflineGuide } from "./offline-guide.tsx";
 import { PageHead } from "./page-head.tsx";
@@ -67,12 +67,13 @@ export function HomeBoard({ back }: { back: boolean }) {
 	const { need, running, idle } = collect(machines);
 	const many = machines.length > 1;
 	const ready = hub.directory().status !== "loading";
+	const loading = machines.some(isListLoading);
 	return (
 		<div className="mx-scroll">
 			<PageHead {...(back ? { back: paths.machines() } : {})} backLabel={t.backToMachines} title={t.agent.home.title} subtitle={t.agent.home.summary(need.length, running.length)} />
 			<div className="mx-body">
 				{ready && machines.length === 0 && <FirstMachine />}
-				{machines.length > 0 && need.length === 0 && (
+				{machines.length > 0 && !loading && need.length === 0 && (
 					<div className="mx-calm">
 						<Icon name="check" />
 						<div>
@@ -80,6 +81,12 @@ export function HomeBoard({ back }: { back: boolean }) {
 							<p className="muted">{t.agent.home.nothingBody}</p>
 						</div>
 					</div>
+				)}
+				{loading && need.length === 0 && (
+					<ul className="mx-rows skeleton" aria-hidden="true">
+						<li />
+						<li />
+					</ul>
 				)}
 				<Tiles need={need} running={running} showMachine={many} />
 				<Recent list={idle.slice(0, RECENT)} showMachine={many} now={now} />

@@ -119,10 +119,16 @@ function useAsk<T>(key: string | null, online: boolean, ask: () => Promise<T>): 
 /**
  * A thread's Claude Code sessions, newest first (the first is the one it runs
  * now; earlier ones are the conversations before /clear), asked once the link
- * is open and again after it reopens. null thread: nothing asked.
+ * is open and again after it reopens, and again whenever `refresh` changes;
+ * while asked again, the thread's last answer stays shown. null thread:
+ * nothing asked.
  */
-export function useThreadSessions(link: ObservatoryLink, threadId: string | null, online: boolean): Asked<readonly LiveMapSessionInfo[]> {
-	return useAsk(threadId, online, () => threadSessions(link, threadId ?? ""));
+export function useThreadSessions(link: ObservatoryLink, threadId: string | null, online: boolean, refresh = 0): Asked<readonly LiveMapSessionInfo[]> {
+	const asked = useAsk(threadId === null ? null : `${threadId}\n${refresh}`, online, () => threadSessions(link, threadId ?? ""));
+	const [kept, setKept] = useState<{ threadId: string | null; asked: Asked<readonly LiveMapSessionInfo[]> } | null>(null);
+	// The newest answer of this thread, kept for the next refresh to show until its own comes.
+	if (asked.kind !== "loading" && (kept === null || kept.asked !== asked || kept.threadId !== threadId)) setKept({ threadId, asked });
+	return asked.kind === "loading" && kept !== null && kept.threadId === threadId ? kept.asked : asked;
 }
 
 /** An event's content, asked when the viewer opens it (null: nothing asked). */

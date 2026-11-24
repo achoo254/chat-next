@@ -60,6 +60,8 @@ import { inFolder } from "./projects-view.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { locate, threadStatus } from "./project-tree.ts";
 import { SessionEmpty, SessionLoading } from "./session-scene.tsx";
+import type { RelaunchAction } from "./observatory/observe-empty-state.tsx";
+import { relaunchFactsOf, relaunchSession } from "./observatory/relaunch-session.ts";
 import { useAdvisorScope, useAdvisorSession } from "../advisor/advisor-context.tsx";
 import { advisorStore, useSessionFill } from "../advisor/advisor-store.ts";
 
@@ -237,6 +239,17 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 	useAdvisorSession(machine, threadId);
 	// "Gửi sang phiên": Advisor's pick waits in the composer for the user to send.
 	const fill = useSessionFill(machine, threadId);
+	// Observe's empty view of this thread, and reopening its session so the machine records it (Claude Code only, the AI
+	// Observe watches). A turn in tunelo's own terminal counts as the thread's own, not as a session elsewhere.
+	const observed = thread !== null && observeOffered(state.info, provider) ? relaunchFactsOf(thread, running) : null;
+	const relaunch: RelaunchAction | undefined =
+		observed !== null && thread !== null && online
+			? {
+					kind: observed.kind,
+					...(observed.busy ? { blocked: t.observe.empty.blockedRunning } : {}),
+					run: () => relaunchSession(link, machine, thread),
+				}
+			: undefined;
 	const endTerminal = held
 		? () => {
 				endOnPurpose(machine, thread.terminalSession);
@@ -320,7 +333,16 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 			{mode === "observe" && (
 				<div className="mx-chat-body">
 					<Suspense fallback={<SessionLoading label={t.observe.loading} />}>
-						<LiveMapView link={link} machine={machine} info={state.info} online={online} target={{ kind: "thread", threadId }} focus={observeFocus(search)} />
+						<LiveMapView
+							link={link}
+							machine={machine}
+							info={state.info}
+							online={online}
+							target={{ kind: "thread", threadId }}
+							focus={observeFocus(search)}
+							thread={observed?.thread}
+							relaunch={relaunch}
+						/>
 					</Suspense>
 					{workspacePanel}
 				</div>

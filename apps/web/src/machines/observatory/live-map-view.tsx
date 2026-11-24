@@ -11,11 +11,14 @@
 // the same reducer as live (replay-controller.ts) and the drawer asks its
 // numbers up to that moment. A link goes to the repository's "Hiệu quả" page.
 // The first map opened after the update says the Office tab became Observe
-// (office-replaced-notice.tsx).
+// (office-replaced-notice.tsx). A thread with no recorded session gets its
+// empty view (observe-empty-state.tsx), which may offer to reopen the session
+// so it is recorded from then on; the thread's sessions are then asked again
+// for a while, so the map opens once the machine records the session.
 // Loaded on demand; unmounted (the watch stopped, the renderer destroyed) as
 // soon as the tab is left.
 import type { MachineInfo } from "@achoo254/chat-proto/remote/remote";
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { ServicesContext } from "../../messaging/data/services.tsx";
 import { Link } from "../../router.tsx";
 import { AGENT_LIVE_MAP, versionAtLeast } from "../agent-version.ts";
@@ -27,7 +30,9 @@ import { EventDetail } from "./event-detail.tsx";
 import { coreOf, type LiveMapState } from "./live-map-state.ts";
 import type { LiveMapEvent } from "./live-map-types.ts";
 import { failureText, type ObservatoryLink } from "./observatory-client.ts";
+import { ObserveEmptyState, type ObserveThread, type RelaunchAction } from "./observe-empty-state.tsx";
 import { OfficeReplacedNotice } from "./office-replaced-notice.tsx";
+import type { RelaunchKind } from "./relaunch-session.ts";
 import { LiveMapStage, readHideDetails } from "./render/live-map-stage.tsx";
 import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
 import { ReplayBar } from "./replay-bar.tsx";
@@ -38,6 +43,30 @@ import { useObservatorySession, useThreadSessions } from "./use-observatory-sess
 import { useReplayHistory } from "./use-replay-history.ts";
 import "./live-map-drawer.css";
 import "./station-palette.css";
+
+/** After a reopen, the thread's sessions are asked again this often, this many times (and anew after the thread changes). */
+export const REOPEN_ASK_MS = 5_000;
+export const REOPEN_ASKS = 12;
+
+/**
+ * While `waiting` (the session was reopened and no recorded one has shown),
+ * bumps the refresh every REOPEN_ASK_MS, REOPEN_ASKS times: the machine
+ * records the session at its first hook, up to a minute later. A change of
+ * the thread (`mark`: a message sent, a turn started or ended) starts the
+ * round again.
+ */
+function useRecordedSessionWait(waiting: boolean, mark: string, bump: (change: (n: number) => number) => void): void {
+	useEffect(() => {
+		if (!waiting) return;
+		let asks = 0;
+		const timer = window.setInterval(() => {
+			asks += 1;
+			bump((n) => n + 1);
+			if (asks >= REOPEN_ASKS) window.clearInterval(timer);
+		}, REOPEN_ASK_MS);
+		return () => window.clearInterval(timer);
+	}, [waiting, mark, bump]);
+}
 
 /** Marks the bar draws across the timeline. */
 const BAR_MARKS = 120;
@@ -60,6 +89,10 @@ export interface LiveMapViewProps {
 	readonly target: LiveMapTarget;
 	/** A link's `?at=&event=`: open the session at that moment and event. */
 	readonly focus?: ObserveFocus;
+	/** The thread shown (target `thread`), for its empty view; absent: the view reads it as one with no session yet. */
+	readonly thread?: ObserveThread | undefined;
+	/** Reopening the thread's session so it is recorded, when the page offers it. */
+	readonly relaunch?: RelaunchAction | undefined;
 }
 
 function Note({ text, retry }: { text: string; retry?: (() => void) | undefined }) {
@@ -212,18 +245,28 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 	);
 }
 
-export default function LiveMapView({ link, machine, info, online, target, focus }: LiveMapViewProps) {
+export default function LiveMapView({ link, machine, info, online, target, focus, thread, relaunch }: LiveMapViewProps) {
 	const t = useMachinesCopy().observe;
 	const served = info !== null && versionAtLeast(info.agentVersion, AGENT_LIVE_MAP);
-	const threadSessions = useThreadSessions(link, served && target.kind === "thread" ? target.threadId : null, online);
+	// The thread's session reopened from its empty view (null: not), and the asks of its sessions since.
+	const [reopened, setReopened] = useState<RelaunchKind | null>(null);
+	const [refresh, setRefresh] = useState(0);
+	const threadSessions = useThreadSessions(link, served && target.kind === "thread" ? target.threadId : null, online, refresh);
 	const newest = threadSessions.kind === "done" ? (threadSessions.value[0]?.sessionId ?? null) : null;
+	useRecordedSessionWait(reopened !== null && newest === null, `${thread?.preview ?? ""}\n${String(thread?.running ?? false)}`, setRefresh);
 	const sessionId = !served ? null : target.kind === "session" ? target.sessionId : newest;
 	const watched = useObservatorySession(link, sessionId);
 
 	if (info === null) return online ? <SessionLoading label={t.loading} /> : <Note text={t.offline} />;
 	if (!served) return <Note text={t.needsUpdate} />;
 	if (target.kind === "thread") {
-		if (threadSessions.kind === "done" && newest === null) return <Note text={t.noSession} />;
+		if (threadSessions.kind === "done" && newest === null) {
+			const onReopened = (kind: RelaunchKind): void => {
+				setReopened(kind);
+				setRefresh((n) => n + 1);
+			};
+			return <ObserveEmptyState thread={thread} relaunch={relaunch} reopened={reopened} onReopened={onReopened} />;
+		}
 		if (threadSessions.kind === "failed") return <Note text={failureText(t, threadSessions.failure)} />;
 	}
 	if (watched.failure !== null) {

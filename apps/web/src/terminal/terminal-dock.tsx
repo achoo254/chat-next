@@ -25,6 +25,7 @@ import type { WorkStatus } from "../machines/project-tree.ts";
 import { aiTabTitle } from "../machines/status-glyph.tsx";
 import { Icon } from "../components/screen-icons.tsx";
 import { Link, navigate, paths } from "../router.tsx";
+import { openAiTerminal, OPEN_COLS, OPEN_ROWS } from "./ai-terminal-open.ts";
 import { ImeInput } from "./ime-input.tsx";
 import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
@@ -369,8 +370,8 @@ export function TerminalDock({
 		setNotice("");
 		setFolderGone(false);
 		try {
-			const value = ai && threadId !== undefined ? { cols: 80, rows: 24, cwd: "", aiSession: { threadId } } : { cols: 80, rows: 24, cwd };
-			const frame = await link.request({ case: "termOpen", value });
+			if (ai && threadId !== undefined) return await openAiTerminal(link, threadId);
+			const frame = await link.request({ case: "termOpen", value: { cols: OPEN_COLS, rows: OPEN_ROWS, cwd } });
 			if (frame.body.case !== "termOpened") throw new Error("the machine did not open a terminal");
 			return frame.body.value.session;
 		} catch (err) {

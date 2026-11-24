@@ -59,7 +59,7 @@ describe("the Observe tab", () => {
 		expect(fake.sent[0]).toEqual({ case: "observatorySessionList", value: { limit: 50, threadId: "t1" } });
 		fake.answer({ case: "observatorySessionListResult", value: create(ObservatorySessionListResultSchema, {}) });
 		await flush();
-		expect(screen.getByText(t.noSession)).toBeTruthy();
+		expect(screen.getByText(t.empty.never)).toBeTruthy();
 	});
 
 	it("watches the thread's session, shows its frame and usage link, and stops watching when left", async () => {
