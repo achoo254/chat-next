@@ -332,7 +332,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 											{!hide && tag.workingTarget ? `${tag.working} · ${tag.workingTarget}` : tag.working}
 										</i>
 									)}
-									{tag.detail !== "" && !hide && (
+									{tag.detail !== "" && !hide && tag.working === "" && (
 										<i className="lm-detail" data-id="observe-detail">
 											{tag.detail}
 										</i>
