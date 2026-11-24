@@ -436,7 +436,8 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 							{...chatPhoto(chat, botPeer, isSavedChat(chat, view?.peer ?? peer ?? null))}
 						/>
 					)}
-					<div className="title">
+					{/* The title clicked: to the newest message, as Telegram does (keyboard users have the to-bottom button). */}
+					<div className="title" role="presentation" onClick={() => store.scrollToNewest(chatId)}>
 						<strong>{topic?.title ?? title}</strong>
 						<Subtitle chat={chat} topic={topic} groupTitle={title} />
 					</div>

@@ -304,6 +304,30 @@ describe("the open chat's row clicked again", () => {
 	});
 });
 
+describe("the chat title clicked", () => {
+	afterEach(() => {
+		delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+	});
+
+	it("scrolls the list to the newest message", async () => {
+		const fixture = new ChatFixture();
+		const ngan = fixture.addUser("Ngân");
+		const chat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, ngan]);
+		for (let i = 1; i <= 10; i++) fixture.send(ngan, chat, `tin ${i}`);
+		renderMessaging(fixture, `/c/${chat}`);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		await within(log).findByText("tin 10", {}, LONG);
+
+		layOut(log).scrollTo(0);
+		await screen.findByRole("button", { name: /^Xuống tin mới nhất/ }, LONG);
+
+		const title = document.querySelector<HTMLElement>(".convo-head .title strong");
+		if (title === null) throw new Error("no chat title");
+		await userEvent.click(title);
+		await waitFor(() => expect(log.scrollTop).toBe(500), LONG);
+	});
+});
+
 describe("forum topics", () => {
 	it("reads each topic on its own", async () => {
 		const fixture = new ChatFixture();
