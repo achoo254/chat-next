@@ -19,6 +19,70 @@
 	},
 	"scene": "live-map-scene.cacc80c3.json",
 	"sceneMeasuredOn": "concept-04",
-	"atlases": [],
-	"sprites": {}
+	"atlases": [
+		{
+			"name": "core",
+			"sheet": "observatory-core.ead07f5e.json",
+			"image": "observatory-core.7ef6d22f.webp",
+			"width": 1564,
+			"height": 696,
+			"sprites": [
+				"core-error",
+				"core-full",
+				"core-idle",
+				"core-thinking",
+				"core-ring",
+				"glow"
+			]
+		},
+		{
+			"name": "actors",
+			"sheet": "observatory-actors.040159c4.json",
+			"image": "observatory-actors.5ecc7888.webp",
+			"width": 1999,
+			"height": 533,
+			"sprites": [
+				"gate-closed",
+				"gate-open",
+				"cloud-flicker",
+				"user-at-desk",
+				"branch-new",
+				"rocket",
+				"shield",
+				"cross",
+				"drone-carry",
+				"check",
+				"drone-fly",
+				"scroll",
+				"document",
+				"box",
+				"jar-glow",
+				"envelope"
+			]
+		}
+	],
+	"sprites": {
+		"core-error": "core",
+		"core-full": "core",
+		"core-idle": "core",
+		"core-thinking": "core",
+		"core-ring": "core",
+		"glow": "core",
+		"gate-closed": "actors",
+		"gate-open": "actors",
+		"cloud-flicker": "actors",
+		"user-at-desk": "actors",
+		"branch-new": "actors",
+		"rocket": "actors",
+		"shield": "actors",
+		"cross": "actors",
+		"drone-carry": "actors",
+		"check": "actors",
+		"drone-fly": "actors",
+		"scroll": "actors",
+		"document": "actors",
+		"box": "actors",
+		"jar-glow": "actors",
+		"envelope": "actors"
+	}
 }

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
 import { CORE_SPIN_IDLE_MS } from "../../src/machines/observatory/render/prop-map.ts";
 import { prompt, tool } from "../machines/observatory/live-map-fixtures.ts";
-import { played, shippedAssets } from "./render-fixtures.ts";
+import { played, readJson, shippedAssets } from "./render-fixtures.ts";
 
 const pixi = vi.hoisted(() => {
 	const record = {
@@ -63,7 +63,14 @@ const pixi = vi.hoisted(() => {
 			record.destroyed.push(args);
 		}
 	}
-	return { record, Container, Sprite, Application, Graphics: function Graphics() { return chain(); }, Texture: { from: () => ({}) }, Spritesheet: function Spritesheet() {} };
+	return { record, Container, Sprite, Application, Graphics: function Graphics() { return chain(); }, Texture: { from: () => ({}) }, Spritesheet: class Spritesheet {
+		textures: Record<string, object> = {};
+		constructor(_texture: unknown, public data: { frames: Record<string, unknown> }) {}
+		destroy() {}
+		async parse() {
+			for (const name of Object.keys(this.data.frames)) this.textures[name] = {};
+		}
+	} };
 });
 
 vi.mock("pixi.js/unsafe-eval", () => ({}));
@@ -102,6 +109,8 @@ beforeEach(() => {
 	});
 	vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.queue.delete(id));
 	vi.stubGlobal("devicePixelRatio", 3);
+	// The atlases' spritesheet files are served from the shipped folder, as the page's server does.
+	vi.stubGlobal("fetch", async (url: string) => ({ ok: true, status: 200, json: async () => readJson(url.replace("/observatory/", "")) }));
 	// jsdom has no image decoding; this file's environment is its own.
 	HTMLImageElement.prototype.decode = () => Promise.resolve();
 	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
