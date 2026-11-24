@@ -48,5 +48,5 @@ export function isBlocked(conn: Conn): conn is Extract<Conn, { kind: "blocked" }
 
 /** The machine can answer but its session list has not arrived yet: a screen must show a skeleton, not "nothing" or the first steps. */
 export function isListLoading(m: { readonly conn: Conn; readonly state: Pick<LinkState, "listed"> }): boolean {
-	return m.conn.kind === "connecting" || (m.conn.kind === "on" && !m.state.listed);
+	return m.conn.kind === "connecting" || m.conn.kind === "retrying" || (m.conn.kind === "on" && !m.state.listed);
 }
